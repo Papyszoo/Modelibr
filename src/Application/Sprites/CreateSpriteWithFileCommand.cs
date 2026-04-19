@@ -1,6 +1,7 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Files;
+using Application.Models;
 using Application.Services;
 using Domain.Models;
 using Domain.Services;
@@ -15,6 +16,7 @@ internal class CreateSpriteWithFileCommandHandler : ICommandHandler<CreateSprite
     private readonly ISpriteCategoryRepository _spriteCategoryRepository;
     private readonly IBatchUploadRepository _batchUploadRepository;
     private readonly IFileCreationService _fileCreationService;
+    private readonly ISettingRepository _settingRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
 
     public CreateSpriteWithFileCommandHandler(
@@ -22,12 +24,14 @@ internal class CreateSpriteWithFileCommandHandler : ICommandHandler<CreateSprite
         ISpriteCategoryRepository spriteCategoryRepository,
         IBatchUploadRepository batchUploadRepository,
         IFileCreationService fileCreationService,
+        ISettingRepository settingRepository,
         IDateTimeProvider dateTimeProvider)
     {
         _spriteRepository = spriteRepository;
         _spriteCategoryRepository = spriteCategoryRepository;
         _batchUploadRepository = batchUploadRepository;
         _fileCreationService = fileCreationService;
+        _settingRepository = settingRepository;
         _dateTimeProvider = dateTimeProvider;
     }
 
@@ -94,9 +98,18 @@ internal class CreateSpriteWithFileCommandHandler : ICommandHandler<CreateSprite
                 }
             }
 
-            // 4. Create new sprite
+            // 4. Resolve name collision based on DuplicateNamePolicy setting
+            var nameResult = await AssetNameService.ResolveNameAsync(
+                command.Name, "Sprite",
+                _spriteRepository.ExistsByNameAsync,
+                _spriteRepository.GetNamesByPrefixAsync,
+                _settingRepository, cancellationToken);
+            if (nameResult.IsFailure)
+                return Result.Failure<CreateSpriteWithFileResponse>(nameResult.Error);
+
+            // 5. Create new sprite with resolved name
             var sprite = Sprite.Create(
-                command.Name,
+                nameResult.Value,
                 file,
                 command.SpriteType,
                 _dateTimeProvider.UtcNow,
@@ -104,7 +117,7 @@ internal class CreateSpriteWithFileCommandHandler : ICommandHandler<CreateSprite
 
             var createdSprite = await _spriteRepository.AddAsync(sprite, cancellationToken);
 
-            // 5. Track batch upload if batchId provided
+            // 6. Track batch upload if batchId provided
             if (!string.IsNullOrWhiteSpace(command.BatchId))
             {
                 var batchUpload = BatchUpload.Create(

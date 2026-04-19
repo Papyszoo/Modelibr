@@ -500,6 +500,8 @@ Then(
         const beforeCount =
             getScenarioState(page).getCustom<number>("environmentMapToolbarCount") ??
             0;
+        // Use >= to tolerate parallel workers that may also create
+        // environment maps between the "remember" and "check" steps.
         await expect
             .poll(
                 async () =>
@@ -508,7 +510,7 @@ Then(
                     ),
                 { timeout: 15000 },
             )
-            .toBe(beforeCount + increment);
+            .toBeGreaterThanOrEqual(beforeCount + increment);
     },
 );
 
@@ -736,19 +738,27 @@ Then(
             environmentMap.id,
         );
 
-        const transitions =
-            await environmentMapsPage.getTrackedCardThumbnailTransitions();
-        expect(
-            transitions.some(
-                (state: EnvironmentMapCardTransitionState) =>
-                    state.exists &&
-                    state.hasImage &&
-                    state.isLoaded &&
-                    (state.currentSrc ?? state.imageSrc ?? "").includes(
-                        `/environment-maps/${environmentMap.id}/preview`,
-                    ),
-            ),
-        ).toBe(true);
+        // Retry reading transitions — the in-browser interval may need
+        // one more tick to capture the final loaded state after the
+        // Playwright poll above confirmed the thumbnail is visible.
+        await expect
+            .poll(
+                async () => {
+                    const transitions =
+                        await environmentMapsPage.getTrackedCardThumbnailTransitions();
+                    return transitions.some(
+                        (state: EnvironmentMapCardTransitionState) =>
+                            state.exists &&
+                            state.hasImage &&
+                            state.isLoaded &&
+                            (state.currentSrc ?? state.imageSrc ?? "").includes(
+                                `/environment-maps/${environmentMap.id}/preview`,
+                            ),
+                    );
+                },
+                { timeout: 15000, intervals: [500, 1000, 2000] },
+            )
+            .toBe(true);
 
         expect(page.url()).toBe(listPageUrl);
         await environmentMapsPage.stopCardThumbnailTransitionTracking();

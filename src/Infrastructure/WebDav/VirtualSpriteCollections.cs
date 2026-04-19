@@ -112,14 +112,14 @@ public sealed class VirtualSpriteCategoryCollection : VirtualCollectionBase
         if (_itemPropertyManager == null || _pathProvider == null)
             return Task.FromResult<IStoreItem?>(null);
 
-        var sprite = _sprites.FirstOrDefault(s => s.File.OriginalFileName == name);
+        var sprite = _sprites.FirstOrDefault(s => WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName) == name);
         if (sprite == null)
             return Task.FromResult<IStoreItem?>(null);
 
         return Task.FromResult<IStoreItem?>(new VirtualAssetFile(
             _itemPropertyManager,
             LockingManager,
-            sprite.File.OriginalFileName,
+            WebDavUtilities.GetVirtualFileName(sprite.Name, sprite.File.OriginalFileName),
             sprite.File.Sha256Hash,
             sprite.File.SizeBytes,
             sprite.File.MimeType,
@@ -136,7 +136,7 @@ public sealed class VirtualSpriteCategoryCollection : VirtualCollectionBase
         var items = _sprites.Select(s => (IStoreItem)new VirtualAssetFile(
             _itemPropertyManager,
             LockingManager,
-            s.File.OriginalFileName,
+            WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName),
             s.File.Sha256Hash,
             s.File.SizeBytes,
             s.File.MimeType,
@@ -177,14 +177,14 @@ public sealed class VirtualUnassignedSpritesCollection : VirtualCollectionBase
         if (_itemPropertyManager == null || _pathProvider == null)
             return Task.FromResult<IStoreItem?>(null);
 
-        var sprite = _sprites.FirstOrDefault(s => s.File.OriginalFileName == name);
+        var sprite = _sprites.FirstOrDefault(s => WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName) == name);
         if (sprite == null)
             return Task.FromResult<IStoreItem?>(null);
 
         return Task.FromResult<IStoreItem?>(new VirtualAssetFile(
             _itemPropertyManager,
             LockingManager,
-            sprite.File.OriginalFileName,
+            WebDavUtilities.GetVirtualFileName(sprite.Name, sprite.File.OriginalFileName),
             sprite.File.Sha256Hash,
             sprite.File.SizeBytes,
             sprite.File.MimeType,
@@ -201,7 +201,7 @@ public sealed class VirtualUnassignedSpritesCollection : VirtualCollectionBase
         var items = _sprites.Select(s => (IStoreItem)new VirtualAssetFile(
             _itemPropertyManager,
             LockingManager,
-            s.File.OriginalFileName,
+            WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName),
             s.File.Sha256Hash,
             s.File.SizeBytes,
             s.File.MimeType,

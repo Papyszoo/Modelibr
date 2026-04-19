@@ -18,6 +18,7 @@ namespace Application.Models
         private readonly IDateTimeProvider _dateTimeProvider;
         private readonly IDomainEventDispatcher _domainEventDispatcher;
         private readonly IBatchUploadRepository _batchUploadRepository;
+        private readonly ISettingRepository _settingRepository;
 
         public AddModelCommandHandler(
             IModelRepository modelRepository,
@@ -25,7 +26,8 @@ namespace Application.Models
             IFileCreationService fileCreationService,
             IDateTimeProvider dateTimeProvider,
             IDomainEventDispatcher domainEventDispatcher,
-            IBatchUploadRepository batchUploadRepository)
+            IBatchUploadRepository batchUploadRepository,
+            ISettingRepository settingRepository)
         {
             _modelRepository = modelRepository;
             _versionRepository = versionRepository;
@@ -33,6 +35,7 @@ namespace Application.Models
             _dateTimeProvider = dateTimeProvider;
             _domainEventDispatcher = domainEventDispatcher;
             _batchUploadRepository = batchUploadRepository;
+            _settingRepository = settingRepository;
         }
 
         public async Task<Result<AddModelCommandResponse>> Handle(AddModelCommand command, CancellationToken cancellationToken)
@@ -85,6 +88,17 @@ namespace Application.Models
             // Create new model
             var modelName = command.ModelName ?? 
                            Path.GetFileNameWithoutExtension(command.File.FileName);
+
+            // Resolve name collision based on DuplicateNamePolicy setting
+            var nameResult = await AssetNameService.ResolveNameAsync(
+                modelName, "Model",
+                _modelRepository.ExistsByNameAsync,
+                _modelRepository.GetNamesByPrefixAsync,
+                _settingRepository, cancellationToken);
+            if (nameResult.IsFailure)
+                return Result.Failure<AddModelCommandResponse>(nameResult.Error);
+
+            modelName = nameResult.Value;
 
             try
             {

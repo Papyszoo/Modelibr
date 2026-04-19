@@ -133,4 +133,22 @@ public class SettingValidatorTests
         // Assert
         Assert.True(result.IsSuccess);
     }
+
+    [Theory]
+    [InlineData("Reject", true)]
+    [InlineData("AutoRename", true)]
+    [InlineData("reject", false)]
+    [InlineData("autorename", false)]
+    [InlineData("REJECT", false)]
+    [InlineData("invalid", false)]
+    [InlineData("true", false)]
+    [InlineData("false", false)]
+    public void ValidateSetting_ModelDuplicateNamePolicy_ValidatesCorrectly(string value, bool shouldSucceed)
+    {
+        // Act
+        var result = SettingValidator.ValidateSetting(SettingKeys.DuplicateNamePolicy, value);
+
+        // Assert
+        Assert.Equal(shouldSucceed, result.IsSuccess);
+    }
 }

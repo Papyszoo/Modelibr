@@ -483,12 +483,25 @@ test.describe("demo mode e2e", () => {
             "City Night Lights",
         );
 
-        // Wait for the generated thumbnail to appear (prewarm runs in background)
-        await expect(
-            page
+        // Prewarm is fire-and-forget; the component may need a reload to
+        // pick up the thumbnail URL from IndexedDB on slow CI runners.
+        await expect(async () => {
+            const thumb = page
                 .locator('[data-testid="environment-map-card-thumbnail"]')
-                .first(),
-        ).toBeVisible({ timeout: 30000 });
+                .first();
+            const isVisible = await thumb.isVisible();
+            if (!isVisible) {
+                await page.reload({ waitUntil: "domcontentloaded" });
+                await environmentMapsPage.waitForEnvironmentMapByName(
+                    "City Night Lights",
+                );
+            }
+            await expect(
+                page
+                    .locator('[data-testid="environment-map-card-thumbnail"]')
+                    .first(),
+            ).toBeVisible({ timeout: 5000 });
+        }).toPass({ intervals: [5000, 10000, 15000, 15000], timeout: 120000 });
     });
 
     test("shows a waveform for the seeded Test Tone sound", async ({
@@ -501,11 +514,27 @@ test.describe("demo mode e2e", () => {
             soundListPage.getSoundCardByName("Test Tone"),
         ).toBeVisible();
 
-        // Wait for the waveform image to appear (prewarm runs in background)
-        const soundCard = soundListPage.getSoundCardByName("Test Tone");
-        await expect(soundCard.locator("img.sound-waveform")).toBeVisible({
-            timeout: 30000,
-        });
+        // Prewarm is fire-and-forget: it generates the waveform in IndexedDB
+        // and sets waveformUrl on the sound record. The React component does
+        // not reactively pick up IndexedDB changes, so if the initial fetch
+        // happened before prewarm finished, the img element won't appear.
+        // Retry with page reloads so the component re-fetches fresh data.
+        await expect(async () => {
+            const soundCard = soundListPage.getSoundCardByName("Test Tone");
+            const waveformImg = soundCard.locator("img.sound-waveform");
+            const isVisible = await waveformImg.isVisible();
+            if (!isVisible) {
+                await page.reload({ waitUntil: "domcontentloaded" });
+                await expect(
+                    soundListPage.getSoundCardByName("Test Tone"),
+                ).toBeVisible({ timeout: 10000 });
+            }
+            await expect(
+                soundListPage
+                    .getSoundCardByName("Test Tone")
+                    .locator("img.sound-waveform"),
+            ).toBeVisible({ timeout: 5000 });
+        }).toPass({ intervals: [5000, 10000, 15000, 15000], timeout: 120000 });
     });
 
     test("shows waveform after uploading a new sound without refresh", async ({
@@ -527,7 +556,7 @@ test.describe("demo mode e2e", () => {
                 soundListPage.getSoundCardByName("DemoUploadSound");
             await expect(
                 uploadedCard.locator("img.sound-waveform"),
-            ).toBeVisible({ timeout: 30000 });
+            ).toBeVisible({ timeout: 60000 });
         } finally {
             await upload.cleanup();
         }

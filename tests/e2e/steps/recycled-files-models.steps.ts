@@ -54,11 +54,21 @@ GivenBdd(
         expect(uploadResponse.ok()).toBe(true);
         const uploadData = await uploadResponse.json();
         recycleTracker.modelId = uploadData.id;
-        recycleTracker.modelName = "test-cube";
+
+        // Fetch actual model name from API (may differ from filename under AutoRename policy)
+        const modelDetailResponse = await page.request.get(
+            `${API_BASE_URL}/models/${uploadData.id}`,
+        );
+        expect(modelDetailResponse.ok()).toBe(true);
+        const modelDetail = await modelDetailResponse.json();
+        recycleTracker.modelName = modelDetail.name || "test-cube";
         // Track by alias for multi-model scenarios
-        modelsByAlias.set(modelName, { id: uploadData.id, name: "test-cube" });
+        modelsByAlias.set(modelName, {
+            id: uploadData.id,
+            name: recycleTracker.modelName,
+        });
         console.log(
-            `[Setup] Uploaded model for "${modelName}" (ID: ${recycleTracker.modelId})`,
+            `[Setup] Uploaded model for "${modelName}" as "${recycleTracker.modelName}" (ID: ${recycleTracker.modelId})`,
         );
 
         // Soft-delete via API to ensure we recycle the exact model we uploaded
@@ -100,10 +110,20 @@ GivenBdd(
         expect(uploadResponse.ok()).toBe(true);
         const uploadData = await uploadResponse.json();
         recycleTracker.modelId = uploadData.id;
-        recycleTracker.modelName = "test-cube";
-        modelsByAlias.set(modelName, { id: uploadData.id, name: "test-cube" });
+
+        // Fetch actual model name from API (may differ from filename under AutoRename policy)
+        const modelDetailResponse = await page.request.get(
+            `${API_BASE_URL}/models/${uploadData.id}`,
+        );
+        expect(modelDetailResponse.ok()).toBe(true);
+        const modelDetail = await modelDetailResponse.json();
+        recycleTracker.modelName = modelDetail.name || "test-cube";
+        modelsByAlias.set(modelName, {
+            id: uploadData.id,
+            name: recycleTracker.modelName,
+        });
         console.log(
-            `[Setup] Uploaded model for "${modelName}" (ID: ${recycleTracker.modelId}, not yet recycled)`,
+            `[Setup] Uploaded model for "${modelName}" as "${recycleTracker.modelName}" (ID: ${recycleTracker.modelId}, not yet recycled)`,
         );
     },
 );

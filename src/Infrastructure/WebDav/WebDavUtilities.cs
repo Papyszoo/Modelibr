@@ -15,4 +15,14 @@ internal static class WebDavUtilities
         var dotIndex = fileName.LastIndexOf('.');
         return dotIndex >= 0 ? fileName[(dotIndex + 1)..] : "";
     }
+
+    /// <summary>
+    /// Builds a virtual filename from an asset's Name and the extension of its stored file.
+    /// Used so that WebDAV listings reflect the unique asset name rather than the original upload filename.
+    /// </summary>
+    public static string GetVirtualFileName(string assetName, string originalFileName)
+    {
+        var ext = GetExtension(originalFileName);
+        return string.IsNullOrEmpty(ext) ? assetName : $"{assetName}.{ext}";
+    }
 }

@@ -19,6 +19,7 @@ import {
   installBlender,
   probeWebDavUrl,
   uninstallBlender,
+  updateSetting,
   updateSettings,
 } from '@/features/settings/api/settingsApi'
 import { useTheme } from '@/hooks/useTheme'
@@ -80,10 +81,16 @@ export function Settings(): JSX.Element {
   const [webDavInstructionsExpanded, setWebDavInstructionsExpanded] =
     useState(false)
 
-  // Accordion state — in demo mode sections 4 (Blender), 5 (SSL), 6 (WebDAV) stay collapsed
+  // Accordion state — in demo mode sections 5 (Blender), 6 (SSL), 7 (WebDAV) stay collapsed
   const [activeIndex, setActiveIndex] = useState<number | number[]>(
-    isDemo ? [0, 1, 2, 3] : [0, 1, 2, 3, 4, 5, 6]
+    isDemo ? [0, 1, 2, 3, 4] : [0, 1, 2, 3, 4, 5, 6, 7]
   )
+
+  // Model duplicate name policy state
+  const [duplicateNamePolicy, setDuplicateNamePolicy] =
+    useState<string>('Reject')
+  const [duplicateNamePolicySaving, setDuplicateNamePolicySaving] =
+    useState(false)
 
   const {
     register,
@@ -214,6 +221,8 @@ export function Settings(): JSX.Element {
       generateThumbnailOnUpload: data.generateThumbnailOnUpload ?? true,
       textureProxySize: data.textureProxySize ?? 512,
     })
+
+    setDuplicateNamePolicy(data.duplicateNamePolicy ?? 'Reject')
   }, [settingsQuery.data, reset])
 
   const handleSave = async (values: SettingsFormOutput) => {
@@ -347,6 +356,28 @@ export function Settings(): JSX.Element {
       setError(
         err instanceof Error ? err.message : 'Failed to start installation'
       )
+    }
+  }
+
+  // ── Model duplicate name policy ──────────────────────────────────────
+
+  const handleDuplicateNamePolicyChange = async (
+    newPolicy: string
+  ): Promise<void> => {
+    if (isDemo) return
+    setDuplicateNamePolicySaving(true)
+    try {
+      await updateSetting('DuplicateNamePolicy', newPolicy)
+      setDuplicateNamePolicy(newPolicy)
+      await queryClient.invalidateQueries({ queryKey: ['settings'] })
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Failed to update duplicate name policy'
+      )
+    } finally {
+      setDuplicateNamePolicySaving(false)
     }
   }
 
@@ -792,11 +823,11 @@ export function Settings(): JSX.Element {
             )}
           </div>
 
+          {/* ── Upload Behavior ────────────────────────────────── */}
           <div className="settings-section">
             <div
-              className={`settings-section-header${isDemo ? ' settings-section-header--locked' : ''}`}
-              onClick={() => {
-                if (isDemo) return
+              className="settings-section-header"
+              onClick={() =>
                 setActiveIndex(prev =>
                   Array.isArray(prev)
                     ? prev.includes(4)
@@ -804,12 +835,70 @@ export function Settings(): JSX.Element {
                       : [...prev, 4]
                     : [4]
                 )
+              }
+            >
+              <span>
+                {Array.isArray(activeIndex) && activeIndex.includes(4)
+                  ? '▼'
+                  : '▶'}{' '}
+                Upload Behavior
+              </span>
+            </div>
+            {Array.isArray(activeIndex) && activeIndex.includes(4) && (
+              <div className="settings-section-content">
+                <div className="settings-field">
+                  <label htmlFor="duplicateNamePolicy">
+                    Duplicate Name Policy
+                  </label>
+                  <select
+                    id="duplicateNamePolicy"
+                    value={duplicateNamePolicy}
+                    onChange={e =>
+                      void handleDuplicateNamePolicyChange(e.target.value)
+                    }
+                    disabled={duplicateNamePolicySaving || isDemo}
+                    className="settings-select"
+                  >
+                    <option value="Reject">Reject duplicate names</option>
+                    <option value="AutoRename">
+                      Auto-rename duplicates (e.g. Chair → Chair (2))
+                    </option>
+                  </select>
+                  <span className="settings-help">
+                    Controls what happens when uploading an asset with a name
+                    that already exists. Applies to all asset types (models,
+                    sprites, sounds, texture sets, environment maps).{' '}
+                    <strong>Reject</strong> blocks the upload and returns an
+                    error. <strong>Auto-rename</strong> appends a number suffix
+                    to make the name unique, similar to how Windows handles
+                    duplicate filenames.
+                  </span>
+                  <span className="settings-default">
+                    Default: Reject duplicate names
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="settings-section">
+            <div
+              className={`settings-section-header${isDemo ? ' settings-section-header--locked' : ''}`}
+              onClick={() => {
+                if (isDemo) return
+                setActiveIndex(prev =>
+                  Array.isArray(prev)
+                    ? prev.includes(5)
+                      ? prev.filter(i => i !== 5)
+                      : [...prev, 5]
+                    : [5]
+                )
               }}
             >
               <span>
                 {isDemo
                   ? '🔒'
-                  : Array.isArray(activeIndex) && activeIndex.includes(4)
+                  : Array.isArray(activeIndex) && activeIndex.includes(5)
                     ? '▼'
                     : '▶'}{' '}
                 Blender Settings
@@ -820,7 +909,7 @@ export function Settings(): JSX.Element {
                 </span>
               )}
             </div>
-            {Array.isArray(activeIndex) && activeIndex.includes(4) && (
+            {Array.isArray(activeIndex) && activeIndex.includes(5) && (
               <div className="settings-section-content">
                 {/* Collapsible Info Box */}
                 <div className="settings-field">
@@ -987,17 +1076,17 @@ export function Settings(): JSX.Element {
                 if (isDemo) return
                 setActiveIndex(prev =>
                   Array.isArray(prev)
-                    ? prev.includes(5)
-                      ? prev.filter(i => i !== 5)
-                      : [...prev, 5]
-                    : [5]
+                    ? prev.includes(6)
+                      ? prev.filter(i => i !== 6)
+                      : [...prev, 6]
+                    : [6]
                 )
               }}
             >
               <span>
                 {isDemo
                   ? '🔒'
-                  : Array.isArray(activeIndex) && activeIndex.includes(5)
+                  : Array.isArray(activeIndex) && activeIndex.includes(6)
                     ? '▼'
                     : '▶'}{' '}
                 SSL Certificate
@@ -1008,7 +1097,7 @@ export function Settings(): JSX.Element {
                 </span>
               )}
             </div>
-            {Array.isArray(activeIndex) && activeIndex.includes(5) && (
+            {Array.isArray(activeIndex) && activeIndex.includes(6) && (
               <div className="settings-section-content">
                 <div className="settings-field">
                   {(() => {
@@ -1085,17 +1174,17 @@ export function Settings(): JSX.Element {
                 if (isDemo) return
                 setActiveIndex(prev =>
                   Array.isArray(prev)
-                    ? prev.includes(6)
-                      ? prev.filter(i => i !== 6)
-                      : [...prev, 6]
-                    : [6]
+                    ? prev.includes(7)
+                      ? prev.filter(i => i !== 7)
+                      : [...prev, 7]
+                    : [7]
                 )
               }}
             >
               <span>
                 {isDemo
                   ? '🔒'
-                  : Array.isArray(activeIndex) && activeIndex.includes(6)
+                  : Array.isArray(activeIndex) && activeIndex.includes(7)
                     ? '▼'
                     : '▶'}{' '}
                 WebDAV
@@ -1106,7 +1195,7 @@ export function Settings(): JSX.Element {
                 </span>
               )}
             </div>
-            {Array.isArray(activeIndex) && activeIndex.includes(6) && (
+            {Array.isArray(activeIndex) && activeIndex.includes(7) && (
               <div className="settings-section-content">
                 {/* WebDAV connectivity status */}
                 <div className="settings-field">

@@ -633,6 +633,14 @@ public class WebDavMiddleware
 
             if (result.IsFailure)
             {
+                if (result.Error.Code == "ModelNameAlreadyExists")
+                {
+                    _logger.LogWarning("WebDAV .blend PUT rejected: {Error}", result.Error.Message);
+                    context.Response.StatusCode = 409; // Conflict
+                    await context.Response.WriteAsync(result.Error.Message);
+                    return;
+                }
+
                 _logger.LogError("Failed to create model from .blend: {Error}", result.Error.Message);
                 context.Response.StatusCode = 500;
                 await context.Response.WriteAsync(result.Error.Message);
