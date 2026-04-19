@@ -179,6 +179,11 @@ public static class ModelEndpoints
 
         if (result.IsFailure)
         {
+            if (result.Error.Code == "ModelNameAlreadyExists")
+            {
+                return Results.Conflict(new { error = result.Error.Code, message = result.Error.Message });
+            }
+
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }
 

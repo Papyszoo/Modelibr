@@ -113,14 +113,14 @@ public sealed class VirtualSoundCategoryCollection : VirtualCollectionBase
         if (_itemPropertyManager == null || _pathProvider == null)
             return Task.FromResult<IStoreItem?>(null);
 
-        var sound = _sounds.FirstOrDefault(s => s.File.OriginalFileName == name);
+        var sound = _sounds.FirstOrDefault(s => WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName) == name);
         if (sound == null)
             return Task.FromResult<IStoreItem?>(null);
 
         return Task.FromResult<IStoreItem?>(new VirtualAssetFile(
             _itemPropertyManager,
             LockingManager,
-            sound.File.OriginalFileName,
+            WebDavUtilities.GetVirtualFileName(sound.Name, sound.File.OriginalFileName),
             sound.File.Sha256Hash,
             sound.File.SizeBytes,
             sound.File.MimeType,
@@ -137,7 +137,7 @@ public sealed class VirtualSoundCategoryCollection : VirtualCollectionBase
         var items = _sounds.Select(s => (IStoreItem)new VirtualAssetFile(
             _itemPropertyManager,
             LockingManager,
-            s.File.OriginalFileName,
+            WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName),
             s.File.Sha256Hash,
             s.File.SizeBytes,
             s.File.MimeType,
@@ -178,14 +178,14 @@ public sealed class VirtualUnassignedSoundsCollection : VirtualCollectionBase
         if (_itemPropertyManager == null || _pathProvider == null)
             return Task.FromResult<IStoreItem?>(null);
 
-        var sound = _sounds.FirstOrDefault(s => s.File.OriginalFileName == name);
+        var sound = _sounds.FirstOrDefault(s => WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName) == name);
         if (sound == null)
             return Task.FromResult<IStoreItem?>(null);
 
         return Task.FromResult<IStoreItem?>(new VirtualAssetFile(
             _itemPropertyManager,
             LockingManager,
-            sound.File.OriginalFileName,
+            WebDavUtilities.GetVirtualFileName(sound.Name, sound.File.OriginalFileName),
             sound.File.Sha256Hash,
             sound.File.SizeBytes,
             sound.File.MimeType,
@@ -202,7 +202,7 @@ public sealed class VirtualUnassignedSoundsCollection : VirtualCollectionBase
         var items = _sounds.Select(s => (IStoreItem)new VirtualAssetFile(
             _itemPropertyManager,
             LockingManager,
-            s.File.OriginalFileName,
+            WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName),
             s.File.Sha256Hash,
             s.File.SizeBytes,
             s.File.MimeType,

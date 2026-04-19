@@ -2,6 +2,7 @@ using Application.Abstractions.Files;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
+using Application.Models;
 using Application.Services;
 using Domain.Models;
 using Domain.Services;
@@ -15,6 +16,7 @@ internal sealed class CreateEnvironmentMapWithFileCommandHandler : ICommandHandl
     private readonly IBatchUploadRepository _batchUploadRepository;
     private readonly IFileCreationService _fileCreationService;
     private readonly IEnvironmentMapSizeLabelService _sizeLabelService;
+    private readonly ISettingRepository _settingRepository;
     private readonly IThumbnailQueue _thumbnailQueue;
     private readonly IDateTimeProvider _dateTimeProvider;
 
@@ -23,6 +25,7 @@ internal sealed class CreateEnvironmentMapWithFileCommandHandler : ICommandHandl
         IBatchUploadRepository batchUploadRepository,
         IFileCreationService fileCreationService,
         IEnvironmentMapSizeLabelService sizeLabelService,
+        ISettingRepository settingRepository,
         IThumbnailQueue thumbnailQueue,
         IDateTimeProvider dateTimeProvider)
     {
@@ -30,6 +33,7 @@ internal sealed class CreateEnvironmentMapWithFileCommandHandler : ICommandHandl
         _batchUploadRepository = batchUploadRepository;
         _fileCreationService = fileCreationService;
         _sizeLabelService = sizeLabelService;
+        _settingRepository = settingRepository;
         _thumbnailQueue = thumbnailQueue;
         _dateTimeProvider = dateTimeProvider;
     }
@@ -94,7 +98,16 @@ internal sealed class CreateEnvironmentMapWithFileCommandHandler : ICommandHandl
             if (sizeLabelResult.IsFailure)
                 return Result.Failure<CreateEnvironmentMapWithFileResponse>(sizeLabelResult.Error);
 
-            var environmentMap = EnvironmentMap.Create(command.Name, now);
+            // Resolve name collision based on DuplicateNamePolicy setting
+            var nameResult = await AssetNameService.ResolveNameAsync(
+                command.Name, "EnvironmentMap",
+                _environmentMapRepository.ExistsByNameAsync,
+                _environmentMapRepository.GetNamesByPrefixAsync,
+                _settingRepository, cancellationToken);
+            if (nameResult.IsFailure)
+                return Result.Failure<CreateEnvironmentMapWithFileResponse>(nameResult.Error);
+
+            var environmentMap = EnvironmentMap.Create(nameResult.Value, now);
             var variant = resolvedFiles.CreateVariant(sizeLabelResult.Value, now);
             environmentMap.AddVariant(variant, now);
 

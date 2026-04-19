@@ -11,6 +11,7 @@ export async function getSettings(): Promise<{
   textureProxySize: number
   blenderPath: string
   blenderEnabled: boolean
+  duplicateNamePolicy: string
   createdAt: string
   updatedAt: string
 }> {
@@ -111,6 +112,16 @@ export async function probeWebDavUrl(
 ): Promise<{ reachable: boolean; folderCount: number; error?: string }> {
   const response = await client.get('/settings/webdav/probe', {
     params: { url },
+  })
+  return response.data
+}
+
+export async function updateSetting(
+  key: string,
+  value: string
+): Promise<{ key: string; value: string; updatedAt: string }> {
+  const response = await client.put(`/settings/${encodeURIComponent(key)}`, {
+    value,
   })
   return response.data
 }

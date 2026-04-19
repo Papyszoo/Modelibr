@@ -15,10 +15,16 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const { Given, When, Then } = createBdd();
+const { Given, When, Then, After } = createBdd();
 
 const ASSETS_DIR = path.join(__dirname, "..", "assets");
 const api = new ApiHelper();
+
+// Restore AutoRename policy after duplicate-name scenarios to prevent poisoning later tests
+After({ tags: "@blend-duplicate-reject or @blend-duplicate-autorename or @blend-duplicate-rest-reject" }, async () => {
+    await api.updateSetting("DuplicateNamePolicy", "AutoRename");
+    console.log("[Cleanup] Restored DuplicateNamePolicy to AutoRename");
+});
 
 const BLENDER_VERSION = "5.1.0";
 let blenderInstallVerified = false;
@@ -679,5 +685,98 @@ When(
             `[Blend B5] MOVE temp file returned status=${result.status}`,
         );
         expect(result.status).toBe(204);
+    },
+);
+
+// ── Duplicate name policy steps ──────────────────────────────────────
+
+Given(
+    "any model named {string} is cleaned up",
+    async ({}, modelName: string) => {
+        await api.softDeleteModelsByName(modelName);
+        console.log(`[Cleanup] Soft-deleted any model named "${modelName}"`);
+    },
+);
+
+Given(
+    "the DuplicateNamePolicy setting is {string}",
+    async ({}, policy: string) => {
+        const result = await api.updateSetting(
+            "DuplicateNamePolicy",
+            policy,
+        );
+        expect(result.status).toBe(200);
+        console.log(
+            `[Settings] Set DuplicateNamePolicy to "${policy}" (status=${result.status})`,
+        );
+    },
+);
+
+When(
+    "I upload {string} as a new model {string} via WebDAV PUT expecting duplicate",
+    async ({ page }, blendFile: string, modelName: string) => {
+        // Do NOT delete the existing model — we want to test duplicate behavior
+        const filePath = await UniqueFileGenerator.generate(blendFile);
+        const result = await api.createModelViaWebDavBlend(filePath, modelName);
+        updateBlendContext(page, {
+            webdavPutStatus: result.status,
+            modelName,
+        });
+        console.log(
+            `[Blend Dup] WebDAV PUT for duplicate "${modelName}" returned status=${result.status}`,
+        );
+    },
+);
+
+Then(
+    "the WebDAV PUT should have returned HTTP {int}",
+    async ({ page }, expectedStatus: number) => {
+        const ctx = getBlendContext(page);
+        expect(ctx.webdavPutStatus).toBe(expectedStatus);
+        console.log(
+            `[Verify Dup] WebDAV PUT status=${ctx.webdavPutStatus} matches expected ${expectedStatus} ✓`,
+        );
+    },
+);
+
+When(
+    "I upload {string} as a new model named {string} via REST API",
+    async ({ page }, blendFile: string, modelName: string) => {
+        // Do NOT delete — we want to test duplicate name rejection via REST.
+        // REST upload uses the filename as the model name when no explicit name is provided,
+        // so we name the file to match the desired model name.
+        const filePath = await UniqueFileGenerator.generate(blendFile);
+        // Rename to match desired model name so the backend derives the correct name
+        const targetDir = path.dirname(filePath);
+        const ext = path.extname(blendFile);
+        const renamedPath = path.join(targetDir, `${modelName}${ext}`);
+        fs.copyFileSync(filePath, renamedPath);
+
+        const result = await api.uploadModelRaw(renamedPath);
+        updateBlendContext(page, {
+            webdavPutStatus: result.status, // reuse field for REST status
+            modelName,
+        });
+        console.log(
+            `[Blend Dup] REST upload for duplicate "${modelName}" returned status=${result.status}`,
+        );
+
+        // Cleanup temp file
+        try {
+            fs.unlinkSync(renamedPath);
+        } catch {
+            // ignore
+        }
+    },
+);
+
+Then(
+    "the REST upload should have returned HTTP {int}",
+    async ({ page }, expectedStatus: number) => {
+        const ctx = getBlendContext(page);
+        expect(ctx.webdavPutStatus).toBe(expectedStatus);
+        console.log(
+            `[Verify Dup] REST upload status=${ctx.webdavPutStatus} matches expected ${expectedStatus} ✓`,
+        );
     },
 );

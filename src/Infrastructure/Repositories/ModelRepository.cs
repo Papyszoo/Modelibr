@@ -236,6 +236,22 @@ internal sealed class ModelRepository : IModelRepository
             .FirstOrDefaultAsync(m => m.Versions.Any(v => v.Files.Any(f => f.Sha256Hash == sha256Hash)), cancellationToken);
     }
 
+    public async Task<bool> ExistsByNameAsync(string name, CancellationToken cancellationToken = default)
+    {
+        return await _context.Models
+            .AsNoTracking()
+            .AnyAsync(m => m.Name == name, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<string>> GetNamesByPrefixAsync(string prefix, CancellationToken cancellationToken = default)
+    {
+        return await _context.Models
+            .AsNoTracking()
+            .Where(m => m.Name.StartsWith(prefix))
+            .Select(m => m.Name)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<(int? ActiveVersionId, Thumbnail? Thumbnail)?> GetThumbnailDataAsync(
         int modelId, CancellationToken cancellationToken = default)
     {

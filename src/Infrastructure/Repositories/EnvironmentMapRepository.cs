@@ -78,6 +78,22 @@ internal sealed class EnvironmentMapRepository : IEnvironmentMapRepository
             .FirstOrDefaultAsync(e => e.Variants.Any(v => v.File != null && v.File.Sha256Hash == sha256Hash), cancellationToken);
     }
 
+    public async Task<bool> ExistsByNameAsync(string name, CancellationToken cancellationToken = default)
+    {
+        return await _context.EnvironmentMaps
+            .AsNoTracking()
+            .AnyAsync(e => e.Name == name, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<string>> GetNamesByPrefixAsync(string prefix, CancellationToken cancellationToken = default)
+    {
+        return await _context.EnvironmentMaps
+            .AsNoTracking()
+            .Where(e => e.Name.StartsWith(prefix))
+            .Select(e => e.Name)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<EnvironmentMap?> GetByFileHashesAsync(
         IEnumerable<string> sha256Hashes,
         EnvironmentMapProjectionType projectionType,

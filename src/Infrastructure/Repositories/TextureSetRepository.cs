@@ -168,6 +168,22 @@ internal sealed class TextureSetRepository : ITextureSetRepository
             .FirstOrDefaultAsync(tp => tp.Textures.Any(t => t.File.Sha256Hash == sha256Hash), cancellationToken);
     }
 
+    public async Task<bool> ExistsByNameAsync(string name, CancellationToken cancellationToken = default)
+    {
+        return await _context.TextureSets
+            .AsNoTracking()
+            .AnyAsync(ts => ts.Name == name, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<string>> GetNamesByPrefixAsync(string prefix, CancellationToken cancellationToken = default)
+    {
+        return await _context.TextureSets
+            .AsNoTracking()
+            .Where(ts => ts.Name.StartsWith(prefix))
+            .Select(ts => ts.Name)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<TextureSet> UpdateAsync(TextureSet textureSet, CancellationToken cancellationToken = default)
     {
         if (textureSet == null)

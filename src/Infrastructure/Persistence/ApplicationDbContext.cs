@@ -221,6 +221,9 @@ namespace Infrastructure.Persistence
                 // Add index for efficient ORDER BY UpdatedAt DESC pagination
                 entity.HasIndex(m => m.UpdatedAt).HasDatabaseName("IX_Models_UpdatedAt");
 
+                // Add index for ExistsByNameAsync (equality) and GetNamesByPrefixAsync (prefix/StartsWith)
+                entity.HasIndex(m => m.Name).HasDatabaseName("IX_Models_Name");
+
                 // Global query filter for soft deletes
                 entity.HasQueryFilter(m => !m.IsDeleted);
             });

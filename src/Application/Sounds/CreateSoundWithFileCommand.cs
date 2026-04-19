@@ -2,6 +2,7 @@ using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Files;
 using Application.Abstractions.Services;
+using Application.Models;
 using Application.Services;
 using Domain.Models;
 using Domain.Services;
@@ -17,6 +18,7 @@ internal class CreateSoundWithFileCommandHandler : ICommandHandler<CreateSoundWi
     private readonly ISoundCategoryRepository _soundCategoryRepository;
     private readonly IBatchUploadRepository _batchUploadRepository;
     private readonly IFileCreationService _fileCreationService;
+    private readonly ISettingRepository _settingRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IThumbnailQueue _thumbnailQueue;
     private readonly ILogger<CreateSoundWithFileCommandHandler> _logger;
@@ -26,6 +28,7 @@ internal class CreateSoundWithFileCommandHandler : ICommandHandler<CreateSoundWi
         ISoundCategoryRepository soundCategoryRepository,
         IBatchUploadRepository batchUploadRepository,
         IFileCreationService fileCreationService,
+        ISettingRepository settingRepository,
         IDateTimeProvider dateTimeProvider,
         IThumbnailQueue thumbnailQueue,
         ILogger<CreateSoundWithFileCommandHandler> logger)
@@ -34,6 +37,7 @@ internal class CreateSoundWithFileCommandHandler : ICommandHandler<CreateSoundWi
         _soundCategoryRepository = soundCategoryRepository;
         _batchUploadRepository = batchUploadRepository;
         _fileCreationService = fileCreationService;
+        _settingRepository = settingRepository;
         _dateTimeProvider = dateTimeProvider;
         _thumbnailQueue = thumbnailQueue;
         _logger = logger;
@@ -103,9 +107,18 @@ internal class CreateSoundWithFileCommandHandler : ICommandHandler<CreateSoundWi
                 }
             }
 
-            // 4. Create new sound
+            // 4. Resolve name collision based on DuplicateNamePolicy setting
+            var nameResult = await AssetNameService.ResolveNameAsync(
+                command.Name, "Sound",
+                _soundRepository.ExistsByNameAsync,
+                _soundRepository.GetNamesByPrefixAsync,
+                _settingRepository, cancellationToken);
+            if (nameResult.IsFailure)
+                return Result.Failure<CreateSoundWithFileResponse>(nameResult.Error);
+
+            // 5. Create new sound with resolved name
             var sound = Sound.Create(
-                command.Name,
+                nameResult.Value,
                 file,
                 command.Duration,
                 command.Peaks,

@@ -724,14 +724,14 @@ public sealed class VirtualProjectSpritesCollection : VirtualCollectionBase
 
     public override Task<IStoreItem?> GetItemAsync(string name, IHttpContext httpContext)
     {
-        var sprite = _project.Sprites.FirstOrDefault(s => !s.IsDeleted && s.File.OriginalFileName == name);
+        var sprite = _project.Sprites.FirstOrDefault(s => !s.IsDeleted && WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName) == name);
         if (sprite == null)
             return Task.FromResult<IStoreItem?>(null);
 
         return Task.FromResult<IStoreItem?>(new VirtualAssetFile(
             _itemPropertyManager,
             LockingManager,
-            sprite.File.OriginalFileName,
+            WebDavUtilities.GetVirtualFileName(sprite.Name, sprite.File.OriginalFileName),
             sprite.File.Sha256Hash,
             sprite.File.SizeBytes,
             sprite.File.MimeType,
@@ -747,7 +747,7 @@ public sealed class VirtualProjectSpritesCollection : VirtualCollectionBase
             .Select(s => (IStoreItem)new VirtualAssetFile(
                 _itemPropertyManager,
                 LockingManager,
-                s.File.OriginalFileName,
+                WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName),
                 s.File.Sha256Hash,
                 s.File.SizeBytes,
                 s.File.MimeType,
@@ -780,14 +780,14 @@ public sealed class VirtualProjectSoundsCollection : VirtualCollectionBase
 
     public override Task<IStoreItem?> GetItemAsync(string name, IHttpContext httpContext)
     {
-        var sound = _project.Sounds.FirstOrDefault(s => !s.IsDeleted && s.File.OriginalFileName == name);
+        var sound = _project.Sounds.FirstOrDefault(s => !s.IsDeleted && WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName) == name);
         if (sound == null)
             return Task.FromResult<IStoreItem?>(null);
 
         return Task.FromResult<IStoreItem?>(new VirtualAssetFile(
             _itemPropertyManager,
             LockingManager,
-            sound.File.OriginalFileName,
+            WebDavUtilities.GetVirtualFileName(sound.Name, sound.File.OriginalFileName),
             sound.File.Sha256Hash,
             sound.File.SizeBytes,
             sound.File.MimeType,
@@ -803,7 +803,7 @@ public sealed class VirtualProjectSoundsCollection : VirtualCollectionBase
             .Select(s => (IStoreItem)new VirtualAssetFile(
                 _itemPropertyManager,
                 LockingManager,
-                s.File.OriginalFileName,
+                WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName),
                 s.File.Sha256Hash,
                 s.File.SizeBytes,
                 s.File.MimeType,

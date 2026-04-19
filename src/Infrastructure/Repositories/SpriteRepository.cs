@@ -137,6 +137,22 @@ internal sealed class SpriteRepository : ISpriteRepository
             .FirstOrDefaultAsync(s => s.File.Sha256Hash == sha256Hash, cancellationToken);
     }
 
+    public async Task<bool> ExistsByNameAsync(string name, CancellationToken cancellationToken = default)
+    {
+        return await _context.Sprites
+            .AsNoTracking()
+            .AnyAsync(s => s.Name == name, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<string>> GetNamesByPrefixAsync(string prefix, CancellationToken cancellationToken = default)
+    {
+        return await _context.Sprites
+            .AsNoTracking()
+            .Where(s => s.Name.StartsWith(prefix))
+            .Select(s => s.Name)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<Sprite> UpdateAsync(Sprite sprite, CancellationToken cancellationToken = default)
     {
         if (sprite == null)

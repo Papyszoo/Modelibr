@@ -16,4 +16,5 @@ public static class SettingKeys
     public const string BlenderPath = "BlenderPath";
     public const string BlenderEnabled = "BlenderEnabled";
     public const string BlenderInstallVersion = "BlenderInstallVersion";
+    public const string DuplicateNamePolicy = "DuplicateNamePolicy";
 }
