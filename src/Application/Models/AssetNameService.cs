@@ -6,21 +6,24 @@ using SharedKernel;
 namespace Application.Models;
 
 /// <summary>
-/// Centralized service for resolving model name collisions based on the configured duplicate name policy.
+/// Centralized service for resolving asset name collisions based on the configured duplicate name policy.
+/// Works for all asset types (Models, Sprites, Sounds, TextureSets, EnvironmentMaps).
 /// </summary>
-internal static partial class ModelNameService
+internal static partial class AssetNameService
 {
     /// <summary>
-    /// Resolves the final model name based on the duplicate name policy.
+    /// Resolves the final asset name based on the duplicate name policy.
     /// Returns the original or auto-renamed name on success, or a failure if the name is rejected.
     /// </summary>
     public static async Task<Result<string>> ResolveNameAsync(
         string requestedName,
-        IModelRepository modelRepository,
+        string assetTypeName,
+        Func<string, CancellationToken, Task<bool>> existsByNameAsync,
+        Func<string, CancellationToken, Task<IReadOnlyList<string>>> getNamesByPrefixAsync,
         ISettingRepository settingRepository,
         CancellationToken cancellationToken)
     {
-        var exists = await modelRepository.ExistsByNameAsync(requestedName, cancellationToken);
+        var exists = await existsByNameAsync(requestedName, cancellationToken);
         if (!exists)
             return Result.Success(requestedName);
 
@@ -29,12 +32,12 @@ internal static partial class ModelNameService
         if (policy == "Reject")
         {
             return Result.Failure<string>(
-                new Error("ModelNameAlreadyExists", $"A model with the name '{requestedName}' already exists."));
+                new Error($"{assetTypeName}NameAlreadyExists", $"A {assetTypeName.ToLowerInvariant()} with the name '{requestedName}' already exists."));
         }
 
         // AutoRename: generate next available name
         var baseName = GetBaseName(requestedName);
-        var existingNames = await modelRepository.GetNamesByPrefixAsync(baseName, cancellationToken);
+        var existingNames = await getNamesByPrefixAsync(baseName, cancellationToken);
         var uniqueName = GenerateUniqueName(baseName, existingNames);
 
         return Result.Success(uniqueName);
@@ -42,12 +45,14 @@ internal static partial class ModelNameService
 
     /// <summary>
     /// Gets the configured duplicate name policy. Defaults to "Reject" if not set.
+    /// Falls back to legacy "ModelDuplicateNamePolicy" key for backward compatibility.
     /// </summary>
     internal static async Task<string> GetPolicyAsync(
         ISettingRepository settingRepository,
         CancellationToken cancellationToken)
     {
-        var setting = await settingRepository.GetByKeyAsync(SettingKeys.ModelDuplicateNamePolicy, cancellationToken);
+        var setting = await settingRepository.GetByKeyAsync(SettingKeys.DuplicateNamePolicy, cancellationToken);
+        setting ??= await settingRepository.GetByKeyAsync("ModelDuplicateNamePolicy", cancellationToken);
         return setting?.Value is "AutoRename" ? "AutoRename" : "Reject";
     }
 

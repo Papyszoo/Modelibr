@@ -505,3 +505,4 @@ tests/e2e/.shared-state.json
 
 .playwright-mcp
 E2E_REPORT.md
+.claude/

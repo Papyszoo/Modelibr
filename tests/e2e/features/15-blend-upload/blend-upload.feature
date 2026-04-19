@@ -117,7 +117,7 @@ Feature: Blend File Upload and Processing
   @blend-duplicate-reject
   Scenario: WebDAV PUT .blend with duplicate name rejects when policy is Reject
     Given the backend has Blender integration enabled
-    And the ModelDuplicateNamePolicy setting is "Reject"
+    And the DuplicateNamePolicy setting is "Reject"
     And a model "DuplicateRejectModel" was created via WebDAV with "test.blend"
     When I upload "test2.blend" as a new model "DuplicateRejectModel" via WebDAV PUT expecting duplicate
     Then the WebDAV PUT should have returned HTTP 409
@@ -125,7 +125,7 @@ Feature: Blend File Upload and Processing
   @blend-duplicate-autorename
   Scenario: WebDAV PUT .blend with duplicate name auto-renames when policy is AutoRename
     Given the backend has Blender integration enabled
-    And the ModelDuplicateNamePolicy setting is "AutoRename"
+    And the DuplicateNamePolicy setting is "AutoRename"
     And any model named "DuplicateAutoModel (2)" is cleaned up
     And a model "DuplicateAutoModel" was created via WebDAV with "test.blend"
     When I upload "test2.blend" as a new model "DuplicateAutoModel" via WebDAV PUT expecting duplicate
@@ -135,7 +135,7 @@ Feature: Blend File Upload and Processing
   @blend-duplicate-rest-reject
   Scenario: REST API upload with duplicate name rejects when policy is Reject
     Given the backend has Blender integration enabled
-    And the ModelDuplicateNamePolicy setting is "Reject"
+    And the DuplicateNamePolicy setting is "Reject"
     And a model "RestDupRejectModel" was created via WebDAV with "test.blend"
     When I upload "test3.blend" as a new model named "RestDupRejectModel" via REST API
     Then the REST upload should have returned HTTP 409

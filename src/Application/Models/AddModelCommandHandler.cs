@@ -89,9 +89,12 @@ namespace Application.Models
             var modelName = command.ModelName ?? 
                            Path.GetFileNameWithoutExtension(command.File.FileName);
 
-            // Resolve name collision based on ModelDuplicateNamePolicy setting
-            var nameResult = await ModelNameService.ResolveNameAsync(
-                modelName, _modelRepository, _settingRepository, cancellationToken);
+            // Resolve name collision based on DuplicateNamePolicy setting
+            var nameResult = await AssetNameService.ResolveNameAsync(
+                modelName, "Model",
+                _modelRepository.ExistsByNameAsync,
+                _modelRepository.GetNamesByPrefixAsync,
+                _settingRepository, cancellationToken);
             if (nameResult.IsFailure)
                 return Result.Failure<AddModelCommandResponse>(nameResult.Error);
 

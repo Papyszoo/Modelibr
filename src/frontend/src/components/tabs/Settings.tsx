@@ -222,7 +222,7 @@ export function Settings(): JSX.Element {
       textureProxySize: data.textureProxySize ?? 512,
     })
 
-    setDuplicateNamePolicy(data.modelDuplicateNamePolicy ?? 'Reject')
+    setDuplicateNamePolicy(data.duplicateNamePolicy ?? 'Reject')
   }, [settingsQuery.data, reset])
 
   const handleSave = async (values: SettingsFormOutput) => {
@@ -367,7 +367,7 @@ export function Settings(): JSX.Element {
     if (isDemo) return
     setDuplicateNamePolicySaving(true)
     try {
-      await updateSetting('ModelDuplicateNamePolicy', newPolicy)
+      await updateSetting('DuplicateNamePolicy', newPolicy)
       setDuplicateNamePolicy(newPolicy)
       await queryClient.invalidateQueries({ queryKey: ['settings'] })
     } catch (err) {
@@ -823,7 +823,7 @@ export function Settings(): JSX.Element {
             )}
           </div>
 
-          {/* ── Model Upload Behavior ────────────────────────────────── */}
+          {/* ── Upload Behavior ────────────────────────────────── */}
           <div className="settings-section">
             <div
               className="settings-section-header"
@@ -841,14 +841,14 @@ export function Settings(): JSX.Element {
                 {Array.isArray(activeIndex) && activeIndex.includes(4)
                   ? '▼'
                   : '▶'}{' '}
-                Model Upload Behavior
+                Upload Behavior
               </span>
             </div>
             {Array.isArray(activeIndex) && activeIndex.includes(4) && (
               <div className="settings-section-content">
                 <div className="settings-field">
                   <label htmlFor="duplicateNamePolicy">
-                    Duplicate Model Name Policy
+                    Duplicate Name Policy
                   </label>
                   <select
                     id="duplicateNamePolicy"
@@ -865,11 +865,13 @@ export function Settings(): JSX.Element {
                     </option>
                   </select>
                   <span className="settings-help">
-                    Controls what happens when uploading a model with a name
-                    that already exists. <strong>Reject</strong> blocks the
-                    upload and returns an error. <strong>Auto-rename</strong>{' '}
-                    appends a number suffix to make the name unique, similar to
-                    how Windows handles duplicate filenames.
+                    Controls what happens when uploading an asset with a name
+                    that already exists. Applies to all asset types (models,
+                    sprites, sounds, texture sets, environment maps).{' '}
+                    <strong>Reject</strong> blocks the upload and returns an
+                    error. <strong>Auto-rename</strong> appends a number suffix
+                    to make the name unique, similar to how Windows handles
+                    duplicate filenames.
                   </span>
                   <span className="settings-default">
                     Default: Reject duplicate names

@@ -506,7 +506,7 @@ public sealed class VirtualAssetStore : IStore
             var sound = allSoundsForFile.FirstOrDefault(s =>
                 s.SoundCategoryId == null &&
                 !s.IsDeleted &&
-                s.File.OriginalFileName == fileName);
+                WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName) == fileName);
 
             if (sound == null)
                 return null;
@@ -514,7 +514,7 @@ public sealed class VirtualAssetStore : IStore
             return new VirtualAssetFile(
                 _itemPropertyManager,
                 _lockingManager,
-                sound.File.OriginalFileName,
+                WebDavUtilities.GetVirtualFileName(sound.Name, sound.File.OriginalFileName),
                 sound.File.Sha256Hash,
                 sound.File.SizeBytes,
                 sound.File.MimeType,
@@ -541,7 +541,7 @@ public sealed class VirtualAssetStore : IStore
         var foundSound = sounds.FirstOrDefault(s =>
             s.SoundCategoryId == category.Id &&
             !s.IsDeleted &&
-            s.File.OriginalFileName == soundName);
+            WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName) == soundName);
 
         if (foundSound == null)
             return null;
@@ -549,7 +549,7 @@ public sealed class VirtualAssetStore : IStore
         return new VirtualAssetFile(
             _itemPropertyManager,
             _lockingManager,
-            foundSound.File.OriginalFileName,
+            WebDavUtilities.GetVirtualFileName(foundSound.Name, foundSound.File.OriginalFileName),
             foundSound.File.Sha256Hash,
             foundSound.File.SizeBytes,
             foundSound.File.MimeType,
@@ -560,7 +560,7 @@ public sealed class VirtualAssetStore : IStore
 
     private IStoreItem? ResolveProjectSpriteFile(Domain.Models.Project project, string fileName)
     {
-        var sprite = project.Sprites.FirstOrDefault(s => !s.IsDeleted && s.File.OriginalFileName == fileName);
+        var sprite = project.Sprites.FirstOrDefault(s => !s.IsDeleted && WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName) == fileName);
 
         if (sprite == null)
             return null;
@@ -568,7 +568,7 @@ public sealed class VirtualAssetStore : IStore
         return new VirtualAssetFile(
             _itemPropertyManager,
             _lockingManager,
-            sprite.File.OriginalFileName,
+            WebDavUtilities.GetVirtualFileName(sprite.Name, sprite.File.OriginalFileName),
             sprite.File.Sha256Hash,
             sprite.File.SizeBytes,
             sprite.File.MimeType,
@@ -579,7 +579,7 @@ public sealed class VirtualAssetStore : IStore
 
     private IStoreItem? ResolveProjectSoundFile(Domain.Models.Project project, string fileName)
     {
-        var sound = project.Sounds.FirstOrDefault(s => !s.IsDeleted && s.File.OriginalFileName == fileName);
+        var sound = project.Sounds.FirstOrDefault(s => !s.IsDeleted && WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName) == fileName);
 
         if (sound == null)
             return null;
@@ -587,7 +587,7 @@ public sealed class VirtualAssetStore : IStore
         return new VirtualAssetFile(
             _itemPropertyManager,
             _lockingManager,
-            sound.File.OriginalFileName,
+            WebDavUtilities.GetVirtualFileName(sound.Name, sound.File.OriginalFileName),
             sound.File.Sha256Hash,
             sound.File.SizeBytes,
             sound.File.MimeType,
@@ -804,14 +804,14 @@ public sealed class VirtualAssetStore : IStore
 
     private IStoreItem? ResolvePackSpriteFile(Domain.Models.Pack pack, string fileName)
     {
-        var sprite = pack.Sprites.FirstOrDefault(s => !s.IsDeleted && s.File.OriginalFileName == fileName);
+        var sprite = pack.Sprites.FirstOrDefault(s => !s.IsDeleted && WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName) == fileName);
         if (sprite == null)
             return null;
 
         return new VirtualAssetFile(
             _itemPropertyManager,
             _lockingManager,
-            sprite.File.OriginalFileName,
+            WebDavUtilities.GetVirtualFileName(sprite.Name, sprite.File.OriginalFileName),
             sprite.File.Sha256Hash,
             sprite.File.SizeBytes,
             sprite.File.MimeType,
@@ -822,14 +822,14 @@ public sealed class VirtualAssetStore : IStore
 
     private IStoreItem? ResolvePackSoundFile(Domain.Models.Pack pack, string fileName)
     {
-        var sound = pack.Sounds.FirstOrDefault(s => !s.IsDeleted && s.File.OriginalFileName == fileName);
+        var sound = pack.Sounds.FirstOrDefault(s => !s.IsDeleted && WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName) == fileName);
         if (sound == null)
             return null;
 
         return new VirtualAssetFile(
             _itemPropertyManager,
             _lockingManager,
-            sound.File.OriginalFileName,
+            WebDavUtilities.GetVirtualFileName(sound.Name, sound.File.OriginalFileName),
             sound.File.Sha256Hash,
             sound.File.SizeBytes,
             sound.File.MimeType,
@@ -1142,7 +1142,7 @@ public sealed class VirtualAssetStore : IStore
             var sprite = allSpritesForFile.FirstOrDefault(s =>
                 s.SpriteCategoryId == null &&
                 !s.IsDeleted &&
-                s.File.OriginalFileName == fileName);
+                WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName) == fileName);
 
             if (sprite == null)
                 return null;
@@ -1150,7 +1150,7 @@ public sealed class VirtualAssetStore : IStore
             return new VirtualAssetFile(
                 _itemPropertyManager,
                 _lockingManager,
-                sprite.File.OriginalFileName,
+                WebDavUtilities.GetVirtualFileName(sprite.Name, sprite.File.OriginalFileName),
                 sprite.File.Sha256Hash,
                 sprite.File.SizeBytes,
                 sprite.File.MimeType,
@@ -1176,7 +1176,7 @@ public sealed class VirtualAssetStore : IStore
         var foundSprite = spritesForFile.FirstOrDefault(s =>
             s.SpriteCategoryId == category.Id &&
             !s.IsDeleted &&
-            s.File.OriginalFileName == spriteFileName);
+            WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName) == spriteFileName);
 
         if (foundSprite == null)
             return null;
@@ -1184,7 +1184,7 @@ public sealed class VirtualAssetStore : IStore
         return new VirtualAssetFile(
             _itemPropertyManager,
             _lockingManager,
-            foundSprite.File.OriginalFileName,
+            WebDavUtilities.GetVirtualFileName(foundSprite.Name, foundSprite.File.OriginalFileName),
             foundSprite.File.Sha256Hash,
             foundSprite.File.SizeBytes,
             foundSprite.File.MimeType,

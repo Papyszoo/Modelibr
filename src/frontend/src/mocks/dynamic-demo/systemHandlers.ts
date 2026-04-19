@@ -66,7 +66,7 @@ export const systemHandlers = [
       textureProxySize: 512,
       blenderPath: 'blender',
       blenderEnabled: false,
-      modelDuplicateNamePolicy: 'Reject',
+      duplicateNamePolicy: 'Reject',
       createdAt: '2025-01-15T10:00:00Z',
       updatedAt: '2025-01-15T10:00:00Z',
     })

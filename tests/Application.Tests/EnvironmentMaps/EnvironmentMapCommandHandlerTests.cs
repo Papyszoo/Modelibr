@@ -20,6 +20,7 @@ public class EnvironmentMapCommandHandlerTests
     private readonly Mock<IBatchUploadRepository> _batchUploadRepository = new();
     private readonly Mock<IFileCreationService> _fileCreationService = new();
     private readonly Mock<IEnvironmentMapSizeLabelService> _sizeLabelService = new();
+    private readonly Mock<ISettingRepository> _settingRepository = new();
     private readonly Mock<IThumbnailQueue> _thumbnailQueue = new();
     private readonly Mock<IDateTimeProvider> _dateTimeProvider = new();
 
@@ -50,6 +51,7 @@ public class EnvironmentMapCommandHandlerTests
             _batchUploadRepository.Object,
             _fileCreationService.Object,
             _sizeLabelService.Object,
+            _settingRepository.Object,
             _thumbnailQueue.Object,
             _dateTimeProvider.Object);
 

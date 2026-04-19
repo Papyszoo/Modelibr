@@ -12,6 +12,8 @@ public interface IEnvironmentMapRepository
     Task<EnvironmentMap?> GetDeletedByIdAsync(int id, CancellationToken cancellationToken = default);
     Task<EnvironmentMap?> GetByNameAsync(string name, CancellationToken cancellationToken = default);
     Task<EnvironmentMap?> GetByFileHashAsync(string sha256Hash, CancellationToken cancellationToken = default);
+    Task<bool> ExistsByNameAsync(string name, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<string>> GetNamesByPrefixAsync(string prefix, CancellationToken cancellationToken = default);
     Task<EnvironmentMap?> GetByFileHashesAsync(
         IEnumerable<string> sha256Hashes,
         EnvironmentMapProjectionType projectionType,

@@ -11,7 +11,7 @@ export async function getSettings(): Promise<{
   textureProxySize: number
   blenderPath: string
   blenderEnabled: boolean
-  modelDuplicateNamePolicy: string
+  duplicateNamePolicy: string
   createdAt: string
   updatedAt: string
 }> {
