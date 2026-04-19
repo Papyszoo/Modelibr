@@ -736,19 +736,27 @@ Then(
             environmentMap.id,
         );
 
-        const transitions =
-            await environmentMapsPage.getTrackedCardThumbnailTransitions();
-        expect(
-            transitions.some(
-                (state: EnvironmentMapCardTransitionState) =>
-                    state.exists &&
-                    state.hasImage &&
-                    state.isLoaded &&
-                    (state.currentSrc ?? state.imageSrc ?? "").includes(
-                        `/environment-maps/${environmentMap.id}/preview`,
-                    ),
-            ),
-        ).toBe(true);
+        // Retry reading transitions — the in-browser interval may need
+        // one more tick to capture the final loaded state after the
+        // Playwright poll above confirmed the thumbnail is visible.
+        await expect
+            .poll(
+                async () => {
+                    const transitions =
+                        await environmentMapsPage.getTrackedCardThumbnailTransitions();
+                    return transitions.some(
+                        (state: EnvironmentMapCardTransitionState) =>
+                            state.exists &&
+                            state.hasImage &&
+                            state.isLoaded &&
+                            (state.currentSrc ?? state.imageSrc ?? "").includes(
+                                `/environment-maps/${environmentMap.id}/preview`,
+                            ),
+                    );
+                },
+                { timeout: 15000, intervals: [500, 1000, 2000] },
+            )
+            .toBe(true);
 
         expect(page.url()).toBe(listPageUrl);
         await environmentMapsPage.stopCardThumbnailTransitionTracking();
