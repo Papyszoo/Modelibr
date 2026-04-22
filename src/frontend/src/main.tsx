@@ -1,5 +1,6 @@
 import 'primereact/resources/primereact.min.css'
 import 'primeicons/primeicons.css'
+import './shared/styles/tokens.css'
 import './index.css'
 
 import { createRoot } from 'react-dom/client'

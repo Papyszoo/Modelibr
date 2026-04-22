@@ -360,18 +360,61 @@
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
+  .recycled-files-list {
+    padding: 0.5rem;
+  }
+
   .recycled-cards-grid {
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 0.75rem;
   }
 
   .recycled-files-header {
-    flex-direction: column;
-    align-items: flex-start;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .recycled-files-header h2 {
+    font-size: 1rem;
+  }
+
+  .recycled-files-content {
     gap: 1rem;
+  }
+
+  .recycled-section-title {
+    font-size: 1rem;
+  }
+
+  .recycled-card:hover {
+    transform: none;
+  }
+
+  /* Touch — reveal actions and overlay without hover. */
+  .recycled-card-actions {
+    opacity: 1;
+  }
+
+  .recycled-card-overlay {
+    opacity: 1;
   }
 
   .recycled-card-actions .p-button {
     width: 2rem;
     height: 2rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .recycled-files-list {
+    padding: 0.375rem;
+  }
+
+  .recycled-cards-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
   }
 }

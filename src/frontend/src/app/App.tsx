@@ -4,7 +4,7 @@ import { NuqsAdapter } from 'nuqs/adapters/react'
 import { useEffect } from 'react'
 
 import { DemoBanner } from '@/components/DemoBanner'
-import { SplitterLayout } from '@/components/layout/SplitterLayout'
+import { AppShell } from '@/components/layout/AppShell'
 import { getWebDavUrls } from '@/features/settings/api/settingsApi'
 import { useGlobalDragPrevention } from '@/hooks/useGlobalDragPrevention'
 import { useTheme } from '@/hooks/useTheme'
@@ -41,7 +41,7 @@ function App(): JSX.Element {
 
   return (
     <NuqsAdapter>
-      <SplitterLayout />
+      <AppShell />
       <UploadProgressWindow />
       {isDemo && <DemoBanner />}
     </NuqsAdapter>

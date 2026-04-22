@@ -4,6 +4,29 @@
   gap: 0.75rem;
 }
 
+.model-info-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* Sticky action bar — pins Save to the bottom of the surrounding scroll
+   container (FloatingWindow desktop, mobile sheet). Negative margins bleed
+   it edge-to-edge inside the container's 0.75rem padding. */
+.model-info-actions {
+  position: sticky;
+  bottom: -0.75rem;
+  margin: 0 -0.75rem -0.75rem;
+  padding: 0.75rem;
+  background: var(--surface-card);
+  border-top: 1px solid var(--surface-border);
+  z-index: 1;
+}
+
+.model-info-actions .save-button {
+  width: 100%;
+}
+
 .model-info-section {
   padding: 0.75rem;
   background: transparent;
@@ -102,10 +125,6 @@
 .description-textarea {
   width: 100%;
   resize: vertical;
-}
-
-.save-button {
-  width: 100%;
 }
 
 .model-info-category-row,
@@ -334,5 +353,26 @@
 
   .tag-add-button {
     width: auto;
+  }
+
+  /* Concept thumbnails: keep 2 columns at the smallest sizes so each tile
+     stays a comfortable tap target instead of collapsing to a single tall
+     image that needs more scrolling. */
+  .model-info-concept-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+
+  .model-info-concept-footer {
+    padding: 0.375rem 0.5rem;
+  }
+
+  /* Category row: stack the dropdown and its action button so the dropdown
+     gets the full width — desktop's flex-wrap leaves a cramped half-row. */
+  .model-info-category-row,
+  .model-info-header-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
   }
 }

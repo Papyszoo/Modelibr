@@ -2,7 +2,8 @@
 import 'primereact/resources/themes/lara-dark-blue/theme.css'
 import 'primereact/resources/primereact.min.css'
 import 'primeicons/primeicons.css'
-// Import application global styles
+// Import application design tokens + global styles
+import '../src/shared/styles/tokens.css'
 import '../src/index.css'
 
 import type { Preview } from '@storybook/react-vite'

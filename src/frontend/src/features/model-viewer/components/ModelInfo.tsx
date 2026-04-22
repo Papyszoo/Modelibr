@@ -147,200 +147,204 @@ export function ModelInfo({ model, onModelUpdated }) {
         onHide={() => setShowCategoryManager(false)}
       />
 
-      <div className="model-info-section">
-        <div className="model-info-grid">
-          <div className="model-info-item">
-            <label>ID:</label>
-            <span>{model.id}</span>
-          </div>
-          <div className="model-info-item">
-            <label>Created:</label>
-            <span>{new Date(model.createdAt).toLocaleString()}</span>
-          </div>
-          <div className="model-info-item">
-            <label>Modified:</label>
-            <span>{new Date(model.updatedAt).toLocaleString()}</span>
-          </div>
-          <div className="model-info-item">
-            <label>Format:</label>
-            <span>{getModelFileFormat(model)}</span>
-          </div>
-          <div className="model-info-item model-info-item-wide">
-            <label>Category:</label>
-            <div className="model-info-category-row">
-              <ModelCategorySinglePicker
-                categories={categories}
-                selectedCategoryId={selectedCategoryId}
-                onChange={setSelectedCategoryId}
-              />
-              <Button
-                icon="pi pi-cog"
-                text
-                rounded
-                aria-label="Manage model categories"
-                tooltip="Manage model categories"
-                tooltipOptions={{ position: 'left' }}
-                onClick={() => setShowCategoryManager(true)}
-              />
+      <div className="model-info-body">
+        <div className="model-info-section">
+          <div className="model-info-grid">
+            <div className="model-info-item">
+              <label>ID:</label>
+              <span>{model.id}</span>
+            </div>
+            <div className="model-info-item">
+              <label>Created:</label>
+              <span>{new Date(model.createdAt).toLocaleString()}</span>
+            </div>
+            <div className="model-info-item">
+              <label>Modified:</label>
+              <span>{new Date(model.updatedAt).toLocaleString()}</span>
+            </div>
+            <div className="model-info-item">
+              <label>Format:</label>
+              <span>{getModelFileFormat(model)}</span>
+            </div>
+            <div className="model-info-item model-info-item-wide">
+              <label>Category:</label>
+              <div className="model-info-category-row">
+                <ModelCategorySinglePicker
+                  categories={categories}
+                  selectedCategoryId={selectedCategoryId}
+                  onChange={setSelectedCategoryId}
+                />
+                <Button
+                  icon="pi pi-cog"
+                  text
+                  rounded
+                  aria-label="Manage model categories"
+                  tooltip="Manage model categories"
+                  tooltipOptions={{ position: 'left' }}
+                  onClick={() => setShowCategoryManager(true)}
+                />
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div className="model-info-section">
-        <h3 className="model-info-title">Technical Data</h3>
-        <div className="model-info-grid">
-          <div className="model-info-item">
-            <label>Triangles</label>
-            <span>{technicalMetadata.triangleCount ?? 'Unknown'}</span>
-          </div>
-          <div className="model-info-item">
-            <label>Vertices</label>
-            <span>{technicalMetadata.vertexCount ?? 'Unknown'}</span>
-          </div>
-          <div className="model-info-item">
-            <label>Meshes</label>
-            <span>{technicalMetadata.meshCount ?? 'Unknown'}</span>
-          </div>
-          <div className="model-info-item">
-            <label>Materials</label>
-            <span>{technicalMetadata.materialCount ?? 'Unknown'}</span>
-          </div>
-          <div className="model-info-item model-info-item-wide">
-            <label>Based On</label>
-            <span>
-              {technicalMetadata.latestVersionNumber
-                ? `Version ${technicalMetadata.latestVersionNumber}`
-                : 'No analyzed version'}
-            </span>
+        <div className="model-info-section">
+          <h3 className="model-info-title">Technical Data</h3>
+          <div className="model-info-grid">
+            <div className="model-info-item">
+              <label>Triangles</label>
+              <span>{technicalMetadata.triangleCount ?? 'Unknown'}</span>
+            </div>
+            <div className="model-info-item">
+              <label>Vertices</label>
+              <span>{technicalMetadata.vertexCount ?? 'Unknown'}</span>
+            </div>
+            <div className="model-info-item">
+              <label>Meshes</label>
+              <span>{technicalMetadata.meshCount ?? 'Unknown'}</span>
+            </div>
+            <div className="model-info-item">
+              <label>Materials</label>
+              <span>{technicalMetadata.materialCount ?? 'Unknown'}</span>
+            </div>
+            <div className="model-info-item model-info-item-wide">
+              <label>Based On</label>
+              <span>
+                {technicalMetadata.latestVersionNumber
+                  ? `Version ${technicalMetadata.latestVersionNumber}`
+                  : 'No analyzed version'}
+              </span>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="model-info-section">
-        <div className="model-info-header-row">
-          <h3 className="model-info-title">Concept Images</h3>
-          <Button
-            label="Add Images"
-            icon="pi pi-images"
-            className="p-button-outlined p-button-sm"
-            onClick={() => conceptFileInputRef.current?.click()}
-          />
-        </div>
-
-        <input
-          ref={conceptFileInputRef}
-          type="file"
-          accept="image/*"
-          hidden
-          multiple
-          onChange={event => {
-            const files = Array.from(event.target.files ?? [])
-            if (files.length > 0) {
-              uploadConceptImageMutation.mutate(files)
-            }
-            event.target.value = ''
-          }}
-        />
-
-        <ImageLightboxDialog
-          visible={activeConceptImageIndex !== null}
-          title="Model concept image"
-          images={lightboxImages}
-          activeIndex={activeConceptImageIndex ?? 0}
-          onIndexChange={setActiveConceptImageIndex}
-          onHide={() => setActiveConceptImageIndex(null)}
-        />
-
-        {conceptImages.length > 0 ? (
-          <div className="model-info-concept-grid">
-            {conceptImages.map((image, index) => (
-              <div key={image.fileId} className="model-info-concept-card">
-                <button
-                  type="button"
-                  className="model-info-concept-preview"
-                  aria-label={`Open concept image ${image.fileName}`}
-                  onClick={() => setActiveConceptImageIndex(index)}
-                >
-                  <img
-                    src={
-                      resolveApiAssetUrl(image.previewUrl) ||
-                      getFilePreviewUrl(String(image.fileId))
-                    }
-                    alt={image.fileName}
-                  />
-                </button>
-                <div className="model-info-concept-footer">
-                  <span title={image.fileName}>{image.fileName}</span>
-                  <Button
-                    icon="pi pi-times"
-                    text
-                    rounded
-                    severity="danger"
-                    onClick={event => {
-                      event.stopPropagation()
-                      removeConceptImageMutation.mutate(image.fileId)
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="model-info-empty">No concept images attached.</div>
-        )}
-      </div>
-
-      <div className="model-info-section">
-        <div className="tags-section">
-          <label className="field-label">Tags:</label>
-          <div className="tags-container">
-            {tags.length > 0 ? (
-              tags.map((tag, index) => (
-                <Chip
-                  key={index}
-                  label={tag}
-                  removable
-                  onRemove={() => handleRemoveTag(tag)}
-                  style={{ background: '#3b82f6', color: 'white' }}
-                />
-              ))
-            ) : (
-              <span className="empty-state-text">No tags yet</span>
-            )}
-          </div>
-          <div className="tag-input-group">
-            <InputText
-              value={newTag}
-              onChange={e => setNewTag(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Add new tag..."
-              className="tag-input"
-            />
+        <div className="model-info-section">
+          <div className="model-info-header-row">
+            <h3 className="model-info-title">Concept Images</h3>
             <Button
-              icon="pi pi-plus"
-              aria-label="Add tag"
-              tooltip="Add tag"
-              tooltipOptions={{ position: 'top' }}
-              onClick={handleAddTag}
-              disabled={!newTag.trim()}
-              size="small"
-              className="tag-add-button"
+              label="Add Images"
+              icon="pi pi-images"
+              className="p-button-outlined p-button-sm"
+              onClick={() => conceptFileInputRef.current?.click()}
+            />
+          </div>
+
+          <input
+            ref={conceptFileInputRef}
+            type="file"
+            accept="image/*"
+            hidden
+            multiple
+            onChange={event => {
+              const files = Array.from(event.target.files ?? [])
+              if (files.length > 0) {
+                uploadConceptImageMutation.mutate(files)
+              }
+              event.target.value = ''
+            }}
+          />
+
+          <ImageLightboxDialog
+            visible={activeConceptImageIndex !== null}
+            title="Model concept image"
+            images={lightboxImages}
+            activeIndex={activeConceptImageIndex ?? 0}
+            onIndexChange={setActiveConceptImageIndex}
+            onHide={() => setActiveConceptImageIndex(null)}
+          />
+
+          {conceptImages.length > 0 ? (
+            <div className="model-info-concept-grid">
+              {conceptImages.map((image, index) => (
+                <div key={image.fileId} className="model-info-concept-card">
+                  <button
+                    type="button"
+                    className="model-info-concept-preview"
+                    aria-label={`Open concept image ${image.fileName}`}
+                    onClick={() => setActiveConceptImageIndex(index)}
+                  >
+                    <img
+                      src={
+                        resolveApiAssetUrl(image.previewUrl) ||
+                        getFilePreviewUrl(String(image.fileId))
+                      }
+                      alt={image.fileName}
+                    />
+                  </button>
+                  <div className="model-info-concept-footer">
+                    <span title={image.fileName}>{image.fileName}</span>
+                    <Button
+                      icon="pi pi-times"
+                      text
+                      rounded
+                      severity="danger"
+                      onClick={event => {
+                        event.stopPropagation()
+                        removeConceptImageMutation.mutate(image.fileId)
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="model-info-empty">No concept images attached.</div>
+          )}
+        </div>
+
+        <div className="model-info-section">
+          <div className="tags-section">
+            <label className="field-label">Tags:</label>
+            <div className="tags-container">
+              {tags.length > 0 ? (
+                tags.map((tag, index) => (
+                  <Chip
+                    key={index}
+                    label={tag}
+                    removable
+                    onRemove={() => handleRemoveTag(tag)}
+                    style={{ background: '#3b82f6', color: 'white' }}
+                  />
+                ))
+              ) : (
+                <span className="empty-state-text">No tags yet</span>
+              )}
+            </div>
+            <div className="tag-input-group">
+              <InputText
+                value={newTag}
+                onChange={e => setNewTag(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Add new tag..."
+                className="tag-input"
+              />
+              <Button
+                icon="pi pi-plus"
+                aria-label="Add tag"
+                tooltip="Add tag"
+                tooltipOptions={{ position: 'top' }}
+                onClick={handleAddTag}
+                disabled={!newTag.trim()}
+                size="small"
+                className="tag-add-button"
+              />
+            </div>
+          </div>
+
+          <div className="description-section">
+            <label className="field-label">Description:</label>
+            <InputTextarea
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              placeholder="Enter description..."
+              rows={3}
+              className="description-textarea"
             />
           </div>
         </div>
+      </div>
 
-        <div className="description-section">
-          <label className="field-label">Description:</label>
-          <InputTextarea
-            value={description}
-            onChange={e => setDescription(e.target.value)}
-            placeholder="Enter description..."
-            rows={3}
-            className="description-textarea"
-          />
-        </div>
-
+      <div className="model-info-actions">
         <Button
           label={saveModelInfoMutation.isPending ? 'Saving...' : 'Save Changes'}
           icon="pi pi-save"
