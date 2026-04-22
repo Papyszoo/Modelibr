@@ -49,7 +49,6 @@ describe('DraggableTab', () => {
     onClose: jest.fn(),
     onDragStart: jest.fn(),
     onDragEnd: jest.fn(),
-    side: 'left' as const,
   }
 
   beforeEach(() => {

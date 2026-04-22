@@ -18,10 +18,12 @@ const gridComponents: GridComponents<{ cardWidth: number }> = {
       ref={ref}
       {...props}
       className="environment-map-grid"
-      style={{
-        ...props.style,
-        gridTemplateColumns: `repeat(auto-fill, minmax(${context?.cardWidth ?? 180}px, 1fr))`,
-      }}
+      style={
+        {
+          ...props.style,
+          '--env-map-card-width': `${context?.cardWidth ?? 180}px`,
+        } as React.CSSProperties
+      }
     >
       {children}
     </div>

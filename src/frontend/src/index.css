@@ -11,6 +11,8 @@
 
 html {
   color-scheme: light;
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 a {
@@ -28,8 +30,10 @@ body {
   place-items: start;
   min-width: 320px;
   min-height: 100vh;
+  min-height: 100dvh;
   color: var(--text-color, #ffffff);
   background: var(--surface-ground, #242424);
+  overflow: hidden;
 }
 
 h1 {

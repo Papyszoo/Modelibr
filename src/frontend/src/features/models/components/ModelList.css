@@ -289,7 +289,8 @@
 
 @media (max-width: 768px) {
   .model-list {
-    padding: 1rem;
+    padding: 0.5rem;
+    height: 100%;
   }
 
   .header-controls {
@@ -305,14 +306,30 @@
     overflow-x: auto;
   }
 
+  /* Tighter header on mobile — desktop's 1.5rem 2rem chews ~30% of phone
+     vertical real estate before any models are visible. */
   .model-list-header-tab {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 1rem;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .model-list-header-tab h1 {
+    font-size: 1rem;
   }
 
   .model-stats {
-    flex-direction: column;
-    gap: 0.5rem;
+    flex-direction: row;
+    gap: 0.25rem;
+  }
+
+  .model-stats .stat-item {
+    font-size: 0.75rem;
+  }
+
+  .model-list-tab .datatable-container {
+    margin: 0.5rem;
   }
 }

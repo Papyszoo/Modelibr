@@ -1,0 +1,95 @@
+/*
+ * Design tokens for Modelibr.
+ *
+ * All app-level UI should use these `--mod-*` variables instead of hardcoded
+ * colors or magic numbers. Tokens layer on top of the PrimeReact Lara theme
+ * so theme switches still flow through, but app surfaces stay decoupled from
+ * PrimeReact-specific names.
+ */
+
+:root {
+  /* ── Surfaces & borders ───────────────────────────────────────── */
+  --mod-color-bg: var(--surface-ground);
+  --mod-color-surface: var(--surface-card);
+  --mod-color-surface-raised: var(--surface-overlay, var(--surface-card));
+  --mod-color-surface-hover: var(--surface-hover);
+  --mod-color-border: var(--surface-border);
+  --mod-color-border-strong: var(--surface-d, var(--surface-border));
+
+  /* ── Text ─────────────────────────────────────────────────────── */
+  --mod-color-text: var(--text-color);
+  --mod-color-text-muted: var(--text-color-secondary);
+  --mod-color-text-inverse: #ffffff;
+
+  /* ── Brand & semantic ─────────────────────────────────────────── */
+  --mod-color-primary: var(--primary-color);
+  --mod-color-primary-text: var(--primary-color-text);
+  --mod-color-primary-hover: var(--primary-400, var(--primary-color));
+  --mod-color-danger: #ef4444;
+  --mod-color-danger-bg: rgba(239, 68, 68, 0.12);
+  --mod-color-warning: #f59e0b;
+  --mod-color-warning-bg: rgba(245, 158, 11, 0.12);
+  --mod-color-success: #10b981;
+  --mod-color-success-bg: rgba(16, 185, 129, 0.12);
+  --mod-color-info: #3b82f6;
+  --mod-color-info-bg: rgba(59, 130, 246, 0.12);
+
+  /* ── Spacing scale ────────────────────────────────────────────── */
+  --mod-space-2xs: 0.25rem;   /*  4px */
+  --mod-space-xs:  0.5rem;    /*  8px */
+  --mod-space-sm:  0.75rem;   /* 12px */
+  --mod-space-md:  1rem;      /* 16px */
+  --mod-space-lg:  1.5rem;    /* 24px */
+  --mod-space-xl:  2rem;      /* 32px */
+  --mod-space-2xl: 3rem;      /* 48px */
+  --mod-space-3xl: 4rem;      /* 64px */
+
+  /* ── Radius ───────────────────────────────────────────────────── */
+  --mod-radius-sm: 4px;
+  --mod-radius-md: 6px;
+  --mod-radius-lg: 8px;
+  --mod-radius-xl: 12px;
+  --mod-radius-pill: 9999px;
+
+  /* ── Typography ───────────────────────────────────────────────── */
+  --mod-text-xs:  0.75rem;
+  --mod-text-sm:  0.875rem;
+  --mod-text-md:  1rem;
+  --mod-text-lg:  1.125rem;
+  --mod-text-xl:  1.25rem;
+  --mod-text-2xl: 1.5rem;
+  --mod-text-3xl: 2rem;
+
+  --mod-font-weight-regular: 400;
+  --mod-font-weight-medium: 500;
+  --mod-font-weight-semibold: 600;
+  --mod-font-weight-bold: 700;
+
+  /* ── Z-index scale ────────────────────────────────────────────── */
+  --mod-z-base: 1;
+  --mod-z-dropdown: 1000;
+  --mod-z-sticky: 1100;
+  --mod-z-overlay: 1200;
+  --mod-z-modal: 1300;
+  --mod-z-toast: 1400;
+
+  /* ── Motion ───────────────────────────────────────────────────── */
+  --mod-transition-fast: 0.15s ease;
+  --mod-transition-base: 0.25s ease;
+  --mod-transition-slow: 0.4s ease;
+
+  /* ── Shadows ──────────────────────────────────────────────────── */
+  --mod-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.15);
+  --mod-shadow-md: 0 2px 6px rgba(0, 0, 0, 0.25);
+  --mod-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.35);
+
+  /*
+   * Breakpoints — kept in sync with `shared/styles/breakpoints.ts`.
+   * Note: CSS `var()` cannot be used inside @media queries, so these
+   * are documentation only. Use the TS constants for runtime checks
+   * and write hardcoded media queries that match these values.
+   */
+  --mod-bp-mobile: 768px;
+  --mod-bp-tablet: 1024px;
+  --mod-bp-desktop: 1280px;
+}

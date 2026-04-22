@@ -1,0 +1,40 @@
+.mod-loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--mod-space-sm);
+  padding: var(--mod-space-xl);
+  background: var(--mod-color-surface);
+  border: 1px solid var(--mod-color-border);
+  border-radius: var(--mod-radius-lg);
+  color: var(--mod-color-text-muted);
+}
+
+.mod-loading-state--inline {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--mod-space-sm);
+  padding: var(--mod-space-sm) var(--mod-space-md);
+  background: transparent;
+  border: none;
+}
+
+.mod-loading-state__bar {
+  height: 6px;
+}
+
+.mod-loading-state__message {
+  margin: 0;
+  text-align: center;
+  font-size: var(--mod-text-sm);
+  color: var(--mod-color-text-muted);
+}
+
+.mod-loading-state--inline .mod-loading-state__message {
+  text-align: left;
+}
+
+.mod-loading-state__spinner {
+  font-size: var(--mod-text-md);
+  color: var(--mod-color-primary);
+}

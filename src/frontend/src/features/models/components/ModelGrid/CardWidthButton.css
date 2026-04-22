@@ -2,6 +2,18 @@
   padding: 0.5rem 0.75rem;
 }
 
+/* When the label is hidden in mobile/icon-only mode, PrimeReact's icon span
+   keeps a margin-right of 0.5rem (its label-spacing) which pushes the icon
+   off-center inside the active highlight. Zero it out. */
+.card-width-toggle-btn .p-button-icon {
+  margin-right: 0;
+  margin-left: 0;
+}
+
+.card-width-toggle-btn .p-button-label {
+  margin-left: 0.5rem;
+}
+
 .card-width-overlay .p-overlaypanel-content {
   padding: 0.75rem;
 }
@@ -29,4 +41,31 @@
 
 .card-width-overlay-slider {
   width: 100%;
+}
+
+/* Mobile overlay — keep it inset from screen edges so neither the back-edge
+   gesture nor the right-edge gesture can be triggered while dragging the
+   slider. Centered horizontally regardless of where the trigger button is. */
+.card-width-overlay.card-width-overlay--mobile {
+  /* Anchor positioning is set by PrimeReact via inline left/top — but we
+     can override it without breaking the open/close behaviour. */
+  left: 1rem !important;
+  right: 1rem !important;
+  width: auto !important;
+  max-width: calc(100vw - 2rem) !important;
+  /* PrimeReact applies a transform for the appearance animation; we don't
+     want our left/right pinning to be undone by a translateX. */
+  transform: none !important;
+}
+
+.card-width-overlay.card-width-overlay--mobile .card-width-overlay-content {
+  min-width: 0;
+  width: 100%;
+}
+
+/* Hide the little arrow that points back at the trigger — it would be
+   detached from our re-positioned panel. */
+.card-width-overlay.card-width-overlay--mobile::before,
+.card-width-overlay.card-width-overlay--mobile::after {
+  display: none;
 }
