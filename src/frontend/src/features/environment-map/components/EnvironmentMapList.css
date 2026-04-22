@@ -415,7 +415,9 @@
     gap: 0.25rem;
   }
 
-  .environment-map-toolbar-actions .environment-map-toolbar-button .p-button-label,
+  .environment-map-toolbar-actions
+    .environment-map-toolbar-button
+    .p-button-label,
   .environment-map-toolbar-actions .card-width-toggle-btn .p-button-label {
     display: none;
   }
