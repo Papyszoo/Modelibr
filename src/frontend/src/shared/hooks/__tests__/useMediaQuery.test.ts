@@ -97,7 +97,9 @@ describe('useMediaQuery', () => {
     })
 
     const { unmount } = renderHook(() => useMediaQuery('(max-width: 767px)'))
-    const subscribed = created.find(mql => mql.addEventListener.mock.calls.length > 0)
+    const subscribed = created.find(
+      mql => mql.addEventListener.mock.calls.length > 0
+    )
     expect(subscribed).toBeDefined()
 
     unmount()
