@@ -329,6 +329,10 @@ jobs:
         runs-on: ubuntu-latest
         needs: [detect-changes]
         if: needs.detect-changes.outputs.e2e-relevant == 'true' || github.event_name == 'workflow_dispatch'
+        # Successful E2E runs take ~15-20 minutes. A hard ceiling prevents a
+        # single hung step (apt mirror flake, stuck Playwright test) from
+        # silently consuming the 6h runner default.
+        timeout-minutes: 50
 
         steps:
             - name: Checkout code
@@ -373,7 +377,11 @@ jobs:
 
             - name: Install Playwright browsers
               working-directory: tests/e2e
-              run: npx playwright install --with-deps chromium
+              timeout-minutes: 10
+              # Drop --with-deps: ubuntu-latest already ships the libs Chromium
+              # needs, and the apt path periodically stalls on Azure mirrors
+              # (Ign: responses that retry indefinitely). Matches the video job.
+              run: npx playwright install chromium
 
             - name: Run E2E tests
               id: e2e
