@@ -94,7 +94,7 @@ export function DockBar({
 
   return (
     <div
-      className={`dock-bar dock-bar--${orientation} dock-bar--placement-${placement}`}
+      className={`dock-bar dock-bar--${orientation} dock-bar--placement-${placement} dock-bar-${placement}`}
       onDrop={onDrop}
       onDragOver={onDragOver}
       onDragEnter={onDragEnter}
