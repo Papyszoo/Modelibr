@@ -35,14 +35,14 @@
   --mod-color-info-bg: rgba(59, 130, 246, 0.12);
 
   /* ── Spacing scale ────────────────────────────────────────────── */
-  --mod-space-2xs: 0.25rem;   /*  4px */
-  --mod-space-xs:  0.5rem;    /*  8px */
-  --mod-space-sm:  0.75rem;   /* 12px */
-  --mod-space-md:  1rem;      /* 16px */
-  --mod-space-lg:  1.5rem;    /* 24px */
-  --mod-space-xl:  2rem;      /* 32px */
-  --mod-space-2xl: 3rem;      /* 48px */
-  --mod-space-3xl: 4rem;      /* 64px */
+  --mod-space-2xs: 0.25rem; /*  4px */
+  --mod-space-xs: 0.5rem; /*  8px */
+  --mod-space-sm: 0.75rem; /* 12px */
+  --mod-space-md: 1rem; /* 16px */
+  --mod-space-lg: 1.5rem; /* 24px */
+  --mod-space-xl: 2rem; /* 32px */
+  --mod-space-2xl: 3rem; /* 48px */
+  --mod-space-3xl: 4rem; /* 64px */
 
   /* ── Radius ───────────────────────────────────────────────────── */
   --mod-radius-sm: 4px;
@@ -52,11 +52,11 @@
   --mod-radius-pill: 9999px;
 
   /* ── Typography ───────────────────────────────────────────────── */
-  --mod-text-xs:  0.75rem;
-  --mod-text-sm:  0.875rem;
-  --mod-text-md:  1rem;
-  --mod-text-lg:  1.125rem;
-  --mod-text-xl:  1.25rem;
+  --mod-text-xs: 0.75rem;
+  --mod-text-sm: 0.875rem;
+  --mod-text-md: 1rem;
+  --mod-text-lg: 1.125rem;
+  --mod-text-xl: 1.25rem;
   --mod-text-2xl: 1.5rem;
   --mod-text-3xl: 2rem;
 

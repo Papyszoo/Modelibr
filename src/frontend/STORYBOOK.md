@@ -167,8 +167,8 @@ Already configured to exclude:
 ## Conventions for new stories
 
 These rules keep Storybook useful as the codebase grows. When in doubt:
-*if the component cannot render in isolation, it does not belong in
-Storybook.*
+_if the component cannot render in isolation, it does not belong in
+Storybook._
 
 ### What SHOULD have a story
 
@@ -212,15 +212,25 @@ const meta: Meta<typeof MyComponent> = {
   component: MyComponent,
   tags: ['autodocs'],
   parameters: { layout: 'centered' }, // 'centered' | 'padded' | 'fullscreen'
-  args: { /* sensible defaults */ },
+  args: {
+    /* sensible defaults */
+  },
 }
 
 export default meta
 type Story = StoryObj<typeof MyComponent>
 
 export const Default: Story = {}
-export const Loading: Story = { args: { /* ... */ } }
-export const Error: Story = { args: { /* ... */ } }
+export const Loading: Story = {
+  args: {
+    /* ... */
+  },
+}
+export const Error: Story = {
+  args: {
+    /* ... */
+  },
+}
 ```
 
 ### Title hierarchy
