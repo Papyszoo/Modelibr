@@ -485,7 +485,11 @@ jobs:
             - name: Install Playwright browsers
               working-directory: docs/videos
               timeout-minutes: 10
-              run: npx playwright install --with-deps chromium
+              # Drop --with-deps: ubuntu-latest already ships the libs Chromium
+              # needs, and the apt path periodically stalls on Azure mirrors
+              # (Ign: responses that retry for 10+ minutes). The browser binary
+              # itself comes from Playwright's CDN and is unaffected.
+              run: npx playwright install chromium
 
             - name: Generate videos
               id: generate
