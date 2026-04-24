@@ -28,6 +28,7 @@ import {
   put,
   remove,
   removeRecycledItem,
+  removeThumbnail,
   storeFileBlob,
   storeThumbnail,
 } from '../db/demoDb'
@@ -62,6 +63,7 @@ export {
   put,
   remove,
   removeRecycledItem,
+  removeThumbnail,
   storeFileBlob,
   storeThumbnail,
 }
@@ -679,6 +681,22 @@ export function generateVersionThumbnailAsync(
       : generateModelThumbnail(fileBlob, 256, 256, fileName)
   gen
     .then(thumb => storeThumbnail(`version:${versionId}`, thumb))
+    .catch(() => {})
+}
+
+export function generateEnvironmentMapThumbnailAsync(
+  envMapId: number,
+  fileBlob: Blob,
+  fileName: string
+) {
+  const lower = fileName.toLowerCase()
+  const gen = lower.endsWith('.hdr')
+    ? generateHdrChannelPreview(fileBlob, 'rgb')
+    : lower.endsWith('.exr')
+      ? generateExrChannelPreview(fileBlob, 'rgb')
+      : generateImageChannelPreview(fileBlob, 'rgb')
+  gen
+    .then(preview => storeThumbnail(`envMapPreview:${envMapId}`, preview))
     .catch(() => {})
 }
 

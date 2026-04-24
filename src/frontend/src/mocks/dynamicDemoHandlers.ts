@@ -15,6 +15,7 @@ import {
   type DemoTextureSet,
   enrichModel,
   fetchStaticAsset,
+  generateEnvironmentMapThumbnailAsync,
   generateExrChannelPreview,
   generateHdrChannelPreview,
   generateImageChannelPreview,
@@ -38,6 +39,7 @@ import {
   recomputePackCounts,
   recomputeProjectCounts,
   remove,
+  removeThumbnail,
   seedAssetUrl,
   seedFileAssets,
   serveFile,
@@ -2265,6 +2267,16 @@ export const dynamicDemoHandlers = [
 
     await put('environmentMaps', environmentMap)
 
+    // Cube uploads fall back to the px face since we can't render a real sphere here.
+    const thumbnailSource = file ?? (cubeFaceFiles ? cubeFaceFiles.px : null)
+    if (thumbnailSource) {
+      generateEnvironmentMapThumbnailAsync(
+        environmentMapId,
+        thumbnailSource,
+        thumbnailSource.name
+      )
+    }
+
     trackUpload({
       batchId: url.searchParams.get('batchId') || `batch-${Date.now()}`,
       uploadType: 'EnvironmentMap',
@@ -2465,6 +2477,20 @@ export const dynamicDemoHandlers = [
       environmentMap.updatedAt = now()
       syncEnvironmentMapDerivedFields(environmentMap)
       await put('environmentMaps', environmentMap)
+
+      await removeThumbnail(`envMapPreview:${environmentMap.id}`)
+      if (environmentMap.previewFileId) {
+        const source = await loadEnvironmentMapPreviewBlob(
+          environmentMap.previewFileId
+        )
+        if (source) {
+          generateEnvironmentMapThumbnailAsync(
+            environmentMap.id,
+            source.blob,
+            source.fileName
+          )
+        }
+      }
 
       const regeneratedVariantIds = (environmentMap.variants ?? [])
         .filter(variant => !variant.isDeleted)
