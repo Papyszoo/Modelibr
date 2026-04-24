@@ -2,6 +2,7 @@ import './FloatingWindow.css'
 
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 
+import { useIsMobile } from '@/shared/hooks/useMediaQuery'
 import { usePanelStore } from '@/stores/panelStore'
 
 interface FloatingWindowProps {
@@ -22,6 +23,7 @@ export function FloatingWindow({
   windowId,
 }: FloatingWindowProps) {
   const [collapsed, setCollapsed] = useState(false)
+  const isMobile = useIsMobile()
 
   // Get panel sizes and active window from store
   const { leftPanelWidth, activeWindowId, setActiveWindow } = usePanelStore()
@@ -106,6 +108,7 @@ export function FloatingWindow({
   }, [visible, windowId, setActiveWindow])
 
   const handleMouseDown = (e: React.MouseEvent) => {
+    if (isMobile) return
     if ((e.target as HTMLElement).closest('.floating-window-header')) {
       setDragging(true)
       setActiveWindow(windowId) // Set as active when dragging starts
@@ -188,15 +191,25 @@ export function FloatingWindow({
 
   if (!visible) return null
 
+  const className = [
+    'floating-window',
+    collapsed && 'collapsed',
+    isMobile && 'floating-window--mobile',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+  // On mobile, the sheet covers the viewport — let CSS own positioning so
+  // it survives orientation changes and avoids the URL-bar resize jumps.
+  const inlineStyle = isMobile
+    ? { zIndex }
+    : { left: `${position.x}px`, top: `${position.y}px`, zIndex }
+
   return (
     <div
       ref={windowRef}
-      className={`floating-window ${collapsed ? 'collapsed' : ''}`}
-      style={{
-        left: `${position.x}px`,
-        top: `${position.y}px`,
-        zIndex,
-      }}
+      className={className}
+      style={inlineStyle}
       onMouseDown={handleMouseDown}
       onClick={handleWindowClick}
       id={windowId}

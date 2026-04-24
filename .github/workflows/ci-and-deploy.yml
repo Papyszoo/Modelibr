@@ -329,6 +329,10 @@ jobs:
         runs-on: ubuntu-latest
         needs: [detect-changes]
         if: needs.detect-changes.outputs.e2e-relevant == 'true' || github.event_name == 'workflow_dispatch'
+        # Successful E2E runs take ~15-20 minutes. A hard ceiling prevents a
+        # single hung step (apt mirror flake, stuck Playwright test) from
+        # silently consuming the 6h runner default.
+        timeout-minutes: 50
 
         steps:
             - name: Checkout code
@@ -373,7 +377,11 @@ jobs:
 
             - name: Install Playwright browsers
               working-directory: tests/e2e
-              run: npx playwright install --with-deps chromium
+              timeout-minutes: 10
+              # Drop --with-deps: ubuntu-latest already ships the libs Chromium
+              # needs, and the apt path periodically stalls on Azure mirrors
+              # (Ign: responses that retry indefinitely). Matches the video job.
+              run: npx playwright install chromium
 
             - name: Run E2E tests
               id: e2e
@@ -447,16 +455,22 @@ jobs:
         name: Generate Feature Videos
         runs-on: ubuntu-latest
         needs: [detect-changes]
+        # Historically this job completes in ~12 minutes. A hard ceiling prevents
+        # a single hung step (e.g. apt mirror flake during `playwright install
+        # --with-deps`) from silently consuming the 6h runner default.
+        timeout-minutes: 45
 
         steps:
             - name: Checkout code
               uses: actions/checkout@v4
 
             - name: Build and start E2E services
+              timeout-minutes: 15
               run: |
                   docker compose -f tests/e2e/docker-compose.e2e.yml up -d --build
 
             - name: Wait for services to be ready
+              timeout-minutes: 5
               run: |
                   echo "Waiting for services to be healthy..."
                   timeout 120 bash -c 'until curl -sf http://localhost:8090/health; do sleep 5; done'
@@ -473,15 +487,22 @@ jobs:
 
             - name: Install video dependencies
               working-directory: docs/videos
+              timeout-minutes: 5
               run: npm ci
 
             - name: Install Playwright browsers
               working-directory: docs/videos
-              run: npx playwright install --with-deps chromium
+              timeout-minutes: 10
+              # Drop --with-deps: ubuntu-latest already ships the libs Chromium
+              # needs, and the apt path periodically stalls on Azure mirrors
+              # (Ign: responses that retry for 10+ minutes). The browser binary
+              # itself comes from Playwright's CDN and is unaffected.
+              run: npx playwright install chromium
 
             - name: Generate videos
               id: generate
               working-directory: docs/videos
+              timeout-minutes: 25
               run: npm run generate
               env:
                   FRONTEND_URL: http://localhost:3002

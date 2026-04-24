@@ -165,10 +165,14 @@
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
-/* Model Grid */
+/* Model Grid — column min-width comes from --model-card-width (set inline
+   from the slider). Falls back to 180px when the variable is missing. */
 .model-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(var(--model-card-width, 180px), 1fr)
+  );
   gap: 1rem;
   padding: 0.5rem;
 }
@@ -543,59 +547,105 @@
   background: transparent;
 }
 
-/* Responsive adjustments */
+/* Responsive adjustments — keep slider in control, but cap the desktop
+   minimum down a notch on narrower windows. */
 @media (max-width: 1200px) {
   .model-grid {
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    grid-template-columns: repeat(
+      auto-fill,
+      minmax(min(var(--model-card-width, 160px), 160px), 1fr)
+    );
   }
 }
 
+/* Tablet & smaller — covers Fold 4 unfolded (~673px CSS) and below.
+   Toolbar collapses to icon-only buttons (including card-width); count chip
+   hides; container padding shrinks so cards get more horizontal room. */
 @media (max-width: 768px) {
+  .model-grid-container {
+    padding: 0.5rem;
+    gap: 0.75rem;
+  }
+
   .model-grid-toolbar {
-    align-items: flex-start;
-    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0;
   }
 
   .model-add-tags-input-row {
     flex-direction: column;
   }
 
-  .model-grid-toolbar-count {
-    align-self: flex-end;
-  }
-
   .model-grid-toolbar-actions {
-    width: 100%;
+    flex: 1;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 0.25rem;
   }
 
-  .model-grid-toolbar-button,
-  .model-grid-toolbar .card-width-toggle-btn {
-    flex: 1 1 calc(50% - 0.375rem);
+  /* Icon-only — but only for the main toolbar actions row. The selection
+     toolbar contains label-only buttons (Select All / Deselect All) that
+     would become invisible if their labels were hidden.
+     Card-width's button is a sibling but uses a different class, so include
+     it explicitly. */
+  .model-grid-toolbar-actions .model-grid-toolbar-button .p-button-label,
+  .model-grid-toolbar-actions .card-width-toggle-btn .p-button-label {
+    display: none;
+  }
+
+  .model-grid-toolbar-actions .model-grid-toolbar-button,
+  .model-grid-toolbar-actions .card-width-toggle-btn {
+    flex: 0 0 auto;
+    width: 2.5rem;
+    height: 2.5rem;
+    padding: 0;
     justify-content: center;
+    /* PrimeReact's icon-with-label spacing leaves a gap to the right of the
+       icon — kill it so the icon truly centers in the square button. */
+    gap: 0;
+  }
+
+  /* Hide the "{N} models" chip — it eats horizontal real estate that the
+     icon row needs, and the count is already visible on the dialog/tab. */
+  .model-grid-toolbar-count {
+    display: none;
   }
 
   .model-grid {
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 0.75rem;
-  }
-
-  .model-grid-container {
     gap: 0.75rem;
   }
 
   .model-card-name {
     font-size: 0.75rem;
   }
+
+  /* Selection checkbox always visible on touch — there's no hover. */
+  .model-card .model-select-checkbox {
+    opacity: 1;
+  }
 }
 
 @media (max-width: 480px) {
-  .model-grid-toolbar-button,
-  .model-grid-toolbar .card-width-toggle-btn {
-    flex-basis: 100%;
+  .model-grid-container {
+    padding: 0.375rem;
+    gap: 0.5rem;
   }
 
+  /* Cap the per-card minimum at 48% of the row so we never collapse to a
+     single column on phones, even when the slider is dragged high. The
+     slider still controls density between ~2 and ~4 columns. */
   .model-grid {
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    grid-template-columns: repeat(
+      auto-fill,
+      minmax(min(var(--model-card-width, 120px), 48%), 1fr)
+    );
     gap: 0.5rem;
+    padding: 0.25rem;
+  }
+
+  .model-card:hover {
+    /* Hover-lift is a desktop-only affordance. */
+    transform: none;
   }
 }

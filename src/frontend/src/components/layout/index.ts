@@ -1,5 +1,7 @@
+export { AppShell } from './AppShell'
 export { DockBar, DockContentArea, DockEmptyState } from './dock-panel'
 export { DockPanelContent } from './DockPanelContent'
 export { DraggableTab } from './DraggableTab'
+export { MobileShell } from './MobileShell'
 export { SplitterLayout } from './SplitterLayout'
 export { TabContent } from './TabContent'

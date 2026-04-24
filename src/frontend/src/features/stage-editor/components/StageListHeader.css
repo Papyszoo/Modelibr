@@ -28,3 +28,40 @@
   display: flex;
   gap: 0.5rem;
 }
+
+@media (max-width: 768px) {
+  .stage-list-header {
+    padding: 0.5rem 0.75rem;
+  }
+
+  .header-content {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .header-title h2 {
+    font-size: 1.125rem;
+    margin-bottom: 0.125rem;
+  }
+
+  .header-subtitle {
+    font-size: 0.8rem;
+  }
+
+  .header-actions .p-button .p-button-label {
+    display: none;
+  }
+
+  .header-actions .p-button {
+    width: 2.5rem;
+    height: 2.5rem;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .header-actions .p-button .p-button-icon {
+    margin-right: 0;
+    margin-left: 0;
+  }
+}

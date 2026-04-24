@@ -5,6 +5,8 @@ import { OverlayPanel } from 'primereact/overlaypanel'
 import { Slider } from 'primereact/slider'
 import { useRef } from 'react'
 
+import { useIsMobile } from '@/shared/hooks'
+
 interface CardWidthButtonProps {
   value: number
   min: number
@@ -19,6 +21,7 @@ export function CardWidthButton({
   onChange,
 }: CardWidthButtonProps) {
   const overlayRef = useRef<OverlayPanel>(null)
+  const isMobile = useIsMobile()
 
   return (
     <>
@@ -26,12 +29,17 @@ export function CardWidthButton({
         icon="pi pi-th-large"
         label="Card Width"
         className="p-button-text p-button-sm card-width-toggle-btn"
-        tooltip="Card Width"
+        // Skip tooltip on touch — it lingers on top of the slider popover
+        // because there's no hover-out event to dismiss it.
+        tooltip={isMobile ? undefined : 'Card Width'}
         tooltipOptions={{ position: 'bottom' }}
         onClick={e => overlayRef.current?.toggle(e)}
         aria-label="Card Width"
       />
-      <OverlayPanel ref={overlayRef} className="card-width-overlay">
+      <OverlayPanel
+        ref={overlayRef}
+        className={`card-width-overlay${isMobile ? ' card-width-overlay--mobile' : ''}`}
+      >
         <div className="card-width-overlay-content">
           <div className="card-width-overlay-label">
             <i className="pi pi-th-large" />

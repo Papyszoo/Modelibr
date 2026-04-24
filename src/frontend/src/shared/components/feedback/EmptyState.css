@@ -1,0 +1,51 @@
+.mod-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: var(--mod-space-sm);
+  padding: var(--mod-space-3xl) var(--mod-space-xl);
+  background: var(--mod-color-surface);
+  color: var(--mod-color-text-muted);
+  border: 2px dashed var(--mod-color-border);
+  border-radius: var(--mod-radius-lg);
+  transition: all var(--mod-transition-base);
+}
+
+.mod-empty-state--compact {
+  padding: var(--mod-space-lg);
+  border-style: solid;
+}
+
+.mod-empty-state--drag-over {
+  border-color: var(--mod-color-info);
+  background: var(--mod-color-info-bg);
+}
+
+.mod-empty-state__icon {
+  font-size: 3rem;
+  color: var(--mod-color-text-muted);
+}
+
+.mod-empty-state--compact .mod-empty-state__icon {
+  font-size: 2rem;
+}
+
+.mod-empty-state__title {
+  margin: 0;
+  font-size: var(--mod-text-lg);
+  font-weight: var(--mod-font-weight-semibold);
+  color: var(--mod-color-text);
+}
+
+.mod-empty-state__message {
+  margin: 0;
+  font-size: var(--mod-text-sm);
+  color: var(--mod-color-text-muted);
+  max-width: 32rem;
+}
+
+.mod-empty-state__action {
+  margin-top: var(--mod-space-sm);
+}

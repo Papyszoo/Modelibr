@@ -157,8 +157,90 @@ Already configured to exclude:
 
 ## Future Enhancements
 
-- Add more component stories (Scene, Model, ModelViewer)
 - Integrate visual regression testing
 - Add accessibility addon
 - Create design system documentation
 - Add interaction testing with play functions
+
+---
+
+## Conventions for new stories
+
+These rules keep Storybook useful as the codebase grows. When in doubt:
+_if the component cannot render in isolation, it does not belong in
+Storybook._
+
+### What SHOULD have a story
+
+- **Presentational primitives** under `src/shared/components/`
+  (e.g. `Dialog`, `EmptyState`, `LoadingState`, `ErrorState`,
+  `ListHeader`, `CardWidthSlider`).
+- **Reusable feature components** that take all data via props and have no
+  side effects (e.g. `ModelListHeader`, `TextureCard`, `SoundCard`).
+- **Visual variants of a component** — one story per meaningful state
+  (default, empty, loading, error, hover, disabled, mobile breakpoint).
+
+### What should NOT have a story
+
+- **Page-level / orchestrator components** (e.g. `ModelViewer`,
+  `SceneEditor`, `TextureSetViewer`, `ModelGrid`). They wire up routing,
+  contexts, queries, and mutations. Storybook can't usefully render them
+  and the story becomes a maintenance burden.
+- **Components that fetch their own data** via `useQuery` /
+  `useMutation` / direct API calls. Either split presentation from data
+  fetching first, or skip the story.
+- **Components tightly coupled to React contexts** owned by the app shell
+  (e.g. `TabContext`, `ModelProvider`, `DockPanelActionsContext`).
+
+### Mocking
+
+- API calls go through **MSW** — handlers in
+  [`src/mocks/handlers.ts`](src/mocks/handlers.ts) are registered globally
+  in `.storybook/preview.ts`. Per-story overrides go in
+  `parameters.msw.handlers`.
+- Do NOT mock the `apiClient` directly inside a story — use MSW instead so
+  the story exercises the same network path as the app.
+
+### Story file template
+
+```tsx
+import type { Meta, StoryObj } from '@storybook/react-vite'
+import { MyComponent } from './MyComponent'
+
+const meta: Meta<typeof MyComponent> = {
+  title: 'Shared/Feedback/MyComponent', // Domain/Category/Name
+  component: MyComponent,
+  tags: ['autodocs'],
+  parameters: { layout: 'centered' }, // 'centered' | 'padded' | 'fullscreen'
+  args: {
+    /* sensible defaults */
+  },
+}
+
+export default meta
+type Story = StoryObj<typeof MyComponent>
+
+export const Default: Story = {}
+export const Loading: Story = {
+  args: {
+    /* ... */
+  },
+}
+export const Error: Story = {
+  args: {
+    /* ... */
+  },
+}
+```
+
+### Title hierarchy
+
+- `Shared/<Category>/<Name>` for primitives in `src/shared/`
+- `<Feature>/<Name>` for feature components (e.g. `Models/ModelListHeader`)
+
+### Design tokens
+
+All app surfaces should use the `--mod-*` CSS variables defined in
+[`src/shared/styles/tokens.css`](src/shared/styles/tokens.css). Storybook
+loads them via `.storybook/preview.ts`, so token-based components render
+identically to the running app.

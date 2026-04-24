@@ -5,45 +5,97 @@
   background: var(--surface-ground);
 }
 
-.dock-panel-left {
+/* Placement controls how the bar is positioned relative to content */
+.dock-panel--placement-left {
   flex-direction: row;
 }
 
-.dock-panel-right {
+.dock-panel--placement-right {
   flex-direction: row-reverse;
+}
+
+.dock-panel--placement-top {
+  flex-direction: column;
+}
+
+.dock-panel--placement-bottom {
+  flex-direction: column-reverse;
 }
 
 /* Dock Bar (Side menu with tabs) */
 .dock-bar {
-  width: 60px;
   background: #1e293b;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  padding: 0.5rem 0;
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
   z-index: 10;
 }
 
-.dock-bar-left {
+.dock-bar--vertical {
+  /* Explicit full-height — defends against any ancestor that drops the
+     default `align-items: stretch` behavior. */
+  height: 100%;
+  align-self: stretch;
+  width: 60px;
+  flex-direction: column;
+  padding: 0.5rem 0;
+}
+
+.dock-bar--horizontal {
+  height: 60px;
+  width: 100%;
+  flex-direction: row;
+  padding: 0 0.5rem;
+}
+
+.dock-bar--placement-left {
   border-right: 1px solid #334155;
 }
 
-.dock-bar-right {
+.dock-bar--placement-right {
   border-left: 1px solid #334155;
+}
+
+.dock-bar--placement-top {
+  border-bottom: 1px solid #334155;
+}
+
+.dock-bar--placement-bottom {
+  border-top: 1px solid #334155;
 }
 
 .dock-tabs {
   display: flex;
-  flex-direction: column;
   gap: 0.375rem;
   flex: 1;
 }
 
+.dock-bar--vertical .dock-tabs {
+  flex-direction: column;
+}
+
+.dock-bar--horizontal .dock-tabs {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
 .dock-add {
   margin-top: auto;
+}
+
+.dock-bar--vertical .dock-add {
   padding-top: 0.5rem;
   border-top: 1px solid #334155;
+}
+
+.dock-bar--horizontal .dock-add {
+  margin-top: 0;
+  margin-left: auto;
+  padding-left: 0.5rem;
+  border-left: 1px solid #334155;
 }
 
 .dock-add-button {
@@ -132,12 +184,33 @@
 
 /* Responsive design */
 @media (max-width: 768px) {
-  .dock-bar {
+  .dock-bar--vertical {
     width: 50px;
+  }
+
+  .dock-bar--horizontal {
+    height: 50px;
   }
 
   .dock-add-button {
     width: 35px !important;
     height: 35px !important;
+  }
+}
+
+/* Phone-sized — every pixel of horizontal real estate matters when the
+   bar sits next to content. 44px is the iOS HIG touch-target minimum. */
+@media (max-width: 480px) {
+  .dock-bar--vertical {
+    width: 44px;
+  }
+
+  .dock-bar--horizontal {
+    height: 44px;
+  }
+
+  .dock-add-button {
+    width: 32px !important;
+    height: 32px !important;
   }
 }

@@ -1,0 +1,55 @@
+.mod-error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--mod-space-sm);
+  padding: var(--mod-space-xl);
+  background: var(--mod-color-danger-bg);
+  color: var(--mod-color-danger);
+  border: 1px solid var(--mod-color-danger);
+  border-radius: var(--mod-radius-lg);
+}
+
+.mod-error-state--inline {
+  flex-direction: row;
+  align-items: center;
+  text-align: left;
+  padding: var(--mod-space-sm) var(--mod-space-md);
+  gap: var(--mod-space-sm);
+}
+
+.mod-error-state__icon {
+  font-size: 2rem;
+  color: var(--mod-color-danger);
+}
+
+.mod-error-state--inline .mod-error-state__icon {
+  font-size: var(--mod-text-lg);
+}
+
+.mod-error-state__title {
+  margin: 0;
+  font-size: var(--mod-text-lg);
+  font-weight: var(--mod-font-weight-semibold);
+  color: var(--mod-color-danger);
+}
+
+.mod-error-state__message {
+  margin: 0;
+  font-size: var(--mod-text-sm);
+  color: var(--mod-color-text);
+  max-width: 32rem;
+}
+
+.mod-error-state--inline .mod-error-state__message {
+  flex: 1;
+}
+
+.mod-error-state__action {
+  margin-top: var(--mod-space-sm);
+}
+
+.mod-error-state--inline .mod-error-state__action {
+  margin-top: 0;
+}

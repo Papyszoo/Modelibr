@@ -96,7 +96,8 @@ interface DraggableTabProps {
   onClose: () => void
   onDragStart: (tab: Tab) => void
   onDragEnd: () => void
-  side: 'left' | 'right'
+  /** Where the tooltip should appear relative to the tab. */
+  tooltipPosition?: 'left' | 'right' | 'top' | 'bottom'
 }
 
 export function DraggableTab({
@@ -106,7 +107,7 @@ export function DraggableTab({
   onClose,
   onDragStart,
   onDragEnd,
-  side,
+  tooltipPosition = 'right',
 }: DraggableTabProps): JSX.Element {
   const handleDragStart = (e: React.DragEvent): void => {
     e.dataTransfer.effectAllowed = 'move'
@@ -149,8 +150,6 @@ export function DraggableTab({
   }
 
   const tooltipId = `tab-tooltip-${tab.id}`
-  // Position tooltip on the opposite side of the tab panel to avoid covering the icon
-  const tooltipPosition = side === 'left' ? 'right' : 'left'
 
   return (
     <>
