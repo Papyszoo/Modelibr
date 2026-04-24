@@ -29,17 +29,23 @@ import { ModelsFilters } from './ModelsFilters'
 import { type ModelGridProps } from './types'
 import { useModelGrid } from './useModelGrid'
 
-// VirtuosoGrid components with CSS Grid layout
+// VirtuosoGrid components with CSS Grid layout.
+// cardWidth is exposed as a CSS variable instead of a hard-coded
+// grid-template-columns inline style so that responsive @media rules can
+// reshape the layout (e.g. clamp to never go below 2 columns on phones)
+// without losing the slider's effect entirely.
 const gridComponents: GridComponents<{ cardWidth: number }> = {
   List: forwardRef(({ children, context, ...props }, ref) => (
     <div
       ref={ref}
       {...props}
       className="model-grid"
-      style={{
-        ...props.style,
-        gridTemplateColumns: `repeat(auto-fill, minmax(${context?.cardWidth ?? 180}px, 1fr))`,
-      }}
+      style={
+        {
+          ...props.style,
+          '--model-card-width': `${context?.cardWidth ?? 180}px`,
+        } as React.CSSProperties
+      }
     >
       {children}
     </div>

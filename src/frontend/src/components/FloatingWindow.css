@@ -7,6 +7,7 @@
   min-width: 300px;
   max-width: 420px;
   max-height: 85vh;
+  max-height: 85dvh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -82,6 +83,7 @@
   overflow: auto;
   padding: 0.75rem;
   max-height: calc(85vh - 40px);
+  max-height: calc(85dvh - 40px);
 }
 
 /* Scrollbar styling */
@@ -117,4 +119,57 @@
 
 .floating-window {
   animation: slideIn 0.2s ease-out;
+}
+
+/* Mobile sheet — full-viewport, drag disabled, header non-movable.
+   The browser URL bar (and any --demo-banner-height) is excluded via dvh
+   so Save buttons in scrollable content stay reachable. */
+.floating-window--mobile {
+  inset: var(--demo-banner-height, 0px) 0 0;
+  left: 0;
+  top: var(--demo-banner-height, 0px);
+  width: 100vw;
+  width: 100dvw;
+  min-width: 0;
+  max-width: none;
+  height: calc(100vh - var(--demo-banner-height, 0px));
+  height: calc(100dvh - var(--demo-banner-height, 0px));
+  max-height: none;
+  border-radius: 0;
+  border: none;
+  animation: sheetSlideIn 0.2s ease-out;
+}
+
+.floating-window--mobile.collapsed {
+  /* On mobile we still allow collapse-to-header for symmetry, but height
+     comes from the header instead of a magic 40px. */
+  height: auto;
+}
+
+.floating-window--mobile .floating-window-header {
+  cursor: default;
+  padding: 0.75rem 1rem;
+  /* Larger touch targets — header buttons grow on mobile via cascade. */
+}
+
+.floating-window--mobile .floating-window-header button.floating-window-btn {
+  width: 32px;
+  height: 32px;
+}
+
+.floating-window--mobile .floating-window-content {
+  max-height: none;
+  padding: 0.75rem;
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+@keyframes sheetSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

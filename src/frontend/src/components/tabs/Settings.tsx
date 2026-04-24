@@ -25,6 +25,11 @@ import {
 import { useTheme } from '@/hooks/useTheme'
 import { settingsFormSchema } from '@/shared/validation/formSchemas'
 import { useBlenderEnabledStore } from '@/stores/blenderEnabledStore'
+import {
+  type MobileBarPosition,
+  useUIPreferencesStore,
+} from '@/stores/uiPreferencesStore'
+
 import { WebDavInstructions } from './WebDavInstructions'
 
 interface SettingsData {
@@ -53,6 +58,10 @@ export function Settings(): JSX.Element {
 
   // Theme hook
   const { theme, setTheme } = useTheme()
+  const mobileBarPosition = useUIPreferencesStore(s => s.mobileBarPosition)
+  const setMobileBarPosition = useUIPreferencesStore(
+    s => s.setMobileBarPosition
+  )
 
   // Blender version management state
   const [blenderVersions, setBlenderVersions] = useState<BlenderVersionInfo[]>(
@@ -417,7 +426,6 @@ export function Settings(): JSX.Element {
         void probeAllWebDavUrls(urls)
       })
       .catch(() => {})
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const handleUninstallBlender = async () => {
@@ -507,6 +515,29 @@ export function Settings(): JSX.Element {
                     Choose between light and dark color themes
                   </span>
                   <span className="settings-default">Default: Light Theme</span>
+                </div>
+
+                <div className="settings-field">
+                  <label htmlFor="mobileBarPosition">
+                    Mobile Tab Bar Position
+                  </label>
+                  <select
+                    id="mobileBarPosition"
+                    value={mobileBarPosition}
+                    onChange={e =>
+                      setMobileBarPosition(e.target.value as MobileBarPosition)
+                    }
+                    className="settings-select"
+                  >
+                    <option value="left">Left (vertical)</option>
+                    <option value="bottom">Bottom (horizontal)</option>
+                    <option value="top">Top (horizontal)</option>
+                  </select>
+                  <span className="settings-help">
+                    Where the tab bar appears on narrow (mobile) screens. The
+                    desktop layout is unaffected.
+                  </span>
+                  <span className="settings-default">Default: Left</span>
                 </div>
               </div>
             )}

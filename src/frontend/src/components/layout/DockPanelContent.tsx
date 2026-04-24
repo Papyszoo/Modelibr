@@ -10,7 +10,7 @@ import {
 } from '@/stores/navigationStore'
 import { type Tab } from '@/types'
 
-import { DockBar } from './dock-panel/DockBar'
+import { DockBar, type DockPlacement } from './dock-panel/DockBar'
 import { DockContentArea } from './dock-panel/DockContentArea'
 import { DockEmptyState } from './dock-panel/DockEmptyState'
 import {
@@ -19,7 +19,10 @@ import {
 } from './dock-panel/DockPanelActionsContext'
 
 interface DockPanelContentProps {
+  /** Logical panel identity — drives cross-panel drag routing. */
   side: 'left' | 'right'
+  /** Visual placement of the dock bar; defaults to mirroring `side`. */
+  placement?: DockPlacement
   tabs: Tab[]
   setTabs: (tabs: Tab[]) => void
   activeTab: string
@@ -31,6 +34,7 @@ interface DockPanelContentProps {
 
 export function DockPanelContent({
   side,
+  placement = side,
   tabs,
   setTabs,
   activeTab,
@@ -197,10 +201,12 @@ export function DockPanelContent({
 
   return (
     <DockPanelActionsContext.Provider value={actions}>
-      <div className={`dock-panel dock-panel-${side}`}>
+      <div
+        className={`dock-panel dock-panel--placement-${placement} dock-panel--side-${side}`}
+      >
         {/* Dock/Menu Bar */}
         <DockBar
-          side={side}
+          placement={placement}
           tabs={tabs}
           activeTab={activeTab}
           onTabSelect={setActiveTab}

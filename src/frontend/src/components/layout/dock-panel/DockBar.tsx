@@ -9,14 +9,41 @@ import { type Tab } from '@/types'
 
 import { useDockPanelActions } from './DockPanelActionsContext'
 
+export type DockPlacement = 'left' | 'right' | 'top' | 'bottom'
+export type DockOrientation = 'vertical' | 'horizontal'
+
 interface DockBarProps {
-  side: 'left' | 'right'
+  /** Where this bar sits relative to the content area. Drives orientation + border. */
+  placement: DockPlacement
   tabs: Tab[]
   activeTab: string
   onTabSelect: (tabId: string) => void
 }
 
-export function DockBar({ side, tabs, activeTab, onTabSelect }: DockBarProps) {
+const ORIENTATION_BY_PLACEMENT: Record<DockPlacement, DockOrientation> = {
+  left: 'vertical',
+  right: 'vertical',
+  top: 'horizontal',
+  bottom: 'horizontal',
+}
+
+/** Tooltips appear on the side opposite the bar so they don't cover the icon. */
+const TOOLTIP_BY_PLACEMENT: Record<
+  DockPlacement,
+  'left' | 'right' | 'top' | 'bottom'
+> = {
+  left: 'right',
+  right: 'left',
+  top: 'bottom',
+  bottom: 'top',
+}
+
+export function DockBar({
+  placement,
+  tabs,
+  activeTab,
+  onTabSelect,
+}: DockBarProps) {
   const {
     closeTab,
     onTabDragStart,
@@ -35,6 +62,9 @@ export function DockBar({ side, tabs, activeTab, onTabSelect }: DockBarProps) {
     unregisterContextMenu,
     showContextMenu,
   } = useDockContext()
+
+  const orientation = ORIENTATION_BY_PLACEMENT[placement]
+  const tooltipPosition = TOOLTIP_BY_PLACEMENT[placement]
 
   const addMenuItems = useTabMenuItems({
     onAddTab: addTab,
@@ -64,7 +94,7 @@ export function DockBar({ side, tabs, activeTab, onTabSelect }: DockBarProps) {
 
   return (
     <div
-      className={`dock-bar dock-bar-${side}`}
+      className={`dock-bar dock-bar--${orientation} dock-bar--placement-${placement} dock-bar-${placement}`}
       onDrop={onDrop}
       onDragOver={onDragOver}
       onDragEnter={onDragEnter}
@@ -82,7 +112,7 @@ export function DockBar({ side, tabs, activeTab, onTabSelect }: DockBarProps) {
             onClose={() => closeTab(tab.id)}
             onDragStart={onTabDragStart}
             onDragEnd={onTabDragEnd}
-            side={side}
+            tooltipPosition={tooltipPosition}
           />
         ))}
       </div>

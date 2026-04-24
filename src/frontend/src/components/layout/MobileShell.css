@@ -1,0 +1,6 @@
+.mobile-shell {
+  height: calc(100vh - var(--demo-banner-height, 0px));
+  height: calc(100dvh - var(--demo-banner-height, 0px));
+  width: 100vw;
+  overflow: hidden;
+}

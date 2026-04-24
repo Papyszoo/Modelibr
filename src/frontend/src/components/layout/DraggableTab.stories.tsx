@@ -16,10 +16,10 @@ const meta = {
       control: 'boolean',
       description: 'Whether the tab is currently active',
     },
-    side: {
+    tooltipPosition: {
       control: 'select',
-      options: ['left', 'right'],
-      description: 'Which side of the screen the tab is on',
+      options: ['left', 'right', 'top', 'bottom'],
+      description: 'Tooltip placement relative to the tab',
     },
   },
 } satisfies Meta<typeof DraggableTab>
@@ -44,12 +44,12 @@ export const ModelList: Story = {
       internalUiState: {},
     },
     isActive: false,
-    side: 'left',
+    tooltipPosition: 'right',
     ...defaultHandlers,
   },
 }
 
-export const ModelViewer: Story = {
+export const ModelViewerActive: Story = {
   args: {
     tab: {
       id: 'model-viewer-1',
@@ -59,7 +59,7 @@ export const ModelViewer: Story = {
       internalUiState: {},
     },
     isActive: true,
-    side: 'left',
+    tooltipPosition: 'right',
     ...defaultHandlers,
   },
 }
@@ -74,23 +74,7 @@ export const TextureSets: Story = {
       internalUiState: {},
     },
     isActive: false,
-    side: 'left',
-    ...defaultHandlers,
-  },
-}
-
-export const TextureSetViewer: Story = {
-  args: {
-    tab: {
-      id: 'texture-set-viewer-1',
-      type: 'textureSetViewer',
-      setId: 'set-123',
-      label: 'Wood Texture Set',
-      params: { setId: 'set-123' },
-      internalUiState: {},
-    },
-    isActive: true,
-    side: 'right',
+    tooltipPosition: 'left',
     ...defaultHandlers,
   },
 }
@@ -105,129 +89,7 @@ export const Settings: Story = {
       internalUiState: {},
     },
     isActive: false,
-    side: 'right',
+    tooltipPosition: 'top',
     ...defaultHandlers,
   },
-}
-
-export const AllTabTypes: Story = {
-  args: {
-    tab: {
-      id: '1',
-      type: 'modelList',
-      label: 'Models',
-      params: {},
-      internalUiState: {},
-    },
-    isActive: false,
-    side: 'left',
-    ...defaultHandlers,
-  },
-  render: () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-        <DraggableTab
-          tab={{
-            id: '1',
-            type: 'modelList',
-            label: 'Models',
-            params: {},
-            internalUiState: {},
-          }}
-          isActive={false}
-          side="left"
-          {...defaultHandlers}
-        />
-        <DraggableTab
-          tab={{
-            id: '2',
-            type: 'modelViewer',
-            modelId: 'model-123',
-            params: { modelId: 'model-123' },
-            internalUiState: {},
-          }}
-          isActive={false}
-          side="left"
-          {...defaultHandlers}
-        />
-        <DraggableTab
-          tab={{
-            id: '3',
-            type: 'textureSets',
-            label: 'Textures',
-            params: {},
-            internalUiState: {},
-          }}
-          isActive={false}
-          side="left"
-          {...defaultHandlers}
-        />
-        <DraggableTab
-          tab={{
-            id: '4',
-            type: 'textureSets',
-            label: 'Texture Sets',
-            params: {},
-            internalUiState: {},
-          }}
-          isActive={true}
-          side="left"
-          {...defaultHandlers}
-        />
-        <DraggableTab
-          tab={{
-            id: '5',
-            type: 'textureSetViewer',
-            setId: 'set-123',
-            label: 'Wood Texture',
-            params: { setId: 'set-123' },
-            internalUiState: {},
-          }}
-          isActive={false}
-          side="left"
-          {...defaultHandlers}
-        />
-        <DraggableTab
-          tab={{
-            id: '6',
-            type: 'sprites',
-            label: 'Sprites',
-            params: {},
-            internalUiState: {},
-          }}
-          isActive={false}
-          side="left"
-          {...defaultHandlers}
-        />
-        <DraggableTab
-          tab={{
-            id: '7',
-            type: 'settings',
-            label: 'Settings',
-            params: {},
-            internalUiState: {},
-          }}
-          isActive={false}
-          side="left"
-          {...defaultHandlers}
-        />
-      </div>
-      <div style={{ marginTop: '16px', fontSize: '14px', color: '#888' }}>
-        <p>Icon mapping:</p>
-        <ul>
-          <li>Model List: pi-list</li>
-          <li>Model Viewer: pi-eye</li>
-          <li>Texture: pi-image</li>
-          <li>
-            <strong>Texture Sets: pi-palette (NEW)</strong>
-          </li>
-          <li>
-            <strong>Texture Set Viewer: pi-images (NEW)</strong>
-          </li>
-          <li>Sprites: pi-play</li>
-          <li>Settings: pi-cog</li>
-        </ul>
-      </div>
-    </div>
-  ),
 }
