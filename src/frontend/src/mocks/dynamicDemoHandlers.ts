@@ -16,6 +16,7 @@ import {
   enrichModel,
   fetchStaticAsset,
   generateEnvironmentMapThumbnailAsync,
+  generateEnvironmentMapVariantThumbnailAsync,
   generateExrChannelPreview,
   generateHdrChannelPreview,
   generateImageChannelPreview,
@@ -2070,11 +2071,20 @@ export const dynamicDemoHandlers = [
   http.get(
     '*/environment-maps/:id/variants/:variantId/preview',
     async ({ params }) => {
+      const variantId = Number(params.variantId)
+
+      const cached = await getThumbnail(`envMapVariantPreview:${variantId}`)
+      if (cached) {
+        return new HttpResponse(cached, {
+          headers: { 'Content-Type': cached.type || 'image/png' },
+        })
+      }
+
       const environmentMap = await getById('environmentMaps', Number(params.id))
       if (!environmentMap) return new HttpResponse(null, { status: 404 })
 
       const variant = (environmentMap.variants ?? []).find(
-        item => item.id === Number(params.variantId) && !item.isDeleted
+        item => item.id === variantId && !item.isDeleted
       )
       if (!variant) return new HttpResponse(null, { status: 404 })
 
@@ -2273,7 +2283,8 @@ export const dynamicDemoHandlers = [
       generateEnvironmentMapThumbnailAsync(
         environmentMapId,
         thumbnailSource,
-        thumbnailSource.name
+        thumbnailSource.name,
+        variantId
       )
     }
 
@@ -2436,6 +2447,16 @@ export const dynamicDemoHandlers = [
       syncEnvironmentMapDerivedFields(environmentMap)
       await put('environmentMaps', environmentMap)
 
+      const variantThumbnailSource =
+        file ?? (cubeFaceFiles ? cubeFaceFiles.px : null)
+      if (variantThumbnailSource) {
+        generateEnvironmentMapVariantThumbnailAsync(
+          variantId,
+          variantThumbnailSource,
+          variantThumbnailSource.name
+        )
+      }
+
       return HttpResponse.json({
         variantId,
         fileId,
@@ -2479,22 +2500,42 @@ export const dynamicDemoHandlers = [
       await put('environmentMaps', environmentMap)
 
       await removeThumbnail(`envMapPreview:${environmentMap.id}`)
-      if (environmentMap.previewFileId) {
-        const source = await loadEnvironmentMapPreviewBlob(
-          environmentMap.previewFileId
-        )
-        if (source) {
+
+      const activeVariants = (environmentMap.variants ?? []).filter(
+        variant => !variant.isDeleted
+      )
+
+      for (const variant of activeVariants) {
+        await removeThumbnail(`envMapVariantPreview:${variant.id}`)
+
+        const variantFileId =
+          variant.previewFileId ??
+          variant.panoramicFile?.fileId ??
+          variant.cubeFaces?.px.fileId ??
+          variant.fileId ??
+          null
+        if (!variantFileId) continue
+
+        const source = await loadEnvironmentMapPreviewBlob(variantFileId)
+        if (!source) continue
+
+        if (variant.id === environmentMap.previewVariantId) {
           generateEnvironmentMapThumbnailAsync(
             environmentMap.id,
+            source.blob,
+            source.fileName,
+            variant.id
+          )
+        } else {
+          generateEnvironmentMapVariantThumbnailAsync(
+            variant.id,
             source.blob,
             source.fileName
           )
         }
       }
 
-      const regeneratedVariantIds = (environmentMap.variants ?? [])
-        .filter(variant => !variant.isDeleted)
-        .map(variant => variant.id)
+      const regeneratedVariantIds = activeVariants.map(variant => variant.id)
 
       return HttpResponse.json({
         message:
