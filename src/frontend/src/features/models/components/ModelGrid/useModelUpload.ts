@@ -3,7 +3,7 @@ import { type RefObject, useCallback } from 'react'
 
 import { addModelToPack } from '@/features/pack/api/packApi'
 import { addModelToProject } from '@/features/project/api/projectApi'
-import { useDragAndDrop, useFileUpload } from '@/shared/hooks/useFileUpload'
+import { useFileUpload } from '@/shared/hooks/useFileUpload'
 import { useBlenderEnabledStore } from '@/stores/blenderEnabledStore'
 
 interface UseModelUploadOptions {
@@ -67,17 +67,9 @@ export function useModelUpload({
     [blenderEnabled, uploadMultipleFiles]
   )
 
-  const { onDrop, onDragOver, onDragEnter, onDragLeave } = useDragAndDrop(
-    filteredUploadMultipleFiles
-  )
-
   return {
     uploading,
     uploadProgress,
     uploadMultipleFiles: filteredUploadMultipleFiles,
-    onDrop,
-    onDragOver,
-    onDragEnter,
-    onDragLeave,
   }
 }

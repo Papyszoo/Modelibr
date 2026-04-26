@@ -7,7 +7,7 @@ import { type MenuItem } from 'primereact/menuitem'
 import { useEffect, useRef } from 'react'
 
 import { getFileUrl } from '@/features/models/api/modelApi'
-import { UploadableGrid } from '@/shared/components'
+import { UploadDropZone } from '@/shared/components/UploadDropZone'
 import { useContainerSounds } from '@/shared/hooks/useContainerSounds'
 import { type ContainerAdapter } from '@/shared/types/ContainerTypes'
 import { formatDuration } from '@/utils/audioUtils'
@@ -57,10 +57,8 @@ export function ContainerSoundsTab({
   return (
     <>
       <ContextMenu model={contextMenuItems} ref={contextMenuRef} />
-      <UploadableGrid
+      <UploadDropZone
         onFilesDropped={sn.handleUpload}
-        isUploading={sn.uploading}
-        uploadMessage={`Drop audio files here to create sounds and add to ${labelLower}`}
         className="container-grid-wrapper"
       >
         <div className="container-section">
@@ -108,7 +106,7 @@ export function ContainerSoundsTab({
             </div>
           )}
         </div>
-      </UploadableGrid>
+      </UploadDropZone>
 
       {/* Add Sound Dialog */}
       <Dialog

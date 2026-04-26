@@ -2,7 +2,6 @@ import { useRef } from 'react'
 
 import { createSoundWithFile } from '@/features/sounds/api/soundApi'
 import { useUploadProgress } from '@/hooks/useUploadProgress'
-import { useDragAndDrop } from '@/shared/hooks/useFileUpload'
 import { decodeAudio, extractPeaks } from '@/utils/audioUtils'
 
 const UNASSIGNED_CATEGORY_ID = -1
@@ -129,14 +128,7 @@ export function useSoundUpload({
     loadSounds()
   }
 
-  const { onDrop, onDragOver, onDragEnter, onDragLeave } =
-    useDragAndDrop(handleFileDrop)
-
   return {
-    onDrop,
-    onDragOver,
-    onDragEnter,
-    onDragLeave,
     fileInputRef,
     handleFileDrop,
   }

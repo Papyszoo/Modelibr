@@ -5,21 +5,8 @@
   flex-direction: column;
   gap: 1.5rem;
   padding: 1rem;
-  border: 2px dashed transparent;
   border-radius: 8px;
-  transition: all 0.3s ease;
   overflow: auto;
-}
-
-.texture-set-grid-container:hover:not(.drag-over) {
-  border-color: #3182ce;
-  background: rgba(49, 130, 206, 0.05);
-}
-
-.texture-set-grid-container.drag-over {
-  border-color: #3182ce;
-  background: rgba(49, 130, 206, 0.1);
-  transform: scale(1.02);
 }
 
 /* Search and Filter Controls */
@@ -250,17 +237,6 @@
   margin: 1rem;
   transition: all 0.3s ease;
   cursor: pointer;
-}
-
-.texture-set-grid-empty:hover:not(.drag-over) {
-  border-color: var(--primary-color);
-  background: rgba(var(--primary-color-rgb), 0.05);
-}
-
-.texture-set-grid-empty.drag-over {
-  border-color: var(--primary-color);
-  background: rgba(var(--primary-color-rgb), 0.1);
-  transform: scale(1.02);
 }
 
 .texture-set-grid-empty .pi {

@@ -7,7 +7,7 @@ import { type MenuItem } from 'primereact/menuitem'
 import { useEffect, useRef } from 'react'
 
 import { getFileUrl } from '@/features/models/api/modelApi'
-import { UploadableGrid } from '@/shared/components'
+import { UploadDropZone } from '@/shared/components/UploadDropZone'
 import { useContainerSprites } from '@/shared/hooks/useContainerSprites'
 import { type ContainerAdapter } from '@/shared/types/ContainerTypes'
 import { formatFileSize } from '@/utils/fileUtils'
@@ -98,10 +98,8 @@ export function ContainerSpritesTab({
   return (
     <>
       <ContextMenu model={contextMenuItems} ref={contextMenuRef} />
-      <UploadableGrid
+      <UploadDropZone
         onFilesDropped={sp.handleUpload}
-        isUploading={sp.uploading}
-        uploadMessage={`Drop image files here to create sprites and add to ${labelLower}`}
         className="container-grid-wrapper"
       >
         <div className="container-section">
@@ -160,7 +158,7 @@ export function ContainerSpritesTab({
             </div>
           )}
         </div>
-      </UploadableGrid>
+      </UploadDropZone>
 
       {/* Add Sprite Dialog */}
       <Dialog

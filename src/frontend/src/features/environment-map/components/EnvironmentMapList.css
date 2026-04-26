@@ -5,21 +5,8 @@
   gap: 1rem;
   height: 100%;
   padding: 1rem;
-  border: 2px dashed transparent;
   border-radius: 8px;
-  transition: all 0.3s ease;
   overflow: auto;
-}
-
-.environment-map-list:hover:not(.drag-over) {
-  border-color: var(--primary-color);
-  background: rgba(var(--primary-color-rgb), 0.05);
-}
-
-.environment-map-list.drag-over {
-  border-color: var(--primary-color);
-  background: rgba(var(--primary-color-rgb), 0.1);
-  transform: scale(1.01);
 }
 
 .environment-map-controls {

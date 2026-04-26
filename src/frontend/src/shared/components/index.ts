@@ -1,4 +1,4 @@
-export { UploadableGrid } from './UploadableGrid'
+export { UploadDropZone } from './UploadDropZone'
 export { UploadProgressWindow } from './UploadProgressWindow'
 
 // Generic UI primitives — prefer these for new feature work over building

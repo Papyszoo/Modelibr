@@ -14,6 +14,7 @@ import {
 import { type GridComponents, VirtuosoGrid } from 'react-virtuoso'
 
 import { useTabContext } from '@/hooks/useTabContext'
+import { UploadDropZone } from '@/shared/components/UploadDropZone'
 import { ThumbnailDisplay } from '@/shared/thumbnail'
 import {
   DEFAULT_MODEL_LIST_VIEW_STATE,
@@ -152,10 +153,6 @@ export function ModelGrid({
     uploading,
     uploadProgress,
     uploadMultipleFiles,
-    onDrop,
-    onDragOver,
-    onDragEnter,
-    onDragLeave,
     searchQuery,
     setSearchQuery,
     selectedCategoryKeys,
@@ -425,13 +422,12 @@ export function ModelGrid({
   }
 
   return (
-    <div
+    <UploadDropZone
       ref={setScrollParent}
       className="model-grid-container"
-      onDrop={onDrop}
-      onDragOver={onDragOver}
-      onDragEnter={onDragEnter}
-      onDragLeave={onDragLeave}
+      onFilesDropped={files => {
+        void uploadMultipleFiles(files)
+      }}
     >
       <Toast ref={toast} />
 
@@ -628,6 +624,6 @@ export function ModelGrid({
           onModelsAdded={() => fetchModels()}
         />
       )}
-    </div>
+    </UploadDropZone>
   )
 }
