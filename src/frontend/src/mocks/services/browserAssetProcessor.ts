@@ -8,18 +8,22 @@
  * 2. Audio Waveforms  — OfflineAudioContext peak extraction → Canvas 2D PNG
  */
 import {
+  ACESFilmicToneMapping,
   AmbientLight,
   Box3,
   CanvasTexture,
   Color,
   DirectionalLight,
+  EquirectangularReflectionMapping,
   type Group,
   Mesh,
   MeshStandardMaterial,
   type Object3D,
   PerspectiveCamera,
+  PMREMGenerator,
   Scene,
   SphereGeometry,
+  type Texture,
   Vector3,
   WebGLRenderer,
 } from 'three'
@@ -709,6 +713,109 @@ export async function generateTextureSetThumbnail(
     return blob
   } catch {
     return generatePlaceholderThumbnail(width, height, '#7b5ea7')
+  }
+}
+
+// ─── Environment Map Thumbnails ─────────────────────────────────────────
+
+async function loadEquirectangularEnvTexture(
+  blob: Blob,
+  fileName: string
+): Promise<Texture> {
+  const lower = fileName.toLowerCase()
+  const url = URL.createObjectURL(blob)
+  try {
+    if (lower.endsWith('.hdr')) {
+      const { RGBELoader } = await import('three-stdlib')
+      const loader = new RGBELoader()
+      return await new Promise<Texture>((resolve, reject) => {
+        loader.load(url, resolve as (tex: unknown) => void, undefined, reject)
+      })
+    }
+    if (lower.endsWith('.exr')) {
+      const { EXRLoader } = await import('three/addons/loaders/EXRLoader.js')
+      const loader = new EXRLoader()
+      return await new Promise<Texture>((resolve, reject) => {
+        loader.load(url, resolve as (tex: unknown) => void, undefined, reject)
+      })
+    }
+    const bitmap = await createImageBitmap(blob)
+    return new CanvasTexture(bitmap as unknown as HTMLCanvasElement)
+  } finally {
+    URL.revokeObjectURL(url)
+  }
+}
+
+/**
+ * Render an environment map thumbnail as an animated WebP: a polished
+ * metallic sphere using the env map for IBL, orbited 360° around the
+ * camera. Mirrors the real asset-processor's environmentMapProcessor.js
+ * output — tone-mapped through ACES so HDRs no longer blow out to white.
+ */
+export async function generateEnvironmentMapThumbnail(
+  fileBlob: Blob,
+  fileName: string,
+  width = 256,
+  height = 256
+): Promise<Blob> {
+  try {
+    const envTexture = await loadEquirectangularEnvTexture(fileBlob, fileName)
+    envTexture.mapping = EquirectangularReflectionMapping
+
+    const canvas = document.createElement('canvas')
+    canvas.width = width
+    canvas.height = height
+
+    const renderer = new WebGLRenderer({
+      canvas,
+      alpha: true,
+      antialias: true,
+      preserveDrawingBuffer: true,
+    })
+    renderer.setSize(width, height)
+    renderer.setClearColor(0x2a2a2e, 1)
+    renderer.toneMapping = ACESFilmicToneMapping
+    renderer.toneMappingExposure = 1.0
+
+    const pmrem = new PMREMGenerator(renderer)
+    const prefiltered = pmrem.fromEquirectangular(envTexture).texture
+
+    const scene = new Scene()
+    scene.background = envTexture
+    scene.environment = prefiltered
+
+    const camera = new PerspectiveCamera(45, width / height, 0.01, 1000)
+
+    const geometry = new SphereGeometry(1, 64, 64)
+    const material = new MeshStandardMaterial({
+      color: 0xffffff,
+      metalness: 1.0,
+      roughness: 0.08,
+      envMapIntensity: 1.2,
+    })
+    scene.add(new Mesh(geometry, material))
+
+    const fov = camera.fov * (Math.PI / 180)
+    const distance = (2.0 / (2 * Math.tan(fov / 2))) * 1.8
+
+    const thumbnailBlob = await renderOrbitAnimation(
+      renderer,
+      scene,
+      camera,
+      distance,
+      width,
+      height
+    )
+
+    renderer.dispose()
+    pmrem.dispose()
+    geometry.dispose()
+    material.dispose()
+    envTexture.dispose()
+    prefiltered.dispose()
+    return thumbnailBlob
+  } catch {
+    return generatePlaceholderThumbnail(width, height, '#4a90d9')
   }
 }
 
