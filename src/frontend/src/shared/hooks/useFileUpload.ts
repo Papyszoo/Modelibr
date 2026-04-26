@@ -8,6 +8,8 @@ import {
   isThreeJSRenderable,
 } from '../../utils/fileUtils'
 
+const UPLOAD_CONCURRENCY = 4
+
 /**
  * Custom hook for handling file uploads with validation and progress tracking
  * @param {Object} options - Configuration options
@@ -36,6 +38,37 @@ export function useFileUpload(options = {}) {
   const uploadProgressContext = useUploadProgress()
 
   /**
+   * Validate a file pre-upload. Returns an error object on failure, null on pass.
+   */
+  const validateFile = file => {
+    const fileExtension = '.' + file.name.split('.').pop().toLowerCase()
+
+    if (!isSupportedModelFormat(fileExtension)) {
+      const error = new Error(
+        `File ${file.name} is not a supported 3D model format`
+      )
+      error.type = 'UNSUPPORTED_FORMAT'
+      return error
+    }
+
+    // .blend files bypass renderability — handled by the asset-processor
+    const isBlendFile = fileExtension === '.blend'
+    if (
+      requireThreeJSRenderable &&
+      !isThreeJSRenderable(fileExtension) &&
+      !isBlendFile
+    ) {
+      const error = new Error(
+        `File ${file.name} (${fileExtension.toUpperCase()}) is supported but not renderable in 3D viewer. Use the upload page for this file type.`
+      )
+      error.type = 'NON_RENDERABLE'
+      return error
+    }
+
+    return null
+  }
+
+  /**
    * Upload a single file
    * @param {File} file - File to upload
    * @param {string} uploadId - Optional upload ID for global progress tracking
@@ -47,53 +80,21 @@ export function useFileUpload(options = {}) {
       throw new Error('No file provided')
     }
 
-    const fileExtension = '.' + file.name.split('.').pop().toLowerCase()
-
-    // Validate file format
-    if (!isSupportedModelFormat(fileExtension)) {
-      const error = new Error(
-        `File ${file.name} is not a supported 3D model format`
-      )
-      error.type = 'UNSUPPORTED_FORMAT'
-
-      // Update global progress if enabled and available
+    const validationError = validateFile(file)
+    if (validationError) {
       if (useGlobalProgress && uploadId && uploadProgressContext) {
-        uploadProgressContext.failUpload(uploadId, error)
+        uploadProgressContext.failUpload(uploadId, validationError)
       }
-
-      throw error
-    }
-
-    // Check Three.js renderability if required
-    // .blend files bypass this check when blenderEnabled is true — they're handled by the asset-processor
-    const isBlendFile = fileExtension === '.blend'
-    if (
-      requireThreeJSRenderable &&
-      !isThreeJSRenderable(fileExtension) &&
-      !isBlendFile
-    ) {
-      const error = new Error(
-        `File ${file.name} (${fileExtension.toUpperCase()}) is supported but not renderable in 3D viewer. Use the upload page for this file type.`
-      )
-      error.type = 'NON_RENDERABLE'
-
-      // Update global progress if enabled and available
-      if (useGlobalProgress && uploadId && uploadProgressContext) {
-        uploadProgressContext.failUpload(uploadId, error)
-      }
-
-      throw error
+      throw validationError
     }
 
     try {
-      // Update global progress if enabled and available
       if (useGlobalProgress && uploadId && uploadProgressContext) {
         uploadProgressContext.updateUploadProgress(uploadId, 50)
       }
 
       const result = await uploadModel(file, { batchId })
 
-      // Update global progress if enabled and available
       if (useGlobalProgress && uploadId && uploadProgressContext) {
         uploadProgressContext.updateUploadProgress(uploadId, 100)
         uploadProgressContext.completeUpload(uploadId, result)
@@ -101,7 +102,6 @@ export function useFileUpload(options = {}) {
 
       return result
     } catch (error) {
-      // Update global progress if enabled and available
       if (useGlobalProgress && uploadId && uploadProgressContext) {
         uploadProgressContext.failUpload(uploadId, error)
       }
@@ -114,7 +114,8 @@ export function useFileUpload(options = {}) {
   }
 
   /**
-   * Upload multiple files with progress tracking
+   * Upload multiple files with progress tracking. Files are uploaded with bounded
+   * concurrency to avoid overwhelming the server while still being faster than serial.
    * @param {FileList|File[]} files - Files to upload
    * @returns {Promise<Object>} Upload results summary
    */
@@ -124,77 +125,98 @@ export function useFileUpload(options = {}) {
     }
 
     const fileArray = Array.from(files)
+    const total = fileArray.length
     const results = {
       succeeded: [],
       failed: [],
-      total: fileArray.length,
+      total,
     }
 
     setUploading(true)
     setUploadProgress(0)
 
-    // Create batch for multiple files
+    const useStore =
+      useGlobalProgress && uploadProgressContext && total > 0
+
+    // Create batch + reserve all upload IDs in a single store update.
+    // This avoids N separate addUpload calls (each cloning state) when many
+    // files are dropped.
     const batchId =
-      useGlobalProgress && uploadProgressContext && fileArray.length > 1
-        ? uploadProgressContext.createBatch()
-        : undefined
+      useStore && total > 1 ? uploadProgressContext.createBatch() : undefined
 
-    try {
-      for (let i = 0; i < fileArray.length; i++) {
-        const file = fileArray[i]
+    const uploadIds = useStore
+      ? uploadProgressContext.addUploads(fileArray, fileType, batchId)
+      : new Array(total).fill(null)
 
-        // Add to global progress tracker if enabled and available
-        const uploadId =
-          useGlobalProgress && uploadProgressContext
-            ? uploadProgressContext.addUpload(file, fileType, batchId)
-            : null
+    let completed = 0
+    const handleFileResult = (file, error) => {
+      completed++
+      const progress = Math.round((completed / total) * 100 * 100) / 100
+      setUploadProgress(progress)
 
-        try {
-          const result = await uploadSingleFile(file, uploadId, batchId)
-          results.succeeded.push({ file, result })
-        } catch (error) {
-          results.failed.push({ file, error })
+      if (error) {
+        results.failed.push({ file, error })
 
-          // Show error notification if toast is provided
-          if (toast?.current) {
-            const severity =
-              error.type === 'UNSUPPORTED_FORMAT' ||
-              error.type === 'NON_RENDERABLE'
-                ? 'warn'
-                : 'error'
-            const summary =
-              error.type === 'UNSUPPORTED_FORMAT'
-                ? 'Unsupported File'
-                : error.type === 'NON_RENDERABLE'
-                  ? 'Non-renderable Format'
-                  : 'Upload Failed'
+        if (toast?.current) {
+          const severity =
+            error.type === 'UNSUPPORTED_FORMAT' ||
+            error.type === 'NON_RENDERABLE'
+              ? 'warn'
+              : 'error'
+          const summary =
+            error.type === 'UNSUPPORTED_FORMAT'
+              ? 'Unsupported File'
+              : error.type === 'NON_RENDERABLE'
+                ? 'Non-renderable Format'
+                : 'Upload Failed'
 
-            toast.current.show({
-              severity,
-              summary,
-              detail: error.message,
-            })
-          }
-
-          if (onError) {
-            onError(file, error)
-          }
+          toast.current.show({
+            severity,
+            summary,
+            detail: error.message,
+          })
         }
 
-        // Round progress to 2 decimal places
-        const progress =
-          Math.round(((i + 1) / fileArray.length) * 100 * 100) / 100
-        setUploadProgress(progress)
+        if (onError) {
+          onError(file, error)
+        }
       }
+    }
 
-      // Call onSuccess once after all uploads complete (if any succeeded)
+    const runOne = async index => {
+      const file = fileArray[index]
+      const uploadId = uploadIds[index]
+      try {
+        const result = await uploadSingleFile(file, uploadId, batchId)
+        results.succeeded.push({ file, result })
+        handleFileResult(file, null)
+      } catch (error) {
+        handleFileResult(file, error)
+      }
+    }
+
+    try {
+      // Bounded concurrency pool: keep UPLOAD_CONCURRENCY workers busy until
+      // the queue is drained. Order of completion is unspecified; results
+      // arrays are populated as each upload finishes.
+      let next = 0
+      const workers = new Array(Math.min(UPLOAD_CONCURRENCY, total))
+        .fill(null)
+        .map(async () => {
+          while (true) {
+            const index = next++
+            if (index >= total) return
+            await runOne(index)
+          }
+        })
+      await Promise.all(workers)
+
       if (onSuccess && results.succeeded.length > 0) {
         onSuccess(null, results)
       }
 
       return results
     } catch (err) {
-      // Handle unexpected errors
       if (toast?.current) {
         toast.current.show({
           severity: 'error',
@@ -218,7 +240,6 @@ export function useFileUpload(options = {}) {
     setUploading(true)
     setUploadProgress(0)
 
-    // Add to global progress tracker if enabled and available
     const uploadId =
       useGlobalProgress && uploadProgressContext
         ? uploadProgressContext.addUpload(file, fileType)
@@ -254,19 +275,56 @@ export function useFileUpload(options = {}) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Shared drag coordinator
+// ---------------------------------------------------------------------------
+// All instances of useDragAndDrop share a single pair of window listeners.
+// When the first instance mounts we attach; when the last unmounts we detach.
+// Each instance registers a clear-callback that runs on global dragend/drop.
+
+type DragSubscriber = () => void
+const dragSubscribers: Set<DragSubscriber> = new Set()
+let dragListenersAttached = false
+let attachedDragEndHandler: ((e: Event) => void) | null = null
+let attachedDropHandler: ((e: Event) => void) | null = null
+
+function notifyDragSubscribers() {
+  dragSubscribers.forEach(fn => fn())
+}
+
+function attachDragListeners() {
+  if (dragListenersAttached) return
+  attachedDragEndHandler = () => notifyDragSubscribers()
+  attachedDropHandler = () => notifyDragSubscribers()
+  window.addEventListener('dragend', attachedDragEndHandler)
+  window.addEventListener('drop', attachedDropHandler)
+  dragListenersAttached = true
+}
+
+function detachDragListeners() {
+  if (!dragListenersAttached) return
+  if (attachedDragEndHandler) {
+    window.removeEventListener('dragend', attachedDragEndHandler)
+    attachedDragEndHandler = null
+  }
+  if (attachedDropHandler) {
+    window.removeEventListener('drop', attachedDropHandler)
+    attachedDropHandler = null
+  }
+  dragListenersAttached = false
+}
+
 /**
  * Utility function to create drag and drop handlers
  * @param {Function} onFilesDropped - Callback when files are dropped
  * @returns {Object} Drag and drop event handlers
  */
 export function useDragAndDrop(onFilesDropped) {
-  // Use a ref to track nested drag enter/leave events
-  // This prevents flickering when dragging over child elements
+  // Track nested drag enter/leave to prevent flickering when dragging over
+  // child elements (counter-based approach).
   const dragCounterRef = useRef(0)
   const dragTargetRef = useRef(null)
 
-  // Clear drag state helper function
-  // Wrapped in useCallback to ensure stable reference across renders
   const clearDragState = useCallback(() => {
     dragCounterRef.current = 0
     document.body.classList.remove('dragging-file')
@@ -276,25 +334,16 @@ export function useDragAndDrop(onFilesDropped) {
     }
   }, [])
 
-  // Set up global event listeners to handle edge cases where drag leaves the window
+  // Subscribe this instance's clear callback to the shared coordinator.
   useEffect(() => {
-    const handleDragEnd = () => {
-      // When drag operation ends anywhere, clear the drag state
-      clearDragState()
-    }
-
-    const handleDrop = () => {
-      // When drop happens anywhere in the document, clear the drag state
-      clearDragState()
-    }
-
-    // Add listeners to window to catch drag operations that end outside our drop zones
-    window.addEventListener('dragend', handleDragEnd)
-    window.addEventListener('drop', handleDrop)
+    dragSubscribers.add(clearDragState)
+    attachDragListeners()
 
     return () => {
-      window.removeEventListener('dragend', handleDragEnd)
-      window.removeEventListener('drop', handleDrop)
+      dragSubscribers.delete(clearDragState)
+      if (dragSubscribers.size === 0) {
+        detachDragListeners()
+      }
       // Clean up any lingering drag state on unmount
       clearDragState()
     }
@@ -304,10 +353,8 @@ export function useDragAndDrop(onFilesDropped) {
     e.preventDefault()
     e.stopPropagation()
 
-    // Clear drag state immediately and unconditionally
     clearDragState()
 
-    // Only process files if they are actually present
     if (
       e.dataTransfer &&
       e.dataTransfer.files &&
@@ -315,12 +362,9 @@ export function useDragAndDrop(onFilesDropped) {
     ) {
       const files = Array.from(e.dataTransfer.files)
 
-      // Call the callback in a try-catch to ensure drag state is always cleared
-      // even if the callback throws an error
       try {
         onFilesDropped(files)
       } catch (error) {
-        // Ensure drag state is cleared even if callback fails
         clearDragState()
         throw error
       }
@@ -331,8 +375,8 @@ export function useDragAndDrop(onFilesDropped) {
     e.preventDefault()
     e.stopPropagation()
 
-    // Only add drag visual feedback if files are being dragged
-    // This prevents tab drags from interfering with the UI
+    // Only add drag visual feedback if files are being dragged.
+    // This prevents tab drags (text/plain, application/json) from interfering.
     if (
       e.dataTransfer &&
       e.dataTransfer.types &&
@@ -340,7 +384,6 @@ export function useDragAndDrop(onFilesDropped) {
     ) {
       dragCounterRef.current++
 
-      // Store reference to the drag target
       if (dragCounterRef.current === 1) {
         dragTargetRef.current = e.currentTarget
         document.body.classList.add('dragging-file')
@@ -353,7 +396,6 @@ export function useDragAndDrop(onFilesDropped) {
     e.preventDefault()
     e.stopPropagation()
 
-    // Only decrement for file drags
     if (
       e.dataTransfer &&
       e.dataTransfer.types &&
@@ -361,13 +403,7 @@ export function useDragAndDrop(onFilesDropped) {
     ) {
       dragCounterRef.current--
 
-      // Only remove classes when we've left all nested elements (counter reaches 0)
-      if (dragCounterRef.current === 0) {
-        clearDragState()
-      }
-
-      // Safety check: prevent negative counter
-      if (dragCounterRef.current < 0) {
+      if (dragCounterRef.current <= 0) {
         clearDragState()
       }
     }
@@ -376,7 +412,6 @@ export function useDragAndDrop(onFilesDropped) {
   const onDragOver = e => {
     e.preventDefault()
     e.stopPropagation()
-    // Don't add any visual feedback here - it's handled in onDragEnter
   }
 
   return {

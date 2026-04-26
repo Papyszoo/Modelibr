@@ -20,7 +20,7 @@ import {
 import { CreateTextureSetDialog } from '@/features/texture-set/dialogs/CreateTextureSetDialog'
 import { useTabContext } from '@/hooks/useTabContext'
 import { useUploadProgress } from '@/hooks/useUploadProgress'
-import { useDragAndDrop } from '@/shared/hooks/useFileUpload'
+import { UploadDropZone } from '@/shared/components/UploadDropZone'
 import { type TextureSetDto, TextureSetKind } from '@/types'
 
 import { TextureSetGrid } from './TextureSetGrid'
@@ -227,12 +227,11 @@ export function TextureSetList() {
     invalidateTextureSets()
   }
 
-  // Use drag and drop hook
-  const { onDrop, onDragOver, onDragEnter, onDragLeave } =
-    useDragAndDrop(handleFileDrop)
-
   return (
-    <div className="texture-set-list">
+    <UploadDropZone
+      className="texture-set-list"
+      onFilesDropped={handleFileDrop}
+    >
       <Toast ref={toast} />
       <ConfirmDialog />
 
@@ -309,10 +308,6 @@ export function TextureSetList() {
         textureSets={textureSets}
         loading={loading}
         onTextureSetSelect={handleViewDetails}
-        onDrop={onDrop}
-        onDragOver={onDragOver}
-        onDragEnter={onDragEnter}
-        onDragLeave={onDragLeave}
         onTextureSetRecycled={handleTextureSetRecycled}
         onTextureSetUpdated={invalidateTextureSets}
       />
@@ -346,6 +341,6 @@ export function TextureSetList() {
           onSubmit={handleCreateTextureSet}
         />
       )}
-    </div>
+    </UploadDropZone>
   )
 }

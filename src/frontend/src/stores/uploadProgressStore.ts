@@ -1,5 +1,13 @@
 import { create } from 'zustand'
 
+export type UploadFileType =
+  | 'model'
+  | 'texture'
+  | 'file'
+  | 'sprite'
+  | 'sound'
+  | 'environmentMap'
+
 export interface UploadItem {
   id: string
   file: File
@@ -7,7 +15,7 @@ export interface UploadItem {
   status: 'pending' | 'uploading' | 'completed' | 'error'
   result?: unknown
   error?: Error
-  fileType: 'model' | 'texture' | 'file' | 'sprite' | 'sound' | 'environmentMap'
+  fileType: UploadFileType
   batchId?: string // ID of the batch this upload belongs to
 }
 
@@ -22,17 +30,12 @@ interface UploadProgressStore {
   uploads: UploadItem[]
   batches: UploadBatch[]
   isVisible: boolean
-  addUpload: (
-    file: File,
-    fileType:
-      | 'model'
-      | 'texture'
-      | 'file'
-      | 'sprite'
-      | 'sound'
-      | 'environmentMap',
+  addUpload: (file: File, fileType: UploadFileType, batchId?: string) => string
+  addUploads: (
+    files: File[],
+    fileType: UploadFileType,
     batchId?: string
-  ) => string
+  ) => string[]
   updateUploadProgress: (id: string, progress: number) => void
   completeUpload: (id: string, result?: unknown) => void
   updateUploadResult: (id: string, result: unknown) => void
@@ -43,6 +46,41 @@ interface UploadProgressStore {
   hideWindow: () => void
   toggleBatchCollapse: (batchId: string) => void
   createBatch: () => string
+}
+
+// Apply a per-item update to both the flat uploads array and the matching
+// batch's nested files array. Only the affected batch is cloned — other
+// batches keep their previous reference, which avoids O(N²) work when many
+// items progress in parallel.
+function applyItemUpdate(
+  state: { uploads: UploadItem[]; batches: UploadBatch[] },
+  id: string,
+  updater: (item: UploadItem) => UploadItem
+): { uploads: UploadItem[]; batches: UploadBatch[] } {
+  let uploadsChanged = false
+  const newUploads = state.uploads.map(upload => {
+    if (upload.id !== id) return upload
+    uploadsChanged = true
+    return updater(upload)
+  })
+
+  let batchesChanged = false
+  const newBatches = state.batches.map(batch => {
+    let fileFound = false
+    const newFiles = batch.files.map(upload => {
+      if (upload.id !== id) return upload
+      fileFound = true
+      return updater(upload)
+    })
+    if (!fileFound) return batch
+    batchesChanged = true
+    return { ...batch, files: newFiles }
+  })
+
+  return {
+    uploads: uploadsChanged ? newUploads : state.uploads,
+    batches: batchesChanged ? newBatches : state.batches,
+  }
 }
 
 export const useUploadProgressStore = create<UploadProgressStore>(set => ({
@@ -61,17 +99,7 @@ export const useUploadProgressStore = create<UploadProgressStore>(set => ({
     return batchId
   },
 
-  addUpload: (
-    file: File,
-    fileType:
-      | 'model'
-      | 'texture'
-      | 'file'
-      | 'sprite'
-      | 'sound'
-      | 'environmentMap',
-    batchId?: string
-  ) => {
+  addUpload: (file, fileType, batchId) => {
     const id = `upload-${Date.now()}-${Math.random()}`
     const newUpload: UploadItem = {
       id,
@@ -100,117 +128,91 @@ export const useUploadProgressStore = create<UploadProgressStore>(set => ({
     return id
   },
 
-  updateUploadProgress: (id: string, progress: number) => {
+  addUploads: (files, fileType, batchId) => {
+    if (files.length === 0) return []
+    const ids: string[] = []
+    const newItems: UploadItem[] = files.map((file, index) => {
+      const id = `upload-${Date.now()}-${index}-${Math.random()}`
+      ids.push(id)
+      return {
+        id,
+        file,
+        progress: 0,
+        status: 'pending',
+        fileType,
+        batchId,
+      }
+    })
     set(state => {
-      const newUploads = state.uploads.map(upload =>
-        upload.id === id
-          ? { ...upload, progress, status: 'uploading' as const }
-          : upload
-      )
-
-      // Update batches too
-      const newBatches = state.batches.map(batch => ({
-        ...batch,
-        files: batch.files.map(upload =>
-          upload.id === id
-            ? { ...upload, progress, status: 'uploading' as const }
-            : upload
-        ),
-      }))
-
+      const newUploads = state.uploads.concat(newItems)
+      const newBatches = batchId
+        ? state.batches.map(batch =>
+            batch.id === batchId
+              ? { ...batch, files: batch.files.concat(newItems) }
+              : batch
+          )
+        : state.batches
       return {
         uploads: newUploads,
         batches: newBatches,
+        isVisible: true,
       }
     })
+    return ids
   },
 
-  completeUpload: (id: string, result?: unknown) => {
-    set(state => {
-      const newUploads = state.uploads.map(upload =>
-        upload.id === id
-          ? { ...upload, progress: 100, status: 'completed' as const, result }
-          : upload
-      )
-
-      const newBatches = state.batches.map(batch => ({
-        ...batch,
-        files: batch.files.map(upload =>
-          upload.id === id
-            ? {
-                ...upload,
-                progress: 100,
-                status: 'completed' as const,
-                result,
-              }
-            : upload
-        ),
+  updateUploadProgress: (id, progress) => {
+    set(state =>
+      applyItemUpdate(state, id, upload => ({
+        ...upload,
+        progress,
+        status: 'uploading' as const,
       }))
-
-      return {
-        uploads: newUploads,
-        batches: newBatches,
-      }
-    })
+    )
   },
 
-  updateUploadResult: (id: string, result: unknown) => {
-    set(state => {
-      const newUploads = state.uploads.map(upload =>
-        upload.id === id
-          ? { ...upload, result: { ...upload.result, ...result } }
-          : upload
-      )
-
-      const newBatches = state.batches.map(batch => ({
-        ...batch,
-        files: batch.files.map(upload =>
-          upload.id === id
-            ? { ...upload, result: { ...upload.result, ...result } }
-            : upload
-        ),
+  completeUpload: (id, result) => {
+    set(state =>
+      applyItemUpdate(state, id, upload => ({
+        ...upload,
+        progress: 100,
+        status: 'completed' as const,
+        result,
       }))
-
-      return {
-        uploads: newUploads,
-        batches: newBatches,
-      }
-    })
+    )
   },
 
-  failUpload: (id: string, error: Error) => {
-    set(state => {
-      const newUploads = state.uploads.map(upload =>
-        upload.id === id
-          ? { ...upload, status: 'error' as const, error }
-          : upload
-      )
-
-      const newBatches = state.batches.map(batch => ({
-        ...batch,
-        files: batch.files.map(upload =>
-          upload.id === id
-            ? { ...upload, status: 'error' as const, error }
-            : upload
-        ),
+  updateUploadResult: (id, result) => {
+    set(state =>
+      applyItemUpdate(state, id, upload => ({
+        ...upload,
+        result: { ...(upload.result as object), ...(result as object) },
       }))
+    )
+  },
 
-      return {
-        uploads: newUploads,
-        batches: newBatches,
-      }
-    })
+  failUpload: (id, error) => {
+    set(state =>
+      applyItemUpdate(state, id, upload => ({
+        ...upload,
+        status: 'error' as const,
+        error,
+      }))
+    )
   },
 
   removeUpload: (id: string) => {
     set(state => {
       const newUploads = state.uploads.filter(upload => upload.id !== id)
       const newBatches = state.batches
-        .map(batch => ({
-          ...batch,
-          files: batch.files.filter(upload => upload.id !== id),
-        }))
-        .filter(batch => batch.files.length > 0) // Remove empty batches
+        .map(batch => {
+          const idx = batch.files.findIndex(upload => upload.id === id)
+          if (idx === -1) return batch
+          const newFiles = batch.files.slice()
+          newFiles.splice(idx, 1)
+          return { ...batch, files: newFiles }
+        })
+        .filter(batch => batch.files.length > 0)
 
       return {
         uploads: newUploads,
@@ -226,12 +228,18 @@ export const useUploadProgressStore = create<UploadProgressStore>(set => ({
       )
 
       const newBatches = state.batches
-        .map(batch => ({
-          ...batch,
-          files: batch.files.filter(
-            upload => upload.status !== 'completed' && upload.status !== 'error'
-          ),
-        }))
+        .map(batch => {
+          const hasFinished = batch.files.some(
+            upload =>
+              upload.status === 'completed' || upload.status === 'error'
+          )
+          if (!hasFinished) return batch
+          const newFiles = batch.files.filter(
+            upload =>
+              upload.status !== 'completed' && upload.status !== 'error'
+          )
+          return { ...batch, files: newFiles }
+        })
         .filter(batch => batch.files.length > 0)
 
       return {

@@ -45,10 +45,6 @@ interface TextureSetGridProps {
   textureSets: TextureSetDto[]
   loading?: boolean
   onTextureSetSelect: (textureSet: TextureSetDto) => void
-  onDrop: (e: React.DragEvent) => void
-  onDragOver: (e: React.DragEvent) => void
-  onDragEnter: (e: React.DragEvent) => void
-  onDragLeave: (e: React.DragEvent) => void
   onTextureSetRecycled?: (textureSetId: number) => void
   onTextureSetUpdated?: () => void
 }
@@ -57,10 +53,6 @@ export function TextureSetGrid({
   textureSets,
   loading = false,
   onTextureSetSelect,
-  onDrop,
-  onDragOver,
-  onDragEnter,
-  onDragLeave,
   onTextureSetRecycled,
   onTextureSetUpdated,
 }: TextureSetGridProps) {
@@ -455,13 +447,7 @@ export function TextureSetGrid({
   // Empty state (no texture sets at all)
   if (textureSets.length === 0) {
     return (
-      <div
-        className="texture-set-grid-empty"
-        onDrop={onDrop}
-        onDragOver={onDragOver}
-        onDragEnter={onDragEnter}
-        onDragLeave={onDragLeave}
-      >
+      <div className="texture-set-grid-empty">
         <i className="pi pi-images" />
         <h3>No Texture Sets</h3>
         <p>Drag and drop texture files here to create new sets</p>
@@ -473,13 +459,7 @@ export function TextureSetGrid({
   }
 
   return (
-    <div
-      className="texture-set-grid-container"
-      onDrop={onDrop}
-      onDragOver={onDragOver}
-      onDragEnter={onDragEnter}
-      onDragLeave={onDragLeave}
-    >
+    <div className="texture-set-grid-container">
       <Toast ref={toast} />
       <ContextMenu model={contextMenuItems} ref={contextMenu} />
 
