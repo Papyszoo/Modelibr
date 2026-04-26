@@ -33,6 +33,7 @@ import {
   storeThumbnail,
 } from '../db/demoDb'
 import {
+  generateEnvironmentMapThumbnail,
   generateExrChannelPreview,
   generateHdrChannelPreview,
   generateImageChannelPreview,
@@ -159,7 +160,7 @@ export const seedFileAssets: Record<number, string> = {
   402: 'texture_albedo.png',
   501: 'test-tone.wav',
   601: 'hdri/potsdamer_platz_1k.hdr',
-  602: 'global texture/normal.exr',
+  602: 'hdri/potsdamer_platz_1k.hdr',
 }
 
 export function paginate<T>(items: T[], page: number, pageSize: number) {
@@ -687,16 +688,33 @@ export function generateVersionThumbnailAsync(
 export function generateEnvironmentMapThumbnailAsync(
   envMapId: number,
   fileBlob: Blob,
+  fileName: string,
+  variantId?: number
+) {
+  generateEnvironmentMapThumbnail(fileBlob, fileName)
+    .then(preview => {
+      const writes: Promise<void>[] = [
+        storeThumbnail(`envMapPreview:${envMapId}`, preview),
+      ]
+      if (variantId) {
+        writes.push(
+          storeThumbnail(`envMapVariantPreview:${variantId}`, preview)
+        )
+      }
+      return Promise.all(writes)
+    })
+    .catch(() => {})
+}
+
+export function generateEnvironmentMapVariantThumbnailAsync(
+  variantId: number,
+  fileBlob: Blob,
   fileName: string
 ) {
-  const lower = fileName.toLowerCase()
-  const gen = lower.endsWith('.hdr')
-    ? generateHdrChannelPreview(fileBlob, 'rgb')
-    : lower.endsWith('.exr')
-      ? generateExrChannelPreview(fileBlob, 'rgb')
-      : generateImageChannelPreview(fileBlob, 'rgb')
-  gen
-    .then(preview => storeThumbnail(`envMapPreview:${envMapId}`, preview))
+  generateEnvironmentMapThumbnail(fileBlob, fileName)
+    .then(preview =>
+      storeThumbnail(`envMapVariantPreview:${variantId}`, preview)
+    )
     .catch(() => {})
 }
 
@@ -1177,13 +1195,35 @@ export async function prewarmSeedThumbnails(): Promise<void> {
  */
 export async function prewarmSeedEnvironmentMapThumbnails(): Promise<void> {
   const seedItems = [
-    { envMapId: 1, fileId: 601, fileName: 'potsdamer_platz_1k.hdr' },
+    {
+      envMapId: 1,
+      variantId: 1,
+      fileId: 601,
+      fileName: 'potsdamer_platz_1k.hdr',
+      isPreviewVariant: true,
+    },
+    {
+      envMapId: 1,
+      variantId: 2,
+      fileId: 601,
+      fileName: 'potsdamer_platz_1k.hdr',
+      isPreviewVariant: false,
+    },
   ]
 
-  for (const { envMapId, fileId, fileName } of seedItems) {
-    const cacheKey = `envMapPreview:${envMapId}`
-    const existing = await getThumbnail(cacheKey)
-    if (existing) continue
+  for (const {
+    envMapId,
+    variantId,
+    fileId,
+    fileName,
+    isPreviewVariant,
+  } of seedItems) {
+    const variantKey = `envMapVariantPreview:${variantId}`
+    const mapKey = `envMapPreview:${envMapId}`
+
+    const existingVariant = await getThumbnail(variantKey)
+    const existingMap = isPreviewVariant ? await getThumbnail(mapKey) : null
+    if (existingVariant && (!isPreviewVariant || existingMap)) continue
 
     const seedPath = seedFileAssets[fileId]
     if (!seedPath) continue
@@ -1195,17 +1235,11 @@ export async function prewarmSeedEnvironmentMapThumbnails(): Promise<void> {
       if (!response.ok) continue
 
       const blob = await response.blob()
-      let preview: Blob
-
-      if (fileName.endsWith('.hdr')) {
-        preview = await generateHdrChannelPreview(blob, 'rgb')
-      } else if (fileName.endsWith('.exr')) {
-        preview = await generateExrChannelPreview(blob, 'rgb')
-      } else {
-        preview = await generateImageChannelPreview(blob, 'rgb')
+      const preview = await generateEnvironmentMapThumbnail(blob, fileName)
+      await storeThumbnail(variantKey, preview)
+      if (isPreviewVariant) {
+        await storeThumbnail(mapKey, preview)
       }
-
-      await storeThumbnail(cacheKey, preview)
     } catch {
       // Silently ignore — preview requests will still generate on demand.
     }

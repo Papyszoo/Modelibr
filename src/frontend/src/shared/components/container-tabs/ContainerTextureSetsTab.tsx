@@ -8,7 +8,7 @@ import { useEffect, useRef } from 'react'
 
 import { getFileUrl } from '@/features/models/api/modelApi'
 import { useTabContext } from '@/hooks/useTabContext'
-import { UploadableGrid } from '@/shared/components'
+import { UploadDropZone } from '@/shared/components/UploadDropZone'
 import { useContainerTextureSets } from '@/shared/hooks/useContainerTextureSets'
 import { type ContainerAdapter } from '@/shared/types/ContainerTypes'
 import { TextureType } from '@/types'
@@ -74,10 +74,8 @@ export function ContainerTextureSetsTab({
   return (
     <>
       <ContextMenu model={contextMenuItems} ref={contextMenuRef} />
-      <UploadableGrid
+      <UploadDropZone
         onFilesDropped={ts.handleUpload}
-        isUploading={ts.uploading}
-        uploadMessage={`Drop texture files here to create and add to ${labelLower}`}
         className="container-grid-wrapper"
       >
         <div className="container-section">
@@ -141,7 +139,7 @@ export function ContainerTextureSetsTab({
             </div>
           )}
         </div>
-      </UploadableGrid>
+      </UploadDropZone>
 
       <Dialog
         header={`Add Texture Sets to ${label}`}

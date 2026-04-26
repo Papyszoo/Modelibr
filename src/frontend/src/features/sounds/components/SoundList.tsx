@@ -22,6 +22,7 @@ import { useSoundListData } from '@/features/sounds/hooks/useSoundListData'
 import { useSoundMutations } from '@/features/sounds/hooks/useSoundMutations'
 import { useSoundUpload } from '@/features/sounds/hooks/useSoundUpload'
 import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
+import { UploadDropZone } from '@/shared/components/UploadDropZone'
 import { soundCategoryFormSchema } from '@/shared/validation/formSchemas'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
 import { type SoundCategoryDto, type SoundDto } from '@/types'
@@ -130,14 +131,7 @@ export function SoundList() {
     setContextMenuTarget,
   })
 
-  const {
-    onDrop,
-    onDragOver,
-    onDragEnter,
-    onDragLeave,
-    fileInputRef,
-    handleFileDrop,
-  } = useSoundUpload({
+  const { fileInputRef, handleFileDrop } = useSoundUpload({
     showToast,
     activeCategoryId,
     loadSounds: invalidateSounds,
@@ -482,12 +476,9 @@ export function SoundList() {
   }
 
   return (
-    <div
+    <UploadDropZone
       className="sound-list"
-      onDrop={onDrop}
-      onDragOver={onDragOver}
-      onDragEnter={onDragEnter}
-      onDragLeave={onDragLeave}
+      onFilesDropped={handleFileDrop}
     >
       <Toast ref={toast} />
       <ConfirmDialog />
@@ -616,6 +607,6 @@ export function SoundList() {
           }
         }}
       />
-    </div>
+    </UploadDropZone>
   )
 }

@@ -26,7 +26,7 @@ import { useSpriteMutations } from '@/features/sprite/hooks/useSpriteMutations'
 import { useSpriteUpload } from '@/features/sprite/hooks/useSpriteUpload'
 import { useUploadProgress } from '@/hooks/useUploadProgress'
 import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
-import { useDragAndDrop } from '@/shared/hooks/useFileUpload'
+import { UploadDropZone } from '@/shared/components/UploadDropZone'
 import {
   spriteCategoryFormSchema,
   spriteRenameFormSchema,
@@ -154,9 +154,6 @@ export function SpriteList() {
     invalidateSprites,
     toast,
   })
-
-  const { onDrop, onDragOver, onDragEnter, onDragLeave } =
-    useDragAndDrop(handleFileDrop)
 
   // ── Category Dialog Handlers ────────────────────────────────────────
   const openCreateCategoryDialog = () => {
@@ -491,12 +488,9 @@ export function SpriteList() {
   }
 
   return (
-    <div
+    <UploadDropZone
       className="sprite-list"
-      onDrop={onDrop}
-      onDragOver={onDragOver}
-      onDragEnter={onDragEnter}
-      onDragLeave={onDragLeave}
+      onFilesDropped={handleFileDrop}
     >
       <Toast ref={toast} />
       <ConfirmDialog />
@@ -759,7 +753,7 @@ export function SpriteList() {
           if (e.target.files) handleFileDrop(e.target.files)
         }}
       />
-    </div>
+    </UploadDropZone>
   )
 }
 
