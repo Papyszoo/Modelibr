@@ -40,16 +40,7 @@ Successfully integrated Storybook 9.1.10 into the Modelibr React frontend for in
   - Fullscreen layout
   - Ambient lighting setup
 
-#### 2. ModelInfo.stories.tsx
-
-- **Location**: `src/features/model-viewer/components/ModelInfo.stories.tsx`
-- **Stories**:
-  - Default (OBJ model)
-  - GLTF Model
-  - FBX Model
-- **Features**: Interactive props for different model types
-
-#### 3. ThumbnailDisplay.stories.tsx
+#### 2. ThumbnailDisplay.stories.tsx
 
 - **Location**: `src/features/thumbnail/components/ThumbnailDisplay.stories.tsx`
 - **Stories**:
@@ -62,7 +53,7 @@ Successfully integrated Storybook 9.1.10 into the Modelibr React frontend for in
   - Mocks ApiClient for different states using decorators
   - Demonstrates simple, focused component design
 
-#### 4. EmptyState.stories.tsx
+#### 3. EmptyState.stories.tsx
 
 - **Location**: `src/features/models/components/EmptyState.stories.tsx`
 - **Stories**:
@@ -70,7 +61,7 @@ Successfully integrated Storybook 9.1.10 into the Modelibr React frontend for in
   - Hidden
 - **Features**: Drag-and-drop event handlers
 
-#### 5. ErrorState.stories.tsx
+#### 4. ErrorState.stories.tsx
 
 - **Location**: `src/features/models/components/ErrorState.stories.tsx`
 - **Stories**:
@@ -128,10 +119,6 @@ Output: `src/frontend/storybook-static/`
    - Running/building instructions
 3. Added to development workflow
 4. Added to acknowledgments
-
-### Screenshots Included
-
-- ModelInfo component documentation: https://github.com/user-attachments/assets/c191f88b-9b39-45c0-bfa9-8f8d34efe1ed
 
 ## .gitignore Updates
 
