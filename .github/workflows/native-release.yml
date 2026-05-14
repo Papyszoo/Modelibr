@@ -1,0 +1,362 @@
+name: Native Installers
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-installers:
+    name: Build ${{ matrix.name }} Installer
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-latest
+            rid: win-x64
+            electronArch: x64
+            artifactGlob: src/desktop/dist/*.exe
+          - name: macOS
+            os: macos-14
+            rid: osx-arm64
+            electronArch: arm64
+            artifactGlob: src/desktop/dist/*.dmg
+          - name: Linux
+            os: ubuntu-latest
+            rid: linux-x64
+            electronArch: x64
+            artifactGlob: |
+              src/desktop/dist/*.AppImage
+              src/desktop/dist/*.deb
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 9
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Export Node runtime path
+        run: node -e "const fs=require('fs'); fs.appendFileSync(process.env.GITHUB_ENV, `MODELIBR_NODE_EXECUTABLE=${process.execPath}\n`)"
+
+      - name: Prepare build folders
+        run: node -e "const fs=require('fs'); fs.mkdirSync('src/desktop/build-input/webapi',{recursive:true})"
+
+      - name: Install frontend dependencies
+        working-directory: src/frontend
+        run: npm ci
+
+      - name: Build frontend bundle for native runtime
+        working-directory: src/frontend
+        run: npm run build
+        env:
+          VITE_API_BASE_URL: /api
+
+      - name: Install asset processor runtime dependencies
+        working-directory: src/asset-processor
+        env:
+          PUPPETEER_CACHE_DIR: ${{ github.workspace }}/src/asset-processor/.cache/puppeteer
+        run: |
+          npm ci --omit=dev
+          npx puppeteer browsers install chrome
+
+      - name: Publish WebApi for native runtime
+        run: >-
+          dotnet publish src/WebApi/WebApi.csproj
+          -c Release
+          -r ${{ matrix.rid }}
+          --self-contained true
+          -o ${{ github.workspace }}/src/desktop/build-input/webapi
+
+      - name: Install PostgreSQL runtime (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install postgresql --params '"/Password:ModelibrBuild123!"' --no-progress -y
+          $pgRoot = Get-ChildItem 'C:\Program Files\PostgreSQL' | Sort-Object Name -Descending | Select-Object -First 1
+          if (-not $pgRoot) { throw 'Embedded PostgreSQL runtime not found' }
+          "MODELIBR_POSTGRES_RUNTIME_DIR=$($pgRoot.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Install PostgreSQL runtime (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          brew install postgresql@16
+          echo "MODELIBR_POSTGRES_RUNTIME_DIR=$(brew --prefix postgresql@16)" >> "$GITHUB_ENV"
+
+      - name: Install PostgreSQL runtime (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-16
+          POSTGRES_RUNTIME_DIR="$GITHUB_WORKSPACE/src/desktop/build-input/postgres"
+          mkdir -p "$POSTGRES_RUNTIME_DIR"
+          cp -R /usr/lib/postgresql/16/bin "$POSTGRES_RUNTIME_DIR/bin"
+          cp -R /usr/lib/postgresql/16/lib "$POSTGRES_RUNTIME_DIR/lib"
+          cp -R /usr/share/postgresql/16 "$POSTGRES_RUNTIME_DIR/share"
+          echo "MODELIBR_POSTGRES_RUNTIME_DIR=$POSTGRES_RUNTIME_DIR" >> "$GITHUB_ENV"
+
+      - name: Install desktop packaging dependencies
+        working-directory: src/desktop
+        run: npm ci
+
+      - name: Build native installers
+        working-directory: src/desktop
+        env:
+          MODELIBR_WEBAPI_PUBLISH_DIR: ${{ github.workspace }}/src/desktop/build-input/webapi
+        run: npm run dist -- --${{ matrix.electronArch }}
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-installers-${{ matrix.name }}
+          path: ${{ matrix.artifactGlob }}
+
+      - name: Upload release assets
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.artifactGlob }}
+
+  test-installers:
+    name: Test ${{ matrix.name }} Installer
+    needs: build-installers
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-latest
+          - name: macOS
+            os: macos-14
+          - name: Linux
+            os: ubuntu-latest
+
+    steps:
+      - name: Download installer artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: native-installers-${{ matrix.name }}
+          path: installer
+
+      # ───── Install ─────
+      - name: Install (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          sudo dpkg -i installer/*.deb || sudo apt-get install -f -y
+
+      - name: Install (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          DMG=$(ls installer/*.dmg | head -n 1)
+          hdiutil attach "$DMG" -mountpoint /Volumes/Modelibr -nobrowse -quiet
+          cp -R "/Volumes/Modelibr/Modelibr.app" /Applications/
+          hdiutil detach /Volumes/Modelibr -quiet
+          # Strip quarantine attribute — installer isn't notarized in CI
+          sudo xattr -dr com.apple.quarantine /Applications/Modelibr.app
+
+      - name: Install (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem installer/*.exe | Select-Object -First 1
+          if (-not $installer) { throw "Installer not found in artifact" }
+          Start-Process -Wait -FilePath $installer.FullName -ArgumentList '/S'
+
+      # ───── Start app ─────
+      - name: Start app (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP_BIN=$(find /opt -type f -executable \( -name 'modelibr*' -o -name 'Modelibr*' \) 2>/dev/null | head -n 1)
+          if [ -z "$APP_BIN" ]; then
+            echo "Could not locate installed binary under /opt"
+            ls -la /opt || true
+            exit 1
+          fi
+          echo "Starting $APP_BIN"
+          Xvfb :99 -screen 0 1280x1024x24 > /tmp/xvfb.log 2>&1 &
+          export DISPLAY=:99
+          nohup "$APP_BIN" --no-sandbox > /tmp/modelibr.log 2>&1 &
+          disown || true
+
+      - name: Start app (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: open /Applications/Modelibr.app
+
+      - name: Start app (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $candidates = @(
+            "$env:LOCALAPPDATA\Programs\Modelibr\Modelibr.exe",
+            "$env:PROGRAMFILES\Modelibr\Modelibr.exe"
+          )
+          $exe = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $exe) { throw "Modelibr.exe not found in expected locations" }
+          Start-Process -FilePath $exe
+
+      # ───── Wait for HTTP server ─────
+      - name: Wait for app ready
+        shell: bash
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:3010 -o /dev/null; then
+              echo "App responding after ${i} attempts"
+              exit 0
+            fi
+            echo "Waiting for app... ($i/60)"
+            sleep 3
+          done
+          echo "App did not become ready within 180s"
+          exit 1
+
+      # ───── Smoke tests ─────
+      - name: Smoke — frontend served
+        shell: bash
+        run: curl -sf http://127.0.0.1:3010 -o /dev/null
+
+      - name: Smoke — native runtime API
+        shell: bash
+        run: |
+          response=$(curl -sf http://127.0.0.1:3010/api/native/runtime)
+          echo "Runtime snapshot: $response"
+          echo "$response" | grep -q publicAppUrl
+          echo "$response" | grep -q workerHealthUrls
+          echo "$response" | grep -q dataDirectory
+
+      - name: Smoke — WebApi health (proxied)
+        shell: bash
+        run: |
+          # /api/* is rewritten to /* by the edge server, so this hits WebApi /health
+          curl -sf http://127.0.0.1:3010/api/health -o /dev/null
+
+      # ───── Stop app ─────
+      - name: Stop app (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          pkill -f -i modelibr || true
+          sleep 5
+
+      - name: Stop app (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          osascript -e 'quit app "Modelibr"' || true
+          sleep 3
+          pkill -f Modelibr || true
+          sleep 3
+
+      - name: Stop app (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Stop-Process -Name Modelibr -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 5
+
+      # ───── Uninstall ─────
+      - name: Uninstall (Linux)
+        if: runner.os == 'Linux'
+        run: sudo dpkg -r modelibr-desktop || sudo dpkg -r modelibr
+
+      - name: Uninstall (macOS)
+        if: runner.os == 'macOS'
+        run: sudo rm -rf /Applications/Modelibr.app
+
+      - name: Uninstall (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $uninst = Get-ChildItem -Path "$env:LOCALAPPDATA\Programs\Modelibr\Uninstall*.exe","$env:PROGRAMFILES\Modelibr\Uninstall*.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $uninst) { throw "Uninstaller not found" }
+          Start-Process -Wait -FilePath $uninst.FullName -ArgumentList '/S'
+          Start-Sleep -Seconds 5
+
+      # ───── Verify removal ─────
+      - name: Verify app binary removed (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          if [ -e /opt/Modelibr ] || [ -e /opt/modelibr ] || [ -e /opt/modelibr-desktop ]; then
+            echo "App directory still present after uninstall"
+            ls -la /opt
+            exit 1
+          fi
+
+      - name: Verify app binary removed (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          if [ -e /Applications/Modelibr.app ]; then
+            echo "Modelibr.app still present after uninstall"
+            exit 1
+          fi
+
+      - name: Verify app binary removed (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $leftover = @(
+            "$env:LOCALAPPDATA\Programs\Modelibr\Modelibr.exe",
+            "$env:PROGRAMFILES\Modelibr\Modelibr.exe"
+          ) | Where-Object { Test-Path $_ }
+          if ($leftover) { throw "App binary still present: $leftover" }
+
+      # ───── Verify user data preserved (by design) ─────
+      - name: Verify user data preserved (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          if [ ! -d "$HOME/.config/Modelibr" ]; then
+            echo "Warning: user data directory was not preserved"
+            exit 1
+          fi
+
+      - name: Verify user data preserved (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          if [ ! -d "$HOME/Library/Application Support/Modelibr" ]; then
+            echo "Warning: user data directory was not preserved"
+            exit 1
+          fi
+
+      - name: Verify user data preserved (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "$env:APPDATA\Modelibr")) {
+            throw "User data directory was not preserved"
+          }
+
+      # ───── Capture logs on failure ─────
+      - name: Upload diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-diagnostics-${{ matrix.name }}
+          path: |
+            /tmp/modelibr.log
+            /tmp/xvfb.log
+          if-no-files-found: ignore
