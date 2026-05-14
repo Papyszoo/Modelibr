@@ -53,7 +53,9 @@ Each environment map directory exposes:
 
 ## Notes
 
-- Availability depends on your local deployment configuration and network access - you can change ports in .env file.
+- Native installers expose WebDAV on the same local port as the app by default. Change that port in **Settings > Native Runtime** and restart Modelibr.
+- Docker deployments still use `.env` for WebDAV port configuration.
+- Availability depends on your local deployment configuration and network access.
 
 :::note Video placeholder
 The walkthrough video for this page will be added later.
