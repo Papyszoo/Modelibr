@@ -244,9 +244,15 @@ public static class SettingsEndpoints
 
             try
             {
-                // Probe through the internal nginx HTTP server to validate the full
-                // nginx → webapi chain without TLS certificate issues.
-                var probeUrl = new Uri(new Uri("http://nginx:80"), new Uri(url).PathAndQuery);
+                // Probe through the locally configured edge server so the full
+                // public request chain is validated in both Docker and native mode.
+                var probeBaseUrl = Environment.GetEnvironmentVariable("WEBDAV_PROBE_BASE_URL")?.Trim();
+                if (string.IsNullOrWhiteSpace(probeBaseUrl))
+                {
+                    probeBaseUrl = "http://nginx:80";
+                }
+
+                var probeUrl = new Uri(new Uri(probeBaseUrl), new Uri(url).PathAndQuery);
 
                 var httpClient = httpClientFactory.CreateClient("WebDavProbe");
                 var request = new HttpRequestMessage(new HttpMethod("PROPFIND"), probeUrl);
