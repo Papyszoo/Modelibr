@@ -40,6 +40,15 @@ export class PuppeteerRenderer {
       process.env.CHROMIUM_PATH ||
       undefined
 
+    const gpuArgs = config.rendering.useHardwareAcceleration
+      ? [
+          '--ignore-gpu-blocklist',
+          '--enable-gpu-rasterization',
+          '--enable-zero-copy',
+          '--use-angle=default',
+        ]
+      : ['--disable-gpu', '--use-gl=angle', '--use-angle=swiftshader']
+
     const launchOptions = {
       headless: true,
       args: [
@@ -47,9 +56,7 @@ export class PuppeteerRenderer {
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--js-flags=--max-old-space-size=4096',
-        '--disable-gpu',
-        '--use-gl=angle',
-        '--use-angle=swiftshader',
+        ...gpuArgs,
         '--enable-webgl',
         '--disable-extensions',
         '--disable-web-security',
