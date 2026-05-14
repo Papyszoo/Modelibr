@@ -1,4 +1,4 @@
-import { client } from '@/lib/apiBase'
+import { ApiClientError, client } from '@/lib/apiBase'
 
 export async function getSettings(): Promise<{
   maxFileSizeBytes: number
@@ -113,6 +113,48 @@ export async function probeWebDavUrl(
   const response = await client.get('/settings/webdav/probe', {
     params: { url },
   })
+  return response.data
+}
+
+export interface NativeRuntimeSettings {
+  appPort: number
+  internalApiPort: number
+  postgresPort: number
+  workerProcessCount: number
+  maxConcurrentJobsPerWorker: number
+  enableHardwareAcceleration: boolean
+  webApiHealthUrl: string
+  publicAppUrl: string
+  publicWebDavUrl: string
+  dataDirectory: string
+  workerHealthUrls: string[]
+}
+
+export interface NativeRuntimeUpdateResult {
+  restartRequired: boolean
+  config: NativeRuntimeSettings
+}
+
+export async function getNativeRuntimeSettings(): Promise<NativeRuntimeSettings | null> {
+  try {
+    const response = await client.get('/native/runtime')
+    return response.data
+  } catch (error) {
+    if (error instanceof ApiClientError && error.status === 404) {
+      return null
+    }
+
+    throw error
+  }
+}
+
+export async function updateNativeRuntimeSettings(settings: {
+  appPort: number
+  workerProcessCount: number
+  maxConcurrentJobsPerWorker: number
+  enableHardwareAcceleration: boolean
+}): Promise<NativeRuntimeUpdateResult> {
+  const response = await client.put('/native/runtime', settings)
   return response.data
 }
 

@@ -10,17 +10,20 @@ import { useSettingsQuery } from '@/features/settings/api/queries'
 import type {
   BlenderInstallStatus,
   BlenderVersionInfo,
+  NativeRuntimeSettings,
   WebDavUrlEntry,
 } from '@/features/settings/api/settingsApi'
 import {
   getBlenderStatus,
   getBlenderVersions,
+  getNativeRuntimeSettings,
   getWebDavUrls,
   installBlender,
   probeWebDavUrl,
   uninstallBlender,
   updateSetting,
   updateSettings,
+  updateNativeRuntimeSettings,
 } from '@/features/settings/api/settingsApi'
 import { useTheme } from '@/hooks/useTheme'
 import { settingsFormSchema } from '@/shared/validation/formSchemas'
@@ -80,10 +83,19 @@ export function Settings(): JSX.Element {
   const [probeLoading, setProbeLoading] = useState(false)
   const [webDavInstructionsExpanded, setWebDavInstructionsExpanded] =
     useState(false)
+  const [nativeRuntime, setNativeRuntime] =
+    useState<NativeRuntimeSettings | null>(null)
+  const [nativeRuntimeDraft, setNativeRuntimeDraft] = useState({
+    appPort: 3010,
+    workerProcessCount: 1,
+    maxConcurrentJobsPerWorker: 3,
+    enableHardwareAcceleration: true,
+  })
+  const [nativeRuntimeSaving, setNativeRuntimeSaving] = useState(false)
 
   // Accordion state — in demo mode sections 5 (Blender), 6 (SSL), 7 (WebDAV) stay collapsed
   const [activeIndex, setActiveIndex] = useState<number | number[]>(
-    isDemo ? [0, 1, 2, 3, 4] : [0, 1, 2, 3, 4, 5, 6, 7]
+    isDemo ? [0, 1, 2, 3, 4] : [0, 1, 2, 3, 4, 5, 6, 7, 8]
   )
 
   // Model duplicate name policy state
@@ -383,6 +395,15 @@ export function Settings(): JSX.Element {
 
   // ── WebDAV URL discovery ──────────────────────────────────────────────
 
+  const applyNativeRuntimeDraft = (settings: NativeRuntimeSettings) => {
+    setNativeRuntimeDraft({
+      appPort: settings.appPort,
+      workerProcessCount: settings.workerProcessCount,
+      maxConcurrentJobsPerWorker: settings.maxConcurrentJobsPerWorker,
+      enableHardwareAcceleration: settings.enableHardwareAcceleration,
+    })
+  }
+
   const probeAllWebDavUrls = async (urls: WebDavUrlEntry[]) => {
     if (urls.length === 0) return
     setProbeLoading(true)
@@ -390,8 +411,7 @@ export function Settings(): JSX.Element {
     try {
       const results = await Promise.all(
         urls.map(async entry => {
-          // Append /modelibr — the probe endpoint forwards the path through
-          // the internal nginx server to validate the full request chain.
+          // Append /modelibr so the probe validates the full public request chain.
           const probeUrl = entry.url.replace(/\/+$/, '') + '/modelibr'
           try {
             const result = await probeWebDavUrl(probeUrl)
@@ -417,8 +437,26 @@ export function Settings(): JSX.Element {
         void probeAllWebDavUrls(urls)
       })
       .catch(() => {})
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    if (isDemo) return
+
+    getNativeRuntimeSettings()
+      .then(settings => {
+        if (!settings) return
+
+        setNativeRuntime(settings)
+        applyNativeRuntimeDraft(settings)
+      })
+      .catch(err => {
+        setError(
+          err instanceof Error
+            ? err.message
+            : 'Failed to load native runtime settings'
+        )
+      })
+  }, [isDemo])
 
   const handleUninstallBlender = async () => {
     if (isDemo) return
@@ -437,6 +475,52 @@ export function Settings(): JSX.Element {
     if (bytes < 1024) return `${bytes} B`
     if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`
     return `${(bytes / 1048576).toFixed(1)} MB`
+  }
+
+  const isNativeRuntimeDirty = nativeRuntime
+    ? nativeRuntimeDraft.appPort !== nativeRuntime.appPort ||
+      nativeRuntimeDraft.workerProcessCount !==
+        nativeRuntime.workerProcessCount ||
+      nativeRuntimeDraft.maxConcurrentJobsPerWorker !==
+        nativeRuntime.maxConcurrentJobsPerWorker ||
+      nativeRuntimeDraft.enableHardwareAcceleration !==
+        nativeRuntime.enableHardwareAcceleration
+    : false
+
+  const hasNativeRuntimeErrors =
+    nativeRuntimeDraft.appPort < 1024 ||
+    nativeRuntimeDraft.appPort > 65535 ||
+    nativeRuntimeDraft.workerProcessCount < 1 ||
+    nativeRuntimeDraft.workerProcessCount > 16 ||
+    nativeRuntimeDraft.maxConcurrentJobsPerWorker < 1 ||
+    nativeRuntimeDraft.maxConcurrentJobsPerWorker > 16
+
+  const handleNativeRuntimeSave = async () => {
+    if (!nativeRuntime) return
+
+    setNativeRuntimeSaving(true)
+    setError(null)
+    setSuccessMessage(null)
+
+    try {
+      const result = await updateNativeRuntimeSettings(nativeRuntimeDraft)
+      setNativeRuntime(result.config)
+      applyNativeRuntimeDraft(result.config)
+      setSuccessMessage(
+        result.restartRequired
+          ? 'Native runtime updated. Restart Modelibr to apply the new port.'
+          : 'Native runtime updated successfully.'
+      )
+      setTimeout(() => setSuccessMessage(null), 5000)
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Failed to update native runtime settings'
+      )
+    } finally {
+      setNativeRuntimeSaving(false)
+    }
   }
 
   const isBlenderBusy =
@@ -1206,10 +1290,20 @@ export function Settings(): JSX.Element {
                     </span>
                   ) : webDavUrls.length === 0 ? (
                     <span className="blender-status-none settings-help">
-                      No WebDAV ports configured. Set{' '}
-                      <code>WEBDAV_HTTP_PORT</code> or{' '}
-                      <code>WEBDAV_HTTPS_PORT</code> in <code>.env</code> and
-                      restart.
+                      {nativeRuntime ? (
+                        <>
+                          No WebDAV URL is currently exposed. Check the Native
+                          Runtime section below and restart Modelibr after
+                          changing the app port.
+                        </>
+                      ) : (
+                        <>
+                          No WebDAV ports configured. Set{' '}
+                          <code>WEBDAV_HTTP_PORT</code> or{' '}
+                          <code>WEBDAV_HTTPS_PORT</code> in <code>.env</code>{' '}
+                          and restart.
+                        </>
+                      )}
                     </span>
                   ) : (
                     <div className="webdav-url-picker">
@@ -1263,10 +1357,21 @@ export function Settings(): JSX.Element {
                     </div>
                   )}
                   <span className="settings-help">
-                    HTTP is preferred for local-network use. To change ports or
-                    disable a protocol, edit <code>WEBDAV_HTTP_PORT</code> /{' '}
-                    <code>WEBDAV_HTTPS_PORT</code> in <code>.env</code> and
-                    restart Docker.
+                    {nativeRuntime ? (
+                      <>
+                        In native installs, WebDAV is exposed on the same local
+                        port as the app. Changing the app port requires a
+                        restart.
+                      </>
+                    ) : (
+                      <>
+                        HTTP is preferred for local-network use. To change ports
+                        or disable a protocol, edit{' '}
+                        <code>WEBDAV_HTTP_PORT</code> /{' '}
+                        <code>WEBDAV_HTTPS_PORT</code> in <code>.env</code> and
+                        restart Docker.
+                      </>
+                    )}
                   </span>
                 </div>
 
@@ -1292,6 +1397,173 @@ export function Settings(): JSX.Element {
               </div>
             )}
           </div>
+
+          {nativeRuntime && (
+            <div className="settings-section">
+              <div
+                className="settings-section-header"
+                onClick={() =>
+                  setActiveIndex(prev =>
+                    Array.isArray(prev)
+                      ? prev.includes(8)
+                        ? prev.filter(i => i !== 8)
+                        : [...prev, 8]
+                      : [8]
+                  )
+                }
+              >
+                <span>
+                  {Array.isArray(activeIndex) && activeIndex.includes(8)
+                    ? '▼'
+                    : '▶'}{' '}
+                  Native Runtime
+                </span>
+              </div>
+              {Array.isArray(activeIndex) && activeIndex.includes(8) && (
+                <div className="settings-section-content">
+                  <div className="settings-field">
+                    <label>Launcher Configuration</label>
+                    <div className="native-runtime-grid">
+                      <div className="native-runtime-inline-field">
+                        <label htmlFor="nativeRuntimePort">App Port</label>
+                        <input
+                          id="nativeRuntimePort"
+                          type="number"
+                          min="1024"
+                          max="65535"
+                          value={nativeRuntimeDraft.appPort}
+                          onChange={event =>
+                            setNativeRuntimeDraft(current => ({
+                              ...current,
+                              appPort: Number(event.target.value),
+                            }))
+                          }
+                          disabled={nativeRuntimeSaving}
+                        />
+                      </div>
+
+                      <div className="native-runtime-inline-field">
+                        <label htmlFor="nativeRuntimeWorkers">
+                          Worker Processes
+                        </label>
+                        <input
+                          id="nativeRuntimeWorkers"
+                          type="number"
+                          min="1"
+                          max="16"
+                          value={nativeRuntimeDraft.workerProcessCount}
+                          onChange={event =>
+                            setNativeRuntimeDraft(current => ({
+                              ...current,
+                              workerProcessCount: Number(event.target.value),
+                            }))
+                          }
+                          disabled={nativeRuntimeSaving}
+                        />
+                      </div>
+
+                      <div className="native-runtime-inline-field">
+                        <label htmlFor="nativeRuntimeConcurrency">
+                          Jobs Per Worker
+                        </label>
+                        <input
+                          id="nativeRuntimeConcurrency"
+                          type="number"
+                          min="1"
+                          max="16"
+                          value={nativeRuntimeDraft.maxConcurrentJobsPerWorker}
+                          onChange={event =>
+                            setNativeRuntimeDraft(current => ({
+                              ...current,
+                              maxConcurrentJobsPerWorker: Number(
+                                event.target.value
+                              ),
+                            }))
+                          }
+                          disabled={nativeRuntimeSaving}
+                        />
+                      </div>
+                    </div>
+
+                    <label className="settings-checkbox-label native-runtime-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={nativeRuntimeDraft.enableHardwareAcceleration}
+                        onChange={event =>
+                          setNativeRuntimeDraft(current => ({
+                            ...current,
+                            enableHardwareAcceleration: event.target.checked,
+                          }))
+                        }
+                        disabled={nativeRuntimeSaving}
+                      />
+                      <span>Enable native GPU acceleration for workers</span>
+                    </label>
+
+                    <span className="settings-help">
+                      The launcher stores these values outside the application
+                      database. Port changes require a restart. Worker changes
+                      apply immediately when the port stays the same.
+                    </span>
+                  </div>
+
+                  <div className="settings-field">
+                    <label>Resolved Paths And Endpoints</label>
+                    <div className="native-runtime-meta">
+                      <div className="native-runtime-endpoint">
+                        <strong>App</strong>
+                        <code>{nativeRuntime.publicAppUrl}</code>
+                      </div>
+                      <div className="native-runtime-endpoint">
+                        <strong>WebDAV</strong>
+                        <code>{nativeRuntime.publicWebDavUrl}</code>
+                      </div>
+                      <div className="native-runtime-endpoint">
+                        <strong>Data Folder</strong>
+                        <code>{nativeRuntime.dataDirectory}</code>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="native-runtime-actions">
+                    <button
+                      type="button"
+                      className="settings-button settings-button-secondary"
+                      onClick={() => applyNativeRuntimeDraft(nativeRuntime)}
+                      disabled={nativeRuntimeSaving || !isNativeRuntimeDirty}
+                    >
+                      Reset
+                    </button>
+                    <button
+                      type="button"
+                      className="settings-button settings-button-primary"
+                      onClick={() => void handleNativeRuntimeSave()}
+                      disabled={
+                        nativeRuntimeSaving ||
+                        !isNativeRuntimeDirty ||
+                        hasNativeRuntimeErrors
+                      }
+                    >
+                      {nativeRuntimeSaving
+                        ? 'Applying...'
+                        : 'Apply Native Runtime'}
+                    </button>
+                  </div>
+
+                  {isNativeRuntimeDirty && !hasNativeRuntimeErrors && (
+                    <span className="settings-unsaved-changes">
+                      ★ Native runtime changes pending
+                    </span>
+                  )}
+                  {hasNativeRuntimeErrors && (
+                    <span className="settings-error-message">
+                      Native runtime values must stay within the allowed ranges.
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="settings-actions">

@@ -258,6 +258,51 @@
   user-select: none;
 }
 
+.native-runtime-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+}
+
+.native-runtime-inline-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.native-runtime-checkbox {
+  margin-top: 1rem;
+}
+
+.native-runtime-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.native-runtime-endpoint {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--surface-border);
+  border-radius: 6px;
+  background: var(--surface-ground);
+}
+
+.native-runtime-endpoint code {
+  font-size: 0.88rem;
+  word-break: break-all;
+}
+
+.native-runtime-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+
 .settings-dirty-indicator {
   color: #ffd700;
   font-size: 1.1rem;
