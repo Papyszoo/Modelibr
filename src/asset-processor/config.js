@@ -27,6 +27,7 @@ export const config = {
     backgroundColor: process.env.RENDER_BACKGROUND || 'transparent',
     cameraDistance: parseFloat(process.env.CAMERA_DISTANCE) || 5,
     enableAntialiasing: process.env.ENABLE_ANTIALIASING !== 'false',
+    useHardwareAcceleration: process.env.ENABLE_GPU_RENDERING === 'true',
   },
 
   // Orbit animation settings
