@@ -371,7 +371,10 @@ export class EnvironmentMapsPage {
     }
 
     async waitForCardThumbnailLoaded(name: string, timeout = 30000): Promise<void> {
+        await this.waitForEnvironmentMapByName(name, timeout);
+
         const image = this.getEnvironmentMapCardThumbnailByName(name);
+        await image.scrollIntoViewIfNeeded().catch(() => {});
         await expect(image).toBeVisible({ timeout });
 
         await expect
