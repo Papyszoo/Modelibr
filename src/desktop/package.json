@@ -1,0 +1,66 @@
+{
+  "name": "modelibr-desktop",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Native Modelibr launcher and installer packaging",
+  "type": "module",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "stage": "node ./scripts/prepare-bundle.mjs",
+    "pack": "electron-builder --dir --publish never",
+    "dist": "node ./scripts/prepare-bundle.mjs && electron-builder --publish never"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "http-proxy-middleware": "^3.0.3"
+  },
+  "devDependencies": {
+    "electron": "^35.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.modelibr.desktop",
+    "productName": "Modelibr",
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "build/runtime",
+        "to": "runtime",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "asar": true,
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "artifactName": "Modelibr-${version}-macos-${arch}.${ext}",
+      "category": "public.app-category.graphics-design"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "artifactName": "Modelibr-${version}-windows-${arch}.${ext}"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "artifactName": "Modelibr-${version}-linux-${arch}.${ext}",
+      "category": "Graphics"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false
+    }
+  }
+}
