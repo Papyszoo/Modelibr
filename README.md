@@ -8,6 +8,8 @@
 
 Modelibr is a self-hosted game asset library. It keeps **models**, **texture sets**, **environment maps**, **sprites**, and **sounds** in one place, lets you preview them in the browser, and helps you organize them into **projects** and reusable **packs**.
 
+Native installers for Windows, macOS, and Linux are published in the GitHub Releases page. They bundle the local web UI, WebApi, asset processor, and PostgreSQL so non-technical users can run Modelibr without setting up Docker.
+
 **[Main Site](https://papyszoo.github.io/Modelibr/)** | **[Documentation](https://papyszoo.github.io/Modelibr/docs)** | **[Live Demo](https://papyszoo.github.io/Modelibr/demo/)** | **[Discord](https://discord.gg/KgwgTDVP3F)** | **[GitHub Issues](https://github.com/Papyszoo/Modelibr/issues)**
 
 The live demo stores its data in your browser, so what you add there is visible only to you.
@@ -33,6 +35,17 @@ The live demo stores its data in your browser, so what you add there is visible 
 
 ## Quick start
 
+### Native installers
+
+Download the installer for your platform from the GitHub Releases page and run it.
+
+- The native build bundles the local database and worker runtime.
+- The app is exposed on a local configurable port.
+- WebDAV is exposed from the same local runtime.
+- Worker process count and GPU acceleration can be adjusted from the in-app `Settings > Native Runtime` section.
+
+### Docker
+
 ```bash
 git clone https://github.com/Papyszoo/Modelibr.git
 cd Modelibr
@@ -48,6 +61,7 @@ Open **https://localhost:3010** in your browser. The first visit uses a self-sig
 
 - WebDAV gives Modelibr a more file-browser style workflow, which is useful when you want the library to sit closer to art-pipeline tools.
 - Environment maps are exposed through WebDAV globally and inside packs/projects, alongside the rest of the library.
+- Native installers expose WebDAV through the local launcher port by default.
 - Blender-related flows are part of the repository, and Blender CLI can be downloaded at runtime from the Settings page when you want that workflow.
 - If you want more detail, start with the [main site](https://papyszoo.github.io/Modelibr/) and the [documentation](https://papyszoo.github.io/Modelibr/docs).
 
