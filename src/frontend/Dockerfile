@@ -17,6 +17,12 @@ RUN npm config set strict-ssl false && \
     npm config set fetch-retry-maxtimeout 120000 && \
     NODE_TLS_REJECT_UNAUTHORIZED=0 npm ci
 COPY . .
+# Bring in the shared TIFF decoder from the asset-processor workspace.
+# tiffTextureLoader.ts imports it as `../../../asset-processor/lib/tiffDecode.js`,
+# which from /app/src/utils resolves to /asset-processor/lib/ — so we drop
+# the lib at that path (sibling of /app/) to match the relative resolution.
+# The named context `asset-processor` is wired up in docker-compose.
+COPY --from=asset-processor lib /asset-processor/lib
 # Adjust if your build script name differs
 RUN npm run build
 
