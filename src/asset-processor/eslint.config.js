@@ -48,6 +48,19 @@ export default [
       ],
     },
   },
+  // UMD libs in lib/ run in both Node (when imported by the asset-processor)
+  // and the browser (via <script> tag in render-template.html), so allow
+  // both global environments.
+  {
+    files: ['lib/**/*.js'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+        ...globals.browser,
+        ...globals.es2022,
+      },
+    },
+  },
   // Override architectural rules for business logic files
   {
     files: [
