@@ -25,9 +25,11 @@
 
   <body>
     <div id="canvas-container"></div>
-    <!-- UTIF (TIFF decoder) is a UMD module that exposes window.UTIF; it depends on window.pako. -->
-    <script src="./node_modules/pako/dist/pako.min.js"></script>
-    <script src="./node_modules/utif2/UTIF.js"></script>
+    <!-- UTIF (TIFF decoder) is a UMD module that exposes window.UTIF; it depends on window.pako.
+         Defer keeps these from blocking the importmap/module-script parse — TIFF decoding only
+         runs much later (during page.evaluate texture loads). -->
+    <script defer src="./node_modules/pako/dist/pako.min.js"></script>
+    <script defer src="./node_modules/utif2/UTIF.js"></script>
     <script type="importmap">
       {
         "imports": {
