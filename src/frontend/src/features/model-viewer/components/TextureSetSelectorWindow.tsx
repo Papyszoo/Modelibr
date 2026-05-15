@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { FloatingWindow } from '@/components/FloatingWindow'
 import { useModelByIdQuery } from '@/features/model-viewer/api/queries'
 import {
-  getFileUrl,
+  getFilePreviewUrl,
   setDefaultTextureSet,
 } from '@/features/models/api/modelApi'
 import { useTextureSetsByModelVersionQuery } from '@/features/texture-set/api/queries'
@@ -126,7 +126,9 @@ export function TextureSetSelectorWindow({
     const albedo = textureSet.textures?.find(t => t.textureType === 1) // Albedo
     const diffuse = textureSet.textures?.find(t => t.textureType === 7) // Diffuse
     const texture = albedo || diffuse
-    return texture ? getFileUrl(texture.fileId.toString()) : null
+    // Use the server-generated preview URL (PNG) so non-browser-native formats
+    // like TIFF render correctly.
+    return texture ? getFilePreviewUrl(texture.fileId.toString()) : null
   }
 
   return (
