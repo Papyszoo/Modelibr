@@ -85,14 +85,17 @@ async function waitForTextureSetTextureTypes(
     );
     let resolvedSet = getScenarioState(page).getTextureSet(setName);
 
+    let lastLookupError: Error | null = null;
+
     while (Date.now() - start < timeoutMs) {
         if (!resolvedSet?.id) {
             throw new Error(`Texture set "${setName}" is missing from scenario state`);
         }
 
-        let details: any;
+        let details: any = null;
         try {
             details = await apiHelper.getTextureSetById(resolvedSet.id);
+            lastLookupError = null;
         } catch (error) {
             const isNotFound =
                 error instanceof Error && error.message.includes("404");
@@ -100,36 +103,57 @@ async function waitForTextureSetTextureTypes(
                 throw error;
             }
 
-            const fallback = await apiHelper.getTextureSetByName(resolvedSet.name, {
-                requireTextures: false,
-            });
-
-            if (!fallback?.id) {
-                throw error;
+            // 404 may be transient (eventual consistency between create and
+            // read after a merge). Try a name-based lookup; on failure, swallow
+            // it and let the outer poll loop retry — never break out of the
+            // retry budget on a single 404.
+            try {
+                const fallback = await apiHelper.getTextureSetByName(
+                    resolvedSet.name,
+                    { requireTextures: false },
+                );
+                if (fallback?.id) {
+                    resolvedSet = {
+                        id: fallback.id,
+                        name: fallback.name || resolvedSet.name,
+                    };
+                    getScenarioState(page).saveTextureSet(setName, resolvedSet);
+                    details = fallback;
+                    lastLookupError = null;
+                } else {
+                    lastLookupError = error;
+                }
+            } catch (lookupError) {
+                lastLookupError =
+                    lookupError instanceof Error ? lookupError : error;
             }
-
-            resolvedSet = {
-                id: fallback.id,
-                name: fallback.name || resolvedSet.name,
-            };
-            getScenarioState(page).saveTextureSet(setName, resolvedSet);
-            details = fallback;
         }
 
-        const presentTypes = new Set(
-            (details?.textures ?? []).map((texture: any) => Number(texture.textureType)),
-        );
+        if (details) {
+            const presentTypes = new Set(
+                (details.textures ?? []).map((texture: any) =>
+                    Number(texture.textureType),
+                ),
+            );
 
-        if (
-            [...expectedTypeValues].every(
-                (textureType) =>
-                    textureType !== undefined && presentTypes.has(textureType),
-            )
-        ) {
-            return;
+            if (
+                [...expectedTypeValues].every(
+                    (textureType) =>
+                        textureType !== undefined &&
+                        presentTypes.has(textureType),
+                )
+            ) {
+                return;
+            }
         }
 
         await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+    }
+
+    if (lastLookupError) {
+        throw new Error(
+            `Texture set "${setName}" did not contain ${textureTypes.join(", ")} within ${timeoutMs}ms (last lookup error: ${lastLookupError.message})`,
+        );
     }
 
     throw new Error(

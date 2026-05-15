@@ -6,7 +6,12 @@ Feature: Version Switching
       | name                |
       | multi-version-model |
 
-  @timeout:300000
+  # @slow: depends on both version thumbnails being Ready in the DB, which
+  # races with the asset-processor queue. GitHub-hosted PR-CI runners are
+  # too slow / variable for this to be reliable in the fast/parallel
+  # chromium phase; this test runs locally (node run-e2e.js) and in the
+  # nightly slow-tests workflow, both of which run @slow sequentially.
+  @slow @timeout:300000
   Scenario: Version dropdown shows all versions with thumbnails
     Given I am on the model viewer page for "multi-version-model"
     When I open the version dropdown

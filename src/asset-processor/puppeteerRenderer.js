@@ -760,12 +760,14 @@ export class PuppeteerRenderer {
 
           const ext = path.extname(filePath).toLowerCase()
           const isExr = ext === '.exr'
+          const isTiff = ext === '.tif' || ext === '.tiff'
           const fileName = path.basename(filePath)
           const url = `http://127.0.0.1:${texturePort}/${encodeURIComponent(fileName)}`
 
           textureData[textureType] = {
             url,
             isExr,
+            isTiff,
             sourceChannel,
           }
 
@@ -942,6 +944,35 @@ export class PuppeteerRenderer {
               return texture
             }
 
+            // Load TIFF texture via window.UTIF — browsers cannot decode TIFF natively
+            // Load TIFF via the shared decoder (window.modelibrTiff) so this
+            // scene and the in-browser viewer interpret the same TIFF identically.
+            const loadTiffTexture = async (url, flip) => {
+              const response = await fetch(url)
+              const arrayBuffer = await response.arrayBuffer()
+              const { width, height, rgba } = window.modelibrTiff.decodeTiff(
+                arrayBuffer,
+                { UTIF: window.UTIF }
+              )
+
+              const texture = new THREE.DataTexture(
+                new Uint8Array(rgba.buffer, rgba.byteOffset, rgba.byteLength),
+                width,
+                height,
+                THREE.RGBAFormat,
+                THREE.UnsignedByteType
+              )
+              texture.minFilter = THREE.LinearMipmapLinearFilter
+              texture.magFilter = THREE.LinearFilter
+              texture.generateMipmaps = true
+              texture.flipY = flip
+              texture.wrapS = THREE.RepeatWrapping
+              texture.wrapT = THREE.RepeatWrapping
+              texture.repeat.set(tiling.x, tiling.y)
+              texture.needsUpdate = true
+              return texture
+            }
+
             // Texture types that carry color data (need sRGB color space)
             const colorTextureProps = new Set(['map', 'emissiveMap'])
 
@@ -951,6 +982,8 @@ export class PuppeteerRenderer {
                 let texture
                 if (data.isExr) {
                   texture = await loadExrTexture(data.url, shouldFlipY)
+                } else if (data.isTiff) {
+                  texture = await loadTiffTexture(data.url, shouldFlipY)
                 } else {
                   texture = await loadTexture(data.url, shouldFlipY)
                 }
@@ -977,7 +1010,7 @@ export class PuppeteerRenderer {
 
                 loadedTextures[materialProperty] = texture
                 console.log(
-                  `Loaded ${type} -> ${materialProperty} (channel: ${sourceChannel}, exr: ${!!data.isExr})`
+                  `Loaded ${type} -> ${materialProperty} (channel: ${sourceChannel}, exr: ${!!data.isExr}, tiff: ${!!data.isTiff})`
                 )
               } catch (error) {
                 console.warn(`Failed to load ${type} texture:`, error)

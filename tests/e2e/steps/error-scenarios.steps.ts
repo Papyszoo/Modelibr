@@ -17,6 +17,7 @@ const __dirname = path.dirname(__filename);
 // State tracking
 const errorState = {
     modelCountBefore: 0,
+    invalidFileBaseName: "",
     apiStatusCode: 0,
     errorToastDetected: false,
     errorToastText: "",
@@ -30,8 +31,11 @@ When(
         // Reset error tracking
         errorState.errorToastDetected = false;
         errorState.errorToastText = "";
+        errorState.invalidFileBaseName = path.parse(filename).name;
 
-        // Count model cards before upload attempt
+        // Count model cards before upload attempt (informational only — the
+        // assertion no longer relies on this number, because parallel workers
+        // can add models to the list while this scenario is running).
         const modelCards = page.locator(".model-card");
         errorState.modelCountBefore = await modelCards.count();
         console.log(
@@ -211,10 +215,24 @@ Then("an error indicator should be displayed", async ({ page }) => {
 });
 
 Then("the model list should remain unchanged", async ({ page }) => {
-    const modelCards = page.locator(".model-card");
-    const currentCount = await modelCards.count();
-    expect(currentCount).toBe(errorState.modelCountBefore);
-    console.log(`[Verify] Model count unchanged: ${currentCount} ✓`);
+    // Parallel workers may add unrelated models to the list during this scenario,
+    // so we can't compare absolute counts. Instead, verify the specific invalid
+    // file (e.g. "package.json") did NOT produce a model — that's the actual
+    // behavior we care about, and it's worker-isolated.
+    const baseName = errorState.invalidFileBaseName;
+    if (!baseName) {
+        throw new Error(
+            "Invalid-file scenario must run the upload step before this assertion",
+        );
+    }
+
+    const invalidModelCard = page.locator(
+        `.model-card:has-text("${baseName}")`,
+    );
+    await expect(invalidModelCard).toHaveCount(0, { timeout: 5000 });
+    console.log(
+        `[Verify] No model card was created for invalid file "${baseName}" ✓`,
+    );
 });
 
 // ============= Non-existent Resource API =============

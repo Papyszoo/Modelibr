@@ -243,7 +243,7 @@ export const HeightCard = memo(function HeightCard({
         type="file"
         ref={fileInputRef}
         onChange={handleFileInputChange}
-        accept="image/*,.exr,.tga,.bmp"
+        accept="image/*,.exr,.tga,.bmp,.tif,.tiff"
         style={{ display: 'none' }}
       />
 

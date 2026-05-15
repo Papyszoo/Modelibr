@@ -42,13 +42,27 @@ export function isExrFile(filePath) {
 }
 
 /**
- * Check whether a file is a browser-compatible image (PNG, JPEG, WebP, etc.).
+ * Check whether Sharp can decode the file directly (PNG/JPEG/WebP/BMP/GIF/TGA/TIFF).
+ *
+ * Note: not all of these formats are decodable by a browser natively — TIFF in
+ * particular is not — but Sharp handles them all server-side, which is what
+ * the preview pipeline depends on. Keep this name accurate when adding formats:
+ * anything Sharp can decode → here; anything that needs a custom decoder
+ * (e.g. EXR) → handled in its own branch in `generateFilePreview`.
  */
-export function isBrowserImage(filePath) {
+export function isSharpDecodableImage(filePath) {
   const ext = path.extname(filePath).toLowerCase()
-  return ['.png', '.jpg', '.jpeg', '.webp', '.bmp', '.gif', '.tga'].includes(
-    ext
-  )
+  return [
+    '.png',
+    '.jpg',
+    '.jpeg',
+    '.webp',
+    '.bmp',
+    '.gif',
+    '.tga',
+    '.tif',
+    '.tiff',
+  ].includes(ext)
 }
 
 /**
@@ -138,7 +152,7 @@ export async function generateFilePreview(filePath, maxSize = 512) {
     return convertExrToPng(filePath, maxSize)
   }
 
-  if (isBrowserImage(filePath)) {
+  if (isSharpDecodableImage(filePath)) {
     return createImagePreview(filePath, maxSize)
   }
 

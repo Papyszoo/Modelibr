@@ -60,6 +60,10 @@ services:
             context: ./src/frontend
             dockerfile: Dockerfile
             target: production
+            additional_contexts:
+                # The frontend imports the shared TIFF decoder from the
+                # asset-processor workspace so both interpret TIFFs identically.
+                asset-processor: ./src/asset-processor
             args:
                 VITE_API_BASE_URL: ${VITE_API_BASE_URL}
         container_name: frontend

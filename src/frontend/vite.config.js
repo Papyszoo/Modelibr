@@ -24,6 +24,11 @@ export default defineConfig(({ mode }) => {
         'Cross-Origin-Embedder-Policy': 'require-corp',
         'Cross-Origin-Opener-Policy': 'same-origin',
       },
+      fs: {
+        // Allow Vite dev server to read the shared TIFF decoder from the
+        // sibling asset-processor workspace.
+        allow: [path.resolve(__dirname, '..')],
+      },
     },
     preview: {
       host: '0.0.0.0',

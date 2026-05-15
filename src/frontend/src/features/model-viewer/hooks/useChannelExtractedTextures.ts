@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import * as THREE from 'three'
 
 import { TextureChannel } from '@/types'
+import { isTiffFile } from '@/utils/fileUtils'
+import { loadTiffTextureFromUrl } from '@/utils/tiffTextureLoader'
 
 /**
  * Vertex shader - simple passthrough
@@ -115,6 +117,8 @@ function extractChannel(
 export interface TextureConfig {
   url: string
   sourceChannel: TextureChannel
+  /** Original file name (used to detect formats the browser cannot decode natively, e.g. TIFF). */
+  fileName?: string
 }
 
 export interface ChannelExtractedTextures {
@@ -141,7 +145,10 @@ export function useChannelExtractedTextures(
   const configKey = useMemo(() => {
     return (
       Object.entries(textureConfigs)
-        .map(([key, config]) => `${key}:${config.url}:${config.sourceChannel}`)
+        .map(
+          ([key, config]) =>
+            `${key}:${config.url}:${config.sourceChannel}:${config.fileName ?? ''}`
+        )
         .join('|') + `:flipY=${flipY}`
     )
   }, [textureConfigs, flipY])
@@ -153,6 +160,28 @@ export function useChannelExtractedTextures(
     const loadedTextures: ChannelExtractedTextures = {}
     const loadPromises: Promise<void>[] = []
 
+    const handleLoaded = (
+      slotName: string,
+      config: TextureConfig,
+      loadedTexture: THREE.Texture
+    ) => {
+      // Configure texture wrapping and flip
+      loadedTexture.wrapS = THREE.RepeatWrapping
+      loadedTexture.wrapT = THREE.RepeatWrapping
+      loadedTexture.flipY = flipY
+
+      if (config.sourceChannel === TextureChannel.RGB) {
+        loadedTextures[slotName] = loadedTexture
+      } else {
+        loadedTextures[slotName] = extractChannel(
+          loadedTexture,
+          config.sourceChannel,
+          renderer
+        )
+        loadedTexture.dispose()
+      }
+    }
+
     Object.entries(textureConfigs).forEach(([slotName, config]) => {
       if (!config.url) {
         loadedTextures[slotName] = null
@@ -160,27 +189,27 @@ export function useChannelExtractedTextures(
       }
 
       const promise = new Promise<void>(resolve => {
+        if (isTiffFile(config.fileName)) {
+          loadTiffTextureFromUrl(config.url)
+            .then(loadedTexture => {
+              handleLoaded(slotName, config, loadedTexture)
+              resolve()
+            })
+            .catch(error => {
+              console.error(
+                `Failed to load TIFF texture for ${slotName}:`,
+                error
+              )
+              loadedTextures[slotName] = null
+              resolve()
+            })
+          return
+        }
+
         loader.load(
           config.url,
           loadedTexture => {
-            // Configure texture wrapping and flip
-            loadedTexture.wrapS = THREE.RepeatWrapping
-            loadedTexture.wrapT = THREE.RepeatWrapping
-            loadedTexture.flipY = flipY
-
-            if (config.sourceChannel === TextureChannel.RGB) {
-              // RGB: use texture as-is
-              loadedTextures[slotName] = loadedTexture
-            } else {
-              // Single channel: extract and convert to grayscale
-              loadedTextures[slotName] = extractChannel(
-                loadedTexture,
-                config.sourceChannel,
-                renderer
-              )
-              // Dispose original since we created a new one
-              loadedTexture.dispose()
-            }
+            handleLoaded(slotName, config, loadedTexture)
             resolve()
           },
           undefined,

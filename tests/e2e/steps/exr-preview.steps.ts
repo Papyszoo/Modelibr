@@ -23,8 +23,10 @@ const GLOBAL_TEXTURE_DIR = path.resolve(
 // Run-unique ID to prevent collisions across test runs
 const runId = Date.now().toString(36).slice(-4);
 
-// Track created texture sets
-const createdSets: Record<string, { id: number; name: string }> = {};
+// Track created texture sets — exported so other step files (e.g. tiff-preview.steps.ts)
+// can register their own sets and reuse the shared "open the texture set viewer for"
+// and "switch to the Preview tab" steps defined below.
+export const createdSets: Record<string, { id: number; name: string }> = {};
 
 function uniqueName(baseName: string): string {
     return `${baseName}_${runId}`;
