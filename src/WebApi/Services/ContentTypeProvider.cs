@@ -22,6 +22,8 @@ public static class ContentTypeProvider
             ".hdr" => "image/vnd.radiance",
             ".tga" => "image/x-tga",
             ".bmp" => "image/bmp",
+            ".tif" => "image/tiff",
+            ".tiff" => "image/tiff",
             _ => "application/octet-stream"
         };
     }

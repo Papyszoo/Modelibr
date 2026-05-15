@@ -17,6 +17,9 @@ public class FileTypeValueObjectTests
     [InlineData("model.mb", "maya")]
     [InlineData("texture.jpg", "texture")]
     [InlineData("texture.png", "texture")]
+    [InlineData("texture.tif", "texture")]
+    [InlineData("texture.tiff", "texture")]
+    [InlineData("TEXTURE.TIFF", "texture")]
     [InlineData("material.mtl", "material")]
     public void FromFileName_WithKnownExtensions_ReturnsCorrectFileType(string fileName, string expectedValue)
     {
@@ -45,6 +48,8 @@ public class FileTypeValueObjectTests
     [Theory]
     [InlineData("test.obj")]
     [InlineData("texture.jpg")]
+    [InlineData("texture.tif")]
+    [InlineData("texture.tiff")]
     [InlineData("project.blend")]
     [InlineData("material.mtl")]
     public void ValidateForUpload_WithSupportedFiles_ReturnsSuccess(string fileName)

@@ -69,6 +69,7 @@ function buildCombinedTextureConfigs(
         configs[`${materialName}${KEY_SEP}${slot}`] = {
           url: getFileUrl(tex.fileId.toString()),
           sourceChannel: tex.sourceChannel ?? TextureChannel.RGB,
+          fileName: tex.fileName,
         }
       }
     }

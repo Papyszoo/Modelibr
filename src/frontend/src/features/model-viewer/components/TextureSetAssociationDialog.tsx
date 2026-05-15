@@ -7,7 +7,7 @@ import { InputText } from 'primereact/inputtext'
 import { Toast } from 'primereact/toast'
 import { useEffect, useRef, useState } from 'react'
 
-import { getFileUrl } from '@/features/models/api/modelApi'
+import { getFilePreviewUrl } from '@/features/models/api/modelApi'
 import { usePacksQuery } from '@/features/pack/api/queries'
 import { useAllTextureSetsQuery } from '@/features/texture-set/api/queries'
 import {
@@ -324,8 +324,10 @@ function TextureSetCard({
   }
 
   const previewTexture = getPreviewTexture()
+  // Use the server-generated PNG preview, not the raw file — browsers can't
+  // decode formats like TIFF natively, and the raw URL bypasses thumbnailing.
   const previewUrl = previewTexture
-    ? getFileUrl(previewTexture.fileId.toString())
+    ? getFilePreviewUrl(previewTexture.fileId.toString())
     : null
 
   return (

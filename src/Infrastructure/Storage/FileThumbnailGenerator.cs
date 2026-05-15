@@ -24,14 +24,14 @@ public sealed class FileThumbnailGenerator : IFileThumbnailGenerator
     // Includes "image/*" which is the generic texture MIME type from the domain.
     private static readonly HashSet<string> SupportedMimeTypes = new(StringComparer.OrdinalIgnoreCase)
     {
-        "image/png", "image/jpeg", "image/bmp", "image/gif", "image/webp", "image/*", "image/vnd.radiance", "image/x-exr"
+        "image/png", "image/jpeg", "image/bmp", "image/gif", "image/webp", "image/tiff", "image/*", "image/vnd.radiance", "image/x-exr"
     };
 
     // Texture MIME types that get 4-channel thumbnails (RGB + R + G + B).
     // "image/*" is the generic texture MIME type used for .png/.jpg/.bmp textures.
     private static readonly HashSet<string> TextureMimeTypes = new(StringComparer.OrdinalIgnoreCase)
     {
-        "image/png", "image/jpeg", "image/bmp", "image/*", "image/vnd.radiance", "image/x-exr"
+        "image/png", "image/jpeg", "image/bmp", "image/tiff", "image/*", "image/vnd.radiance", "image/x-exr"
     };
 
     public FileThumbnailGenerator(

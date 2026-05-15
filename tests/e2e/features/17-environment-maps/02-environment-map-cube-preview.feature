@@ -2,6 +2,10 @@
 Feature: Cube environment maps and preview loading
   Users can upload cube textures with explicit face mapping and inspect them in the viewer.
 
+  # Uploads 6 cube faces + a custom thumbnail, then opens the viewer which
+  # triggers PMREM cubemap generation. On slow PR-CI runners this races
+  # with other parallel thumbnail jobs; @slow runs sequentially.
+  @slow
   Scenario: Upload a cube environment map with a custom thumbnail and preview it
     Given I am on the environment maps page
     When I upload the cube environment map "studio-cube" with size label "1K" and custom thumbnail "texture_albedo.png" using:
