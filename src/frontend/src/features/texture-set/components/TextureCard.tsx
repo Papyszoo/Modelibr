@@ -303,7 +303,7 @@ export const TextureCard = memo(function TextureCard({
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*,.exr,.tga,.bmp"
+          accept="image/*,.exr,.tga,.bmp,.tif,.tiff"
           style={{ display: 'none' }}
           onChange={handleFileInputChange}
         />

@@ -4,7 +4,8 @@ import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js'
 
 import { getFileUrl } from '@/features/models/api/modelApi'
 import { TextureChannel, type TextureSetDto, TextureType } from '@/types'
-import { isExrFile } from '@/utils/fileUtils'
+import { isExrFile, isTiffFile } from '@/utils/fileUtils'
+import { decodeTiffBlobToBitmap } from '@/utils/tiffTextureLoader'
 
 import { type GeometryType } from './GeometrySelector'
 
@@ -45,6 +46,7 @@ interface TexturedGeometryProps {
 interface TextureUrlInfo {
   url: string
   isExrFormat: boolean
+  isTiffFormat: boolean
   /** Channel to extract client-side (1=R, 2=G, 3=B, 4=A, undefined=full RGB).
    *  Only set when textureQuality=0 (original) and texture uses a split channel.
    *  When using proxies, channel extraction is done server-side. */
@@ -75,6 +77,7 @@ function buildTextureUrls(
         return {
           url: getFileUrl(proxy.fileId.toString()),
           isExrFormat: false, // proxies are always WebP/PNG, never EXR
+          isTiffFormat: false,
         }
       }
     }
@@ -87,6 +90,7 @@ function buildTextureUrls(
     return {
       url: getFileUrl(t.fileId.toString()),
       isExrFormat: isExrFile(t.fileName),
+      isTiffFormat: isTiffFile(t.fileName),
       sourceChannel: needsChannelExtract ? t.sourceChannel : undefined,
     }
   }
@@ -221,6 +225,7 @@ function extractChannelFromBitmap(
 async function loadTextureOffThread(
   url: string,
   isExr: boolean,
+  isTiff: boolean,
   signal: AbortSignal,
   sourceChannel?: number,
   cachedBlob?: Blob
@@ -241,7 +246,9 @@ async function loadTextureOffThread(
     blob = await response.blob()
   }
 
-  const bitmap = await createImageBitmap(blob, { imageOrientation: 'flipY' })
+  const bitmap = isTiff
+    ? await decodeTiffBlobToBitmap(blob)
+    : await createImageBitmap(blob, { imageOrientation: 'flipY' })
 
   // If a specific channel needs extraction, do it via canvas
   if (sourceChannel && sourceChannel >= 1 && sourceChannel <= 4) {
@@ -360,17 +367,20 @@ function TexturedMesh({
       const result: Record<string, THREE.Texture> = {}
 
       // Step 1: Deduplicate — fetch each unique URL once
-      const uniqueUrls = new Map<string, boolean>() // url → isExr
+      const uniqueUrls = new Map<string, { isExr: boolean; isTiff: boolean }>()
       for (const [, info] of entries) {
         if (!uniqueUrls.has(info.url)) {
-          uniqueUrls.set(info.url, info.isExrFormat)
+          uniqueUrls.set(info.url, {
+            isExr: info.isExrFormat,
+            isTiff: info.isTiffFormat,
+          })
         }
       }
 
       const blobCache = new Map<string, Blob>()
       await Promise.all(
-        Array.from(uniqueUrls.entries()).map(async ([url, isExr]) => {
-          if (isExr) return // EXR uses its own loader, no blob caching
+        Array.from(uniqueUrls.entries()).map(async ([url, fmt]) => {
+          if (fmt.isExr) return // EXR uses its own loader, no blob caching
           try {
             const response = await fetch(url, {
               signal: abortController.signal,
@@ -394,6 +404,7 @@ function TexturedMesh({
             const texture = await loadTextureOffThread(
               info.url,
               info.isExrFormat,
+              info.isTiffFormat,
               abortController.signal,
               info.sourceChannel,
               blobCache.get(info.url)

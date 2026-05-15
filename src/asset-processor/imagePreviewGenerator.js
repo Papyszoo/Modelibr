@@ -46,9 +46,17 @@ export function isExrFile(filePath) {
  */
 export function isBrowserImage(filePath) {
   const ext = path.extname(filePath).toLowerCase()
-  return ['.png', '.jpg', '.jpeg', '.webp', '.bmp', '.gif', '.tga'].includes(
-    ext
-  )
+  return [
+    '.png',
+    '.jpg',
+    '.jpeg',
+    '.webp',
+    '.bmp',
+    '.gif',
+    '.tga',
+    '.tif',
+    '.tiff',
+  ].includes(ext)
 }
 
 /**
