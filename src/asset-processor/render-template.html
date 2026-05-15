@@ -28,14 +28,14 @@
     <!-- TIFF decoding stack:
          - pako: dependency of utif2 (deflate/inflate), exposes window.pako
          - utif2: TIFF parser, exposes window.UTIF
-         - lib/tiffDecode.js: shared decoder used by both this Puppeteer scene
-           and the frontend, exposes window.modelibrTiff (single source of
-           truth so the in-browser viewer and server-side thumbnail render
-           interpret the same TIFF identically).
-         All deferred so they execute before the module script in document order. -->
+         - lib/tiffDecode.js: shared decoder (ESM, with a window.modelibrTiff
+           side-effect for the page.evaluate classic-script context). Single
+           source of truth so the in-browser viewer and server-side thumbnail
+           render interpret the same TIFF identically.
+         All deferred so they execute before the main module script in document order. -->
     <script defer src="./node_modules/pako/dist/pako.min.js"></script>
     <script defer src="./node_modules/utif2/UTIF.js"></script>
-    <script defer src="./lib/tiffDecode.js"></script>
+    <script type="module" src="./lib/tiffDecode.js"></script>
     <script type="importmap">
       {
         "imports": {
