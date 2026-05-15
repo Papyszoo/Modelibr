@@ -23,6 +23,8 @@ internal sealed class FileUtilityService : IFileUtilityService
             ".png" => "image/png",
             ".tga" => "image/tga",
             ".bmp" => "image/bmp",
+            ".tif" => "image/tiff",
+            ".tiff" => "image/tiff",
             ".mtl" => "text/plain",
             ".max" => "application/octet-stream",
             ".ma" => "application/octet-stream",

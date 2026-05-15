@@ -28,73 +28,6 @@ const runId = Date.now().toString(36).slice(-4);
 // Store the last created texture set name for the viewer to use
 // Tracked via getScenarioState(page).getCustom('lastCreatedTextureSetName')
 
-// Track whether cleanup has been done this run (per-worker, not per-scenario)
-let cleanupDone = false;
-
-/**
- * Clean up stale texture sets from previous test runs.
- * Keeps only the first 'blue_color' and removes old test artifacts.
- */
-async function cleanupStaleTextureSets(): Promise<void> {
-    if (cleanupDone) return;
-    cleanupDone = true;
-
-    try {
-        const API_BASE = process.env.API_BASE_URL || "http://localhost:8090";
-        const response = await fetch(`${API_BASE}/texture-sets`);
-        if (!response.ok) return;
-
-        const data = (await response.json()) as {
-            textureSets: Array<{ id: number; name: string }>;
-        };
-        const textureSets = data.textureSets;
-
-        // Find stale duplicates: keep first blue_color, delete rest
-        let firstBlueKept = false;
-        const toDelete: number[] = [];
-
-        for (const ts of textureSets) {
-            if (ts.name === "blue_color") {
-                if (firstBlueKept) {
-                    toDelete.push(ts.id);
-                } else {
-                    firstBlueKept = true;
-                }
-            }
-            // Delete old test artifacts from previous runs
-            if (
-                ts.name.startsWith("channel-test_") ||
-                ts.name.startsWith("orm-test_") ||
-                ts.name.startsWith("height-test_") ||
-                ts.name.startsWith("complete-texture-set-") ||
-                ts.name.startsWith("Source ORM_") ||
-                ts.name.startsWith("ORM Target_")
-            ) {
-                // Only delete ones from previous runs (not current)
-                if (!ts.name.endsWith(`_${runId}`)) {
-                    toDelete.push(ts.id);
-                }
-            }
-        }
-
-        if (toDelete.length > 0) {
-            console.log(
-                `[Cleanup] Removing ${toDelete.length} stale texture sets`,
-            );
-            for (const id of toDelete) {
-                await fetch(`${API_BASE}/texture-sets/${id}`, {
-                    method: "DELETE",
-                });
-            }
-            console.log(
-                `[Cleanup] Removed ${toDelete.length} stale texture sets ✓`,
-            );
-        }
-    } catch (e) {
-        console.log(`[Cleanup] Warning: cleanup failed: ${e}`);
-    }
-}
-
 // ============================================================================
 // SETUP STEPS
 // ============================================================================
@@ -122,7 +55,9 @@ When("I open the texture set viewer for any set", async ({ page }) => {
 });
 
 Given("I have a texture set with uploaded textures", async ({ page }) => {
-    await cleanupStaleTextureSets();
+    // NOTE: per-test cleanup removed — it used a per-worker runId and would
+    // delete other workers' fresh test data (e.g. the merge ORM scenario's
+    // source/target). Global cleanup (global-setup.ts) handles old runs.
     const textureSetsPage = new TextureSetsPage(page);
     await textureSetsPage.goto();
 
@@ -182,7 +117,9 @@ Given("I have a texture set with uploaded textures", async ({ page }) => {
 });
 
 Given("I have a texture set with ORM packed texture", async ({ page }) => {
-    await cleanupStaleTextureSets();
+    // NOTE: per-test cleanup removed — it used a per-worker runId and would
+    // delete other workers' fresh test data (e.g. the merge ORM scenario's
+    // source/target). Global cleanup (global-setup.ts) handles old runs.
     const textureSetsPage = new TextureSetsPage(page);
     await textureSetsPage.goto();
 
@@ -231,7 +168,9 @@ Given("I have a texture set with ORM packed texture", async ({ page }) => {
 });
 
 Given("I have a texture set with a height texture", async ({ page }) => {
-    await cleanupStaleTextureSets();
+    // NOTE: per-test cleanup removed — it used a per-worker runId and would
+    // delete other workers' fresh test data (e.g. the merge ORM scenario's
+    // source/target). Global cleanup (global-setup.ts) handles old runs.
     const textureSetsPage = new TextureSetsPage(page);
     await textureSetsPage.goto();
 

@@ -177,3 +177,14 @@ export function isExrFile(fileName?: string): boolean {
   if (!fileName) return false
   return fileName.toLowerCase().endsWith('.exr')
 }
+
+/**
+ * Detect TIFF file by extension.
+ *
+ * Browsers cannot decode TIFF natively, so the viewer routes these through utif2.
+ */
+export function isTiffFile(fileName?: string): boolean {
+  if (!fileName) return false
+  const lower = fileName.toLowerCase()
+  return lower.endsWith('.tif') || lower.endsWith('.tiff')
+}

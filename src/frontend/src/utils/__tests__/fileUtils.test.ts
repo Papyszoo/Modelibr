@@ -7,6 +7,7 @@ import {
   getModelFileFormat,
   isSupportedModelFormat,
   isThreeJSRenderable,
+  isTiffFile,
   THREEJS_SUPPORTED_FORMATS,
 } from '../fileUtils'
 
@@ -145,6 +146,23 @@ describe('fileUtils', () => {
       expect(isSupportedModelFormat('.jpg')).toBe(false)
       expect(isSupportedModelFormat('.mp4')).toBe(false)
       expect(isSupportedModelFormat('.unknown')).toBe(false)
+    })
+  })
+
+  describe('isTiffFile', () => {
+    it('matches .tif and .tiff regardless of case', () => {
+      expect(isTiffFile('texture.tif')).toBe(true)
+      expect(isTiffFile('texture.tiff')).toBe(true)
+      expect(isTiffFile('TEXTURE.TIFF')).toBe(true)
+      expect(isTiffFile('path/to/Albedo.Tif')).toBe(true)
+    })
+
+    it('rejects non-TIFF extensions and empty input', () => {
+      expect(isTiffFile('texture.png')).toBe(false)
+      expect(isTiffFile('texture.exr')).toBe(false)
+      expect(isTiffFile('texture')).toBe(false)
+      expect(isTiffFile('')).toBe(false)
+      expect(isTiffFile(undefined)).toBe(false)
     })
   })
 

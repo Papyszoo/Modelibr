@@ -42,7 +42,7 @@ export function TextureSetListHeader({
           type="file"
           ref={fileInputRef}
           onChange={handleFileChange}
-          accept="image/*,.exr,.tga,.bmp"
+          accept="image/*,.exr,.tga,.bmp,.tif,.tiff"
           multiple
           style={{ display: 'none' }}
           data-testid="texture-upload-input"

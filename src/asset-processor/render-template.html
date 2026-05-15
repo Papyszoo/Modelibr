@@ -25,6 +25,9 @@
 
   <body>
     <div id="canvas-container"></div>
+    <!-- UTIF (TIFF decoder) is a UMD module that exposes window.UTIF; it depends on window.pako. -->
+    <script src="./node_modules/pako/dist/pako.min.js"></script>
+    <script src="./node_modules/utif2/UTIF.js"></script>
     <script type="importmap">
       {
         "imports": {
