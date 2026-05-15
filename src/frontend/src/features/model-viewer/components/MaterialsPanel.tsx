@@ -18,8 +18,8 @@ import { useModelObject } from '@/features/model-viewer/hooks/useModelObject'
 import { getFilePreviewUrl } from '@/features/models/api/modelApi'
 import { useTextureSetsByModelVersionQuery } from '@/features/texture-set/api/queries'
 import { disassociateTextureSetFromModelVersion } from '@/features/texture-set/api/textureSetApi'
-import { type TextureSetDto } from '@/types'
 import { TextureType } from '@/features/texture-set/types'
+import { type TextureSetDto } from '@/types'
 
 import { TextureSetAssociationDialog } from './TextureSetAssociationDialog'
 
@@ -85,9 +85,17 @@ export function MaterialsPanel({
   const textureSets: TextureSetDto[] = textureSetsQuery.data ?? []
   const loading = textureSetsQuery.isLoading || textureSetsQuery.isFetching
 
-  const variantNames = selectedVersion?.variantNames ?? []
+  // Memoize array/string fallbacks so the `?? []` doesn't produce a fresh
+  // reference on every render and invalidate downstream useMemo dependencies.
+  const variantNames = useMemo(
+    () => selectedVersion?.variantNames ?? [],
+    [selectedVersion?.variantNames]
+  )
   const mainVariantName = selectedVersion?.mainVariantName ?? ''
-  const rawMaterialNames = selectedVersion?.materialNames ?? []
+  const rawMaterialNames = useMemo(
+    () => selectedVersion?.materialNames ?? [],
+    [selectedVersion?.materialNames]
+  )
 
   // Extract material names from the loaded 3D model as a fallback
   const runtimeMaterialNames = useMemo(() => {
@@ -106,7 +114,10 @@ export function MaterialsPanel({
     return Array.from(names)
   }, [modelObject])
 
-  const textureMappings = selectedVersion?.textureMappings ?? []
+  const textureMappings = useMemo(
+    () => selectedVersion?.textureMappings ?? [],
+    [selectedVersion?.textureMappings]
+  )
 
   // Merge API material names with runtime ones, dedup, fallback to 'Default'
   const materialNames = useMemo(() => {
