@@ -196,7 +196,10 @@ export function useChannelExtractedTextures(
               resolve()
             })
             .catch(error => {
-              console.error(`Failed to load TIFF texture for ${slotName}:`, error)
+              console.error(
+                `Failed to load TIFF texture for ${slotName}:`,
+                error
+              )
               loadedTextures[slotName] = null
               resolve()
             })

@@ -19,9 +19,7 @@ export async function decodeTiffBufferToBitmap(
   return createImageBitmap(imageData, { imageOrientation: 'flipY' })
 }
 
-export async function decodeTiffBlobToBitmap(
-  blob: Blob
-): Promise<ImageBitmap> {
+export async function decodeTiffBlobToBitmap(blob: Blob): Promise<ImageBitmap> {
   return decodeTiffBufferToBitmap(await blob.arrayBuffer())
 }
 
