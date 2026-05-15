@@ -462,7 +462,9 @@ export function RecycledFilesList() {
 
   const getTexturePreviewUrl = (textureSet: RecycledTextureSet) => {
     if (textureSet.previewFileId) {
-      return getFileUrl(textureSet.previewFileId.toString())
+      // Use the server-generated preview URL (PNG) so non-browser-native
+      // formats like TIFF render correctly.
+      return getFilePreviewUrl(textureSet.previewFileId.toString())
     }
     return null
   }

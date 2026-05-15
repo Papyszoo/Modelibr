@@ -6,7 +6,7 @@ import { InputText } from 'primereact/inputtext'
 import { type MenuItem } from 'primereact/menuitem'
 import { useEffect, useRef } from 'react'
 
-import { getFileUrl } from '@/features/models/api/modelApi'
+import { getFilePreviewUrl } from '@/features/models/api/modelApi'
 import { useTabContext } from '@/hooks/useTabContext'
 import { UploadableGrid } from '@/shared/components'
 import { useContainerTextureSets } from '@/shared/hooks/useContainerTextureSets'
@@ -58,7 +58,9 @@ export function ContainerTextureSetsTab({
         ? textureSet.textures?.find(t => t.textureType === diffuseType)
         : undefined
     const texture = albedo || diffuse
-    return texture ? getFileUrl(texture.fileId.toString()) : null
+    // Use the server-generated preview URL (PNG) so non-browser-native formats
+    // like TIFF render correctly.
+    return texture ? getFilePreviewUrl(texture.fileId.toString()) : null
   }
 
   const contextMenuItems: MenuItem[] = [
