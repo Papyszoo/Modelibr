@@ -2,6 +2,10 @@
 Feature: Environment map list parity
   Environment maps should match the current model-style list interactions.
 
+  # Both scenarios upload an environment map and open its viewer, which triggers
+  # PMREM/cube preview generation. On slow PR-CI runners this races with other
+  # parallel thumbnail jobs; @slow runs sequentially in the slow phase.
+  @slow
   Scenario: Drag and drop upload updates the toolbar count and keeps the detected 4K label
     Given I am on the environment maps page
     Then the environment maps toolbar should include:
@@ -19,6 +23,7 @@ Feature: Environment map list parity
     Then the environment map viewer for "lighting-sky-4k" should be visible
     And the environment map "lighting-sky-4k" should show the preview size option "4K"
 
+  @slow
   Scenario: Drag and drop HDR upload keeps the inferred 2K label
     Given I am on the environment maps page
     When I drag and drop a generated 2048x1024 HDR environment map "studio-hdr-2k"
