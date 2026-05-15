@@ -285,7 +285,10 @@ Then(
                 },
                 {
                     message: `Thumbnail for version ${versionNumber} did not become ready in DB within timeout`,
-                    timeout: 240000,
+                    // Bumped from 240s — on slow CI runners the asset-processor
+                    // queue can take longer to drain when other parallel tests
+                    // are creating thumbnail jobs.
+                    timeout: 480000,
                     intervals: [3000],
                 },
             )
