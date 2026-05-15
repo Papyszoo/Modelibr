@@ -33,7 +33,7 @@ import {
 import { uploadFile } from '@/features/models/api/modelApi'
 import { useTabContext } from '@/hooks/useTabContext'
 import { useUploadProgress } from '@/hooks/useUploadProgress'
-import { useDragAndDrop } from '@/shared/hooks/useFileUpload'
+import { UploadDropZone } from '@/shared/components/UploadDropZone'
 import { collectCategoryBranchIds } from '@/shared/utils/categoryTree'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
 import {
@@ -308,17 +308,6 @@ export function EnvironmentMapList() {
     void uploadItems(prepareEnvironmentMapUploadItems(files))
   }
 
-  const { onDrop, onDragOver, onDragEnter, onDragLeave } =
-    useDragAndDrop(handleDropUpload)
-  const pageDragAndDropHandlers = showUploadDialog
-    ? {}
-    : {
-        onDrop,
-        onDragOver,
-        onDragEnter,
-        onDragLeave,
-      }
-
   const handleDialogSubmit = async (
     values: EnvironmentMapUploadDialogSubmitValues
   ) => {
@@ -522,10 +511,11 @@ export function EnvironmentMapList() {
   )
 
   return (
-    <div
+    <UploadDropZone
       ref={listScrollRef}
       className="environment-map-list"
-      {...pageDragAndDropHandlers}
+      onFilesDropped={handleDropUpload}
+      disabled={showUploadDialog}
     >
       <Toast ref={toast} />
       <EnvironmentMapContextMenu
@@ -631,6 +621,6 @@ export function EnvironmentMapList() {
           }}
         />
       )}
-    </div>
+    </UploadDropZone>
   )
 }

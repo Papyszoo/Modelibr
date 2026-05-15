@@ -5,21 +5,8 @@
   flex-direction: column;
   gap: 1rem;
   padding: 1rem;
-  border: 2px dashed transparent;
   border-radius: 8px;
-  transition: all 0.3s ease;
   overflow: auto;
-}
-
-.model-grid-container:hover:not(.drag-over) {
-  border-color: #3182ce;
-  background: rgba(49, 130, 206, 0.05);
-}
-
-.model-grid-container.drag-over {
-  border-color: #3182ce;
-  background: rgba(49, 130, 206, 0.1);
-  transform: scale(1.02);
 }
 
 /* Search and Filter Controls */
@@ -535,16 +522,6 @@
 .model-card-add-content span {
   font-size: 0.875rem;
   font-weight: 500;
-}
-
-/* Tab content specific styles */
-.model-list-tab .model-grid-container {
-  border: none;
-  background: transparent;
-}
-
-.model-list-tab .model-grid-container:hover {
-  background: transparent;
 }
 
 /* Responsive adjustments — keep slider in control, but cap the desktop

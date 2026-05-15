@@ -1,0 +1,19 @@
+/* Canonical drop-zone visual.
+ * Single source of truth for the file-drop affordance. The transparent
+ * baseline border keeps layout stable when the active state turns the
+ * border solid; only the color/background change on .drag-over so the
+ * page does not jump.
+ */
+.upload-drop-zone {
+  position: relative;
+  border: 2px dashed transparent;
+  background-color: transparent;
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease;
+}
+
+.upload-drop-zone.drag-over {
+  border-color: var(--primary-color, #3182ce);
+  background-color: rgba(49, 130, 206, 0.04);
+}

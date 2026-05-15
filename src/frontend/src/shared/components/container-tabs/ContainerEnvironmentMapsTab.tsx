@@ -8,7 +8,7 @@ import { useEffect, useRef } from 'react'
 
 import { getEnvironmentMapPrimaryPreviewUrl } from '@/features/environment-map/utils/environmentMapUtils'
 import { useTabContext } from '@/hooks/useTabContext'
-import { UploadableGrid } from '@/shared/components'
+import { UploadDropZone } from '@/shared/components/UploadDropZone'
 import { useContainerEnvironmentMaps } from '@/shared/hooks/useContainerEnvironmentMaps'
 import { type ContainerAdapter } from '@/shared/types/ContainerTypes'
 
@@ -60,10 +60,8 @@ export function ContainerEnvironmentMapsTab({
     <>
       <ContextMenu model={contextMenuItems} ref={contextMenuRef} />
 
-      <UploadableGrid
+      <UploadDropZone
         onFilesDropped={env.handleUpload}
-        isUploading={env.uploading}
-        uploadMessage={`Drop panoramic images here to create environment maps and add to ${labelLower}`}
         className="container-grid-wrapper"
       >
         <div className="container-section">
@@ -137,7 +135,7 @@ export function ContainerEnvironmentMapsTab({
             </div>
           ) : null}
         </div>
-      </UploadableGrid>
+      </UploadDropZone>
 
       <Dialog
         header={`Add Environment Maps to ${label}`}

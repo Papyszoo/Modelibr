@@ -212,8 +212,21 @@ export function DockPanelContent({
           onTabSelect={setActiveTab}
         />
 
-        {/* Content Area */}
-        <div className="dock-content">
+        {/* Content Area
+         *
+         * The .dock-content div accepts tab drops anywhere on the panel side.
+         * Tab-drag handlers gate on `draggedTab` so file drags pass through
+         * untouched, and inner UploadDropZone elements call stopPropagation
+         * so file drops never reach this listener — the two systems coexist
+         * via MIME-type isolation.
+         */}
+        <div
+          className="dock-content"
+          onDrop={handleDropOnOtherPanel}
+          onDragOver={handleDragOver}
+          onDragEnter={handleDragEnter}
+          onDragLeave={handleDragLeave}
+        >
           {activeTabData ? (
             <DockContentArea
               side={side}

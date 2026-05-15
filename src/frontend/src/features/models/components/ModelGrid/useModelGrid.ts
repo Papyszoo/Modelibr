@@ -95,12 +95,6 @@ export function useModelGrid({
     uploadProgress: upload.uploadProgress,
     uploadMultipleFiles: upload.uploadMultipleFiles,
 
-    // Drag and drop
-    onDrop: upload.onDrop,
-    onDragOver: upload.onDragOver,
-    onDragEnter: upload.onDragEnter,
-    onDragLeave: upload.onDragLeave,
-
     // Search & Filters
     isSearchOpen: filters.isSearchOpen,
     setIsSearchOpen: filters.setIsSearchOpen,
