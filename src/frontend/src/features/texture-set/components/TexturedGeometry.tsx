@@ -246,8 +246,11 @@ async function loadTextureOffThread(
     blob = await response.blob()
   }
 
+  // Pre-flip TIFF to match the non-TIFF path (createImageBitmap with
+  // imageOrientation: 'flipY'). Both produce a top-down-flipped bitmap that
+  // texture.flipY = true (THREE default) leaves visually upright on the sphere.
   const bitmap = isTiff
-    ? await decodeTiffBlobToBitmap(blob)
+    ? await decodeTiffBlobToBitmap(blob, { flipY: true })
     : await createImageBitmap(blob, { imageOrientation: 'flipY' })
 
   // If a specific channel needs extraction, do it via canvas

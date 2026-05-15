@@ -945,22 +945,20 @@ export class PuppeteerRenderer {
             }
 
             // Load TIFF texture via window.UTIF — browsers cannot decode TIFF natively
+            // Load TIFF via the shared decoder (window.modelibrTiff) so this
+            // scene and the in-browser viewer interpret the same TIFF identically.
             const loadTiffTexture = async (url, flip) => {
               const response = await fetch(url)
               const arrayBuffer = await response.arrayBuffer()
-
-              const ifds = window.UTIF.decode(arrayBuffer)
-              if (!ifds || ifds.length === 0) {
-                throw new Error('TIFF contains no image directories')
-              }
-              const ifd = ifds[0]
-              window.UTIF.decodeImage(arrayBuffer, ifd)
-              const rgba = window.UTIF.toRGBA8(ifd)
+              const { width, height, rgba } = window.modelibrTiff.decodeTiff(
+                arrayBuffer,
+                { UTIF: window.UTIF }
+              )
 
               const texture = new THREE.DataTexture(
                 new Uint8Array(rgba.buffer, rgba.byteOffset, rgba.byteLength),
-                ifd.width,
-                ifd.height,
+                width,
+                height,
                 THREE.RGBAFormat,
                 THREE.UnsignedByteType
               )
