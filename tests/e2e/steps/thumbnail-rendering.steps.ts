@@ -26,9 +26,20 @@ Given("at least one model with a thumbnail exists", async ({ page }) => {
     );
     expect(response.ok()).toBeTruthy();
     const body = await response.json();
-    const models: Array<{ id: number }> = body.models ?? body;
-    expect(Array.isArray(models)).toBe(true);
-    expect(models.length).toBeGreaterThan(0);
+    // /models returns { items, totalCount, page, pageSize, totalPages } when
+    // paginated. The earlier `body.models ?? body` fallback fell through to
+    // the response object itself and produced an Array.isArray = false.
+    const models: Array<{ id: number }> = Array.isArray(body)
+        ? body
+        : (body.items ?? body.models ?? []);
+    expect(
+        Array.isArray(models),
+        `Expected an array of models, got: ${JSON.stringify(body).slice(0, 200)}`,
+    ).toBe(true);
+    expect(
+        models.length,
+        `No models found via /models?page=1&pageSize=10 — the @setup phase probably didn't run before this @slow scenario`,
+    ).toBeGreaterThan(0);
     ctx.modelId = models[0].id;
     console.log(`[Rendering] Using model id=${ctx.modelId} as test subject`);
 
