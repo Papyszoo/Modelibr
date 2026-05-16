@@ -54,12 +54,36 @@ namespace Infrastructure.Migrations
                 table: "ApplicationSettings",
                 newName: "ThumbnailWidth");
 
+            // ThumbnailHeight defaults to 256 (the original schema default) —
+            // 0 would fail the legacy domain validator that required >= 64.
             migrationBuilder.AddColumn<int>(
                 name: "ThumbnailHeight",
                 table: "ApplicationSettings",
                 type: "integer",
                 nullable: false,
-                defaultValue: 0);
+                defaultValue: 256);
+
+            // Restore the Settings key-value rows that Up() removed so the
+            // rolled-back state has the legacy keys present (rather than the
+            // GetSettingsQueryHandler falling through to its hardcoded
+            // fallbacks). Use ThumbnailSize as the source value for both since
+            // it's the most accurate proxy after a Down rollback.
+            migrationBuilder.Sql(
+                "INSERT INTO \"Settings\" (\"Key\", \"Value\", \"CreatedAt\", \"UpdatedAt\") " +
+                "SELECT 'ThumbnailWidth', " +
+                "       COALESCE((SELECT \"Value\" FROM \"Settings\" WHERE \"Key\" = 'ThumbnailSize'), '256'), " +
+                "       NOW(), NOW() " +
+                "WHERE NOT EXISTS (SELECT 1 FROM \"Settings\" WHERE \"Key\" = 'ThumbnailWidth');");
+
+            migrationBuilder.Sql(
+                "INSERT INTO \"Settings\" (\"Key\", \"Value\", \"CreatedAt\", \"UpdatedAt\") " +
+                "SELECT 'ThumbnailHeight', " +
+                "       COALESCE((SELECT \"Value\" FROM \"Settings\" WHERE \"Key\" = 'ThumbnailSize'), '256'), " +
+                "       NOW(), NOW() " +
+                "WHERE NOT EXISTS (SELECT 1 FROM \"Settings\" WHERE \"Key\" = 'ThumbnailHeight');");
+
+            migrationBuilder.Sql(
+                "DELETE FROM \"Settings\" WHERE \"Key\" = 'ThumbnailSize';");
         }
     }
 }

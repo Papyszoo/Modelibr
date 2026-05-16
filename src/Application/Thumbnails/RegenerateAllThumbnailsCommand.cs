@@ -53,15 +53,24 @@ public class RegenerateAllThumbnailsCommandHandler
                 continue;
             }
 
-            if (targetVersion.Thumbnail != null)
+            // GetAllAsync returns detached entities (AsNoTracking), so the
+            // Thumbnail navigation may be stale. Re-fetch via the repository
+            // to make the create-vs-reset decision idempotent — important
+            // because there's no unique constraint on Thumbnails.ModelVersionId
+            // and concurrent bulk-regen invocations would otherwise produce
+            // duplicate rows.
+            var existingThumbnail = await _thumbnailRepository
+                .GetByModelVersionIdAsync(targetVersion.Id, cancellationToken);
+
+            if (existingThumbnail != null)
             {
-                targetVersion.Thumbnail.Reset(now);
-                await _thumbnailRepository.UpdateAsync(targetVersion.Thumbnail, cancellationToken);
+                existingThumbnail.Reset(now);
+                await _thumbnailRepository.UpdateAsync(existingThumbnail, cancellationToken);
             }
             else
             {
                 var newThumbnail = Thumbnail.Create(model.Id, targetVersion.Id, now);
-                targetVersion.SetThumbnail(await _thumbnailRepository.AddAsync(newThumbnail, cancellationToken));
+                await _thumbnailRepository.AddAsync(newThumbnail, cancellationToken);
             }
 
             await _thumbnailQueue.EnqueueAsync(
