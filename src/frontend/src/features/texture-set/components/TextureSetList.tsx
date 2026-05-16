@@ -6,7 +6,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query'
 import { Button } from 'primereact/button'
-import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog'
+import { ConfirmDialog } from 'primereact/confirmdialog'
 import { Toast } from 'primereact/toast'
 import { useRef, useState } from 'react'
 
@@ -14,7 +14,6 @@ import { getTextureSetsPaginated } from '@/features/texture-set/api/textureSetAp
 import {
   createTextureSet,
   createTextureSetWithFile,
-  deleteTextureSet,
   updateTextureSetKind,
 } from '@/features/texture-set/api/textureSetApi'
 import { CreateTextureSetDialog } from '@/features/texture-set/dialogs/CreateTextureSetDialog'
@@ -116,43 +115,8 @@ export function TextureSetList() {
     },
   })
 
-  const deleteTextureSetMutation = useMutation({
-    mutationFn: async (textureSetId: number) => {
-      await deleteTextureSet(textureSetId)
-    },
-    onSuccess: async () => {
-      toast.current?.show({
-        severity: 'success',
-        summary: 'Success',
-        detail: 'Texture set deleted successfully',
-        life: 3000,
-      })
-      invalidateTextureSets()
-    },
-    onError: error => {
-      console.error('Failed to delete texture set:', error)
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to delete texture set',
-        life: 3000,
-      })
-    },
-  })
-
   const handleCreateTextureSet = async (name: string, kind: number = 0) => {
     await createTextureSetMutation.mutateAsync({ name, kind })
-  }
-
-  const _handleDeleteTextureSet = (textureSet: TextureSetDto) => {
-    confirmDialog({
-      message: `Are you sure you want to delete the texture set "${textureSet.name}"?`,
-      header: 'Delete Confirmation',
-      icon: 'pi pi-exclamation-triangle',
-      accept: async () => {
-        await deleteTextureSetMutation.mutateAsync(textureSet.id)
-      },
-    })
   }
 
   const handleViewDetails = (textureSet: TextureSetDto) => {

@@ -319,7 +319,6 @@ describe('uploadProgressStore', () => {
       let batchId1: string
       let batchId2: string
       let completedId: string
-      let pendingId: string
 
       act(() => {
         // Batch 1 will have only completed file (should be removed)
@@ -332,7 +331,7 @@ describe('uploadProgressStore', () => {
 
         // Batch 2 will have a pending file (should remain)
         batchId2 = result.current.createBatch()
-        pendingId = result.current.addUpload(
+        result.current.addUpload(
           createMockFile('pending.glb'),
           'model',
           batchId2

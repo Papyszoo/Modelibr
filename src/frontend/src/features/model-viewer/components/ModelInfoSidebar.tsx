@@ -1,3 +1,5 @@
+import type { JSX } from 'react'
+
 import { type Model } from '@/utils/fileUtils'
 
 import { ModelInfo } from './ModelInfo'

@@ -13,10 +13,13 @@ public class ApplicationSettings : AggregateRoot
 
     // Thumbnail generation settings
     public int ThumbnailFrameCount { get; private set; }
-    public double ThumbnailCameraVerticalAngle { get; private set; }
-    public int ThumbnailWidth { get; private set; }
-    public int ThumbnailHeight { get; private set; }
+    /// <summary>
+    /// Square side length in pixels for rendered thumbnails.
+    /// Allowed values: 64, 128, 256, 512, 1024, 2048.
+    /// </summary>
+    public int ThumbnailSize { get; private set; }
     public bool GenerateThumbnailOnUpload { get; private set; }
+    public bool GenerateAnimatedThumbnail { get; private set; }
 
     // Soft delete settings
     public int CleanRecycledFilesAfterDays { get; private set; }
@@ -43,10 +46,9 @@ public class ApplicationSettings : AggregateRoot
             MaxFileSizeBytes = 1_073_741_824, // 1GB
             MaxThumbnailSizeBytes = 10_485_760, // 10MB
             ThumbnailFrameCount = 30, // Default: 360/12 = 30 frames
-            ThumbnailCameraVerticalAngle = 0.75, // Default camera height multiplier
-            ThumbnailWidth = 256,
-            ThumbnailHeight = 256,
+            ThumbnailSize = 256,
             GenerateThumbnailOnUpload = true, // Generate thumbnails by default
+            GenerateAnimatedThumbnail = true, // Generate animated (multi-frame orbit) thumbnails by default
             CleanRecycledFilesAfterDays = 30, // Default: 30 days
             TextureProxySize = 512, // Default: 512px square
             CreatedAt = createdAt,
@@ -72,21 +74,18 @@ public class ApplicationSettings : AggregateRoot
     /// </summary>
     public void UpdateThumbnailSettings(
         int frameCount,
-        double cameraVerticalAngle,
-        int width,
-        int height,
+        int size,
         bool generateOnUpload,
+        bool generateAnimated,
         DateTime updatedAt)
     {
         ValidateFrameCount(frameCount);
-        ValidateCameraVerticalAngle(cameraVerticalAngle);
-        ValidateThumbnailDimensions(width, height);
+        ValidateThumbnailSize(size);
 
         ThumbnailFrameCount = frameCount;
-        ThumbnailCameraVerticalAngle = cameraVerticalAngle;
-        ThumbnailWidth = width;
-        ThumbnailHeight = height;
+        ThumbnailSize = size;
         GenerateThumbnailOnUpload = generateOnUpload;
+        GenerateAnimatedThumbnail = generateAnimated;
         UpdatedAt = updatedAt;
     }
 
@@ -109,22 +108,12 @@ public class ApplicationSettings : AggregateRoot
             throw new ArgumentException("Frame count cannot exceed 360.", nameof(frameCount));
     }
 
-    private static void ValidateCameraVerticalAngle(double angle)
+    private static void ValidateThumbnailSize(int size)
     {
-        if (angle < 0)
-            throw new ArgumentException("Camera vertical angle cannot be negative.", nameof(angle));
-
-        if (angle > 2)
-            throw new ArgumentException("Camera vertical angle cannot exceed 2.", nameof(angle));
-    }
-
-    private static void ValidateThumbnailDimensions(int width, int height)
-    {
-        if (width < 64 || width > 2048)
-            throw new ArgumentException("Thumbnail width must be between 64 and 2048 pixels.", nameof(width));
-
-        if (height < 64 || height > 2048)
-            throw new ArgumentException("Thumbnail height must be between 64 and 2048 pixels.", nameof(height));
+        if (size is not (64 or 128 or 256 or 512 or 1024 or 2048))
+            throw new ArgumentException(
+                "Thumbnail size must be one of: 64, 128, 256, 512, 1024, 2048.",
+                nameof(size));
     }
 
     /// <summary>

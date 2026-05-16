@@ -1,7 +1,7 @@
 import './CodePanel.css'
 
 import { Button } from 'primereact/button'
-import { useState } from 'react'
+import { type JSX, useState } from 'react'
 
 import { type StageConfig } from './SceneEditor'
 

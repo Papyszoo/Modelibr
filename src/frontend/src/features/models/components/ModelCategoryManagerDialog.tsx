@@ -1,11 +1,12 @@
+import { useQueryClient } from '@tanstack/react-query'
+
 import {
   createModelCategory,
   deleteModelCategory,
   updateModelCategory,
 } from '@/features/models/api/modelApi'
-import { type ModelCategoryDto } from '@/types'
 import { CategoryManagerDialog } from '@/shared/components/categories/CategoryManagerDialog'
-import { useQueryClient } from '@tanstack/react-query'
+import { type ModelCategoryDto } from '@/types'
 
 interface ModelCategoryManagerDialogProps {
   visible: boolean

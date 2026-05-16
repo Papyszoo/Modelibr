@@ -1,3 +1,5 @@
+import type { JSX } from 'react'
+
 import { type StageLight } from './SceneEditor'
 
 interface SceneLightsProps {

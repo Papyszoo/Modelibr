@@ -1,5 +1,6 @@
 using Application.Abstractions.Services;
 using Application.EventHandlers;
+using Application.Settings;
 using Domain.Events;
 using Domain.Models;
 using Microsoft.Extensions.Logging;
@@ -11,11 +12,32 @@ namespace Application.Tests.EventHandlers;
 
 public class ModelUploadedEventHandlerTests
 {
+    private static Mock<ISettingsService> SettingsServiceMock(bool generateOnUpload)
+    {
+        var settings = ApplicationSettings.CreateDefault(DateTime.UtcNow);
+        if (!generateOnUpload)
+        {
+            // CreateDefault enables uploads by default; flip via the domain setter.
+            settings.UpdateThumbnailSettings(
+                frameCount: settings.ThumbnailFrameCount,
+                size: settings.ThumbnailSize,
+                generateOnUpload: false,
+                generateAnimated: settings.GenerateAnimatedThumbnail,
+                updatedAt: DateTime.UtcNow);
+        }
+
+        var mock = new Mock<ISettingsService>();
+        mock.Setup(s => s.GetSettingsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(settings);
+        return mock;
+    }
+
     [Fact]
     public async Task Handle_ValidEvent_EnqueuesJob()
     {
         // Arrange
         var mockThumbnailQueue = new Mock<IThumbnailQueue>();
+        var mockSettings = SettingsServiceMock(generateOnUpload: true);
         var mockLogger = new Mock<ILogger<ModelUploadedEventHandler>>();
 
         // Use a valid 64-character SHA256 hash
@@ -31,7 +53,7 @@ public class ModelUploadedEventHandlerTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(job);
 
-        var handler = new ModelUploadedEventHandler(mockThumbnailQueue.Object, mockLogger.Object);
+        var handler = new ModelUploadedEventHandler(mockThumbnailQueue.Object, mockSettings.Object, mockLogger.Object);
         var domainEvent = new ModelUploadedEvent(1, 10, validHash, true);
 
         // Act
@@ -50,10 +72,39 @@ public class ModelUploadedEventHandlerTests
     }
 
     [Fact]
+    public async Task Handle_GenerateThumbnailOnUploadDisabled_SkipsEnqueue()
+    {
+        // Arrange
+        var mockThumbnailQueue = new Mock<IThumbnailQueue>();
+        var mockSettings = SettingsServiceMock(generateOnUpload: false);
+        var mockLogger = new Mock<ILogger<ModelUploadedEventHandler>>();
+
+        var validHash = "a".PadRight(64, 'b');
+        var handler = new ModelUploadedEventHandler(mockThumbnailQueue.Object, mockSettings.Object, mockLogger.Object);
+        var domainEvent = new ModelUploadedEvent(1, 10, validHash, true);
+
+        // Act
+        var result = await handler.Handle(domainEvent, CancellationToken.None);
+
+        // Assert — handler reports success (the upload itself is not failed),
+        // but no thumbnail job is enqueued.
+        Assert.True(result.IsSuccess);
+        mockThumbnailQueue.Verify(x => x.EnqueueAsync(
+            It.IsAny<int>(),
+            It.IsAny<int>(),
+            It.IsAny<string>(),
+            It.IsAny<bool>(),
+            It.IsAny<int>(),
+            It.IsAny<int>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task Handle_EnqueueThrowsException_ReturnsFailure()
     {
         // Arrange
         var mockThumbnailQueue = new Mock<IThumbnailQueue>();
+        var mockSettings = SettingsServiceMock(generateOnUpload: true);
         var mockLogger = new Mock<ILogger<ModelUploadedEventHandler>>();
 
         mockThumbnailQueue.Setup(x => x.EnqueueAsync(
@@ -66,7 +117,7 @@ public class ModelUploadedEventHandlerTests
                 It.IsAny<CancellationToken>()))
             .ThrowsAsync(new Exception("Test exception"));
 
-        var handler = new ModelUploadedEventHandler(mockThumbnailQueue.Object, mockLogger.Object);
+        var handler = new ModelUploadedEventHandler(mockThumbnailQueue.Object, mockSettings.Object, mockLogger.Object);
         var domainEvent = new ModelUploadedEvent(1, 10, "test-hash", true);
 
         // Act

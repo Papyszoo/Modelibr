@@ -8,10 +8,9 @@ public static class SettingKeys
     public const string MaxFileSizeBytes = "MaxFileSizeBytes";
     public const string MaxThumbnailSizeBytes = "MaxThumbnailSizeBytes";
     public const string ThumbnailFrameCount = "ThumbnailFrameCount";
-    public const string ThumbnailCameraVerticalAngle = "ThumbnailCameraVerticalAngle";
-    public const string ThumbnailWidth = "ThumbnailWidth";
-    public const string ThumbnailHeight = "ThumbnailHeight";
+    public const string ThumbnailSize = "ThumbnailSize";
     public const string GenerateThumbnailOnUpload = "GenerateThumbnailOnUpload";
+    public const string GenerateAnimatedThumbnail = "GenerateAnimatedThumbnail";
     public const string TextureProxySize = "TextureProxySize";
     public const string BlenderPath = "BlenderPath";
     public const string BlenderEnabled = "BlenderEnabled";

@@ -42,71 +42,38 @@ export const settingsFormSchema = z.object({
   maxFileSizeMB: z.preprocess(
     parseNumberInput,
     z
-      .number({
-        required_error: 'Must be at least 1 MB',
-        invalid_type_error: 'Must be at least 1 MB',
-      })
+      .number({ error: 'Must be at least 1 MB' })
       .min(1, 'Must be at least 1 MB')
       .max(10240, 'Cannot exceed 10240 MB (10 GB)')
   ),
   maxThumbnailSizeMB: z.preprocess(
     parseNumberInput,
     z
-      .number({
-        required_error: 'Must be at least 1 MB',
-        invalid_type_error: 'Must be at least 1 MB',
-      })
+      .number({ error: 'Must be at least 1 MB' })
       .min(1, 'Must be at least 1 MB')
       .max(100, 'Cannot exceed 100 MB')
   ),
   thumbnailFrameCount: z.preprocess(
     parseNumberInput,
     z
-      .number({
-        required_error: 'Must be at least 1 frame',
-        invalid_type_error: 'Must be at least 1 frame',
-      })
+      .number({ error: 'Must be at least 1 frame' })
       .min(1, 'Must be at least 1 frame')
       .max(360, 'Cannot exceed 360 frames')
   ),
-  thumbnailCameraAngle: z.preprocess(
+  thumbnailSize: z.preprocess(
     parseNumberInput,
     z
-      .number({
-        required_error: 'Cannot be negative',
-        invalid_type_error: 'Cannot be negative',
+      .number({ error: 'Must be a valid thumbnail size' })
+      .refine(val => [64, 128, 256, 512, 1024, 2048].includes(val), {
+        message: 'Must be one of 64, 128, 256, 512, 1024, 2048',
       })
-      .min(0, 'Cannot be negative')
-      .max(2, 'Cannot exceed 2')
-  ),
-  thumbnailWidth: z.preprocess(
-    parseNumberInput,
-    z
-      .number({
-        required_error: 'Must be at least 64 pixels',
-        invalid_type_error: 'Must be at least 64 pixels',
-      })
-      .min(64, 'Must be at least 64 pixels')
-      .max(2048, 'Cannot exceed 2048 pixels')
-  ),
-  thumbnailHeight: z.preprocess(
-    parseNumberInput,
-    z
-      .number({
-        required_error: 'Must be at least 64 pixels',
-        invalid_type_error: 'Must be at least 64 pixels',
-      })
-      .min(64, 'Must be at least 64 pixels')
-      .max(2048, 'Cannot exceed 2048 pixels')
   ),
   generateThumbnailOnUpload: z.boolean(),
+  generateAnimatedThumbnail: z.boolean(),
   textureProxySize: z.preprocess(
     parseNumberInput,
     z
-      .number({
-        required_error: 'Must be a valid proxy size',
-        invalid_type_error: 'Must be a valid proxy size',
-      })
+      .number({ error: 'Must be a valid proxy size' })
       .refine(val => [256, 512, 1024, 2048].includes(val), {
         message: 'Must be 256, 512, 1024, or 2048',
       })

@@ -18,7 +18,7 @@ jest.mock('../../../stores/uploadProgressStore', () => ({
     uploads: [],
     batches: [],
     isVisible: false,
-    addUpload: jest.fn((file, fileType, batchId) => `upload-${Date.now()}`),
+    addUpload: jest.fn((_file, _fileType, _batchId) => `upload-${Date.now()}`),
     updateUploadProgress: jest.fn(),
     completeUpload: jest.fn(),
     failUpload: jest.fn(),

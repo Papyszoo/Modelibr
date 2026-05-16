@@ -7,8 +7,8 @@ import { type QueryConfig } from '@/lib/react-query'
 import {
   getModelById,
   getModelCategories,
-  getModelTags,
   getModelsPaginated,
+  getModelTags,
 } from './modelApi'
 
 // --- Models (paginated) ---

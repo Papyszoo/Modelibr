@@ -1,6 +1,7 @@
 import './LightLibrary.css'
 
 import { Button } from 'primereact/button'
+import type { JSX } from 'react'
 
 import { type SceneLight } from './SceneEditor'
 

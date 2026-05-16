@@ -13,6 +13,13 @@ public interface IModelVersionRepository
     Task<ModelVersion> UpdateAsync(ModelVersion version, CancellationToken cancellationToken = default);
     Task DeleteAsync(ModelVersion version, CancellationToken cancellationToken = default);
     Task<int> GetLatestVersionNumberAsync(int modelId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Direct DB update of ModelVersion.ThumbnailId — avoids the EF graph attach
+    /// that <see cref="UpdateAsync"/> triggers when called repeatedly in a loop
+    /// over models with shared related entities (Packs, Projects, etc.).
+    /// </summary>
+    Task SetThumbnailIdAsync(int modelVersionId, int thumbnailId, CancellationToken cancellationToken = default);
     
     // Texture mapping operations (direct DB operations to avoid EF Core composite key tracking issues)
     Task AddTextureMappingAsync(int modelVersionId, int textureSetId, string materialName, CancellationToken cancellationToken = default);

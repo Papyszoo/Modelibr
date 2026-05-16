@@ -702,9 +702,7 @@ namespace Infrastructure.Persistence
                 entity.Property(s => s.MaxFileSizeBytes).IsRequired();
                 entity.Property(s => s.MaxThumbnailSizeBytes).IsRequired();
                 entity.Property(s => s.ThumbnailFrameCount).IsRequired();
-                entity.Property(s => s.ThumbnailCameraVerticalAngle).IsRequired();
-                entity.Property(s => s.ThumbnailWidth).IsRequired();
-                entity.Property(s => s.ThumbnailHeight).IsRequired();
+                entity.Property(s => s.ThumbnailSize).IsRequired();
                 entity.Property(s => s.CleanRecycledFilesAfterDays).IsRequired();
                 entity.Property(s => s.TextureProxySize).IsRequired()
                     .HasDefaultValue(512);

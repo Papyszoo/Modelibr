@@ -1,4 +1,4 @@
-import { type ReactNode, useContext } from 'react'
+import { type JSX, type ReactNode, useContext } from 'react'
 
 import { TabContext, type TabContextValue } from '@/contexts/TabContext'
 import { createTab } from '@/stores/navigationStore'

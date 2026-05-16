@@ -1,6 +1,6 @@
 import './TabContent.css'
 
-import { lazy, Suspense } from 'react'
+import { type JSX, lazy, Suspense } from 'react'
 
 import { Settings } from '@/components/tabs/Settings'
 import { History } from '@/features/history'

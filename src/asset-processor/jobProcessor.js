@@ -10,7 +10,11 @@ import { ThumbnailStorageService } from './thumbnailStorageService.js'
 import { JobEventService } from './jobEventService.js'
 import { ThumbnailApiService } from './thumbnailApiService.js'
 import { ProcessorRegistry } from './processors/processorRegistry.js'
-import { config, refreshBlenderConfigFromApi } from './config.js'
+import {
+  config,
+  refreshBlenderConfigFromApi,
+  refreshThumbnailRenderConfigFromApi,
+} from './config.js'
 import logger, { withJobContext } from './logger.js'
 
 /**
@@ -53,8 +57,9 @@ export class JobProcessor {
       logger.warn('API connection test failed, but continuing anyway')
     }
 
-    // Refresh blender config from API settings
+    // Refresh blender + thumbnail render config from API settings
     await refreshBlenderConfigFromApi(this.jobService)
+    await refreshThumbnailRenderConfigFromApi(this.jobService)
 
     // Start periodic cleanup of old temporary files
     this.startPeriodicCleanup()
@@ -292,6 +297,7 @@ export class JobProcessor {
         const jobPromise = (async () => {
           try {
             await refreshBlenderConfigFromApi(this.jobService)
+            await refreshThumbnailRenderConfigFromApi(this.jobService)
             const timeoutPromise = new Promise((_, reject) =>
               setTimeout(
                 () =>

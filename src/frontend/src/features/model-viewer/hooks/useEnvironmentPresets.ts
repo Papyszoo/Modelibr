@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-
-import { EquirectangularReflectionMapping } from 'three'
 import type { DataTexture } from 'three'
+import { EquirectangularReflectionMapping } from 'three'
 import { RGBELoader } from 'three-stdlib'
 
 import {

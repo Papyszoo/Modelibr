@@ -28,11 +28,14 @@ export class SettingsPage {
 
     // Thumbnail Generation Settings
     private readonly generateThumbnailCheckbox =
-        '.settings-checkbox-label input[type="checkbox"]';
+        '.settings-checkbox-label input[type="checkbox"]:not(#generateAnimatedThumbnail)';
+    private readonly generateAnimatedThumbnailCheckbox =
+        "#generateAnimatedThumbnail";
     private readonly frameCountInput = "#frameCount";
-    private readonly cameraAngleInput = "#cameraAngle";
-    private readonly thumbnailWidthInput = "#thumbnailWidth";
-    private readonly thumbnailHeightInput = "#thumbnailHeight";
+    private readonly thumbnailSizeSelect = "#thumbnailSize";
+
+    // Regenerate All Thumbnails (matches by visible label so it survives style refactors)
+    private readonly regenerateAllButton = 'button:has-text("Regenerate All Thumbnails")';
 
     // Validation
     private readonly errorMessage = ".settings-error-message";
@@ -89,22 +92,9 @@ export class SettingsPage {
         );
     }
 
-    async getCameraAngle(): Promise<string> {
+    async getThumbnailSize(): Promise<string> {
         return (
-            (await this.page.locator(this.cameraAngleInput).inputValue()) || ""
-        );
-    }
-
-    async getThumbnailWidth(): Promise<string> {
-        return (
-            (await this.page.locator(this.thumbnailWidthInput).inputValue()) ||
-            ""
-        );
-    }
-
-    async getThumbnailHeight(): Promise<string> {
-        return (
-            (await this.page.locator(this.thumbnailHeightInput).inputValue()) ||
+            (await this.page.locator(this.thumbnailSizeSelect).inputValue()) ||
             ""
         );
     }
@@ -117,6 +107,16 @@ export class SettingsPage {
         return await this.page
             .locator(this.generateThumbnailCheckbox)
             .isChecked();
+    }
+
+    async isGenerateAnimatedThumbnailChecked(): Promise<boolean> {
+        return await this.page
+            .locator(this.generateAnimatedThumbnailCheckbox)
+            .isChecked();
+    }
+
+    async isFrameCountVisible(): Promise<boolean> {
+        return await this.page.locator(this.frameCountInput).isVisible();
     }
 
     // ===== Field Setters =====
@@ -135,18 +135,8 @@ export class SettingsPage {
         await this.page.locator(this.frameCountInput).fill(value);
     }
 
-    async setCameraAngle(value: string): Promise<void> {
-        await this.page.locator(this.cameraAngleInput).fill(value);
-    }
-
-    async setThumbnailWidth(value: string): Promise<void> {
-        const input = this.page.locator(this.thumbnailWidthInput);
-        await input.fill(value);
-        await input.press("Tab");
-    }
-
-    async setThumbnailHeight(value: string): Promise<void> {
-        await this.page.locator(this.thumbnailHeightInput).fill(value);
+    async setThumbnailSize(value: string): Promise<void> {
+        await this.page.locator(this.thumbnailSizeSelect).selectOption(value);
     }
 
     async setTheme(value: "light" | "dark"): Promise<void> {
@@ -155,6 +145,55 @@ export class SettingsPage {
 
     async toggleGenerateThumbnail(): Promise<void> {
         await this.page.locator(this.generateThumbnailCheckbox).click();
+    }
+
+    async toggleGenerateAnimatedThumbnail(): Promise<void> {
+        await this.page
+            .locator(this.generateAnimatedThumbnailCheckbox)
+            .click();
+    }
+
+    async isRegenerateAllButtonVisible(): Promise<boolean> {
+        return await this.page.locator(this.regenerateAllButton).isVisible();
+    }
+
+    /**
+     * Click "Regenerate All Thumbnails". The button opens a PrimeReact
+     * ConfirmDialog modal — we wait for it to appear and click the
+     * "Regenerate" accept button.
+     */
+    async clickRegenerateAll(): Promise<void> {
+        await this.page.locator(this.regenerateAllButton).click();
+        const modalAcceptButton = this.page.locator(
+            '.p-confirm-dialog .p-confirm-dialog-accept, .p-confirm-dialog button:has-text("Regenerate")'
+        ).first();
+        await modalAcceptButton.waitFor({ state: "visible", timeout: 5000 });
+        await modalAcceptButton.click();
+    }
+
+    /**
+     * Waits briefly for the PrimeReact ConfirmDialog to mount, then reports
+     * visibility. The dialog is rendered imperatively after a React tick, so a
+     * raw `isVisible()` immediately after the trigger click races.
+     */
+    async isRegenerateConfirmDialogVisible(): Promise<boolean> {
+        try {
+            await this.page
+                .locator(".p-confirm-dialog")
+                .waitFor({ state: "visible", timeout: 5000 });
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    async cancelRegenerateConfirmDialog(): Promise<void> {
+        await this.page
+            .locator(
+                '.p-confirm-dialog .p-confirm-dialog-reject, .p-confirm-dialog button:has-text("Cancel")'
+            )
+            .first()
+            .click();
     }
 
     // ===== Actions =====

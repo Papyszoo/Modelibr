@@ -1,7 +1,7 @@
 import './App.css'
 
 import { NuqsAdapter } from 'nuqs/adapters/react'
-import { useEffect } from 'react'
+import { type JSX, useEffect } from 'react'
 
 import { DemoBanner } from '@/components/DemoBanner'
 import { AppShell } from '@/components/layout/AppShell'

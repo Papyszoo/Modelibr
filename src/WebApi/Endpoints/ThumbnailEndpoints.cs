@@ -68,7 +68,7 @@ public static class ThumbnailEndpoints
             CancellationToken cancellationToken) =>
         {
             var result = await commandHandler.Handle(new RegenerateThumbnailCommand(id, versionId), cancellationToken);
-            
+
             if (result.IsFailure)
             {
                 return Results.NotFound(result.Error.Message);
@@ -77,6 +77,26 @@ public static class ThumbnailEndpoints
             return Results.Ok(new { Message = "Thumbnail regeneration queued successfully", ModelId = result.Value.ModelId, ModelVersionId = result.Value.ModelVersionId });
         })
         .WithName("Regenerate Thumbnail")
+        .WithTags("Thumbnails");
+
+        app.MapPost("/thumbnails/regenerate-all", async (
+            ICommandHandler<RegenerateAllThumbnailsCommand, RegenerateAllThumbnailsCommandResponse> commandHandler,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await commandHandler.Handle(new RegenerateAllThumbnailsCommand(), cancellationToken);
+
+            if (result.IsFailure)
+            {
+                return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+            }
+
+            return Results.Ok(new
+            {
+                enqueuedCount = result.Value.EnqueuedCount,
+                skippedCount = result.Value.SkippedCount,
+            });
+        })
+        .WithName("Regenerate All Thumbnails")
         .WithTags("Thumbnails");
 
         app.MapPost("/models/{id}/thumbnail/upload", async (
