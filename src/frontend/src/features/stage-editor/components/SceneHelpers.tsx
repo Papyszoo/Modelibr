@@ -1,5 +1,3 @@
-import type { JSX } from 'react'
-
 import {
   AccumulativeShadows,
   Backdrop,
@@ -12,6 +10,7 @@ import {
   Stage as DreiStage,
   Stars,
 } from '@react-three/drei'
+import type { JSX } from 'react'
 
 import { type StageHelper } from './SceneEditor'
 

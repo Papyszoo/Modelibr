@@ -176,8 +176,7 @@ export function Settings(): JSX.Element {
         )
       case 'generateAnimatedThumbnail':
         return (
-          generateAnimatedThumbnail !==
-          originalValues.generateAnimatedThumbnail
+          generateAnimatedThumbnail !== originalValues.generateAnimatedThumbnail
         )
       case 'textureProxySize':
         return textureProxySize !== originalValues.textureProxySize

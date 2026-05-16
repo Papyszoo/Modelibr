@@ -267,7 +267,10 @@ export async function refreshThumbnailRenderConfigFromApi(apiClient) {
     const response = await apiClient.apiClient.get('/settings/thumbnail-render')
     const data = response.data
 
-    if (typeof data.size === 'number' && ALLOWED_THUMBNAIL_SIZES.has(data.size)) {
+    if (
+      typeof data.size === 'number' &&
+      ALLOWED_THUMBNAIL_SIZES.has(data.size)
+    ) {
       config.rendering.outputWidth = data.size
       config.rendering.outputHeight = data.size
     }
