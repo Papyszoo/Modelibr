@@ -1,3 +1,5 @@
+import type { JSX } from 'react'
+
 import { useWebDavStore } from '@/stores/webDavStore'
 import { detectOS } from '@/utils/webdavUtils'
 

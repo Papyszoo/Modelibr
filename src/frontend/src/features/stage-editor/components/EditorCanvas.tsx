@@ -2,7 +2,7 @@ import './EditorCanvas.css'
 
 import { Grid, OrbitControls } from '@react-three/drei'
 import { Canvas } from '@react-three/fiber'
-import { Suspense, useRef } from 'react'
+import { type JSX, Suspense, useRef } from 'react'
 
 import { LoadingPlaceholder } from '@/components/LoadingPlaceholder'
 

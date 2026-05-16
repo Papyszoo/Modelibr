@@ -68,10 +68,9 @@ public static class SettingsEndpoints
                 request.MaxFileSizeBytes,
                 request.MaxThumbnailSizeBytes,
                 request.ThumbnailFrameCount,
-                request.ThumbnailCameraVerticalAngle,
-                request.ThumbnailWidth,
-                request.ThumbnailHeight,
+                request.ThumbnailSize,
                 request.GenerateThumbnailOnUpload,
+                request.GenerateAnimatedThumbnail,
                 request.TextureProxySize
             );
 
@@ -85,6 +84,28 @@ public static class SettingsEndpoints
             return Results.Ok(result.Value);
         })
         .WithName("Update Settings")
+        .WithTags("Settings");
+
+        // Lightweight subset of /settings consumed by the asset-processor before each render job.
+        // Returns the live rendering parameters so the worker doesn't rely on its boot-time env vars.
+        app.MapGet("/settings/thumbnail-render", async (
+            IQueryHandler<GetSettingsQuery, GetSettingsQueryResponse> queryHandler,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await queryHandler.Handle(new GetSettingsQuery(), cancellationToken);
+            if (result.IsFailure)
+            {
+                return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+            }
+
+            return Results.Ok(new
+            {
+                size = result.Value.ThumbnailSize,
+                frameCount = result.Value.ThumbnailFrameCount,
+                isAnimated = result.Value.GenerateAnimatedThumbnail,
+            });
+        })
+        .WithName("Get Thumbnail Render Settings")
         .WithTags("Settings");
 
         app.MapGet("/settings/blender-enabled", async (
@@ -275,10 +296,9 @@ public record UpdateSettingsRequest(
     long MaxFileSizeBytes,
     long MaxThumbnailSizeBytes,
     int ThumbnailFrameCount,
-    double ThumbnailCameraVerticalAngle,
-    int ThumbnailWidth,
-    int ThumbnailHeight,
+    int ThumbnailSize,
     bool GenerateThumbnailOnUpload,
-    int TextureProxySize = 512);
+    int TextureProxySize = 512,
+    bool GenerateAnimatedThumbnail = true);
 
 public record InstallBlenderRequest(string Version);

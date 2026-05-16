@@ -12,7 +12,10 @@ Feature: Preview Texture Sets
       | blue_color  |
       | red_color   |
 
-  @three-js @preview
+  @three-js @preview @slow
+  # @slow: Three.js/WebGL page crash on shared CI runners — fails with
+  # "Target page, context or browser has been closed" mid-test. Moved off the
+  # PR-gating fast lane until the renderer-context-loss root cause is fixed.
   Scenario: Switching between texture sets updates the 3D model
     # Ensure ID is in URL for linking steps
     Given I am on the model viewer page for "single-version-model"

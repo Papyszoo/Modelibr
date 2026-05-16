@@ -1,9 +1,10 @@
+import './ThumbnailSidebar.css'
+
 import { Button } from 'primereact/button'
+import type { JSX } from 'react'
 
 import { ThumbnailDisplay } from '@/shared/thumbnail'
 import { type Model } from '@/utils/fileUtils'
-
-import './ThumbnailSidebar.css'
 
 interface ThumbnailSidebarProps {
   model: Model

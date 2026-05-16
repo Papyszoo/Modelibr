@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260515184530_AddGenerateAnimatedThumbnail")]
+    partial class AddGenerateAnimatedThumbnail
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -54,10 +57,16 @@ namespace Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasDefaultValue(512);
 
+                    b.Property<double>("ThumbnailCameraVerticalAngle")
+                        .HasColumnType("double precision");
+
                     b.Property<int>("ThumbnailFrameCount")
                         .HasColumnType("integer");
 
-                    b.Property<int>("ThumbnailSize")
+                    b.Property<int>("ThumbnailHeight")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ThumbnailWidth")
                         .HasColumnType("integer");
 
                     b.Property<DateTime>("UpdatedAt")

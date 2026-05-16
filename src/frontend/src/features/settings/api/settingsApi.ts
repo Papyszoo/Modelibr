@@ -4,10 +4,9 @@ export async function getSettings(): Promise<{
   maxFileSizeBytes: number
   maxThumbnailSizeBytes: number
   thumbnailFrameCount: number
-  thumbnailCameraVerticalAngle: number
-  thumbnailWidth: number
-  thumbnailHeight: number
+  thumbnailSize: number
   generateThumbnailOnUpload: boolean
+  generateAnimatedThumbnail: boolean
   textureProxySize: number
   blenderPath: string
   blenderEnabled: boolean
@@ -23,19 +22,17 @@ export async function updateSettings(settings: {
   maxFileSizeBytes: number
   maxThumbnailSizeBytes: number
   thumbnailFrameCount: number
-  thumbnailCameraVerticalAngle: number
-  thumbnailWidth: number
-  thumbnailHeight: number
+  thumbnailSize: number
   generateThumbnailOnUpload: boolean
+  generateAnimatedThumbnail: boolean
   textureProxySize: number
 }): Promise<{
   maxFileSizeBytes: number
   maxThumbnailSizeBytes: number
   thumbnailFrameCount: number
-  thumbnailCameraVerticalAngle: number
-  thumbnailWidth: number
-  thumbnailHeight: number
+  thumbnailSize: number
   generateThumbnailOnUpload: boolean
+  generateAnimatedThumbnail: boolean
   textureProxySize: number
   updatedAt: string
 }> {
@@ -123,5 +120,13 @@ export async function updateSetting(
   const response = await client.put(`/settings/${encodeURIComponent(key)}`, {
     value,
   })
+  return response.data
+}
+
+export async function regenerateAllThumbnails(): Promise<{
+  enqueuedCount: number
+  skippedCount: number
+}> {
+  const response = await client.post('/thumbnails/regenerate-all')
   return response.data
 }

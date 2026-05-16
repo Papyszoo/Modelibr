@@ -1,6 +1,6 @@
 import './DemoBanner.css'
 
-import { useCallback, useEffect, useState } from 'react'
+import { type JSX, useCallback, useEffect, useState } from 'react'
 
 const BANNER_HEIGHT = '32px'
 

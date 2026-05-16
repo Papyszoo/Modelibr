@@ -1,6 +1,7 @@
 import './ComponentLibrary.css'
 
 import { Button } from 'primereact/button'
+import type { JSX } from 'react'
 
 export type ComponentType =
   | 'light'

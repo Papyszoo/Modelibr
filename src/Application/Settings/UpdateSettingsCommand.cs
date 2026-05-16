@@ -6,10 +6,9 @@ public record UpdateSettingsCommand(
     long MaxFileSizeBytes,
     long MaxThumbnailSizeBytes,
     int ThumbnailFrameCount,
-    double ThumbnailCameraVerticalAngle,
-    int ThumbnailWidth,
-    int ThumbnailHeight,
+    int ThumbnailSize,
     bool GenerateThumbnailOnUpload,
+    bool GenerateAnimatedThumbnail,
     int TextureProxySize
 ) : ICommand<UpdateSettingsResponse>;
 
@@ -17,10 +16,9 @@ public record UpdateSettingsResponse(
     long MaxFileSizeBytes,
     long MaxThumbnailSizeBytes,
     int ThumbnailFrameCount,
-    double ThumbnailCameraVerticalAngle,
-    int ThumbnailWidth,
-    int ThumbnailHeight,
+    int ThumbnailSize,
     bool GenerateThumbnailOnUpload,
+    bool GenerateAnimatedThumbnail,
     int TextureProxySize,
     DateTime UpdatedAt
 );

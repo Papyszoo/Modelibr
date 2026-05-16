@@ -91,6 +91,15 @@ internal sealed class ModelVersionRepository : IModelVersionRepository
         return version;
     }
 
+    public async Task SetThumbnailIdAsync(int modelVersionId, int thumbnailId, CancellationToken cancellationToken = default)
+    {
+        await _context.ModelVersions
+            .Where(mv => mv.Id == modelVersionId)
+            .ExecuteUpdateAsync(
+                s => s.SetProperty(mv => mv.ThumbnailId, thumbnailId),
+                cancellationToken);
+    }
+
     public async Task AddTextureMappingAsync(int modelVersionId, int textureSetId, string materialName, CancellationToken cancellationToken = default)
     {
         var mapping = ModelVersionTextureSet.Create(modelVersionId, textureSetId, materialName);

@@ -62,8 +62,8 @@ export class ThumbnailProcessor extends BaseProcessor {
         return {
           thumbnailPath: existingThumbnails.paths?.webpPath || '/default/path',
           sizeBytes: 0,
-          width: 256,
-          height: 256,
+          width: config.rendering.outputWidth,
+          height: config.rendering.outputHeight,
         }
       }
 

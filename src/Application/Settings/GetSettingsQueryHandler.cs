@@ -32,10 +32,9 @@ internal class GetSettingsQueryHandler : IQueryHandler<GetSettingsQuery, GetSett
             var maxFileSizeBytesSetting = await _settingRepository.GetByKeyAsync(SettingKeys.MaxFileSizeBytes, cancellationToken);
             var maxThumbnailSizeBytesSetting = await _settingRepository.GetByKeyAsync(SettingKeys.MaxThumbnailSizeBytes, cancellationToken);
             var thumbnailFrameCountSetting = await _settingRepository.GetByKeyAsync(SettingKeys.ThumbnailFrameCount, cancellationToken);
-            var thumbnailCameraVerticalAngleSetting = await _settingRepository.GetByKeyAsync(SettingKeys.ThumbnailCameraVerticalAngle, cancellationToken);
-            var thumbnailWidthSetting = await _settingRepository.GetByKeyAsync(SettingKeys.ThumbnailWidth, cancellationToken);
-            var thumbnailHeightSetting = await _settingRepository.GetByKeyAsync(SettingKeys.ThumbnailHeight, cancellationToken);
+            var thumbnailSizeSetting = await _settingRepository.GetByKeyAsync(SettingKeys.ThumbnailSize, cancellationToken);
             var generateThumbnailOnUploadSetting = await _settingRepository.GetByKeyAsync(SettingKeys.GenerateThumbnailOnUpload, cancellationToken);
+            var generateAnimatedThumbnailSetting = await _settingRepository.GetByKeyAsync(SettingKeys.GenerateAnimatedThumbnail, cancellationToken);
 
             // If settings exist in new table, use them
             if (maxFileSizeBytesSetting != null)
@@ -48,10 +47,9 @@ internal class GetSettingsQueryHandler : IQueryHandler<GetSettingsQuery, GetSett
                     long.Parse(maxFileSizeBytesSetting.Value),
                     long.Parse(maxThumbnailSizeBytesSetting?.Value ?? "10485760"),
                     int.Parse(thumbnailFrameCountSetting?.Value ?? "30"),
-                    double.Parse(thumbnailCameraVerticalAngleSetting?.Value ?? "0.75"),
-                    int.Parse(thumbnailWidthSetting?.Value ?? "256"),
-                    int.Parse(thumbnailHeightSetting?.Value ?? "256"),
+                    int.Parse(thumbnailSizeSetting?.Value ?? "256"),
                     bool.Parse(generateThumbnailOnUploadSetting?.Value ?? "true"),
+                    bool.Parse(generateAnimatedThumbnailSetting?.Value ?? "true"),
                     int.Parse(textureProxySizeSetting?.Value ?? "512"),
                     blenderPathSetting?.Value ?? "blender",
                     bool.Parse(blenderEnabledSetting?.Value ?? "false"),
@@ -71,10 +69,9 @@ internal class GetSettingsQueryHandler : IQueryHandler<GetSettingsQuery, GetSett
             settings.MaxFileSizeBytes,
             settings.MaxThumbnailSizeBytes,
             settings.ThumbnailFrameCount,
-            settings.ThumbnailCameraVerticalAngle,
-            settings.ThumbnailWidth,
-            settings.ThumbnailHeight,
+            settings.ThumbnailSize,
             settings.GenerateThumbnailOnUpload,
+            settings.GenerateAnimatedThumbnail,
             settings.TextureProxySize,
             (await _settingRepository.GetByKeyAsync(SettingKeys.BlenderPath, cancellationToken))?.Value ?? "blender",
             bool.Parse((await _settingRepository.GetByKeyAsync(SettingKeys.BlenderEnabled, cancellationToken))?.Value ?? "false"),
