@@ -2,6 +2,7 @@
 import { type ContextMenu } from 'primereact/contextmenu'
 import {
   createContext,
+  type JSX,
   type ReactNode,
   type RefObject,
   useContext,
@@ -16,10 +17,10 @@ interface DockContextValue {
   recentlyClosedTabs: Tab[]
   addRecentlyClosedTab: (tab: Tab) => void
   removeRecentlyClosedTab: (tabId: string) => void
-  registerContextMenu: (ref: RefObject<ContextMenu>) => void
-  unregisterContextMenu: (ref: RefObject<ContextMenu>) => void
+  registerContextMenu: (ref: RefObject<ContextMenu | null>) => void
+  unregisterContextMenu: (ref: RefObject<ContextMenu | null>) => void
   showContextMenu: (
-    ref: RefObject<ContextMenu>,
+    ref: RefObject<ContextMenu | null>,
     event: React.MouseEvent
   ) => void
 }
@@ -48,7 +49,7 @@ export const DockProvider = ({ children }: DockProviderProps): JSX.Element => {
     s => s.removeRecentlyClosedTab
   )
 
-  const contextMenuRefs = useRef<Set<RefObject<ContextMenu>>>(new Set())
+  const contextMenuRefs = useRef<Set<RefObject<ContextMenu | null>>>(new Set())
 
   const addRecentlyClosedTab = (tab: Tab): void => {
     addRecentlyClosedTabAction(tab)
@@ -58,16 +59,16 @@ export const DockProvider = ({ children }: DockProviderProps): JSX.Element => {
     removeRecentlyClosedTabAction(tabId)
   }
 
-  const registerContextMenu = (ref: RefObject<ContextMenu>): void => {
+  const registerContextMenu = (ref: RefObject<ContextMenu | null>): void => {
     contextMenuRefs.current.add(ref)
   }
 
-  const unregisterContextMenu = (ref: RefObject<ContextMenu>): void => {
+  const unregisterContextMenu = (ref: RefObject<ContextMenu | null>): void => {
     contextMenuRefs.current.delete(ref)
   }
 
   const showContextMenu = (
-    ref: RefObject<ContextMenu>,
+    ref: RefObject<ContextMenu | null>,
     event: React.MouseEvent
   ): void => {
     // Hide all other menus immediately

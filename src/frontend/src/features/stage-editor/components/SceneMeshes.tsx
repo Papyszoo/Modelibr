@@ -1,3 +1,5 @@
+import type { JSX } from 'react'
+
 import { type StageMesh } from './SceneEditor'
 
 interface SceneMeshesProps {

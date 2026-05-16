@@ -2,10 +2,12 @@ import './Settings.css'
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQueryClient } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
+import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog'
+import { type JSX, useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { type z } from 'zod'
 
+import { useModelsQuery } from '@/features/models/api/queries'
 import { useSettingsQuery } from '@/features/settings/api/queries'
 import type {
   BlenderInstallStatus,
@@ -18,6 +20,7 @@ import {
   getWebDavUrls,
   installBlender,
   probeWebDavUrl,
+  regenerateAllThumbnails,
   uninstallBlender,
   updateSetting,
   updateSettings,
@@ -36,10 +39,9 @@ interface SettingsData {
   maxFileSizeBytes: number
   maxThumbnailSizeBytes: number
   thumbnailFrameCount: number
-  thumbnailCameraVerticalAngle: number
-  thumbnailWidth: number
-  thumbnailHeight: number
+  thumbnailSize: number
   generateThumbnailOnUpload: boolean
+  generateAnimatedThumbnail: boolean
   textureProxySize: number
 }
 
@@ -101,6 +103,21 @@ export function Settings(): JSX.Element {
   const [duplicateNamePolicySaving, setDuplicateNamePolicySaving] =
     useState(false)
 
+  // Bulk thumbnail regeneration state
+  const [isRegeneratingThumbnails, setIsRegeneratingThumbnails] =
+    useState(false)
+
+  // Fetch the total model count to show in the Regenerate All help text.
+  // pageSize=1 because we only need the totalCount field, not the rows.
+  const regenerateCountQuery = useModelsQuery({
+    params: { page: 1, pageSize: 1 },
+  })
+  const regenerateAssetCount = regenerateCountQuery.data?.totalCount
+  const regenerateAssetCountLabel =
+    typeof regenerateAssetCount === 'number'
+      ? `${regenerateAssetCount} ${regenerateAssetCount === 1 ? 'asset' : 'assets'}`
+      : 'All existing assets'
+
   const {
     register,
     handleSubmit,
@@ -114,10 +131,9 @@ export function Settings(): JSX.Element {
       maxFileSizeMB: 1024,
       maxThumbnailSizeMB: 10,
       thumbnailFrameCount: 30,
-      thumbnailCameraAngle: 0.75,
-      thumbnailWidth: 256,
-      thumbnailHeight: 256,
+      thumbnailSize: 256,
       generateThumbnailOnUpload: true,
+      generateAnimatedThumbnail: true,
       textureProxySize: 512,
     },
   })
@@ -127,20 +143,18 @@ export function Settings(): JSX.Element {
     maxFileSizeMB: number
     maxThumbnailSizeMB: number
     thumbnailFrameCount: number
-    thumbnailCameraAngle: number
-    thumbnailWidth: number
-    thumbnailHeight: number
+    thumbnailSize: number
     generateThumbnailOnUpload: boolean
+    generateAnimatedThumbnail: boolean
     textureProxySize: number
   } | null>(null)
 
   const maxFileSizeMB = watch('maxFileSizeMB')
   const maxThumbnailSizeMB = watch('maxThumbnailSizeMB')
   const thumbnailFrameCount = watch('thumbnailFrameCount')
-  const thumbnailCameraAngle = watch('thumbnailCameraAngle')
-  const thumbnailWidth = watch('thumbnailWidth')
-  const thumbnailHeight = watch('thumbnailHeight')
+  const thumbnailSize = watch('thumbnailSize')
   const generateThumbnailOnUpload = watch('generateThumbnailOnUpload')
+  const generateAnimatedThumbnail = watch('generateAnimatedThumbnail')
   const textureProxySize = watch('textureProxySize')
 
   // Check if field is dirty (changed from original)
@@ -154,15 +168,16 @@ export function Settings(): JSX.Element {
         return maxThumbnailSizeMB !== originalValues.maxThumbnailSizeMB
       case 'thumbnailFrameCount':
         return thumbnailFrameCount !== originalValues.thumbnailFrameCount
-      case 'thumbnailCameraAngle':
-        return thumbnailCameraAngle !== originalValues.thumbnailCameraAngle
-      case 'thumbnailWidth':
-        return thumbnailWidth !== originalValues.thumbnailWidth
-      case 'thumbnailHeight':
-        return thumbnailHeight !== originalValues.thumbnailHeight
+      case 'thumbnailSize':
+        return thumbnailSize !== originalValues.thumbnailSize
       case 'generateThumbnailOnUpload':
         return (
           generateThumbnailOnUpload !== originalValues.generateThumbnailOnUpload
+        )
+      case 'generateAnimatedThumbnail':
+        return (
+          generateAnimatedThumbnail !==
+          originalValues.generateAnimatedThumbnail
         )
       case 'textureProxySize':
         return textureProxySize !== originalValues.textureProxySize
@@ -177,10 +192,9 @@ export function Settings(): JSX.Element {
       isFieldDirty('maxFileSizeMB') ||
       isFieldDirty('maxThumbnailSizeMB') ||
       isFieldDirty('thumbnailFrameCount') ||
-      isFieldDirty('thumbnailCameraAngle') ||
-      isFieldDirty('thumbnailWidth') ||
-      isFieldDirty('thumbnailHeight') ||
+      isFieldDirty('thumbnailSize') ||
       isFieldDirty('generateThumbnailOnUpload') ||
+      isFieldDirty('generateAnimatedThumbnail') ||
       isFieldDirty('textureProxySize')
     )
   }
@@ -213,10 +227,9 @@ export function Settings(): JSX.Element {
       maxFileSizeMB: fileSizeMB,
       maxThumbnailSizeMB: thumbnailSizeMB,
       thumbnailFrameCount: data.thumbnailFrameCount,
-      thumbnailCameraAngle: data.thumbnailCameraVerticalAngle,
-      thumbnailWidth: data.thumbnailWidth,
-      thumbnailHeight: data.thumbnailHeight,
+      thumbnailSize: data.thumbnailSize,
       generateThumbnailOnUpload: data.generateThumbnailOnUpload ?? true,
+      generateAnimatedThumbnail: data.generateAnimatedThumbnail ?? true,
       textureProxySize: data.textureProxySize ?? 512,
     })
 
@@ -224,10 +237,9 @@ export function Settings(): JSX.Element {
       maxFileSizeMB: fileSizeMB,
       maxThumbnailSizeMB: thumbnailSizeMB,
       thumbnailFrameCount: data.thumbnailFrameCount,
-      thumbnailCameraAngle: data.thumbnailCameraVerticalAngle,
-      thumbnailWidth: data.thumbnailWidth,
-      thumbnailHeight: data.thumbnailHeight,
+      thumbnailSize: data.thumbnailSize,
       generateThumbnailOnUpload: data.generateThumbnailOnUpload ?? true,
+      generateAnimatedThumbnail: data.generateAnimatedThumbnail ?? true,
       textureProxySize: data.textureProxySize ?? 512,
     })
 
@@ -249,10 +261,9 @@ export function Settings(): JSX.Element {
       maxFileSizeBytes: values.maxFileSizeMB * 1_048_576,
       maxThumbnailSizeBytes: values.maxThumbnailSizeMB * 1_048_576,
       thumbnailFrameCount: values.thumbnailFrameCount,
-      thumbnailCameraVerticalAngle: values.thumbnailCameraAngle,
-      thumbnailWidth: values.thumbnailWidth,
-      thumbnailHeight: values.thumbnailHeight,
+      thumbnailSize: values.thumbnailSize,
       generateThumbnailOnUpload: values.generateThumbnailOnUpload,
+      generateAnimatedThumbnail: values.generateAnimatedThumbnail,
       textureProxySize: values.textureProxySize,
     }
 
@@ -269,10 +280,9 @@ export function Settings(): JSX.Element {
         maxFileSizeMB: fileSizeMB,
         maxThumbnailSizeMB: thumbnailSizeMB,
         thumbnailFrameCount: data.thumbnailFrameCount,
-        thumbnailCameraAngle: data.thumbnailCameraVerticalAngle,
-        thumbnailWidth: data.thumbnailWidth,
-        thumbnailHeight: data.thumbnailHeight,
+        thumbnailSize: data.thumbnailSize,
         generateThumbnailOnUpload: data.generateThumbnailOnUpload ?? true,
+        generateAnimatedThumbnail: data.generateAnimatedThumbnail ?? true,
         textureProxySize: data.textureProxySize ?? 512,
       })
 
@@ -280,10 +290,9 @@ export function Settings(): JSX.Element {
         maxFileSizeMB: fileSizeMB,
         maxThumbnailSizeMB: thumbnailSizeMB,
         thumbnailFrameCount: data.thumbnailFrameCount,
-        thumbnailCameraAngle: data.thumbnailCameraVerticalAngle,
-        thumbnailWidth: data.thumbnailWidth,
-        thumbnailHeight: data.thumbnailHeight,
+        thumbnailSize: data.thumbnailSize,
         generateThumbnailOnUpload: data.generateThumbnailOnUpload ?? true,
+        generateAnimatedThumbnail: data.generateAnimatedThumbnail ?? true,
         textureProxySize: data.textureProxySize ?? 512,
       })
 
@@ -300,6 +309,45 @@ export function Settings(): JSX.Element {
 
   const handleInvalidSave = () => {
     setError('Please fix all validation errors before saving')
+  }
+
+  const handleRegenerateAllThumbnails = (): void => {
+    const countLabel =
+      typeof regenerateAssetCount === 'number'
+        ? `${regenerateAssetCount} ${regenerateAssetCount === 1 ? 'asset' : 'assets'}`
+        : 'every existing asset'
+
+    confirmDialog({
+      message: `Regenerate thumbnails for ${countLabel}? Existing thumbnails will be replaced and may be temporarily unavailable while jobs are queued.`,
+      header: 'Regenerate All Thumbnails',
+      icon: 'pi pi-exclamation-triangle',
+      acceptLabel: 'Regenerate',
+      rejectLabel: 'Cancel',
+      acceptClassName: 'p-button-danger',
+      accept: async () => {
+        setIsRegeneratingThumbnails(true)
+        setError(null)
+        setSuccessMessage(null)
+        try {
+          const { enqueuedCount, skippedCount } =
+            await regenerateAllThumbnails()
+          const skipNote =
+            skippedCount > 0 ? ` (${skippedCount} skipped — no files)` : ''
+          setSuccessMessage(
+            `Queued ${enqueuedCount} thumbnail regeneration${enqueuedCount === 1 ? '' : 's'}${skipNote}.`
+          )
+          setTimeout(() => setSuccessMessage(null), 5000)
+        } catch (err) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : 'Failed to regenerate thumbnails'
+          )
+        } finally {
+          setIsRegeneratingThumbnails(false)
+        }
+      },
+    })
   }
 
   // ── Blender version management effects ──────────────────────────────
@@ -671,124 +719,115 @@ export function Settings(): JSX.Element {
                 </div>
 
                 <div className="settings-field">
-                  <label htmlFor="frameCount">
-                    Frame Count
-                    {isFieldDirty('thumbnailFrameCount') && (
-                      <span className="settings-dirty-indicator"> ★</span>
-                    )}
-                  </label>
-                  <input
-                    id="frameCount"
-                    type="number"
-                    min="1"
-                    max="360"
-                    {...register('thumbnailFrameCount', {
-                      valueAsNumber: true,
-                    })}
-                    disabled={isSaving}
-                    className={
-                      errors.thumbnailFrameCount ? 'settings-input-error' : ''
-                    }
-                  />
-                  {errors.thumbnailFrameCount && (
-                    <span className="settings-error-message">
-                      {errors.thumbnailFrameCount.message}
+                  <label className="settings-checkbox-label">
+                    <input
+                      id="generateAnimatedThumbnail"
+                      type="checkbox"
+                      {...register('generateAnimatedThumbnail')}
+                      disabled={isSaving}
+                    />
+                    <span>
+                      Generate Animated Thumbnail
+                      {isFieldDirty('generateAnimatedThumbnail') && (
+                        <span className="settings-dirty-indicator"> ★</span>
+                      )}
                     </span>
-                  )}
+                  </label>
                   <span className="settings-help">
-                    Number of frames in thumbnail animation (1-360)
+                    Render a multi-frame orbiting animation. Disable to produce
+                    a single static frame.
                   </span>
-                  <span className="settings-default">Default: 30 frames</span>
+                  <span className="settings-default">Default: Yes</span>
                 </div>
 
-                <div className="settings-field">
-                  <label htmlFor="cameraAngle">
-                    Camera Vertical Angle
-                    {isFieldDirty('thumbnailCameraAngle') && (
-                      <span className="settings-dirty-indicator"> ★</span>
+                {generateAnimatedThumbnail && (
+                  <div className="settings-field">
+                    <label htmlFor="frameCount">
+                      Frame Count
+                      {isFieldDirty('thumbnailFrameCount') && (
+                        <span className="settings-dirty-indicator"> ★</span>
+                      )}
+                    </label>
+                    <input
+                      id="frameCount"
+                      type="number"
+                      min="1"
+                      max="360"
+                      {...register('thumbnailFrameCount', {
+                        valueAsNumber: true,
+                      })}
+                      disabled={isSaving}
+                      className={
+                        errors.thumbnailFrameCount ? 'settings-input-error' : ''
+                      }
+                    />
+                    {errors.thumbnailFrameCount && (
+                      <span className="settings-error-message">
+                        {errors.thumbnailFrameCount.message}
+                      </span>
                     )}
-                  </label>
-                  <input
-                    id="cameraAngle"
-                    type="number"
-                    min="0"
-                    max="2"
-                    step="0.01"
-                    {...register('thumbnailCameraAngle', {
-                      valueAsNumber: true,
-                    })}
-                    disabled={isSaving}
-                    className={
-                      errors.thumbnailCameraAngle ? 'settings-input-error' : ''
-                    }
-                  />
-                  {errors.thumbnailCameraAngle && (
-                    <span className="settings-error-message">
-                      {errors.thumbnailCameraAngle.message}
+                    <span className="settings-help">
+                      Number of frames in thumbnail animation (1-360)
                     </span>
-                  )}
-                  <span className="settings-help">
-                    Camera height multiplier (0-2)
-                  </span>
-                  <span className="settings-default">Default: 0.75</span>
-                </div>
+                    <span className="settings-default">Default: 30 frames</span>
+                  </div>
+                )}
 
                 <div className="settings-field">
-                  <label htmlFor="thumbnailWidth">
-                    Thumbnail Width (px)
-                    {isFieldDirty('thumbnailWidth') && (
+                  <label htmlFor="thumbnailSize">
+                    Thumbnail Size (px)
+                    {isFieldDirty('thumbnailSize') && (
                       <span className="settings-dirty-indicator"> ★</span>
                     )}
                   </label>
-                  <input
-                    id="thumbnailWidth"
-                    type="number"
-                    min="64"
-                    max="2048"
-                    {...register('thumbnailWidth', { valueAsNumber: true })}
+                  <select
+                    id="thumbnailSize"
+                    {...register('thumbnailSize', { valueAsNumber: true })}
                     disabled={isSaving}
                     className={
-                      errors.thumbnailWidth ? 'settings-input-error' : ''
+                      errors.thumbnailSize
+                        ? 'settings-input-error'
+                        : 'settings-select'
                     }
-                  />
-                  {errors.thumbnailWidth && (
+                  >
+                    <option value={64}>64 px</option>
+                    <option value={128}>128 px</option>
+                    <option value={256}>256 px</option>
+                    <option value={512}>512 px</option>
+                    <option value={1024}>1024 px</option>
+                    <option value={2048}>2048 px</option>
+                  </select>
+                  {errors.thumbnailSize && (
                     <span className="settings-error-message">
-                      {errors.thumbnailWidth.message}
+                      {errors.thumbnailSize.message}
                     </span>
                   )}
                   <span className="settings-help">
-                    Width in pixels (64-2048)
+                    Square side length for rendered thumbnails. Larger values
+                    look sharper but take longer to generate and load.
                   </span>
                   <span className="settings-default">Default: 256 px</span>
                 </div>
 
                 <div className="settings-field">
-                  <label htmlFor="thumbnailHeight">
-                    Thumbnail Height (px)
-                    {isFieldDirty('thumbnailHeight') && (
-                      <span className="settings-dirty-indicator"> ★</span>
-                    )}
-                  </label>
-                  <input
-                    id="thumbnailHeight"
-                    type="number"
-                    min="64"
-                    max="2048"
-                    {...register('thumbnailHeight', { valueAsNumber: true })}
-                    disabled={isSaving}
-                    className={
-                      errors.thumbnailHeight ? 'settings-input-error' : ''
-                    }
-                  />
-                  {errors.thumbnailHeight && (
-                    <span className="settings-error-message">
-                      {errors.thumbnailHeight.message}
-                    </span>
-                  )}
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => void handleRegenerateAllThumbnails()}
+                      disabled={isRegeneratingThumbnails || isDemo}
+                      className="settings-button settings-button-secondary"
+                    >
+                      {isRegeneratingThumbnails
+                        ? 'Queueing…'
+                        : 'Regenerate All Thumbnails'}
+                    </button>
+                  </div>
                   <span className="settings-help">
-                    Height in pixels (64-2048)
+                    {regenerateAssetCountLabel} will be re-rendered using the
+                    settings above (animated/static, frame count, thumbnail
+                    size). Each model uses its current default texture set /
+                    material.
                   </span>
-                  <span className="settings-default">Default: 256 px</span>
                 </div>
               </div>
             )}
@@ -1338,6 +1377,7 @@ export function Settings(): JSX.Element {
           )}
         </div>
       </form>
+      <ConfirmDialog />
     </div>
   )
 }

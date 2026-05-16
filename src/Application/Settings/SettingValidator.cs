@@ -14,10 +14,9 @@ internal static class SettingValidator
             SettingKeys.MaxFileSizeBytes => ValidateMaxFileSizeBytes(value),
             SettingKeys.MaxThumbnailSizeBytes => ValidateMaxThumbnailSizeBytes(value),
             SettingKeys.ThumbnailFrameCount => ValidateThumbnailFrameCount(value),
-            SettingKeys.ThumbnailCameraVerticalAngle => ValidateThumbnailCameraVerticalAngle(value),
-            SettingKeys.ThumbnailWidth => ValidateThumbnailWidth(value),
-            SettingKeys.ThumbnailHeight => ValidateThumbnailHeight(value),
+            SettingKeys.ThumbnailSize => ValidateThumbnailSize(value),
             SettingKeys.GenerateThumbnailOnUpload => ValidateGenerateThumbnailOnUpload(value),
+            SettingKeys.GenerateAnimatedThumbnail => ValidateGenerateAnimatedThumbnail(value),
             SettingKeys.TextureProxySize => ValidateTextureProxySize(value),
             SettingKeys.BlenderPath => ValidateBlenderPath(value),
             SettingKeys.BlenderEnabled => ValidateBlenderEnabled(value),
@@ -70,44 +69,13 @@ internal static class SettingValidator
         return Result.Success();
     }
 
-    private static Result ValidateThumbnailCameraVerticalAngle(string value)
+    private static Result ValidateThumbnailSize(string value)
     {
-        if (!double.TryParse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var angle))
-            return Result.Failure(new Error("InvalidSetting", "ThumbnailCameraVerticalAngle must be a valid number."));
+        if (!int.TryParse(value, out var size))
+            return Result.Failure(new Error("InvalidSetting", "ThumbnailSize must be a valid integer."));
 
-        if (angle < 0)
-            return Result.Failure(new Error("InvalidSetting", "Camera vertical angle cannot be negative."));
-
-        if (angle > 2)
-            return Result.Failure(new Error("InvalidSetting", "Camera vertical angle cannot exceed 2."));
-
-        return Result.Success();
-    }
-
-    private static Result ValidateThumbnailWidth(string value)
-    {
-        if (!int.TryParse(value, out var width))
-            return Result.Failure(new Error("InvalidSetting", "ThumbnailWidth must be a valid integer."));
-
-        if (width < 64)
-            return Result.Failure(new Error("InvalidSetting", "Thumbnail width must be at least 64 pixels."));
-
-        if (width > 2048)
-            return Result.Failure(new Error("InvalidSetting", "Thumbnail width cannot exceed 2048 pixels."));
-
-        return Result.Success();
-    }
-
-    private static Result ValidateThumbnailHeight(string value)
-    {
-        if (!int.TryParse(value, out var height))
-            return Result.Failure(new Error("InvalidSetting", "ThumbnailHeight must be a valid integer."));
-
-        if (height < 64)
-            return Result.Failure(new Error("InvalidSetting", "Thumbnail height must be at least 64 pixels."));
-
-        if (height > 2048)
-            return Result.Failure(new Error("InvalidSetting", "Thumbnail height cannot exceed 2048 pixels."));
+        if (size is not (64 or 128 or 256 or 512 or 1024 or 2048))
+            return Result.Failure(new Error("InvalidSetting", "ThumbnailSize must be one of: 64, 128, 256, 512, 1024, 2048."));
 
         return Result.Success();
     }
@@ -116,6 +84,14 @@ internal static class SettingValidator
     {
         if (!bool.TryParse(value, out _))
             return Result.Failure(new Error("InvalidSetting", "GenerateThumbnailOnUpload must be 'true' or 'false'."));
+
+        return Result.Success();
+    }
+
+    private static Result ValidateGenerateAnimatedThumbnail(string value)
+    {
+        if (!bool.TryParse(value, out _))
+            return Result.Failure(new Error("InvalidSetting", "GenerateAnimatedThumbnail must be 'true' or 'false'."));
 
         return Result.Success();
     }

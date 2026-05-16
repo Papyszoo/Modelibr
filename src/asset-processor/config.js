@@ -245,3 +245,42 @@ export async function refreshBlenderConfigFromApi(apiClient) {
     // Silently fall back to the current config values
   }
 }
+
+// Allowed values for the single square thumbnail-size setting.
+const ALLOWED_THUMBNAIL_SIZES = new Set([64, 128, 256, 512, 1024, 2048])
+
+/**
+ * Refresh thumbnail render configuration from the backend API settings.
+ * Translates the user-facing settings (size, frameCount, isAnimated) into the
+ * orbit/rendering knobs the renderer reads. Thumbnails are always square so a
+ * single `size` drives both outputWidth and outputHeight. Falls back silently
+ * to existing in-memory config on failure.
+ *
+ * When isAnimated=false, frameCount collapses to 1 (single frame at start angle)
+ * — the renderer still produces a webp, just a 1-frame one. This keeps the
+ * pipeline uniform without a separate static-thumbnail code path.
+ *
+ * @param {import('./jobApiClient.js').JobApiClient} apiClient
+ */
+export async function refreshThumbnailRenderConfigFromApi(apiClient) {
+  try {
+    const response = await apiClient.apiClient.get('/settings/thumbnail-render')
+    const data = response.data
+
+    if (typeof data.size === 'number' && ALLOWED_THUMBNAIL_SIZES.has(data.size)) {
+      config.rendering.outputWidth = data.size
+      config.rendering.outputHeight = data.size
+    }
+
+    const isAnimated = data.isAnimated !== false
+    const frameCount =
+      typeof data.frameCount === 'number' && data.frameCount >= 1
+        ? data.frameCount
+        : 30
+    const effectiveFrameCount = isAnimated ? frameCount : 1
+    const angleRange = config.orbit.endAngle - config.orbit.startAngle
+    config.orbit.angleStep = angleRange / effectiveFrameCount
+  } catch {
+    // Silently fall back to the current config values
+  }
+}

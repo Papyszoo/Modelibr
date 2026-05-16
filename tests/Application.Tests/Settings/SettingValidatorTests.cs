@@ -57,51 +57,20 @@ public class SettingValidatorTests
     }
 
     [Theory]
-    [InlineData("0", true)] // Min
-    [InlineData("0.75", true)] // Default
-    [InlineData("1.5", true)] // Mid range
-    [InlineData("2", true)] // Max
-    [InlineData("-0.1", false)] // Invalid: negative
-    [InlineData("2.1", false)] // Invalid: above max
-    [InlineData("invalid", false)] // Invalid: not a number
-    public void ValidateSetting_ThumbnailCameraVerticalAngle_ValidatesCorrectly(string value, bool shouldSucceed)
-    {
-        // Act
-        var result = SettingValidator.ValidateSetting(SettingKeys.ThumbnailCameraVerticalAngle, value);
-
-        // Assert
-        Assert.Equal(shouldSucceed, result.IsSuccess);
-    }
-
-    [Theory]
-    [InlineData("64", true)] // Min
+    [InlineData("64", true)]
+    [InlineData("128", true)]
     [InlineData("256", true)] // Default
-    [InlineData("2048", true)] // Max
-    [InlineData("63", false)] // Invalid: below min
-    [InlineData("2049", false)] // Invalid: above max
-    [InlineData("0", false)] // Invalid: zero
-    [InlineData("invalid", false)] // Invalid: not a number
-    public void ValidateSetting_ThumbnailWidth_ValidatesCorrectly(string value, bool shouldSucceed)
+    [InlineData("512", true)]
+    [InlineData("1024", true)]
+    [InlineData("2048", true)]
+    [InlineData("100", false)] // Not in allowed set
+    [InlineData("4096", false)] // Above allowed
+    [InlineData("0", false)] // Zero
+    [InlineData("invalid", false)] // Not a number
+    public void ValidateSetting_ThumbnailSize_ValidatesCorrectly(string value, bool shouldSucceed)
     {
         // Act
-        var result = SettingValidator.ValidateSetting(SettingKeys.ThumbnailWidth, value);
-
-        // Assert
-        Assert.Equal(shouldSucceed, result.IsSuccess);
-    }
-
-    [Theory]
-    [InlineData("64", true)] // Min
-    [InlineData("256", true)] // Default
-    [InlineData("2048", true)] // Max
-    [InlineData("63", false)] // Invalid: below min
-    [InlineData("2049", false)] // Invalid: above max
-    [InlineData("0", false)] // Invalid: zero
-    [InlineData("invalid", false)] // Invalid: not a number
-    public void ValidateSetting_ThumbnailHeight_ValidatesCorrectly(string value, bool shouldSucceed)
-    {
-        // Act
-        var result = SettingValidator.ValidateSetting(SettingKeys.ThumbnailHeight, value);
+        var result = SettingValidator.ValidateSetting(SettingKeys.ThumbnailSize, value);
 
         // Assert
         Assert.Equal(shouldSucceed, result.IsSuccess);

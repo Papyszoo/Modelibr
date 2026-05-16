@@ -1,6 +1,7 @@
 import './PropertyPanel.css'
 
 import { Button } from 'primereact/button'
+import type { JSX } from 'react'
 import { Checkbox } from 'primereact/checkbox'
 import { ColorPicker } from 'primereact/colorpicker'
 import { InputNumber } from 'primereact/inputnumber'

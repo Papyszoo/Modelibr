@@ -45,10 +45,9 @@ internal class UpdateSettingsCommandHandler : ICommandHandler<UpdateSettingsComm
             // Update thumbnail settings
             settings.UpdateThumbnailSettings(
                 command.ThumbnailFrameCount,
-                command.ThumbnailCameraVerticalAngle,
-                command.ThumbnailWidth,
-                command.ThumbnailHeight,
+                command.ThumbnailSize,
                 command.GenerateThumbnailOnUpload,
+                command.GenerateAnimatedThumbnail,
                 now);
 
             // Update texture proxy size
@@ -60,20 +59,18 @@ internal class UpdateSettingsCommandHandler : ICommandHandler<UpdateSettingsComm
             await UpdateOrCreateSettingAsync(SettingKeys.MaxFileSizeBytes, command.MaxFileSizeBytes.ToString(), now, cancellationToken);
             await UpdateOrCreateSettingAsync(SettingKeys.MaxThumbnailSizeBytes, command.MaxThumbnailSizeBytes.ToString(), now, cancellationToken);
             await UpdateOrCreateSettingAsync(SettingKeys.ThumbnailFrameCount, command.ThumbnailFrameCount.ToString(), now, cancellationToken);
-            await UpdateOrCreateSettingAsync(SettingKeys.ThumbnailCameraVerticalAngle, command.ThumbnailCameraVerticalAngle.ToString(), now, cancellationToken);
-            await UpdateOrCreateSettingAsync(SettingKeys.ThumbnailWidth, command.ThumbnailWidth.ToString(), now, cancellationToken);
-            await UpdateOrCreateSettingAsync(SettingKeys.ThumbnailHeight, command.ThumbnailHeight.ToString(), now, cancellationToken);
+            await UpdateOrCreateSettingAsync(SettingKeys.ThumbnailSize, command.ThumbnailSize.ToString(), now, cancellationToken);
             await UpdateOrCreateSettingAsync(SettingKeys.GenerateThumbnailOnUpload, command.GenerateThumbnailOnUpload.ToString().ToLower(), now, cancellationToken);
+            await UpdateOrCreateSettingAsync(SettingKeys.GenerateAnimatedThumbnail, command.GenerateAnimatedThumbnail.ToString().ToLower(), now, cancellationToken);
             await UpdateOrCreateSettingAsync(SettingKeys.TextureProxySize, command.TextureProxySize.ToString(), now, cancellationToken);
 
             return Result.Success(new UpdateSettingsResponse(
                 updatedSettings.MaxFileSizeBytes,
                 updatedSettings.MaxThumbnailSizeBytes,
                 updatedSettings.ThumbnailFrameCount,
-                updatedSettings.ThumbnailCameraVerticalAngle,
-                updatedSettings.ThumbnailWidth,
-                updatedSettings.ThumbnailHeight,
+                updatedSettings.ThumbnailSize,
                 updatedSettings.GenerateThumbnailOnUpload,
+                updatedSettings.GenerateAnimatedThumbnail,
                 updatedSettings.TextureProxySize,
                 updatedSettings.UpdatedAt
             ));

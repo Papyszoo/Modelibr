@@ -36,7 +36,6 @@ const TestWrapper = ({ children }: { children: React.ReactNode }) => (
 
 // Mock PrimeReact components - use require inside factory to avoid scope issues
 jest.mock('primereact/button', () => {
-  const React = require('react')
   return {
     Button: ({
       children,
@@ -103,7 +102,6 @@ jest.mock('../DraggableTab', () => ({
 }))
 
 jest.mock('../../../hooks/useTabContext', () => {
-  const React = require('react')
   return {
     TabProvider: ({ children }: { children: React.ReactNode }) => (
       <div data-testid="tab-provider">{children}</div>

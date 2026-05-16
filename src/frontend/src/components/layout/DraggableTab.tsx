@@ -1,6 +1,7 @@
 import './DraggableTab.css'
 
 import { Tooltip } from 'primereact/tooltip'
+import type { JSX } from 'react'
 
 import { getWindowId } from '@/stores/navigationStore'
 import { type Tab } from '@/types'
