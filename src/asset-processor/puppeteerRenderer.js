@@ -1149,6 +1149,16 @@ export class PuppeteerRenderer {
     const startTime = Date.now()
 
     try {
+      // Re-apply viewport from live config. The page is initialized once
+      // (with whatever config was at init time) and reused across jobs;
+      // refreshThumbnailRenderConfigFromApi() can have updated
+      // config.rendering.outputWidth/outputHeight between jobs, so without
+      // this call the renderer stays at the size captured at first init.
+      await this.setViewport(
+        config.rendering.outputWidth,
+        config.rendering.outputHeight
+      )
+
       // Check if model is loaded
       const isReady = await this.page.evaluate(
         () => window.modelRenderer.isReady

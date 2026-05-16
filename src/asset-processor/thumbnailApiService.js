@@ -205,8 +205,8 @@ export class ThumbnailApiService {
           modelId,
           thumbnailPaths.webpPath,
           {
-            width: 256, // Default WebP dimensions
-            height: 256,
+            width: config.rendering.outputWidth,
+            height: config.rendering.outputHeight,
           },
           versionId
         )
@@ -247,8 +247,8 @@ export class ThumbnailApiService {
           modelId,
           thumbnailPaths.pngPath,
           {
-            width: 256, // Default PNG dimensions
-            height: 256,
+            width: config.rendering.outputWidth,
+            height: config.rendering.outputHeight,
           },
           versionId
         )
@@ -294,8 +294,8 @@ export class ThumbnailApiService {
             modelId,
             thumbnailPaths.posterPath,
             {
-              width: 256, // Default poster dimensions
-              height: 256,
+              width: config.rendering.outputWidth,
+              height: config.rendering.outputHeight,
             },
             versionId
           )

@@ -11,17 +11,20 @@ public class RegenerateAllThumbnailsCommandHandler
     : ICommandHandler<RegenerateAllThumbnailsCommand, RegenerateAllThumbnailsCommandResponse>
 {
     private readonly IModelRepository _modelRepository;
+    private readonly IModelVersionRepository _modelVersionRepository;
     private readonly IThumbnailRepository _thumbnailRepository;
     private readonly IThumbnailQueue _thumbnailQueue;
     private readonly IDateTimeProvider _dateTimeProvider;
 
     public RegenerateAllThumbnailsCommandHandler(
         IModelRepository modelRepository,
+        IModelVersionRepository modelVersionRepository,
         IThumbnailRepository thumbnailRepository,
         IThumbnailQueue thumbnailQueue,
         IDateTimeProvider dateTimeProvider)
     {
         _modelRepository = modelRepository;
+        _modelVersionRepository = modelVersionRepository;
         _thumbnailRepository = thumbnailRepository;
         _thumbnailQueue = thumbnailQueue;
         _dateTimeProvider = dateTimeProvider;
@@ -54,23 +57,38 @@ public class RegenerateAllThumbnailsCommandHandler
             }
 
             // GetAllAsync returns detached entities (AsNoTracking), so the
-            // Thumbnail navigation may be stale. Re-fetch via the repository
-            // to make the create-vs-reset decision idempotent — important
-            // because there's no unique constraint on Thumbnails.ModelVersionId
-            // and concurrent bulk-regen invocations would otherwise produce
-            // duplicate rows.
+            // Thumbnail navigation may be stale. Re-fetch by ModelVersionId
+            // to make the create-vs-reset decision idempotent — there IS a
+            // unique constraint on Thumbnails.ModelVersionId, and a bare
+            // AddAsync would 500 on the second invocation.
             var existingThumbnail = await _thumbnailRepository
                 .GetByModelVersionIdAsync(targetVersion.Id, cancellationToken);
 
+            Thumbnail thumbnailRow;
             if (existingThumbnail != null)
             {
                 existingThumbnail.Reset(now);
                 await _thumbnailRepository.UpdateAsync(existingThumbnail, cancellationToken);
+                thumbnailRow = existingThumbnail;
             }
             else
             {
                 var newThumbnail = Thumbnail.Create(model.Id, targetVersion.Id, now);
-                await _thumbnailRepository.AddAsync(newThumbnail, cancellationToken);
+                thumbnailRow = await _thumbnailRepository.AddAsync(newThumbnail, cancellationToken);
+            }
+
+            // The Thumbnails table's FK is ModelVersion.ThumbnailId — without
+            // updating it, the subsequent worker upload (UploadThumbnailCommand)
+            // would see ThumbnailId == null and try to AddAsync a fresh row,
+            // hitting IX_Thumbnails_ModelVersionId. Use a targeted SQL update
+            // because IModelRepository.UpdateAsync attaches the whole graph
+            // (Packs/Projects/etc.) and conflicts across loop iterations.
+            if (targetVersion.ThumbnailId != thumbnailRow.Id)
+            {
+                await _modelVersionRepository.SetThumbnailIdAsync(
+                    targetVersion.Id,
+                    thumbnailRow.Id,
+                    cancellationToken);
             }
 
             await _thumbnailQueue.EnqueueAsync(
