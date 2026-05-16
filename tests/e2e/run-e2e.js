@@ -83,13 +83,9 @@ async function waitForHealth(url, label, timeoutMs = 120000) {
 }
 
 function printReportHint(e2eDir) {
-  const reportDir = path.join(e2eDir, "playwright-report");
-  if (!fs.existsSync(reportDir)) return;
-  console.log("📊 HTML report is ready. Open with:\n");
+  if (!fs.existsSync(path.join(e2eDir, "playwright-report"))) return;
+  console.log("📊 HTML report is ready. Open with:");
   console.log("   cd tests/e2e && npx playwright show-report\n");
-  console.log(
-    "   (or `npx playwright show-report " + reportDir + "` from anywhere)\n",
-  );
 }
 
 function isE2ERunning() {
