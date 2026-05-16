@@ -1,9 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 
-import {
-  config,
-  refreshThumbnailRenderConfigFromApi,
-} from '../config.js'
+import { config, refreshThumbnailRenderConfigFromApi } from '../config.js'
 
 // Snapshot defaults so each test starts from a clean slate
 const originalRendering = { ...config.rendering }
