@@ -196,6 +196,21 @@ async function ensureLegacyNavigationInitScript(page: Page) {
                     sessionStorage.setItem(sessionWindowIdKey, windowId);
                 }
 
+                // Drop any prior archive for the same windowId before
+                // writing the new activeWindows entry. Between two
+                // navigateTo() calls in the same recording, the previous
+                // page fires `pagehide`, which self-archives the window
+                // into `recentlyClosedWindows`. If we left that archive
+                // in place, the app's `reclaimWindow(id)` on the next
+                // mount would overwrite the snapshot we're seeding here
+                // with the old tabs.
+                const priorClosed = (
+                    stored.state?.recentlyClosedWindows || []
+                ).filter(
+                    (entry: { windowId?: string } | null | undefined) =>
+                        entry?.windowId !== windowId,
+                );
+
                 stored.state = {
                     activeWindows: {
                         ...(stored.state?.activeWindows || {}),
@@ -208,8 +223,7 @@ async function ensureLegacyNavigationInitScript(page: Page) {
                         },
                     },
                     recentlyClosedTabs: stored.state?.recentlyClosedTabs || [],
-                    recentlyClosedWindows:
-                        stored.state?.recentlyClosedWindows || [],
+                    recentlyClosedWindows: priorClosed,
                 };
 
                 localStorage.setItem(storageKey, JSON.stringify(stored));
