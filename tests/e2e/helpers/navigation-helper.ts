@@ -16,24 +16,37 @@ import { Page, expect } from "@playwright/test";
  *   ModelViewer  → pi-box        | PackViewer   → pi-folder-open
  */
 
-const MENU_LABELS: Record<string, string> = {
-    modelList: "Models List",
-    textureSets: "Texture Sets",
+/**
+ * Tile titles in the New Tab page. Used to locate the tile button when
+ * opening a tab via UI.
+ *
+ * Tab types not in this map (`textureSets`, `stageList`) have no tile —
+ * `textureSets` was split into Global Materials / Model Textures, and
+ * `stageList` is disabled while the feature is incomplete. Tests that need
+ * them inject the tab via localStorage state — see `injectAndActivateTab`.
+ */
+const TILE_LABELS: Record<string, string> = {
+    modelList: "Models",
+    globalMaterials: "Global Materials",
+    modelTextures: "Model Textures",
     sprites: "Sprites",
     environmentMaps: "Environment Maps",
     sounds: "Sounds",
     packs: "Packs",
     projects: "Projects",
-    stageList: "Stages",
     history: "History",
     recycledFiles: "Recycled Files",
     settings: "Settings",
 };
 
+const STATE_INJECTABLE_TYPES = new Set(["textureSets", "stageList"]);
+
 const TAB_ICONS: Record<string, string> = {
     modelList: "pi-list",
     modelViewer: "pi-box",
     textureSets: "pi-folder",
+    globalMaterials: "pi-palette",
+    modelTextures: "pi-images",
     textureSetViewer: "pi-image",
     environmentMaps: "pi-globe",
     environmentMapViewer: "pi-globe",
@@ -89,38 +102,173 @@ export async function navigateToApp(page: Page): Promise<void> {
 }
 
 /**
- * Open a tab from the "+" (Add tab) context menu in the dock bar.
+ * Open a tab from the New Tab page.
+ *
+ * Flow: click `+` on the target dock bar → New Tab page renders → click the
+ * matching tile → placeholder converts in place to the target type.
+ *
+ * For tab types that have no tile (`textureSets`, `stageList`), this falls
+ * back to a localStorage state injection + reload — same pattern used by
+ * `openModelViewer`. Those entries are deliberately not surfaced in the New
+ * Tab page (combined texture-sets view is replaced by Global Materials /
+ * Model Textures; stages is disabled while incomplete) but the underlying
+ * tab types still work, so tests can drive them directly.
  *
  * @param side  Which panel's dock bar to use ('left' | 'right')
- * @param tabType  The tab type key (e.g. 'textureSets', 'packs')
+ * @param tabType  The tab type key (e.g. 'globalMaterials', 'packs')
  */
 export async function openTabViaMenu(
     page: Page,
     tabType: string,
     side: "left" | "right" = "left",
 ): Promise<void> {
-    const menuLabel = MENU_LABELS[tabType];
-    if (!menuLabel) {
-        throw new Error(`Unknown tab type "${tabType}" for menu navigation`);
+    if (STATE_INJECTABLE_TYPES.has(tabType)) {
+        await injectAndActivateTab(page, tabType, side);
+        return;
     }
 
-    // Click the "+" button in the target dock bar
+    const tileLabel = TILE_LABELS[tabType];
+    if (!tileLabel) {
+        throw new Error(
+            `Unknown tab type "${tabType}" — no tile in New Tab page and not state-injectable`,
+        );
+    }
+
+    // Click the "+" button to open the New Tab page in the target panel.
     const dockBar = page.locator(`.dock-bar-${side}`);
     const addButton = dockBar.locator(".dock-add-button");
     await addButton.click();
 
-    // Wait for the context menu to appear
-    await page.waitForSelector(".dock-add-menu", {
+    // The New Tab page renders inside the panel's content area; find the
+    // tile by its title text. The tile is a <button> with an <h3 class="
+    // newtab-tile-title"> child.
+    const newtabPage = page.locator(".newtab-page").last();
+    await expect(newtabPage).toBeVisible({ timeout: 5000 });
+
+    const tile = newtabPage
+        .locator(".newtab-tile")
+        .filter({
+            has: page.locator(".newtab-tile-title", { hasText: tileLabel }),
+        })
+        .first();
+    await expect(tile).toBeVisible({ timeout: 5000 });
+    await tile.click();
+
+    // The placeholder converts in place; the New Tab page should detach.
+    await expect(newtabPage).toBeHidden({ timeout: 5000 });
+    console.log(
+        `[Nav] Opened "${tileLabel}" tab in ${side} panel via New Tab page ✓`,
+    );
+}
+
+/**
+ * Inject a tab directly into the persisted navigation state and reload.
+ *
+ * Used for tab types that have no New Tab page tile (e.g. the combined
+ * `textureSets` view, kept for the kind-filter e2e tests, and `stageList`,
+ * disabled in the UI). The reload guarantees Zustand rehydrates from the
+ * mutated localStorage and the app paints the right tab as active.
+ */
+async function injectAndActivateTab(
+    page: Page,
+    tabType: string,
+    side: "left" | "right",
+): Promise<void> {
+    await page.evaluate(
+        ({ type, side }) => {
+            const storageKey = "modelibr_navigation";
+            const sessionWindowIdKey = "modelibr_windowId";
+            const storedRaw = localStorage.getItem(storageKey);
+            const stored = storedRaw
+                ? JSON.parse(storedRaw)
+                : {
+                      state: {
+                          activeWindows: {},
+                          recentlyClosedTabs: [],
+                          recentlyClosedWindows: [],
+                      },
+                      version: 0,
+                  };
+
+            let windowId = sessionStorage.getItem(sessionWindowIdKey);
+            if (!windowId) {
+                windowId = crypto.randomUUID();
+                sessionStorage.setItem(sessionWindowIdKey, windowId);
+            }
+
+            const defaultWindowState = {
+                tabs: [
+                    {
+                        id: "modelList",
+                        type: "modelList",
+                        label: "Models",
+                        params: {},
+                        internalUiState: {},
+                    },
+                ],
+                activeTabId: "modelList",
+                activeRightTabId: null,
+                splitterSize: 50,
+                lastActiveAt: new Date().toISOString(),
+            };
+
+            const activeWindows = stored.state?.activeWindows || {};
+            const windowState =
+                activeWindows[windowId] || defaultWindowState;
+
+            const labels: Record<string, string> = {
+                textureSets: "Texture Sets",
+                stageList: "Stages",
+            };
+
+            const params: Record<string, string> =
+                side === "right" ? { panel: "right" } : {};
+
+            const newTab = {
+                id: type,
+                type,
+                label: labels[type] ?? type,
+                params,
+                internalUiState: {},
+            };
+
+            const existingTabs = (windowState.tabs || []).filter(
+                (tab: { id: string }) => tab.id !== type,
+            );
+            existingTabs.push(newTab);
+
+            const activeUpdate =
+                side === "right"
+                    ? { activeRightTabId: type }
+                    : { activeTabId: type };
+
+            activeWindows[windowId] = {
+                ...windowState,
+                tabs: existingTabs,
+                ...activeUpdate,
+                lastActiveAt: new Date().toISOString(),
+            };
+
+            stored.state = {
+                activeWindows,
+                recentlyClosedTabs: stored.state?.recentlyClosedTabs || [],
+                recentlyClosedWindows:
+                    stored.state?.recentlyClosedWindows || [],
+            };
+
+            localStorage.setItem(storageKey, JSON.stringify(stored));
+        },
+        { type: tabType, side },
+    );
+
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.waitForSelector(".p-splitter", {
         state: "visible",
-        timeout: 5000,
+        timeout: 15000,
     });
-
-    // Click the menu item
-    await page.locator(".dock-add-menu").getByText(menuLabel).click();
-
-    // Wait for the context menu to close and the new tab to appear
-    await expect(page.locator(".dock-add-menu")).toBeHidden({ timeout: 5000 });
-    console.log(`[Nav] Opened "${menuLabel}" tab in ${side} panel via menu ✓`);
+    console.log(
+        `[Nav] Injected "${tabType}" tab into ${side} panel via state ✓`,
+    );
 }
 
 /**
