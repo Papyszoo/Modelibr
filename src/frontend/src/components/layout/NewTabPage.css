@@ -474,17 +474,9 @@
 
 .newtab-session-tooltip-grid {
   display: grid;
-  grid-template-columns: minmax(140px, 1fr) auto minmax(140px, 1fr);
-  gap: 0.75rem;
+  grid-template-columns: minmax(140px, 1fr) minmax(140px, 1fr);
+  column-gap: 1.25rem;
   align-items: start;
-}
-
-.newtab-session-tooltip-grid::before {
-  content: '';
-  grid-column: 2;
-  align-self: stretch;
-  width: 1px;
-  background: var(--surface-border);
 }
 
 .newtab-session-tooltip-col {
@@ -494,8 +486,14 @@
   min-width: 0;
 }
 
+.newtab-session-tooltip-col--left {
+  grid-column: 1;
+  border-right: 1px solid var(--surface-border);
+  padding-right: 1.25rem;
+}
+
 .newtab-session-tooltip-col--right {
-  grid-column: 3;
+  grid-column: 2;
 }
 
 .newtab-session-tooltip-heading {
