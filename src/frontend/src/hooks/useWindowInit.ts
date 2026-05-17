@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react'
 
 import {
-  broadcastNavigation,
   getNavigationChannel,
   getWindowId,
   type NavigationBroadcast,
@@ -15,25 +14,31 @@ import {
  *
  * Responsibilities:
  * 1. Generate / recover a stable windowId via sessionStorage.
- * 2. Register the window in the Zustand store (creates default tabs on first visit).
- * 3. Listen for BroadcastChannel messages from other windows.
- * 4. On beforeunload → move the window state to recentlyClosedWindows.
- * 5. Run stale-window garbage collection on mount.
+ * 2. Reclaim a self-archived entry (refresh path) before registering.
+ * 3. Register the window in the Zustand store (default tabs on first visit).
+ * 4. Listen for BroadcastChannel messages from other windows.
+ * 5. On pagehide → move our own window state into recentlyClosedWindows.
+ * 6. Run stale-window garbage collection on mount.
  */
 export function useWindowInit(): string {
   const windowId = getWindowId()
   const windowIdRef = useRef(windowId)
 
   const initWindow = useNavigationStore(s => s.initWindow)
+  const reclaimWindow = useNavigationStore(s => s.reclaimWindow)
   const removeTabFromWindow = useNavigationStore(s => s.removeTabFromWindow)
   const addTabToWindow = useNavigationStore(s => s.addTabToWindow)
   const removeWindow = useNavigationStore(s => s.removeWindow)
   const gcStaleWindows = useNavigationStore(s => s.gcStaleWindows)
   const touchWindow = useNavigationStore(s => s.touchWindow)
 
-  // ── 1. Init & GC on mount ───────────────────────────────────────────
+  // ── 1. Reclaim / Init / GC on mount ─────────────────────────────────
   useEffect(() => {
     const id = windowIdRef.current
+    // If a previous instance of this tab pagehid'd into the archive,
+    // pull its state back out before initWindow runs (initWindow would
+    // otherwise overwrite the archived tabs with a default state).
+    reclaimWindow(id)
     initWindow(id)
     gcStaleWindows()
 
@@ -41,7 +46,7 @@ export function useWindowInit(): string {
     const interval = setInterval(() => touchWindow(id), 5 * 60 * 1000) // every 5 min
 
     return () => clearInterval(interval)
-  }, [initWindow, gcStaleWindows, touchWindow])
+  }, [reclaimWindow, initWindow, gcStaleWindows, touchWindow])
 
   // ── 2. BroadcastChannel listener ────────────────────────────────────
   useEffect(() => {
@@ -64,38 +69,11 @@ export function useWindowInit(): string {
           }
           break
 
-        case 'WINDOW_CLOSED': {
-          // Another window pagehid'd. `pagehide` fires on refresh too, not
-          // just on close — if we archived immediately, refreshing a peer
-          // tab would dump its state into our Sessions strip and the peer
-          // would come back with default tabs. Defer the archive long
-          // enough for any re-init storage event to land, then re-check
-          // the peer's lastActiveAt: if it advanced, peer refreshed and we
-          // skip; otherwise the peer is truly gone and we archive it.
-          if (msg.windowId === id) break
-          const closedId = msg.windowId
-          const snapshotAt =
-            useNavigationStore.getState().activeWindows[closedId]
-              ?.lastActiveAt ?? null
-          window.setTimeout(() => {
-            // Re-read localStorage first — peer pages may have written
-            // their `initWindow` entry that this tab's in-memory store
-            // hasn't picked up yet (persist doesn't sync between tabs).
-            // The storage-event listener below handles this in real time,
-            // but the deferred check has to be defensive.
-            void useNavigationStore.persist.rehydrate()
-            const ws = useNavigationStore.getState().activeWindows[closedId]
-            if (!ws) return
-            // If snapshot was null (we didn't know about the peer at
-            // broadcast time) but we do now: archive — we may have just
-            // learned about its initial state. If the snapshot was
-            // populated and lastActiveAt has advanced: it's a refresh,
-            // skip.
-            if (snapshotAt && ws.lastActiveAt !== snapshotAt) return
-            removeWindow(closedId)
-          }, 1500)
+        case 'WINDOW_CLOSED':
+          // The closing tab archives itself on pagehide and the storage-
+          // event listener below propagates that change to this tab. The
+          // broadcast remains as a hint but doesn't need any action here.
           break
-        }
 
         case 'STATE_SYNC':
           // Another window requests a fresh read — store already synced via
@@ -106,7 +84,7 @@ export function useWindowInit(): string {
 
     channel.addEventListener('message', handler)
     return () => channel.removeEventListener('message', handler)
-  }, [removeTabFromWindow, addTabToWindow, removeWindow])
+  }, [removeTabFromWindow, addTabToWindow])
 
   // ── 2b. Cross-tab localStorage sync ─────────────────────────────────
   //
@@ -126,28 +104,31 @@ export function useWindowInit(): string {
     return () => window.removeEventListener('storage', onStorage)
   }, [])
 
-  // ── 3. pagehide → archive window (only on actual tab close) ──────────
-  // NOTE: We intentionally do NOT use 'beforeunload' here because it fires
-  // on page refresh as well, which would archive the window state and
-  // destroy tab persistence. The GC (STALE_WINDOW_MS = 24h) handles
-  // cleaning up abandoned windows instead. We only archive on pagehide
-  // when the page is being truly discarded (not entering bfcache).
+  // ── 3. pagehide → self-archive into recentlyClosedWindows ───────────
+  //
+  // `pagehide` fires on both refresh and close (with `event.persisted`
+  // false for "truly discarded", true for bfcache). We archive ourselves
+  // unconditionally on non-persisted unloads — that's the only way the
+  // "last open window closes" case can survive, because there's no peer
+  // tab to do the archive for us.
+  //
+  // Refresh isn't broken by this because the next mount will call
+  // `reclaimWindow(id)` BEFORE `initWindow(id)`: when the same windowId
+  // (preserved by sessionStorage) comes back, we pull our state out of
+  // the archive and back into activeWindows. If the same windowId does
+  // NOT come back (real close), the entry stays in recentlyClosedWindows
+  // and shows up in the Sessions strip the next time any tab opens.
   useEffect(() => {
     const id = windowIdRef.current
 
     const handlePageHide = (event: PageTransitionEvent) => {
-      // event.persisted === true means the page MAY be restored from bfcache.
-      // We skip cleanup in that case. For genuine closes, persisted is false,
-      // but so is a normal refresh. Since we cannot distinguish close from
-      // refresh, we let GC handle stale windows and only broadcast the event.
-      if (!event.persisted) {
-        broadcastNavigation({ type: 'WINDOW_CLOSED', windowId: id })
-      }
+      if (event.persisted) return
+      removeWindow(id)
     }
 
     window.addEventListener('pagehide', handlePageHide)
     return () => window.removeEventListener('pagehide', handlePageHide)
-  }, [])
+  }, [removeWindow])
 
   return windowId
 }

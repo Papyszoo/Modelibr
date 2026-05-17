@@ -53,6 +53,14 @@ export interface NavigationStore {
   // ── Actions: window lifecycle ──────────────────────────────────────
   initWindow: (windowId: string) => void
   removeWindow: (windowId: string) => void
+  /**
+   * Promote a pending-archive entry for `windowId` back into
+   * `activeWindows`. Used on mount when the same `windowId` shows up
+   * again (refresh case): we self-archived on the previous pagehide,
+   * and now we want to restore that state rather than start fresh.
+   * No-op if there is no matching entry.
+   */
+  reclaimWindow: (windowId: string) => void
   touchWindow: (windowId: string) => void
 
   // ── Actions: tab management ────────────────────────────────────────
@@ -321,16 +329,40 @@ export const useNavigationStore = create<NavigationStore>()(
           const { [windowId]: _, ...rest } = state.activeWindows
           return {
             activeWindows: rest,
+            // Drop any pre-existing archive for the same windowId so a
+            // tab repeatedly self-archiving on pagehide doesn't pile
+            // duplicates into recentlyClosedWindows.
             recentlyClosedWindows: [
               {
                 closedAt: new Date().toISOString(),
                 windowId,
                 state: windowState,
               },
-              ...state.recentlyClosedWindows,
+              ...state.recentlyClosedWindows.filter(
+                e => e.windowId !== windowId
+              ),
             ].slice(0, MAX_RECENTLY_CLOSED_WINDOWS),
           }
         })
+      },
+
+      reclaimWindow: (windowId: string) => {
+        const archived = get().recentlyClosedWindows.find(
+          e => e.windowId === windowId
+        )
+        if (!archived) return
+        set(state => ({
+          activeWindows: {
+            ...state.activeWindows,
+            [windowId]: {
+              ...archived.state,
+              lastActiveAt: new Date().toISOString(),
+            },
+          },
+          recentlyClosedWindows: state.recentlyClosedWindows.filter(
+            e => e.windowId !== windowId
+          ),
+        }))
       },
 
       touchWindow: (windowId: string) => {
