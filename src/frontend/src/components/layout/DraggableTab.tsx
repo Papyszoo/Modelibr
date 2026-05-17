@@ -1,7 +1,7 @@
 import './DraggableTab.css'
 
 import { Tooltip } from 'primereact/tooltip'
-import type { JSX } from 'react'
+import { type JSX, useRef } from 'react'
 
 import { getWindowId } from '@/stores/navigationStore'
 import { type Tab } from '@/types'
@@ -122,6 +122,17 @@ export function DraggableTab({
   onDragEnd,
   tooltipPosition = 'right',
 }: DraggableTabProps): JSX.Element {
+  const tabRef = useRef<HTMLDivElement | null>(null)
+
+  // PrimeReact's Tooltip hides via a `mouseleave` listener on the target. If
+  // the target is removed from the DOM mid-show (close click while hovered),
+  // mouseleave never fires and the portaled tooltip element is orphaned on
+  // <body>. Dispatching mouseleave synchronously before unmount lets the
+  // tooltip's hide path run in the same React batch as the tab removal.
+  const dismissTooltip = (): void => {
+    tabRef.current?.dispatchEvent(new MouseEvent('mouseleave'))
+  }
+
   const handleDragStart = (e: React.DragEvent): void => {
     e.dataTransfer.effectAllowed = 'move'
     // Legacy plain text for intra-window drags
@@ -147,6 +158,7 @@ export function DraggableTab({
 
   const handleCloseClick = (e: React.MouseEvent): void => {
     e.stopPropagation() // Prevent tab selection when clicking close
+    dismissTooltip()
     onClose()
   }
 
@@ -158,6 +170,7 @@ export function DraggableTab({
     if (e.button === 1) {
       e.preventDefault() // Prevent default middle button behavior (e.g., auto-scroll)
       e.stopPropagation() // Prevent tab selection when closing
+      dismissTooltip()
       onClose()
     }
   }
@@ -172,6 +185,7 @@ export function DraggableTab({
         hideDelay={0}
       />
       <div
+        ref={tabRef}
         id={tooltipId}
         className={`draggable-tab ${isActive ? 'active' : ''}`}
         draggable
