@@ -760,13 +760,12 @@ function SessionsGrid({
               showDelay={120}
               hideDelay={0}
               className="newtab-session-tooltip"
-              content={
-                <div className="newtab-session-tooltip-grid">
-                  <SessionTooltipColumn side="left" tabs={left} />
-                  <SessionTooltipColumn side="right" tabs={right} />
-                </div>
-              }
-            />
+            >
+              <div className="newtab-session-tooltip-grid">
+                <SessionTooltipColumn side="left" tabs={left} />
+                <SessionTooltipColumn side="right" tabs={right} />
+              </div>
+            </Tooltip>
             <button
               id={targetId}
               type="button"
