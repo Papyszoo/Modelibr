@@ -8,6 +8,9 @@ import {
   useNavigationStore,
 } from '@/stores/navigationStore'
 
+const STORAGE_KEY = 'modelibr_navigation'
+const MAX_RECENTLY_CLOSED_WINDOWS = 5
+
 /**
  * Read the persisted navigation state directly from localStorage and
  * push it into the in-memory Zustand store. Used by both the storage
@@ -18,7 +21,7 @@ import {
  */
 function syncFromLocalStorage(): void {
   try {
-    const raw = localStorage.getItem('modelibr_navigation')
+    const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return
     const parsed = JSON.parse(raw) as {
       state?: {
@@ -37,6 +40,59 @@ function syncFromLocalStorage(): void {
       recentlyClosedWindows: (persisted.recentlyClosedWindows ??
         []) as State['recentlyClosedWindows'],
     })
+  } catch {
+    /* malformed payload — ignore */
+  }
+}
+
+/**
+ * Archive the current window's state directly via localStorage,
+ * bypassing the Zustand persist middleware. We do this on `pagehide`
+ * for two reasons:
+ *
+ *   1. localStorage is the freshest source of truth — a peer tab (or
+ *      an e2e test fixture) may have written to it after our in-memory
+ *      Zustand snapshot was last refreshed. Archiving from the
+ *      in-memory snapshot would clobber those writes.
+ *   2. The write must be synchronous so it commits before the tab is
+ *      destroyed. Going through Zustand here would risk persist
+ *      middleware queuing the write past the pagehide window.
+ */
+function archiveSelfDirectly(windowId: string): void {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    const parsed: {
+      state?: {
+        activeWindows?: Record<string, unknown>
+        recentlyClosedTabs?: unknown[]
+        recentlyClosedWindows?: Array<{ windowId?: string } & unknown>
+      }
+      version?: number
+    } = raw ? JSON.parse(raw) : { state: {}, version: 0 }
+    const persisted = parsed.state ?? {}
+    const activeWindows = { ...(persisted.activeWindows ?? {}) } as Record<
+      string,
+      unknown
+    >
+    const windowState = activeWindows[windowId]
+    if (!windowState) return
+    delete activeWindows[windowId]
+    const priorClosed = (persisted.recentlyClosedWindows ?? []).filter(
+      e => e?.windowId !== windowId
+    )
+    parsed.state = {
+      ...persisted,
+      activeWindows,
+      recentlyClosedWindows: [
+        {
+          closedAt: new Date().toISOString(),
+          windowId,
+          state: windowState,
+        },
+        ...priorClosed,
+      ].slice(0, MAX_RECENTLY_CLOSED_WINDOWS),
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed))
   } catch {
     /* malformed payload — ignore */
   }
@@ -63,7 +119,6 @@ export function useWindowInit(): string {
   const reclaimWindow = useNavigationStore(s => s.reclaimWindow)
   const removeTabFromWindow = useNavigationStore(s => s.removeTabFromWindow)
   const addTabToWindow = useNavigationStore(s => s.addTabToWindow)
-  const removeWindow = useNavigationStore(s => s.removeWindow)
   const gcStaleWindows = useNavigationStore(s => s.gcStaleWindows)
   const touchWindow = useNavigationStore(s => s.touchWindow)
 
@@ -165,9 +220,11 @@ export function useWindowInit(): string {
 
     const handlePageHide = (event: PageTransitionEvent) => {
       if (event.persisted) return
-      // 1. Self-archive into recentlyClosedWindows via localStorage so
-      //    the data survives even when nobody is listening.
-      removeWindow(id)
+      // 1. Self-archive directly via localStorage — reading the freshest
+      //    persisted value (which may have been touched by a peer tab or
+      //    a test fixture out-of-band) and writing back synchronously
+      //    before the browser kills us.
+      archiveSelfDirectly(id)
       // 2. Broadcast a hint. Other tabs already get the `storage` event
       //    when we write above, but `storage` delivery during page
       //    unload has been observed to drop in Chromium; the broadcast
@@ -177,7 +234,7 @@ export function useWindowInit(): string {
 
     window.addEventListener('pagehide', handlePageHide)
     return () => window.removeEventListener('pagehide', handlePageHide)
-  }, [removeWindow])
+  }, [])
 
   return windowId
 }
