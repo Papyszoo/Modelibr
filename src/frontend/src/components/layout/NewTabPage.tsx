@@ -316,20 +316,6 @@ export function NewTabPage({ tabId }: NewTabPageProps): JSX.Element {
           </span>
         </div>
 
-        {recents.length > 0 && (
-          <section
-            className="newtab-section"
-            data-testid="newtab-recents-section"
-          >
-            <h2 className="newtab-section-tag">Recently Closed</h2>
-            <RecentlyClosedGrid
-              recents={recents}
-              onReopen={handleReopenRecent}
-              onDismiss={handleDismissRecent}
-            />
-          </section>
-        )}
-
         {filtered.length === 0 && recents.length === 0 ? (
           <div className="newtab-empty">
             <i className="pi pi-search" aria-hidden="true" />
@@ -351,6 +337,20 @@ export function NewTabPage({ tabId }: NewTabPageProps): JSX.Element {
               </section>
             )
           })
+        )}
+
+        {recents.length > 0 && (
+          <section
+            className="newtab-section newtab-section--recents"
+            data-testid="newtab-recents-section"
+          >
+            <h2 className="newtab-section-tag">Recently Closed</h2>
+            <RecentlyClosedGrid
+              recents={recents}
+              onReopen={handleReopenRecent}
+              onDismiss={handleDismissRecent}
+            />
+          </section>
         )}
       </div>
     </div>

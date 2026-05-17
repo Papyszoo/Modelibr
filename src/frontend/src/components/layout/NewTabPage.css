@@ -19,6 +19,10 @@
   max-width: 1080px;
   margin: 0 auto;
   padding: 1.5rem 1.75rem 2.5rem;
+  /* Stretch to fill the page so .newtab-section--recents (with margin-top:
+   * auto) can pin to the visual bottom when the content is shorter than
+   * the viewport. */
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
@@ -249,17 +253,46 @@
 
 /* ── Recently closed ──────────────────────────────────────────────────── */
 
+/* Section sits at the bottom of the page and acts as a single horizontal
+ * strip — when there are more entries than fit, the row scrolls sideways
+ * rather than wrapping into a tall block that pushes the asset tiles up. */
+.newtab-section--recents {
+  margin-top: auto;
+}
+
 .newtab-recents {
   margin: 0;
-  padding: 0;
+  padding: 0 0 0.25rem;
   list-style: none;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
+  display: flex;
+  flex-wrap: nowrap;
   gap: 0.4rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+  scrollbar-color: var(--surface-border) transparent;
+}
+
+.newtab-recents::-webkit-scrollbar {
+  height: 6px;
+}
+
+.newtab-recents::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.newtab-recents::-webkit-scrollbar-thumb {
+  background: var(--surface-border);
+  border-radius: 999px;
 }
 
 .newtab-recent {
   position: relative;
+  flex: 0 0 auto;
+  width: 240px;
+  max-width: 80%;
+  scroll-snap-align: start;
   display: flex;
   align-items: stretch;
   background: var(--surface-card);
