@@ -95,7 +95,7 @@ const TILES: Tile[] = [
     group: 'assets',
     icon: 'pi-th-large',
     label: 'Stages',
-    description: 'Scene compositions — coming soon.',
+    description: 'Scene compositions — under rework.',
     targetType: 'stageList',
     targetLabel: 'Stages',
     disabled: true,
@@ -375,14 +375,16 @@ function NewTabGrid({ tiles, onPick }: NewTabGridProps): JSX.Element {
           onClick={() => onPick(tile)}
           disabled={tile.disabled}
           aria-disabled={tile.disabled || undefined}
-          title={tile.disabled ? `${tile.label} — coming soon` : tile.label}
+          title={tile.disabled ? `${tile.label} — reworking` : tile.label}
         >
           <div className="newtab-tile-head">
             <span className="newtab-tile-icon" aria-hidden="true">
               <i className={`pi ${tile.icon}`} />
             </span>
             <h3 className="newtab-tile-title">{tile.label}</h3>
-            {tile.disabled && <span className="newtab-tile-soon">Soon</span>}
+            {tile.disabled && (
+              <span className="newtab-tile-soon">Reworking</span>
+            )}
           </div>
           <p className="newtab-tile-desc">{tile.description}</p>
         </button>
