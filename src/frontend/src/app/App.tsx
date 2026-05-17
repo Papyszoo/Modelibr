@@ -1,6 +1,7 @@
 import './App.css'
 
 import { NuqsAdapter } from 'nuqs/adapters/react'
+import { ConfirmDialog } from 'primereact/confirmdialog'
 import { type JSX, useEffect } from 'react'
 
 import { DemoBanner } from '@/components/DemoBanner'
@@ -43,6 +44,7 @@ function App(): JSX.Element {
     <NuqsAdapter>
       <AppShell />
       <UploadProgressWindow />
+      <ConfirmDialog />
       {isDemo && <DemoBanner />}
     </NuqsAdapter>
   )

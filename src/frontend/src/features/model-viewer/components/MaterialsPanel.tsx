@@ -2,7 +2,7 @@ import './MaterialsPanel.css'
 
 import { Badge } from 'primereact/badge'
 import { Button } from 'primereact/button'
-import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog'
+import { confirmDialog } from 'primereact/confirmdialog'
 import { Dropdown } from 'primereact/dropdown'
 import { InputText } from 'primereact/inputtext'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -311,8 +311,6 @@ export function MaterialsPanel({
 
   return (
     <div className="materials-panel" data-testid="materials-panel">
-      <ConfirmDialog />
-
       {/* Preset selector — always visible */}
       <div className="materials-variant-section">
         <label className="materials-variant-label">Preset</label>

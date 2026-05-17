@@ -2,7 +2,7 @@ import './SoundList.css'
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Button } from 'primereact/button'
-import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog'
+import { confirmDialog } from 'primereact/confirmdialog'
 import { type ContextMenu } from 'primereact/contextmenu'
 import { Dialog } from 'primereact/dialog'
 import { ProgressSpinner } from 'primereact/progressspinner'
@@ -490,7 +490,6 @@ export function SoundList() {
       onDragLeave={onDragLeave}
     >
       <Toast ref={toast} />
-      <ConfirmDialog />
       <SoundContextMenu
         contextMenuRef={contextMenuRef}
         selectedCount={selectedSoundIds.size}
