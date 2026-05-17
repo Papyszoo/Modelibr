@@ -68,21 +68,30 @@ export function useWindowInit(): string {
           // Another window pagehid'd. `pagehide` fires on refresh too, not
           // just on close — if we archived immediately, refreshing a peer
           // tab would dump its state into our Sessions strip and the peer
-          // would come back with default tabs. Defer the archive and verify
-          // afterwards that the window hasn't been re-touched by a fresh
-          // init / heartbeat. BroadcastChannel doesn't deliver to the
-          // sender; guard regardless in case of cross-runtime duplicates.
+          // would come back with default tabs. Defer the archive long
+          // enough for any re-init storage event to land, then re-check
+          // the peer's lastActiveAt: if it advanced, peer refreshed and we
+          // skip; otherwise the peer is truly gone and we archive it.
           if (msg.windowId === id) break
           const closedId = msg.windowId
           const snapshotAt =
             useNavigationStore.getState().activeWindows[closedId]
               ?.lastActiveAt ?? null
           window.setTimeout(() => {
+            // Re-read localStorage first — peer pages may have written
+            // their `initWindow` entry that this tab's in-memory store
+            // hasn't picked up yet (persist doesn't sync between tabs).
+            // The storage-event listener below handles this in real time,
+            // but the deferred check has to be defensive.
+            void useNavigationStore.persist.rehydrate()
             const ws = useNavigationStore.getState().activeWindows[closedId]
-            // Skip if the window disappeared (already archived) OR was
-            // re-initialised (lastActiveAt has moved forward — a refresh).
             if (!ws) return
-            if (ws.lastActiveAt !== snapshotAt) return
+            // If snapshot was null (we didn't know about the peer at
+            // broadcast time) but we do now: archive — we may have just
+            // learned about its initial state. If the snapshot was
+            // populated and lastActiveAt has advanced: it's a refresh,
+            // skip.
+            if (snapshotAt && ws.lastActiveAt !== snapshotAt) return
             removeWindow(closedId)
           }, 1500)
           break
@@ -98,6 +107,24 @@ export function useWindowInit(): string {
     channel.addEventListener('message', handler)
     return () => channel.removeEventListener('message', handler)
   }, [removeTabFromWindow, addTabToWindow, removeWindow])
+
+  // ── 2b. Cross-tab localStorage sync ─────────────────────────────────
+  //
+  // Zustand `persist` writes to localStorage on every action but doesn't
+  // pick up changes a peer browser tab makes. Without this listener, this
+  // tab's in-memory `activeWindows` is forever a snapshot from mount and
+  // we'd never learn that peer tab B exists — making the WINDOW_CLOSED
+  // handler unable to archive it. The `storage` event fires only when
+  // *another* tab modifies localStorage (not when this tab does), so
+  // calling `rehydrate()` here doesn't loop on our own writes.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== 'modelibr_navigation') return
+      void useNavigationStore.persist.rehydrate()
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [])
 
   // ── 3. pagehide → archive window (only on actual tab close) ──────────
   // NOTE: We intentionally do NOT use 'beforeunload' here because it fires
