@@ -297,6 +297,15 @@ export const useNavigationStore = create<NavigationStore>()(
       },
 
       removeWindow: (windowId: string) => {
+        // Early-out BEFORE `set` runs. Zustand `persist` writes on every
+        // `set` call regardless of whether the state actually changed, so
+        // a no-op archive (the windowId isn't in our in-memory state —
+        // which happens when a peer browser tab closes and we never saw
+        // its `initWindow` write) would otherwise clobber peer-written
+        // localStorage entries (e.g. a manually archived session). See
+        // tests/e2e/features/02-dock-system/05-sessions.feature.
+        if (!get().activeWindows[windowId]) return
+
         set(state => {
           const windowState = state.activeWindows[windowId]
           if (!windowState) return state
