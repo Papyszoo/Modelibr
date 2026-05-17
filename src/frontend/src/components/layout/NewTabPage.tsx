@@ -5,6 +5,7 @@ import {
   type JSX,
   type RefObject,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -255,20 +256,14 @@ export function NewTabPage({ tabId }: NewTabPageProps): JSX.Element {
   }, [recentlyClosedTabs, tabs, tabId, q])
 
   // Sessions: every archived window state that isn't this browser tab's own.
-  // Current-window guard is defensive — recentlyClosedWindows is only meant
-  // to hold *other* windows, but if a stale GC ever caught the current
-  // window we don't want it appearing in its own restore list.
+  // `recentlyClosedWindows` is only meant to hold *other* windows but the
+  // 24h GC or a buggy archive path could land the current one in here, so
+  // we filter by the entry's recorded `windowId` (added at archive time).
   const sessions = useMemo(() => {
     const currentId = getWindowId()
     return recentlyClosedWindows
-      .filter(entry => {
-        const isCurrent = entry.state.tabs.some(
-          t => t.params?.windowId === currentId
-        )
-        if (isCurrent) return false
-        if (entry.state.tabs.length === 0) return false
-        return true
-      })
+      .filter(entry => entry.windowId !== currentId)
+      .filter(entry => entry.state.tabs.length > 0)
       .filter(entry => {
         if (!q) return true
         return entry.state.tabs.some(t =>
@@ -337,14 +332,14 @@ export function NewTabPage({ tabId }: NewTabPageProps): JSX.Element {
     removeRecentlyClosedTab(closed.id)
   }
 
-  const handleRestoreSession = (
-    entry: ClosedWindowEntry,
-    index: number
-  ): void => {
+  const handleRestoreSession = (entry: ClosedWindowEntry): void => {
     // Drop the host newTab placeholder up front, then ask the store to
     // merge each session tab into the current window. `openTab` dedups by
     // id and routes panel='right' tabs to the right active list, so the
-    // merge respects both sides.
+    // merge respects both sides. The original session's `activeTabId` /
+    // `activeRightTabId` are intentionally NOT reapplied — the last tab
+    // inserted on each side ends up active, which matches how merging
+    // tabs from another browser window works in most editors.
     const remaining = tabs.filter(t => t.id !== tabId)
     setTabs(remaining)
 
@@ -356,16 +351,15 @@ export function NewTabPage({ tabId }: NewTabPageProps): JSX.Element {
       openTabAction(currentWindowId, side, tab)
     }
 
-    removeClosedWindow(index)
+    removeClosedWindow({ closedAt: entry.closedAt, windowId: entry.windowId })
   }
 
   const handleDismissSession = (
-    _entry: ClosedWindowEntry,
-    index: number,
+    entry: ClosedWindowEntry,
     e: React.MouseEvent<HTMLButtonElement>
   ): void => {
     e.stopPropagation()
-    removeClosedWindow(index)
+    removeClosedWindow({ closedAt: entry.closedAt, windowId: entry.windowId })
   }
 
   return (
@@ -660,10 +654,9 @@ function RecentlyClosedGrid({
 
 interface SessionsGridProps {
   sessions: ClosedWindowEntry[]
-  onRestore: (entry: ClosedWindowEntry, index: number) => void
+  onRestore: (entry: ClosedWindowEntry) => void
   onDismiss: (
     entry: ClosedWindowEntry,
-    index: number,
     e: React.MouseEvent<HTMLButtonElement>
   ) => void
 }
@@ -728,11 +721,13 @@ function SessionsGrid({
   const state = useHorizontalScrollStrip(listRef, sessions.length)
   // Each session needs a unique DOM target the PrimeReact tooltip can bind
   // to. The tooltip renders in a portal so it isn't clipped by the strip's
-  // overflow:auto.
-  const tooltipIdPrefix = useMemo(
-    () => `newtab-session-tt-${Math.random().toString(36).slice(2, 8)}`,
-    []
-  )
+  // overflow:auto. `useId` returns a stable, collision-free id per
+  // component instance — important when several NewTabPage panels render
+  // simultaneously.
+  const tooltipIdBase = useId()
+  // CSS.escape the colons React injects into useId() output so the
+  // resulting `target=` selector parses cleanly.
+  const tooltipIdPrefix = `newtab-session-tt-${tooltipIdBase.replace(/:/g, '')}`
 
   return (
     <StripFrame
@@ -742,15 +737,16 @@ function SessionsGrid({
     >
       {sessions.map((entry, index) => {
         const { left, right } = splitTabsByPanel(entry.state.tabs)
+        // The entry key (closedAt + windowId) is the store identity; the
+        // tooltip target also uses it so the tooltip stays bound to the
+        // right card across re-orders / filtering.
+        const entryKey = `${entry.closedAt}-${entry.windowId}`
         const targetId = `${tooltipIdPrefix}-${index}`
         const ariaSummary =
           `Left (${left.length}): ${tabTitlesPreview(left)}` +
           ` | Right (${right.length}): ${tabTitlesPreview(right)}`
         return (
-          <li
-            key={`${entry.closedAt}-${index}`}
-            className="newtab-recent newtab-session"
-          >
+          <li key={entryKey} className="newtab-recent newtab-session">
             <Tooltip
               target={`#${CSS.escape(targetId)}`}
               position="top"
@@ -767,7 +763,7 @@ function SessionsGrid({
               id={targetId}
               type="button"
               className="newtab-recent-row newtab-session-row"
-              onClick={() => onRestore(entry, index)}
+              onClick={() => onRestore(entry)}
               aria-label={`Restore session — ${ariaSummary}`}
             >
               <span
@@ -788,7 +784,7 @@ function SessionsGrid({
             <button
               type="button"
               className="newtab-recent-dismiss"
-              onClick={e => onDismiss(entry, index, e)}
+              onClick={e => onDismiss(entry, e)}
               aria-label="Remove session from list"
               title="Remove from sessions"
             >

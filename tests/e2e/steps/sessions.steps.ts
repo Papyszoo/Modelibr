@@ -48,10 +48,11 @@ async function archiveSession(
         leftTabs?: Array<Record<string, unknown>>;
         rightTabs?: Array<Record<string, unknown>>;
         closedAt?: string;
+        windowId?: string;
     },
 ): Promise<void> {
     await page.evaluate(
-        ({ storageKey, leftTabs, rightTabs, closedAt }) => {
+        ({ storageKey, leftTabs, rightTabs, closedAt, windowId }) => {
             const raw = localStorage.getItem(storageKey);
             const parsed = raw
                 ? JSON.parse(raw)
@@ -67,6 +68,7 @@ async function archiveSession(
             const tabs = [...leftTabs, ...rightTabs];
             const entry = {
                 closedAt,
+                windowId,
                 state: {
                     tabs,
                     activeTabId: tabs[0]?.id ?? null,
@@ -91,6 +93,9 @@ async function archiveSession(
             leftTabs: options.leftTabs ?? [],
             rightTabs: options.rightTabs ?? [],
             closedAt: options.closedAt ?? new Date().toISOString(),
+            windowId:
+                options.windowId ??
+                `archived-${Math.random().toString(36).slice(2, 10)}`,
         },
     );
 }
@@ -115,36 +120,57 @@ Given(
     },
 );
 
+// The peer page is shared between two steps (`Given` opens it, the
+// later `When` drives + closes it). We carry it on the `page` object's
+// owning context so a failure between the two steps doesn't leak a
+// browser tab into the next scenario — `context.close()` (fired by the
+// Playwright fixture teardown) reaps any still-open peer.
+function attachPeer(page: Page, peer: Page): void {
+    (page as unknown as { __peer__: Page | null }).__peer__ = peer;
+}
+function takePeer(page: Page): Page | null {
+    const slot = page as unknown as { __peer__: Page | null };
+    const peer = slot.__peer__ ?? null;
+    slot.__peer__ = null;
+    return peer;
+}
+
 Given("a second browser page is opened", async ({ context, page }) => {
-    // Open a peer page in the same browser context so localStorage is
-    // shared. We deliberately keep a handle on it via the global so a later
-    // step can drive it before this scope ends.
     const peer = await context.newPage();
     await peer.goto(page.url());
     await peer.waitForSelector(".p-splitter", {
         state: "visible",
         timeout: 15000,
     });
-    // Hand the peer back through page-locals so the next step can find it.
-    (page as unknown as { __peer__: Page }).__peer__ = peer;
+    attachPeer(page, peer);
 });
 
 When(
     'the second page archives an extra session "peer" with 1 left tab',
     async ({ page }) => {
-        const peer = (page as unknown as { __peer__: Page }).__peer__;
-        await archiveSession(peer, {
-            leftTabs: [
-                {
-                    id: "history",
-                    type: "history",
-                    label: "Upload History",
-                    params: {},
-                    internalUiState: {},
-                },
-            ],
-        });
-        await peer.close();
+        const peer = takePeer(page);
+        if (!peer) {
+            throw new Error("No peer page attached — did the prior step run?");
+        }
+        try {
+            await archiveSession(peer, {
+                leftTabs: [
+                    {
+                        id: "history",
+                        type: "history",
+                        label: "Upload History",
+                        params: {},
+                        internalUiState: {},
+                    },
+                ],
+            });
+        } finally {
+            // Always close the peer — even if archiveSession throws — so
+            // the test context isn't left holding an extra tab.
+            if (!peer.isClosed()) {
+                await peer.close();
+            }
+        }
     },
 );
 
@@ -236,26 +262,28 @@ Then(
     },
 );
 
+// Accepts both the "1 session card" and "N session cards" wordings —
+// playwright-bdd parses `{int}` and uses a single matcher with a regex
+// suffix is awkward, so the simplest portable solution is one impl
+// hooked to both phrasings.
+async function expectSessionCardCount(
+    page: Page,
+    expected: number,
+): Promise<void> {
+    const section = page.locator('[data-testid="newtab-sessions-section"]');
+    await expect(section).toBeVisible({ timeout: 5000 });
+    const cards = section.locator('button[aria-label^="Restore session"]');
+    await expect(cards).toHaveCount(expected, { timeout: 5000 });
+}
+
 Then(
     "exactly {int} session card should be present",
-    async ({ page }, expected: number) => {
-        const section = page.locator(
-            '[data-testid="newtab-sessions-section"]',
-        );
-        await expect(section).toBeVisible({ timeout: 5000 });
-        const cards = section.locator('button[aria-label^="Restore session"]');
-        await expect(cards).toHaveCount(expected, { timeout: 5000 });
-    },
+    async ({ page }, expected: number) =>
+        expectSessionCardCount(page, expected),
 );
 
 Then(
     "exactly {int} session cards should be present",
-    async ({ page }, expected: number) => {
-        const section = page.locator(
-            '[data-testid="newtab-sessions-section"]',
-        );
-        await expect(section).toBeVisible({ timeout: 5000 });
-        const cards = section.locator('button[aria-label^="Restore session"]');
-        await expect(cards).toHaveCount(expected, { timeout: 5000 });
-    },
+    async ({ page }, expected: number) =>
+        expectSessionCardCount(page, expected),
 );

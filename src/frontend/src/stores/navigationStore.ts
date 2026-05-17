@@ -26,6 +26,9 @@ export interface WindowState {
 
 export interface ClosedWindowEntry {
   closedAt: string
+  /** The windowId the entry was archived from. Lets consumers identify
+   *  and de-dup their own window from the Sessions list. */
+  windowId: string
   state: WindowState
 }
 
@@ -72,8 +75,13 @@ export interface NavigationStore {
   addRecentlyClosedTab: (tab: Tab) => void
   removeRecentlyClosedTab: (tabId: string) => void
   restoreWindow: (index: number, windowId: string) => void
-  /** Discard one closed-window entry by index without restoring it. */
-  removeClosedWindow: (index: number) => void
+  /**
+   * Discard one closed-window entry without restoring it. Identified by
+   * the `closedAt` ISO timestamp + originating `windowId`, since UI
+   * consumers commonly filter/sort the array and a positional index
+   * would alias the wrong entry.
+   */
+  removeClosedWindow: (key: { closedAt: string; windowId: string }) => void
 
   // ── Actions: internal UI state per tab ─────────────────────────────
   setTabUiState: (
@@ -314,7 +322,11 @@ export const useNavigationStore = create<NavigationStore>()(
           return {
             activeWindows: rest,
             recentlyClosedWindows: [
-              { closedAt: new Date().toISOString(), state: windowState },
+              {
+                closedAt: new Date().toISOString(),
+                windowId,
+                state: windowState,
+              },
               ...state.recentlyClosedWindows,
             ].slice(0, MAX_RECENTLY_CLOSED_WINDOWS),
           }
@@ -604,15 +616,16 @@ export const useNavigationStore = create<NavigationStore>()(
         })
       },
 
-      removeClosedWindow: index => {
-        set(state => {
-          if (!state.recentlyClosedWindows[index]) return state
-          return {
-            recentlyClosedWindows: state.recentlyClosedWindows.filter(
-              (_, i) => i !== index
-            ),
-          }
-        })
+      removeClosedWindow: ({ closedAt, windowId }) => {
+        const found = get().recentlyClosedWindows.some(
+          e => e.closedAt === closedAt && e.windowId === windowId
+        )
+        if (!found) return
+        set(state => ({
+          recentlyClosedWindows: state.recentlyClosedWindows.filter(
+            e => !(e.closedAt === closedAt && e.windowId === windowId)
+          ),
+        }))
       },
 
       // ── Tab internal UI state ───────────────────────────────────────
@@ -676,6 +689,7 @@ export const useNavigationStore = create<NavigationStore>()(
               stale.push(id)
               movedToRecent.push({
                 closedAt: new Date().toISOString(),
+                windowId: id,
                 state: ws,
               })
             }
