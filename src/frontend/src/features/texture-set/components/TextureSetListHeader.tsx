@@ -5,12 +5,18 @@ interface TextureSetListHeaderProps {
   setCount: number
   onCreateSet: () => void
   onFilesSelected?: (files: FileList) => void
+  /** Overrides the default "Texture Sets" page title. */
+  title?: string
+  /** Noun used in the count line. Singular form; "s" is appended when count !== 1. */
+  unitLabel?: string
 }
 
 export function TextureSetListHeader({
   setCount,
   onCreateSet,
   onFilesSelected,
+  title = 'Texture Sets',
+  unitLabel = 'set',
 }: TextureSetListHeaderProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -29,11 +35,12 @@ export function TextureSetListHeader({
   return (
     <header className="texture-set-list-header">
       <div className="header-content">
-        <h1>Texture Sets</h1>
+        <h1>{title}</h1>
         <div className="texture-set-stats">
           <span className="stat-item">
             <i className="pi pi-palette"></i>
-            {setCount} set{setCount !== 1 ? 's' : ''}
+            {setCount} {unitLabel}
+            {setCount !== 1 ? 's' : ''}
           </span>
         </div>
       </div>

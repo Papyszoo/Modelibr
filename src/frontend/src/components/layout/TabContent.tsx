@@ -2,11 +2,12 @@ import './TabContent.css'
 
 import { type JSX, lazy, Suspense } from 'react'
 
+import { NewTabPage } from '@/components/layout/NewTabPage'
 import { Settings } from '@/components/tabs/Settings'
 import { History } from '@/features/history'
 import { ModelList } from '@/features/models'
 import { useTabContext } from '@/hooks/useTabContext'
-import { type Tab } from '@/types'
+import { type Tab, TextureSetKind } from '@/types'
 
 const ModelViewer = lazy(() =>
   import('@/features/model-viewer').then(module => ({
@@ -97,6 +98,9 @@ export function TabContent({ tab }: TabContentProps): JSX.Element {
 
   const renderContent = (): JSX.Element => {
     switch (tab.type) {
+      case 'newTab':
+        return <NewTabPage tabId={tab.id} />
+
       case 'modelList':
         return <ModelList isTabContent={true} tabId={tab.id} />
 
@@ -113,6 +117,12 @@ export function TabContent({ tab }: TabContentProps): JSX.Element {
 
       case 'textureSets':
         return <TextureSetList />
+
+      case 'globalMaterials':
+        return <TextureSetList kind={TextureSetKind.Universal} />
+
+      case 'modelTextures':
+        return <TextureSetList kind={TextureSetKind.ModelSpecific} />
 
       case 'textureSetViewer':
         if (!tab.setId) {

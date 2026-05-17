@@ -1,27 +1,28 @@
 import { ContextMenu } from 'primereact/contextmenu'
-import { useEffect, useRef } from 'react'
+import { type MenuItem } from 'primereact/menuitem'
+import { useEffect, useMemo, useRef } from 'react'
 
 import { useDockContext } from '@/contexts/DockContext'
-import { useTabMenuItems } from '@/hooks/useTabMenuItems'
 
 import { useDockPanelActions } from './DockPanelActionsContext'
 
 export function DockEmptyState() {
-  const { addTab, reopenTab, onDrop, onDragOver, onDragEnter, onDragLeave } =
+  const { addTab, onDrop, onDragOver, onDragEnter, onDragLeave } =
     useDockPanelActions()
   const contextMenuRef = useRef<ContextMenu>(null)
-  const {
-    recentlyClosedTabs,
-    registerContextMenu,
-    unregisterContextMenu,
-    showContextMenu,
-  } = useDockContext()
+  const { registerContextMenu, unregisterContextMenu, showContextMenu } =
+    useDockContext()
 
-  const addMenuItems = useTabMenuItems({
-    onAddTab: addTab,
-    recentlyClosedTabs,
-    onReopenTab: reopenTab,
-  })
+  const addMenuItems = useMemo<MenuItem[]>(
+    () => [
+      {
+        label: 'New Tab',
+        icon: 'pi pi-plus',
+        command: () => addTab('newTab', 'New Tab'),
+      },
+    ],
+    [addTab]
+  )
 
   useEffect(() => {
     const menu = contextMenuRef.current
@@ -43,6 +44,10 @@ export function DockEmptyState() {
     showContextMenu(contextMenuRef, e)
   }
 
+  const handleClick = (): void => {
+    addTab('newTab', 'New Tab')
+  }
+
   return (
     <div
       className="dock-empty"
@@ -51,10 +56,19 @@ export function DockEmptyState() {
       onDragOver={onDragOver}
       onDragEnter={onDragEnter}
       onDragLeave={onDragLeave}
+      onClick={handleClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          handleClick()
+        }
+      }}
     >
       <i className="pi pi-plus" style={{ fontSize: '3rem' }}></i>
       <h3>No tabs open</h3>
-      <p>Click the + button to add a new tab</p>
+      <p>Click here or the + button to open a new tab</p>
       <ContextMenu
         model={addMenuItems}
         ref={contextMenuRef}
