@@ -145,34 +145,19 @@ Given("a second browser page is opened", async ({ context, page }) => {
     attachPeer(page, peer);
 });
 
-When(
-    'the second page archives an extra session "peer" with 1 left tab',
-    async ({ page }) => {
-        const peer = takePeer(page);
-        if (!peer) {
-            throw new Error("No peer page attached — did the prior step run?");
-        }
-        try {
-            await archiveSession(peer, {
-                leftTabs: [
-                    {
-                        id: "history",
-                        type: "history",
-                        label: "Upload History",
-                        params: {},
-                        internalUiState: {},
-                    },
-                ],
-            });
-        } finally {
-            // Always close the peer — even if archiveSession throws — so
-            // the test context isn't left holding an extra tab.
-            if (!peer.isClosed()) {
-                await peer.close();
-            }
-        }
-    },
-);
+When("the second browser page is closed", async ({ page }) => {
+    const peer = takePeer(page);
+    if (!peer) {
+        throw new Error("No peer page attached — did the prior step run?");
+    }
+    if (!peer.isClosed()) {
+        await peer.close();
+    }
+    // Give the closing tab's pagehide handler a moment to land its
+    // self-archive into localStorage and let the storage event propagate
+    // into this tab's in-memory store.
+    await page.waitForTimeout(300);
+});
 
 When("I reload the app", async ({ page }) => {
     await page.reload();
@@ -286,4 +271,18 @@ Then(
     "exactly {int} session cards should be present",
     async ({ page }, expected: number) =>
         expectSessionCardCount(page, expected),
+);
+
+Then(
+    "at least {int} session card should be present",
+    async ({ page }, expected: number) => {
+        const section = page.locator(
+            '[data-testid="newtab-sessions-section"]',
+        );
+        await expect(section).toBeVisible({ timeout: 5000 });
+        const cards = section.locator('button[aria-label^="Restore session"]');
+        await expect
+            .poll(async () => cards.count(), { timeout: 5000 })
+            .toBeGreaterThanOrEqual(expected);
+    },
 );

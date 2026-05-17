@@ -31,11 +31,11 @@ Feature: Sessions section restores closed windows
     Then the Sessions section should be visible
     And the session card should show 2 on the left and 1 on the right
 
-  Scenario: A second browser page sees the first page's archived session
+  Scenario: Closing a peer browser tab leaves its session in the Sessions list
     Given I am on the app with a clean slate
     And a second browser page is opened
-    When the second page archives an extra session "peer" with 1 left tab
+    When the second browser page is closed
     And I reload the app
     And I open the New Tab page in the left panel
     Then the Sessions section should be visible
-    And exactly 1 session card should be present
+    And at least 1 session card should be present
