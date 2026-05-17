@@ -72,6 +72,8 @@ export interface NavigationStore {
   addRecentlyClosedTab: (tab: Tab) => void
   removeRecentlyClosedTab: (tabId: string) => void
   restoreWindow: (index: number, windowId: string) => void
+  /** Discard one closed-window entry by index without restoring it. */
+  removeClosedWindow: (index: number) => void
 
   // ── Actions: internal UI state per tab ─────────────────────────────
   setTabUiState: (
@@ -586,6 +588,17 @@ export const useNavigationStore = create<NavigationStore>()(
                 lastActiveAt: new Date().toISOString(),
               },
             },
+            recentlyClosedWindows: state.recentlyClosedWindows.filter(
+              (_, i) => i !== index
+            ),
+          }
+        })
+      },
+
+      removeClosedWindow: index => {
+        set(state => {
+          if (!state.recentlyClosedWindows[index]) return state
+          return {
             recentlyClosedWindows: state.recentlyClosedWindows.filter(
               (_, i) => i !== index
             ),

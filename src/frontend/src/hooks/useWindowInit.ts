@@ -27,6 +27,7 @@ export function useWindowInit(): string {
   const initWindow = useNavigationStore(s => s.initWindow)
   const removeTabFromWindow = useNavigationStore(s => s.removeTabFromWindow)
   const addTabToWindow = useNavigationStore(s => s.addTabToWindow)
+  const removeWindow = useNavigationStore(s => s.removeWindow)
   const gcStaleWindows = useNavigationStore(s => s.gcStaleWindows)
   const touchWindow = useNavigationStore(s => s.touchWindow)
 
@@ -63,6 +64,16 @@ export function useWindowInit(): string {
           }
           break
 
+        case 'WINDOW_CLOSED':
+          // Another window pagehid'd — archive its state into
+          // recentlyClosedWindows so it shows up in this window's "Sessions"
+          // section. Skip if it's our own broadcast (BroadcastChannel doesn't
+          // deliver to the sender, but guard anyway in case of duplicates).
+          if (msg.windowId !== id) {
+            removeWindow(msg.windowId)
+          }
+          break
+
         case 'STATE_SYNC':
           // Another window requests a fresh read — store already synced via
           // localStorage events; nothing else needed.
@@ -72,7 +83,7 @@ export function useWindowInit(): string {
 
     channel.addEventListener('message', handler)
     return () => channel.removeEventListener('message', handler)
-  }, [removeTabFromWindow, addTabToWindow])
+  }, [removeTabFromWindow, addTabToWindow, removeWindow])
 
   // ── 3. pagehide → archive window (only on actual tab close) ──────────
   // NOTE: We intentionally do NOT use 'beforeunload' here because it fires
