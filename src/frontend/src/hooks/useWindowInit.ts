@@ -1,11 +1,46 @@
 import { useEffect, useRef } from 'react'
 
 import {
+  broadcastNavigation,
   getNavigationChannel,
   getWindowId,
   type NavigationBroadcast,
   useNavigationStore,
 } from '@/stores/navigationStore'
+
+/**
+ * Read the persisted navigation state directly from localStorage and
+ * push it into the in-memory Zustand store. Used by both the storage
+ * event listener (peer tab wrote something) and the WINDOW_CLOSED
+ * broadcast listener (peer tab just pagehid'd) — they're redundant
+ * triggers, and we want either one to wake the in-memory state up
+ * even if the other got dropped by the browser.
+ */
+function syncFromLocalStorage(): void {
+  try {
+    const raw = localStorage.getItem('modelibr_navigation')
+    if (!raw) return
+    const parsed = JSON.parse(raw) as {
+      state?: {
+        activeWindows?: Record<string, unknown>
+        recentlyClosedTabs?: unknown[]
+        recentlyClosedWindows?: unknown[]
+      }
+    }
+    const persisted = parsed?.state
+    if (!persisted) return
+    type State = ReturnType<typeof useNavigationStore.getState>
+    useNavigationStore.setState({
+      activeWindows: (persisted.activeWindows ?? {}) as State['activeWindows'],
+      recentlyClosedTabs: (persisted.recentlyClosedTabs ??
+        []) as State['recentlyClosedTabs'],
+      recentlyClosedWindows: (persisted.recentlyClosedWindows ??
+        []) as State['recentlyClosedWindows'],
+    })
+  } catch {
+    /* malformed payload — ignore */
+  }
+}
 
 /**
  * Initialises the current browser tab as a unique "window" in the navigation
@@ -70,9 +105,16 @@ export function useWindowInit(): string {
           break
 
         case 'WINDOW_CLOSED':
-          // The closing tab archives itself on pagehide and the storage-
-          // event listener below propagates that change to this tab. The
-          // broadcast remains as a hint but doesn't need any action here.
+          // The closing tab self-archives via localStorage during its
+          // pagehide handler. The `storage` event listener below
+          // usually picks that change up, but cross-tab `storage`
+          // delivery can be unreliable during browser unload — Chrome
+          // in particular has been observed to occasionally not fire
+          // it for writes from a closing tab. Treat the broadcast as a
+          // second, redundant trigger to re-read localStorage.
+          if (msg.windowId !== id) {
+            syncFromLocalStorage()
+          }
           break
 
         case 'STATE_SYNC':
@@ -88,17 +130,17 @@ export function useWindowInit(): string {
 
   // ── 2b. Cross-tab localStorage sync ─────────────────────────────────
   //
-  // Zustand `persist` writes to localStorage on every action but doesn't
-  // pick up changes a peer browser tab makes. Without this listener, this
-  // tab's in-memory `activeWindows` is forever a snapshot from mount and
-  // we'd never learn that peer tab B exists — making the WINDOW_CLOSED
-  // handler unable to archive it. The `storage` event fires only when
-  // *another* tab modifies localStorage (not when this tab does), so
-  // calling `rehydrate()` here doesn't loop on our own writes.
+  // Zustand `persist` writes to localStorage on every action but never
+  // reads back peer browser tabs' writes — each tab's in-memory store
+  // stays at its mount-time snapshot otherwise, and a peer tab's
+  // pagehide-archive into recentlyClosedWindows would never reach this
+  // tab. The `storage` event fires only when *another* tab modifies
+  // localStorage (not when this tab does), so writing back from inside
+  // the handler can't loop on our own writes.
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
       if (e.key !== 'modelibr_navigation') return
-      void useNavigationStore.persist.rehydrate()
+      syncFromLocalStorage()
     }
     window.addEventListener('storage', onStorage)
     return () => window.removeEventListener('storage', onStorage)
@@ -123,7 +165,14 @@ export function useWindowInit(): string {
 
     const handlePageHide = (event: PageTransitionEvent) => {
       if (event.persisted) return
+      // 1. Self-archive into recentlyClosedWindows via localStorage so
+      //    the data survives even when nobody is listening.
       removeWindow(id)
+      // 2. Broadcast a hint. Other tabs already get the `storage` event
+      //    when we write above, but `storage` delivery during page
+      //    unload has been observed to drop in Chromium; the broadcast
+      //    is a redundant kick that makes the receiver re-read.
+      broadcastNavigation({ type: 'WINDOW_CLOSED', windowId: id })
     }
 
     window.addEventListener('pagehide', handlePageHide)
