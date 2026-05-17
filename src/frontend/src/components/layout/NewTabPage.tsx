@@ -407,54 +407,116 @@ function RecentlyClosedGrid({
   onDismiss,
 }: RecentlyClosedGridProps): JSX.Element {
   const listRef = useRef<HTMLUListElement>(null)
+  const [canScrollLeft, setCanScrollLeft] = useState(false)
+  const [canScrollRight, setCanScrollRight] = useState(false)
+
+  // Read the width of one entry (plus the row gap) so wheel + buttons step
+  // by a consistent amount regardless of the panel size.
+  const stepSize = (): number => {
+    const el = listRef.current
+    if (!el) return 240
+    const first = el.firstElementChild as HTMLElement | null
+    const gap = parseFloat(getComputedStyle(el).columnGap || '0') || 0
+    return (first?.offsetWidth ?? 240) + gap
+  }
+
+  const updateScrollState = (): void => {
+    const el = listRef.current
+    if (!el) return
+    setCanScrollLeft(el.scrollLeft > 0)
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1)
+  }
 
   // Translate vertical wheel input into horizontal scroll, since the strip
-  // is a single row. We use a non-passive listener so we can preventDefault
-  // and stop the parent page from scrolling vertically — but only when this
-  // row actually has horizontal overflow to consume. Trackpad horizontal
-  // gestures (deltaX) are left to the native scroller.
+  // is a single row. Trackpad horizontal gestures (deltaX dominant) are
+  // intentionally passed through to the native overflow-x scroller —
+  // preventDefault would otherwise eat them. Vertical wheel only intervenes
+  // when the row actually has overflow to consume, so the page can still
+  // scroll past the strip at either end.
   useEffect(() => {
     const el = listRef.current
     if (!el) return
+
     const onWheel = (e: WheelEvent) => {
       if (e.deltaY === 0) return
-      const canScrollRight =
-        e.deltaY > 0 && el.scrollLeft + el.clientWidth < el.scrollWidth
-      const canScrollLeft = e.deltaY < 0 && el.scrollLeft > 0
-      if (!canScrollRight && !canScrollLeft) return
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return
+      const right = e.deltaY > 0 && el.scrollLeft + el.clientWidth < el.scrollWidth
+      const left = e.deltaY < 0 && el.scrollLeft > 0
+      if (!right && !left) return
       e.preventDefault()
       el.scrollLeft += e.deltaY
     }
+
     el.addEventListener('wheel', onWheel, { passive: false })
-    return () => el.removeEventListener('wheel', onWheel)
+    el.addEventListener('scroll', updateScrollState, { passive: true })
+    updateScrollState()
+
+    const ro = new ResizeObserver(updateScrollState)
+    ro.observe(el)
+
+    return () => {
+      el.removeEventListener('wheel', onWheel)
+      el.removeEventListener('scroll', updateScrollState)
+      ro.disconnect()
+    }
   }, [recents.length])
 
+  const scrollByOne = (direction: 1 | -1): void => {
+    const el = listRef.current
+    if (!el) return
+    el.scrollBy({ left: direction * stepSize(), behavior: 'smooth' })
+  }
+
   return (
-    <ul ref={listRef} className="newtab-recents" role="list">
-      {recents.map(tab => (
-        <li key={tab.id} className="newtab-recent">
-          <button
-            type="button"
-            className="newtab-recent-row"
-            onClick={() => onReopen(tab)}
-            title={`Reopen ${tab.label ?? tab.type}`}
-          >
-            <span className="newtab-recent-icon" aria-hidden="true">
-              <i className={`pi ${iconForTab(tab.type)}`} />
-            </span>
-            <span className="newtab-recent-label">{tab.label ?? tab.type}</span>
-          </button>
-          <button
-            type="button"
-            className="newtab-recent-dismiss"
-            onClick={e => onDismiss(tab, e)}
-            aria-label={`Remove ${tab.label ?? tab.type} from recently closed`}
-            title="Remove from recently closed"
-          >
-            ×
-          </button>
-        </li>
-      ))}
-    </ul>
+    <div className="newtab-recents-wrap">
+      <button
+        type="button"
+        className="newtab-recents-scroll newtab-recents-scroll--left"
+        onClick={() => scrollByOne(-1)}
+        disabled={!canScrollLeft}
+        aria-label="Scroll recently closed left"
+        title="Scroll left"
+      >
+        <i className="pi pi-chevron-left" aria-hidden="true" />
+      </button>
+      <ul ref={listRef} className="newtab-recents" role="list">
+        {recents.map(tab => (
+          <li key={tab.id} className="newtab-recent">
+            <button
+              type="button"
+              className="newtab-recent-row"
+              onClick={() => onReopen(tab)}
+              title={`Reopen ${tab.label ?? tab.type}`}
+            >
+              <span className="newtab-recent-icon" aria-hidden="true">
+                <i className={`pi ${iconForTab(tab.type)}`} />
+              </span>
+              <span className="newtab-recent-label">
+                {tab.label ?? tab.type}
+              </span>
+            </button>
+            <button
+              type="button"
+              className="newtab-recent-dismiss"
+              onClick={e => onDismiss(tab, e)}
+              aria-label={`Remove ${tab.label ?? tab.type} from recently closed`}
+              title="Remove from recently closed"
+            >
+              ×
+            </button>
+          </li>
+        ))}
+      </ul>
+      <button
+        type="button"
+        className="newtab-recents-scroll newtab-recents-scroll--right"
+        onClick={() => scrollByOne(1)}
+        disabled={!canScrollRight}
+        aria-label="Scroll recently closed right"
+        title="Scroll right"
+      >
+        <i className="pi pi-chevron-right" aria-hidden="true" />
+      </button>
+    </div>
   )
 }

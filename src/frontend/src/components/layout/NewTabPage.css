@@ -260,7 +260,49 @@
   margin-top: auto;
 }
 
+.newtab-recents-wrap {
+  display: flex;
+  align-items: stretch;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.newtab-recents-scroll {
+  flex: 0 0 auto;
+  width: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-card);
+  border: 1px solid var(--surface-border);
+  border-radius: 8px;
+  color: var(--text-color-secondary);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s,
+    opacity 0.15s;
+}
+
+.newtab-recents-scroll:hover:not(:disabled) {
+  background: var(--surface-ground);
+  color: var(--text-color);
+  border-color: rgba(var(--primary-color-rgb), 0.35);
+}
+
+.newtab-recents-scroll:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.newtab-recents-scroll .pi {
+  font-size: 0.8rem;
+}
+
 .newtab-recents {
+  flex: 1 1 auto;
+  min-width: 0;
   margin: 0;
   padding: 0 0 0.25rem;
   list-style: none;
