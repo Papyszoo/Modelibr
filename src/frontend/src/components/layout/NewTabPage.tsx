@@ -688,10 +688,7 @@ interface SessionColumnProps {
   tabs: Tab[]
 }
 
-function SessionTooltipColumn({
-  side,
-  tabs,
-}: SessionColumnProps): JSX.Element {
+function SessionTooltipColumn({ side, tabs }: SessionColumnProps): JSX.Element {
   return (
     <div
       className={`newtab-session-tooltip-col newtab-session-tooltip-col--${side}`}
