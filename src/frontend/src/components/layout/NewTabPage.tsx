@@ -1,5 +1,6 @@
 import './NewTabPage.css'
 
+import { Tooltip } from 'primereact/tooltip'
 import {
   type JSX,
   type RefObject,
@@ -682,6 +683,45 @@ function tabTitlesPreview(tabs: Tab[]): string {
   return tabs.map(t => t.label ?? t.type).join(', ')
 }
 
+interface SessionColumnProps {
+  side: 'left' | 'right'
+  tabs: Tab[]
+}
+
+function SessionTooltipColumn({
+  side,
+  tabs,
+}: SessionColumnProps): JSX.Element {
+  return (
+    <div
+      className={`newtab-session-tooltip-col newtab-session-tooltip-col--${side}`}
+    >
+      <div className="newtab-session-tooltip-heading">
+        <i
+          className={`pi ${
+            side === 'left' ? 'pi-arrow-left' : 'pi-arrow-right'
+          }`}
+          aria-hidden="true"
+        />
+        <span>{side === 'left' ? 'Left' : 'Right'}</span>
+        <span className="newtab-session-tooltip-count">{tabs.length}</span>
+      </div>
+      {tabs.length === 0 ? (
+        <p className="newtab-session-tooltip-empty">—</p>
+      ) : (
+        <ul className="newtab-session-tooltip-list">
+          {tabs.map(t => (
+            <li key={t.id} className="newtab-session-tooltip-item">
+              <i className={`pi ${iconForTab(t.type)}`} aria-hidden="true" />
+              <span>{t.label ?? t.type}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 function SessionsGrid({
   sessions,
   onRestore,
@@ -689,6 +729,13 @@ function SessionsGrid({
 }: SessionsGridProps): JSX.Element {
   const listRef = useRef<HTMLUListElement>(null)
   const state = useHorizontalScrollStrip(listRef, sessions.length)
+  // Each session needs a unique DOM target the PrimeReact tooltip can bind
+  // to. The tooltip renders in a portal so it isn't clipped by the strip's
+  // overflow:auto.
+  const tooltipIdPrefix = useMemo(
+    () => `newtab-session-tt-${Math.random().toString(36).slice(2, 8)}`,
+    []
+  )
 
   return (
     <StripFrame
@@ -698,7 +745,8 @@ function SessionsGrid({
     >
       {sessions.map((entry, index) => {
         const { left, right } = splitTabsByPanel(entry.state.tabs)
-        const tooltip =
+        const targetId = `${tooltipIdPrefix}-${index}`
+        const ariaSummary =
           `Left (${left.length}): ${tabTitlesPreview(left)}` +
           ` | Right (${right.length}): ${tabTitlesPreview(right)}`
         return (
@@ -706,12 +754,25 @@ function SessionsGrid({
             key={`${entry.closedAt}-${index}`}
             className="newtab-recent newtab-session"
           >
+            <Tooltip
+              target={`#${CSS.escape(targetId)}`}
+              position="top"
+              showDelay={120}
+              hideDelay={0}
+              className="newtab-session-tooltip"
+              content={
+                <div className="newtab-session-tooltip-grid">
+                  <SessionTooltipColumn side="left" tabs={left} />
+                  <SessionTooltipColumn side="right" tabs={right} />
+                </div>
+              }
+            />
             <button
+              id={targetId}
               type="button"
               className="newtab-recent-row newtab-session-row"
               onClick={() => onRestore(entry, index)}
-              title={tooltip}
-              aria-label={`Restore session — ${tooltip}`}
+              aria-label={`Restore session — ${ariaSummary}`}
             >
               <span
                 className="newtab-session-side newtab-session-side--left"

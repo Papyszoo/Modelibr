@@ -454,6 +454,115 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* ── Sessions tooltip ─────────────────────────────────────────────────
+ *
+ * Renders inside PrimeReact's portalised .p-tooltip container, which
+ * already provides positioning + arrow. The selectors below override
+ * PrimeReact's default single-line styling so the tooltip can host the
+ * two-column layout (left tabs on the left, right tabs on the right).
+ */
+.newtab-session-tooltip .p-tooltip-text {
+  padding: 0.6rem 0.75rem;
+  background: var(--surface-overlay);
+  color: var(--text-color);
+  border: 1px solid var(--surface-border);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.16);
+  white-space: normal;
+  max-width: 480px;
+}
+
+.newtab-session-tooltip-grid {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) auto minmax(140px, 1fr);
+  gap: 0.75rem;
+  align-items: start;
+}
+
+.newtab-session-tooltip-grid::before {
+  content: '';
+  grid-column: 2;
+  align-self: stretch;
+  width: 1px;
+  background: var(--surface-border);
+}
+
+.newtab-session-tooltip-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.newtab-session-tooltip-col--right {
+  grid-column: 3;
+}
+
+.newtab-session-tooltip-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-color-secondary);
+}
+
+.newtab-session-tooltip-heading .pi {
+  color: var(--primary-color);
+  font-size: 0.75rem;
+}
+
+.newtab-session-tooltip-count {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-color);
+  background: var(--surface-ground);
+  border: 1px solid var(--surface-border);
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  font-size: 0.65rem;
+}
+
+.newtab-session-tooltip-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.newtab-session-tooltip-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--text-color);
+  min-width: 0;
+}
+
+.newtab-session-tooltip-item .pi {
+  color: var(--primary-color);
+  flex-shrink: 0;
+  font-size: 0.78rem;
+}
+
+.newtab-session-tooltip-item > span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.newtab-session-tooltip-empty {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-color-secondary);
+  font-style: italic;
+}
+
 /* ── Empty state ──────────────────────────────────────────────────────── */
 
 .newtab-empty {
