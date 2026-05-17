@@ -41,7 +41,7 @@ h1 {
   line-height: 1.1;
 }
 
-button:not(.p-button):not(.p-component) {
+button:not(.p-button):not(.p-component):not(.p-link) {
   border-radius: 8px;
   border: 1px solid var(--surface-border, transparent);
   padding: 0.6em 1.2em;
@@ -59,12 +59,12 @@ button:not(.p-button):not(.p-component) {
     color 0.25s,
     box-shadow 0.25s;
 }
-button:not(.p-button):not(.p-component):hover {
+button:not(.p-button):not(.p-component):not(.p-link):hover {
   border-color: var(--primary-color, #646cff);
   background-color: var(--surface-hover, var(--surface-card, transparent));
 }
-button:not(.p-button):not(.p-component):focus,
-button:not(.p-button):not(.p-component):focus-visible {
+button:not(.p-button):not(.p-component):not(.p-link):focus,
+button:not(.p-button):not(.p-component):not(.p-link):focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px rgba(var(--primary-color-rgb, 100, 108, 255), 0.16);
 }
@@ -79,7 +79,7 @@ button:not(.p-button):not(.p-component):focus-visible {
 }
 
 /* Disable pointer events only on interactive elements during drag, not the drop zone */
-.dragging-file button:not(.p-button):not(.p-component),
+.dragging-file button:not(.p-button):not(.p-component):not(.p-link),
 .dragging-file a,
 .dragging-file input:not([type='file']),
 .dragging-file select,
