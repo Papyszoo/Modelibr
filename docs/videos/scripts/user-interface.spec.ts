@@ -7,17 +7,76 @@ import {
     mediumPause,
     longPause,
     viewerPause,
-    smoothMoveTo,
-    humanClick,
-    humanRightClick,
     smoothDrag,
-    dragElementTo,
     navigateTo,
     clearAllData,
     disableHighlights,
     startFeatureRecording,
     stopFeatureRecording,
 } from "../helpers/video-helpers";
+
+import type { Locator, Page } from "@playwright/test";
+
+/**
+ * Open the New Tab page in the given panel by clicking its "+" button.
+ *
+ * Pauses are sized so the click lands cleanly on screen in the recorded
+ * video — mirroring the human-like timing used elsewhere in this script.
+ */
+async function openNewTabPageInPanel(
+    page: Page,
+    panel: Locator,
+): Promise<void> {
+    const addButton = panel.locator(".dock-add-button").first();
+    await addButton.waitFor({ state: "visible", timeout: 10000 });
+    const box = await addButton.boundingBox();
+    if (box) {
+        await page.mouse.move(
+            box.x + box.width / 2,
+            box.y + box.height / 2,
+            { steps: 20 },
+        );
+        await viewerPause(page, 400);
+    }
+    await addButton.click();
+    await panel
+        .locator(".newtab-page")
+        .last()
+        .waitFor({ state: "visible", timeout: 5000 });
+    await shortPause(page);
+}
+
+/**
+ * Pick a tile in the New Tab page hosted by the given panel. Waits for the
+ * placeholder to collapse so the next step is interacting with the target
+ * tab's content, not the (now stale) New Tab page DOM.
+ */
+async function pickNewTabTile(
+    page: Page,
+    panel: Locator,
+    tileTitle: RegExp,
+): Promise<void> {
+    const newtab = panel.locator(".newtab-page").last();
+    const tile = newtab
+        .locator(".newtab-tile")
+        .filter({
+            has: page.locator(".newtab-tile-title", { hasText: tileTitle }),
+        })
+        .first();
+    await tile.waitFor({ state: "visible", timeout: 5000 });
+    const box = await tile.boundingBox();
+    if (box) {
+        await page.mouse.move(
+            box.x + box.width / 2,
+            box.y + box.height / 2,
+            { steps: 20 },
+        );
+        await viewerPause(page, 300);
+    }
+    await tile.click();
+    await newtab.waitFor({ state: "hidden", timeout: 5000 });
+    await mediumPause(page);
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const assetsDir = path.resolve(__dirname, "../../../tests/e2e/assets");
@@ -89,46 +148,12 @@ test.describe("User Interface", () => {
 
         // ────────────────────────────────────────────────────────────
         // Step 1: Click the "+" add tab button on the left dock bar
-        //         and select "Sprites" from the menu
+        //         to open the New Tab page, then pick "Sprites"
         // ────────────────────────────────────────────────────────────
 
-        // Move to and click the add button on the left dock bar
         const leftPanel = page.locator(".p-splitter-panel").nth(0);
-        const leftAddButton = leftPanel.locator(".dock-add-button").first();
-        await leftAddButton.waitFor({ state: "visible", timeout: 10000 });
-        const addBtnBox = await leftAddButton.boundingBox();
-        if (addBtnBox) {
-            await page.mouse.move(
-                addBtnBox.x + addBtnBox.width / 2,
-                addBtnBox.y + addBtnBox.height / 2,
-                { steps: 20 },
-            );
-            await viewerPause(page, 400);
-        }
-        await leftAddButton.click();
-        await shortPause(page);
-
-        // Wait for the popup menu to appear (ContextMenu with class dock-add-menu)
-        await page
-            .locator(".dock-add-menu")
-            .waitFor({ state: "visible", timeout: 5000 });
-        await shortPause(page);
-
-        // Click "Sprites" in the menu
-        const spritesMenuItem = page
-            .locator(".dock-add-menu .p-menuitem")
-            .filter({ hasText: /Sprites/i });
-        const spritesItemBox = await spritesMenuItem.boundingBox();
-        if (spritesItemBox) {
-            await page.mouse.move(
-                spritesItemBox.x + spritesItemBox.width / 2,
-                spritesItemBox.y + spritesItemBox.height / 2,
-                { steps: 20 },
-            );
-            await viewerPause(page, 300);
-        }
-        await spritesMenuItem.click();
-        await mediumPause(page);
+        await openNewTabPageInPanel(page, leftPanel);
+        await pickNewTabTile(page, leftPanel, /^Sprites$/);
 
         // Verify sprites tab is now visible on the left
         await viewerPause(page, 500);
@@ -170,42 +195,8 @@ test.describe("User Interface", () => {
         // Step 3: Open "Sounds" tab on the left side
         // ────────────────────────────────────────────────────────────
 
-        // Click the add button on the left dock bar again
-        const leftAddButton2 = leftPanel.locator(".dock-add-button").first();
-        await leftAddButton2.waitFor({ state: "visible", timeout: 10000 });
-        const addBtn2Box = await leftAddButton2.boundingBox();
-        if (addBtn2Box) {
-            await page.mouse.move(
-                addBtn2Box.x + addBtn2Box.width / 2,
-                addBtn2Box.y + addBtn2Box.height / 2,
-                { steps: 20 },
-            );
-            await viewerPause(page, 400);
-        }
-        await leftAddButton2.click();
-        await shortPause(page);
-
-        // Wait for the popup menu
-        await page
-            .locator(".dock-add-menu")
-            .waitFor({ state: "visible", timeout: 5000 });
-        await shortPause(page);
-
-        // Click "Sounds" in the menu
-        const soundsMenuItem = page
-            .locator(".dock-add-menu .p-menuitem")
-            .filter({ hasText: /Sounds/i });
-        const soundsItemBox = await soundsMenuItem.boundingBox();
-        if (soundsItemBox) {
-            await page.mouse.move(
-                soundsItemBox.x + soundsItemBox.width / 2,
-                soundsItemBox.y + soundsItemBox.height / 2,
-                { steps: 20 },
-            );
-            await viewerPause(page, 300);
-        }
-        await soundsMenuItem.click();
-        await mediumPause(page);
+        await openNewTabPageInPanel(page, leftPanel);
+        await pickNewTabTile(page, leftPanel, /^Sounds$/);
 
         // Pause to show: sounds on left, sprites on right
         await longPause(page);
@@ -252,104 +243,39 @@ test.describe("User Interface", () => {
         await longPause(page);
 
         // ────────────────────────────────────────────────────────────
-        // Step 5: Right-click on the left dock bar to restore
-        //         the recently closed tab
+        // Step 5: Restore the recently closed Models tab via the
+        //         "Recently Closed" section in the New Tab page
         // ────────────────────────────────────────────────────────────
 
-        // Right-click on the left dock bar to open the context menu
-        const dockBarBox = await leftDockBar.boundingBox();
-        if (dockBarBox) {
-            await page.mouse.click(
-                dockBarBox.x + dockBarBox.width / 2,
-                dockBarBox.y + dockBarBox.height / 2,
-                { button: "right" },
-            );
-        }
-        await shortPause(page);
+        await openNewTabPageInPanel(page, leftPanel);
 
-        // Wait for the context menu to appear
-        await page
-            .locator(".p-contextmenu")
-            .waitFor({ state: "visible", timeout: 5000 });
-        await mediumPause(page);
-
-        // Open the "Reopen" submenu and restore the recently closed Models tab
-        const reopenItem = page.locator(".p-contextmenu .p-menuitem").filter({
-            hasText: /^Reopen$/i,
+        // The most-recently-closed entry is the Models tab; the section is
+        // scoped to the New Tab page that just opened in the left panel.
+        const newtabInLeft = leftPanel.locator(".newtab-page").last();
+        const recentsHeader = newtabInLeft.locator(".newtab-section-tag", {
+            hasText: /^Recently Closed$/i,
         });
-        const reopenVisible = await reopenItem
-            .first()
-            .waitFor({ state: "visible", timeout: 3000 })
-            .then(() => true)
-            .catch(() => false);
-        let modelsRestored = false;
-        if (reopenVisible) {
-            const reopenBox = await reopenItem.first().boundingBox();
-            if (reopenBox) {
-                await page.mouse.move(
-                    reopenBox.x + reopenBox.width / 2,
-                    reopenBox.y + reopenBox.height / 2,
-                    { steps: 20 },
-                );
-                await viewerPause(page, 400);
-            }
-
-            const reopenedModelsItem = page
-                .locator(".p-contextmenu .p-submenu-list .p-menuitem")
-                .filter({ hasText: /^Models$/i })
-                .first();
-            const reopenedModelsVisible = await reopenedModelsItem
-                .waitFor({ state: "visible", timeout: 3000 })
-                .then(() => true)
-                .catch(() => false);
-
-            if (reopenedModelsVisible) {
-                const reopenedModelsBox = await reopenedModelsItem.boundingBox();
-                if (reopenedModelsBox) {
-                    await page.mouse.move(
-                        reopenedModelsBox.x + reopenedModelsBox.width / 2,
-                        reopenedModelsBox.y + reopenedModelsBox.height / 2,
-                        { steps: 20 },
-                    );
-                    await viewerPause(page, 300);
-                    await page.mouse.click(
-                        reopenedModelsBox.x + reopenedModelsBox.width / 2,
-                        reopenedModelsBox.y + reopenedModelsBox.height / 2,
-                    );
-                    modelsRestored = true;
-                }
-            }
-        }
-
-        if (!modelsRestored) {
-            // If no "Reopen" option exists, dismiss the menu and re-add
-            // the Models tab via the + button as a fallback
-            await page.keyboard.press("Escape");
-            await shortPause(page);
-            const fallbackAddBtn = leftPanel
-                .locator(".dock-add-button")
-                .first();
-            await fallbackAddBtn.click();
-            await shortPause(page);
-            await page
-                .locator(".dock-add-menu")
-                .waitFor({ state: "visible", timeout: 5000 });
-            const modelsMenuItem = page
-                .locator(".dock-add-menu .p-menuitem")
-                .filter({ hasText: /Models/i });
-            if (
-                await modelsMenuItem
-                    .first()
-                    .isVisible({ timeout: 2000 })
-                    .catch(() => false)
-            ) {
-                await modelsMenuItem.first().click();
-                modelsRestored = true;
-            }
-        }
+        await recentsHeader.waitFor({ state: "visible", timeout: 5000 });
         await mediumPause(page);
 
-        expect(modelsRestored).toBe(true);
+        const reopenModels = newtabInLeft.locator(
+            '.newtab-recent button[title="Reopen Models"]',
+        );
+        await reopenModels.waitFor({ state: "visible", timeout: 3000 });
+        const reopenBox = await reopenModels.boundingBox();
+        if (reopenBox) {
+            await page.mouse.move(
+                reopenBox.x + reopenBox.width / 2,
+                reopenBox.y + reopenBox.height / 2,
+                { steps: 20 },
+            );
+            await viewerPause(page, 300);
+        }
+        await reopenModels.click();
+        await mediumPause(page);
+
+        // Confirm the placeholder converted in place and the Models tab is back.
+        await expect(newtabInLeft).toBeHidden({ timeout: 5000 });
         await leftDockBar
             .locator('.draggable-tab[data-pr-tooltip="Models List"]')
             .first()
