@@ -8,12 +8,18 @@ import { type Tab } from '@/types'
 
 const getTabIcon = (tabType: Tab['type']): string => {
   switch (tabType) {
+    case 'newTab':
+      return 'pi pi-home'
     case 'modelList':
       return 'pi pi-list'
     case 'modelViewer':
       return 'pi pi-box'
     case 'textureSets':
       return 'pi pi-folder'
+    case 'globalMaterials':
+      return 'pi pi-palette'
+    case 'modelTextures':
+      return 'pi pi-images'
     case 'textureSetViewer':
       return 'pi pi-image'
     case 'environmentMaps':
@@ -49,12 +55,18 @@ const getTabIcon = (tabType: Tab['type']): string => {
 
 const getTabTooltip = (tab: Tab): string => {
   switch (tab.type) {
+    case 'newTab':
+      return 'New Tab'
     case 'modelList':
       return 'Models List'
     case 'modelViewer':
       return `Model: ${tab.label || tab.modelId || 'Unknown'}`
     case 'textureSets':
       return 'Texture Sets'
+    case 'globalMaterials':
+      return 'Global Materials'
+    case 'modelTextures':
+      return 'Model Textures'
     case 'textureSetViewer': {
       return `Texture Set: ${tab.label || tab.setId || 'Unknown'}`
     }

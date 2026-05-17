@@ -124,6 +124,8 @@ export function getTabLabel(
     stageName,
   } = options
   switch (type) {
+    case 'newTab':
+      return 'New Tab'
     case 'modelList':
       return 'Models'
     case 'modelViewer':
@@ -131,6 +133,10 @@ export function getTabLabel(
       return modelId ? `Model ${modelId}` : 'Model Viewer'
     case 'textureSets':
       return 'Texture Sets'
+    case 'globalMaterials':
+      return 'Global Materials'
+    case 'modelTextures':
+      return 'Model Textures'
     case 'textureSetViewer':
       if (setName) return setName
       return setId ? `Set ${setId}` : 'Texture Set'
