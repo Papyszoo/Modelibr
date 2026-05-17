@@ -311,10 +311,12 @@ describe('NewTabPage', () => {
     /** Build a closed-window entry with a fixed shape we can assert against. */
     function makeClosedWindow(
       tabs: Tab[],
-      closedAt = '2026-05-17T10:00:00.000Z'
+      closedAt = '2026-05-17T10:00:00.000Z',
+      windowId = `closed-${closedAt}`
     ): ClosedWindowEntry {
       return {
         closedAt,
+        windowId,
         state: {
           tabs,
           activeTabId: tabs[0]?.id ?? null,

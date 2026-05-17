@@ -64,15 +64,29 @@ export function useWindowInit(): string {
           }
           break
 
-        case 'WINDOW_CLOSED':
-          // Another window pagehid'd — archive its state into
-          // recentlyClosedWindows so it shows up in this window's "Sessions"
-          // section. Skip if it's our own broadcast (BroadcastChannel doesn't
-          // deliver to the sender, but guard anyway in case of duplicates).
-          if (msg.windowId !== id) {
-            removeWindow(msg.windowId)
-          }
+        case 'WINDOW_CLOSED': {
+          // Another window pagehid'd. `pagehide` fires on refresh too, not
+          // just on close — if we archived immediately, refreshing a peer
+          // tab would dump its state into our Sessions strip and the peer
+          // would come back with default tabs. Defer the archive and verify
+          // afterwards that the window hasn't been re-touched by a fresh
+          // init / heartbeat. BroadcastChannel doesn't deliver to the
+          // sender; guard regardless in case of cross-runtime duplicates.
+          if (msg.windowId === id) break
+          const closedId = msg.windowId
+          const snapshotAt =
+            useNavigationStore.getState().activeWindows[closedId]
+              ?.lastActiveAt ?? null
+          window.setTimeout(() => {
+            const ws = useNavigationStore.getState().activeWindows[closedId]
+            // Skip if the window disappeared (already archived) OR was
+            // re-initialised (lastActiveAt has moved forward — a refresh).
+            if (!ws) return
+            if (ws.lastActiveAt !== snapshotAt) return
+            removeWindow(closedId)
+          }, 1500)
           break
+        }
 
         case 'STATE_SYNC':
           // Another window requests a fresh read — store already synced via
