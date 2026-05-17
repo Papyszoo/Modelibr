@@ -404,8 +404,31 @@ function RecentlyClosedGrid({
   onReopen,
   onDismiss,
 }: RecentlyClosedGridProps): JSX.Element {
+  const listRef = useRef<HTMLUListElement>(null)
+
+  // Translate vertical wheel input into horizontal scroll, since the strip
+  // is a single row. We use a non-passive listener so we can preventDefault
+  // and stop the parent page from scrolling vertically — but only when this
+  // row actually has horizontal overflow to consume. Trackpad horizontal
+  // gestures (deltaX) are left to the native scroller.
+  useEffect(() => {
+    const el = listRef.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      if (e.deltaY === 0) return
+      const canScrollRight =
+        e.deltaY > 0 && el.scrollLeft + el.clientWidth < el.scrollWidth
+      const canScrollLeft = e.deltaY < 0 && el.scrollLeft > 0
+      if (!canScrollRight && !canScrollLeft) return
+      e.preventDefault()
+      el.scrollLeft += e.deltaY
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [recents.length])
+
   return (
-    <ul className="newtab-recents" role="list">
+    <ul ref={listRef} className="newtab-recents" role="list">
       {recents.map(tab => (
         <li key={tab.id} className="newtab-recent">
           <button
