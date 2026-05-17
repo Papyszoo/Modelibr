@@ -2,7 +2,7 @@ import './SpriteList.css'
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Button } from 'primereact/button'
-import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog'
+import { confirmDialog } from 'primereact/confirmdialog'
 import { ContextMenu } from 'primereact/contextmenu'
 import { Dialog } from 'primereact/dialog'
 import { InputText } from 'primereact/inputtext'
@@ -499,7 +499,6 @@ export function SpriteList() {
       onDragLeave={onDragLeave}
     >
       <Toast ref={toast} />
-      <ConfirmDialog />
       <ContextMenu ref={contextMenuRef} model={getContextMenuItems()} />
 
       {/* Header */}

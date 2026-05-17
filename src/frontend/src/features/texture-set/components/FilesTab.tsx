@@ -2,7 +2,7 @@ import './FilesTab.css'
 
 import { useQueryClient } from '@tanstack/react-query'
 import { Button } from 'primereact/button'
-import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog'
+import { confirmDialog } from 'primereact/confirmdialog'
 import { Dropdown } from 'primereact/dropdown'
 import { Tag } from 'primereact/tag'
 import { Toast } from 'primereact/toast'
@@ -476,7 +476,6 @@ export function FilesTab({ textureSet, onMappingChanged }: FilesTabProps) {
   return (
     <div className="files-tab">
       <Toast ref={toast} />
-      <ConfirmDialog />
       <div className="files-tab-header">
         <h3>Source Files</h3>
       </div>

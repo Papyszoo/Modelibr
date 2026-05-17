@@ -2,7 +2,7 @@ import './Settings.css'
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQueryClient } from '@tanstack/react-query'
-import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog'
+import { confirmDialog } from 'primereact/confirmdialog'
 import { type JSX, useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { type z } from 'zod'
@@ -1376,7 +1376,6 @@ export function Settings(): JSX.Element {
           )}
         </div>
       </form>
-      <ConfirmDialog />
     </div>
   )
 }

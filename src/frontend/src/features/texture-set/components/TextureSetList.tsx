@@ -6,7 +6,6 @@ import {
   useQueryClient,
 } from '@tanstack/react-query'
 import { Button } from 'primereact/button'
-import { ConfirmDialog } from 'primereact/confirmdialog'
 import { Toast } from 'primereact/toast'
 import { useRef, useState } from 'react'
 
@@ -214,7 +213,6 @@ export function TextureSetList({ kind }: TextureSetListProps = {}) {
   return (
     <div className="texture-set-list">
       <Toast ref={toast} />
-      <ConfirmDialog />
 
       <TextureSetListHeader
         setCount={totalCount || textureSets.length}

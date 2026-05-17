@@ -1,7 +1,7 @@
 import './StageList.css'
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog'
+import { confirmDialog } from 'primereact/confirmdialog'
 import { Toast } from 'primereact/toast'
 import { useEffect, useRef, useState } from 'react'
 
@@ -108,7 +108,6 @@ export function StageList() {
   return (
     <div className="stage-list-container">
       <Toast ref={toast} />
-      <ConfirmDialog />
 
       <StageListHeader onCreateClick={() => setShowCreateDialog(true)} />
 
