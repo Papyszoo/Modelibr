@@ -1,0 +1,580 @@
+/* ── New Tab page ──────────────────────────────────────────────────────
+ *
+ * Lives inside .tab-content (which is already height:100%, flex column).
+ * Scrolls the inner content rather than the dock-content so the dock bar
+ * never gets cropped on short viewports.
+ */
+
+.newtab-page {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  background: var(--surface-ground);
+  overflow: auto;
+}
+
+.newtab-inner {
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 1.5rem 1.75rem 2.5rem;
+  /* Stretch to fill the page so .newtab-section--recents (with margin-top:
+   * auto) can pin to the visual bottom when the content is shorter than
+   * the viewport. */
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+@media (max-width: 720px) {
+  .newtab-inner {
+    padding: 1rem 1rem 1.5rem;
+    gap: 0.9rem;
+  }
+}
+
+/* ── Search ───────────────────────────────────────────────────────────── */
+
+.newtab-search {
+  position: relative;
+  width: 420px;
+  max-width: 100%;
+  align-self: center;
+}
+
+.newtab-search > i.pi {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-color-secondary);
+  font-size: 0.85rem;
+  pointer-events: none;
+}
+
+.newtab-search input {
+  width: 100%;
+  padding: 0.55rem 2.5rem 0.55rem 2.1rem;
+  border: 1px solid var(--surface-border);
+  background: var(--surface-card);
+  color: var(--text-color);
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-family: inherit;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+
+.newtab-search input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(var(--primary-color-rgb), 0.12);
+}
+
+.newtab-search-kbd {
+  position: absolute;
+  right: 0.55rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.68rem;
+  color: var(--text-color-secondary);
+  background: var(--surface-ground);
+  border: 1px solid var(--surface-border);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  pointer-events: none;
+}
+
+/* ── Section header ───────────────────────────────────────────────────── */
+
+.newtab-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.newtab-section-tag {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--primary-color);
+  padding: 0 0.1rem;
+}
+
+/* ── Grid ─────────────────────────────────────────────────────────────── */
+
+.newtab-grid {
+  display: grid;
+  /* Tiles grow to fill, but never go below 220px so 2-column works at narrow widths. */
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+  gap: 0.8rem;
+}
+
+/* ── Tile ─────────────────────────────────────────────────────────────── */
+
+.newtab-tile {
+  position: relative;
+  background: var(--surface-card);
+  border: 1px solid var(--surface-border);
+  border-radius: 12px;
+  padding: 0.95rem 1rem 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background 0.18s ease;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.newtab-tile::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(var(--primary-color-rgb), 0.07),
+    transparent 60%
+  );
+  opacity: 0;
+  transition: opacity 0.2s;
+  z-index: -1;
+}
+
+.newtab-tile:hover {
+  transform: translateY(-2px);
+  border-color: rgba(var(--primary-color-rgb), 0.35);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+}
+
+.newtab-tile:hover::before {
+  opacity: 1;
+}
+
+.newtab-tile:focus-visible {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(var(--primary-color-rgb), 0.2);
+}
+
+.newtab-tile-head {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.newtab-tile-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(var(--primary-color-rgb), 0.1);
+  color: var(--primary-color);
+  flex-shrink: 0;
+  transition:
+    background 0.2s,
+    color 0.2s;
+}
+
+.newtab-tile-icon .pi {
+  font-size: 1.15rem;
+}
+
+.newtab-tile:hover .newtab-tile-icon {
+  background: var(--primary-color);
+  color: #fff;
+}
+
+.newtab-tile-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-color);
+  letter-spacing: -0.005em;
+  flex: 1;
+  min-width: 0;
+}
+
+.newtab-tile-desc {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--text-color-secondary);
+}
+
+/* ── Disabled tile ────────────────────────────────────────────────────── */
+
+.newtab-tile--disabled,
+.newtab-tile--disabled:hover {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  border-color: var(--surface-border);
+}
+
+.newtab-tile--disabled::before {
+  display: none;
+}
+
+.newtab-tile--disabled:hover .newtab-tile-icon {
+  background: rgba(var(--primary-color-rgb), 0.1);
+  color: var(--primary-color);
+}
+
+.newtab-tile-soon {
+  margin-left: auto;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-color-secondary);
+  background: var(--surface-ground);
+  border: 1px solid var(--surface-border);
+  padding: 2px 6px;
+  border-radius: 999px;
+}
+
+/* ── Recently closed ──────────────────────────────────────────────────── */
+
+/* Wrapper around the Recently Closed and Sessions sections. Sits at the
+ * visual bottom of the page; both sections act as single horizontal
+ * strips — when there are more entries than fit, the rows scroll sideways
+ * rather than wrapping into a tall block that pushes the asset tiles up. */
+.newtab-bottom {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.newtab-recents-wrap {
+  display: flex;
+  align-items: stretch;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.newtab-recents-scroll {
+  flex: 0 0 auto;
+  width: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-card);
+  border: 1px solid var(--surface-border);
+  border-radius: 8px;
+  color: var(--text-color-secondary);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s,
+    opacity 0.15s;
+}
+
+.newtab-recents-scroll:hover:not(:disabled) {
+  background: var(--surface-ground);
+  color: var(--text-color);
+  border-color: rgba(var(--primary-color-rgb), 0.35);
+}
+
+.newtab-recents-scroll:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.newtab-recents-scroll .pi {
+  font-size: 0.8rem;
+}
+
+.newtab-recents {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 0 0 0.25rem;
+  list-style: none;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.4rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+  scrollbar-color: var(--surface-border) transparent;
+}
+
+.newtab-recents::-webkit-scrollbar {
+  height: 6px;
+}
+
+.newtab-recents::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.newtab-recents::-webkit-scrollbar-thumb {
+  background: var(--surface-border);
+  border-radius: 999px;
+}
+
+.newtab-recent {
+  position: relative;
+  flex: 0 0 auto;
+  width: 240px;
+  max-width: 80%;
+  scroll-snap-align: start;
+  display: flex;
+  align-items: stretch;
+  background: var(--surface-card);
+  border: 1px solid var(--surface-border);
+  border-radius: 8px;
+  overflow: hidden;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+
+.newtab-recent:hover {
+  border-color: rgba(var(--primary-color-rgb), 0.35);
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.06);
+}
+
+.newtab-recent-row {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.5rem 0.7rem;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  min-width: 0;
+}
+
+.newtab-recent-row:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: -2px;
+}
+
+.newtab-recent-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(var(--primary-color-rgb), 0.1);
+  color: var(--primary-color);
+  flex-shrink: 0;
+}
+
+.newtab-recent-icon .pi {
+  font-size: 0.85rem;
+}
+
+.newtab-recent-label {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.newtab-recent-dismiss {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  background: transparent;
+  border: 0;
+  border-left: 1px solid var(--surface-border);
+  color: var(--text-color-secondary);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+
+.newtab-recent-dismiss:hover {
+  background: var(--surface-ground);
+  color: var(--text-color);
+}
+
+/* ── Sessions ─────────────────────────────────────────────────────────── */
+
+.newtab-session {
+  /* Sessions cards are slightly wider than recently-closed entries to fit
+   * the two-count layout comfortably. */
+  width: 200px;
+}
+
+.newtab-session-row {
+  justify-content: space-between;
+  padding: 0.55rem 0.75rem;
+}
+
+.newtab-session-side {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--text-color);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.newtab-session-side .pi {
+  font-size: 0.85rem;
+  color: var(--primary-color);
+}
+
+.newtab-session-count {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Sessions tooltip ─────────────────────────────────────────────────
+ *
+ * Renders inside PrimeReact's portalised .p-tooltip container, which
+ * already provides positioning + arrow. The selectors below override
+ * PrimeReact's default single-line styling so the tooltip can host the
+ * two-column layout (left tabs on the left, right tabs on the right).
+ */
+.newtab-session-tooltip .p-tooltip-text {
+  padding: 0.6rem 0.75rem;
+  background: var(--surface-overlay);
+  color: var(--text-color);
+  border: 1px solid var(--surface-border);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.16);
+  white-space: normal;
+  max-width: 480px;
+}
+
+.newtab-session-tooltip-grid {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) minmax(140px, 1fr);
+  column-gap: 1.25rem;
+  align-items: start;
+}
+
+.newtab-session-tooltip-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.newtab-session-tooltip-col--left {
+  grid-column: 1;
+  border-right: 1px solid var(--surface-border);
+  padding-right: 1.25rem;
+}
+
+.newtab-session-tooltip-col--right {
+  grid-column: 2;
+}
+
+.newtab-session-tooltip-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-color-secondary);
+}
+
+.newtab-session-tooltip-heading .pi {
+  color: var(--primary-color);
+  font-size: 0.75rem;
+}
+
+.newtab-session-tooltip-count {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-color);
+  background: var(--surface-ground);
+  border: 1px solid var(--surface-border);
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  font-size: 0.65rem;
+}
+
+.newtab-session-tooltip-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.newtab-session-tooltip-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--text-color);
+  min-width: 0;
+}
+
+.newtab-session-tooltip-item .pi {
+  color: var(--primary-color);
+  flex-shrink: 0;
+  font-size: 0.78rem;
+}
+
+.newtab-session-tooltip-item > span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.newtab-session-tooltip-empty {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-color-secondary);
+  font-style: italic;
+}
+
+/* ── Empty state ──────────────────────────────────────────────────────── */
+
+.newtab-empty {
+  border: 1px dashed var(--surface-border);
+  border-radius: 12px;
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-color-secondary);
+  font-size: 0.9rem;
+}
+
+.newtab-empty .pi {
+  display: block;
+  font-size: 1.6rem;
+  opacity: 0.4;
+  margin-bottom: 0.6rem;
+}

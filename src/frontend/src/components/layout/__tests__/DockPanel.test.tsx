@@ -130,7 +130,7 @@ describe('DockPanelContent', () => {
 
     expect(screen.getByText('No tabs open')).toBeInTheDocument()
     expect(
-      screen.getByText('Click the + button to add a new tab')
+      screen.getByText('Click here or the + button to open a new tab')
     ).toBeInTheDocument()
   })
 
