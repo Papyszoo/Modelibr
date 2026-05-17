@@ -253,11 +253,15 @@
 
 /* ── Recently closed ──────────────────────────────────────────────────── */
 
-/* Section sits at the bottom of the page and acts as a single horizontal
- * strip — when there are more entries than fit, the row scrolls sideways
+/* Wrapper around the Recently Closed and Sessions sections. Sits at the
+ * visual bottom of the page; both sections act as single horizontal
+ * strips — when there are more entries than fit, the rows scroll sideways
  * rather than wrapping into a tall block that pushes the asset tiles up. */
-.newtab-section--recents {
+.newtab-bottom {
   margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
 }
 
 .newtab-recents-wrap {
@@ -417,6 +421,37 @@
 .newtab-recent-dismiss:hover {
   background: var(--surface-ground);
   color: var(--text-color);
+}
+
+/* ── Sessions ─────────────────────────────────────────────────────────── */
+
+.newtab-session {
+  /* Sessions cards are slightly wider than recently-closed entries to fit
+   * the two-count layout comfortably. */
+  width: 200px;
+}
+
+.newtab-session-row {
+  justify-content: space-between;
+  padding: 0.55rem 0.75rem;
+}
+
+.newtab-session-side {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--text-color);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.newtab-session-side .pi {
+  font-size: 0.85rem;
+  color: var(--primary-color);
+}
+
+.newtab-session-count {
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── Empty state ──────────────────────────────────────────────────────── */

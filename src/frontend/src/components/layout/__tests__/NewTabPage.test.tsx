@@ -3,6 +3,11 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { NewTabPage } from '@/components/layout/NewTabPage'
 import { DockContext } from '@/contexts/DockContext'
 import { TabContext, type TabContextValue } from '@/contexts/TabContext'
+import {
+  type ClosedWindowEntry,
+  getWindowId,
+  useNavigationStore,
+} from '@/stores/navigationStore'
 import { type Tab } from '@/types'
 
 function makeContextValue(
@@ -298,5 +303,153 @@ describe('NewTabPage', () => {
 
     // Section header should be absent because the only candidate is filtered out.
     expect(screen.queryByText('Recently Closed')).not.toBeInTheDocument()
+  })
+
+  // ── Sessions ─────────────────────────────────────────────────────────
+
+  describe('Sessions section', () => {
+    /** Build a closed-window entry with a fixed shape we can assert against. */
+    function makeClosedWindow(
+      tabs: Tab[],
+      closedAt = '2026-05-17T10:00:00.000Z'
+    ): ClosedWindowEntry {
+      return {
+        closedAt,
+        state: {
+          tabs,
+          activeTabId: tabs[0]?.id ?? null,
+          activeRightTabId:
+            tabs.find(t => t.params?.panel === 'right')?.id ?? null,
+          splitterSize: 50,
+          lastActiveAt: closedAt,
+        },
+      }
+    }
+
+    /** Reset the persisted store between assertions so leftover state from
+     * the persist middleware doesn't bleed across tests. */
+    beforeEach(() => {
+      useNavigationStore.setState({
+        activeWindows: {
+          [getWindowId()]: {
+            tabs: [
+              {
+                id: 'newTab',
+                type: 'newTab',
+                label: 'New Tab',
+                params: {},
+                internalUiState: {},
+              },
+            ],
+            activeTabId: 'newTab',
+            activeRightTabId: null,
+            splitterSize: 50,
+            lastActiveAt: new Date().toISOString(),
+          },
+        },
+        recentlyClosedTabs: [],
+        recentlyClosedWindows: [],
+      })
+    })
+
+    const leftModels: Tab = {
+      id: 'modelList',
+      type: 'modelList',
+      label: 'Models',
+      params: {},
+      internalUiState: {},
+    }
+    const leftSounds: Tab = {
+      id: 'sounds',
+      type: 'sounds',
+      label: 'Sounds',
+      params: {},
+      internalUiState: {},
+    }
+    const rightSprites: Tab = {
+      id: 'sprites',
+      type: 'sprites',
+      label: 'Sprites',
+      params: { panel: 'right' },
+      internalUiState: {},
+    }
+
+    it('renders one entry per archived window with left/right counts', () => {
+      useNavigationStore.setState({
+        recentlyClosedWindows: [
+          makeClosedWindow([leftModels, leftSounds, rightSprites]),
+        ],
+      })
+      const ctx = makeContextValue({ tabs: [newTab], activeTab: 'newTab' })
+      renderWithContext(<NewTabPage tabId="newTab" />, ctx)
+
+      expect(screen.getByText('Sessions')).toBeInTheDocument()
+
+      const restoreBtn = screen.getByRole('button', {
+        name: /Restore session — Left \(2\): Models, Sounds \| Right \(1\): Sprites/,
+      })
+      expect(restoreBtn).toBeInTheDocument()
+    })
+
+    it('restores tabs into the current window and drops the session entry', () => {
+      useNavigationStore.setState({
+        recentlyClosedWindows: [makeClosedWindow([leftModels, rightSprites])],
+      })
+      const setTabs = jest.fn()
+      const ctx = makeContextValue({
+        tabs: [newTab],
+        activeTab: 'newTab',
+        setTabs,
+      })
+      renderWithContext(<NewTabPage tabId="newTab" />, ctx)
+
+      fireEvent.click(
+        screen.getByRole('button', { name: /^Restore session — Left/ })
+      )
+
+      // Placeholder newTab removed from the panel.
+      expect(setTabs).toHaveBeenCalledWith([])
+
+      const state = useNavigationStore.getState()
+      // Session entry consumed.
+      expect(state.recentlyClosedWindows).toHaveLength(0)
+      // Both tabs (left + right) merged into the current window.
+      const merged = state.activeWindows[getWindowId()].tabs
+      expect(merged.find(t => t.id === 'modelList')).toBeTruthy()
+      expect(merged.find(t => t.id === 'sprites')?.params.panel).toBe('right')
+    })
+
+    it('dismiss button removes the entry without restoring tabs', () => {
+      useNavigationStore.setState({
+        recentlyClosedWindows: [makeClosedWindow([leftModels])],
+      })
+      const setTabs = jest.fn()
+      const ctx = makeContextValue({
+        tabs: [newTab],
+        activeTab: 'newTab',
+        setTabs,
+      })
+      renderWithContext(<NewTabPage tabId="newTab" />, ctx)
+
+      fireEvent.click(screen.getByLabelText('Remove session from list'))
+
+      expect(useNavigationStore.getState().recentlyClosedWindows).toHaveLength(
+        0
+      )
+      // The placeholder newTab is untouched by dismiss.
+      expect(setTabs).not.toHaveBeenCalled()
+      // No tabs added to the current window.
+      const tabs =
+        useNavigationStore.getState().activeWindows[getWindowId()].tabs
+      expect(tabs.find(t => t.id === 'modelList')).toBeFalsy()
+    })
+
+    it('hides the section when there are no sessions', () => {
+      useNavigationStore.setState({ recentlyClosedWindows: [] })
+      const ctx = makeContextValue({ tabs: [newTab], activeTab: 'newTab' })
+      renderWithContext(<NewTabPage tabId="newTab" />, ctx)
+
+      expect(screen.queryByText('Sessions')).not.toBeInTheDocument()
+    })
   })
 })

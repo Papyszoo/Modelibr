@@ -1,10 +1,22 @@
 import './NewTabPage.css'
 
-import { type JSX, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  type JSX,
+  type RefObject,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 
 import { useDockContext } from '@/contexts/DockContext'
 import { useTabContext } from '@/hooks/useTabContext'
-import { createTab } from '@/stores/navigationStore'
+import {
+  type ClosedWindowEntry,
+  createTab,
+  getWindowId,
+  useNavigationStore,
+} from '@/stores/navigationStore'
 import { type Tab, type TabType } from '@/types'
 
 // ── Tile catalog ────────────────────────────────────────────────────────────
@@ -198,6 +210,9 @@ interface NewTabPageProps {
 export function NewTabPage({ tabId }: NewTabPageProps): JSX.Element {
   const { tabs, setTabs, setActiveTab } = useTabContext()
   const { recentlyClosedTabs, removeRecentlyClosedTab } = useDockContext()
+  const recentlyClosedWindows = useNavigationStore(s => s.recentlyClosedWindows)
+  const removeClosedWindow = useNavigationStore(s => s.removeClosedWindow)
+  const openTabAction = useNavigationStore(s => s.openTab)
   const [query, setQuery] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -237,6 +252,29 @@ export function NewTabPage({ tabId }: NewTabPageProps): JSX.Element {
       .filter(t => t.type !== 'newTab' && !openTypes.has(t.type))
       .filter(t => (q ? (t.label ?? t.type).toLowerCase().includes(q) : true))
   }, [recentlyClosedTabs, tabs, tabId, q])
+
+  // Sessions: every archived window state that isn't this browser tab's own.
+  // Current-window guard is defensive — recentlyClosedWindows is only meant
+  // to hold *other* windows, but if a stale GC ever caught the current
+  // window we don't want it appearing in its own restore list.
+  const sessions = useMemo(() => {
+    const currentId = getWindowId()
+    return recentlyClosedWindows
+      .filter(entry => {
+        const isCurrent = entry.state.tabs.some(
+          t => t.params?.windowId === currentId
+        )
+        if (isCurrent) return false
+        if (entry.state.tabs.length === 0) return false
+        return true
+      })
+      .filter(entry => {
+        if (!q) return true
+        return entry.state.tabs.some(t =>
+          (t.label ?? t.type).toLowerCase().includes(q)
+        )
+      })
+  }, [recentlyClosedWindows, q])
 
   const handlePick = (tile: Tile): void => {
     if (tile.disabled) return
@@ -298,6 +336,37 @@ export function NewTabPage({ tabId }: NewTabPageProps): JSX.Element {
     removeRecentlyClosedTab(closed.id)
   }
 
+  const handleRestoreSession = (
+    entry: ClosedWindowEntry,
+    index: number
+  ): void => {
+    // Drop the host newTab placeholder up front, then ask the store to
+    // merge each session tab into the current window. `openTab` dedups by
+    // id and routes panel='right' tabs to the right active list, so the
+    // merge respects both sides.
+    const remaining = tabs.filter(t => t.id !== tabId)
+    setTabs(remaining)
+
+    const currentWindowId = getWindowId()
+    for (const tab of entry.state.tabs) {
+      if (tab.type === 'newTab') continue
+      const side: 'left' | 'right' =
+        tab.params?.panel === 'right' ? 'right' : 'left'
+      openTabAction(currentWindowId, side, tab)
+    }
+
+    removeClosedWindow(index)
+  }
+
+  const handleDismissSession = (
+    _entry: ClosedWindowEntry,
+    index: number,
+    e: React.MouseEvent<HTMLButtonElement>
+  ): void => {
+    e.stopPropagation()
+    removeClosedWindow(index)
+  }
+
   return (
     <div className="newtab-page">
       <div className="newtab-inner">
@@ -339,18 +408,36 @@ export function NewTabPage({ tabId }: NewTabPageProps): JSX.Element {
           })
         )}
 
-        {recents.length > 0 && (
-          <section
-            className="newtab-section newtab-section--recents"
-            data-testid="newtab-recents-section"
-          >
-            <h2 className="newtab-section-tag">Recently Closed</h2>
-            <RecentlyClosedGrid
-              recents={recents}
-              onReopen={handleReopenRecent}
-              onDismiss={handleDismissRecent}
-            />
-          </section>
+        {(recents.length > 0 || sessions.length > 0) && (
+          <div className="newtab-bottom">
+            {recents.length > 0 && (
+              <section
+                className="newtab-section newtab-section--recents"
+                data-testid="newtab-recents-section"
+              >
+                <h2 className="newtab-section-tag">Recently Closed</h2>
+                <RecentlyClosedGrid
+                  recents={recents}
+                  onReopen={handleReopenRecent}
+                  onDismiss={handleDismissRecent}
+                />
+              </section>
+            )}
+
+            {sessions.length > 0 && (
+              <section
+                className="newtab-section newtab-section--sessions"
+                data-testid="newtab-sessions-section"
+              >
+                <h2 className="newtab-section-tag">Sessions</h2>
+                <SessionsGrid
+                  sessions={sessions}
+                  onRestore={handleRestoreSession}
+                  onDismiss={handleDismissSession}
+                />
+              </section>
+            )}
+          </div>
         )}
       </div>
     </div>
@@ -393,25 +480,26 @@ function NewTabGrid({ tiles, onPick }: NewTabGridProps): JSX.Element {
   )
 }
 
-// ── Recently closed ─────────────────────────────────────────────────────────
+// ── Horizontal scroll strip ─────────────────────────────────────────────────
+//
+// Shared between Recently Closed and Sessions: a single horizontal row with
+// chevron buttons that scroll one entry at a time and a wheel handler that
+// remaps vertical mouse-wheel input into horizontal scroll.
 
-interface RecentlyClosedGridProps {
-  recents: Tab[]
-  onReopen: (tab: Tab) => void
-  onDismiss: (tab: Tab, e: React.MouseEvent<HTMLButtonElement>) => void
+interface ScrollStripState {
+  canScrollLeft: boolean
+  canScrollRight: boolean
+  scrollByOne: (direction: 1 | -1) => void
 }
 
-function RecentlyClosedGrid({
-  recents,
-  onReopen,
-  onDismiss,
-}: RecentlyClosedGridProps): JSX.Element {
-  const listRef = useRef<HTMLUListElement>(null)
+function useHorizontalScrollStrip(
+  listRef: RefObject<HTMLElement | null>,
+  /** Re-bind when the entry count changes (entries dismissed / added). */
+  itemCount: number
+): ScrollStripState {
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(false)
 
-  // Read the width of one entry (plus the row gap) so wheel + buttons step
-  // by a consistent amount regardless of the panel size.
   const stepSize = (): number => {
     const el = listRef.current
     if (!el) return 240
@@ -420,31 +508,34 @@ function RecentlyClosedGrid({
     return (first?.offsetWidth ?? 240) + gap
   }
 
-  const updateScrollState = (): void => {
-    const el = listRef.current
-    if (!el) return
-    setCanScrollLeft(el.scrollLeft > 0)
-    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1)
-  }
-
-  // Translate vertical wheel input into horizontal scroll, since the strip
-  // is a single row. Trackpad horizontal gestures (deltaX dominant) are
-  // intentionally passed through to the native overflow-x scroller —
-  // preventDefault would otherwise eat them. Vertical wheel only intervenes
-  // when the row actually has overflow to consume, so the page can still
-  // scroll past the strip at either end.
   useEffect(() => {
     const el = listRef.current
     if (!el) return
 
+    const updateScrollState = (): void => {
+      setCanScrollLeft(el.scrollLeft > 0)
+      setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1)
+    }
+
     const onWheel = (e: WheelEvent) => {
       if (e.deltaY === 0) return
+      // Trackpad horizontal gestures (deltaX dominant) — let native handle.
       if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return
-      const right = e.deltaY > 0 && el.scrollLeft + el.clientWidth < el.scrollWidth
+      const right =
+        e.deltaY > 0 && el.scrollLeft + el.clientWidth < el.scrollWidth
       const left = e.deltaY < 0 && el.scrollLeft > 0
       if (!right && !left) return
       e.preventDefault()
-      el.scrollLeft += e.deltaY
+      // Firefox reports wheel notches in DOM_DELTA_LINE (~3 per notch);
+      // Chrome / Safari use DOM_DELTA_PIXEL (~100 per notch). Normalise so
+      // one notch moves a visible chunk regardless of browser.
+      const factor =
+        e.deltaMode === 1 // DOM_DELTA_LINE
+          ? 30
+          : e.deltaMode === 2 // DOM_DELTA_PAGE
+            ? el.clientWidth
+            : 1
+      el.scrollLeft += e.deltaY * factor
     }
 
     el.addEventListener('wheel', onWheel, { passive: false })
@@ -459,7 +550,7 @@ function RecentlyClosedGrid({
       el.removeEventListener('scroll', updateScrollState)
       ro.disconnect()
     }
-  }, [recents.length])
+  }, [listRef, itemCount])
 
   const scrollByOne = (direction: 1 | -1): void => {
     const el = listRef.current
@@ -467,56 +558,188 @@ function RecentlyClosedGrid({
     el.scrollBy({ left: direction * stepSize(), behavior: 'smooth' })
   }
 
+  return { canScrollLeft, canScrollRight, scrollByOne }
+}
+
+interface StripFrameProps {
+  className?: string
+  ariaLabelPrefix: string
+  state: ScrollStripState
+  children: React.ReactNode
+  listRef: RefObject<HTMLUListElement | null>
+}
+
+function StripFrame({
+  className = '',
+  ariaLabelPrefix,
+  state,
+  children,
+  listRef,
+}: StripFrameProps): JSX.Element {
   return (
-    <div className="newtab-recents-wrap">
+    <div className={`newtab-recents-wrap ${className}`.trim()}>
       <button
         type="button"
         className="newtab-recents-scroll newtab-recents-scroll--left"
-        onClick={() => scrollByOne(-1)}
-        disabled={!canScrollLeft}
-        aria-label="Scroll recently closed left"
+        onClick={() => state.scrollByOne(-1)}
+        disabled={!state.canScrollLeft}
+        aria-label={`${ariaLabelPrefix} left`}
         title="Scroll left"
       >
         <i className="pi pi-chevron-left" aria-hidden="true" />
       </button>
       <ul ref={listRef} className="newtab-recents" role="list">
-        {recents.map(tab => (
-          <li key={tab.id} className="newtab-recent">
-            <button
-              type="button"
-              className="newtab-recent-row"
-              onClick={() => onReopen(tab)}
-              title={`Reopen ${tab.label ?? tab.type}`}
-            >
-              <span className="newtab-recent-icon" aria-hidden="true">
-                <i className={`pi ${iconForTab(tab.type)}`} />
-              </span>
-              <span className="newtab-recent-label">
-                {tab.label ?? tab.type}
-              </span>
-            </button>
-            <button
-              type="button"
-              className="newtab-recent-dismiss"
-              onClick={e => onDismiss(tab, e)}
-              aria-label={`Remove ${tab.label ?? tab.type} from recently closed`}
-              title="Remove from recently closed"
-            >
-              ×
-            </button>
-          </li>
-        ))}
+        {children}
       </ul>
       <button
         type="button"
         className="newtab-recents-scroll newtab-recents-scroll--right"
-        onClick={() => scrollByOne(1)}
-        disabled={!canScrollRight}
-        aria-label="Scroll recently closed right"
+        onClick={() => state.scrollByOne(1)}
+        disabled={!state.canScrollRight}
+        aria-label={`${ariaLabelPrefix} right`}
         title="Scroll right"
       >
         <i className="pi pi-chevron-right" aria-hidden="true" />
       </button>
     </div>
+  )
+}
+
+// ── Recently closed ─────────────────────────────────────────────────────────
+
+interface RecentlyClosedGridProps {
+  recents: Tab[]
+  onReopen: (tab: Tab) => void
+  onDismiss: (tab: Tab, e: React.MouseEvent<HTMLButtonElement>) => void
+}
+
+function RecentlyClosedGrid({
+  recents,
+  onReopen,
+  onDismiss,
+}: RecentlyClosedGridProps): JSX.Element {
+  const listRef = useRef<HTMLUListElement>(null)
+  const state = useHorizontalScrollStrip(listRef, recents.length)
+
+  return (
+    <StripFrame
+      ariaLabelPrefix="Scroll recently closed"
+      state={state}
+      listRef={listRef}
+    >
+      {recents.map(tab => (
+        <li key={tab.id} className="newtab-recent">
+          <button
+            type="button"
+            className="newtab-recent-row"
+            onClick={() => onReopen(tab)}
+            title={`Reopen ${tab.label ?? tab.type}`}
+          >
+            <span className="newtab-recent-icon" aria-hidden="true">
+              <i className={`pi ${iconForTab(tab.type)}`} />
+            </span>
+            <span className="newtab-recent-label">{tab.label ?? tab.type}</span>
+          </button>
+          <button
+            type="button"
+            className="newtab-recent-dismiss"
+            onClick={e => onDismiss(tab, e)}
+            aria-label={`Remove ${tab.label ?? tab.type} from recently closed`}
+            title="Remove from recently closed"
+          >
+            ×
+          </button>
+        </li>
+      ))}
+    </StripFrame>
+  )
+}
+
+// ── Sessions ────────────────────────────────────────────────────────────────
+
+interface SessionsGridProps {
+  sessions: ClosedWindowEntry[]
+  onRestore: (entry: ClosedWindowEntry, index: number) => void
+  onDismiss: (
+    entry: ClosedWindowEntry,
+    index: number,
+    e: React.MouseEvent<HTMLButtonElement>
+  ) => void
+}
+
+function splitTabsByPanel(tabs: Tab[]): { left: Tab[]; right: Tab[] } {
+  const left: Tab[] = []
+  const right: Tab[] = []
+  for (const tab of tabs) {
+    if (tab.params?.panel === 'right') right.push(tab)
+    else left.push(tab)
+  }
+  return { left, right }
+}
+
+function tabTitlesPreview(tabs: Tab[]): string {
+  if (tabs.length === 0) return '—'
+  return tabs.map(t => t.label ?? t.type).join(', ')
+}
+
+function SessionsGrid({
+  sessions,
+  onRestore,
+  onDismiss,
+}: SessionsGridProps): JSX.Element {
+  const listRef = useRef<HTMLUListElement>(null)
+  const state = useHorizontalScrollStrip(listRef, sessions.length)
+
+  return (
+    <StripFrame
+      ariaLabelPrefix="Scroll sessions"
+      state={state}
+      listRef={listRef}
+    >
+      {sessions.map((entry, index) => {
+        const { left, right } = splitTabsByPanel(entry.state.tabs)
+        const tooltip =
+          `Left (${left.length}): ${tabTitlesPreview(left)}` +
+          ` | Right (${right.length}): ${tabTitlesPreview(right)}`
+        return (
+          <li
+            key={`${entry.closedAt}-${index}`}
+            className="newtab-recent newtab-session"
+          >
+            <button
+              type="button"
+              className="newtab-recent-row newtab-session-row"
+              onClick={() => onRestore(entry, index)}
+              title={tooltip}
+              aria-label={`Restore session — ${tooltip}`}
+            >
+              <span
+                className="newtab-session-side newtab-session-side--left"
+                aria-hidden="true"
+              >
+                <i className="pi pi-arrow-left" />
+                <span className="newtab-session-count">{left.length}</span>
+              </span>
+              <span
+                className="newtab-session-side newtab-session-side--right"
+                aria-hidden="true"
+              >
+                <i className="pi pi-arrow-right" />
+                <span className="newtab-session-count">{right.length}</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              className="newtab-recent-dismiss"
+              onClick={e => onDismiss(entry, index, e)}
+              aria-label="Remove session from list"
+              title="Remove from sessions"
+            >
+              ×
+            </button>
+          </li>
+        )
+      })}
+    </StripFrame>
   )
 }
