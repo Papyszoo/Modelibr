@@ -50,10 +50,26 @@ function kindFilterToApiKind(filter: KindFilter): number {
   }
 }
 
-export function TextureSetList() {
+interface TextureSetListProps {
+  /**
+   * When set, the list is locked to a single kind and the kind-filter
+   * bar is hidden. Used by the dedicated `globalMaterials` and
+   * `modelTextures` tab pages.
+   */
+  kind?: TextureSetKind
+}
+
+function kindToFilter(kind: TextureSetKind): KindFilter {
+  return kind === TextureSetKind.Universal ? 'universal' : 'model-specific'
+}
+
+export function TextureSetList({ kind }: TextureSetListProps = {}) {
   const [showCreateDialog, setShowCreateDialog] = useState(false)
-  const [kindFilter, setKindFilter] = useState<KindFilter>('universal')
+  const [kindFilter, setKindFilter] = useState<KindFilter>(
+    kind !== undefined ? kindToFilter(kind) : 'universal'
+  )
   const [dragOverTab, setDragOverTab] = useState<KindFilter | null>(null)
+  const isKindLocked = kind !== undefined
   const toast = useRef<Toast>(null)
   const { openTextureSetDetailsTab } = useTabContext()
   const uploadProgressContext = useUploadProgress()
@@ -204,70 +220,88 @@ export function TextureSetList() {
         setCount={totalCount || textureSets.length}
         onCreateSet={() => setShowCreateDialog(true)}
         onFilesSelected={files => handleFileDrop(files)}
+        title={
+          kind === TextureSetKind.Universal
+            ? 'Global Materials'
+            : kind === TextureSetKind.ModelSpecific
+              ? 'Model Textures'
+              : undefined
+        }
+        unitLabel={
+          kind === TextureSetKind.Universal
+            ? 'material'
+            : kind === TextureSetKind.ModelSpecific
+              ? 'texture'
+              : undefined
+        }
       />
 
-      <div className="kind-filter-bar">
-        <div className="kind-filter-select p-selectbutton p-component">
-          {kindFilterOptions.map(opt => (
-            <button
-              key={opt.value}
-              type="button"
-              className={
-                'p-button p-component' +
-                (kindFilter === opt.value ? ' p-highlight' : '') +
-                (dragOverTab === opt.value && kindFilter !== opt.value
-                  ? ' p-button-outlined kind-drop-target'
-                  : '')
-              }
-              onClick={() => {
-                if (kindFilter === opt.value) return
-                setKindFilter(opt.value)
-              }}
-              onDragOver={e => {
-                if (
-                  e.dataTransfer.types.includes('application/x-texture-set-id')
-                ) {
+      {!isKindLocked && (
+        <div className="kind-filter-bar">
+          <div className="kind-filter-select p-selectbutton p-component">
+            {kindFilterOptions.map(opt => (
+              <button
+                key={opt.value}
+                type="button"
+                className={
+                  'p-button p-component' +
+                  (kindFilter === opt.value ? ' p-highlight' : '') +
+                  (dragOverTab === opt.value && kindFilter !== opt.value
+                    ? ' p-button-outlined kind-drop-target'
+                    : '')
+                }
+                onClick={() => {
+                  if (kindFilter === opt.value) return
+                  setKindFilter(opt.value)
+                }}
+                onDragOver={e => {
+                  if (
+                    e.dataTransfer.types.includes(
+                      'application/x-texture-set-id'
+                    )
+                  ) {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setDragOverTab(opt.value)
+                  }
+                }}
+                onDragLeave={() => setDragOverTab(null)}
+                onDrop={async e => {
                   e.preventDefault()
                   e.stopPropagation()
-                  setDragOverTab(opt.value)
-                }
-              }}
-              onDragLeave={() => setDragOverTab(null)}
-              onDrop={async e => {
-                e.preventDefault()
-                e.stopPropagation()
-                setDragOverTab(null)
-                const textureSetId = e.dataTransfer.getData(
-                  'application/x-texture-set-id'
-                )
-                if (!textureSetId) return
-                // Only change kind when dropping on a different tab
-                if (opt.value === kindFilter) return
-                try {
-                  await updateTextureSetKind(Number(textureSetId), opt.kind)
-                  toast.current?.show({
-                    severity: 'success',
-                    summary: 'Kind Changed',
-                    detail: `Texture set moved to ${opt.label}`,
-                    life: 3000,
-                  })
-                  invalidateTextureSets()
-                } catch (error) {
-                  console.error('Failed to change texture set kind:', error)
-                  toast.current?.show({
-                    severity: 'error',
-                    summary: 'Error',
-                    detail: 'Failed to change texture set kind',
-                    life: 3000,
-                  })
-                }
-              }}
-            >
-              <span className="p-button-label">{opt.label}</span>
-            </button>
-          ))}
+                  setDragOverTab(null)
+                  const textureSetId = e.dataTransfer.getData(
+                    'application/x-texture-set-id'
+                  )
+                  if (!textureSetId) return
+                  // Only change kind when dropping on a different tab
+                  if (opt.value === kindFilter) return
+                  try {
+                    await updateTextureSetKind(Number(textureSetId), opt.kind)
+                    toast.current?.show({
+                      severity: 'success',
+                      summary: 'Kind Changed',
+                      detail: `Texture set moved to ${opt.label}`,
+                      life: 3000,
+                    })
+                    invalidateTextureSets()
+                  } catch (error) {
+                    console.error('Failed to change texture set kind:', error)
+                    toast.current?.show({
+                      severity: 'error',
+                      summary: 'Error',
+                      detail: 'Failed to change texture set kind',
+                      life: 3000,
+                    })
+                  }
+                }}
+              >
+                <span className="p-button-label">{opt.label}</span>
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       <TextureSetGrid
         textureSets={textureSets}

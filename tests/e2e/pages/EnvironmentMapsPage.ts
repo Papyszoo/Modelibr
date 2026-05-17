@@ -76,13 +76,24 @@ export class EnvironmentMapsPage {
         ) {
             await navMenuItem.first().click();
         } else {
+            // No nav menubar in this app variant — go through the New Tab page:
+            // click "+" on the dock bar, then click the Environment Maps tile.
             const addButton = this.page.locator(".dock-bar-left .dock-add-button");
             await expect(addButton).toBeVisible({ timeout: 10000 });
             await addButton.click();
 
-            const addMenu = this.page.locator(".dock-add-menu");
-            await expect(addMenu).toBeVisible({ timeout: 5000 });
-            await addMenu.getByText("Environment Maps", { exact: true }).click();
+            const newtabPage = this.page.locator(".newtab-page").last();
+            await expect(newtabPage).toBeVisible({ timeout: 5000 });
+            await newtabPage
+                .locator(".newtab-tile")
+                .filter({
+                    has: this.page.locator(".newtab-tile-title", {
+                        hasText: "Environment Maps",
+                    }),
+                })
+                .first()
+                .click();
+            await expect(newtabPage).toBeHidden({ timeout: 5000 });
         }
 
         await this.waitForListReady();

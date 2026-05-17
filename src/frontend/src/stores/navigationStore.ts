@@ -26,6 +26,9 @@ export interface WindowState {
 
 export interface ClosedWindowEntry {
   closedAt: string
+  /** The windowId the entry was archived from. Lets consumers identify
+   *  and de-dup their own window from the Sessions list. */
+  windowId: string
   state: WindowState
 }
 
@@ -50,6 +53,14 @@ export interface NavigationStore {
   // ── Actions: window lifecycle ──────────────────────────────────────
   initWindow: (windowId: string) => void
   removeWindow: (windowId: string) => void
+  /**
+   * Promote a pending-archive entry for `windowId` back into
+   * `activeWindows`. Used on mount when the same `windowId` shows up
+   * again (refresh case): we self-archived on the previous pagehide,
+   * and now we want to restore that state rather than start fresh.
+   * No-op if there is no matching entry.
+   */
+  reclaimWindow: (windowId: string) => void
   touchWindow: (windowId: string) => void
 
   // ── Actions: tab management ────────────────────────────────────────
@@ -72,6 +83,13 @@ export interface NavigationStore {
   addRecentlyClosedTab: (tab: Tab) => void
   removeRecentlyClosedTab: (tabId: string) => void
   restoreWindow: (index: number, windowId: string) => void
+  /**
+   * Discard one closed-window entry without restoring it. Identified by
+   * the `closedAt` ISO timestamp + originating `windowId`, since UI
+   * consumers commonly filter/sort the array and a positional index
+   * would alias the wrong entry.
+   */
+  removeClosedWindow: (key: { closedAt: string; windowId: string }) => void
 
   // ── Actions: internal UI state per tab ─────────────────────────────
   setTabUiState: (
@@ -124,6 +142,8 @@ export function getTabLabel(
     stageName,
   } = options
   switch (type) {
+    case 'newTab':
+      return 'New Tab'
     case 'modelList':
       return 'Models'
     case 'modelViewer':
@@ -131,6 +151,10 @@ export function getTabLabel(
       return modelId ? `Model ${modelId}` : 'Model Viewer'
     case 'textureSets':
       return 'Texture Sets'
+    case 'globalMaterials':
+      return 'Global Materials'
+    case 'modelTextures':
+      return 'Model Textures'
     case 'textureSetViewer':
       if (setName) return setName
       return setId ? `Set ${setId}` : 'Texture Set'
@@ -289,6 +313,15 @@ export const useNavigationStore = create<NavigationStore>()(
       },
 
       removeWindow: (windowId: string) => {
+        // Early-out BEFORE `set` runs. Zustand `persist` writes on every
+        // `set` call regardless of whether the state actually changed, so
+        // a no-op archive (the windowId isn't in our in-memory state —
+        // which happens when a peer browser tab closes and we never saw
+        // its `initWindow` write) would otherwise clobber peer-written
+        // localStorage entries (e.g. a manually archived session). See
+        // tests/e2e/features/02-dock-system/05-sessions.feature.
+        if (!get().activeWindows[windowId]) return
+
         set(state => {
           const windowState = state.activeWindows[windowId]
           if (!windowState) return state
@@ -296,12 +329,40 @@ export const useNavigationStore = create<NavigationStore>()(
           const { [windowId]: _, ...rest } = state.activeWindows
           return {
             activeWindows: rest,
+            // Drop any pre-existing archive for the same windowId so a
+            // tab repeatedly self-archiving on pagehide doesn't pile
+            // duplicates into recentlyClosedWindows.
             recentlyClosedWindows: [
-              { closedAt: new Date().toISOString(), state: windowState },
-              ...state.recentlyClosedWindows,
+              {
+                closedAt: new Date().toISOString(),
+                windowId,
+                state: windowState,
+              },
+              ...state.recentlyClosedWindows.filter(
+                e => e.windowId !== windowId
+              ),
             ].slice(0, MAX_RECENTLY_CLOSED_WINDOWS),
           }
         })
+      },
+
+      reclaimWindow: (windowId: string) => {
+        const archived = get().recentlyClosedWindows.find(
+          e => e.windowId === windowId
+        )
+        if (!archived) return
+        set(state => ({
+          activeWindows: {
+            ...state.activeWindows,
+            [windowId]: {
+              ...archived.state,
+              lastActiveAt: new Date().toISOString(),
+            },
+          },
+          recentlyClosedWindows: state.recentlyClosedWindows.filter(
+            e => e.windowId !== windowId
+          ),
+        }))
       },
 
       touchWindow: (windowId: string) => {
@@ -587,6 +648,18 @@ export const useNavigationStore = create<NavigationStore>()(
         })
       },
 
+      removeClosedWindow: ({ closedAt, windowId }) => {
+        const found = get().recentlyClosedWindows.some(
+          e => e.closedAt === closedAt && e.windowId === windowId
+        )
+        if (!found) return
+        set(state => ({
+          recentlyClosedWindows: state.recentlyClosedWindows.filter(
+            e => !(e.closedAt === closedAt && e.windowId === windowId)
+          ),
+        }))
+      },
+
       // ── Tab internal UI state ───────────────────────────────────────
 
       setTabUiState: (windowId, tabId, key, value) => {
@@ -648,6 +721,7 @@ export const useNavigationStore = create<NavigationStore>()(
               stale.push(id)
               movedToRecent.push({
                 closedAt: new Date().toISOString(),
+                windowId: id,
                 state: ws,
               })
             }
