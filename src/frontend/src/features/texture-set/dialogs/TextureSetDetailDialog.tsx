@@ -1,7 +1,7 @@
 import './dialogs.css'
 
 import { Button } from 'primereact/button'
-import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog'
+import { confirmDialog } from 'primereact/confirmdialog'
 import { Dialog } from 'primereact/dialog'
 import { TabPanel, TabView } from 'primereact/tabview'
 import { Toast } from 'primereact/toast'
@@ -167,7 +167,6 @@ export function TextureSetDetailDialog({
         className="texture-set-detail-dialog"
       >
         <Toast ref={toast} />
-        <ConfirmDialog />
 
         <div className="set-overview">
           <div className="set-info">
