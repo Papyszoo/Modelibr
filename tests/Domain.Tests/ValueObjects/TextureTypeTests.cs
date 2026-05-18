@@ -13,6 +13,7 @@ public class TextureTypeTests
     [InlineData(TextureType.AO)]
     [InlineData(TextureType.Roughness)]
     [InlineData(TextureType.Metallic)]
+    [InlineData(TextureType.Specular)]
     [InlineData(TextureType.Emissive)]
     [InlineData(TextureType.Bump)]
     [InlineData(TextureType.Alpha)]
@@ -48,8 +49,8 @@ public class TextureTypeTests
         // Act
         var supportedTypes = TextureTypeExtensions.GetSupportedTypes();
 
-        // Assert - Diffuse and Specular have been removed, SplitChannel added, now 11 types
-        Assert.Equal(11, supportedTypes.Count);
+        // Assert - Diffuse removed, SplitChannel + Specular present, now 12 types
+        Assert.Equal(12, supportedTypes.Count);
         Assert.Contains(TextureType.SplitChannel, supportedTypes);
         Assert.Contains(TextureType.Albedo, supportedTypes);
         Assert.Contains(TextureType.Normal, supportedTypes);
@@ -57,6 +58,7 @@ public class TextureTypeTests
         Assert.Contains(TextureType.AO, supportedTypes);
         Assert.Contains(TextureType.Roughness, supportedTypes);
         Assert.Contains(TextureType.Metallic, supportedTypes);
+        Assert.Contains(TextureType.Specular, supportedTypes);
         Assert.Contains(TextureType.Emissive, supportedTypes);
         Assert.Contains(TextureType.Bump, supportedTypes);
         Assert.Contains(TextureType.Alpha, supportedTypes);
@@ -70,6 +72,7 @@ public class TextureTypeTests
     [InlineData(TextureType.AO, "Ambient Occlusion map")]
     [InlineData(TextureType.Roughness, "Surface roughness map")]
     [InlineData(TextureType.Metallic, "Metallic surface map")]
+    [InlineData(TextureType.Specular, "Specular reflection map")]
     [InlineData(TextureType.Emissive, "Emissive map for glowing areas")]
     [InlineData(TextureType.Bump, "Bump map for surface detail")]
     [InlineData(TextureType.Alpha, "Alpha map for transparency")]
@@ -115,6 +118,7 @@ public class TextureTypeTests
     [InlineData(TextureType.AO)]
     [InlineData(TextureType.Roughness)]
     [InlineData(TextureType.Metallic)]
+    [InlineData(TextureType.Specular)]
     [InlineData(TextureType.Emissive)]
     [InlineData(TextureType.Alpha)]
     public void IsHeightRelatedType_WithNonHeightTypes_ReturnsFalse(TextureType textureType)

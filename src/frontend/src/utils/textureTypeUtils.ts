@@ -8,7 +8,7 @@ export interface TextureTypeInfo {
 }
 
 // Texture type definitions with visual indicators
-// Note: Diffuse and Specular have been removed (not PBR standard)
+// Note: Diffuse has been removed (use Albedo instead)
 export const TEXTURE_TYPE_INFO: Partial<Record<TextureType, TextureTypeInfo>> =
   {
     [TextureType.SplitChannel]: {
@@ -53,6 +53,13 @@ export const TEXTURE_TYPE_INFO: Partial<Record<TextureType, TextureTypeInfo>> =
       description: 'Metallic map - defines metallic vs non-metallic areas',
       color: '#6b7280', // Silver/gray
       icon: 'pi-star-fill',
+    },
+    [TextureType.Specular]: {
+      label: 'Specular',
+      description:
+        'Specular map - defines specular reflection color/intensity (legacy/non-PBR workflows)',
+      color: '#e5e7eb', // Light silver
+      icon: 'pi-sparkles',
     },
     [TextureType.Emissive]: {
       label: 'Emissive',
