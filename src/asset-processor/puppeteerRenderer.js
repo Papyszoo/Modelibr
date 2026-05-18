@@ -801,7 +801,7 @@ export class PuppeteerRenderer {
             const renderer = window.modelRenderer.renderer
             const textureLoader = new THREE.TextureLoader()
 
-            // Map texture type enum values to material properties
+            // Map texture type enum values to MeshPhysicalMaterial properties
             const textureTypeMap = {
               1: 'map', // Albedo
               2: 'normalMap',
@@ -810,7 +810,7 @@ export class PuppeteerRenderer {
               5: 'roughnessMap',
               6: 'metalnessMap',
               7: 'map', // Diffuse (legacy)
-              8: 'specularMap',
+              8: 'specularColorMap', // Specular (MeshPhysicalMaterial)
               9: 'emissiveMap', // Emissive
               10: 'bumpMap', // Bump
               11: 'alphaMap', // Alpha
@@ -822,7 +822,7 @@ export class PuppeteerRenderer {
               Roughness: 'roughnessMap',
               Metallic: 'metalnessMap',
               Diffuse: 'map',
-              Specular: 'specularMap',
+              Specular: 'specularColorMap',
               BaseColor: 'map',
               AmbientOcclusion: 'aoMap',
               Emissive: 'emissiveMap',
@@ -974,7 +974,11 @@ export class PuppeteerRenderer {
             }
 
             // Texture types that carry color data (need sRGB color space)
-            const colorTextureProps = new Set(['map', 'emissiveMap'])
+            const colorTextureProps = new Set([
+              'map',
+              'emissiveMap',
+              'specularColorMap',
+            ])
 
             const loadedTextures = {}
             for (const [type, data] of Object.entries(textures)) {
@@ -1046,8 +1050,12 @@ export class PuppeteerRenderer {
                   ? child.material[0]?.name || ''
                   : child.material?.name || ''
 
-                // Create new material with white base color for textures
-                child.material = new THREE.MeshStandardMaterial({
+                // Create new material with white base color for textures.
+                // specularIntensity defaults to 1 on MeshPhysicalMaterial,
+                // which adds a dielectric sheen even without a Specular map
+                // and visibly washes the albedo. Disable it unless a real
+                // specularColorMap is present.
+                child.material = new THREE.MeshPhysicalMaterial({
                   name: originalName,
                   color: loadedTextures.map
                     ? 0xffffff
@@ -1055,6 +1063,7 @@ export class PuppeteerRenderer {
                   metalness: loadedTextures.metalnessMap ? 1 : 0,
                   roughness: loadedTextures.roughnessMap ? 1 : 0.8,
                   envMapIntensity: 1.0,
+                  specularIntensity: loadedTextures.specularColorMap ? 1 : 0,
                 })
 
                 // Apply each loaded texture with proper material settings
@@ -1072,7 +1081,16 @@ export class PuppeteerRenderer {
                       child.material.emissiveIntensity = 1.0
                     }
                     if (property === 'displacementMap') {
-                      child.material.displacementScale = 0.1
+                      // Scale conservatively + bias by -scale/2 so the
+                      // heightmap's mid-grey means "no displacement";
+                      // without the bias every vertex inflates outward and
+                      // only the grout *recesses*. Triplanar projection is
+                      // intentionally NOT applied here — it samples by
+                      // world-axis projection and produces chevron
+                      // patterns on curved surfaces; the geometry's
+                      // native UVs project the heightmap correctly.
+                      child.material.displacementScale = 0.02
+                      child.material.displacementBias = -0.01
                     }
                     if (property === 'normalMap') {
                       child.material.normalScale = new THREE.Vector2(1, 1)
