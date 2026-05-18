@@ -30,8 +30,10 @@ public enum TextureType
     Metallic = 6,
     
     // Diffuse = 7 (REMOVED - use Albedo instead)
-    // Specular = 8 (REMOVED - not PBR standard)
-    
+
+    /// <summary>Specular map - defines specular reflection color/intensity (legacy / non-PBR workflows)</summary>
+    Specular = 8,
+
     /// <summary>Emissive map - areas where the mesh emits light</summary>
     Emissive = 9,
     
@@ -59,6 +61,7 @@ public static class TextureTypeExtensions
         TextureType.AO,
         TextureType.Roughness,
         TextureType.Metallic,
+        TextureType.Specular,
         TextureType.Emissive,
         TextureType.Bump,
         TextureType.Alpha,
@@ -121,6 +124,7 @@ public static class TextureTypeExtensions
             TextureType.AO => "Ambient Occlusion map",
             TextureType.Roughness => "Surface roughness map",
             TextureType.Metallic => "Metallic surface map",
+            TextureType.Specular => "Specular reflection map",
             TextureType.Emissive => "Emissive map for glowing areas",
             TextureType.Bump => "Bump map for surface detail",
             TextureType.Alpha => "Alpha map for transparency",
