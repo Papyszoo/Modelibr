@@ -11,6 +11,7 @@ import {
 } from '@/features/model-viewer/hooks/useChannelExtractedTextures'
 import { useModelObject } from '@/features/model-viewer/hooks/useModelObject'
 import { getFileUrl } from '@/features/models/api/modelApi'
+import { weldByPosition } from '@/shared/three/weldGeometry'
 import { TextureChannel, type TextureSetDto, TextureType } from '@/types'
 
 /** Map of material names to their texture sets. Key "" means apply to all meshes. */
@@ -23,7 +24,7 @@ interface TexturedModelProps {
   materialTextureSets: MaterialTextureSets
 }
 
-// Material property slot names used by MeshStandardMaterial
+// Material property slot names used by MeshPhysicalMaterial
 const TEXTURE_SLOTS: Array<{
   slot: string
   type: TextureType
@@ -33,6 +34,7 @@ const TEXTURE_SLOTS: Array<{
   { slot: 'normalMap', type: TextureType.Normal },
   { slot: 'roughnessMap', type: TextureType.Roughness },
   { slot: 'metalnessMap', type: TextureType.Metallic },
+  { slot: 'specularColorMap', type: TextureType.Specular },
   { slot: 'aoMap', type: TextureType.AO },
   { slot: 'emissiveMap', type: TextureType.Emissive },
   { slot: 'bumpMap', type: TextureType.Bump },
@@ -85,27 +87,35 @@ function getMeshMaterialNames(mesh: THREE.Mesh): string[] {
 }
 
 /**
- * Build a MeshStandardMaterial from loaded textures for a given material key prefix.
+ * Build a MeshPhysicalMaterial from loaded textures for a given material key prefix.
  */
 function buildMaterialFromTextures(
   loadedTextures: Record<string, THREE.Texture | null>,
   materialPrefix: string
-): THREE.MeshStandardMaterial {
+): THREE.MeshPhysicalMaterial {
   const get = (slot: string) =>
     loadedTextures[`${materialPrefix}${KEY_SEP}${slot}`] ?? null
   const hasMap = get('map') !== null
 
-  const material = new THREE.MeshStandardMaterial({
+  const material = new THREE.MeshPhysicalMaterial({
     color: hasMap ? 0xffffff : new THREE.Color(0.7, 0.7, 0.9),
     metalness: hasMap ? 1 : 0.3,
     roughness: hasMap ? 1 : 0.4,
     envMapIntensity: 1.0,
+    // MeshPhysicalMaterial enables a dielectric specular channel by default
+    // (intensity=1, color=white). Without an explicit Specular texture we
+    // want MeshStandardMaterial-equivalent behavior, otherwise the channel
+    // adds a sheen that washes the albedo toward white.
+    specularIntensity: get('specularColorMap') ? 1 : 0,
   })
 
   if (get('map')) material.map = get('map')
   if (get('normalMap')) material.normalMap = get('normalMap')
   if (get('roughnessMap')) material.roughnessMap = get('roughnessMap')
   if (get('metalnessMap')) material.metalnessMap = get('metalnessMap')
+  if (get('specularColorMap')) {
+    material.specularColorMap = get('specularColorMap')
+  }
   if (get('aoMap')) material.aoMap = get('aoMap')
   if (get('emissiveMap')) {
     material.emissiveMap = get('emissiveMap')
@@ -116,7 +126,14 @@ function buildMaterialFromTextures(
     material.alphaMap = get('alphaMap')
     material.transparent = true
   }
-  if (get('displacementMap')) material.displacementMap = get('displacementMap')
+  if (get('displacementMap')) {
+    material.displacementMap = get('displacementMap')
+    // Scale conservatively + bias by -scale/2 so the heightmap's mid-grey
+    // means "no displacement"; without the bias every vertex inflates
+    // outward (only grout *recesses* — tile tops stay near the surface).
+    material.displacementScale = 0.02
+    material.displacementBias = -0.01
+  }
 
   return material
 }
@@ -136,7 +153,7 @@ function applyMaterialTextures(
   const hasWildcard = materialNames.includes('')
 
   // Pre-build materials for each material name that has textures
-  const builtMaterials: Record<string, THREE.MeshStandardMaterial> = {}
+  const builtMaterials: Record<string, THREE.MeshPhysicalMaterial> = {}
   if (texturesReady) {
     for (const matName of materialNames) {
       builtMaterials[matName] = buildMaterialFromTextures(
@@ -147,7 +164,7 @@ function applyMaterialTextures(
   }
 
   // Shared fallback material for unmatched meshes (avoids per-mesh allocation)
-  const fallbackMaterial = new THREE.MeshStandardMaterial({
+  const fallbackMaterial = new THREE.MeshPhysicalMaterial({
     color: new THREE.Color(0.7, 0.7, 0.9),
     metalness: 0.3,
     roughness: 0.4,
@@ -156,16 +173,19 @@ function applyMaterialTextures(
 
   clonedModel.traverse(child => {
     if (!child.isMesh) return
-    child.castShadow = true
-    child.receiveShadow = true
+    const mesh = child as THREE.Mesh
+    mesh.castShadow = true
+    mesh.receiveShadow = true
 
-    const meshMatNames = getMeshMaterialNames(child as THREE.Mesh)
+    const meshMatNames = getMeshMaterialNames(mesh)
 
     // Find matching material: check mesh material names against our map
     let matched = false
+    let appliedMaterial: THREE.MeshPhysicalMaterial | null = null
     for (const meshMatName of meshMatNames) {
       if (meshMatName in builtMaterials) {
-        ;(child as THREE.Mesh).material = builtMaterials[meshMatName]
+        appliedMaterial = builtMaterials[meshMatName]
+        mesh.material = appliedMaterial
         matched = true
         break
       }
@@ -173,12 +193,35 @@ function applyMaterialTextures(
 
     // Fallback: use wildcard "" material (applies to all unmatched meshes)
     if (!matched && hasWildcard && texturesReady) {
-      ;(child as THREE.Mesh).material = builtMaterials['']
+      appliedMaterial = builtMaterials['']
+      mesh.material = appliedMaterial
     }
 
     // Strip embedded materials from unmatched meshes to match worker behavior
     if (!matched && !hasWildcard) {
-      ;(child as THREE.Mesh).material = fallbackMaterial
+      mesh.material = fallbackMaterial
+    }
+
+    // Weld duplicated edge vertices when this mesh is about to be displaced.
+    // User-uploaded models with hard edges (e.g., game assets, low-poly
+    // boxes) carry the same per-face vertex duplication as three's stock
+    // primitives, and would tear open along every seam under displacement.
+    // Cache the welded geometry on userData so we only do the work once per
+    // (geometry, displacement-applied) pair.
+    if (appliedMaterial?.displacementMap) {
+      const cached = mesh.geometry.userData.weldedForDisplacement as
+        | THREE.BufferGeometry
+        | undefined
+      if (cached) {
+        mesh.geometry = cached
+      } else {
+        const welded = weldByPosition(mesh.geometry)
+        if (welded !== mesh.geometry) {
+          // Stash on the *original* geometry so re-traversals reuse it.
+          mesh.geometry.userData.weldedForDisplacement = welded
+          mesh.geometry = welded
+        }
+      }
     }
   })
 }
