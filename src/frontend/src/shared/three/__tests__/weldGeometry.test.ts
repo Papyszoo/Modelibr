@@ -95,7 +95,9 @@ describe('weldByPosition', () => {
     const geom = new THREE.BufferGeometry()
     geom.setAttribute('position', positionAttr)
     geom.setAttribute('uv', uvAttr)
-    geom.setIndex(new THREE.BufferAttribute(new Uint16Array([0, 1, 2, 3, 4, 5]), 1))
+    geom.setIndex(
+      new THREE.BufferAttribute(new Uint16Array([0, 1, 2, 3, 4, 5]), 1)
+    )
 
     const welded = weldByPosition(geom)
 
