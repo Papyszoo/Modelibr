@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js'
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 
 import { getFileUrl } from '@/features/models/api/modelApi'
-import { weldByPosition } from '@/shared/three/weldGeometry'
+import { applyDispNormalDisplacement } from '@/shared/three/sharedDisplacementNormal'
 import { TextureChannel, type TextureSetDto, TextureType } from '@/types'
 import { isExrFile, isTiffFile } from '@/utils/fileUtils'
 import { decodeTiffBlobToBitmap } from '@/utils/tiffTextureLoader'
 
+import { createPreviewGeometry } from '../utils/createPreviewGeometry'
 import { type GeometryType } from './GeometrySelector'
 
 interface GeometryParams {
@@ -168,80 +168,6 @@ const MATERIAL_PROP_TO_TYPE_KEY: Record<string, string[]> = {
   displacementMap: ['Height', 'Displacement'],
 }
 
-/**
- * Copy `uv` to `uv2` if `uv2` doesn't already exist. AO maps require a
- * second UV set; without this the post-weld UVs (which keep only the
- * first occurrence per merged position) propagate into uv2 too, causing
- * misaligned AO at rim/seam vertices.
- */
-function ensureUv2(geometry: THREE.BufferGeometry): THREE.BufferGeometry {
-  const uv = geometry.getAttribute('uv')
-  if (uv && !geometry.getAttribute('uv2')) {
-    geometry.setAttribute('uv2', uv.clone())
-  }
-  return geometry
-}
-
-/**
- * Compound cylinder: welded open-ended side + two independent
- * CircleGeometry caps merged into one buffer. A simple welded
- * CylinderGeometry would collapse cap-and-side rim vertices into a single
- * averaged-normal vertex (~45° outward-up), which flares the rim badly
- * under displacement. Keeping the rim vertices distinct between side and
- * cap preserves the hard 90° edge — they share position, so adjacent
- * triangles meet visually, but each piece keeps its own normal/UV.
- */
-function createCylinderGeometry(): THREE.BufferGeometry {
-  const side = weldByPosition(
-    ensureUv2(new THREE.CylinderGeometry(1, 1, 2, 128, 128, true))
-  )
-
-  const topCap = ensureUv2(new THREE.CircleGeometry(1, 128))
-  topCap.rotateX(-Math.PI / 2)
-  topCap.translate(0, 1, 0)
-
-  const bottomCap = ensureUv2(new THREE.CircleGeometry(1, 128))
-  bottomCap.rotateX(Math.PI / 2)
-  bottomCap.translate(0, -1, 0)
-
-  const merged = mergeGeometries([side, topCap, bottomCap])
-  if (!merged) {
-    return weldByPosition(
-      ensureUv2(new THREE.CylinderGeometry(1, 1, 2, 128, 128, false))
-    )
-  }
-  return merged
-}
-
-/**
- * Create a BufferGeometry for the given primitive type.
- *
- * Welding by position collapses seam/edge vertex duplicates so adjacent
- * triangles share a single normal and stay watertight under displacement.
- * `uv → uv2` is copied *before* welding so AO sampling at rim/seam
- * vertices uses the same (welded) UV the color textures do. The cylinder
- * is a compound geometry — see `createCylinderGeometry`.
- */
-function createGeometry(geometryType: GeometryType): THREE.BufferGeometry {
-  switch (geometryType) {
-    case 'plane':
-      // High subdivision (512) so displacement mapping captures fine texture detail
-      return ensureUv2(new THREE.PlaneGeometry(2.4, 2.4, 512, 512))
-    case 'box':
-      return weldByPosition(
-        ensureUv2(new THREE.BoxGeometry(2, 2, 2, 128, 128, 128))
-      )
-    case 'sphere':
-      return weldByPosition(ensureUv2(new THREE.SphereGeometry(1.2, 128, 128)))
-    case 'cylinder':
-      return createCylinderGeometry()
-    case 'torus':
-      return weldByPosition(ensureUv2(new THREE.TorusGeometry(1, 0.4, 64, 128)))
-    default:
-      return ensureUv2(new THREE.PlaneGeometry(2.4, 2.4, 512, 512))
-  }
-}
-
 /** Texture properties that carry color data (need sRGB encoding) */
 const COLOR_TEXTURE_PROPS = new Set(['map', 'emissiveMap', 'specularColorMap'])
 
@@ -364,7 +290,10 @@ function TexturedMesh({
   // onLoadingChange intentionally excluded — stable callback from parent
 
   // Build geometry (memoised — depends only on geometry type)
-  const geometry = useMemo(() => createGeometry(geometryType), [geometryType])
+  const geometry = useMemo(
+    () => createPreviewGeometry(geometryType),
+    [geometryType]
+  )
 
   const hasNormalMap = !!loadedTextures.normalMap
 
@@ -551,6 +480,9 @@ function TexturedMesh({
     <mesh ref={meshRef} castShadow receiveShadow geometry={geometry}>
       <meshPhysicalMaterial
         key={materialKey}
+        ref={(mat: THREE.MeshPhysicalMaterial | null) => {
+          if (mat) applyDispNormalDisplacement(mat)
+        }}
         map={(!isDisabled('map') && t.map) || null}
         normalMap={(!isDisabled('normalMap') && t.normalMap) || null}
         normalScale={normalScale}
