@@ -8,6 +8,7 @@ export enum TextureType {
   AO = 4,
   Roughness = 5,
   Metallic = 6,
+  Specular = 8,
   Emissive = 9,
   Bump = 10,
   Alpha = 11,

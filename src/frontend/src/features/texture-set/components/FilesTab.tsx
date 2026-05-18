@@ -29,7 +29,7 @@ interface FilesTabProps {
 interface FileMapping {
   fileId: number
   fileName: string
-  rgbOption: 'none' | 'albedo' | 'normal' | 'emissive' | 'split'
+  rgbOption: 'none' | 'albedo' | 'normal' | 'specular' | 'emissive' | 'split'
   rChannel: TextureType | null
   gChannel: TextureType | null
   bChannel: TextureType | null
@@ -41,6 +41,7 @@ const rgbOptions = [
   { label: 'None', value: 'none' },
   { label: 'Albedo', value: 'albedo' },
   { label: 'Normal', value: 'normal' },
+  { label: 'Specular', value: 'specular' },
   { label: 'Emissive', value: 'emissive' },
   { label: 'Split Channels', value: 'split' },
 ]
@@ -108,6 +109,9 @@ function inferRgbOption(textures: TextureDto[]): FileMapping['rgbOption'] {
 
   const normal = textures.find(t => t.textureType === TextureType.Normal)
   if (normal) return 'normal'
+
+  const specular = textures.find(t => t.textureType === TextureType.Specular)
+  if (specular) return 'specular'
 
   const emissive = textures.find(t => t.textureType === TextureType.Emissive)
   if (emissive) return 'emissive'
@@ -189,6 +193,7 @@ export function FilesTab({ textureSet, onMappingChanged }: FilesTabProps) {
         const typeMap: Record<string, TextureType> = {
           albedo: TextureType.Albedo,
           normal: TextureType.Normal,
+          specular: TextureType.Specular,
           emissive: TextureType.Emissive,
         }
         const textureType = typeMap[opt.value]
@@ -343,6 +348,7 @@ export function FilesTab({ textureSet, onMappingChanged }: FilesTabProps) {
       let targetType: TextureType | null = null
       if (newOption === 'albedo') targetType = TextureType.Albedo
       else if (newOption === 'normal') targetType = TextureType.Normal
+      else if (newOption === 'specular') targetType = TextureType.Specular
       else if (newOption === 'emissive') targetType = TextureType.Emissive
 
       if (targetType) {
