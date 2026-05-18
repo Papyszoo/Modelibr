@@ -1086,6 +1086,75 @@ export class PuppeteerRenderer {
                       // outward and only the grout *recesses*.
                       child.material.displacementScale = 0.02
                       child.material.displacementBias = -0.01
+                      // Push along an averaged-by-position normal so hard
+                      // edges (cube faces, hard-edge user meshes) stay
+                      // watertight while keeping per-face UVs intact for
+                      // color sampling. See the frontend equivalent in
+                      // shared/three/sharedDisplacementNormal.ts.
+                      const geom = child.geometry
+                      if (
+                        geom &&
+                        geom.getAttribute('position') &&
+                        geom.getAttribute('normal') &&
+                        !geom.getAttribute('aDispNormal')
+                      ) {
+                        const pos = geom.getAttribute('position')
+                        const nor = geom.getAttribute('normal')
+                        const cnt = pos.count
+                        const mult = 1 / 1e-4
+                        const groups = new Map()
+                        for (let i = 0; i < cnt; i++) {
+                          const k = `${Math.round(pos.getX(i) * mult)},${Math.round(pos.getY(i) * mult)},${Math.round(pos.getZ(i) * mult)}`
+                          let g = groups.get(k)
+                          if (!g) {
+                            g = []
+                            groups.set(k, g)
+                          }
+                          g.push(i)
+                        }
+                        const out = new Float32Array(cnt * 3)
+                        for (const idxs of groups.values()) {
+                          let x = 0,
+                            y = 0,
+                            z = 0
+                          for (const i of idxs) {
+                            x += nor.getX(i)
+                            y += nor.getY(i)
+                            z += nor.getZ(i)
+                          }
+                          const len = Math.hypot(x, y, z)
+                          if (len > 0) {
+                            x /= len
+                            y /= len
+                            z /= len
+                          }
+                          for (const i of idxs) {
+                            out[i * 3] = x
+                            out[i * 3 + 1] = y
+                            out[i * 3 + 2] = z
+                          }
+                        }
+                        geom.setAttribute(
+                          'aDispNormal',
+                          new THREE.BufferAttribute(out, 3)
+                        )
+                      }
+                      child.material.onBeforeCompile = shader => {
+                        shader.vertexShader = shader.vertexShader.replace(
+                          '#include <displacementmap_pars_vertex>',
+                          `#include <displacementmap_pars_vertex>
+attribute vec3 aDispNormal;`
+                        )
+                        shader.vertexShader = shader.vertexShader.replace(
+                          '#include <displacementmap_vertex>',
+                          `#ifdef USE_DISPLACEMENTMAP
+	transformed += normalize( aDispNormal ) * ( texture2D( displacementMap, vDisplacementMapUv ).x * displacementScale + displacementBias );
+#endif`
+                        )
+                      }
+                      child.material.customProgramCacheKey = () =>
+                        'disp-normal'
+                      child.material.needsUpdate = true
                     }
                     if (property === 'normalMap') {
                       child.material.normalScale = new THREE.Vector2(1, 1)
