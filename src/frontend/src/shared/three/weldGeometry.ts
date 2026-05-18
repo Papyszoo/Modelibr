@@ -73,7 +73,9 @@ export function weldByPosition(
       attr instanceof THREE.InterleavedBufferAttribute
         ? attr.data.array
         : attr.array
-    const ArrCtor = srcArray.constructor as new (length: number) => typeof srcArray
+    const ArrCtor = srcArray.constructor as new (
+      length: number
+    ) => typeof srcArray
     const newArr = new ArrCtor(newCount * itemSize)
     const seen = new Uint8Array(newCount)
     for (let i = 0; i < oldCount; i++) {

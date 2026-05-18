@@ -232,15 +232,11 @@ function createGeometry(geometryType: GeometryType): THREE.BufferGeometry {
         ensureUv2(new THREE.BoxGeometry(2, 2, 2, 128, 128, 128))
       )
     case 'sphere':
-      return weldByPosition(
-        ensureUv2(new THREE.SphereGeometry(1.2, 128, 128))
-      )
+      return weldByPosition(ensureUv2(new THREE.SphereGeometry(1.2, 128, 128)))
     case 'cylinder':
       return createCylinderGeometry()
     case 'torus':
-      return weldByPosition(
-        ensureUv2(new THREE.TorusGeometry(1, 0.4, 64, 128))
-      )
+      return weldByPosition(ensureUv2(new THREE.TorusGeometry(1, 0.4, 64, 128)))
     default:
       return ensureUv2(new THREE.PlaneGeometry(2.4, 2.4, 512, 512))
   }
@@ -578,9 +574,7 @@ function TexturedMesh({
           hasDisplacementMap ? getStrength('displacementMap') * 0.02 : 0
         }
         displacementBias={
-          hasDisplacementMap
-            ? -(getStrength('displacementMap') * 0.02) / 2
-            : 0
+          hasDisplacementMap ? -(getStrength('displacementMap') * 0.02) / 2 : 0
         }
         roughness={t.roughnessMap && !isDisabled('roughnessMap') ? 1 : 0.8}
         metalness={t.metalnessMap && !isDisabled('metalnessMap') ? 1 : 0}
