@@ -1,17 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js'
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 
 import { getFileUrl } from '@/features/models/api/modelApi'
-import {
-  addSharedDisplacementNormal,
-  applyDispNormalDisplacement,
-} from '@/shared/three/sharedDisplacementNormal'
+import { applyDispNormalDisplacement } from '@/shared/three/sharedDisplacementNormal'
 import { TextureChannel, type TextureSetDto, TextureType } from '@/types'
 import { isExrFile, isTiffFile } from '@/utils/fileUtils'
 import { decodeTiffBlobToBitmap } from '@/utils/tiffTextureLoader'
 
+import { createPreviewGeometry } from '../utils/createPreviewGeometry'
 import { type GeometryType } from './GeometrySelector'
 
 interface GeometryParams {
@@ -171,84 +168,6 @@ const MATERIAL_PROP_TO_TYPE_KEY: Record<string, string[]> = {
   displacementMap: ['Height', 'Displacement'],
 }
 
-/**
- * Copy `uv` to `uv2` if `uv2` doesn't already exist. AO maps require a
- * second UV set.
- */
-function ensureUv2(geometry: THREE.BufferGeometry): THREE.BufferGeometry {
-  const uv = geometry.getAttribute('uv')
-  if (uv && !geometry.getAttribute('uv2')) {
-    geometry.setAttribute('uv2', uv.clone())
-  }
-  return geometry
-}
-
-/**
- * Cylinder: open-ended side + two independent CircleGeometry caps merged
- * into one buffer. Per-piece dispNormal is computed *before* merging so the
- * side rim keeps its radial direction and the cap rim keeps its vertical
- * direction — otherwise averaging would flare the rim outward-and-up.
- */
-function createCylinderGeometry(): THREE.BufferGeometry {
-  const side = addSharedDisplacementNormal(
-    ensureUv2(new THREE.CylinderGeometry(1, 1, 2, 128, 128, true))
-  )
-
-  const topCap = addSharedDisplacementNormal(
-    ensureUv2(new THREE.CircleGeometry(1, 128))
-  )
-  topCap.rotateX(-Math.PI / 2)
-  topCap.translate(0, 1, 0)
-
-  const bottomCap = addSharedDisplacementNormal(
-    ensureUv2(new THREE.CircleGeometry(1, 128))
-  )
-  bottomCap.rotateX(Math.PI / 2)
-  bottomCap.translate(0, -1, 0)
-
-  return (
-    mergeGeometries([side, topCap, bottomCap]) ??
-    addSharedDisplacementNormal(
-      ensureUv2(new THREE.CylinderGeometry(1, 1, 2, 128, 128, false))
-    )
-  )
-}
-
-/**
- * Create a BufferGeometry for the given primitive type. Each primitive gets
- * a `uv2` (for AO sampling) and an averaged-by-position `aDispNormal`
- * attribute used by the displacement shader injection. Box/cube duplicates
- * survive — face UVs stay per-face (no smear band) and the shared
- * displacement direction prevents tearing under displacement.
- */
-function createGeometry(geometryType: GeometryType): THREE.BufferGeometry {
-  switch (geometryType) {
-    case 'plane':
-      // High subdivision (512) so displacement mapping captures fine texture detail
-      return addSharedDisplacementNormal(
-        ensureUv2(new THREE.PlaneGeometry(2.4, 2.4, 512, 512))
-      )
-    case 'box':
-      return addSharedDisplacementNormal(
-        ensureUv2(new THREE.BoxGeometry(2, 2, 2, 128, 128, 128))
-      )
-    case 'sphere':
-      return addSharedDisplacementNormal(
-        ensureUv2(new THREE.SphereGeometry(1.2, 128, 128))
-      )
-    case 'cylinder':
-      return createCylinderGeometry()
-    case 'torus':
-      return addSharedDisplacementNormal(
-        ensureUv2(new THREE.TorusGeometry(1, 0.4, 64, 128))
-      )
-    default:
-      return addSharedDisplacementNormal(
-        ensureUv2(new THREE.PlaneGeometry(2.4, 2.4, 512, 512))
-      )
-  }
-}
-
 /** Texture properties that carry color data (need sRGB encoding) */
 const COLOR_TEXTURE_PROPS = new Set(['map', 'emissiveMap', 'specularColorMap'])
 
@@ -371,7 +290,10 @@ function TexturedMesh({
   // onLoadingChange intentionally excluded — stable callback from parent
 
   // Build geometry (memoised — depends only on geometry type)
-  const geometry = useMemo(() => createGeometry(geometryType), [geometryType])
+  const geometry = useMemo(
+    () => createPreviewGeometry(geometryType),
+    [geometryType]
+  )
 
   const hasNormalMap = !!loadedTextures.normalMap
 

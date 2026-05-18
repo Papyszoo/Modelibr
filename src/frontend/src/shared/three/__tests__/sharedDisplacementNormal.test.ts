@@ -112,9 +112,49 @@ void main() {
     expect(mat.onBeforeCompile).toBe(firstOnBeforeCompile)
   })
 
-  it('chains a customProgramCacheKey suffix', () => {
+  it('puts the disp-normal token at the start of the cache key', () => {
+    // three.js's default Material.customProgramCacheKey returns
+    // `this.onBeforeCompile.toString()` — so even with no prior caller-set
+    // key there is always a "previous" key (the stringified onBeforeCompile
+    // we just attached). The disp-normal token must appear at the start so
+    // the key is recognisable and stable across material variants.
     const mat = new THREE.MeshPhysicalMaterial()
     applyDispNormalDisplacement(mat)
-    expect(mat.customProgramCacheKey!()).toContain('disp-normal')
+    expect(mat.customProgramCacheKey!()).toMatch(/^disp-normal/)
+  })
+
+  it('composes with a pre-existing onBeforeCompile / customProgramCacheKey', () => {
+    const mat = new THREE.MeshPhysicalMaterial()
+    const priorCalls: string[] = []
+    mat.onBeforeCompile = shader => {
+      priorCalls.push('prior')
+      shader.vertexShader += '\n//prior\n'
+    }
+    mat.customProgramCacheKey = () => 'prior-key'
+
+    applyDispNormalDisplacement(mat)
+
+    const shader = {
+      uniforms: {},
+      vertexShader: `
+#include <displacementmap_pars_vertex>
+void main() {
+  #include <displacementmap_vertex>
+}
+`,
+      fragmentShader: '',
+    } as unknown as Parameters<NonNullable<typeof mat.onBeforeCompile>>[0]
+    mat.onBeforeCompile!(shader, {} as THREE.WebGLRenderer)
+
+    // Prior hook ran (and ran *first*, so disp-normal's chunk replacement
+    // operates on the version produced by the prior hook).
+    expect(priorCalls).toEqual(['prior'])
+    expect(shader.vertexShader).toContain('//prior')
+    // Disp-normal injection still applied on top.
+    expect(shader.vertexShader).toContain('attribute vec3 aDispNormal;')
+    expect(shader.vertexShader).toContain('normalize( aDispNormal )')
+    // Cache key is the chained form; prior key still present so three can
+    // invalidate the program if either side changes.
+    expect(mat.customProgramCacheKey!()).toBe('disp-normal|prior-key')
   })
 })

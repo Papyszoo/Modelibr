@@ -1139,21 +1139,44 @@ export class PuppeteerRenderer {
                           new THREE.BufferAttribute(out, 3)
                         )
                       }
-                      child.material.onBeforeCompile = shader => {
-                        shader.vertexShader = shader.vertexShader.replace(
-                          '#include <displacementmap_pars_vertex>',
-                          `#include <displacementmap_pars_vertex>
+                      // Idempotence guard: skip if the same material has
+                      // already been wired (e.g. shared across child meshes
+                      // or re-encountered after a hot reload). Without this
+                      // a second pass would overwrite onBeforeCompile and
+                      // drop the previous closure.
+                      if (!child.material.userData.dispNormalShaderApplied) {
+                        child.material.userData.dispNormalShaderApplied = true
+                        const previousOnBeforeCompile =
+                          child.material.onBeforeCompile
+                        child.material.onBeforeCompile = (shader, renderer) => {
+                          if (previousOnBeforeCompile) {
+                            previousOnBeforeCompile.call(
+                              child.material,
+                              shader,
+                              renderer
+                            )
+                          }
+                          shader.vertexShader = shader.vertexShader.replace(
+                            '#include <displacementmap_pars_vertex>',
+                            `#include <displacementmap_pars_vertex>
 attribute vec3 aDispNormal;`
-                        )
-                        shader.vertexShader = shader.vertexShader.replace(
-                          '#include <displacementmap_vertex>',
-                          `#ifdef USE_DISPLACEMENTMAP
+                          )
+                          shader.vertexShader = shader.vertexShader.replace(
+                            '#include <displacementmap_vertex>',
+                            `#ifdef USE_DISPLACEMENTMAP
 	transformed += normalize( aDispNormal ) * ( texture2D( displacementMap, vDisplacementMapUv ).x * displacementScale + displacementBias );
 #endif`
-                        )
+                          )
+                        }
+                        const previousCacheKey =
+                          child.material.customProgramCacheKey
+                        child.material.customProgramCacheKey = () => {
+                          const prev = previousCacheKey
+                            ? previousCacheKey.call(child.material)
+                            : ''
+                          return prev ? `disp-normal|${prev}` : 'disp-normal'
+                        }
                       }
-                      child.material.customProgramCacheKey = () =>
-                        'disp-normal'
                       child.material.needsUpdate = true
                     }
                     if (property === 'normalMap') {

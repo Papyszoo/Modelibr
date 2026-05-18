@@ -26,11 +26,12 @@ import * as THREE from 'three'
  *      along `aDispNormal` instead of `objectNormal`.
  *
  * Trade-off: heights at duplicates can still differ if their face-local UVs
- * sample different texels. For tileable PBR textures with RepeatWrapping,
- * adjacent face UVs almost always wrap to the same texel at corners; only
- * mid-edges can show a tiny height mismatch (well under one percent of the
- * mesh size at the displacement scales we use for previews). That residual is
- * far less perceptible than the smear band welding produced.
+ * sample different texels. With `RepeatWrapping`, adjacent face UVs at cube
+ * corners wrap to the same texel (`u = 0` and `u = 1` are identical samples);
+ * only *mid-edges* can show a height mismatch. The worst-case mismatch is
+ * `(maxHeight − minHeight) × displacementScale` along the averaged normal —
+ * up to one percent of mesh size at the 0.02 displacement scale we use for
+ * previews. Still far less perceptible than the smear band welding produced.
  */
 
 const DISP_NORMAL_ATTR = 'aDispNormal'
@@ -140,6 +141,6 @@ export function applyDispNormalDisplacement(material: THREE.Material): void {
   const previousCacheKey = material.customProgramCacheKey
   material.customProgramCacheKey = () => {
     const prev = previousCacheKey ? previousCacheKey.call(material) : ''
-    return `${prev}|disp-normal`
+    return prev ? `disp-normal|${prev}` : 'disp-normal'
   }
 }
