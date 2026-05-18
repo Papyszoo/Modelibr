@@ -216,6 +216,39 @@ function extractChannelFromBitmap(
 }
 
 /**
+ * Invert the RGB channels of an EXR-loaded texture in place. EXR stores
+ * linear-light values, so the Glossiness → Roughness inversion is `1 - v`.
+ * Three's EXRLoader returns either Float32 or HalfFloat (Uint16) pixel data;
+ * both layouts are handled. Alpha is preserved.
+ */
+function invertExrTextureInPlace(texture: THREE.Texture): void {
+  const img = texture.image as
+    | { data?: Float32Array | Uint16Array; width: number; height: number }
+    | undefined
+  const data = img?.data
+  if (!data) return
+
+  if (data instanceof Float32Array) {
+    for (let i = 0; i < data.length; i += 4) {
+      data[i] = 1 - data[i]
+      data[i + 1] = 1 - data[i + 1]
+      data[i + 2] = 1 - data[i + 2]
+    }
+  } else if (data instanceof Uint16Array) {
+    // HalfFloat path — decode, invert, re-encode each value.
+    for (let i = 0; i < data.length; i += 4) {
+      for (let c = 0; c < 3; c++) {
+        const v = THREE.DataUtils.fromHalfFloat(data[i + c])
+        data[i + c] = THREE.DataUtils.toHalfFloat(1 - v)
+      }
+    }
+  } else {
+    return
+  }
+  texture.needsUpdate = true
+}
+
+/**
  * Invert RGB pixel values (255 - v) of an ImageBitmap. Alpha is preserved.
  * Used for Glossiness textures sourced as full-RGB grayscale, where we need
  * to flip the channel before feeding it into Three's roughnessMap slot.
@@ -258,7 +291,9 @@ async function loadTextureOffThread(
   if (isExr) {
     // EXR must use the specialised loader — no ImageBitmap path
     const exrLoader = new EXRLoader()
-    return exrLoader.loadAsync(url)
+    const texture = await exrLoader.loadAsync(url)
+    if (invert) invertExrTextureInPlace(texture)
+    return texture
   }
 
   // Fetch blob (or use cached one for dedup), then decode off-thread

@@ -224,6 +224,12 @@ export function useChannelExtractedTextures(
   useEffect(() => {
     if (!renderer) return
 
+    // Guard against the effect re-running before async loads settle. Without
+    // this, the cleanup disposes whatever is already in loadedTextures while
+    // later-resolving promises keep writing into the same map, and the final
+    // Promise.all(...).then(setTextures) installs a state of dead GPU objects.
+    let cancelled = false
+
     const loader = new THREE.TextureLoader()
     const loadedTextures: ChannelExtractedTextures = {}
     const loadPromises: Promise<void>[] = []
@@ -233,6 +239,10 @@ export function useChannelExtractedTextures(
       config: TextureConfig,
       loadedTexture: THREE.Texture
     ) => {
+      if (cancelled) {
+        loadedTexture.dispose()
+        return
+      }
       // Configure texture wrapping and flip
       loadedTexture.wrapS = THREE.RepeatWrapping
       loadedTexture.wrapT = THREE.RepeatWrapping
@@ -299,11 +309,20 @@ export function useChannelExtractedTextures(
     })
 
     Promise.all(loadPromises).then(() => {
+      if (cancelled) {
+        // Cleanup already ran; dispose any textures that landed afterward
+        // so they don't leak. setTextures must not be called.
+        Object.values(loadedTextures).forEach(texture => {
+          if (texture) texture.dispose()
+        })
+        return
+      }
       setTextures(loadedTextures)
     })
 
     // Cleanup on unmount or config change
     return () => {
+      cancelled = true
       Object.values(loadedTextures).forEach(texture => {
         if (texture) texture.dispose()
       })
