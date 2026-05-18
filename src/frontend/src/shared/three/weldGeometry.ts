@@ -61,23 +61,30 @@ export function weldByPosition(
 
   const dest = new THREE.BufferGeometry()
   for (const name in source.attributes) {
-    const attr = source.attributes[name] as THREE.BufferAttribute
+    const attr = source.attributes[name] as
+      | THREE.BufferAttribute
+      | THREE.InterleavedBufferAttribute
     const itemSize = attr.itemSize
-    const ArrCtor = attr.array.constructor as {
-      new (length: number): ArrayLike<number> & { [n: number]: number }
-    }
-    const newArr = new ArrCtor(newCount * itemSize) as unknown as
-      | Float32Array
-      | Uint16Array
-      | Uint32Array
+    // GLTF imports commonly use InterleavedBufferAttribute (strided buffers);
+    // reading attr.array directly would index into the shared interleaved
+    // buffer with the wrong stride. Use getX/getY/getZ/getW which both
+    // attribute types implement and de-interleave the output.
+    const srcArray =
+      attr instanceof THREE.InterleavedBufferAttribute
+        ? attr.data.array
+        : attr.array
+    const ArrCtor = srcArray.constructor as new (length: number) => typeof srcArray
+    const newArr = new ArrCtor(newCount * itemSize)
     const seen = new Uint8Array(newCount)
     for (let i = 0; i < oldCount; i++) {
       const newIdx = oldToNew[i]
       if (!seen[newIdx]) {
         seen[newIdx] = 1
-        for (let k = 0; k < itemSize; k++) {
-          newArr[newIdx * itemSize + k] = attr.array[i * itemSize + k]
-        }
+        const base = newIdx * itemSize
+        if (itemSize >= 1) newArr[base] = attr.getX(i)
+        if (itemSize >= 2) newArr[base + 1] = attr.getY(i)
+        if (itemSize >= 3) newArr[base + 2] = attr.getZ(i)
+        if (itemSize >= 4) newArr[base + 3] = attr.getW(i)
       }
     }
     dest.setAttribute(

@@ -1081,14 +1081,9 @@ export class PuppeteerRenderer {
                       child.material.emissiveIntensity = 1.0
                     }
                     if (property === 'displacementMap') {
-                      // Scale conservatively + bias by -scale/2 so the
-                      // heightmap's mid-grey means "no displacement";
-                      // without the bias every vertex inflates outward and
-                      // only the grout *recesses*. Triplanar projection is
-                      // intentionally NOT applied here — it samples by
-                      // world-axis projection and produces chevron
-                      // patterns on curved surfaces; the geometry's
-                      // native UVs project the heightmap correctly.
+                      // Bias by -scale/2 so heightmap mid-grey means "no
+                      // displacement" — without it every vertex inflates
+                      // outward and only the grout *recesses*.
                       child.material.displacementScale = 0.02
                       child.material.displacementBias = -0.01
                     }
