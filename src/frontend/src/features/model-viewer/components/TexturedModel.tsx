@@ -11,7 +11,10 @@ import {
 } from '@/features/model-viewer/hooks/useChannelExtractedTextures'
 import { useModelObject } from '@/features/model-viewer/hooks/useModelObject'
 import { getFileUrl } from '@/features/models/api/modelApi'
-import { weldByPosition } from '@/shared/three/weldGeometry'
+import {
+  addSharedDisplacementNormal,
+  applyDispNormalDisplacement,
+} from '@/shared/three/sharedDisplacementNormal'
 import { TextureChannel, type TextureSetDto, TextureType } from '@/types'
 
 /** Map of material names to their texture sets. Key "" means apply to all meshes. */
@@ -128,11 +131,14 @@ function buildMaterialFromTextures(
   }
   if (get('displacementMap')) {
     material.displacementMap = get('displacementMap')
-    // Scale conservatively + bias by -scale/2 so the heightmap's mid-grey
-    // means "no displacement"; without the bias every vertex inflates
-    // outward (only grout *recesses* — tile tops stay near the surface).
+    // Bias by -scale/2 so heightmap mid-grey means "no displacement".
     material.displacementScale = 0.02
     material.displacementBias = -0.01
+    // Sample displacement direction from an averaged-by-position normal
+    // attribute rather than the face-aligned objectNormal — so hard-edged
+    // meshes (game-asset cubes etc.) stay watertight under displacement
+    // while keeping their original per-face UVs intact for color sampling.
+    applyDispNormalDisplacement(material)
   }
 
   return material
@@ -203,26 +209,13 @@ function applyMaterialTextures(
       mesh.material = fallbackMaterial
     }
 
-    // Weld duplicated edge vertices when this mesh is about to be displaced.
-    // User-uploaded models with hard edges (e.g., game assets, low-poly
-    // boxes) carry the same per-face vertex duplication as three's stock
-    // primitives, and would tear open along every seam under displacement.
-    // Cache the welded geometry on userData so we only do the work once per
-    // (geometry, displacement-applied) pair.
+    // Add the shared-displacement-normal attribute when this mesh is about
+    // to be displaced. The shader uses this attribute as the push direction
+    // so hard-edged meshes (game-asset cubes etc.) stay watertight along
+    // seams while keeping their original per-face UVs / normals intact for
+    // color shading. Idempotent: skipped if the attribute already exists.
     if (appliedMaterial?.displacementMap) {
-      const cached = mesh.geometry.userData.weldedForDisplacement as
-        | THREE.BufferGeometry
-        | undefined
-      if (cached) {
-        mesh.geometry = cached
-      } else {
-        const welded = weldByPosition(mesh.geometry)
-        if (welded !== mesh.geometry) {
-          // Stash on the *original* geometry so re-traversals reuse it.
-          mesh.geometry.userData.weldedForDisplacement = welded
-          mesh.geometry = welded
-        }
-      }
+      addSharedDisplacementNormal(mesh.geometry)
     }
   })
 }
