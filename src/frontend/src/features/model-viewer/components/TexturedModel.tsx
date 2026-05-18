@@ -11,6 +11,7 @@ import {
 } from '@/features/model-viewer/hooks/useChannelExtractedTextures'
 import { useModelObject } from '@/features/model-viewer/hooks/useModelObject'
 import { getFileUrl } from '@/features/models/api/modelApi'
+import { safeLoadingManager } from '@/shared/three/safeLoadingManager'
 import {
   addSharedDisplacementNormal,
   applyDispNormalDisplacement,
@@ -27,15 +28,24 @@ interface TexturedModelProps {
   materialTextureSets: MaterialTextureSets
 }
 
-// Material property slot names used by MeshPhysicalMaterial
+// Material property slot names used by MeshPhysicalMaterial.
+// `fallback` is used when the primary type is absent (mutually-exclusive groups).
+// `invertFallback` means the fallback texture must be channel-inverted at load
+// time (e.g. Glossiness fed through the roughnessMap slot).
 const TEXTURE_SLOTS: Array<{
   slot: string
   type: TextureType
   fallback?: TextureType
+  invertFallback?: boolean
 }> = [
   { slot: 'map', type: TextureType.Albedo },
   { slot: 'normalMap', type: TextureType.Normal },
-  { slot: 'roughnessMap', type: TextureType.Roughness },
+  {
+    slot: 'roughnessMap',
+    type: TextureType.Roughness,
+    fallback: TextureType.Glossiness,
+    invertFallback: true,
+  },
   { slot: 'metalnessMap', type: TextureType.Metallic },
   { slot: 'specularColorMap', type: TextureType.Specular },
   { slot: 'aoMap', type: TextureType.AO },
@@ -65,16 +75,19 @@ function buildCombinedTextureConfigs(
     materialTextureSets
   )) {
     if (!textureSet?.textures) continue
-    for (const { slot, type, fallback } of TEXTURE_SLOTS) {
+    for (const { slot, type, fallback, invertFallback } of TEXTURE_SLOTS) {
       let tex = textureSet.textures.find(t => t.textureType === type)
+      let invert = false
       if (!tex && fallback) {
         tex = textureSet.textures.find(t => t.textureType === fallback)
+        if (tex && invertFallback) invert = true
       }
       if (tex) {
         configs[`${materialName}${KEY_SEP}${slot}`] = {
           url: getFileUrl(tex.fileId.toString()),
           sourceChannel: tex.sourceChannel ?? TextureChannel.RGB,
           fileName: tex.fileName,
+          invert,
         }
       }
     }
@@ -273,14 +286,18 @@ function setupModel(
   const maxDim = Math.max(size.x, size.y, size.z)
   const scale = 2 / maxDim
 
-  clonedModel.scale.setScalar(scale)
+  // Multiply, don't replace: FBX bakes a non-1 unit-conversion scale into
+  // the root and setScalar would drop it, collapsing the model.
+  clonedModel.scale.multiplyScalar(scale)
 
   const scaledBox = new THREE.Box3().setFromObject(clonedModel)
   const scaledCenter = scaledBox.getCenter(new THREE.Vector3())
 
-  clonedModel.position.x = -scaledCenter.x
-  clonedModel.position.z = -scaledCenter.z
-  clonedModel.position.y = -scaledBox.min.y
+  // Subtract (not assign): FBX bakes a non-zero translation into the root,
+  // and overwriting it would offset the model from the camera target.
+  clonedModel.position.x -= scaledCenter.x
+  clonedModel.position.z -= scaledCenter.z
+  clonedModel.position.y -= scaledBox.min.y
 
   if (meshRef.current) {
     meshRef.current.clear()
@@ -307,7 +324,9 @@ function OBJModelWithTextures({
     }
   })
 
-  const model = useLoader(OBJLoader, modelUrl)
+  const model = useLoader(OBJLoader, modelUrl, loader => {
+    loader.manager = safeLoadingManager
+  })
   const { loadedTextures, texturesReady } = usePerMaterialTextures(
     materialTextureSets,
     renderer,
@@ -354,7 +373,9 @@ function GLTFModelWithTextures({
     }
   })
 
-  const gltf = useLoader(GLTFLoader, modelUrl)
+  const gltf = useLoader(GLTFLoader, modelUrl, loader => {
+    loader.manager = safeLoadingManager
+  })
   const model = gltf?.scene
   const { loadedTextures, texturesReady } = usePerMaterialTextures(
     materialTextureSets,
@@ -403,7 +424,9 @@ function FBXModelWithTextures({
     }
   })
 
-  const model = useLoader(FBXLoader, modelUrl)
+  const model = useLoader(FBXLoader, modelUrl, loader => {
+    loader.manager = safeLoadingManager
+  })
   const { loadedTextures, texturesReady } = usePerMaterialTextures(
     materialTextureSets,
     renderer,

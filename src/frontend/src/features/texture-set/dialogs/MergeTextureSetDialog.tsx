@@ -12,6 +12,7 @@ import { TextureChannel, type TextureSetDto, TextureType } from '@/types'
 import {
   getTextureTypeLabel,
   isHeightRelatedType,
+  isSurfaceRelatedType,
 } from '../../../utils/textureTypeUtils'
 
 // RGB dropdown options
@@ -173,6 +174,30 @@ export function MergeTextureSetDialog({
     return null
   }, [targetTextureSet, getAllSelectedTypes])
 
+  // Check Surface exclusivity (Roughness vs Glossiness)
+  const surfaceConflict = useMemo(() => {
+    const selectedTypes = getAllSelectedTypes()
+    const targetSurfaceType = targetTextureSet?.textures?.find(t =>
+      isSurfaceRelatedType(t.textureType)
+    )?.textureType
+
+    const selectedSurfaceTypes = selectedTypes.filter(t =>
+      isSurfaceRelatedType(t)
+    )
+    if (selectedSurfaceTypes.length > 1) {
+      return 'Cannot select multiple Roughness/Glossiness types'
+    }
+
+    if (targetSurfaceType && selectedSurfaceTypes.length > 0) {
+      const selectedSurface = selectedSurfaceTypes[0]
+      if (selectedSurface !== targetSurfaceType) {
+        return `Target already has ${getTextureTypeLabel(targetSurfaceType)}. Cannot add ${getTextureTypeLabel(selectedSurface)}.`
+      }
+    }
+
+    return null
+  }, [targetTextureSet, getAllSelectedTypes])
+
   const updateFileMapping = (
     fileId: number,
     updates: Partial<FileChannelMapping>
@@ -183,11 +208,12 @@ export function MergeTextureSetDialog({
   }
 
   const handleMerge = async () => {
-    if (heightConflict) {
+    const conflict = heightConflict || surfaceConflict
+    if (conflict) {
       toast.current?.show({
         severity: 'error',
         summary: 'Validation Error',
-        detail: heightConflict,
+        detail: conflict,
         life: 3000,
       })
       return
@@ -271,7 +297,7 @@ export function MergeTextureSetDialog({
         label="Merge Textures"
         icon="pi pi-check"
         onClick={handleMerge}
-        disabled={merging || !!heightConflict}
+        disabled={merging || !!heightConflict || !!surfaceConflict}
         loading={merging}
       />
     </div>
@@ -397,6 +423,14 @@ export function MergeTextureSetDialog({
                 <Message
                   severity="error"
                   text={heightConflict}
+                  className="height-conflict-error"
+                />
+              )}
+
+              {surfaceConflict && (
+                <Message
+                  severity="error"
+                  text={surfaceConflict}
                   className="height-conflict-error"
                 />
               )}

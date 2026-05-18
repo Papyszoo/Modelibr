@@ -309,6 +309,18 @@ public class TextureSet : AggregateRoot
             }
         }
 
+        // Validate mutual exclusivity of Roughness and Glossiness (Glossiness is inverted Roughness)
+        if (texture.TextureType.IsSurfaceRelatedType())
+        {
+            var existingSurfaceType = _textures.FirstOrDefault(t => t.TextureType.IsSurfaceRelatedType());
+            if (existingSurfaceType != null)
+            {
+                throw new InvalidOperationException(
+                    $"Cannot add '{texture.TextureType}' because '{existingSurfaceType.TextureType}' already exists in this set. " +
+                    "Only one of Roughness or Glossiness can be assigned per texture set.");
+            }
+        }
+
         _textures.Add(texture);
         UpdatedAt = updatedAt;
     }

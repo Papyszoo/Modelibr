@@ -44,9 +44,17 @@ export const TEXTURE_TYPE_INFO: Partial<Record<TextureType, TextureTypeInfo>> =
     },
     [TextureType.Roughness]: {
       label: 'Roughness',
-      description: 'Roughness map - surface micro-detail affecting reflections',
+      description:
+        'Roughness map - surface micro-detail affecting reflections (exclusive with Glossiness)',
       color: '#f59e0b', // Orange/yellow
       icon: 'pi-circle',
+    },
+    [TextureType.Glossiness]: {
+      label: 'Glossiness',
+      description:
+        'Glossiness map - inverted roughness, applied as roughnessMap with channel inverted (exclusive with Roughness)',
+      color: '#fbbf24', // Lighter yellow/amber
+      icon: 'pi-circle-fill',
     },
     [TextureType.Metallic]: {
       label: 'Metallic',
@@ -96,6 +104,12 @@ export const HEIGHT_RELATED_TYPES = [
   TextureType.Displacement,
 ]
 
+// Surface-related types are mutually exclusive (Glossiness is inverted Roughness)
+export const SURFACE_RELATED_TYPES = [
+  TextureType.Roughness,
+  TextureType.Glossiness,
+]
+
 export function getTextureTypeInfo(textureType: TextureType): TextureTypeInfo {
   return (
     TEXTURE_TYPE_INFO[textureType] || {
@@ -142,10 +156,22 @@ export function isHeightRelatedType(textureType: TextureType): boolean {
 }
 
 /**
- * Get all texture types except Height/Displacement/Bump (for regular cards)
+ * Check if a texture type is one of the mutually exclusive surface-related types
+ * (Roughness or Glossiness)
  */
-export function getNonHeightTypes(): TextureType[] {
-  return getAllTextureTypes().filter(type => !isHeightRelatedType(type))
+export function isSurfaceRelatedType(textureType: TextureType): boolean {
+  return SURFACE_RELATED_TYPES.includes(textureType)
+}
+
+/**
+ * Get all texture types that are rendered as standalone cards (i.e. not grouped
+ * behind a mode dropdown — Height/Bump/Displacement and Roughness/Glossiness
+ * are excluded because they live in HeightCard and SurfaceCard respectively).
+ */
+export function getRegularTypes(): TextureType[] {
+  return getAllTextureTypes().filter(
+    type => !isHeightRelatedType(type) && !isSurfaceRelatedType(type)
+  )
 }
 
 /**
@@ -153,6 +179,18 @@ export function getNonHeightTypes(): TextureType[] {
  */
 export function getHeightModeOptions() {
   return HEIGHT_RELATED_TYPES.map(type => ({
+    label: getTextureTypeLabel(type),
+    value: type,
+    color: getTextureTypeColor(type),
+    icon: getTextureTypeIcon(type),
+  }))
+}
+
+/**
+ * Get Surface mode dropdown options (Roughness / Glossiness)
+ */
+export function getSurfaceModeOptions() {
+  return SURFACE_RELATED_TYPES.map(type => ({
     label: getTextureTypeLabel(type),
     value: type,
     color: getTextureTypeColor(type),

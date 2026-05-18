@@ -8,6 +8,7 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader'
 
 import { LoadingPlaceholder } from '@/components/LoadingPlaceholder'
 import { useModelObject } from '@/features/model-viewer/hooks/useModelObject'
+import { safeLoadingManager } from '@/shared/three/safeLoadingManager'
 
 // Separate components for each model type to avoid conditional hooks
 function OBJModel({
@@ -30,7 +31,9 @@ function OBJModel({
     }
   })
 
-  const model = useLoader(OBJLoader, modelUrl)
+  const model = useLoader(OBJLoader, modelUrl, loader => {
+    loader.manager = safeLoadingManager
+  })
 
   useEffect(() => {
     // Reset scaled flag when modelUrl changes
@@ -65,16 +68,21 @@ function OBJModel({
       const scale = 2 / maxDim
 
       // Scale the model first
-      clonedModel.scale.setScalar(scale)
+      // Multiply, don't replace: some loaders (notably FBX) bake a non-1
+      // unit-conversion scale into the root. setScalar would drop that and
+      // shrink the model to ~1/100 of intended size.
+      clonedModel.scale.multiplyScalar(scale)
 
       // Recalculate bounding box after scaling
       const scaledBox = new THREE.Box3().setFromObject(clonedModel)
       const scaledCenter = scaledBox.getCenter(new THREE.Vector3())
 
       // Position model so it's centered in X and Z, but bottom is at y=0 (floor level)
-      clonedModel.position.x = -scaledCenter.x
-      clonedModel.position.z = -scaledCenter.z
-      clonedModel.position.y = -scaledBox.min.y
+      // Subtract (not assign): FBX bakes a non-zero translation into the root,
+      // and overwriting it would offset the model from the camera target.
+      clonedModel.position.x -= scaledCenter.x
+      clonedModel.position.z -= scaledCenter.z
+      clonedModel.position.y -= scaledBox.min.y
 
       // Store the cloned model in the ref
       if (meshRef.current) {
@@ -122,7 +130,9 @@ function GLTFModel({
     }
   })
 
-  const gltf = useLoader(GLTFLoader, modelUrl)
+  const gltf = useLoader(GLTFLoader, modelUrl, loader => {
+    loader.manager = safeLoadingManager
+  })
   const model = gltf?.scene
 
   useEffect(() => {
@@ -158,16 +168,21 @@ function GLTFModel({
       const scale = 2 / maxDim
 
       // Scale the model first
-      clonedModel.scale.setScalar(scale)
+      // Multiply, don't replace: some loaders (notably FBX) bake a non-1
+      // unit-conversion scale into the root. setScalar would drop that and
+      // shrink the model to ~1/100 of intended size.
+      clonedModel.scale.multiplyScalar(scale)
 
       // Recalculate bounding box after scaling
       const scaledBox = new THREE.Box3().setFromObject(clonedModel)
       const scaledCenter = scaledBox.getCenter(new THREE.Vector3())
 
       // Position model so it's centered in X and Z, but bottom is at y=0 (floor level)
-      clonedModel.position.x = -scaledCenter.x
-      clonedModel.position.z = -scaledCenter.z
-      clonedModel.position.y = -scaledBox.min.y
+      // Subtract (not assign): FBX bakes a non-zero translation into the root,
+      // and overwriting it would offset the model from the camera target.
+      clonedModel.position.x -= scaledCenter.x
+      clonedModel.position.z -= scaledCenter.z
+      clonedModel.position.y -= scaledBox.min.y
 
       // Store the cloned model in the ref
       if (meshRef.current) {
@@ -215,7 +230,9 @@ function FBXModel({
     }
   })
 
-  const model = useLoader(FBXLoader, modelUrl)
+  const model = useLoader(FBXLoader, modelUrl, loader => {
+    loader.manager = safeLoadingManager
+  })
 
   useEffect(() => {
     // Reset scaled flag when modelUrl changes
@@ -249,17 +266,21 @@ function FBXModel({
       const maxDim = Math.max(size.x, size.y, size.z)
       const scale = 2 / maxDim
 
-      // Scale the model first
-      clonedModel.scale.setScalar(scale)
+      // Multiply, don't replace: some loaders (notably FBX) bake a non-1
+      // unit-conversion scale into the root. setScalar would drop that and
+      // shrink the model to ~1/100 of intended size.
+      clonedModel.scale.multiplyScalar(scale)
 
       // Recalculate bounding box after scaling
       const scaledBox = new THREE.Box3().setFromObject(clonedModel)
       const scaledCenter = scaledBox.getCenter(new THREE.Vector3())
 
       // Position model so it's centered in X and Z, but bottom is at y=0 (floor level)
-      clonedModel.position.x = -scaledCenter.x
-      clonedModel.position.z = -scaledCenter.z
-      clonedModel.position.y = -scaledBox.min.y
+      // Subtract (not assign): FBX bakes a non-zero translation into the root,
+      // and overwriting it would offset the model from the camera target.
+      clonedModel.position.x -= scaledCenter.x
+      clonedModel.position.z -= scaledCenter.z
+      clonedModel.position.y -= scaledBox.min.y
 
       // Store the cloned model in the ref
       if (meshRef.current) {

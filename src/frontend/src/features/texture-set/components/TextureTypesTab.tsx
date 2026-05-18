@@ -1,9 +1,10 @@
 import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
 import { type TextureSetDto, type TextureType } from '@/types'
-import { getNonHeightTypes } from '@/utils/textureTypeUtils'
+import { getRegularTypes } from '@/utils/textureTypeUtils'
 
 import { HeightCard } from './HeightCard'
+import { SurfaceCard } from './SurfaceCard'
 import { TextureCard } from './TextureCard'
 
 interface TextureTypesTabProps {
@@ -21,7 +22,7 @@ export function TextureTypesTab({
   const cardWidthKey =
     side === 'right' ? 'textureSetViewerRight' : 'textureSetViewerLeft'
   const cardWidth = settings[cardWidthKey]
-  const nonHeightTypes = getNonHeightTypes()
+  const regularTypes = getRegularTypes()
 
   return (
     <>
@@ -45,7 +46,7 @@ export function TextureTypesTab({
           gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))`,
         }}
       >
-        {nonHeightTypes.map((textureType: TextureType) => {
+        {regularTypes.map((textureType: TextureType) => {
           const texture =
             textureSet.textures.find(t => t.textureType === textureType) || null
 
@@ -59,6 +60,12 @@ export function TextureTypesTab({
             />
           )
         })}
+
+        <SurfaceCard
+          textures={textureSet.textures}
+          setId={textureSet.id}
+          onTextureUpdated={onTextureUpdated}
+        />
 
         <HeightCard
           textures={textureSet.textures}
