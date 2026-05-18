@@ -18,6 +18,7 @@ public class TextureTypeTests
     [InlineData(TextureType.Bump)]
     [InlineData(TextureType.Alpha)]
     [InlineData(TextureType.Displacement)]
+    [InlineData(TextureType.Glossiness)]
     public void ValidateForStorage_WithSupportedTypes_ReturnsSuccess(TextureType textureType)
     {
         // Act
@@ -49,8 +50,8 @@ public class TextureTypeTests
         // Act
         var supportedTypes = TextureTypeExtensions.GetSupportedTypes();
 
-        // Assert - Diffuse removed, SplitChannel + Specular present, now 12 types
-        Assert.Equal(12, supportedTypes.Count);
+        // Assert - Diffuse removed, SplitChannel + Specular present, Glossiness added, now 13 types
+        Assert.Equal(13, supportedTypes.Count);
         Assert.Contains(TextureType.SplitChannel, supportedTypes);
         Assert.Contains(TextureType.Albedo, supportedTypes);
         Assert.Contains(TextureType.Normal, supportedTypes);
@@ -63,6 +64,7 @@ public class TextureTypeTests
         Assert.Contains(TextureType.Bump, supportedTypes);
         Assert.Contains(TextureType.Alpha, supportedTypes);
         Assert.Contains(TextureType.Displacement, supportedTypes);
+        Assert.Contains(TextureType.Glossiness, supportedTypes);
     }
 
     [Theory]
@@ -77,6 +79,7 @@ public class TextureTypeTests
     [InlineData(TextureType.Bump, "Bump map for surface detail")]
     [InlineData(TextureType.Alpha, "Alpha map for transparency")]
     [InlineData(TextureType.Displacement, "Displacement map for vertex displacement")]
+    [InlineData(TextureType.Glossiness, "Glossiness map (inverted roughness)")]
     public void GetDescription_ReturnsCorrectDescription(TextureType textureType, string expectedDescription)
     {
         // Act

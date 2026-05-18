@@ -44,7 +44,10 @@ public enum TextureType
     Alpha = 11,
     
     /// <summary>Displacement map - actual geometric displacement of vertices (mutually exclusive with Height, Bump)</summary>
-    Displacement = 12
+    Displacement = 12,
+
+    /// <summary>Glossiness map - inverted Roughness (mutually exclusive with Roughness). Applied as roughnessMap with channel inverted at load time.</summary>
+    Glossiness = 13
 }
 
 /// <summary>
@@ -65,17 +68,28 @@ public static class TextureTypeExtensions
         TextureType.Emissive,
         TextureType.Bump,
         TextureType.Alpha,
-        TextureType.Displacement
+        TextureType.Displacement,
+        TextureType.Glossiness
     };
 
     /// <summary>
     /// Height, Displacement, and Bump are mutually exclusive - only one can be present in a texture set.
     /// </summary>
-    public static readonly TextureType[] MutuallyExclusiveHeightTypes = 
+    public static readonly TextureType[] MutuallyExclusiveHeightTypes =
     {
         TextureType.Height,
         TextureType.Displacement,
         TextureType.Bump
+    };
+
+    /// <summary>
+    /// Roughness and Glossiness are mutually exclusive - they describe the same surface property
+    /// (microsurface) inverted. Only one can be present in a texture set.
+    /// </summary>
+    public static readonly TextureType[] MutuallyExclusiveSurfaceTypes =
+    {
+        TextureType.Roughness,
+        TextureType.Glossiness
     };
 
     /// <summary>
@@ -100,6 +114,14 @@ public static class TextureTypeExtensions
     public static bool IsHeightRelatedType(this TextureType textureType)
     {
         return MutuallyExclusiveHeightTypes.Contains(textureType);
+    }
+
+    /// <summary>
+    /// Checks if this texture type is mutually exclusive with Roughness/Glossiness.
+    /// </summary>
+    public static bool IsSurfaceRelatedType(this TextureType textureType)
+    {
+        return MutuallyExclusiveSurfaceTypes.Contains(textureType);
     }
 
     /// <summary>
@@ -129,6 +151,7 @@ public static class TextureTypeExtensions
             TextureType.Bump => "Bump map for surface detail",
             TextureType.Alpha => "Alpha map for transparency",
             TextureType.Displacement => "Displacement map for vertex displacement",
+            TextureType.Glossiness => "Glossiness map (inverted roughness)",
             _ => "Unknown texture type"
         };
     }

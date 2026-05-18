@@ -17,23 +17,40 @@ const vertexShader = `
 `
 
 /**
- * Fragment shader - extracts a single channel and converts to grayscale
+ * Fragment shader - extracts a single channel and converts to grayscale.
+ * Optionally inverts the value (used for Glossiness → Roughness conversion).
  */
 const fragmentShader = `
   uniform sampler2D uTexture;
   uniform int uChannel; // 0=R, 1=G, 2=B, 3=A
+  uniform int uInvert; // 0=no, 1=output 1.0 - value
   varying vec2 vUv;
-  
+
   void main() {
     vec4 texColor = texture2D(uTexture, vUv);
     float channelValue;
-    
+
     if (uChannel == 0) channelValue = texColor.r;
     else if (uChannel == 1) channelValue = texColor.g;
     else if (uChannel == 2) channelValue = texColor.b;
     else channelValue = texColor.a;
-    
-    gl_FragColor = vec4(channelValue, channelValue, channelValue, 1.0);
+
+    float v = uInvert == 1 ? 1.0 - channelValue : channelValue;
+    gl_FragColor = vec4(v, v, v, 1.0);
+  }
+`
+
+/**
+ * Fragment shader - inverts RGB channels (255-based). Used when a Glossiness
+ * texture is sourced as full-RGB grayscale and no channel extraction is needed.
+ */
+const invertFragmentShader = `
+  uniform sampler2D uTexture;
+  varying vec2 vUv;
+
+  void main() {
+    vec4 texColor = texture2D(uTexture, vUv);
+    gl_FragColor = vec4(1.0 - texColor.rgb, texColor.a);
   }
 `
 
@@ -58,11 +75,13 @@ function getChannelIndex(channel: TextureChannel): number {
 /**
  * Extract a single channel from a texture using WebGL rendering.
  * Returns a new texture with the extracted channel as grayscale.
+ * If invert=true, the channel value is flipped (used for Glossiness → Roughness).
  */
 function extractChannel(
   sourceTexture: THREE.Texture,
   channel: TextureChannel,
-  renderer: THREE.WebGLRenderer
+  renderer: THREE.WebGLRenderer,
+  invert: boolean = false
 ): THREE.Texture {
   const width = sourceTexture.image?.width || 1024
   const height = sourceTexture.image?.height || 1024
@@ -86,6 +105,7 @@ function extractChannel(
     uniforms: {
       uTexture: { value: sourceTexture },
       uChannel: { value: getChannelIndex(channel) },
+      uInvert: { value: invert ? 1 : 0 },
     },
   })
 
@@ -114,11 +134,59 @@ function extractChannel(
   return extractedTexture
 }
 
+/**
+ * Invert an RGB texture using WebGL rendering. Used for Glossiness textures
+ * sourced as full-RGB grayscale, which need to be flipped to behave as roughness.
+ */
+function invertTexture(
+  sourceTexture: THREE.Texture,
+  renderer: THREE.WebGLRenderer
+): THREE.Texture {
+  const width = sourceTexture.image?.width || 1024
+  const height = sourceTexture.image?.height || 1024
+
+  const renderTarget = new THREE.WebGLRenderTarget(width, height, {
+    format: THREE.RGBAFormat,
+    type: THREE.UnsignedByteType,
+    minFilter: THREE.LinearFilter,
+    magFilter: THREE.LinearFilter,
+  })
+
+  const scene = new THREE.Scene()
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
+  const geometry = new THREE.PlaneGeometry(2, 2)
+  const material = new THREE.ShaderMaterial({
+    vertexShader,
+    fragmentShader: invertFragmentShader,
+    uniforms: { uTexture: { value: sourceTexture } },
+  })
+
+  const mesh = new THREE.Mesh(geometry, material)
+  scene.add(mesh)
+  renderer.setRenderTarget(renderTarget)
+  renderer.render(scene, camera)
+  renderer.setRenderTarget(null)
+
+  const inverted = renderTarget.texture.clone()
+  inverted.needsUpdate = true
+  inverted.wrapS = sourceTexture.wrapS
+  inverted.wrapT = sourceTexture.wrapT
+  inverted.flipY = sourceTexture.flipY
+
+  geometry.dispose()
+  material.dispose()
+  renderTarget.dispose()
+
+  return inverted
+}
+
 export interface TextureConfig {
   url: string
   sourceChannel: TextureChannel
   /** Original file name (used to detect formats the browser cannot decode natively, e.g. TIFF). */
   fileName?: string
+  /** Invert texture values (255-v) after load. Used for Glossiness → Roughness. */
+  invert?: boolean
 }
 
 export interface ChannelExtractedTextures {
@@ -147,7 +215,7 @@ export function useChannelExtractedTextures(
       Object.entries(textureConfigs)
         .map(
           ([key, config]) =>
-            `${key}:${config.url}:${config.sourceChannel}:${config.fileName ?? ''}`
+            `${key}:${config.url}:${config.sourceChannel}:${config.fileName ?? ''}:${config.invert ? 1 : 0}`
         )
         .join('|') + `:flipY=${flipY}`
     )
@@ -155,6 +223,12 @@ export function useChannelExtractedTextures(
 
   useEffect(() => {
     if (!renderer) return
+
+    // Guard against the effect re-running before async loads settle. Without
+    // this, the cleanup disposes whatever is already in loadedTextures while
+    // later-resolving promises keep writing into the same map, and the final
+    // Promise.all(...).then(setTextures) installs a state of dead GPU objects.
+    let cancelled = false
 
     const loader = new THREE.TextureLoader()
     const loadedTextures: ChannelExtractedTextures = {}
@@ -165,18 +239,28 @@ export function useChannelExtractedTextures(
       config: TextureConfig,
       loadedTexture: THREE.Texture
     ) => {
+      if (cancelled) {
+        loadedTexture.dispose()
+        return
+      }
       // Configure texture wrapping and flip
       loadedTexture.wrapS = THREE.RepeatWrapping
       loadedTexture.wrapT = THREE.RepeatWrapping
       loadedTexture.flipY = flipY
 
       if (config.sourceChannel === TextureChannel.RGB) {
-        loadedTextures[slotName] = loadedTexture
+        if (config.invert) {
+          loadedTextures[slotName] = invertTexture(loadedTexture, renderer)
+          loadedTexture.dispose()
+        } else {
+          loadedTextures[slotName] = loadedTexture
+        }
       } else {
         loadedTextures[slotName] = extractChannel(
           loadedTexture,
           config.sourceChannel,
-          renderer
+          renderer,
+          config.invert ?? false
         )
         loadedTexture.dispose()
       }
@@ -225,11 +309,20 @@ export function useChannelExtractedTextures(
     })
 
     Promise.all(loadPromises).then(() => {
+      if (cancelled) {
+        // Cleanup already ran; dispose any textures that landed afterward
+        // so they don't leak. setTextures must not be called.
+        Object.values(loadedTextures).forEach(texture => {
+          if (texture) texture.dispose()
+        })
+        return
+      }
       setTextures(loadedTextures)
     })
 
     // Cleanup on unmount or config change
     return () => {
+      cancelled = true
       Object.values(loadedTextures).forEach(texture => {
         if (texture) texture.dispose()
       })

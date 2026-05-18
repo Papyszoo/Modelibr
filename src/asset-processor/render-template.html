@@ -519,7 +519,10 @@
         const maxDimension = Math.max(size.x, size.y, size.z)
         if (maxDimension > 0) {
           const scaleFactor = scale / maxDimension
-          model.scale.setScalar(scaleFactor)
+          // Multiply, don't replace: FBX (and some glTF) loaders bake a
+          // non-1 unit-conversion scale into the root. setScalar would drop
+          // it and shrink the model to ~1/100 of intended size.
+          model.scale.multiplyScalar(scaleFactor)
         }
 
         // Recalculate bounding box after scaling
@@ -527,11 +530,12 @@
         const scaledCenter = scaledBox.getCenter(new THREE.Vector3())
         const scaledSize = scaledBox.getSize(new THREE.Vector3())
 
-        // Center the model around its bounding box center (not origin)
-        // This ensures the model rotates correctly around its visual center
-        model.position.x = -scaledCenter.x
-        model.position.y = -scaledCenter.y
-        model.position.z = -scaledCenter.z
+        // Center the model around its bounding box center.
+        // Subtract (not assign): FBX bakes a non-zero translation into the
+        // root, and overwriting it would offset the model from the camera.
+        model.position.x -= scaledCenter.x
+        model.position.y -= scaledCenter.y
+        model.position.z -= scaledCenter.z
 
         // Create a container group for rotation around the true center
         const container = new THREE.Group()
