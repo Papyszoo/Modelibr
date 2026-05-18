@@ -169,6 +169,7 @@ function applyMaterialTextures(
     metalness: 0.3,
     roughness: 0.4,
     envMapIntensity: 1.0,
+    specularIntensity: 0,
   })
 
   clonedModel.traverse(child => {
