@@ -11,11 +11,11 @@ import {
 } from '@/features/model-viewer/hooks/useChannelExtractedTextures'
 import { useModelObject } from '@/features/model-viewer/hooks/useModelObject'
 import { getFileUrl } from '@/features/models/api/modelApi'
+import { safeLoadingManager } from '@/shared/three/safeLoadingManager'
 import {
   addSharedDisplacementNormal,
   applyDispNormalDisplacement,
 } from '@/shared/three/sharedDisplacementNormal'
-import { safeLoadingManager } from '@/shared/three/safeLoadingManager'
 import { TextureChannel, type TextureSetDto, TextureType } from '@/types'
 
 /** Map of material names to their texture sets. Key "" means apply to all meshes. */

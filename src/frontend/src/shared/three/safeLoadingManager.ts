@@ -14,7 +14,8 @@ const TRANSPARENT_PIXEL =
 // that will 400 against the strictly-typed file route and crash the WebGL
 // context. Inverted allowlist: pass through only the shapes we know are
 // safe; rewrite the rest to a transparent pixel.
-const OUR_FILE_ENDPOINT_RE = /^https?:\/\/[^/]+\/api\/files\/\d+(?:\?.*)?$|^\/api\/files\/\d+(?:\?.*)?$/
+const OUR_FILE_ENDPOINT_RE =
+  /^https?:\/\/[^/]+\/api\/files\/\d+(?:\?.*)?$|^\/api\/files\/\d+(?:\?.*)?$/
 
 function rewriteTextureUrl(url: string): string {
   if (OUR_FILE_ENDPOINT_RE.test(url)) return url
