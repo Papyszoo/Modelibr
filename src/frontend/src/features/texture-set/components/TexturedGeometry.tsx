@@ -53,6 +53,9 @@ interface TextureUrlInfo {
    *  Only set when textureQuality=0 (original) and texture uses a split channel.
    *  When using proxies, channel extraction is done server-side. */
   sourceChannel?: number
+  /** Invert pixel values (255 - v) after decode. Used for Glossiness, which is
+   *  stored as glossiness but rendered through Three's roughnessMap slot. */
+  invert?: boolean
 }
 
 /** Build ALL texture URLs from the texture set (never filters by disabled state).
@@ -112,6 +115,12 @@ function buildTextureUrls(
   )
   if (roughness) urls.roughnessMap = makeInfo(roughness)
 
+  // Glossiness is the inverse of Roughness — same slot, channel inverted at load
+  const glossiness = textureSet.textures.find(
+    t => t.textureType === TextureType.Glossiness
+  )
+  if (glossiness) urls.roughnessMap = { ...makeInfo(glossiness), invert: true }
+
   const metallic = textureSet.textures.find(
     t => t.textureType === TextureType.Metallic
   )
@@ -158,7 +167,7 @@ function buildTextureUrls(
 const MATERIAL_PROP_TO_TYPE_KEY: Record<string, string[]> = {
   map: ['Albedo'],
   normalMap: ['Normal'],
-  roughnessMap: ['Roughness'],
+  roughnessMap: ['Roughness', 'Glossiness'],
   metalnessMap: ['Metallic'],
   specularColorMap: ['Specular'],
   aoMap: ['AO'],
@@ -173,12 +182,15 @@ const COLOR_TEXTURE_PROPS = new Set(['map', 'emissiveMap', 'specularColorMap'])
 
 /**
  * Extract a single channel from an ImageBitmap, producing a grayscale canvas texture.
+ * Optionally inverts the channel value (used for Glossiness → Roughness conversion).
  * @param bitmap Source ImageBitmap (will be closed after extraction)
  * @param channel 1=R, 2=G, 3=B, 4=A
+ * @param invert If true, output 255 - channelValue instead of channelValue
  */
 function extractChannelFromBitmap(
   bitmap: ImageBitmap,
-  channel: number
+  channel: number,
+  invert: boolean = false
 ): HTMLCanvasElement {
   const canvas = document.createElement('canvas')
   canvas.width = bitmap.width
@@ -190,11 +202,38 @@ function extractChannelFromBitmap(
   const offset = channel - 1 // 1→0, 2→1, 3→2, 4→3
 
   for (let i = 0; i < data.length; i += 4) {
-    const v = data[i + offset]
+    const raw = data[i + offset]
+    const v = invert ? 255 - raw : raw
     data[i] = v // R
     data[i + 1] = v // G
     data[i + 2] = v // B
     data[i + 3] = 255
+  }
+
+  ctx.putImageData(imageData, 0, 0)
+  bitmap.close()
+  return canvas
+}
+
+/**
+ * Invert RGB pixel values (255 - v) of an ImageBitmap. Alpha is preserved.
+ * Used for Glossiness textures sourced as full-RGB grayscale, where we need
+ * to flip the channel before feeding it into Three's roughnessMap slot.
+ * @param bitmap Source ImageBitmap (will be closed after inversion)
+ */
+function invertBitmap(bitmap: ImageBitmap): HTMLCanvasElement {
+  const canvas = document.createElement('canvas')
+  canvas.width = bitmap.width
+  canvas.height = bitmap.height
+  const ctx = canvas.getContext('2d')!
+  ctx.drawImage(bitmap, 0, 0)
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+  const data = imageData.data
+
+  for (let i = 0; i < data.length; i += 4) {
+    data[i] = 255 - data[i]
+    data[i + 1] = 255 - data[i + 1]
+    data[i + 2] = 255 - data[i + 2]
   }
 
   ctx.putImageData(imageData, 0, 0)
@@ -213,7 +252,8 @@ async function loadTextureOffThread(
   isTiff: boolean,
   signal: AbortSignal,
   sourceChannel?: number,
-  cachedBlob?: Blob
+  cachedBlob?: Blob,
+  invert: boolean = false
 ): Promise<THREE.Texture> {
   if (isExr) {
     // EXR must use the specialised loader — no ImageBitmap path
@@ -238,9 +278,17 @@ async function loadTextureOffThread(
     ? await decodeTiffBlobToBitmap(blob, { flipY: true })
     : await createImageBitmap(blob, { imageOrientation: 'flipY' })
 
-  // If a specific channel needs extraction, do it via canvas
+  // If a specific channel needs extraction, do it via canvas (inversion fused in)
   if (sourceChannel && sourceChannel >= 1 && sourceChannel <= 4) {
-    const canvas = extractChannelFromBitmap(bitmap, sourceChannel)
+    const canvas = extractChannelFromBitmap(bitmap, sourceChannel, invert)
+    const texture = new THREE.CanvasTexture(canvas)
+    texture.needsUpdate = true
+    return texture
+  }
+
+  // Full-RGB path with inversion (e.g. Glossiness as a normal grayscale image)
+  if (invert) {
+    const canvas = invertBitmap(bitmap)
     const texture = new THREE.CanvasTexture(canvas)
     texture.needsUpdate = true
     return texture
@@ -386,7 +434,8 @@ function TexturedMesh({
               info.isTiffFormat,
               abortController.signal,
               info.sourceChannel,
-              blobCache.get(info.url)
+              blobCache.get(info.url),
+              info.invert
             )
             if (!abortController.signal.aborted) {
               // Set color space based on texture property

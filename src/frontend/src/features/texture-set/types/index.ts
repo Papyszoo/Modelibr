@@ -13,6 +13,7 @@ export enum TextureType {
   Bump = 10,
   Alpha = 11,
   Displacement = 12,
+  Glossiness = 13,
 }
 
 export enum TextureChannel {

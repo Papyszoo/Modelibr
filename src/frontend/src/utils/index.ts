@@ -26,7 +26,8 @@ export type { TextureTypeInfo } from './textureTypeUtils'
 export {
   getAllTextureTypes,
   getHeightModeOptions,
-  getNonHeightTypes,
+  getRegularTypes,
+  getSurfaceModeOptions,
   getTextureTypeColor,
   getTextureTypeIcon,
   getTextureTypeInfo,
@@ -34,6 +35,8 @@ export {
   getTextureTypeOptions,
   HEIGHT_RELATED_TYPES,
   isHeightRelatedType,
+  isSurfaceRelatedType,
+  SURFACE_RELATED_TYPES,
   TEXTURE_TYPE_INFO,
 } from './textureTypeUtils'
 export type { OperatingSystem, WebDavPathInfo } from './webdavUtils'
