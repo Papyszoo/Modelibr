@@ -33,6 +33,8 @@ import {
   useUIPreferencesStore,
 } from '@/stores/uiPreferencesStore'
 
+import { BackupsSection } from '@/features/settings/BackupsSection'
+
 import { WebDavInstructions } from './WebDavInstructions'
 
 interface SettingsData {
@@ -92,9 +94,9 @@ export function Settings(): JSX.Element {
   const [webDavInstructionsExpanded, setWebDavInstructionsExpanded] =
     useState(false)
 
-  // Accordion state — in demo mode sections 5 (Blender), 6 (SSL), 7 (WebDAV) stay collapsed
+  // Accordion state — in demo mode sections 5 (Blender), 6 (SSL), 7 (WebDAV), 8 (Backups) stay collapsed
   const [activeIndex, setActiveIndex] = useState<number | number[]>(
-    isDemo ? [0, 1, 2, 3, 4] : [0, 1, 2, 3, 4, 5, 6, 7]
+    isDemo ? [0, 1, 2, 3, 4] : [0, 1, 2, 3, 4, 5, 6, 7, 8]
   )
 
   // Model duplicate name policy state
@@ -1360,6 +1362,40 @@ export function Settings(): JSX.Element {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* ── Backup & Restore ───────────────────────────────────── */}
+          <div className="settings-section">
+            <div
+              className={`settings-section-header${isDemo ? ' settings-section-header--locked' : ''}`}
+              onClick={() => {
+                if (isDemo) return
+                setActiveIndex(prev =>
+                  Array.isArray(prev)
+                    ? prev.includes(8)
+                      ? prev.filter(i => i !== 8)
+                      : [...prev, 8]
+                    : [8]
+                )
+              }}
+            >
+              <span>
+                {isDemo
+                  ? '🔒'
+                  : Array.isArray(activeIndex) && activeIndex.includes(8)
+                    ? '▼'
+                    : '▶'}{' '}
+                Backup &amp; Restore
+              </span>
+              {isDemo && (
+                <span className="settings-demo-notice">
+                  Not available in demo mode
+                </span>
+              )}
+            </div>
+            {!isDemo &&
+              Array.isArray(activeIndex) &&
+              activeIndex.includes(8) && <BackupsSection />}
           </div>
         </div>
 

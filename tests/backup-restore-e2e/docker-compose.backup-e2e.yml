@@ -1,0 +1,86 @@
+services:
+    webapi-backup-e2e:
+        build:
+            context: ../../
+            dockerfile: src/WebApi/Dockerfile
+            args:
+                APP_UID: ${HOST_UID:-1000}
+                APP_GID: ${HOST_GID:-1000}
+        container_name: webapi-backup-e2e
+        environment:
+            - ASPNETCORE_ENVIRONMENT=Development
+            - ASPNETCORE_HTTP_PORTS=8080
+            - UPLOAD_STORAGE_PATH=/var/lib/modelibr/uploads
+            - BACKUP_STORAGE_PATH=/var/lib/modelibr/backups
+            - RESTORE_STORAGE_PATH=/var/lib/modelibr/restore
+            - THUMBNAIL_STORAGE_PATH=/var/lib/modelibr/thumbnails
+            - POSTGRES_HOST=postgres-backup-e2e
+            - POSTGRES_PORT=5432
+            - POSTGRES_DB=Modelibr
+            - POSTGRES_USER=modelibr
+            - POSTGRES_PASSWORD=backup_e2e_password
+            - ConnectionStrings__Default=Host=postgres-backup-e2e;Port=5432;Database=Modelibr;Username=modelibr;Password=backup_e2e_password;
+            - DisableHttpsRedirection=true
+            - AllowedOrigins__0=http://localhost:3102
+            - AllowedOrigins__1=http://localhost:8190
+            - BLENDER_INSTALL_PATH=/var/lib/modelibr/blender
+        ports:
+            - "8190:8080"
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+            interval: 5s
+            timeout: 5s
+            retries: 10
+            start_period: 30s
+        volumes:
+            # Bind-mount everything under ./data/ so tests can inspect and
+            # manipulate files directly (e.g. drop a bad archive into restore/).
+            - ./data/uploads:/var/lib/modelibr/uploads
+            - ./data/backups:/var/lib/modelibr/backups
+            - ./data/restore:/var/lib/modelibr/restore
+            - ./data/thumbnails:/var/lib/modelibr/thumbnails
+            - blender-data-backup:/var/lib/modelibr/blender
+        depends_on:
+            postgres-backup-e2e:
+                condition: service_healthy
+        networks:
+            - backup-e2e-net
+    frontend-backup-e2e:
+        build:
+            context: ../../src/frontend
+            dockerfile: Dockerfile
+            target: production
+            additional_contexts:
+                asset-processor: ../../src/asset-processor
+            args:
+                VITE_API_BASE_URL: http://localhost:8190
+        container_name: frontend-backup-e2e
+        ports:
+            - "3102:80"
+        networks:
+            - backup-e2e-net
+    postgres-backup-e2e:
+        image: postgres:16-alpine
+        container_name: postgres-backup-e2e
+        environment:
+            POSTGRES_DB: Modelibr
+            POSTGRES_USER: modelibr
+            POSTGRES_PASSWORD: backup_e2e_password
+        ports:
+            - "5434:5432"
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U modelibr -d Modelibr"]
+            interval: 5s
+            timeout: 5s
+            retries: 10
+        volumes:
+            - ./data/postgres:/var/lib/postgresql/data
+        networks:
+            - backup-e2e-net
+
+networks:
+    backup-e2e-net:
+        driver: bridge
+
+volumes:
+    blender-data-backup:
