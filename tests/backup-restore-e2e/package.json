@@ -1,0 +1,23 @@
+{
+    "name": "modelibr-backup-restore-e2e",
+    "version": "1.0.0",
+    "description": "E2E tests for backup & restore — runs in an isolated docker-compose stack separate from the main e2e suite.",
+    "type": "module",
+    "scripts": {
+        "test:setup": "npx playwright install --with-deps chromium && docker compose -f docker-compose.backup-e2e.yml up -d --build && node wait-for-services.js",
+        "test": "npx playwright test",
+        "test:headed": "npx playwright test --headed",
+        "test:teardown": "docker compose -f docker-compose.backup-e2e.yml down -v && node -e \"import('fs').then(({rmSync}) => rmSync('data',{recursive:true,force:true}))\"",
+        "test:full": "npm run test:setup && npm test; status=$?; npm run test:teardown; exit $status",
+        "test:report": "npx playwright show-report"
+    },
+    "devDependencies": {
+        "@playwright/test": "^1.49.1",
+        "@types/node": "^22.19.3",
+        "typescript": "^5.7.2"
+    },
+    "dependencies": {
+        "axios": "^1.13.2",
+        "form-data": "^4.0.5"
+    }
+}

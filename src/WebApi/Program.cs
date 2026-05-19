@@ -23,6 +23,13 @@ namespace WebApi
         {
             var builder = WebApplication.CreateBuilder(args);
 
+            // Process any backup archive staged in the restore directory BEFORE
+            // any database connections are opened. If an archive is present and
+            // valid, it replaces the current DB + uploads tree. Validation failures
+            // move the archive to restore/failed/ and boot continues normally.
+            await RestoreOnBootProcessor.RunAsync(builder.Configuration,
+                LoggerFactory.Create(b => b.AddConsole()).CreateLogger("RestoreOnBoot"));
+
             // Allow uploads up to 1 GB (Kestrel + form options)
             const long maxFileSize = 1L * 1024 * 1024 * 1024; // 1 GB
 
@@ -143,6 +150,7 @@ namespace WebApi
             app.MapEnvironmentMapEndpoints();
             app.MapBlenderEndpoints();
             app.MapAudioSelectionEndpoints();
+            app.MapBackupEndpoints();
 
             // Map SignalR hubs
             app.MapHub<ThumbnailHub>("/thumbnailHub");

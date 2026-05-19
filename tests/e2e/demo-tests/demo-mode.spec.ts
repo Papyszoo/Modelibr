@@ -410,7 +410,7 @@ test.describe("demo mode e2e", () => {
         }
     });
 
-    test("locks Blender, SSL, and WebDAV settings sections in demo mode", async ({
+    test("locks Blender, SSL, WebDAV, and Backup & Restore settings sections in demo mode", async ({
         page,
     }) => {
         const settingsPage = new SettingsPage(page);
@@ -419,10 +419,15 @@ test.describe("demo mode e2e", () => {
         await settingsPage.waitForLoaded();
 
         const lockedSections = page.locator(".settings-section-header--locked");
-        await expect(lockedSections).toHaveCount(3);
+        await expect(lockedSections).toHaveCount(4);
 
         // Verify each locked section shows the notice text
-        for (const name of ["Blender Settings", "SSL Certificate", "WebDAV"]) {
+        for (const name of [
+            "Blender Settings",
+            "SSL Certificate",
+            "WebDAV",
+            "Backup & Restore",
+        ]) {
             const header = page.locator(".settings-section-header--locked", {
                 hasText: name,
             });
