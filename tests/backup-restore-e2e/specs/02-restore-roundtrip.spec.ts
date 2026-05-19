@@ -5,6 +5,7 @@ import { SettingsPage } from "../helpers/settings-page.js";
 import {
     getWebapiLogs,
     listHostDir,
+    purgePreRestoreDirs,
     restartWebapi,
     waitForWebapi,
 } from "../helpers/docker-stack.js";
@@ -29,6 +30,12 @@ test.describe.serial("Restore round-trip — verify every entity survives intact
         // Clear any backups from previous runs so this test owns the list.
         const existing = await api.listBackups();
         for (const b of existing) await api.deleteBackup(b.fileName);
+
+        // The production processor refuses to run a new restore on top of an
+        // unrecovered .pre-restore-* directory. In tests we know the previous
+        // run was controlled, so clear any leftover ones to start clean.
+        purgePreRestoreDirs("uploads");
+        purgePreRestoreDirs("thumbnails");
     });
 
     test("Seed full dataset → backup → mutate → restore → snapshot matches", async ({ page }) => {

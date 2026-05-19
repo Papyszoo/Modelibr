@@ -90,7 +90,9 @@ public static class BackupEndpoints
             try
             {
                 backupService.StageRestore(fileName);
-                return Results.Ok(new
+                // 202 Accepted — the actual restore happens on the next webapi boot
+                // via RestoreOnBootProcessor, not synchronously here.
+                return Results.Accepted(value: new
                 {
                     staged = true,
                     message = "Backup staged for restore. Restart the webapi container to apply.",

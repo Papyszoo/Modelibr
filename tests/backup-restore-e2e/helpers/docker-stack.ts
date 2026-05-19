@@ -84,3 +84,23 @@ export function listHostDir(relativePath: string): string[] {
     if (!fs.existsSync(full)) return [];
     return fs.readdirSync(full);
 }
+
+/**
+ * Delete any `.pre-restore-*` directory under `<HOST_DATA_DIR>/<root>`. The
+ * production restore processor refuses to run if these exist — they're the
+ * only on-disk copy of the operator's pre-restore data, and silently sweeping
+ * them would be a data-loss bug. In tests we know the previous run was a
+ * controlled experiment so it's safe to purge them on setup.
+ */
+export function purgePreRestoreDirs(root: "uploads" | "thumbnails"): void {
+    const dir = path.join(HOST_DATA_DIR, root);
+    if (!fs.existsSync(dir)) return;
+    for (const name of fs.readdirSync(dir)) {
+        if (!name.startsWith(".pre-restore-")) continue;
+        try {
+            fs.rmSync(path.join(dir, name), { recursive: true, force: true });
+        } catch {
+            // best-effort
+        }
+    }
+}

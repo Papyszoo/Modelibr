@@ -1,23 +1,29 @@
 using System.Diagnostics;
 using System.Formats.Tar;
+using System.Security.Cryptography;
 using System.Text.Json;
+using Application.Abstractions.Services;
 
 namespace WebApi.Infrastructure;
 
 /// <summary>
 /// Runs before the host is built. If a .tar archive is present in the restore
-/// directory, validates its manifest, then restores Postgres (pg_restore --clean)
-/// and replaces the uploads/thumbnails trees. On success the archive is moved to
-/// restore/processed/. On validation failure it is moved to restore/failed/ and
-/// boot proceeds normally — never destroy live data because of a bad archive.
+/// directory, performs a strict pre-flight validation (manifest version, app
+/// schema compat, archive integrity, expected entries) BEFORE moving any live
+/// data. If validation passes, stages existing uploads/thumbnails into
+/// <c>.pre-restore-&lt;ts&gt;/</c>, extracts the archive, runs
+/// <c>pg_restore --clean --if-exists --exit-on-error</c>, and only then moves
+/// the archive to <c>restore/processed/</c>.
+///
+/// Invalid archives go to <c>restore/failed/</c> with an <c>.error.txt</c>
+/// sibling — live data is never touched in that path.
+///
+/// <c>.pre-restore-*</c> directories are NEVER auto-swept: a failed restore
+/// leaves the operator's only recovery copy on disk, and silently deleting
+/// it on the next boot would cause permanent data loss.
 /// </summary>
 public static class RestoreOnBootProcessor
 {
-    private const string ManifestEntryName = "manifest.json";
-    private const string DatabaseDumpEntryName = "database.dump";
-    private const string UploadsPrefix = "uploads/";
-    private const string ThumbnailsPrefix = "thumbnails/";
-
     public static async Task RunAsync(IConfiguration configuration, ILogger logger)
     {
         var restoreRoot = configuration["RESTORE_STORAGE_PATH"] ?? "/var/lib/modelibr/restore";
@@ -30,35 +36,89 @@ public static class RestoreOnBootProcessor
         Directory.CreateDirectory(processedDir);
         Directory.CreateDirectory(failedDir);
 
-        // Clean up stale .pre-restore-* directories from any previous incomplete run.
-        SweepStalePreRestoreDirs(uploadRoot, logger);
-        SweepStalePreRestoreDirs(thumbnailRoot, logger);
+        // Surface stale .pre-restore-* directories (left by a previous failed
+        // restore). We do NOT delete them automatically — they are the only
+        // recovery copy of the operator's live data and must be removed manually.
+        WarnAboutStalePreRestoreDirs(uploadRoot, logger);
+        WarnAboutStalePreRestoreDirs(thumbnailRoot, logger);
 
         var archive = Directory.EnumerateFiles(restoreRoot, "*.tar")
             .OrderBy(f => f, StringComparer.Ordinal)
             .FirstOrDefault();
         if (archive == null) return;
 
+        // Refuse to run a second restore on top of an unrecovered pre-restore dir.
+        // If those still exist, an operator hasn't finished cleaning up the previous
+        // failure — running another restore now would shadow the recovery copy.
+        if (HasStalePreRestoreDirs(uploadRoot) || HasStalePreRestoreDirs(thumbnailRoot))
+        {
+            await MoveToFailedAsync(archive, failedDir,
+                "Refusing to restore: .pre-restore-* directories from a previous run still exist. " +
+                "Either delete them manually after confirming live data is intact, or move them back " +
+                "into place to recover.",
+                logger);
+            return;
+        }
+
         logger.LogInformation("Found staged restore archive {Archive}", archive);
 
-        Manifest? manifest;
+        // ── Phase 1: validate the archive BEFORE touching live data ────────
+
+        BackupManifest? manifest;
+        string? archiveValidationError = null;
         try
         {
-            manifest = ReadManifest(archive)
-                ?? throw new InvalidOperationException("Archive does not contain manifest.json.");
+            manifest = ReadManifest(archive);
+            if (manifest == null)
+            {
+                archiveValidationError = "Archive does not contain manifest.json.";
+            }
+            else if (manifest.ManifestVersion != BackupManifestConstants.CurrentManifestVersion)
+            {
+                archiveValidationError =
+                    $"Backup ManifestVersion {manifest.ManifestVersion} is incompatible with this " +
+                    $"app's expected version {BackupManifestConstants.CurrentManifestVersion}.";
+            }
+            else if (!manifest.Scope.Database)
+            {
+                archiveValidationError = "Manifest claims no database — refusing to restore.";
+            }
+            else
+            {
+                // Confirm the archive structurally has what the manifest promised
+                // before we let any pg_restore or file-tree mutation happen.
+                var entryNames = EnumerateEntryNames(archive).ToHashSet(StringComparer.Ordinal);
+                if (!entryNames.Contains(BackupServiceConstants.DatabaseDumpEntryName))
+                {
+                    archiveValidationError = "Archive is missing the database.dump entry.";
+                }
+                else
+                {
+                    var uploadEntries = entryNames.Count(n =>
+                        n.StartsWith(BackupServiceConstants.UploadsPrefix, StringComparison.Ordinal));
+                    if (uploadEntries != manifest.Stats.UploadsCount)
+                    {
+                        archiveValidationError =
+                            $"Archive integrity check failed: manifest says {manifest.Stats.UploadsCount} upload " +
+                            $"entries but tar contains {uploadEntries}. Refusing to restore — backup is truncated.";
+                    }
+                }
+            }
         }
         catch (Exception ex)
         {
-            await MoveToFailedAsync(archive, failedDir, $"Manifest read failed: {ex.Message}", logger);
+            archiveValidationError = $"Manifest read failed: {ex.Message}";
+            manifest = null;
+        }
+
+        if (archiveValidationError != null || manifest == null)
+        {
+            await MoveToFailedAsync(archive, failedDir,
+                archiveValidationError ?? "Unknown validation failure", logger);
             return;
         }
 
-        if (manifest.PostgresMajorVersion != 16)
-        {
-            await MoveToFailedAsync(archive, failedDir,
-                $"Backup Postgres major version {manifest.PostgresMajorVersion} does not match current 16.", logger);
-            return;
-        }
+        // ── Phase 2: connect to Postgres and verify versions ──────────────
 
         var host = configuration["POSTGRES_HOST"] ?? "postgres";
         var port = int.TryParse(configuration["POSTGRES_PORT"], out var p) ? p : 5432;
@@ -67,36 +127,79 @@ public static class RestoreOnBootProcessor
         var password = configuration["POSTGRES_PASSWORD"] ?? string.Empty;
 
         await WaitForPostgresAsync(host, port, user, password, db, logger);
+        var liveMajor = await GetPostgresMajorVersionAsync(host, port, user, password, db);
+        if (liveMajor != manifest.PostgresMajorVersion)
+        {
+            await MoveToFailedAsync(archive, failedDir,
+                $"Postgres major version mismatch: archive was made under PG {manifest.PostgresMajorVersion} " +
+                $"but the running server reports PG {liveMajor}. Restore aborted — live data untouched.",
+                logger);
+            return;
+        }
 
-        // Stage the existing uploads/thumbnails trees to .pre-restore-<ts>/ — preserved
-        // until the entire restore succeeds so we can recover manually on failure.
+        // ── Phase 3: extract dump to a temp file and verify its SHA-256 ───
+        // The dump bytes are read out of the tar BEFORE any live tree is moved.
+        // If the archive is truncated mid-dump, we abort while live data is intact.
+
         var stamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
-        var uploadsPreRestore = StageExistingTree(uploadRoot, $".pre-restore-{stamp}", logger);
-        var thumbnailsPreRestore = manifest.Scope.Thumbnails
-            ? StageExistingTree(thumbnailRoot, $".pre-restore-{stamp}", logger)
-            : null;
-
         var dumpPath = Path.Combine(restoreRoot, $".dump-{stamp}");
         try
         {
-            ExtractArchive(archive, dumpPath, uploadRoot, thumbnailRoot, manifest, logger);
+            ExtractDatabaseDumpOnly(archive, dumpPath, logger);
 
+            var actualSha = await ComputeSha256Async(dumpPath);
+            if (!string.Equals(actualSha, manifest.Stats.DatabaseDumpSha256, StringComparison.OrdinalIgnoreCase))
+            {
+                await MoveToFailedAsync(archive, failedDir,
+                    $"database.dump SHA-256 mismatch — expected {manifest.Stats.DatabaseDumpSha256}, got {actualSha}. " +
+                    "Archive is corrupted. Live data untouched.",
+                    logger);
+                return;
+            }
+
+            // ── Phase 4: stage existing trees and extract uploads/thumbnails ──
+            // Past this point we ARE touching live data. Any failure leaves
+            // pre-restore copies behind for manual recovery.
+
+            var uploadsPreRestore = StageExistingTreeStrict(uploadRoot, $".pre-restore-{stamp}", logger);
+            var thumbnailsPreRestore = manifest.Scope.Thumbnails
+                ? StageExistingTreeStrict(thumbnailRoot, $".pre-restore-{stamp}", logger)
+                : null;
+
+            var (extractedUploads, extractedThumbnails) =
+                ExtractDataEntries(archive, uploadRoot, thumbnailRoot, manifest);
+
+            if (extractedUploads != manifest.Stats.UploadsCount)
+            {
+                throw new InvalidOperationException(
+                    $"Extracted {extractedUploads} upload files but manifest expected {manifest.Stats.UploadsCount}. " +
+                    $"Pre-restore copy preserved at {uploadsPreRestore}.");
+            }
+            if (manifest.Scope.Thumbnails && extractedThumbnails != manifest.Stats.ThumbnailsCount)
+            {
+                throw new InvalidOperationException(
+                    $"Extracted {extractedThumbnails} thumbnail files but manifest expected " +
+                    $"{manifest.Stats.ThumbnailsCount}. Pre-restore copy preserved at {thumbnailsPreRestore}.");
+            }
+
+            // ── Phase 5: pg_restore with --exit-on-error so exit 1 is fatal ──
             await RunPgRestoreAsync(dumpPath, host, port, user, password, db, logger);
 
-            // Success — drop the pre-restore copies.
+            // Success — drop the pre-restore copies and move the archive aside.
             DeleteDirectoryQuiet(uploadsPreRestore, logger);
             if (thumbnailsPreRestore != null) DeleteDirectoryQuiet(thumbnailsPreRestore, logger);
 
-            // Move the archive into processed/.
             var processedPath = Path.Combine(processedDir, $"{stamp}-{Path.GetFileName(archive)}");
             File.Move(archive, processedPath);
             logger.LogInformation("Restore completed successfully. Archive moved to {Path}", processedPath);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Restore failed. Pre-restore data preserved at {UploadsBackup}", uploadsPreRestore);
-            await MoveToFailedAsync(archive, failedDir, $"Restore execution failed: {ex.Message}", logger);
-            // Note: pre-restore-* directories are left in place so the operator can recover manually.
+            logger.LogError(ex, "Restore execution failed.");
+            // Guarantee the archive leaves the staging directory even if MoveToFailed
+            // itself errors — otherwise the next boot retries the same broken archive
+            // and locks the container in a crash loop.
+            await EnsureArchiveOutOfStagingAsync(archive, failedDir, $"Restore execution failed: {ex.Message}", logger);
             throw;
         }
         finally
@@ -111,65 +214,94 @@ public static class RestoreOnBootProcessor
 
     // ── private ─────────────────────────────────────────────────────────
 
-    private static Manifest? ReadManifest(string tarPath)
+    private static BackupManifest? ReadManifest(string tarPath)
     {
         using var fs = File.OpenRead(tarPath);
         using var reader = new TarReader(fs);
         TarEntry? entry;
         while ((entry = reader.GetNextEntry(copyData: true)) != null)
         {
-            if (entry.Name == ManifestEntryName && entry.DataStream != null)
+            if (entry.Name == BackupServiceConstants.ManifestEntryName && entry.DataStream != null)
             {
                 using var ms = new MemoryStream();
                 entry.DataStream.CopyTo(ms);
                 ms.Position = 0;
-                return JsonSerializer.Deserialize<Manifest>(ms);
+                return JsonSerializer.Deserialize<BackupManifest>(ms);
             }
         }
         return null;
     }
 
-    private static void ExtractArchive(
-        string tarPath, string dumpOutputPath,
-        string uploadRoot, string thumbnailRoot,
-        Manifest manifest, ILogger logger)
+    private static IEnumerable<string> EnumerateEntryNames(string tarPath)
     {
+        using var fs = File.OpenRead(tarPath);
+        using var reader = new TarReader(fs);
+        TarEntry? entry;
+        while ((entry = reader.GetNextEntry(copyData: false)) != null)
+        {
+            yield return entry.Name;
+        }
+    }
+
+    private static void ExtractDatabaseDumpOnly(string tarPath, string dumpOutputPath, ILogger logger)
+    {
+        using var fs = File.OpenRead(tarPath);
+        using var reader = new TarReader(fs);
+        TarEntry? entry;
+        while ((entry = reader.GetNextEntry(copyData: true)) != null)
+        {
+            if (entry.Name == BackupServiceConstants.DatabaseDumpEntryName && entry.DataStream != null)
+            {
+                using var outFs = File.Create(dumpOutputPath);
+                entry.DataStream.CopyTo(outFs);
+                outFs.Flush(flushToDisk: true);
+                return;
+            }
+        }
+        throw new InvalidOperationException("Archive did not contain database.dump (pre-validation should have caught this).");
+    }
+
+    private static (int uploads, int thumbnails) ExtractDataEntries(
+        string tarPath,
+        string uploadRoot,
+        string thumbnailRoot,
+        BackupManifest manifest)
+    {
+        var uploads = 0;
+        var thumbnails = 0;
+
         using var fs = File.OpenRead(tarPath);
         using var reader = new TarReader(fs);
         TarEntry? entry;
         while ((entry = reader.GetNextEntry(copyData: true)) != null)
         {
             if (entry.EntryType is not (TarEntryType.RegularFile or TarEntryType.V7RegularFile)) continue;
-
-            if (entry.Name == ManifestEntryName) continue; // already read
-
-            if (entry.Name == DatabaseDumpEntryName)
-            {
-                using var outFs = File.Create(dumpOutputPath);
-                entry.DataStream!.CopyTo(outFs);
-                continue;
-            }
+            if (entry.Name == BackupServiceConstants.ManifestEntryName) continue;
+            if (entry.Name == BackupServiceConstants.DatabaseDumpEntryName) continue;
 
             string? targetPath = null;
-            if (entry.Name.StartsWith(UploadsPrefix, StringComparison.Ordinal))
+            if (entry.Name.StartsWith(BackupServiceConstants.UploadsPrefix, StringComparison.Ordinal))
             {
-                var rel = entry.Name[UploadsPrefix.Length..];
+                var rel = entry.Name[BackupServiceConstants.UploadsPrefix.Length..];
                 targetPath = SafeCombine(uploadRoot, rel);
+                uploads++;
             }
-            else if (entry.Name.StartsWith(ThumbnailsPrefix, StringComparison.Ordinal) && manifest.Scope.Thumbnails)
+            else if (entry.Name.StartsWith(BackupServiceConstants.ThumbnailsPrefix, StringComparison.Ordinal)
+                     && manifest.Scope.Thumbnails)
             {
-                var rel = entry.Name[ThumbnailsPrefix.Length..];
+                var rel = entry.Name[BackupServiceConstants.ThumbnailsPrefix.Length..];
                 targetPath = SafeCombine(thumbnailRoot, rel);
+                thumbnails++;
             }
 
             if (targetPath == null) continue;
 
             Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
-            using var outFs2 = File.Create(targetPath);
-            entry.DataStream!.CopyTo(outFs2);
+            using var outFs = File.Create(targetPath);
+            entry.DataStream!.CopyTo(outFs);
         }
 
-        logger.LogInformation("Archive extracted to disk.");
+        return (uploads, thumbnails);
     }
 
     private static string SafeCombine(string root, string relative)
@@ -195,6 +327,7 @@ public static class RestoreOnBootProcessor
             {
                 "--clean", "--if-exists",
                 "--no-owner", "--no-privileges",
+                "--exit-on-error", // bail on the first real failure rather than continuing past errors
                 "-h", host,
                 "-p", port.ToString(),
                 "-U", user,
@@ -213,10 +346,12 @@ public static class RestoreOnBootProcessor
         await p.WaitForExitAsync();
         if (p.ExitCode != 0)
         {
+            // With --exit-on-error in place, any non-zero exit means a real failure
+            // (not a benign "object did not exist" warning suppressed by --if-exists).
             throw new InvalidOperationException(
                 $"pg_restore exited with code {p.ExitCode}. stdout: {stdout}. stderr: {stderr}");
         }
-        logger.LogInformation("pg_restore completed.");
+        logger.LogInformation("pg_restore completed successfully.");
     }
 
     private static async Task WaitForPostgresAsync(
@@ -252,9 +387,46 @@ public static class RestoreOnBootProcessor
         throw new InvalidOperationException("Postgres did not become ready within 30 seconds.");
     }
 
-    private static string StageExistingTree(string root, string suffix, ILogger logger)
+    private static async Task<int> GetPostgresMajorVersionAsync(
+        string host, int port, string user, string password, string db)
     {
-        if (!Directory.Exists(root)) return Path.Combine(root, suffix);
+        var psi = new ProcessStartInfo
+        {
+            FileName = "psql",
+            ArgumentList =
+            {
+                "-h", host,
+                "-p", port.ToString(),
+                "-U", user,
+                "-d", db,
+                "-t", "-A",
+                "-c", "SHOW server_version_num",
+            },
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+        };
+        psi.Environment["PGPASSWORD"] = password;
+
+        using var p = Process.Start(psi)
+            ?? throw new InvalidOperationException("Failed to launch psql for version probe.");
+        var output = (await p.StandardOutput.ReadToEndAsync()).Trim();
+        await p.WaitForExitAsync();
+        if (p.ExitCode != 0 || !int.TryParse(output, out var verNum))
+        {
+            throw new InvalidOperationException($"Failed to read postgres version (exit {p.ExitCode}): '{output}'");
+        }
+        return verNum / 10000;
+    }
+
+    /// <summary>
+    /// Moves every direct entry of <paramref name="root"/> into a sibling
+    /// <c>{root}/{suffix}</c> directory. Throws if ANY entry cannot be moved —
+    /// a partial stage would leave live files mixed with restored files after
+    /// extraction, producing silent inconsistency.
+    /// </summary>
+    private static string StageExistingTreeStrict(string root, string suffix, ILogger logger)
+    {
         Directory.CreateDirectory(root);
         var stageDir = Path.Combine(root, suffix);
         Directory.CreateDirectory(stageDir);
@@ -263,26 +435,38 @@ public static class RestoreOnBootProcessor
         {
             var name = Path.GetFileName(entry);
             if (string.Equals(name, suffix, StringComparison.Ordinal)) continue;
-            if (name.StartsWith(".pre-restore-", StringComparison.Ordinal)) continue; // already-staged dirs from this run
+            if (name.StartsWith(".pre-restore-", StringComparison.Ordinal)) continue;
             try
             {
                 Directory.Move(entry, Path.Combine(stageDir, name));
             }
             catch (IOException ex)
             {
-                logger.LogWarning(ex, "Failed to stage {Entry}", entry);
+                throw new InvalidOperationException(
+                    $"Failed to stage live entry {entry} into {stageDir}. The restore has been aborted " +
+                    "with live data still in place — fix the cause and retry.", ex);
             }
         }
+        logger.LogInformation("Staged existing tree from {Root} into {StageDir}", root, stageDir);
         return stageDir;
     }
 
-    private static void SweepStalePreRestoreDirs(string root, ILogger logger)
+    private static bool HasStalePreRestoreDirs(string root)
+    {
+        if (!Directory.Exists(root)) return false;
+        return Directory.EnumerateDirectories(root, ".pre-restore-*").Any();
+    }
+
+    private static void WarnAboutStalePreRestoreDirs(string root, ILogger logger)
     {
         if (!Directory.Exists(root)) return;
         foreach (var dir in Directory.EnumerateDirectories(root, ".pre-restore-*"))
         {
-            logger.LogInformation("Removing stale pre-restore directory {Dir}", dir);
-            DeleteDirectoryQuiet(dir, logger);
+            logger.LogWarning(
+                "Pre-restore directory {Dir} still exists from a previous failed restore. " +
+                "It holds the only on-disk copy of your live data from that point. Delete it " +
+                "manually after confirming the current tree is intact.",
+                dir);
         }
     }
 
@@ -298,37 +482,71 @@ public static class RestoreOnBootProcessor
         }
     }
 
+    private static async Task<string> ComputeSha256Async(string filePath)
+    {
+        await using var fs = File.OpenRead(filePath);
+        using var sha = SHA256.Create();
+        var hash = await sha.ComputeHashAsync(fs);
+        return Convert.ToHexString(hash).ToLowerInvariant();
+    }
+
     private static async Task MoveToFailedAsync(string archive, string failedDir, string reason, ILogger logger)
     {
         logger.LogError("Refusing to restore archive {Archive}: {Reason}", archive, reason);
-        var target = Path.Combine(failedDir, Path.GetFileName(archive));
+        await EnsureArchiveOutOfStagingAsync(archive, failedDir, reason, logger);
+    }
+
+    /// <summary>
+    /// Guarantees the archive does NOT remain at its current path. The primary
+    /// strategy is moving it to <paramref name="failedDir"/>. If that fails, the
+    /// fallback renames it with a <c>.invalid</c> suffix in place, so the next
+    /// boot's <c>*.tar</c> glob ignores it and the container doesn't crash-loop.
+    /// </summary>
+    private static async Task EnsureArchiveOutOfStagingAsync(
+        string archive, string failedDir, string reason, ILogger logger)
+    {
+        if (!File.Exists(archive)) return;
+
+        var fileName = Path.GetFileName(archive);
+        var target = Path.Combine(failedDir, fileName);
         try
         {
+            Directory.CreateDirectory(failedDir);
             if (File.Exists(target)) File.Delete(target);
             File.Move(archive, target);
             await File.WriteAllTextAsync(target + ".error.txt", reason);
+            return;
         }
-        catch (IOException ex)
+        catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to move archive to failed/");
+            logger.LogError(ex,
+                "Could not move archive to failed/. Falling back to in-place rename so it is not retried on next boot.");
+        }
+
+        // Fallback: rename in place with a non-.tar extension so the next boot
+        // skips it. Crash-loop prevention is the priority here.
+        try
+        {
+            var renamed = archive + ".invalid";
+            if (File.Exists(renamed)) File.Delete(renamed);
+            File.Move(archive, renamed);
+            try { await File.WriteAllTextAsync(renamed + ".error.txt", reason); } catch { /* swallow */ }
+        }
+        catch (Exception ex)
+        {
+            logger.LogCritical(ex,
+                "Could not rename failed archive in place. Manual cleanup required: delete {Archive} or move it to {FailedDir}.",
+                archive, failedDir);
+            // We deliberately do not throw — the original failure (which the caller
+            // is about to re-throw) is the real issue. This is best-effort cleanup.
         }
     }
+}
 
-    // ── manifest mirror (kept in sync with BackupService.BackupManifest) ─
-
-    private sealed record Manifest(
-        int ManifestVersion,
-        DateTime CreatedAtUtc,
-        int PostgresMajorVersion,
-        ManifestScopeData Scope,
-        ManifestStatsData Stats);
-
-    private sealed record ManifestScopeData(bool Database, bool Uploads, bool Thumbnails);
-
-    private sealed record ManifestStatsData(
-        int UploadsCount,
-        long UploadsBytes,
-        int ThumbnailsCount,
-        long ThumbnailsBytes,
-        long DatabaseDumpBytes);
+internal static class BackupServiceConstants
+{
+    public const string ManifestEntryName = "manifest.json";
+    public const string DatabaseDumpEntryName = "database.dump";
+    public const string UploadsPrefix = "uploads/";
+    public const string ThumbnailsPrefix = "thumbnails/";
 }

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Formats.Tar;
+using System.Security.Cryptography;
 using System.Text.Json;
 using Application.Abstractions.Services;
 using Microsoft.Extensions.Configuration;
@@ -9,17 +10,16 @@ namespace Infrastructure.Services;
 
 public sealed class BackupService : IBackupService
 {
-    private const string ManifestEntryName = "manifest.json";
-    private const string DatabaseDumpEntryName = "database.dump";
-    private const string UploadsPrefix = "uploads/";
-    private const string ThumbnailsPrefix = "thumbnails/";
-
-    public const int CurrentManifestVersion = 1;
+    public const string ManifestEntryName = "manifest.json";
+    public const string DatabaseDumpEntryName = "database.dump";
+    public const string UploadsPrefix = "uploads/";
+    public const string ThumbnailsPrefix = "thumbnails/";
 
     private readonly ILogger<BackupService> _logger;
     private readonly BackupPaths _paths;
     private readonly PostgresConnectionInfo _postgres;
     private readonly SemaphoreSlim _runLock = new(1, 1);
+    private readonly SemaphoreSlim _stageLock = new(1, 1);
 
     private readonly object _stateLock = new();
     private BackupSummary? _inProgress;
@@ -61,7 +61,7 @@ public sealed class BackupService : IBackupService
             SizeBytes: 0,
             CreatedAtUtc: createdAt,
             Status: "in_progress",
-            HostPath: PathRelativeToHost(finalPath, _paths.BackupRoot),
+            HostPath: _paths.HostRelativeBackupPath(fileName),
             ContainerPath: finalPath,
             IncludesThumbnails: scope.IncludeThumbnails,
             Error: null);
@@ -76,10 +76,7 @@ public sealed class BackupService : IBackupService
             try
             {
                 await RunBackupAsync(scope, tmpPath, finalPath, createdAt);
-                lock (_stateLock)
-                {
-                    _inProgress = null;
-                }
+                lock (_stateLock) { _inProgress = null; }
                 _logger.LogInformation("Backup completed: {FileName}", fileName);
             }
             catch (Exception ex)
@@ -124,7 +121,7 @@ public sealed class BackupService : IBackupService
                     SizeBytes: info.Length,
                     CreatedAtUtc: info.LastWriteTimeUtc,
                     Status: "ready",
-                    HostPath: PathRelativeToHost(file, _paths.BackupRoot),
+                    HostPath: _paths.HostRelativeBackupPath(info.Name),
                     ContainerPath: file,
                     IncludesThumbnails: includesThumbnails,
                     Error: null));
@@ -140,9 +137,7 @@ public sealed class BackupService : IBackupService
             }
         }
 
-        return list
-            .OrderByDescending(b => b.CreatedAtUtc)
-            .ToList();
+        return list.OrderByDescending(b => b.CreatedAtUtc).ToList();
     }
 
     public BackupStorageInfo GetStorageInfo()
@@ -157,7 +152,7 @@ public sealed class BackupService : IBackupService
             }
         }
         return new BackupStorageInfo(
-            HostPath: "./data/backups",
+            HostPath: _paths.HostBackupRoot,
             ContainerPath: _paths.BackupRoot,
             TotalUsedBytes: total);
     }
@@ -198,15 +193,31 @@ public sealed class BackupService : IBackupService
         if (!File.Exists(source))
             throw new FileNotFoundException("Backup not found.", fileName);
 
-        // Clear any older staged restore so only the newest takes effect on boot.
-        foreach (var existing in Directory.EnumerateFiles(_paths.RestoreRoot, "*.tar"))
+        // Single-lock the clear-then-copy sequence so concurrent calls cannot
+        // interleave and leave the wrong backup staged.
+        _stageLock.Wait();
+        try
         {
-            try { File.Delete(existing); }
-            catch (IOException ex) { _logger.LogWarning(ex, "Failed to clear staged restore {Path}", existing); }
-        }
+            // Clear any older staged restore so only the newest takes effect on boot.
+            foreach (var existing in Directory.EnumerateFiles(_paths.RestoreRoot, "*.tar"))
+            {
+                try { File.Delete(existing); }
+                catch (IOException ex) { _logger.LogWarning(ex, "Failed to clear staged restore {Path}", existing); }
+            }
 
-        var target = Path.Combine(_paths.RestoreRoot, fileName);
-        File.Copy(source, target, overwrite: true);
+            var target = Path.Combine(_paths.RestoreRoot, fileName);
+            // Copy into a .tmp sibling first, fsync, then atomic rename — guarantees
+            // the boot processor never sees a half-copied archive.
+            var tmpTarget = target + ".staging";
+            File.Copy(source, tmpTarget, overwrite: true);
+            FsyncFile(tmpTarget);
+            if (File.Exists(target)) File.Delete(target);
+            File.Move(tmpTarget, target);
+        }
+        finally
+        {
+            _stageLock.Release();
+        }
     }
 
     // ── private ─────────────────────────────────────────────────────────
@@ -221,13 +232,20 @@ public sealed class BackupService : IBackupService
 
         try
         {
+            // Pre-flight: query the running Postgres for its actual major version
+            // so the manifest reports the truth, not a baked-in literal.
+            var pgMajor = await GetPostgresMajorVersionAsync();
+
             await RunPgDumpAsync(dumpPath);
             var dumpInfo = new FileInfo(dumpPath);
+            var dumpSha = await ComputeSha256Async(dumpPath);
 
             await using (var outStream = File.Create(tmpPath))
             await using (var tar = new TarWriter(outStream, TarEntryFormat.Pax, leaveOpen: false))
             {
-                // database.dump first so streaming consumers can decide quickly.
+                // database.dump first so a streaming reader can extract the DB
+                // even before scanning every upload entry. Manifest is written
+                // last so its stats reflect the actual contents.
                 await WriteFileEntryAsync(tar, dumpPath, DatabaseDumpEntryName);
 
                 if (Directory.Exists(_paths.UploadRoot))
@@ -244,22 +262,28 @@ public sealed class BackupService : IBackupService
                 }
 
                 var manifest = new BackupManifest(
-                    ManifestVersion: CurrentManifestVersion,
+                    ManifestVersion: BackupManifestConstants.CurrentManifestVersion,
                     CreatedAtUtc: createdAt,
-                    PostgresMajorVersion: 16,
-                    Scope: new ManifestScope(
+                    PostgresMajorVersion: pgMajor,
+                    Scope: new BackupManifestScope(
                         Database: true,
                         Uploads: true,
                         Thumbnails: scope.IncludeThumbnails),
-                    Stats: new ManifestStats(
+                    Stats: new BackupManifestStats(
                         UploadsCount: uploadsCount,
                         UploadsBytes: uploadsBytes,
                         ThumbnailsCount: thumbsCount,
                         ThumbnailsBytes: thumbsBytes,
-                        DatabaseDumpBytes: dumpInfo.Length));
+                        DatabaseDumpBytes: dumpInfo.Length,
+                        DatabaseDumpSha256: dumpSha));
 
                 await WriteJsonEntryAsync(tar, ManifestEntryName, manifest);
             }
+
+            // Force the OS to write the file's bytes to disk before we make it
+            // visible. Without this, a power loss between completion and the
+            // OS flushing buffers could leave a zero-byte or torn archive.
+            FsyncFile(tmpPath);
 
             // Atomic publish.
             if (File.Exists(finalPath)) File.Delete(finalPath);
@@ -305,6 +329,38 @@ public sealed class BackupService : IBackupService
         }
     }
 
+    private async Task<int> GetPostgresMajorVersionAsync()
+    {
+        var psi = new ProcessStartInfo
+        {
+            FileName = "psql",
+            ArgumentList =
+            {
+                "-h", _postgres.Host,
+                "-p", _postgres.Port.ToString(),
+                "-U", _postgres.User,
+                "-d", _postgres.Database,
+                "-t", "-A",
+                "-c", "SHOW server_version_num",
+            },
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+        };
+        psi.Environment["PGPASSWORD"] = _postgres.Password;
+
+        using var p = Process.Start(psi)
+            ?? throw new InvalidOperationException("Failed to launch psql for version probe.");
+        var output = (await p.StandardOutput.ReadToEndAsync()).Trim();
+        await p.WaitForExitAsync();
+        if (p.ExitCode != 0 || !int.TryParse(output, out var verNum))
+        {
+            throw new InvalidOperationException($"Failed to read postgres version (exit {p.ExitCode}): '{output}'");
+        }
+        // server_version_num format: 160003 → major 16; 170000 → 17. Major = verNum / 10000.
+        return verNum / 10000;
+    }
+
     private static async Task WriteFileEntryAsync(TarWriter tar, string filePath, string entryName)
     {
         var entry = new PaxTarEntry(TarEntryType.RegularFile, entryName);
@@ -336,10 +392,13 @@ public sealed class BackupService : IBackupService
             var entryName = entryPrefix + relative;
             var entry = new PaxTarEntry(TarEntryType.RegularFile, entryName);
             await using var fs = File.OpenRead(path);
+            // fs.Length is valid here regardless of stream position — it returns the
+            // file's size, not bytes-read-since-open.
+            var size = fs.Length;
             entry.DataStream = fs;
             await tar.WriteEntryAsync(entry);
             count++;
-            bytes += fs.Length;
+            bytes += size;
         }
 
         return (count, bytes);
@@ -369,6 +428,29 @@ public sealed class BackupService : IBackupService
             }
         }
         return null;
+    }
+
+    private static async Task<string> ComputeSha256Async(string filePath)
+    {
+        await using var fs = File.OpenRead(filePath);
+        using var sha = SHA256.Create();
+        var hash = await sha.ComputeHashAsync(fs);
+        return Convert.ToHexString(hash).ToLowerInvariant();
+    }
+
+    private static void FsyncFile(string path)
+    {
+        try
+        {
+            using var fs = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.Read);
+            fs.Flush(flushToDisk: true);
+        }
+        catch (IOException)
+        {
+            // Best-effort. On filesystems that don't support fsync (rare in our
+            // bind-mounted Linux setup) the rest of the pipeline still produces
+            // a valid archive — the manifest read on restore catches truncation.
+        }
     }
 
     private async Task<long> GetDatabaseSizeBytesAsync(CancellationToken cancellationToken)
@@ -427,13 +509,6 @@ public sealed class BackupService : IBackupService
             && name.StartsWith("modelibr-", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string PathRelativeToHost(string containerPath, string containerRoot)
-    {
-        // Map the container path to its bind-mount equivalent for display purposes.
-        var rel = Path.GetRelativePath(containerRoot, containerPath).Replace('\\', '/');
-        return $"./data/backups/{rel}";
-    }
-
     // ── nested config types ─────────────────────────────────────────────
 
     internal sealed class BackupPaths
@@ -445,6 +520,16 @@ public sealed class BackupService : IBackupService
         public required string RestoreFailed { get; init; }
         public required string UploadRoot { get; init; }
         public required string ThumbnailRoot { get; init; }
+        // Best-effort hint shown in the UI so operators know where to find the
+        // archive on the host. Defaults to the value used by docker-compose;
+        // override with BACKUP_HOST_DISPLAY_PATH if your bind mount differs.
+        public required string HostBackupRoot { get; init; }
+
+        public string HostRelativeBackupPath(string fileName)
+        {
+            var trimmed = HostBackupRoot.TrimEnd('/', '\\');
+            return $"{trimmed}/{fileName}";
+        }
 
         public static BackupPaths FromConfiguration(IConfiguration cfg)
         {
@@ -452,6 +537,7 @@ public sealed class BackupService : IBackupService
             var restoreRoot = cfg["RESTORE_STORAGE_PATH"] ?? "/var/lib/modelibr/restore";
             var uploadRoot = cfg["UPLOAD_STORAGE_PATH"] ?? "/var/lib/modelibr/uploads";
             var thumbRoot = cfg["THUMBNAIL_STORAGE_PATH"] ?? "/var/lib/modelibr/thumbnails";
+            var hostBackupRoot = cfg["BACKUP_HOST_DISPLAY_PATH"] ?? "./data/backups";
             return new BackupPaths
             {
                 BackupRoot = backupRoot,
@@ -461,6 +547,7 @@ public sealed class BackupService : IBackupService
                 RestoreFailed = Path.Combine(restoreRoot, "failed"),
                 UploadRoot = uploadRoot,
                 ThumbnailRoot = thumbRoot,
+                HostBackupRoot = hostBackupRoot,
             };
         }
     }
@@ -485,22 +572,4 @@ public sealed class BackupService : IBackupService
             };
         }
     }
-
-    // ── manifest types ──────────────────────────────────────────────────
-
-    public sealed record BackupManifest(
-        int ManifestVersion,
-        DateTime CreatedAtUtc,
-        int PostgresMajorVersion,
-        ManifestScope Scope,
-        ManifestStats Stats);
-
-    public sealed record ManifestScope(bool Database, bool Uploads, bool Thumbnails);
-
-    public sealed record ManifestStats(
-        int UploadsCount,
-        long UploadsBytes,
-        int ThumbnailsCount,
-        long ThumbnailsBytes,
-        long DatabaseDumpBytes);
 }
