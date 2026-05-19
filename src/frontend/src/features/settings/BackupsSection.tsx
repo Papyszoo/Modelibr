@@ -17,7 +17,10 @@ import {
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B'
   const units = ['B', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)))
+  const i = Math.min(
+    units.length - 1,
+    Math.floor(Math.log(bytes) / Math.log(1024))
+  )
   return `${(bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1)} ${units[i]}`
 }
 
@@ -193,9 +196,7 @@ export function BackupsSection(): JSX.Element {
       setShowCreate(false)
       void refresh()
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Failed to start backup'
-      )
+      setError(err instanceof Error ? err.message : 'Failed to start backup')
     } finally {
       setIsCreating(false)
     }
@@ -290,7 +291,10 @@ export function BackupsSection(): JSX.Element {
           </thead>
           <tbody>
             {backups.map(b => (
-              <tr key={b.fileName} className={`backups-row backups-row--${b.status}`}>
+              <tr
+                key={b.fileName}
+                className={`backups-row backups-row--${b.status}`}
+              >
                 <td>
                   <div className="backups-filename">{b.fileName}</div>
                   <div className="backups-pathline">
@@ -299,9 +303,7 @@ export function BackupsSection(): JSX.Element {
                 </td>
                 <td>{formatDate(b.createdAtUtc)}</td>
                 <td>
-                  {b.status === 'in_progress'
-                    ? '—'
-                    : formatBytes(b.sizeBytes)}
+                  {b.status === 'in_progress' ? '—' : formatBytes(b.sizeBytes)}
                 </td>
                 <td>
                   DB + uploads
@@ -360,11 +362,11 @@ export function BackupsSection(): JSX.Element {
             off-host (scp, rsync, NAS, S3) to satisfy the 3-2-1 rule.
           </li>
           <li>
-            Restore works by staging the archive into <code>./data/restore/</code>{' '}
-            and restarting the webapi container. On boot, the database and
-            uploads are replaced; pre-existing data is preserved in{' '}
-            <code>.pre-restore-*</code> directories until the restore
-            completes successfully.
+            Restore works by staging the archive into{' '}
+            <code>./data/restore/</code> and restarting the webapi container. On
+            boot, the database and uploads are replaced; pre-existing data is
+            preserved in <code>.pre-restore-*</code> directories until the
+            restore completes successfully.
           </li>
           <li>
             Postgres major version of the backup must match the running server

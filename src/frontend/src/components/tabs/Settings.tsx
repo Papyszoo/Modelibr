@@ -25,6 +25,7 @@ import {
   updateSetting,
   updateSettings,
 } from '@/features/settings/api/settingsApi'
+import { BackupsSection } from '@/features/settings/BackupsSection'
 import { useTheme } from '@/hooks/useTheme'
 import { settingsFormSchema } from '@/shared/validation/formSchemas'
 import { useBlenderEnabledStore } from '@/stores/blenderEnabledStore'
@@ -32,8 +33,6 @@ import {
   type MobileBarPosition,
   useUIPreferencesStore,
 } from '@/stores/uiPreferencesStore'
-
-import { BackupsSection } from '@/features/settings/BackupsSection'
 
 import { WebDavInstructions } from './WebDavInstructions'
 

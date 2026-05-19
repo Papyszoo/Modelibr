@@ -10,7 +10,6 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const STACK_DIR = path.resolve(HERE, "..");
 const COMPOSE_FILE = path.join(STACK_DIR, "docker-compose.backup-e2e.yml");
 const WEBAPI_CONTAINER = "webapi-backup-e2e";
-const POSTGRES_CONTAINER = "postgres-backup-e2e";
 
 export const HOST_DATA_DIR = path.join(STACK_DIR, "data");
 
@@ -47,22 +46,6 @@ export async function getWebapiLogs(lines: number = 200): Promise<string> {
     } catch (e: any) {
         return `Failed to read webapi logs: ${e.message}`;
     }
-}
-
-/** Drop a stale row from a Postgres table via psql, useful to mutate the DB between tests. */
-export async function execPsql(sql: string): Promise<string> {
-    const escaped = sql.replace(/"/g, '\\"');
-    const { stdout } = await execAsync(
-        `docker exec -e PGPASSWORD=backup_e2e_password ${POSTGRES_CONTAINER} psql -U modelibr -d Modelibr -c "${escaped}"`,
-    );
-    return stdout;
-}
-
-/** Drop ALL public-schema tables and re-create the empty schema. Simulates a wipe scenario. */
-export async function wipePostgresPublicSchema(): Promise<void> {
-    await execAsync(
-        `docker exec -e PGPASSWORD=backup_e2e_password ${POSTGRES_CONTAINER} psql -U modelibr -d Modelibr -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"`,
-    );
 }
 
 export function readHostFile(relativePath: string): Buffer {
