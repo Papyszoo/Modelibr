@@ -260,6 +260,9 @@ Generated_Code/
 # because we have git ;-)
 _UpgradeReport_Files/
 Backup*/
+# `Backup*/` (Visual Studio default) would otherwise swallow the entire
+# backup-restore-e2e test suite directory.
+!tests/backup-restore-e2e/
 UpgradeLog*.XML
 UpgradeLog*.htm
 ServiceFabricBackup/

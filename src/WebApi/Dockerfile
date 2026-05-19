@@ -36,9 +36,16 @@ RUN dotnet publish "./WebApi.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:
 
 # Final stage
 FROM base AS final
-# Install curl for healthchecks and libgomp1 for Magick.NET (ImageMagick OpenMP)
+# Install curl for healthchecks, libgomp1 for Magick.NET (ImageMagick OpenMP),
+# and postgresql-client-16 (matching postgres:16-alpine in compose) for backup/restore via pg_dump/pg_restore.
 USER root
-RUN apt-get update && apt-get install -y curl libgomp1 xz-utils && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y curl libgomp1 xz-utils gnupg lsb-release \
+    && install -d /usr/share/postgresql-common/pgdg \
+    && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+    && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update \
+    && apt-get install -y postgresql-client-16 \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install x86_64 compatibility libraries when the container itself is not amd64.
 # The runtime installer downloads the Linux x64 Blender binary into shared storage.
@@ -59,6 +66,9 @@ RUN groupadd -g $APP_GID app || true && \
     useradd -u $APP_UID -g app -m -d /home/app app || true && \
     mkdir -p /var/lib/modelibr/uploads && \
     mkdir -p /var/lib/modelibr/blender && \
+    mkdir -p /var/lib/modelibr/backups && \
+    mkdir -p /var/lib/modelibr/restore && \
+    mkdir -p /var/lib/modelibr/thumbnails && \
     chmod -R 755 /var/lib/modelibr && \
     chown -R app:app /var/lib/modelibr
 # Copy published output

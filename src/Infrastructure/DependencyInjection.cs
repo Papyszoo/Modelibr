@@ -60,6 +60,9 @@ namespace Infrastructure
             // Add audio selection service for trimmed audio snippets
             services.AddSingleton<IAudioSelectionService, AudioSelectionService>();
 
+            // Backup / restore service
+            services.AddSingleton<IBackupService, BackupService>();
+
             // Add Blender installation management service
             services.AddSingleton<IBlenderInstallationService, BlenderInstallationService>();
             services.AddSingleton<IBlendFileGenerator, BlendFileGenerator>();

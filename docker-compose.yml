@@ -31,6 +31,14 @@ services:
             - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT}
             - WORKER_API_KEY=${WORKER_API_KEY:-}
             - UPLOAD_STORAGE_PATH=/var/lib/modelibr/uploads
+            - BACKUP_STORAGE_PATH=/var/lib/modelibr/backups
+            - RESTORE_STORAGE_PATH=/var/lib/modelibr/restore
+            - THUMBNAIL_STORAGE_PATH=/var/lib/modelibr/thumbnails
+            - POSTGRES_HOST=postgres
+            - POSTGRES_PORT=5432
+            - POSTGRES_DB=Modelibr
+            - POSTGRES_USER=${POSTGRES_USER}
+            - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
             - ConnectionStrings__Default=Host=postgres;Port=5432;Database=Modelibr;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};
             - DisableHttpsRedirection=true
             - HTTPS_PORT=${HTTPS_PORT:-8443}
@@ -48,6 +56,9 @@ services:
             - ${HOME}/.microsoft/usersecrets:/home/app/.microsoft/usersecrets:ro
             - ${HOME}/.aspnet/https:/home/app/.aspnet/https:ro
             - ./data/uploads:/var/lib/modelibr/uploads
+            - ./data/backups:/var/lib/modelibr/backups
+            - ./data/restore:/var/lib/modelibr/restore
+            - ./data/thumbnails:/var/lib/modelibr/thumbnails
             - blender-data:/var/lib/modelibr/blender
         depends_on:
             postgres:
