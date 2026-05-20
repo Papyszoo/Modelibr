@@ -13,7 +13,7 @@ namespace Infrastructure.WebDav;
 /// with material preset textures applied via Blender CLI.
 /// The generated file is cached on disk for subsequent reads.
 /// </summary>
-public sealed class VirtualGeneratedBlendFile : IStoreItem
+public sealed class VirtualGeneratedBlendFile : IStoreItem, IVirtualFileMetadata
 {
     private static readonly VirtualGeneratedBlendPropertyManager s_propertyManager = new();
 
