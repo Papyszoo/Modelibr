@@ -340,7 +340,9 @@ export function TextureSetList({ kind }: TextureSetListProps = {}) {
           visible={showCreateDialog}
           onHide={() => setShowCreateDialog(false)}
           onSubmit={handleCreateTextureSet}
-          lockedKind={kind ?? kindFilterToApiKind(kindFilter)}
+          // Dedicated kind pages (Multi-Model / Global Materials) lock the
+          // dialog to their kind; the generic tab keeps the kind selector.
+          lockedKind={kind}
         />
       )}
     </div>

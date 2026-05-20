@@ -5,7 +5,7 @@ import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
 import { ModelViewerPage } from "../pages/ModelViewerPage";
 import { getScenarioState } from "../fixtures/shared-state";
 
-const { Given, When, Then } = createBdd();
+const { Given, When, Then, Before } = createBdd();
 
 const apiHelper = new ApiHelper();
 
@@ -20,8 +20,16 @@ const KIND_BY_NAME: Record<string, number> = {
     "Single Model": KIND.singleModel,
 };
 
-// Texture sets created within this scenario, keyed by feature-file alias.
+// Texture sets created within the current scenario, keyed by feature-file
+// alias. Reset before each scenario so aliases never leak between scenarios
+// that share a worker process.
 const createdSets: Record<string, { id: number; name: string }> = {};
+
+Before(() => {
+    for (const key of Object.keys(createdSets)) {
+        delete createdSets[key];
+    }
+});
 
 function uniqueName(alias: string): string {
     return `${alias}_${runId}`;

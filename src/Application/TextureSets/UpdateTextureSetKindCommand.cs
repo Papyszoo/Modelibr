@@ -34,6 +34,21 @@ internal class UpdateTextureSetKindCommandHandler : ICommandHandler<UpdateTextur
     {
         try
         {
+            if (!Enum.IsDefined(typeof(TextureSetKind), command.Kind))
+            {
+                return Result.Failure<UpdateTextureSetKindResponse>(
+                    new Error("InvalidTextureSetKind", $"'{(int)command.Kind}' is not a valid texture set kind."));
+            }
+
+            // A single-model (ModelOwned) set must be tied to exactly one model,
+            // so the owner must be known — otherwise the set could end up
+            // ModelOwned while still linked to several models.
+            if (command.Kind == TextureSetKind.ModelOwned && !command.OwnerModelId.HasValue)
+            {
+                return Result.Failure<UpdateTextureSetKindResponse>(
+                    new Error("OwnerModelIdRequired", "Converting a texture set to Single Model requires an owner model id."));
+            }
+
             var textureSet = await _textureSetRepository.GetByIdAsync(command.Id, cancellationToken);
             if (textureSet == null)
             {
@@ -45,7 +60,7 @@ internal class UpdateTextureSetKindCommandHandler : ICommandHandler<UpdateTextur
 
             // Converting to a single-model (ModelOwned) kind ties the texture
             // set to exactly one model — drop links to every other model.
-            if (command.Kind == TextureSetKind.ModelOwned && command.OwnerModelId.HasValue)
+            if (command.Kind == TextureSetKind.ModelOwned)
             {
                 var removed = textureSet.RemoveModelVersionsNotOwnedBy(
                     command.OwnerModelId.Value, _dateTimeProvider.UtcNow);

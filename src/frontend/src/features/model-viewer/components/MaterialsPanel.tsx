@@ -8,6 +8,7 @@ import { ContextMenu } from 'primereact/contextmenu'
 import { Dropdown } from 'primereact/dropdown'
 import { InputText } from 'primereact/inputtext'
 import type { MenuItem } from 'primereact/menuitem'
+import { Toast } from 'primereact/toast'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 
@@ -86,6 +87,7 @@ export function MaterialsPanel({
     useState<TextureSetDto | null>(null)
   const [convertingId, setConvertingId] = useState<number | null>(null)
   const contextMenuRef = useRef<ContextMenu>(null)
+  const toastRef = useRef<Toast>(null)
 
   const queryClient = useQueryClient()
   const { openTextureSetDetailsTab } = useTabContext()
@@ -286,15 +288,30 @@ export function MaterialsPanel({
 
   const handleCreateOwnedSet = async (name: string, kind: TextureSetKind) => {
     if (!modelVersionId || creatingForMaterial === null) return
-    const created = await createTextureSet({ name, kind })
     const apiMaterialName =
       creatingForMaterial === 'Default' ? '' : creatingForMaterial
-    await associateTextureSetWithModelVersion(
-      created.id,
-      modelVersionId,
-      apiMaterialName,
-      selectedVariant
-    )
+
+    let created: { id: number; name: string }
+    try {
+      created = await createTextureSet({ name, kind })
+      await associateTextureSetWithModelVersion(
+        created.id,
+        modelVersionId,
+        apiMaterialName,
+        selectedVariant
+      )
+    } catch (error) {
+      console.error('Failed to create texture set:', error)
+      toastRef.current?.show({
+        severity: 'error',
+        summary: 'Create failed',
+        detail: 'Could not create the texture set. Please try again.',
+        life: 4000,
+      })
+      // Rethrow so the dialog stays open and the user can retry.
+      throw error
+    }
+
     await textureSetsQuery.refetch()
     onModelUpdated()
     openTextureSetDetailsTab(created.id, created.name)
@@ -308,37 +325,42 @@ export function MaterialsPanel({
     if (!modelVersionId) return
     // Map 'Default' display name to '' for API calls
     const apiMaterialName = materialName === 'Default' ? '' : materialName
-    const mapping = textureSetId
-      ? currentVariantMappings.find(
-          m =>
-            m.textureSetId === textureSetId &&
-            (m.materialName === apiMaterialName ||
-              (materialName === 'Default' && m.materialName === ''))
+    const matchesMaterial = (m: { materialName: string }) =>
+      m.materialName === apiMaterialName ||
+      (materialName === 'Default' && m.materialName === '')
+    // With a texture set id, unlink only that set; without one (the header
+    // button), unlink every set linked to the material in this variant.
+    const mappings = textureSetId
+      ? currentVariantMappings.filter(
+          m => m.textureSetId === textureSetId && matchesMaterial(m)
         )
-      : currentVariantMappings.find(
-          m =>
-            m.materialName === apiMaterialName ||
-            (materialName === 'Default' && m.materialName === '')
-        )
-    if (!mapping) return
+      : currentVariantMappings.filter(matchesMaterial)
+    if (mappings.length === 0) return
 
     try {
       setUnlinking(materialName)
-      await disassociateTextureSetFromModelVersion(
-        mapping.textureSetId,
-        modelVersionId,
-        mapping.materialName,
-        selectedVariant
-      )
-
-      if (selectedTextureSetId === mapping.textureSetId) {
-        onTextureSetSelect(null)
+      for (const mapping of mappings) {
+        await disassociateTextureSetFromModelVersion(
+          mapping.textureSetId,
+          modelVersionId,
+          mapping.materialName,
+          selectedVariant
+        )
+        if (selectedTextureSetId === mapping.textureSetId) {
+          onTextureSetSelect(null)
+        }
       }
 
       await textureSetsQuery.refetch()
       onModelUpdated()
     } catch (error) {
       console.error('Failed to unlink material:', error)
+      toastRef.current?.show({
+        severity: 'error',
+        summary: 'Unlink failed',
+        detail: 'Could not unlink the texture set. Please try again.',
+        life: 4000,
+      })
     } finally {
       setUnlinking(null)
     }
@@ -362,6 +384,12 @@ export function MaterialsPanel({
         onModelUpdated()
       } catch (error) {
         console.error('Failed to change texture set kind:', error)
+        toastRef.current?.show({
+          severity: 'error',
+          summary: 'Conversion failed',
+          detail: 'Could not change the texture set kind. Please try again.',
+          life: 4000,
+        })
       } finally {
         setConvertingId(null)
       }
@@ -708,6 +736,8 @@ export function MaterialsPanel({
         model={contextMenuItems}
         onHide={() => setContextTextureSet(null)}
       />
+
+      <Toast ref={toastRef} />
     </div>
   )
 }
