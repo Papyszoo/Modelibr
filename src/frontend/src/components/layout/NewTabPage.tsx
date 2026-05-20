@@ -73,7 +73,8 @@ const TILES: Tile[] = [
     group: 'assets',
     icon: 'pi-images',
     label: 'Multi-Model Textures',
-    description: 'Baked texture sets that can be shared across multiple models.',
+    description:
+      'Baked texture sets that can be shared across multiple models.',
     targetType: 'modelTextures',
     targetLabel: 'Multi-Model Textures',
   },
