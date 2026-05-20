@@ -67,7 +67,9 @@ internal class GetAllTextureSetsQueryHandler : IQueryHandler<GetAllTextureSetsQu
             {
                 Id = t.Id,
                 TextureType = t.TextureType,
-                FileId = t.FileId
+                SourceChannel = t.SourceChannel,
+                FileId = t.FileId,
+                FileName = t.File != null ? t.File.OriginalFileName : null
             }).ToList(),
             AssociatedModels = tp.ModelVersionMappings.Select(m => new ModelSummaryListDto
             {
@@ -112,13 +114,19 @@ public record TextureSetListDto
 }
 
 /// <summary>
-/// Minimal texture info for list views - only essential fields for thumbnails and basic operations
+/// Minimal texture info for list views - only essential fields for thumbnails and basic operations.
+/// FileName and SourceChannel are required by the model viewer, which builds its
+/// textured materials from this list DTO: FileName lets it detect formats the
+/// browser cannot decode natively (e.g. TIFF), and SourceChannel drives
+/// single-channel extraction.
 /// </summary>
 public record TextureListDto
 {
     public int Id { get; init; }
     public required TextureType TextureType { get; init; }
+    public TextureChannel SourceChannel { get; init; }
     public int FileId { get; init; }
+    public string? FileName { get; init; }
 }
 
 /// <summary>
