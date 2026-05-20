@@ -1,10 +1,13 @@
 import './MaterialsPanel.css'
 
+import { useQueryClient } from '@tanstack/react-query'
 import { Badge } from 'primereact/badge'
 import { Button } from 'primereact/button'
 import { confirmDialog } from 'primereact/confirmdialog'
+import { ContextMenu } from 'primereact/contextmenu'
 import { Dropdown } from 'primereact/dropdown'
 import { InputText } from 'primereact/inputtext'
+import type { MenuItem } from 'primereact/menuitem'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 
@@ -17,9 +20,17 @@ import { useModelByIdQuery } from '@/features/model-viewer/api/queries'
 import { useModelObject } from '@/features/model-viewer/hooks/useModelObject'
 import { getFilePreviewUrl } from '@/features/models/api/modelApi'
 import { useTextureSetsByModelVersionQuery } from '@/features/texture-set/api/queries'
-import { disassociateTextureSetFromModelVersion } from '@/features/texture-set/api/textureSetApi'
+import {
+  associateTextureSetWithModelVersion,
+  createTextureSet,
+  disassociateTextureSetFromModelVersion,
+  getTextureSetById,
+  updateTextureSetKind,
+} from '@/features/texture-set/api/textureSetApi'
+import { CreateTextureSetDialog } from '@/features/texture-set/dialogs/CreateTextureSetDialog'
 import { TextureType } from '@/features/texture-set/types'
-import { type TextureSetDto } from '@/types'
+import { useTabContext } from '@/hooks/useTabContext'
+import { type TextureSetDto, TextureSetKind } from '@/types'
 
 import { TextureSetAssociationDialog } from './TextureSetAssociationDialog'
 
@@ -67,6 +78,17 @@ export function MaterialsPanel({
   const [newPresetName, setNewPresetName] = useState('')
   const [deletingPreset, setDeletingPreset] = useState(false)
   const newPresetInputRef = useRef<HTMLInputElement>(null)
+  const [createSetDialogVisible, setCreateSetDialogVisible] = useState(false)
+  const [creatingForMaterial, setCreatingForMaterial] = useState<string | null>(
+    null
+  )
+  const [contextTextureSet, setContextTextureSet] =
+    useState<TextureSetDto | null>(null)
+  const [convertingId, setConvertingId] = useState<number | null>(null)
+  const contextMenuRef = useRef<ContextMenu>(null)
+
+  const queryClient = useQueryClient()
+  const { openTextureSetDetailsTab } = useTabContext()
 
   // Sync selectedVariant to mainVariantName when version changes
   useEffect(() => {
@@ -252,6 +274,33 @@ export function MaterialsPanel({
     onModelUpdated()
   }
 
+  const handleOpenCreateSetDialog = (materialName: string) => {
+    setCreatingForMaterial(materialName)
+    setCreateSetDialogVisible(true)
+  }
+
+  const handleCloseCreateSetDialog = () => {
+    setCreateSetDialogVisible(false)
+    setCreatingForMaterial(null)
+  }
+
+  const handleCreateOwnedSet = async (name: string, kind: TextureSetKind) => {
+    if (!modelVersionId || creatingForMaterial === null) return
+    const created = await createTextureSet({ name, kind })
+    const apiMaterialName =
+      creatingForMaterial === 'Default' ? '' : creatingForMaterial
+    await associateTextureSetWithModelVersion(
+      created.id,
+      modelVersionId,
+      apiMaterialName,
+      selectedVariant
+    )
+    await textureSetsQuery.refetch()
+    onModelUpdated()
+    openTextureSetDetailsTab(created.id, created.name)
+    handleCloseCreateSetDialog()
+  }
+
   const handleUnlinkMaterial = async (
     materialName: string,
     textureSetId?: number
@@ -294,6 +343,107 @@ export function MaterialsPanel({
       setUnlinking(null)
     }
   }
+
+  // Apply a kind change and refresh every texture-set-derived query so the
+  // Materials panel, link picker and texture set pages all stay in sync.
+  const applyKindChange = useCallback(
+    async (ts: TextureSetDto, kind: TextureSetKind, ownerModelId?: number) => {
+      try {
+        setConvertingId(ts.id)
+        await updateTextureSetKind(ts.id, kind, ownerModelId)
+        // Converting to Single Model unlinks the set from other models, so
+        // refresh texture-set, model and version queries — any open model
+        // viewer must drop the now-stale mapping from its 3D preview.
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ['textureSets'] }),
+          queryClient.invalidateQueries({ queryKey: ['modelVersions'] }),
+          queryClient.invalidateQueries({ queryKey: ['models'] }),
+        ])
+        onModelUpdated()
+      } catch (error) {
+        console.error('Failed to change texture set kind:', error)
+      } finally {
+        setConvertingId(null)
+      }
+    },
+    [queryClient, onModelUpdated]
+  )
+
+  // Multi-Model → Single Model. Single-model sets belong to exactly one model,
+  // so warn (and list) when other models would be unlinked by the conversion.
+  const handleConvertToSingleModel = useCallback(
+    async (ts: TextureSetDto) => {
+      const currentModelId = Number(modelId)
+
+      // The cached texture set may be stale — e.g. it was linked to another
+      // model from a different panel since this list was loaded. Re-fetch so
+      // the unlink warning reflects the set's actual associations.
+      let associatedModels = ts.associatedModels
+      try {
+        const fresh = await getTextureSetById(ts.id)
+        associatedModels = fresh.associatedModels
+      } catch (error) {
+        console.error('Failed to refresh texture set associations:', error)
+      }
+
+      const otherModels = Array.from(
+        new Map(
+          associatedModels
+            .filter(m => m.id !== currentModelId)
+            .map(m => [m.id, m.name])
+        ).values()
+      )
+
+      if (otherModels.length > 0) {
+        const label = otherModels.length === 1 ? 'model' : 'models'
+        confirmDialog({
+          header: 'Convert to Single Model Texture Set',
+          message: `"${ts.name}" is also linked to ${otherModels.length} other ${label}: ${otherModels.join(', ')}.\n\nConverting it will unlink the texture set from ${otherModels.length === 1 ? 'that model' : 'those models'}. Continue?`,
+          icon: 'pi pi-exclamation-triangle',
+          acceptLabel: 'Convert & Unlink',
+          rejectLabel: 'Cancel',
+          acceptClassName: 'p-button-danger',
+          accept: () =>
+            applyKindChange(ts, TextureSetKind.ModelOwned, currentModelId),
+        })
+        return
+      }
+
+      applyKindChange(ts, TextureSetKind.ModelOwned, currentModelId)
+    },
+    [modelId, applyKindChange]
+  )
+
+  // Single Model → Multi-Model. No data is lost, so convert without a prompt.
+  const handleConvertToMultiModel = useCallback(
+    (ts: TextureSetDto) => {
+      applyKindChange(ts, TextureSetKind.ModelSpecific)
+    },
+    [applyKindChange]
+  )
+
+  const contextMenuItems = useMemo<MenuItem[]>(() => {
+    if (!contextTextureSet) return []
+    if (contextTextureSet.kind === TextureSetKind.ModelSpecific) {
+      return [
+        {
+          label: 'Convert to Single Model Texture Set',
+          icon: 'pi pi-box',
+          command: () => handleConvertToSingleModel(contextTextureSet),
+        },
+      ]
+    }
+    if (contextTextureSet.kind === TextureSetKind.ModelOwned) {
+      return [
+        {
+          label: 'Convert to Multi-Model Texture Set',
+          icon: 'pi pi-images',
+          command: () => handleConvertToMultiModel(contextTextureSet),
+        },
+      ]
+    }
+    return []
+  }, [contextTextureSet, handleConvertToSingleModel, handleConvertToMultiModel])
 
   // Use persisted variant names from backend (no longer need localPresets)
   // Filter out '' (Default) and '__embedded__' which are shown as fixed options
@@ -410,30 +560,77 @@ export function MaterialsPanel({
                 <div className="materials-item-header">
                   <span className="materials-item-name">{materialName}</span>
                   {!isEmbeddedPreset && (
-                    <Button
-                      icon="pi pi-link"
-                      label="Link Texture Set"
-                      className="p-button-sm p-button-text"
-                      onClick={() => handleLinkTextureSet(materialName)}
-                      size="small"
-                      data-testid={`link-ts-${materialName}`}
-                    />
+                    <div className="materials-item-actions">
+                      <Button
+                        icon="pi pi-link"
+                        className="p-button-sm p-button-text"
+                        onClick={() => handleLinkTextureSet(materialName)}
+                        tooltip="Link Texture Set"
+                        tooltipOptions={{ position: 'top' }}
+                        aria-label="Link Texture Set"
+                        size="small"
+                        data-testid={`link-ts-${materialName}`}
+                      />
+                      <Button
+                        icon="pi pi-plus"
+                        className="p-button-sm p-button-text"
+                        onClick={() => handleOpenCreateSetDialog(materialName)}
+                        tooltip="Add new texture set"
+                        tooltipOptions={{ position: 'top' }}
+                        aria-label="Add new texture set"
+                        size="small"
+                        data-testid={`add-ts-${materialName}`}
+                      />
+                      {linkedSets.length > 0 && (
+                        <Button
+                          icon="pi pi-times"
+                          className="p-button-text p-button-sm p-button-danger"
+                          onClick={() => handleUnlinkMaterial(materialName)}
+                          loading={unlinking === materialName}
+                          tooltip="Unlink"
+                          tooltipOptions={{ position: 'top' }}
+                          aria-label="Unlink"
+                          size="small"
+                          data-testid={`unlink-ts-${materialName}`}
+                        />
+                      )}
+                    </div>
                   )}
                 </div>
                 {linkedSets.map(linkedTs => {
                   const previewUrl = getPreviewUrl(linkedTs)
+                  const openSet = () => {
+                    onTextureSetSelect(linkedTs.id)
+                    openTextureSetDetailsTab(linkedTs.id, linkedTs.name)
+                  }
+                  const canConvert =
+                    linkedTs.kind === TextureSetKind.ModelSpecific ||
+                    linkedTs.kind === TextureSetKind.ModelOwned
                   return (
                     <div
                       key={`${materialName}-${linkedTs.id}`}
-                      className="materials-item"
+                      className="materials-item materials-item-clickable"
                       data-testid={`material-item-${materialName}-${linkedTs.id}`}
                       data-texture-set={linkedTs.name}
+                      role="button"
+                      tabIndex={0}
+                      onClick={openSet}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          openSet()
+                        }
+                      }}
+                      onContextMenu={e => {
+                        if (!canConvert || convertingId !== null) return
+                        e.preventDefault()
+                        setContextTextureSet(linkedTs)
+                        contextMenuRef.current?.show(e)
+                      }}
+                      title={`Open ${linkedTs.name} in a new tab`}
                     >
                       <div className="materials-item-linked">
-                        <div
-                          className="materials-item-preview"
-                          onClick={() => onTextureSetSelect(linkedTs.id)}
-                        >
+                        <div className="materials-item-preview">
                           {previewUrl ? (
                             <img
                               src={previewUrl}
@@ -453,17 +650,6 @@ export function MaterialsPanel({
                             {linkedTs.textureCount !== 1 ? 's' : ''}
                           </span>
                         </div>
-                        <Button
-                          icon="pi pi-times"
-                          className="p-button-text p-button-sm p-button-danger"
-                          onClick={() =>
-                            handleUnlinkMaterial(materialName, linkedTs.id)
-                          }
-                          loading={unlinking === materialName}
-                          tooltip="Unlink"
-                          tooltipOptions={{ position: 'left' }}
-                          size="small"
-                        />
                       </div>
                     </div>
                   )
@@ -504,6 +690,24 @@ export function MaterialsPanel({
           onAssociationsChanged={handleLinkDialogClose}
         />
       )}
+
+      <CreateTextureSetDialog
+        visible={createSetDialogVisible}
+        onHide={handleCloseCreateSetDialog}
+        onSubmit={handleCreateOwnedSet}
+        lockedKind={TextureSetKind.ModelOwned}
+        header={
+          creatingForMaterial
+            ? `New Texture Set — ${creatingForMaterial}`
+            : 'New Texture Set'
+        }
+      />
+
+      <ContextMenu
+        ref={contextMenuRef}
+        model={contextMenuItems}
+        onHide={() => setContextTextureSet(null)}
+      />
     </div>
   )
 }

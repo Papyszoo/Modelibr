@@ -257,10 +257,10 @@ ThenBdd(
                 );
             });
 
-        // Switch to Model-Specific tab (default tab is now Global Materials)
+        // Switch to Multi-Model tab (default tab is now Global Materials)
         const msTab = page
             .locator(".kind-filter-select .p-button")
-            .filter({ hasText: "Model-Specific" });
+            .filter({ hasText: "Multi-Model" });
         await msTab.waitFor({ state: "visible", timeout: 10000 });
         const isActive = await msTab.evaluate((el: Element) =>
             el.classList.contains("p-highlight"),

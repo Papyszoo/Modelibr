@@ -72,10 +72,10 @@ const TILES: Tile[] = [
     key: 'model-textures',
     group: 'assets',
     icon: 'pi-images',
-    label: 'Model Textures',
-    description: 'Textures bound to a specific model and its UVs.',
+    label: 'Multi-Model Textures',
+    description: 'Baked texture sets that can be shared across multiple models.',
     targetType: 'modelTextures',
-    targetLabel: 'Model Textures',
+    targetLabel: 'Multi-Model Textures',
   },
   {
     key: 'environment-maps',

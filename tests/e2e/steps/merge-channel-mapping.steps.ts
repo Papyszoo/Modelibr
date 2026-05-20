@@ -237,11 +237,11 @@ When(
         // Refresh the page to see newly created texture sets
         await page.reload({ waitUntil: "domcontentloaded" });
 
-        // Wait for the texture set page to render, then switch to Model-Specific tab
+        // Wait for the texture set page to render, then switch to Multi-Model tab
         await page.waitForSelector(".kind-filter-select", { timeout: 10000 });
         const msTab = page
             .locator(".kind-filter-select .p-button")
-            .filter({ hasText: "Model-Specific" });
+            .filter({ hasText: "Multi-Model" });
         await msTab.waitFor({ state: "visible", timeout: 5000 });
         const isActive = await msTab.evaluate((el: Element) =>
             el.classList.contains("p-highlight"),

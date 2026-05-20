@@ -13,17 +13,20 @@ internal class UpdateTextureSetKindCommandHandler : ICommandHandler<UpdateTextur
     private readonly ITextureSetRepository _textureSetRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IThumbnailQueue _thumbnailQueue;
+    private readonly IBlendFileGenerator _blendFileGenerator;
     private readonly ILogger<UpdateTextureSetKindCommandHandler> _logger;
 
     public UpdateTextureSetKindCommandHandler(
         ITextureSetRepository textureSetRepository,
         IDateTimeProvider dateTimeProvider,
         IThumbnailQueue thumbnailQueue,
+        IBlendFileGenerator blendFileGenerator,
         ILogger<UpdateTextureSetKindCommandHandler> logger)
     {
         _textureSetRepository = textureSetRepository;
         _dateTimeProvider = dateTimeProvider;
         _thumbnailQueue = thumbnailQueue;
+        _blendFileGenerator = blendFileGenerator;
         _logger = logger;
     }
 
@@ -39,6 +42,24 @@ internal class UpdateTextureSetKindCommandHandler : ICommandHandler<UpdateTextur
             }
 
             textureSet.UpdateKind(command.Kind, _dateTimeProvider.UtcNow);
+
+            // Converting to a single-model (ModelOwned) kind ties the texture
+            // set to exactly one model — drop links to every other model.
+            if (command.Kind == TextureSetKind.ModelOwned && command.OwnerModelId.HasValue)
+            {
+                var removed = textureSet.RemoveModelVersionsNotOwnedBy(
+                    command.OwnerModelId.Value, _dateTimeProvider.UtcNow);
+
+                // Invalidate each unlinked model version's cached .blend so it
+                // regenerates without the removed texture set (mirrors the
+                // disassociate-from-model-version flow).
+                foreach (var mapping in removed.DistinctBy(m => m.ModelVersionId))
+                {
+                    _blendFileGenerator.InvalidateCache(
+                        mapping.ModelVersion.Model.Id, mapping.ModelVersionId);
+                }
+            }
+
             var updated = await _textureSetRepository.UpdateAsync(textureSet, cancellationToken);
 
             // Auto-enqueue thumbnail generation when kind changes to Universal
@@ -65,5 +86,5 @@ internal class UpdateTextureSetKindCommandHandler : ICommandHandler<UpdateTextur
     }
 }
 
-public record UpdateTextureSetKindCommand(int Id, TextureSetKind Kind) : ICommand<UpdateTextureSetKindResponse>;
+public record UpdateTextureSetKindCommand(int Id, TextureSetKind Kind, int? OwnerModelId = null) : ICommand<UpdateTextureSetKindResponse>;
 public record UpdateTextureSetKindResponse(int Id, TextureSetKind Kind);

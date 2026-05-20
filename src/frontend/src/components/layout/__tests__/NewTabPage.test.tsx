@@ -72,7 +72,7 @@ describe('NewTabPage', () => {
 
     expect(screen.getByText('Models')).toBeInTheDocument()
     expect(screen.getByText('Global Materials')).toBeInTheDocument()
-    expect(screen.getByText('Model Textures')).toBeInTheDocument()
+    expect(screen.getByText('Multi-Model Textures')).toBeInTheDocument()
     expect(screen.getByText('Projects')).toBeInTheDocument()
     expect(screen.getByText('Settings')).toBeInTheDocument()
 
@@ -160,7 +160,7 @@ describe('NewTabPage', () => {
     expect(setActiveTab).toHaveBeenCalledWith(updated[0].id)
   })
 
-  it('opens a dedicated modelTextures tab when Model Textures is picked', () => {
+  it('opens a dedicated modelTextures tab when Multi-Model Textures is picked', () => {
     const setTabs = jest.fn()
     const setActiveTab = jest.fn()
     const ctx = makeContextValue({
@@ -171,12 +171,12 @@ describe('NewTabPage', () => {
     })
     renderWithContext(<NewTabPage tabId="newTab" />, ctx)
 
-    fireEvent.click(screen.getByText('Model Textures'))
+    fireEvent.click(screen.getByText('Multi-Model Textures'))
 
     const [updated] = setTabs.mock.calls[0]
     expect(updated[0]).toMatchObject({
       type: 'modelTextures',
-      label: 'Model Textures',
+      label: 'Multi-Model Textures',
     })
     expect(setActiveTab).toHaveBeenCalledWith(updated[0].id)
   })
