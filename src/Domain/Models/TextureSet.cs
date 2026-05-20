@@ -532,6 +532,29 @@ public class TextureSet : AggregateRoot
     }
 
     /// <summary>
+    /// Removes every model-version mapping that does not belong to the given
+    /// owner model. Used when converting a texture set to the single-model
+    /// (ModelOwned) kind so it stays tied to exactly one model.
+    /// Requires ModelVersion.Model to be loaded on each mapping.
+    /// </summary>
+    /// <param name="ownerModelId">The model that should remain associated</param>
+    /// <param name="updatedAt">When the change occurred</param>
+    /// <returns>The mappings that were removed.</returns>
+    public IReadOnlyList<ModelVersionTextureSet> RemoveModelVersionsNotOwnedBy(int ownerModelId, DateTime updatedAt)
+    {
+        var toRemove = _modelVersionMappings
+            .Where(m => m.ModelVersion.Model.Id != ownerModelId)
+            .ToList();
+        foreach (var mapping in toRemove)
+        {
+            _modelVersionMappings.Remove(mapping);
+        }
+        if (toRemove.Count > 0)
+            UpdatedAt = updatedAt;
+        return toRemove;
+    }
+
+    /// <summary>
     /// Checks if this texture set is associated with a model version with the specified ID.
     /// </summary>
     /// <param name="modelVersionId">The model version ID to check</param>

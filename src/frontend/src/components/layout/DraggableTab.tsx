@@ -66,7 +66,7 @@ const getTabTooltip = (tab: Tab): string => {
     case 'globalMaterials':
       return 'Global Materials'
     case 'modelTextures':
-      return 'Model Textures'
+      return 'Multi-Model Textures'
     case 'textureSetViewer': {
       return `Texture Set: ${tab.label || tab.setId || 'Unknown'}`
     }

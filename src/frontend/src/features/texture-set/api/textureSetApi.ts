@@ -249,7 +249,8 @@ export async function regenerateTextureSetThumbnail(
 
 export async function updateTextureSetKind(
   textureSetId: number,
-  kind: number
+  kind: number,
+  ownerModelId?: number
 ): Promise<void> {
-  await client.put(`/texture-sets/${textureSetId}/kind`, { kind })
+  await client.put(`/texture-sets/${textureSetId}/kind`, { kind, ownerModelId })
 }

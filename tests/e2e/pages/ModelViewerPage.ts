@@ -804,19 +804,19 @@ export class ModelViewerPage {
             (await item.count()) > 0 ? item.first() : fallbackItem.first();
         await expect(targetItem).toBeVisible({ timeout: 10000 });
 
-        // Click the preview to select this texture set
-        const preview = targetItem.locator(".materials-item-preview");
-        if (
-            await preview
-                .waitFor({ state: "visible", timeout: 2000 })
-                .then(() => true)
-                .catch(() => false)
-        ) {
-            await preview.scrollIntoViewIfNeeded();
-            await preview.click();
-        } else {
-            await targetItem.scrollIntoViewIfNeeded();
-            await targetItem.click();
+        // Click the material item to select this texture set. The whole row is
+        // clickable: it applies the texture set to the 3D model AND opens the
+        // texture set in its own tab.
+        await targetItem.scrollIntoViewIfNeeded();
+        await targetItem.click();
+
+        // Opening the texture set switches focus to its new tab — return to the
+        // model viewer tab so the inline preview is visible for assertions.
+        const modelViewerTab = this.page
+            .locator(".draggable-tab:has(.pi-box)")
+            .first();
+        if ((await modelViewerTab.count()) > 0) {
+            await modelViewerTab.click();
         }
 
         // Let React commit the selection before the assertion step polls the scene.
@@ -1002,21 +1002,25 @@ export class ModelViewerPage {
 
     /**
      * Unlink a texture set from a specific material in the current preset.
-     * Clicks the pi-times (unlink) button on the material item that has the given texture set.
+     * The unlink button lives in the material group header (a sibling of the
+     * .materials-item that displays the texture set), so we scope to the
+     * enclosing .materials-material-group.
      */
     async unlinkTextureSetFromMaterial(textureSetName: string): Promise<void> {
         await this.openTab("Materials", '[data-testid="materials-panel"]');
 
-        // Find the material item showing this texture set
-        const materialItem = this.page.locator(
-            `.materials-item[data-texture-set="${textureSetName}"]`,
-        );
-        await expect(materialItem.first()).toBeVisible({ timeout: 10000 });
+        // Find the material group that contains this texture set's item
+        const group = this.page.locator(".materials-material-group", {
+            has: this.page.locator(
+                `.materials-item[data-texture-set="${textureSetName}"]`,
+            ),
+        });
+        await expect(group.first()).toBeVisible({ timeout: 10000 });
 
-        // Click the unlink button (pi-times icon) inside it
-        const unlinkBtn = materialItem
+        // Click the unlink button in that group's header
+        const unlinkBtn = group
             .first()
-            .locator("button.p-button-danger");
+            .locator('[data-testid^="unlink-ts-"]');
         await unlinkBtn.click();
 
         // Wait for the UI to update

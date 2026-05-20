@@ -21,14 +21,14 @@ import { Page, expect } from "@playwright/test";
  * opening a tab via UI.
  *
  * Tab types not in this map (`textureSets`, `stageList`) have no tile —
- * `textureSets` was split into Global Materials / Model Textures, and
+ * `textureSets` was split into Global Materials / Multi-Model Textures, and
  * `stageList` is disabled while the feature is incomplete. Tests that need
  * them inject the tab via localStorage state — see `injectAndActivateTab`.
  */
 const TILE_LABELS: Record<string, string> = {
     modelList: "Models",
     globalMaterials: "Global Materials",
-    modelTextures: "Model Textures",
+    modelTextures: "Multi-Model Textures",
     sprites: "Sprites",
     environmentMaps: "Environment Maps",
     sounds: "Sounds",

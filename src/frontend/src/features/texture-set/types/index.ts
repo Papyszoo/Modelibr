@@ -27,6 +27,7 @@ export enum TextureChannel {
 export enum TextureSetKind {
   ModelSpecific = 0,
   Universal = 1,
+  ModelOwned = 2,
 }
 
 export enum UvMappingMode {

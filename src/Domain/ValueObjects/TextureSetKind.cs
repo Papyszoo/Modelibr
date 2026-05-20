@@ -18,7 +18,13 @@ public enum TextureSetKind
     /// Suitable for large surfaces (walls, floors, terrain) and modular kits.
     /// Exists independently of any model and supports tiling scale metadata.
     /// </summary>
-    Universal = 1
+    Universal = 1,
+
+    /// <summary>
+    /// Owned by a single model — never surfaced in cross-model browsing or
+    /// linking pickers. Lives inside the owning model's Materials panel.
+    /// </summary>
+    ModelOwned = 2
 }
 
 /// <summary>
@@ -33,8 +39,9 @@ public static class TextureSetKindExtensions
     {
         return kind switch
         {
-            TextureSetKind.ModelSpecific => "Model-Specific (Baked/Unique)",
+            TextureSetKind.ModelSpecific => "Multi-Model (Baked/Unique)",
             TextureSetKind.Universal => "Universal (Tileable/Global)",
+            TextureSetKind.ModelOwned => "Model-Owned (Single-Model)",
             _ => "Unknown"
         };
     }
@@ -46,8 +53,9 @@ public static class TextureSetKindExtensions
     {
         return kind switch
         {
-            TextureSetKind.ModelSpecific => "Model-Specific",
+            TextureSetKind.ModelSpecific => "Multi-Model",
             TextureSetKind.Universal => "Universal",
+            TextureSetKind.ModelOwned => "Model-Owned",
             _ => "Unknown"
         };
     }

@@ -121,7 +121,7 @@ export class TextureSetsPage {
      * @param label - Visible tab label
      */
     async selectKindTab(
-        label: "Model-Specific" | "Global Materials",
+        label: "Multi-Model" | "Global Materials",
     ): Promise<void> {
         await this.page.getByRole("button", { name: label }).click();
         await this.waitForLoad();

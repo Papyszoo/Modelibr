@@ -1,8 +1,8 @@
 @texture-set-kind
-Feature: Texture Set Kind (Model-Specific vs Global Materials)
+Feature: Texture Set Kind (Multi-Model vs Global Materials)
 
   Tests for the texture set kind feature including:
-  - Kind filter tabs (Model-Specific and Global Materials)
+  - Kind filter tabs (Multi-Model and Global Materials)
   - Default tab is Global Materials
   - Creating texture sets with specific kind
   - Changing kind via API
@@ -18,30 +18,30 @@ Feature: Texture Set Kind (Model-Specific vs Global Materials)
   Scenario: Creating texture sets places them in correct kind tabs
     Given I am on the texture sets page
     When I create a model-specific texture set "kind_test_ms" via API
-    And I switch to the "Model-Specific" kind tab
+    And I switch to the "Multi-Model" kind tab
     Then I should see texture set "kind_test_ms" in the grid
     When I switch to the "Global Materials" kind tab
     Then I should not see texture set "kind_test_ms" in the grid
     When I create a universal texture set "kind_test_uni" via API
     And I switch to the "Global Materials" kind tab
     Then I should see texture set "kind_test_uni" in the grid
-    When I switch to the "Model-Specific" kind tab
+    When I switch to the "Multi-Model" kind tab
     Then I should not see texture set "kind_test_uni" in the grid
 
-  Scenario: Changing kind between Model-Specific and Universal via API
+  Scenario: Changing kind between Multi-Model and Universal via API
     Given I am on the texture sets page
     When I create a model-specific texture set "kind_change_test" via API
-    And I switch to the "Model-Specific" kind tab
+    And I switch to the "Multi-Model" kind tab
     Then I should see texture set "kind_change_test" in the grid
     When I change texture set "kind_change_test" kind to Universal via API
     And I reload the page
     And I switch to the "Global Materials" kind tab
     Then I should see texture set "kind_change_test" in the grid
-    When I switch to the "Model-Specific" kind tab
+    When I switch to the "Multi-Model" kind tab
     Then I should not see texture set "kind_change_test" in the grid
     When I change texture set "kind_change_test" kind to ModelSpecific via API
     And I reload the page
-    And I switch to the "Model-Specific" kind tab
+    And I switch to the "Multi-Model" kind tab
     Then I should see texture set "kind_change_test" in the grid
     When I switch to the "Global Materials" kind tab
     Then I should not see texture set "kind_change_test" in the grid
@@ -50,7 +50,7 @@ Feature: Texture Set Kind (Model-Specific vs Global Materials)
     Given I am on the texture sets page
     When I create a model-specific texture set "drag_to_global" via API
     And I reload the page
-    And I switch to the "Model-Specific" kind tab
+    And I switch to the "Multi-Model" kind tab
     Then I should see texture set "drag_to_global" in the grid
     When I drag texture set "drag_to_global" to the "Global Materials" kind tab
     Then I should not see texture set "drag_to_global" in the grid
@@ -60,9 +60,9 @@ Feature: Texture Set Kind (Model-Specific vs Global Materials)
     And I reload the page
     And I switch to the "Global Materials" kind tab
     Then I should see texture set "drag_to_ms" in the grid
-    When I drag texture set "drag_to_ms" to the "Model-Specific" kind tab
+    When I drag texture set "drag_to_ms" to the "Multi-Model" kind tab
     Then I should not see texture set "drag_to_ms" in the grid
-    When I switch to the "Model-Specific" kind tab
+    When I switch to the "Multi-Model" kind tab
     Then I should see texture set "drag_to_ms" in the grid
 
   @timeout:720000 @slow
@@ -79,7 +79,7 @@ Feature: Texture Set Kind (Model-Specific vs Global Materials)
     And I right-click on texture set "ctx_uni_regen"
     Then I should see "Regenerate Thumbnail" in the context menu
     When I create a model-specific texture set "ctx_ms_no_regen" via API
-    And I switch to the "Model-Specific" kind tab
+    And I switch to the "Multi-Model" kind tab
     And I right-click on texture set "ctx_ms_no_regen"
     Then I should not see "Regenerate Thumbnail" in the context menu
 
