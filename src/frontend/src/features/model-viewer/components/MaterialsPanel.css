@@ -90,11 +90,32 @@
   background: var(--surface-card, #2a2a2a);
 }
 
+.materials-item-clickable {
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.materials-item-clickable:hover,
+.materials-item-clickable:focus-visible {
+  background: var(--surface-hover, #333);
+  border-color: var(--primary-color, #4a9eff);
+  outline: none;
+}
+
 .materials-item-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 0.25rem;
   margin-bottom: 0.25rem;
+}
+
+.materials-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
 }
 
 .materials-item-name {
@@ -118,7 +139,6 @@
   align-items: center;
   justify-content: center;
   background: var(--surface-hover, #333);
-  cursor: pointer;
   flex-shrink: 0;
 }
 

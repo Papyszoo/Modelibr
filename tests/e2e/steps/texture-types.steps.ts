@@ -83,10 +83,10 @@ Given("I have a texture set with uploaded textures", async ({ page }) => {
     await page.waitForLoadState("domcontentloaded");
     await textureSetsPage.goto();
 
-    // Switch to Model-Specific tab (default tab is now Global Materials)
+    // Switch to Multi-Model tab (default tab is now Global Materials)
     const msTab = page
         .locator(".kind-filter-select .p-button")
-        .filter({ hasText: "Model-Specific" });
+        .filter({ hasText: "Multi-Model" });
     await msTab.waitFor({ state: "visible", timeout: 10000 });
     const msTabActive = await msTab.evaluate((el: Element) =>
         el.classList.contains("p-highlight"),
@@ -145,10 +145,10 @@ Given("I have a texture set with ORM packed texture", async ({ page }) => {
     await page.waitForLoadState("domcontentloaded");
     await textureSetsPage.goto();
 
-    // Switch to Model-Specific tab (default tab is now Global Materials)
+    // Switch to Multi-Model tab (default tab is now Global Materials)
     const msTabOrm = page
         .locator(".kind-filter-select .p-button")
-        .filter({ hasText: "Model-Specific" });
+        .filter({ hasText: "Multi-Model" });
     await msTabOrm.waitFor({ state: "visible", timeout: 10000 });
     const msTabOrmActive = await msTabOrm.evaluate((el: Element) =>
         el.classList.contains("p-highlight"),
@@ -196,10 +196,10 @@ Given("I have a texture set with a height texture", async ({ page }) => {
     await page.waitForLoadState("domcontentloaded");
     await textureSetsPage.goto();
 
-    // Switch to Model-Specific tab (default tab is now Global Materials)
+    // Switch to Multi-Model tab (default tab is now Global Materials)
     const msTabHeight = page
         .locator(".kind-filter-select .p-button")
-        .filter({ hasText: "Model-Specific" });
+        .filter({ hasText: "Multi-Model" });
     await msTabHeight.waitFor({ state: "visible", timeout: 10000 });
     const msTabHeightActive = await msTabHeight.evaluate((el: Element) =>
         el.classList.contains("p-highlight"),

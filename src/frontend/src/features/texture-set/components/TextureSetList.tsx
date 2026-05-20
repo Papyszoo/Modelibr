@@ -29,7 +29,7 @@ type KindFilter = 'model-specific' | 'universal'
 const kindFilterOptions: { label: string; value: KindFilter; kind: number }[] =
   [
     {
-      label: 'Model-Specific',
+      label: 'Multi-Model',
       value: 'model-specific',
       kind: TextureSetKind.ModelSpecific,
     },
@@ -40,7 +40,7 @@ const kindFilterOptions: { label: string; value: KindFilter; kind: number }[] =
     },
   ]
 
-function kindFilterToApiKind(filter: KindFilter): number {
+function kindFilterToApiKind(filter: KindFilter): TextureSetKind {
   switch (filter) {
     case 'model-specific':
       return TextureSetKind.ModelSpecific
@@ -222,7 +222,7 @@ export function TextureSetList({ kind }: TextureSetListProps = {}) {
           kind === TextureSetKind.Universal
             ? 'Global Materials'
             : kind === TextureSetKind.ModelSpecific
-              ? 'Model Textures'
+              ? 'Multi-Model Textures'
               : undefined
         }
         unitLabel={
@@ -340,6 +340,9 @@ export function TextureSetList({ kind }: TextureSetListProps = {}) {
           visible={showCreateDialog}
           onHide={() => setShowCreateDialog(false)}
           onSubmit={handleCreateTextureSet}
+          // Dedicated kind pages (Multi-Model / Global Materials) lock the
+          // dialog to their kind; the generic tab keeps the kind selector.
+          lockedKind={kind}
         />
       )}
     </div>

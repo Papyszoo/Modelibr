@@ -125,12 +125,12 @@ Given("I have a sprite with an uploaded image", async () => {
 
 // ============= UI navigation steps =============
 
-/** After navigating to texture sets page, switch to Model-Specific tab
- *  (the default is Global Materials, but our API creates Model-Specific sets)
+/** After navigating to texture sets page, switch to Multi-Model tab
+ *  (the default is Global Materials, but our API creates Multi-Model sets)
  *  Optionally searches for a specific card name to handle pagination (>50 sets). */
 async function switchToModelSpecificKind(page: any, searchText?: string) {
     const modelSpecificBtn = page.locator(".kind-filter-select button").filter({
-        hasText: "Model-Specific",
+        hasText: "Multi-Model",
     });
     await expect(modelSpecificBtn).toBeVisible({ timeout: 5000 });
     const isActive = await modelSpecificBtn.evaluate((el: Element) =>

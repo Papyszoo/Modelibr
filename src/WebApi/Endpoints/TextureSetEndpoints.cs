@@ -105,7 +105,7 @@ public static class TextureSetEndpoints
         // Kind update
         app.MapPut("/texture-sets/{id}/kind", UpdateTextureSetKind)
             .WithName("Update Texture Set Kind")
-            .WithSummary("Updates the kind of a texture set (ModelSpecific or Universal)")
+            .WithSummary("Updates the kind of a texture set (ModelSpecific, Universal or ModelOwned)")
             .WithOpenApi();
 
         // Tiling scale (Universal texture sets only)
@@ -459,7 +459,7 @@ public static class TextureSetEndpoints
         CancellationToken cancellationToken)
     {
         var result = await commandHandler.Handle(
-            new UpdateTextureSetKindCommand(id, request.Kind),
+            new UpdateTextureSetKindCommand(id, request.Kind, request.OwnerModelId),
             cancellationToken);
 
         if (result.IsFailure)
@@ -595,7 +595,7 @@ public static class TextureSetEndpoints
 // Request DTOs
 public record CreateTextureSetRequest(string Name, TextureSetKind? Kind = null, int? CategoryId = null);
 public record UpdateTextureSetRequest(string Name, int? CategoryId);
-public record UpdateTextureSetKindRequest(TextureSetKind Kind);
+public record UpdateTextureSetKindRequest(TextureSetKind Kind, int? OwnerModelId = null);
 public record UpdateTilingScaleRequest(float TilingScaleX, float TilingScaleY, UvMappingMode? UvMappingMode = null, float? UvScale = null);
 public record AddTextureToTextureSetRequest(int FileId, TextureType TextureType, TextureChannel? SourceChannel = null);
 public record ChangeTextureTypeRequest(TextureType? TextureType);

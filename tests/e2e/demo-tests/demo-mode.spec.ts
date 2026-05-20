@@ -158,7 +158,7 @@ test.describe("demo mode e2e", () => {
             expect.arrayContaining(["Global Stone Material"]),
         );
 
-        await textureSetsPage.selectKindTab("Model-Specific");
+        await textureSetsPage.selectKindTab("Multi-Model");
         expect(await textureSetsPage.getTextureSetNames()).toEqual(
             expect.arrayContaining(["Basic Texture Set", "Color Textures"]),
         );
@@ -262,7 +262,7 @@ test.describe("demo mode e2e", () => {
         const textureSetName = `Demo Runtime Texture Set ${Date.now()}`;
 
         await textureSetsPage.goto();
-        await textureSetsPage.selectKindTab("Model-Specific");
+        await textureSetsPage.selectKindTab("Multi-Model");
         await textureSetsPage.createEmptyTextureSet(textureSetName);
         await expect(textureSetsPage.getCardByName(textureSetName)).toBeVisible(
             {
@@ -289,7 +289,7 @@ test.describe("demo mode e2e", () => {
         await recycledFilesPage.restoreTextureSet(0);
 
         await textureSetsPage.goto();
-        await textureSetsPage.selectKindTab("Model-Specific");
+        await textureSetsPage.selectKindTab("Multi-Model");
         await expect(textureSetsPage.getCardByName(textureSetName)).toBeVisible(
             {
                 timeout: 15000,

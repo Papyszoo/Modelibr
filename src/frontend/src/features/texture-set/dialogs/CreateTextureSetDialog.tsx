@@ -18,18 +18,30 @@ interface CreateTextureSetDialogProps {
   visible: boolean
   onHide: () => void
   onSubmit: (name: string, kind: TextureSetKind) => Promise<void>
+  /**
+   * When set, the kind is fixed to this value and the kind selector is hidden.
+   * Used by the Materials panel "Add new texture set" flow which always
+   * creates ModelOwned texture sets.
+   */
+  lockedKind?: TextureSetKind
+  /** Optional header override; defaults to "Create Texture Set". */
+  header?: string
 }
 
 export function CreateTextureSetDialog({
   visible,
   onHide,
   onSubmit,
+  lockedKind,
+  header,
 }: CreateTextureSetDialogProps) {
   const [submitting, setSubmitting] = useState(false)
-  const [kind, setKind] = useState<TextureSetKind>(TextureSetKind.ModelSpecific)
+  const [kind, setKind] = useState<TextureSetKind>(
+    lockedKind ?? TextureSetKind.ModelSpecific
+  )
 
   const kindOptions = [
-    { label: 'Model-Specific', value: TextureSetKind.ModelSpecific },
+    { label: 'Multi-Model', value: TextureSetKind.ModelSpecific },
     { label: 'Universal (Tileable)', value: TextureSetKind.Universal },
   ]
 
@@ -52,9 +64,9 @@ export function CreateTextureSetDialog({
   useEffect(() => {
     if (!visible) {
       reset({ name: '' })
-      setKind(TextureSetKind.ModelSpecific)
+      setKind(lockedKind ?? TextureSetKind.ModelSpecific)
     }
-  }, [visible, reset])
+  }, [visible, reset, lockedKind])
 
   const handleValidSubmit = async (values: TextureSetNameFormValues) => {
     try {
@@ -94,7 +106,7 @@ export function CreateTextureSetDialog({
 
   return (
     <Dialog
-      header="Create Texture Set"
+      header={header ?? 'Create Texture Set'}
       visible={visible}
       onHide={handleCancel}
       footer={dialogFooter}
@@ -128,22 +140,24 @@ export function CreateTextureSetDialog({
         </small>
       </div>
 
-      <div className="p-field" style={{ marginTop: '1rem' }}>
-        <label className="p-text-bold">Type</label>
-        <SelectButton
-          value={kind}
-          options={kindOptions}
-          onChange={e => {
-            if (e.value !== null && e.value !== undefined) setKind(e.value)
-          }}
-          style={{ marginTop: '0.5rem' }}
-        />
-        <small className="p-text-secondary">
-          {kind === TextureSetKind.ModelSpecific
-            ? "Baked textures tied to a specific model's UV layout"
-            : 'Tileable/seamless textures for surfaces (walls, floors, terrain)'}
-        </small>
-      </div>
+      {lockedKind === undefined && (
+        <div className="p-field" style={{ marginTop: '1rem' }}>
+          <label className="p-text-bold">Type</label>
+          <SelectButton
+            value={kind}
+            options={kindOptions}
+            onChange={e => {
+              if (e.value !== null && e.value !== undefined) setKind(e.value)
+            }}
+            style={{ marginTop: '0.5rem' }}
+          />
+          <small className="p-text-secondary">
+            {kind === TextureSetKind.ModelSpecific
+              ? "Baked textures tied to a specific model's UV layout"
+              : 'Tileable/seamless textures for surfaces (walls, floors, terrain)'}
+          </small>
+        </div>
+      )}
     </Dialog>
   )
 }

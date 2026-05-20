@@ -154,7 +154,7 @@ export function getTabLabel(
     case 'globalMaterials':
       return 'Global Materials'
     case 'modelTextures':
-      return 'Model Textures'
+      return 'Multi-Model Textures'
     case 'textureSetViewer':
       if (setName) return setName
       return setId ? `Set ${setId}` : 'Texture Set'

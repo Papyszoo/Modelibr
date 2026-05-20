@@ -325,11 +325,11 @@ GivenBdd(
         await openTabViaMenu(page, "textureSets", "left");
         await page.waitForLoadState("domcontentloaded");
 
-        // The texture sets created in test setup are Model-Specific (backend default).
-        // The default tab is Global Materials, so we must switch to Model-Specific first.
+        // The texture sets created in test setup are Multi-Model (backend default).
+        // The default tab is Global Materials, so we must switch to Multi-Model first.
         const modelSpecificBtn = page
             .locator(".kind-filter-select button")
-            .filter({ hasText: "Model-Specific" });
+            .filter({ hasText: "Multi-Model" });
         await expect(modelSpecificBtn).toBeVisible({ timeout: 10000 });
         const isActive = await modelSpecificBtn.evaluate((el: Element) =>
             el.classList.contains("p-highlight"),

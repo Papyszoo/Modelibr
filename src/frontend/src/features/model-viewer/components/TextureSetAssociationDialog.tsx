@@ -17,6 +17,7 @@ import {
 import {
   type PackSummaryDto,
   type TextureSetDto,
+  TextureSetKind,
   TextureType,
 } from '@/features/texture-set/types'
 import type { Model } from '@/utils/fileUtils'
@@ -38,7 +39,7 @@ interface TextureSetAssociationDialogProps {
 
 export function TextureSetAssociationDialog({
   visible,
-  model: _model,
+  model,
   modelVersionId,
   materialName,
   variantName,
@@ -46,6 +47,7 @@ export function TextureSetAssociationDialog({
   onHide,
   onAssociationsChanged,
 }: TextureSetAssociationDialogProps) {
+  const currentModelId = Number(model.id)
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [originalId, setOriginalId] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
@@ -178,9 +180,17 @@ export function TextureSetAssociationDialog({
     onHide()
   }
 
-  // Filter texture sets
+  // Filter + group texture sets. Model-owned sets are private to their
+  // owning model — they're hidden outright when viewing a different model.
   const allTextureSets = allTextureSetsQuery.data ?? []
-  const filteredTextureSets = allTextureSets.filter(ts => {
+  const isLinkedToCurrentModel = (ts: TextureSetDto) =>
+    ts.associatedModels.some(m => m.id === currentModelId)
+
+  const matchedTextureSets = allTextureSets.filter(ts => {
+    if (ts.kind === TextureSetKind.ModelOwned && !isLinkedToCurrentModel(ts)) {
+      return false
+    }
+
     const matchesSearch = ts.name
       .toLowerCase()
       .includes(searchQuery.toLowerCase())
@@ -191,6 +201,21 @@ export function TextureSetAssociationDialog({
 
     return matchesSearch && matchesPack
   })
+
+  // Three exclusive groups; "This Model" wins over kind-based groups so a
+  // texture set already used on this model surfaces in one place only.
+  const thisModelSets = matchedTextureSets.filter(ts =>
+    isLinkedToCurrentModel(ts)
+  )
+  const multiModelSets = matchedTextureSets.filter(
+    ts =>
+      ts.kind === TextureSetKind.ModelSpecific && !isLinkedToCurrentModel(ts)
+  )
+  const globalMaterialSets = matchedTextureSets.filter(
+    ts => ts.kind === TextureSetKind.Universal && !isLinkedToCurrentModel(ts)
+  )
+  const totalMatched =
+    thisModelSets.length + multiModelSets.length + globalMaterialSets.length
 
   const handlePackFilterToggle = (packId: number) => {
     setSelectedPackIds(prev =>
@@ -271,33 +296,74 @@ export function TextureSetAssociationDialog({
             <i className="pi pi-spin pi-spinner" />
             <p>Loading texture sets...</p>
           </div>
-        ) : (
-          <div className="association-section">
-            <h4 className="section-header">
-              <i className="pi pi-image" />
-              Texture Sets ({filteredTextureSets.length})
-            </h4>
-            {filteredTextureSets.length === 0 ? (
-              <div className="no-results">
-                <i className="pi pi-inbox" />
-                <p>No texture sets found</p>
-              </div>
-            ) : (
-              <div className="texture-sets-card-grid">
-                {filteredTextureSets.map(ts => (
-                  <TextureSetCard
-                    key={ts.id}
-                    textureSet={ts}
-                    isSelected={ts.id === selectedId}
-                    onSelect={handleSelect}
-                  />
-                ))}
-              </div>
-            )}
+        ) : totalMatched === 0 ? (
+          <div className="no-results">
+            <i className="pi pi-inbox" />
+            <p>No texture sets found</p>
           </div>
+        ) : (
+          <>
+            <TextureSetGroup
+              icon="pi-box"
+              title="This Model Textures"
+              sets={thisModelSets}
+              selectedId={selectedId}
+              onSelect={handleSelect}
+            />
+            <TextureSetGroup
+              icon="pi-images"
+              title="Multi-Model Textures"
+              sets={multiModelSets}
+              selectedId={selectedId}
+              onSelect={handleSelect}
+            />
+            <TextureSetGroup
+              icon="pi-palette"
+              title="Global Materials"
+              sets={globalMaterialSets}
+              selectedId={selectedId}
+              onSelect={handleSelect}
+            />
+          </>
         )}
       </div>
     </Dialog>
+  )
+}
+
+interface TextureSetGroupProps {
+  icon: string
+  title: string
+  sets: TextureSetDto[]
+  selectedId: number | null
+  onSelect: (textureSetId: number) => void
+}
+
+function TextureSetGroup({
+  icon,
+  title,
+  sets,
+  selectedId,
+  onSelect,
+}: TextureSetGroupProps) {
+  if (sets.length === 0) return null
+  return (
+    <div className="association-section">
+      <h4 className="section-header">
+        <i className={`pi ${icon}`} />
+        {title} ({sets.length})
+      </h4>
+      <div className="texture-sets-card-grid">
+        {sets.map(ts => (
+          <TextureSetCard
+            key={ts.id}
+            textureSet={ts}
+            isSelected={ts.id === selectedId}
+            onSelect={onSelect}
+          />
+        ))}
+      </div>
+    </div>
   )
 }
 
