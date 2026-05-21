@@ -15,7 +15,7 @@ namespace Infrastructure.WebDav;
 /// <summary>
 /// Represents a virtual asset file that is a specific channel extracted from a source image.
 /// </summary>
-public sealed class VirtualExtractedTextureFile : IStoreItem
+public sealed class VirtualExtractedTextureFile : IStoreItem, IVirtualFileMetadata
 {
     private readonly IUploadPathProvider _pathProvider;
     private readonly TextureChannel _channel;
