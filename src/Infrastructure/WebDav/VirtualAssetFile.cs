@@ -10,7 +10,7 @@ namespace Infrastructure.WebDav;
 /// <summary>
 /// Represents a virtual asset file that streams from the hash-based storage.
 /// </summary>
-public sealed class VirtualAssetFile : IStoreItem
+public sealed class VirtualAssetFile : IStoreItem, IVirtualFileMetadata
 {
     private readonly IUploadPathProvider _pathProvider;
 
