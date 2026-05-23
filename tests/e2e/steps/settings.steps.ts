@@ -3,9 +3,31 @@
  */
 import { createBdd } from "playwright-bdd";
 import { expect } from "@playwright/test";
-import { SettingsPage } from "../pages/SettingsPage";
+import {
+    SettingsPage,
+    type SettingsSectionKey,
+} from "../pages/SettingsPage";
 
 const { Given, When, Then } = createBdd();
+
+const SECTION_KEY_BY_LABEL: Record<string, SettingsSectionKey> = {
+    Appearance: "appearance",
+    "File Upload": "fileUpload",
+    "Thumbnail Generation": "thumbnails",
+    "Texture Proxy": "textureProxy",
+    Blender: "blender",
+    "SSL Certificate": "ssl",
+    WebDAV: "webdav",
+    "Backup & Restore": "backup",
+};
+
+function sectionKey(label: string): SettingsSectionKey {
+    const key = SECTION_KEY_BY_LABEL[label];
+    if (!key) {
+        throw new Error(`Unknown settings section label: "${label}"`);
+    }
+    return key;
+}
 
 const API_BASE = process.env.API_BASE_URL || "http://localhost:8090";
 
@@ -247,10 +269,9 @@ When("I click the regenerate all thumbnails button", async ({ page }) => {
 When("I open the regenerate all thumbnails confirmation", async ({ page }) => {
     console.log("Opening regenerate-all confirmation modal...");
     const settingsPage = new SettingsPage(page);
-    // Click the underlying button — leaves the modal open without accepting.
-    await page
-        .locator('button:has-text("Regenerate All Thumbnails")')
-        .click();
+    // The button lives inside the Thumbnail Generation section detail —
+    // openSection() first, then click without accepting the modal.
+    await settingsPage.openRegenerateAllConfirmation();
 });
 
 Then("the regenerate confirmation dialog should be visible", async ({ page }) => {
@@ -309,5 +330,211 @@ Then(
         const value = await settingsPage.getTheme();
         console.log(`Theme value: "${value}"`);
         expect(value).toBe(expectedValue);
+    },
+);
+
+// ── Grid + navigation ─────────────────────────────────────────────
+
+Then("the settings grid should be visible", async ({ page }) => {
+    const settingsPage = new SettingsPage(page);
+    const onGrid = await settingsPage.isOnGrid();
+    expect(onGrid).toBe(true);
+});
+
+Then(
+    "the grid should show the following section cards:",
+    async (
+        { page },
+        // playwright-bdd's data tables expose raw() => string[][]
+        dataTable: { raw: () => string[][] },
+    ) => {
+        const settingsPage = new SettingsPage(page);
+        const expectedLabels = dataTable.raw().map((row) => row[0].trim());
+        const actualLabels = await settingsPage.getAllCardLabels();
+        for (const expected of expectedLabels) {
+            expect(actualLabels, `card "${expected}" missing`).toContain(
+                expected,
+            );
+        }
+    },
+);
+
+When(
+    "I open the {string} section card",
+    async ({ page }, label: string) => {
+        const settingsPage = new SettingsPage(page);
+        await settingsPage.openSection(sectionKey(label));
+    },
+);
+
+Then(
+    "I should be in the {string} section",
+    async ({ page }, label: string) => {
+        const settingsPage = new SettingsPage(page);
+        const inSection = await settingsPage.isInSection(sectionKey(label));
+        expect(inSection).toBe(true);
+    },
+);
+
+When("I click the back button", async ({ page }) => {
+    const settingsPage = new SettingsPage(page);
+    await settingsPage.clickBack();
+});
+
+When("I click discard", async ({ page }) => {
+    const settingsPage = new SettingsPage(page);
+    await settingsPage.discard();
+});
+
+Then("the save button should be visible", async ({ page }) => {
+    const settingsPage = new SettingsPage(page);
+    const visible = await settingsPage.isSaveButtonVisible();
+    expect(visible).toBe(true);
+});
+
+// ── Tab-switch persistence ────────────────────────────────────────
+
+// Use clickTab (which clicks the existing tab in the dock bar) instead of
+// navigateToTab — navigateToTab calls navigateToAppClean which wipes
+// localStorage, defeating the per-tab UI-state persistence we're testing.
+
+When("I switch to the model list tab", async ({ page }) => {
+    const { clickTab } = await import("../helpers/navigation-helper");
+    await clickTab(page, "modelList");
+});
+
+When("I return to the settings tab", async ({ page }) => {
+    const { clickTab } = await import("../helpers/navigation-helper");
+    await clickTab(page, "settings");
+    const settingsPage = new SettingsPage(page);
+    await settingsPage.waitForLoaded();
+});
+
+// ── Search ────────────────────────────────────────────────────────
+
+When(
+    "I search settings for {string}",
+    async ({ page }, query: string) => {
+        const settingsPage = new SettingsPage(page);
+        await settingsPage.searchFor(query);
+    },
+);
+
+When("I click the first search result", async ({ page }) => {
+    const settingsPage = new SettingsPage(page);
+    await settingsPage.clickFirstSearchResult();
+});
+
+Then("the search dropdown should be visible", async ({ page }) => {
+    const settingsPage = new SettingsPage(page);
+    const visible = await settingsPage.isSearchDropdownVisible();
+    expect(visible).toBe(true);
+});
+
+Then(
+    "the search results should include {string}",
+    async ({ page }, expectedLabel: string) => {
+        const settingsPage = new SettingsPage(page);
+        const labels = await settingsPage.getSearchResultLabels();
+        const found = labels.some((l) => l.includes(expectedLabel));
+        expect(found, `expected "${expectedLabel}" in ${JSON.stringify(labels)}`)
+            .toBe(true);
+    },
+);
+
+Then(
+    "the dimmed card labels should include {string}",
+    async ({ page }, expectedLabel: string) => {
+        const settingsPage = new SettingsPage(page);
+        const dimmed = await settingsPage.getDimmedCardLabels();
+        expect(dimmed).toContain(expectedLabel);
+    },
+);
+
+Then(
+    "the dimmed card labels should not include {string}",
+    async ({ page }, label: string) => {
+        const settingsPage = new SettingsPage(page);
+        const dimmed = await settingsPage.getDimmedCardLabels();
+        expect(dimmed).not.toContain(label);
+    },
+);
+
+// ── Texture proxy ─────────────────────────────────────────────────
+
+When(
+    "I change the texture proxy size to {string}",
+    async ({ page }, value: string) => {
+        const settingsPage = new SettingsPage(page);
+        await settingsPage.setTextureProxySize(value);
+    },
+);
+
+Then(
+    "the texture proxy size should be {string}",
+    async ({ page }, expected: string) => {
+        const settingsPage = new SettingsPage(page);
+        const value = await settingsPage.getTextureProxySize();
+        expect(value).toBe(expected);
+    },
+);
+
+// ── Duplicate name policy ─────────────────────────────────────────
+
+When(
+    "I change the duplicate name policy to {string}",
+    async ({ page }, value: string) => {
+        const settingsPage = new SettingsPage(page);
+        await settingsPage.setDuplicateNamePolicy(value);
+        // The policy is persisted immediately via /settings/:key, no Save
+        // button to press — wait a tick for the request to land.
+        await page.waitForTimeout(500);
+    },
+);
+
+Then(
+    "the duplicate name policy should be {string}",
+    async ({ page }, expected: string) => {
+        const settingsPage = new SettingsPage(page);
+        const value = await settingsPage.getDuplicateNamePolicy();
+        expect(value).toBe(expected);
+    },
+);
+
+// ── Mobile bar position ───────────────────────────────────────────
+
+When(
+    "I change the mobile tab bar position to {string}",
+    async ({ page }, value: string) => {
+        const settingsPage = new SettingsPage(page);
+        await settingsPage.setMobileBarPosition(
+            value as "top" | "bottom" | "left",
+        );
+    },
+);
+
+Then(
+    "the mobile tab bar position should be {string}",
+    async ({ page }, expected: string) => {
+        const settingsPage = new SettingsPage(page);
+        const value = await settingsPage.getMobileBarPosition();
+        expect(value).toBe(expected);
+    },
+);
+
+// ── SSL ───────────────────────────────────────────────────────────
+
+Then("the SSL certificate download link should be visible", async ({ page }) => {
+    const link = page.locator('a[download][href*="modelibr-cert.crt"]');
+    await expect(link).toBeVisible();
+});
+
+Then(
+    "the SSL certificate download link should point at {string}",
+    async ({ page }, expectedSuffix: string) => {
+        const settingsPage = new SettingsPage(page);
+        const href = await settingsPage.getSslCertificateDownloadHref();
+        expect(href, "download href missing").toBeTruthy();
+        expect(href ?? "").toContain(expectedSuffix);
     },
 );

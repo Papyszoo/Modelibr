@@ -9,7 +9,8 @@ Feature: Application Settings
 
   @settings-display
   Scenario: Settings page displays all configuration fields
-    Then the settings page title should be "Application Settings"
+    Then the settings page title should be "Settings"
+    And the settings grid should be visible
     And the max file size field should have a value
     And the max thumbnail size field should have a value
     And the frame count field should have a value
@@ -84,3 +85,120 @@ Feature: Application Settings
     Then the theme should be "dark"
     When I change the theme to "light"
     Then the theme should be "light"
+
+  # ── Grid + navigation ─────────────────────────────────────────────
+
+  @settings-grid-cards
+  Scenario: All eight settings sections are listed in the grid
+    Then the grid should show the following section cards:
+      | Appearance           |
+      | File Upload          |
+      | Thumbnail Generation |
+      | Texture Proxy        |
+      | Blender              |
+      | SSL Certificate      |
+      | WebDAV               |
+      | Backup & Restore     |
+
+  @settings-grid-open-card
+  Scenario: Clicking a card opens its section detail
+    When I open the "File Upload" section card
+    Then I should be in the "File Upload" section
+    And the save button should be visible
+    When I click the back button
+    Then the settings grid should be visible
+
+  @settings-grid-back-clean
+  Scenario: Back button on a clean section returns to the grid without prompting
+    When I open the "Thumbnail Generation" section card
+    And I click the back button
+    Then the settings grid should be visible
+
+  @settings-discard-resets
+  Scenario: Discard resets unsaved changes in the current section
+    When I open the "Texture Proxy" section card
+    And I change the texture proxy size to "1024"
+    Then the save button should be enabled
+    When I click discard
+    Then the texture proxy size should be "512"
+    And the save button should be disabled
+
+  # ── Section state persists across tab switches ────────────────────
+
+  @settings-section-tab-persistence
+  Scenario: Active section is remembered when switching away and back
+    When I open the "Thumbnail Generation" section card
+    Then I should be in the "Thumbnail Generation" section
+    When I switch to the model list tab
+    And I return to the settings tab
+    Then I should be in the "Thumbnail Generation" section
+
+  # ── Search ────────────────────────────────────────────────────────
+
+  @settings-search-results
+  Scenario: Searching surfaces matching section labels and fields
+    When I search settings for "frame"
+    Then the search dropdown should be visible
+    And the search results should include "Frame count"
+    And the search results should include "Thumbnail Generation"
+
+  @settings-search-dimming
+  Scenario: Cards for non-matching sections are dimmed
+    When I search settings for "blender"
+    Then the dimmed card labels should not include "Blender"
+    And the dimmed card labels should include "Appearance"
+
+  @settings-search-click
+  Scenario: Clicking a search result opens its section and clears the search
+    When I search settings for "frame"
+    And I click the first search result
+    Then I should be in the "Thumbnail Generation" section
+
+  # ── Persistence of newer settings ─────────────────────────────────
+
+  @settings-texture-proxy-persist
+  Scenario: Texture proxy size persists across reload
+    When I open the "Texture Proxy" section card
+    And I change the texture proxy size to "1024"
+    And I save the settings
+    Then the success message should be visible
+    When I reload the settings page
+    Then the texture proxy size should be "1024"
+    # Restore default so the run is hermetic
+    When I change the texture proxy size to "512"
+    And I save the settings
+
+  @settings-duplicate-name-policy-persist
+  Scenario: Duplicate name policy persists across reload
+    When I change the duplicate name policy to "AutoRename"
+    Then the duplicate name policy should be "AutoRename"
+    When I reload the settings page
+    Then the duplicate name policy should be "AutoRename"
+    # Restore default
+    When I change the duplicate name policy to "Reject"
+
+  @settings-theme-persist
+  Scenario: Theme persists across reload
+    When I change the theme to "dark"
+    And I reload the settings page
+    Then the theme should be "dark"
+    When I change the theme to "light"
+    And I reload the settings page
+    Then the theme should be "light"
+
+  @settings-mobile-bar-persist
+  Scenario: Mobile tab bar position persists across reload
+    When I change the mobile tab bar position to "bottom"
+    Then the mobile tab bar position should be "bottom"
+    When I reload the settings page
+    Then the mobile tab bar position should be "bottom"
+    # Restore default
+    When I change the mobile tab bar position to "left"
+
+  # ── SSL section sanity check ──────────────────────────────────────
+
+  @settings-ssl-download-link
+  Scenario: SSL Certificate section exposes a download link
+    When I open the "SSL Certificate" section card
+    Then the SSL certificate download link should be visible
+    And the SSL certificate download link should point at "modelibr-cert.crt"
