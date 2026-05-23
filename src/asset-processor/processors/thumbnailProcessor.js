@@ -104,23 +104,54 @@ export class ThumbnailProcessor extends BaseProcessor {
         const candidateGlbPath = fileInfo.filePath.replace(/\.blend$/i, '.glb')
 
         try {
+          // --python-exit-code 1 makes Blender exit non-zero on any unhandled
+          // Python error (otherwise it can exit 0 even when the script fails).
+          // Timeout sits below config.jobTimeout (default 5 min) so the
+          // Blender-specific "killed by SIGTERM" message wins cleanly instead
+          // of racing the outer job timeout; emulated linux-x64 Blender on
+          // Apple Silicon still gets ~4 min, which covers typical scenes.
           execFileSync(
             blenderPath,
-            ['-b', fileInfo.filePath, '-P', scriptPath, '--', candidateGlbPath],
-            { timeout: 120000, stdio: ['pipe', 'pipe', 'pipe'] }
+            [
+              '-b',
+              fileInfo.filePath,
+              '--python-exit-code',
+              '1',
+              '-P',
+              scriptPath,
+              '--',
+              candidateGlbPath,
+            ],
+            { timeout: 240000, stdio: ['pipe', 'pipe', 'pipe'] }
           )
         } catch (blenderError) {
           const stderr = blenderError.stderr?.toString() || ''
           const stdout = blenderError.stdout?.toString() || ''
-          const output = stderr || stdout // Blender often writes errors to stdout
+
+          // export_glb.py marks its own failures with an EXPORT_GLB_ERROR:
+          // prefix — prefer that precise reason over raw Blender output.
+          // Use findLast so that if the script falls through multiple failure
+          // paths (e.g. the TypeError retry also fails), the more specific
+          // last reason wins instead of the generic first one.
+          const markedLine = `${stdout}\n${stderr}`
+            .split('\n')
+            .findLast(line => line.includes('EXPORT_GLB_ERROR:'))
+          const detail = markedLine
+            ? markedLine.split('EXPORT_GLB_ERROR:')[1].trim()
+            : (stderr || stdout).slice(-500)
+
+          // A timeout kills the process with a signal and leaves status null.
+          const reason = blenderError.signal
+            ? `killed by ${blenderError.signal}` +
+              (blenderError.signal === 'SIGTERM' ? ' (likely timed out)' : '')
+            : `exit ${blenderError.status}`
+
           jobLogger.error('Blender GLB export failed', {
-            exitCode: blenderError.status,
+            reason,
             stderr: stderr.slice(-2000),
             stdout: stdout.slice(-2000),
           })
-          throw new Error(
-            `Blender GLB export failed (exit ${blenderError.status}): ${output.slice(-500)}`
-          )
+          throw new Error(`Blender GLB export failed (${reason}): ${detail}`)
         }
 
         if (!fs.existsSync(candidateGlbPath)) {
@@ -283,7 +314,7 @@ export class ThumbnailProcessor extends BaseProcessor {
 
     // "__embedded__" means use the model's original materials — skip all texture application
     if (mainVariant === '__embedded__') {
-      this.jobLogger.info(
+      jobLogger.info(
         'Main variant is __embedded__, preserving original model materials'
       )
       return null
