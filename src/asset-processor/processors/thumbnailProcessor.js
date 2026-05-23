@@ -104,23 +104,49 @@ export class ThumbnailProcessor extends BaseProcessor {
         const candidateGlbPath = fileInfo.filePath.replace(/\.blend$/i, '.glb')
 
         try {
+          // --python-exit-code 1 makes Blender exit non-zero on any unhandled
+          // Python error (otherwise it can exit 0 even when the script fails).
+          // Timeout is generous: on Apple Silicon the linux-x64 Blender runs
+          // under emulation and a complex scene can take minutes to export.
           execFileSync(
             blenderPath,
-            ['-b', fileInfo.filePath, '-P', scriptPath, '--', candidateGlbPath],
-            { timeout: 120000, stdio: ['pipe', 'pipe', 'pipe'] }
+            [
+              '-b',
+              fileInfo.filePath,
+              '--python-exit-code',
+              '1',
+              '-P',
+              scriptPath,
+              '--',
+              candidateGlbPath,
+            ],
+            { timeout: 300000, stdio: ['pipe', 'pipe', 'pipe'] }
           )
         } catch (blenderError) {
           const stderr = blenderError.stderr?.toString() || ''
           const stdout = blenderError.stdout?.toString() || ''
-          const output = stderr || stdout // Blender often writes errors to stdout
+
+          // export_glb.py marks its own failures with an EXPORT_GLB_ERROR:
+          // prefix — prefer that precise reason over raw Blender output.
+          const markedLine = `${stdout}\n${stderr}`
+            .split('\n')
+            .find(line => line.includes('EXPORT_GLB_ERROR:'))
+          const detail = markedLine
+            ? markedLine.split('EXPORT_GLB_ERROR:')[1].trim()
+            : (stderr || stdout).slice(-500)
+
+          // A timeout kills the process with a signal and leaves status null.
+          const reason = blenderError.signal
+            ? `killed by ${blenderError.signal}` +
+              (blenderError.signal === 'SIGTERM' ? ' (likely timed out)' : '')
+            : `exit ${blenderError.status}`
+
           jobLogger.error('Blender GLB export failed', {
-            exitCode: blenderError.status,
+            reason,
             stderr: stderr.slice(-2000),
             stdout: stdout.slice(-2000),
           })
-          throw new Error(
-            `Blender GLB export failed (exit ${blenderError.status}): ${output.slice(-500)}`
-          )
+          throw new Error(`Blender GLB export failed (${reason}): ${detail}`)
         }
 
         if (!fs.existsSync(candidateGlbPath)) {
@@ -283,7 +309,7 @@ export class ThumbnailProcessor extends BaseProcessor {
 
     // "__embedded__" means use the model's original materials — skip all texture application
     if (mainVariant === '__embedded__') {
-      this.jobLogger.info(
+      jobLogger.info(
         'Main variant is __embedded__, preserving original model materials'
       )
       return null
