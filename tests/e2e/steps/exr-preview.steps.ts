@@ -147,20 +147,67 @@ When("I switch to the Preview tab", async ({ page }) => {
     await expect(previewTab).toBeVisible({ timeout: 10000 });
     await previewTab.click();
 
-    // Wait for the preview canvas to render
-    await page.waitForTimeout(2000);
+    // Wait until the Canvas wrapper actually mounts. We don't sleep a fixed
+    // amount here because EXR decoding can run longer than any reasonable
+    // hard-coded wait, and the next step (toBeVisible / canvas-ready) has
+    // its own bounded retry budget.
+    await page.waitForSelector(".texture-preview-canvas canvas", {
+        timeout: 15000,
+    });
     console.log("[UI] Switched to Preview tab ✓");
 });
 
+/**
+ * Wait until the Three.js canvas is rendered AND laid out at a non-zero
+ * CSS size. We can't just call `toBeVisible()` directly because:
+ *   - The R3F `<Canvas>` puts the actual `<canvas>` inside an absolutely-
+ *     positioned wrapper. While the parent TabPanel finishes its layout
+ *     pass and the texture loader resolves, the canvas's bounding box is
+ *     briefly 0×0 — Playwright reports it as hidden even though the WebGL
+ *     drawing buffer (the `width`/`height` attributes) is already sized.
+ *   - The loading overlay covers the canvas during EXR/TIFF decode. The
+ *     canvas is layered behind it, which is fine for visibility checks, but
+ *     waiting for the overlay to vanish keeps the check honest.
+ */
+async function waitForCanvasReady(page: import("@playwright/test").Page) {
+    // 1) Wait for the loading overlay (if it appears) to disappear so we
+    //    don't race against texture decode.
+    await page
+        .locator(".texture-loading-overlay")
+        .waitFor({ state: "hidden", timeout: 60000 })
+        .catch(() => {
+            // Some sets load fast enough that the overlay never paints —
+            // fall through to the layout check.
+        });
+
+    // 2) Wait until the canvas has a non-zero rendered bounding box. This
+    //    is the actual condition `toBeVisible` checks, but with a longer
+    //    explicit timeout and a clearer failure mode.
+    await page.waitForFunction(
+        () => {
+            const c = document.querySelector(
+                ".texture-preview-canvas canvas",
+            ) as HTMLCanvasElement | null;
+            if (!c) return false;
+            const r = c.getBoundingClientRect();
+            return r.width > 0 && r.height > 0;
+        },
+        null,
+        { timeout: 30000 },
+    );
+}
+
 Then("the 3D preview canvas should be visible", async ({ page }) => {
+    await waitForCanvasReady(page);
     const canvas = page.locator(".texture-preview-canvas canvas");
-    await expect(canvas).toBeVisible({ timeout: 15000 });
+    await expect(canvas).toBeVisible({ timeout: 5000 });
     console.log("[UI] 3D preview canvas is visible ✓");
 });
 
 Then("no console errors should be present", async ({ page }) => {
-    // Collect any errors that occurred (playwright doesn't have built-in error tracking,
-    // so we check the page didn't navigate to an error page and the canvas is still alive)
+    // Mirror the visibility check used above — the canvas should still be
+    // mounted and laid out after the previous assertions.
+    await waitForCanvasReady(page);
     const canvas = page.locator(".texture-preview-canvas canvas");
     await expect(canvas).toBeVisible({ timeout: 5000 });
 
