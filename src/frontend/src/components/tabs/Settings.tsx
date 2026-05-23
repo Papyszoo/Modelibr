@@ -187,10 +187,13 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
   const isDemo = import.meta.env.VITE_DEMO_MODE === 'true'
 
   // ── Top-level UI state ──────────────────────────────────────────────
-  // activeSection lives in the per-tab UI state store so it survives the
-  // unmount-on-tab-switch the TabContent rendering performs.
+  // activeSection and the dirty form draft both live in the per-tab UI
+  // state store so they survive the unmount-on-tab-switch the TabContent
+  // rendering performs. Without the draft, typed-but-unsaved values are
+  // discarded when the user briefly visits another tab.
+  const tabStateKey = tabId ?? 'settings'
   const [activeSection, setActiveSection] = useTabUiState<SectionKey | null>(
-    tabId ?? 'settings',
+    tabStateKey,
     'activeSection',
     null
   )
@@ -274,6 +277,15 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
     null
   )
 
+  // Dirty form draft (per-tab). Persists across tab switches so values
+  // typed-but-not-yet-saved survive a brief visit to another tab.
+  // `null` means "no draft, form mirrors originalValues".
+  const [formDraft, setFormDraft] = useTabUiState<OriginalValues | null>(
+    tabStateKey,
+    'formDraft',
+    null
+  )
+
   const maxFileSizeMB = watch('maxFileSizeMB')
   const maxThumbnailSizeMB = watch('maxThumbnailSizeMB')
   const thumbnailFrameCount = watch('thumbnailFrameCount')
@@ -281,6 +293,52 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
   const generateThumbnailOnUpload = watch('generateThumbnailOnUpload')
   const generateAnimatedThumbnail = watch('generateAnimatedThumbnail')
   const textureProxySize = watch('textureProxySize')
+
+  // Persist the current form values to per-tab UI state whenever they
+  // diverge from the server snapshot. When the user is back in sync (after
+  // save or discard) we clear the draft so a fresh mount won't replay a
+  // stale value over newer server data.
+  useEffect(() => {
+    if (!originalValues || !formInitialisedRef.current) return
+    // `watch()` returns the zod-input type (unknown) because the schema uses
+    // `z.preprocess`. At runtime react-hook-form's `valueAsNumber` keeps
+    // these as numbers, so a narrow cast is safe.
+    const current: OriginalValues = {
+      maxFileSizeMB: maxFileSizeMB as number,
+      maxThumbnailSizeMB: maxThumbnailSizeMB as number,
+      thumbnailFrameCount: thumbnailFrameCount as number,
+      thumbnailSize: thumbnailSize as number,
+      generateThumbnailOnUpload: generateThumbnailOnUpload as boolean,
+      generateAnimatedThumbnail: generateAnimatedThumbnail as boolean,
+      textureProxySize: textureProxySize as number,
+    }
+    const dirty = (Object.keys(current) as (keyof OriginalValues)[]).some(
+      k => current[k] !== originalValues[k]
+    )
+    if (dirty) {
+      if (
+        !formDraft ||
+        (Object.keys(current) as (keyof OriginalValues)[]).some(
+          k => current[k] !== formDraft[k]
+        )
+      ) {
+        setFormDraft(current)
+      }
+    } else if (formDraft !== null) {
+      setFormDraft(null)
+    }
+  }, [
+    maxFileSizeMB,
+    maxThumbnailSizeMB,
+    thumbnailFrameCount,
+    thumbnailSize,
+    generateThumbnailOnUpload,
+    generateAnimatedThumbnail,
+    textureProxySize,
+    originalValues,
+    formDraft,
+    setFormDraft,
+  ])
 
   const isFieldDirty = (fieldName: keyof OriginalValues): boolean => {
     if (!originalValues) return false
@@ -390,6 +448,12 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
     )
   }, [settingsQuery.error])
 
+  // Tracks whether we've already initialised the form once on this mount.
+  // The settingsQuery.data effect should hydrate the form exactly once per
+  // tab visit so that re-fetches don't clobber the user's in-progress edits
+  // (preserved either in the live form state, or in formDraft after a tab
+  // switch round-trip).
+  const formInitialisedRef = useRef(false)
   useEffect(() => {
     if (!settingsQuery.data) return
     const data = settingsQuery.data
@@ -407,9 +471,18 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
       generateAnimatedThumbnail: data.generateAnimatedThumbnail ?? true,
       textureProxySize: data.textureProxySize ?? 512,
     }
-    reset(original)
     setOriginalValues(original)
     setDuplicateNamePolicy(data.duplicateNamePolicy ?? 'Reject')
+
+    // First hydration after mount: prefer the persisted draft (typed but
+    // not yet saved) over the server snapshot so a tab switch doesn't wipe
+    // the user's edits. Subsequent settings refetches do NOT reset the form
+    // — refetches can race with the user typing.
+    if (!formInitialisedRef.current) {
+      reset(formDraft ?? original)
+      formInitialisedRef.current = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settingsQuery.data, reset])
 
   useEffect(() => {
@@ -539,6 +612,9 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
       }
       setOriginalValues(original)
       reset(original)
+      // Form now mirrors the server; drop the persisted draft so a future
+      // mount doesn't replay an older value over fresh server data.
+      setFormDraft(null)
       showSuccess('Settings saved successfully!', 3000)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
@@ -555,6 +631,7 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
     if (originalValues) reset(originalValues)
     setError(null)
     clearSuccess()
+    setFormDraft(null)
   }
 
   const handleBack = () => {

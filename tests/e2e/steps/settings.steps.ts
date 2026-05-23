@@ -460,6 +460,25 @@ Then(
     },
 );
 
+// ── File upload section ───────────────────────────────────────────
+
+When(
+    "I change the max thumbnail size to {string}",
+    async ({ page }, value: string) => {
+        const settingsPage = new SettingsPage(page);
+        await settingsPage.setMaxThumbnailSize(value);
+    },
+);
+
+Then(
+    "the max thumbnail size should be {string}",
+    async ({ page }, expected: string) => {
+        const settingsPage = new SettingsPage(page);
+        const value = await settingsPage.getMaxThumbnailSize();
+        expect(value).toBe(expected);
+    },
+);
+
 // ── Texture proxy ─────────────────────────────────────────────────
 
 When(

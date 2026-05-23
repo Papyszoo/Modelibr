@@ -133,6 +133,19 @@ Feature: Application Settings
     And I return to the settings tab
     Then I should be in the "Thumbnail Generation" section
 
+  @settings-dirty-draft-tab-persistence
+  Scenario: Unsaved field values are remembered when switching away and back
+    When I open the "File Upload" section card
+    And I change the max thumbnail size to "42"
+    Then the save button should be enabled
+    When I switch to the model list tab
+    And I return to the settings tab
+    Then I should be in the "File Upload" section
+    And the max thumbnail size should be "42"
+    And the save button should be enabled
+    # Discard so subsequent scenarios don't see leftover dirty state
+    When I click discard
+
   # ── Search ────────────────────────────────────────────────────────
 
   @settings-search-results
