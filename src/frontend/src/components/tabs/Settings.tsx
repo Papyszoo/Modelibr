@@ -285,6 +285,18 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
     'formDraft',
     null
   )
+  // Ref shadow of formDraft so the dirty-detect effect can read the latest
+  // draft without listing formDraft as a dep — listing it would cause an
+  // extra effect run every time we setFormDraft from inside the effect.
+  const formDraftRef = useRef(formDraft)
+  useEffect(() => {
+    formDraftRef.current = formDraft
+  }, [formDraft])
+
+  // Gate the settingsQuery.data hydration so it runs exactly once. Declared
+  // here (before any effect that reads it) so future code re-orderings can't
+  // trip into a TDZ.
+  const formInitialisedRef = useRef(false)
 
   const maxFileSizeMB = watch('maxFileSizeMB')
   const maxThumbnailSizeMB = watch('maxThumbnailSizeMB')
@@ -298,11 +310,25 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
   // diverge from the server snapshot. When the user is back in sync (after
   // save or discard) we clear the draft so a fresh mount won't replay a
   // stale value over newer server data.
+  //
+  // Skipped while any number field is NaN (empty/invalid input mid-typing);
+  // otherwise we'd persist NaN, which round-trips as a blank field on the
+  // next mount and obscures the user's intent.
   useEffect(() => {
     if (!originalValues || !formInitialisedRef.current) return
     // `watch()` returns the zod-input type (unknown) because the schema uses
     // `z.preprocess`. At runtime react-hook-form's `valueAsNumber` keeps
-    // these as numbers, so a narrow cast is safe.
+    // numeric inputs as numbers, so a narrow cast is safe.
+    const numericValues = [
+      maxFileSizeMB,
+      maxThumbnailSizeMB,
+      thumbnailFrameCount,
+      thumbnailSize,
+      textureProxySize,
+    ]
+    if (numericValues.some(v => typeof v !== 'number' || !Number.isFinite(v))) {
+      return
+    }
     const current: OriginalValues = {
       maxFileSizeMB: maxFileSizeMB as number,
       maxThumbnailSizeMB: maxThumbnailSizeMB as number,
@@ -315,16 +341,17 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
     const dirty = (Object.keys(current) as (keyof OriginalValues)[]).some(
       k => current[k] !== originalValues[k]
     )
+    const draft = formDraftRef.current
     if (dirty) {
       if (
-        !formDraft ||
+        !draft ||
         (Object.keys(current) as (keyof OriginalValues)[]).some(
-          k => current[k] !== formDraft[k]
+          k => current[k] !== draft[k]
         )
       ) {
         setFormDraft(current)
       }
-    } else if (formDraft !== null) {
+    } else if (draft !== null) {
       setFormDraft(null)
     }
   }, [
@@ -336,7 +363,6 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
     generateAnimatedThumbnail,
     textureProxySize,
     originalValues,
-    formDraft,
     setFormDraft,
   ])
 
@@ -448,12 +474,11 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
     )
   }, [settingsQuery.error])
 
-  // Tracks whether we've already initialised the form once on this mount.
-  // The settingsQuery.data effect should hydrate the form exactly once per
-  // tab visit so that re-fetches don't clobber the user's in-progress edits
+  // The settingsQuery.data effect hydrates the form exactly once per tab
+  // visit so that re-fetches don't clobber the user's in-progress edits
   // (preserved either in the live form state, or in formDraft after a tab
-  // switch round-trip).
-  const formInitialisedRef = useRef(false)
+  // switch round-trip). formInitialisedRef is declared near the other refs
+  // at the top of the component.
   useEffect(() => {
     if (!settingsQuery.data) return
     const data = settingsQuery.data

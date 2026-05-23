@@ -8,7 +8,7 @@ import {
     type SettingsSectionKey,
 } from "../pages/SettingsPage";
 
-const { Given, When, Then } = createBdd();
+const { Given, When, Then, After } = createBdd();
 
 const SECTION_KEY_BY_LABEL: Record<string, SettingsSectionKey> = {
     Appearance: "appearance",
@@ -459,6 +459,26 @@ Then(
         expect(dimmed).not.toContain(label);
     },
 );
+
+// ── Tab-switch persistence cleanup ────────────────────────────────
+
+// Each scenario's Background runs `navigateToAppClean` which clears
+// localStorage, so the per-tab formDraft is already wiped between
+// scenarios. This After hook is a belt-and-suspenders cleanup for the
+// dirty-draft scenario in case a future change removes that guarantee
+// or one of the assertions throws before the in-line discard step runs.
+After("@settings-dirty-draft-tab-persistence", async ({ page }) => {
+    try {
+        const settingsPage = new SettingsPage(page);
+        if (await settingsPage.isVisible()) {
+            if (await settingsPage.isSaveButtonVisible()) {
+                await settingsPage.discard().catch(() => {});
+            }
+        }
+    } catch {
+        // Best-effort cleanup; never fail the scenario from a teardown.
+    }
+});
 
 // ── File upload section ───────────────────────────────────────────
 
