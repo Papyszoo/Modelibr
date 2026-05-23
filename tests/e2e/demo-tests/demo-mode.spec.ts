@@ -418,35 +418,30 @@ test.describe("demo mode e2e", () => {
         await settingsPage.navigateToSettings();
         await settingsPage.waitForLoaded();
 
-        const lockedSections = page.locator(".settings-section-header--locked");
-        await expect(lockedSections).toHaveCount(4);
+        // The new grid uses .setting-card.locked for demo-disabled sections.
+        const lockedCards = page.locator(".setting-card.locked");
+        await expect(lockedCards).toHaveCount(4);
 
-        // Verify each locked section shows the notice text
         for (const name of [
-            "Blender Settings",
+            "Blender",
             "SSL Certificate",
             "WebDAV",
             "Backup & Restore",
         ]) {
-            const header = page.locator(".settings-section-header--locked", {
+            const card = page.locator(".setting-card.locked", {
                 hasText: name,
             });
-            await expect(header).toBeVisible();
-            await expect(
-                header.locator(".settings-demo-notice"),
-            ).toHaveText("Not available in demo mode");
+            await expect(card).toBeVisible();
+            await expect(card).toContainText("Disabled in demo mode");
         }
 
-        // Verify clicking a locked section does NOT expand it
-        const blenderHeader = page.locator(".settings-section-header--locked", {
-            hasText: "Blender Settings",
-        });
-        await blenderHeader.click();
-        // The section content should NOT appear
-        const blenderContent = blenderHeader
-            .locator("..")
-            .locator(".settings-section-content");
-        await expect(blenderContent).toHaveCount(0);
+        // Clicking a locked card must not navigate into the detail view —
+        // the grid stays visible.
+        await page
+            .locator(".setting-card.locked", { hasText: "Blender" })
+            .click({ force: true });
+        await expect(page.locator(".settings-grid")).toBeVisible();
+        await expect(page.locator(".section-detail")).toHaveCount(0);
     });
 
     test("shows the demo mode banner with reset and info buttons", async ({ page }) => {

@@ -192,7 +192,7 @@ export function TabContent({ tab }: TabContentProps): JSX.Element {
         return <StageEditor stageId={tab.stageId} />
 
       case 'settings':
-        return <Settings />
+        return <Settings tabId={tab.id} />
 
       case 'history':
         return <History />
