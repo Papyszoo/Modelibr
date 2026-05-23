@@ -106,8 +106,10 @@ export class ThumbnailProcessor extends BaseProcessor {
         try {
           // --python-exit-code 1 makes Blender exit non-zero on any unhandled
           // Python error (otherwise it can exit 0 even when the script fails).
-          // Timeout is generous: on Apple Silicon the linux-x64 Blender runs
-          // under emulation and a complex scene can take minutes to export.
+          // Timeout sits below config.jobTimeout (default 5 min) so the
+          // Blender-specific "killed by SIGTERM" message wins cleanly instead
+          // of racing the outer job timeout; emulated linux-x64 Blender on
+          // Apple Silicon still gets ~4 min, which covers typical scenes.
           execFileSync(
             blenderPath,
             [
@@ -120,7 +122,7 @@ export class ThumbnailProcessor extends BaseProcessor {
               '--',
               candidateGlbPath,
             ],
-            { timeout: 300000, stdio: ['pipe', 'pipe', 'pipe'] }
+            { timeout: 240000, stdio: ['pipe', 'pipe', 'pipe'] }
           )
         } catch (blenderError) {
           const stderr = blenderError.stderr?.toString() || ''
@@ -128,9 +130,12 @@ export class ThumbnailProcessor extends BaseProcessor {
 
           // export_glb.py marks its own failures with an EXPORT_GLB_ERROR:
           // prefix — prefer that precise reason over raw Blender output.
+          // Use findLast so that if the script falls through multiple failure
+          // paths (e.g. the TypeError retry also fails), the more specific
+          // last reason wins instead of the generic first one.
           const markedLine = `${stdout}\n${stderr}`
             .split('\n')
-            .find(line => line.includes('EXPORT_GLB_ERROR:'))
+            .findLast(line => line.includes('EXPORT_GLB_ERROR:'))
           const detail = markedLine
             ? markedLine.split('EXPORT_GLB_ERROR:')[1].trim()
             : (stderr || stdout).slice(-500)

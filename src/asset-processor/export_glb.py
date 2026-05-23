@@ -60,11 +60,15 @@ def main():
              "a newer Blender than the installed CLI can read.")
 
     scene_objects = list(bpy.context.scene.objects)
-    mesh_objects = [o for o in scene_objects if o.type == "MESH"]
+    # Object types the glTF exporter can produce geometry from. Curves/surfaces
+    # are tessellated, metaballs/text become meshes, GPencil exports as nodes.
+    EXPORTABLE_TYPES = {"MESH", "CURVE", "SURFACE", "META", "FONT", "GPENCIL"}
+    exportable = [o for o in scene_objects if o.type in EXPORTABLE_TYPES]
     print(f"export_glb: loaded {bpy.data.filepath} — "
-          f"{len(scene_objects)} object(s), {len(mesh_objects)} mesh(es)", flush=True)
-    if not mesh_objects:
-        fail("Loaded .blend has no mesh objects in the active scene — nothing to export.")
+          f"{len(scene_objects)} object(s), {len(exportable)} exportable", flush=True)
+    if not exportable:
+        fail("Loaded .blend has no exportable geometry in the active scene "
+             "(no MESH/CURVE/SURFACE/META/FONT/GPENCIL objects) — nothing to export.")
 
     ensure_gltf_addon()
 
