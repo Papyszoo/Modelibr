@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { confirmDialog } from 'primereact/confirmdialog'
 import {
   type JSX,
+  type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
   useEffect,
   useMemo,
@@ -200,6 +201,36 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
   // ── Banner state ────────────────────────────────────────────────────
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  // Holds the auto-clear timer so it can be cancelled on unmount and when a
+  // new success message overwrites a still-pending one. Without this the
+  // banner would leak across sections and trigger React state-after-unmount
+  // warnings when the tab is closed before the timer fires.
+  const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const clearSuccessTimer = (): void => {
+    if (successTimerRef.current !== null) {
+      clearTimeout(successTimerRef.current)
+      successTimerRef.current = null
+    }
+  }
+  const showSuccess = (message: string, durationMs: number): void => {
+    clearSuccessTimer()
+    setSuccessMessage(message)
+    successTimerRef.current = setTimeout(() => {
+      setSuccessMessage(null)
+      successTimerRef.current = null
+    }, durationMs)
+  }
+  const clearSuccess = (): void => {
+    clearSuccessTimer()
+    setSuccessMessage(null)
+  }
+  useEffect(() => () => clearSuccessTimer(), [])
+
+  // ── Search keyboard navigation ──────────────────────────────────────
+  const [searchActiveIndex, setSearchActiveIndex] = useState(0)
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
+  const searchListboxId = 'settings-search-results'
+  const searchOptionId = (i: number): string => `settings-search-option-${i}`
 
   // ── Appearance (live-applied via stores) ────────────────────────────
   const { theme, setTheme } = useTheme()
@@ -428,25 +459,50 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
   }, [blenderStatus.state, isDemo, fetchBlenderEnabled])
 
   useEffect(() => {
+    if (isDemo) return
     getWebDavUrls()
       .then(({ urls }) => {
         setWebDavUrls(urls)
         void probeAllWebDavUrls(urls)
       })
       .catch(() => {})
-  }, [])
+  }, [isDemo])
 
-  // ── Close search dropdown when clicking outside ─────────────────────
+  // If we boot in demo mode but the persisted activeSection points at a
+  // demo-locked section (Blender, SSL, WebDAV, Backup), bounce back to the
+  // grid — otherwise the detail view renders with disabled actions and no
+  // clear path out.
+  useEffect(() => {
+    if (!isDemo || !activeSection) return
+    const target = SECTIONS.find(s => s.key === activeSection)
+    if (target?.demoLocked) {
+      setActiveSection(null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDemo, activeSection])
+
+  // ── Close search dropdown when focus or pointer leaves the wrapper ──
+  // `mousedown` covers click-outside; `focusout` covers Tab/Shift+Tab. The
+  // focusout handler waits a tick so that an `onMouseDown` on a result can
+  // run first (mousedown fires before focusout).
   useEffect(() => {
     if (!searchOpen) return
-    const handler = (e: MouseEvent) => {
-      if (!searchWrapRef.current) return
-      if (!searchWrapRef.current.contains(e.target as Node)) {
-        setSearchOpen(false)
-      }
+    const wrap = searchWrapRef.current
+    if (!wrap) return
+    const onMouseDown = (e: MouseEvent) => {
+      if (!wrap.contains(e.target as Node)) setSearchOpen(false)
     }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
+    const onFocusOut = (e: FocusEvent) => {
+      const next = e.relatedTarget as Node | null
+      if (next && wrap.contains(next)) return
+      setTimeout(() => setSearchOpen(false), 0)
+    }
+    document.addEventListener('mousedown', onMouseDown)
+    wrap.addEventListener('focusout', onFocusOut)
+    return () => {
+      document.removeEventListener('mousedown', onMouseDown)
+      wrap.removeEventListener('focusout', onFocusOut)
+    }
   }, [searchOpen])
 
   // ── Actions ─────────────────────────────────────────────────────────
@@ -457,7 +513,7 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
     }
     setIsSaving(true)
     setError(null)
-    setSuccessMessage(null)
+    clearSuccess()
     try {
       const data = await updateSettings({
         maxFileSizeBytes: values.maxFileSizeMB * 1_048_576,
@@ -483,8 +539,7 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
       }
       setOriginalValues(original)
       reset(original)
-      setSuccessMessage('Settings saved successfully!')
-      setTimeout(() => setSuccessMessage(null), 3000)
+      showSuccess('Settings saved successfully!', 3000)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
@@ -499,6 +554,7 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
   const handleDiscard = () => {
     if (originalValues) reset(originalValues)
     setError(null)
+    clearSuccess()
   }
 
   const handleBack = () => {
@@ -540,16 +596,16 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
       accept: async () => {
         setIsRegeneratingThumbnails(true)
         setError(null)
-        setSuccessMessage(null)
+        clearSuccess()
         try {
           const { enqueuedCount, skippedCount } =
             await regenerateAllThumbnails()
           const skipNote =
             skippedCount > 0 ? ` (${skippedCount} skipped — no files)` : ''
-          setSuccessMessage(
-            `Queued ${enqueuedCount} thumbnail regeneration${enqueuedCount === 1 ? '' : 's'}${skipNote}.`
+          showSuccess(
+            `Queued ${enqueuedCount} thumbnail regeneration${enqueuedCount === 1 ? '' : 's'}${skipNote}.`,
+            5000
           )
-          setTimeout(() => setSuccessMessage(null), 5000)
         } catch (err) {
           setError(
             err instanceof Error
@@ -674,15 +730,54 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
       .slice(0, 12)
   }, [search, searchIndex])
 
+  // Reset the keyboard cursor whenever the result list changes so it never
+  // points at a stale index after typing more characters.
+  useEffect(() => {
+    setSearchActiveIndex(0)
+  }, [searchResults.length])
+
+  const handleSearchKeyDown = (
+    e: ReactKeyboardEvent<HTMLInputElement>
+  ): void => {
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      setSearchOpen(false)
+      return
+    }
+    if (!searchOpen || searchResults.length === 0) return
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setSearchActiveIndex(i => (i + 1) % searchResults.length)
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setSearchActiveIndex(
+        i => (i - 1 + searchResults.length) % searchResults.length
+      )
+    } else if (e.key === 'Home') {
+      e.preventDefault()
+      setSearchActiveIndex(0)
+    } else if (e.key === 'End') {
+      e.preventDefault()
+      setSearchActiveIndex(searchResults.length - 1)
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      const chosen = searchResults[searchActiveIndex]
+      if (chosen) handleSelectSection(chosen.sectionKey)
+    }
+  }
+
   const matchingSectionKeys = useMemo<Set<SectionKey>>(() => {
     if (!search.trim()) return new Set(SECTIONS.map(s => s.key))
     return new Set(searchResults.map(r => r.sectionKey))
   }, [search, searchResults])
 
   const handleSelectSection = (key: SectionKey) => {
+    clearSuccess()
+    setError(null)
     setActiveSection(key)
     setSearch('')
     setSearchOpen(false)
+    setSearchActiveIndex(0)
   }
 
   if (isLoading) {
@@ -1249,8 +1344,9 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
       <div className="settings-header">
         <h1 className="settings-title">Settings</h1>
         <div className="settings-search-wrap" ref={searchWrapRef}>
-          <i className="pi pi-search" />
+          <i className="pi pi-search" aria-hidden="true" />
           <input
+            ref={searchInputRef}
             type="text"
             className="settings-search"
             placeholder="Search settings…"
@@ -1260,27 +1356,50 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
               setSearchOpen(true)
             }}
             onFocus={() => setSearchOpen(true)}
+            onKeyDown={handleSearchKeyDown}
+            role="combobox"
+            aria-label="Search settings"
+            aria-expanded={searchOpen && searchResults.length > 0}
+            aria-controls={searchListboxId}
+            aria-autocomplete="list"
+            aria-activedescendant={
+              searchOpen && searchResults.length > 0
+                ? searchOptionId(searchActiveIndex)
+                : undefined
+            }
           />
           {searchOpen && searchResults.length > 0 && (
-            <div className="search-results">
-              {searchResults.map((r, i) => (
-                <div
-                  key={`${r.sectionKey}-${i}`}
-                  className="search-result-item"
-                  onMouseDown={e => {
-                    e.preventDefault()
-                    handleSelectSection(r.sectionKey)
-                  }}
-                >
-                  <span className="search-result-category">
-                    {r.sectionLabel}
-                  </span>
-                  <span className="search-result-label">
-                    {highlight(r.label, search.trim())}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <ul
+              id={searchListboxId}
+              className="search-results"
+              role="listbox"
+              aria-label="Settings search results"
+            >
+              {searchResults.map((r, i) => {
+                const active = i === searchActiveIndex
+                return (
+                  <li
+                    id={searchOptionId(i)}
+                    key={`${r.sectionKey}-${i}`}
+                    className={`search-result-item ${active ? 'active' : ''}`}
+                    role="option"
+                    aria-selected={active}
+                    onMouseDown={e => {
+                      e.preventDefault()
+                      handleSelectSection(r.sectionKey)
+                    }}
+                    onMouseEnter={() => setSearchActiveIndex(i)}
+                  >
+                    <span className="search-result-category">
+                      {r.sectionLabel}
+                    </span>
+                    <span className="search-result-label">
+                      {highlight(r.label, search.trim())}
+                    </span>
+                  </li>
+                )
+              })}
+            </ul>
           )}
         </div>
       </div>

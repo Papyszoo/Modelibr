@@ -92,6 +92,9 @@
   top: calc(100% + 4px);
   left: 0;
   right: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
   background: var(--surface-overlay, var(--surface-card));
   border: 1px solid var(--surface-border);
   border-radius: 8px;
@@ -112,8 +115,12 @@
 .search-result-item:last-child {
   border-bottom: none;
 }
-.search-result-item:hover {
+.search-result-item:hover,
+.search-result-item.active {
   background: var(--surface-hover);
+}
+.search-result-item.active {
+  box-shadow: inset 2px 0 0 var(--primary-color);
 }
 .search-result-category {
   font-size: 0.72rem;
