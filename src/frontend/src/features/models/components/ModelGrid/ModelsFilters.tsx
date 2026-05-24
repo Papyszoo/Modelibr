@@ -14,7 +14,7 @@ import {
   type ProjectDto,
 } from '@/types'
 
-import { CardWidthButton } from './CardWidthButton'
+import { OptionsButton } from './OptionsButton'
 import { type ModelCategorySelectionKeys } from './useModelFilters'
 
 interface ModelsFiltersProps {
@@ -154,11 +154,11 @@ export function ModelsFilters({
             }
             badgeClassName="model-grid-toolbar-badge"
           />
-          <CardWidthButton
-            value={cardWidth}
-            min={120}
-            max={400}
-            onChange={onCardWidthChange}
+          <OptionsButton
+            cardWidth={cardWidth}
+            minCardWidth={120}
+            maxCardWidth={400}
+            onCardWidthChange={onCardWidthChange}
           />
           <Button
             icon="pi pi-upload"

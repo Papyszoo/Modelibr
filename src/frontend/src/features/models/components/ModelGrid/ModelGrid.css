@@ -57,14 +57,14 @@
 }
 
 .model-grid-toolbar-button,
-.model-grid-toolbar .card-width-toggle-btn {
+.model-grid-toolbar .options-toggle-btn {
   border-radius: 999px;
   border: 1px solid transparent;
   color: var(--text-color-secondary);
 }
 
 .model-grid-toolbar-button.is-active,
-.model-grid-toolbar .card-width-toggle-btn:hover,
+.model-grid-toolbar .options-toggle-btn:hover,
 .model-grid-toolbar-button:hover {
   background: var(--surface-card);
   border: 1px solid var(--surface-border);
@@ -72,7 +72,7 @@
 }
 
 .model-grid-toolbar-button .p-button-label,
-.model-grid-toolbar .card-width-toggle-btn .p-button-label {
+.model-grid-toolbar .options-toggle-btn .p-button-label {
   font-weight: 500;
 }
 
@@ -595,12 +595,12 @@
      Card-width's button is a sibling but uses a different class, so include
      it explicitly. */
   .model-grid-toolbar-actions .model-grid-toolbar-button .p-button-label,
-  .model-grid-toolbar-actions .card-width-toggle-btn .p-button-label {
+  .model-grid-toolbar-actions .options-toggle-btn .p-button-label {
     display: none;
   }
 
   .model-grid-toolbar-actions .model-grid-toolbar-button,
-  .model-grid-toolbar-actions .card-width-toggle-btn {
+  .model-grid-toolbar-actions .options-toggle-btn {
     flex: 0 0 auto;
     width: 2.5rem;
     height: 2.5rem;

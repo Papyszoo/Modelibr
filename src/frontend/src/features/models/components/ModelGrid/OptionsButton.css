@@ -1,31 +1,37 @@
-.card-width-toggle-btn {
+.options-toggle-btn {
   padding: 0.5rem 0.75rem;
 }
 
 /* When the label is hidden in mobile/icon-only mode, PrimeReact's icon span
    keeps a margin-right of 0.5rem (its label-spacing) which pushes the icon
    off-center inside the active highlight. Zero it out. */
-.card-width-toggle-btn .p-button-icon {
+.options-toggle-btn .p-button-icon {
   margin-right: 0;
   margin-left: 0;
 }
 
-.card-width-toggle-btn .p-button-label {
+.options-toggle-btn .p-button-label {
   margin-left: 0.5rem;
 }
 
-.card-width-overlay .p-overlaypanel-content {
+.options-overlay .p-overlaypanel-content {
   padding: 0.75rem;
 }
 
-.card-width-overlay-content {
+.options-overlay-content {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  min-width: 220px;
+  gap: 1rem;
+  min-width: 260px;
 }
 
-.card-width-overlay-label {
+.options-overlay-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.options-overlay-label {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -34,19 +40,30 @@
   white-space: nowrap;
 }
 
-.card-width-overlay-label i {
+.options-overlay-label i {
   font-size: 0.875rem;
   color: var(--text-color-secondary);
 }
 
-.card-width-overlay-slider {
+.options-overlay-slider {
   width: 100%;
+}
+
+.options-overlay-mode {
+  display: flex;
+  width: 100%;
+}
+
+.options-overlay-mode .p-button {
+  flex: 1;
+  font-size: 0.8rem;
+  padding: 0.4rem 0.6rem;
 }
 
 /* Mobile overlay — keep it inset from screen edges so neither the back-edge
    gesture nor the right-edge gesture can be triggered while dragging the
    slider. Centered horizontally regardless of where the trigger button is. */
-.card-width-overlay.card-width-overlay--mobile {
+.options-overlay.options-overlay--mobile {
   /* Anchor positioning is set by PrimeReact via inline left/top — but we
      can override it without breaking the open/close behaviour. */
   left: 1rem !important;
@@ -58,14 +75,14 @@
   transform: none !important;
 }
 
-.card-width-overlay.card-width-overlay--mobile .card-width-overlay-content {
+.options-overlay.options-overlay--mobile .options-overlay-content {
   min-width: 0;
   width: 100%;
 }
 
 /* Hide the little arrow that points back at the trigger — it would be
    detached from our re-positioned panel. */
-.card-width-overlay.card-width-overlay--mobile::before,
-.card-width-overlay.card-width-overlay--mobile::after {
+.options-overlay.options-overlay--mobile::before,
+.options-overlay.options-overlay--mobile::after {
   display: none;
 }

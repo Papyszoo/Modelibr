@@ -45,7 +45,7 @@
 }
 
 .environment-map-toolbar-button,
-.environment-map-toolbar .card-width-toggle-btn {
+.environment-map-toolbar .options-toggle-btn {
   border-radius: 999px;
   border: 1px solid transparent;
   color: var(--text-color-secondary);
@@ -53,14 +53,14 @@
 
 .environment-map-toolbar-button.is-active,
 .environment-map-toolbar-button:hover,
-.environment-map-toolbar .card-width-toggle-btn:hover {
+.environment-map-toolbar .options-toggle-btn:hover {
   background: var(--surface-card);
   border-color: var(--surface-border);
   color: var(--text-color);
 }
 
 .environment-map-toolbar-button .p-button-label,
-.environment-map-toolbar .card-width-toggle-btn .p-button-label {
+.environment-map-toolbar .options-toggle-btn .p-button-label {
   font-weight: 500;
 }
 
@@ -423,12 +423,12 @@
   .environment-map-toolbar-actions
     .environment-map-toolbar-button
     .p-button-label,
-  .environment-map-toolbar-actions .card-width-toggle-btn .p-button-label {
+  .environment-map-toolbar-actions .options-toggle-btn .p-button-label {
     display: none;
   }
 
   .environment-map-toolbar-actions .environment-map-toolbar-button,
-  .environment-map-toolbar-actions .card-width-toggle-btn {
+  .environment-map-toolbar-actions .options-toggle-btn {
     flex: 0 0 auto;
     width: 2.5rem;
     height: 2.5rem;
