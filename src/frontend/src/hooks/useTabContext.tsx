@@ -30,19 +30,28 @@ export const TabProvider = ({
   activeTab,
   setActiveTab,
 }: TabProviderProps): JSX.Element => {
-  const openModelDetailsTab = (modelId: string, name?: string): void => {
+  const openModelDetailsTab = (
+    modelId: string,
+    name?: string,
+    options?: { activate?: boolean }
+  ): void => {
+    const activate = options?.activate ?? true
     const existingTab = tabs.find(
       tab => tab.type === 'modelViewer' && tab.modelId === modelId
     )
 
     if (existingTab) {
-      setActiveTab(existingTab.id)
+      if (activate) {
+        setActiveTab(existingTab.id)
+      }
       return
     }
 
     const newTab = createTab('modelViewer', modelId, name)
     setTabs([...tabs, newTab])
-    setActiveTab(newTab.id)
+    if (activate) {
+      setActiveTab(newTab.id)
+    }
   }
 
   const openTextureSetDetailsTab = (

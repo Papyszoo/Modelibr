@@ -30,6 +30,8 @@ export {
 export { usePanelStore } from './panelStore'
 export type { Theme } from './themeStore'
 export { useThemeStore } from './themeStore'
+export type { ThumbnailAnimationMode } from './thumbnailAnimationStore'
+export { useThumbnailAnimationStore } from './thumbnailAnimationStore'
 export type { UploadBatch, UploadItem } from './uploadProgressStore'
 export { useUploadProgressStore } from './uploadProgressStore'
 export type { ViewerSettingsState } from './viewerSettingsStore'
