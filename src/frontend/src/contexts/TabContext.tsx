@@ -8,7 +8,11 @@ export interface TabContextValue {
   setTabs: (tabs: Tab[]) => void
   activeTab: string
   setActiveTab: (tabId: string) => void
-  openModelDetailsTab: (modelId: string, name?: string) => void
+  openModelDetailsTab: (
+    modelId: string,
+    name?: string,
+    options?: { activate?: boolean }
+  ) => void
   openTextureSetDetailsTab: (textureSetId: number, name?: string) => void
   openEnvironmentMapDetailsTab: (
     environmentMapId: number,

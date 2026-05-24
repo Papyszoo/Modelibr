@@ -557,6 +557,22 @@ export function ModelGrid({
                     className={`model-card${isSelected ? ' selected' : ''}`}
                     data-model-id={model.id}
                     onClick={() => handleModelSelect(model)}
+                    onMouseDown={event => {
+                      // Suppress middle-click autoscroll so we can use it
+                      // to open the model in a background tab.
+                      if (event.button === 1) {
+                        event.preventDefault()
+                      }
+                    }}
+                    onAuxClick={event => {
+                      if (event.button !== 1) {
+                        return
+                      }
+                      event.preventDefault()
+                      openModelDetailsTab(model.id, model.name, {
+                        activate: false,
+                      })
+                    }}
                     onContextMenu={event => {
                       if (isSelectionEnabled && selectedModels.length > 1) {
                         contextMenuRef.current?.show(event, {
