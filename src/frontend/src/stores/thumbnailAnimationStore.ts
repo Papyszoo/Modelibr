@@ -32,3 +32,15 @@ export const useThumbnailAnimationStore = create<ThumbnailAnimationStore>(
     },
   })
 )
+
+// Keep this tab's store in sync when another tab changes the setting —
+// otherwise the in-memory mode would diverge from localStorage until a
+// page reload. The `storage` event only fires for cross-tab writes, so
+// the same-tab `setMode` path is not re-entered.
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', event => {
+    if (event.key !== STORAGE_KEY) return
+    const next = isMode(event.newValue) ? event.newValue : DEFAULT_MODE
+    useThumbnailAnimationStore.setState({ mode: next })
+  })
+}
