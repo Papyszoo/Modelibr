@@ -146,6 +146,17 @@
   transition: transform 0.2s ease;
 }
 
+.thumbnail-image-still {
+  /* Canvas shares the same box as <img>; CSS scales the bitmap to fit. */
+  display: block;
+}
+
+.thumbnail-image-still.is-hidden {
+  /* Keeps the canvas in the DOM (so decoding can write into it) without
+     occupying layout. */
+  display: none;
+}
+
 .thumbnail-image:hover {
   transform: scale(1.05);
 }
