@@ -8,7 +8,6 @@ import { useThumbnailAnimationStore } from '@/stores/thumbnailAnimationStore'
 interface ThumbnailDisplayProps {
   modelId: number | string
   versionId?: number
-  className?: string
   modelName?: string
 }
 
@@ -83,8 +82,18 @@ export function ThumbnailDisplay({
       cancelled = true
       loader.onload = null
       loader.onerror = null
+      // Aborts any still-pending network fetch so rapid mode toggling
+      // doesn't saturate the connection pool with abandoned loads.
+      loader.src = ''
     }
   }, [imgSrc, needsStill])
+
+  // Drop any stale hover state when the user switches modes — otherwise
+  // a cursor sitting over a card during the switch would keep `isHovered`
+  // out of sync with what the new mode expects.
+  useEffect(() => {
+    setIsHovered(false)
+  }, [mode])
 
   if (!(thumbnailDetails?.status === 'Ready' && imgSrc && !imageError)) {
     return (
@@ -114,8 +123,11 @@ export function ThumbnailDisplay({
   return (
     <div
       className="thumbnail-image-container"
-      onMouseEnter={mode === 'onHover' ? () => setIsHovered(true) : undefined}
-      onMouseLeave={mode === 'onHover' ? () => setIsHovered(false) : undefined}
+      // Always wire the hover handlers so `isHovered` stays accurate even
+      // when the user is mid-flight between modes. Acting on it is gated
+      // by `mode === 'onHover'` in `stillCovers`.
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
       {needsStill && (
         <canvas
