@@ -4,7 +4,7 @@ import { Button } from 'primereact/button'
 import { InputSwitch } from 'primereact/inputswitch'
 import { MultiSelect } from 'primereact/multiselect'
 
-import { CardWidthButton } from '@/features/models/components/ModelGrid/CardWidthButton'
+import { OptionsButton } from '@/features/models/components/ModelGrid/OptionsButton'
 import { CategoryFilterPicker } from '@/shared/components/categories/CategoryFilterPicker'
 import { type CategorySelectionKeys } from '@/shared/types/categories'
 import { type EnvironmentMapCategoryDto } from '@/types'
@@ -126,11 +126,11 @@ export function EnvironmentMapToolbar({
             }
             badgeClassName="environment-map-toolbar-badge"
           />
-          <CardWidthButton
-            value={cardWidth}
-            min={220}
-            max={520}
-            onChange={onCardWidthChange}
+          <OptionsButton
+            cardWidth={cardWidth}
+            minCardWidth={220}
+            maxCardWidth={520}
+            onCardWidthChange={onCardWidthChange}
           />
           <Button
             icon="pi pi-check-square"
