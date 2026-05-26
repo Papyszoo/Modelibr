@@ -357,8 +357,10 @@ export function SpriteList() {
     e: DragEvent<HTMLDivElement>,
     sprite: SpriteDto
   ) => {
-    if (!selectedSpriteIds.has(sprite.id))
-      setSelectedSpriteIds(new Set([sprite.id]))
+    // See SoundList.handleSoundDragStart for why we don't auto-select
+    // the dragged item here: a state-driven layout shift inside the
+    // toolbar (the selection bar appearing) cancels the native HTML5
+    // drag mid-flight, so `drop` never fires.
     setDraggedSpriteId(sprite.id)
     e.dataTransfer.effectAllowed = 'move'
     const spriteIdsToMove = selectedSpriteIds.has(sprite.id)
