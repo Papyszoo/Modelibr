@@ -59,6 +59,8 @@ internal sealed class SpriteRepository : ISpriteRepository
                 s.SpriteCategoryId.HasValue &&
                 categoryIds.Contains(s.SpriteCategoryId.Value));
 
+        // EF.Functions.ILike — case-insensitive substring match.
+        // Postgres-specific; see SoundRepository for the in-memory note.
         if (!string.IsNullOrWhiteSpace(searchName))
         {
             var pattern = $"%{searchName.Trim()}%";

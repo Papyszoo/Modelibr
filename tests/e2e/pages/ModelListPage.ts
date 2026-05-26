@@ -387,12 +387,19 @@ export class ModelListPage {
         if (packNames.length === 0) return;
         await this.ensureFiltersOpen();
 
-        // Locate by position: the first multiselect in the filter row
-        // is Packs (Packs first, then Projects, then Tags). This avoids
-        // relying on placeholder text which disappears after selection.
-        const packsMultiselect = this.page
-            .locator("#model-grid-filters-panel .p-multiselect")
-            .first();
+        // Prefer the stable `data-testid="pack-filter"` (PrimeReact
+        // forwards unknown attrs onto the .p-multiselect root). Fall
+        // back to position-based selection for older builds that don't
+        // have the attribute yet so this remains robust across rollbacks.
+        const taggedPackFilter = this.page.locator(
+            '#model-grid-filters-panel [data-testid="pack-filter"]',
+        );
+        const packsMultiselect =
+            (await taggedPackFilter.count()) > 0
+                ? taggedPackFilter.first()
+                : this.page
+                      .locator("#model-grid-filters-panel .p-multiselect")
+                      .first();
         await packsMultiselect.waitFor({ state: "visible", timeout: 10000 });
         await packsMultiselect.click();
 

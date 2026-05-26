@@ -239,6 +239,7 @@ export function ModelsFilters({
               filter
               filterPlaceholder="Search packs..."
               disabled={packFilterDisabled}
+              data-testid="pack-filter"
             />
           )}
           {projects.length > 0 && (
@@ -247,6 +248,7 @@ export function ModelsFilters({
               options={projectOptions}
               onChange={e => onProjectFilterChange(e.value || [])}
               placeholder="Projects"
+              data-testid="project-filter"
               className="list-filters-control"
               display="chip"
               showClear={!projectFilterDisabled}
