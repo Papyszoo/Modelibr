@@ -55,8 +55,7 @@ export function useContainerSprites(
         packIds?: number[]
         projectIds?: number[]
       } = { page: pageParam, pageSize: PAGE_SIZE }
-      if (adapter.type === 'pack')
-        filterOptions.packIds = [adapter.containerId]
+      if (adapter.type === 'pack') filterOptions.packIds = [adapter.containerId]
       if (adapter.type === 'project')
         filterOptions.projectIds = [adapter.containerId]
       return getSpritesPaginated(filterOptions)

@@ -285,12 +285,7 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
     }
     setIsAreaSelecting(false)
     setSelectionBox(null)
-  }, [
-    isAreaSelecting,
-    scrollParent,
-    selectionBox,
-    setSelectedTextureSetIds,
-  ])
+  }, [isAreaSelecting, scrollParent, selectionBox, setSelectedTextureSetIds])
 
   // --- File upload (toolbar button) ---
   const handleUploadClick = useCallback(() => {
@@ -814,98 +809,98 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
                 fetchNextPage()
               }
             }}
-          itemContent={index => {
-            const textureSet = filteredTextureSets[index]
-            if (!textureSet) return null
-            const albedoUrl = getAlbedoTextureUrl(textureSet)
-            const isDraggedOver = dragOverCardId === textureSet.id
-            const isSelected = selectedIdSet.has(textureSet.id)
-            const proxySizes = new Set<number>()
-            textureSet.textures?.forEach(t => {
-              ;(t.proxies ?? []).forEach(p => proxySizes.add(p.size))
-            })
+            itemContent={index => {
+              const textureSet = filteredTextureSets[index]
+              if (!textureSet) return null
+              const albedoUrl = getAlbedoTextureUrl(textureSet)
+              const isDraggedOver = dragOverCardId === textureSet.id
+              const isSelected = selectedIdSet.has(textureSet.id)
+              const proxySizes = new Set<number>()
+              textureSet.textures?.forEach(t => {
+                ;(t.proxies ?? []).forEach(p => proxySizes.add(p.size))
+              })
 
-            return (
-              <div
-                key={textureSet.id}
-                className={`texture-set-card${isSelected ? ' selected' : ''}${isDraggedOver ? ' drag-over-card' : ''}`}
-                data-texture-set-id={textureSet.id}
-                draggable={true}
-                onDragStart={e => handleCardDragStart(e, textureSet)}
-                onDragEnd={handleCardDragEnd}
-                onDragOver={e => handleCardDragOver(e, textureSet)}
-                onDragLeave={e => handleCardDragLeave(e, textureSet)}
-                onDrop={e => handleCardDrop(e, textureSet)}
-                onClick={() => handleCardClick(textureSet)}
-                onMouseDown={event => {
-                  if (event.button === 1) {
-                    event.preventDefault()
-                  }
-                }}
-                onAuxClick={e => handleCardAuxClick(e, textureSet)}
-                onContextMenu={e => handleCardContextMenu(e, textureSet)}
-              >
-                <div className="texture-set-card-thumbnail">
-                  <button
-                    type="button"
-                    className="texture-set-select-checkbox"
-                    onMouseDown={e => e.stopPropagation()}
-                    onClick={e => {
-                      e.preventDefault()
-                      e.stopPropagation()
-                      toggleSelection(textureSet.id)
-                    }}
-                    aria-label={`${isSelected ? 'Deselect' : 'Select'} ${textureSet.name}`}
-                    aria-pressed={isSelected}
-                  >
-                    <i
-                      className={`pi ${isSelected ? 'pi-check-square' : 'pi-stop'}`}
-                    />
-                  </button>
+              return (
+                <div
+                  key={textureSet.id}
+                  className={`texture-set-card${isSelected ? ' selected' : ''}${isDraggedOver ? ' drag-over-card' : ''}`}
+                  data-texture-set-id={textureSet.id}
+                  draggable={true}
+                  onDragStart={e => handleCardDragStart(e, textureSet)}
+                  onDragEnd={handleCardDragEnd}
+                  onDragOver={e => handleCardDragOver(e, textureSet)}
+                  onDragLeave={e => handleCardDragLeave(e, textureSet)}
+                  onDrop={e => handleCardDrop(e, textureSet)}
+                  onClick={() => handleCardClick(textureSet)}
+                  onMouseDown={event => {
+                    if (event.button === 1) {
+                      event.preventDefault()
+                    }
+                  }}
+                  onAuxClick={e => handleCardAuxClick(e, textureSet)}
+                  onContextMenu={e => handleCardContextMenu(e, textureSet)}
+                >
+                  <div className="texture-set-card-thumbnail">
+                    <button
+                      type="button"
+                      className="texture-set-select-checkbox"
+                      onMouseDown={e => e.stopPropagation()}
+                      onClick={e => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        toggleSelection(textureSet.id)
+                      }}
+                      aria-label={`${isSelected ? 'Deselect' : 'Select'} ${textureSet.name}`}
+                      aria-pressed={isSelected}
+                    >
+                      <i
+                        className={`pi ${isSelected ? 'pi-check-square' : 'pi-stop'}`}
+                      />
+                    </button>
 
-                  {albedoUrl ? (
-                    <img
-                      src={albedoUrl}
-                      alt={textureSet.name}
-                      className="texture-set-image"
-                    />
-                  ) : (
-                    <div className="texture-set-placeholder">
-                      <i className="pi pi-image" />
-                      <span>No Preview</span>
-                    </div>
-                  )}
-                  <div className="texture-set-card-overlay">
-                    <span className="texture-set-card-name">
-                      {textureSet.name}
-                    </span>
-                    <div className="texture-set-card-info">
-                      <span className="texture-count">
-                        <i className="pi pi-palette" />
-                        {textureSet.textureCount || 0} texture
-                        {textureSet.textureCount !== 1 ? 's' : ''}
+                    {albedoUrl ? (
+                      <img
+                        src={albedoUrl}
+                        alt={textureSet.name}
+                        className="texture-set-image"
+                      />
+                    ) : (
+                      <div className="texture-set-placeholder">
+                        <i className="pi pi-image" />
+                        <span>No Preview</span>
+                      </div>
+                    )}
+                    <div className="texture-set-card-overlay">
+                      <span className="texture-set-card-name">
+                        {textureSet.name}
                       </span>
+                      <div className="texture-set-card-info">
+                        <span className="texture-count">
+                          <i className="pi pi-palette" />
+                          {textureSet.textureCount || 0} texture
+                          {textureSet.textureCount !== 1 ? 's' : ''}
+                        </span>
+                      </div>
                     </div>
+                    {proxySizes.size > 0 ? (
+                      <div className="texture-set-card-badges">
+                        {ALL_PROXY_SIZES.filter(s => proxySizes.has(s)).map(
+                          size => (
+                            <Tag
+                              key={size}
+                              value={`${size}`}
+                              severity="success"
+                              className="grid-proxy-badge"
+                            />
+                          )
+                        )}
+                      </div>
+                    ) : null}
                   </div>
-                  {proxySizes.size > 0 ? (
-                    <div className="texture-set-card-badges">
-                      {ALL_PROXY_SIZES.filter(s => proxySizes.has(s)).map(
-                        size => (
-                          <Tag
-                            key={size}
-                            value={`${size}`}
-                            severity="success"
-                            className="grid-proxy-badge"
-                          />
-                        )
-                      )}
-                    </div>
-                  ) : null}
                 </div>
-              </div>
-            )
-          }}
-        />
+              )
+            }}
+          />
 
           {isAreaSelecting && selectionBox ? (
             <div

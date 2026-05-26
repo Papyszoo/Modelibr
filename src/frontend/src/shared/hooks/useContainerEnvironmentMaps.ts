@@ -59,8 +59,7 @@ export function useContainerEnvironmentMaps(
       } = { page: pageParam, pageSize: PAGE_SIZE }
 
       if (adapter.type === 'pack') params.packIds = [adapter.containerId]
-      if (adapter.type === 'project')
-        params.projectIds = [adapter.containerId]
+      if (adapter.type === 'project') params.projectIds = [adapter.containerId]
 
       return getEnvironmentMapsPaginated(params)
     },
