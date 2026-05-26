@@ -23,8 +23,10 @@ internal sealed class GetAllEnvironmentMapsQueryHandler : IQueryHandler<GetAllEn
             var result = await _environmentMapRepository.GetPagedAsync(
                 query.Page.Value,
                 query.PageSize.Value,
-                query.PackId,
-                query.ProjectId,
+                query.PackIds,
+                query.ProjectIds,
+                query.CategoryIds,
+                query.SearchName,
                 cancellationToken);
 
             environmentMaps = result.Items;
@@ -34,11 +36,23 @@ internal sealed class GetAllEnvironmentMapsQueryHandler : IQueryHandler<GetAllEn
         {
             environmentMaps = await _environmentMapRepository.GetAllAsync(cancellationToken);
 
-            if (query.PackId.HasValue)
-                environmentMaps = environmentMaps.Where(e => e.Packs.Any(p => p.Id == query.PackId.Value));
+            if (query.PackIds is { Count: > 0 })
+                environmentMaps = environmentMaps.Where(e => e.Packs.Any(p => query.PackIds.Contains(p.Id)));
 
-            if (query.ProjectId.HasValue)
-                environmentMaps = environmentMaps.Where(e => e.Projects.Any(p => p.Id == query.ProjectId.Value));
+            if (query.ProjectIds is { Count: > 0 })
+                environmentMaps = environmentMaps.Where(e => e.Projects.Any(p => query.ProjectIds.Contains(p.Id)));
+
+            if (query.CategoryIds is { Count: > 0 })
+                environmentMaps = environmentMaps.Where(e =>
+                    e.EnvironmentMapCategoryId.HasValue &&
+                    query.CategoryIds.Contains(e.EnvironmentMapCategoryId.Value));
+
+            if (!string.IsNullOrWhiteSpace(query.SearchName))
+            {
+                var search = query.SearchName.Trim();
+                environmentMaps = environmentMaps.Where(e =>
+                    e.Name.Contains(search, StringComparison.OrdinalIgnoreCase));
+            }
         }
 
         var items = environmentMaps
@@ -54,8 +68,10 @@ internal sealed class GetAllEnvironmentMapsQueryHandler : IQueryHandler<GetAllEn
 }
 
 public record GetAllEnvironmentMapsQuery(
-    int? PackId = null,
-    int? ProjectId = null,
+    IReadOnlyCollection<int>? PackIds = null,
+    IReadOnlyCollection<int>? ProjectIds = null,
+    IReadOnlyCollection<int>? CategoryIds = null,
+    string? SearchName = null,
     int? Page = null,
     int? PageSize = null) : IQuery<GetAllEnvironmentMapsResponse>;
 

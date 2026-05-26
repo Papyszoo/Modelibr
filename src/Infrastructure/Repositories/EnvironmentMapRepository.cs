@@ -126,17 +126,30 @@ internal sealed class EnvironmentMapRepository : IEnvironmentMapRepository
     public async Task<(IEnumerable<EnvironmentMap> Items, int TotalCount)> GetPagedAsync(
         int page,
         int pageSize,
-        int? packId = null,
-        int? projectId = null,
+        IReadOnlyCollection<int>? packIds = null,
+        IReadOnlyCollection<int>? projectIds = null,
+        IReadOnlyCollection<int>? categoryIds = null,
+        string? searchName = null,
         CancellationToken cancellationToken = default)
     {
         var query = _context.EnvironmentMaps.AsNoTracking().AsQueryable();
 
-        if (packId.HasValue)
-            query = query.Where(e => e.Packs.Any(p => p.Id == packId.Value));
+        if (packIds is { Count: > 0 })
+            query = query.Where(e => e.Packs.Any(p => packIds.Contains(p.Id)));
 
-        if (projectId.HasValue)
-            query = query.Where(e => e.Projects.Any(p => p.Id == projectId.Value));
+        if (projectIds is { Count: > 0 })
+            query = query.Where(e => e.Projects.Any(p => projectIds.Contains(p.Id)));
+
+        if (categoryIds is { Count: > 0 })
+            query = query.Where(e =>
+                e.EnvironmentMapCategoryId.HasValue &&
+                categoryIds.Contains(e.EnvironmentMapCategoryId.Value));
+
+        if (!string.IsNullOrWhiteSpace(searchName))
+        {
+            var pattern = $"%{searchName.Trim()}%";
+            query = query.Where(e => EF.Functions.ILike(e.Name, pattern));
+        }
 
         var totalCount = await query.CountAsync(cancellationToken);
 

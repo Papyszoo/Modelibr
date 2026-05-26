@@ -17,11 +17,23 @@ public interface IModelRepository
     Task<IReadOnlyList<string>> GetNamesByPrefixAsync(string prefix, CancellationToken cancellationToken = default);
     Task<(IEnumerable<Model> Items, int TotalCount)> GetPagedAsync(
         int page, int pageSize,
-        int? packId = null, int? projectId = null, int? textureSetId = null, IReadOnlyCollection<int>? categoryIds = null, IReadOnlyCollection<string>? normalizedTagNames = null, bool? hasConceptImages = null,
+        IReadOnlyCollection<int>? packIds = null,
+        IReadOnlyCollection<int>? projectIds = null,
+        int? textureSetId = null,
+        IReadOnlyCollection<int>? categoryIds = null,
+        IReadOnlyCollection<string>? normalizedTagNames = null,
+        bool? hasConceptImages = null,
+        string? searchName = null,
         CancellationToken cancellationToken = default);
     Task<(IEnumerable<ModelListDto> Items, int TotalCount)> GetPagedListAsync(
         int page, int pageSize,
-        int? packId = null, int? projectId = null, int? textureSetId = null, IReadOnlyCollection<int>? categoryIds = null, IReadOnlyCollection<string>? normalizedTagNames = null, bool? hasConceptImages = null,
+        IReadOnlyCollection<int>? packIds = null,
+        IReadOnlyCollection<int>? projectIds = null,
+        int? textureSetId = null,
+        IReadOnlyCollection<int>? categoryIds = null,
+        IReadOnlyCollection<string>? normalizedTagNames = null,
+        bool? hasConceptImages = null,
+        string? searchName = null,
         CancellationToken cancellationToken = default);
     Task<(int? ActiveVersionId, Domain.Models.Thumbnail? Thumbnail)?> GetThumbnailDataAsync(
         int modelId, CancellationToken cancellationToken = default);

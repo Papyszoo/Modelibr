@@ -44,24 +44,42 @@ internal sealed class TextureSetRepository : ITextureSetRepository
 
     public async Task<(IEnumerable<TextureSet> Items, int TotalCount)> GetPagedAsync(
         int page, int pageSize,
-        int? packId = null, int? projectId = null,
-        int? categoryId = null,
+        IReadOnlyCollection<int>? packIds = null,
+        int? projectId = null,
+        IReadOnlyCollection<int>? categoryIds = null,
+        IReadOnlyCollection<TextureType>? textureTypes = null,
         TextureSetKind? kind = null,
+        string? searchName = null,
         CancellationToken cancellationToken = default)
     {
         var query = _context.TextureSets.AsNoTracking().AsQueryable();
 
-        if (packId.HasValue)
-            query = query.Where(ts => ts.Packs.Any(p => p.Id == packId.Value));
+        if (packIds is { Count: > 0 })
+            query = query.Where(ts => ts.Packs.Any(p => packIds.Contains(p.Id)));
 
         if (projectId.HasValue)
             query = query.Where(ts => ts.Projects.Any(p => p.Id == projectId.Value));
 
-        if (categoryId.HasValue)
-            query = query.Where(ts => ts.TextureSetCategoryId == categoryId.Value);
+        if (categoryIds is { Count: > 0 })
+            query = query.Where(ts =>
+                ts.TextureSetCategoryId.HasValue &&
+                categoryIds.Contains(ts.TextureSetCategoryId.Value));
+
+        // ANY-of semantics: keep the set if it contains at least one of the
+        // requested texture types.
+        if (textureTypes is { Count: > 0 })
+            query = query.Where(ts =>
+                ts.Textures.Any(t => textureTypes.Contains(t.TextureType)));
 
         if (kind.HasValue)
             query = query.Where(ts => ts.Kind == kind.Value);
+
+        // EF.Functions.ILike — case-insensitive Contains on Postgres.
+        if (!string.IsNullOrWhiteSpace(searchName))
+        {
+            var pattern = $"%{searchName.Trim()}%";
+            query = query.Where(ts => EF.Functions.ILike(ts.Name, pattern));
+        }
 
         var totalCount = await query.CountAsync(cancellationToken);
 

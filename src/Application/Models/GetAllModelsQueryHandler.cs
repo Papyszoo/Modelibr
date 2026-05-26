@@ -27,7 +27,8 @@ namespace Application.Models
             {
                 var result = await _modelRepository.GetPagedListAsync(
                     query.Page.Value, query.PageSize.Value,
-                    query.PackId, query.ProjectId, query.TextureSetId, query.CategoryIds, normalizedTags, query.HasConceptImages,
+                    query.PackIds, query.ProjectIds, query.TextureSetId, query.CategoryIds, normalizedTags, query.HasConceptImages,
+                    query.SearchName,
                     cancellationToken);
                 modelListDtos = result.Items;
                 totalCount = result.TotalCount;
@@ -36,16 +37,16 @@ namespace Application.Models
             {
                 var models = await _modelRepository.GetAllAsync(cancellationToken);
 
-                // Filter by pack if specified
-                if (query.PackId.HasValue)
+                // Filter by packs if specified (any-of)
+                if (query.PackIds is { Count: > 0 })
                 {
-                    models = models.Where(m => m.Packs.Any(p => p.Id == query.PackId.Value));
+                    models = models.Where(m => m.Packs.Any(p => query.PackIds.Contains(p.Id)));
                 }
 
-                // Filter by project if specified
-                if (query.ProjectId.HasValue)
+                // Filter by projects if specified (any-of)
+                if (query.ProjectIds is { Count: > 0 })
                 {
-                    models = models.Where(m => m.Projects.Any(p => p.Id == query.ProjectId.Value));
+                    models = models.Where(m => m.Projects.Any(p => query.ProjectIds.Contains(p.Id)));
                 }
 
                 // Filter by texture set if specified
@@ -69,6 +70,13 @@ namespace Application.Models
                     models = query.HasConceptImages.Value
                         ? models.Where(m => m.ConceptImages.Any())
                         : models.Where(m => !m.ConceptImages.Any());
+                }
+
+                if (!string.IsNullOrWhiteSpace(query.SearchName))
+                {
+                    var search = query.SearchName.Trim();
+                    models = models.Where(m =>
+                        m.Name.Contains(search, StringComparison.OrdinalIgnoreCase));
                 }
 
                 // NOTE: Keep this mapping in sync with ModelRepository.GetPagedListAsync
@@ -113,7 +121,16 @@ namespace Application.Models
         }
     }
 
-    public record GetAllModelsQuery(int? PackId = null, int? ProjectId = null, int? TextureSetId = null, IReadOnlyCollection<int>? CategoryIds = null, IReadOnlyCollection<string>? Tags = null, bool? HasConceptImages = null, int? Page = null, int? PageSize = null) : IQuery<GetAllModelsQueryResponse>;
+    public record GetAllModelsQuery(
+        IReadOnlyCollection<int>? PackIds = null,
+        IReadOnlyCollection<int>? ProjectIds = null,
+        int? TextureSetId = null,
+        IReadOnlyCollection<int>? CategoryIds = null,
+        IReadOnlyCollection<string>? Tags = null,
+        bool? HasConceptImages = null,
+        int? Page = null,
+        int? PageSize = null,
+        string? SearchName = null) : IQuery<GetAllModelsQueryResponse>;
     
     public record GetAllModelsQueryResponse(IEnumerable<ModelListDto> Models, int? TotalCount = null, int? Page = null, int? PageSize = null, int? TotalPages = null);
     
