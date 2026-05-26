@@ -20,14 +20,13 @@ import {
   ListToolbarSelectionSummary,
   OptionsButton,
 } from '@/shared/components/list-toolbar'
+import { type CategorySelectionKeys as ModelCategorySelectionKeys } from '@/shared/types/categories'
 import {
   type ModelCategoryDto,
   type ModelTagDto,
   type PackDto,
   type ProjectDto,
 } from '@/types'
-
-import { type ModelCategorySelectionKeys } from './useModelFilters'
 
 interface ModelsFiltersProps {
   isSearchOpen: boolean
