@@ -145,6 +145,10 @@ export async function getModelsByProject(projectId: number): Promise<Model[]> {
 export async function getTextureSetsByProject(
   projectId: number
 ): Promise<TextureSetDto[]> {
+  // TextureSet endpoint deliberately kept singular `projectId` — see
+  // `ITextureSetRepository.GetPagedAsync`. The TextureSet API was not
+  // migrated to array `projectIds[]` because the UI does not currently
+  // expose a multi-project filter for texture sets.
   const response = await client.get<GetAllTextureSetsResponse>(
     `/texture-sets?projectId=${projectId}`
   )
@@ -169,7 +173,7 @@ export async function getSpritesByProject(
   projectId: number
 ): Promise<SpriteDto[]> {
   const response = await client.get<GetAllSpritesResponse>(
-    `/sprites?projectId=${projectId}`
+    `/sprites?projectIds=${projectId}`
   )
   return response.data.sprites
 }
@@ -219,7 +223,7 @@ export async function getEnvironmentMapsByProject(
   projectId: number
 ): Promise<EnvironmentMapDto[]> {
   const response = await client.get<GetAllEnvironmentMapsResponse>(
-    `/environment-maps?projectId=${projectId}`
+    `/environment-maps?projectIds=${projectId}`
   )
   return response.data.environmentMaps
 }
