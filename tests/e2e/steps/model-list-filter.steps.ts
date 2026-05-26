@@ -53,6 +53,31 @@ When(
     },
 );
 
+When(
+    "I filter the model list by packs {string} and {string}",
+    async ({ page }, firstPackName: string, secondPackName: string) => {
+        const state = getScenarioState(page);
+        for (const name of [firstPackName, secondPackName]) {
+            if (!state.getPack(name)) {
+                throw new Error(`Pack "${name}" not found in shared state`);
+            }
+        }
+        const modelListPage = new ModelListPage(page);
+        // `filterByPacks` opens the multiselect once and clicks each
+        // option in turn before closing. Calling `filterByPack` twice
+        // doesn't work here: PrimeReact's `display="chip"` mode replaces
+        // the placeholder text with the selected chip after the first
+        // pick, so the second call's `:has-text("Packs")` locator fails.
+        await modelListPage.filterByPacks([firstPackName, secondPackName]);
+        const tokenCount = await modelListPage.getFilterTokens().count();
+        // Two distinct packs selected -> two chips inside the multiselect.
+        expect(tokenCount).toBeGreaterThanOrEqual(2);
+        console.log(
+            `[Action] Filtered model list by packs "${firstPackName}" + "${secondPackName}"`,
+        );
+    },
+);
+
 When("I clear the model list filter", async ({ page }) => {
     const modelListPage = new ModelListPage(page);
     await modelListPage.clearFilters();

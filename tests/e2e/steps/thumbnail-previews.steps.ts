@@ -10,6 +10,10 @@
 import { createBdd } from "playwright-bdd";
 import { expect } from "@playwright/test";
 import { ApiHelper } from "../helpers/api-helper";
+import {
+    narrowVirtualisedList,
+    waitForCountLabelStable,
+} from "../helpers/list-toolbar-helper";
 import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
 import { TextureSetsPage } from "../pages/TextureSetsPage";
 import { SpriteListPage } from "../pages/SpriteListPage";
@@ -138,22 +142,14 @@ async function switchToModelSpecificKind(page: any, searchText?: string) {
     );
     if (!isActive) {
         await modelSpecificBtn.click();
+        // Wait for the kind-switch's data query to resolve instead of
+        // sleeping a fixed 500ms.
+        await waitForCountLabelStable(page);
     }
-    // Wait for the query to settle
-    await page.waitForTimeout(500);
-    // If a search text is provided, filter the grid so the card appears on the first page
+    // If a search text is provided, filter the grid so the card appears
+    // on the first page (the grid is virtualised).
     if (searchText) {
-        const searchInput = page.locator(".search-input");
-        if (
-            await searchInput
-                .waitFor({ state: "visible", timeout: 3000 })
-                .then(() => true)
-                .catch(() => false)
-        ) {
-            await searchInput.clear();
-            await searchInput.fill(searchText);
-            await page.waitForTimeout(500);
-        }
+        await narrowVirtualisedList(page, searchText);
     }
 }
 

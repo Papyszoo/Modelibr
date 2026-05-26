@@ -23,3 +23,20 @@ Feature: Pack Filter on Model List
     And the model list is filtered by pack "Clear Filter Pack"
     When I clear the model list filter
     Then the model list should show all models
+
+  Scenario: Filtering by two packs returns the union of their models (ANY-of)
+    # The server endpoint accepts `packIds[]` and returns models that
+    # belong to ANY of the listed packs. This scenario closes a gap
+    # flagged in review: nothing else asserts the union semantics, so a
+    # silent regression to AND-semantics or to "last pack wins" would
+    # not be caught.
+    Given I create a test pack named "Union Pack A" via API
+    And I create a test pack named "Union Pack B" via API
+    And I create a unique test model named "union-model-a" via API
+    And I create a unique test model named "union-model-b" via API
+    And I add the model "union-model-a" to the pack "Union Pack A" via API
+    And I add the model "union-model-b" to the pack "Union Pack B" via API
+    And I am on the model list page
+    When I filter the model list by packs "Union Pack A" and "Union Pack B"
+    Then the model list should show model "union-model-a"
+    And the model list should show model "union-model-b"
