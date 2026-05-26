@@ -34,7 +34,12 @@ import { useModelGrid } from './useModelGrid'
 // grid-template-columns inline style so that responsive @media rules can
 // reshape the layout (e.g. clamp to never go below 2 columns on phones)
 // without losing the slider's effect entirely.
-const gridComponents: GridComponents<{ cardWidth: number }> = {
+interface ModelGridContext {
+  cardWidth: number
+  isLoadingMore: boolean
+}
+
+const gridComponents: GridComponents<ModelGridContext> = {
   List: forwardRef(({ children, context, ...props }, ref) => (
     <div
       ref={ref}
@@ -55,6 +60,13 @@ const gridComponents: GridComponents<{ cardWidth: number }> = {
       {children}
     </div>
   ),
+  Footer: ({ context }) =>
+    context?.isLoadingMore ? (
+      <div className="model-grid-loading-more" aria-live="polite">
+        <i className="pi pi-spin pi-spinner" />
+        <span>Loading more…</span>
+      </div>
+    ) : null,
 }
 
 export function ModelGrid({
@@ -523,7 +535,7 @@ export function ModelGrid({
               totalCount={filteredModels.length + (isContainerContext ? 1 : 0)}
               overscan={200}
               components={gridComponents}
-              context={{ cardWidth }}
+              context={{ cardWidth, isLoadingMore }}
               endReached={() => {
                 if (pagination.hasMore && !isLoadingMore) {
                   fetchModels(true)

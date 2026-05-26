@@ -52,10 +52,10 @@ export function useContainerTextureSets(
       const filterOptions: {
         page: number
         pageSize: number
-        packId?: number
+        packIds?: number[]
         projectId?: number
       } = { page: pageParam, pageSize: PAGE_SIZE }
-      if (adapter.type === 'pack') filterOptions.packId = adapter.containerId
+      if (adapter.type === 'pack') filterOptions.packIds = [adapter.containerId]
       if (adapter.type === 'project')
         filterOptions.projectId = adapter.containerId
       return getTextureSetsPaginated(filterOptions)

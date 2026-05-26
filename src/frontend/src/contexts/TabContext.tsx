@@ -13,7 +13,11 @@ export interface TabContextValue {
     name?: string,
     options?: { activate?: boolean }
   ) => void
-  openTextureSetDetailsTab: (textureSetId: number, name?: string) => void
+  openTextureSetDetailsTab: (
+    textureSetId: number,
+    name?: string,
+    options?: { activate?: boolean }
+  ) => void
   openEnvironmentMapDetailsTab: (
     environmentMapId: number,
     name?: string

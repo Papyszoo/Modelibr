@@ -54,12 +54,13 @@ export function useContainerEnvironmentMaps(
       const params: {
         page: number
         pageSize: number
-        packId?: number
-        projectId?: number
+        packIds?: number[]
+        projectIds?: number[]
       } = { page: pageParam, pageSize: PAGE_SIZE }
 
-      if (adapter.type === 'pack') params.packId = adapter.containerId
-      if (adapter.type === 'project') params.projectId = adapter.containerId
+      if (adapter.type === 'pack') params.packIds = [adapter.containerId]
+      if (adapter.type === 'project')
+        params.projectIds = [adapter.containerId]
 
       return getEnvironmentMapsPaginated(params)
     },

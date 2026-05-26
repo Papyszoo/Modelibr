@@ -52,12 +52,13 @@ export function useContainerSprites(
       const filterOptions: {
         page: number
         pageSize: number
-        packId?: number
-        projectId?: number
+        packIds?: number[]
+        projectIds?: number[]
       } = { page: pageParam, pageSize: PAGE_SIZE }
-      if (adapter.type === 'pack') filterOptions.packId = adapter.containerId
+      if (adapter.type === 'pack')
+        filterOptions.packIds = [adapter.containerId]
       if (adapter.type === 'project')
-        filterOptions.projectId = adapter.containerId
+        filterOptions.projectIds = [adapter.containerId]
       return getSpritesPaginated(filterOptions)
     },
     initialPageParam: 1,

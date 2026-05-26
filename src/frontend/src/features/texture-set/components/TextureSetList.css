@@ -1,16 +1,30 @@
+/* Texture-set list page shell. Mirrors model-list — the toolbar provides
+   page identity (count chip), so there's no header band or h1 here. */
+
 .texture-set-list {
+  flex: 1;
   display: flex;
   flex-direction: column;
+  min-height: 0;
   height: 100%;
-  padding: 1rem;
   background: var(--surface-ground);
 }
 
+/* `.texture-set-list-tab` used to override the background to transparent
+   on the theory that the surrounding tab dock provides framing, but
+   Models / Sounds / Sprites / Environment Maps all keep
+   `--surface-ground` inside a tab. The mismatched chrome made the
+   Texture Sets tab look "different" from the rest of the app, so we
+   inherit the same surface here. */
+
+/* Kind switcher — only rendered on the generic textureSets tab. The
+   dedicated Global Materials / Multi-Model Textures tabs lock the kind
+   via prop and hide this row. */
 .kind-filter-bar {
   display: flex;
   align-items: center;
-  margin-bottom: 1rem;
   gap: 0.5rem;
+  padding: 0.5rem 1rem 0;
 }
 
 .kind-filter-bar .kind-filter-select .p-button {
@@ -24,222 +38,4 @@
   background: var(--primary-color);
   color: var(--primary-color-text);
   opacity: 0.85;
-}
-
-.texture-set-list-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 1.5rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid var(--surface-border);
-}
-
-.header-actions {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-}
-
-.header-content {
-  flex: 1;
-}
-
-.texture-set-list-header h1 {
-  margin: 0 0 0.5rem 0;
-  color: var(--text-color);
-  font-size: 1.75rem;
-  font-weight: 600;
-}
-
-.texture-set-stats {
-  display: flex;
-  gap: 1rem;
-}
-
-.stat-item {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: var(--text-color-secondary);
-  font-size: 0.875rem;
-}
-
-.stat-item i {
-  color: var(--text-color-secondary);
-}
-
-.texture-set-list-content {
-  flex: 1;
-  background: var(--surface-card);
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.texture-set-table {
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.texture-set-name {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.empty-badge {
-  background: #fee2e2;
-  color: #dc2626;
-  padding: 0.125rem 0.5rem;
-  border-radius: 9999px;
-  font-size: 0.75rem;
-  font-weight: 500;
-}
-
-.texture-types-preview {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem;
-  align-items: center;
-}
-
-.texture-type-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  color: white;
-  padding: 0.125rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-}
-
-.texture-type-badge i {
-  font-size: 0.75rem;
-}
-
-.texture-count-more {
-  color: #64748b;
-  font-size: 0.75rem;
-  font-style: italic;
-  margin-left: 0.25rem;
-}
-
-.associated-models {
-  display: flex;
-  align-items: center;
-}
-
-.model-count {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  color: #64748b;
-  font-size: 0.875rem;
-}
-
-.model-count i {
-  color: #94a3b8;
-}
-
-.text-muted {
-  color: #9ca3af;
-  font-style: italic;
-}
-
-.texture-set-actions {
-  display: flex;
-  gap: 0.25rem;
-  justify-content: center;
-}
-
-.texture-set-actions .p-button {
-  width: 2rem;
-  height: 2rem;
-}
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .texture-set-list {
-    padding: 0.5rem;
-  }
-
-  .texture-set-list-header {
-    flex-direction: column;
-    gap: 0.5rem;
-    align-items: stretch;
-    margin-bottom: 0.75rem;
-    padding-bottom: 0.5rem;
-  }
-
-  .texture-set-list-header h1 {
-    font-size: 1.125rem;
-    margin-bottom: 0.25rem;
-  }
-
-  .texture-set-stats {
-    gap: 0.5rem;
-    flex-wrap: wrap;
-  }
-
-  .texture-types-preview {
-    flex-direction: row;
-    align-items: center;
-  }
-
-  .texture-type-badge {
-    font-size: 0.6875rem;
-    padding: 0.0625rem 0.375rem;
-  }
-
-  .kind-filter-bar {
-    overflow-x: auto;
-    flex-wrap: nowrap;
-    margin-bottom: 0.5rem;
-  }
-}
-
-/* Loading and empty states */
-.p-datatable .p-datatable-tbody > tr.p-datatable-emptymessage > td {
-  padding: 3rem;
-  text-align: center;
-  color: #9ca3af;
-}
-
-.p-datatable .p-datatable-loading-overlay {
-  background-color: rgba(255, 255, 255, 0.8);
-}
-
-/* Table styling improvements */
-.texture-set-table .p-datatable-thead > tr > th {
-  background: #f1f5f9;
-  color: #475569;
-  font-weight: 600;
-  border: none;
-  border-bottom: 2px solid #e2e8f0;
-}
-
-.texture-set-table .p-datatable-tbody > tr {
-  border: none;
-  border-bottom: 1px solid #f1f5f9;
-}
-
-.texture-set-table .p-datatable-tbody > tr:hover {
-  background: #f8fafc;
-}
-
-.texture-set-table .p-datatable-tbody > tr > td {
-  border: none;
-  padding: 1rem 0.75rem;
-}
-
-/* Frozen column styling */
-.texture-set-table .p-datatable-frozen-column {
-  background: #ffffff;
-  border-left: 1px solid #e2e8f0;
-}
-
-.texture-set-table .p-datatable-thead .p-datatable-frozen-column {
-  background: #f1f5f9;
 }

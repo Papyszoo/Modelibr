@@ -1,102 +1,50 @@
-/* Texture Set Grid Container */
+/* Texture-set grid — visual parity with the model grid. The toolbar
+   chrome lives in @/shared/components/list-toolbar; this file owns the
+   container, grid layout, and card. */
+
 .texture-set-grid-container {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1rem;
   padding: 1rem;
   border: 2px dashed transparent;
   border-radius: 8px;
-  transition: all 0.3s ease;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease;
   overflow: auto;
-}
-
-.texture-set-grid-container:hover:not(.drag-over) {
-  border-color: #3182ce;
-  background: rgba(49, 130, 206, 0.05);
 }
 
 .texture-set-grid-container.drag-over {
   border-color: #3182ce;
   background: rgba(49, 130, 206, 0.1);
-  transform: scale(1.02);
 }
 
-/* Search and Filter Controls */
-.texture-set-grid-controls {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  background: var(--surface-card);
-  padding: 1.5rem;
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.texture-set-grid-controls .search-bar {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  background: var(--surface-ground);
-  border: 1px solid var(--surface-border);
-  border-radius: 8px;
-  transition: all 0.2s ease;
-}
-
-.texture-set-grid-controls .search-bar:focus-within {
-  border-color: var(--primary-color);
-  background: var(--surface-card);
-  box-shadow: 0 0 0 3px rgba(var(--primary-color-rgb), 0.1);
-}
-
-.texture-set-grid-controls .search-bar .pi-search {
-  color: var(--text-color-secondary);
-  font-size: 1rem;
-}
-
-.texture-set-grid-controls .search-input {
-  flex: 1;
-  border: none;
-  background: transparent;
-  outline: none;
-  font-size: 1rem;
-  color: var(--text-color);
-}
-
-.texture-set-grid-controls .search-input::placeholder {
-  color: var(--text-color-secondary);
-}
-
-.texture-set-grid-controls .filter-bar {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.texture-set-grid-controls .filter-placeholder {
-  color: var(--text-color-secondary);
-  font-size: 0.875rem;
-  font-style: italic;
-}
-
-/* Texture Set Grid */
+/* Texture Set Grid — column min-width comes from --texture-set-card-width
+   (set inline from the slider). Falls back to 200px when the variable is
+   missing. */
 .texture-set-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 1.5rem;
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(var(--texture-set-card-width, 200px), 1fr)
+  );
+  gap: 1rem;
   padding: 0.5rem;
 }
 
 /* Texture Set Card */
 .texture-set-card {
   background: var(--surface-card);
+  border: 2px solid transparent;
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   transition: all 0.3s ease;
   cursor: pointer;
   position: relative;
+  user-select: none;
 }
 
 .texture-set-card:hover {
@@ -104,7 +52,11 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-/* Drag over card styling */
+.texture-set-card.selected {
+  border-color: var(--primary-color);
+  box-shadow: 0 4px 14px rgba(var(--primary-color-rgb), 0.2);
+}
+
 .texture-set-card.drag-over-card {
   border: 2px solid var(--primary-color);
   box-shadow: 0 0 0 3px rgba(var(--primary-color-rgb), 0.2);
@@ -113,6 +65,46 @@
 
 .texture-set-card.drag-over-card .texture-set-card-thumbnail {
   opacity: 0.7;
+}
+
+.texture-set-select-checkbox {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 2;
+  opacity: 0;
+  transition: opacity 0.2s;
+  width: 1.25rem;
+  height: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--surface-border);
+  border-radius: 4px;
+  background: var(--surface-card);
+  color: var(--text-color);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+
+.texture-set-select-checkbox i {
+  font-size: 1rem;
+  color: inherit;
+}
+
+.texture-set-card:hover .texture-set-select-checkbox,
+.texture-set-card.selected .texture-set-select-checkbox {
+  opacity: 1;
+}
+
+.texture-set-card.selected .texture-set-select-checkbox {
+  border-color: rgba(var(--primary-color-rgb), 0.45);
+}
+
+.texture-set-card.selected .texture-set-select-checkbox i {
+  color: var(--primary-color);
 }
 
 .texture-set-card-thumbnail {
@@ -156,7 +148,6 @@
   font-weight: 500;
 }
 
-/* Overlay with texture set name and info */
 .texture-set-card-overlay {
   position: absolute;
   bottom: 0;
@@ -201,9 +192,67 @@
   font-size: 0.75rem;
 }
 
+.texture-set-card-badges {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  gap: 2px;
+  z-index: 2;
+}
+
+.grid-proxy-badge {
+  font-size: 0.6rem !important;
+  padding: 0.05rem 0.3rem !important;
+  opacity: 0.9;
+}
+
+/* Area-drag (lasso) selection — mirrors .model-grid-selection-* */
+.texture-set-grid-selection-surface {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 100%;
+}
+
+.texture-set-grid-selection-surface.is-selecting {
+  cursor: crosshair;
+}
+
+.texture-set-grid-selection-box {
+  position: absolute;
+  z-index: 5;
+  border: 1px dashed var(--primary-color);
+  border-radius: 8px;
+  background: rgba(var(--primary-color-rgb), 0.16);
+  pointer-events: none;
+}
+
+/* "Loading more…" footer shown while the next infinite-scroll page is in
+   flight. Mirrors the model grid footer. */
+.texture-set-grid-loading-more,
+.model-grid-loading-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  color: var(--text-color-secondary);
+  font-size: 0.875rem;
+}
+
+.texture-set-grid-loading-more .pi,
+.model-grid-loading-more .pi {
+  font-size: 0.875rem;
+}
+
 /* No results state */
 .no-results {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   text-align: center;
+  gap: 0.75rem;
   padding: 4rem 2rem;
   color: var(--text-color-secondary);
 }
@@ -220,7 +269,8 @@
 }
 
 /* Loading state */
-.texture-set-grid-loading {
+.texture-set-grid-loading,
+.texture-set-grid-error {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -230,10 +280,15 @@
   gap: 1rem;
 }
 
-.texture-set-grid-loading p {
+.texture-set-grid-loading p,
+.texture-set-grid-error p {
   color: var(--text-color-secondary);
   font-size: 1rem;
   margin: 0;
+}
+
+.texture-set-grid-error .pi-exclamation-triangle {
+  color: var(--orange-500, #f97316);
 }
 
 /* Empty state */
@@ -248,19 +303,7 @@
   border: 2px dashed var(--surface-border);
   border-radius: 8px;
   margin: 1rem;
-  transition: all 0.3s ease;
-  cursor: pointer;
-}
-
-.texture-set-grid-empty:hover:not(.drag-over) {
-  border-color: var(--primary-color);
-  background: rgba(var(--primary-color-rgb), 0.05);
-}
-
-.texture-set-grid-empty.drag-over {
-  border-color: var(--primary-color);
-  background: rgba(var(--primary-color-rgb), 0.1);
-  transform: scale(1.02);
+  transition: all 0.2s ease;
 }
 
 .texture-set-grid-empty .pi {
@@ -289,10 +332,19 @@
   font-style: italic;
 }
 
-/* Responsive adjustments */
+/* Tab content specific styles */
+.texture-set-list-tab .texture-set-grid-container {
+  border: none;
+  background: transparent;
+}
+
+/* Responsive */
 @media (max-width: 1200px) {
   .texture-set-grid {
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    grid-template-columns: repeat(
+      auto-fill,
+      minmax(min(var(--texture-set-card-width, 180px), 180px), 1fr)
+    );
   }
 }
 
@@ -303,26 +355,16 @@
   }
 
   .texture-set-grid {
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     gap: 0.75rem;
-    padding: 0.25rem;
-  }
-
-  .texture-set-grid-controls {
-    padding: 0.75rem;
-    gap: 0.5rem;
-  }
-
-  .texture-set-grid-controls .search-bar {
-    padding: 0.5rem 0.75rem;
   }
 
   .texture-set-card-name {
     font-size: 0.75rem;
   }
 
-  /* Touch — overlays/info should be visible without hover. */
-  .texture-set-card-overlay {
+  /* Touch — overlays + checkbox always visible. */
+  .texture-set-card-overlay,
+  .texture-set-card .texture-set-select-checkbox {
     opacity: 1;
   }
 
@@ -334,25 +376,19 @@
 @media (max-width: 480px) {
   .texture-set-grid-container {
     padding: 0.375rem;
+    gap: 0.5rem;
   }
 
   .texture-set-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(
+      auto-fill,
+      minmax(min(var(--texture-set-card-width, 120px), 48%), 1fr)
+    );
     gap: 0.5rem;
+    padding: 0.25rem;
   }
-}
 
-.texture-set-card-badges {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  display: flex;
-  gap: 2px;
-  z-index: 2;
-}
-
-.grid-proxy-badge {
-  font-size: 0.6rem !important;
-  padding: 0.05rem 0.3rem !important;
-  opacity: 0.9;
+  .texture-set-card:hover {
+    transform: none;
+  }
 }
