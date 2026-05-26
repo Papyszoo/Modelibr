@@ -121,7 +121,10 @@ export function useTextureSetGrid({
   // Debounce the search query for the server side so each keystroke doesn't
   // spawn its own fetch. Client-side filtering of already-loaded pages
   // stays instant via `viewState.searchQuery`.
-  const debouncedSearchName = useDebouncedValue(viewState.searchQuery.trim(), 300)
+  const debouncedSearchName = useDebouncedValue(
+    viewState.searchQuery.trim(),
+    300
+  )
 
   const {
     data: paginatedData,
