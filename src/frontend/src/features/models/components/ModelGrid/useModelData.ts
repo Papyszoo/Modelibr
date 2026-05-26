@@ -8,6 +8,7 @@ import {
   usePacksQuery,
   useProjectsQuery,
 } from '@/features/models/api/queries'
+import { useDebouncedValue } from '@/shared/hooks'
 import { type PaginationState } from '@/types'
 
 const PAGE_SIZE = 50
@@ -19,6 +20,7 @@ interface UseModelDataOptions {
   selectedTagNames: string[]
   hasConceptImages: boolean
   textureSetId?: number
+  searchQuery?: string
 }
 
 export function useModelData({
@@ -28,12 +30,20 @@ export function useModelData({
   selectedTagNames,
   hasConceptImages,
   textureSetId,
+  searchQuery = '',
 }: UseModelDataOptions) {
   const queryClient = useQueryClient()
 
-  const packId = effectivePackIds.length > 0 ? effectivePackIds[0] : undefined
-  const projectId =
-    effectiveProjectIds.length > 0 ? effectiveProjectIds[0] : undefined
+  // Stable, ordered filter arrays for the React Query cache key. Sorting
+  // before stringification means [1,2] and [2,1] share a cache slot.
+  const sortedPackIds = [...effectivePackIds].sort((a, b) => a - b)
+  const sortedProjectIds = [...effectiveProjectIds].sort((a, b) => a - b)
+  const sortedCategoryIds = [...selectedCategoryIds].sort((a, b) => a - b)
+  const sortedTagNames = [...selectedTagNames].sort()
+
+  // Debounce typing — server fetch waits 300ms past the last keystroke.
+  // Client-side filtering in useModelFilters keeps the visual snappy.
+  const debouncedSearchName = useDebouncedValue(searchQuery.trim(), 300)
 
   const {
     data: paginatedData,
@@ -46,25 +56,27 @@ export function useModelData({
     queryKey: [
       'models',
       {
-        packId,
-        projectId,
+        packIds: sortedPackIds,
+        projectIds: sortedProjectIds,
         textureSetId,
-        selectedCategoryIds,
-        selectedTagNames,
+        categoryIds: sortedCategoryIds,
+        tags: sortedTagNames,
         hasConceptImages,
+        searchName: debouncedSearchName || undefined,
       },
     ],
     queryFn: ({ pageParam }) =>
       getModelsPaginated({
         page: pageParam,
         pageSize: PAGE_SIZE,
-        packId,
-        projectId,
+        packIds: sortedPackIds.length > 0 ? sortedPackIds : undefined,
+        projectIds: sortedProjectIds.length > 0 ? sortedProjectIds : undefined,
         textureSetId,
         categoryIds:
-          selectedCategoryIds.length > 0 ? selectedCategoryIds : undefined,
-        tags: selectedTagNames.length > 0 ? selectedTagNames : undefined,
+          sortedCategoryIds.length > 0 ? sortedCategoryIds : undefined,
+        tags: sortedTagNames.length > 0 ? sortedTagNames : undefined,
         hasConceptImages: hasConceptImages || undefined,
+        searchName: debouncedSearchName || undefined,
       }),
     initialPageParam: 1,
     placeholderData: previousData => previousData,

@@ -16,8 +16,8 @@ import {
 export function getModelsQueryOptions(params: {
   page: number
   pageSize: number
-  packId?: number
-  projectId?: number
+  packIds?: number[]
+  projectIds?: number[]
   textureSetId?: number
   categoryIds?: number[]
   tags?: string[]

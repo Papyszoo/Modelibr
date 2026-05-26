@@ -17,6 +17,12 @@ interface OptionsButtonProps {
   minCardWidth: number
   maxCardWidth: number
   onCardWidthChange: (value: number) => void
+  /**
+   * Whether to show the Thumbnail Animation control. Off for pages where
+   * thumbnails are static images (e.g. texture sets) and the control would
+   * be misleading. Defaults to `true`.
+   */
+  showThumbnailAnimation?: boolean
 }
 
 const ANIMATION_MODE_OPTIONS: {
@@ -33,6 +39,7 @@ export function OptionsButton({
   minCardWidth,
   maxCardWidth,
   onCardWidthChange,
+  showThumbnailAnimation = true,
 }: OptionsButtonProps) {
   const overlayRef = useRef<OverlayPanel>(null)
   const isMobile = useIsMobile()
@@ -72,25 +79,27 @@ export function OptionsButton({
             />
           </div>
 
-          <div className="options-overlay-section">
-            <div className="options-overlay-label">
-              <i className="pi pi-play" />
-              <span>Thumbnail Animation</span>
+          {showThumbnailAnimation ? (
+            <div className="options-overlay-section">
+              <div className="options-overlay-label">
+                <i className="pi pi-play" />
+                <span>Thumbnail Animation</span>
+              </div>
+              <SelectButton
+                value={animationMode}
+                onChange={e => {
+                  // SelectButton emits null when the same option is clicked
+                  // again — ignore so the user can't accidentally unset it.
+                  if (e.value) {
+                    setAnimationMode(e.value as ThumbnailAnimationMode)
+                  }
+                }}
+                options={ANIMATION_MODE_OPTIONS}
+                className="options-overlay-mode"
+                allowEmpty={false}
+              />
             </div>
-            <SelectButton
-              value={animationMode}
-              onChange={e => {
-                // SelectButton emits null when the same option is clicked
-                // again — ignore so the user can't accidentally unset it.
-                if (e.value) {
-                  setAnimationMode(e.value as ThumbnailAnimationMode)
-                }
-              }}
-              options={ANIMATION_MODE_OPTIONS}
-              className="options-overlay-mode"
-              allowEmpty={false}
-            />
-          </div>
+          ) : null}
         </div>
       </OverlayPanel>
     </>

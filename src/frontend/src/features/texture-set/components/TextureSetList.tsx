@@ -1,243 +1,127 @@
 import './TextureSetList.css'
 
-import {
-  useInfiniteQuery,
-  useMutation,
-  useQueryClient,
-} from '@tanstack/react-query'
-import { Button } from 'primereact/button'
+import { useQueryClient } from '@tanstack/react-query'
 import { Toast } from 'primereact/toast'
-import { useRef, useState } from 'react'
+import { type JSX, useRef, useState } from 'react'
 
-import { getTextureSetsPaginated } from '@/features/texture-set/api/textureSetApi'
-import {
-  createTextureSet,
-  createTextureSetWithFile,
-  updateTextureSetKind,
-} from '@/features/texture-set/api/textureSetApi'
-import { CreateTextureSetDialog } from '@/features/texture-set/dialogs/CreateTextureSetDialog'
+import { type TabContextValue } from '@/contexts/TabContext'
+import { updateTextureSetKind } from '@/features/texture-set/api/textureSetApi'
 import { useTabContext } from '@/hooks/useTabContext'
-import { useUploadProgress } from '@/hooks/useUploadProgress'
-import { useDragAndDrop } from '@/shared/hooks/useFileUpload'
-import { type TextureSetDto, TextureSetKind } from '@/types'
+import { TextureSetKind } from '@/types'
 
 import { TextureSetGrid } from './TextureSetGrid'
-import { TextureSetListHeader } from './TextureSetListHeader'
-
-type KindFilter = 'model-specific' | 'universal'
-
-const kindFilterOptions: { label: string; value: KindFilter; kind: number }[] =
-  [
-    {
-      label: 'Multi-Model',
-      value: 'model-specific',
-      kind: TextureSetKind.ModelSpecific,
-    },
-    {
-      label: 'Global Materials',
-      value: 'universal',
-      kind: TextureSetKind.Universal,
-    },
-  ]
-
-function kindFilterToApiKind(filter: KindFilter): TextureSetKind {
-  switch (filter) {
-    case 'model-specific':
-      return TextureSetKind.ModelSpecific
-    case 'universal':
-      return TextureSetKind.Universal
-  }
-}
 
 interface TextureSetListProps {
   /**
-   * When set, the list is locked to a single kind and the kind-filter
-   * bar is hidden. Used by the dedicated `globalMaterials` and
-   * `modelTextures` tab pages.
+   * Optional kind lock. Dedicated Global Materials / Multi-Model Textures
+   * tabs pass their kind; the generic textureSets tab leaves it undefined
+   * and exposes the kind-filter switcher below.
    */
   kind?: TextureSetKind
+  /** True when rendered inside the tab dock — enables per-tab view state. */
+  isTabContent?: boolean
+  tabId?: string
 }
+
+export function TextureSetList({
+  kind,
+  isTabContent = false,
+  tabId,
+}: TextureSetListProps = {}): JSX.Element {
+  if (isTabContent) {
+    return <TextureSetListWithTabContext kind={kind} tabId={tabId} />
+  }
+
+  return (
+    <TextureSetListContent kind={kind} tabContext={null} isTabContent={false} />
+  )
+}
+
+function TextureSetListWithTabContext({
+  kind,
+  tabId,
+}: {
+  kind?: TextureSetKind
+  tabId?: string
+}): JSX.Element {
+  const tabContext = useTabContext()
+  return (
+    <TextureSetListContent
+      kind={kind}
+      tabContext={tabContext}
+      isTabContent={true}
+      tabId={tabId}
+    />
+  )
+}
+
+type KindFilter = 'universal' | 'model-specific'
+
+const KIND_FILTER_OPTIONS: {
+  label: string
+  value: KindFilter
+  kind: TextureSetKind
+}[] = [
+  {
+    label: 'Multi-Model',
+    value: 'model-specific',
+    kind: TextureSetKind.ModelSpecific,
+  },
+  {
+    label: 'Global Materials',
+    value: 'universal',
+    kind: TextureSetKind.Universal,
+  },
+]
 
 function kindToFilter(kind: TextureSetKind): KindFilter {
   return kind === TextureSetKind.Universal ? 'universal' : 'model-specific'
 }
 
-export function TextureSetList({ kind }: TextureSetListProps = {}) {
-  const [showCreateDialog, setShowCreateDialog] = useState(false)
+function TextureSetListContent({
+  kind,
+  tabContext,
+  tabId,
+  isTabContent,
+}: {
+  kind?: TextureSetKind
+  tabContext: TabContextValue | null
+  isTabContent: boolean
+  tabId?: string
+}): JSX.Element {
+  const isKindLocked = kind !== undefined
+
+  // On the generic textureSets tab the user picks the kind via the switcher
+  // below; the dedicated Global Materials / Multi-Model Textures tabs lock
+  // it via the `kind` prop and hide the switcher.
   const [kindFilter, setKindFilter] = useState<KindFilter>(
     kind !== undefined ? kindToFilter(kind) : 'universal'
   )
+
+  const effectiveKind: TextureSetKind = isKindLocked
+    ? (kind as TextureSetKind)
+    : KIND_FILTER_OPTIONS.find(opt => opt.value === kindFilter)!.kind
+
   const [dragOverTab, setDragOverTab] = useState<KindFilter | null>(null)
-  const isKindLocked = kind !== undefined
   const toast = useRef<Toast>(null)
-  const { openTextureSetDetailsTab } = useTabContext()
-  const uploadProgressContext = useUploadProgress()
   const queryClient = useQueryClient()
 
-  const PAGE_SIZE = 50
-
-  const {
-    data: paginatedData,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-    isLoading,
-  } = useInfiniteQuery({
-    queryKey: ['textureSets', { kind: kindFilterToApiKind(kindFilter) }],
-    queryFn: ({ pageParam }) =>
-      getTextureSetsPaginated({
-        page: pageParam,
-        pageSize: PAGE_SIZE,
-        kind: kindFilterToApiKind(kindFilter),
-      }),
-    initialPageParam: 1,
-    getNextPageParam: (lastPage, allPages) => {
-      const loaded = allPages.reduce((sum, p) => sum + p.textureSets.length, 0)
-      return loaded < lastPage.totalCount ? allPages.length + 1 : undefined
-    },
-  })
-
-  const textureSets = paginatedData?.pages.flatMap(p => p.textureSets) ?? []
-  const totalCount = paginatedData?.pages[0]?.totalCount ?? 0
-  const loading = isLoading
-
-  const invalidateTextureSets = () => {
-    queryClient.invalidateQueries({ queryKey: ['textureSets'] })
-  }
-
-  const createTextureSetMutation = useMutation({
-    mutationFn: async ({ name, kind }: { name: string; kind: number }) => {
-      await createTextureSet({ name, kind })
-    },
-    onSuccess: async () => {
-      toast.current?.show({
-        severity: 'success',
-        summary: 'Success',
-        detail: 'Texture set created successfully',
-        life: 3000,
-      })
-      invalidateTextureSets()
-      setShowCreateDialog(false)
-    },
-    onError: error => {
-      console.error('Failed to create texture set:', error)
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to create texture set',
-        life: 3000,
-      })
-    },
-  })
-
-  const handleCreateTextureSet = async (name: string, kind: number = 0) => {
-    await createTextureSetMutation.mutateAsync({ name, kind })
-  }
-
-  const handleViewDetails = (textureSet: TextureSetDto) => {
-    openTextureSetDetailsTab(textureSet.id, textureSet.name)
-  }
-
-  const handleTextureSetRecycled = (_textureSetId: number) => {
-    invalidateTextureSets()
-  }
-
-  const handleFileDrop = async (files: File[] | FileList) => {
-    const fileArray = Array.from(files)
-
-    // Create batch for all files (even single file uploads)
-    const batchId = uploadProgressContext?.createBatch() || undefined
-
-    for (const file of fileArray) {
-      let uploadId: string | null = null
-      try {
-        // 1. Track the upload and get its ID
-        uploadId =
-          uploadProgressContext?.addUpload(file, 'texture', batchId) || null
-
-        // 2. Update progress
-        if (uploadId && uploadProgressContext) {
-          uploadProgressContext.updateUploadProgress(uploadId, 50)
-        }
-
-        // 3. Use the new consolidated endpoint that handles file upload + texture set creation + texture addition
-        const fileName = file.name.replace(/\.[^/.]+$/, '')
-        // Inherit the kind from the current filter tab (Global Materials → Universal, Model-Specific → ModelSpecific)
-        const dropKind = kindFilterToApiKind(kindFilter)
-        const result = await createTextureSetWithFile(file, {
-          name: fileName,
-          textureType: 'Albedo',
-          batchId,
-          kind: dropKind,
-        })
-
-        // 4. Complete the upload with texture set ID
-        if (uploadId && uploadProgressContext) {
-          uploadProgressContext.updateUploadProgress(uploadId, 100)
-          uploadProgressContext.completeUpload(uploadId, {
-            fileId: result.fileId,
-            textureSetId: result.textureSetId,
-          })
-        }
-
-        toast.current?.show({
-          severity: 'success',
-          summary: 'Success',
-          detail: `Texture set "${fileName}" created with albedo texture`,
-          life: 3000,
-        })
-      } catch (error) {
-        // Mark upload as failed
-        if (uploadId && uploadProgressContext) {
-          uploadProgressContext.failUpload(uploadId, error as Error)
-        }
-
-        console.error('Failed to create texture set from file:', error)
-        toast.current?.show({
-          severity: 'error',
-          summary: 'Error',
-          detail: `Failed to create texture set from ${file.name}`,
-          life: 3000,
-        })
-      }
-    }
-
-    // Refresh the texture sets list
-    invalidateTextureSets()
-  }
-
-  // Use drag and drop hook
-  const { onDrop, onDragOver, onDragEnter, onDragLeave } =
-    useDragAndDrop(handleFileDrop)
+  const scopeKindKey = kind ?? `generic:${kindFilter}`
+  const viewStateScope =
+    isTabContent && tabContext && tabId
+      ? `${tabContext.side}:${tabId}:${scopeKindKey}`
+      : undefined
 
   return (
-    <div className="texture-set-list">
+    <div
+      className={`texture-set-list${isTabContent ? ' texture-set-list-tab' : ''}`}
+    >
       <Toast ref={toast} />
-
-      <TextureSetListHeader
-        setCount={totalCount || textureSets.length}
-        onCreateSet={() => setShowCreateDialog(true)}
-        onFilesSelected={files => handleFileDrop(files)}
-        title={
-          kind === TextureSetKind.Universal
-            ? 'Global Materials'
-            : kind === TextureSetKind.ModelSpecific
-              ? 'Multi-Model Textures'
-              : undefined
-        }
-        unitLabel={
-          kind === TextureSetKind.Universal
-            ? 'material'
-            : kind === TextureSetKind.ModelSpecific
-              ? 'texture'
-              : undefined
-        }
-      />
 
       {!isKindLocked && (
         <div className="kind-filter-bar">
           <div className="kind-filter-select p-selectbutton p-component">
-            {kindFilterOptions.map(opt => (
+            {KIND_FILTER_OPTIONS.map(opt => (
               <button
                 key={opt.value}
                 type="button"
@@ -272,7 +156,6 @@ export function TextureSetList({ kind }: TextureSetListProps = {}) {
                     'application/x-texture-set-id'
                   )
                   if (!textureSetId) return
-                  // Only change kind when dropping on a different tab
                   if (opt.value === kindFilter) return
                   try {
                     await updateTextureSetKind(Number(textureSetId), opt.kind)
@@ -282,7 +165,9 @@ export function TextureSetList({ kind }: TextureSetListProps = {}) {
                       detail: `Texture set moved to ${opt.label}`,
                       life: 3000,
                     })
-                    invalidateTextureSets()
+                    await queryClient.invalidateQueries({
+                      queryKey: ['textureSets'],
+                    })
                   } catch (error) {
                     console.error('Failed to change texture set kind:', error)
                     toast.current?.show({
@@ -301,50 +186,7 @@ export function TextureSetList({ kind }: TextureSetListProps = {}) {
         </div>
       )}
 
-      <TextureSetGrid
-        textureSets={textureSets}
-        loading={loading}
-        onTextureSetSelect={handleViewDetails}
-        onDrop={onDrop}
-        onDragOver={onDragOver}
-        onDragEnter={onDragEnter}
-        onDragLeave={onDragLeave}
-        onTextureSetRecycled={handleTextureSetRecycled}
-        onTextureSetUpdated={invalidateTextureSets}
-      />
-
-      {hasNextPage && (
-        <div
-          style={{ display: 'flex', justifyContent: 'center', padding: '16px' }}
-        >
-          <Button
-            label={
-              isFetchingNextPage
-                ? 'Loading...'
-                : `Load More (${textureSets.length} of ${totalCount})`
-            }
-            icon={
-              isFetchingNextPage
-                ? 'pi pi-spinner pi-spin'
-                : 'pi pi-chevron-down'
-            }
-            onClick={() => fetchNextPage()}
-            disabled={isFetchingNextPage}
-            className="p-button-outlined"
-          />
-        </div>
-      )}
-
-      {showCreateDialog && (
-        <CreateTextureSetDialog
-          visible={showCreateDialog}
-          onHide={() => setShowCreateDialog(false)}
-          onSubmit={handleCreateTextureSet}
-          // Dedicated kind pages (Multi-Model / Global Materials) lock the
-          // dialog to their kind; the generic tab keeps the kind selector.
-          lockedKind={kind}
-        />
-      )}
+      <TextureSetGrid kind={effectiveKind} viewStateScope={viewStateScope} />
     </div>
   )
 }

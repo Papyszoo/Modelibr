@@ -138,7 +138,7 @@ export async function removeTextureSetFromProject(
 }
 
 export async function getModelsByProject(projectId: number): Promise<Model[]> {
-  const response = await client.get<Model[]>(`/models?projectId=${projectId}`)
+  const response = await client.get<Model[]>(`/models?projectIds=${projectId}`)
   return response.data
 }
 
@@ -192,7 +192,7 @@ export async function getSoundsByProject(
   projectId: number
 ): Promise<SoundDto[]> {
   const response = await client.get<GetAllSoundsResponse>(
-    `/sounds?projectId=${projectId}`
+    `/sounds?projectIds=${projectId}`
   )
   return response.data.sounds
 }

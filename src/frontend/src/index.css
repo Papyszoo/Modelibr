@@ -69,7 +69,17 @@ button:not(.p-button):not(.p-component):not(.p-link):focus-visible {
   box-shadow: 0 0 0 3px rgba(var(--primary-color-rgb, 100, 108, 255), 0.16);
 }
 
-/* Global drag and drop styles */
+/* Global drag and drop styles
+ *
+ * The `.dragging-file` body class is added on dragenter and removed on
+ * dragend / drop. Drag events are notoriously racy across multiple
+ * mounted drop zones, and a stale `.dragging-file` class would lock
+ * the entire UI (no clicks on native buttons). We gate the
+ * pointer-events block on `body.dragging-file:has(.drag-over)` so the
+ * block only applies when there is also an *active* drop target in
+ * the DOM. If the body class leaks past the drag, no `.drag-over`
+ * exists and pointer events stay enabled — the UI self-recovers.
+ */
 .dragging-file {
   cursor: copy !important;
 }
@@ -79,10 +89,10 @@ button:not(.p-button):not(.p-component):not(.p-link):focus-visible {
 }
 
 /* Disable pointer events only on interactive elements during drag, not the drop zone */
-.dragging-file button:not(.p-button):not(.p-component):not(.p-link),
-.dragging-file a,
-.dragging-file input:not([type='file']),
-.dragging-file select,
-.dragging-file textarea {
+.dragging-file:has(.drag-over) button:not(.p-button):not(.p-component):not(.p-link),
+.dragging-file:has(.drag-over) a,
+.dragging-file:has(.drag-over) input:not([type='file']),
+.dragging-file:has(.drag-over) select,
+.dragging-file:has(.drag-over) textarea {
   pointer-events: none;
 }

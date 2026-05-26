@@ -4,6 +4,7 @@ import { useCallback } from 'react'
 import { getEnvironmentMapsPaginated } from '@/features/environment-map/api/environmentMapApi'
 import { useEnvironmentMapCategoriesQuery } from '@/features/environment-map/api/queries'
 import { useModelTagsQuery } from '@/features/models/api/queries'
+import { useDebouncedValue } from '@/shared/hooks'
 import { type PaginationState } from '@/types'
 
 const PAGE_SIZE = 50
@@ -11,17 +12,24 @@ const PAGE_SIZE = 50
 interface UseEnvironmentMapDataOptions {
   effectivePackIds: number[]
   effectiveProjectIds: number[]
+  selectedCategoryIds?: number[]
+  searchQuery?: string
 }
 
 export function useEnvironmentMapData({
   effectivePackIds,
   effectiveProjectIds,
+  selectedCategoryIds = [],
+  searchQuery = '',
 }: UseEnvironmentMapDataOptions) {
   const queryClient = useQueryClient()
 
-  const packId = effectivePackIds.length > 0 ? effectivePackIds[0] : undefined
-  const projectId =
-    effectiveProjectIds.length > 0 ? effectiveProjectIds[0] : undefined
+  // Stable, sorted filter keys so [1,2] and [2,1] share a cache slot.
+  const sortedPackIds = [...effectivePackIds].sort((a, b) => a - b)
+  const sortedProjectIds = [...effectiveProjectIds].sort((a, b) => a - b)
+  const sortedCategoryIds = [...selectedCategoryIds].sort((a, b) => a - b)
+
+  const debouncedSearchName = useDebouncedValue(searchQuery.trim(), 300)
 
   const {
     data: paginatedData,
@@ -31,16 +39,26 @@ export function useEnvironmentMapData({
     isLoading,
     error: queryError,
   } = useInfiniteQuery({
-    queryKey: ['environmentMaps', { packId, projectId }],
+    queryKey: [
+      'environmentMaps',
+      {
+        packIds: sortedPackIds,
+        projectIds: sortedProjectIds,
+        categoryIds: sortedCategoryIds,
+        searchName: debouncedSearchName || undefined,
+      },
+    ],
     queryFn: ({ pageParam }) =>
       getEnvironmentMapsPaginated({
         page: pageParam,
         pageSize: PAGE_SIZE,
-        packId,
-        projectId,
+        packIds: sortedPackIds.length > 0 ? sortedPackIds : undefined,
+        projectIds: sortedProjectIds.length > 0 ? sortedProjectIds : undefined,
+        categoryIds:
+          sortedCategoryIds.length > 0 ? sortedCategoryIds : undefined,
+        searchName: debouncedSearchName || undefined,
       }),
     initialPageParam: 1,
-    placeholderData: previousData => previousData,
     getNextPageParam: (lastPage, allPages) => {
       const loaded = allPages.reduce(
         (sum, p) => sum + p.environmentMaps.length,

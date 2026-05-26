@@ -120,7 +120,7 @@ export async function removeTextureSetFromPack(
 }
 
 export async function getModelsByPack(packId: number): Promise<Model[]> {
-  const response = await client.get<Model[]>(`/models?packId=${packId}`)
+  const response = await client.get<Model[]>(`/models?packIds=${packId}`)
   return response.data
 }
 
@@ -128,7 +128,7 @@ export async function getTextureSetsByPack(
   packId: number
 ): Promise<TextureSetDto[]> {
   const response = await client.get<GetAllTextureSetsResponse>(
-    `/texture-sets?packId=${packId}`
+    `/texture-sets?packIds=${packId}`
   )
   return response.data.textureSets
 }
@@ -170,7 +170,7 @@ export async function removeSoundFromPack(
 
 export async function getSoundsByPack(packId: number): Promise<SoundDto[]> {
   const response = await client.get<GetAllSoundsResponse>(
-    `/sounds?packId=${packId}`
+    `/sounds?packIds=${packId}`
   )
   return response.data.sounds
 }

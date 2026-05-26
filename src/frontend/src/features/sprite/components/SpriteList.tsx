@@ -25,7 +25,19 @@ import { useSpriteListData } from '@/features/sprite/hooks/useSpriteListData'
 import { useSpriteMutations } from '@/features/sprite/hooks/useSpriteMutations'
 import { useSpriteUpload } from '@/features/sprite/hooks/useSpriteUpload'
 import { useUploadProgress } from '@/hooks/useUploadProgress'
-import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
+import {
+  ListToolbar,
+  ListToolbarActions,
+  ListToolbarButton,
+  ListToolbarCount,
+  ListToolbarPanel,
+  ListToolbarRow,
+  ListToolbarSearchInput,
+  ListToolbarSelectionActions,
+  ListToolbarSelectionBar,
+  ListToolbarSelectionSummary,
+  OptionsButton,
+} from '@/shared/components/list-toolbar'
 import { useDragAndDrop } from '@/shared/hooks/useFileUpload'
 import {
   spriteCategoryFormSchema,
@@ -74,6 +86,7 @@ export function SpriteList() {
   const [contextMenuTarget, setContextMenuTarget] = useState<SpriteDto | null>(
     null
   )
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
 
   // ── Refs ────────────────────────────────────────────────────────────
   const spriteGridRef = useRef<HTMLDivElement>(null)
@@ -118,6 +131,8 @@ export function SpriteList() {
     fetchNextPage,
     activeCategoryId,
     setActiveCategoryId,
+    searchQuery,
+    setSearchQuery,
     filteredSprites,
     invalidateSprites,
     loadCategories,
@@ -482,14 +497,6 @@ export function SpriteList() {
   }
 
   // ── Render ─────────────────────────────────────────────────────────
-  if (loading) {
-    return (
-      <div className="sprite-list-loading">
-        <ProgressSpinner />
-      </div>
-    )
-  }
-
   return (
     <div
       className="sprite-list"
@@ -501,38 +508,72 @@ export function SpriteList() {
       <Toast ref={toast} />
       <ContextMenu ref={contextMenuRef} model={getContextMenuItems()} />
 
-      {/* Header */}
-      <div className="sprite-list-header">
-        <div className="sprite-list-title">
-          <h2>Sprites</h2>
-          <span className="sprite-count">{filteredSprites.length} sprites</span>
-          {selectedSpriteIds.size > 0 && (
-            <span className="selection-count">
-              ({selectedSpriteIds.size} selected)
-              <Button
+      <ListToolbar>
+        <ListToolbarRow>
+          <ListToolbarActions>
+            <ListToolbarButton
+              icon="pi pi-search"
+              label="Search"
+              active={isSearchOpen || searchQuery.trim().length > 0}
+              onClick={() => setIsSearchOpen(open => !open)}
+              ariaLabel="Search"
+              ariaExpanded={isSearchOpen}
+              ariaControls="sprite-list-search-panel"
+            />
+            <OptionsButton
+              cardWidth={cardWidth}
+              minCardWidth={120}
+              maxCardWidth={400}
+              onCardWidthChange={width => setCardWidth('sprites', width)}
+              showThumbnailAnimation={false}
+            />
+            <ListToolbarButton
+              icon="pi pi-refresh"
+              label="Refresh"
+              onClick={() => void invalidateSprites()}
+              tooltip="Refresh list"
+              ariaLabel="Refresh"
+            />
+            <ListToolbarButton
+              icon="pi pi-plus"
+              label="Add Category"
+              onClick={openCreateCategoryDialog}
+              tooltip="Add a sprite category"
+              ariaLabel="Add Category"
+            />
+          </ListToolbarActions>
+
+          <ListToolbarCount
+            icon="pi pi-images"
+            count={filteredSprites.length}
+            unitLabel="sprite"
+          />
+        </ListToolbarRow>
+
+        {selectedSpriteIds.size > 0 ? (
+          <ListToolbarSelectionBar>
+            <ListToolbarSelectionSummary>
+              {selectedSpriteIds.size} sprite
+              {selectedSpriteIds.size === 1 ? '' : 's'} selected.
+            </ListToolbarSelectionSummary>
+            <ListToolbarSelectionActions>
+              <ListToolbarButton
                 icon="pi pi-times"
-                className="p-button-text p-button-sm clear-selection-btn"
+                label="Clear"
                 onClick={clearSelection}
-                tooltip="Clear selection"
               />
-            </span>
-          )}
-        </div>
-        <div className="sprite-list-actions">
-          <CardWidthSlider
-            value={cardWidth}
-            min={120}
-            max={400}
-            onChange={width => setCardWidth('sprites', width)}
+            </ListToolbarSelectionActions>
+          </ListToolbarSelectionBar>
+        ) : null}
+
+        <ListToolbarPanel id="sprite-list-search-panel" open={isSearchOpen}>
+          <ListToolbarSearchInput
+            value={searchQuery}
+            onChange={setSearchQuery}
+            placeholder="Search sprites..."
           />
-          <Button
-            label="Add Category"
-            icon="pi pi-plus"
-            className="p-button-outlined"
-            onClick={openCreateCategoryDialog}
-          />
-        </div>
-      </div>
+        </ListToolbarPanel>
+      </ListToolbar>
 
       {/* Category Tabs */}
       <SpriteCategoryTabs
@@ -549,28 +590,34 @@ export function SpriteList() {
       />
 
       {/* Grid Content */}
-      <SpriteGridContent
-        filteredSprites={filteredSprites}
-        cardWidth={cardWidth}
-        selectedSpriteIds={selectedSpriteIds}
-        draggedSpriteId={draggedSpriteId}
-        spriteGridRef={spriteGridRef}
-        isAreaSelecting={isAreaSelecting}
-        selectionBox={selectionBox}
-        hasNextPage={hasNextPage}
-        isFetchingNextPage={isFetchingNextPage}
-        totalCount={totalCount}
-        totalSpritesCount={sprites.length}
-        onToggleSelection={toggleSpriteSelection}
-        onSpriteClick={openSpriteModal}
-        onContextMenu={handleSpriteContextMenu}
-        onSpriteDragStart={handleSpriteDragStart}
-        onSpriteDragEnd={handleSpriteDragEnd}
-        onGridMouseDown={handleGridMouseDown}
-        onGridMouseMove={handleGridMouseMove}
-        onGridMouseUp={handleGridMouseUp}
-        onLoadMore={() => fetchNextPage()}
-      />
+      {loading ? (
+        <div className="sprite-list-loading">
+          <ProgressSpinner />
+        </div>
+      ) : (
+        <SpriteGridContent
+          filteredSprites={filteredSprites}
+          cardWidth={cardWidth}
+          selectedSpriteIds={selectedSpriteIds}
+          draggedSpriteId={draggedSpriteId}
+          spriteGridRef={spriteGridRef}
+          isAreaSelecting={isAreaSelecting}
+          selectionBox={selectionBox}
+          hasNextPage={hasNextPage}
+          isFetchingNextPage={isFetchingNextPage}
+          totalCount={totalCount}
+          totalSpritesCount={sprites.length}
+          onToggleSelection={toggleSpriteSelection}
+          onSpriteClick={openSpriteModal}
+          onContextMenu={handleSpriteContextMenu}
+          onSpriteDragStart={handleSpriteDragStart}
+          onSpriteDragEnd={handleSpriteDragEnd}
+          onGridMouseDown={handleGridMouseDown}
+          onGridMouseMove={handleGridMouseMove}
+          onGridMouseUp={handleGridMouseUp}
+          onLoadMore={() => fetchNextPage()}
+        />
+      )}
 
       <div className="sprite-drop-overlay">
         <i className="pi pi-upload" />

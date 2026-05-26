@@ -114,19 +114,19 @@ export async function getModels(
 export async function getModelsPaginated(options: {
   page: number
   pageSize: number
-  packId?: number
-  projectId?: number
+  packIds?: number[]
+  projectIds?: number[]
   textureSetId?: number
   categoryIds?: number[]
   tags?: string[]
   hasConceptImages?: boolean
+  searchName?: string
 }): Promise<PaginatedResponse<Model>> {
   const params = new URLSearchParams()
   params.append('page', options.page.toString())
   params.append('pageSize', options.pageSize.toString())
-  if (options.packId) params.append('packId', options.packId.toString())
-  if (options.projectId)
-    params.append('projectId', options.projectId.toString())
+  options.packIds?.forEach(id => params.append('packIds', id.toString()))
+  options.projectIds?.forEach(id => params.append('projectIds', id.toString()))
   if (options.textureSetId)
     params.append('textureSetId', options.textureSetId.toString())
   for (const categoryId of options.categoryIds ?? []) {
@@ -137,6 +137,9 @@ export async function getModelsPaginated(options: {
   }
   if (typeof options.hasConceptImages === 'boolean') {
     params.append('hasConceptImages', String(options.hasConceptImages))
+  }
+  if (options.searchName && options.searchName.trim()) {
+    params.append('searchName', options.searchName.trim())
   }
 
   const response = await client.get<PaginatedResponse<Model>>(

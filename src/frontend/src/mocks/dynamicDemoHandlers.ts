@@ -386,8 +386,22 @@ export const dynamicDemoHandlers = [
     const url = new URL(request.url)
     const page = Number(url.searchParams.get('page') || '1')
     const pageSize = Number(url.searchParams.get('pageSize') || '50')
-    const packId = url.searchParams.get('packId')
-    const projectId = url.searchParams.get('projectId')
+    const packIds = [
+      ...url.searchParams.getAll('packIds'),
+      ...(url.searchParams.get('packId')
+        ? [url.searchParams.get('packId') as string]
+        : []),
+    ]
+      .map(Number)
+      .filter(Number.isFinite)
+    const projectIds = [
+      ...url.searchParams.getAll('projectIds'),
+      ...(url.searchParams.get('projectId')
+        ? [url.searchParams.get('projectId') as string]
+        : []),
+    ]
+      .map(Number)
+      .filter(Number.isFinite)
     const textureSetId = url.searchParams.get('textureSetId')
     const categoryIds = url.searchParams
       .getAll('categoryId')
@@ -398,22 +412,27 @@ export const dynamicDemoHandlers = [
       .map(tag => tag.trim().toLowerCase())
       .filter(Boolean)
     const hasConceptImages = url.searchParams.get('hasConceptImages')
+    const searchName = (url.searchParams.get('searchName') ?? '')
+      .trim()
+      .toLowerCase()
 
     let models = await getAll('models')
 
-    if (packId) {
-      const pack = await getById('packs', Number(packId))
-      if (pack) {
-        const ids = new Set(pack.models.map(m => m.id))
-        models = models.filter(m => ids.has(m.id))
+    if (packIds.length > 0) {
+      const allowed = new Set<number>()
+      for (const id of packIds) {
+        const pack = await getById('packs', id)
+        pack?.models.forEach(m => allowed.add(m.id))
       }
+      models = models.filter(m => allowed.has(m.id))
     }
-    if (projectId) {
-      const project = await getById('projects', Number(projectId))
-      if (project) {
-        const ids = new Set(project.models.map(m => m.id))
-        models = models.filter(m => ids.has(m.id))
+    if (projectIds.length > 0) {
+      const allowed = new Set<number>()
+      for (const id of projectIds) {
+        const project = await getById('projects', id)
+        project?.models.forEach(m => allowed.add(m.id))
       }
+      models = models.filter(m => allowed.has(m.id))
     }
     if (textureSetId) {
       models = models.filter(m =>
@@ -434,6 +453,11 @@ export const dynamicDemoHandlers = [
       const wantsConceptImages = hasConceptImages === 'true'
       models = models.filter(
         m => (m.conceptImages ?? []).length > 0 === wantsConceptImages
+      )
+    }
+    if (searchName) {
+      models = models.filter(m =>
+        (m.name ?? '').toLowerCase().includes(searchName)
       )
     }
 
@@ -1329,28 +1353,70 @@ export const dynamicDemoHandlers = [
     const url = new URL(request.url)
     const page = Number(url.searchParams.get('page') || '1')
     const pageSize = Number(url.searchParams.get('pageSize') || '50')
-    const packId = url.searchParams.get('packId')
-    const projectId = url.searchParams.get('projectId')
+    const packIds = [
+      ...url.searchParams.getAll('packIds'),
+      ...(url.searchParams.get('packId')
+        ? [url.searchParams.get('packId') as string]
+        : []),
+    ]
+      .map(Number)
+      .filter(Number.isFinite)
+    const projectIds = [
+      ...url.searchParams.getAll('projectIds'),
+      ...(url.searchParams.get('projectId')
+        ? [url.searchParams.get('projectId') as string]
+        : []),
+    ]
+      .map(Number)
+      .filter(Number.isFinite)
     const kind = url.searchParams.get('kind')
+    const categoryIds = url.searchParams
+      .getAll('categoryIds')
+      .map(value => Number(value))
+      .filter(Number.isFinite)
+    const textureTypes = url.searchParams
+      .getAll('textureTypes')
+      .map(value => Number(value))
+      .filter(Number.isFinite)
+    const searchName = (url.searchParams.get('searchName') ?? '')
+      .trim()
+      .toLowerCase()
 
     let sets = await getAll('textureSets')
 
-    if (packId) {
-      const pack = await getById('packs', Number(packId))
-      if (pack) {
-        const ids = new Set(pack.textureSets.map(ts => ts.id))
-        sets = sets.filter(ts => ids.has(ts.id))
+    if (packIds.length > 0) {
+      const allowed = new Set<number>()
+      for (const id of packIds) {
+        const pack = await getById('packs', id)
+        pack?.textureSets.forEach(ts => allowed.add(ts.id))
       }
+      sets = sets.filter(ts => allowed.has(ts.id))
     }
-    if (projectId) {
-      const project = await getById('projects', Number(projectId))
-      if (project) {
-        const ids = new Set(project.textureSets.map(ts => ts.id))
-        sets = sets.filter(ts => ids.has(ts.id))
+    if (projectIds.length > 0) {
+      const allowed = new Set<number>()
+      for (const id of projectIds) {
+        const project = await getById('projects', id)
+        project?.textureSets.forEach(ts => allowed.add(ts.id))
       }
+      sets = sets.filter(ts => allowed.has(ts.id))
     }
     if (kind !== null && kind !== undefined) {
       sets = sets.filter(ts => ts.kind === Number(kind))
+    }
+    if (categoryIds.length > 0) {
+      sets = sets.filter(
+        ts => ts.categoryId != null && categoryIds.includes(ts.categoryId)
+      )
+    }
+    if (textureTypes.length > 0) {
+      sets = sets.filter(ts =>
+        (ts.textures ?? []).some(t => textureTypes.includes(t.textureType))
+      )
+    }
+    if (searchName) {
+      sets = sets.filter(ts =>
+        (ts.name ?? '').toLowerCase().includes(searchName)
+      )
     }
 
     if (url.searchParams.has('page')) {
@@ -1898,22 +1964,45 @@ export const dynamicDemoHandlers = [
     const url = new URL(request.url)
     const page = Number(url.searchParams.get('page') || '1')
     const pageSize = Number(url.searchParams.get('pageSize') || '50')
-    const packId = url.searchParams.get('packId')
-    const projectId = url.searchParams.get('projectId')
+    const packIds = [
+      ...url.searchParams.getAll('packIds'),
+      ...(url.searchParams.get('packId')
+        ? [url.searchParams.get('packId') as string]
+        : []),
+    ]
+      .map(Number)
+      .filter(Number.isFinite)
+    const projectIds = [
+      ...url.searchParams.getAll('projectIds'),
+      ...(url.searchParams.get('projectId')
+        ? [url.searchParams.get('projectId') as string]
+        : []),
+    ]
+      .map(Number)
+      .filter(Number.isFinite)
+    const searchName = (url.searchParams.get('searchName') ?? '')
+      .trim()
+      .toLowerCase()
 
     let environmentMaps = await getAll('environmentMaps')
 
-    if (packId) {
-      const id = Number(packId)
+    if (packIds.length > 0) {
       environmentMaps = environmentMaps.filter(environmentMap =>
-        (environmentMap.packs ?? []).some(pack => pack.id === id)
+        (environmentMap.packs ?? []).some(pack => packIds.includes(pack.id))
       )
     }
 
-    if (projectId) {
-      const id = Number(projectId)
+    if (projectIds.length > 0) {
       environmentMaps = environmentMaps.filter(environmentMap =>
-        (environmentMap.projects ?? []).some(project => project.id === id)
+        (environmentMap.projects ?? []).some(project =>
+          projectIds.includes(project.id)
+        )
+      )
+    }
+
+    if (searchName) {
+      environmentMaps = environmentMaps.filter(em =>
+        (em.name ?? '').toLowerCase().includes(searchName)
       )
     }
 
@@ -2599,28 +2688,52 @@ export const dynamicDemoHandlers = [
     const url = new URL(request.url)
     const page = Number(url.searchParams.get('page') || '1')
     const pageSize = Number(url.searchParams.get('pageSize') || '50')
-    const packId = url.searchParams.get('packId')
-    const projectId = url.searchParams.get('projectId')
+    const packIds = [
+      ...url.searchParams.getAll('packIds'),
+      ...(url.searchParams.get('packId')
+        ? [url.searchParams.get('packId') as string]
+        : []),
+    ]
+      .map(Number)
+      .filter(Number.isFinite)
+    const projectIds = [
+      ...url.searchParams.getAll('projectIds'),
+      ...(url.searchParams.get('projectId')
+        ? [url.searchParams.get('projectId') as string]
+        : []),
+    ]
+      .map(Number)
+      .filter(Number.isFinite)
     const categoryId = url.searchParams.get('categoryId')
+    const searchName = (url.searchParams.get('searchName') ?? '')
+      .trim()
+      .toLowerCase()
 
     let sprites = await getAll('sprites')
 
-    if (packId) {
-      const pack = await getById('packs', Number(packId))
-      if (pack) {
-        const ids = new Set(pack.sprites.map(s => s.id))
-        sprites = sprites.filter(s => ids.has(s.id))
+    if (packIds.length > 0) {
+      const allowed = new Set<number>()
+      for (const id of packIds) {
+        const pack = await getById('packs', id)
+        pack?.sprites.forEach(s => allowed.add(s.id))
       }
+      sprites = sprites.filter(s => allowed.has(s.id))
     }
-    if (projectId) {
-      const project = await getById('projects', Number(projectId))
-      if (project) {
-        const ids = new Set(project.sprites.map(s => s.id))
-        sprites = sprites.filter(s => ids.has(s.id))
+    if (projectIds.length > 0) {
+      const allowed = new Set<number>()
+      for (const id of projectIds) {
+        const project = await getById('projects', id)
+        project?.sprites.forEach(s => allowed.add(s.id))
       }
+      sprites = sprites.filter(s => allowed.has(s.id))
     }
     if (categoryId) {
       sprites = sprites.filter(s => s.categoryId === Number(categoryId))
+    }
+    if (searchName) {
+      sprites = sprites.filter(s =>
+        (s.name ?? '').toLowerCase().includes(searchName)
+      )
     }
 
     if (url.searchParams.has('page')) {
@@ -2853,28 +2966,52 @@ export const dynamicDemoHandlers = [
     const url = new URL(request.url)
     const page = Number(url.searchParams.get('page') || '1')
     const pageSize = Number(url.searchParams.get('pageSize') || '50')
-    const packId = url.searchParams.get('packId')
-    const projectId = url.searchParams.get('projectId')
+    const packIds = [
+      ...url.searchParams.getAll('packIds'),
+      ...(url.searchParams.get('packId')
+        ? [url.searchParams.get('packId') as string]
+        : []),
+    ]
+      .map(Number)
+      .filter(Number.isFinite)
+    const projectIds = [
+      ...url.searchParams.getAll('projectIds'),
+      ...(url.searchParams.get('projectId')
+        ? [url.searchParams.get('projectId') as string]
+        : []),
+    ]
+      .map(Number)
+      .filter(Number.isFinite)
     const categoryId = url.searchParams.get('categoryId')
+    const searchName = (url.searchParams.get('searchName') ?? '')
+      .trim()
+      .toLowerCase()
 
     let sounds = await getAll('sounds')
 
-    if (packId) {
-      const pack = await getById('packs', Number(packId))
-      if (pack) {
-        const ids = new Set(pack.sounds.map(s => s.id))
-        sounds = sounds.filter(s => ids.has(s.id))
+    if (packIds.length > 0) {
+      const allowed = new Set<number>()
+      for (const id of packIds) {
+        const pack = await getById('packs', id)
+        pack?.sounds.forEach(s => allowed.add(s.id))
       }
+      sounds = sounds.filter(s => allowed.has(s.id))
     }
-    if (projectId) {
-      const project = await getById('projects', Number(projectId))
-      if (project) {
-        const ids = new Set(project.sounds.map(s => s.id))
-        sounds = sounds.filter(s => ids.has(s.id))
+    if (projectIds.length > 0) {
+      const allowed = new Set<number>()
+      for (const id of projectIds) {
+        const project = await getById('projects', id)
+        project?.sounds.forEach(s => allowed.add(s.id))
       }
+      sounds = sounds.filter(s => allowed.has(s.id))
     }
     if (categoryId) {
       sounds = sounds.filter(s => s.categoryId === Number(categoryId))
+    }
+    if (searchName) {
+      sounds = sounds.filter(s =>
+        (s.name ?? '').toLowerCase().includes(searchName)
+      )
     }
 
     if (url.searchParams.has('page')) {
