@@ -2,6 +2,10 @@ import { createBdd } from "playwright-bdd";
 import { expect, Page, test } from "@playwright/test";
 import { RecycledFilesPage } from "../pages/RecycledFilesPage";
 import { ModelListPage } from "../pages/ModelListPage";
+import {
+    narrowVirtualisedList,
+    waitForCountLabelStable,
+} from "../helpers/list-toolbar-helper";
 import { getScenarioState } from "../fixtures/shared-state";
 import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
 import fs from "fs/promises";
@@ -336,21 +340,13 @@ GivenBdd(
         );
         if (!isActive) {
             await modelSpecificBtn.click();
-            await page.waitForTimeout(500);
+            // Wait for the new tab's data to load instead of sleeping.
+            await waitForCountLabelStable(page);
         }
 
-        // Use the search box to avoid pagination issues (>50 sets alphabetically before this one)
-        const searchInput = page.locator(".search-input");
-        if (
-            await searchInput
-                .waitFor({ state: "visible", timeout: 3000 })
-                .then(() => true)
-                .catch(() => false)
-        ) {
-            await searchInput.clear();
-            await searchInput.fill(name);
-            await page.waitForTimeout(500);
-        }
+        // Narrow the (virtualised) grid by name so the card is in DOM
+        // even when >50 sets sit alphabetically before this one.
+        await narrowVirtualisedList(page, name);
 
         // Find and open the texture set card
         const card = realtimeTestState.textureSetId

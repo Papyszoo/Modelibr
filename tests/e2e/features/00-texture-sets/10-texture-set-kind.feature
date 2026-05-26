@@ -91,6 +91,22 @@ Feature: Texture Set Kind (Multi-Model vs Global Materials)
     And I click "Regenerate Thumbnail" in the context menu
     Then I should see a success toast with "Thumbnail regeneration started"
 
+  Scenario: Kind tab switch never surfaces the previous tab's data
+    # Regression trap: when the texture-set list query used
+    # `placeholderData: previousData => previousData`, switching tabs
+    # would leave the prior tab's cards on screen until the new query
+    # resolved — and tests that immediately read the grid saw the wrong
+    # data. The current `selectKindTab` waits for the count chip to
+    # stabilise; this scenario asserts the user-visible outcome.
+    Given I am on the texture sets page
+    When I create a model-specific texture set "stale_check_ms" via API
+    And I create a universal texture set "stale_check_uni" via API
+    And I switch to the "Multi-Model" kind tab
+    Then I should see texture set "stale_check_ms" in the grid
+    When I switch to the "Global Materials" kind tab
+    Then I should not see texture set "stale_check_ms" in the grid
+    And I should see texture set "stale_check_uni" in the grid
+
   Scenario: Kind persistence, API filtering, and global texture files
     Given I am on the texture sets page
     When I create a model-specific texture set "persist_ms" via API
