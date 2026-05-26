@@ -89,7 +89,8 @@ button:not(.p-button):not(.p-component):not(.p-link):focus-visible {
 }
 
 /* Disable pointer events only on interactive elements during drag, not the drop zone */
-.dragging-file:has(.drag-over) button:not(.p-button):not(.p-component):not(.p-link),
+.dragging-file:has(.drag-over)
+  button:not(.p-button):not(.p-component):not(.p-link),
 .dragging-file:has(.drag-over) a,
 .dragging-file:has(.drag-over) input:not([type='file']),
 .dragging-file:has(.drag-over) select,
