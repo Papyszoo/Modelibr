@@ -42,9 +42,31 @@ public static class ModelEndpoints
         .WithName("Remove Model Concept Image")
         .WithTags("Models");
 
-        app.MapGet("/models", async (int? packId, int? projectId, int? textureSetId, int[]? categoryId, string[]? tag, bool? hasConceptImages, int? page, int? pageSize, IQueryHandler<GetAllModelsQuery, GetAllModelsQueryResponse> queryHandler, CancellationToken cancellationToken) =>
+        app.MapGet("/models", async (
+            [FromQuery(Name = "packIds")] int[]? packIds,
+            [FromQuery(Name = "projectIds")] int[]? projectIds,
+            int? textureSetId,
+            [FromQuery(Name = "categoryId")] int[]? categoryId,
+            [FromQuery(Name = "tag")] string[]? tag,
+            bool? hasConceptImages,
+            int? page,
+            int? pageSize,
+            string? searchName,
+            IQueryHandler<GetAllModelsQuery, GetAllModelsQueryResponse> queryHandler,
+            CancellationToken cancellationToken) =>
         {
-            var result = await queryHandler.Handle(new GetAllModelsQuery(packId, projectId, textureSetId, categoryId, tag, hasConceptImages, page, pageSize), cancellationToken);
+            var result = await queryHandler.Handle(
+                new GetAllModelsQuery(
+                    PackIds: packIds is { Length: > 0 } ? packIds : null,
+                    ProjectIds: projectIds is { Length: > 0 } ? projectIds : null,
+                    TextureSetId: textureSetId,
+                    CategoryIds: categoryId,
+                    Tags: tag,
+                    HasConceptImages: hasConceptImages,
+                    Page: page,
+                    PageSize: pageSize,
+                    SearchName: string.IsNullOrWhiteSpace(searchName) ? null : searchName),
+                cancellationToken);
             
             if (result.IsFailure)
             {

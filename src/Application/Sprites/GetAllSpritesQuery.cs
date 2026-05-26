@@ -23,7 +23,7 @@ internal class GetAllSpritesQueryHandler : IQueryHandler<GetAllSpritesQuery, Get
         {
             var result = await _spriteRepository.GetPagedAsync(
                 query.Page.Value, query.PageSize.Value,
-                query.PackId, query.ProjectId, query.CategoryId,
+                query.PackIds, query.ProjectIds, query.CategoryIds, query.SearchName,
                 cancellationToken);
             filteredSprites = result.Items;
             totalCount = result.TotalCount;
@@ -33,12 +33,20 @@ internal class GetAllSpritesQueryHandler : IQueryHandler<GetAllSpritesQuery, Get
             var sprites = await _spriteRepository.GetAllAsync(cancellationToken);
             filteredSprites = sprites.Where(s => !s.IsDeleted);
 
-            if (query.PackId.HasValue)
-                filteredSprites = filteredSprites.Where(s => s.Packs.Any(p => p.Id == query.PackId.Value));
-            if (query.ProjectId.HasValue)
-                filteredSprites = filteredSprites.Where(s => s.Projects.Any(p => p.Id == query.ProjectId.Value));
-            if (query.CategoryId.HasValue)
-                filteredSprites = filteredSprites.Where(s => s.SpriteCategoryId == query.CategoryId.Value);
+            if (query.PackIds is { Count: > 0 })
+                filteredSprites = filteredSprites.Where(s => s.Packs.Any(p => query.PackIds.Contains(p.Id)));
+            if (query.ProjectIds is { Count: > 0 })
+                filteredSprites = filteredSprites.Where(s => s.Projects.Any(p => query.ProjectIds.Contains(p.Id)));
+            if (query.CategoryIds is { Count: > 0 })
+                filteredSprites = filteredSprites.Where(s =>
+                    s.SpriteCategoryId.HasValue &&
+                    query.CategoryIds.Contains(s.SpriteCategoryId.Value));
+            if (!string.IsNullOrWhiteSpace(query.SearchName))
+            {
+                var search = query.SearchName.Trim();
+                filteredSprites = filteredSprites.Where(s =>
+                    s.Name.Contains(search, StringComparison.OrdinalIgnoreCase));
+            }
         }
 
         var spriteDtos = filteredSprites
@@ -63,7 +71,13 @@ internal class GetAllSpritesQueryHandler : IQueryHandler<GetAllSpritesQuery, Get
     }
 }
 
-public record GetAllSpritesQuery(int? PackId = null, int? ProjectId = null, int? CategoryId = null, int? Page = null, int? PageSize = null) : IQuery<GetAllSpritesResponse>;
+public record GetAllSpritesQuery(
+    IReadOnlyCollection<int>? PackIds = null,
+    IReadOnlyCollection<int>? ProjectIds = null,
+    IReadOnlyCollection<int>? CategoryIds = null,
+    string? SearchName = null,
+    int? Page = null,
+    int? PageSize = null) : IQuery<GetAllSpritesResponse>;
 
 public record GetAllSpritesResponse(IReadOnlyList<SpriteDto> Sprites, int? TotalCount = null, int? Page = null, int? PageSize = null, int? TotalPages = null);
 

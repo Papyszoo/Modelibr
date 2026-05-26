@@ -15,7 +15,10 @@ public interface ISoundRepository
     Task<IReadOnlyList<string>> GetNamesByPrefixAsync(string prefix, CancellationToken cancellationToken = default);
     Task<(IEnumerable<Sound> Items, int TotalCount)> GetPagedAsync(
         int page, int pageSize,
-        int? packId = null, int? projectId = null, int? categoryId = null,
+        IReadOnlyCollection<int>? packIds = null,
+        IReadOnlyCollection<int>? projectIds = null,
+        IReadOnlyCollection<int>? categoryIds = null,
+        string? searchName = null,
         CancellationToken cancellationToken = default);
     Task<Sound> UpdateAsync(Sound sound, CancellationToken cancellationToken = default);
     Task DeleteAsync(int id, CancellationToken cancellationToken = default);

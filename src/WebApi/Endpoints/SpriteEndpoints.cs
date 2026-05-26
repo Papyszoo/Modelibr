@@ -48,15 +48,24 @@ public static class SpriteEndpoints
     }
 
     private static async Task<IResult> GetAllSprites(
-        int? packId,
-        int? projectId,
-        int? categoryId,
+        [FromQuery(Name = "packIds")] int[]? packIds,
+        [FromQuery(Name = "projectIds")] int[]? projectIds,
+        [FromQuery(Name = "categoryIds")] int[]? categoryIds,
+        string? searchName,
         int? page,
         int? pageSize,
         IQueryHandler<GetAllSpritesQuery, GetAllSpritesResponse> queryHandler,
         CancellationToken cancellationToken)
     {
-        var result = await queryHandler.Handle(new GetAllSpritesQuery(packId, projectId, categoryId, page, pageSize), cancellationToken);
+        var result = await queryHandler.Handle(
+            new GetAllSpritesQuery(
+                PackIds: packIds is { Length: > 0 } ? packIds : null,
+                ProjectIds: projectIds is { Length: > 0 } ? projectIds : null,
+                CategoryIds: categoryIds is { Length: > 0 } ? categoryIds : null,
+                SearchName: string.IsNullOrWhiteSpace(searchName) ? null : searchName,
+                Page: page,
+                PageSize: pageSize),
+            cancellationToken);
 
         if (result.IsFailure)
         {
