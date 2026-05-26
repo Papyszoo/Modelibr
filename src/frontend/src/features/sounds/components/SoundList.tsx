@@ -341,9 +341,15 @@ export function SoundList() {
     e: DragEvent<HTMLDivElement>,
     sound: SoundDto
   ) => {
-    if (!selectedSoundIds.has(sound.id)) {
-      setSelectedSoundIds(new Set([sound.id]))
-    }
+    // Note: deliberately do NOT update `selectedSoundIds` here. Calling
+    // `setSelectedSoundIds(new Set([sound.id]))` during `dragstart`
+    // commits a state change before the next paint; the resulting
+    // `ListToolbarSelectionBar` mount adds a new row to the toolbar
+    // column, pushing the category-tabs / grid down. Chromium treats
+    // that mid-drag layout shift as a cancellation and fires `dragend`
+    // before `drop` — so `draggedSoundId` is null when
+    // `handleCategoryDrop` runs and the move never happens. (Verified
+    // by reproducing the docs/videos `Sounds Video` failure locally.)
     setDraggedSoundId(sound.id)
     e.dataTransfer.effectAllowed = 'move'
     const soundIdsToMove = selectedSoundIds.has(sound.id)
