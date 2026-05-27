@@ -288,13 +288,31 @@ export function useDragAndDrop(onFilesDropped) {
       clearDragState()
     }
 
+    // Safety net: a regular click anywhere outside a drop zone proves no
+    // drag is in progress. `dragenter`/`dragleave` are notoriously
+    // racy (multiple components share the document, a drag can end
+    // outside our handlers, browser focus changes), and a stale
+    // `.dragging-file` class on <body> globally disables pointer
+    // events on native buttons — locking the UI. This cleanup runs
+    // cheaply on every mouseup; the only cost when no drag was active
+    // is a single classList check.
+    const handlePointerSafety = () => {
+      if (document.body.classList.contains('dragging-file')) {
+        clearDragState()
+      }
+    }
+
     // Add listeners to window to catch drag operations that end outside our drop zones
     window.addEventListener('dragend', handleDragEnd)
     window.addEventListener('drop', handleDrop)
+    window.addEventListener('mouseup', handlePointerSafety)
+    window.addEventListener('blur', handlePointerSafety)
 
     return () => {
       window.removeEventListener('dragend', handleDragEnd)
       window.removeEventListener('drop', handleDrop)
+      window.removeEventListener('mouseup', handlePointerSafety)
+      window.removeEventListener('blur', handlePointerSafety)
       // Clean up any lingering drag state on unmount
       clearDragState()
     }

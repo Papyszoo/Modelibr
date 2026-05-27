@@ -113,14 +113,24 @@ public static class EnvironmentMapEndpoints
     }
 
     private static async Task<IResult> GetAllEnvironmentMaps(
-        int? packId,
-        int? projectId,
+        [FromQuery(Name = "packIds")] int[]? packIds,
+        [FromQuery(Name = "projectIds")] int[]? projectIds,
+        [FromQuery(Name = "categoryIds")] int[]? categoryIds,
+        string? searchName,
         int? page,
         int? pageSize,
         IQueryHandler<GetAllEnvironmentMapsQuery, GetAllEnvironmentMapsResponse> queryHandler,
         CancellationToken cancellationToken)
     {
-        var result = await queryHandler.Handle(new GetAllEnvironmentMapsQuery(packId, projectId, page, pageSize), cancellationToken);
+        var result = await queryHandler.Handle(
+            new GetAllEnvironmentMapsQuery(
+                PackIds: packIds is { Length: > 0 } ? packIds : null,
+                ProjectIds: projectIds is { Length: > 0 } ? projectIds : null,
+                CategoryIds: categoryIds is { Length: > 0 } ? categoryIds : null,
+                SearchName: string.IsNullOrWhiteSpace(searchName) ? null : searchName,
+                Page: page,
+                PageSize: pageSize),
+            cancellationToken);
 
         if (result.IsFailure)
             return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });

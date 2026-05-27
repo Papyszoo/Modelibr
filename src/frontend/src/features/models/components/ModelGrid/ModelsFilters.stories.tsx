@@ -54,6 +54,7 @@ const mockProjects: ProjectDto[] = [
     textureSetCount: 0,
     spriteCount: 0,
     soundCount: 0,
+    conceptImageCount: 0,
     isEmpty: false,
     models: [],
     textureSets: [],

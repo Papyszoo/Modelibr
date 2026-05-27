@@ -7,7 +7,9 @@ import {
   type AddTextureToSetResponse,
   type CreateTextureSetRequest,
   type CreateTextureSetResponse,
+  type GetAllTextureSetCategoriesResponse,
   type GetAllTextureSetsResponse,
+  type TextureSetCategoryDto,
   type TextureSetDto,
   type UpdateTextureSetRequest,
   type UpdateTextureSetResponse,
@@ -27,9 +29,12 @@ export async function getAllTextureSets(
 export async function getTextureSetsPaginated(options: {
   page: number
   pageSize: number
-  packId?: number
+  packIds?: number[]
   projectId?: number
+  categoryIds?: number[]
+  textureTypes?: number[]
   kind?: number
+  searchName?: string
 }): Promise<{
   textureSets: TextureSetDto[]
   totalCount: number
@@ -40,13 +45,30 @@ export async function getTextureSetsPaginated(options: {
   const params = new URLSearchParams()
   params.append('page', options.page.toString())
   params.append('pageSize', options.pageSize.toString())
-  if (options.packId) params.append('packId', options.packId.toString())
+  options.packIds?.forEach(id => params.append('packIds', id.toString()))
   if (options.projectId)
     params.append('projectId', options.projectId.toString())
+  options.categoryIds?.forEach(id =>
+    params.append('categoryIds', id.toString())
+  )
+  options.textureTypes?.forEach(t =>
+    params.append('textureTypes', t.toString())
+  )
   if (options.kind !== undefined) params.append('kind', options.kind.toString())
+  if (options.searchName && options.searchName.trim()) {
+    params.append('searchName', options.searchName.trim())
+  }
 
   const response = await client.get(`/texture-sets?${params.toString()}`)
   return response.data
+}
+
+export async function getAllTextureSetCategories(): Promise<
+  TextureSetCategoryDto[]
+> {
+  const response: AxiosResponse<GetAllTextureSetCategoriesResponse> =
+    await client.get('/texture-set-categories')
+  return response.data.categories
 }
 
 export async function getTextureSetById(

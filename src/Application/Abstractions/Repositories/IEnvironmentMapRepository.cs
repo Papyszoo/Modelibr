@@ -22,8 +22,10 @@ public interface IEnvironmentMapRepository
     Task<(IEnumerable<EnvironmentMap> Items, int TotalCount)> GetPagedAsync(
         int page,
         int pageSize,
-        int? packId = null,
-        int? projectId = null,
+        IReadOnlyCollection<int>? packIds = null,
+        IReadOnlyCollection<int>? projectIds = null,
+        IReadOnlyCollection<int>? categoryIds = null,
+        string? searchName = null,
         CancellationToken cancellationToken = default);
     Task<EnvironmentMap> UpdateAsync(EnvironmentMap environmentMap, CancellationToken cancellationToken = default);
     Task DeleteAsync(int id, CancellationToken cancellationToken = default);

@@ -40,19 +40,33 @@ internal sealed class SoundRepository : ISoundRepository
 
     public async Task<(IEnumerable<Sound> Items, int TotalCount)> GetPagedAsync(
         int page, int pageSize,
-        int? packId = null, int? projectId = null, int? categoryId = null,
+        IReadOnlyCollection<int>? packIds = null,
+        IReadOnlyCollection<int>? projectIds = null,
+        IReadOnlyCollection<int>? categoryIds = null,
+        string? searchName = null,
         CancellationToken cancellationToken = default)
     {
         var query = _context.Sounds.AsNoTracking().AsQueryable();
 
-        if (packId.HasValue)
-            query = query.Where(s => s.Packs.Any(p => p.Id == packId.Value));
+        if (packIds is { Count: > 0 })
+            query = query.Where(s => s.Packs.Any(p => packIds.Contains(p.Id)));
 
-        if (projectId.HasValue)
-            query = query.Where(s => s.Projects.Any(p => p.Id == projectId.Value));
+        if (projectIds is { Count: > 0 })
+            query = query.Where(s => s.Projects.Any(p => projectIds.Contains(p.Id)));
 
-        if (categoryId.HasValue)
-            query = query.Where(s => s.SoundCategoryId == categoryId.Value);
+        if (categoryIds is { Count: > 0 })
+            query = query.Where(s =>
+                s.SoundCategoryId.HasValue &&
+                categoryIds.Contains(s.SoundCategoryId.Value));
+
+        // EF.Functions.ILike — case-insensitive substring match.
+        // Postgres-specific; an in-memory provider (e.g. Sqlite for unit
+        // tests) will throw `The method 'ILike' cannot be translated`.
+        if (!string.IsNullOrWhiteSpace(searchName))
+        {
+            var pattern = $"%{searchName.Trim()}%";
+            query = query.Where(s => EF.Functions.ILike(s.Name, pattern));
+        }
 
         var totalCount = await query.CountAsync(cancellationToken);
 

@@ -28,7 +28,7 @@ internal class GetAllSoundsQueryHandler : IQueryHandler<GetAllSoundsQuery, GetAl
         {
             var result = await _soundRepository.GetPagedAsync(
                 query.Page.Value, query.PageSize.Value,
-                query.PackId, query.ProjectId, query.CategoryId,
+                query.PackIds, query.ProjectIds, query.CategoryIds, query.SearchName,
                 cancellationToken);
             soundsList = result.Items;
             totalCount = result.TotalCount;
@@ -38,12 +38,20 @@ internal class GetAllSoundsQueryHandler : IQueryHandler<GetAllSoundsQuery, GetAl
             var sounds = await _soundRepository.GetAllAsync(cancellationToken);
             var filteredSounds = sounds.Where(s => !s.IsDeleted);
 
-            if (query.PackId.HasValue)
-                filteredSounds = filteredSounds.Where(s => s.Packs.Any(p => p.Id == query.PackId.Value));
-            if (query.ProjectId.HasValue)
-                filteredSounds = filteredSounds.Where(s => s.Projects.Any(p => p.Id == query.ProjectId.Value));
-            if (query.CategoryId.HasValue)
-                filteredSounds = filteredSounds.Where(s => s.SoundCategoryId == query.CategoryId.Value);
+            if (query.PackIds is { Count: > 0 })
+                filteredSounds = filteredSounds.Where(s => s.Packs.Any(p => query.PackIds.Contains(p.Id)));
+            if (query.ProjectIds is { Count: > 0 })
+                filteredSounds = filteredSounds.Where(s => s.Projects.Any(p => query.ProjectIds.Contains(p.Id)));
+            if (query.CategoryIds is { Count: > 0 })
+                filteredSounds = filteredSounds.Where(s =>
+                    s.SoundCategoryId.HasValue &&
+                    query.CategoryIds.Contains(s.SoundCategoryId.Value));
+            if (!string.IsNullOrWhiteSpace(query.SearchName))
+            {
+                var search = query.SearchName.Trim();
+                filteredSounds = filteredSounds.Where(s =>
+                    s.Name.Contains(search, StringComparison.OrdinalIgnoreCase));
+            }
 
             soundsList = filteredSounds.ToList();
         }
@@ -82,7 +90,13 @@ internal class GetAllSoundsQueryHandler : IQueryHandler<GetAllSoundsQuery, GetAl
     }
 }
 
-public record GetAllSoundsQuery(int? PackId = null, int? ProjectId = null, int? CategoryId = null, int? Page = null, int? PageSize = null) : IQuery<GetAllSoundsResponse>;
+public record GetAllSoundsQuery(
+    IReadOnlyCollection<int>? PackIds = null,
+    IReadOnlyCollection<int>? ProjectIds = null,
+    IReadOnlyCollection<int>? CategoryIds = null,
+    string? SearchName = null,
+    int? Page = null,
+    int? PageSize = null) : IQuery<GetAllSoundsResponse>;
 
 public record GetAllSoundsResponse(IReadOnlyList<SoundDto> Sounds, int? TotalCount = null, int? Page = null, int? PageSize = null, int? TotalPages = null);
 

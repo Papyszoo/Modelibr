@@ -26,9 +26,11 @@ internal class GetAllTextureSetsQueryHandler : IQueryHandler<GetAllTextureSetsQu
         {
             var result = await _textureSetRepository.GetPagedAsync(
                 query.Page.Value, query.PageSize.Value,
-                query.PackId, query.ProjectId,
-                query.CategoryId,
+                query.PackIds, query.ProjectId,
+                query.CategoryIds,
+                query.TextureTypes,
                 query.Kind,
+                query.SearchName,
                 cancellationToken);
             textureSets = result.Items;
             totalCount = result.TotalCount;
@@ -37,14 +39,25 @@ internal class GetAllTextureSetsQueryHandler : IQueryHandler<GetAllTextureSetsQu
         {
             textureSets = await _textureSetRepository.GetAllAsync(cancellationToken);
 
-            if (query.PackId.HasValue)
-                textureSets = textureSets.Where(ts => ts.Packs.Any(p => p.Id == query.PackId.Value));
+            if (query.PackIds is { Count: > 0 })
+                textureSets = textureSets.Where(ts => ts.Packs.Any(p => query.PackIds.Contains(p.Id)));
             if (query.ProjectId.HasValue)
                 textureSets = textureSets.Where(ts => ts.Projects.Any(p => p.Id == query.ProjectId.Value));
-            if (query.CategoryId.HasValue)
-                textureSets = textureSets.Where(ts => ts.TextureSetCategoryId == query.CategoryId.Value);
+            if (query.CategoryIds is { Count: > 0 })
+                textureSets = textureSets.Where(ts =>
+                    ts.TextureSetCategoryId.HasValue &&
+                    query.CategoryIds.Contains(ts.TextureSetCategoryId.Value));
+            if (query.TextureTypes is { Count: > 0 })
+                textureSets = textureSets.Where(ts =>
+                    ts.Textures.Any(t => query.TextureTypes.Contains(t.TextureType)));
             if (query.Kind.HasValue)
                 textureSets = textureSets.Where(ts => ts.Kind == query.Kind.Value);
+            if (!string.IsNullOrWhiteSpace(query.SearchName))
+            {
+                var search = query.SearchName.Trim();
+                textureSets = textureSets.Where(ts =>
+                    ts.Name.Contains(search, StringComparison.OrdinalIgnoreCase));
+            }
         }
 
         var categories = await _textureSetCategoryRepository.GetAllAsync(cancellationToken);
@@ -89,7 +102,15 @@ internal class GetAllTextureSetsQueryHandler : IQueryHandler<GetAllTextureSetsQu
     }
 }
 
-public record GetAllTextureSetsQuery(int? PackId = null, int? ProjectId = null, int? CategoryId = null, int? Page = null, int? PageSize = null, TextureSetKind? Kind = null) : IQuery<GetAllTextureSetsResponse>;
+public record GetAllTextureSetsQuery(
+    IReadOnlyCollection<int>? PackIds = null,
+    int? ProjectId = null,
+    IReadOnlyCollection<int>? CategoryIds = null,
+    IReadOnlyCollection<TextureType>? TextureTypes = null,
+    int? Page = null,
+    int? PageSize = null,
+    TextureSetKind? Kind = null,
+    string? SearchName = null) : IQuery<GetAllTextureSetsResponse>;
 public record GetAllTextureSetsResponse(IEnumerable<TextureSetListDto> TextureSets, int? TotalCount = null, int? Page = null, int? PageSize = null, int? TotalPages = null);
 
 /// <summary>

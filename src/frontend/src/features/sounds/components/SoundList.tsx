@@ -1,7 +1,6 @@
 import './SoundList.css'
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Button } from 'primereact/button'
 import { confirmDialog } from 'primereact/confirmdialog'
 import { type ContextMenu } from 'primereact/contextmenu'
 import { Dialog } from 'primereact/dialog'
@@ -21,7 +20,19 @@ import { getFileUrl } from '@/features/models/api/modelApi'
 import { useSoundListData } from '@/features/sounds/hooks/useSoundListData'
 import { useSoundMutations } from '@/features/sounds/hooks/useSoundMutations'
 import { useSoundUpload } from '@/features/sounds/hooks/useSoundUpload'
-import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
+import {
+  ListToolbar,
+  ListToolbarActions,
+  ListToolbarButton,
+  ListToolbarCount,
+  ListToolbarPanel,
+  ListToolbarRow,
+  ListToolbarSearchInput,
+  ListToolbarSelectionActions,
+  ListToolbarSelectionBar,
+  ListToolbarSelectionSummary,
+  OptionsButton,
+} from '@/shared/components/list-toolbar'
 import { soundCategoryFormSchema } from '@/shared/validation/formSchemas'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
 import { type SoundCategoryDto, type SoundDto } from '@/types'
@@ -70,6 +81,8 @@ export function SoundList() {
     fetchNextPage,
     activeCategoryId,
     setActiveCategoryId,
+    searchQuery,
+    setSearchQuery,
     filteredSounds,
     invalidateSounds,
     loadCategories,
@@ -97,6 +110,7 @@ export function SoundList() {
   const [contextMenuTarget, setContextMenuTarget] = useState<SoundDto | null>(
     null
   )
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
 
   const {
     register: registerCategory,
@@ -327,9 +341,15 @@ export function SoundList() {
     e: DragEvent<HTMLDivElement>,
     sound: SoundDto
   ) => {
-    if (!selectedSoundIds.has(sound.id)) {
-      setSelectedSoundIds(new Set([sound.id]))
-    }
+    // Note: deliberately do NOT update `selectedSoundIds` here. Calling
+    // `setSelectedSoundIds(new Set([sound.id]))` during `dragstart`
+    // commits a state change before the next paint; the resulting
+    // `ListToolbarSelectionBar` mount adds a new row to the toolbar
+    // column, pushing the category-tabs / grid down. Chromium treats
+    // that mid-drag layout shift as a cancellation and fires `dragend`
+    // before `drop` — so `draggedSoundId` is null when
+    // `handleCategoryDrop` runs and the move never happens. (Verified
+    // by reproducing the docs/videos `Sounds Video` failure locally.)
     setDraggedSoundId(sound.id)
     e.dataTransfer.effectAllowed = 'move'
     const soundIdsToMove = selectedSoundIds.has(sound.id)
@@ -473,14 +493,6 @@ export function SoundList() {
     contextMenuRef.current?.show(e)
   }
 
-  if (loading) {
-    return (
-      <div className="sound-list-loading">
-        <ProgressSpinner />
-      </div>
-    )
-  }
-
   return (
     <div
       className="sound-list"
@@ -498,37 +510,72 @@ export function SoundList() {
         onRecycle={handleRecycleSounds}
       />
 
-      <div className="sound-list-header">
-        <div className="sound-list-title">
-          <h2>Sounds</h2>
-          <span className="sound-count">{filteredSounds.length} sounds</span>
-          {selectedSoundIds.size > 0 && (
-            <span className="selection-count">
-              ({selectedSoundIds.size} selected)
-              <Button
+      <ListToolbar>
+        <ListToolbarRow>
+          <ListToolbarActions>
+            <ListToolbarButton
+              icon="pi pi-search"
+              label="Search"
+              active={isSearchOpen || searchQuery.trim().length > 0}
+              onClick={() => setIsSearchOpen(open => !open)}
+              ariaLabel="Search"
+              ariaExpanded={isSearchOpen}
+              ariaControls="sound-list-search-panel"
+            />
+            <OptionsButton
+              cardWidth={cardWidth}
+              minCardWidth={200}
+              maxCardWidth={500}
+              onCardWidthChange={width => setCardWidth('sounds', width)}
+              showThumbnailAnimation={false}
+            />
+            <ListToolbarButton
+              icon="pi pi-refresh"
+              label="Refresh"
+              onClick={() => void invalidateSounds()}
+              tooltip="Refresh list"
+              ariaLabel="Refresh"
+            />
+            <ListToolbarButton
+              icon="pi pi-plus"
+              label="Add Category"
+              onClick={openCreateCategoryDialog}
+              tooltip="Add a sound category"
+              ariaLabel="Add Category"
+            />
+          </ListToolbarActions>
+
+          <ListToolbarCount
+            icon="pi pi-volume-up"
+            count={filteredSounds.length}
+            unitLabel="sound"
+          />
+        </ListToolbarRow>
+
+        {selectedSoundIds.size > 0 ? (
+          <ListToolbarSelectionBar>
+            <ListToolbarSelectionSummary>
+              {selectedSoundIds.size} sound
+              {selectedSoundIds.size === 1 ? '' : 's'} selected.
+            </ListToolbarSelectionSummary>
+            <ListToolbarSelectionActions>
+              <ListToolbarButton
                 icon="pi pi-times"
-                className="p-button-text p-button-sm clear-selection-btn"
+                label="Clear"
                 onClick={clearSelection}
-                tooltip="Clear selection"
               />
-            </span>
-          )}
-        </div>
-        <div className="sound-list-actions">
-          <CardWidthSlider
-            value={cardWidth}
-            min={200}
-            max={500}
-            onChange={width => setCardWidth('sounds', width)}
+            </ListToolbarSelectionActions>
+          </ListToolbarSelectionBar>
+        ) : null}
+
+        <ListToolbarPanel id="sound-list-search-panel" open={isSearchOpen}>
+          <ListToolbarSearchInput
+            value={searchQuery}
+            onChange={setSearchQuery}
+            placeholder="Search sounds..."
           />
-          <Button
-            label="Add Category"
-            icon="pi pi-plus"
-            className="p-button-outlined"
-            onClick={openCreateCategoryDialog}
-          />
-        </div>
-      </div>
+        </ListToolbarPanel>
+      </ListToolbar>
 
       <SoundCategoryTabs
         categories={categories}
@@ -543,28 +590,34 @@ export function SoundList() {
         onDeleteCategory={handleDeleteCategory}
       />
 
-      <SoundGridContent
-        filteredSounds={filteredSounds}
-        cardWidth={cardWidth}
-        selectedSoundIds={selectedSoundIds}
-        draggedSoundId={draggedSoundId}
-        soundGridRef={soundGridRef}
-        isAreaSelecting={isAreaSelecting}
-        selectionBox={selectionBox}
-        hasNextPage={hasNextPage}
-        isFetchingNextPage={isFetchingNextPage}
-        totalCount={totalCount}
-        totalSoundsCount={sounds.length}
-        onToggleSelection={toggleSoundSelection}
-        onSoundClick={openSoundModal}
-        onContextMenu={handleSoundContextMenu}
-        onSoundDragStart={handleSoundDragStart}
-        onSoundDragEnd={handleSoundDragEnd}
-        onGridMouseDown={handleGridMouseDown}
-        onGridMouseMove={handleGridMouseMove}
-        onGridMouseUp={handleGridMouseUp}
-        onLoadMore={() => fetchNextPage()}
-      />
+      {loading ? (
+        <div className="sound-list-loading">
+          <ProgressSpinner />
+        </div>
+      ) : (
+        <SoundGridContent
+          filteredSounds={filteredSounds}
+          cardWidth={cardWidth}
+          selectedSoundIds={selectedSoundIds}
+          draggedSoundId={draggedSoundId}
+          soundGridRef={soundGridRef}
+          isAreaSelecting={isAreaSelecting}
+          selectionBox={selectionBox}
+          hasNextPage={hasNextPage}
+          isFetchingNextPage={isFetchingNextPage}
+          totalCount={totalCount}
+          totalSoundsCount={sounds.length}
+          onToggleSelection={toggleSoundSelection}
+          onSoundClick={openSoundModal}
+          onContextMenu={handleSoundContextMenu}
+          onSoundDragStart={handleSoundDragStart}
+          onSoundDragEnd={handleSoundDragEnd}
+          onGridMouseDown={handleGridMouseDown}
+          onGridMouseMove={handleGridMouseMove}
+          onGridMouseUp={handleGridMouseUp}
+          onLoadMore={() => fetchNextPage()}
+        />
+      )}
 
       <div className="sound-drop-overlay">
         <i className="pi pi-upload" />

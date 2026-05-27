@@ -141,17 +141,32 @@ public static class TextureSetEndpoints
     }
 
     private static async Task<IResult> GetAllTextureSets(
-        int? packId,
+        [FromQuery(Name = "packIds")] int[]? packIds,
         int? projectId,
-        int? categoryId,
+        [FromQuery(Name = "categoryIds")] int[]? categoryIds,
+        [FromQuery(Name = "textureTypes")] int[]? textureTypes,
         int? page,
         int? pageSize,
         int? kind,
+        string? searchName,
         IQueryHandler<GetAllTextureSetsQuery, GetAllTextureSetsResponse> queryHandler,
         CancellationToken cancellationToken)
     {
         TextureSetKind? textureSetKind = kind.HasValue ? (TextureSetKind)kind.Value : null;
-        var result = await queryHandler.Handle(new GetAllTextureSetsQuery(packId, projectId, categoryId, page, pageSize, textureSetKind), cancellationToken);
+        var textureTypeFilter = textureTypes is { Length: > 0 }
+            ? textureTypes.Select(t => (TextureType)t).ToArray()
+            : null;
+        var result = await queryHandler.Handle(
+            new GetAllTextureSetsQuery(
+                PackIds: packIds is { Length: > 0 } ? packIds : null,
+                ProjectId: projectId,
+                CategoryIds: categoryIds is { Length: > 0 } ? categoryIds : null,
+                TextureTypes: textureTypeFilter,
+                Page: page,
+                PageSize: pageSize,
+                Kind: textureSetKind,
+                SearchName: string.IsNullOrWhiteSpace(searchName) ? null : searchName),
+            cancellationToken);
 
         if (result.IsFailure)
         {

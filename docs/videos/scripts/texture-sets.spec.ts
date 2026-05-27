@@ -166,9 +166,16 @@ test.describe("Texture Sets", () => {
         await disableHighlights(page);
 
         const leftPanel = page.locator(".p-splitter-panel").nth(0);
+        // The dedicated `<h1>Texture Sets</h1>` header band was removed
+        // when the page adopted the shared list-toolbar — page identity
+        // is now carried by the toolbar's count chip + the "Create Set"
+        // button. Confirm we're on the right page by waiting on those.
+        await expect(leftPanel.locator(".list-toolbar")).toBeVisible({
+            timeout: ciVideoTimeout,
+        });
         await expect(
-            leftPanel.locator(".texture-set-list-header h1"),
-        ).toHaveText("Texture Sets", {
+            leftPanel.getByRole("button", { name: /create set/i }),
+        ).toBeVisible({
             timeout: ciVideoTimeout,
         });
 

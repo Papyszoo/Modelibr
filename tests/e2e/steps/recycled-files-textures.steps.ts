@@ -3,6 +3,10 @@ import { expect, Page, test } from "@playwright/test";
 import { RecycledFilesPage } from "../pages/RecycledFilesPage";
 import { getScenarioState } from "../fixtures/shared-state";
 import { DbHelper } from "../fixtures/db-helper";
+import {
+    narrowVirtualisedList,
+    waitForCountLabelStable,
+} from "../helpers/list-toolbar-helper";
 import { takeScreenshotToReport } from "./recycled-files-common.steps";
 
 const { Given: GivenBdd, When: WhenBdd, Then: ThenBdd } = createBdd();
@@ -267,8 +271,18 @@ ThenBdd(
         );
         if (!isActive) {
             await msTab.click();
-            await page.waitForTimeout(500);
+            // Block until the new tab's data has resolved instead of
+            // sleeping 500ms and hoping the debounced fetch finished.
+            await waitForCountLabelStable(page);
         }
+
+        // The grid is virtualized — only cards in the visible viewport
+        // are rendered. Narrow via the toolbar search so the card is
+        // guaranteed to be in DOM. `narrowVirtualisedList` opens the
+        // search panel (throws if it can't), fills the name, and waits
+        // for the count chip to stabilise — replacing the older
+        // `waitForTimeout(600)` debounce-assumption sleep.
+        await narrowVirtualisedList(page, name);
 
         // Look for the texture set by name in any card element
         const textureSetCard = page.locator(

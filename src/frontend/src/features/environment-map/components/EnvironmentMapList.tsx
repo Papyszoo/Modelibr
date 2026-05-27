@@ -72,6 +72,19 @@ export function EnvironmentMapList() {
   const uploadProgress = useUploadProgress()
   const cardWidth = settings.environmentMaps
 
+  // Server-side category filter uses the raw checked leaves; the cascade
+  // expansion below (selectedCategoryIds, with child branches collected)
+  // still drives the *visible* set on the page in case selectedCategoryKeys
+  // changes between the server request and the next render.
+  const checkedCategoryIds = useMemo(
+    () =>
+      Object.entries(viewState.selectedCategoryKeys)
+        .filter(([, state]) => state?.checked)
+        .map(([key]) => Number(key))
+        .filter(Number.isFinite),
+    [viewState.selectedCategoryKeys]
+  )
+
   const {
     environmentMaps,
     loading,
@@ -83,6 +96,8 @@ export function EnvironmentMapList() {
   } = useEnvironmentMapData({
     effectivePackIds: viewState.selectedPackIds,
     effectiveProjectIds: viewState.selectedProjectIds,
+    selectedCategoryIds: checkedCategoryIds,
+    searchQuery: viewState.searchQuery,
   })
 
   const createEnvironmentMapMutation = useCreateEnvironmentMapWithFileMutation()

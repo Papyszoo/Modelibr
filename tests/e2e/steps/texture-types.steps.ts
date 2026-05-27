@@ -11,6 +11,7 @@ import { createBdd } from "playwright-bdd";
 import { expect } from "@playwright/test";
 import { TextureSetsPage } from "../pages/TextureSetsPage";
 import { ApiHelper } from "../helpers/api-helper";
+import { narrowVirtualisedList } from "../helpers/list-toolbar-helper";
 import { getScenarioState } from "../fixtures/shared-state";
 import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
 import path from "path";
@@ -98,16 +99,8 @@ Given("I have a texture set with uploaded textures", async ({ page }) => {
             .catch(() => {});
     }
 
-    // Use search to find the specific card (grid may have many items off-screen)
-    const searchInput = page.locator(".search-input");
-    if (
-        await searchInput
-            .waitFor({ state: "visible", timeout: 3000 })
-            .then(() => true)
-            .catch(() => false)
-    ) {
-        await searchInput.fill(uniqueName);
-    }
+    // Narrow the (virtualised) grid by name so the card is in the DOM.
+    await narrowVirtualisedList(page, uniqueName);
 
     // Verify the card is visible
     const card = page.locator(
@@ -211,16 +204,8 @@ Given("I have a texture set with a height texture", async ({ page }) => {
             .catch(() => {});
     }
 
-    // Use search to find the specific card (grid may have many items off-screen)
-    const searchInput3 = page.locator(".search-input");
-    if (
-        await searchInput3
-            .waitFor({ state: "visible", timeout: 3000 })
-            .then(() => true)
-            .catch(() => false)
-    ) {
-        await searchInput3.fill(uniqueName);
-    }
+    // Narrow the (virtualised) grid by name so the card is in the DOM.
+    await narrowVirtualisedList(page, uniqueName);
 
     // Verify the card is visible
     const card = page.locator(

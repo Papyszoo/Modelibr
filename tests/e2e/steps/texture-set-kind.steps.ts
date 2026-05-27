@@ -2,6 +2,10 @@ import { createBdd } from "playwright-bdd";
 import { expect } from "@playwright/test";
 import { ApiHelper } from "../helpers/api-helper";
 import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
+import {
+    narrowVirtualisedList,
+    waitForCountLabelStable,
+} from "../helpers/list-toolbar-helper";
 import { navigateToTab } from "../helpers/navigation-helper";
 import { TextureSetsPage } from "../pages/TextureSetsPage";
 import path from "path";
@@ -74,9 +78,12 @@ When("I switch to the {string} kind tab", async ({ page }, tabName: string) => {
     );
     if (!isActive) {
         await tabButton.click();
+        // Wait deterministically for the grid's data query to resolve.
+        // The toolbar stays mounted across the loading cycle, so an
+        // immediate `getCardByName` read would see whatever cards the
+        // grid happens to be showing right now.
+        await waitForCountLabelStable(page);
     }
-    // Wait for grid to refresh
-    await page.waitForTimeout(1000);
 });
 
 // ── Create Texture Sets via API ───────────────────────────────────────
@@ -170,25 +177,18 @@ Then(
 
         const textureSetsPage = new TextureSetsPage(page);
 
-        // Use search to filter by name — avoids pagination issues when >50 sets exist
-        const searchVisible = await textureSetsPage.searchInput
-            .waitFor({ state: "visible", timeout: 3000 })
-            .then(() => true)
-            .catch(() => false);
-        if (searchVisible) {
-            await textureSetsPage.searchInput.clear();
-            await textureSetsPage.searchInput.fill(set.name);
-            await page.waitForTimeout(300);
-        }
+        // Narrow the (virtualised) grid by name so pagination + virtual
+        // scrolling can't hide the card. `narrowVirtualisedList` opens
+        // the search panel, fills the name, and waits for the count
+        // chip to stabilise — no fixed sleep needed.
+        const searchInput = await narrowVirtualisedList(page, set.name);
 
         const card = textureSetsPage.getCardByName(set.name);
         await expect(card).toBeVisible({ timeout: 10000 });
 
-        // Clear search so it doesn't affect subsequent steps
-        if (searchVisible) {
-            await textureSetsPage.searchInput.clear();
-            await page.waitForTimeout(300);
-        }
+        // Clear the search so it doesn't leak into subsequent steps.
+        await searchInput.clear();
+        await waitForCountLabelStable(page);
     },
 );
 
@@ -217,8 +217,13 @@ When(
                 `Texture set "${baseName}" not tracked. Create it first.`,
             );
 
+        // Narrow the virtualized grid to just this set so the card is
+        // guaranteed to be rendered (off-screen cards aren't in the DOM).
+        const textureSetsPage = new TextureSetsPage(page);
+        const searchInput = await narrowVirtualisedList(page, set.name);
+
         // Find the source card
-        const card = new TextureSetsPage(page).getCardByName(set.name);
+        const card = textureSetsPage.getCardByName(set.name);
         await expect(card).toBeVisible({ timeout: 5000 });
 
         // Find the target tab button
@@ -230,8 +235,11 @@ When(
         // Perform drag and drop
         await card.dragTo(targetTab);
 
-        // Wait for the API call to complete and grid to refresh
-        await page.waitForTimeout(1000);
+        // Clear the search and wait for the underlying data to settle
+        // after the drop (the API call moves the set to the other kind
+        // and the count chip will update once the refetch lands).
+        await searchInput.clear();
+        await waitForCountLabelStable(page);
     },
 );
 
@@ -317,7 +325,12 @@ When(
                 `Texture set "${baseName}" not tracked. Create it first.`,
             );
 
-        const card = new TextureSetsPage(page).getCardByName(set.name);
+        // Narrow the virtualized grid to the target set so the card is
+        // rendered in DOM even if it'd otherwise scroll off-screen.
+        const textureSetsPage = new TextureSetsPage(page);
+        await narrowVirtualisedList(page, set.name);
+
+        const card = textureSetsPage.getCardByName(set.name);
         await expect(card).toBeVisible({ timeout: 5000 });
 
         // Right-click to open context menu

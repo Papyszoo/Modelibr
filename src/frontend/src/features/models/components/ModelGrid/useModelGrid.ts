@@ -41,6 +41,7 @@ export function useModelGrid({
     selectedTagNames: filters.selectedTagNames,
     hasConceptImages: filters.hasConceptImages,
     textureSetId,
+    searchQuery: filters.searchQuery,
   })
 
   // Upload with auto-association to pack/project

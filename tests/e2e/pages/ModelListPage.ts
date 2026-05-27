@@ -374,6 +374,60 @@ export class ModelListPage {
     }
 
     /**
+     * Select multiple packs in a single open of the Packs multiselect.
+     *
+     * `filterByPack` uses `:has-text("Packs")` to locate the multiselect,
+     * but PrimeReact's `display="chip"` mode replaces the placeholder
+     * text with selected-item chips. Calling `filterByPack` a second
+     * time can therefore fail to find the multiselect because "Packs"
+     * is no longer in its DOM. This method opens the multiselect once,
+     * clicks every requested option in turn, then closes it.
+     */
+    async filterByPacks(packNames: string[]): Promise<void> {
+        if (packNames.length === 0) return;
+        await this.ensureFiltersOpen();
+
+        // Prefer the stable `data-testid="pack-filter"` (PrimeReact
+        // forwards unknown attrs onto the .p-multiselect root). Fall
+        // back to position-based selection for older builds that don't
+        // have the attribute yet so this remains robust across rollbacks.
+        const taggedPackFilter = this.page.locator(
+            '#model-grid-filters-panel [data-testid="pack-filter"]',
+        );
+        const packsMultiselect =
+            (await taggedPackFilter.count()) > 0
+                ? taggedPackFilter.first()
+                : this.page
+                      .locator("#model-grid-filters-panel .p-multiselect")
+                      .first();
+        await packsMultiselect.waitFor({ state: "visible", timeout: 10000 });
+        await packsMultiselect.click();
+
+        const panel = this.page.locator(".p-multiselect-panel");
+        await panel.waitFor({ state: "visible", timeout: 5000 });
+
+        for (const packName of packNames) {
+            const option = panel.locator(
+                `.p-multiselect-item:has-text("${packName}")`,
+            );
+            await expect(option).toBeVisible({ timeout: 5000 });
+            // The selected state is reflected on the .p-multiselect-item
+            // (PrimeReact adds .p-highlight). Skip if already selected so
+            // a re-call doesn't deselect.
+            const alreadySelected = await option.evaluate((el: Element) =>
+                el.classList.contains("p-highlight"),
+            );
+            if (!alreadySelected) {
+                await option.click();
+            }
+        }
+
+        await this.page.keyboard.press("Escape");
+        await panel.waitFor({ state: "hidden", timeout: 5000 });
+        await this.page.waitForLoadState("domcontentloaded");
+    }
+
+    /**
      * Clear all active filters in the filter bar
      */
     async clearFilters(): Promise<void> {

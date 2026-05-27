@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react'
 
 import { useSpriteCategoriesQuery } from '@/features/sprite/api/queries'
 import { getSpritesPaginated } from '@/features/sprite/api/spriteApi'
+import { useDebouncedValue } from '@/shared/hooks'
 
 const UNASSIGNED_CATEGORY_ID = -1
 const PAGE_SIZE = 50
@@ -11,8 +12,11 @@ export function useSpriteListData() {
   const [activeCategoryId, setActiveCategoryId] = useState<number | null>(
     UNASSIGNED_CATEGORY_ID
   )
+  const [searchQuery, setSearchQuery] = useState('')
 
   const queryClient = useQueryClient()
+
+  const debouncedSearchName = useDebouncedValue(searchQuery.trim(), 300)
 
   const {
     data: paginatedData,
@@ -21,9 +25,13 @@ export function useSpriteListData() {
     isFetchingNextPage,
     isLoading: loading,
   } = useInfiniteQuery({
-    queryKey: ['sprites'],
+    queryKey: ['sprites', { searchName: debouncedSearchName || undefined }],
     queryFn: ({ pageParam }) =>
-      getSpritesPaginated({ page: pageParam, pageSize: PAGE_SIZE }),
+      getSpritesPaginated({
+        page: pageParam,
+        pageSize: PAGE_SIZE,
+        searchName: debouncedSearchName || undefined,
+      }),
     initialPageParam: 1,
     getNextPageParam: (lastPage, allPages) => {
       const loaded = allPages.reduce((sum, p) => sum + p.sprites.length, 0)
@@ -62,6 +70,8 @@ export function useSpriteListData() {
     fetchNextPage,
     activeCategoryId,
     setActiveCategoryId,
+    searchQuery,
+    setSearchQuery,
     filteredSprites,
     invalidateSprites,
     loadCategories,

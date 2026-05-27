@@ -7,16 +7,20 @@ import {
 } from '../../../types'
 
 export async function getAllSounds(options?: {
-  packId?: number
-  projectId?: number
-  categoryId?: number
+  packIds?: number[]
+  projectIds?: number[]
+  categoryIds?: number[]
+  searchName?: string
 }): Promise<GetAllSoundsResponse> {
   const params = new URLSearchParams()
-  if (options?.packId) params.append('packId', options.packId.toString())
-  if (options?.projectId)
-    params.append('projectId', options.projectId.toString())
-  if (options?.categoryId)
-    params.append('categoryId', options.categoryId.toString())
+  options?.packIds?.forEach(id => params.append('packIds', id.toString()))
+  options?.projectIds?.forEach(id => params.append('projectIds', id.toString()))
+  options?.categoryIds?.forEach(id =>
+    params.append('categoryIds', id.toString())
+  )
+  if (options?.searchName && options.searchName.trim()) {
+    params.append('searchName', options.searchName.trim())
+  }
 
   const url = params.toString() ? `/sounds?${params.toString()}` : '/sounds'
   const response = await client.get<GetAllSoundsResponse>(url)
@@ -26,9 +30,10 @@ export async function getAllSounds(options?: {
 export async function getSoundsPaginated(options: {
   page: number
   pageSize: number
-  packId?: number
-  projectId?: number
-  categoryId?: number
+  packIds?: number[]
+  projectIds?: number[]
+  categoryIds?: number[]
+  searchName?: string
 }): Promise<{
   sounds: SoundDto[]
   totalCount: number
@@ -39,11 +44,14 @@ export async function getSoundsPaginated(options: {
   const params = new URLSearchParams()
   params.append('page', options.page.toString())
   params.append('pageSize', options.pageSize.toString())
-  if (options.packId) params.append('packId', options.packId.toString())
-  if (options.projectId)
-    params.append('projectId', options.projectId.toString())
-  if (options.categoryId)
-    params.append('categoryId', options.categoryId.toString())
+  options.packIds?.forEach(id => params.append('packIds', id.toString()))
+  options.projectIds?.forEach(id => params.append('projectIds', id.toString()))
+  options.categoryIds?.forEach(id =>
+    params.append('categoryIds', id.toString())
+  )
+  if (options.searchName && options.searchName.trim()) {
+    params.append('searchName', options.searchName.trim())
+  }
 
   const response = await client.get(`/sounds?${params.toString()}`)
   return response.data

@@ -1,0 +1,199 @@
+/* Shared list-toolbar — minimalist pill toolbar used by list pages
+   (Models, Texture Sets, Environment Maps, …).
+
+   Visual parity with the original model-grid-* toolbar. Class names here
+   are namespaced to `list-toolbar-*` so they can be reused across pages
+   without coupling to a specific feature. */
+
+.list-toolbar-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.list-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 2.75rem;
+  padding: 0.375rem 0;
+}
+
+.list-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  flex-wrap: wrap;
+}
+
+.list-toolbar-button,
+.list-toolbar .options-toggle-btn {
+  border-radius: 999px;
+  border: 1px solid transparent;
+  color: var(--text-color-secondary);
+}
+
+.list-toolbar-button:hover,
+.list-toolbar .options-toggle-btn:hover {
+  background: var(--surface-card);
+  border: 1px solid var(--surface-border);
+  color: var(--text-color);
+}
+
+/* Active state needs to read clearly even when the panel is *collapsed*
+ * (the user has a filter or a query set but can't see it). Borrow the
+ * primary color for the border + a subtle tint so it stands out from
+ * the hover state. */
+.list-toolbar-button.is-active {
+  background: color-mix(
+    in srgb,
+    var(--primary-color, currentColor) 12%,
+    var(--surface-card)
+  );
+  border: 1px solid var(--primary-color, var(--surface-border));
+  color: var(--text-color);
+}
+
+.list-toolbar-button .p-button-label,
+.list-toolbar .options-toggle-btn .p-button-label {
+  font-weight: 500;
+}
+
+.list-toolbar-badge {
+  min-width: 1.1rem;
+  height: 1.1rem;
+  line-height: 1.1rem;
+  font-size: 0.7rem;
+  margin-left: 0.3rem;
+}
+
+.list-toolbar-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--text-color-secondary);
+  white-space: nowrap;
+}
+
+.list-toolbar-count .pi {
+  font-size: 0.875rem;
+}
+
+.list-toolbar-selection-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  min-height: 2.5rem;
+  padding: 0.625rem 0.875rem;
+  border: 1px solid var(--surface-border);
+  border-radius: 12px;
+  background: var(--surface-card);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.list-toolbar-selection-summary {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-color);
+}
+
+.list-toolbar-selection-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  flex-wrap: wrap;
+}
+
+.list-toolbar-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transform: translateY(-0.35rem);
+  transition:
+    grid-template-rows 0.22s ease,
+    opacity 0.22s ease,
+    transform 0.22s ease;
+  pointer-events: none;
+}
+
+.list-toolbar-panel.is-open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.list-toolbar-panel-inner {
+  overflow: hidden;
+}
+
+.list-toolbar-search-panel,
+.list-toolbar-panel-inner .list-filters-row,
+.list-toolbar-panel-inner .list-filters-empty {
+  background: var(--surface-card);
+  border: 1px solid var(--surface-border);
+  border-radius: 12px;
+  padding: 0.75rem 0.875rem;
+}
+
+.list-toolbar-panel-inner .list-filters-empty {
+  display: block;
+  margin-top: 0.75rem;
+}
+
+.list-toolbar-search-panel {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.list-toolbar-panel-inner .list-filters-row {
+  gap: 0.75rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+/* Tablet & smaller — toolbar collapses to icon-only buttons and the
+   count chip hides. Mirrors the responsive behavior the model grid had
+   before extraction. */
+@media (max-width: 768px) {
+  .list-toolbar {
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0;
+  }
+
+  .list-toolbar-actions {
+    flex: 1;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 0.25rem;
+  }
+
+  /* Icon-only — but only for the main toolbar actions row. The selection
+     bar contains label-only buttons (Select All / Deselect All) that
+     would become invisible if their labels were hidden. */
+  .list-toolbar-actions .list-toolbar-button .p-button-label,
+  .list-toolbar-actions .options-toggle-btn .p-button-label {
+    display: none;
+  }
+
+  .list-toolbar-actions .list-toolbar-button,
+  .list-toolbar-actions .options-toggle-btn {
+    flex: 0 0 auto;
+    width: 2.5rem;
+    height: 2.5rem;
+    padding: 0;
+    justify-content: center;
+    /* PrimeReact's icon-with-label spacing leaves a gap to the right of
+       the icon — kill it so the icon truly centers in the square button. */
+    gap: 0;
+  }
+
+  /* Hide the "{N} items" chip — it eats horizontal real estate that the
+     icon row needs. */
+  .list-toolbar-count {
+    display: none;
+  }
+}

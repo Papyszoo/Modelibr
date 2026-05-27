@@ -1,5 +1,9 @@
 import { Page, expect, Locator } from "@playwright/test";
 import * as path from "path";
+import {
+    ensureToolbarSearchOpen,
+    waitForCountLabelStable,
+} from "../helpers/list-toolbar-helper";
 import { navigateToTab } from "../helpers/navigation-helper";
 
 /**
@@ -125,6 +129,11 @@ export class TextureSetsPage {
     ): Promise<void> {
         await this.page.getByRole("button", { name: label }).click();
         await this.waitForLoad();
+        // Block until the new kind's data has actually resolved — the
+        // toolbar stays mounted across the loading cycle, so an immediate
+        // read of `getTextureSetNames()` would otherwise see whatever
+        // cards the grid happens to be displaying at that instant.
+        await waitForCountLabelStable(this.page);
     }
 
     /**
@@ -155,10 +164,12 @@ export class TextureSetsPage {
     }
 
     /**
-     * Search for texture sets by name
+     * Search for texture sets by name. Opens the (collapsed-by-default)
+     * toolbar search panel first.
      * @param query - Search query
      */
     async search(query: string): Promise<void> {
+        await ensureToolbarSearchOpen(this.page);
         await this.searchInput.fill(query);
     }
 
@@ -166,6 +177,7 @@ export class TextureSetsPage {
      * Clear the search input
      */
     async clearSearch(): Promise<void> {
+        await ensureToolbarSearchOpen(this.page);
         await this.searchInput.clear();
     }
 

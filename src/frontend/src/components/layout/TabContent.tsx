@@ -116,13 +116,25 @@ export function TabContent({ tab }: TabContentProps): JSX.Element {
         return <ModelViewer modelId={tab.modelId} side={side} tabId={tab.id} />
 
       case 'textureSets':
-        return <TextureSetList />
+        return <TextureSetList isTabContent={true} tabId={tab.id} />
 
       case 'globalMaterials':
-        return <TextureSetList kind={TextureSetKind.Universal} />
+        return (
+          <TextureSetList
+            kind={TextureSetKind.Universal}
+            isTabContent={true}
+            tabId={tab.id}
+          />
+        )
 
       case 'modelTextures':
-        return <TextureSetList kind={TextureSetKind.ModelSpecific} />
+        return (
+          <TextureSetList
+            kind={TextureSetKind.ModelSpecific}
+            isTabContent={true}
+            tabId={tab.id}
+          />
+        )
 
       case 'textureSetViewer':
         if (!tab.setId) {
