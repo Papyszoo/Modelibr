@@ -527,13 +527,18 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
   }
 
   // After mutating a pack/project association, refresh both list-level and
-  // container-viewer caches so an open Pack/Project tab updates live.
+  // container-viewer caches so an open Pack/Project tab updates live. Also
+  // bust `all-textureSets-for-container` so the next "Add ..." dialog open
+  // doesn't show the just-added set as still-available.
   const invalidateContainerCaches = (target: 'pack' | 'project') => {
     queryClient.invalidateQueries({
       queryKey: [target === 'pack' ? 'packs' : 'projects'],
     })
     queryClient.invalidateQueries({ queryKey: ['container'] })
     queryClient.invalidateQueries({ queryKey: ['container-textureSets'] })
+    queryClient.invalidateQueries({
+      queryKey: ['all-textureSets-for-container'],
+    })
   }
 
   const handleAddToPack = async (packId: number) => {

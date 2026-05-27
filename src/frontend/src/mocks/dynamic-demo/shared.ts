@@ -1,5 +1,7 @@
 import { HttpResponse } from 'msw'
 
+import { TextureSetKind } from '@/types'
+
 import {
   addRecycledItem,
   addUploadHistory,
@@ -294,8 +296,9 @@ async function splitTextureSetCounts(
   for (const ref of refs) {
     const ts = await getById('textureSets', ref.id)
     if (!ts) continue
-    if (ts.kind === 1) globalMaterialCount += 1
-    else if (ts.kind === 0) multiModelTextureCount += 1
+    if (ts.kind === TextureSetKind.Universal) globalMaterialCount += 1
+    else if (ts.kind === TextureSetKind.ModelSpecific)
+      multiModelTextureCount += 1
   }
   return { globalMaterialCount, multiModelTextureCount }
 }

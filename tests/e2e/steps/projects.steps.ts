@@ -1091,17 +1091,24 @@ async function ensureTextureSetExists(
             const detail = await page.request.get(
                 `${API_BASE}/texture-sets/${existing.id}`,
             );
-            if (detail.ok()) {
-                const data = await detail.json();
-                if (data.kind !== kind) {
-                    await page.request.put(
-                        `${API_BASE}/texture-sets/${existing.id}/kind`,
-                        { data: { kind } },
-                    );
-                    console.log(
-                        `[AutoProvision] Switched ${logLabel} "${textureSetName}" kind to ${kind}`,
-                    );
-                }
+            if (!detail.ok()) {
+                // Cached in shared state but the backend can't find it —
+                // throw rather than proceeding with the wrong kind, which
+                // would surface later as a confusing "card not visible on
+                // the wrong tab" failure.
+                throw new Error(
+                    `Failed to look up cached ${logLabel} "${textureSetName}" (ID: ${existing.id}): ${detail.status()}`,
+                );
+            }
+            const data = await detail.json();
+            if (data.kind !== kind) {
+                await page.request.put(
+                    `${API_BASE}/texture-sets/${existing.id}/kind`,
+                    { data: { kind } },
+                );
+                console.log(
+                    `[AutoProvision] Switched ${logLabel} "${textureSetName}" kind to ${kind}`,
+                );
             }
         }
         console.log(
