@@ -50,16 +50,22 @@ internal sealed class ModelRepository : IModelRepository
 
     public async Task<(IEnumerable<Model> Items, int TotalCount)> GetPagedAsync(
         int page, int pageSize,
-        int? packId = null, int? projectId = null, int? textureSetId = null, IReadOnlyCollection<int>? categoryIds = null, IReadOnlyCollection<string>? normalizedTagNames = null, bool? hasConceptImages = null,
+        IReadOnlyCollection<int>? packIds = null,
+        IReadOnlyCollection<int>? projectIds = null,
+        int? textureSetId = null,
+        IReadOnlyCollection<int>? categoryIds = null,
+        IReadOnlyCollection<string>? normalizedTagNames = null,
+        bool? hasConceptImages = null,
+        string? searchName = null,
         CancellationToken cancellationToken = default)
     {
         var query = _context.Models.AsNoTracking().AsQueryable();
 
-        if (packId.HasValue)
-            query = query.Where(m => m.Packs.Any(p => p.Id == packId.Value));
+        if (packIds is { Count: > 0 })
+            query = query.Where(m => m.Packs.Any(p => packIds.Contains(p.Id)));
 
-        if (projectId.HasValue)
-            query = query.Where(m => m.Projects.Any(p => p.Id == projectId.Value));
+        if (projectIds is { Count: > 0 })
+            query = query.Where(m => m.Projects.Any(p => projectIds.Contains(p.Id)));
 
         if (textureSetId.HasValue)
             query = query.Where(m => m.TextureSets.Any(ts => ts.Id == textureSetId.Value));
@@ -74,6 +80,13 @@ internal sealed class ModelRepository : IModelRepository
             query = hasConceptImages.Value
                 ? query.Where(m => m.ConceptImages.Any())
                 : query.Where(m => !m.ConceptImages.Any());
+
+        // EF.Functions.ILike — case-insensitive Contains on Postgres.
+        if (!string.IsNullOrWhiteSpace(searchName))
+        {
+            var pattern = $"%{searchName.Trim()}%";
+            query = query.Where(m => EF.Functions.ILike(m.Name, pattern));
+        }
 
         var totalCount = await query.CountAsync(cancellationToken);
 
@@ -103,16 +116,22 @@ internal sealed class ModelRepository : IModelRepository
 
     public async Task<(IEnumerable<ModelListDto> Items, int TotalCount)> GetPagedListAsync(
         int page, int pageSize,
-        int? packId = null, int? projectId = null, int? textureSetId = null, IReadOnlyCollection<int>? categoryIds = null, IReadOnlyCollection<string>? normalizedTagNames = null, bool? hasConceptImages = null,
+        IReadOnlyCollection<int>? packIds = null,
+        IReadOnlyCollection<int>? projectIds = null,
+        int? textureSetId = null,
+        IReadOnlyCollection<int>? categoryIds = null,
+        IReadOnlyCollection<string>? normalizedTagNames = null,
+        bool? hasConceptImages = null,
+        string? searchName = null,
         CancellationToken cancellationToken = default)
     {
         var query = _context.Models.AsNoTracking().AsQueryable();
 
-        if (packId.HasValue)
-            query = query.Where(m => m.Packs.Any(p => p.Id == packId.Value));
+        if (packIds is { Count: > 0 })
+            query = query.Where(m => m.Packs.Any(p => packIds.Contains(p.Id)));
 
-        if (projectId.HasValue)
-            query = query.Where(m => m.Projects.Any(p => p.Id == projectId.Value));
+        if (projectIds is { Count: > 0 })
+            query = query.Where(m => m.Projects.Any(p => projectIds.Contains(p.Id)));
 
         if (textureSetId.HasValue)
             query = query.Where(m => m.TextureSets.Any(ts => ts.Id == textureSetId.Value));
@@ -127,6 +146,13 @@ internal sealed class ModelRepository : IModelRepository
             query = hasConceptImages.Value
                 ? query.Where(m => m.ConceptImages.Any())
                 : query.Where(m => !m.ConceptImages.Any());
+
+        // EF.Functions.ILike — case-insensitive Contains on Postgres.
+        if (!string.IsNullOrWhiteSpace(searchName))
+        {
+            var pattern = $"%{searchName.Trim()}%";
+            query = query.Where(m => EF.Functions.ILike(m.Name, pattern));
+        }
 
         var totalCount = await query.CountAsync(cancellationToken);
 

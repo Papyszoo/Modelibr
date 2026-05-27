@@ -56,21 +56,27 @@ export const TabProvider = ({
 
   const openTextureSetDetailsTab = (
     textureSetId: number,
-    name?: string
+    name?: string,
+    options?: { activate?: boolean }
   ): void => {
+    const activate = options?.activate ?? true
     const existingTab = tabs.find(
       tab =>
         tab.type === 'textureSetViewer' && tab.setId === textureSetId.toString()
     )
 
     if (existingTab) {
-      setActiveTab(existingTab.id)
+      if (activate) {
+        setActiveTab(existingTab.id)
+      }
       return
     }
 
     const newTab = createTab('textureSetViewer', textureSetId.toString(), name)
     setTabs([...tabs, newTab])
-    setActiveTab(newTab.id)
+    if (activate) {
+      setActiveTab(newTab.id)
+    }
   }
 
   const openEnvironmentMapDetailsTab = (

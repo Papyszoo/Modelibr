@@ -4,8 +4,20 @@ import { Button } from 'primereact/button'
 import { InputSwitch } from 'primereact/inputswitch'
 import { MultiSelect } from 'primereact/multiselect'
 
-import { OptionsButton } from '@/features/models/components/ModelGrid/OptionsButton'
 import { CategoryFilterPicker } from '@/shared/components/categories/CategoryFilterPicker'
+import {
+  ListToolbar,
+  ListToolbarActions,
+  ListToolbarButton,
+  ListToolbarCount,
+  ListToolbarPanel,
+  ListToolbarRow,
+  ListToolbarSearchInput,
+  ListToolbarSelectionActions,
+  ListToolbarSelectionBar,
+  ListToolbarSelectionSummary,
+  OptionsButton,
+} from '@/shared/components/list-toolbar'
 import { type CategorySelectionKeys } from '@/shared/types/categories'
 import { type EnvironmentMapCategoryDto } from '@/types'
 
@@ -97,200 +109,185 @@ export function EnvironmentMapToolbar({
     onlyCustomThumbnail,
   ].filter(Boolean).length
 
-  const countLabel =
-    visibleCount === totalCount
-      ? `${totalCount} map${totalCount === 1 ? '' : 's'}`
-      : `${visibleCount}/${totalCount} maps`
+  const showFilteredCount = visibleCount !== totalCount
 
   return (
-    <div className="environment-map-controls">
-      <div className="environment-map-toolbar">
-        <div className="environment-map-toolbar-actions">
-          <Button
+    <ListToolbar>
+      <ListToolbarRow>
+        <ListToolbarActions>
+          <ListToolbarButton
             icon="pi pi-search"
             label="Search"
-            className={`p-button-text p-button-sm environment-map-toolbar-button${isSearchOpen || hasActiveSearch ? ' is-active' : ''}`}
+            active={isSearchOpen || hasActiveSearch}
             onClick={() => onSearchToggle(!isSearchOpen)}
-            aria-expanded={isSearchOpen}
-            aria-controls="environment-map-search-panel"
+            ariaLabel="Search"
+            ariaExpanded={isSearchOpen}
+            ariaControls="environment-map-search-panel"
           />
-          <Button
+          <ListToolbarButton
             icon="pi pi-sliders-h"
             label="Filters"
-            className={`p-button-text p-button-sm environment-map-toolbar-button${isFiltersOpen || hasActiveFilters ? ' is-active' : ''}`}
+            active={isFiltersOpen || hasActiveFilters}
             onClick={() => onFiltersToggle(!isFiltersOpen)}
-            aria-expanded={isFiltersOpen}
-            aria-controls="environment-map-filters-panel"
-            badge={
-              activeFilterCount > 0 ? String(activeFilterCount) : undefined
-            }
-            badgeClassName="environment-map-toolbar-badge"
+            ariaLabel="Filters"
+            ariaExpanded={isFiltersOpen}
+            ariaControls="environment-map-filters-panel"
+            badge={activeFilterCount}
           />
           <OptionsButton
             cardWidth={cardWidth}
             minCardWidth={220}
             maxCardWidth={520}
             onCardWidthChange={onCardWidthChange}
+            showThumbnailAnimation={false}
           />
-          <Button
+          <ListToolbarButton
             icon="pi pi-check-square"
             label="Select all"
-            className="p-button-text p-button-sm environment-map-toolbar-button"
             onClick={onSelectAllClick}
             disabled={visibleCount === 0}
           />
-          <Button
+          <ListToolbarButton
             icon="pi pi-upload"
             label="Upload"
-            className="p-button-text p-button-sm environment-map-toolbar-button"
             onClick={onUploadClick}
+            tooltip="Upload environment maps"
+            ariaLabel="Upload"
           />
-          <Button
+          <ListToolbarButton
             icon="pi pi-refresh"
             label="Refresh"
-            className="p-button-text p-button-sm environment-map-toolbar-button"
             onClick={onRefreshClick}
+            tooltip="Refresh list"
+            ariaLabel="Refresh"
           />
-        </div>
+        </ListToolbarActions>
 
-        <div className="environment-map-toolbar-count" aria-live="polite">
-          <i className="pi pi-globe" />
-          <span>{countLabel}</span>
-        </div>
-      </div>
+        <ListToolbarCount
+          icon="pi pi-globe"
+          count={showFilteredCount ? visibleCount : totalCount}
+          unitLabel="map"
+        />
+      </ListToolbarRow>
 
       {selectedCount > 0 ? (
-        <div className="environment-map-selection-toolbar">
-          <span className="environment-map-selection-summary">
+        <ListToolbarSelectionBar>
+          <ListToolbarSelectionSummary>
             {selectedCount} environment map{selectedCount === 1 ? '' : 's'}{' '}
-            selected
-          </span>
-
-          <div className="environment-map-selection-actions">
-            <Button
-              icon="pi pi-times"
-              label="Clear"
-              className="p-button-text p-button-sm environment-map-toolbar-button"
-              onClick={onDeselectAllClick}
-            />
-            <Button
+            selected.
+          </ListToolbarSelectionSummary>
+          <ListToolbarSelectionActions>
+            <ListToolbarButton
               icon="pi pi-ellipsis-h"
               label="Bulk actions"
-              className="p-button-text p-button-sm environment-map-toolbar-button"
+              active
               onClick={onBulkActionsClick}
+              ariaLabel="Bulk actions"
             />
-          </div>
-        </div>
+            <ListToolbarButton
+              icon="pi pi-times"
+              label="Clear"
+              onClick={onDeselectAllClick}
+            />
+          </ListToolbarSelectionActions>
+        </ListToolbarSelectionBar>
       ) : null}
 
-      <div
-        id="environment-map-search-panel"
-        className={`environment-map-toolbar-panel${isSearchOpen ? ' is-open' : ''}`}
-      >
-        <div className="environment-map-toolbar-panel-inner">
-          <div className="list-filters-search environment-map-search-panel">
-            <i className="pi pi-search" />
-            <input
-              type="text"
-              placeholder="Search environment maps..."
-              value={searchQuery}
-              onChange={event => onSearchChange(event.target.value)}
-              className="list-filters-search-input"
-            />
-          </div>
-        </div>
-      </div>
+      <ListToolbarPanel id="environment-map-search-panel" open={isSearchOpen}>
+        <ListToolbarSearchInput
+          value={searchQuery}
+          onChange={onSearchChange}
+          placeholder="Search environment maps..."
+        />
+      </ListToolbarPanel>
 
-      <div
-        id="environment-map-filters-panel"
-        className={`environment-map-toolbar-panel${isFiltersOpen ? ' is-open' : ''}`}
-      >
-        <div className="environment-map-toolbar-panel-inner">
-          <div className="list-filters-row environment-map-filters-row">
-            {previewSizeOptions.length > 0 ? (
-              <MultiSelect
-                value={selectedPreviewSizes}
-                options={previewSizeOptions}
-                onChange={event =>
-                  onPreviewSizesChange((event.value ?? []) as string[])
-                }
-                placeholder="Preview Size"
-                className="list-filters-control"
-                display="chip"
-                showClear
-              />
-            ) : null}
-            {packOptions.length > 0 ? (
-              <MultiSelect
-                value={selectedPackIds}
-                options={packOptions}
-                onChange={event =>
-                  onPackIdsChange((event.value ?? []) as number[])
-                }
-                placeholder="Packs"
-                className="list-filters-control"
-                display="chip"
-                showClear
-                filter
-                filterPlaceholder="Search packs..."
-              />
-            ) : null}
-            {projectOptions.length > 0 ? (
-              <MultiSelect
-                value={selectedProjectIds}
-                options={projectOptions}
-                onChange={event =>
-                  onProjectIdsChange((event.value ?? []) as number[])
-                }
-                placeholder="Projects"
-                className="list-filters-control"
-                display="chip"
-                showClear
-                filter
-                filterPlaceholder="Search projects..."
-              />
-            ) : null}
-            {categories.length > 0 ? (
-              <CategoryFilterPicker
-                categories={categories}
-                selectedKeys={selectedCategoryKeys}
-                onChange={onCategoryChange}
-                onManageClick={onManageCategoriesClick}
-                ariaLabel="Filter by environment map categories"
-              />
-            ) : (
-              <Button
-                icon="pi pi-sitemap"
-                label="Manage Categories"
-                className="p-button-text p-button-sm list-filters-control"
-                onClick={onManageCategoriesClick}
-              />
-            )}
-            <div className="list-filters-switch">
-              <InputSwitch
-                checked={onlyCustomThumbnail}
-                onChange={event =>
-                  onOnlyCustomThumbnailChange(Boolean(event.value))
-                }
-              />
-              <span>Custom thumbnail</span>
-            </div>
-            {hasActiveFilters ? (
-              <Button
-                icon="pi pi-times"
-                className="p-button-text p-button-sm list-filters-clear"
-                onClick={() => {
-                  onPreviewSizesChange([])
-                  onPackIdsChange([])
-                  onProjectIdsChange([])
-                  onCategoryChange({})
-                  onOnlyCustomThumbnailChange(false)
-                }}
-              />
-            ) : null}
+      <ListToolbarPanel id="environment-map-filters-panel" open={isFiltersOpen}>
+        <div className="list-filters-row">
+          {previewSizeOptions.length > 0 ? (
+            <MultiSelect
+              value={selectedPreviewSizes}
+              options={previewSizeOptions}
+              onChange={event =>
+                onPreviewSizesChange((event.value ?? []) as string[])
+              }
+              placeholder="Preview Size"
+              className="list-filters-control"
+              display="chip"
+              showClear
+            />
+          ) : null}
+          {packOptions.length > 0 ? (
+            <MultiSelect
+              value={selectedPackIds}
+              options={packOptions}
+              onChange={event =>
+                onPackIdsChange((event.value ?? []) as number[])
+              }
+              placeholder="Packs"
+              className="list-filters-control"
+              display="chip"
+              showClear
+              filter
+              filterPlaceholder="Search packs..."
+            />
+          ) : null}
+          {projectOptions.length > 0 ? (
+            <MultiSelect
+              value={selectedProjectIds}
+              options={projectOptions}
+              onChange={event =>
+                onProjectIdsChange((event.value ?? []) as number[])
+              }
+              placeholder="Projects"
+              className="list-filters-control"
+              display="chip"
+              showClear
+              filter
+              filterPlaceholder="Search projects..."
+            />
+          ) : null}
+          {categories.length > 0 ? (
+            <CategoryFilterPicker
+              categories={categories}
+              selectedKeys={selectedCategoryKeys}
+              onChange={onCategoryChange}
+              onManageClick={onManageCategoriesClick}
+              ariaLabel="Filter by environment map categories"
+            />
+          ) : (
+            <Button
+              icon="pi pi-sitemap"
+              label="Manage Categories"
+              className="p-button-text p-button-sm list-filters-control"
+              onClick={onManageCategoriesClick}
+            />
+          )}
+          <div className="list-filters-switch">
+            <InputSwitch
+              checked={onlyCustomThumbnail}
+              onChange={event =>
+                onOnlyCustomThumbnailChange(Boolean(event.value))
+              }
+            />
+            <span>Custom thumbnail</span>
           </div>
+          {hasActiveFilters ? (
+            <Button
+              icon="pi pi-times"
+              className="p-button-text p-button-sm list-filters-clear"
+              tooltip="Clear all filters"
+              tooltipOptions={{ position: 'bottom' }}
+              onClick={() => {
+                onPreviewSizesChange([])
+                onPackIdsChange([])
+                onProjectIdsChange([])
+                onCategoryChange({})
+                onOnlyCustomThumbnailChange(false)
+              }}
+            />
+          ) : null}
         </div>
-      </div>
-    </div>
+      </ListToolbarPanel>
+    </ListToolbar>
   )
 }

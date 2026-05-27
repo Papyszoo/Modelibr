@@ -118,9 +118,13 @@ export class EnvironmentMapsPage {
     }
 
     async getToolbarCountLabel(): Promise<string> {
+        // Shared list-toolbar primitive renders the count chip as
+        // `.list-toolbar-count > span`. The old `.environment-map-toolbar-count`
+        // namespace was removed when EnvironmentMapToolbar migrated to the
+        // shared primitives.
         const label =
             (await this.page
-                .locator(".environment-map-toolbar-count span")
+                .locator(".list-toolbar-count span")
                 .textContent()) ?? "";
         return label.trim();
     }

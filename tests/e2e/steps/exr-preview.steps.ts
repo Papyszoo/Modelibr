@@ -1,6 +1,10 @@
 import { createBdd } from "playwright-bdd";
 import { expect } from "@playwright/test";
 import { ApiHelper } from "../helpers/api-helper";
+import {
+    narrowVirtualisedList,
+    waitForR3FCanvas,
+} from "../helpers/list-toolbar-helper";
 import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
 import { TextureSetsPage } from "../pages/TextureSetsPage";
 import path from "path";
@@ -124,8 +128,16 @@ When(
             );
         }
 
+        // Narrow the virtualized grid to the target set so the card is
+        // rendered in DOM even if it'd otherwise scroll off-screen.
+        // `narrowVirtualisedList` opens the search panel (throws if it
+        // can't), fills the name, and waits for the count chip to
+        // stabilise.
+        const textureSetsPage = new TextureSetsPage(page);
+        await narrowVirtualisedList(page, set.name);
+
         // Find the card by the unique name
-        const card = new TextureSetsPage(page).getCardByName(set.name).first();
+        const card = textureSetsPage.getCardByName(set.name).first();
 
         await expect(card).toBeVisible({ timeout: 10000 });
         await card.dblclick();
@@ -160,34 +172,12 @@ When("I switch to the Preview tab", async ({ page }) => {
 });
 
 Then("the 3D preview canvas should be visible", async ({ page }) => {
-    // What this assertion actually proves: the Preview tab mounted the R3F
-    // Canvas without the React tree crashing. We deliberately do NOT check
-    // CSS visibility / bounding box here — that's gated by the PrimeReact
-    // TabPanel display-toggle, R3F's ResizeObserver, and Suspense fallback
-    // rendering, all of which race against EXR/TIFF decode on a loaded CI
-    // runner. The downstream "no console errors" / "has textures applied"
-    // steps already cover the no-crash invariant via separate channels.
-    //
-    // Instead, poll for the R3F-managed drawing-buffer attributes (`width`
-    // and `height`). R3F sets these as soon as it initialises the WebGL
-    // context, so they're a stable signal that the renderer came up.
-    await expect
-        .poll(
-            async () =>
-                await page.evaluate(() => {
-                    const c = document.querySelector(
-                        ".texture-preview-canvas canvas",
-                    ) as HTMLCanvasElement | null;
-                    if (!c) return 0;
-                    return Math.min(c.width, c.height);
-                }),
-            {
-                timeout: 30000,
-                message: "R3F canvas never initialised drawing buffer",
-            },
-        )
-        .toBeGreaterThan(0);
-
+    // What this assertion actually proves: the Preview tab mounted the
+    // R3F Canvas without the React tree crashing. We don't check CSS
+    // visibility — see `waitForR3FCanvas` for why. The downstream "no
+    // console errors" / "has textures applied" steps cover the no-crash
+    // invariant via separate channels.
+    await waitForR3FCanvas(page, ".texture-preview-canvas");
     console.log("[UI] 3D preview canvas mounted ✓");
 });
 

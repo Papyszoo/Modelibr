@@ -40,19 +40,32 @@ internal sealed class SpriteRepository : ISpriteRepository
 
     public async Task<(IEnumerable<Sprite> Items, int TotalCount)> GetPagedAsync(
         int page, int pageSize,
-        int? packId = null, int? projectId = null, int? categoryId = null,
+        IReadOnlyCollection<int>? packIds = null,
+        IReadOnlyCollection<int>? projectIds = null,
+        IReadOnlyCollection<int>? categoryIds = null,
+        string? searchName = null,
         CancellationToken cancellationToken = default)
     {
         var query = _context.Sprites.AsNoTracking().AsQueryable();
 
-        if (packId.HasValue)
-            query = query.Where(s => s.Packs.Any(p => p.Id == packId.Value));
+        if (packIds is { Count: > 0 })
+            query = query.Where(s => s.Packs.Any(p => packIds.Contains(p.Id)));
 
-        if (projectId.HasValue)
-            query = query.Where(s => s.Projects.Any(p => p.Id == projectId.Value));
+        if (projectIds is { Count: > 0 })
+            query = query.Where(s => s.Projects.Any(p => projectIds.Contains(p.Id)));
 
-        if (categoryId.HasValue)
-            query = query.Where(s => s.SpriteCategoryId == categoryId.Value);
+        if (categoryIds is { Count: > 0 })
+            query = query.Where(s =>
+                s.SpriteCategoryId.HasValue &&
+                categoryIds.Contains(s.SpriteCategoryId.Value));
+
+        // EF.Functions.ILike — case-insensitive substring match.
+        // Postgres-specific; see SoundRepository for the in-memory note.
+        if (!string.IsNullOrWhiteSpace(searchName))
+        {
+            var pattern = $"%{searchName.Trim()}%";
+            query = query.Where(s => EF.Functions.ILike(s.Name, pattern));
+        }
 
         var totalCount = await query.CountAsync(cancellationToken);
 

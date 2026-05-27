@@ -12,26 +12,32 @@ import {
 function buildEnvironmentMapQueryString(options: {
   page?: number
   pageSize?: number
-  packId?: number
-  projectId?: number
+  packIds?: number[]
+  projectIds?: number[]
+  categoryIds?: number[]
+  searchName?: string
 }) {
   const params = new URLSearchParams()
 
   if (options.page !== undefined) params.append('page', options.page.toString())
   if (options.pageSize !== undefined)
     params.append('pageSize', options.pageSize.toString())
-  if (options.packId !== undefined)
-    params.append('packId', options.packId.toString())
-  if (options.projectId !== undefined)
-    params.append('projectId', options.projectId.toString())
+  options.packIds?.forEach(id => params.append('packIds', id.toString()))
+  options.projectIds?.forEach(id => params.append('projectIds', id.toString()))
+  options.categoryIds?.forEach(id =>
+    params.append('categoryIds', id.toString())
+  )
+  if (options.searchName && options.searchName.trim()) {
+    params.append('searchName', options.searchName.trim())
+  }
 
   return params.toString()
 }
 
 export async function getAllEnvironmentMaps(
   options: {
-    packId?: number
-    projectId?: number
+    packIds?: number[]
+    projectIds?: number[]
   } = {}
 ): Promise<EnvironmentMapDto[]> {
   const query = buildEnvironmentMapQueryString(options)
@@ -43,8 +49,10 @@ export async function getAllEnvironmentMaps(
 export async function getEnvironmentMapsPaginated(options: {
   page: number
   pageSize: number
-  packId?: number
-  projectId?: number
+  packIds?: number[]
+  projectIds?: number[]
+  categoryIds?: number[]
+  searchName?: string
 }): Promise<GetAllEnvironmentMapsResponsePaginated> {
   const query = buildEnvironmentMapQueryString(options)
   const response = await client.get<GetAllEnvironmentMapsResponsePaginated>(

@@ -16,9 +16,12 @@ public interface ITextureSetRepository
     Task<IReadOnlyList<string>> GetNamesByPrefixAsync(string prefix, CancellationToken cancellationToken = default);
     Task<(IEnumerable<TextureSet> Items, int TotalCount)> GetPagedAsync(
         int page, int pageSize,
-        int? packId = null, int? projectId = null,
-        int? categoryId = null,
+        IReadOnlyCollection<int>? packIds = null,
+        int? projectId = null,
+        IReadOnlyCollection<int>? categoryIds = null,
+        IReadOnlyCollection<TextureType>? textureTypes = null,
         TextureSetKind? kind = null,
+        string? searchName = null,
         CancellationToken cancellationToken = default);
     Task<TextureSet> UpdateAsync(TextureSet textureSet, CancellationToken cancellationToken = default);
     Task DeleteAsync(int id, CancellationToken cancellationToken = default);

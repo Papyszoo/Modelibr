@@ -6,6 +6,7 @@ import { expect } from "@playwright/test";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { getScenarioState } from "../fixtures/shared-state";
+import { ensureToolbarSearchOpen } from "../helpers/list-toolbar-helper";
 import { SpriteListPage } from "../pages/SpriteListPage";
 import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
 
@@ -744,21 +745,15 @@ When(
 When(
     "I search for sprites with query {string}",
     async ({ page }, query: string) => {
-        // Find search input in sprite list
-        const searchInput = page.locator(
-            ".sprite-list input[type='text'], .search-input",
-        );
-        if (await searchInput.isVisible()) {
-            await searchInput.fill(query);
-            // Wait for filter to apply reactively
-            await page.waitForLoadState("domcontentloaded");
-            console.log(`[Action] Searched for sprites with query "${query}"`);
-        } else {
-            // Fallback: Might not have search field - check if sprites are visible
-            console.log(
-                `[Warning] Search input not found, skipping search action`,
-            );
-        }
+        // Open the toolbar search panel first — the new shared toolbar
+        // keeps it collapsed until clicked. `ensureToolbarSearchOpen`
+        // throws if the input cannot be opened, so we don't proceed
+        // silently against a closed panel.
+        const searchInput = await ensureToolbarSearchOpen(page);
+        await searchInput.fill(query);
+        // Wait for filter to apply reactively
+        await page.waitForLoadState("domcontentloaded");
+        console.log(`[Action] Searched for sprites with query "${query}"`);
     },
 );
 

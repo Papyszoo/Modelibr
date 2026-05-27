@@ -22,9 +22,10 @@ export async function getAllSprites(): Promise<{
 export async function getSpritesPaginated(options: {
   page: number
   pageSize: number
-  packId?: number
-  projectId?: number
-  categoryId?: number
+  packIds?: number[]
+  projectIds?: number[]
+  categoryIds?: number[]
+  searchName?: string
 }): Promise<{
   sprites: SpriteDto[]
   totalCount: number
@@ -35,11 +36,14 @@ export async function getSpritesPaginated(options: {
   const params = new URLSearchParams()
   params.append('page', options.page.toString())
   params.append('pageSize', options.pageSize.toString())
-  if (options.packId) params.append('packId', options.packId.toString())
-  if (options.projectId)
-    params.append('projectId', options.projectId.toString())
-  if (options.categoryId)
-    params.append('categoryId', options.categoryId.toString())
+  options.packIds?.forEach(id => params.append('packIds', id.toString()))
+  options.projectIds?.forEach(id => params.append('projectIds', id.toString()))
+  options.categoryIds?.forEach(id =>
+    params.append('categoryIds', id.toString())
+  )
+  if (options.searchName && options.searchName.trim()) {
+    params.append('searchName', options.searchName.trim())
+  }
 
   const response = await client.get(`/sprites?${params.toString()}`)
   return response.data

@@ -25,8 +25,10 @@ import { getEnvironmentMapCategories } from './environmentMapCategoryApi'
 export function getEnvironmentMapsQueryOptions(params: {
   page: number
   pageSize: number
-  packId?: number
-  projectId?: number
+  packIds?: number[]
+  projectIds?: number[]
+  categoryIds?: number[]
+  searchName?: string
 }) {
   return queryOptions({
     queryKey: ['environmentMaps', params] as const,
@@ -35,8 +37,8 @@ export function getEnvironmentMapsQueryOptions(params: {
 }
 
 export function getAllEnvironmentMapsQueryOptions(params?: {
-  packId?: number
-  projectId?: number
+  packIds?: number[]
+  projectIds?: number[]
 }) {
   return queryOptions({
     queryKey: ['environmentMaps', 'all', params ?? {}] as const,
@@ -62,8 +64,10 @@ type UseEnvironmentMapsQueryOptions = {
   params: {
     page: number
     pageSize: number
-    packId?: number
-    projectId?: number
+    packIds?: number[]
+    projectIds?: number[]
+    categoryIds?: number[]
+    searchName?: string
   }
   queryConfig?: QueryConfig<typeof getEnvironmentMapsQueryOptions>
 }
@@ -80,8 +84,8 @@ export function useEnvironmentMapsQuery({
 
 type UseAllEnvironmentMapsQueryOptions = {
   params?: {
-    packId?: number
-    projectId?: number
+    packIds?: number[]
+    projectIds?: number[]
   }
   queryConfig?: QueryConfig<typeof getAllEnvironmentMapsQueryOptions>
 }

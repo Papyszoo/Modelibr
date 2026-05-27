@@ -470,11 +470,13 @@ Then(
 After("@settings-dirty-draft-tab-persistence", async ({ page }) => {
     try {
         const settingsPage = new SettingsPage(page);
-        if (await settingsPage.isVisible()) {
-            if (await settingsPage.isSaveButtonVisible()) {
-                await settingsPage.discard().catch(() => {});
-            }
-        }
+        if (!(await settingsPage.isVisible())) return;
+        // Only click discard if it's actually enabled — the test's own
+        // "I click discard" step may have already cleared the dirty state,
+        // in which case the button stays visible but disabled and a plain
+        // click() would wait for actionability until the test timeout.
+        if (!(await settingsPage.hasUnsavedChanges())) return;
+        await settingsPage.discard().catch(() => {});
     } catch {
         // Best-effort cleanup; never fail the scenario from a teardown.
     }

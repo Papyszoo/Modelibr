@@ -1,12 +1,10 @@
 import '@/shared/components/FilterPanel.css'
 
 import { Button } from 'primereact/button'
-import { InputSwitch } from 'primereact/inputswitch'
 import { MultiSelect } from 'primereact/multiselect'
-import { type MouseEvent as ReactMouseEvent, useState } from 'react'
+import { type MouseEvent as ReactMouseEvent } from 'react'
 
-import { ModelCategoryManagerDialog } from '@/features/models/components/ModelCategoryManagerDialog'
-import { ModelCategoryFilterPicker } from '@/features/models/components/ModelGrid/ModelCategoryFilterPicker'
+import { CategoryFilterPicker } from '@/shared/components/categories/CategoryFilterPicker'
 import {
   ListToolbar,
   ListToolbarActions,
@@ -20,15 +18,28 @@ import {
   ListToolbarSelectionSummary,
   OptionsButton,
 } from '@/shared/components/list-toolbar'
-import { type CategorySelectionKeys as ModelCategorySelectionKeys } from '@/shared/types/categories'
-import {
-  type ModelCategoryDto,
-  type ModelTagDto,
-  type PackDto,
-  type ProjectDto,
-} from '@/types'
+import { type CategorySelectionKeys } from '@/shared/types/categories'
+import { type PackDto, type TextureSetCategoryDto, TextureType } from '@/types'
 
-interface ModelsFiltersProps {
+// Texture types exposed in the filter. SplitChannel is an implementation
+// detail (a single source file fanned out across channels) — hiding it
+// keeps the picker focused on user-meaningful map types.
+const TEXTURE_TYPE_FILTER_OPTIONS: { label: string; value: number }[] = [
+  { label: 'Albedo', value: TextureType.Albedo },
+  { label: 'Normal', value: TextureType.Normal },
+  { label: 'Height', value: TextureType.Height },
+  { label: 'AO', value: TextureType.AO },
+  { label: 'Roughness', value: TextureType.Roughness },
+  { label: 'Metallic', value: TextureType.Metallic },
+  { label: 'Specular', value: TextureType.Specular },
+  { label: 'Emissive', value: TextureType.Emissive },
+  { label: 'Bump', value: TextureType.Bump },
+  { label: 'Alpha', value: TextureType.Alpha },
+  { label: 'Displacement', value: TextureType.Displacement },
+  { label: 'Glossiness', value: TextureType.Glossiness },
+]
+
+interface TexturesFiltersProps {
   isSearchOpen: boolean
   onSearchToggle: (value: boolean) => void
   isFiltersOpen: boolean
@@ -36,35 +47,28 @@ interface ModelsFiltersProps {
   searchQuery: string
   onSearchChange: (query: string) => void
   packs: PackDto[]
-  projects: ProjectDto[]
-  categories: ModelCategoryDto[]
-  tags: ModelTagDto[]
+  categories: TextureSetCategoryDto[]
   selectedPackIds: number[]
-  selectedProjectIds: number[]
-  selectedCategoryKeys: ModelCategorySelectionKeys
-  selectedCategoryIds: number[]
-  selectedTagNames: string[]
-  hasConceptImages: boolean
+  selectedCategoryKeys: CategorySelectionKeys
+  selectedTextureTypes: number[]
   onPackFilterChange: (packIds: number[]) => void
-  onProjectFilterChange: (projectIds: number[]) => void
-  onCategoryChange: (keys: ModelCategorySelectionKeys) => void
-  onTagChange: (tags: string[]) => void
-  onHasConceptImagesChange: (value: boolean) => void
-  packFilterDisabled?: boolean
-  projectFilterDisabled?: boolean
+  onCategoryChange: (keys: CategorySelectionKeys) => void
+  onTextureTypesChange: (types: number[]) => void
   cardWidth: number
   onCardWidthChange: (width: number) => void
-  modelCount: number
-  selectedModelCount: number
+  count: number
+  unitLabel: string
+  selectedCount: number
+  visibleCount: number
   onUploadClick: () => void
+  onCreateClick: () => void
   onRefreshClick: () => void
   onBulkActionsClick: (event: ReactMouseEvent<HTMLElement>) => void
   onSelectAllClick: () => void
   onDeselectAllClick: () => void
-  visibleModelCount: number
 }
 
-export function ModelsFilters({
+export function TexturesFilters({
   isSearchOpen,
   onSearchToggle,
   isFiltersOpen,
@@ -72,73 +76,50 @@ export function ModelsFilters({
   searchQuery,
   onSearchChange,
   packs,
-  projects,
   categories,
-  tags,
   selectedPackIds,
-  selectedProjectIds,
   selectedCategoryKeys,
-  selectedCategoryIds,
-  selectedTagNames,
-  hasConceptImages,
+  selectedTextureTypes,
   onPackFilterChange,
-  onProjectFilterChange,
   onCategoryChange,
-  onTagChange,
-  onHasConceptImagesChange,
-  packFilterDisabled = false,
-  projectFilterDisabled = false,
+  onTextureTypesChange,
   cardWidth,
   onCardWidthChange,
-  modelCount,
-  selectedModelCount,
+  count,
+  unitLabel,
+  selectedCount,
+  visibleCount,
   onUploadClick,
+  onCreateClick,
   onRefreshClick,
   onBulkActionsClick,
   onSelectAllClick,
   onDeselectAllClick,
-  visibleModelCount,
-}: ModelsFiltersProps) {
-  const [showCategoryManager, setShowCategoryManager] = useState(false)
-
+}: TexturesFiltersProps) {
   const packOptions = packs.map(pack => ({
     label: pack.name,
     value: pack.id,
   }))
 
-  const projectOptions = projects.map(project => ({
-    label: project.name,
-    value: project.id,
-  }))
-  const tagOptions = tags.map(tag => ({
-    label: tag.name,
-    value: tag.name,
-  }))
   const hasActiveSearch = searchQuery.trim().length > 0
+  const selectedCategoryCount = Object.values(selectedCategoryKeys).filter(
+    state => state?.checked
+  ).length
   const hasActiveFilters =
     selectedPackIds.length > 0 ||
-    selectedProjectIds.length > 0 ||
-    selectedCategoryIds.length > 0 ||
-    selectedTagNames.length > 0 ||
-    hasConceptImages
+    selectedCategoryCount > 0 ||
+    selectedTextureTypes.length > 0
 
   const activeFilterCount = [
     selectedPackIds.length > 0,
-    selectedProjectIds.length > 0,
-    selectedCategoryIds.length > 0,
-    selectedTagNames.length > 0,
-    hasConceptImages,
+    selectedCategoryCount > 0,
+    selectedTextureTypes.length > 0,
   ].filter(Boolean).length
-  const selectedCountLabel = `${selectedModelCount} model${selectedModelCount === 1 ? '' : 's'}`
+
+  const selectedCountLabel = `${selectedCount} ${unitLabel}${selectedCount === 1 ? '' : 's'}`
 
   return (
     <ListToolbar>
-      <ModelCategoryManagerDialog
-        visible={showCategoryManager}
-        categories={categories}
-        onHide={() => setShowCategoryManager(false)}
-      />
-
       <ListToolbarRow>
         <ListToolbarActions>
           <ListToolbarButton
@@ -148,7 +129,7 @@ export function ModelsFilters({
             onClick={() => onSearchToggle(!isSearchOpen)}
             ariaLabel="Search"
             ariaExpanded={isSearchOpen}
-            ariaControls="model-grid-search-panel"
+            ariaControls="texture-set-grid-search-panel"
           />
           <ListToolbarButton
             icon="pi pi-sliders-h"
@@ -157,7 +138,7 @@ export function ModelsFilters({
             onClick={() => onFiltersToggle(!isFiltersOpen)}
             ariaLabel="Filters"
             ariaExpanded={isFiltersOpen}
-            ariaControls="model-grid-filters-panel"
+            ariaControls="texture-set-grid-filters-panel"
             badge={activeFilterCount}
           />
           <OptionsButton
@@ -165,29 +146,42 @@ export function ModelsFilters({
             minCardWidth={120}
             maxCardWidth={400}
             onCardWidthChange={onCardWidthChange}
+            showThumbnailAnimation={false}
           />
           <ListToolbarButton
             icon="pi pi-upload"
             label="Upload"
             onClick={onUploadClick}
-            tooltip="Upload models"
-            // ModelListPage.ts (e2e) selects this button by accessible name
-            // via `getByLabel("Upload models")`.
-            ariaLabel="Upload models"
+            tooltip="Upload textures"
+            // Keep the descriptive aria-label: the texture-sets page object
+            // (`tests/e2e/pages/TextureSetsPage.ts`) selects this button via
+            // `button[aria-label="Upload textures"]`.
+            ariaLabel="Upload textures"
+          />
+          <ListToolbarButton
+            icon="pi pi-plus"
+            label="Create Set"
+            onClick={onCreateClick}
+            tooltip="Create a new texture set"
+            ariaLabel="Create Set"
           />
           <ListToolbarButton
             icon="pi pi-refresh"
             label="Refresh"
             onClick={onRefreshClick}
-            tooltip="Refresh models"
+            tooltip="Refresh list"
             ariaLabel="Refresh"
           />
         </ListToolbarActions>
 
-        <ListToolbarCount count={modelCount} unitLabel="model" />
+        <ListToolbarCount
+          icon="pi pi-palette"
+          count={count}
+          unitLabel={unitLabel}
+        />
       </ListToolbarRow>
 
-      {selectedModelCount > 0 ? (
+      {selectedCount > 0 ? (
         <ListToolbarSelectionBar>
           <ListToolbarSelectionSummary>
             {selectedCountLabel} selected.
@@ -203,10 +197,7 @@ export function ModelsFilters({
             <ListToolbarButton
               label="Select All"
               onClick={onSelectAllClick}
-              disabled={
-                visibleModelCount === 0 ||
-                selectedModelCount >= visibleModelCount
-              }
+              disabled={visibleCount === 0 || selectedCount >= visibleCount}
             />
             <ListToolbarButton
               label="Deselect All"
@@ -216,15 +207,18 @@ export function ModelsFilters({
         </ListToolbarSelectionBar>
       ) : null}
 
-      <ListToolbarPanel id="model-grid-search-panel" open={isSearchOpen}>
+      <ListToolbarPanel id="texture-set-grid-search-panel" open={isSearchOpen}>
         <ListToolbarSearchInput
           value={searchQuery}
           onChange={onSearchChange}
-          placeholder="Search models..."
+          placeholder="Search texture sets..."
         />
       </ListToolbarPanel>
 
-      <ListToolbarPanel id="model-grid-filters-panel" open={isFiltersOpen}>
+      <ListToolbarPanel
+        id="texture-set-grid-filters-panel"
+        open={isFiltersOpen}
+      >
         <div className="list-filters-row">
           {packs.length > 0 && (
             <MultiSelect
@@ -234,57 +228,31 @@ export function ModelsFilters({
               placeholder="Packs"
               className="list-filters-control"
               display="chip"
-              showClear={!packFilterDisabled}
+              showClear
               filter
               filterPlaceholder="Search packs..."
-              disabled={packFilterDisabled}
-              data-testid="pack-filter"
-            />
-          )}
-          {projects.length > 0 && (
-            <MultiSelect
-              value={selectedProjectIds}
-              options={projectOptions}
-              onChange={e => onProjectFilterChange(e.value || [])}
-              placeholder="Projects"
-              data-testid="project-filter"
-              className="list-filters-control"
-              display="chip"
-              showClear={!projectFilterDisabled}
-              filter
-              filterPlaceholder="Search projects..."
-              disabled={projectFilterDisabled}
             />
           )}
           {categories.length > 0 && (
-            <ModelCategoryFilterPicker
+            <CategoryFilterPicker
               categories={categories}
               selectedKeys={selectedCategoryKeys}
               onChange={onCategoryChange}
-              onManageClick={() => setShowCategoryManager(true)}
-              disabled={categories.length === 0}
+              label="Categories"
+              ariaLabel="Filter by texture-set categories"
             />
           )}
-          {tags.length > 0 && (
-            <MultiSelect
-              value={selectedTagNames}
-              options={tagOptions}
-              onChange={event => onTagChange(event.value || [])}
-              placeholder="Tags"
-              className="list-filters-control"
-              display="chip"
-              showClear
-              filter
-              filterPlaceholder="Search tags..."
-            />
-          )}
-          <div className="list-filters-switch models-filter-switch">
-            <InputSwitch
-              checked={hasConceptImages}
-              onChange={e => onHasConceptImagesChange(Boolean(e.value))}
-            />
-            <span>Concept art</span>
-          </div>
+          <MultiSelect
+            value={selectedTextureTypes}
+            options={TEXTURE_TYPE_FILTER_OPTIONS}
+            onChange={e => onTextureTypesChange(e.value || [])}
+            placeholder="Texture types"
+            className="list-filters-control"
+            display="chip"
+            showClear
+            filter
+            filterPlaceholder="Search types..."
+          />
           {hasActiveFilters ? (
             <Button
               icon="pi pi-times"
@@ -293,21 +261,17 @@ export function ModelsFilters({
               tooltipOptions={{ position: 'bottom' }}
               onClick={() => {
                 onPackFilterChange([])
-                onProjectFilterChange([])
                 onCategoryChange({})
-                onTagChange([])
-                onHasConceptImagesChange(false)
+                onTextureTypesChange([])
               }}
             />
           ) : null}
         </div>
 
-        {packs.length === 0 &&
-        projects.length === 0 &&
-        categories.length === 0 &&
-        tags.length === 0 ? (
+        {packs.length === 0 && categories.length === 0 ? (
           <span className="list-filters-empty">
-            No category, tag, pack, or project filters yet.
+            No pack or category filters yet — texture-type filter is always
+            available.
           </span>
         ) : null}
       </ListToolbarPanel>
