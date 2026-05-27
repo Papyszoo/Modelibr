@@ -26,7 +26,8 @@ internal class GetAllProjectsQueryHandler : IQueryHandler<GetAllProjectsQuery, G
             CreatedAt = p.CreatedAt,
             UpdatedAt = p.UpdatedAt,
             ModelCount = p.ModelCount,
-            TextureSetCount = p.TextureSetCount,
+            GlobalMaterialCount = p.GlobalMaterialCount,
+            MultiModelTextureCount = p.MultiModelTextureCount,
             SpriteCount = p.SpriteCount,
             SoundCount = p.SoundCount,
             EnvironmentMapCount = p.EnvironmentMapCount,
@@ -54,7 +55,8 @@ public record ProjectListDto
     public DateTime CreatedAt { get; init; }
     public DateTime UpdatedAt { get; init; }
     public int ModelCount { get; init; }
-    public int TextureSetCount { get; init; }
+    public int GlobalMaterialCount { get; init; }
+    public int MultiModelTextureCount { get; init; }
     public int SpriteCount { get; init; }
     public int SoundCount { get; init; }
     public int EnvironmentMapCount { get; init; }

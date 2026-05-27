@@ -1,4 +1,4 @@
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { type RefObject } from 'react'
 
 import {
@@ -60,6 +60,7 @@ export function useSpriteMutations({
   loadCategories,
   toast,
 }: UseSpriteMutationsOptions) {
+  const queryClient = useQueryClient()
   const saveCategoryMutation = useMutation({
     mutationFn: async (vars: {
       editingCategory: SpriteCategoryDto | null
@@ -190,6 +191,7 @@ export function useSpriteMutations({
       setSelectedSpriteIds(new Set())
       setContextMenuTarget(null)
       await invalidateSprites()
+      await queryClient.invalidateQueries({ queryKey: ['recycledFiles'] })
     },
     onError: error => {
       console.error('Failed to recycle sprites:', error)

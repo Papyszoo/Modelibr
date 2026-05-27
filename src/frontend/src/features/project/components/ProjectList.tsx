@@ -207,23 +207,28 @@ export function ProjectList() {
                     </p>
                   )}
                   <div className="project-grid-card-stats">
-                    <span>
+                    <span title="Models">
                       <i className="pi pi-box" /> {project.modelCount}
                     </span>
-                    <span>
-                      <i className="pi pi-palette" /> {project.textureSetCount}
+                    <span title="Global Materials">
+                      <i className="pi pi-palette" />{' '}
+                      {project.globalMaterialCount}
                     </span>
-                    <span>
+                    <span title="Multi-Model Textures">
+                      <i className="pi pi-th-large" />{' '}
+                      {project.multiModelTextureCount}
+                    </span>
+                    <span title="Sprites">
                       <i className="pi pi-image" /> {project.spriteCount}
                     </span>
-                    <span>
+                    <span title="Sounds">
                       <i className="pi pi-volume-up" /> {project.soundCount}
                     </span>
-                    <span>
+                    <span title="Environment maps">
                       <i className="pi pi-globe" />{' '}
                       {project.environmentMapCount ?? 0}
                     </span>
-                    <span>
+                    <span title="Concept images">
                       <i className="pi pi-images" /> {project.conceptImageCount}
                     </span>
                   </div>

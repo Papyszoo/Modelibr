@@ -110,6 +110,13 @@ export const EnvironmentMapContextMenu = forwardRef<
         queryClient.invalidateQueries({ queryKey: ['packs'] }),
         queryClient.invalidateQueries({ queryKey: ['projects'] }),
         queryClient.invalidateQueries({ queryKey: ['model-tags'] }),
+        // Container detail + the env-maps list rendered inside Pack/Project
+        // viewers. Without this, add-to-pack/-project doesn't show up in an
+        // open viewer until a full page reload.
+        queryClient.invalidateQueries({ queryKey: ['container'] }),
+        queryClient.invalidateQueries({
+          queryKey: ['container-environmentMaps'],
+        }),
         ...selectedEnvironmentMaps.map(environmentMap =>
           queryClient.invalidateQueries({
             queryKey: ['environmentMaps', 'detail', environmentMap.id],
@@ -264,6 +271,7 @@ export const EnvironmentMapContextMenu = forwardRef<
         }
 
         await invalidateRelatedQueries()
+        await queryClient.invalidateQueries({ queryKey: ['recycledFiles'] })
         toast.current?.show({
           severity: 'success',
           summary: 'Recycled',

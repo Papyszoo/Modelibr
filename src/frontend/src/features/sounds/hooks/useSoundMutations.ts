@@ -1,4 +1,4 @@
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 import {
   createSoundCategory,
@@ -41,6 +41,7 @@ export function useSoundMutations({
   setSelectedSoundIds,
   setContextMenuTarget,
 }: UseSoundMutationsOptions) {
+  const queryClient = useQueryClient()
   const saveCategoryMutation = useMutation({
     mutationFn: async (vars: {
       editingCategory: SoundCategoryDto | null
@@ -174,6 +175,7 @@ export function useSoundMutations({
       setSelectedSoundIds(new Set())
       setContextMenuTarget(null)
       await loadSounds()
+      await queryClient.invalidateQueries({ queryKey: ['recycledFiles'] })
     },
     onError: error => {
       console.error('Failed to recycle sounds:', error)

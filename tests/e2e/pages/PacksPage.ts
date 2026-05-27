@@ -354,9 +354,17 @@ export class PacksPage {
         return parseInt(text?.trim() || "0", 10);
     }
 
-    async getTextureSetCount(): Promise<number> {
+    async getGlobalMaterialCount(): Promise<number> {
         const stat = this.page.locator(
             ".pack-grid-card-stats span:has(.pi-palette)",
+        );
+        const text = await stat.textContent();
+        return parseInt(text?.trim() || "0", 10);
+    }
+
+    async getMultiModelTextureCount(): Promise<number> {
+        const stat = this.page.locator(
+            ".pack-grid-card-stats span:has(.pi-th-large)",
         );
         const text = await stat.textContent();
         return parseInt(text?.trim() || "0", 10);

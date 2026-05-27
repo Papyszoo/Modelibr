@@ -1,3 +1,5 @@
+using Domain.ValueObjects;
+
 namespace Domain.Models;
 
 /// <summary>
@@ -437,9 +439,14 @@ public class Project : AggregateRoot
     public int ModelCount => _models.Count;
 
     /// <summary>
-    /// Gets the count of texture sets in this project.
+    /// Gets the count of universal (Global Materials) texture sets in this project.
     /// </summary>
-    public int TextureSetCount => _textureSets.Count;
+    public int GlobalMaterialCount => _textureSets.Count(ts => ts.Kind == TextureSetKind.Universal);
+
+    /// <summary>
+    /// Gets the count of model-specific (Multi-Model) texture sets in this project.
+    /// </summary>
+    public int MultiModelTextureCount => _textureSets.Count(ts => ts.Kind == TextureSetKind.ModelSpecific);
 
     /// <summary>
     /// Gets the count of sprites in this project.

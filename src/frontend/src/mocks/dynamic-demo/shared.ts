@@ -279,31 +279,60 @@ export async function trackUpload(
   await addUploadHistory(full)
 }
 
+/**
+ * Recompute the kind-split texture-set counts for a container by looking up
+ * the kind of each linked texture set in the textureSets store. Texture sets
+ * with kind=Universal contribute to `globalMaterialCount`, kind=ModelSpecific
+ * to `multiModelTextureCount`; ModelOwned (or unknown kinds) are excluded
+ * from both — matching the backend domain split.
+ */
+async function splitTextureSetCounts(
+  refs: { id: number; name: string }[]
+): Promise<{ globalMaterialCount: number; multiModelTextureCount: number }> {
+  let globalMaterialCount = 0
+  let multiModelTextureCount = 0
+  for (const ref of refs) {
+    const ts = await getById('textureSets', ref.id)
+    if (!ts) continue
+    if (ts.kind === 1) globalMaterialCount += 1
+    else if (ts.kind === 0) multiModelTextureCount += 1
+  }
+  return { globalMaterialCount, multiModelTextureCount }
+}
+
 /** Recalculate pack counts from its association arrays. */
-export function recomputePackCounts(pack: DemoPack) {
+export async function recomputePackCounts(pack: DemoPack) {
   pack.modelCount = pack.models.length
-  pack.textureSetCount = pack.textureSets.length
+  const { globalMaterialCount, multiModelTextureCount } =
+    await splitTextureSetCounts(pack.textureSets)
+  pack.globalMaterialCount = globalMaterialCount
+  pack.multiModelTextureCount = multiModelTextureCount
   pack.spriteCount = pack.sprites.length
   pack.soundCount = pack.sounds.length
   pack.environmentMapCount = (pack.environmentMaps ?? []).length
   pack.isEmpty =
     pack.modelCount +
-      pack.textureSetCount +
+      pack.globalMaterialCount +
+      pack.multiModelTextureCount +
       pack.spriteCount +
       pack.soundCount +
       (pack.environmentMapCount ?? 0) ===
     0
 }
 
-export function recomputeProjectCounts(project: DemoProject) {
+export async function recomputeProjectCounts(project: DemoProject) {
   project.modelCount = project.models.length
-  project.textureSetCount = project.textureSets.length
+  const { globalMaterialCount, multiModelTextureCount } =
+    await splitTextureSetCounts(project.textureSets)
+  project.globalMaterialCount = globalMaterialCount
+  project.multiModelTextureCount = multiModelTextureCount
   project.spriteCount = project.sprites.length
   project.soundCount = project.sounds.length
   project.environmentMapCount = (project.environmentMaps ?? []).length
   project.isEmpty =
     project.modelCount +
-      project.textureSetCount +
+      project.globalMaterialCount +
+      project.multiModelTextureCount +
       project.spriteCount +
       project.soundCount +
       (project.environmentMapCount ?? 0) ===
@@ -766,6 +795,8 @@ export async function getVersionTextureMaps(
 export function toPackDto(pack: DemoPack) {
   return {
     ...pack,
+    globalMaterialCount: pack.globalMaterialCount ?? 0,
+    multiModelTextureCount: pack.multiModelTextureCount ?? 0,
     environmentMapCount: pack.environmentMapCount ?? 0,
     environmentMaps: pack.environmentMaps ?? [],
     licenseType: pack.licenseType ?? '',
@@ -781,6 +812,8 @@ export function toProjectDto(project: DemoProject) {
   return {
     ...project,
     notes: project.notes ?? '',
+    globalMaterialCount: project.globalMaterialCount ?? 0,
+    multiModelTextureCount: project.multiModelTextureCount ?? 0,
     environmentMapCount: project.environmentMapCount ?? 0,
     environmentMaps: project.environmentMaps ?? [],
     customThumbnailFileId: project.customThumbnailFileId ?? null,
@@ -883,16 +916,18 @@ export async function ensureDemoDataShape(): Promise<void> {
 
     const previousSignature = [
       pack.modelCount,
-      pack.textureSetCount,
+      pack.globalMaterialCount,
+      pack.multiModelTextureCount,
       pack.spriteCount,
       pack.soundCount,
       pack.environmentMapCount,
       pack.isEmpty,
     ].join(':')
-    recomputePackCounts(pack)
+    await recomputePackCounts(pack)
     const nextSignature = [
       pack.modelCount,
-      pack.textureSetCount,
+      pack.globalMaterialCount,
+      pack.multiModelTextureCount,
       pack.spriteCount,
       pack.soundCount,
       pack.environmentMapCount,
@@ -965,16 +1000,18 @@ export async function ensureDemoDataShape(): Promise<void> {
 
     const previousSignature = [
       project.modelCount,
-      project.textureSetCount,
+      project.globalMaterialCount,
+      project.multiModelTextureCount,
       project.spriteCount,
       project.soundCount,
       project.environmentMapCount,
       project.isEmpty,
     ].join(':')
-    recomputeProjectCounts(project)
+    await recomputeProjectCounts(project)
     const nextSignature = [
       project.modelCount,
-      project.textureSetCount,
+      project.globalMaterialCount,
+      project.multiModelTextureCount,
       project.spriteCount,
       project.soundCount,
       project.environmentMapCount,

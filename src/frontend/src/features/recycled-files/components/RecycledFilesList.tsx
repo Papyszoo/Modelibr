@@ -317,6 +317,7 @@ export function RecycledFilesList() {
       entityId: textureSet.id,
       successDetail: `${textureSet.name} has been restored`,
       errorDetail: 'Failed to restore texture set',
+      invalidateQueryKeys: [['textureSets']],
     })
   }
 

@@ -12,6 +12,7 @@ import { ContainerSpritesTab } from '@/shared/components/container-tabs/Containe
 import { ContainerTextureSetsTab } from '@/shared/components/container-tabs/ContainerTextureSetsTab'
 import { useContainerData } from '@/shared/hooks/useContainerData'
 import { type ContainerAdapter } from '@/shared/types/ContainerTypes'
+import { TextureSetKind } from '@/types'
 
 interface ContainerViewerProps {
   adapter: ContainerAdapter
@@ -21,7 +22,9 @@ interface ContainerViewerProps {
 export function ContainerViewer({ adapter, tabId }: ContainerViewerProps) {
   const toast = useRef<Toast>(null)
   const [modelTotalCount, setModelTotalCount] = useState(0)
-  const [textureSetTotalCount, setTextureSetTotalCount] = useState(0)
+  const [globalMaterialTotalCount, setGlobalMaterialTotalCount] = useState(0)
+  const [multiModelTextureTotalCount, setMultiModelTextureTotalCount] =
+    useState(0)
   const [spriteTotalCount, setSpriteTotalCount] = useState(0)
   const [soundTotalCount, setSoundTotalCount] = useState(0)
   const [environmentMapTotalCount, setEnvironmentMapTotalCount] = useState(0)
@@ -51,7 +54,8 @@ export function ContainerViewer({ adapter, tabId }: ContainerViewerProps) {
   useEffect(() => {
     if (container) {
       setModelTotalCount(container.modelCount)
-      setTextureSetTotalCount(container.textureSetCount)
+      setGlobalMaterialTotalCount(container.globalMaterialCount)
+      setMultiModelTextureTotalCount(container.multiModelTextureCount)
       setSpriteTotalCount(container.spriteCount)
       setSoundTotalCount(container.soundCount)
       setEnvironmentMapTotalCount(container.environmentMapCount ?? 0)
@@ -105,7 +109,12 @@ export function ContainerViewer({ adapter, tabId }: ContainerViewerProps) {
                   <label>Assets</label>
                   <div className="container-detail-assets">
                     <span>{container.modelCount} models</span>
-                    <span>{container.textureSetCount} texture sets</span>
+                    <span>
+                      {container.globalMaterialCount} global materials
+                    </span>
+                    <span>
+                      {container.multiModelTextureCount} multi-model textures
+                    </span>
                     <span>{container.spriteCount} sprites</span>
                     <span>{container.soundCount} sounds</span>
                     <span>
@@ -126,12 +135,29 @@ export function ContainerViewer({ adapter, tabId }: ContainerViewerProps) {
             />
           </TabPanel>
 
-          <TabPanel header={`Texture Sets: ${textureSetTotalCount}`}>
+          <TabPanel header={`Global Materials: ${globalMaterialTotalCount}`}>
             <ContainerTextureSetsTab
               adapter={adapter}
               showToast={showToast}
               refetchContainer={refetchContainer}
-              onTotalCountChange={setTextureSetTotalCount}
+              onTotalCountChange={setGlobalMaterialTotalCount}
+              kind={TextureSetKind.Universal}
+              assetLabel="global material"
+              assetTitle="Global Material"
+            />
+          </TabPanel>
+
+          <TabPanel
+            header={`Multi-Model Textures: ${multiModelTextureTotalCount}`}
+          >
+            <ContainerTextureSetsTab
+              adapter={adapter}
+              showToast={showToast}
+              refetchContainer={refetchContainer}
+              onTotalCountChange={setMultiModelTextureTotalCount}
+              kind={TextureSetKind.ModelSpecific}
+              assetLabel="multi-model texture"
+              assetTitle="Multi-Model Texture"
             />
           </TabPanel>
 

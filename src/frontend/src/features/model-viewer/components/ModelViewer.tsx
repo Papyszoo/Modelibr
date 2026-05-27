@@ -517,6 +517,7 @@ export function ModelViewer({
           await modelQuery.refetch()
         }
         await versionsQuery.refetch()
+        await queryClient.invalidateQueries({ queryKey: ['recycledFiles'] })
       } catch (error) {
         console.error('Failed to recycle version:', error)
         const errorMessage =
@@ -532,7 +533,7 @@ export function ModelViewer({
         })
       }
     },
-    [model, modelId, propModel, versionsQuery, modelQuery]
+    [model, modelId, propModel, versionsQuery, modelQuery, queryClient]
   )
 
   const showToast = useCallback(

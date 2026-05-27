@@ -226,7 +226,8 @@ export function PackDetailsPanel({
             <span className="container-rich-kicker">Snapshot</span>
             <div className="container-detail-assets">
               <span>{pack.modelCount} models</span>
-              <span>{pack.textureSetCount} texture sets</span>
+              <span>{pack.globalMaterialCount} global materials</span>
+              <span>{pack.multiModelTextureCount} multi-model textures</span>
               <span>{pack.spriteCount} sprites</span>
               <span>{pack.soundCount} sounds</span>
               <span>{pack.environmentMapCount ?? 0} environment maps</span>

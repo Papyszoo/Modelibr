@@ -338,6 +338,13 @@
   background: transparent;
 }
 
+.texture-set-context-menu-title {
+  padding: 0.5rem 0.875rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-color-secondary);
+}
+
 /* Responsive */
 @media (max-width: 1200px) {
   .texture-set-grid {

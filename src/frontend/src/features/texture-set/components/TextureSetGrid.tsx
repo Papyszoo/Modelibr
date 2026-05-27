@@ -1,5 +1,6 @@
 import './TextureSetGrid.css'
 
+import { useQueryClient } from '@tanstack/react-query'
 import { Button } from 'primereact/button'
 import { ContextMenu } from 'primereact/contextmenu'
 import { type MenuItem } from 'primereact/menuitem'
@@ -17,6 +18,7 @@ import { type GridComponents, VirtuosoGrid } from 'react-virtuoso'
 
 import { getFilePreviewUrl } from '@/features/models/api/modelApi'
 import { addTextureSetToPack } from '@/features/pack/api/packApi'
+import { addTextureSetToProject } from '@/features/project/api/projectApi'
 import {
   addTextureToSetEndpoint,
   hardDeleteTextureSet,
@@ -28,6 +30,7 @@ import { MergeTextureSetDialog } from '@/features/texture-set/dialogs/MergeTextu
 import { useTabContext } from '@/hooks/useTabContext'
 import { baseURL } from '@/lib/apiBase'
 import { SelectPackDialog } from '@/shared/components/dialogs/SelectPackDialog'
+import { SelectProjectDialog } from '@/shared/components/dialogs/SelectProjectDialog'
 import {
   type TextureChannel,
   type TextureSetDto,
@@ -97,6 +100,7 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
   const [scrollParent, setScrollParent] = useState<HTMLDivElement | null>(null)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showPackDialog, setShowPackDialog] = useState(false)
+  const [showProjectDialog, setShowProjectDialog] = useState(false)
   const [showMergeDialog, setShowMergeDialog] = useState(false)
   const [draggedTextureSet, setDraggedTextureSet] =
     useState<TextureSetDto | null>(null)
@@ -124,6 +128,7 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
   const selectionSurfaceRef = useRef<HTMLDivElement | null>(null)
 
   const { openTextureSetDetailsTab } = useTabContext()
+  const queryClient = useQueryClient()
 
   const {
     textureSets,
@@ -521,6 +526,16 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
     invalidateTextureSets()
   }
 
+  // After mutating a pack/project association, refresh both list-level and
+  // container-viewer caches so an open Pack/Project tab updates live.
+  const invalidateContainerCaches = (target: 'pack' | 'project') => {
+    queryClient.invalidateQueries({
+      queryKey: [target === 'pack' ? 'packs' : 'projects'],
+    })
+    queryClient.invalidateQueries({ queryKey: ['container'] })
+    queryClient.invalidateQueries({ queryKey: ['container-textureSets'] })
+  }
+
   const handleAddToPack = async (packId: number) => {
     const sets = targetSets()
     let okCount = 0
@@ -539,6 +554,28 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
       life: 3000,
     })
     setShowPackDialog(false)
+    invalidateContainerCaches('pack')
+  }
+
+  const handleAddToProject = async (projectId: number) => {
+    const sets = targetSets()
+    let okCount = 0
+    for (const set of sets) {
+      try {
+        await addTextureSetToProject(projectId, set.id)
+        okCount += 1
+      } catch (error) {
+        console.error('Failed to add texture set to project:', error)
+      }
+    }
+    toast.current?.show({
+      severity: okCount === sets.length ? 'success' : 'warn',
+      summary: 'Add to project',
+      detail: `Added ${okCount} of ${sets.length} set${sets.length === 1 ? '' : 's'}`,
+      life: 3000,
+    })
+    setShowProjectDialog(false)
+    invalidateContainerCaches('project')
   }
 
   const handleRecycle = async () => {
@@ -566,6 +603,7 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
       life: 3000,
     })
     invalidateTextureSets()
+    queryClient.invalidateQueries({ queryKey: ['recycledFiles'] })
     if (contextMode === 'bulk') {
       setSelectedTextureSetIds([])
     }
@@ -580,7 +618,18 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
           : []
     const allUniversal =
       sets.length > 0 && sets.every(s => s.kind === TextureSetKind.Universal)
+    const selectedCountLabel = `${sets.length} ${unitLabel}${sets.length === 1 ? '' : 's'}`
     return [
+      {
+        disabled: true,
+        visible: contextMode === 'bulk',
+        template: () => (
+          <div className="texture-set-context-menu-title">
+            Selected {selectedCountLabel}
+          </div>
+        ),
+      },
+      { separator: true, visible: contextMode === 'bulk' },
       {
         label: 'Show in Folder',
         icon: 'pi pi-folder-open',
@@ -619,6 +668,14 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
         command: () => setShowPackDialog(true),
       },
       {
+        label:
+          contextMode === 'bulk'
+            ? `Add ${sets.length} to Project`
+            : 'Add to Project',
+        icon: 'pi pi-folder',
+        command: () => setShowProjectDialog(true),
+      },
+      {
         label: contextMode === 'bulk' ? `Recycle ${sets.length}` : 'Recycle',
         icon: 'pi pi-trash',
         command: handleRecycle,
@@ -628,7 +685,7 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
     // captured below — including them would trigger a new menu identity on
     // every render and drop the open menu.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contextMode, activeContextSet, selectedTextureSets])
+  }, [contextMode, activeContextSet, selectedTextureSets, unitLabel])
 
   const handleBulkActionsClick = useCallback(
     (event: ReactMouseEvent<HTMLElement>) => {
@@ -920,6 +977,17 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
         visible={showPackDialog}
         onHide={() => setShowPackDialog(false)}
         onSelect={handleAddToPack}
+      />
+
+      <SelectProjectDialog
+        visible={showProjectDialog}
+        onHide={() => setShowProjectDialog(false)}
+        onSelect={handleAddToProject}
+        header={
+          contextMode === 'bulk' && selectedTextureSets.length > 0
+            ? `Add ${selectedTextureSets.length} ${unitLabel}${selectedTextureSets.length === 1 ? '' : 's'} to Project`
+            : 'Add to Project'
+        }
       />
 
       <MergeTextureSetDialog
