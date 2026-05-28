@@ -123,6 +123,12 @@ export const ModelContextMenu = forwardRef<
         queryClient.invalidateQueries({ queryKey: ['packs'] }),
         queryClient.invalidateQueries({ queryKey: ['projects'] }),
         queryClient.invalidateQueries({ queryKey: ['model-tags'] }),
+        // Container detail rendered inside Pack/Project viewers. Add /
+        // remove / recycle must refresh this so the viewer reflects the
+        // change without a full page reload. (The model list inside the
+        // viewer reuses the ['models', params] query, so the ['models']
+        // invalidation above already covers it.)
+        queryClient.invalidateQueries({ queryKey: ['container'] }),
         ...selectedModels.map(model =>
           queryClient.invalidateQueries({
             queryKey: ['models', 'detail', String(model.id)],
@@ -220,6 +226,7 @@ export const ModelContextMenu = forwardRef<
           await softDeleteModel(Number(model.id))
         }
         await invalidateRelatedQueries()
+        await queryClient.invalidateQueries({ queryKey: ['recycledFiles'] })
         toast.current?.show({
           severity: 'success',
           summary: 'Recycled',

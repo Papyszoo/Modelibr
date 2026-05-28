@@ -33,7 +33,8 @@ internal class GetPackByIdQueryHandler : IQueryHandler<GetPackByIdQuery, PackDet
             CreatedAt = pack.CreatedAt,
             UpdatedAt = pack.UpdatedAt,
             ModelCount = pack.ModelCount,
-            TextureSetCount = pack.TextureSetCount,
+            GlobalMaterialCount = pack.GlobalMaterialCount,
+            MultiModelTextureCount = pack.MultiModelTextureCount,
             SpriteCount = pack.SpriteCount,
             SoundCount = pack.SoundCount,
             EnvironmentMapCount = pack.EnvironmentMapCount,
@@ -80,7 +81,8 @@ public record PackDetailDto
     public DateTime CreatedAt { get; init; }
     public DateTime UpdatedAt { get; init; }
     public int ModelCount { get; init; }
-    public int TextureSetCount { get; init; }
+    public int GlobalMaterialCount { get; init; }
+    public int MultiModelTextureCount { get; init; }
     public int SpriteCount { get; init; }
     public int SoundCount { get; init; }
     public int EnvironmentMapCount { get; init; }

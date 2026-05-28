@@ -250,7 +250,7 @@ export const systemHandlers = [
                 ...(pack.environmentMaps ?? []),
                 { id: environmentMap.id, name: environmentMap.name },
               ]
-              recomputePackCounts(pack)
+              await recomputePackCounts(pack)
               await put('packs', pack)
             }
           }
@@ -267,7 +267,7 @@ export const systemHandlers = [
                 ...(project.environmentMaps ?? []),
                 { id: environmentMap.id, name: environmentMap.name },
               ]
-              recomputeProjectCounts(project)
+              await recomputeProjectCounts(project)
               await put('projects', project)
             }
           }

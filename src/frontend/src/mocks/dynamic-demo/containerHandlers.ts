@@ -55,7 +55,8 @@ export const containerHandlers = [
       createdAt: ts,
       updatedAt: ts,
       modelCount: 0,
-      textureSetCount: 0,
+      globalMaterialCount: 0,
+      multiModelTextureCount: 0,
       spriteCount: 0,
       soundCount: 0,
       isEmpty: true,
@@ -113,7 +114,7 @@ export const containerHandlers = [
     if (!pack || !model) return new HttpResponse(null, { status: 404 })
     if (!pack.models.some(m => m.id === model.id)) {
       pack.models.push({ id: model.id, name: model.name })
-      recomputePackCounts(pack)
+      await recomputePackCounts(pack)
       pack.updatedAt = now()
       await put('packs', pack)
     }
@@ -129,7 +130,7 @@ export const containerHandlers = [
     const model = await getById('models', Number(params.modelId))
     if (!pack) return new HttpResponse(null, { status: 404 })
     pack.models = pack.models.filter(m => m.id !== Number(params.modelId))
-    recomputePackCounts(pack)
+    await recomputePackCounts(pack)
     pack.updatedAt = now()
     await put('packs', pack)
     if (model) {
@@ -146,7 +147,7 @@ export const containerHandlers = [
     if (!pack || !ts) return new HttpResponse(null, { status: 404 })
     if (!pack.textureSets.some(t => t.id === ts.id)) {
       pack.textureSets.push({ id: ts.id, name: ts.name })
-      recomputePackCounts(pack)
+      await recomputePackCounts(pack)
       pack.updatedAt = now()
       await put('packs', pack)
     }
@@ -163,7 +164,7 @@ export const containerHandlers = [
     pack.textureSets = pack.textureSets.filter(
       t => t.id !== Number(params.tsId)
     )
-    recomputePackCounts(pack)
+    await recomputePackCounts(pack)
     pack.updatedAt = now()
     await put('packs', pack)
     const ts = await getById('textureSets', Number(params.tsId))
@@ -181,7 +182,7 @@ export const containerHandlers = [
     if (!pack || !sprite) return new HttpResponse(null, { status: 404 })
     if (!pack.sprites.some(s => s.id === sprite.id)) {
       pack.sprites.push({ id: sprite.id, name: sprite.name })
-      recomputePackCounts(pack)
+      await recomputePackCounts(pack)
       pack.updatedAt = now()
       await put('packs', pack)
     }
@@ -192,7 +193,7 @@ export const containerHandlers = [
     const pack = await getById('packs', Number(params.packId))
     if (!pack) return new HttpResponse(null, { status: 404 })
     pack.sprites = pack.sprites.filter(s => s.id !== Number(params.spriteId))
-    recomputePackCounts(pack)
+    await recomputePackCounts(pack)
     pack.updatedAt = now()
     await put('packs', pack)
     return new HttpResponse(null, { status: 204 })
@@ -205,7 +206,7 @@ export const containerHandlers = [
     if (!pack || !sound) return new HttpResponse(null, { status: 404 })
     if (!pack.sounds.some(s => s.id === sound.id)) {
       pack.sounds.push({ id: sound.id, name: sound.name })
-      recomputePackCounts(pack)
+      await recomputePackCounts(pack)
       pack.updatedAt = now()
       await put('packs', pack)
     }
@@ -216,7 +217,7 @@ export const containerHandlers = [
     const pack = await getById('packs', Number(params.packId))
     if (!pack) return new HttpResponse(null, { status: 404 })
     pack.sounds = pack.sounds.filter(s => s.id !== Number(params.soundId))
-    recomputePackCounts(pack)
+    await recomputePackCounts(pack)
     pack.updatedAt = now()
     await put('packs', pack)
     return new HttpResponse(null, { status: 204 })
@@ -238,7 +239,7 @@ export const containerHandlers = [
           ...(pack.environmentMaps ?? []),
           { id: environmentMap.id, name: environmentMap.name },
         ]
-        recomputePackCounts(pack)
+        await recomputePackCounts(pack)
         pack.updatedAt = now()
         await put('packs', pack)
       }
@@ -262,7 +263,7 @@ export const containerHandlers = [
       pack.environmentMaps = (pack.environmentMaps ?? []).filter(
         item => item.id !== Number(params.environmentMapId)
       )
-      recomputePackCounts(pack)
+      await recomputePackCounts(pack)
       pack.updatedAt = now()
       await put('packs', pack)
       if (environmentMap) {
@@ -333,7 +334,7 @@ export const containerHandlers = [
       if (pack) {
         textureSet.packs = [{ id: packId, name: pack.name }]
         pack.textureSets.push({ id: tsId, name })
-        recomputePackCounts(pack)
+        await recomputePackCounts(pack)
         pack.updatedAt = ts
         await put('packs', pack)
       }
@@ -374,7 +375,8 @@ export const containerHandlers = [
       createdAt: ts,
       updatedAt: ts,
       modelCount: 0,
-      textureSetCount: 0,
+      globalMaterialCount: 0,
+      multiModelTextureCount: 0,
       spriteCount: 0,
       soundCount: 0,
       isEmpty: true,
@@ -461,7 +463,7 @@ export const containerHandlers = [
     if (!project || !model) return new HttpResponse(null, { status: 404 })
     if (!project.models.some(m => m.id === model.id)) {
       project.models.push({ id: model.id, name: model.name })
-      recomputeProjectCounts(project)
+      await recomputeProjectCounts(project)
       project.updatedAt = now()
       await put('projects', project)
     }
@@ -480,7 +482,7 @@ export const containerHandlers = [
     const model = await getById('models', Number(params.modelId))
     if (!project) return new HttpResponse(null, { status: 404 })
     project.models = project.models.filter(m => m.id !== Number(params.modelId))
-    recomputeProjectCounts(project)
+    await recomputeProjectCounts(project)
     project.updatedAt = now()
     await put('projects', project)
     if (model) {
@@ -497,7 +499,7 @@ export const containerHandlers = [
     if (!project || !ts) return new HttpResponse(null, { status: 404 })
     if (!project.textureSets.some(t => t.id === ts.id)) {
       project.textureSets.push({ id: ts.id, name: ts.name })
-      recomputeProjectCounts(project)
+      await recomputeProjectCounts(project)
       project.updatedAt = now()
       await put('projects', project)
     }
@@ -512,7 +514,7 @@ export const containerHandlers = [
       project.textureSets = project.textureSets.filter(
         t => t.id !== Number(params.tsId)
       )
-      recomputeProjectCounts(project)
+      await recomputeProjectCounts(project)
       project.updatedAt = now()
       await put('projects', project)
       return new HttpResponse(null, { status: 204 })
@@ -526,7 +528,7 @@ export const containerHandlers = [
     if (!project || !sprite) return new HttpResponse(null, { status: 404 })
     if (!project.sprites.some(s => s.id === sprite.id)) {
       project.sprites.push({ id: sprite.id, name: sprite.name })
-      recomputeProjectCounts(project)
+      await recomputeProjectCounts(project)
       project.updatedAt = now()
       await put('projects', project)
     }
@@ -539,7 +541,7 @@ export const containerHandlers = [
     project.sprites = project.sprites.filter(
       s => s.id !== Number(params.spriteId)
     )
-    recomputeProjectCounts(project)
+    await recomputeProjectCounts(project)
     project.updatedAt = now()
     await put('projects', project)
     return new HttpResponse(null, { status: 204 })
@@ -552,7 +554,7 @@ export const containerHandlers = [
     if (!project || !sound) return new HttpResponse(null, { status: 404 })
     if (!project.sounds.some(s => s.id === sound.id)) {
       project.sounds.push({ id: sound.id, name: sound.name })
-      recomputeProjectCounts(project)
+      await recomputeProjectCounts(project)
       project.updatedAt = now()
       await put('projects', project)
     }
@@ -563,7 +565,7 @@ export const containerHandlers = [
     const project = await getById('projects', Number(params.projectId))
     if (!project) return new HttpResponse(null, { status: 404 })
     project.sounds = project.sounds.filter(s => s.id !== Number(params.soundId))
-    recomputeProjectCounts(project)
+    await recomputeProjectCounts(project)
     project.updatedAt = now()
     await put('projects', project)
     return new HttpResponse(null, { status: 204 })
@@ -587,7 +589,7 @@ export const containerHandlers = [
           ...(project.environmentMaps ?? []),
           { id: environmentMap.id, name: environmentMap.name },
         ]
-        recomputeProjectCounts(project)
+        await recomputeProjectCounts(project)
         project.updatedAt = now()
         await put('projects', project)
       }
@@ -611,7 +613,7 @@ export const containerHandlers = [
       project.environmentMaps = (project.environmentMaps ?? []).filter(
         item => item.id !== Number(params.environmentMapId)
       )
-      recomputeProjectCounts(project)
+      await recomputeProjectCounts(project)
       project.updatedAt = now()
       await put('projects', project)
       if (environmentMap) {
@@ -681,7 +683,7 @@ export const containerHandlers = [
       const project = await getById('projects', projectId)
       if (project) {
         project.textureSets.push({ id: tsId, name })
-        recomputeProjectCounts(project)
+        await recomputeProjectCounts(project)
         project.updatedAt = ts
         await put('projects', project)
       }

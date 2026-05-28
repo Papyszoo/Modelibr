@@ -614,373 +614,578 @@ Given(
     },
 );
 
-// ============= Texture Set Association Steps =============
+// ============= Texture Set / Global Material Association Steps =============
+
+// Texture sets in containers are now split into two kinds — "Global Materials"
+// (Universal, kind=1) and "Multi-Model Textures" (ModelSpecific, kind=0). The
+// helpers below take a `kind` arg so the same flow drives both kinds; the
+// existing "texture set" step names continue to mean Multi-Model Textures
+// (backend default) and parallel "global material" step names target Global
+// Materials.
+type TextureSetKindLabel = {
+    tabHeader: string; // tab text in .p-tabview-nav
+    dialogHeader: string; // dialog header substring
+    label: string; // logging label
+};
+
+const MULTI_MODEL_LABEL: TextureSetKindLabel = {
+    tabHeader: "Multi-Model Textures",
+    dialogHeader: "Add Multi-Model Textures",
+    label: "texture set",
+};
+
+const GLOBAL_MATERIAL_LABEL: TextureSetKindLabel = {
+    tabHeader: "Global Materials",
+    dialogHeader: "Add Global Materials",
+    label: "global material",
+};
+
+async function addTextureSetOfKindToProject(
+    page: Page,
+    textureSetName: string,
+    labels: TextureSetKindLabel,
+) {
+    const textureSet = getScenarioState(page).getTextureSet(textureSetName);
+
+    if (!textureSet) {
+        throw new Error(
+            `${labels.label} "${textureSetName}" not found in shared state`,
+        );
+    }
+
+    // Clean up: remove this texture set from the project if already present
+    const project = getScenarioState(page).getProject("Test Project");
+    if (project) {
+        const projRes = await page.request.get(
+            `${API_BASE}/projects/${project.id}`,
+        );
+        if (projRes.ok()) {
+            const projData = await projRes.json();
+            const existing = (projData.textureSets || []).filter(
+                (ts: any) => ts.name === textureSet.name,
+            );
+            for (const ts of existing) {
+                await page.request
+                    .delete(
+                        `${API_BASE}/projects/${project.id}/texture-sets/${ts.id}`,
+                    )
+                    .catch(() => {});
+                console.log(
+                    `[Cleanup] Removed stale ${labels.label} "${ts.name}" (ID: ${ts.id}) from project`,
+                );
+            }
+            if (existing.length > 0) {
+                // Reload the project viewer to reflect changes
+                await page.reload({ waitUntil: "domcontentloaded" });
+                await page
+                    .locator(".container-viewer")
+                    .first()
+                    .waitFor({ state: "visible", timeout: 15000 });
+            }
+        }
+    }
+
+    // Click the appropriate kind tab, then find Add card
+    await page
+        .locator(".p-tabview-nav li")
+        .filter({ hasText: labels.tabHeader })
+        .click();
+
+    const addCard = page.locator(".container-card-add").first();
+    await addCard.waitFor({ state: "visible", timeout: 10000 });
+    await addCard.click();
+    console.log(`[Action] Clicked Add ${labels.label} card`);
+
+    // Wait for dialog
+    await page.waitForSelector(`.p-dialog:has-text("${labels.dialogHeader}")`, {
+        state: "visible",
+        timeout: 5000,
+    });
+    console.log(`[Action] ${labels.dialogHeader} dialog opened`);
+
+    // Find and click texture set item in the dialog grid
+    const textureItems = page.locator(".p-dialog .container-card").filter({
+        hasText: textureSet.name,
+    });
+
+    const firstItem = textureItems.first();
+    await firstItem.waitFor({ state: "visible", timeout: 5000 });
+    await firstItem.click();
+    console.log(`[Action] Clicked ${labels.label} item: ${textureSet.name}`);
+
+    // Wait for selection to register in the Add button
+    const addButton = page
+        .locator('.p-dialog-footer button:has-text("Add Selected")')
+        .first();
+    await addButton.waitFor({ state: "visible", timeout: 5000 });
+
+    const buttonText = await addButton.textContent();
+    console.log(`[Action] Add button text: ${buttonText}`);
+
+    if (buttonText?.includes("(0)")) {
+        const checkbox = firstItem
+            .locator('input[type="checkbox"], .p-checkbox-box')
+            .first();
+        await checkbox.click({ force: true });
+        console.log("[Action] Clicked checkbox directly");
+        // Wait for selection count to update
+        await expect(addButton).not.toContainText("(0)", { timeout: 5000 });
+    }
+
+    // Set up response interceptor before clicking Add
+    const responsePromise = page.waitForResponse(
+        (resp) =>
+            resp.url().includes("/projects/") &&
+            resp.url().includes("/texture-sets/") &&
+            resp.request().method() === "POST",
+        { timeout: 15000 },
+    );
+
+    await addButton.click();
+    console.log("[Action] Clicked Add button");
+
+    // Wait for the API response from the add operation
+    try {
+        const response = await responsePromise;
+        console.log(
+            `[API] Add ${labels.label} response: ${response.status()} ${response.url()}`,
+        );
+    } catch {
+        console.log(
+            `[API] No POST /projects/*/texture-sets/* response detected — add ${labels.label} may have failed silently`,
+        );
+    }
+
+    await page.waitForSelector(`.p-dialog:has-text("${labels.dialogHeader}")`, {
+        state: "hidden",
+        timeout: 10000,
+    });
+    console.log("[Action] Dialog closed");
+
+    // Switch to the kind tab to see the newly added card
+    const kindTab = page
+        .locator(".p-tabview-nav li")
+        .filter({ hasText: labels.tabHeader });
+    await kindTab.click();
+
+    // Wait for the texture set card to appear (React Query refetch + render)
+    const textureSetCard = page
+        .locator(".container-card")
+        .filter({ hasText: textureSet.name })
+        .first();
+    await expect(textureSetCard).toBeVisible({
+        timeout: 15000,
+    });
+    console.log(
+        `[Action] Added ${labels.label} "${textureSet.name}" to project`,
+    );
+}
 
 When(
     "I add texture set {string} to the project",
     async ({ page }, textureSetName: string) => {
-        const textureSet = getScenarioState(page).getTextureSet(textureSetName);
-
-        if (!textureSet) {
-            throw new Error(
-                `Texture set "${textureSetName}" not found in shared state`,
-            );
-        }
-
-        // Clean up: remove this texture set from the project if already present
-        const project = getScenarioState(page).getProject("Test Project");
-        if (project) {
-            const projRes = await page.request.get(
-                `${API_BASE}/projects/${project.id}`,
-            );
-            if (projRes.ok()) {
-                const projData = await projRes.json();
-                const existing = (projData.textureSets || []).filter(
-                    (ts: any) => ts.name === textureSet.name,
-                );
-                for (const ts of existing) {
-                    await page.request
-                        .delete(
-                            `${API_BASE}/projects/${project.id}/texture-sets/${ts.id}`,
-                        )
-                        .catch(() => {});
-                    console.log(
-                        `[Cleanup] Removed stale texture set "${ts.name}" (ID: ${ts.id}) from project`,
-                    );
-                }
-                if (existing.length > 0) {
-                    // Reload the project viewer to reflect changes
-                    await page.reload({ waitUntil: "domcontentloaded" });
-                    await page
-                        .locator(".container-viewer")
-                        .first()
-                        .waitFor({ state: "visible", timeout: 15000 });
-                }
-            }
-        }
-
-        // Click Texture Sets tab first, then find Add card
-        await page
-            .locator(".p-tabview-nav li")
-            .filter({ hasText: "Texture Sets" })
-            .click();
-
-        const addCard = page.locator(".container-card-add").first();
-        await addCard.waitFor({ state: "visible", timeout: 10000 });
-        await addCard.click();
-        console.log("[Action] Clicked Add Texture Set card");
-
-        // Wait for dialog
-        await page.waitForSelector('.p-dialog:has-text("Add Texture Sets")', {
-            state: "visible",
-            timeout: 5000,
-        });
-        console.log("[Action] Add Texture Sets dialog opened");
-
-        // Find and click texture set item in the dialog grid
-        const textureItems = page.locator(".p-dialog .container-card").filter({
-            hasText: textureSet.name,
-        });
-
-        const firstItem = textureItems.first();
-        await firstItem.waitFor({ state: "visible", timeout: 5000 });
-        await firstItem.click();
-        console.log(`[Action] Clicked texture set item: ${textureSet.name}`);
-
-        // Wait for selection to register in the Add button
-        const addButton = page
-            .locator('.p-dialog-footer button:has-text("Add Selected")')
-            .first();
-        await addButton.waitFor({ state: "visible", timeout: 5000 });
-
-        const buttonText = await addButton.textContent();
-        console.log(`[Action] Add button text: ${buttonText}`);
-
-        if (buttonText?.includes("(0)")) {
-            const checkbox = firstItem
-                .locator('input[type="checkbox"], .p-checkbox-box')
-                .first();
-            await checkbox.click({ force: true });
-            console.log("[Action] Clicked checkbox directly");
-            // Wait for selection count to update
-            await expect(addButton).not.toContainText("(0)", { timeout: 5000 });
-        }
-
-        // Set up response interceptor before clicking Add
-        const responsePromise = page.waitForResponse(
-            (resp) =>
-                resp.url().includes("/projects/") &&
-                resp.url().includes("/texture-sets/") &&
-                resp.request().method() === "POST",
-            { timeout: 15000 },
-        );
-
-        await addButton.click();
-        console.log("[Action] Clicked Add button");
-
-        // Wait for the API response from the add operation
-        try {
-            const response = await responsePromise;
-            console.log(
-                `[API] Add texture set response: ${response.status()} ${response.url()}`,
-            );
-        } catch {
-            console.log(
-                "[API] No POST /projects/*/texture-sets/* response detected — add may have failed silently",
-            );
-        }
-
-        await page.waitForSelector('.p-dialog:has-text("Add Texture Sets")', {
-            state: "hidden",
-            timeout: 10000,
-        });
-        console.log("[Action] Dialog closed");
-
-        // Switch to Texture Sets tab to see the newly added card
-        const textureSetTab = page
-            .locator(".p-tabview-nav li")
-            .filter({ hasText: "Texture Sets" });
-        await textureSetTab.click();
-
-        // Wait for the texture set card to appear (React Query refetch + render)
-        const textureSetCard = page
-            .locator(".container-card")
-            .filter({ hasText: textureSet.name })
-            .first();
-        await expect(textureSetCard).toBeVisible({
-            timeout: 15000,
-        });
-        console.log(
-            `[Action] Added texture set "${textureSet.name}" to project`,
+        await addTextureSetOfKindToProject(
+            page,
+            textureSetName,
+            MULTI_MODEL_LABEL,
         );
     },
 );
 
 When(
-    "I remove texture set {string} from the project",
+    "I add global material {string} to the project",
     async ({ page }, textureSetName: string) => {
-        const textureSet = getScenarioState(page).getTextureSet(textureSetName);
-
-        if (!textureSet) {
-            throw new Error(
-                `Texture set "${textureSetName}" not found in shared state`,
-            );
-        }
-
-        // Click Texture Sets tab first, then find and right-click texture set card
-        await page
-            .locator(".p-tabview-nav li")
-            .filter({ hasText: "Texture Sets" })
-            .click();
-
-        const textureCard = page.locator(
-            `.container-card[data-texture-set-id="${textureSet.id}"]`,
-        );
-        await textureCard.waitFor({ state: "visible", timeout: 5000 });
-        await textureCard.click({ button: "right" });
-        console.log("[Action] Right-clicked on texture set card");
-
-        // Click remove option
-        const removeOption = page
-            .locator(
-                '.p-contextmenu-item:has-text("Remove from project"), .p-menuitem:has-text("Remove")',
-            )
-            .first();
-        await removeOption.waitFor({ state: "visible", timeout: 3000 });
-        await removeOption.click();
-        console.log("[Action] Clicked Remove from project");
-
-        // Wait for texture set card to disappear after removal
-        await expect(textureCard).not.toBeVisible({ timeout: 5000 });
-        console.log(
-            `[Action] Removed texture set "${textureSet.name}" from project`,
+        await addTextureSetOfKindToProject(
+            page,
+            textureSetName,
+            GLOBAL_MATERIAL_LABEL,
         );
     },
 );
 
-// Texture set in project assertions
+async function removeTextureSetOfKindFromProject(
+    page: Page,
+    textureSetName: string,
+    labels: TextureSetKindLabel,
+) {
+    const textureSet = getScenarioState(page).getTextureSet(textureSetName);
+
+    if (!textureSet) {
+        throw new Error(
+            `${labels.label} "${textureSetName}" not found in shared state`,
+        );
+    }
+
+    // Click the kind tab first, then find and right-click texture set card
+    await page
+        .locator(".p-tabview-nav li")
+        .filter({ hasText: labels.tabHeader })
+        .click();
+
+    const textureCard = page.locator(
+        `.container-card[data-texture-set-id="${textureSet.id}"]`,
+    );
+    await textureCard.waitFor({ state: "visible", timeout: 5000 });
+    await textureCard.click({ button: "right" });
+    console.log(`[Action] Right-clicked on ${labels.label} card`);
+
+    // Click remove option
+    const removeOption = page
+        .locator(
+            '.p-contextmenu-item:has-text("Remove from project"), .p-menuitem:has-text("Remove")',
+        )
+        .first();
+    await removeOption.waitFor({ state: "visible", timeout: 3000 });
+    await removeOption.click();
+    console.log("[Action] Clicked Remove from project");
+
+    // Wait for texture set card to disappear after removal
+    await expect(textureCard).not.toBeVisible({ timeout: 5000 });
+    console.log(
+        `[Action] Removed ${labels.label} "${textureSet.name}" from project`,
+    );
+}
+
+When(
+    "I remove texture set {string} from the project",
+    async ({ page }, textureSetName: string) => {
+        await removeTextureSetOfKindFromProject(
+            page,
+            textureSetName,
+            MULTI_MODEL_LABEL,
+        );
+    },
+);
+
+When(
+    "I remove global material {string} from the project",
+    async ({ page }, textureSetName: string) => {
+        await removeTextureSetOfKindFromProject(
+            page,
+            textureSetName,
+            GLOBAL_MATERIAL_LABEL,
+        );
+    },
+);
+
+// Texture set / global material in project assertions
+async function assertProjectContainsTextureSetOfKind(
+    page: Page,
+    textureSetName: string,
+    labels: TextureSetKindLabel,
+) {
+    const textureSet = getScenarioState(page).getTextureSet(textureSetName);
+
+    if (!textureSet) {
+        throw new Error(
+            `${labels.label} "${textureSetName}" not found in shared state`,
+        );
+    }
+
+    // Click the kind tab first, then poll with reload until the card appears
+    await page
+        .locator(".p-tabview-nav li")
+        .filter({ hasText: labels.tabHeader })
+        .click();
+
+    await expect
+        .poll(
+            async () => {
+                const textureCard = page.locator(
+                    `.container-card[data-texture-set-id="${textureSet.id}"]`,
+                );
+                return await textureCard.isVisible().catch(() => false);
+            },
+            {
+                message: `Waiting for ${labels.label} "${textureSet.name}" to appear in project`,
+                timeout: 10000,
+                intervals: [500, 1000, 2000],
+            },
+        )
+        .toBe(true);
+    console.log(
+        `[UI] Project contains ${labels.label} "${textureSet.name}" ✓`,
+    );
+}
+
+async function assertProjectDoesNotContainTextureSetOfKind(
+    page: Page,
+    textureSetName: string,
+    labels: TextureSetKindLabel,
+) {
+    const textureSet = getScenarioState(page).getTextureSet(textureSetName);
+
+    if (!textureSet) {
+        throw new Error(
+            `${labels.label} "${textureSetName}" not found in shared state`,
+        );
+    }
+
+    // Click the kind tab first
+    await page
+        .locator(".p-tabview-nav li")
+        .filter({ hasText: labels.tabHeader })
+        .click();
+
+    const textureCard = page.locator(
+        `.container-card[data-texture-set-id="${textureSet.id}"]`,
+    );
+    await expect(textureCard).not.toBeVisible({ timeout: 5000 });
+    console.log(
+        `[UI] Project does not contain ${labels.label} "${textureSet.name}" ✓`,
+    );
+}
+
 Then(
     "the project should contain texture set {string}",
     async ({ page }, textureSetName: string) => {
-        const textureSet = getScenarioState(page).getTextureSet(textureSetName);
+        await assertProjectContainsTextureSetOfKind(
+            page,
+            textureSetName,
+            MULTI_MODEL_LABEL,
+        );
+    },
+);
 
-        if (!textureSet) {
-            throw new Error(
-                `Texture set "${textureSetName}" not found in shared state`,
-            );
-        }
-
-        // Click Texture Sets tab first, then poll with reload until the card appears
-        await page
-            .locator(".p-tabview-nav li")
-            .filter({ hasText: "Texture Sets" })
-            .click();
-
-        await expect
-            .poll(
-                async () => {
-                    const textureCard = page.locator(
-                        `.container-card[data-texture-set-id="${textureSet.id}"]`,
-                    );
-                    return await textureCard.isVisible().catch(() => false);
-                },
-                {
-                    message: `Waiting for texture set "${textureSet.name}" to appear in project`,
-                    timeout: 10000,
-                    intervals: [500, 1000, 2000],
-                },
-            )
-            .toBe(true);
-        console.log(`[UI] Project contains texture set "${textureSet.name}" ✓`);
+Then(
+    "the project should contain global material {string}",
+    async ({ page }, textureSetName: string) => {
+        await assertProjectContainsTextureSetOfKind(
+            page,
+            textureSetName,
+            GLOBAL_MATERIAL_LABEL,
+        );
     },
 );
 
 Then(
     "the project should not contain texture set {string}",
     async ({ page }, textureSetName: string) => {
-        const textureSet = getScenarioState(page).getTextureSet(textureSetName);
-
-        if (!textureSet) {
-            throw new Error(
-                `Texture set "${textureSetName}" not found in shared state`,
-            );
-        }
-
-        // Click Texture Sets tab first
-        await page
-            .locator(".p-tabview-nav li")
-            .filter({ hasText: "Texture Sets" })
-            .click();
-
-        const textureCard = page.locator(
-            `.container-card[data-texture-set-id="${textureSet.id}"]`,
-        );
-        await expect(textureCard).not.toBeVisible({ timeout: 5000 });
-        console.log(
-            `[UI] Project does not contain texture set "${textureSet.name}" ✓`,
+        await assertProjectDoesNotContainTextureSetOfKind(
+            page,
+            textureSetName,
+            MULTI_MODEL_LABEL,
         );
     },
 );
 
-// Precondition: project contains texture set
+Then(
+    "the project should not contain global material {string}",
+    async ({ page }, textureSetName: string) => {
+        await assertProjectDoesNotContainTextureSetOfKind(
+            page,
+            textureSetName,
+            GLOBAL_MATERIAL_LABEL,
+        );
+    },
+);
+
+// Precondition: project contains texture set / global material
+async function ensureProjectContainsTextureSetOfKind(
+    page: Page,
+    textureSetName: string,
+    labels: TextureSetKindLabel,
+) {
+    const textureSet = getScenarioState(page).getTextureSet(textureSetName);
+
+    if (!textureSet) {
+        throw new Error(
+            `${labels.label} "${textureSetName}" not found in shared state`,
+        );
+    }
+
+    // Click the kind tab first
+    await page
+        .locator(".p-tabview-nav li")
+        .filter({ hasText: labels.tabHeader })
+        .click();
+
+    const textureCard = page.locator(
+        `.container-card[data-texture-set-id="${textureSet.id}"]`,
+    );
+    // Wait for tab content to render, then check presence
+    const isPresent = await textureCard
+        .waitFor({ state: "visible", timeout: 5000 })
+        .then(() => true)
+        .catch(() => false);
+
+    if (!isPresent) {
+        // Self-provision: add texture set to project via API
+        console.log(
+            `[AutoProvision] ${labels.label} "${textureSet.name}" not in project, adding via API...`,
+        );
+        const currentUrl = page.url();
+        // Extract project ID from shared state
+        const projectMatch = currentUrl.match(/project[=/](\d+)/);
+        const projectState = getScenarioState(page).getProject("Test Project");
+        const projectId = projectState?.id || projectMatch?.[1];
+
+        if (projectId && textureSet.id) {
+            const API = process.env.API_BASE_URL || "http://localhost:8090";
+            const response = await page.request.post(
+                `${API}/projects/${projectId}/texture-sets/${textureSet.id}`,
+            );
+            if (response.ok()) {
+                console.log(
+                    `[AutoProvision] Added ${labels.label} via API ✓`,
+                );
+                await page.reload({ waitUntil: "domcontentloaded" });
+                // Wait for page content to render after reload
+                await page
+                    .locator(".container-viewer")
+                    .first()
+                    .waitFor({ state: "visible", timeout: 10000 });
+            } else {
+                throw new Error(
+                    `Failed to auto-provision ${labels.label} association: ${response.status()}`,
+                );
+            }
+        } else {
+            throw new Error(
+                `Project does not contain ${labels.label} "${textureSet.name}". Add it first.`,
+            );
+        }
+    }
+    console.log(
+        `[Precondition] Project contains ${labels.label} "${textureSet.name}" ✓`,
+    );
+}
+
 Given(
     "the project contains texture set {string}",
     async ({ page }, textureSetName: string) => {
-        const textureSet = getScenarioState(page).getTextureSet(textureSetName);
-
-        if (!textureSet) {
-            throw new Error(
-                `Texture set "${textureSetName}" not found in shared state`,
-            );
-        }
-
-        // Click Texture Sets tab first
-        await page
-            .locator(".p-tabview-nav li")
-            .filter({ hasText: "Texture Sets" })
-            .click();
-
-        const textureCard = page.locator(
-            `.container-card[data-texture-set-id="${textureSet.id}"]`,
-        );
-        // Wait for tab content to render, then check presence
-        const isPresent = await textureCard
-            .waitFor({ state: "visible", timeout: 5000 })
-            .then(() => true)
-            .catch(() => false);
-
-        if (!isPresent) {
-            // Self-provision: add texture set to project via API
-            console.log(
-                `[AutoProvision] Texture set "${textureSet.name}" not in project, adding via API...`,
-            );
-            const currentUrl = page.url();
-            // Extract project ID from shared state
-            const projectMatch = currentUrl.match(/project[=/](\d+)/);
-            const projectState =
-                getScenarioState(page).getProject("Test Project");
-            const projectId = projectState?.id || projectMatch?.[1];
-
-            if (projectId && textureSet.id) {
-                const API = process.env.API_BASE_URL || "http://localhost:8090";
-                const response = await page.request.post(
-                    `${API}/projects/${projectId}/texture-sets/${textureSet.id}`,
-                );
-                if (response.ok()) {
-                    console.log(`[AutoProvision] Added texture set via API ✓`);
-                    await page.reload({ waitUntil: "domcontentloaded" });
-                    // Wait for page content to render after reload
-                    await page
-                        .locator(".container-viewer")
-                        .first()
-                        .waitFor({ state: "visible", timeout: 10000 });
-                } else {
-                    throw new Error(
-                        `Failed to auto-provision texture set association: ${response.status()}`,
-                    );
-                }
-            } else {
-                throw new Error(
-                    `Project does not contain texture set "${textureSet.name}". Add it first.`,
-                );
-            }
-        }
-        console.log(
-            `[Precondition] Project contains texture set "${textureSet.name}" ✓`,
+        await ensureProjectContainsTextureSetOfKind(
+            page,
+            textureSetName,
+            MULTI_MODEL_LABEL,
         );
     },
 );
 
-// Texture set existence check
 Given(
-    "the texture set {string} exists",
+    "the project contains global material {string}",
     async ({ page }, textureSetName: string) => {
-        if (!getScenarioState(page).hasTextureSet(textureSetName)) {
-            // Self-provision: create or find the texture set via API
-            console.log(
-                `[AutoProvision] Texture set "${textureSetName}" not in shared state, creating via API...`,
+        await ensureProjectContainsTextureSetOfKind(
+            page,
+            textureSetName,
+            GLOBAL_MATERIAL_LABEL,
+        );
+    },
+);
+
+// Texture set existence check — `kind` corresponds to TextureSetKind:
+// 0 = ModelSpecific (Multi-Model Textures), 1 = Universal (Global Materials).
+async function ensureTextureSetExists(
+    page: Page,
+    textureSetName: string,
+    kind: 0 | 1,
+    logLabel: string,
+) {
+    if (getScenarioState(page).hasTextureSet(textureSetName)) {
+        const existing = getScenarioState(page).getTextureSet(textureSetName);
+        // If the cached entry has the wrong kind, refresh kind via API. This
+        // matters when a previous scenario created the same-named set with
+        // the other kind — the backend rejects duplicate names but the kind
+        // lookup is per-id.
+        if (existing?.id) {
+            const detail = await page.request.get(
+                `${API_BASE}/texture-sets/${existing.id}`,
             );
-            const API = process.env.API_BASE_URL || "http://localhost:8090";
-            const response = await page.request.post(`${API}/texture-sets`, {
-                data: { name: textureSetName },
-            });
-            if (response.ok()) {
-                const data = await response.json();
-                getScenarioState(page).saveTextureSet(textureSetName, {
-                    id: data.id,
-                    name: textureSetName,
-                });
-                console.log(
-                    `[AutoProvision] Created texture set "${textureSetName}" (ID: ${data.id})`,
+            if (!detail.ok()) {
+                // Cached in shared state but the backend can't find it —
+                // throw rather than proceeding with the wrong kind, which
+                // would surface later as a confusing "card not visible on
+                // the wrong tab" failure.
+                throw new Error(
+                    `Failed to look up cached ${logLabel} "${textureSetName}" (ID: ${existing.id}): ${detail.status()}`,
                 );
-            } else {
-                // Texture set likely already exists — look up via GET
-                const listResp = await page.request.get(`${API}/texture-sets`);
-                const textureSetsResp = await listResp.json();
-                const tsList = Array.isArray(textureSetsResp)
-                    ? textureSetsResp
-                    : textureSetsResp.textureSets ||
-                      textureSetsResp.items ||
-                      [];
-                const existing = tsList.find(
-                    (ts: any) => ts.name === textureSetName,
+            }
+            const data = await detail.json();
+            if (data.kind !== kind) {
+                await page.request.put(
+                    `${API_BASE}/texture-sets/${existing.id}/kind`,
+                    { data: { kind } },
                 );
-                if (!existing) {
-                    throw new Error(
-                        `Failed to auto-provision texture set "${textureSetName}": ${response.status()} and not found via GET`,
-                    );
-                }
-                getScenarioState(page).saveTextureSet(textureSetName, {
-                    id: existing.id,
-                    name: textureSetName,
-                });
                 console.log(
-                    `[AutoProvision] Found existing texture set "${textureSetName}" (ID: ${existing.id})`,
+                    `[AutoProvision] Switched ${logLabel} "${textureSetName}" kind to ${kind}`,
                 );
             }
         }
         console.log(
-            `[SharedState] Verified texture set exists: ${textureSetName}`,
+            `[SharedState] Verified ${logLabel} exists: ${textureSetName}`,
+        );
+        return;
+    }
+
+    // Self-provision: create or find the texture set via API
+    console.log(
+        `[AutoProvision] ${logLabel} "${textureSetName}" not in shared state, creating via API...`,
+    );
+    const response = await page.request.post(`${API_BASE}/texture-sets`, {
+        data: { name: textureSetName, kind },
+    });
+    if (response.ok()) {
+        const data = await response.json();
+        getScenarioState(page).saveTextureSet(textureSetName, {
+            id: data.id,
+            name: textureSetName,
+        });
+        console.log(
+            `[AutoProvision] Created ${logLabel} "${textureSetName}" (ID: ${data.id}, kind: ${kind})`,
+        );
+    } else {
+        // Texture set likely already exists — look up via GET, then enforce
+        // the requested kind.
+        const listResp = await page.request.get(`${API_BASE}/texture-sets`);
+        const textureSetsResp = await listResp.json();
+        const tsList = Array.isArray(textureSetsResp)
+            ? textureSetsResp
+            : textureSetsResp.textureSets || textureSetsResp.items || [];
+        const existing = tsList.find(
+            (ts: any) => ts.name === textureSetName,
+        );
+        if (!existing) {
+            throw new Error(
+                `Failed to auto-provision ${logLabel} "${textureSetName}": ${response.status()} and not found via GET`,
+            );
+        }
+        if (existing.kind !== kind) {
+            await page.request.put(
+                `${API_BASE}/texture-sets/${existing.id}/kind`,
+                { data: { kind } },
+            );
+            console.log(
+                `[AutoProvision] Switched existing "${textureSetName}" kind to ${kind}`,
+            );
+        }
+        getScenarioState(page).saveTextureSet(textureSetName, {
+            id: existing.id,
+            name: textureSetName,
+        });
+        console.log(
+            `[AutoProvision] Found existing ${logLabel} "${textureSetName}" (ID: ${existing.id})`,
+        );
+    }
+    console.log(
+        `[SharedState] Verified ${logLabel} exists: ${textureSetName}`,
+    );
+}
+
+Given(
+    "the texture set {string} exists",
+    async ({ page }, textureSetName: string) => {
+        await ensureTextureSetExists(page, textureSetName, 0, "texture set");
+    },
+);
+
+Given(
+    "the global material {string} exists",
+    async ({ page }, textureSetName: string) => {
+        await ensureTextureSetExists(
+            page,
+            textureSetName,
+            1,
+            "global material",
         );
     },
 );
