@@ -17,7 +17,7 @@ public interface ITextureSetRepository
     Task<(IEnumerable<TextureSet> Items, int TotalCount)> GetPagedAsync(
         int page, int pageSize,
         IReadOnlyCollection<int>? packIds = null,
-        int? projectId = null,
+        IReadOnlyCollection<int>? projectIds = null,
         IReadOnlyCollection<int>? categoryIds = null,
         IReadOnlyCollection<TextureType>? textureTypes = null,
         TextureSetKind? kind = null,

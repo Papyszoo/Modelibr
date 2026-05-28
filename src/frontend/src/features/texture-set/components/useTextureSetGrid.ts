@@ -8,6 +8,7 @@ import { type Toast } from 'primereact/toast'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { usePacksQuery } from '@/features/pack/api/queries'
+import { useProjectsQuery } from '@/features/project/api/queries'
 import {
   createTextureSet,
   createTextureSetWithFile,
@@ -85,6 +86,7 @@ export function useTextureSetGrid({
   // --- Filter facet data ---
 
   const { data: packs = [] } = usePacksQuery()
+  const { data: projects = [] } = useProjectsQuery()
   const { data: categories = [] } = useQuery({
     queryKey: ['textureSetCategories'],
     queryFn: getAllTextureSetCategories,
@@ -108,6 +110,10 @@ export function useTextureSetGrid({
   const sortedPackIds = useMemo(
     () => [...viewState.selectedPackIds].sort((a, b) => a - b),
     [viewState.selectedPackIds]
+  )
+  const sortedProjectIds = useMemo(
+    () => [...viewState.selectedProjectIds].sort((a, b) => a - b),
+    [viewState.selectedProjectIds]
   )
   const sortedTextureTypes = useMemo(
     () => [...viewState.selectedTextureTypes].sort((a, b) => a - b),
@@ -140,6 +146,7 @@ export function useTextureSetGrid({
       {
         kind,
         packIds: sortedPackIds,
+        projectIds: sortedProjectIds,
         categoryIds: sortedCategoryIds,
         textureTypes: sortedTextureTypes,
         searchName: debouncedSearchName || undefined,
@@ -151,6 +158,7 @@ export function useTextureSetGrid({
         pageSize: PAGE_SIZE,
         kind,
         packIds: sortedPackIds.length > 0 ? sortedPackIds : undefined,
+        projectIds: sortedProjectIds.length > 0 ? sortedProjectIds : undefined,
         categoryIds:
           sortedCategoryIds.length > 0 ? sortedCategoryIds : undefined,
         textureTypes:
@@ -195,6 +203,10 @@ export function useTextureSetGrid({
   )
   const setSelectedPackIds = useCallback(
     (ids: number[]) => setView({ selectedPackIds: ids }),
+    [setView]
+  )
+  const setSelectedProjectIds = useCallback(
+    (ids: number[]) => setView({ selectedProjectIds: ids }),
     [setView]
   )
   const setSelectedCategoryKeys = useCallback(
@@ -366,6 +378,7 @@ export function useTextureSetGrid({
     isFetchingNextPage,
     fetchNextPage,
     packs,
+    projects,
     categories,
 
     // Filter / search state
@@ -377,6 +390,8 @@ export function useTextureSetGrid({
     setIsFiltersOpen,
     selectedPackIds: viewState.selectedPackIds,
     setSelectedPackIds,
+    selectedProjectIds: viewState.selectedProjectIds,
+    setSelectedProjectIds,
     selectedCategoryKeys: viewState.selectedCategoryKeys,
     setSelectedCategoryKeys,
     selectedCategoryIds,

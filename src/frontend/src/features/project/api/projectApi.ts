@@ -145,12 +145,8 @@ export async function getModelsByProject(projectId: number): Promise<Model[]> {
 export async function getTextureSetsByProject(
   projectId: number
 ): Promise<TextureSetDto[]> {
-  // TextureSet endpoint deliberately kept singular `projectId` — see
-  // `ITextureSetRepository.GetPagedAsync`. The TextureSet API was not
-  // migrated to array `projectIds[]` because the UI does not currently
-  // expose a multi-project filter for texture sets.
   const response = await client.get<GetAllTextureSetsResponse>(
-    `/texture-sets?projectId=${projectId}`
+    `/texture-sets?projectIds=${projectId}`
   )
   return response.data.textureSets
 }

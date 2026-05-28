@@ -141,6 +141,7 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
     isFetchingNextPage,
     fetchNextPage,
     packs,
+    projects,
     categories,
     searchQuery,
     setSearchQuery,
@@ -150,6 +151,8 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
     setIsFiltersOpen,
     selectedPackIds,
     setSelectedPackIds,
+    selectedProjectIds,
+    setSelectedProjectIds,
     selectedCategoryKeys,
     setSelectedCategoryKeys,
     selectedTextureTypes,
@@ -762,11 +765,14 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         packs={packs}
+        projects={projects}
         categories={categories}
         selectedPackIds={selectedPackIds}
+        selectedProjectIds={selectedProjectIds}
         selectedCategoryKeys={selectedCategoryKeys}
         selectedTextureTypes={selectedTextureTypes}
         onPackFilterChange={setSelectedPackIds}
+        onProjectFilterChange={setSelectedProjectIds}
         onCategoryChange={setSelectedCategoryKeys}
         onTextureTypesChange={setSelectedTextureTypes}
         cardWidth={cardWidth}
@@ -816,6 +822,7 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
         //      something").
         searchQuery.trim().length > 0 ||
         selectedPackIds.length > 0 ||
+        selectedProjectIds.length > 0 ||
         selectedTextureTypes.length > 0 ||
         Object.values(selectedCategoryKeys).some(s => s?.checked) ? (
           <div className="no-results">
