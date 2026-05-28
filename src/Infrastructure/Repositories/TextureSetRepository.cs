@@ -45,7 +45,7 @@ internal sealed class TextureSetRepository : ITextureSetRepository
     public async Task<(IEnumerable<TextureSet> Items, int TotalCount)> GetPagedAsync(
         int page, int pageSize,
         IReadOnlyCollection<int>? packIds = null,
-        int? projectId = null,
+        IReadOnlyCollection<int>? projectIds = null,
         IReadOnlyCollection<int>? categoryIds = null,
         IReadOnlyCollection<TextureType>? textureTypes = null,
         TextureSetKind? kind = null,
@@ -57,8 +57,8 @@ internal sealed class TextureSetRepository : ITextureSetRepository
         if (packIds is { Count: > 0 })
             query = query.Where(ts => ts.Packs.Any(p => packIds.Contains(p.Id)));
 
-        if (projectId.HasValue)
-            query = query.Where(ts => ts.Projects.Any(p => p.Id == projectId.Value));
+        if (projectIds is { Count: > 0 })
+            query = query.Where(ts => ts.Projects.Any(p => projectIds.Contains(p.Id)));
 
         if (categoryIds is { Count: > 0 })
             query = query.Where(ts =>

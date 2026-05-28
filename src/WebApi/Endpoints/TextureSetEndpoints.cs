@@ -142,7 +142,7 @@ public static class TextureSetEndpoints
 
     private static async Task<IResult> GetAllTextureSets(
         [FromQuery(Name = "packIds")] int[]? packIds,
-        int? projectId,
+        [FromQuery(Name = "projectIds")] int[]? projectIds,
         [FromQuery(Name = "categoryIds")] int[]? categoryIds,
         [FromQuery(Name = "textureTypes")] int[]? textureTypes,
         int? page,
@@ -159,7 +159,7 @@ public static class TextureSetEndpoints
         var result = await queryHandler.Handle(
             new GetAllTextureSetsQuery(
                 PackIds: packIds is { Length: > 0 } ? packIds : null,
-                ProjectId: projectId,
+                ProjectIds: projectIds is { Length: > 0 } ? projectIds : null,
                 CategoryIds: categoryIds is { Length: > 0 } ? categoryIds : null,
                 TextureTypes: textureTypeFilter,
                 Page: page,

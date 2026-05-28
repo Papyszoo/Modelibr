@@ -26,7 +26,7 @@ internal class GetAllTextureSetsQueryHandler : IQueryHandler<GetAllTextureSetsQu
         {
             var result = await _textureSetRepository.GetPagedAsync(
                 query.Page.Value, query.PageSize.Value,
-                query.PackIds, query.ProjectId,
+                query.PackIds, query.ProjectIds,
                 query.CategoryIds,
                 query.TextureTypes,
                 query.Kind,
@@ -41,8 +41,8 @@ internal class GetAllTextureSetsQueryHandler : IQueryHandler<GetAllTextureSetsQu
 
             if (query.PackIds is { Count: > 0 })
                 textureSets = textureSets.Where(ts => ts.Packs.Any(p => query.PackIds.Contains(p.Id)));
-            if (query.ProjectId.HasValue)
-                textureSets = textureSets.Where(ts => ts.Projects.Any(p => p.Id == query.ProjectId.Value));
+            if (query.ProjectIds is { Count: > 0 })
+                textureSets = textureSets.Where(ts => ts.Projects.Any(p => query.ProjectIds.Contains(p.Id)));
             if (query.CategoryIds is { Count: > 0 })
                 textureSets = textureSets.Where(ts =>
                     ts.TextureSetCategoryId.HasValue &&
@@ -104,7 +104,7 @@ internal class GetAllTextureSetsQueryHandler : IQueryHandler<GetAllTextureSetsQu
 
 public record GetAllTextureSetsQuery(
     IReadOnlyCollection<int>? PackIds = null,
-    int? ProjectId = null,
+    IReadOnlyCollection<int>? ProjectIds = null,
     IReadOnlyCollection<int>? CategoryIds = null,
     IReadOnlyCollection<TextureType>? TextureTypes = null,
     int? Page = null,
