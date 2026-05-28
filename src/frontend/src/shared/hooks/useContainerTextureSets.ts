@@ -12,7 +12,7 @@ import {
 } from '@/features/texture-set/api/textureSetApi'
 import { useUploadProgress } from '@/hooks/useUploadProgress'
 import { type ContainerAdapter } from '@/shared/types/ContainerTypes'
-import { type TextureSetDto } from '@/types'
+import { type TextureSetDto, type TextureSetKind } from '@/types'
 
 const PAGE_SIZE = 20
 
@@ -28,7 +28,8 @@ interface ShowToast {
 export function useContainerTextureSets(
   adapter: ContainerAdapter,
   showToast: ShowToast,
-  refetchContainer: () => Promise<void>
+  refetchContainer: () => Promise<void>,
+  kind?: TextureSetKind
 ) {
   const queryClient = useQueryClient()
   const uploadProgressContext = useUploadProgress()
@@ -47,17 +48,24 @@ export function useContainerTextureSets(
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: ['container-textureSets', adapter.type, adapter.containerId],
+    queryKey: [
+      'container-textureSets',
+      adapter.type,
+      adapter.containerId,
+      kind ?? 'all',
+    ],
     queryFn: ({ pageParam }) => {
       const filterOptions: {
         page: number
         pageSize: number
         packIds?: number[]
         projectId?: number
+        kind?: number
       } = { page: pageParam, pageSize: PAGE_SIZE }
       if (adapter.type === 'pack') filterOptions.packIds = [adapter.containerId]
       if (adapter.type === 'project')
         filterOptions.projectId = adapter.containerId
+      if (kind !== undefined) filterOptions.kind = kind
       return getTextureSetsPaginated(filterOptions)
     },
     initialPageParam: 1,
@@ -72,20 +80,27 @@ export function useContainerTextureSets(
 
   // All available texture sets (for add dialog)
   const { data: allTextureSetsData } = useQuery({
-    queryKey: ['all-textureSets-for-container', adapter.containerId],
+    queryKey: [
+      'all-textureSets-for-container',
+      adapter.containerId,
+      kind ?? 'all',
+    ],
     queryFn: () => getAllTextureSets(),
     enabled: showAddDialog,
   })
 
-  const availableTextureSets = (allTextureSetsData ?? []).filter(
-    ts => !textureSets.some(existing => existing.id === ts.id)
-  )
+  const availableTextureSets = (allTextureSetsData ?? [])
+    .filter(ts => kind === undefined || ts.kind === kind)
+    .filter(ts => !textureSets.some(existing => existing.id === ts.id))
 
   const filteredAvailable = availableTextureSets.filter(ts =>
     ts.name.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
   const invalidateAll = useCallback(async () => {
+    // Invalidate every kind-scoped query for this container so both tabs
+    // (Global Materials and Multi-Model Textures) refresh together when one
+    // mutates an association.
     await Promise.all([
       queryClient.invalidateQueries({
         queryKey: ['container-textureSets', adapter.type, adapter.containerId],

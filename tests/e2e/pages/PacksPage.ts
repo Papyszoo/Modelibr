@@ -354,9 +354,21 @@ export class PacksPage {
         return parseInt(text?.trim() || "0", 10);
     }
 
-    async getTextureSetCount(): Promise<number> {
+    // Stats badges are identified by their PrimeIcon classes (mirrors what
+    // PackList.tsx renders). Keep these selectors in sync if the icons
+    // change: `pi-palette` → Global Materials, `pi-th-large` → Multi-Model
+    // Textures. A missing/swapped icon would silently make these return 0.
+    async getGlobalMaterialCount(): Promise<number> {
         const stat = this.page.locator(
             ".pack-grid-card-stats span:has(.pi-palette)",
+        );
+        const text = await stat.textContent();
+        return parseInt(text?.trim() || "0", 10);
+    }
+
+    async getMultiModelTextureCount(): Promise<number> {
+        const stat = this.page.locator(
+            ".pack-grid-card-stats span:has(.pi-th-large)",
         );
         const text = await stat.textContent();
         return parseInt(text?.trim() || "0", 10);

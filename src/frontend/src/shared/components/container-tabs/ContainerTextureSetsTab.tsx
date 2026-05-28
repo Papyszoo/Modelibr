@@ -11,7 +11,7 @@ import { useTabContext } from '@/hooks/useTabContext'
 import { UploadableGrid } from '@/shared/components'
 import { useContainerTextureSets } from '@/shared/hooks/useContainerTextureSets'
 import { type ContainerAdapter } from '@/shared/types/ContainerTypes'
-import { TextureType } from '@/types'
+import { type TextureSetKind, TextureType } from '@/types'
 
 interface ShowToast {
   (opts: {
@@ -27,6 +27,26 @@ interface ContainerTextureSetsTabProps {
   showToast: ShowToast
   refetchContainer: () => Promise<void>
   onTotalCountChange?: (count: number) => void
+  /**
+   * Optional kind scope. When provided, the tab only lists/adds texture sets
+   * of that kind — used to split the single "Texture Sets" tab into separate
+   * "Global Materials" and "Multi-Model Textures" tabs.
+   */
+  kind?: TextureSetKind
+  /**
+   * Lowercase singular label ("texture set", "global material",
+   * "multi-model texture"). Used inline in drop-hint, search placeholder,
+   * empty-state, etc.
+   */
+  assetLabel?: string
+  /**
+   * Title-cased singular label ("Texture Set", "Global Material",
+   * "Multi-Model Texture"). Used for Add-card label and dialog header.
+   * Provided explicitly because hyphenated/multi-word labels can't be
+   * derived from the lowercase form by simple capitalization
+   * ("multi-model texture" → "Multi-model texture").
+   */
+  assetTitle?: string
 }
 
 export function ContainerTextureSetsTab({
@@ -34,10 +54,13 @@ export function ContainerTextureSetsTab({
   showToast,
   refetchContainer,
   onTotalCountChange,
+  kind,
+  assetLabel = 'texture set',
+  assetTitle = 'Texture Set',
 }: ContainerTextureSetsTabProps) {
   const contextMenuRef = useRef<ContextMenu>(null)
   const { openTextureSetDetailsTab } = useTabContext()
-  const ts = useContainerTextureSets(adapter, showToast, refetchContainer)
+  const ts = useContainerTextureSets(adapter, showToast, refetchContainer, kind)
   const label = adapter.label
   const labelLower = label.toLowerCase()
 
@@ -79,7 +102,7 @@ export function ContainerTextureSetsTab({
       <UploadableGrid
         onFilesDropped={ts.handleUpload}
         isUploading={ts.uploading}
-        uploadMessage={`Drop texture files here to create and add to ${labelLower}`}
+        uploadMessage={`Drop ${assetLabel} files here to create and add to ${labelLower}`}
         className="container-grid-wrapper"
       >
         <div className="container-section">
@@ -128,7 +151,7 @@ export function ContainerTextureSetsTab({
             >
               <div className="container-card-add-content">
                 <i className="pi pi-plus" />
-                <span>Add Texture Set</span>
+                <span>Add {assetTitle}</span>
               </div>
             </div>
           </div>
@@ -146,7 +169,7 @@ export function ContainerTextureSetsTab({
       </UploadableGrid>
 
       <Dialog
-        header={`Add Texture Sets to ${label}`}
+        header={`Add ${assetTitle}s to ${label}`}
         visible={ts.showAddDialog}
         style={{ width: '80vw', maxWidth: '1200px', maxHeight: '80vh' }}
         onHide={() => {
@@ -178,7 +201,7 @@ export function ContainerTextureSetsTab({
             <i className="pi pi-search" />
             <InputText
               type="text"
-              placeholder="Search texture sets..."
+              placeholder={`Search ${assetLabel}s...`}
               value={ts.searchQuery}
               onChange={e => ts.setSearchQuery(e.target.value)}
               className="search-input"
@@ -224,7 +247,7 @@ export function ContainerTextureSetsTab({
           {ts.filteredAvailable.length === 0 && (
             <div className="no-results">
               <i className="pi pi-inbox" />
-              <p>No texture sets available to add</p>
+              <p>No {assetLabel}s available to add</p>
             </div>
           )}
         </div>

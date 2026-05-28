@@ -222,7 +222,8 @@ export interface DemoPack {
   createdAt: string
   updatedAt: string
   modelCount: number
-  textureSetCount: number
+  globalMaterialCount: number
+  multiModelTextureCount: number
   spriteCount: number
   soundCount: number
   environmentMapCount?: number
@@ -244,7 +245,8 @@ export interface DemoProject {
   createdAt: string
   updatedAt: string
   modelCount: number
-  textureSetCount: number
+  globalMaterialCount: number
+  multiModelTextureCount: number
   spriteCount: number
   soundCount: number
   environmentMapCount?: number
@@ -1135,7 +1137,8 @@ export async function seedIfEmpty(): Promise<void> {
       createdAt: now,
       updatedAt: now,
       modelCount: 2,
-      textureSetCount: 0,
+      globalMaterialCount: 0,
+      multiModelTextureCount: 0,
       spriteCount: 0,
       soundCount: 0,
       environmentMapCount: 1,
@@ -1160,7 +1163,8 @@ export async function seedIfEmpty(): Promise<void> {
       createdAt: now,
       updatedAt: now,
       modelCount: 1,
-      textureSetCount: 1,
+      globalMaterialCount: 0,
+      multiModelTextureCount: 1,
       spriteCount: 0,
       soundCount: 0,
       environmentMapCount: 0,
@@ -1184,7 +1188,8 @@ export async function seedIfEmpty(): Promise<void> {
       createdAt: now,
       updatedAt: now,
       modelCount: 3,
-      textureSetCount: 1,
+      globalMaterialCount: 0,
+      multiModelTextureCount: 1,
       spriteCount: 1,
       soundCount: 1,
       environmentMapCount: 1,

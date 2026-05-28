@@ -561,10 +561,13 @@ When(
             );
         }
 
-        // Click the Texture Sets tab first to reveal texture set content
+        // Click the Multi-Model Textures tab first to reveal texture set
+        // content (the formerly-combined "Texture Sets" tab is now split into
+        // Global Materials + Multi-Model Textures; newly-created sets default
+        // to the model-specific kind).
         await page
             .locator(".p-tabview-nav li")
-            .filter({ hasText: "Texture Sets" })
+            .filter({ hasText: "Multi-Model Textures" })
             .click();
 
         // Click add texture set card
@@ -607,10 +610,13 @@ When(
             );
         }
 
-        // Click the Texture Sets tab first to reveal texture set content
+        // Click the Multi-Model Textures tab first to reveal texture set
+        // content (the formerly-combined "Texture Sets" tab is now split into
+        // Global Materials + Multi-Model Textures; newly-created sets default
+        // to the model-specific kind).
         await page
             .locator(".p-tabview-nav li")
-            .filter({ hasText: "Texture Sets" })
+            .filter({ hasText: "Multi-Model Textures" })
             .click();
 
         // Right-click on texture set card
@@ -763,10 +769,13 @@ Then(
             );
         }
 
-        // Click the Texture Sets tab first to reveal texture set content
+        // Click the Multi-Model Textures tab first to reveal texture set
+        // content (the formerly-combined "Texture Sets" tab is now split into
+        // Global Materials + Multi-Model Textures; newly-created sets default
+        // to the model-specific kind).
         await page
             .locator(".p-tabview-nav li")
-            .filter({ hasText: "Texture Sets" })
+            .filter({ hasText: "Multi-Model Textures" })
             .click();
 
         const textureCard = page.locator(
@@ -788,10 +797,13 @@ Then(
             );
         }
 
-        // Click the Texture Sets tab first to reveal texture set content
+        // Click the Multi-Model Textures tab first to reveal texture set
+        // content (the formerly-combined "Texture Sets" tab is now split into
+        // Global Materials + Multi-Model Textures; newly-created sets default
+        // to the model-specific kind).
         await page
             .locator(".p-tabview-nav li")
-            .filter({ hasText: "Texture Sets" })
+            .filter({ hasText: "Multi-Model Textures" })
             .click();
 
         const textureCard = page.locator(
@@ -813,17 +825,36 @@ Then(
             .filter({ hasText: "Details" })
             .click();
 
-        const stat = page
+        // Texture sets are now split into Global Materials + Multi-Model
+        // Textures in the Details snapshot; sum the two for the legacy
+        // assertion.
+        const globalStat = page
             .locator(
-                '.container-detail-assets span:has-text("texture sets"), .container-detail-assets span:has-text("texture set")',
+                '.container-detail-assets span:has-text("global materials")',
             )
             .first();
-        // Wait for Details tab content to render
-        await stat.waitFor({ state: "visible", timeout: 5000 });
-        const text = await stat.textContent();
-        const count = parseInt(text?.match(/\d+/)?.[0] || "0", 10);
+        const multiModelStat = page
+            .locator(
+                '.container-detail-assets span:has-text("multi-model textures")',
+            )
+            .first();
+        await globalStat.waitFor({ state: "visible", timeout: 5000 });
+        await multiModelStat.waitFor({ state: "visible", timeout: 5000 });
+        const globalText = await globalStat.textContent();
+        const multiModelText = await multiModelStat.textContent();
+        const globalCount = parseInt(
+            globalText?.match(/\d+/)?.[0] || "0",
+            10,
+        );
+        const multiModelCount = parseInt(
+            multiModelText?.match(/\d+/)?.[0] || "0",
+            10,
+        );
+        const count = globalCount + multiModelCount;
         expect(count).toBe(expectedCount);
-        console.log(`[UI] Pack texture set count is ${count} ✓`);
+        console.log(
+            `[UI] Pack texture set count is ${count} (${globalCount} global + ${multiModelCount} multi-model) ✓`,
+        );
     },
 );
 
@@ -879,10 +910,13 @@ Given(
             );
         }
 
-        // Click the Texture Sets tab first to reveal texture set content
+        // Click the Multi-Model Textures tab first to reveal texture set
+        // content (the formerly-combined "Texture Sets" tab is now split into
+        // Global Materials + Multi-Model Textures; newly-created sets default
+        // to the model-specific kind).
         await page
             .locator(".p-tabview-nav li")
-            .filter({ hasText: "Texture Sets" })
+            .filter({ hasText: "Multi-Model Textures" })
             .click();
 
         const textureCard = page.locator(

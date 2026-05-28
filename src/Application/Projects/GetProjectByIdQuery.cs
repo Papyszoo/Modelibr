@@ -32,7 +32,8 @@ internal class GetProjectByIdQueryHandler : IQueryHandler<GetProjectByIdQuery, P
             CreatedAt = project.CreatedAt,
             UpdatedAt = project.UpdatedAt,
             ModelCount = project.ModelCount,
-            TextureSetCount = project.TextureSetCount,
+            GlobalMaterialCount = project.GlobalMaterialCount,
+            MultiModelTextureCount = project.MultiModelTextureCount,
             SpriteCount = project.SpriteCount,
             SoundCount = project.SoundCount,
             EnvironmentMapCount = project.EnvironmentMapCount,
@@ -88,7 +89,8 @@ public record ProjectDetailDto
     public DateTime CreatedAt { get; init; }
     public DateTime UpdatedAt { get; init; }
     public int ModelCount { get; init; }
-    public int TextureSetCount { get; init; }
+    public int GlobalMaterialCount { get; init; }
+    public int MultiModelTextureCount { get; init; }
     public int SpriteCount { get; init; }
     public int SoundCount { get; init; }
     public int EnvironmentMapCount { get; init; }

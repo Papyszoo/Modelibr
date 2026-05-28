@@ -26,7 +26,8 @@ export interface ProjectDto {
   createdAt: string
   updatedAt: string
   modelCount: number
-  textureSetCount: number
+  globalMaterialCount: number
+  multiModelTextureCount: number
   spriteCount: number
   soundCount: number
   environmentMapCount?: number

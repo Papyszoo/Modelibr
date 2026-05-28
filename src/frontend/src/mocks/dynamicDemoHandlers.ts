@@ -973,7 +973,7 @@ export const dynamicDemoHandlers = [
         const before = pack.models.length
         pack.models = pack.models.filter(m => m.id !== id)
         if (pack.models.length !== before) {
-          recomputePackCounts(pack)
+          await recomputePackCounts(pack)
           await put('packs', pack)
         }
       }
@@ -982,7 +982,7 @@ export const dynamicDemoHandlers = [
         const before = proj.models.length
         proj.models = proj.models.filter(m => m.id !== id)
         if (proj.models.length !== before) {
-          recomputeProjectCounts(proj)
+          await recomputeProjectCounts(proj)
           await put('projects', proj)
         }
       }
@@ -1641,7 +1641,7 @@ export const dynamicDemoHandlers = [
         const before = pack.textureSets.length
         pack.textureSets = pack.textureSets.filter(t => t.id !== id)
         if (pack.textureSets.length !== before) {
-          recomputePackCounts(pack)
+          await recomputePackCounts(pack)
           await put('packs', pack)
         }
       }
@@ -1650,7 +1650,7 @@ export const dynamicDemoHandlers = [
         const before = proj.textureSets.length
         proj.textureSets = proj.textureSets.filter(t => t.id !== id)
         if (proj.textureSets.length !== before) {
-          recomputeProjectCounts(proj)
+          await recomputeProjectCounts(proj)
           await put('projects', proj)
         }
       }
@@ -2338,7 +2338,7 @@ export const dynamicDemoHandlers = [
             ...(pack.environmentMaps ?? []),
             { id: environmentMapId, name },
           ]
-          recomputePackCounts(pack)
+          await recomputePackCounts(pack)
           pack.updatedAt = ts
           await put('packs', pack)
         }
@@ -2357,7 +2357,7 @@ export const dynamicDemoHandlers = [
             ...(project.environmentMaps ?? []),
             { id: environmentMapId, name },
           ]
-          recomputeProjectCounts(project)
+          await recomputeProjectCounts(project)
           project.updatedAt = ts
           await put('projects', project)
         }
@@ -2658,7 +2658,7 @@ export const dynamicDemoHandlers = [
           item => item.id !== id
         )
         if ((pack.environmentMaps?.length ?? 0) !== before) {
-          recomputePackCounts(pack)
+          await recomputePackCounts(pack)
           await put('packs', pack)
         }
       }
@@ -2670,7 +2670,7 @@ export const dynamicDemoHandlers = [
           item => item.id !== id
         )
         if ((project.environmentMaps?.length ?? 0) !== before) {
-          recomputeProjectCounts(project)
+          await recomputeProjectCounts(project)
           await put('projects', project)
         }
       }
@@ -2835,7 +2835,7 @@ export const dynamicDemoHandlers = [
       const pack = await getById('packs', Number(packId))
       if (pack && !pack.sprites.some(s => s.id === spriteId)) {
         pack.sprites.push({ id: spriteId, name })
-        recomputePackCounts(pack)
+        await recomputePackCounts(pack)
         await put('packs', pack)
       }
     }
@@ -2843,7 +2843,7 @@ export const dynamicDemoHandlers = [
       const project = await getById('projects', Number(projectId))
       if (project && !project.sprites.some(s => s.id === spriteId)) {
         project.sprites.push({ id: spriteId, name })
-        recomputeProjectCounts(project)
+        await recomputeProjectCounts(project)
         await put('projects', project)
       }
     }
@@ -2903,7 +2903,7 @@ export const dynamicDemoHandlers = [
         const before = pack.sprites.length
         pack.sprites = pack.sprites.filter(s => s.id !== id)
         if (pack.sprites.length !== before) {
-          recomputePackCounts(pack)
+          await recomputePackCounts(pack)
           await put('packs', pack)
         }
       }
@@ -2912,7 +2912,7 @@ export const dynamicDemoHandlers = [
         const before = proj.sprites.length
         proj.sprites = proj.sprites.filter(s => s.id !== id)
         if (proj.sprites.length !== before) {
-          recomputeProjectCounts(proj)
+          await recomputeProjectCounts(proj)
           await put('projects', proj)
         }
       }
@@ -3144,7 +3144,7 @@ export const dynamicDemoHandlers = [
       const pack = await getById('packs', Number(packId))
       if (pack && !pack.sounds.some(s => s.id === soundId)) {
         pack.sounds.push({ id: soundId, name })
-        recomputePackCounts(pack)
+        await recomputePackCounts(pack)
         await put('packs', pack)
       }
     }
@@ -3152,7 +3152,7 @@ export const dynamicDemoHandlers = [
       const project = await getById('projects', Number(projectId))
       if (project && !project.sounds.some(s => s.id === soundId)) {
         project.sounds.push({ id: soundId, name })
-        recomputeProjectCounts(project)
+        await recomputeProjectCounts(project)
         await put('projects', project)
       }
     }
@@ -3205,7 +3205,7 @@ export const dynamicDemoHandlers = [
         const before = pack.sounds.length
         pack.sounds = pack.sounds.filter(s => s.id !== id)
         if (pack.sounds.length !== before) {
-          recomputePackCounts(pack)
+          await recomputePackCounts(pack)
           await put('packs', pack)
         }
       }
@@ -3214,7 +3214,7 @@ export const dynamicDemoHandlers = [
         const before = proj.sounds.length
         proj.sounds = proj.sounds.filter(s => s.id !== id)
         if (proj.sounds.length !== before) {
-          recomputeProjectCounts(proj)
+          await recomputeProjectCounts(proj)
           await put('projects', proj)
         }
       }

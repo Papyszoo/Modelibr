@@ -333,7 +333,8 @@ export function ProjectDetailsPanel({
             <span className="container-rich-kicker">Snapshot</span>
             <div className="container-detail-assets">
               <span>{project.modelCount} models</span>
-              <span>{project.textureSetCount} texture sets</span>
+              <span>{project.globalMaterialCount} global materials</span>
+              <span>{project.multiModelTextureCount} multi-model textures</span>
               <span>{project.spriteCount} sprites</span>
               <span>{project.soundCount} sounds</span>
               <span>{project.environmentMapCount ?? 0} environment maps</span>

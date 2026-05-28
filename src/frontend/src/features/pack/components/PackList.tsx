@@ -207,19 +207,23 @@ export function PackList() {
                     </div>
                   )}
                   <div className="pack-grid-card-stats">
-                    <span>
+                    <span title="Models">
                       <i className="pi pi-box" /> {pack.modelCount}
                     </span>
-                    <span>
-                      <i className="pi pi-palette" /> {pack.textureSetCount}
+                    <span title="Global Materials">
+                      <i className="pi pi-palette" /> {pack.globalMaterialCount}
                     </span>
-                    <span>
+                    <span title="Multi-Model Textures">
+                      <i className="pi pi-th-large" />{' '}
+                      {pack.multiModelTextureCount}
+                    </span>
+                    <span title="Sprites">
                       <i className="pi pi-image" /> {pack.spriteCount}
                     </span>
-                    <span>
+                    <span title="Sounds">
                       <i className="pi pi-volume-up" /> {pack.soundCount}
                     </span>
-                    <span>
+                    <span title="Environment maps">
                       <i className="pi pi-globe" />{' '}
                       {pack.environmentMapCount ?? 0}
                     </span>
