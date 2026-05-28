@@ -19,7 +19,12 @@ import {
   OptionsButton,
 } from '@/shared/components/list-toolbar'
 import { type CategorySelectionKeys } from '@/shared/types/categories'
-import { type PackDto, type TextureSetCategoryDto, TextureType } from '@/types'
+import {
+  type PackDto,
+  type ProjectDto,
+  type TextureSetCategoryDto,
+  TextureType,
+} from '@/types'
 
 // Texture types exposed in the filter. SplitChannel is an implementation
 // detail (a single source file fanned out across channels) — hiding it
@@ -47,11 +52,14 @@ interface TexturesFiltersProps {
   searchQuery: string
   onSearchChange: (query: string) => void
   packs: PackDto[]
+  projects: ProjectDto[]
   categories: TextureSetCategoryDto[]
   selectedPackIds: number[]
+  selectedProjectIds: number[]
   selectedCategoryKeys: CategorySelectionKeys
   selectedTextureTypes: number[]
   onPackFilterChange: (packIds: number[]) => void
+  onProjectFilterChange: (projectIds: number[]) => void
   onCategoryChange: (keys: CategorySelectionKeys) => void
   onTextureTypesChange: (types: number[]) => void
   cardWidth: number
@@ -76,11 +84,14 @@ export function TexturesFilters({
   searchQuery,
   onSearchChange,
   packs,
+  projects,
   categories,
   selectedPackIds,
+  selectedProjectIds,
   selectedCategoryKeys,
   selectedTextureTypes,
   onPackFilterChange,
+  onProjectFilterChange,
   onCategoryChange,
   onTextureTypesChange,
   cardWidth,
@@ -100,6 +111,10 @@ export function TexturesFilters({
     label: pack.name,
     value: pack.id,
   }))
+  const projectOptions = projects.map(project => ({
+    label: project.name,
+    value: project.id,
+  }))
 
   const hasActiveSearch = searchQuery.trim().length > 0
   const selectedCategoryCount = Object.values(selectedCategoryKeys).filter(
@@ -107,11 +122,13 @@ export function TexturesFilters({
   ).length
   const hasActiveFilters =
     selectedPackIds.length > 0 ||
+    selectedProjectIds.length > 0 ||
     selectedCategoryCount > 0 ||
     selectedTextureTypes.length > 0
 
   const activeFilterCount = [
     selectedPackIds.length > 0,
+    selectedProjectIds.length > 0,
     selectedCategoryCount > 0,
     selectedTextureTypes.length > 0,
   ].filter(Boolean).length
@@ -233,6 +250,20 @@ export function TexturesFilters({
               filterPlaceholder="Search packs..."
             />
           )}
+          {projects.length > 0 && (
+            <MultiSelect
+              value={selectedProjectIds}
+              options={projectOptions}
+              onChange={e => onProjectFilterChange(e.value || [])}
+              placeholder="Projects"
+              data-testid="texture-set-project-filter"
+              className="list-filters-control"
+              display="chip"
+              showClear
+              filter
+              filterPlaceholder="Search projects..."
+            />
+          )}
           {categories.length > 0 && (
             <CategoryFilterPicker
               categories={categories}
@@ -261,6 +292,7 @@ export function TexturesFilters({
               tooltipOptions={{ position: 'bottom' }}
               onClick={() => {
                 onPackFilterChange([])
+                onProjectFilterChange([])
                 onCategoryChange({})
                 onTextureTypesChange([])
               }}
@@ -268,10 +300,12 @@ export function TexturesFilters({
           ) : null}
         </div>
 
-        {packs.length === 0 && categories.length === 0 ? (
+        {packs.length === 0 &&
+        projects.length === 0 &&
+        categories.length === 0 ? (
           <span className="list-filters-empty">
-            No pack or category filters yet — texture-type filter is always
-            available.
+            No pack, project, or category filters yet — texture-type filter is
+            always available.
           </span>
         ) : null}
       </ListToolbarPanel>

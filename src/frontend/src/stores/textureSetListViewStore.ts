@@ -13,6 +13,7 @@ export interface TextureSetListViewState {
   isFiltersOpen: boolean
   searchQuery: string
   selectedPackIds: number[]
+  selectedProjectIds: number[]
   selectedCategoryKeys: PersistedModelCategorySelectionKeys
   /** Subset of `TextureType` enum values (numeric). */
   selectedTextureTypes: number[]
@@ -34,6 +35,7 @@ export const DEFAULT_TEXTURE_SET_LIST_VIEW_STATE: TextureSetListViewState = {
   isFiltersOpen: false,
   searchQuery: '',
   selectedPackIds: [],
+  selectedProjectIds: [],
   selectedCategoryKeys: {},
   selectedTextureTypes: [],
   selectedTextureSetIds: [],
@@ -65,6 +67,20 @@ export const useTextureSetListViewStore = create<TextureSetListViewStore>()(
       name: 'texture-set-list-view-state',
       storage: createJSONStorage(() => localStorage),
       partialize: state => ({ views: state.views }),
+      // Backfill fields added after a view was first persisted (e.g.
+      // selectedProjectIds) so consumers can read them without guards.
+      merge: (persisted, current) => {
+        const persistedViews =
+          (persisted as { views?: Record<string, TextureSetListViewState> })
+            ?.views ?? {}
+        const views = Object.fromEntries(
+          Object.entries(persistedViews).map(([scope, view]) => [
+            scope,
+            { ...DEFAULT_TEXTURE_SET_LIST_VIEW_STATE, ...view },
+          ])
+        )
+        return { ...current, views }
+      },
     }
   )
 )

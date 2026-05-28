@@ -30,7 +30,7 @@ export async function getTextureSetsPaginated(options: {
   page: number
   pageSize: number
   packIds?: number[]
-  projectId?: number
+  projectIds?: number[]
   categoryIds?: number[]
   textureTypes?: number[]
   kind?: number
@@ -46,8 +46,7 @@ export async function getTextureSetsPaginated(options: {
   params.append('page', options.page.toString())
   params.append('pageSize', options.pageSize.toString())
   options.packIds?.forEach(id => params.append('packIds', id.toString()))
-  if (options.projectId)
-    params.append('projectId', options.projectId.toString())
+  options.projectIds?.forEach(id => params.append('projectIds', id.toString()))
   options.categoryIds?.forEach(id =>
     params.append('categoryIds', id.toString())
   )
