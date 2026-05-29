@@ -135,6 +135,23 @@ export function CategoryManagerDialog<TCategory extends HierarchicalCategory>({
         })
       }
       setFormTarget(null)
+    } catch (error) {
+      // Keep the form open so the user can correct their input. Surface the
+      // server's message (e.g. "A category named 'X' already exists in this
+      // branch.") via an error toast instead of dropping it silently.
+      const detail =
+        (error as { response?: { data?: { message?: string } } })?.response
+          ?.data?.message ??
+        (error as Error | undefined)?.message ??
+        'The category could not be saved.'
+      toastRef.current?.show({
+        severity: 'error',
+        summary: editingCategory
+          ? 'Could not update category'
+          : 'Could not create category',
+        detail,
+        life: 5000,
+      })
     } finally {
       setIsSaving(false)
     }

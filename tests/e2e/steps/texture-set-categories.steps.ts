@@ -6,6 +6,7 @@ import {
     closeManager,
     createCategory,
     deleteCategory,
+    managerDialog,
     renameCategory,
 } from "../helpers/category-manager-helper";
 import {
@@ -194,5 +195,31 @@ Then(
             resolve(toBase),
         );
         expect(status).toBe(400);
+    },
+);
+
+Then(
+    "renaming the category {string} to {string} fails in the manager",
+    async ({ page }, fromBase: string, toBase: string) => {
+        const dialog = managerDialog(page, TS_TITLE);
+        await dialog
+            .getByRole("button", { name: `Edit ${resolve(fromBase)}` })
+            .click();
+        await dialog.locator("#category-name").fill(resolve(toBase));
+        await dialog.getByRole("button", { name: "Save Changes" }).click();
+        // Error toast surfaces the rejection; success toast must NOT appear.
+        await page
+            .locator(".p-toast-message", {
+                hasText: "Could not update category",
+            })
+            .first()
+            .waitFor({ state: "visible", timeout: 5000 });
+        await expect(
+            page.locator(".p-toast-message", {
+                hasText: "Category updated",
+            }),
+        ).toHaveCount(0);
+        // Form stays open; return to the list for subsequent assertions.
+        await dialog.getByRole("button", { name: "Cancel" }).click();
     },
 );

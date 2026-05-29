@@ -153,7 +153,15 @@ async function updateCategoryInStore(
     return new HttpResponse(null, { status: 404 })
   }
 
-  const categories = await getAll(storeName)
+  const all = await getAll(storeName)
+  // Texture-set categories are kind-scoped — same name is allowed across
+  // kinds — so the duplicate-name and descendant checks must only see
+  // siblings of the same kind. Other category types omit `kind`, in which
+  // case this is a no-op.
+  const categories =
+    category.kind === undefined
+      ? all
+      : all.filter(item => item.kind === category.kind)
   if (body.parentId === category.id) {
     return HttpResponse.json(
       {

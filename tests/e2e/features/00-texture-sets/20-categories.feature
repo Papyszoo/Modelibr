@@ -68,6 +68,15 @@ Feature: Texture Set Categories (per-kind)
     And I have a model-specific texture set category "rej-b"
     Then renaming category "rej-b" to "rej-a" is rejected
 
+  Scenario: The category manager surfaces a save error when the rename collides
+    Given I have a model-specific texture set category "uirej-a"
+    And I am on the texture sets page
+    And I switch to the "Multi-Model" kind tab
+    When I open the category manager
+    And I create the category "uirej-b"
+    Then renaming the category "uirej-b" to "uirej-a" fails in the manager
+    And the category "uirej-b" is listed in the manager
+
   Scenario: Delete a texture set category
     Given I am on the texture sets page
     And I switch to the "Multi-Model" kind tab
