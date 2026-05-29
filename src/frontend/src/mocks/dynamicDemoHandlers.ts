@@ -78,8 +78,13 @@ const toCategoryDto = (category: DemoCategory, categories: DemoCategory[]) => ({
   path: buildCategoryPath(category, categories),
 })
 
-async function listCategoryStore(storeName: DemoCategoryStoreName) {
-  const categories = await getAll(storeName)
+async function listCategoryStore(
+  storeName: DemoCategoryStoreName,
+  kind?: number
+) {
+  const all = await getAll(storeName)
+  const categories =
+    kind === undefined ? all : all.filter(category => category.kind === kind)
   return HttpResponse.json({
     categories: categories.map(category => toCategoryDto(category, categories)),
   })
@@ -92,9 +97,12 @@ async function createCategoryInStore(
     name: string
     description?: string
     parentId?: number | null
-  }
+  },
+  kind?: number
 ) {
-  const categories = await getAll(storeName)
+  const all = await getAll(storeName)
+  const categories =
+    kind === undefined ? all : all.filter(category => category.kind === kind)
   const duplicate = categories.find(
     category =>
       category.parentId === (body.parentId ?? null) &&
@@ -118,6 +126,7 @@ async function createCategoryInStore(
     name: body.name,
     description: body.description ?? null,
     parentId: body.parentId ?? null,
+    kind,
     createdAt: ts,
     updatedAt: ts,
   }
@@ -878,17 +887,25 @@ export const dynamicDemoHandlers = [
     return new HttpResponse(null, { status: 204 })
   }),
 
-  http.get('*/texture-set-categories', async () =>
-    listCategoryStore('textureSetCategories')
-  ),
+  http.get('*/texture-set-categories', async ({ request }) => {
+    const kindParam = new URL(request.url).searchParams.get('kind')
+    const kind = kindParam !== null ? Number(kindParam) : undefined
+    return listCategoryStore('textureSetCategories', kind)
+  }),
 
   http.post('*/texture-set-categories', async ({ request }) => {
     const body = (await request.json()) as {
       name: string
       description?: string
       parentId?: number | null
+      kind?: number
     }
-    return createCategoryInStore('textureSetCategories', 'texture set', body)
+    return createCategoryInStore(
+      'textureSetCategories',
+      'texture set',
+      body,
+      body.kind
+    )
   }),
 
   http.put('*/texture-set-categories/:id', async ({ params, request }) => {

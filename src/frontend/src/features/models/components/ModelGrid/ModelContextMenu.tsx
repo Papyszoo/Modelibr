@@ -31,6 +31,8 @@ import {
   openInFileExplorer,
 } from '@/utils/webdavUtils'
 
+import { ModelCategoryManagerDialog } from '@/features/models/components/ModelCategoryManagerDialog'
+
 import { AddModelTagsDialog } from './AddModelTagsDialog'
 import { ChangeModelCategoryDialog } from './ChangeModelCategoryDialog'
 
@@ -89,6 +91,7 @@ export const ModelContextMenu = forwardRef<
     const [showPackDialog, setShowPackDialog] = useState(false)
     const [showProjectDialog, setShowProjectDialog] = useState(false)
     const [showCategoryDialog, setShowCategoryDialog] = useState(false)
+    const [showCategoryManager, setShowCategoryManager] = useState(false)
     const [showTagsDialog, setShowTagsDialog] = useState(false)
     const contextMenu = useRef<ContextMenu>(null)
     const toast = useRef<Toast>(null)
@@ -521,6 +524,13 @@ export const ModelContextMenu = forwardRef<
           }
           onHide={() => setShowCategoryDialog(false)}
           onConfirm={handleChangeCategory}
+          onManageCategories={() => setShowCategoryManager(true)}
+        />
+
+        <ModelCategoryManagerDialog
+          visible={showCategoryManager}
+          categories={categories}
+          onHide={() => setShowCategoryManager(false)}
         />
 
         <AddModelTagsDialog

@@ -106,6 +106,7 @@ export interface CreateTextureSetResponse {
 
 export interface UpdateTextureSetRequest {
   name: string
+  categoryId?: number | null
 }
 
 export interface UpdateTextureSetResponse {
@@ -158,4 +159,5 @@ export interface UpsertTextureSetCategoryRequest {
   name: string
   description?: string
   parentId?: number | null
+  kind: TextureSetKind
 }

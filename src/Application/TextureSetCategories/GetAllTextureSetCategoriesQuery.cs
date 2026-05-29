@@ -1,5 +1,6 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Domain.ValueObjects;
 using SharedKernel;
 
 namespace Application.TextureSetCategories;
@@ -15,7 +16,7 @@ internal sealed class GetAllTextureSetCategoriesQueryHandler : IQueryHandler<Get
 
     public async Task<Result<GetAllTextureSetCategoriesResponse>> Handle(GetAllTextureSetCategoriesQuery query, CancellationToken cancellationToken)
     {
-        var categories = await _categoryRepository.GetAllAsync(cancellationToken);
+        var categories = await _categoryRepository.GetAllByKindAsync(query.Kind, cancellationToken);
         var items = categories
             .OrderBy(c => c.ParentId)
             .ThenBy(c => c.Name)
@@ -26,5 +27,5 @@ internal sealed class GetAllTextureSetCategoriesQueryHandler : IQueryHandler<Get
     }
 }
 
-public record GetAllTextureSetCategoriesQuery : IQuery<GetAllTextureSetCategoriesResponse>;
+public record GetAllTextureSetCategoriesQuery(TextureSetKind Kind) : IQuery<GetAllTextureSetCategoriesResponse>;
 public record GetAllTextureSetCategoriesResponse(IReadOnlyList<TextureSetCategorySummaryDto> Categories);

@@ -24,7 +24,10 @@ import {
   hardDeleteTextureSet,
   regenerateTextureSetThumbnail,
   softDeleteTextureSet,
+  updateTextureSet,
 } from '@/features/texture-set/api/textureSetApi'
+import { TextureSetCategoryManagerDialog } from '@/features/texture-set/components/TextureSetCategoryManagerDialog'
+import { ChangeTextureSetCategoryDialog } from '@/features/texture-set/dialogs/ChangeTextureSetCategoryDialog'
 import { CreateTextureSetDialog } from '@/features/texture-set/dialogs/CreateTextureSetDialog'
 import { MergeTextureSetDialog } from '@/features/texture-set/dialogs/MergeTextureSetDialog'
 import { useTabContext } from '@/hooks/useTabContext'
@@ -102,6 +105,8 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
   const [showPackDialog, setShowPackDialog] = useState(false)
   const [showProjectDialog, setShowProjectDialog] = useState(false)
   const [showMergeDialog, setShowMergeDialog] = useState(false)
+  const [showCategoryManager, setShowCategoryManager] = useState(false)
+  const [showChangeCategory, setShowChangeCategory] = useState(false)
   const [draggedTextureSet, setDraggedTextureSet] =
     useState<TextureSetDto | null>(null)
   const [dropTargetTextureSet, setDropTargetTextureSet] =
@@ -143,6 +148,7 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
     packs,
     projects,
     categories,
+    categoriesKind,
     searchQuery,
     setSearchQuery,
     isSearchOpen,
@@ -586,6 +592,26 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
     invalidateContainerCaches('project')
   }
 
+  const handleChangeCategory = async (categoryId: number) => {
+    const sets = targetSets()
+    let okCount = 0
+    for (const set of sets) {
+      try {
+        await updateTextureSet(set.id, { name: set.name, categoryId })
+        okCount += 1
+      } catch (error) {
+        console.error('Failed to change texture set category:', error)
+      }
+    }
+    toast.current?.show({
+      severity: okCount === sets.length ? 'success' : 'warn',
+      summary: 'Category changed',
+      detail: `Updated ${okCount} of ${sets.length} ${unitLabel}${sets.length === 1 ? '' : 's'}`,
+      life: 3000,
+    })
+    invalidateTextureSets()
+  }
+
   const handleRecycle = async () => {
     const sets = targetSets()
     let okCount = 0
@@ -668,6 +694,11 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
           label: `${size}px`,
           command: () => handleGenerateProxy(size),
         })),
+      },
+      {
+        label: 'Change Category',
+        icon: 'pi pi-sitemap',
+        command: () => setShowChangeCategory(true),
       },
       {
         label:
@@ -774,6 +805,7 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
         onPackFilterChange={setSelectedPackIds}
         onProjectFilterChange={setSelectedProjectIds}
         onCategoryChange={setSelectedCategoryKeys}
+        onManageCategoriesClick={() => setShowCategoryManager(true)}
         onTextureTypesChange={setSelectedTextureTypes}
         cardWidth={cardWidth}
         onCardWidthChange={handleCardWidthChange}
@@ -1008,6 +1040,31 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
         targetTextureSet={dropTargetTextureSet}
         onHide={handleMergeDialogHide}
         onMerge={handleMergeTextureSets}
+      />
+
+      <ChangeTextureSetCategoryDialog
+        visible={showChangeCategory}
+        categories={categories}
+        selectedCount={
+          contextMode === 'bulk' ? selectedTextureSets.length : 1
+        }
+        unitLabel={unitLabel}
+        initialCategoryId={
+          contextMode === 'single' ? (activeContextSet?.categoryId ?? null) : null
+        }
+        onHide={() => setShowChangeCategory(false)}
+        onConfirm={handleChangeCategory}
+        onManageCategories={() => {
+          setShowChangeCategory(false)
+          setShowCategoryManager(true)
+        }}
+      />
+
+      <TextureSetCategoryManagerDialog
+        visible={showCategoryManager}
+        categories={categories}
+        kind={categoriesKind}
+        onHide={() => setShowCategoryManager(false)}
       />
 
       {showCreateDialog && (

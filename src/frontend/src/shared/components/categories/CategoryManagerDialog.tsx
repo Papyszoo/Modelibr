@@ -2,12 +2,15 @@ import './CategoryTreeControls.css'
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Button } from 'primereact/button'
+import { confirmDialog } from 'primereact/confirmdialog'
 import { Dialog } from 'primereact/dialog'
 import { InputText } from 'primereact/inputtext'
 import { InputTextarea } from 'primereact/inputtextarea'
+import { Toast } from 'primereact/toast'
 import { Tree } from 'primereact/tree'
+import { type TreeNode } from 'primereact/treenode'
 import { TreeSelect } from 'primereact/treeselect'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { type z } from 'zod'
 
@@ -17,7 +20,6 @@ import {
   buildExpandedKeys,
   collectCategoryBranchIds,
   findCategoryById,
-  getSelectedTreeId,
 } from '@/shared/utils/categoryTree'
 import { hierarchicalCategoryFormSchema } from '@/shared/validation/formSchemas'
 
@@ -32,9 +34,13 @@ interface CategoryManagerDialogProps<TCategory extends HierarchicalCategory> {
   createCategory: (request: CategoryFormOutput) => Promise<unknown>
   updateCategory: (id: number, request: CategoryFormOutput) => Promise<unknown>
   deleteCategory: (id: number) => Promise<unknown>
-  initialSelectedCategoryId?: number | null
   createLabel?: string
 }
+
+// `null` -> showing the list; a number -> editing that category; 'new' ->
+// adding. Keeping list and form as distinct views (instead of a permanent
+// two-pane editor) makes the add-vs-edit mode unmistakable.
+type FormTarget = number | 'new' | null
 
 export function CategoryManagerDialog<TCategory extends HierarchicalCategory>({
   title,
@@ -44,14 +50,15 @@ export function CategoryManagerDialog<TCategory extends HierarchicalCategory>({
   createCategory,
   updateCategory,
   deleteCategory,
-  initialSelectedCategoryId = null,
   createLabel = 'Create Category',
 }: CategoryManagerDialogProps<TCategory>) {
-  const [selectedId, setSelectedId] = useState<number | null>(
-    initialSelectedCategoryId
-  )
+  const [formTarget, setFormTarget] = useState<FormTarget>(null)
   const [isSaving, setIsSaving] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
+  const toastRef = useRef<Toast>(null)
+
+  const isFormOpen = formTarget !== null
+  const editingId = typeof formTarget === 'number' ? formTarget : null
+
   const {
     control,
     handleSubmit,
@@ -60,137 +67,168 @@ export function CategoryManagerDialog<TCategory extends HierarchicalCategory>({
   } = useForm<CategoryFormInput, unknown, CategoryFormOutput>({
     resolver: zodResolver(hierarchicalCategoryFormSchema),
     mode: 'onChange',
-    defaultValues: {
-      name: '',
-      description: '',
-      parentId: null,
-    },
+    defaultValues: { name: '', description: '', parentId: null },
   })
 
-  const allCategoryTreeNodes = useMemo(
-    () => buildCategoryTree(categories),
-    [categories]
+  const treeNodes = useMemo(() => buildCategoryTree(categories), [categories])
+  const expandedKeys = useMemo(
+    () => buildExpandedKeys(treeNodes),
+    [treeNodes]
+  )
+  const editingCategory = useMemo(
+    () => (editingId !== null ? findCategoryById(categories, editingId) : null),
+    [categories, editingId]
   )
   const blockedParentIds = useMemo(() => {
-    if (selectedId === null) {
+    if (editingId === null) {
       return undefined
     }
-
-    return collectCategoryBranchIds(categories, selectedId)
-  }, [categories, selectedId])
+    return collectCategoryBranchIds(categories, editingId)
+  }, [categories, editingId])
   const parentTreeNodes = useMemo(
     () => buildCategoryTree(categories, blockedParentIds),
     [blockedParentIds, categories]
   )
-  const expandedKeys = useMemo(
-    () => buildExpandedKeys(allCategoryTreeNodes),
-    [allCategoryTreeNodes]
-  )
-  const selectedCategory = useMemo(
-    () => findCategoryById(categories, selectedId),
-    [categories, selectedId]
-  )
-  const selectedTreeKeys = selectedId ? { [String(selectedId)]: true } : {}
 
+  // Always return to the list when the dialog (re)opens.
   useEffect(() => {
-    if (!visible) {
-      return
+    if (visible) {
+      setFormTarget(null)
     }
+  }, [visible])
 
-    setSelectedId(initialSelectedCategoryId)
-  }, [initialSelectedCategoryId, visible])
+  // Seed the form synchronously when entering add/edit so a post-render
+  // reset can't clobber freshly-typed input (and a background categories
+  // refetch can't wipe an in-progress edit).
+  const openAddForm = () => {
+    reset({ name: '', description: '', parentId: null })
+    setFormTarget('new')
+  }
 
-  useEffect(() => {
-    if (!selectedCategory) {
-      reset({
-        name: '',
-        description: '',
-        parentId: null,
-      })
-      return
-    }
-
+  const openEditForm = (category: TCategory) => {
     reset({
-      name: selectedCategory.name,
-      description: selectedCategory.description ?? '',
-      parentId: selectedCategory.parentId ?? null,
+      name: category.name,
+      description: category.description ?? '',
+      parentId: category.parentId ?? null,
     })
-  }, [reset, selectedCategory])
+    setFormTarget(category.id)
+  }
 
   const onSubmit = handleSubmit(async values => {
     setIsSaving(true)
-
     try {
-      if (selectedCategory) {
-        await updateCategory(selectedCategory.id, values)
+      if (editingCategory) {
+        await updateCategory(editingCategory.id, values)
+        toastRef.current?.show({
+          severity: 'success',
+          summary: 'Category updated',
+          detail: values.name,
+          life: 3000,
+        })
       } else {
         await createCategory(values)
+        toastRef.current?.show({
+          severity: 'success',
+          summary: 'Category created',
+          detail: values.name,
+          life: 3000,
+        })
       }
+      setFormTarget(null)
     } finally {
       setIsSaving(false)
     }
   })
 
-  const handleDelete = async () => {
-    if (!selectedCategory) {
-      return
-    }
+  const requestDelete = (category: TCategory) => {
+    const childCount = categories.filter(c => c.parentId === category.id).length
+    const subcategoryNote =
+      childCount > 0
+        ? ` Its ${childCount} subcategor${childCount === 1 ? 'y' : 'ies'} will be affected.`
+        : ''
 
-    setIsDeleting(true)
-    try {
-      await deleteCategory(selectedCategory.id)
-      setSelectedId(null)
-    } finally {
-      setIsDeleting(false)
-    }
+    confirmDialog({
+      header: 'Delete category',
+      icon: 'pi pi-exclamation-triangle',
+      acceptClassName: 'p-button-danger',
+      acceptLabel: 'Delete',
+      message: `Delete "${category.name}"? This cannot be undone.${subcategoryNote}`,
+      accept: async () => {
+        await deleteCategory(category.id)
+        toastRef.current?.show({
+          severity: 'success',
+          summary: 'Category deleted',
+          detail: category.name,
+          life: 3000,
+        })
+        if (editingId === category.id) {
+          setFormTarget(null)
+        }
+      },
+    })
+  }
+
+  const nodeTemplate = (node: TreeNode) => {
+    const category = node.data as TCategory
+    return (
+      <div className="category-row">
+        <span className="category-row-name">{category.name}</span>
+        <span className="category-row-actions">
+          <Button
+            type="button"
+            icon="pi pi-pencil"
+            text
+            rounded
+            aria-label={`Edit ${category.name}`}
+            onClick={event => {
+              event.stopPropagation()
+              openEditForm(category)
+            }}
+          />
+          <Button
+            type="button"
+            icon="pi pi-trash"
+            text
+            rounded
+            severity="danger"
+            aria-label={`Delete ${category.name}`}
+            onClick={event => {
+              event.stopPropagation()
+              requestDelete(category)
+            }}
+          />
+        </span>
+      </div>
+    )
   }
 
   return (
     <Dialog
       header={title}
       visible={visible}
-      style={{ width: '880px', maxWidth: '96vw' }}
+      style={{ width: '520px', maxWidth: '94vw' }}
       onHide={onHide}
     >
-      <div className="category-manager">
-        <div className="category-manager-list">
-          <div className="category-manager-list-header">
-            <h4>Existing Categories</h4>
-            <Button
-              label="New"
-              icon="pi pi-plus"
-              text
-              onClick={() => setSelectedId(null)}
-            />
-          </div>
+      <Toast ref={toastRef} />
 
-          <div className="category-manager-list-tree">
-            {allCategoryTreeNodes.length > 0 ? (
-              <Tree
-                value={allCategoryTreeNodes}
-                selectionMode="single"
-                selectionKeys={selectedTreeKeys}
-                expandedKeys={expandedKeys}
-                onSelectionChange={event => {
-                  setSelectedId(getSelectedTreeId(event.value))
-                }}
-                className="category-tree"
-              />
-            ) : (
-              <div className="category-tree-empty-state">
-                No categories yet.
-              </div>
-            )}
-          </div>
-        </div>
-
+      {isFormOpen ? (
         <form
-          className="category-manager-editor"
+          className="category-form"
           onSubmit={event => void onSubmit(event)}
         >
-          <h4>{selectedCategory ? 'Edit Category' : createLabel}</h4>
+          <div className="category-form-header">
+            <Button
+              type="button"
+              icon="pi pi-arrow-left"
+              text
+              rounded
+              aria-label="Back to categories"
+              onClick={() => setFormTarget(null)}
+            />
+            <h4>{editingCategory ? 'Edit category' : 'Add category'}</h4>
+          </div>
 
-          <div className="category-manager-field">
+          <div className="category-form-field">
             <label htmlFor="category-name">Name</label>
             <Controller
               name="name"
@@ -199,13 +237,14 @@ export function CategoryManagerDialog<TCategory extends HierarchicalCategory>({
                 <InputText
                   id="category-name"
                   {...field}
-                  placeholder="Environment / Props / Characters"
+                  autoFocus
+                  placeholder="e.g. Environment, Props, Characters"
                 />
               )}
             />
           </div>
 
-          <div className="category-manager-field">
+          <div className="category-form-field">
             <label htmlFor="category-parent">Parent</label>
             <Controller
               name="parentId"
@@ -222,18 +261,18 @@ export function CategoryManagerDialog<TCategory extends HierarchicalCategory>({
                         : String(event.value)
                     field.onChange(value ? Number(value) : null)
                   }}
-                  placeholder="Root category"
+                  placeholder="None (top level)"
                   showClear
                   filter
                   selectionMode="single"
-                  className="category-manager-parent-select"
+                  className="category-form-control"
                   disabled={parentTreeNodes.length === 0}
                 />
               )}
             />
           </div>
 
-          <div className="category-manager-field">
+          <div className="category-form-field">
             <label htmlFor="category-description">Description</label>
             <Controller
               name="description"
@@ -242,34 +281,60 @@ export function CategoryManagerDialog<TCategory extends HierarchicalCategory>({
                 <InputTextarea
                   id="category-description"
                   {...field}
-                  rows={5}
-                  placeholder="Optional note about when to use this category"
-                  className="category-manager-textarea"
+                  rows={3}
+                  placeholder="Optional"
+                  className="category-form-control"
                 />
               )}
             />
           </div>
 
-          <div className="category-manager-actions">
+          <div className="category-form-actions">
+            <Button
+              type="button"
+              label="Cancel"
+              text
+              onClick={() => setFormTarget(null)}
+              disabled={isSaving}
+            />
             <Button
               type="submit"
-              label={selectedCategory ? 'Save Changes' : createLabel}
-              icon="pi pi-save"
+              label={editingCategory ? 'Save Changes' : createLabel}
+              icon="pi pi-check"
               disabled={!isValid || isSaving}
               loading={isSaving}
             />
-            <Button
-              label="Delete"
-              icon="pi pi-trash"
-              severity="danger"
-              text
-              onClick={() => void handleDelete()}
-              disabled={!selectedCategory || isDeleting}
-              loading={isDeleting}
-            />
           </div>
         </form>
-      </div>
+      ) : (
+        <div className="category-list">
+          <div className="category-list-header">
+            <span className="category-list-count">
+              {categories.length} categor{categories.length === 1 ? 'y' : 'ies'}
+            </span>
+            <Button
+              label="Add category"
+              icon="pi pi-plus"
+              onClick={openAddForm}
+            />
+          </div>
+
+          {treeNodes.length > 0 ? (
+            <div className="category-manager-list">
+              <Tree
+                value={treeNodes}
+                expandedKeys={expandedKeys}
+                nodeTemplate={nodeTemplate}
+                className="category-tree"
+              />
+            </div>
+          ) : (
+            <div className="category-tree-empty-state">
+              No categories yet. Click “Add category” to create one.
+            </div>
+          )}
+        </div>
+      )}
     </Dialog>
   )
 }

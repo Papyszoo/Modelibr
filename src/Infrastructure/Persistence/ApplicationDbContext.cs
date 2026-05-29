@@ -518,6 +518,12 @@ namespace Infrastructure.Persistence
                 entity.HasKey(c => c.Id);
                 entity.Property(c => c.Name).IsRequired().HasMaxLength(100);
                 entity.Property(c => c.Description).HasMaxLength(500);
+                // No HasDefaultValue here: EF Core would treat ModelSpecific
+                // (=0, the CLR default) as "unset" and let the store default
+                // win, silently saving Multi-Model categories as Universal.
+                // Existing rows were backfilled to Universal by the
+                // AddKindToTextureSetCategory migration.
+                entity.Property(c => c.Kind).IsRequired();
                 entity.Property(c => c.CreatedAt).IsRequired();
                 entity.Property(c => c.UpdatedAt).IsRequired();
 
@@ -526,7 +532,7 @@ namespace Infrastructure.Persistence
                     .HasForeignKey(c => c.ParentId)
                     .OnDelete(DeleteBehavior.Restrict);
 
-                entity.HasIndex(c => new { c.ParentId, c.Name }).IsUnique();
+                entity.HasIndex(c => new { c.Kind, c.ParentId, c.Name }).IsUnique();
             });
 
             modelBuilder.Entity<ModelConceptImage>(entity =>

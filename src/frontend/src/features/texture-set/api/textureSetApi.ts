@@ -11,10 +11,12 @@ import {
   type GetAllTextureSetsResponse,
   type TextureSetCategoryDto,
   type TextureSetDto,
+  type TextureSetKind,
   type UpdateTextureSetRequest,
   type UpdateTextureSetResponse,
   type UpdateTilingScaleRequest,
   type UpdateTilingScaleResponse,
+  type UpsertTextureSetCategoryRequest,
 } from '../../../types'
 
 export async function getAllTextureSets(
@@ -62,12 +64,33 @@ export async function getTextureSetsPaginated(options: {
   return response.data
 }
 
-export async function getAllTextureSetCategories(): Promise<
-  TextureSetCategoryDto[]
-> {
+export async function getAllTextureSetCategories(
+  kind: TextureSetKind
+): Promise<TextureSetCategoryDto[]> {
   const response: AxiosResponse<GetAllTextureSetCategoriesResponse> =
-    await client.get('/texture-set-categories')
+    await client.get(`/texture-set-categories?kind=${kind}`)
   return response.data.categories
+}
+
+export async function createTextureSetCategory(
+  request: UpsertTextureSetCategoryRequest
+): Promise<TextureSetCategoryDto> {
+  const response = await client.post<TextureSetCategoryDto>(
+    '/texture-set-categories',
+    request
+  )
+  return response.data
+}
+
+export async function updateTextureSetCategory(
+  id: number,
+  request: UpsertTextureSetCategoryRequest
+): Promise<void> {
+  await client.put(`/texture-set-categories/${id}`, request)
+}
+
+export async function deleteTextureSetCategory(id: number): Promise<void> {
+  await client.delete(`/texture-set-categories/${id}`)
 }
 
 export async function getTextureSetById(

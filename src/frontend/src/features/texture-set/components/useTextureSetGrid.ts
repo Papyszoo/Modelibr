@@ -25,7 +25,7 @@ import {
   type TextureSetListViewState,
   useTextureSetListViewStore,
 } from '@/stores/textureSetListViewStore'
-import { type TextureSetKind, type TextureType } from '@/types'
+import { TextureSetKind, type TextureType } from '@/types'
 
 const PAGE_SIZE = 50
 
@@ -87,9 +87,12 @@ export function useTextureSetGrid({
 
   const { data: packs = [] } = usePacksQuery()
   const { data: projects = [] } = useProjectsQuery()
+  // Categories are scoped per kind. The generic "Texture Sets" tab (no locked
+  // kind) falls back to the Universal (Global Materials) pool.
+  const categoriesKind = kind ?? TextureSetKind.Universal
   const { data: categories = [] } = useQuery({
-    queryKey: ['textureSetCategories'],
-    queryFn: getAllTextureSetCategories,
+    queryKey: ['textureSetCategories', categoriesKind],
+    queryFn: () => getAllTextureSetCategories(categoriesKind),
   })
 
   // --- Derived filter state ---
@@ -380,6 +383,7 @@ export function useTextureSetGrid({
     packs,
     projects,
     categories,
+    categoriesKind,
 
     // Filter / search state
     searchQuery: viewState.searchQuery,

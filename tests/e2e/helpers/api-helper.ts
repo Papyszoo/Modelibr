@@ -539,6 +539,137 @@ export class ApiHelper {
     }
 
     /**
+     * Create a texture set with a specific kind (no file).
+     */
+    async createTextureSetWithKind(
+        name: string,
+        kind: number, // 0 = ModelSpecific, 1 = Universal
+    ): Promise<{ id: number; name: string }> {
+        const response = await this.client.post("/texture-sets", {
+            name,
+            kind,
+        });
+        if (response.status !== 200 && response.status !== 201) {
+            throw new Error(
+                `Failed to create texture set with kind: ${response.status} ${response.statusText} ${JSON.stringify(response.data)}`,
+            );
+        }
+        return response.data;
+    }
+
+    /**
+     * Create a texture set category scoped to a kind.
+     */
+    async createTextureSetCategory(
+        name: string,
+        kind: number, // 0 = ModelSpecific, 1 = Universal
+        parentId: number | null = null,
+    ): Promise<{ id: number; name: string; parentId: number | null }> {
+        const response = await this.client.post("/texture-set-categories", {
+            name,
+            description: null,
+            parentId,
+            kind,
+        });
+        if (response.status !== 200 && response.status !== 201) {
+            throw new Error(
+                `Failed to create texture set category: ${response.status} ${response.statusText} ${JSON.stringify(response.data)}`,
+            );
+        }
+        return response.data;
+    }
+
+    /** Create a model category. */
+    async createModelCategory(
+        name: string,
+        parentId: number | null = null,
+    ): Promise<{ id: number; name: string }> {
+        const response = await this.client.post("/model-categories", {
+            name,
+            description: null,
+            parentId,
+        });
+        if (response.status !== 200 && response.status !== 201) {
+            throw new Error(
+                `Failed to create model category: ${response.status} ${JSON.stringify(response.data)}`,
+            );
+        }
+        return response.data;
+    }
+
+    /** Assign a model to a category (mirrors the detail "save" path). */
+    async assignModelCategory(
+        modelId: number,
+        categoryId: number | null,
+    ): Promise<void> {
+        const response = await this.client.post(`/models/${modelId}/tags`, {
+            tags: [],
+            description: "",
+            categoryId,
+        });
+        if (response.status !== 200 && response.status !== 201) {
+            throw new Error(
+                `Failed to assign model category: ${response.status} ${JSON.stringify(response.data)}`,
+            );
+        }
+    }
+
+    /** Create an environment map category. */
+    async createEnvironmentMapCategory(
+        name: string,
+        parentId: number | null = null,
+    ): Promise<{ id: number; name: string }> {
+        const response = await this.client.post(
+            "/environment-map-categories",
+            { name, description: null, parentId },
+        );
+        if (response.status !== 200 && response.status !== 201) {
+            throw new Error(
+                `Failed to create environment map category: ${response.status} ${JSON.stringify(response.data)}`,
+            );
+        }
+        return response.data;
+    }
+
+    /**
+     * Attempt to rename a texture set category, returning the HTTP status
+     * without throwing (used to assert rejection cases).
+     */
+    async updateTextureSetCategoryStatus(
+        id: number,
+        name: string,
+        parentId: number | null = null,
+    ): Promise<number> {
+        const response = await this.client.put(
+            `/texture-set-categories/${id}`,
+            { name, description: null, parentId },
+        );
+        return response.status;
+    }
+
+    /**
+     * List texture set categories for a kind.
+     */
+    async getTextureSetCategories(kind: number): Promise<any[]> {
+        const response = await this.client.get(
+            `/texture-set-categories?kind=${kind}`,
+        );
+        if (response.status !== 200) {
+            throw new Error(
+                `Failed to get texture set categories: ${response.status}`,
+            );
+        }
+        return response.data.categories || [];
+    }
+
+    /**
+     * Delete a texture set category by id.
+     */
+    async deleteTextureSetCategory(id: number): Promise<void> {
+        await this.client.delete(`/texture-set-categories/${id}`);
+    }
+
+    /**
      * Update the kind of a texture set
      */
     async updateTextureSetKind(

@@ -61,6 +61,7 @@ interface TexturesFiltersProps {
   onPackFilterChange: (packIds: number[]) => void
   onProjectFilterChange: (projectIds: number[]) => void
   onCategoryChange: (keys: CategorySelectionKeys) => void
+  onManageCategoriesClick: () => void
   onTextureTypesChange: (types: number[]) => void
   cardWidth: number
   onCardWidthChange: (width: number) => void
@@ -93,6 +94,7 @@ export function TexturesFilters({
   onPackFilterChange,
   onProjectFilterChange,
   onCategoryChange,
+  onManageCategoriesClick,
   onTextureTypesChange,
   cardWidth,
   onCardWidthChange,
@@ -264,13 +266,21 @@ export function TexturesFilters({
               filterPlaceholder="Search projects..."
             />
           )}
-          {categories.length > 0 && (
+          {categories.length > 0 ? (
             <CategoryFilterPicker
               categories={categories}
               selectedKeys={selectedCategoryKeys}
               onChange={onCategoryChange}
+              onManageClick={onManageCategoriesClick}
               label="Categories"
               ariaLabel="Filter by texture-set categories"
+            />
+          ) : (
+            <Button
+              icon="pi pi-sitemap"
+              label="Manage categories"
+              className="p-button-text p-button-sm list-filters-control"
+              onClick={onManageCategoriesClick}
             />
           )}
           <MultiSelect
