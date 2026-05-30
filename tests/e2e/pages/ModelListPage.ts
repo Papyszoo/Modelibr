@@ -34,6 +34,44 @@ export class ModelListPage {
         await filterPanel.waitFor({ state: "visible", timeout: 5000 });
     }
 
+    /**
+     * Open the model category manager. Mirrors the texture-set flow: the
+     * toolbar panel is `pointer-events: none` until it has `.is-open`, so we
+     * gate on that class before clicking the picker trigger / manage button.
+     */
+    async openCategoryManager(): Promise<void> {
+        const openPanel = this.page.locator(
+            "#model-grid-filters-panel.is-open",
+        );
+        if (!(await openPanel.count())) {
+            await this.page
+                .getByRole("button", { name: /^filters$/i })
+                .click();
+        }
+        await openPanel.waitFor({ state: "visible", timeout: 5000 });
+
+        const panel = this.page.locator("#model-grid-filters-panel");
+        const trigger = panel.locator(
+            'button[aria-label="Filter by model categories"]',
+        );
+        if (await trigger.count()) {
+            await trigger.scrollIntoViewIfNeeded();
+            await trigger.click();
+            const overlay = this.page.locator(".p-overlaypanel");
+            await overlay.waitFor({ state: "visible" });
+            await overlay
+                .locator('button[aria-label="Manage categories"]')
+                .click();
+        } else {
+            await panel
+                .getByRole("button", { name: "Manage categories" })
+                .click();
+        }
+        await this.page
+            .getByRole("dialog", { name: "Manage Model Categories" })
+            .waitFor({ state: "visible" });
+    }
+
     async goto() {
         // Navigate with clean state — default tab is modelList
         await navigateToAppClean(this.page);
@@ -244,6 +282,54 @@ export class ModelListPage {
             return this.page.locator(`.model-card[data-model-id="${id}"]`);
         }
         return this.page.locator(`.model-card:has-text("${name}")`).first();
+    }
+
+    /** Assign a model to a category via the right-click "Change category". */
+    async changeCategoryViaContextMenu(
+        card: Locator,
+        categoryName: string,
+    ): Promise<void> {
+        await card.click({ button: "right" });
+        await this.page.waitForSelector(".p-contextmenu", { timeout: 5000 });
+        await this.page
+            .locator(
+                '.p-contextmenu .p-menuitem:has-text("Change category") .p-menuitem-link',
+            )
+            .click();
+
+        const dialog = this.page.getByRole("dialog", {
+            name: "Change Category",
+        });
+        await dialog.waitFor({ state: "visible" });
+        await dialog
+            .locator(".model-category-tree .p-treenode-content", {
+                hasText: categoryName,
+            })
+            .first()
+            .click();
+        await dialog.getByRole("button", { name: "Move" }).click();
+        await dialog.waitFor({ state: "hidden" });
+    }
+
+    /** Filter the model list by a category via the filter-picker popover. */
+    async filterByCategory(categoryName: string): Promise<void> {
+        await this.ensureFiltersOpen();
+        const trigger = this.page
+            .locator("#model-grid-filters-panel")
+            .locator('button[aria-label="Filter by model categories"]');
+        await trigger.scrollIntoViewIfNeeded();
+        await trigger.click();
+        const overlay = this.page.locator(".p-overlaypanel");
+        await overlay.waitFor({ state: "visible" });
+        await overlay
+            .locator(".category-tree .p-treenode-content", {
+                hasText: categoryName,
+            })
+            .first()
+            .locator(".p-checkbox")
+            .click();
+        await this.page.keyboard.press("Escape");
+        await overlay.waitFor({ state: "hidden" });
     }
 
     /**

@@ -4,30 +4,33 @@ import { Tree } from 'primereact/tree'
 import { useEffect, useMemo, useState } from 'react'
 
 import {
+  buildCategoryTree,
   buildExpandedKeys,
-  buildModelCategoryTree,
-} from '@/features/models/utils/categoryTree'
-import { type ModelCategoryDto } from '@/types'
+  getSelectedTreeId,
+} from '@/shared/utils/categoryTree'
+import { type TextureSetCategoryDto } from '@/types'
 
-interface ChangeModelCategoryDialogProps {
+interface ChangeTextureSetCategoryDialogProps {
   visible: boolean
-  categories: ModelCategoryDto[]
+  categories: TextureSetCategoryDto[]
   selectedCount: number
+  unitLabel: string
   initialCategoryId?: number | null
   onHide: () => void
   onConfirm: (categoryId: number) => Promise<void>
   onManageCategories?: () => void
 }
 
-export function ChangeModelCategoryDialog({
+export function ChangeTextureSetCategoryDialog({
   visible,
   categories,
   selectedCount,
+  unitLabel,
   initialCategoryId = null,
   onHide,
   onConfirm,
   onManageCategories,
-}: ChangeModelCategoryDialogProps) {
+}: ChangeTextureSetCategoryDialogProps) {
   const [selectedId, setSelectedId] = useState<number | null>(initialCategoryId)
   const [isSaving, setIsSaving] = useState(false)
 
@@ -40,7 +43,7 @@ export function ChangeModelCategoryDialog({
   }, [initialCategoryId, visible])
 
   const categoryTreeNodes = useMemo(
-    () => buildModelCategoryTree(categories),
+    () => buildCategoryTree(categories),
     [categories]
   )
 
@@ -50,20 +53,7 @@ export function ChangeModelCategoryDialog({
   )
 
   const selectedTreeKeys = selectedId ? { [String(selectedId)]: true } : {}
-  const selectedCountLabel = `${selectedCount} model${selectedCount === 1 ? '' : 's'}`
-
-  const getSelectedTreeId = (
-    value: string | Record<string, boolean> | null | undefined
-  ): number | null => {
-    if (!value) {
-      return null
-    }
-
-    const rawKey =
-      typeof value === 'string' ? value : (Object.keys(value)[0] ?? null)
-
-    return rawKey ? Number(rawKey) : null
-  }
+  const selectedCountLabel = `${selectedCount} ${unitLabel}${selectedCount === 1 ? '' : 's'}`
 
   const handleConfirm = async () => {
     if (selectedId === null) {
@@ -88,8 +78,8 @@ export function ChangeModelCategoryDialog({
       style={{ width: '620px', maxWidth: '96vw' }}
       onHide={onHide}
     >
-      <div className="model-change-category-dialog">
-        <p className="model-change-category-description">
+      <div className="texture-set-change-category-dialog">
+        <p className="texture-set-change-category-description">
           Select the destination category for {selectedCountLabel}.
         </p>
 
@@ -100,12 +90,16 @@ export function ChangeModelCategoryDialog({
             selectionKeys={selectedTreeKeys}
             expandedKeys={expandedKeys}
             onSelectionChange={event => {
-              setSelectedId(getSelectedTreeId(event.value))
+              setSelectedId(
+                getSelectedTreeId(
+                  event.value as string | Record<string, boolean> | null
+                )
+              )
             }}
-            className="model-category-tree"
+            className="texture-set-category-tree"
           />
         ) : (
-          <div className="model-category-empty-state">
+          <div className="texture-set-category-empty-state">
             <span>No categories available yet.</span>
             {onManageCategories ? (
               <Button
@@ -118,8 +112,8 @@ export function ChangeModelCategoryDialog({
           </div>
         )}
 
-        <div className="model-change-category-actions">
-          {onManageCategories && categories.length > 0 ? (
+        <div className="texture-set-change-category-actions">
+          {onManageCategories && categoryTreeNodes.length > 0 ? (
             <Button
               label="Manage categories"
               icon="pi pi-sitemap"

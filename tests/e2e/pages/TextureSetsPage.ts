@@ -264,6 +264,113 @@ export class TextureSetsPage {
         await menuItem.click();
     }
 
+    // ── Categories ────────────────────────────────────────────────────
+
+    /** The shared "Manage Categories" dialog (CategoryManagerDialog). */
+    get categoryManagerDialog(): Locator {
+        return this.page.getByRole("dialog", { name: "Manage Categories" });
+    }
+
+    /** The Filters toolbar panel (collapsed by default). */
+    get filtersPanel(): Locator {
+        return this.page.locator("#texture-set-grid-filters-panel");
+    }
+
+    /**
+     * Open the Filters toolbar panel and wait until it is fully expanded.
+     * The panel animates from a 0fr grid row with `pointer-events: none`;
+     * only once it has the `.is-open` class are its controls clickable, so
+     * we gate on that class rather than mere element visibility.
+     */
+    async openFiltersPanel(): Promise<void> {
+        const openPanel = this.page.locator(
+            "#texture-set-grid-filters-panel.is-open",
+        );
+        if (await openPanel.count()) {
+            await openPanel.waitFor({ state: "visible", timeout: 5000 });
+            return;
+        }
+        await this.page.getByRole("button", { name: /^filters$/i }).click();
+        await openPanel.waitFor({ state: "visible", timeout: 5000 });
+    }
+
+    /**
+     * Open the category manager. Works whether or not categories exist:
+     * with categories it opens the filter-picker popover and clicks the cog,
+     * otherwise it clicks the standalone "Manage categories" button.
+     */
+    async openCategoryManager(): Promise<void> {
+        await this.openFiltersPanel();
+        const trigger = this.filtersPanel.locator(
+            'button[aria-label="Filter by texture-set categories"]',
+        );
+        if (await trigger.count()) {
+            await trigger.scrollIntoViewIfNeeded();
+            await trigger.click();
+            const overlay = this.page.locator(".p-overlaypanel");
+            await overlay.waitFor({ state: "visible" });
+            await overlay
+                .locator('button[aria-label="Manage categories"]')
+                .click();
+        } else {
+            await this.filtersPanel
+                .getByRole("button", { name: "Manage categories" })
+                .click();
+        }
+        await this.categoryManagerDialog.waitFor({ state: "visible" });
+    }
+
+    /**
+     * Assign a texture set to a category via the right-click "Change
+     * Category" dialog.
+     */
+    async assignCategoryViaContextMenu(
+        setName: string,
+        categoryName: string,
+    ): Promise<void> {
+        await this.openContextMenu(setName);
+        await this.selectContextMenuOption("Change Category");
+
+        const dialog = this.page.getByRole("dialog", {
+            name: "Change Category",
+        });
+        await dialog.waitFor({ state: "visible" });
+        await dialog
+            .locator(".texture-set-category-tree .p-treenode-content", {
+                hasText: categoryName,
+            })
+            .first()
+            .click();
+        await dialog.getByRole("button", { name: "Move" }).click();
+        await dialog.waitFor({ state: "hidden" });
+        await this.page
+            .locator(".p-toast-message", { hasText: "Category changed" })
+            .first()
+            .waitFor({ state: "visible", timeout: 10000 });
+    }
+
+    /** Filter the grid by a category using the filter-picker popover. */
+    async filterByCategory(categoryName: string): Promise<void> {
+        await this.openFiltersPanel();
+        const trigger = this.filtersPanel.locator(
+            'button[aria-label="Filter by texture-set categories"]',
+        );
+        await trigger.scrollIntoViewIfNeeded();
+        await trigger.click();
+        const overlay = this.page.locator(".p-overlaypanel");
+        await overlay.waitFor({ state: "visible" });
+        await overlay
+            .locator(".category-tree .p-treenode-content", {
+                hasText: categoryName,
+            })
+            .first()
+            .locator(".p-checkbox")
+            .click();
+        // Close the overlay so it doesn't intercept later interactions.
+        await this.page.keyboard.press("Escape");
+        await overlay.waitFor({ state: "hidden" });
+    }
+
     /**
      * Recycle a texture set via context menu
      * @param name - Name of the texture set to recycle

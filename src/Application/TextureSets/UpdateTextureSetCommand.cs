@@ -48,6 +48,12 @@ internal class UpdateTextureSetCommandHandler : ICommandHandler<UpdateTextureSet
                     return Result.Failure<UpdateTextureSetResponse>(
                         new Error("CategoryNotFound", $"Texture set category with ID {command.CategoryId.Value} was not found."));
                 }
+
+                if (category.Kind != textureSet.Kind)
+                {
+                    return Result.Failure<UpdateTextureSetResponse>(
+                        new Error("CategoryKindMismatch", "The category belongs to a different texture set kind."));
+                }
             }
 
             // Update the texture set name

@@ -75,6 +75,12 @@ internal class CreateTextureSetWithFileCommandHandler : ICommandHandler<CreateTe
                     return Result.Failure<CreateTextureSetWithFileResponse>(
                         new Error("CategoryNotFound", $"Texture set category with ID {command.CategoryId.Value} was not found."));
                 }
+
+                if (category.Kind != command.Kind)
+                {
+                    return Result.Failure<CreateTextureSetWithFileResponse>(
+                        new Error("CategoryKindMismatch", "The category belongs to a different texture set kind."));
+                }
             }
 
             // 3. Resolve name collision based on DuplicateNamePolicy setting

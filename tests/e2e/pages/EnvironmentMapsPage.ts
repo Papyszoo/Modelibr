@@ -160,6 +160,98 @@ export class EnvironmentMapsPage {
         );
     }
 
+    // ── Categories ────────────────────────────────────────────────────
+
+    /** Open the Filters toolbar panel and wait until it is clickable. */
+    async openFiltersPanel(): Promise<void> {
+        const openPanel = this.page.locator(
+            "#environment-map-filters-panel.is-open",
+        );
+        if (!(await openPanel.count())) {
+            await this.page
+                .getByRole("button", { name: /^filters$/i })
+                .click();
+        }
+        await openPanel.waitFor({ state: "visible", timeout: 5000 });
+    }
+
+    /** Open the (shared) Manage Environment Map Categories dialog. */
+    async openCategoryManager(): Promise<void> {
+        await this.openFiltersPanel();
+        const panel = this.page.locator("#environment-map-filters-panel");
+        const trigger = panel.locator(
+            'button[aria-label="Filter by environment map categories"]',
+        );
+        if (await trigger.count()) {
+            await trigger.scrollIntoViewIfNeeded();
+            await trigger.click();
+            const overlay = this.page.locator(".p-overlaypanel");
+            await overlay.waitFor({ state: "visible" });
+            await overlay
+                .locator('button[aria-label="Manage categories"]')
+                .click();
+        } else {
+            await panel
+                .getByRole("button", { name: "Manage Categories" })
+                .click();
+        }
+        await this.page
+            .getByRole("dialog", { name: "Manage Environment Map Categories" })
+            .waitFor({ state: "visible" });
+    }
+
+    /** Assign an environment map to a category via the right-click menu. */
+    async changeCategoryViaContextMenu(
+        mapName: string,
+        categoryName: string,
+    ): Promise<void> {
+        await this.getEnvironmentMapCardByName(mapName)
+            .first()
+            .click({ button: "right" });
+        await this.page.waitForSelector(".p-contextmenu", { timeout: 5000 });
+        await this.page
+            .locator(
+                '.p-contextmenu .p-menuitem:has-text("Change category") .p-menuitem-link',
+            )
+            .click();
+
+        const dialog = this.page.getByRole("dialog", {
+            name: "Change Category",
+        });
+        await dialog.waitFor({ state: "visible" });
+        await dialog
+            .locator(".environment-map-category-tree .p-treenode-content", {
+                hasText: categoryName,
+            })
+            .first()
+            .click();
+        await dialog.getByRole("button", { name: "Move" }).click();
+        await dialog.waitFor({ state: "hidden" });
+    }
+
+    /** Filter the list by a category via the filter-picker popover. */
+    async filterByCategory(categoryName: string): Promise<void> {
+        await this.openFiltersPanel();
+        const trigger = this.page
+            .locator("#environment-map-filters-panel")
+            .locator(
+                'button[aria-label="Filter by environment map categories"]',
+            );
+        await trigger.scrollIntoViewIfNeeded();
+        await trigger.click();
+        const overlay = this.page.locator(".p-overlaypanel");
+        await overlay.waitFor({ state: "visible" });
+        await overlay
+            .locator(".category-tree .p-treenode-content", {
+                hasText: categoryName,
+            })
+            .first()
+            .locator(".p-checkbox")
+            .click();
+        await this.page.keyboard.press("Escape");
+        await overlay.waitFor({ state: "hidden" });
+    }
+
     async dragAndDropUpload(
         payloads: UploadFilePayload[],
     ): Promise<{ environmentMapId: number }> {

@@ -1,5 +1,6 @@
 using Application.Abstractions.Repositories;
 using Domain.Models;
+using Domain.ValueObjects;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -40,6 +41,21 @@ internal sealed class TextureSetCategoryRepository : ITextureSetCategoryReposito
     {
         return await _context.TextureSetCategories
             .FirstOrDefaultAsync(c => c.Name == name && c.ParentId == parentId, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<TextureSetCategory>> GetAllByKindAsync(TextureSetKind kind, CancellationToken cancellationToken = default)
+    {
+        return await _context.TextureSetCategories
+            .AsNoTracking()
+            .Include(c => c.Children)
+            .Where(c => c.Kind == kind)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<TextureSetCategory?> GetByNameAsync(string name, int? parentId, TextureSetKind kind, CancellationToken cancellationToken = default)
+    {
+        return await _context.TextureSetCategories
+            .FirstOrDefaultAsync(c => c.Name == name && c.ParentId == parentId && c.Kind == kind, cancellationToken);
     }
 
     public async Task UpdateAsync(TextureSetCategory category, CancellationToken cancellationToken = default)

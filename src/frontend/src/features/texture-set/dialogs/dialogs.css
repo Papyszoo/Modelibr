@@ -17,6 +17,16 @@
   gap: 1rem;
 }
 
+.set-category-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.set-category-row label {
+  color: var(--text-color-secondary);
+}
+
 .set-name-section {
   display: flex;
   flex-direction: column;

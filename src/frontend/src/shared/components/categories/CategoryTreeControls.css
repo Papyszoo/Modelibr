@@ -147,56 +147,93 @@
   justify-content: flex-end;
 }
 
-.category-manager {
-  display: grid;
-  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
-  gap: 1rem;
-}
-
-.category-manager-list,
-.category-manager-editor {
-  border: 1px solid var(--surface-border);
-  border-radius: 8px;
-  padding: 1rem;
-  background: var(--surface-ground);
-}
-
-.category-manager-list-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.75rem;
-}
-
-.category-manager-list-header h4,
-.category-manager-editor h4 {
-  margin: 0;
-}
-
-.category-manager-list-tree {
-  max-height: 420px;
-  overflow: auto;
-}
-
-.category-manager-field {
+/* ── Manage Categories dialog: list view ─────────────────────────────── */
+.category-list {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-  margin-bottom: 1rem;
-}
-
-.category-manager-parent-select,
-.category-manager-textarea {
-  width: 100%;
-}
-
-.category-manager-actions {
-  display: flex;
   gap: 0.75rem;
 }
 
-@media (max-width: 960px) {
-  .category-manager {
-    grid-template-columns: 1fr;
-  }
+.category-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.category-list-count {
+  font-size: 0.85rem;
+  color: var(--text-color-secondary);
+}
+
+.category-manager-list {
+  max-height: 50vh;
+  overflow: auto;
+}
+
+/* Per-row layout: name on the left, edit/delete actions on the right. */
+.category-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.category-row-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.category-row-actions {
+  display: flex;
+  gap: 0.1rem;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.category-manager-list .p-treenode-content:hover .category-row-actions,
+.category-manager-list .p-treenode-content:focus-within .category-row-actions {
+  opacity: 1;
+}
+
+.category-row-actions .p-button.p-button-icon-only {
+  width: 2rem;
+  height: 2rem;
+}
+
+/* ── Manage Categories dialog: add / edit form ───────────────────────── */
+.category-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.category-form-header {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.category-form-header h4 {
+  margin: 0;
+}
+
+.category-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.category-form-control {
+  width: 100%;
+}
+
+.category-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
 }

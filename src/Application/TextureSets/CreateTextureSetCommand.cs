@@ -43,6 +43,12 @@ internal class CreateTextureSetCommandHandler : ICommandHandler<CreateTextureSet
                     return Result.Failure<CreateTextureSetResponse>(
                         new Error("CategoryNotFound", $"Texture set category with ID {command.CategoryId.Value} was not found."));
                 }
+
+                if (category.Kind != command.Kind)
+                {
+                    return Result.Failure<CreateTextureSetResponse>(
+                        new Error("CategoryKindMismatch", "The category belongs to a different texture set kind."));
+                }
             }
 
             // Create new texture set using domain factory method

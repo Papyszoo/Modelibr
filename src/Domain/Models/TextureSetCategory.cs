@@ -1,3 +1,5 @@
+using Domain.ValueObjects;
+
 namespace Domain.Models;
 
 public class TextureSetCategory : AggregateRoot, IHierarchicalCategory<TextureSetCategory>
@@ -8,6 +10,7 @@ public class TextureSetCategory : AggregateRoot, IHierarchicalCategory<TextureSe
     public string Name { get; private set; } = string.Empty;
     public string? Description { get; private set; }
     public int? ParentId { get; private set; }
+    public TextureSetKind Kind { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
 
@@ -23,16 +26,18 @@ public class TextureSetCategory : AggregateRoot, IHierarchicalCategory<TextureSe
         }
     }
 
-    public static TextureSetCategory Create(string name, string? description, int? parentId, DateTime createdAt)
+    public static TextureSetCategory Create(string name, string? description, int? parentId, TextureSetKind kind, DateTime createdAt)
     {
         ValidateName(name);
         ValidateDescription(description);
+        ValidateKind(kind);
 
         return new TextureSetCategory
         {
             Name = name.Trim(),
             Description = description?.Trim(),
             ParentId = parentId,
+            Kind = kind,
             CreatedAt = createdAt,
             UpdatedAt = createdAt
         };
@@ -70,5 +75,13 @@ public class TextureSetCategory : AggregateRoot, IHierarchicalCategory<TextureSe
     {
         if (description != null && description.Length > 500)
             throw new ArgumentException("Texture set category description cannot exceed 500 characters.", nameof(description));
+    }
+
+    private static void ValidateKind(TextureSetKind kind)
+    {
+        if (kind != TextureSetKind.Universal && kind != TextureSetKind.ModelSpecific)
+            throw new ArgumentException(
+                "Texture set categories are only supported for Universal (Global Materials) and ModelSpecific (Multi-Model) kinds.",
+                nameof(kind));
     }
 }
