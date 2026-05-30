@@ -1,5 +1,6 @@
 using Application.Abstractions.Messaging;
 using Application.TextureSetCategories;
+using Domain.ValueObjects;
 using Microsoft.AspNetCore.Mvc;
 
 namespace WebApi.Endpoints;
@@ -15,10 +16,11 @@ public static class TextureSetCategoryEndpoints
     }
 
     private static async Task<IResult> GetAllCategories(
+        [FromQuery] TextureSetKind kind,
         IQueryHandler<GetAllTextureSetCategoriesQuery, GetAllTextureSetCategoriesResponse> queryHandler,
         CancellationToken cancellationToken)
     {
-        var result = await queryHandler.Handle(new GetAllTextureSetCategoriesQuery(), cancellationToken);
+        var result = await queryHandler.Handle(new GetAllTextureSetCategoriesQuery(kind), cancellationToken);
         return result.IsSuccess
             ? Results.Ok(result.Value)
             : Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
@@ -30,7 +32,7 @@ public static class TextureSetCategoryEndpoints
         CancellationToken cancellationToken)
     {
         var result = await commandHandler.Handle(
-            new CreateTextureSetCategoryCommand(request.Name, request.Description, request.ParentId),
+            new CreateTextureSetCategoryCommand(request.Name, request.Description, request.ParentId, request.Kind),
             cancellationToken);
 
         return result.IsSuccess
@@ -65,4 +67,4 @@ public static class TextureSetCategoryEndpoints
     }
 }
 
-public record UpsertTextureSetCategoryRequest(string Name, string? Description, int? ParentId);
+public record UpsertTextureSetCategoryRequest(string Name, string? Description, int? ParentId, TextureSetKind Kind);

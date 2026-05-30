@@ -205,6 +205,14 @@
   color: var(--text-color-secondary);
 }
 
+.model-change-category-dialog .model-category-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  color: var(--text-color-secondary);
+}
+
 .model-change-category-actions {
   display: flex;
   justify-content: flex-end;

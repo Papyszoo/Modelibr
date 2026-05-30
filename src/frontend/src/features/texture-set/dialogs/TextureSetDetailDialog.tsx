@@ -1,5 +1,6 @@
 import './dialogs.css'
 
+import { useQuery } from '@tanstack/react-query'
 import { Button } from 'primereact/button'
 import { confirmDialog } from 'primereact/confirmdialog'
 import { Dialog } from 'primereact/dialog'
@@ -7,11 +8,15 @@ import { TabPanel, TabView } from 'primereact/tabview'
 import { Toast } from 'primereact/toast'
 import { useEffect, useRef, useState } from 'react'
 
+import { getAllTextureSetCategories } from '@/features/texture-set/api/textureSetApi'
+import { TextureSetCategoryManagerDialog } from '@/features/texture-set/components/TextureSetCategoryManagerDialog'
 import { useTextureSets } from '@/features/texture-set/hooks/useTextureSets'
+import { CategorySinglePicker } from '@/shared/components/categories/CategorySinglePicker'
 import {
   type ModelSummaryDto,
   type TextureDto,
   type TextureSetDto,
+  TextureSetKind,
 } from '@/types'
 import { getTextureTypeLabel } from '@/utils/textureTypeUtils'
 
@@ -40,8 +45,20 @@ export function TextureSetDetailDialog({
   const [showAddTextureDialog, setShowAddTextureDialog] = useState(false)
   const [showModelAssociationDialog, setShowModelAssociationDialog] =
     useState(false)
+  const [showCategoryManager, setShowCategoryManager] = useState(false)
   const toast = useRef<Toast>(null)
   const textureSetsApi = useTextureSets()
+
+  // Categories only apply to Universal (Global Materials) and ModelSpecific
+  // (Multi-Model) sets; model-owned sets are excluded.
+  const categoriesEnabled =
+    currentSet.kind === TextureSetKind.Universal ||
+    currentSet.kind === TextureSetKind.ModelSpecific
+  const { data: categories = [] } = useQuery({
+    queryKey: ['textureSetCategories', currentSet.kind],
+    queryFn: () => getAllTextureSetCategories(currentSet.kind),
+    enabled: categoriesEnabled,
+  })
 
   useEffect(() => {
     setCurrentSet(textureSet)
@@ -71,6 +88,33 @@ export function TextureSetDetailDialog({
         life: 3000,
       })
       throw error // Re-throw to let the child component handle UI state
+    } finally {
+      setUpdating(false)
+    }
+  }
+
+  const handleUpdateCategory = async (categoryId: number | null) => {
+    try {
+      setUpdating(true)
+      await textureSetsApi.updateTextureSet(currentSet.id, {
+        name: currentSet.name,
+        categoryId,
+      })
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Success',
+        detail: 'Category updated',
+        life: 3000,
+      })
+      onSetUpdated()
+    } catch (error) {
+      console.error('Failed to update category:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to update category',
+        life: 3000,
+      })
     } finally {
       setUpdating(false)
     }
@@ -175,6 +219,26 @@ export function TextureSetDetailDialog({
               onNameUpdate={handleUpdateName}
               updating={updating}
             />
+            {categoriesEnabled ? (
+              <div className="set-category-row">
+                <label>Category:</label>
+                <CategorySinglePicker
+                  categories={categories}
+                  selectedCategoryId={currentSet.categoryId ?? null}
+                  onChange={categoryId => void handleUpdateCategory(categoryId)}
+                  ariaLabel="Select texture set category"
+                />
+                <Button
+                  icon="pi pi-cog"
+                  text
+                  rounded
+                  aria-label="Manage categories"
+                  tooltip="Manage categories"
+                  tooltipOptions={{ position: 'left' }}
+                  onClick={() => setShowCategoryManager(true)}
+                />
+              </div>
+            ) : null}
             <SetStats textureSet={currentSet} />
           </div>
         </div>
@@ -219,6 +283,15 @@ export function TextureSetDetailDialog({
             setShowModelAssociationDialog(false)
             onSetUpdated()
           }}
+        />
+      )}
+
+      {categoriesEnabled && (
+        <TextureSetCategoryManagerDialog
+          visible={showCategoryManager}
+          categories={categories}
+          kind={currentSet.kind}
+          onHide={() => setShowCategoryManager(false)}
         />
       )}
     </>

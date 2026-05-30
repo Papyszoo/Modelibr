@@ -256,13 +256,19 @@ export function ModelsFilters({
               disabled={projectFilterDisabled}
             />
           )}
-          {categories.length > 0 && (
+          {categories.length > 0 ? (
             <ModelCategoryFilterPicker
               categories={categories}
               selectedKeys={selectedCategoryKeys}
               onChange={onCategoryChange}
               onManageClick={() => setShowCategoryManager(true)}
-              disabled={categories.length === 0}
+            />
+          ) : (
+            <Button
+              icon="pi pi-sitemap"
+              label="Manage categories"
+              className="p-button-text p-button-sm list-filters-control"
+              onClick={() => setShowCategoryManager(true)}
             />
           )}
           {tags.length > 0 && (

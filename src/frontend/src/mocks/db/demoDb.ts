@@ -266,6 +266,9 @@ export interface DemoCategory {
   name: string
   description: string | null
   parentId?: number | null
+  // Texture-set categories are scoped by TextureSetKind (1 = Universal/Global
+  // Materials, 0 = ModelSpecific/Multi-Model). Other category types omit it.
+  kind?: number
   createdAt: string
   updatedAt: string
 }
@@ -1299,12 +1302,15 @@ export async function seedIfEmpty(): Promise<void> {
     },
   ]
 
+  // Seeded as Universal (Global Materials, kind=1) to match the backend
+  // backfill default; the Multi-Model pool starts empty in the demo.
   const seedTextureSetCategories: DemoCategory[] = [
     {
       id: 1,
       name: 'Materials',
       description: 'Reusable material libraries',
       parentId: null,
+      kind: 1,
       createdAt: now,
       updatedAt: now,
     },
@@ -1313,6 +1319,7 @@ export async function seedIfEmpty(): Promise<void> {
       name: 'Surfaces',
       description: 'Tileable surface materials',
       parentId: 1,
+      kind: 1,
       createdAt: now,
       updatedAt: now,
     },
@@ -1321,6 +1328,7 @@ export async function seedIfEmpty(): Promise<void> {
       name: 'Decals',
       description: 'Projected details and overlays',
       parentId: null,
+      kind: 1,
       createdAt: now,
       updatedAt: now,
     },
