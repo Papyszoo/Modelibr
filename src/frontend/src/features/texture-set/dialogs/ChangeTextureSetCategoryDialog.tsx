@@ -3,12 +3,12 @@ import { Dialog } from 'primereact/dialog'
 import { Tree } from 'primereact/tree'
 import { useEffect, useMemo, useState } from 'react'
 
-import { type TextureSetCategoryDto } from '@/types'
 import {
   buildCategoryTree,
   buildExpandedKeys,
   getSelectedTreeId,
 } from '@/shared/utils/categoryTree'
+import { type TextureSetCategoryDto } from '@/types'
 
 interface ChangeTextureSetCategoryDialogProps {
   visible: boolean
@@ -128,7 +128,9 @@ export function ChangeTextureSetCategoryDialog({
             label="Move"
             icon="pi pi-check"
             onClick={handleConfirm}
-            disabled={selectedId === null || isSaving || categories.length === 0}
+            disabled={
+              selectedId === null || isSaving || categories.length === 0
+            }
             loading={isSaving}
           />
         </div>

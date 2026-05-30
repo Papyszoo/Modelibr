@@ -597,23 +597,6 @@ export class ApiHelper {
         return response.data;
     }
 
-    /** Assign a model to a category (mirrors the detail "save" path). */
-    async assignModelCategory(
-        modelId: number,
-        categoryId: number | null,
-    ): Promise<void> {
-        const response = await this.client.post(`/models/${modelId}/tags`, {
-            tags: [],
-            description: "",
-            categoryId,
-        });
-        if (response.status !== 200 && response.status !== 201) {
-            throw new Error(
-                `Failed to assign model category: ${response.status} ${JSON.stringify(response.data)}`,
-            );
-        }
-    }
-
     /** Create an environment map category. */
     async createEnvironmentMapCategory(
         name: string,

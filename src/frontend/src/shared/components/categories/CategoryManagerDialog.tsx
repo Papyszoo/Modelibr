@@ -10,7 +10,7 @@ import { Toast } from 'primereact/toast'
 import { Tree } from 'primereact/tree'
 import { type TreeNode } from 'primereact/treenode'
 import { TreeSelect } from 'primereact/treeselect'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { type z } from 'zod'
 
@@ -71,10 +71,7 @@ export function CategoryManagerDialog<TCategory extends HierarchicalCategory>({
   })
 
   const treeNodes = useMemo(() => buildCategoryTree(categories), [categories])
-  const expandedKeys = useMemo(
-    () => buildExpandedKeys(treeNodes),
-    [treeNodes]
-  )
+  const expandedKeys = useMemo(() => buildExpandedKeys(treeNodes), [treeNodes])
   const editingCategory = useMemo(
     () => (editingId !== null ? findCategoryById(categories, editingId) : null),
     [categories, editingId]
@@ -115,6 +112,23 @@ export function CategoryManagerDialog<TCategory extends HierarchicalCategory>({
   }
 
   const onSubmit = handleSubmit(async values => {
+    // Guard against the race where a background categories refetch has
+    // dropped the category being edited (e.g. another client deleted it).
+    // Without this, the `editingCategory` memo returns null and the submit
+    // would silently create a *new* category from the form values instead
+    // of failing.
+    if (editingId !== null && !editingCategory) {
+      toastRef.current?.show({
+        severity: 'warn',
+        summary: 'Category no longer exists',
+        detail:
+          'It was removed since you opened the form. Returning to the list.',
+        life: 5000,
+      })
+      setFormTarget(null)
+      return
+    }
+
     setIsSaving(true)
     try {
       if (editingCategory) {
@@ -171,53 +185,78 @@ export function CategoryManagerDialog<TCategory extends HierarchicalCategory>({
       acceptLabel: 'Delete',
       message: `Delete "${category.name}"? This cannot be undone.${subcategoryNote}`,
       accept: async () => {
-        await deleteCategory(category.id)
-        toastRef.current?.show({
-          severity: 'success',
-          summary: 'Category deleted',
-          detail: category.name,
-          life: 3000,
-        })
-        if (editingId === category.id) {
-          setFormTarget(null)
+        try {
+          await deleteCategory(category.id)
+          toastRef.current?.show({
+            severity: 'success',
+            summary: 'Category deleted',
+            detail: category.name,
+            life: 3000,
+          })
+          if (editingId === category.id) {
+            setFormTarget(null)
+          }
+        } catch (error) {
+          // PrimeReact confirmDialog does not catch async rejections, so an
+          // uncaught throw here becomes an unhandled promise rejection and
+          // the user sees no feedback at all.
+          const detail =
+            (error as { response?: { data?: { message?: string } } })?.response
+              ?.data?.message ??
+            (error as Error | undefined)?.message ??
+            'The category could not be deleted.'
+          toastRef.current?.show({
+            severity: 'error',
+            summary: 'Could not delete category',
+            detail,
+            life: 5000,
+          })
         }
       },
     })
   }
 
-  const nodeTemplate = (node: TreeNode) => {
-    const category = node.data as TCategory
-    return (
-      <div className="category-row">
-        <span className="category-row-name">{category.name}</span>
-        <span className="category-row-actions">
-          <Button
-            type="button"
-            icon="pi pi-pencil"
-            text
-            rounded
-            aria-label={`Edit ${category.name}`}
-            onClick={event => {
-              event.stopPropagation()
-              openEditForm(category)
-            }}
-          />
-          <Button
-            type="button"
-            icon="pi pi-trash"
-            text
-            rounded
-            severity="danger"
-            aria-label={`Delete ${category.name}`}
-            onClick={event => {
-              event.stopPropagation()
-              requestDelete(category)
-            }}
-          />
-        </span>
-      </div>
-    )
-  }
+  // Memoised so the Tree doesn't re-render every node on each keystroke in
+  // the sibling name input.
+  const nodeTemplate = useCallback(
+    (node: TreeNode) => {
+      const category = node.data as TCategory
+      return (
+        <div className="category-row">
+          <span className="category-row-name">{category.name}</span>
+          <span className="category-row-actions">
+            <Button
+              type="button"
+              icon="pi pi-pencil"
+              text
+              rounded
+              aria-label={`Edit ${category.name}`}
+              onClick={event => {
+                event.stopPropagation()
+                openEditForm(category)
+              }}
+            />
+            <Button
+              type="button"
+              icon="pi pi-trash"
+              text
+              rounded
+              severity="danger"
+              aria-label={`Delete ${category.name}`}
+              onClick={event => {
+                event.stopPropagation()
+                requestDelete(category)
+              }}
+            />
+          </span>
+        </div>
+      )
+    },
+    // openEditForm / requestDelete close over `reset` and `categories`; including
+    // categories keeps the count-aware delete confirmation message fresh.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [categories]
+  )
 
   return (
     <Dialog

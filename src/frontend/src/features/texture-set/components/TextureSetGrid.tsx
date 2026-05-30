@@ -593,23 +593,54 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
   }
 
   const handleChangeCategory = async (categoryId: number) => {
-    const sets = targetSets()
-    let okCount = 0
-    for (const set of sets) {
-      try {
-        await updateTextureSet(set.id, { name: set.name, categoryId })
-        okCount += 1
-      } catch (error) {
-        console.error('Failed to change texture set category:', error)
-      }
+    const allSets = targetSets()
+    // ModelOwned sets don't participate in the shared category system; the
+    // backend would reject them with CategoryKindMismatch. Filter them out
+    // up front and surface the skip in the toast so the user isn't left
+    // wondering why N-1 of N succeeded.
+    const eligible = allSets.filter(s => s.kind !== TextureSetKind.ModelOwned)
+    const skipped = allSets.length - eligible.length
+
+    // Issue updates in parallel — they're independent.
+    const results = await Promise.allSettled(
+      eligible.map(set =>
+        updateTextureSet(set.id, { name: set.name, categoryId })
+      )
+    )
+    const okCount = results.filter(r => r.status === 'fulfilled').length
+    const failedCount = eligible.length - okCount
+
+    if (failedCount > 0) {
+      console.error(
+        'Failed to change category for some texture sets:',
+        results.filter(r => r.status === 'rejected')
+      )
+    }
+
+    const detailParts = [
+      `Updated ${okCount} of ${eligible.length} ${unitLabel}${eligible.length === 1 ? '' : 's'}`,
+    ]
+    if (skipped > 0) {
+      detailParts.push(`skipped ${skipped} model-owned`)
     }
     toast.current?.show({
-      severity: okCount === sets.length ? 'success' : 'warn',
+      severity:
+        okCount === eligible.length && eligible.length > 0
+          ? 'success'
+          : okCount === 0
+            ? 'error'
+            : 'warn',
       summary: 'Category changed',
-      detail: `Updated ${okCount} of ${sets.length} ${unitLabel}${sets.length === 1 ? '' : 's'}`,
+      detail: detailParts.join(' — '),
       life: 3000,
     })
     invalidateTextureSets()
+
+    // Surface total failure to the dialog so it can keep the user's
+    // selection rather than closing.
+    if (eligible.length > 0 && okCount === 0) {
+      throw new Error('All category assignments failed')
+    }
   }
 
   const handleRecycle = async () => {
@@ -1045,12 +1076,12 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
       <ChangeTextureSetCategoryDialog
         visible={showChangeCategory}
         categories={categories}
-        selectedCount={
-          contextMode === 'bulk' ? selectedTextureSets.length : 1
-        }
+        selectedCount={contextMode === 'bulk' ? selectedTextureSets.length : 1}
         unitLabel={unitLabel}
         initialCategoryId={
-          contextMode === 'single' ? (activeContextSet?.categoryId ?? null) : null
+          contextMode === 'single'
+            ? (activeContextSet?.categoryId ?? null)
+            : null
         }
         onHide={() => setShowChangeCategory(false)}
         onConfirm={handleChangeCategory}

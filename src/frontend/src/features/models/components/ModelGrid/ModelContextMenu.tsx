@@ -14,6 +14,7 @@ import {
   softDeleteModel,
   updateModelTags,
 } from '@/features/models/api/modelApi'
+import { ModelCategoryManagerDialog } from '@/features/models/components/ModelCategoryManagerDialog'
 import {
   addModelToPack,
   removeModelFromPack,
@@ -30,8 +31,6 @@ import {
   getCopyPathSuccessMessage,
   openInFileExplorer,
 } from '@/utils/webdavUtils'
-
-import { ModelCategoryManagerDialog } from '@/features/models/components/ModelCategoryManagerDialog'
 
 import { AddModelTagsDialog } from './AddModelTagsDialog'
 import { ChangeModelCategoryDialog } from './ChangeModelCategoryDialog'
