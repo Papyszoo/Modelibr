@@ -380,7 +380,7 @@ test.describe("Projects", () => {
         });
         await viewerPause(page, 700);
 
-        const modelsTab = page.getByRole("tab", { name: /Models:\s*2/i });
+        const modelsTab = page.getByTestId("container-tab-models");
         await moveToLocator(page, modelsTab, 220);
         await modelsTab.click();
         await expect(page.locator(".model-card:not(.model-card-add)").first()).toBeVisible({
@@ -415,9 +415,11 @@ test.describe("Projects", () => {
         await moveToLocator(page, confirmAddButton, 240);
         await confirmAddButton.click();
 
-        await expect(page.getByRole("tab", { name: /Models:\s*3/i })).toBeVisible({
-            timeout: ciVideoTimeout,
-        });
+        await expect(page.getByTestId("container-tab-models")).toHaveAttribute(
+            "aria-label",
+            "Models (3)",
+            { timeout: ciVideoTimeout },
+        );
         await longPause(page);
 
         const visibleModelCards = page.locator(".model-card:not(.model-card-add)");
