@@ -3,37 +3,105 @@
   flex-direction: column;
   height: 100%;
   padding: 1rem;
-  gap: 1rem;
+  gap: 0.5rem;
   overflow-y: auto;
+  background: var(--mod-color-bg);
 }
 
-.container-header {
-  padding-bottom: 1rem;
-  border-bottom: 1px solid var(--surface-border);
+/* Single-row layout: title on the left, tab nav on the right, panels on
+   row 2 spanning full width. `display: contents` on the TabView lifts its
+   children (nav-container, panels) into the grid so we can place them
+   independently — without splitting the PrimeReact component. */
+.container-tab-bar {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto 1fr;
+  flex: 1;
+  min-height: 0;
+  column-gap: var(--mod-space-md);
 }
 
-.container-header h2 {
+.container-title {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: center;
   margin: 0;
+  font-size: var(--mod-text-sm);
+  font-weight: var(--mod-font-weight-medium);
+  color: var(--mod-color-text-muted);
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
-.container-content {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
+.container-tab-bar > .container-tabs {
+  display: contents;
+}
+
+.container-tab-bar > .container-tabs > .p-tabview-nav-container {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+}
+
+.container-tab-bar > .container-tabs > .p-tabview-panels {
+  grid-column: 1 / -1;
+  grid-row: 2;
   min-height: 0;
-}
-
-.container-tabs {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-}
-
-.container-tabs .p-tabview-panels {
-  flex: 1;
   overflow-y: auto;
-  padding: 1rem 0;
+  padding: var(--mod-space-md) 0;
+}
+
+/* PrimeReact's theme is loaded at runtime via <link> injection
+   (see useTheme.ts), so on equal-specificity ties it wins. Background
+   and border overrides need !important to defeat the late-loader. */
+.container-tab-bar .p-tabview,
+.container-tab-bar .p-tabview-nav-container,
+.container-tab-bar .p-tabview-nav-content,
+.container-tab-bar .p-tabview-nav,
+.container-tab-bar .p-tabview-nav-link,
+.container-tab-bar .p-tabview-nav li.p-highlight .p-tabview-nav-link,
+.container-tab-bar
+  .p-tabview-nav
+  li:not(.p-highlight):not(.p-disabled):hover
+  .p-tabview-nav-link,
+.container-tab-bar .p-tabview-panels,
+.container-tab-bar .p-tabview-nav-btn {
+  background: transparent !important;
+}
+
+.container-tab-bar .p-tabview-nav {
+  gap: var(--mod-space-2xs);
+  flex-wrap: nowrap;
+  border-color: var(--mod-color-border) !important;
+}
+
+.container-tab-bar .p-tabview-nav li .p-tabview-nav-link {
+  border-color: transparent !important;
+  padding: var(--mod-space-xs) var(--mod-space-sm);
+  color: var(--mod-color-text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mod-space-2xs);
+  font-weight: var(--mod-font-weight-medium);
+}
+
+/* Active tab: tint the link's bottom border (PrimeReact's existing
+   `margin: 0 0 -2px 0` on the link makes it overlap the nav's bottom
+   border exactly — no double line). */
+.container-tab-bar .p-tabview-nav li.p-highlight .p-tabview-nav-link {
+  color: var(--mod-color-primary);
+  border-color: var(--mod-color-primary) !important;
+}
+
+.container-tab-trigger i {
+  font-size: var(--mod-text-md);
+  line-height: 1;
+}
+
+.container-tab-count {
+  font-size: var(--mod-text-sm);
+  font-weight: var(--mod-font-weight-medium);
+  line-height: 1;
 }
 
 .container-details {

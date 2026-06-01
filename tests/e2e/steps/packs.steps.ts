@@ -328,7 +328,7 @@ Then("the pack viewer should be visible", async ({ page }) => {
 Then(
     "the pack name {string} should be displayed",
     async ({ page }, packName: string) => {
-        const header = page.locator(".container-header h2");
+        const header = page.locator(".container-tab-bar .container-title");
         await expect(header).toContainText(packName);
         console.log(`[UI] Pack name "${packName}" is displayed ✓`);
     },
@@ -432,8 +432,7 @@ When(
 
         // Click the Models tab first to reveal model content
         await page
-            .locator(".p-tabview-nav li")
-            .filter({ hasText: "Models" })
+            .locator('[data-testid="container-tab-models"]')
             .click();
 
         // Click "Add Model" card in container viewer (ModelGrid uses .model-card-add)
@@ -517,8 +516,7 @@ When(
 
         // Click the Models tab first to reveal model content
         await page
-            .locator(".p-tabview-nav li")
-            .filter({ hasText: "Models" })
+            .locator('[data-testid="container-tab-models"]')
             .click();
 
         // Right-click on model card in container viewer (ModelGrid uses .model-card)
@@ -566,8 +564,7 @@ When(
         // Global Materials + Multi-Model Textures; newly-created sets default
         // to the model-specific kind).
         await page
-            .locator(".p-tabview-nav li")
-            .filter({ hasText: "Multi-Model Textures" })
+            .locator('[data-testid="container-tab-multi-model-textures"]')
             .click();
 
         // Click add texture set card
@@ -615,8 +612,7 @@ When(
         // Global Materials + Multi-Model Textures; newly-created sets default
         // to the model-specific kind).
         await page
-            .locator(".p-tabview-nav li")
-            .filter({ hasText: "Multi-Model Textures" })
+            .locator('[data-testid="container-tab-multi-model-textures"]')
             .click();
 
         // Right-click on texture set card
@@ -661,8 +657,7 @@ Then(
 
         // Click the Models tab first to reveal model content
         await page
-            .locator(".p-tabview-nav li")
-            .filter({ hasText: "Models" })
+            .locator('[data-testid="container-tab-models"]')
             .click();
 
         // Wait for model grid to finish loading - wait for actual model cards (not just add button)
@@ -714,8 +709,7 @@ Then(
 
         // Click the Models tab first to reveal model content
         await page
-            .locator(".p-tabview-nav li")
-            .filter({ hasText: "Models" })
+            .locator('[data-testid="container-tab-models"]')
             .click();
 
         // Wait for model grid to finish loading
@@ -740,8 +734,7 @@ Then(
     async ({ page }, expectedCount: number) => {
         // Click Details tab to see asset counts
         await page
-            .locator(".p-tabview-nav li")
-            .filter({ hasText: "Details" })
+            .locator('[data-testid="container-tab-details"]')
             .click();
 
         const stat = page
@@ -774,8 +767,7 @@ Then(
         // Global Materials + Multi-Model Textures; newly-created sets default
         // to the model-specific kind).
         await page
-            .locator(".p-tabview-nav li")
-            .filter({ hasText: "Multi-Model Textures" })
+            .locator('[data-testid="container-tab-multi-model-textures"]')
             .click();
 
         const textureCard = page.locator(
@@ -802,8 +794,7 @@ Then(
         // Global Materials + Multi-Model Textures; newly-created sets default
         // to the model-specific kind).
         await page
-            .locator(".p-tabview-nav li")
-            .filter({ hasText: "Multi-Model Textures" })
+            .locator('[data-testid="container-tab-multi-model-textures"]')
             .click();
 
         const textureCard = page.locator(
@@ -821,8 +812,7 @@ Then(
     async ({ page }, expectedCount: number) => {
         // Click Details tab to see asset counts
         await page
-            .locator(".p-tabview-nav li")
-            .filter({ hasText: "Details" })
+            .locator('[data-testid="container-tab-details"]')
             .click();
 
         // Texture sets are now split into Global Materials + Multi-Model
@@ -872,8 +862,7 @@ Given(
 
         // Click the Models tab first to reveal model content
         await page
-            .locator(".p-tabview-nav li")
-            .filter({ hasText: "Models" })
+            .locator('[data-testid="container-tab-models"]')
             .click();
 
         // Wait for model grid to finish loading (cards or empty state)
@@ -915,8 +904,7 @@ Given(
         // Global Materials + Multi-Model Textures; newly-created sets default
         // to the model-specific kind).
         await page
-            .locator(".p-tabview-nav li")
-            .filter({ hasText: "Multi-Model Textures" })
+            .locator('[data-testid="container-tab-multi-model-textures"]')
             .click();
 
         const textureCard = page.locator(
@@ -981,8 +969,7 @@ Then("I take a screenshot of pack after sprite removed", async ({ page }) => {
 When("I click add sprites button", async ({ page }) => {
     // Click the Sprites tab first to reveal sprite content
     await page
-        .locator(".p-tabview-nav li")
-        .filter({ hasText: "Sprites" })
+        .locator('[data-testid="container-tab-sprites"]')
         .click();
 
     // Find the Add Sprite card in the active tab and wait for it
@@ -1040,8 +1027,7 @@ Then(
     async ({ page }, expectedCount: number) => {
         // Click Details tab to see asset counts
         await page
-            .locator(".p-tabview-nav li")
-            .filter({ hasText: "Details" })
+            .locator('[data-testid="container-tab-details"]')
             .click();
 
         // Check sprite count in container details
@@ -1062,8 +1048,7 @@ Given(
     async ({ page }, minCount: number) => {
         // Click Details tab to see asset counts
         await page
-            .locator(".p-tabview-nav li")
-            .filter({ hasText: "Details" })
+            .locator('[data-testid="container-tab-details"]')
             .click();
 
         const statSpan = page
@@ -1085,8 +1070,7 @@ Given(
 When("I remove the first sprite from the pack", async ({ page }) => {
     // Click the Sprites tab first to reveal sprite content
     await page
-        .locator(".p-tabview-nav li")
-        .filter({ hasText: "Sprites" })
+        .locator('[data-testid="container-tab-sprites"]')
         .click();
 
     // Right-click on first sprite card to open context menu
