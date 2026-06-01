@@ -102,7 +102,7 @@ async function openProject(page, name) {
 }
 
 async function addModelToOpenPack(page, modelName, modelId) {
-    await page.locator(".p-tabview-nav li", { hasText: /^Models:/ }).click();
+    await page.locator('[data-testid="container-tab-models"]').click();
 
     const addCard = page.locator(".model-card.model-card-add").first();
     await expect(addCard).toBeVisible({ timeout: 15000 });
@@ -305,8 +305,8 @@ test.describe("demo mode e2e", () => {
         await addModelToOpenPack(page, "Test Cone", 2);
 
         await expect(
-            page.locator(".p-tabview-nav li", { hasText: /^Models: 1$/ }),
-        ).toBeVisible();
+            page.locator('[data-testid="container-tab-models"]'),
+        ).toHaveAttribute("aria-label", "Models (1)");
     });
 
     test("creates a pack with metadata and uploads a custom thumbnail", async ({
