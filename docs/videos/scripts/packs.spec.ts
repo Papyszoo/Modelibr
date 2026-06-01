@@ -122,7 +122,7 @@ test.describe("Packs", () => {
         await disableHighlights(page);
         await longPause(page);
 
-        const modelsTab = page.getByRole("tab", { name: /Models:\s*0/i });
+        const modelsTab = page.getByTestId("container-tab-models");
         await modelsTab.waitFor({ state: "visible", timeout: ciVideoTimeout });
         await modelsTab.click();
         await mediumPause(page);
@@ -186,9 +186,11 @@ test.describe("Packs", () => {
             }
         }
 
-        await expect(page.getByRole("tab", { name: /Models:\s*2/i })).toBeVisible({
-            timeout: ciVideoTimeout,
-        });
+        await expect(page.getByTestId("container-tab-models")).toHaveAttribute(
+            "aria-label",
+            "Models (2)",
+            { timeout: ciVideoTimeout },
+        );
         const assignedModelCards = page.locator(".model-card:not(.model-card-add)");
         await expect(assignedModelCards.first()).toBeVisible({ timeout: ciVideoTimeout });
         const assignedCount = await assignedModelCards.count();
