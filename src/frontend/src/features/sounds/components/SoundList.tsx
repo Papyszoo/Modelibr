@@ -264,6 +264,13 @@ export function SoundList() {
       return
     }
     if (soundGridRef.current) {
+      // NOTE: soundGridRef IS the scroll container (.sound-grid-container has
+      // overflow: auto), so its bounding rect stays fixed while the content
+      // scrolls — the scrollLeft/scrollTop term below is REQUIRED to map the
+      // cursor into the scrolled content. This differs from the model /
+      // texture-set / environment-map grids, where the rect comes from a
+      // non-scrolling selection-surface child and adding scroll would
+      // double-count it. Don't "simplify" this by removing the scroll terms.
       const rect = soundGridRef.current.getBoundingClientRect()
       setIsAreaSelecting(true)
       setSelectionBox({
