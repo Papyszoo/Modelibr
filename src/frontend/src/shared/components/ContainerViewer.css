@@ -85,9 +85,12 @@
   font-weight: var(--mod-font-weight-medium);
 }
 
+/* Active tab: tint the link's bottom border (PrimeReact's existing
+   `margin: 0 0 -2px 0` on the link makes it overlap the nav's bottom
+   border exactly — no double line). */
 .container-tab-bar .p-tabview-nav li.p-highlight .p-tabview-nav-link {
   color: var(--mod-color-primary);
-  box-shadow: inset 0 -2px 0 0 var(--mod-color-primary);
+  border-color: var(--mod-color-primary) !important;
 }
 
 .container-tab-trigger i {
@@ -99,18 +102,6 @@
   font-size: var(--mod-text-sm);
   font-weight: var(--mod-font-weight-medium);
   line-height: 1;
-}
-
-.container-tab-label-sr {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
 }
 
 .container-details {
