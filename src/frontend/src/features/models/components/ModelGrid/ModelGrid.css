@@ -51,7 +51,15 @@
 .model-grid-selection-surface {
   position: relative;
   flex: 1 1 auto;
-  min-height: 100%;
+  /* Fill the remaining space below the toolbar via flex-grow — NOT
+     min-height: 100%. Against a height-bounded .model-grid-container (the
+     standalone Models list is a bounded flex column) `min-height: 100%`
+     resolves to the *full* container height, so stacked under the toolbar it
+     forced the container to overflow by ~the toolbar height — a phantom
+     scrollbar even with only a few cards that fit. flex:1 already stretches
+     the surface to fill the leftover space (drop / rubber-band area), and
+     .model-grid-selection-content keeps min-height:100% to fill it. */
+  min-height: 0;
 }
 
 .model-grid-selection-surface.is-selecting {
