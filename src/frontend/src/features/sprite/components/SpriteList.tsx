@@ -284,6 +284,13 @@ export function SpriteList() {
     const target = e.target as HTMLElement
     if (target.closest('.sprite-card')) return
     if (spriteGridRef.current) {
+      // NOTE: spriteGridRef IS the scroll container (.sprite-grid-container has
+      // overflow: auto), so its bounding rect stays fixed while the content
+      // scrolls — the scrollLeft/scrollTop term below is REQUIRED to map the
+      // cursor into the scrolled content. This differs from the model /
+      // texture-set / environment-map grids, where the rect comes from a
+      // non-scrolling selection-surface child and adding scroll would
+      // double-count it. Don't "simplify" this by removing the scroll terms.
       const rect = spriteGridRef.current.getBoundingClientRect()
       setIsAreaSelecting(true)
       setSelectionBox({

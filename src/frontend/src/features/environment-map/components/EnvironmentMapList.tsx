@@ -393,15 +393,20 @@ export function EnvironmentMapList() {
         return
       }
 
+      // Coordinates are relative to the selection surface's live bounding
+      // rect, which already shifts with the scroll position — so no
+      // scrollTop/scrollLeft offset is added here (doing so double-counts the
+      // scroll and the box would start away from the cursor). The selection
+      // box is absolutely positioned inside the surface, so these surface-
+      // relative coords map directly to its left/top.
       const rect = selectionSurfaceRef.current.getBoundingClientRect()
-      const scrollContainer = listScrollRef.current
 
       setIsAreaSelecting(true)
       setSelectionBox({
-        startX: event.clientX - rect.left + scrollContainer.scrollLeft,
-        startY: event.clientY - rect.top + scrollContainer.scrollTop,
-        currentX: event.clientX - rect.left + scrollContainer.scrollLeft,
-        currentY: event.clientY - rect.top + scrollContainer.scrollTop,
+        startX: event.clientX - rect.left,
+        startY: event.clientY - rect.top,
+        currentX: event.clientX - rect.left,
+        currentY: event.clientY - rect.top,
       })
     },
     []
@@ -419,14 +424,13 @@ export function EnvironmentMapList() {
       }
 
       const rect = selectionSurfaceRef.current.getBoundingClientRect()
-      const scrollContainer = listScrollRef.current
 
       setSelectionBox(previous =>
         previous
           ? {
               ...previous,
-              currentX: event.clientX - rect.left + scrollContainer.scrollLeft,
-              currentY: event.clientY - rect.top + scrollContainer.scrollTop,
+              currentX: event.clientX - rect.left,
+              currentY: event.clientY - rect.top,
             }
           : null
       )
@@ -442,7 +446,6 @@ export function EnvironmentMapList() {
       listScrollRef.current
     ) {
       const rect = selectionSurfaceRef.current.getBoundingClientRect()
-      const scrollContainer = listScrollRef.current
       const selectionLeft = Math.min(selectionBox.startX, selectionBox.currentX)
       const selectionTop = Math.min(selectionBox.startY, selectionBox.currentY)
       const selectionRight = Math.max(
@@ -461,8 +464,8 @@ export function EnvironmentMapList() {
 
       cards.forEach(card => {
         const cardRect = card.getBoundingClientRect()
-        const cardLeft = cardRect.left - rect.left + scrollContainer.scrollLeft
-        const cardTop = cardRect.top - rect.top + scrollContainer.scrollTop
+        const cardLeft = cardRect.left - rect.left
+        const cardTop = cardRect.top - rect.top
         const cardRight = cardLeft + cardRect.width
         const cardBottom = cardTop + cardRect.height
 
