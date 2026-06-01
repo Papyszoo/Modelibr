@@ -4,11 +4,28 @@ import { ContextMenu } from 'primereact/contextmenu'
 import { Dialog } from 'primereact/dialog'
 import { InputText } from 'primereact/inputtext'
 import { type MenuItem } from 'primereact/menuitem'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { getFilePreviewUrl } from '@/features/models/api/modelApi'
 import { useTabContext } from '@/hooks/useTabContext'
 import { UploadableGrid } from '@/shared/components'
+import {
+  AddTile,
+  ASSET_CARD_WIDTH,
+  AssetGrid,
+  AssetTile,
+  AssetTilePlaceholder,
+} from '@/shared/components/asset-tile'
+import {
+  ListToolbar,
+  ListToolbarActions,
+  ListToolbarButton,
+  ListToolbarCount,
+  ListToolbarPanel,
+  ListToolbarRow,
+  ListToolbarSearchInput,
+  OptionsButton,
+} from '@/shared/components/list-toolbar'
 import { useContainerTextureSets } from '@/shared/hooks/useContainerTextureSets'
 import { type ContainerAdapter } from '@/shared/types/ContainerTypes'
 import { type TextureSetKind, TextureType } from '@/types'
@@ -59,10 +76,16 @@ export function ContainerTextureSetsTab({
   assetTitle = 'Texture Set',
 }: ContainerTextureSetsTabProps) {
   const contextMenuRef = useRef<ContextMenu>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const { openTextureSetDetailsTab } = useTabContext()
   const ts = useContainerTextureSets(adapter, showToast, refetchContainer, kind)
   const label = adapter.label
   const labelLower = label.toLowerCase()
+
+  // ── Toolbar state ────────────────────────────────────────────────────
+  const [cardWidth, setCardWidth] = useState(ASSET_CARD_WIDTH.default)
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
+  const [localSearch, setLocalSearch] = useState('')
 
   useEffect(() => {
     onTotalCountChange?.(ts.totalCount)
@@ -81,8 +104,6 @@ export function ContainerTextureSetsTab({
         ? textureSet.textures?.find(t => t.textureType === diffuseType)
         : undefined
     const texture = albedo || diffuse
-    // Use the server-generated preview URL (PNG) so non-browser-native formats
-    // like TIFF render correctly.
     return texture ? getFilePreviewUrl(texture.fileId.toString()) : null
   }
 
@@ -96,9 +117,81 @@ export function ContainerTextureSetsTab({
     },
   ]
 
+  // Client-side filter of currently-loaded items
+  const filteredTextureSets = localSearch.trim()
+    ? ts.textureSets.filter(ts =>
+        ts.name.toLowerCase().includes(localSearch.toLowerCase())
+      )
+    : ts.textureSets
+
   return (
     <>
       <ContextMenu model={contextMenuItems} ref={contextMenuRef} />
+
+      {/* Hidden file input for toolbar Upload button */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        style={{ display: 'none' }}
+        multiple
+        onChange={e => {
+          if (e.target.files && e.target.files.length > 0) {
+            ts.handleUpload(Array.from(e.target.files))
+            e.target.value = ''
+          }
+        }}
+      />
+
+      <ListToolbar>
+        <ListToolbarRow>
+          <ListToolbarActions>
+            <ListToolbarButton
+              icon="pi pi-search"
+              label="Search"
+              active={isSearchOpen || localSearch.trim().length > 0}
+              onClick={() => setIsSearchOpen(open => !open)}
+              ariaLabel="Search"
+              ariaExpanded={isSearchOpen}
+              ariaControls="ts-tab-search-panel"
+            />
+            <OptionsButton
+              cardWidth={cardWidth}
+              minCardWidth={ASSET_CARD_WIDTH.min}
+              maxCardWidth={ASSET_CARD_WIDTH.max}
+              onCardWidthChange={setCardWidth}
+              showThumbnailAnimation={false}
+            />
+            <ListToolbarButton
+              icon="pi pi-upload"
+              label="Upload"
+              onClick={() => fileInputRef.current?.click()}
+              tooltip={`Upload ${assetLabel} files`}
+              ariaLabel="Upload"
+            />
+            <ListToolbarButton
+              icon="pi pi-refresh"
+              label="Refresh"
+              onClick={() => void refetchContainer()}
+              tooltip="Refresh"
+              ariaLabel="Refresh"
+            />
+          </ListToolbarActions>
+          <ListToolbarCount
+            icon="pi pi-palette"
+            count={ts.totalCount}
+            unitLabel={assetLabel}
+          />
+        </ListToolbarRow>
+
+        <ListToolbarPanel id="ts-tab-search-panel" open={isSearchOpen}>
+          <ListToolbarSearchInput
+            value={localSearch}
+            onChange={setLocalSearch}
+            placeholder={`Search ${assetLabel}s…`}
+          />
+        </ListToolbarPanel>
+      </ListToolbar>
+
       <UploadableGrid
         onFilesDropped={ts.handleUpload}
         isUploading={ts.uploading}
@@ -106,14 +199,23 @@ export function ContainerTextureSetsTab({
         className="container-grid-wrapper"
       >
         <div className="container-section">
-          <div className="container-grid">
-            {ts.textureSets.map(textureSet => {
+          <AssetGrid cardWidth={cardWidth}>
+            {filteredTextureSets.map(textureSet => {
               const albedoUrl = getAlbedoTextureUrl(textureSet)
               return (
-                <div
+                <AssetTile
                   key={textureSet.id}
-                  className="container-card"
-                  data-texture-set-id={textureSet.id}
+                  name={textureSet.name}
+                  media={
+                    albedoUrl ? (
+                      <img src={albedoUrl} alt={textureSet.name} />
+                    ) : (
+                      <AssetTilePlaceholder
+                        icon="pi pi-image"
+                        label="No Preview"
+                      />
+                    )
+                  }
                   onClick={() =>
                     openTextureSetDetailsTab(textureSet.id, textureSet.name)
                   }
@@ -122,39 +224,12 @@ export function ContainerTextureSetsTab({
                     ts.setSelectedItem(textureSet)
                     contextMenuRef.current?.show(e)
                   }}
-                >
-                  <div className="container-card-thumbnail">
-                    {albedoUrl ? (
-                      <img
-                        src={albedoUrl}
-                        alt={textureSet.name}
-                        className="container-card-image"
-                      />
-                    ) : (
-                      <div className="container-card-placeholder">
-                        <i className="pi pi-image" />
-                        <span>No Preview</span>
-                      </div>
-                    )}
-                    <div className="container-card-overlay">
-                      <span className="container-card-name">
-                        {textureSet.name}
-                      </span>
-                    </div>
-                  </div>
-                </div>
+                />
               )
             })}
-            <div
-              className="container-card container-card-add"
-              onClick={ts.openAddDialog}
-            >
-              <div className="container-card-add-content">
-                <i className="pi pi-plus" />
-                <span>Add {assetTitle}</span>
-              </div>
-            </div>
-          </div>
+            <AddTile label={`Add ${assetTitle}`} onClick={ts.openAddDialog} />
+          </AssetGrid>
+
           {ts.hasMore && (
             <div className="container-load-more">
               <Button
@@ -208,41 +283,32 @@ export function ContainerTextureSetsTab({
               style={{ width: '100%' }}
             />
           </div>
-          <div className="container-grid scrollable-grid">
-            {ts.filteredAvailable.map(textureSet => {
-              const albedoUrl = getAlbedoTextureUrl(textureSet)
-              const isSelected = ts.selectedIds.includes(textureSet.id)
-              return (
-                <div
-                  key={textureSet.id}
-                  className={`container-card ${isSelected ? 'selected' : ''}`}
-                  onClick={() => ts.toggleSelection(textureSet.id)}
-                >
-                  <div className="container-card-checkbox">
-                    <Checkbox checked={isSelected} readOnly />
-                  </div>
-                  <div className="container-card-thumbnail">
-                    {albedoUrl ? (
-                      <img
-                        src={albedoUrl}
-                        alt={textureSet.name}
-                        className="container-card-image"
-                      />
-                    ) : (
-                      <div className="container-card-placeholder">
-                        <i className="pi pi-image" />
-                        <span>No Preview</span>
-                      </div>
-                    )}
-                    <div className="container-card-overlay">
-                      <span className="container-card-name">
-                        {textureSet.name}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
+          <div className="scrollable-grid">
+            <AssetGrid cardWidth={160}>
+              {ts.filteredAvailable.map(textureSet => {
+                const albedoUrl = getAlbedoTextureUrl(textureSet)
+                const isSelected = ts.selectedIds.includes(textureSet.id)
+                return (
+                  <AssetTile
+                    key={textureSet.id}
+                    name={textureSet.name}
+                    selected={isSelected}
+                    checkbox={<Checkbox checked={isSelected} readOnly />}
+                    media={
+                      albedoUrl ? (
+                        <img src={albedoUrl} alt={textureSet.name} />
+                      ) : (
+                        <AssetTilePlaceholder
+                          icon="pi pi-image"
+                          label="No Preview"
+                        />
+                      )
+                    }
+                    onClick={() => ts.toggleSelection(textureSet.id)}
+                  />
+                )
+              })}
+            </AssetGrid>
           </div>
           {ts.filteredAvailable.length === 0 && (
             <div className="no-results">
