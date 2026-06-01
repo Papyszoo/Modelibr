@@ -288,8 +288,7 @@ export class PacksPage {
     async addModelToPack(): Promise<void> {
         // Click Models tab first, then find the Add Model card
         await this.page
-            .locator(".p-tabview-nav li")
-            .filter({ hasText: "Models" })
+            .locator('[data-testid="container-tab-models"]')
             .click();
         const addCard = this.page.locator(".model-card-add").first();
         await addCard.waitFor({ state: "visible", timeout: 10000 });
@@ -325,8 +324,7 @@ export class PacksPage {
     ): Promise<void> {
         // Click Models tab first
         await this.page
-            .locator(".p-tabview-nav li")
-            .filter({ hasText: "Models" })
+            .locator('[data-testid="container-tab-models"]')
             .click();
         const modelCard = modelId
             ? this.page.locator(`.model-card[data-model-id="${modelId}"]`)

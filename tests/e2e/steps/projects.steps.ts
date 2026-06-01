@@ -271,8 +271,7 @@ When(
 
         // Click Models tab first, then find Add Model card
         await page
-            .locator(".p-tabview-nav li")
-            .filter({ hasText: "Models" })
+            .locator('[data-testid="container-tab-models"]')
             .click();
 
         const addModelCard = page.locator(".model-card-add").first();
@@ -347,8 +346,7 @@ When(
 
         // Click Models tab first, then find and right-click model card
         await page
-            .locator(".p-tabview-nav li")
-            .filter({ hasText: "Models" })
+            .locator('[data-testid="container-tab-models"]')
             .click();
 
         const modelCard = page.locator(
@@ -511,8 +509,7 @@ Then(
 
         // Click Models tab first
         await page
-            .locator(".p-tabview-nav li")
-            .filter({ hasText: "Models" })
+            .locator('[data-testid="container-tab-models"]')
             .click();
 
         const modelCard = page.locator(
@@ -536,8 +533,7 @@ Then(
 
         // Click Models tab first
         await page
-            .locator(".p-tabview-nav li")
-            .filter({ hasText: "Models" })
+            .locator('[data-testid="container-tab-models"]')
             .click();
 
         const modelCard = page.locator(
@@ -562,8 +558,7 @@ Given(
 
         // Click Models tab first
         await page
-            .locator(".p-tabview-nav li")
-            .filter({ hasText: "Models" })
+            .locator('[data-testid="container-tab-models"]')
             .click();
 
         const modelCard = page.locator(
@@ -605,8 +600,7 @@ Given(
                 .first()
                 .waitFor({ state: "visible", timeout: 15000 });
             await page
-                .locator(".p-tabview-nav li")
-                .filter({ hasText: "Models" })
+                .locator('[data-testid="container-tab-models"]')
                 .click();
             await modelCard.waitFor({ state: "visible", timeout: 10000 });
         }
@@ -623,19 +617,19 @@ Given(
 // (backend default) and parallel "global material" step names target Global
 // Materials.
 type TextureSetKindLabel = {
-    tabHeader: string; // tab text in .p-tabview-nav
+    tabTestId: string; // data-testid on the container tab anchor
     dialogHeader: string; // dialog header substring
     label: string; // logging label
 };
 
 const MULTI_MODEL_LABEL: TextureSetKindLabel = {
-    tabHeader: "Multi-Model Textures",
+    tabTestId: "container-tab-multi-model-textures",
     dialogHeader: "Add Multi-Model Textures",
     label: "texture set",
 };
 
 const GLOBAL_MATERIAL_LABEL: TextureSetKindLabel = {
-    tabHeader: "Global Materials",
+    tabTestId: "container-tab-global-materials",
     dialogHeader: "Add Global Materials",
     label: "global material",
 };
@@ -687,8 +681,7 @@ async function addTextureSetOfKindToProject(
 
     // Click the appropriate kind tab, then find Add card
     await page
-        .locator(".p-tabview-nav li")
-        .filter({ hasText: labels.tabHeader })
+        .locator(`[data-testid="${labels.tabTestId}"]`)
         .click();
 
     const addCard = page.locator(".container-card-add").first();
@@ -764,8 +757,7 @@ async function addTextureSetOfKindToProject(
 
     // Switch to the kind tab to see the newly added card
     const kindTab = page
-        .locator(".p-tabview-nav li")
-        .filter({ hasText: labels.tabHeader });
+        .locator(`[data-testid="${labels.tabTestId}"]`);
     await kindTab.click();
 
     // Wait for the texture set card to appear (React Query refetch + render)
@@ -818,8 +810,7 @@ async function removeTextureSetOfKindFromProject(
 
     // Click the kind tab first, then find and right-click texture set card
     await page
-        .locator(".p-tabview-nav li")
-        .filter({ hasText: labels.tabHeader })
+        .locator(`[data-testid="${labels.tabTestId}"]`)
         .click();
 
     const textureCard = page.locator(
@@ -884,8 +875,7 @@ async function assertProjectContainsTextureSetOfKind(
 
     // Click the kind tab first, then poll with reload until the card appears
     await page
-        .locator(".p-tabview-nav li")
-        .filter({ hasText: labels.tabHeader })
+        .locator(`[data-testid="${labels.tabTestId}"]`)
         .click();
 
     await expect
@@ -923,8 +913,7 @@ async function assertProjectDoesNotContainTextureSetOfKind(
 
     // Click the kind tab first
     await page
-        .locator(".p-tabview-nav li")
-        .filter({ hasText: labels.tabHeader })
+        .locator(`[data-testid="${labels.tabTestId}"]`)
         .click();
 
     const textureCard = page.locator(
@@ -996,8 +985,7 @@ async function ensureProjectContainsTextureSetOfKind(
 
     // Click the kind tab first
     await page
-        .locator(".p-tabview-nav li")
-        .filter({ hasText: labels.tabHeader })
+        .locator(`[data-testid="${labels.tabTestId}"]`)
         .click();
 
     const textureCard = page.locator(
@@ -1214,8 +1202,7 @@ Then(
     async ({ page }, expectedCount: number) => {
         // Click Details tab to see stats
         await page
-            .locator(".p-tabview-nav li")
-            .filter({ hasText: "Details" })
+            .locator('[data-testid="container-tab-details"]')
             .click();
 
         // Use retrying assertion — the count may take a moment to update
@@ -1238,8 +1225,7 @@ Given(
     async ({ page }, minCount: number) => {
         // Click Details tab to see stats
         await page
-            .locator(".p-tabview-nav li")
-            .filter({ hasText: "Details" })
+            .locator('[data-testid="container-tab-details"]')
             .click();
 
         // Wait for Details tab content to render
@@ -1261,8 +1247,7 @@ Given(
 When("I remove the first sprite from the project", async ({ page }) => {
     // Click Sprites tab first, then right-click on first sprite card
     await page
-        .locator(".p-tabview-nav li")
-        .filter({ hasText: "Sprites" })
+        .locator('[data-testid="container-tab-sprites"]')
         .click();
 
     const spriteCard = page
