@@ -1,6 +1,10 @@
 import './ContainerViewer.css'
 
-import { TabPanel, TabView, type TabPanelHeaderTemplateOptions } from 'primereact/tabview'
+import {
+  TabPanel,
+  type TabPanelHeaderTemplateOptions,
+  TabView,
+} from 'primereact/tabview'
 import { Toast } from 'primereact/toast'
 import { Tooltip } from 'primereact/tooltip'
 import { useCallback, useEffect, useRef, useState } from 'react'
