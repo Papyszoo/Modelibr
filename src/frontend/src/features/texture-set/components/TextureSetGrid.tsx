@@ -223,13 +223,19 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
       // Only react to primary-button drags.
       if (event.button !== 0) return
 
+      // Coordinates are relative to the selection surface's live bounding
+      // rect, which already shifts with the scroll position — so no
+      // scrollTop/scrollLeft offset is added here (doing so double-counts the
+      // scroll and the box would start away from the cursor). The selection
+      // box is absolutely positioned inside the surface, so these surface-
+      // relative coords map directly to its left/top.
       const rect = selectionSurfaceRef.current.getBoundingClientRect()
       setIsAreaSelecting(true)
       setSelectionBox({
-        startX: event.clientX - rect.left + scrollParent.scrollLeft,
-        startY: event.clientY - rect.top + scrollParent.scrollTop,
-        currentX: event.clientX - rect.left + scrollParent.scrollLeft,
-        currentY: event.clientY - rect.top + scrollParent.scrollTop,
+        startX: event.clientX - rect.left,
+        startY: event.clientY - rect.top,
+        currentX: event.clientX - rect.left,
+        currentY: event.clientY - rect.top,
       })
     },
     [scrollParent]
@@ -250,8 +256,8 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
         prev
           ? {
               ...prev,
-              currentX: event.clientX - rect.left + scrollParent.scrollLeft,
-              currentY: event.clientY - rect.top + scrollParent.scrollTop,
+              currentX: event.clientX - rect.left,
+              currentY: event.clientY - rect.top,
             }
           : null
       )
@@ -278,8 +284,8 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
       const next = new Set<number>()
       cards.forEach(card => {
         const cardRect = card.getBoundingClientRect()
-        const cardLeft = cardRect.left - rect.left + scrollParent.scrollLeft
-        const cardTop = cardRect.top - rect.top + scrollParent.scrollTop
+        const cardLeft = cardRect.left - rect.left
+        const cardTop = cardRect.top - rect.top
         const cardRight = cardLeft + cardRect.width
         const cardBottom = cardTop + cardRect.height
         if (
