@@ -1,7 +1,8 @@
 import './ContainerViewer.css'
 
-import { TabPanel, TabView } from 'primereact/tabview'
+import { TabPanel, TabView, type TabPanelHeaderTemplateOptions } from 'primereact/tabview'
 import { Toast } from 'primereact/toast'
+import { Tooltip } from 'primereact/tooltip'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { ModelGrid } from '@/features/models/components/ModelGrid'
@@ -50,6 +51,29 @@ export function ContainerViewer({ adapter, tabId }: ContainerViewerProps) {
   const { container, refetchContainer } = useContainerData(adapter, showToast)
   const label = adapter.label
 
+  const renderTabHeader =
+    (icon: string, title: string, count?: number) =>
+    (options: TabPanelHeaderTemplateOptions) => {
+      const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+      return (
+        <a
+          href="#"
+          role="tab"
+          aria-label={count !== undefined ? `${title} (${count})` : title}
+          className={`${options.className} container-tab-trigger`}
+          onClick={options.onClick}
+          data-pr-tooltip={title}
+          data-pr-position="bottom"
+          data-testid={`container-tab-${slug}`}
+        >
+          <i className={`pi ${icon}`} aria-hidden="true" />
+          {count !== undefined && (
+            <span className="container-tab-count">{count}</span>
+          )}
+        </a>
+      )
+    }
+
   // Sync tab counts from container data
   useEffect(() => {
     if (container) {
@@ -70,19 +94,26 @@ export function ContainerViewer({ adapter, tabId }: ContainerViewerProps) {
     <div className="container-viewer">
       <Toast ref={toast} />
 
-      <div className="container-header">
-        <h2>
-          {label}: {container.name}
-        </h2>
-      </div>
+      <Tooltip
+        target=".container-tab-trigger"
+        showDelay={0}
+        hideDelay={0}
+        mouseTrack={false}
+      />
 
-      <div className="container-content">
+      <div className="container-tab-bar">
+        <h3 className="container-title">
+          {label}: {container.name}
+        </h3>
         <TabView
           activeIndex={activeTabIndex}
           onTabChange={e => setActiveTabIndex(e.index)}
-          className="container-tabs"
+          className="container-tabs container-tabs-compact"
         >
-          <TabPanel header="Details">
+          <TabPanel
+            header="Details"
+            headerTemplate={renderTabHeader('pi-info-circle', 'Details')}
+          >
             {adapter.renderDetails ? (
               adapter.renderDetails({
                 container,
@@ -126,7 +157,14 @@ export function ContainerViewer({ adapter, tabId }: ContainerViewerProps) {
             )}
           </TabPanel>
 
-          <TabPanel header={`Models: ${modelTotalCount}`}>
+          <TabPanel
+            header={`Models: ${modelTotalCount}`}
+            headerTemplate={renderTabHeader(
+              'pi-box',
+              'Models',
+              modelTotalCount
+            )}
+          >
             <ModelGrid
               {...(adapter.type === 'pack'
                 ? { packId: adapter.containerId }
@@ -135,7 +173,14 @@ export function ContainerViewer({ adapter, tabId }: ContainerViewerProps) {
             />
           </TabPanel>
 
-          <TabPanel header={`Global Materials: ${globalMaterialTotalCount}`}>
+          <TabPanel
+            header={`Global Materials: ${globalMaterialTotalCount}`}
+            headerTemplate={renderTabHeader(
+              'pi-globe',
+              'Global Materials',
+              globalMaterialTotalCount
+            )}
+          >
             <ContainerTextureSetsTab
               adapter={adapter}
               showToast={showToast}
@@ -149,6 +194,11 @@ export function ContainerViewer({ adapter, tabId }: ContainerViewerProps) {
 
           <TabPanel
             header={`Multi-Model Textures: ${multiModelTextureTotalCount}`}
+            headerTemplate={renderTabHeader(
+              'pi-clone',
+              'Multi-Model Textures',
+              multiModelTextureTotalCount
+            )}
           >
             <ContainerTextureSetsTab
               adapter={adapter}
@@ -161,7 +211,14 @@ export function ContainerViewer({ adapter, tabId }: ContainerViewerProps) {
             />
           </TabPanel>
 
-          <TabPanel header={`Sprites: ${spriteTotalCount}`}>
+          <TabPanel
+            header={`Sprites: ${spriteTotalCount}`}
+            headerTemplate={renderTabHeader(
+              'pi-image',
+              'Sprites',
+              spriteTotalCount
+            )}
+          >
             <ContainerSpritesTab
               adapter={adapter}
               showToast={showToast}
@@ -170,7 +227,14 @@ export function ContainerViewer({ adapter, tabId }: ContainerViewerProps) {
             />
           </TabPanel>
 
-          <TabPanel header={`Sounds: ${soundTotalCount}`}>
+          <TabPanel
+            header={`Sounds: ${soundTotalCount}`}
+            headerTemplate={renderTabHeader(
+              'pi-volume-up',
+              'Sounds',
+              soundTotalCount
+            )}
+          >
             <ContainerSoundsTab
               adapter={adapter}
               showToast={showToast}
@@ -179,7 +243,14 @@ export function ContainerViewer({ adapter, tabId }: ContainerViewerProps) {
             />
           </TabPanel>
 
-          <TabPanel header={`Environment Maps: ${environmentMapTotalCount}`}>
+          <TabPanel
+            header={`Environment Maps: ${environmentMapTotalCount}`}
+            headerTemplate={renderTabHeader(
+              'pi-map',
+              'Environment Maps',
+              environmentMapTotalCount
+            )}
+          >
             <ContainerEnvironmentMapsTab
               adapter={adapter}
               showToast={showToast}
