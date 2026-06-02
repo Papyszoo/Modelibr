@@ -568,7 +568,7 @@ When(
             .click();
 
         // Click add texture set card
-        const addButton = page.locator(".container-card-add").first();
+        const addButton = page.locator(".asset-tile-add").first();
         await addButton.click();
         // Wait for add dialog to appear
         await page
@@ -617,7 +617,7 @@ When(
 
         // Right-click on texture set card
         const textureCard = page.locator(
-            `.container-card[data-texture-set-id="${textureSet.id}"]`,
+            `.asset-tile[data-texture-set-id="${textureSet.id}"]`,
         );
         await textureCard.click({ button: "right" });
         // Wait for context menu
@@ -771,7 +771,7 @@ Then(
             .click();
 
         const textureCard = page.locator(
-            `.container-card[data-texture-set-id="${textureSet.id}"]`,
+            `.asset-tile[data-texture-set-id="${textureSet.id}"]`,
         );
         await expect(textureCard).toBeVisible({ timeout: 10000 });
         console.log(`[UI] Pack contains texture set "${textureSet.name}" ✓`);
@@ -798,7 +798,7 @@ Then(
             .click();
 
         const textureCard = page.locator(
-            `.container-card[data-texture-set-id="${textureSet.id}"]`,
+            `.asset-tile[data-texture-set-id="${textureSet.id}"]`,
         );
         await expect(textureCard).not.toBeVisible();
         console.log(
@@ -908,7 +908,7 @@ Given(
             .click();
 
         const textureCard = page.locator(
-            `.container-card[data-texture-set-id="${textureSet.id}"]`,
+            `.asset-tile[data-texture-set-id="${textureSet.id}"]`,
         );
         // Wait for tab content to render and verify texture set is present
         try {
@@ -974,7 +974,7 @@ When("I click add sprites button", async ({ page }) => {
 
     // Find the Add Sprite card in the active tab and wait for it
     const addSpriteCard = page
-        .locator('.container-card-add:has-text("Add Sprite")')
+        .locator('.asset-tile-add:has-text("Add Sprite")')
         .first();
     await addSpriteCard.waitFor({ state: "visible", timeout: 10000 });
 
@@ -1075,7 +1075,7 @@ When("I remove the first sprite from the pack", async ({ page }) => {
 
     // Right-click on first sprite card to open context menu
     const spriteCard = page
-        .locator(".container-section .container-card:not(.container-card-add)")
+        .locator(".container-section .asset-tile")
         .first();
     await spriteCard.click({ button: "right" });
     // Wait for context menu

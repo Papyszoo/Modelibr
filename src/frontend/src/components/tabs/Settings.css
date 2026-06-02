@@ -642,7 +642,7 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #f59e0b;
+  background: var(--mod-color-warning);
   display: inline-block;
   vertical-align: middle;
 }
