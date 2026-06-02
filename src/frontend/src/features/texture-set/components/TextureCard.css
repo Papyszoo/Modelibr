@@ -6,8 +6,8 @@
 }
 
 .texture-card.dragging {
-  border-color: #3b82f6;
-  background-color: #eff6ff;
+  border-color: var(--mod-color-primary);
+  background-color: rgba(var(--primary-color-rgb), 0.08);
   transform: scale(1.02);
 }
 

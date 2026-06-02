@@ -4,10 +4,27 @@ import { ContextMenu } from 'primereact/contextmenu'
 import { Dialog } from 'primereact/dialog'
 import { InputText } from 'primereact/inputtext'
 import { type MenuItem } from 'primereact/menuitem'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { getFileUrl } from '@/features/models/api/modelApi'
 import { UploadableGrid } from '@/shared/components'
+import {
+  AddTile,
+  ASSET_CARD_WIDTH,
+  AssetGrid,
+  AssetTile,
+  AssetTilePlaceholder,
+} from '@/shared/components/asset-tile'
+import {
+  ListToolbar,
+  ListToolbarActions,
+  ListToolbarButton,
+  ListToolbarCount,
+  ListToolbarPanel,
+  ListToolbarRow,
+  ListToolbarSearchInput,
+  OptionsButton,
+} from '@/shared/components/list-toolbar'
 import { useContainerSprites } from '@/shared/hooks/useContainerSprites'
 import { type ContainerAdapter } from '@/shared/types/ContainerTypes'
 import { formatFileSize } from '@/utils/fileUtils'
@@ -35,30 +52,19 @@ export function ContainerSpritesTab({
   onTotalCountChange,
 }: ContainerSpritesTabProps) {
   const contextMenuRef = useRef<ContextMenu>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const sp = useContainerSprites(adapter, showToast, refetchContainer)
   const label = adapter.label
   const labelLower = label.toLowerCase()
 
+  // ── Toolbar state ────────────────────────────────────────────────────
+  const [cardWidth, setCardWidth] = useState(ASSET_CARD_WIDTH.default)
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
+  const [localSearch, setLocalSearch] = useState('')
+
   useEffect(() => {
     onTotalCountChange?.(sp.totalCount)
   }, [sp.totalCount, onTotalCountChange])
-
-  const getSpriteTypeName = (type: number): string => {
-    switch (type) {
-      case 1:
-        return 'Static'
-      case 2:
-        return 'Sprite Sheet'
-      case 3:
-        return 'GIF'
-      case 4:
-        return 'APNG'
-      case 5:
-        return 'Animated WebP'
-      default:
-        return 'Unknown'
-    }
-  }
 
   const handleDownloadSprite = async () => {
     if (!sp.selectedItem) return
@@ -95,9 +101,82 @@ export function ContainerSpritesTab({
     },
   ]
 
+  // Client-side filter of currently-loaded items
+  const filteredSprites = localSearch.trim()
+    ? sp.sprites.filter(s =>
+        s.name.toLowerCase().includes(localSearch.toLowerCase())
+      )
+    : sp.sprites
+
   return (
     <>
       <ContextMenu model={contextMenuItems} ref={contextMenuRef} />
+
+      {/* Hidden file input for toolbar Upload button */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        style={{ display: 'none' }}
+        multiple
+        accept="image/*"
+        onChange={e => {
+          if (e.target.files && e.target.files.length > 0) {
+            sp.handleUpload(Array.from(e.target.files))
+            e.target.value = ''
+          }
+        }}
+      />
+
+      <ListToolbar>
+        <ListToolbarRow>
+          <ListToolbarActions>
+            <ListToolbarButton
+              icon="pi pi-search"
+              label="Search"
+              active={isSearchOpen || localSearch.trim().length > 0}
+              onClick={() => setIsSearchOpen(open => !open)}
+              ariaLabel="Search"
+              ariaExpanded={isSearchOpen}
+              ariaControls="sp-tab-search-panel"
+            />
+            <OptionsButton
+              cardWidth={cardWidth}
+              minCardWidth={ASSET_CARD_WIDTH.min}
+              maxCardWidth={ASSET_CARD_WIDTH.max}
+              onCardWidthChange={setCardWidth}
+              showThumbnailAnimation={false}
+            />
+            <ListToolbarButton
+              icon="pi pi-upload"
+              label="Upload"
+              onClick={() => fileInputRef.current?.click()}
+              tooltip="Upload sprite images"
+              ariaLabel="Upload"
+            />
+            <ListToolbarButton
+              icon="pi pi-refresh"
+              label="Refresh"
+              onClick={() => void refetchContainer()}
+              tooltip="Refresh"
+              ariaLabel="Refresh"
+            />
+          </ListToolbarActions>
+          <ListToolbarCount
+            icon="pi pi-images"
+            count={localSearch.trim() ? filteredSprites.length : sp.totalCount}
+            unitLabel="sprite"
+          />
+        </ListToolbarRow>
+
+        <ListToolbarPanel id="sp-tab-search-panel" open={isSearchOpen}>
+          <ListToolbarSearchInput
+            value={localSearch}
+            onChange={setLocalSearch}
+            placeholder="Search sprites…"
+          />
+        </ListToolbarPanel>
+      </ListToolbar>
+
       <UploadableGrid
         onFilesDropped={sp.handleUpload}
         isUploading={sp.uploading}
@@ -105,50 +184,35 @@ export function ContainerSpritesTab({
         className="container-grid-wrapper"
       >
         <div className="container-section">
-          <div className="container-grid">
-            {sp.sprites.map(sprite => {
+          <AssetGrid cardWidth={cardWidth}>
+            {filteredSprites.map(sprite => {
               const spriteUrl = getFileUrl(sprite.fileId.toString())
               return (
-                <div
+                <AssetTile
                   key={sprite.id}
-                  className="container-card"
+                  name={sprite.name}
+                  media={
+                    spriteUrl ? (
+                      <img src={spriteUrl} alt={sprite.name} />
+                    ) : (
+                      <AssetTilePlaceholder
+                        icon="pi pi-image"
+                        label="No Preview"
+                      />
+                    )
+                  }
                   onClick={() => sp.openModal(sprite)}
                   onContextMenu={e => {
                     e.preventDefault()
                     sp.setSelectedItem(sprite)
                     contextMenuRef.current?.show(e)
                   }}
-                >
-                  <div className="container-card-thumbnail">
-                    {spriteUrl ? (
-                      <img
-                        src={spriteUrl}
-                        alt={sprite.name}
-                        className="container-card-image"
-                      />
-                    ) : (
-                      <div className="container-card-placeholder">
-                        <i className="pi pi-image" />
-                        <span>No Preview</span>
-                      </div>
-                    )}
-                    <div className="container-card-overlay">
-                      <span className="container-card-name">{sprite.name}</span>
-                    </div>
-                  </div>
-                </div>
+                />
               )
             })}
-            <div
-              className="container-card container-card-add"
-              onClick={sp.openAddDialog}
-            >
-              <div className="container-card-add-content">
-                <i className="pi pi-plus" />
-                <span>Add Sprite</span>
-              </div>
-            </div>
-          </div>
+            <AddTile label="Add Sprite" onClick={sp.openAddDialog} />
+          </AssetGrid>
+
           {sp.hasMore && (
             <div className="container-load-more">
               <Button
@@ -203,39 +267,32 @@ export function ContainerSpritesTab({
               style={{ width: '100%' }}
             />
           </div>
-          <div className="container-grid scrollable-grid">
-            {sp.filteredAvailable.map(sprite => {
-              const spriteUrl = getFileUrl(sprite.fileId.toString())
-              const isSelected = sp.selectedIds.includes(sprite.id)
-              return (
-                <div
-                  key={sprite.id}
-                  className={`container-card ${isSelected ? 'selected' : ''}`}
-                  onClick={() => sp.toggleSelection(sprite.id)}
-                >
-                  <div className="container-card-checkbox">
-                    <Checkbox checked={isSelected} readOnly />
-                  </div>
-                  <div className="container-card-thumbnail">
-                    {spriteUrl ? (
-                      <img
-                        src={spriteUrl}
-                        alt={sprite.name}
-                        className="container-card-image"
-                      />
-                    ) : (
-                      <div className="container-card-placeholder">
-                        <i className="pi pi-image" />
-                        <span>No Preview</span>
-                      </div>
-                    )}
-                    <div className="container-card-overlay">
-                      <span className="container-card-name">{sprite.name}</span>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
+          <div className="scrollable-grid">
+            <AssetGrid cardWidth={160}>
+              {sp.filteredAvailable.map(sprite => {
+                const spriteUrl = getFileUrl(sprite.fileId.toString())
+                const isSelected = sp.selectedIds.includes(sprite.id)
+                return (
+                  <AssetTile
+                    key={sprite.id}
+                    name={sprite.name}
+                    selected={isSelected}
+                    checkbox={<Checkbox checked={isSelected} readOnly />}
+                    media={
+                      spriteUrl ? (
+                        <img src={spriteUrl} alt={sprite.name} />
+                      ) : (
+                        <AssetTilePlaceholder
+                          icon="pi pi-image"
+                          label="No Preview"
+                        />
+                      )
+                    }
+                    onClick={() => sp.toggleSelection(sprite.id)}
+                  />
+                )
+              })}
+            </AssetGrid>
           </div>
           {sp.filteredAvailable.length === 0 && (
             <div className="no-results">
@@ -294,4 +351,22 @@ export function ContainerSpritesTab({
       </Dialog>
     </>
   )
+}
+
+// ── Utility ───────────────────────────────────────────────────────────
+function getSpriteTypeName(type: number): string {
+  switch (type) {
+    case 1:
+      return 'Static'
+    case 2:
+      return 'Sprite Sheet'
+    case 3:
+      return 'GIF'
+    case 4:
+      return 'APNG'
+    case 5:
+      return 'Animated WebP'
+    default:
+      return 'Unknown'
+  }
 }

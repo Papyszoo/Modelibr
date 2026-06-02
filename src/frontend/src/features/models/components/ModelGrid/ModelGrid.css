@@ -11,11 +11,8 @@
   overflow: auto;
 }
 
-.model-grid-container:hover:not(.drag-over) {
-  border-color: #3182ce;
-  background: rgba(49, 130, 206, 0.05);
-}
-
+/* Drag-over highlight — dashed borders appear ONLY while dragging files
+   over the container, never as a plain mouse-hover affordance. */
 .model-grid-container.drag-over {
   border-color: #3182ce;
   background: rgba(49, 130, 206, 0.1);
@@ -424,13 +421,10 @@
   font-weight: 500;
 }
 
-/* Tab content specific styles */
+/* Tab content specific styles — suppress the drag-over border/bg when the
+   model grid sits inside a tab panel (where the outer container handles D&D). */
 .model-list-tab .model-grid-container {
   border: none;
-  background: transparent;
-}
-
-.model-list-tab .model-grid-container:hover {
   background: transparent;
 }
 

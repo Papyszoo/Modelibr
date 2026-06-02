@@ -4,10 +4,27 @@ import { ContextMenu } from 'primereact/contextmenu'
 import { Dialog } from 'primereact/dialog'
 import { InputText } from 'primereact/inputtext'
 import { type MenuItem } from 'primereact/menuitem'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { getFileUrl } from '@/features/models/api/modelApi'
 import { UploadableGrid } from '@/shared/components'
+import {
+  AddTile,
+  ASSET_CARD_WIDTH,
+  AssetGrid,
+  AssetTile,
+  AssetTilePlaceholder,
+} from '@/shared/components/asset-tile'
+import {
+  ListToolbar,
+  ListToolbarActions,
+  ListToolbarButton,
+  ListToolbarCount,
+  ListToolbarPanel,
+  ListToolbarRow,
+  ListToolbarSearchInput,
+  OptionsButton,
+} from '@/shared/components/list-toolbar'
 import { useContainerSounds } from '@/shared/hooks/useContainerSounds'
 import { type ContainerAdapter } from '@/shared/types/ContainerTypes'
 import { formatDuration } from '@/utils/audioUtils'
@@ -36,9 +53,15 @@ export function ContainerSoundsTab({
   onTotalCountChange,
 }: ContainerSoundsTabProps) {
   const contextMenuRef = useRef<ContextMenu>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const sn = useContainerSounds(adapter, showToast, refetchContainer)
   const label = adapter.label
   const labelLower = label.toLowerCase()
+
+  // ── Toolbar state ────────────────────────────────────────────────────
+  const [cardWidth, setCardWidth] = useState(ASSET_CARD_WIDTH.default)
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
+  const [localSearch, setLocalSearch] = useState('')
 
   useEffect(() => {
     onTotalCountChange?.(sn.totalCount)
@@ -54,9 +77,82 @@ export function ContainerSoundsTab({
     },
   ]
 
+  // Client-side filter of currently-loaded items
+  const filteredSounds = localSearch.trim()
+    ? sn.sounds.filter(s =>
+        s.name.toLowerCase().includes(localSearch.toLowerCase())
+      )
+    : sn.sounds
+
   return (
     <>
       <ContextMenu model={contextMenuItems} ref={contextMenuRef} />
+
+      {/* Hidden file input for toolbar Upload button */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        style={{ display: 'none' }}
+        multiple
+        accept="audio/*"
+        onChange={e => {
+          if (e.target.files && e.target.files.length > 0) {
+            sn.handleUpload(Array.from(e.target.files))
+            e.target.value = ''
+          }
+        }}
+      />
+
+      <ListToolbar>
+        <ListToolbarRow>
+          <ListToolbarActions>
+            <ListToolbarButton
+              icon="pi pi-search"
+              label="Search"
+              active={isSearchOpen || localSearch.trim().length > 0}
+              onClick={() => setIsSearchOpen(open => !open)}
+              ariaLabel="Search"
+              ariaExpanded={isSearchOpen}
+              ariaControls="sn-tab-search-panel"
+            />
+            <OptionsButton
+              cardWidth={cardWidth}
+              minCardWidth={ASSET_CARD_WIDTH.min}
+              maxCardWidth={ASSET_CARD_WIDTH.max}
+              onCardWidthChange={setCardWidth}
+              showThumbnailAnimation={false}
+            />
+            <ListToolbarButton
+              icon="pi pi-upload"
+              label="Upload"
+              onClick={() => fileInputRef.current?.click()}
+              tooltip="Upload audio files"
+              ariaLabel="Upload"
+            />
+            <ListToolbarButton
+              icon="pi pi-refresh"
+              label="Refresh"
+              onClick={() => void refetchContainer()}
+              tooltip="Refresh"
+              ariaLabel="Refresh"
+            />
+          </ListToolbarActions>
+          <ListToolbarCount
+            icon="pi pi-volume-up"
+            count={localSearch.trim() ? filteredSounds.length : sn.totalCount}
+            unitLabel="sound"
+          />
+        </ListToolbarRow>
+
+        <ListToolbarPanel id="sn-tab-search-panel" open={isSearchOpen}>
+          <ListToolbarSearchInput
+            value={localSearch}
+            onChange={setLocalSearch}
+            placeholder="Search sounds…"
+          />
+        </ListToolbarPanel>
+      </ListToolbar>
+
       <UploadableGrid
         onFilesDropped={sn.handleUpload}
         isUploading={sn.uploading}
@@ -64,39 +160,24 @@ export function ContainerSoundsTab({
         className="container-grid-wrapper"
       >
         <div className="container-section">
-          <div className="container-grid">
-            {sn.sounds.map(sound => (
-              <div
+          <AssetGrid cardWidth={cardWidth}>
+            {filteredSounds.map(sound => (
+              <AssetTile
                 key={sound.id}
-                className="container-card"
+                name={sound.name}
+                meta={formatDuration(sound.duration)}
+                media={<AssetTilePlaceholder icon="pi pi-volume-up" />}
                 onClick={() => sn.openModal(sound)}
                 onContextMenu={e => {
                   e.preventDefault()
                   sn.setSelectedItem(sound)
                   contextMenuRef.current?.show(e)
                 }}
-              >
-                <div className="container-card-thumbnail">
-                  <div className="container-card-placeholder">
-                    <i className="pi pi-volume-up" />
-                    <span>{formatDuration(sound.duration)}</span>
-                  </div>
-                  <div className="container-card-overlay">
-                    <span className="container-card-name">{sound.name}</span>
-                  </div>
-                </div>
-              </div>
+              />
             ))}
-            <div
-              className="container-card container-card-add"
-              onClick={sn.openAddDialog}
-            >
-              <div className="container-card-add-content">
-                <i className="pi pi-plus" />
-                <span>Add Sound</span>
-              </div>
-            </div>
-          </div>
+            <AddTile label="Add Sound" onClick={sn.openAddDialog} />
+          </AssetGrid>
+
           {sn.hasMore && (
             <div className="container-load-more">
               <Button
@@ -151,36 +232,29 @@ export function ContainerSoundsTab({
               style={{ width: '100%' }}
             />
           </div>
-          <div className="container-grid scrollable-grid">
-            {sn.filteredAvailable.map(sound => {
-              const isSelected = sn.selectedIds.includes(sound.id)
-              return (
-                <div
-                  key={sound.id}
-                  className={`container-card ${isSelected ? 'selected' : ''}`}
-                  onClick={() => {
-                    sn.setSelectedIds(prev =>
-                      prev.includes(sound.id)
-                        ? prev.filter(id => id !== sound.id)
-                        : [...prev, sound.id]
-                    )
-                  }}
-                >
-                  <div className="container-card-checkbox">
-                    <Checkbox checked={isSelected} readOnly />
-                  </div>
-                  <div className="container-card-thumbnail">
-                    <div className="container-card-placeholder">
-                      <i className="pi pi-volume-up" />
-                      <span>{formatDuration(sound.duration)}</span>
-                    </div>
-                    <div className="container-card-overlay">
-                      <span className="container-card-name">{sound.name}</span>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
+          <div className="scrollable-grid">
+            <AssetGrid cardWidth={160}>
+              {sn.filteredAvailable.map(sound => {
+                const isSelected = sn.selectedIds.includes(sound.id)
+                return (
+                  <AssetTile
+                    key={sound.id}
+                    name={sound.name}
+                    meta={formatDuration(sound.duration)}
+                    selected={isSelected}
+                    checkbox={<Checkbox checked={isSelected} readOnly />}
+                    media={<AssetTilePlaceholder icon="pi pi-volume-up" />}
+                    onClick={() => {
+                      sn.setSelectedIds(prev =>
+                        prev.includes(sound.id)
+                          ? prev.filter(id => id !== sound.id)
+                          : [...prev, sound.id]
+                      )
+                    }}
+                  />
+                )
+              })}
+            </AssetGrid>
           </div>
           {sn.filteredAvailable.length === 0 && (
             <div className="no-results">

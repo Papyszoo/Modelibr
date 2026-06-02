@@ -1,0 +1,48 @@
+/*
+ * AssetGrid — responsive CSS Grid wrapper for asset tiles.
+ *
+ * Column min-width comes from --asset-card-width (set inline via the
+ * `cardWidth` prop). Mirrors the responsive clamping in ModelGrid.css so the
+ * slider stays in control but the layout never collapses below ~2 columns on
+ * phones.
+ */
+
+.asset-grid {
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(var(--asset-card-width, 180px), 1fr)
+  );
+  gap: var(--mod-space-md);
+  padding: var(--mod-space-xs);
+}
+
+/* ── Responsive ────────────────────────────────────────────────── */
+
+@media (max-width: 1200px) {
+  .asset-grid {
+    grid-template-columns: repeat(
+      auto-fill,
+      minmax(min(var(--asset-card-width, 160px), 160px), 1fr)
+    );
+  }
+}
+
+@media (max-width: 768px) {
+  .asset-grid {
+    gap: var(--mod-space-sm);
+  }
+}
+
+@media (max-width: 480px) {
+  /* Cap the per-card minimum at 48% of the row so we never collapse to a
+     single column on phones, even when the slider is dragged high. */
+  .asset-grid {
+    grid-template-columns: repeat(
+      auto-fill,
+      minmax(min(var(--asset-card-width, 120px), 48%), 1fr)
+    );
+    gap: var(--mod-space-xs);
+    padding: 0.25rem;
+  }
+}

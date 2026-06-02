@@ -1,0 +1,200 @@
+/*
+ * AssetTile — presentational card primitive.
+ *
+ * Mirrors .model-card from ModelGrid.css so every asset tab looks like the
+ * gold-standard Models tab. Pull values from --mod-* design tokens so the
+ * Lara theme stays in control of colors, radii, and motion.
+ *
+ * No feature-specific rules live here — callers pass the right markup via the
+ * `media` and `meta` props and choose a variant.
+ */
+
+.asset-tile {
+  position: relative;
+  cursor: pointer;
+  border-radius: var(--mod-radius-lg);
+  overflow: hidden;
+  background: var(--mod-color-surface);
+  border: 2px solid transparent;
+  box-shadow: var(--mod-shadow-sm);
+  transition:
+    transform var(--mod-transition-fast),
+    box-shadow var(--mod-transition-fast),
+    border-color var(--mod-transition-fast);
+  user-select: none;
+}
+
+.asset-tile:hover {
+  transform: translateY(var(--asset-card-hover-lift));
+  box-shadow: var(--mod-shadow-md);
+}
+
+.asset-tile.is-selected {
+  border-color: var(--mod-color-primary);
+  box-shadow: 0 0 0 3px rgba(var(--primary-color-rgb), 0.18);
+}
+
+/* ── Media area ────────────────────────────────────────────────── */
+
+.asset-tile-media {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  background: var(--mod-color-bg);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Wide variant (env maps — panoramic images) */
+.asset-tile--wide .asset-tile-media {
+  aspect-ratio: 2 / 1;
+}
+
+.asset-tile-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform var(--mod-transition-base);
+}
+
+/* Panoramic images look better with contain so they don't crop. */
+.asset-tile--wide .asset-tile-media img {
+  object-fit: contain;
+}
+
+.asset-tile:hover .asset-tile-media img {
+  transform: scale(1.06);
+}
+
+/* Wide variant: the image is already letterboxed, scale on hover isn't useful. */
+.asset-tile--wide:hover .asset-tile-media img {
+  transform: none;
+}
+
+/* ── Placeholder (no image) ────────────────────────────────────── */
+
+.asset-tile-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--mod-space-xs);
+  color: var(--mod-color-text-muted);
+  width: 100%;
+  height: 100%;
+}
+
+.asset-tile-placeholder i {
+  font-size: 2rem;
+}
+
+.asset-tile-placeholder span {
+  font-size: var(--mod-text-xs);
+}
+
+/* ── Bottom overlay — name + optional meta ─────────────────────── */
+
+.asset-tile-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--asset-card-overlay-gradient);
+  padding: 2rem var(--mod-space-sm) var(--mod-space-sm);
+}
+
+.asset-tile-name {
+  color: var(--mod-color-text-inverse);
+  font-size: var(--mod-text-sm);
+  font-weight: var(--mod-font-weight-medium);
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.asset-tile-meta {
+  color: rgba(255, 255, 255, 0.75);
+  font-size: var(--mod-text-xs);
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 0.125rem;
+}
+
+/* ── Optional checkbox corner ──────────────────────────────────── */
+
+.asset-tile-checkbox {
+  position: absolute;
+  top: var(--mod-space-xs);
+  right: var(--mod-space-xs);
+  z-index: 10;
+  background: var(--mod-color-surface);
+  border-radius: var(--mod-radius-sm);
+  padding: 0.2rem;
+  box-shadow: var(--mod-shadow-sm);
+}
+
+/* ── Add tile — dashed "Add X" call-to-action ──────────────────── */
+
+.asset-tile-add {
+  position: relative;
+  cursor: pointer;
+  border-radius: var(--mod-radius-lg);
+  overflow: hidden;
+  border: 2px dashed var(--mod-color-border);
+  background: transparent;
+  box-shadow: none;
+  /* Always square regardless of sibling variant */
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    border-color var(--mod-transition-fast),
+    background var(--mod-transition-fast),
+    transform var(--mod-transition-fast);
+  user-select: none;
+}
+
+.asset-tile-add:hover {
+  border-color: var(--mod-color-primary);
+  background: rgba(var(--primary-color-rgb), 0.05);
+  transform: translateY(var(--asset-card-hover-lift));
+}
+
+.asset-tile-add-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--mod-space-xs);
+  color: var(--mod-color-text-muted);
+  padding: var(--mod-space-lg);
+}
+
+.asset-tile-add-content i {
+  font-size: 2rem;
+}
+
+.asset-tile-add-content span {
+  font-size: var(--mod-text-sm);
+  font-weight: var(--mod-font-weight-medium);
+  text-align: center;
+}
+
+/* ── Responsive ────────────────────────────────────────────────── */
+
+@media (max-width: 480px) {
+  .asset-tile:hover {
+    transform: none;
+  }
+
+  .asset-tile-add:hover {
+    transform: none;
+  }
+}
