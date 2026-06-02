@@ -140,7 +140,11 @@ export function ContainerEnvironmentMapsTab({
           </ListToolbarActions>
           <ListToolbarCount
             icon="pi pi-globe"
-            count={env.totalCount}
+            count={
+              localSearch.trim()
+                ? filteredEnvironmentMaps.length
+                : env.totalCount
+            }
             unitLabel="environment map"
           />
         </ListToolbarRow>

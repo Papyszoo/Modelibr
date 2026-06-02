@@ -22,6 +22,11 @@
   --mod-color-text-inverse: #ffffff;
 
   /* ── Brand & semantic ─────────────────────────────────────────── */
+  /* The Lara *-blue themes ship --primary-color but not its rgb triplet, yet
+     ~20 stylesheets use `rgba(var(--primary-color-rgb), …)` for selection
+     rings / hover tints. Without a definition those declarations are invalid
+     and silently dropped, so define the triplet once here (Lara blue #3b82f6). */
+  --primary-color-rgb: 59, 130, 246;
   --mod-color-primary: var(--primary-color);
   --mod-color-primary-text: var(--primary-color-text);
   --mod-color-primary-hover: var(--primary-400, var(--primary-color));
