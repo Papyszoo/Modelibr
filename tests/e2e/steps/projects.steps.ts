@@ -684,7 +684,7 @@ async function addTextureSetOfKindToProject(
         .locator(`[data-testid="${labels.tabTestId}"]`)
         .click();
 
-    const addCard = page.locator(".container-card-add").first();
+    const addCard = page.locator(".asset-tile-add").first();
     await addCard.waitFor({ state: "visible", timeout: 10000 });
     await addCard.click();
     console.log(`[Action] Clicked Add ${labels.label} card`);
@@ -697,7 +697,7 @@ async function addTextureSetOfKindToProject(
     console.log(`[Action] ${labels.dialogHeader} dialog opened`);
 
     // Find and click texture set item in the dialog grid
-    const textureItems = page.locator(".p-dialog .container-card").filter({
+    const textureItems = page.locator(".p-dialog .asset-tile").filter({
         hasText: textureSet.name,
     });
 
@@ -762,7 +762,7 @@ async function addTextureSetOfKindToProject(
 
     // Wait for the texture set card to appear (React Query refetch + render)
     const textureSetCard = page
-        .locator(".container-card")
+        .locator(".asset-tile")
         .filter({ hasText: textureSet.name })
         .first();
     await expect(textureSetCard).toBeVisible({
@@ -814,7 +814,7 @@ async function removeTextureSetOfKindFromProject(
         .click();
 
     const textureCard = page.locator(
-        `.container-card[data-texture-set-id="${textureSet.id}"]`,
+        `.asset-tile[data-texture-set-id="${textureSet.id}"]`,
     );
     await textureCard.waitFor({ state: "visible", timeout: 5000 });
     await textureCard.click({ button: "right" });
@@ -882,7 +882,7 @@ async function assertProjectContainsTextureSetOfKind(
         .poll(
             async () => {
                 const textureCard = page.locator(
-                    `.container-card[data-texture-set-id="${textureSet.id}"]`,
+                    `.asset-tile[data-texture-set-id="${textureSet.id}"]`,
                 );
                 return await textureCard.isVisible().catch(() => false);
             },
@@ -917,7 +917,7 @@ async function assertProjectDoesNotContainTextureSetOfKind(
         .click();
 
     const textureCard = page.locator(
-        `.container-card[data-texture-set-id="${textureSet.id}"]`,
+        `.asset-tile[data-texture-set-id="${textureSet.id}"]`,
     );
     await expect(textureCard).not.toBeVisible({ timeout: 5000 });
     console.log(
@@ -989,7 +989,7 @@ async function ensureProjectContainsTextureSetOfKind(
         .click();
 
     const textureCard = page.locator(
-        `.container-card[data-texture-set-id="${textureSet.id}"]`,
+        `.asset-tile[data-texture-set-id="${textureSet.id}"]`,
     );
     // Wait for tab content to render, then check presence
     const isPresent = await textureCard
@@ -1251,7 +1251,7 @@ When("I remove the first sprite from the project", async ({ page }) => {
         .click();
 
     const spriteCard = page
-        .locator(".container-section .container-card:not(.container-card-add)")
+        .locator(".container-section .asset-tile")
         .first();
     await spriteCard.waitFor({ state: "visible", timeout: 5000 });
     await spriteCard.click({ button: "right" });

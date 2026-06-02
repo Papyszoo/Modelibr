@@ -206,6 +206,7 @@ export function ContainerTextureSetsTab({
                 <AssetTile
                   key={textureSet.id}
                   name={textureSet.name}
+                  dataAttributes={{ 'data-texture-set-id': textureSet.id }}
                   media={
                     albedoUrl ? (
                       <img src={albedoUrl} alt={textureSet.name} />
@@ -292,6 +293,7 @@ export function ContainerTextureSetsTab({
                   <AssetTile
                     key={textureSet.id}
                     name={textureSet.name}
+                    dataAttributes={{ 'data-texture-set-id': textureSet.id }}
                     selected={isSelected}
                     checkbox={<Checkbox checked={isSelected} readOnly />}
                     media={

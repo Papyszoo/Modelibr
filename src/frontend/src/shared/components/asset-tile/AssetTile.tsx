@@ -35,6 +35,12 @@ export interface AssetTileProps {
   onClick?: (e: React.MouseEvent) => void
   onContextMenu?: (e: React.MouseEvent) => void
   className?: string
+  /**
+   * Extra `data-*` attributes spread on the root element — stable hooks for
+   * tests/automation to target a specific item, e.g.
+   * `{ 'data-texture-set-id': id }`.
+   */
+  dataAttributes?: Record<`data-${string}`, string | number>
 }
 
 export function AssetTile({
@@ -47,6 +53,7 @@ export function AssetTile({
   onClick,
   onContextMenu,
   className,
+  dataAttributes,
 }: AssetTileProps) {
   const tileClass = [
     'asset-tile',
@@ -58,7 +65,12 @@ export function AssetTile({
     .join(' ')
 
   return (
-    <div className={tileClass} onClick={onClick} onContextMenu={onContextMenu}>
+    <div
+      className={tileClass}
+      onClick={onClick}
+      onContextMenu={onContextMenu}
+      {...dataAttributes}
+    >
       {checkbox ? <div className="asset-tile-checkbox">{checkbox}</div> : null}
 
       <div className="asset-tile-media">{media}</div>
