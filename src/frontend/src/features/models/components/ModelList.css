@@ -58,40 +58,40 @@
 }
 
 .model-list-header h1 {
-  color: #e2e8f0;
+  color: var(--text-color);
   margin-bottom: 0.5rem;
 }
 
 .model-list-header p {
-  color: #b8c4d0;
+  color: var(--text-color-secondary);
   font-size: 1.1rem;
 }
 
 .upload-progress {
   margin: 1rem 0;
   padding: 1rem;
-  background: #2a2a2a;
+  background: var(--surface-card);
   border-radius: 8px;
-  border: 1px solid #4a4a4a;
+  border: 1px solid var(--surface-border);
 }
 
 .upload-progress p {
   margin: 0 0 0.5rem 0;
-  color: #e2e8f0;
+  color: var(--text-color);
   font-weight: 500;
 }
 
 .loading {
   text-align: center;
   padding: 3rem;
-  background: #2a2a2a;
+  background: var(--surface-card);
   border-radius: 8px;
   margin: 2rem 0;
 }
 
 .loading p {
   margin-top: 1rem;
-  color: #ccc;
+  color: var(--text-color-secondary);
 }
 
 .error-message {
@@ -101,9 +101,9 @@
   gap: 1rem;
   text-align: center;
   padding: 1.5rem;
-  background: #4a2c2c;
-  color: #ff6b6b;
-  border: 1px solid #6b3333;
+  background: var(--mod-color-danger-bg);
+  color: var(--mod-color-danger);
+  border: 1px solid var(--mod-color-danger);
   border-radius: 8px;
   margin: 2rem 0;
 }
@@ -111,180 +111,34 @@
 .empty-state {
   text-align: center;
   padding: 4rem;
-  background: #2a2a2a;
+  background: var(--surface-card);
   border-radius: 8px;
   margin: 2rem 0;
-  border: 2px dashed #444;
+  border: 2px dashed var(--surface-border);
   transition: all 0.3s ease;
 }
 
 .empty-state h3 {
-  color: #ccc;
+  color: var(--text-color);
   margin: 1rem 0 0.5rem 0;
 }
 
 .empty-state p {
-  color: #999;
+  color: var(--text-color-secondary);
   margin: 0;
 }
 
-.datatable-container {
-  flex: 1;
-  margin-top: 1rem;
-  border: 2px dashed transparent;
-  border-radius: 8px;
-  transition: all 0.3s ease;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.datatable-container:hover {
-  border-color: #3182ce;
-  background: rgba(49, 130, 206, 0.05);
-}
-
-/* Drag and drop states */
-.datatable-container.drag-over {
-  border-color: #3182ce;
-  background: rgba(49, 130, 206, 0.1);
-  transform: scale(1.02);
-}
-
 .empty-state.drag-over {
-  border-color: #3182ce;
-  background: #3a3a3a;
+  border-color: var(--primary-color);
+  background: rgba(var(--primary-color-rgb), 0.1);
   transform: scale(1.02);
 }
 
-.model-datatable {
-  background: #2a2a2a;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.model-datatable .p-datatable-wrapper {
-  flex: 1;
-  overflow: auto;
-}
-
-/* Override PrimeReact styles to match app theme */
-.p-datatable .p-datatable-header {
-  background: #3a3a3a;
-  border-bottom: 1px solid #4a4a4a;
-  padding: 1rem;
-}
-
-.p-datatable .p-datatable-thead > tr > th {
-  background: #3a3a3a;
-  color: #e2e8f0;
-  font-weight: 600;
-  border-bottom: 2px solid #4a4a4a;
-  padding: 0.75rem;
-}
-
-.p-datatable .p-datatable-tbody > tr > td {
-  padding: 0.75rem;
-  border-bottom: 1px solid #4a4a4a;
-  background: #2a2a2a;
-  color: #e2e8f0;
-}
-
-.p-datatable .p-datatable-tbody > tr:hover {
-  background: #3a3a3a;
-}
-
-.p-datatable .p-datatable-tbody > tr:nth-child(even) {
-  background: #333;
-}
-
-.p-datatable .p-datatable-tbody > tr:nth-child(even):hover {
-  background: #3a3a3a;
-}
-
-.p-button.p-button-outlined {
-  border-color: #3182ce;
-  color: #3182ce;
-}
-
-.p-button.p-button-outlined:hover {
-  background: #3182ce;
-  color: white;
-}
-
-.p-progressbar {
-  height: 1rem;
-  background: #e2e8f0;
-  border-radius: 0.5rem;
-  overflow: hidden;
-}
-
-.p-progressbar .p-progressbar-value {
-  background: linear-gradient(90deg, #3182ce, #4299e1);
-}
-
-/* Styles for tab content vs standalone view */
-.model-list-tab .datatable-container {
-  flex: 1;
-  margin: 1rem;
-  border: none;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.model-list-tab .model-datatable {
-  background: white;
-  box-shadow: none;
-}
-
-.model-list-tab .p-datatable .p-datatable-thead > tr > th {
-  background: #f8fafc;
-  color: #374151;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.model-list-tab .p-datatable .p-datatable-tbody > tr > td {
-  background: white;
-  color: #374151;
-  border-bottom: 1px solid #f3f4f6;
-}
-
-.model-list-tab .p-datatable .p-datatable-tbody > tr:hover {
-  background: #f9fafb;
-}
-
-.model-list-tab .p-datatable .p-datatable-tbody > tr:nth-child(even) {
-  background: #f9fafb;
-}
-
-.model-list-tab .p-datatable .p-datatable-tbody > tr:nth-child(even):hover {
-  background: #f3f4f6;
-}
-
+/* Tab-content layout: tighter margins than the standalone view */
 .model-list-tab .loading,
 .model-list-tab .error-message,
 .model-list-tab .empty-state {
   margin: 1rem;
-  background: var(--surface-card);
-  border: 1px solid var(--surface-border);
-  color: var(--text-color);
-}
-
-.model-list-tab .loading p,
-.model-list-tab .empty-state h3,
-.model-list-tab .empty-state p {
-  color: var(--text-color-secondary);
-}
-
-.model-list-tab .error-message {
-  background: var(--red-50);
-  border-color: var(--red-200);
-  color: var(--red-700);
 }
 
 @media (max-width: 768px) {
@@ -300,10 +154,6 @@
 
   .model-list-header {
     text-align: left;
-  }
-
-  .datatable-container {
-    overflow-x: auto;
   }
 
   /* Tighter header on mobile — desktop's 1.5rem 2rem chews ~30% of phone
@@ -327,9 +177,5 @@
 
   .model-stats .stat-item {
     font-size: 0.75rem;
-  }
-
-  .model-list-tab .datatable-container {
-    margin: 0.5rem;
   }
 }

@@ -16,16 +16,16 @@
 
 /* Custom splitter resizer styling */
 .splitter-layout .p-splitter .p-splitter-gutter {
-  background: #e2e8f0;
+  background: var(--mod-color-border);
   border: none;
   transition: background-color 0.2s;
 }
 
 .splitter-layout .p-splitter .p-splitter-gutter:hover {
-  background: #cbd5e1;
+  background: var(--mod-color-border-strong);
 }
 
 .splitter-layout .p-splitter .p-splitter-gutter-handle {
-  background: #64748b;
+  background: var(--mod-color-text-muted);
   border-radius: 2px;
 }

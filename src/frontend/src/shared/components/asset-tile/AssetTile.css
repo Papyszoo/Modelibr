@@ -133,7 +133,7 @@
   top: var(--mod-space-xs);
   right: var(--mod-space-xs);
   z-index: 10;
-  background: white;
+  background: var(--mod-color-surface);
   border-radius: var(--mod-radius-sm);
   padding: 0.2rem;
   box-shadow: var(--mod-shadow-sm);

@@ -17,6 +17,12 @@ export const useTheme = () => {
   const { theme, setTheme } = useThemeStore()
 
   useEffect(() => {
+    // Keep the document color-scheme in sync with the app theme so native UI
+    // (scrollbars, form controls, autofill) renders dark in dark mode instead
+    // of staying light. Authoritative over the static `color-scheme` in
+    // index.css because it's an inline style on <html>.
+    document.documentElement.style.colorScheme = theme
+
     // Find or create the theme link element
     let themeLink = document.getElementById(
       THEME_LINK_ID
