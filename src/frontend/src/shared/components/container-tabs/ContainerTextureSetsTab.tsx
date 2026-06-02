@@ -119,8 +119,8 @@ export function ContainerTextureSetsTab({
 
   // Client-side filter of currently-loaded items
   const filteredTextureSets = localSearch.trim()
-    ? ts.textureSets.filter(ts =>
-        ts.name.toLowerCase().includes(localSearch.toLowerCase())
+    ? ts.textureSets.filter(textureSet =>
+        textureSet.name.toLowerCase().includes(localSearch.toLowerCase())
       )
     : ts.textureSets
 
@@ -178,7 +178,9 @@ export function ContainerTextureSetsTab({
           </ListToolbarActions>
           <ListToolbarCount
             icon="pi pi-palette"
-            count={ts.totalCount}
+            count={
+              localSearch.trim() ? filteredTextureSets.length : ts.totalCount
+            }
             unitLabel={assetLabel}
           />
         </ListToolbarRow>

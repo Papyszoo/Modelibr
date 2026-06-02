@@ -163,7 +163,7 @@ export function ContainerSpritesTab({
           </ListToolbarActions>
           <ListToolbarCount
             icon="pi pi-images"
-            count={sp.totalCount}
+            count={localSearch.trim() ? filteredSprites.length : sp.totalCount}
             unitLabel="sprite"
           />
         </ListToolbarRow>

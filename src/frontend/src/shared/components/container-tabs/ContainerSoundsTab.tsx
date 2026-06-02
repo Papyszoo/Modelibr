@@ -139,7 +139,7 @@ export function ContainerSoundsTab({
           </ListToolbarActions>
           <ListToolbarCount
             icon="pi pi-volume-up"
-            count={sn.totalCount}
+            count={localSearch.trim() ? filteredSounds.length : sn.totalCount}
             unitLabel="sound"
           />
         </ListToolbarRow>
