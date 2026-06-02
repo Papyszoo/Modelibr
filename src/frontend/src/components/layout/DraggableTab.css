@@ -2,7 +2,7 @@
   position: relative;
   width: 40px;
   height: 40px;
-  background: #334155;
+  background: var(--mod-color-surface);
   border-radius: 6px;
   display: flex;
   align-items: center;
@@ -14,27 +14,27 @@
 }
 
 .draggable-tab:hover {
-  background: #475569;
-  border-color: #64748b;
+  background: var(--mod-color-surface-hover);
+  border-color: var(--mod-color-border);
 }
 
 .draggable-tab.active {
-  background: #3b82f6;
-  border-color: #2563eb;
+  background: var(--mod-color-primary);
+  border-color: var(--mod-color-primary);
 }
 
 .draggable-tab.active:hover {
-  background: #2563eb;
+  background: var(--mod-color-primary-hover);
 }
 
 /* Tab Icon */
 .tab-icon {
-  color: #e2e8f0;
+  color: var(--mod-color-text-muted);
   font-size: 1rem;
 }
 
 .draggable-tab.active .tab-icon {
-  color: white;
+  color: var(--mod-color-primary-text);
 }
 
 /* Close button - small icon in top right corner */
@@ -79,7 +79,7 @@
   height: 32px;
   border-radius: 4px;
   overflow: hidden;
-  background: #1e293b;
+  background: var(--mod-color-bg);
 }
 
 .tab-thumbnail-img {
@@ -90,23 +90,23 @@
 
 /* Context Menu */
 .tab-context-menu {
-  border: 1px solid #475569;
+  border: 1px solid var(--mod-color-border);
   border-radius: 4px;
-  background: #334155;
+  background: var(--mod-color-surface);
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
 }
 
 .tab-context-menu .p-menuitem-link {
-  color: #e2e8f0;
+  color: var(--mod-color-text);
   padding: 8px 12px;
 }
 
 .tab-context-menu .p-menuitem-link:hover {
-  background: #475569;
+  background: var(--mod-color-surface-hover);
 }
 
 .tab-context-menu .p-menuitem-icon {
-  color: #ef4444;
+  color: var(--mod-color-danger);
 }
 
 /* Drag feedback */

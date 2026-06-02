@@ -24,7 +24,7 @@
 
 /* Dock Bar (Side menu with tabs) */
 .dock-bar {
-  background: #1e293b;
+  background: var(--mod-color-bg);
   display: flex;
   align-items: center;
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
@@ -49,19 +49,19 @@
 }
 
 .dock-bar--placement-left {
-  border-right: 1px solid #334155;
+  border-right: 1px solid var(--mod-color-border);
 }
 
 .dock-bar--placement-right {
-  border-left: 1px solid #334155;
+  border-left: 1px solid var(--mod-color-border);
 }
 
 .dock-bar--placement-top {
-  border-bottom: 1px solid #334155;
+  border-bottom: 1px solid var(--mod-color-border);
 }
 
 .dock-bar--placement-bottom {
-  border-top: 1px solid #334155;
+  border-top: 1px solid var(--mod-color-border);
 }
 
 .dock-tabs {
@@ -88,25 +88,25 @@
 
 .dock-bar--vertical .dock-add {
   padding-top: 0.5rem;
-  border-top: 1px solid #334155;
+  border-top: 1px solid var(--mod-color-border);
 }
 
 .dock-bar--horizontal .dock-add {
   margin-top: 0;
   margin-left: auto;
   padding-left: 0.5rem;
-  border-left: 1px solid #334155;
+  border-left: 1px solid var(--mod-color-border);
 }
 
 .dock-add-button {
-  color: #94a3b8 !important;
+  color: var(--mod-color-text-muted) !important;
   width: 40px !important;
   height: 40px !important;
 }
 
 .dock-add-button:hover {
-  background: #334155 !important;
-  color: #e2e8f0 !important;
+  background: var(--mod-color-surface-hover) !important;
+  color: var(--mod-color-text) !important;
 }
 
 .dock-add-menu {

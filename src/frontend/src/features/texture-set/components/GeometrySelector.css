@@ -1,9 +1,9 @@
 .geometry-selector {
-  background: white;
+  background: var(--mod-color-surface);
   border-radius: 8px;
   padding: 1.5rem;
   margin-top: 2rem;
-  border: 2px solid #e5e7eb;
+  border: 2px solid var(--mod-color-border);
 }
 
 .geometry-selector-title {
