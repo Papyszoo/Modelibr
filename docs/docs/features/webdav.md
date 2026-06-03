@@ -53,7 +53,7 @@ Each environment map directory exposes:
 
 ## Notes
 
-- Native installers expose WebDAV on the same local port as the app by default. Change that port in **Settings > Native Runtime** and restart Modelibr.
+- Native installers expose WebDAV on the same local port as the app by default. Change that port in the host status window's **Configuration** panel and restart Modelibr.
 - Docker deployments still use `.env` for WebDAV port configuration.
 - Availability depends on your local deployment configuration and network access.
 

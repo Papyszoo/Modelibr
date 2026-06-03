@@ -360,3 +360,56 @@ jobs:
             /tmp/modelibr.log
             /tmp/xvfb.log
           if-no-files-found: ignore
+
+  build-client:
+    name: Build ${{ matrix.name }} Client
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-latest
+            electronArch: x64
+            artifactGlob: src/desktop-client/dist/*.exe
+          - name: macOS
+            os: macos-14
+            electronArch: arm64
+            artifactGlob: src/desktop-client/dist/*.dmg
+          - name: Linux
+            os: ubuntu-latest
+            electronArch: x64
+            artifactGlob: |
+              src/desktop-client/dist/*.AppImage
+              src/desktop-client/dist/*.deb
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # The client bundles no runtime — it's just an Electron shell that loads a
+      # running host, so the build needs nothing but its own dependencies.
+      - name: Install client dependencies
+        working-directory: src/desktop-client
+        run: npm install
+
+      - name: Build client installers
+        working-directory: src/desktop-client
+        run: npm run dist -- --${{ matrix.electronArch }}
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: client-installers-${{ matrix.name }}
+          path: ${{ matrix.artifactGlob }}
+
+      - name: Upload release assets
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.artifactGlob }}
