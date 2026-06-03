@@ -130,16 +130,28 @@ When(
 
         // Narrow the virtualized grid to the target set so the card is
         // rendered in DOM even if it'd otherwise scroll off-screen.
-        // `narrowVirtualisedList` opens the search panel (throws if it
-        // can't), fills the name, and waits for the count chip to
-        // stabilise.
         const textureSetsPage = new TextureSetsPage(page);
-        await narrowVirtualisedList(page, set.name);
-
-        // Find the card by the unique name
         const card = textureSetsPage.getCardByName(set.name).first();
 
-        await expect(card).toBeVisible({ timeout: 10000 });
+        // `narrowVirtualisedList` waits on the count chip, which can briefly
+        // read "stable" at its pre-filter value before the search debounce
+        // fires — leaving the target card rendered off-screen in the
+        // VirtuosoGrid, where a plain visibility wait can't recover because
+        // nothing scrolls it back into the DOM. Re-narrow + scroll into view
+        // until the card actually materialises, so a single stale count read
+        // can't fail the step (intermittent in CI).
+        await expect
+            .poll(
+                async () => {
+                    await narrowVirtualisedList(page, set.name);
+                    if ((await card.count()) === 0) return false;
+                    await card.scrollIntoViewIfNeeded().catch(() => {});
+                    return card.isVisible().catch(() => false);
+                },
+                { timeout: 30000, intervals: [500, 1000, 2000, 3000] },
+            )
+            .toBe(true);
+
         await card.dblclick();
 
         // Wait for viewer to open
