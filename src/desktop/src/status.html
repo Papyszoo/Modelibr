@@ -38,6 +38,15 @@
       header h1 { font-size: 15px; margin: 0; font-weight: 600; }
       header .phase { margin-left: auto; font-size: 11px; color: var(--muted); }
 
+      .update-banner {
+        display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--muted);
+        margin-bottom: 12px; padding: 8px 11px;
+        background: var(--panel); border: 1px solid var(--border); border-radius: 9px;
+      }
+      .update-banner.available { color: var(--text); border-color: var(--accent); background: rgba(99,102,241,.12); }
+      .update-banner .ub-text { flex: 1; cursor: pointer; }
+      .update-banner button { padding: 4px 10px; }
+
       .services { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
       .service {
         display: flex; align-items: center; gap: 10px;
@@ -123,6 +132,11 @@
       <h1>Modelibr</h1>
       <span class="phase" id="phase">connecting…</span>
     </header>
+
+    <div class="update-banner" id="update-banner">
+      <span class="ub-text" id="ub-text" title="Click to check for updates">Checking for updates…</span>
+      <button class="primary" id="ub-action" style="display:none">Update</button>
+    </div>
 
     <div class="services">
       <div class="service">
@@ -245,10 +259,59 @@
         if (status.frontendUrl) $('frontend-url').textContent = status.frontendUrl
       }
 
+      // ── Updates ──
+      function renderUpdate(u) {
+        const banner = $('update-banner')
+        const text = $('ub-text')
+        const action = $('ub-action')
+        banner.classList.remove('available')
+
+        if (!u || u.status === 'idle') {
+          text.textContent = u ? `v${u.currentVersion}` : ''
+          action.style.display = 'none'
+          return
+        }
+
+        if (u.status === 'available') {
+          banner.classList.add('available')
+          text.textContent = `Update available — v${u.latestVersion}`
+          action.textContent = 'Update'
+          action.style.display = ''
+        } else if (u.status === 'checking') {
+          text.textContent = 'Checking for updates…'
+          action.style.display = 'none'
+        } else if (u.status === 'error') {
+          text.textContent = 'Update check failed'
+          action.textContent = 'Retry'
+          action.style.display = ''
+        } else {
+          text.textContent = `v${u.currentVersion} · up to date`
+          action.style.display = 'none'
+        }
+      }
+
+      async function recheckUpdate() {
+        renderUpdate({ status: 'checking' })
+        await api.checkUpdate()
+        renderUpdate(await api.getUpdate())
+      }
+
+      $('ub-action').addEventListener('click', async () => {
+        const u = await api.getUpdate()
+        if (u?.status === 'available') api.openUpdate()
+        else recheckUpdate()
+      })
+
+      $('ub-text').addEventListener('click', async () => {
+        const u = await api.getUpdate()
+        if (u?.status !== 'available' && u?.status !== 'checking') recheckUpdate()
+      })
+
       async function refresh() {
         try {
           const status = await api.getStatus()
           render(status)
+          renderUpdate(await api.getUpdate())
           // Config is only available once the host is ready; load it once.
           if (status?.phase === 'ready' && !loadedConfig) {
             await loadConfig()

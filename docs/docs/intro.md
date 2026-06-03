@@ -27,6 +27,7 @@ If you want the simplest local setup, download the **Modelibr** (host) installer
 - The host runs from a tray / menu-bar icon. Use its **Show Status** window for live service health (backend, database, asset processor) and the frontend URL.
 - The application and WebDAV are exposed on the same local configurable port.
 - Worker process count, jobs per worker, GPU acceleration, and the app port are configured in the host status window's **Configuration** panel.
+- The host checks GitHub Releases for newer versions and shows an update prompt in the tray and status window.
 - An optional **Modelibr Client** installer opens a running host in its own desktop window instead of a browser tab.
 
 Native installs store data in your operating system's application data folder instead of the repository `data` directory.

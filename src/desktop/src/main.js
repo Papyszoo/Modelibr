@@ -16,6 +16,7 @@ import { fileURLToPath } from 'url'
 import { startEdgeServer } from './edgeServer.js'
 import { ProcessManager } from './processManager.js'
 import { loadRuntimeConfig, saveRuntimeConfig } from './runtimeConfig.js'
+import { UpdateManager } from './updateManager.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -34,6 +35,7 @@ let statusWindow = null
 let edgeServer = null
 let runtimeManager = null
 let runtimeConfigPath = null
+let updateManager = null
 let isShuttingDown = false
 let isQuitting = false
 
@@ -97,10 +99,24 @@ function buildTrayMenu() {
         ? `Error: ${bootError ?? 'failed to start'}`
         : 'Starting…'
 
+  const update = updateManager?.state
+  const updateItem =
+    update?.status === 'available'
+      ? {
+          label: `Update available (v${update.latestVersion})…`,
+          click: () => void shell.openExternal(updateManager.releaseUrl),
+        }
+      : {
+          label: update?.status === 'checking' ? 'Checking for updates…' : 'Check for Updates',
+          enabled: update?.status !== 'checking',
+          click: () => void updateManager?.check(),
+        }
+
   return Menu.buildFromTemplate([
     { label: `Modelibr — ${phaseLabel}`, enabled: false },
     { type: 'separator' },
     { label: 'Show Status', click: () => showStatusWindow() },
+    updateItem,
     {
       label: 'Open in Browser',
       enabled: ready,
@@ -261,6 +277,17 @@ function registerIpc() {
     void shell.openExternal(DESKTOP_CLIENT_URL)
   })
 
+  ipcMain.handle('modelibr:get-update', () => updateManager?.state ?? null)
+
+  ipcMain.handle('modelibr:check-update', async () => {
+    await updateManager?.check()
+    return updateManager?.state ?? null
+  })
+
+  ipcMain.handle('modelibr:open-update', () => {
+    if (updateManager) void shell.openExternal(updateManager.releaseUrl)
+  })
+
   ipcMain.handle('modelibr:get-config', () => {
     if (!runtimeManager) {
       return null
@@ -350,6 +377,11 @@ async function bootstrap() {
   const { config, configPath } = await loadRuntimeConfig(app.getPath('userData'))
   runtimeConfigPath = configPath
 
+  updateManager = new UpdateManager({
+    log: runtimeLog,
+    onChange: () => refreshTray(),
+  })
+
   registerIpc()
   try {
     createTray()
@@ -360,6 +392,9 @@ async function bootstrap() {
   }
   createStatusWindow()
   showStatusWindow()
+
+  // Non-blocking: surfaces a newer release in the tray + status window if found.
+  void updateManager.check()
 
   runtimeManager = new ProcessManager({
     runtimeDir,
