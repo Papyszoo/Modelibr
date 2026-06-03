@@ -25,6 +25,7 @@
         color: var(--text);
         font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         padding: 14px 14px 10px;
+        overflow-y: auto;
         user-select: none;
         -webkit-user-select: none;
       }
@@ -83,6 +84,30 @@
       .install .text b { color: var(--text); font-weight: 600; }
       .install button { margin-left: auto; white-space: nowrap; }
 
+      details.config {
+        background: var(--panel); border: 1px solid var(--border);
+        border-radius: 9px; padding: 0; margin-bottom: 12px; overflow: hidden;
+      }
+      details.config > summary {
+        list-style: none; cursor: pointer; padding: 10px 11px;
+        font-weight: 500; display: flex; align-items: center; gap: 8px;
+      }
+      details.config > summary::-webkit-details-marker { display: none; }
+      details.config > summary::after {
+        content: '▸'; margin-left: auto; color: var(--muted); transition: transform .15s;
+      }
+      details.config[open] > summary::after { transform: rotate(90deg); }
+      .config-body { padding: 4px 11px 11px; border-top: 1px solid var(--border); }
+      .config-field { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+      .config-field label { flex: 1; color: var(--muted); }
+      .config-field input[type="number"] {
+        width: 88px; font: inherit; color: var(--text);
+        background: #0f1115; border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px;
+      }
+      .config-field input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); }
+      .config-actions { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+      .config-note { font-size: 11px; color: var(--pending); flex: 1; min-height: 14px; }
+
       footer { display: flex; gap: 8px; }
       footer button { flex: 1; }
       .toast {
@@ -132,6 +157,33 @@
       </div>
       <button id="install-client">Install</button>
     </div>
+
+    <details class="config">
+      <summary>Configuration</summary>
+      <div class="config-body">
+        <div class="config-field">
+          <label for="cfg-port">App port</label>
+          <input type="number" id="cfg-port" min="1024" max="65535" />
+        </div>
+        <div class="config-field">
+          <label for="cfg-workers">Worker processes</label>
+          <input type="number" id="cfg-workers" min="1" max="16" />
+        </div>
+        <div class="config-field">
+          <label for="cfg-jobs">Jobs per worker</label>
+          <input type="number" id="cfg-jobs" min="1" max="16" />
+        </div>
+        <div class="config-field">
+          <label for="cfg-gpu">Hardware acceleration</label>
+          <input type="checkbox" id="cfg-gpu" />
+        </div>
+        <div class="config-actions">
+          <span class="config-note" id="cfg-note"></span>
+          <button id="cfg-reset">Reset</button>
+          <button class="primary" id="cfg-apply">Apply</button>
+        </div>
+      </div>
+    </details>
 
     <footer>
       <button id="open-data">Data folder</button>
@@ -195,11 +247,65 @@
 
       async function refresh() {
         try {
-          render(await api.getStatus())
+          const status = await api.getStatus()
+          render(status)
+          // Config is only available once the host is ready; load it once.
+          if (status?.phase === 'ready' && !loadedConfig) {
+            await loadConfig()
+          }
         } catch (err) {
           $('phase').textContent = 'disconnected'
         }
       }
+
+      // ── Configuration ──
+      let loadedConfig = null
+
+      function applyConfigToInputs(config) {
+        $('cfg-port').value = config.appPort
+        $('cfg-workers').value = config.workerProcessCount
+        $('cfg-jobs').value = config.maxConcurrentJobsPerWorker
+        $('cfg-gpu').checked = !!config.enableHardwareAcceleration
+      }
+
+      function readConfigInputs() {
+        return {
+          appPort: Number($('cfg-port').value),
+          workerProcessCount: Number($('cfg-workers').value),
+          maxConcurrentJobsPerWorker: Number($('cfg-jobs').value),
+          enableHardwareAcceleration: $('cfg-gpu').checked,
+        }
+      }
+
+      async function loadConfig() {
+        const data = await api.getConfig()
+        if (!data) return
+        loadedConfig = data.config
+        applyConfigToInputs(loadedConfig)
+      }
+
+      $('cfg-reset').addEventListener('click', () => {
+        if (loadedConfig) applyConfigToInputs(loadedConfig)
+        $('cfg-note').textContent = ''
+      })
+
+      $('cfg-apply').addEventListener('click', async () => {
+        $('cfg-apply').disabled = true
+        $('cfg-note').textContent = ''
+        try {
+          const result = await api.saveConfig(readConfigInputs())
+          if (result?.ok) {
+            loadedConfig = result.config
+            applyConfigToInputs(loadedConfig)
+            $('cfg-note').textContent = result.restartRequired
+              ? 'Saved — restart to apply the new port.'
+              : 'Saved.'
+            toast('Configuration saved')
+          }
+        } finally {
+          $('cfg-apply').disabled = false
+        }
+      })
 
       $('open-frontend').addEventListener('click', () => api.openFrontend())
       $('copy-url').addEventListener('click', async () => {
