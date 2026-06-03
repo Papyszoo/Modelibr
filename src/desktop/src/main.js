@@ -15,17 +15,25 @@ import { fileURLToPath } from 'url'
 
 import { startEdgeServer } from './edgeServer.js'
 import { ProcessManager } from './processManager.js'
-import { loadRuntimeConfig } from './runtimeConfig.js'
+import { loadRuntimeConfig, saveRuntimeConfig } from './runtimeConfig.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
-// Placeholder until the standalone desktop client gets its own release asset.
+// The desktop client ships as its own installer in the same GitHub release.
 const DESKTOP_CLIENT_URL = 'https://github.com/Papyszoo/Modelibr/releases'
+
+// Bounds advertised to the configuration UI (saveRuntimeConfig clamps to these).
+const CONFIG_BOUNDS = {
+  appPort: { min: 1024, max: 65535 },
+  workerProcessCount: { min: 1, max: 16 },
+  maxConcurrentJobsPerWorker: { min: 1, max: 16 },
+}
 
 let tray = null
 let statusWindow = null
 let edgeServer = null
 let runtimeManager = null
+let runtimeConfigPath = null
 let isShuttingDown = false
 let isQuitting = false
 
@@ -57,6 +65,9 @@ function snapshot() {
 // ── Tray ──────────────────────────────────────────────────────────────────
 
 function createTray() {
+  // Headless environments (e.g. CI under xvfb, or Linux desktops without a
+  // StatusNotifier host) can't create a tray. That must not stop the host from
+  // serving the app, so callers treat a failure here as non-fatal.
   const image = nativeImage
     .createFromPath(path.join(__dirname, 'assets', 'tray.png'))
     .resize({ width: 18, height: 18 })
@@ -141,7 +152,7 @@ function refreshTray() {
 function createStatusWindow() {
   statusWindow = new BrowserWindow({
     width: 380,
-    height: 470,
+    height: 560,
     resizable: false,
     fullscreenable: false,
     maximizable: false,
@@ -250,6 +261,50 @@ function registerIpc() {
     void shell.openExternal(DESKTOP_CLIENT_URL)
   })
 
+  ipcMain.handle('modelibr:get-config', () => {
+    if (!runtimeManager) {
+      return null
+    }
+
+    const { config } = runtimeManager
+    return {
+      bounds: CONFIG_BOUNDS,
+      config: {
+        appPort: config.appPort,
+        workerProcessCount: config.workerProcessCount,
+        maxConcurrentJobsPerWorker: config.maxConcurrentJobsPerWorker,
+        enableHardwareAcceleration: config.enableHardwareAcceleration,
+      },
+    }
+  })
+
+  ipcMain.handle('modelibr:save-config', async (_event, patch) => {
+    if (!runtimeManager || !runtimeConfigPath) {
+      return { ok: false }
+    }
+
+    const previous = runtimeManager.config
+    const saved = await saveRuntimeConfig(runtimeConfigPath, {
+      ...previous,
+      ...patch,
+    })
+    runtimeManager.updateConfig(saved)
+
+    // Changing the public port needs a full restart; worker-only changes can be
+    // applied live by recycling the worker pool.
+    const restartRequired = saved.appPort !== previous.appPort
+    const workersChanged =
+      saved.workerProcessCount !== previous.workerProcessCount ||
+      saved.maxConcurrentJobsPerWorker !== previous.maxConcurrentJobsPerWorker ||
+      saved.enableHardwareAcceleration !== previous.enableHardwareAcceleration
+
+    if (workersChanged && !restartRequired) {
+      await runtimeManager.restartWorkers()
+    }
+
+    return { ok: true, restartRequired, config: saved }
+  })
+
   ipcMain.handle('modelibr:restart', () => {
     app.relaunch()
     app.quit()
@@ -293,9 +348,16 @@ async function bootstrap() {
 
   const runtimeDir = resolveRuntimeDirectory()
   const { config, configPath } = await loadRuntimeConfig(app.getPath('userData'))
+  runtimeConfigPath = configPath
 
   registerIpc()
-  createTray()
+  try {
+    createTray()
+  } catch (error) {
+    runtimeLog('[ModelibrDesktop] Tray unavailable — continuing headless', {
+      error: error instanceof Error ? error.message : String(error),
+    })
+  }
   createStatusWindow()
   showStatusWindow()
 

@@ -9,6 +9,8 @@ contextBridge.exposeInMainWorld('modelibr', {
   copyFrontendUrl: () => ipcRenderer.invoke('modelibr:copy-frontend-url'),
   openDataFolder: () => ipcRenderer.invoke('modelibr:open-data-folder'),
   installClient: () => ipcRenderer.invoke('modelibr:install-client'),
+  getConfig: () => ipcRenderer.invoke('modelibr:get-config'),
+  saveConfig: patch => ipcRenderer.invoke('modelibr:save-config', patch),
   restart: () => ipcRenderer.invoke('modelibr:restart'),
   quit: () => ipcRenderer.invoke('modelibr:quit'),
 })
