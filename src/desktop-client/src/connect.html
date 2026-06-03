@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline';" />
+    <title>Connect to Modelibr</title>
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; }
+      body {
+        background: #15171c; color: #e7e9ee;
+        font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        display: grid; place-items: center; padding: 24px;
+      }
+      .card {
+        width: 100%; max-width: 460px; text-align: center;
+        background: #1d2027; border: 1px solid #2c3038; border-radius: 14px; padding: 32px 28px;
+      }
+      .logo {
+        width: 52px; height: 52px; border-radius: 13px; margin: 0 auto 16px;
+        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        display: grid; place-items: center; font-weight: 700; font-size: 24px; color: #fff;
+      }
+      h1 { font-size: 19px; margin: 0 0 6px; }
+      p { color: #9aa0ad; margin: 0 0 20px; font-size: 13px; }
+      label { display: block; text-align: left; font-size: 12px; color: #9aa0ad; margin-bottom: 6px; }
+      input {
+        width: 100%; font: inherit; color: #e7e9ee;
+        background: #0f1115; border: 1px solid #2c3038; border-radius: 8px; padding: 10px 12px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      .actions { display: flex; gap: 10px; margin-top: 18px; }
+      button {
+        flex: 1; font: inherit; cursor: pointer; color: #e7e9ee;
+        background: #23262f; border: 1px solid #2c3038; border-radius: 8px; padding: 10px 14px;
+      }
+      button:hover { background: #2c3038; }
+      button.primary { background: #6366f1; border-color: #6366f1; color: #fff; }
+      button.primary:hover { background: #5457e6; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="logo">M</div>
+      <h1>Can't reach the Modelibr host</h1>
+      <p>
+        Make sure the Modelibr host app is running, then reconnect. You can also
+        point this client at a host on another machine.
+      </p>
+      <label for="host">Host URL</label>
+      <input id="host" type="text" placeholder="http://127.0.0.1:3010" />
+      <div class="actions">
+        <button id="retry">Retry</button>
+        <button class="primary" id="connect">Connect</button>
+      </div>
+    </div>
+
+    <script>
+      const api = window.client
+      const params = new URLSearchParams(location.search)
+      const input = document.getElementById('host')
+
+      async function init() {
+        const current = params.get('host') || (await api.getHostUrl())
+        input.value = current || 'http://127.0.0.1:3010'
+      }
+
+      document.getElementById('retry').addEventListener('click', () => api.retry())
+      document.getElementById('connect').addEventListener('click', () => {
+        api.connect(input.value)
+      })
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') api.connect(input.value)
+      })
+
+      init()
+    </script>
+  </body>
+</html>
