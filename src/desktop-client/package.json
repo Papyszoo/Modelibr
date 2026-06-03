@@ -3,6 +3,8 @@
   "private": true,
   "version": "0.1.0",
   "description": "Modelibr desktop client — an app window for a running Modelibr host",
+  "homepage": "https://github.com/Papyszoo/Modelibr",
+  "author": "Papyszoo",
   "type": "module",
   "main": "src/main.js",
   "scripts": {
