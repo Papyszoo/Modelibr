@@ -56,10 +56,12 @@ jobs:
           node-version: 20
 
       - name: Export Node runtime path
-        run: node -e "const fs=require('fs'); fs.appendFileSync(process.env.GITHUB_ENV, `MODELIBR_NODE_EXECUTABLE=${process.execPath}\n`)"
+        shell: bash
+        run: echo "MODELIBR_NODE_EXECUTABLE=$(node -p 'process.execPath')" >> "$GITHUB_ENV"
 
       - name: Prepare build folders
-        run: node -e "const fs=require('fs'); fs.mkdirSync('src/desktop/build-input/webapi',{recursive:true})"
+        shell: bash
+        run: mkdir -p src/desktop/build-input/webapi
 
       - name: Install frontend dependencies
         working-directory: src/frontend
