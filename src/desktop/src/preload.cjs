@@ -11,6 +11,9 @@ contextBridge.exposeInMainWorld('modelibr', {
   installClient: () => ipcRenderer.invoke('modelibr:install-client'),
   getConfig: () => ipcRenderer.invoke('modelibr:get-config'),
   saveConfig: patch => ipcRenderer.invoke('modelibr:save-config', patch),
+  getUpdate: () => ipcRenderer.invoke('modelibr:get-update'),
+  checkUpdate: () => ipcRenderer.invoke('modelibr:check-update'),
+  openUpdate: () => ipcRenderer.invoke('modelibr:open-update'),
   restart: () => ipcRenderer.invoke('modelibr:restart'),
   quit: () => ipcRenderer.invoke('modelibr:quit'),
 })
