@@ -182,6 +182,63 @@ export class ProcessManager {
     }
   }
 
+  // Live health snapshot consumed by the tray status window. Probes each
+  // service independently so a single component being down is visible on
+  // its own row rather than collapsing the whole app into "not running".
+  async probeStatus() {
+    const internalApiPort = this.config.internalApiPort
+
+    const backendStatusCode = await requestStatus(
+      `http://127.0.0.1:${internalApiPort}/health`
+    )
+    const backendUp = backendStatusCode >= 200 && backendStatusCode < 500
+
+    const databaseUp = await this.isPostgresRunning()
+
+    const workerChecks = await Promise.all(
+      this.workerProcesses.map(async worker => {
+        const code = await requestStatus(
+          `http://127.0.0.1:${this.getWorkerHealthPort(worker.index)}/health`
+        )
+        return code >= 200 && code < 500
+      })
+    )
+    const healthyWorkers = workerChecks.filter(Boolean).length
+
+    return {
+      backend: { up: backendUp, port: internalApiPort },
+      database: { up: databaseUp, port: this.config.postgresPort },
+      assetProcessor: {
+        up: healthyWorkers > 0,
+        healthy: healthyWorkers,
+        running: this.workerProcesses.length,
+        configured: this.config.workerProcessCount,
+      },
+      frontendUrl: `http://127.0.0.1:${this.config.appPort}`,
+      webDavUrl: `http://127.0.0.1:${this.config.appPort}/modelibr`,
+      dataDirectory: this.paths.data,
+    }
+  }
+
+  async isPostgresRunning() {
+    if (!this.postgresControlPath) {
+      return false
+    }
+
+    // `pg_ctl status` exits 0 when the server is up and non-zero otherwise,
+    // which runCommand surfaces as a rejection.
+    try {
+      await runCommand(
+        this.postgresControlPath,
+        ['-D', this.paths.postgresData, 'status'],
+        { env: this.getPostgresEnvironment() }
+      )
+      return true
+    } catch {
+      return false
+    }
+  }
+
   async start() {
     await this.ensureLayout()
     await this.ensureRuntimeAssets()
