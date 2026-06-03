@@ -37,12 +37,12 @@ The live demo stores its data in your browser, so what you add there is visible 
 
 ### Native installers
 
-Download the installer for your platform from the GitHub Releases page and run it.
+Download the installer for your platform from the GitHub Releases page and run it. Two installers are published:
 
-- The native build bundles the local database and worker runtime.
-- The app is exposed on a local configurable port.
-- WebDAV is exposed from the same local runtime.
-- Worker process count and GPU acceleration can be adjusted from the in-app `Settings > Native Runtime` section.
+- **Modelibr** (host) — the full self-contained app for users who can't run the Docker stack. It bundles the database, WebApi, and worker runtime and runs from a tray / menu-bar icon. Open its **Show Status** window for live service health, the frontend URL, and a **Configuration** panel (app port, worker process count, jobs per worker, GPU acceleration).
+- **Modelibr Client** (optional) — a thin desktop window that opens a running host in its own app frame instead of a browser tab. Point it at the host URL shown in the host's status window.
+
+The app and WebDAV are exposed on the same local configurable port.
 
 ### Docker
 
