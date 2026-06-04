@@ -15,6 +15,11 @@ on:
 permissions:
   contents: write
 
+# Don't stack installer builds: a newer push supersedes an in-flight run.
+concurrency:
+  group: native-installers-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-installers:
     name: Build ${{ matrix.name }} Installer
