@@ -24,10 +24,10 @@ async function ensureExists(targetPath, label) {
   }
 }
 
-async function copyDirectory(source, destination) {
+async function copyDirectory(source, destination, { dereference = false } = {}) {
   await ensureExists(source, source)
   await fs.mkdir(path.dirname(destination), { recursive: true })
-  await fs.cp(source, destination, { recursive: true, force: true })
+  await fs.cp(source, destination, { recursive: true, force: true, dereference })
 }
 
 async function copyFile(source, destination) {
@@ -39,7 +39,12 @@ async function copyFile(source, destination) {
 async function stagePostgresRuntime() {
   const postgresRuntimeDir = process.env.MODELIBR_POSTGRES_RUNTIME_DIR?.trim()
   if (postgresRuntimeDir) {
-    await copyDirectory(postgresRuntimeDir, path.join(runtimeRoot, 'postgres'))
+    // Dereference symlinks: the bundled PostgreSQL libs are symlink chains
+    // (libicuuc.so.60 -> .so.60.2) and the symlinks are lost when packaged
+    // into the app, leaving initdb unable to load the exact referenced names.
+    await copyDirectory(postgresRuntimeDir, path.join(runtimeRoot, 'postgres'), {
+      dereference: true,
+    })
     return
   }
 
