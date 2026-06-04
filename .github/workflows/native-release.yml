@@ -98,38 +98,58 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          # community.chocolatey.org downloads are occasionally flaky — retry a few times.
-          $installed = $false
-          for ($attempt = 1; $attempt -le 3; $attempt++) {
-            choco install postgresql --params '"/Password:ModelibrBuild123!"' --no-progress -y
-            if ($LASTEXITCODE -eq 0) { $installed = $true; break }
-            Write-Host "PostgreSQL install attempt $attempt failed; retrying in 30s..."
-            Start-Sleep -Seconds 30
-          }
-          if (-not $installed) { throw 'PostgreSQL install failed after 3 attempts' }
-          $pgRoot = Get-ChildItem 'C:\Program Files\PostgreSQL' | Sort-Object Name -Descending | Select-Object -First 1
-          if (-not $pgRoot) { throw 'Embedded PostgreSQL runtime not found' }
-          "MODELIBR_POSTGRES_RUNTIME_DIR=$($pgRoot.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $ErrorActionPreference = 'Stop'
+          # EnterpriseDB (used by Chocolatey's postgresql package) returns 403 to
+          # GitHub's datacenter IPs, so pull portable PostgreSQL 16 binaries from
+          # Maven Central (Zonky) instead — reliable from CI and self-contained.
+          $ver = '16.4.0'
+          $jarUrl = "https://repo1.maven.org/maven2/io/zonky/test/postgres/embedded-postgres-binaries-windows-amd64/$ver/embedded-postgres-binaries-windows-amd64-$ver.jar"
+          $work = Join-Path $env:RUNNER_TEMP 'pg'
+          New-Item -ItemType Directory -Force -Path $work | Out-Null
+          $zip = Join-Path $work 'pg.zip'
+          Invoke-WebRequest -Uri $jarUrl -OutFile $zip
+          Expand-Archive -Path $zip -DestinationPath (Join-Path $work 'jar') -Force
+          $txz = Get-ChildItem -Path (Join-Path $work 'jar') -Filter '*.txz' -Recurse | Select-Object -First 1
+          if (-not $txz) { throw 'PostgreSQL binaries archive not found in jar' }
+          $pgDir = Join-Path $work 'pgsql'
+          New-Item -ItemType Directory -Force -Path $pgDir | Out-Null
+          tar -xf $txz.FullName -C $pgDir
+          if (-not (Test-Path (Join-Path $pgDir 'bin/pg_ctl.exe'))) { throw 'pg_ctl.exe not found after extraction' }
+          "MODELIBR_POSTGRES_RUNTIME_DIR=$pgDir" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
+      # Self-contained PostgreSQL 16 from Maven Central (Zonky) — relocatable
+      # binaries that bundle their own libs, so they run on clean user machines
+      # and on the test runners (Homebrew/apt builds linked against libs that
+      # aren't present at runtime).
       - name: Install PostgreSQL runtime (macOS)
         if: runner.os == 'macOS'
         shell: bash
         run: |
-          brew install postgresql@16
-          echo "MODELIBR_POSTGRES_RUNTIME_DIR=$(brew --prefix postgresql@16)" >> "$GITHUB_ENV"
+          set -euo pipefail
+          ver=16.4.0
+          url="https://repo1.maven.org/maven2/io/zonky/test/postgres/embedded-postgres-binaries-darwin-arm64v8/$ver/embedded-postgres-binaries-darwin-arm64v8-$ver.jar"
+          work="$RUNNER_TEMP/pg"
+          mkdir -p "$work/jar" "$work/pgsql"
+          curl -fsSL "$url" -o "$work/pg.jar"
+          unzip -q "$work/pg.jar" -d "$work/jar"
+          tar -xf "$(ls "$work"/jar/*.txz | head -n1)" -C "$work/pgsql"
+          test -x "$work/pgsql/bin/pg_ctl"
+          echo "MODELIBR_POSTGRES_RUNTIME_DIR=$work/pgsql" >> "$GITHUB_ENV"
 
       - name: Install PostgreSQL runtime (Linux)
         if: runner.os == 'Linux'
         shell: bash
         run: |
-          sudo apt-get update
-          sudo apt-get install -y postgresql-16
-          POSTGRES_RUNTIME_DIR="$GITHUB_WORKSPACE/src/desktop/build-input/postgres"
-          mkdir -p "$POSTGRES_RUNTIME_DIR"
-          cp -R /usr/lib/postgresql/16/bin "$POSTGRES_RUNTIME_DIR/bin"
-          cp -R /usr/lib/postgresql/16/lib "$POSTGRES_RUNTIME_DIR/lib"
-          cp -R /usr/share/postgresql/16 "$POSTGRES_RUNTIME_DIR/share"
-          echo "MODELIBR_POSTGRES_RUNTIME_DIR=$POSTGRES_RUNTIME_DIR" >> "$GITHUB_ENV"
+          set -euo pipefail
+          ver=16.4.0
+          url="https://repo1.maven.org/maven2/io/zonky/test/postgres/embedded-postgres-binaries-linux-amd64/$ver/embedded-postgres-binaries-linux-amd64-$ver.jar"
+          work="$RUNNER_TEMP/pg"
+          mkdir -p "$work/jar" "$work/pgsql"
+          curl -fsSL "$url" -o "$work/pg.jar"
+          unzip -q "$work/pg.jar" -d "$work/jar"
+          tar -xf "$(ls "$work"/jar/*.txz | head -n1)" -C "$work/pgsql"
+          test -x "$work/pgsql/bin/pg_ctl"
+          echo "MODELIBR_POSTGRES_RUNTIME_DIR=$work/pgsql" >> "$GITHUB_ENV"
 
       - name: Install desktop packaging dependencies
         working-directory: src/desktop
