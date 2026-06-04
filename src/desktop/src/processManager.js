@@ -316,9 +316,18 @@ export class ProcessManager {
     const binDir = path.join(postgresRoot, 'bin')
     const libDir = path.join(postgresRoot, 'lib')
 
+    // The bundled PostgreSQL ships its own shared libraries (e.g. ICU) in lib/.
+    // The dynamic loader resolves them via LD_LIBRARY_PATH (Linux) / DYLD_*
+    // (macOS) — PATH alone doesn't cover shared-library lookup.
+    const prependLib = existing =>
+      [libDir, existing].filter(Boolean).join(path.delimiter)
+
     return {
       ...process.env,
       PATH: [binDir, libDir, process.env.PATH].filter(Boolean).join(path.delimiter),
+      LD_LIBRARY_PATH: prependLib(process.env.LD_LIBRARY_PATH),
+      DYLD_LIBRARY_PATH: prependLib(process.env.DYLD_LIBRARY_PATH),
+      DYLD_FALLBACK_LIBRARY_PATH: prependLib(process.env.DYLD_FALLBACK_LIBRARY_PATH),
       PGDATA: this.paths.postgresData,
     }
   }

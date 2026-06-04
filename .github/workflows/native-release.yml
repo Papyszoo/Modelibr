@@ -250,7 +250,10 @@ jobs:
       - name: Start app (macOS)
         if: runner.os == 'macOS'
         shell: bash
-        run: open /Applications/Modelibr.app
+        run: |
+          # Launch the binary directly (not via `open`) so we capture stdout/stderr.
+          nohup "/Applications/Modelibr.app/Contents/MacOS/Modelibr" > /tmp/modelibr.log 2>&1 &
+          disown || true
 
       - name: Start app (Windows)
         if: runner.os == 'Windows'
