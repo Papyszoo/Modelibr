@@ -1,5 +1,6 @@
 {
   "name": "modelibr-desktop",
+  "productName": "Modelibr",
   "private": true,
   "version": "0.1.0",
   "description": "Native Modelibr launcher and installer packaging",
