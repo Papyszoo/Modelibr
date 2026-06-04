@@ -1,4 +1,5 @@
 import express from 'express'
+import rateLimit from 'express-rate-limit'
 import { createProxyMiddleware } from 'http-proxy-middleware'
 import http from 'http'
 import path from 'path'
@@ -70,6 +71,17 @@ export async function startEdgeServer({ runtimeDir, configPath, runtimeManager, 
 
     next()
   })
+
+  // Rate-limit the static frontend file serving. The /api and WebDAV proxies
+  // above short-circuit before reaching here, so this only guards the local
+  // file-system reads — generous enough to never affect normal local use.
+  const staticLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 10000,
+    standardHeaders: true,
+    legacyHeaders: false,
+  })
+  app.use(staticLimiter)
 
   app.use(express.static(frontendDir, { index: false }))
   app.get('*', (_request, response) => {
