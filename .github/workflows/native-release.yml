@@ -197,7 +197,9 @@ jobs:
           cp -R "/Volumes/Modelibr/Modelibr.app" /Applications/
           hdiutil detach /Volumes/Modelibr -quiet
           # Strip quarantine attribute — installer isn't notarized in CI
-          sudo xattr -dr com.apple.quarantine /Applications/Modelibr.app
+          # Bundled Puppeteer Chrome + node_modules/.bin contain dangling
+          # symlinks that make recursive xattr exit non-zero; that's harmless.
+          sudo xattr -dr com.apple.quarantine /Applications/Modelibr.app 2>/dev/null || true
 
       - name: Install (Windows)
         if: runner.os == 'Windows'

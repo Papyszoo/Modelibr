@@ -2,6 +2,7 @@ import { spawn } from 'child_process'
 import fs from 'fs/promises'
 import http from 'http'
 import https from 'https'
+import os from 'os'
 import path from 'path'
 
 const POSTGRES_USER = 'modelibr'
@@ -162,6 +163,11 @@ export class ProcessManager {
       postgresData: path.join(userDataDir, 'data', 'postgres'),
       blender: path.join(userDataDir, 'data', 'blender'),
       temp: path.join(userDataDir, 'temp'),
+      // PostgreSQL's Unix socket lives in a short, writable, space-free temp
+      // path. The default (/var/run/postgresql) isn't writable on Linux, and
+      // the userData dir can contain spaces (macOS "Application Support") which
+      // pg_ctl's -o option string can't parse.
+      pgSocket: path.join(os.tmpdir(), 'modelibr-postgres'),
     }
   }
 
@@ -266,6 +272,7 @@ export class ProcessManager {
       ensureDirectory(this.paths.postgresData),
       ensureDirectory(this.paths.blender),
       ensureDirectory(this.paths.temp),
+      ensureDirectory(this.paths.pgSocket),
     ])
   }
 
@@ -368,6 +375,11 @@ export class ProcessManager {
       port: this.config.postgresPort,
     })
 
+    // Windows builds use TCP only (no Unix socket); elsewhere point the socket
+    // at a writable directory so PostgreSQL can create its lock file.
+    const socketOption =
+      process.platform === 'win32' ? '' : ` -k ${this.paths.pgSocket}`
+
     await runCommand(
       this.postgresControlPath,
       [
@@ -377,7 +389,7 @@ export class ProcessManager {
         '-t',
         '60',
         '-o',
-        `-p ${this.config.postgresPort} -h 127.0.0.1`,
+        `-p ${this.config.postgresPort} -h 127.0.0.1${socketOption}`,
         'start',
       ],
       {
