@@ -4,7 +4,10 @@
   "version": "0.1.0",
   "description": "Modelibr desktop client — an app window for a running Modelibr host",
   "homepage": "https://github.com/Papyszoo/Modelibr",
-  "author": "Papyszoo",
+  "author": {
+    "name": "Papyszoo",
+    "email": "papyszoo@users.noreply.github.com"
+  },
   "type": "module",
   "main": "src/main.js",
   "scripts": {
