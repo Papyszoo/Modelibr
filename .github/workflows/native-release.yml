@@ -98,7 +98,15 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          choco install postgresql --params '"/Password:ModelibrBuild123!"' --no-progress -y
+          # community.chocolatey.org downloads are occasionally flaky — retry a few times.
+          $installed = $false
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            choco install postgresql --params '"/Password:ModelibrBuild123!"' --no-progress -y
+            if ($LASTEXITCODE -eq 0) { $installed = $true; break }
+            Write-Host "PostgreSQL install attempt $attempt failed; retrying in 30s..."
+            Start-Sleep -Seconds 30
+          }
+          if (-not $installed) { throw 'PostgreSQL install failed after 3 attempts' }
           $pgRoot = Get-ChildItem 'C:\Program Files\PostgreSQL' | Sort-Object Name -Descending | Select-Object -First 1
           if (-not $pgRoot) { throw 'Embedded PostgreSQL runtime not found' }
           "MODELIBR_POSTGRES_RUNTIME_DIR=$($pgRoot.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
