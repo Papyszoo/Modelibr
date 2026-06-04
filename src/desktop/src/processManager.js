@@ -46,7 +46,6 @@ function requestStatus(url) {
       target,
       {
         method: 'GET',
-        rejectUnauthorized: false,
       },
       res => {
         res.resume()
