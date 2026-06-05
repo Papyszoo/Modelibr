@@ -13,7 +13,11 @@ const useBlobReporter = !!process.env.PW_MERGE_BLOB;
 export default defineConfig({
     testDir,
     globalSetup: "./global-setup.ts",
-    timeout: 90000, // 90s to allow for thumbnail generation (Puppeteer cold start + rendering takes 30-40s)
+    // 90s default to allow for thumbnail generation (Puppeteer cold start +
+    // rendering takes 30-40s). Overridable via PW_TEST_TIMEOUT so slower
+    // deployments (e.g. an installed native build on a contended CI runner) can
+    // give UI actions more headroom without changing local/Docker behavior.
+    timeout: parseInt(process.env.PW_TEST_TIMEOUT || "90000", 10),
     fullyParallel: true,
     forbidOnly: !!process.env.CI,
     retries: 1,
