@@ -1,4 +1,5 @@
 import { spawn } from 'child_process'
+import crypto from 'crypto'
 import fs from 'fs/promises'
 import http from 'http'
 import https from 'https'
@@ -155,6 +156,12 @@ export class ProcessManager {
     this.workerProcesses = []
     this.postgresControlPath = null
     this.stoppingWorkers = false
+    // Shared secret the worker presents (X-Api-Key) and the WebApi validates
+    // (WORKER_API_KEY) on upload endpoints. The WebApi runs as Production, where
+    // an empty key is rejected as Unauthorized, so we mint a strong per-session
+    // key and hand the same value to both local processes. Both bind to
+    // 127.0.0.1 only, so a fresh in-memory key needs no persistence.
+    this.workerApiKey = crypto.randomBytes(32).toString('hex')
     this.paths = {
       data: path.join(userDataDir, 'data'),
       uploads: path.join(userDataDir, 'data', 'uploads'),
@@ -446,7 +453,7 @@ export class ProcessManager {
         EXPOSE_443_PORT: 'false',
         WEBDAV_HTTP_PORT: String(this.config.appPort),
         WEBDAV_PROBE_BASE_URL: `http://127.0.0.1:${this.config.appPort}`,
-        WORKER_API_KEY: '',
+        WORKER_API_KEY: this.workerApiKey,
         UPLOAD_STORAGE_PATH: this.paths.uploads,
         THUMBNAIL_STORAGE_PATH: this.paths.thumbnails,
         RESTORE_STORAGE_PATH: this.paths.restore,
@@ -504,7 +511,7 @@ export class ProcessManager {
         WORKER_ID: `worker-${index + 1}`,
         WORKER_PORT: String(healthPort),
         API_BASE_URL: `http://127.0.0.1:${this.config.internalApiPort}`,
-        WORKER_API_KEY: '',
+        WORKER_API_KEY: this.workerApiKey,
         MAX_CONCURRENT_JOBS: String(this.config.maxConcurrentJobsPerWorker),
         THUMBNAIL_STORAGE_PATH: this.paths.thumbnails,
         BLENDER_INSTALL_PATH: this.paths.blender,
