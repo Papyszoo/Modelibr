@@ -129,6 +129,24 @@ export class PuppeteerRenderer {
   async _initializePage() {
     this.page = await this.browser.newPage()
 
+    // Surface why the render template failed to load (e.g. a module/import the
+    // bundle is missing) instead of only seeing the downstream "window.THREE
+    // never defined" timeout.
+    this.page.on('pageerror', error =>
+      logger.error('Render template page error', { error: error.message })
+    )
+    this.page.on('console', message => {
+      if (message.type() === 'error') {
+        logger.error('Render template console error', { text: message.text() })
+      }
+    })
+    this.page.on('requestfailed', request =>
+      logger.error('Render template request failed', {
+        url: request.url(),
+        error: request.failure()?.errorText,
+      })
+    )
+
     await this.page.setViewport({
       width: config.rendering.outputWidth,
       height: config.rendering.outputHeight,
