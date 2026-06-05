@@ -12,13 +12,17 @@ export async function startEdgeServer({ runtimeDir, configPath, runtimeManager, 
   const frontendDir = path.join(runtimeDir, 'frontend')
 
   app.disable('x-powered-by')
-  app.use(express.json())
 
+  // IMPORTANT: do NOT parse the body globally. http-proxy-middleware streams
+  // the request body to the WebApi/WebDAV target, so consuming it here with
+  // express.json() would make every proxied POST/PUT/PROPFIND hang (the target
+  // waits for a body that was already drained). Parse JSON only on the local
+  // routes that actually read req.body.
   app.get('/api/native/runtime', (_request, response) => {
     response.json(runtimeManager.buildRuntimeSnapshot())
   })
 
-  app.put('/api/native/runtime', async (request, response) => {
+  app.put('/api/native/runtime', express.json(), async (request, response) => {
     const nextConfig = sanitizeRuntimeConfig({
       ...runtimeManager.config,
       ...request.body,
