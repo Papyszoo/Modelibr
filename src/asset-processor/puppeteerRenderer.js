@@ -40,6 +40,16 @@ export class PuppeteerRenderer {
       process.env.CHROMIUM_PATH ||
       undefined
 
+    // macOS Chromium cannot create a WebGL context through SwiftShader
+    // (ANGLE → Vulkan → SwiftShader fails with "BindToCurrentSequence failed"),
+    // so the software path used on Linux/Windows produces no thumbnails there.
+    // Every Mac has a usable Metal GPU, so render through ANGLE's Metal backend
+    // instead — this works headlessly and is faster than software rendering.
+    const softwareGpuArgs =
+      process.platform === 'darwin'
+        ? ['--use-angle=metal']
+        : ['--disable-gpu', '--use-gl=angle', '--use-angle=swiftshader']
+
     const gpuArgs = config.rendering.useHardwareAcceleration
       ? [
           '--ignore-gpu-blocklist',
@@ -47,7 +57,7 @@ export class PuppeteerRenderer {
           '--enable-zero-copy',
           '--use-angle=default',
         ]
-      : ['--disable-gpu', '--use-gl=angle', '--use-angle=swiftshader']
+      : softwareGpuArgs
 
     const launchOptions = {
       headless: true,
