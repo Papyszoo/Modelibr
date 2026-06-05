@@ -178,8 +178,9 @@ jobs:
     needs: build-installers
     runs-on: ${{ matrix.os }}
     # Smoke + the full Playwright suite against the installed app (incl. the
-    # slow Blender tier) can run long; keep a generous ceiling.
-    timeout-minutes: 120
+    # slow Blender tier) can run long — the Windows runner in particular is much
+    # slower under the parallel UI tests — so keep a generous ceiling.
+    timeout-minutes: 180
     strategy:
       fail-fast: false
       matrix:
