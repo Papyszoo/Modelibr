@@ -7,7 +7,11 @@ export const DEFAULT_RUNTIME_CONFIG = Object.freeze({
   postgresPort: 35432,
   workerProcessCount: 1,
   maxConcurrentJobsPerWorker: 3,
-  enableHardwareAcceleration: true,
+  // Default to software rendering (swiftshader): it produces thumbnails on any
+  // machine, including GPU-less laptops, VMs, and headless runners. GPU
+  // acceleration is faster but fails to initialize WebGL on machines without a
+  // usable GPU, so it's opt-in via the Configuration panel.
+  enableHardwareAcceleration: false,
 })
 
 function coerceInteger(value, fallback, minimum, maximum) {
@@ -46,9 +50,11 @@ export function sanitizeRuntimeConfig(input = {}) {
       1,
       16
     ),
+    // Opt-in: only enabled when explicitly set true; absent/false → software
+    // rendering, which works on any machine.
     enableHardwareAcceleration:
-      input.enableHardwareAcceleration !== false &&
-      input.enableHardwareAcceleration !== 'false',
+      input.enableHardwareAcceleration === true ||
+      input.enableHardwareAcceleration === 'true',
   }
 }
 
