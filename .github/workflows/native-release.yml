@@ -302,6 +302,16 @@ jobs:
           # /api/* is rewritten to /* by the edge server, so this hits WebApi /health
           curl -sf http://127.0.0.1:3010/api/health -o /dev/null
 
+      - name: Smoke — DB-backed endpoint (catches missing migrations)
+        shell: bash
+        run: |
+          # /api/models queries the database, so it returns 200 only when the
+          # schema exists. Health checks don't touch tables, so this is what
+          # catches a database that was never created / migrated.
+          code=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:3010/api/models")
+          echo "GET /api/models -> $code"
+          test "$code" = "200"
+
       # ───── Stop app ─────
       - name: Stop app (Linux)
         if: runner.os == 'Linux'
