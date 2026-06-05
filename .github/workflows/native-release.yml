@@ -267,11 +267,10 @@ jobs:
           )
           $exe = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
           if (-not $exe) { throw "Modelibr.exe not found in expected locations" }
-          # Capture stdout/stderr so an E2E failure is debuggable; the diagnostics
-          # step uploads these from RUNNER_TEMP (== ${{ runner.temp }}).
-          Start-Process -FilePath $exe `
-            -RedirectStandardOutput "$env:RUNNER_TEMP\modelibr.log" `
-            -RedirectStandardError "$env:RUNNER_TEMP\modelibr.err.log"
+          # Plain launch: Modelibr is a GUI-subsystem app, and Start-Process
+          # -RedirectStandardOutput/-Error prevents it from initializing (the
+          # HTTP server never comes up), so don't redirect its streams here.
+          Start-Process -FilePath $exe
 
       # ───── Wait for HTTP server ─────
       - name: Wait for app ready
@@ -468,8 +467,6 @@ jobs:
           path: |
             /tmp/modelibr.log
             /tmp/xvfb.log
-            ${{ runner.temp }}/modelibr.log
-            ${{ runner.temp }}/modelibr.err.log
           if-no-files-found: ignore
 
   build-client:
