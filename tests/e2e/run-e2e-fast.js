@@ -12,11 +12,13 @@ const __dirname = path.dirname(__filename);
 const testEnv = {
   ...process.env,
   PW_MERGE_BLOB: "1",
-  POSTGRES_USER: "modelibr",
-  POSTGRES_PASSWORD: "e2e_password",
-  POSTGRES_DB: "Modelibr",
-  POSTGRES_HOST: "localhost",
-  POSTGRES_PORT: "5433",
+  // Defaults target the Docker e2e stack; override via env to run against a
+  // different deployment (e.g. an installed native build on its own ports).
+  POSTGRES_USER: process.env.POSTGRES_USER || "modelibr",
+  POSTGRES_PASSWORD: process.env.POSTGRES_PASSWORD || "e2e_password",
+  POSTGRES_DB: process.env.POSTGRES_DB || "Modelibr",
+  POSTGRES_HOST: process.env.POSTGRES_HOST || "localhost",
+  POSTGRES_PORT: process.env.POSTGRES_PORT || "5433",
   FRONTEND_URL: process.env.FRONTEND_URL || "http://localhost:3002",
 };
 
@@ -91,8 +93,18 @@ async function main() {
   const args = forwardedArgs.join(" ");
 
   try {
-    await waitForHealth("http://localhost:8090/health", "WebApi");
-    await waitForHealth("http://localhost:3003/health", "Asset processor");
+    await waitForHealth(
+      process.env.WEBAPI_HEALTH_URL || "http://localhost:8090/health",
+      "WebApi",
+    );
+    // Native installs don't expose a separate asset-processor health port
+    // (workers are health-gated internally before the app serves), so allow
+    // skipping this check by setting ASSET_HEALTH_URL to an empty string.
+    const assetHealthUrl =
+      process.env.ASSET_HEALTH_URL ?? "http://localhost:3003/health";
+    if (assetHealthUrl) {
+      await waitForHealth(assetHealthUrl, "Asset processor");
+    }
     await waitForHealth(testEnv.FRONTEND_URL, "Frontend");
   } catch (error) {
     console.error(`\n❌ ${error.message}`);

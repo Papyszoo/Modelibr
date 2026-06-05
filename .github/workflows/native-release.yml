@@ -177,7 +177,9 @@ jobs:
     name: Test ${{ matrix.name }} Installer
     needs: build-installers
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    # Smoke + the full Playwright suite against the installed app (incl. the
+    # slow Blender tier) can run long; keep a generous ceiling.
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
@@ -311,6 +313,58 @@ jobs:
           code=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:3010/api/models")
           echo "GET /api/models -> $code"
           test "$code" = "200"
+
+      # ───── Full Playwright E2E suite against the installed app ─────
+      # Runs the real test suite (not just smoke checks) against the running
+      # native install. Validating on Linux first; will fan out to Windows +
+      # macOS once green.
+      - name: Checkout repo (for E2E suite)
+        if: runner.os == 'Linux'
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js for E2E
+        if: runner.os == 'Linux'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: tests/e2e/package-lock.json
+
+      - name: Install E2E dependencies
+        if: runner.os == 'Linux'
+        working-directory: tests/e2e
+        run: npm ci
+
+      - name: Install Playwright browser
+        if: runner.os == 'Linux'
+        working-directory: tests/e2e
+        run: npx playwright install chromium
+
+      - name: Run full E2E suite against installed app
+        if: runner.os == 'Linux'
+        working-directory: tests/e2e
+        env:
+          CI: "true"
+          # Point the suite at the running native install (HTTP via the edge
+          # server, Postgres via the loopback port the launcher binds).
+          FRONTEND_URL: http://127.0.0.1:3010
+          API_BASE_URL: http://127.0.0.1:3010/api
+          WEBAPI_HEALTH_URL: http://127.0.0.1:3010/api/health
+          ASSET_HEALTH_URL: ""
+          POSTGRES_HOST: 127.0.0.1
+          POSTGRES_PORT: "35432"
+          POSTGRES_USER: modelibr
+          POSTGRES_PASSWORD: modelibr
+          POSTGRES_DB: Modelibr
+        run: node run-e2e-fast.js
+
+      - name: Upload native E2E report
+        if: always() && runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-e2e-report-${{ matrix.name }}
+          path: tests/e2e/playwright-report/
+          if-no-files-found: ignore
 
       # ───── Stop app ─────
       - name: Stop app (Linux)
