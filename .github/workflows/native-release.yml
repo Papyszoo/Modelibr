@@ -267,7 +267,11 @@ jobs:
           )
           $exe = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
           if (-not $exe) { throw "Modelibr.exe not found in expected locations" }
-          Start-Process -FilePath $exe
+          # Capture stdout/stderr so an E2E failure is debuggable; the diagnostics
+          # step uploads these from RUNNER_TEMP (== ${{ runner.temp }}).
+          Start-Process -FilePath $exe `
+            -RedirectStandardOutput "$env:RUNNER_TEMP\modelibr.log" `
+            -RedirectStandardError "$env:RUNNER_TEMP\modelibr.err.log"
 
       # ───── Wait for HTTP server ─────
       - name: Wait for app ready
@@ -316,14 +320,11 @@ jobs:
 
       # ───── Full Playwright E2E suite against the installed app ─────
       # Runs the real test suite (not just smoke checks) against the running
-      # native install. Validating on Linux first; will fan out to Windows +
-      # macOS once green.
+      # native install on every OS (Windows, macOS, Linux).
       - name: Checkout repo (for E2E suite)
-        if: runner.os == 'Linux'
         uses: actions/checkout@v4
 
       - name: Set up Node.js for E2E
-        if: runner.os == 'Linux'
         uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -331,17 +332,14 @@ jobs:
           cache-dependency-path: tests/e2e/package-lock.json
 
       - name: Install E2E dependencies
-        if: runner.os == 'Linux'
         working-directory: tests/e2e
         run: npm ci
 
       - name: Install Playwright browser
-        if: runner.os == 'Linux'
         working-directory: tests/e2e
         run: npx playwright install chromium
 
       - name: Run full E2E suite against installed app
-        if: runner.os == 'Linux'
         working-directory: tests/e2e
         env:
           CI: "true"
@@ -359,7 +357,7 @@ jobs:
         run: node run-e2e-fast.js
 
       - name: Upload native E2E report
-        if: always() && runner.os == 'Linux'
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: native-e2e-report-${{ matrix.name }}
@@ -470,6 +468,8 @@ jobs:
           path: |
             /tmp/modelibr.log
             /tmp/xvfb.log
+            ${{ runner.temp }}/modelibr.log
+            ${{ runner.temp }}/modelibr.err.log
           if-no-files-found: ignore
 
   build-client:
