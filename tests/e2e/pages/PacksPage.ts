@@ -1,7 +1,9 @@
 import { Page, Locator, expect } from "@playwright/test";
 import { navigateToTab } from "../helpers/navigation-helper";
 
-const API_BASE = "http://localhost:8090";
+// Honor API_BASE_URL so the suite can target a non-Docker deployment (e.g. an
+// installed native build on its own ports); fall back to the Docker e2e port.
+const API_BASE = process.env.API_BASE_URL || "http://localhost:8090";
 
 export interface PackInfo {
     id: number;
