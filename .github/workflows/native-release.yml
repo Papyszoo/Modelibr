@@ -179,7 +179,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     # Smoke + the full Playwright suite against the installed app (incl. the
     # slow Blender tier) can run long; keep a generous ceiling.
-    timeout-minutes: 90
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
@@ -348,6 +348,9 @@ jobs:
           API_BASE_URL: http://127.0.0.1:3010/api
           WEBAPI_HEALTH_URL: http://127.0.0.1:3010/api/health
           ASSET_HEALTH_URL: ""
+          # The demo phase tests a standalone demo build in Playwright's own
+          # browser, not the installed app — skip it here (covered by Docker CI).
+          SKIP_DEMO_PHASE: "1"
           POSTGRES_HOST: 127.0.0.1
           POSTGRES_PORT: "35432"
           POSTGRES_USER: modelibr

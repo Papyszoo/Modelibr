@@ -161,11 +161,20 @@ async function main() {
     preserveBlobs("slow");
   }
 
-  console.log(`\n📋 Phase ${fastOnly ? 3 : 5}: Demo tests (workers=1)\n`);
-  const demoResult = run(`node run-demo-e2e.js ${args}`, {
-    env: testEnv,
-  });
-  preserveBlobs("demo");
+  // The demo phase builds a standalone "demo mode" frontend and tests it in
+  // Playwright's own browser — it does not exercise the deployment under test,
+  // so it's skippable when running against an installed native build (it's
+  // still covered by the Docker e2e CI).
+  let demoResult = 0;
+  if (process.env.SKIP_DEMO_PHASE === "1") {
+    console.log("\n📋 Demo tests: skipped (SKIP_DEMO_PHASE=1)\n");
+  } else {
+    console.log(`\n📋 Phase ${fastOnly ? 3 : 5}: Demo tests (workers=1)\n`);
+    demoResult = run(`node run-demo-e2e.js ${args}`, {
+      env: testEnv,
+    });
+    preserveBlobs("demo");
+  }
 
   console.log("\n📊 Merging test reports...\n");
   const mergeResult = run(
