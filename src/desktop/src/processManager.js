@@ -162,13 +162,17 @@ export class ProcessManager {
     // key and hand the same value to both local processes. Both bind to
     // 127.0.0.1 only, so a fresh in-memory key needs no persistence.
     this.workerApiKey = crypto.randomBytes(32).toString('hex')
+    // Data root is user-configurable (config.dataDirectory); empty means the
+    // default location under userData. Everything stateful lives under it so a
+    // single setting relocates all data.
+    const dataRoot = config.dataDirectory || path.join(userDataDir, 'data')
     this.paths = {
-      data: path.join(userDataDir, 'data'),
-      uploads: path.join(userDataDir, 'data', 'uploads'),
-      thumbnails: path.join(userDataDir, 'data', 'thumbnails'),
-      restore: path.join(userDataDir, 'data', 'restore'),
-      postgresData: path.join(userDataDir, 'data', 'postgres'),
-      blender: path.join(userDataDir, 'data', 'blender'),
+      data: dataRoot,
+      uploads: path.join(dataRoot, 'uploads'),
+      thumbnails: path.join(dataRoot, 'thumbnails'),
+      restore: path.join(dataRoot, 'restore'),
+      postgresData: path.join(dataRoot, 'postgres'),
+      blender: path.join(dataRoot, 'blender'),
       temp: path.join(userDataDir, 'temp'),
       // PostgreSQL's Unix socket lives in a short, writable, space-free temp
       // path. The default (/var/run/postgresql) isn't writable on Linux, and
