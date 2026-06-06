@@ -1,10 +1,47 @@
-import { app, BrowserWindow, Menu, shell, ipcMain } from 'electron'
+import { app, BrowserWindow, Menu, shell, ipcMain, dialog } from 'electron'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import electronUpdater from 'electron-updater'
 
 import { loadClientConfig, saveClientConfig } from './clientConfig.js'
 
+const { autoUpdater } = electronUpdater
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
+// Background auto-update: check on launch, download in the background, and
+// install on quit. Safe no-op in dev (unpackaged). macOS auto-install needs a
+// signed build; the error is caught so it never blocks the client.
+function checkForUpdates({ notifyNoUpdate = false } = {}) {
+  if (!app.isPackaged) {
+    if (notifyNoUpdate) {
+      void dialog.showMessageBox({
+        type: 'info',
+        message: 'Updates are only available in the installed app.',
+      })
+    }
+    return
+  }
+
+  autoUpdater.autoDownload = true
+  autoUpdater.autoInstallOnAppQuit = true
+
+  if (notifyNoUpdate) {
+    autoUpdater.once('update-not-available', () =>
+      dialog.showMessageBox({ type: 'info', message: 'Modelibr Client is up to date.' })
+    )
+  }
+
+  autoUpdater.checkForUpdatesAndNotify().catch(error => {
+    console.error('[ModelibrClient][update]', error)
+    if (notifyNoUpdate) {
+      void dialog.showMessageBox({
+        type: 'error',
+        message: 'Update check failed',
+        detail: error instanceof Error ? error.message : String(error),
+      })
+    }
+  })
+}
 
 let mainWindow = null
 let hostUrl = null
@@ -76,6 +113,8 @@ function buildMenu() {
           click: () => void shell.openExternal(hostUrl),
         },
         { type: 'separator' },
+        { label: 'Check for Updates…', click: () => checkForUpdates({ notifyNoUpdate: true }) },
+        { type: 'separator' },
         { role: 'quit' },
       ],
     },
@@ -122,6 +161,7 @@ async function bootstrap() {
   registerIpc()
   buildMenu()
   createWindow()
+  checkForUpdates()
 }
 
 const gotSingleInstanceLock = app.requestSingleInstanceLock()

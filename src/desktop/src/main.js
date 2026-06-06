@@ -117,17 +117,24 @@ function buildTrayMenu() {
         : 'Starting…'
 
   const update = updateManager?.state
-  const updateItem =
-    update?.status === 'available'
-      ? {
-          label: `Update available (v${update.latestVersion})…`,
-          click: () => void shell.openExternal(updateManager.releaseUrl),
-        }
-      : {
-          label: update?.status === 'checking' ? 'Checking for updates…' : 'Check for Updates',
-          enabled: update?.status !== 'checking',
-          click: () => void updateManager?.check(),
-        }
+  let updateItem
+  if (update?.status === 'downloaded') {
+    updateItem = {
+      label: `Restart & Install v${update.latestVersion}`,
+      click: () => updateManager?.install(),
+    }
+  } else if (update?.status === 'downloading') {
+    updateItem = {
+      label: `Downloading update… ${update.percent ?? 0}%`,
+      enabled: false,
+    }
+  } else {
+    updateItem = {
+      label: update?.status === 'checking' ? 'Checking for updates…' : 'Check for Updates',
+      enabled: update?.status !== 'checking',
+      click: () => void updateManager?.check(),
+    }
+  }
 
   return Menu.buildFromTemplate([
     { label: `Modelibr — ${phaseLabel}`, enabled: false },
@@ -337,7 +344,7 @@ function registerIpc() {
   })
 
   ipcMain.handle('modelibr:open-update', () => {
-    if (updateManager) void shell.openExternal(updateManager.releaseUrl)
+    updateManager?.install()
   })
 
   ipcMain.handle('modelibr:get-config', () => {

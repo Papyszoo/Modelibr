@@ -32,12 +32,21 @@ jobs:
             os: windows-latest
             rid: win-x64
             electronArch: x64
-            artifactGlob: src/desktop/dist/*.exe
+            # Installer + electron-updater feed (latest.yml) and delta blockmap.
+            artifactGlob: |
+              src/desktop/dist/*.exe
+              src/desktop/dist/latest.yml
+              src/desktop/dist/*.blockmap
           - name: macOS
             os: macos-14
             rid: osx-arm64
             electronArch: arm64
-            artifactGlob: src/desktop/dist/*.dmg
+            # dmg for fresh installs; zip + latest-mac.yml are the update payload.
+            artifactGlob: |
+              src/desktop/dist/*.dmg
+              src/desktop/dist/*.zip
+              src/desktop/dist/latest-mac.yml
+              src/desktop/dist/*.blockmap
           - name: Linux
             os: ubuntu-latest
             rid: linux-x64
@@ -45,6 +54,8 @@ jobs:
             artifactGlob: |
               src/desktop/dist/*.AppImage
               src/desktop/dist/*.deb
+              src/desktop/dist/latest-linux.yml
+              src/desktop/dist/*.blockmap
 
     steps:
       - name: Checkout code
@@ -489,17 +500,28 @@ jobs:
           - name: Windows
             os: windows-latest
             electronArch: x64
-            artifactGlob: src/desktop-client/dist/*.exe
+            # Installer + electron-updater feed (latest.yml) and delta blockmap.
+            artifactGlob: |
+              src/desktop-client/dist/*.exe
+              src/desktop-client/dist/latest.yml
+              src/desktop-client/dist/*.blockmap
           - name: macOS
             os: macos-14
             electronArch: arm64
-            artifactGlob: src/desktop-client/dist/*.dmg
+            # dmg for fresh installs; zip + latest-mac.yml are the update payload.
+            artifactGlob: |
+              src/desktop-client/dist/*.dmg
+              src/desktop-client/dist/*.zip
+              src/desktop-client/dist/latest-mac.yml
+              src/desktop-client/dist/*.blockmap
           - name: Linux
             os: ubuntu-latest
             electronArch: x64
             artifactGlob: |
               src/desktop-client/dist/*.AppImage
               src/desktop-client/dist/*.deb
+              src/desktop-client/dist/latest-linux.yml
+              src/desktop-client/dist/*.blockmap
 
     steps:
       - name: Checkout code
