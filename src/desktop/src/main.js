@@ -26,9 +26,19 @@ const DESKTOP_CLIENT_URL = 'https://github.com/Papyszoo/Modelibr/releases'
 // Bounds advertised to the configuration UI (saveRuntimeConfig clamps to these).
 const CONFIG_BOUNDS = {
   appPort: { min: 1024, max: 65535 },
+  internalApiPort: { min: 1024, max: 65535 },
+  postgresPort: { min: 1024, max: 65535 },
   workerProcessCount: { min: 1, max: 16 },
   maxConcurrentJobsPerWorker: { min: 1, max: 16 },
 }
+
+// Settings that only take effect on a full restart (vs. worker-pool recycle).
+const RESTART_REQUIRED_KEYS = [
+  'appPort',
+  'internalApiPort',
+  'postgresPort',
+  'dataDirectory',
+]
 
 let tray = null
 let statusWindow = null
@@ -38,6 +48,10 @@ let runtimeConfigPath = null
 let updateManager = null
 let isShuttingDown = false
 let isQuitting = false
+// Guards against re-entrant restarts: calling app.relaunch()/quit() twice spawns
+// duplicate instances and crashes the app. Once a restart is in flight every
+// further request is a no-op.
+let isRestarting = false
 
 // 'starting' until every service is up, then 'ready'; 'error' if boot fails.
 let bootPhase = 'starting'
@@ -136,11 +150,9 @@ function buildTrayMenu() {
       },
     },
     {
-      label: 'Restart',
-      click: () => {
-        app.relaunch()
-        app.quit()
-      },
+      label: isRestarting ? 'Restarting…' : 'Restart',
+      enabled: !isRestarting,
+      click: () => performRestart(),
     },
     { type: 'separator' },
     { label: 'Quit Modelibr', click: () => app.quit() },
@@ -251,6 +263,19 @@ function openFrontend() {
   if (url) void shell.openExternal(url)
 }
 
+// Idempotent restart. Returns whether this call initiated the restart so the UI
+// can show "Restarting…" only once and disable the control.
+function performRestart() {
+  if (isRestarting) {
+    return false
+  }
+  isRestarting = true
+  refreshTray()
+  app.relaunch()
+  app.quit()
+  return true
+}
+
 function registerIpc() {
   ipcMain.handle('modelibr:get-status', async () => {
     if (!runtimeManager || bootPhase === 'starting') {
@@ -296,11 +321,17 @@ function registerIpc() {
     const { config } = runtimeManager
     return {
       bounds: CONFIG_BOUNDS,
+      // The effective data path (config.dataDirectory may be blank → default);
+      // shown to the user as the active/placeholder location.
+      effectiveDataDirectory: snapshot()?.dataDirectory ?? '',
       config: {
         appPort: config.appPort,
+        internalApiPort: config.internalApiPort,
+        postgresPort: config.postgresPort,
         workerProcessCount: config.workerProcessCount,
         maxConcurrentJobsPerWorker: config.maxConcurrentJobsPerWorker,
         enableHardwareAcceleration: config.enableHardwareAcceleration,
+        dataDirectory: config.dataDirectory,
       },
     }
   })
@@ -317,9 +348,11 @@ function registerIpc() {
     })
     runtimeManager.updateConfig(saved)
 
-    // Changing the public port needs a full restart; worker-only changes can be
+    // Ports and the data folder need a full restart; worker-only changes can be
     // applied live by recycling the worker pool.
-    const restartRequired = saved.appPort !== previous.appPort
+    const restartRequired = RESTART_REQUIRED_KEYS.some(
+      key => saved[key] !== previous[key]
+    )
     const workersChanged =
       saved.workerProcessCount !== previous.workerProcessCount ||
       saved.maxConcurrentJobsPerWorker !== previous.maxConcurrentJobsPerWorker ||
@@ -332,9 +365,20 @@ function registerIpc() {
     return { ok: true, restartRequired, config: saved }
   })
 
+  ipcMain.handle('modelibr:choose-data-folder', async () => {
+    const result = await dialog.showOpenDialog({
+      title: 'Choose Modelibr data folder',
+      properties: ['openDirectory', 'createDirectory'],
+    })
+    if (result.canceled || result.filePaths.length === 0) {
+      return null
+    }
+    return result.filePaths[0]
+  })
+
   ipcMain.handle('modelibr:restart', () => {
-    app.relaunch()
-    app.quit()
+    const started = performRestart()
+    return { ok: true, started, alreadyRestarting: !started }
   })
 
   ipcMain.handle('modelibr:quit', () => {

@@ -114,6 +114,18 @@
         background: #0f1115; border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px;
       }
       .config-field input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); }
+      .config-field.data-folder { margin-top: 12px; }
+      input.data-path {
+        width: 100%; margin-top: 6px; font: inherit; color: var(--text);
+        background: #0f1115; border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px;
+        overflow: hidden; text-overflow: ellipsis;
+      }
+      .link-btn {
+        background: none; border: none; color: var(--accent); padding: 4px 0; margin-top: 4px;
+        font-size: 11px; cursor: pointer;
+      }
+      .link-btn:hover { background: none; text-decoration: underline; }
       .config-actions { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
       .config-note { font-size: 11px; color: var(--pending); flex: 1; min-height: 14px; }
 
@@ -180,6 +192,14 @@
           <input type="number" id="cfg-port" min="1024" max="65535" />
         </div>
         <div class="config-field">
+          <label for="cfg-api-port">Backend port</label>
+          <input type="number" id="cfg-api-port" min="1024" max="65535" />
+        </div>
+        <div class="config-field">
+          <label for="cfg-db-port">Database port</label>
+          <input type="number" id="cfg-db-port" min="1024" max="65535" />
+        </div>
+        <div class="config-field">
           <label for="cfg-workers">Worker processes</label>
           <input type="number" id="cfg-workers" min="1" max="16" />
         </div>
@@ -191,6 +211,12 @@
           <label for="cfg-gpu">Hardware acceleration</label>
           <input type="checkbox" id="cfg-gpu" />
         </div>
+        <div class="config-field data-folder">
+          <label for="cfg-data">Data folder</label>
+          <button id="cfg-data-browse" class="icon">Browse…</button>
+        </div>
+        <input type="text" id="cfg-data" class="data-path" placeholder="" readonly />
+        <button id="cfg-data-default" class="link-btn">Use default location</button>
         <div class="config-actions">
           <span class="config-note" id="cfg-note"></span>
           <button id="cfg-reset">Reset</button>
@@ -323,20 +349,37 @@
 
       // ── Configuration ──
       let loadedConfig = null
+      // The data-folder override the user has picked but not yet applied. '' means
+      // "use the default location" (shown as a placeholder).
+      let pendingDataDirectory = ''
+      let effectiveDataDirectory = ''
+
+      function renderDataFolder() {
+        const input = $('cfg-data')
+        input.value = pendingDataDirectory
+        input.placeholder = effectiveDataDirectory || 'Default location'
+      }
 
       function applyConfigToInputs(config) {
         $('cfg-port').value = config.appPort
+        $('cfg-api-port').value = config.internalApiPort
+        $('cfg-db-port').value = config.postgresPort
         $('cfg-workers').value = config.workerProcessCount
         $('cfg-jobs').value = config.maxConcurrentJobsPerWorker
         $('cfg-gpu').checked = !!config.enableHardwareAcceleration
+        pendingDataDirectory = config.dataDirectory || ''
+        renderDataFolder()
       }
 
       function readConfigInputs() {
         return {
           appPort: Number($('cfg-port').value),
+          internalApiPort: Number($('cfg-api-port').value),
+          postgresPort: Number($('cfg-db-port').value),
           workerProcessCount: Number($('cfg-workers').value),
           maxConcurrentJobsPerWorker: Number($('cfg-jobs').value),
           enableHardwareAcceleration: $('cfg-gpu').checked,
+          dataDirectory: pendingDataDirectory,
         }
       }
 
@@ -344,8 +387,22 @@
         const data = await api.getConfig()
         if (!data) return
         loadedConfig = data.config
+        effectiveDataDirectory = data.effectiveDataDirectory || ''
         applyConfigToInputs(loadedConfig)
       }
+
+      $('cfg-data-browse').addEventListener('click', async () => {
+        const picked = await api.chooseDataFolder()
+        if (picked) {
+          pendingDataDirectory = picked
+          renderDataFolder()
+        }
+      })
+
+      $('cfg-data-default').addEventListener('click', () => {
+        pendingDataDirectory = ''
+        renderDataFolder()
+      })
 
       $('cfg-reset').addEventListener('click', () => {
         if (loadedConfig) applyConfigToInputs(loadedConfig)
@@ -361,7 +418,7 @@
             loadedConfig = result.config
             applyConfigToInputs(loadedConfig)
             $('cfg-note').textContent = result.restartRequired
-              ? 'Saved — restart to apply the new port.'
+              ? 'Saved — restart to apply (ports / data folder).'
               : 'Saved.'
             toast('Configuration saved')
           }
@@ -377,7 +434,19 @@
       })
       $('open-data').addEventListener('click', () => api.openDataFolder())
       $('install-client').addEventListener('click', () => api.installClient())
-      $('restart').addEventListener('click', () => api.restart())
+
+      let restarting = false
+      $('restart').addEventListener('click', async () => {
+        if (restarting) return
+        restarting = true
+        const btn = $('restart')
+        btn.disabled = true
+        btn.textContent = 'Restarting…'
+        $('phase').textContent = 'restarting…'
+        await api.restart()
+        // The host relaunches and this window is torn down; nothing else to do.
+      })
+
       $('quit').addEventListener('click', () => api.quit())
 
       refresh()

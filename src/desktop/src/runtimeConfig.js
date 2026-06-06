@@ -24,7 +24,19 @@ export const DEFAULT_RUNTIME_CONFIG = Object.freeze({
   // acceleration is faster but fails to initialize WebGL on machines without a
   // usable GPU, so it's opt-in via the Configuration panel.
   enableHardwareAcceleration: false,
+  // Where uploads, thumbnails, the embedded database, etc. live. Empty string
+  // means "use the default under the app's userData dir"; the ProcessManager
+  // resolves it. Set a custom absolute path to relocate all data (e.g. to a
+  // larger drive). Changing it requires a restart.
+  dataDirectory: '',
 })
+
+function sanitizeDataDirectory(input) {
+  const value = String(input ?? '').trim()
+  // Only honor absolute paths; anything else (relative, empty) falls back to
+  // the default location chosen by the ProcessManager.
+  return value && path.isAbsolute(value) ? value : ''
+}
 
 function coerceInteger(value, fallback, minimum, maximum) {
   const parsed = Number.parseInt(String(value ?? ''), 10)
@@ -67,6 +79,7 @@ export function sanitizeRuntimeConfig(input = {}) {
     enableHardwareAcceleration:
       input.enableHardwareAcceleration === true ||
       input.enableHardwareAcceleration === 'true',
+    dataDirectory: sanitizeDataDirectory(input.dataDirectory),
   }
 }
 
