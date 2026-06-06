@@ -63,6 +63,14 @@ public interface IThumbnailJobRepository
     Task<ThumbnailJob?> GetNextPendingJobAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Atomically claims a still-pending job for a worker via a single conditional
+    /// UPDATE (WHERE Status = Pending). Returns true only for the worker whose
+    /// update actually changed the row, so multiple worker processes can never
+    /// claim the same job. Returns false if another worker already claimed it.
+    /// </summary>
+    Task<bool> TryClaimPendingJobAsync(int jobId, string workerId, DateTime claimedAtUtc, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Gets all jobs with expired locks.
     /// </summary>
     Task<IEnumerable<ThumbnailJob>> GetJobsWithExpiredLocksAsync(CancellationToken cancellationToken = default);

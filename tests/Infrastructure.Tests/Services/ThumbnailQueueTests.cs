@@ -131,6 +131,8 @@ public class ThumbnailQueueTests
 
         _mockRepository.Setup(r => r.GetNextPendingJobAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(job);
+        _mockRepository.Setup(r => r.TryClaimPendingJobAsync(job.Id, workerId, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
 
         // Act
         var result = await _thumbnailQueue.DequeueAsync(workerId);
@@ -142,8 +144,30 @@ public class ThumbnailQueueTests
         Assert.Equal(1, result.AttemptCount);
 
         _mockRepository.Verify(r => r.GetNextPendingJobAsync(It.IsAny<CancellationToken>()), Times.Once);
-        _mockRepository.Verify(r => r.UpdateAsync(job, It.IsAny<CancellationToken>()), Times.Once);
+        _mockRepository.Verify(r => r.TryClaimPendingJobAsync(job.Id, workerId, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Once);
         _mockQueueNotificationService.Verify(s => s.NotifyJobStatusChangedAsync(job.Id, ThumbnailJobStatus.Processing.ToString(), workerId, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task DequeueAsync_WhenAnotherWorkerClaimsFirst_ShouldReturnNull()
+    {
+        // Arrange: the atomic claim affects zero rows (another worker won the race).
+        var workerId = "worker-2";
+        var modelHash = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
+        var job = ThumbnailJob.Create(1, 10, modelHash, DateTime.UtcNow);
+
+        _mockRepository.Setup(r => r.GetNextPendingJobAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(job);
+        _mockRepository.Setup(r => r.TryClaimPendingJobAsync(job.Id, workerId, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+
+        // Act
+        var result = await _thumbnailQueue.DequeueAsync(workerId);
+
+        // Assert: no job returned, and we never notify of a claim we didn't win.
+        Assert.Null(result);
+        _mockRepository.Verify(r => r.TryClaimPendingJobAsync(job.Id, workerId, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Once);
+        _mockQueueNotificationService.Verify(s => s.NotifyJobStatusChangedAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

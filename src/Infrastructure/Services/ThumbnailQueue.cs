@@ -202,16 +202,24 @@ public class ThumbnailQueue : IThumbnailQueue
             return null;
         }
 
-        var claimSuccessful = job.TryClaim(workerId, DateTime.UtcNow);
-        if (!claimSuccessful)
+        // Atomically claim the job so multiple worker processes can't both pick it
+        // up. The conditional UPDATE (WHERE Status = Pending) is resolved by the
+        // database under row locking: exactly one worker's claim changes the row;
+        // any that lose the race affect zero rows and simply poll again.
+        var claimedAt = DateTime.UtcNow;
+        var claimed = await _thumbnailJobRepository.TryClaimPendingJobAsync(job.Id, workerId, claimedAt, cancellationToken);
+        if (!claimed)
         {
-            _logger.LogWarning("Failed to claim job {JobId} for worker {WorkerId}", job.Id, workerId);
+            _logger.LogDebug("Worker {WorkerId} lost the claim race for job {JobId}; will poll again", workerId, job.Id);
             return null;
         }
 
-        await _thumbnailJobRepository.UpdateAsync(job, cancellationToken);
+        // Reflect the persisted claim on the entity returned to the worker (the
+        // atomic UPDATE bypassed the change tracker, so the in-memory copy would
+        // otherwise still look pending). This sets the same fields the UPDATE did.
+        job.TryClaim(workerId, claimedAt);
 
-        _logger.LogInformation("Worker {WorkerId} claimed thumbnail job {JobId} for model {ModelId} version {ModelVersionId} (attempt {AttemptCount})", 
+        _logger.LogInformation("Worker {WorkerId} claimed thumbnail job {JobId} for model {ModelId} version {ModelVersionId} (attempt {AttemptCount})",
             workerId, job.Id, job.ModelId, job.ModelVersionId, job.AttemptCount);
 
         // Notify other workers about job status change for coordination
