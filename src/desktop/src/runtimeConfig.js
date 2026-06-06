@@ -1,23 +1,17 @@
 import fs from 'fs/promises'
-import os from 'os'
 import path from 'path'
-
-// Software (swiftshader) rendering is CPU-bound, and a single texture-set
-// thumbnail can occupy a worker for minutes. With only one worker, a slow
-// render head-of-line-blocks every other asset (e.g. a quick model thumbnail
-// waits behind it). Default to a small, CPU-aware pool so capable machines
-// render thumbnails in parallel, while low-core machines stay at one worker to
-// bound memory (each worker runs its own headless Chromium).
-function defaultWorkerProcessCount() {
-  const cores = os.cpus()?.length || 1
-  return Math.max(1, Math.min(Math.floor(cores / 2), 2))
-}
 
 export const DEFAULT_RUNTIME_CONFIG = Object.freeze({
   appPort: 3010,
   internalApiPort: 38080,
   postgresPort: 35432,
-  workerProcessCount: defaultWorkerProcessCount(),
+  // Default to a single worker process. Running multiple worker *processes* can
+  // double-claim the same job (the server-side dequeue isn't fully atomic across
+  // processes): two workers pick up one job, one wins and the other fails the
+  // upload and marks the job failed. Per-worker concurrency
+  // (maxConcurrentJobsPerWorker) parallelises safely within one process. The
+  // setting remains user-tunable for advanced setups.
+  workerProcessCount: 1,
   maxConcurrentJobsPerWorker: 3,
   // Default to software rendering (swiftshader): it produces thumbnails on any
   // machine, including GPU-less laptops, VMs, and headless runners. GPU

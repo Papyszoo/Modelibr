@@ -136,10 +136,11 @@ async function main() {
   }
   preserveBlobs("setup");
 
-  console.log("\n📋 Phase 2: Chromium tests (workers=3)\n");
+  const chromiumWorkers = process.env.PW_WORKERS || "3";
+  console.log(`\n📋 Phase 2: Chromium tests (workers=${chromiumWorkers})\n`);
   const chromiumResult = run(
     `npx playwright test --project=chromium --no-deps ${args}`,
-    { env: { ...testEnv, PW_WORKERS: process.env.PW_WORKERS || "3" } },
+    { env: { ...testEnv, PW_WORKERS: chromiumWorkers } },
   );
   preserveBlobs("chromium");
 

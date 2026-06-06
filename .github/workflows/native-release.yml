@@ -364,10 +364,12 @@ jobs:
           # browser, not the installed app — skip it here (covered by Docker CI).
           SKIP_DEMO_PHASE: "1"
           # The hosted runners (Windows especially) are CPU-contended running the
-          # native stack + parallel browsers, which made UI actions miss their
-          # default timeouts. Fewer parallel workers + a longer per-test ceiling
-          # keep the suite reliable; Linux/macOS finish with room to spare.
-          PW_WORKERS: "2"
+          # native stack alongside parallel browsers, which thrashed and made UI
+          # actions miss their timeouts (the Chromium phase took ~1.6h with flaky
+          # failures even at 2 workers). Run the suite single-worker: no
+          # thrashing, reliable, and still well within the ceiling. A longer
+          # per-test timeout absorbs slow-but-correct actions on slow runners.
+          PW_WORKERS: "1"
           PW_TEST_TIMEOUT: "180000"
           POSTGRES_HOST: 127.0.0.1
           POSTGRES_PORT: "35432"
