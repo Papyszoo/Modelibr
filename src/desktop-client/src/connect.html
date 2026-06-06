@@ -25,12 +25,18 @@
       h1 { font-size: 19px; margin: 0 0 6px; }
       p { color: #9aa0ad; margin: 0 0 20px; font-size: 13px; }
       label { display: block; text-align: left; font-size: 12px; color: #9aa0ad; margin-bottom: 6px; }
+      .fields { display: flex; gap: 10px; text-align: left; }
+      .fields .host { flex: 1; }
+      .fields .port { width: 110px; }
       input {
         width: 100%; font: inherit; color: #e7e9ee;
         background: #0f1115; border: 1px solid #2c3038; border-radius: 8px; padding: 10px 12px;
         font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       }
-      .actions { display: flex; gap: 10px; margin-top: 18px; }
+      .preview { margin-top: 12px; font-size: 12px; color: #9aa0ad; text-align: left; }
+      .preview code { color: #e7e9ee; }
+      .error { color: #f87171; font-size: 12px; min-height: 16px; margin-top: 10px; text-align: left; }
+      .actions { display: flex; gap: 10px; margin-top: 14px; }
       button {
         flex: 1; font: inherit; cursor: pointer; color: #e7e9ee;
         background: #23262f; border: 1px solid #2c3038; border-radius: 8px; padding: 10px 14px;
@@ -43,13 +49,26 @@
   <body>
     <div class="card">
       <div class="logo">M</div>
-      <h1>Can't reach the Modelibr host</h1>
-      <p>
-        Make sure the Modelibr host app is running, then reconnect. You can also
-        point this client at a host on another machine.
+      <h1 id="title">Connect to Modelibr</h1>
+      <p id="subtitle">
+        Point this client at a Modelibr host — on this machine or another
+        computer on your network.
       </p>
-      <label for="host">Host URL</label>
-      <input id="host" type="text" placeholder="http://127.0.0.1:3010" />
+
+      <div class="fields">
+        <div class="host">
+          <label for="host">Host</label>
+          <input id="host" type="text" placeholder="127.0.0.1 or 192.168.1.50" />
+        </div>
+        <div class="port">
+          <label for="port">Port</label>
+          <input id="port" type="number" min="1" max="65535" placeholder="3010" />
+        </div>
+      </div>
+
+      <div class="preview">Connecting to <code id="preview">http://127.0.0.1:3010</code></div>
+      <div class="error" id="error"></div>
+
       <div class="actions">
         <button id="retry">Retry</button>
         <button class="primary" id="connect">Connect</button>
@@ -59,20 +78,77 @@
     <script>
       const api = window.client
       const params = new URLSearchParams(location.search)
-      const input = document.getElementById('host')
+      const hostInput = document.getElementById('host')
+      const portInput = document.getElementById('port')
+      const preview = document.getElementById('preview')
+      const error = document.getElementById('error')
+
+      // Shown proactively (Connection Settings) vs. after a failed load.
+      if (params.get('failed') === '1') {
+        document.getElementById('title').textContent = "Can't reach the Modelibr host"
+        document.getElementById('subtitle').textContent =
+          'Make sure the Modelibr host app is running, then retry — or point this client at a host on another machine.'
+      }
+
+      function splitUrl(value) {
+        try {
+          const url = new URL(value)
+          return {
+            host: url.hostname,
+            port: url.port || (url.protocol === 'https:' ? '443' : '3010'),
+            protocol: url.protocol,
+          }
+        } catch {
+          return { host: '127.0.0.1', port: '3010', protocol: 'http:' }
+        }
+      }
+
+      // Preserve the scheme of the current host (defaults to http for LAN hosts).
+      let protocol = 'http:'
+
+      function composeUrl() {
+        const host = hostInput.value.trim() || '127.0.0.1'
+        const port = String(portInput.value || '3010').trim()
+        return `${protocol}//${host}:${port}`
+      }
+
+      function updatePreview() {
+        preview.textContent = composeUrl()
+      }
+
+      function submit() {
+        error.textContent = ''
+        const host = hostInput.value.trim()
+        const port = Number(portInput.value)
+        if (!host) {
+          error.textContent = 'Enter a host name or IP address.'
+          return
+        }
+        if (!Number.isInteger(port) || port < 1 || port > 65535) {
+          error.textContent = 'Enter a valid port (1–65535).'
+          return
+        }
+        api.connect(composeUrl())
+      }
 
       async function init() {
         const current = params.get('host') || (await api.getHostUrl())
-        input.value = current || 'http://127.0.0.1:3010'
+        const parts = splitUrl(current || 'http://127.0.0.1:3010')
+        protocol = parts.protocol
+        hostInput.value = parts.host
+        portInput.value = parts.port
+        updatePreview()
       }
 
+      hostInput.addEventListener('input', updatePreview)
+      portInput.addEventListener('input', updatePreview)
       document.getElementById('retry').addEventListener('click', () => api.retry())
-      document.getElementById('connect').addEventListener('click', () => {
-        api.connect(input.value)
-      })
-      input.addEventListener('keydown', e => {
-        if (e.key === 'Enter') api.connect(input.value)
-      })
+      document.getElementById('connect').addEventListener('click', submit)
+      ;[hostInput, portInput].forEach(el =>
+        el.addEventListener('keydown', e => {
+          if (e.key === 'Enter') submit()
+        })
+      )
 
       init()
     </script>
