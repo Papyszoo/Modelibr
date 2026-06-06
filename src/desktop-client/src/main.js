@@ -45,7 +45,7 @@ function createWindow() {
     // -3 (ABORTED) fires for ordinary in-app navigations; ignore it.
     if (errorCode === -3) return
     if (validatedUrl && validatedUrl.startsWith('file://')) return
-    showConnectionPage()
+    showConnectionPage({ failed: true })
   })
 
   loadHost()
@@ -55,9 +55,9 @@ function loadHost() {
   void mainWindow?.loadURL(hostUrl)
 }
 
-function showConnectionPage() {
+function showConnectionPage({ failed = false } = {}) {
   void mainWindow?.loadFile(path.join(__dirname, 'connect.html'), {
-    query: { host: hostUrl },
+    query: { host: hostUrl, failed: failed ? '1' : '0' },
   })
 }
 
