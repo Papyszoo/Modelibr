@@ -556,3 +556,43 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ matrix.artifactGlob }}
+
+  # On manual (workflow_dispatch) runs there's no GitHub Release to attach
+  # assets to, so the build jobs only leave Actions artifacts — and GitHub
+  # always serves those as a single .zip. This job instead collects every built
+  # installer into one *draft* GitHub Release, where each file is a separate,
+  # directly-downloadable asset (bare .exe / .dmg / .AppImage / .deb) with no
+  # zip wrapper. It's a draft, so it stays private until you click Publish.
+  # Production releases (the `release: published` trigger) keep using the
+  # per-job "Upload release assets" steps above and are unaffected. Gated on the
+  # build jobs only — not the long test-installers suite — so a try-it build is
+  # downloadable as soon as it finishes building.
+  publish-draft-release:
+    name: Publish draft release (manual builds)
+    if: github.event_name == 'workflow_dispatch'
+    needs: [build-installers, build-client]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all installer artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: "*-installers-*"
+
+      - name: Publish draft release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: draft-${{ github.run_id }}
+          name: Draft build ${{ github.run_number }} (${{ github.ref_name }})
+          draft: true
+          prerelease: true
+          # Only the user-facing installers — not the electron-updater feed
+          # files (latest*.yml) or delta maps (*.blockmap). Those are machine
+          # -only, and their fixed names (e.g. latest.yml) would collide between
+          # the host and client apps. Each installer name is already unique, so
+          # they all upload as separate assets.
+          files: |
+            artifacts/**/*.exe
+            artifacts/**/*.dmg
+            artifacts/**/*.AppImage
+            artifacts/**/*.deb
