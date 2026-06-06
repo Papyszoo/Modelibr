@@ -9,6 +9,11 @@ contextBridge.exposeInMainWorld('modelibr', {
   copyFrontendUrl: () => ipcRenderer.invoke('modelibr:copy-frontend-url'),
   openDataFolder: () => ipcRenderer.invoke('modelibr:open-data-folder'),
   installClient: () => ipcRenderer.invoke('modelibr:install-client'),
+  onInstallProgress: callback => {
+    const listener = (_event, progress) => callback(progress)
+    ipcRenderer.on('modelibr:install-progress', listener)
+    return () => ipcRenderer.removeListener('modelibr:install-progress', listener)
+  },
   getConfig: () => ipcRenderer.invoke('modelibr:get-config'),
   saveConfig: patch => ipcRenderer.invoke('modelibr:save-config', patch),
   chooseDataFolder: () => ipcRenderer.invoke('modelibr:choose-data-folder'),
