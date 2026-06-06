@@ -1,17 +1,22 @@
 import fs from 'fs/promises'
+import os from 'os'
 import path from 'path'
+
+function defaultWorkerProcessCount() {
+  const cores = os.cpus()?.length || 1
+  return Math.max(1, Math.min(Math.floor(cores / 2), 2))
+}
 
 export const DEFAULT_RUNTIME_CONFIG = Object.freeze({
   appPort: 3010,
   internalApiPort: 38080,
   postgresPort: 35432,
-  // Default to a single worker process. Running multiple worker *processes* can
-  // double-claim the same job (the server-side dequeue isn't fully atomic across
-  // processes): two workers pick up one job, one wins and the other fails the
-  // upload and marks the job failed. Per-worker concurrency
-  // (maxConcurrentJobsPerWorker) parallelises safely within one process. The
-  // setting remains user-tunable for advanced setups.
-  workerProcessCount: 1,
+  // A small CPU-aware pool of worker processes so capable machines render
+  // thumbnails in parallel, while low-core machines stay at one worker to bound
+  // memory (each worker runs its own headless Chromium). Multi-worker job
+  // claiming is race-safe: the server claims jobs under an optimistic-concurrency
+  // token, so two workers never process the same job. Fully user-tunable.
+  workerProcessCount: defaultWorkerProcessCount(),
   maxConcurrentJobsPerWorker: 3,
   // Default to software rendering (swiftshader): it produces thumbnails on any
   // machine, including GPU-less laptops, VMs, and headless runners. GPU
