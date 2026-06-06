@@ -298,7 +298,16 @@
           return
         }
 
-        if (u.status === 'available') {
+        if (u.status === 'downloaded') {
+          banner.classList.add('available')
+          text.textContent = `Update ready — v${u.latestVersion}`
+          action.textContent = 'Restart & Install'
+          action.style.display = ''
+        } else if (u.status === 'downloading') {
+          banner.classList.add('available')
+          text.textContent = `Downloading update… ${u.percent || 0}%`
+          action.style.display = 'none'
+        } else if (u.status === 'available') {
           banner.classList.add('available')
           text.textContent = `Update available — v${u.latestVersion}`
           action.textContent = 'Update'
@@ -324,13 +333,15 @@
 
       $('ub-action').addEventListener('click', async () => {
         const u = await api.getUpdate()
-        if (u?.status === 'available') api.openUpdate()
+        // 'downloaded' → quit & install; 'available' → open page (manual).
+        if (u?.status === 'downloaded' || u?.status === 'available') api.openUpdate()
         else recheckUpdate()
       })
 
+      const busyStatuses = ['available', 'checking', 'downloading', 'downloaded']
       $('ub-text').addEventListener('click', async () => {
         const u = await api.getUpdate()
-        if (u?.status !== 'available' && u?.status !== 'checking') recheckUpdate()
+        if (!busyStatuses.includes(u?.status)) recheckUpdate()
       })
 
       async function refresh() {

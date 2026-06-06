@@ -15,6 +15,9 @@
     "pack": "electron-builder --dir --publish never",
     "dist": "electron-builder --publish never"
   },
+  "dependencies": {
+    "electron-updater": "^6.3.9"
+  },
   "devDependencies": {
     "electron": "^35.0.0",
     "electron-builder": "^25.1.8"
@@ -27,9 +30,17 @@
       "package.json"
     ],
     "asar": true,
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Papyszoo",
+        "repo": "Modelibr"
+      }
+    ],
     "mac": {
       "target": [
-        "dmg"
+        "dmg",
+        "zip"
       ],
       "artifactName": "Modelibr-Client-${version}-macos-${arch}.${ext}",
       "category": "public.app-category.graphics-design"

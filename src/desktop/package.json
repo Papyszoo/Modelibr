@@ -18,6 +18,7 @@
     "dist": "node ./scripts/prepare-bundle.mjs && electron-builder --publish never"
   },
   "dependencies": {
+    "electron-updater": "^6.3.9",
     "express": "^4.21.2",
     "express-rate-limit": "^8.5.2",
     "http-proxy-middleware": "^3.0.3"
@@ -43,9 +44,17 @@
       }
     ],
     "asar": true,
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Papyszoo",
+        "repo": "Modelibr"
+      }
+    ],
     "mac": {
       "target": [
-        "dmg"
+        "dmg",
+        "zip"
       ],
       "artifactName": "Modelibr-${version}-macos-${arch}.${ext}",
       "category": "public.app-category.graphics-design"
