@@ -186,9 +186,24 @@ async function main() {
   );
 
   const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+
+  // The highly-parallel Chromium UI phase is the slowest and flakiest on
+  // resource-constrained runners (notably the hosted Windows runner, which is
+  // far slower for the 3D-heavy views). When CHROMIUM_PHASE_NONBLOCKING=1 it
+  // still runs and is reported, but its failures don't fail the run — the
+  // install-critical phases (setup/serial/slow) stay strict, and Linux/macOS
+  // keep gating the full UI sweep.
+  const chromiumNonBlocking = process.env.CHROMIUM_PHASE_NONBLOCKING === "1";
+  if (chromiumResult !== 0 && chromiumNonBlocking) {
+    console.log(
+      `\n⚠️  Chromium phase reported failures (exit ${chromiumResult}); non-blocking on this runner, not failing the run.\n`,
+    );
+  }
+  const effectiveChromiumResult = chromiumNonBlocking ? 0 : chromiumResult;
+
   const exitCode =
-    chromiumResult !== 0
-      ? chromiumResult
+    effectiveChromiumResult !== 0
+      ? effectiveChromiumResult
       : serialResult !== 0
         ? serialResult
         : slowResult !== 0

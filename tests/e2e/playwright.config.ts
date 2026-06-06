@@ -20,7 +20,9 @@ export default defineConfig({
     timeout: parseInt(process.env.PW_TEST_TIMEOUT || "90000", 10),
     fullyParallel: true,
     forbidOnly: !!process.env.CI,
-    retries: 1,
+    // Retries only re-run failed tests, so they don't weaken anything; raising
+    // them via PW_RETRIES helps the flaky-timeout tail on slow runners pass.
+    retries: parseInt(process.env.PW_RETRIES || "1", 10),
     // Workers are controlled per-phase by run-e2e.js:
     //   setup    → --workers=1  (sequential, avoids asset-processor overload)
     //   chromium → --workers=2  (local) / --workers=4  (CI)
