@@ -1,13 +1,6 @@
 name: Native Installers
 
 on:
-  push:
-    branches:
-      # TEMP: build + smoke-test installers on every push while validating this
-      # branch. Remove before merge — release publication and manual
-      # workflow_dispatch (available once this is on the default branch) are the
-      # real triggers.
-      - feat/native-installer
   release:
     types: [published]
   workflow_dispatch:
