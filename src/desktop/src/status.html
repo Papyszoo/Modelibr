@@ -179,7 +179,7 @@
 
     <div class="install">
       <div class="text">
-        <b>Desktop client</b> — open Modelibr in its own app window instead of a browser tab.
+        <b>Desktop client</b> — <span id="install-text">open Modelibr in its own app window instead of a browser tab.</span>
       </div>
       <button id="install-client">Install</button>
     </div>
@@ -433,7 +433,42 @@
         toast('Frontend URL copied')
       })
       $('open-data').addEventListener('click', () => api.openDataFolder())
-      $('install-client').addEventListener('click', () => api.installClient())
+
+      // ── Desktop client install ──
+      const installDefaultText =
+        'open Modelibr in its own app window instead of a browser tab.'
+      let installing = false
+
+      api.onInstallProgress(progress => {
+        if (!progress) return
+        if (progress.message) $('install-text').textContent = progress.message
+        if (progress.phase === 'error') {
+          installing = false
+          $('install-client').disabled = false
+          $('install-client').textContent = 'Install'
+        }
+      })
+
+      $('install-client').addEventListener('click', async () => {
+        if (installing) return
+        installing = true
+        const btn = $('install-client')
+        btn.disabled = true
+        btn.textContent = 'Installing…'
+        $('install-text').textContent = 'Starting…'
+        try {
+          const result = await api.installClient()
+          if (result?.ok) {
+            $('install-text').textContent = 'Installer opened — follow its prompts.'
+          } else if (result?.reason !== 'error') {
+            $('install-text').textContent = installDefaultText
+          }
+        } finally {
+          installing = false
+          btn.disabled = false
+          btn.textContent = 'Install'
+        }
+      })
 
       let restarting = false
       $('restart').addEventListener('click', async () => {

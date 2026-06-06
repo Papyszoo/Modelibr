@@ -17,11 +17,14 @@ import { startEdgeServer } from './edgeServer.js'
 import { ProcessManager } from './processManager.js'
 import { loadRuntimeConfig, saveRuntimeConfig } from './runtimeConfig.js'
 import { UpdateManager } from './updateManager.js'
+import { installClient, CLIENT_RELEASES_URL } from './clientInstaller.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // The desktop client ships as its own installer in the same GitHub release.
-const DESKTOP_CLIENT_URL = 'https://github.com/Papyszoo/Modelibr/releases'
+const DESKTOP_CLIENT_URL = CLIENT_RELEASES_URL
+// One client install at a time — re-entry would download/launch twice.
+let clientInstallInFlight = false
 
 // Bounds advertised to the configuration UI (saveRuntimeConfig clamps to these).
 const CONFIG_BOUNDS = {
@@ -298,8 +301,32 @@ function registerIpc() {
     if (data) void shell.openPath(data)
   })
 
-  ipcMain.handle('modelibr:install-client', () => {
-    void shell.openExternal(DESKTOP_CLIENT_URL)
+  ipcMain.handle('modelibr:install-client', async () => {
+    if (clientInstallInFlight) {
+      return { ok: false, reason: 'in-progress' }
+    }
+    clientInstallInFlight = true
+
+    const sendProgress = progress =>
+      statusWindow?.webContents.send('modelibr:install-progress', progress)
+
+    try {
+      return await installClient({
+        onProgress: sendProgress,
+        openPath: target => shell.openPath(target),
+        openExternal: url => shell.openExternal(url),
+        log: runtimeLog,
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      runtimeLog('[ModelibrDesktop] Client install failed', { error: message })
+      sendProgress({ phase: 'error', percent: 0, message })
+      // Leave the user a manual path when the automated install can't proceed.
+      void shell.openExternal(DESKTOP_CLIENT_URL)
+      return { ok: false, reason: 'error', error: message }
+    } finally {
+      clientInstallInFlight = false
+    }
   })
 
   ipcMain.handle('modelibr:get-update', () => updateManager?.state ?? null)
