@@ -4,7 +4,11 @@ import { createProxyMiddleware } from 'http-proxy-middleware'
 import http from 'http'
 import path from 'path'
 
-import { sanitizeRuntimeConfig, saveRuntimeConfig } from './runtimeConfig.js'
+import {
+  requiresRestart,
+  sanitizeRuntimeConfig,
+  saveRuntimeConfig,
+} from './runtimeConfig.js'
 
 export async function startEdgeServer({ runtimeDir, configPath, runtimeManager, log = console.log }) {
   const app = express()
@@ -23,16 +27,20 @@ export async function startEdgeServer({ runtimeDir, configPath, runtimeManager, 
   })
 
   app.put('/api/native/runtime', express.json(), async (request, response) => {
+    const previousConfig = runtimeManager.config
     const nextConfig = sanitizeRuntimeConfig({
-      ...runtimeManager.config,
+      ...previousConfig,
       ...request.body,
     })
 
-    const restartRequired = nextConfig.appPort !== runtimeManager.config.appPort
+    // Same restart-required definition as the tray IPC handler (all ports + the
+    // data folder), so changing the backend/database port here behaves the same
+    // as changing it from the tray — not just appPort.
+    const restartRequired = requiresRestart(previousConfig, nextConfig)
     const workerSettingsChanged =
-      nextConfig.workerProcessCount !== runtimeManager.config.workerProcessCount ||
-      nextConfig.maxConcurrentJobsPerWorker !== runtimeManager.config.maxConcurrentJobsPerWorker ||
-      nextConfig.enableHardwareAcceleration !== runtimeManager.config.enableHardwareAcceleration
+      nextConfig.workerProcessCount !== previousConfig.workerProcessCount ||
+      nextConfig.maxConcurrentJobsPerWorker !== previousConfig.maxConcurrentJobsPerWorker ||
+      nextConfig.enableHardwareAcceleration !== previousConfig.enableHardwareAcceleration
 
     const savedConfig = await saveRuntimeConfig(configPath, nextConfig)
     runtimeManager.updateConfig(savedConfig)
@@ -42,7 +50,7 @@ export async function startEdgeServer({ runtimeDir, configPath, runtimeManager, 
     }
 
     response.json({
-      restartRequired,
+      restartRequired: runtimeManager.hasPendingRestart(),
       config: runtimeManager.buildRuntimeSnapshot(),
     })
   })

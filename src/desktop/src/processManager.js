@@ -6,6 +6,8 @@ import https from 'https'
 import os from 'os'
 import path from 'path'
 
+import { requiresRestart } from './runtimeConfig.js'
+
 const POSTGRES_USER = 'modelibr'
 const POSTGRES_PASSWORD = 'modelibr'
 const POSTGRES_DATABASE = 'Modelibr'
@@ -150,7 +152,16 @@ export class ProcessManager {
   constructor({ runtimeDir, userDataDir, config, log = console.log }) {
     this.runtimeDir = runtimeDir
     this.userDataDir = userDataDir
+    // `config` is the *desired* config — the latest saved values, shown in the
+    // Settings panel. `activeConfig` is what the currently-running services were
+    // actually started with; it's captured by markRunning() once boot succeeds.
+    // The two diverge after a restart-required change is saved but before the
+    // app relaunches. Snapshot URLs and health probes report the ACTIVE values
+    // (what's reachable right now) so the "Open" button never points at a port
+    // nothing is serving yet — hasPendingRestart() tells the UI a relaunch is
+    // needed to make the saved change live.
     this.config = config
+    this.activeConfig = null
     this.log = log
     this.webApiProcess = null
     this.workerProcesses = []
@@ -182,20 +193,47 @@ export class ProcessManager {
     }
   }
 
+  // The latest saved config (this.config) drives what Settings shows; the
+  // running services are described by activeConfig. Until the first successful
+  // boot captures it, fall back to the desired config.
+  get runningConfig() {
+    return this.activeConfig ?? this.config
+  }
+
   updateConfig(config) {
     this.config = config
   }
 
+  // Records the config the live services were started with. Called at the end
+  // of start() (and partially refreshed by restartWorkers, which applies worker
+  // settings live). Everything user-visible about a *running* service reads
+  // from this, so saving a port change can't make the UI advertise a port that
+  // isn't bound yet.
+  markRunning() {
+    this.activeConfig = { ...this.config }
+  }
+
+  // True when the saved config differs from what's actually running on a
+  // restart-only setting (ports / data folder) — i.e. a relaunch is needed to
+  // make the saved change take effect.
+  hasPendingRestart() {
+    return this.activeConfig
+      ? requiresRestart(this.activeConfig, this.config)
+      : false
+  }
+
   buildRuntimeSnapshot() {
+    const active = this.runningConfig
     return {
-      ...this.config,
-      webApiHealthUrl: `http://127.0.0.1:${this.config.internalApiPort}/health`,
-      publicAppUrl: `http://127.0.0.1:${this.config.appPort}`,
-      publicWebDavUrl: `http://127.0.0.1:${this.config.appPort}/modelibr`,
+      ...active,
+      webApiHealthUrl: `http://127.0.0.1:${active.internalApiPort}/health`,
+      publicAppUrl: `http://127.0.0.1:${active.appPort}`,
+      publicWebDavUrl: `http://127.0.0.1:${active.appPort}/modelibr`,
       dataDirectory: this.paths.data,
       workerHealthUrls: this.workerProcesses.map(w =>
-        `http://127.0.0.1:${this.config.internalApiPort + 100 + w.index}/health`
+        `http://127.0.0.1:${active.internalApiPort + 100 + w.index}/health`
       ),
+      pendingRestart: this.hasPendingRestart(),
     }
   }
 
@@ -203,7 +241,11 @@ export class ProcessManager {
   // service independently so a single component being down is visible on
   // its own row rather than collapsing the whole app into "not running".
   async probeStatus() {
-    const internalApiPort = this.config.internalApiPort
+    // Probe and report the ports the services are actually bound to (active),
+    // not the latest-saved ones — otherwise a pending port change would make
+    // every service read as "down" against a port nothing is listening on yet.
+    const active = this.runningConfig
+    const internalApiPort = active.internalApiPort
 
     const backendStatusCode = await requestStatus(
       `http://127.0.0.1:${internalApiPort}/health`
@@ -224,16 +266,17 @@ export class ProcessManager {
 
     return {
       backend: { up: backendUp, port: internalApiPort },
-      database: { up: databaseUp, port: this.config.postgresPort },
+      database: { up: databaseUp, port: active.postgresPort },
       assetProcessor: {
         up: healthyWorkers > 0,
         healthy: healthyWorkers,
         running: this.workerProcesses.length,
         configured: this.config.workerProcessCount,
       },
-      frontendUrl: `http://127.0.0.1:${this.config.appPort}`,
-      webDavUrl: `http://127.0.0.1:${this.config.appPort}/modelibr`,
+      frontendUrl: `http://127.0.0.1:${active.appPort}`,
+      webDavUrl: `http://127.0.0.1:${active.appPort}/modelibr`,
       dataDirectory: this.paths.data,
+      pendingRestart: this.hasPendingRestart(),
     }
   }
 
@@ -263,6 +306,9 @@ export class ProcessManager {
     await this.startPostgres()
     await this.startWebApi()
     await this.startWorkers()
+    // Everything is up on the current config — snapshot it as the active config
+    // so later saves are correctly reported as "pending restart".
+    this.markRunning()
   }
 
   async stop() {
@@ -274,6 +320,16 @@ export class ProcessManager {
   async restartWorkers() {
     await this.stopWorkers()
     await this.startWorkers()
+    // Worker settings are applied live by this recycle, so they're now part of
+    // what's actually running — fold them into activeConfig (ports/data folder
+    // are untouched; those still require a full restart).
+    if (this.activeConfig) {
+      this.activeConfig.workerProcessCount = this.config.workerProcessCount
+      this.activeConfig.maxConcurrentJobsPerWorker =
+        this.config.maxConcurrentJobsPerWorker
+      this.activeConfig.enableHardwareAcceleration =
+        this.config.enableHardwareAcceleration
+    }
   }
 
   async ensureLayout() {
@@ -498,7 +554,8 @@ export class ProcessManager {
   }
 
   getWorkerHealthPort(index) {
-    return this.config.internalApiPort + 100 + index
+    // Health ports hang off the port the workers were actually started with.
+    return this.runningConfig.internalApiPort + 100 + index
   }
 
   async spawnWorker(index) {

@@ -131,9 +131,19 @@
 
       footer { display: flex; gap: 8px; }
       footer button { flex: 1; }
+      footer button.pending {
+        background: var(--accent); border-color: var(--accent); color: #fff;
+      }
+      footer button.pending:hover { background: #5457e6; }
+      /* A centered, opaque pill so the message stays readable instead of
+         bleeding transparent text over the footer buttons underneath it. */
       .toast {
-        position: fixed; left: 0; right: 0; bottom: 10px; text-align: center;
-        font-size: 11px; color: var(--up); opacity: 0; transition: opacity .2s; pointer-events: none;
+        position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%);
+        max-width: calc(100% - 28px);
+        background: #0f1115; border: 1px solid var(--border); border-radius: 999px;
+        padding: 5px 14px; font-size: 11px; color: var(--up); white-space: nowrap;
+        box-shadow: 0 6px 18px rgba(0,0,0,.5);
+        opacity: 0; transition: opacity .2s; pointer-events: none;
       }
       .toast.show { opacity: 1; }
     </style>
@@ -283,6 +293,21 @@
           asset.configured != null ? `${asset.healthy}/${asset.configured} workers` : ''
 
         if (status.frontendUrl) $('frontend-url').textContent = status.frontendUrl
+
+        // A saved port / data-folder change only goes live after a relaunch.
+        // Until then the URL shown above is the *current working* one (the
+        // services are still bound to it), so prompt for a restart rather than
+        // silently pointing at a port nothing is serving yet.
+        const restartBtn = $('restart')
+        if (!restarting) {
+          if (status.pendingRestart) {
+            restartBtn.textContent = 'Restart to apply'
+            restartBtn.classList.add('pending')
+          } else {
+            restartBtn.textContent = 'Restart'
+            restartBtn.classList.remove('pending')
+          }
+        }
       }
 
       // ── Updates ──

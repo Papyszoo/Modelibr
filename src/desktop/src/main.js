@@ -35,14 +35,6 @@ const CONFIG_BOUNDS = {
   maxConcurrentJobsPerWorker: { min: 1, max: 16 },
 }
 
-// Settings that only take effect on a full restart (vs. worker-pool recycle).
-const RESTART_REQUIRED_KEYS = [
-  'appPort',
-  'internalApiPort',
-  'postgresPort',
-  'dataDirectory',
-]
-
 let tray = null
 let statusWindow = null
 let edgeServer = null
@@ -380,23 +372,27 @@ function registerIpc() {
       ...previous,
       ...patch,
     })
+    // updateConfig only changes the *desired* config — the running services keep
+    // serving their active ports until a relaunch, so the snapshot/URLs stay
+    // valid. hasPendingRestart() then reports the desired-vs-active gap.
     runtimeManager.updateConfig(saved)
 
-    // Ports and the data folder need a full restart; worker-only changes can be
-    // applied live by recycling the worker pool.
-    const restartRequired = RESTART_REQUIRED_KEYS.some(
-      key => saved[key] !== previous[key]
-    )
+    // Worker-only changes are applied live by recycling the pool; ports and the
+    // data folder need a full restart.
     const workersChanged =
       saved.workerProcessCount !== previous.workerProcessCount ||
       saved.maxConcurrentJobsPerWorker !== previous.maxConcurrentJobsPerWorker ||
       saved.enableHardwareAcceleration !== previous.enableHardwareAcceleration
 
-    if (workersChanged && !restartRequired) {
+    if (workersChanged && !runtimeManager.hasPendingRestart()) {
       await runtimeManager.restartWorkers()
     }
 
-    return { ok: true, restartRequired, config: saved }
+    return {
+      ok: true,
+      restartRequired: runtimeManager.hasPendingRestart(),
+      config: saved,
+    }
   })
 
   ipcMain.handle('modelibr:choose-data-folder', async () => {

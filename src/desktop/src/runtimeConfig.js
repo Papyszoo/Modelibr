@@ -30,6 +30,24 @@ export const DEFAULT_RUNTIME_CONFIG = Object.freeze({
   dataDirectory: '',
 })
 
+// Settings whose new value only takes effect when the whole runtime is
+// restarted (the ports services bind to, and the data folder everything lives
+// under). Worker-pool settings are NOT here — those are applied live by
+// recycling the workers. Both save paths (the tray IPC handler and the
+// in-browser PUT /api/native/runtime) import this so they can never disagree
+// about what a change requires.
+export const RESTART_REQUIRED_KEYS = Object.freeze([
+  'appPort',
+  'internalApiPort',
+  'postgresPort',
+  'dataDirectory',
+])
+
+// True when moving from `previous` to `next` changes any restart-only setting.
+export function requiresRestart(previous, next) {
+  return RESTART_REQUIRED_KEYS.some(key => previous?.[key] !== next?.[key])
+}
+
 function sanitizeDataDirectory(input) {
   const value = String(input ?? '').trim()
   // Only honor absolute paths; anything else (relative, empty) falls back to
