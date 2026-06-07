@@ -14,6 +14,7 @@
   "scripts": {
     "start": "electron .",
     "stage": "node ./scripts/prepare-bundle.mjs",
+    "test": "node --test test/",
     "pack": "electron-builder --dir --publish never",
     "dist": "node ./scripts/prepare-bundle.mjs && electron-builder --publish never"
   },
