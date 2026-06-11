@@ -18,6 +18,7 @@ import { ProcessManager } from './processManager.js'
 import { loadRuntimeConfig, saveRuntimeConfig } from './runtimeConfig.js'
 import { UpdateManager } from './updateManager.js'
 import { installClient, CLIENT_RELEASES_URL } from './clientInstaller.js'
+import { detectInstalledClient } from './clientDetection.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -332,6 +333,23 @@ function registerIpc() {
     } finally {
       clientInstallInFlight = false
     }
+  })
+
+  ipcMain.handle('modelibr:client-status', () => detectInstalledClient())
+
+  ipcMain.handle('modelibr:open-client', async () => {
+    const { installed, launchPath } = await detectInstalledClient()
+    if (!installed || !launchPath) {
+      return { ok: false }
+    }
+    // openPath launches the .exe / .app / binary at its install location; an
+    // empty return string means success.
+    const error = await shell.openPath(launchPath)
+    if (error) {
+      runtimeLog('[ModelibrDesktop] Failed to open client', { error })
+      return { ok: false, error }
+    }
+    return { ok: true }
   })
 
   ipcMain.handle('modelibr:get-update', () => updateManager?.state ?? null)

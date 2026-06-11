@@ -9,6 +9,8 @@ contextBridge.exposeInMainWorld('modelibr', {
   copyFrontendUrl: () => ipcRenderer.invoke('modelibr:copy-frontend-url'),
   openDataFolder: () => ipcRenderer.invoke('modelibr:open-data-folder'),
   installClient: () => ipcRenderer.invoke('modelibr:install-client'),
+  getClientStatus: () => ipcRenderer.invoke('modelibr:client-status'),
+  openClient: () => ipcRenderer.invoke('modelibr:open-client'),
   onInstallProgress: callback => {
     const listener = (_event, progress) => callback(progress)
     ipcRenderer.on('modelibr:install-progress', listener)

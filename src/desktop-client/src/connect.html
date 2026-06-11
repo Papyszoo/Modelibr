@@ -84,10 +84,13 @@
       const error = document.getElementById('error')
 
       // Shown proactively (Connection Settings) vs. after a failed load.
-      if (params.get('failed') === '1') {
+      const failed = params.get('failed') === '1'
+      if (failed) {
         document.getElementById('title').textContent = "Can't reach the Modelibr host"
-        document.getElementById('subtitle').textContent =
-          'Make sure the Modelibr host app is running, then retry — or point this client at a host on another machine.'
+        document.getElementById('subtitle').innerHTML =
+          'The host app may be off, or its <b>app port</b> may have changed. ' +
+          "Check the host's status window (the <b>Frontend</b> address) for the " +
+          'current port, update it below, then Connect.'
       }
 
       function splitUrl(value) {
@@ -138,6 +141,12 @@
         hostInput.value = parts.host
         portInput.value = parts.port
         updatePreview()
+        // After a failed connect the port is the most likely thing to fix, so
+        // put the cursor there ready to edit.
+        if (failed) {
+          portInput.focus()
+          portInput.select()
+        }
       }
 
       hostInput.addEventListener('input', updatePreview)
