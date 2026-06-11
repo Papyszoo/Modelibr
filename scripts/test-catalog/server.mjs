@@ -10,7 +10,7 @@ import path from "node:path";
 import { spawn, execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { CATALOG_FILE, GH_CACHE_FILE, REPORT_DIR, HISTORY_FILE } from "./util.mjs";
+import { CATALOG_FILE, REPORT_DIR, HISTORY_FILE } from "./util.mjs";
 import { exists, dockerUp, REPO_ROOT } from "../test-runner/util.mjs";
 import { buildRunSpec, getSuite } from "./runspec.mjs";
 import { buildCatalog } from "./build-catalog.mjs";
@@ -66,9 +66,10 @@ function ensureCatalog(res) {
         !watchersOk && !missing && Date.now() - fs.statSync(CATALOG_FILE).mtimeMs > 60_000;
     if (missing || catalogDirty || timeStale) {
         try {
-            // Reuse the GitHub-history cache when present (instant); never block
-            // a page load on a 30s gh fetch — the ↻ button does explicit refreshes.
-            buildCatalog({ github: fs.existsSync(GH_CACHE_FILE), quiet: true });
+            // ghCacheOnly: use the cached GitHub data regardless of its age so a
+            // page load never blocks ~30s on a gh refetch — the ↻ button (and the
+            // CLI catalog build) do the explicit, TTL-respecting refreshes.
+            buildCatalog({ github: true, ghCacheOnly: true, quiet: true });
             catalogDirty = false;
         } catch (e) {
             if (missing) {

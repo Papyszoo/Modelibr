@@ -67,9 +67,14 @@ export function buildRunSpec(spec) {
         // The mega-runner orchestrates everything itself; aggregate its
         // summary.json into a single counts object for the console tally.
         command = suite.command;
+        const builtAt = Date.now();
         parse = () => {
             try {
-                const j = JSON.parse(fs.readFileSync(path.join(REPORT_DIR, "summary.json"), "utf8"));
+                const summaryFile = path.join(REPORT_DIR, "summary.json");
+                // A runner crash before writing summary.json must not attach the
+                // PREVIOUS run's counts to this run — only trust a fresh file.
+                if (fs.statSync(summaryFile).mtimeMs < builtAt) return null;
+                const j = JSON.parse(fs.readFileSync(summaryFile, "utf8"));
                 const agg = { total: 0, passed: 0, failed: 0, skipped: 0 };
                 for (const r of j.results || []) {
                     if (r.counts) {

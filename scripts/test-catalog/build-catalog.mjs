@@ -32,7 +32,7 @@ function branch() {
     }
 }
 
-export function buildCatalog({ github = true, build = false, refreshGh = false, quiet = false } = {}) {
+export function buildCatalog({ github = true, build = false, refreshGh = false, ghCacheOnly = false, quiet = false } = {}) {
     const log = (m) => !quiet && console.log(m);
 
     log(color.dim("• suites"));
@@ -50,8 +50,8 @@ export function buildCatalog({ github = true, build = false, refreshGh = false, 
     const local = collectLocalHistory();
     let githubHist = { available: false, note: "skipped (--no-github)", jobs: {} };
     if (github) {
-        log(color.dim("• github history (gh) — this can take a moment"));
-        githubHist = collectGithubHistory({ force: refreshGh });
+        if (!ghCacheOnly) log(color.dim("• github history (gh) — this can take a moment"));
+        githubHist = collectGithubHistory({ force: refreshGh, cacheOnly: ghCacheOnly });
     }
 
     const wfByFile = Object.fromEntries(ci.workflows.map((w) => [w.file, w]));
