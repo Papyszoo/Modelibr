@@ -566,7 +566,8 @@ jobs:
   # Production releases (the `release: published` trigger) keep using the
   # per-job "Upload release assets" steps above and are unaffected. Gated on the
   # build jobs only — not the long test-installers suite — so a try-it build is
-  # downloadable as soon as it finishes building.
+  # downloadable as soon as it finishes building (see the warning in the release
+  # body: these binaries are NOT gated on the tests passing).
   publish-draft-release:
     name: Publish draft release (manual builds)
     if: github.event_name == 'workflow_dispatch'
@@ -582,10 +583,20 @@ jobs:
       - name: Publish draft release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: draft-${{ github.run_id }}
-          name: Draft build ${{ github.run_number }} (${{ github.ref_name }})
+          # A single, stable draft that every manual run replaces, so these
+          # don't pile up as a new draft per run. (Same-named assets are
+          # overwritten; the constant version keeps names stable.)
+          tag_name: draft-build
+          name: 🚧 Draft build — ${{ github.ref_name }} (run ${{ github.run_number }})
           draft: true
           prerelease: true
+          body: |
+            Automated draft from a manual workflow run of `${{ github.ref_name }}`.
+
+            ⚠️ **Not verified** — this is published as soon as the installers
+            *build*; the installer test suite may still be running or may have
+            failed. These binaries are for quick local trials only, and are
+            replaced on every manual run.
           # Only the user-facing installers — not the electron-updater feed
           # files (latest*.yml) or delta maps (*.blockmap). Those are machine
           # -only, and their fixed names (e.g. latest.yml) would collide between

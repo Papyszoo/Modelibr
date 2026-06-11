@@ -80,6 +80,24 @@ test('changing the data folder is pending; snapshot keeps the active path', () =
   assert.equal(pm.config.dataDirectory, dataB)
 })
 
+test('setting the data folder to the default-resolved path is not a pending restart', () => {
+  const userDataDir = path.join(os.tmpdir(), 'mlbr-userdata-default')
+  const pm = new ProcessManager({
+    runtimeDir: path.join(os.tmpdir(), 'mlbr-runtime'),
+    userDataDir,
+    config: sanitizeRuntimeConfig({}), // dataDirectory '' → default location
+    log: () => {},
+  })
+  pm.markRunning()
+
+  // The literal path the default resolves to — selecting it should be a no-op,
+  // not a spurious "restart required" (raw '' vs the absolute path differ).
+  const resolvedDefault = path.join(userDataDir, 'data')
+  pm.updateConfig(sanitizeRuntimeConfig({ ...pm.config, dataDirectory: resolvedDefault }))
+
+  assert.equal(pm.hasPendingRestart(), false)
+})
+
 test('worker-only changes never require a restart', () => {
   const pm = makePM({ workerProcessCount: 1, maxConcurrentJobsPerWorker: 2 })
   pm.markRunning()

@@ -273,6 +273,12 @@ function performRestart() {
   }
   isRestarting = true
   refreshTray()
+  // Release the single-instance lock before relaunching. app.relaunch() starts
+  // the replacement instance as this one exits; if the lock is still held, that
+  // fresh instance fails requestSingleInstanceLock() and immediately quits —
+  // leaving nothing running (the "I pressed Restart and nothing happened" case).
+  // Releasing it first guarantees the relaunched instance can acquire it.
+  app.releaseSingleInstanceLock()
   app.relaunch()
   app.quit()
   return true
@@ -377,14 +383,15 @@ function registerIpc() {
     // valid. hasPendingRestart() then reports the desired-vs-active gap.
     runtimeManager.updateConfig(saved)
 
-    // Worker-only changes are applied live by recycling the pool; ports and the
-    // data folder need a full restart.
+    // Worker settings are applied live by recycling the pool — safe even when a
+    // port change is also pending, since workers target the active API port.
+    // Ports and the data folder still need a full restart to take effect.
     const workersChanged =
       saved.workerProcessCount !== previous.workerProcessCount ||
       saved.maxConcurrentJobsPerWorker !== previous.maxConcurrentJobsPerWorker ||
       saved.enableHardwareAcceleration !== previous.enableHardwareAcceleration
 
-    if (workersChanged && !runtimeManager.hasPendingRestart()) {
+    if (workersChanged) {
       await runtimeManager.restartWorkers()
     }
 

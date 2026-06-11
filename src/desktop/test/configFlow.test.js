@@ -11,6 +11,9 @@ import { loadRuntimeConfig, saveRuntimeConfig } from '../src/runtimeConfig.js'
 // exercise the full save → persist → pending-restart flow end to end, without
 // Electron. This is the regression guard for "I changed the port twice, the app
 // shows the new one but only the old one works".
+// Note: the real handler also recycles the worker pool when worker settings
+// change; that spawns child processes, so it's intentionally omitted here. The
+// persistence + pending-restart bookkeeping under test is unaffected by it.
 async function saveConfig(pm, configPath, patch) {
   const previous = pm.config
   const saved = await saveRuntimeConfig(configPath, { ...previous, ...patch })

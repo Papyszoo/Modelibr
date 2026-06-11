@@ -139,9 +139,9 @@
          bleeding transparent text over the footer buttons underneath it. */
       .toast {
         position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%);
-        max-width: calc(100% - 28px);
-        background: #0f1115; border: 1px solid var(--border); border-radius: 999px;
-        padding: 5px 14px; font-size: 11px; color: var(--up); white-space: nowrap;
+        max-width: calc(100% - 28px); text-align: center;
+        background: #0f1115; border: 1px solid var(--border); border-radius: 12px;
+        padding: 5px 14px; font-size: 11px; color: var(--up);
         box-shadow: 0 6px 18px rgba(0,0,0,.5);
         opacity: 0; transition: opacity .2s; pointer-events: none;
       }
@@ -247,6 +247,9 @@
       const $ = id => document.getElementById(id)
       const api = window.modelibr
 
+      // Declared up top so render() (which reads it on every 1.5s refresh) can
+      // never hit it in the temporal dead zone.
+      let restarting = false
       let toastTimer = null
       function toast(message) {
         const el = $('toast')
@@ -506,7 +509,6 @@
         }
       })
 
-      let restarting = false
       $('restart').addEventListener('click', async () => {
         if (restarting) return
         restarting = true

@@ -4,11 +4,7 @@ import { createProxyMiddleware } from 'http-proxy-middleware'
 import http from 'http'
 import path from 'path'
 
-import {
-  requiresRestart,
-  sanitizeRuntimeConfig,
-  saveRuntimeConfig,
-} from './runtimeConfig.js'
+import { sanitizeRuntimeConfig, saveRuntimeConfig } from './runtimeConfig.js'
 
 export async function startEdgeServer({ runtimeDir, configPath, runtimeManager, log = console.log }) {
   const app = express()
@@ -33,10 +29,11 @@ export async function startEdgeServer({ runtimeDir, configPath, runtimeManager, 
       ...request.body,
     })
 
-    // Same restart-required definition as the tray IPC handler (all ports + the
-    // data folder), so changing the backend/database port here behaves the same
-    // as changing it from the tray — not just appPort.
-    const restartRequired = requiresRestart(previousConfig, nextConfig)
+    // Worker settings apply live; ports and the data folder need a restart.
+    // ProcessManager.hasPendingRestart() is the single source of truth for
+    // "needs restart" (used identically by the tray IPC handler), so changing
+    // the backend/database port here behaves the same as from the tray — not
+    // just appPort.
     const workerSettingsChanged =
       nextConfig.workerProcessCount !== previousConfig.workerProcessCount ||
       nextConfig.maxConcurrentJobsPerWorker !== previousConfig.maxConcurrentJobsPerWorker ||
@@ -45,7 +42,7 @@ export async function startEdgeServer({ runtimeDir, configPath, runtimeManager, 
     const savedConfig = await saveRuntimeConfig(configPath, nextConfig)
     runtimeManager.updateConfig(savedConfig)
 
-    if (workerSettingsChanged && !restartRequired) {
+    if (workerSettingsChanged) {
       await runtimeManager.restartWorkers()
     }
 
