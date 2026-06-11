@@ -501,7 +501,11 @@ export class ProcessManager {
     try {
       await runCommand(
         this.postgresControlPath,
-        ['-D', this.paths.postgresData, '-m', 'fast', '-w', 'stop'],
+        // `-m fast` terminates open connections immediately; `-t 20` caps the
+        // wait so a stuck client can't stretch shutdown to pg_ctl's 60s default
+        // (which made a restart appear to hang for ~90s while the old instance
+        // was still serving).
+        ['-D', this.paths.postgresData, '-m', 'fast', '-w', '-t', '20', 'stop'],
         {
           env: this.getPostgresEnvironment(),
         }

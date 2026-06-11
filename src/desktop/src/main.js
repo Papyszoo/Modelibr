@@ -535,6 +535,11 @@ if (!gotSingleInstanceLock) {
 // Tray app: closing the status window must not quit the host.
 app.on('window-all-closed', () => {})
 
+// Absolute ceiling on graceful shutdown. If a stop step ever wedges, exit
+// anyway so a relaunch always proceeds instead of leaving the app stuck on
+// "Restarting…". Comfortably above stopPostgres's own 20s cap.
+const SHUTDOWN_DEADLINE_MS = 30000
+
 app.on('before-quit', event => {
   isQuitting = true
 
@@ -543,5 +548,15 @@ app.on('before-quit', event => {
   }
 
   event.preventDefault()
-  void shutdown().finally(() => app.exit(0))
+
+  const forceExit = setTimeout(() => {
+    runtimeLog('[ModelibrDesktop] Shutdown exceeded deadline — forcing exit')
+    app.exit(0)
+  }, SHUTDOWN_DEADLINE_MS)
+  forceExit.unref?.()
+
+  void shutdown().finally(() => {
+    clearTimeout(forceExit)
+    app.exit(0)
+  })
 })
