@@ -539,19 +539,21 @@ jobs:
           - name: Windows
             os: windows-latest
             electronArch: x64
-            # Installer + electron-updater feed (latest.yml) and delta blockmap.
+            # Installer + electron-updater feed (renamed to the client channel,
+            # client.yml, so it doesn't collide with the host's latest.yml in the
+            # shared release) and delta blockmap.
             artifactGlob: |
               src/desktop-client/dist/*.exe
-              src/desktop-client/dist/latest.yml
+              src/desktop-client/dist/client.yml
               src/desktop-client/dist/*.blockmap
           - name: macOS
             os: macos-14
             electronArch: arm64
-            # dmg for fresh installs; zip + latest-mac.yml are the update payload.
+            # dmg for fresh installs; zip + client-mac.yml are the update payload.
             artifactGlob: |
               src/desktop-client/dist/*.dmg
               src/desktop-client/dist/*.zip
-              src/desktop-client/dist/latest-mac.yml
+              src/desktop-client/dist/client-mac.yml
               src/desktop-client/dist/*.blockmap
           - name: Linux
             os: ubuntu-latest
@@ -559,7 +561,7 @@ jobs:
             artifactGlob: |
               src/desktop-client/dist/*.AppImage
               src/desktop-client/dist/*.deb
-              src/desktop-client/dist/latest-linux.yml
+              src/desktop-client/dist/client-linux.yml
               src/desktop-client/dist/*.blockmap
 
     steps:
@@ -580,6 +582,20 @@ jobs:
       - name: Build client installers
         working-directory: src/desktop-client
         run: npm run dist -- --${{ matrix.electronArch }}
+
+      # Rename the client's update feed onto its own channel so it can live in
+      # the same GitHub release as the host without overwriting the host's
+      # latest*.yml. The client sets autoUpdater.channel = 'client', so it
+      # fetches these. The .yml contents (installer name, sha, blockmap) are
+      # unchanged — only the filename differs.
+      - name: Rename client update feed to its own channel
+        working-directory: src/desktop-client/dist
+        shell: bash
+        run: |
+          for f in latest.yml latest-mac.yml latest-linux.yml; do
+            [ -f "$f" ] && mv "$f" "${f/latest/client}"
+          done
+          ls -1 client*.yml || true
 
       - name: Upload workflow artifacts
         uses: actions/upload-artifact@v4
