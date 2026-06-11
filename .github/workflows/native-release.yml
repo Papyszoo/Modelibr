@@ -4,6 +4,24 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+  # Merge to main → build the installers and smoke-test them on all 3 OS (the
+  # full e2e suite is gated off for push events below). Path-filtered so merges
+  # that don't touch the app don't pay for an installer build.
+  push:
+    branches: [main]
+    paths:
+      - "src/desktop/**"
+      - "src/desktop-client/**"
+      - "src/WebApi/**"
+      - "src/Application/**"
+      - "src/Domain/**"
+      - "src/Infrastructure/**"
+      - "src/asset-processor/**"
+      - "src/frontend/**"
+      - ".github/workflows/native-release.yml"
+  # Nightly: the full installed-app e2e suite on all 3 OS, off the critical path.
+  schedule:
+    - cron: "0 6 * * *"
 
 permissions:
   contents: write
@@ -324,11 +342,15 @@ jobs:
 
       # ───── Full Playwright E2E suite against the installed app ─────
       # Runs the real test suite (not just smoke checks) against the running
-      # native install on every OS (Windows, macOS, Linux).
+      # native install on every OS (Windows, macOS, Linux). Skipped on a `main`
+      # push, which only smoke-tests the install (the smoke steps above always
+      # run) — release / nightly schedule / manual dispatch run the full suite.
       - name: Checkout repo (for E2E suite)
+        if: github.event_name != 'push'
         uses: actions/checkout@v4
 
       - name: Set up Node.js for E2E
+        if: github.event_name != 'push'
         uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -336,14 +358,17 @@ jobs:
           cache-dependency-path: tests/e2e/package-lock.json
 
       - name: Install E2E dependencies
+        if: github.event_name != 'push'
         working-directory: tests/e2e
         run: npm ci
 
       - name: Install Playwright browser
+        if: github.event_name != 'push'
         working-directory: tests/e2e
         run: npx playwright install chromium
 
       - name: Run full E2E suite against installed app
+        if: github.event_name != 'push'
         working-directory: tests/e2e
         env:
           CI: "true"
