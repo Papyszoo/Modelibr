@@ -214,7 +214,20 @@ async function main() {
     await stopHost(pm)
     pm = null
 
-    log('✅ PASS — the uploaded model (DB row + file bytes) survived the data-folder change.')
+    // Simulate an unclean exit (crash / force-quit) that left a postmaster.pid
+    // behind, then boot again — the host must recover instead of failing with
+    // "lock file already exists".
+    log('Writing a stale postmaster.pid and rebooting to test recovery…')
+    const pgData = path.join(folderB, 'postgres')
+    await fs.writeFile(path.join(pgData, 'postmaster.pid'), `2147483646\n${pgData}\n`)
+    pm = await bootHost(runtimeDir, userDataDir, folderB)
+    const recovered = await listModels(pm)
+    assert(recovered.length === 1, `host did not recover from a stale lock (got ${recovered.length})`)
+    await stopHost(pm)
+    pm = null
+    log('Recovered from a stale postmaster.pid with data intact.')
+
+    log('✅ PASS — model survived the data-folder change AND a stale-lock recovery.')
   } finally {
     if (pm) await stopHost(pm)
     await fs.rm(base, { recursive: true, force: true }).catch(() => {})

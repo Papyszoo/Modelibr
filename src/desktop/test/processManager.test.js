@@ -162,3 +162,37 @@ test('scheduleDataMigrationIfNeeded records a move when the data folder changes'
     await fs.rm(userDataDir, { recursive: true, force: true })
   }
 })
+
+function makePMWithData(base) {
+  return new ProcessManager({
+    runtimeDir: path.join(os.tmpdir(), 'mlbr-runtime'),
+    userDataDir: base,
+    config: sanitizeRuntimeConfig({ dataDirectory: path.join(base, 'data') }),
+    log: () => {},
+  })
+}
+
+test('clearStalePostgresLock removes a lock left by a dead process', async () => {
+  const base = await fs.mkdtemp(path.join(os.tmpdir(), 'mlbr-lock-'))
+  try {
+    const pm = makePMWithData(base)
+    await fs.mkdir(pm.paths.postgresData, { recursive: true })
+    const pidFile = path.join(pm.paths.postgresData, 'postmaster.pid')
+    // A PID above the OS maximum → not a running process → the lock is stale.
+    await fs.writeFile(pidFile, `2147483646\n${pm.paths.postgresData}\n`)
+
+    await pm.clearStalePostgresLock()
+    await assert.rejects(fs.access(pidFile), 'stale postmaster.pid should be removed')
+  } finally {
+    await fs.rm(base, { recursive: true, force: true })
+  }
+})
+
+test('clearStalePostgresLock is a no-op when there is no lock file', async () => {
+  const base = await fs.mkdtemp(path.join(os.tmpdir(), 'mlbr-lock-'))
+  try {
+    await makePMWithData(base).clearStalePostgresLock() // must not throw
+  } finally {
+    await fs.rm(base, { recursive: true, force: true })
+  }
+})
