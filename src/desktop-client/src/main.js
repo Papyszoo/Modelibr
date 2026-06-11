@@ -22,6 +22,11 @@ function checkForUpdates({ notifyNoUpdate = false } = {}) {
     return
   }
 
+  // The host and client ship in the same GitHub repo/release. electron-updater's
+  // default feed file is latest.yml for both, which would collide. Put the
+  // client on its own channel so it fetches client*.yml (the release workflow
+  // renames the client's feed to match); the host keeps the default latest*.yml.
+  autoUpdater.channel = 'client'
   autoUpdater.autoDownload = true
   autoUpdater.autoInstallOnAppQuit = true
 
