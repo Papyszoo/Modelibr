@@ -99,3 +99,27 @@ test('requiresRestart ignores worker-only settings and no-op changes', () => {
   )
   assert.equal(requiresRestart(base, { ...base }), false)
 })
+
+test('every setting survives a full save → load round-trip', async () => {
+  const dir = await tempDir()
+  try {
+    const { configPath } = await loadRuntimeConfig(dir)
+    const desired = {
+      appPort: 4010,
+      internalApiPort: 41000,
+      postgresPort: 45432,
+      workerProcessCount: 4,
+      maxConcurrentJobsPerWorker: 6,
+      enableHardwareAcceleration: true,
+      dataDirectory: path.join(os.tmpdir(), 'mlbr-roundtrip-data'),
+    }
+    await saveRuntimeConfig(configPath, desired)
+
+    const { config } = await loadRuntimeConfig(dir)
+    for (const [key, value] of Object.entries(desired)) {
+      assert.deepEqual(config[key], value, `${key} should persist`)
+    }
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true })
+  }
+})

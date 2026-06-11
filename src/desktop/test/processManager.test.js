@@ -1,10 +1,12 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import fs from 'fs/promises'
 import os from 'os'
 import path from 'path'
 
 import { ProcessManager } from '../src/processManager.js'
 import { sanitizeRuntimeConfig } from '../src/runtimeConfig.js'
+import { readMigrationMarker } from '../src/dataMigration.js'
 
 // ProcessManager's constructor is side-effect free (no spawning, no FS writes),
 // so we can exercise the desired-vs-active config model directly. markRunning()
@@ -119,4 +121,44 @@ test('reverting a saved port back to the active value clears the pending restart
   assert.equal(pm.hasPendingRestart(), true)
   pm.updateConfig(sanitizeRuntimeConfig({ ...pm.config, appPort: 3010 }))
   assert.equal(pm.hasPendingRestart(), false)
+})
+
+test('an auto-resolved port is reported as active but is NOT a pending restart', () => {
+  // start() resolves a taken port to a free one and records it via
+  // markRunning({ appPort: <free> }); the saved config keeps the preference.
+  const pm = makePM({ appPort: 3010 })
+  pm.markRunning({ appPort: 50515 }) // 3010 was busy, bound 50515 instead
+
+  // The window shows the port that's actually listening...
+  assert.equal(pm.buildRuntimeSnapshot().publicAppUrl, 'http://127.0.0.1:50515')
+  // ...but the user changed nothing, so no restart is pending...
+  assert.equal(pm.hasPendingRestart(), false)
+  // ...and their saved preference is untouched (tried again next launch).
+  assert.equal(pm.config.appPort, 3010)
+})
+
+test('scheduleDataMigrationIfNeeded records a move when the data folder changes', async () => {
+  const userDataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'mlbr-pm-'))
+  try {
+    const pm = new ProcessManager({
+      runtimeDir: path.join(os.tmpdir(), 'mlbr-runtime'),
+      userDataDir,
+      config: sanitizeRuntimeConfig({}), // default data folder
+      log: () => {},
+    })
+    pm.markRunning()
+    const activeRoot = pm.paths.data
+
+    const newRoot = path.join(os.tmpdir(), 'mlbr-relocated')
+    pm.updateConfig(sanitizeRuntimeConfig({ ...pm.config, dataDirectory: newRoot }))
+    await pm.scheduleDataMigrationIfNeeded()
+    assert.deepEqual(await readMigrationMarker(userDataDir), { from: activeRoot, to: newRoot })
+
+    // Changing it back to the running folder cancels the queued move.
+    pm.updateConfig(sanitizeRuntimeConfig({ ...pm.config, dataDirectory: '' }))
+    await pm.scheduleDataMigrationIfNeeded()
+    assert.equal(await readMigrationMarker(userDataDir), null)
+  } finally {
+    await fs.rm(userDataDir, { recursive: true, force: true })
+  }
 })
