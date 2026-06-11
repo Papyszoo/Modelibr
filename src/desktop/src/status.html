@@ -114,6 +114,7 @@
         background: #0f1115; border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px;
       }
       .config-field input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); }
+      .config-subnote { font-size: 10.5px; color: var(--muted); margin-top: 5px; line-height: 1.35; }
       .config-field.data-folder { margin-top: 12px; }
       input.data-path {
         width: 100%; margin-top: 6px; font: inherit; color: var(--text);
@@ -200,6 +201,9 @@
         <div class="config-field">
           <label for="cfg-port">App port</label>
           <input type="number" id="cfg-port" min="1024" max="65535" />
+        </div>
+        <div class="config-subnote">
+          Desktop clients connect to this port — change it and they'll need to reconnect to the new one.
         </div>
         <div class="config-field">
           <label for="cfg-api-port">Backend port</label>
@@ -398,6 +402,23 @@
         }
       }
 
+      // ── Desktop client presence ──
+      // Whether the client is already installed at its default location. When it
+      // is, the button opens it instead of re-running the installer.
+      let clientInstalled = false
+      async function refreshClientStatus() {
+        const result = await api.getClientStatus().catch(() => null)
+        clientInstalled = !!result?.installed
+        const btn = $('install-client')
+        if (clientInstalled) {
+          btn.textContent = 'Open'
+          $('install-text').textContent = 'installed — open Modelibr in its own app window.'
+        } else {
+          btn.textContent = 'Install'
+          $('install-text').textContent = installDefaultText
+        }
+      }
+
       // ── Configuration ──
       let loadedConfig = null
       // The data-folder override the user has picked but not yet applied. '' means
@@ -501,6 +522,17 @@
       })
 
       $('install-client').addEventListener('click', async () => {
+        // Already installed → just open it instead of re-running the installer.
+        if (clientInstalled) {
+          const result = await api.openClient()
+          if (!result?.ok) {
+            // The default-location guess was wrong (custom install dir, or it
+            // was removed) — fall back to the install flow next time.
+            await refreshClientStatus()
+          }
+          return
+        }
+
         if (installing) return
         installing = true
         const btn = $('install-client')
@@ -518,6 +550,8 @@
           installing = false
           btn.disabled = false
           btn.textContent = 'Install'
+          // Pick up a freshly-completed install so the button becomes "Open".
+          await refreshClientStatus()
         }
       })
 
@@ -544,6 +578,7 @@
       $('quit').addEventListener('click', () => api.quit())
 
       refresh()
+      refreshClientStatus()
       setInterval(refresh, 1500)
     </script>
   </body>
