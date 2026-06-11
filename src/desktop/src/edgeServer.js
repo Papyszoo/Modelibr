@@ -8,7 +8,9 @@ import { sanitizeRuntimeConfig, saveRuntimeConfig } from './runtimeConfig.js'
 
 export async function startEdgeServer({ runtimeDir, configPath, runtimeManager, log = console.log }) {
   const app = express()
-  const backendBaseUrl = `http://127.0.0.1:${runtimeManager.config.internalApiPort}`
+  // Proxy to the API port the WebApi actually bound (a free fallback if the
+  // configured one was taken), not the raw config.
+  const backendBaseUrl = `http://127.0.0.1:${runtimeManager.runningConfig.internalApiPort}`
   const frontendDir = path.join(runtimeDir, 'frontend')
 
   app.disable('x-powered-by')
@@ -41,6 +43,8 @@ export async function startEdgeServer({ runtimeDir, configPath, runtimeManager, 
 
     const savedConfig = await saveRuntimeConfig(configPath, nextConfig)
     runtimeManager.updateConfig(savedConfig)
+    // Queue a data-folder move for the next launch if it changed here too.
+    await runtimeManager.scheduleDataMigrationIfNeeded()
 
     if (workerSettingsChanged) {
       await runtimeManager.restartWorkers()
@@ -108,20 +112,23 @@ export async function startEdgeServer({ runtimeDir, configPath, runtimeManager, 
     socket.destroy()
   })
 
+  // The app port was already resolved to a free one at start (runningConfig),
+  // so a clash here is rare — surface a clear message if it somehow still hits.
+  const appPort = runtimeManager.runningConfig.appPort
   await new Promise((resolve, reject) => {
     server.once('error', err => {
       if (err.code === 'EADDRINUSE') {
         reject(new Error(
-          `Port ${runtimeManager.config.appPort} is already in use.\n\nChange it in Settings > Native Runtime and restart Modelibr.`
+          `Port ${appPort} is already in use.\n\nChange it in Settings and restart Modelibr.`
         ))
       } else {
         reject(err)
       }
     })
-    server.listen(runtimeManager.config.appPort, '127.0.0.1', resolve)
+    server.listen(appPort, '127.0.0.1', resolve)
   })
 
-  log(`[ModelibrDesktop][edge] Listening on http://127.0.0.1:${runtimeManager.config.appPort}`)
+  log(`[ModelibrDesktop][edge] Listening on http://127.0.0.1:${appPort}`)
 
   return {
     async close() {

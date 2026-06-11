@@ -7,6 +7,13 @@ import os from 'os'
 import path from 'path'
 
 import { requiresRestart } from './runtimeConfig.js'
+import { resolveUsablePort } from './ports.js'
+import {
+  readMigrationMarker,
+  clearMigrationMarker,
+  writeMigrationMarker,
+  migrateDataDirectory,
+} from './dataMigration.js'
 
 const POSTGRES_USER = 'modelibr'
 const POSTGRES_PASSWORD = 'modelibr'
@@ -152,15 +159,18 @@ export class ProcessManager {
   constructor({ runtimeDir, userDataDir, config, log = console.log }) {
     this.runtimeDir = runtimeDir
     this.userDataDir = userDataDir
-    // `config` is the *desired* config — the latest saved values, shown in the
-    // Settings panel. `activeConfig` is what the currently-running services were
-    // actually started with; it's captured by markRunning() once boot succeeds.
-    // The two diverge after a restart-required change is saved but before the
-    // app relaunches. Snapshot URLs and health probes report the ACTIVE values
-    // (what's reachable right now) so the "Open" button never points at a port
-    // nothing is serving yet — hasPendingRestart() tells the UI a relaunch is
-    // needed to make the saved change live.
+    // Three views of the config:
+    //   config        — the desired/saved values, shown in Settings.
+    //   startedConfig — what was desired at the last successful boot; drives
+    //                   "needs restart" (did the user change a restart setting
+    //                   since start?), so an auto-resolved port isn't mistaken
+    //                   for a pending change.
+    //   activeConfig  — the ports actually bound (config, but with any port that
+    //                   was taken swapped for a free one). Snapshot URLs and
+    //                   health probes read this, so the "Open" button always
+    //                   points at a port that's really listening.
     this.config = config
+    this.startedConfig = null
     this.activeConfig = null
     this.log = log
     this.webApiProcess = null
@@ -211,31 +221,32 @@ export class ProcessManager {
     this.config = config
   }
 
-  // Records the config the live services were started with. Called at the end
-  // of start() (and partially refreshed by restartWorkers, which applies worker
-  // settings live). Everything user-visible about a *running* service reads
-  // from this, so saving a port change can't make the UI advertise a port that
-  // isn't bound yet.
-  markRunning() {
-    this.activeConfig = { ...this.config }
+  // Records that services are now running. `activePorts` carries any ports that
+  // had to be swapped for a free one (see start()); everything user-visible
+  // about a running service reads from activeConfig, while startedConfig is the
+  // baseline for "needs restart".
+  markRunning(activePorts = null) {
+    this.startedConfig = { ...this.config }
+    this.activeConfig = { ...this.config, ...(activePorts || {}) }
   }
 
-  // True when the saved config differs from what's actually running on a
-  // restart-only setting (ports / data folder) — i.e. a relaunch is needed to
-  // make the saved change take effect.
+  // True when the user has changed a restart-only setting (ports / data folder)
+  // SINCE the last start — i.e. a relaunch would apply it. Compared against
+  // startedConfig (not activeConfig) so an auto-resolved port, where active
+  // already differs from desired through no user action, isn't read as pending.
   hasPendingRestart() {
-    if (!this.activeConfig) {
+    if (!this.startedConfig) {
       return false
     }
     // The data folder compares *resolved* roots, so choosing the path the
     // default already resolves to isn't a false positive. The remaining
     // restart-only keys (the ports) compare directly via the shared definition
     // — dataDirectory is zeroed on both sides so it doesn't double-count here.
-    if (this.dataRootFor(this.config) !== this.dataRootFor(this.activeConfig)) {
+    if (this.dataRootFor(this.config) !== this.dataRootFor(this.startedConfig)) {
       return true
     }
     return requiresRestart(
-      { ...this.activeConfig, dataDirectory: '' },
+      { ...this.startedConfig, dataDirectory: '' },
       { ...this.config, dataDirectory: '' }
     )
   }
@@ -295,7 +306,21 @@ export class ProcessManager {
       webDavUrl: `http://127.0.0.1:${active.appPort}/modelibr`,
       dataDirectory: this.paths.data,
       pendingRestart: this.hasPendingRestart(),
+      portsAutoAdjusted: this.portsAutoAdjusted(),
     }
+  }
+
+  // True when a configured port was taken at start and we bound a free one
+  // instead — lets the UI explain why the address differs from the saved port.
+  portsAutoAdjusted() {
+    if (!this.startedConfig || !this.activeConfig) {
+      return false
+    }
+    return (
+      this.activeConfig.appPort !== this.startedConfig.appPort ||
+      this.activeConfig.internalApiPort !== this.startedConfig.internalApiPort ||
+      this.activeConfig.postgresPort !== this.startedConfig.postgresPort
+    )
   }
 
   async isPostgresRunning() {
@@ -318,15 +343,61 @@ export class ProcessManager {
   }
 
   async start() {
-    await this.ensureLayout()
     await this.ensureRuntimeAssets()
+    // If the data folder was changed last run, move the existing data into it
+    // before anything touches the new location (Postgres is stopped here).
+    await this.maybeMigrateData()
+    await this.ensureLayout()
+    // Decide the ports we'll actually bind: keep the configured one when it's
+    // free, otherwise grab a free port so a clash can't block boot. Record them
+    // as the running config BEFORE starting services (which read these via
+    // runningConfig). The saved config keeps the user's preferred ports.
+    this.markRunning({
+      appPort: await resolveUsablePort(this.config.appPort),
+      internalApiPort: await resolveUsablePort(this.config.internalApiPort),
+      postgresPort: await resolveUsablePort(this.config.postgresPort),
+    })
     await this.ensurePostgresCluster()
     await this.startPostgres()
     await this.startWebApi()
     await this.startWorkers()
-    // Everything is up on the current config — snapshot it as the active config
-    // so later saves are correctly reported as "pending restart".
-    this.markRunning()
+  }
+
+  // Runs the one-shot data-folder migration recorded by a previous save (see
+  // scheduleDataMigrationIfNeeded). Failures are logged, not fatal, and the
+  // marker is always cleared so a bad migration can't loop on every launch.
+  async maybeMigrateData() {
+    const marker = await readMigrationMarker(this.userDataDir)
+    if (!marker) {
+      return
+    }
+    try {
+      if (marker.to === this.paths.data) {
+        const moved = await migrateDataDirectory(marker.from, marker.to)
+        if (moved) {
+          logWithPrefix(this.log, 'data', 'Migrated data folder', marker)
+        }
+      }
+    } catch (error) {
+      logWithPrefix(this.log, 'data', 'Data folder migration failed', {
+        error: error instanceof Error ? error.message : String(error),
+      })
+    } finally {
+      await clearMigrationMarker(this.userDataDir)
+    }
+  }
+
+  // Records (or clears) a pending data-folder migration so the next launch moves
+  // existing assets/database into the newly-chosen folder. Call after saving a
+  // config that may have changed the data folder.
+  async scheduleDataMigrationIfNeeded() {
+    const desiredRoot = this.dataRootFor(this.config)
+    const activeRoot = this.paths.data
+    if (desiredRoot !== activeRoot) {
+      await writeMigrationMarker(this.userDataDir, activeRoot, desiredRoot)
+    } else {
+      await clearMigrationMarker(this.userDataDir)
+    }
   }
 
   async stop() {
@@ -466,8 +537,9 @@ export class ProcessManager {
       platformExecutable('pg_ctl')
     )
 
+    const postgresPort = this.runningConfig.postgresPort
     logWithPrefix(this.log, 'postgres', 'Starting embedded database', {
-      port: this.config.postgresPort,
+      port: postgresPort,
     })
 
     // Windows builds use TCP only (no Unix socket); elsewhere point the socket
@@ -484,7 +556,7 @@ export class ProcessManager {
         '-t',
         '60',
         '-o',
-        `-p ${this.config.postgresPort} -h 127.0.0.1${socketOption}`,
+        `-p ${postgresPort} -h 127.0.0.1${socketOption}`,
         'start',
       ],
       {
@@ -531,16 +603,18 @@ export class ProcessManager {
         ASPNETCORE_ENVIRONMENT: 'Production',
         DisableHttpsRedirection: 'true',
         DISABLE_HTTPS_LISTENER: 'true',
-        HTTP_PORT: String(this.config.internalApiPort),
+        // Bind/connect to the ports we actually resolved at start (which may be
+        // a free fallback if the configured one was taken), not the raw config.
+        HTTP_PORT: String(this.runningConfig.internalApiPort),
         EXPOSE_443_PORT: 'false',
-        WEBDAV_HTTP_PORT: String(this.config.appPort),
-        WEBDAV_PROBE_BASE_URL: `http://127.0.0.1:${this.config.appPort}`,
+        WEBDAV_HTTP_PORT: String(this.runningConfig.appPort),
+        WEBDAV_PROBE_BASE_URL: `http://127.0.0.1:${this.runningConfig.appPort}`,
         WORKER_API_KEY: this.workerApiKey,
         UPLOAD_STORAGE_PATH: this.paths.uploads,
         THUMBNAIL_STORAGE_PATH: this.paths.thumbnails,
         RESTORE_STORAGE_PATH: this.paths.restore,
         BLENDER_INSTALL_PATH: this.paths.blender,
-        ConnectionStrings__Default: `Host=127.0.0.1;Port=${this.config.postgresPort};Database=${POSTGRES_DATABASE};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};`,
+        ConnectionStrings__Default: `Host=127.0.0.1;Port=${this.runningConfig.postgresPort};Database=${POSTGRES_DATABASE};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};`,
       },
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
@@ -560,7 +634,7 @@ export class ProcessManager {
     })
 
     await waitForHttp(
-      `http://127.0.0.1:${this.config.internalApiPort}/health`,
+      `http://127.0.0.1:${this.runningConfig.internalApiPort}/health`,
       START_TIMEOUT_MS
     )
   }

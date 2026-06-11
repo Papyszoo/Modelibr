@@ -97,7 +97,8 @@
       button.hero:hover { background: #5457e6; }
       button.hero:disabled { background: var(--panel-2); border-color: var(--border); color: var(--muted); cursor: default; }
 
-      .address-line { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+      .address-line { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+      .address-note { font-size: 10.5px; color: var(--pending); margin-bottom: 12px; line-height: 1.35; }
       .address-line code {
         flex: 1; font-size: 11px; color: var(--muted);
         background: #0f1115; border: 1px solid var(--border); border-radius: 6px;
@@ -226,6 +227,9 @@
     <div class="address-line">
       <code id="frontend-url">—</code>
       <button class="icon" id="copy-url" title="Copy address">Copy</button>
+    </div>
+    <div class="address-note" id="address-note" style="display:none">
+      A saved port was in use, so Modelibr is running on a free one.
     </div>
 
     <div class="install">
@@ -375,6 +379,7 @@
           asset.configured != null ? `${asset.healthy}/${asset.configured} ready` : ''
 
         if (status.frontendUrl) $('frontend-url').textContent = status.frontendUrl
+        $('address-note').style.display = status.portsAutoAdjusted ? '' : 'none'
 
         // A saved port / data-folder change only goes live after a relaunch, so
         // nudge the user to restart (the address shown is still the working one).

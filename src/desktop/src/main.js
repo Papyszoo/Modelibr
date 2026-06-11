@@ -429,6 +429,10 @@ function registerIpc() {
     // serving their active ports until a relaunch, so the snapshot/URLs stay
     // valid. hasPendingRestart() then reports the desired-vs-active gap.
     runtimeManager.updateConfig(saved)
+    // If the data folder changed, queue a move so the next launch brings the
+    // existing uploads/database into the new location (kept on the running app's
+    // current folder until then).
+    await runtimeManager.scheduleDataMigrationIfNeeded()
 
     // Worker settings are applied live by recycling the pool — safe even when a
     // port change is also pending, since workers target the active API port.
