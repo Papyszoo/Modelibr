@@ -115,6 +115,12 @@ export async function startEdgeServer({ runtimeDir, configPath, runtimeManager, 
   // The app port was already resolved to a free one at start (runningConfig),
   // so a clash here is rare — surface a clear message if it somehow still hits.
   const appPort = runtimeManager.runningConfig.appPort
+  // Loopback by default (this machine only). Bind all interfaces when the user
+  // opts into network access, so a desktop client on another LAN machine can
+  // reach the host. The app has no auth, so this is off by default.
+  const bindHost = runtimeManager.runningConfig.allowNetworkAccess
+    ? '0.0.0.0'
+    : '127.0.0.1'
   await new Promise((resolve, reject) => {
     server.once('error', err => {
       if (err.code === 'EADDRINUSE') {
@@ -125,10 +131,10 @@ export async function startEdgeServer({ runtimeDir, configPath, runtimeManager, 
         reject(err)
       }
     })
-    server.listen(appPort, '127.0.0.1', resolve)
+    server.listen(appPort, bindHost, resolve)
   })
 
-  log(`[ModelibrDesktop][edge] Listening on http://127.0.0.1:${appPort}`)
+  log(`[ModelibrDesktop][edge] Listening on http://${bindHost}:${appPort}`)
 
   return {
     async close() {

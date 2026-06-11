@@ -305,6 +305,14 @@
             <label for="cfg-gpu">Hardware acceleration</label>
             <input type="checkbox" id="cfg-gpu" />
           </div>
+          <div class="config-field">
+            <label for="cfg-network">Allow access from my network</label>
+            <input type="checkbox" id="cfg-network" />
+          </div>
+          <div class="config-subnote">
+            Lets a desktop client on another computer connect to this host. Modelibr has no
+            password, so only turn this on for networks you trust.
+          </div>
         </details>
 
         <div class="config-actions">
@@ -528,6 +536,7 @@
         $('cfg-workers').value = config.workerProcessCount
         $('cfg-jobs').value = config.maxConcurrentJobsPerWorker
         $('cfg-gpu').checked = !!config.enableHardwareAcceleration
+        $('cfg-network').checked = !!config.allowNetworkAccess
         pendingDataDirectory = config.dataDirectory || ''
         renderDataFolder()
       }
@@ -541,6 +550,7 @@
           maxConcurrentJobsPerWorker: Number($('cfg-jobs').value),
           enableHardwareAcceleration: $('cfg-gpu').checked,
           dataDirectory: pendingDataDirectory,
+          allowNetworkAccess: $('cfg-network').checked,
         }
       }
 

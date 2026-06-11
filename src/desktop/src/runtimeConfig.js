@@ -28,6 +28,11 @@ export const DEFAULT_RUNTIME_CONFIG = Object.freeze({
   // resolves it. Set a custom absolute path to relocate all data (e.g. to a
   // larger drive). Changing it requires a restart.
   dataDirectory: '',
+  // Off by default: the app serves on 127.0.0.1 (this machine only). When true
+  // the edge server binds 0.0.0.0 so a desktop client on another LAN machine
+  // can connect — but Modelibr has no authentication, so this exposes it to
+  // everyone on the network. Opt-in, with a warning in the UI. Needs a restart.
+  allowNetworkAccess: false,
 })
 
 // Settings whose new value only takes effect when the whole runtime is
@@ -41,6 +46,7 @@ export const RESTART_REQUIRED_KEYS = Object.freeze([
   'internalApiPort',
   'postgresPort',
   'dataDirectory',
+  'allowNetworkAccess',
 ])
 
 // True when moving from `previous` to `next` changes any restart-only setting.
@@ -97,6 +103,9 @@ export function sanitizeRuntimeConfig(input = {}) {
       input.enableHardwareAcceleration === true ||
       input.enableHardwareAcceleration === 'true',
     dataDirectory: sanitizeDataDirectory(input.dataDirectory),
+    // Opt-in network exposure: only true when explicitly set.
+    allowNetworkAccess:
+      input.allowNetworkAccess === true || input.allowNetworkAccess === 'true',
   }
 }
 
