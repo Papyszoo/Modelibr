@@ -40,7 +40,8 @@ export default defineConfig({
         trace: envEnum(process.env.PW_TRACE, ["off", "on", "on-first-retry", "retain-on-failure"], "on-first-retry") as any,
         screenshot: envEnum(process.env.PW_SCREENSHOT, ["off", "on", "only-on-failure"], "on") as any,
         video: envEnum(process.env.PW_VIDEO, ["off", "on", "retain-on-failure", "on-first-retry"], "retain-on-failure") as any,
-        headless: process.env.PW_HEADED ? false : undefined,
+        // Strict compare: PW_HEADED=0 must not mean headed.
+        headless: process.env.PW_HEADED === "1" ? false : undefined,
     },
     // NOTE: Per-worker DB isolation (PARALLEL_DB=true / TEST_WORKER_INDEX) is
     // NOT active. The e2e stack uses a single WebAPI + single PostgreSQL container,

@@ -65,6 +65,21 @@ Open **https://localhost:3010** in your browser. The first visit uses a self-sig
 
 ---
 
+## Testing
+
+```bash
+npm run test:all        # run any subset of the 10 test suites (interactive picker)
+npm run test:all:full   # run everything, non-interactive
+npm run test:site       # Test Studio — browse every test, CI lanes, timings; run with live output
+npm run test:audit      # flag test suites not tracked by the runner manifest
+```
+
+Suites are self-contained (Docker stacks start/stop themselves). See
+[scripts/test-runner](scripts/test-runner/README.md) and
+[scripts/test-catalog](scripts/test-catalog/README.md).
+
+---
+
 ## Supported model uploads
 
 - `.obj`

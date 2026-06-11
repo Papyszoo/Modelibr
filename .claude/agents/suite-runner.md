@@ -14,6 +14,9 @@ You run Modelibr test suites and report a compact, decision-ready verdict.
 - Suites are self-contained (Docker up/teardown built in). Docker-needing suites
   are auto-skipped if the daemon is down — report that as "skipped", never as
   passed. E2E suites can take 5–20 minutes; that is normal, do not kill them.
+- Before starting Docker suites, check nothing else is using the e2e stack:
+  if `curl -s http://127.0.0.1:5178/api/run/active` shows a running Studio run,
+  or e2e containers are already up, report the conflict instead of running.
 
 ## After the run
 
