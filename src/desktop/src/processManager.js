@@ -13,6 +13,7 @@ import {
   clearMigrationMarker,
   writeMigrationMarker,
   migrateDataDirectory,
+  writeLeftoverFolder,
 } from './dataMigration.js'
 
 const POSTGRES_USER = 'modelibr'
@@ -376,6 +377,9 @@ export class ProcessManager {
         const moved = await migrateDataDirectory(marker.from, marker.to)
         if (moved) {
           logWithPrefix(this.log, 'data', 'Migrated data folder', marker)
+          // Leave the old folder in place as a backup, and remember it so the
+          // UI can offer to open it / say it's safe to delete.
+          await writeLeftoverFolder(this.userDataDir, marker.from)
         }
       }
     } catch (error) {
