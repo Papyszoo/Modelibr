@@ -533,6 +533,85 @@ export class ProcessManager {
     }
   }
 
+  // True if `pid` names a live process. Signal 0 only checks existence — it
+  // never actually signals the process. EPERM means it exists but isn't ours.
+  isPidAlive(pid) {
+    try {
+      process.kill(pid, 0)
+      return true
+    } catch (error) {
+      return error?.code === 'EPERM'
+    }
+  }
+
+  async readPostmasterPid(pidFile) {
+    try {
+      const firstLine = (await fs.readFile(pidFile, 'utf8')).split('\n')[0]?.trim()
+      const pid = Number.parseInt(firstLine ?? '', 10)
+      return Number.isInteger(pid) && pid > 0 ? pid : null
+    } catch {
+      return null
+    }
+  }
+
+  // True if `pid` belongs to a process whose image looks like PostgreSQL — so we
+  // can tell a real orphaned server (stop it) from a stale lock whose PID was
+  // reused by something unrelated (remove the file, never signal it).
+  async isPostgresProcess(pid) {
+    try {
+      if (process.platform === 'win32') {
+        const { stdout } = await runCommand('tasklist', [
+          '/FI',
+          `PID eq ${pid}`,
+          '/FO',
+          'CSV',
+          '/NH',
+        ])
+        return /postgres/i.test(stdout)
+      }
+      const { stdout } = await runCommand('ps', ['-p', String(pid), '-o', 'comm='])
+      return /postgres/i.test(stdout)
+    } catch {
+      return false
+    }
+  }
+
+  // Recovers from an unclean previous exit (crash, force-quit, OS kill) that
+  // left a postmaster.pid behind, which otherwise makes pg_ctl start fail with
+  // "lock file already exists". Safe by construction: it only sends a signal
+  // (via stopPostgres) to a PID it has VERIFIED is PostgreSQL, and otherwise
+  // just deletes the stale lock file — never a live server's, never an
+  // unrelated process's.
+  async clearStalePostgresLock() {
+    const pidFile = path.join(this.paths.postgresData, 'postmaster.pid')
+    if (!(await exists(pidFile))) {
+      return
+    }
+
+    const pid = await this.readPostmasterPid(pidFile)
+
+    // A real leftover Postgres still holding the data dir → stop it cleanly
+    // (which also removes the lock).
+    if (pid != null && this.isPidAlive(pid) && (await this.isPostgresProcess(pid))) {
+      logWithPrefix(this.log, 'postgres', 'Stopping a leftover database instance', { pid })
+      await this.stopPostgres()
+    }
+
+    if (!(await exists(pidFile))) {
+      return
+    }
+
+    // The lock lingers. Remove it only when safe: the PID is gone, or it's alive
+    // but not Postgres (a reused PID). Never delete a running server's lock.
+    const alive = pid != null && this.isPidAlive(pid)
+    if (!alive || !(await this.isPostgresProcess(pid))) {
+      logWithPrefix(this.log, 'postgres', 'Removing stale postmaster.pid', { pid })
+      await fs.rm(pidFile, { force: true }).catch(() => {})
+    } else {
+      logWithPrefix(this.log, 'postgres', 'postmaster.pid points at a running Postgres that could not be stopped', { pid })
+    }
+  }
+
   async startPostgres() {
     this.postgresControlPath = path.join(
       this.runtimeDir,
@@ -540,6 +619,10 @@ export class ProcessManager {
       'bin',
       platformExecutable('pg_ctl')
     )
+
+    // Clean up a lock left by an unclean previous exit so start doesn't fail
+    // with "lock file postmaster.pid already exists".
+    await this.clearStalePostgresLock()
 
     const postgresPort = this.runningConfig.postgresPort
     logWithPrefix(this.log, 'postgres', 'Starting embedded database', {
