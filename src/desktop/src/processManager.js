@@ -176,7 +176,7 @@ export class ProcessManager {
     // Data root is user-configurable (config.dataDirectory); empty means the
     // default location under userData. Everything stateful lives under it so a
     // single setting relocates all data.
-    const dataRoot = config.dataDirectory || path.join(userDataDir, 'data')
+    const dataRoot = this.dataRootFor(config)
     this.paths = {
       data: dataRoot,
       uploads: path.join(dataRoot, 'uploads'),
@@ -200,6 +200,13 @@ export class ProcessManager {
     return this.activeConfig ?? this.config
   }
 
+  // Resolves a config's absolute data root: an explicit dataDirectory, or the
+  // default under userData when blank. Used so pending-restart detection can
+  // compare the *resolved* paths.
+  dataRootFor(config) {
+    return config.dataDirectory || path.join(this.userDataDir, 'data')
+  }
+
   updateConfig(config) {
     this.config = config
   }
@@ -217,9 +224,20 @@ export class ProcessManager {
   // restart-only setting (ports / data folder) — i.e. a relaunch is needed to
   // make the saved change take effect.
   hasPendingRestart() {
-    return this.activeConfig
-      ? requiresRestart(this.activeConfig, this.config)
-      : false
+    if (!this.activeConfig) {
+      return false
+    }
+    // The data folder compares *resolved* roots, so choosing the path the
+    // default already resolves to isn't a false positive. The remaining
+    // restart-only keys (the ports) compare directly via the shared definition
+    // — dataDirectory is zeroed on both sides so it doesn't double-count here.
+    if (this.dataRootFor(this.config) !== this.dataRootFor(this.activeConfig)) {
+      return true
+    }
+    return requiresRestart(
+      { ...this.activeConfig, dataDirectory: '' },
+      { ...this.config, dataDirectory: '' }
+    )
   }
 
   buildRuntimeSnapshot() {
@@ -571,7 +589,11 @@ export class ProcessManager {
         NODE_ENV: 'production',
         WORKER_ID: `worker-${index + 1}`,
         WORKER_PORT: String(healthPort),
-        API_BASE_URL: `http://127.0.0.1:${this.config.internalApiPort}`,
+        // Target the WebApi the workers can actually reach right now (active
+        // port), not a just-saved one that won't be bound until a restart — so
+        // recycling workers is safe even while a port change is pending. The
+        // worker-pool settings below still come from the latest saved config.
+        API_BASE_URL: `http://127.0.0.1:${this.runningConfig.internalApiPort}`,
         WORKER_API_KEY: this.workerApiKey,
         MAX_CONCURRENT_JOBS: String(this.config.maxConcurrentJobsPerWorker),
         THUMBNAIL_STORAGE_PATH: this.paths.thumbnails,
