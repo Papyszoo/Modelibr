@@ -267,6 +267,18 @@
       function render(status) {
         if (!status) return
 
+        // While a restart is in flight the old instance is still being torn
+        // down, so its health probe keeps reporting "up". Freeze the UI to a
+        // restarting state instead of repainting green dots that contradict the
+        // "restarting…" label.
+        if (restarting) {
+          $('phase').textContent = 'restarting…'
+          setDot('dot-backend', 'pending')
+          setDot('dot-database', 'pending')
+          setDot('dot-asset', 'pending')
+          return
+        }
+
         if (status.phase === 'starting') {
           $('phase').textContent = 'starting services…'
         } else if (status.phase === 'error') {
@@ -510,12 +522,21 @@
       })
 
       $('restart').addEventListener('click', async () => {
+        // Re-entry guard: ignore further clicks once a restart is in flight, so
+        // the host can't be told to relaunch twice. The button is also disabled
+        // below; this covers the keyboard/Enter path too.
         if (restarting) return
         restarting = true
         const btn = $('restart')
         btn.disabled = true
         btn.textContent = 'Restarting…'
+        btn.classList.remove('pending')
+        // Reflect the restarting state immediately (render() keeps it frozen on
+        // the next poll) so the dots don't stay green during the relaunch.
         $('phase').textContent = 'restarting…'
+        setDot('dot-backend', 'pending')
+        setDot('dot-database', 'pending')
+        setDot('dot-asset', 'pending')
         await api.restart()
         // The host relaunches and this window is torn down; nothing else to do.
       })
