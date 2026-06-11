@@ -36,7 +36,6 @@
         display: grid; place-items: center; font-weight: 700; color: #fff;
       }
       header h1 { font-size: 15px; margin: 0; font-weight: 600; }
-      header .phase { margin-left: auto; font-size: 11px; color: var(--muted); }
 
       .update-banner {
         display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--muted);
@@ -47,32 +46,38 @@
       .update-banner .ub-text { flex: 1; cursor: pointer; }
       .update-banner button { padding: 4px 10px; }
 
-      .services { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
-      .service {
-        display: flex; align-items: center; gap: 10px;
-        background: var(--panel); border: 1px solid var(--border);
-        border-radius: 9px; padding: 9px 11px;
-      }
       .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; background: var(--muted); }
       .dot.up { background: var(--up); box-shadow: 0 0 0 3px rgba(52,211,153,.15); }
       .dot.down { background: var(--down); box-shadow: 0 0 0 3px rgba(248,113,113,.15); }
       .dot.pending { background: var(--pending); box-shadow: 0 0 0 3px rgba(251,191,36,.15); animation: pulse 1.1s infinite; }
       @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+      /* One outcome-level status instead of a wall of components. */
+      .status-card {
+        display: flex; align-items: center; gap: 12px;
+        background: var(--panel); border: 1px solid var(--border);
+        border-radius: 11px; padding: 13px 14px; margin-bottom: 8px;
+      }
+      .status-card .dot { width: 14px; height: 14px; }
+      .status-headline { font-size: 14px; font-weight: 600; }
+      .status-sub { font-size: 11px; color: var(--muted); margin-top: 2px; line-height: 1.35; }
+
+      /* Component breakdown, on demand. */
+      details.details { margin-bottom: 12px; }
+      details.details > summary {
+        list-style: none; cursor: pointer; font-size: 11px; color: var(--muted); padding: 2px 2px 6px;
+      }
+      details.details > summary::-webkit-details-marker { display: none; }
+      details.details > summary::before { content: '▸ '; }
+      details.details[open] > summary::before { content: '▾ '; }
+      .services { display: flex; flex-direction: column; gap: 6px; }
+      .service {
+        display: flex; align-items: center; gap: 10px;
+        background: var(--panel); border: 1px solid var(--border);
+        border-radius: 9px; padding: 9px 11px;
+      }
       .service .name { font-weight: 500; }
       .service .detail { margin-left: auto; color: var(--muted); font-size: 11px; }
-
-      .url-row {
-        background: var(--panel-2); border: 1px solid var(--border);
-        border-radius: 9px; padding: 10px 11px; margin-bottom: 12px;
-      }
-      .url-row .label { font-size: 11px; color: var(--muted); margin-bottom: 5px; }
-      .url-row .url-line { display: flex; align-items: center; gap: 8px; }
-      .url-row code {
-        flex: 1; font-size: 12px; color: var(--text);
-        background: #0f1115; border: 1px solid var(--border); border-radius: 6px;
-        padding: 5px 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      }
 
       button {
         font: inherit; color: var(--text); cursor: pointer;
@@ -83,6 +88,22 @@
       button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
       button.primary:hover { background: #5457e6; }
       button.icon { padding: 6px 9px; }
+
+      /* The one thing most people open this window to do. */
+      button.hero {
+        width: 100%; font-size: 14px; font-weight: 600; padding: 11px;
+        background: var(--accent); border-color: var(--accent); color: #fff; margin-bottom: 8px;
+      }
+      button.hero:hover { background: #5457e6; }
+      button.hero:disabled { background: var(--panel-2); border-color: var(--border); color: var(--muted); cursor: default; }
+
+      .address-line { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+      .address-line code {
+        flex: 1; font-size: 11px; color: var(--muted);
+        background: #0f1115; border: 1px solid var(--border); border-radius: 6px;
+        padding: 5px 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
 
       .install {
         display: flex; gap: 8px; align-items: center;
@@ -127,15 +148,26 @@
         font-size: 11px; cursor: pointer;
       }
       .link-btn:hover { background: none; text-decoration: underline; }
+      .folder-actions { display: flex; gap: 14px; }
+
+      /* Advanced settings — tucked away so the common fields stay uncluttered. */
+      details.advanced { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 4px; }
+      details.advanced > summary {
+        list-style: none; cursor: pointer; font-size: 11.5px; color: var(--muted); padding: 6px 0;
+      }
+      details.advanced > summary::-webkit-details-marker { display: none; }
+      details.advanced > summary::before { content: '▸ '; }
+      details.advanced[open] > summary::before { content: '▾ '; }
+
       .config-actions { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
       .config-note { font-size: 11px; color: var(--pending); flex: 1; min-height: 14px; }
 
       footer { display: flex; gap: 8px; }
       footer button { flex: 1; }
-      footer button.pending {
+      footer button#restart.pending {
         background: var(--accent); border-color: var(--accent); color: #fff;
       }
-      footer button.pending:hover { background: #5457e6; }
+      footer button#restart.pending:hover { background: #5457e6; }
       /* A centered, opaque pill so the message stays readable instead of
          bleeding transparent text over the footer buttons underneath it. */
       .toast {
@@ -153,7 +185,6 @@
     <header>
       <div class="logo">M</div>
       <h1>Modelibr</h1>
-      <span class="phase" id="phase">connecting…</span>
     </header>
 
     <div class="update-banner" id="update-banner">
@@ -161,31 +192,40 @@
       <button class="primary" id="ub-action" style="display:none">Update</button>
     </div>
 
-    <div class="services">
-      <div class="service">
-        <span class="dot pending" id="dot-backend"></span>
-        <span class="name">Backend (WebApi)</span>
-        <span class="detail" id="detail-backend">—</span>
-      </div>
-      <div class="service">
-        <span class="dot pending" id="dot-database"></span>
-        <span class="name">Database (PostgreSQL)</span>
-        <span class="detail" id="detail-database">—</span>
-      </div>
-      <div class="service">
-        <span class="dot pending" id="dot-asset"></span>
-        <span class="name">Asset Processor</span>
-        <span class="detail" id="detail-asset">—</span>
+    <!-- One clear status; the technical breakdown is opt-in below. -->
+    <div class="status-card">
+      <span class="dot pending" id="status-dot"></span>
+      <div>
+        <div class="status-headline" id="status-headline">Connecting…</div>
+        <div class="status-sub" id="status-sub"></div>
       </div>
     </div>
 
-    <div class="url-row">
-      <div class="label">Frontend</div>
-      <div class="url-line">
-        <code id="frontend-url">—</code>
-        <button class="icon" id="copy-url" title="Copy URL">Copy</button>
-        <button class="primary" id="open-frontend">Open</button>
+    <details class="details">
+      <summary>Show details</summary>
+      <div class="services">
+        <div class="service">
+          <span class="dot pending" id="dot-backend"></span>
+          <span class="name">Modelibr service</span>
+          <span class="detail" id="detail-backend">—</span>
+        </div>
+        <div class="service">
+          <span class="dot pending" id="dot-database"></span>
+          <span class="name">Storage</span>
+          <span class="detail" id="detail-database">—</span>
+        </div>
+        <div class="service">
+          <span class="dot pending" id="dot-asset"></span>
+          <span class="name">Preview generator</span>
+          <span class="detail" id="detail-asset">—</span>
+        </div>
       </div>
+    </details>
+
+    <button class="hero" id="open-frontend" disabled>Open Modelibr</button>
+    <div class="address-line">
+      <code id="frontend-url">—</code>
+      <button class="icon" id="copy-url" title="Copy address">Copy</button>
     </div>
 
     <div class="install">
@@ -196,41 +236,51 @@
     </div>
 
     <details class="config">
-      <summary>Configuration</summary>
+      <summary>Settings</summary>
       <div class="config-body">
         <div class="config-field">
           <label for="cfg-port">App port</label>
           <input type="number" id="cfg-port" min="1024" max="65535" />
         </div>
         <div class="config-subnote">
-          Desktop clients connect to this port — change it and they'll need to reconnect to the new one.
+          The address you open Modelibr at, and what desktop clients connect to. Change it and clients will need to reconnect.
         </div>
-        <div class="config-field">
-          <label for="cfg-api-port">Backend port</label>
-          <input type="number" id="cfg-api-port" min="1024" max="65535" />
-        </div>
-        <div class="config-field">
-          <label for="cfg-db-port">Database port</label>
-          <input type="number" id="cfg-db-port" min="1024" max="65535" />
-        </div>
-        <div class="config-field">
-          <label for="cfg-workers">Worker processes</label>
-          <input type="number" id="cfg-workers" min="1" max="16" />
-        </div>
-        <div class="config-field">
-          <label for="cfg-jobs">Jobs per worker</label>
-          <input type="number" id="cfg-jobs" min="1" max="16" />
-        </div>
-        <div class="config-field">
-          <label for="cfg-gpu">Hardware acceleration</label>
-          <input type="checkbox" id="cfg-gpu" />
-        </div>
+
         <div class="config-field data-folder">
           <label for="cfg-data">Data folder</label>
           <button id="cfg-data-browse" class="icon">Browse…</button>
         </div>
         <input type="text" id="cfg-data" class="data-path" placeholder="" readonly />
-        <button id="cfg-data-default" class="link-btn">Use default location</button>
+        <div class="folder-actions">
+          <button id="cfg-data-default" class="link-btn">Use default location</button>
+          <button id="open-data" class="link-btn">Open current folder</button>
+        </div>
+
+        <details class="advanced">
+          <summary>Advanced</summary>
+          <div class="config-subnote">Most people never need to change these.</div>
+          <div class="config-field">
+            <label for="cfg-api-port">Backend port</label>
+            <input type="number" id="cfg-api-port" min="1024" max="65535" />
+          </div>
+          <div class="config-field">
+            <label for="cfg-db-port">Database port</label>
+            <input type="number" id="cfg-db-port" min="1024" max="65535" />
+          </div>
+          <div class="config-field">
+            <label for="cfg-workers">Worker processes</label>
+            <input type="number" id="cfg-workers" min="1" max="16" />
+          </div>
+          <div class="config-field">
+            <label for="cfg-jobs">Jobs per worker</label>
+            <input type="number" id="cfg-jobs" min="1" max="16" />
+          </div>
+          <div class="config-field">
+            <label for="cfg-gpu">Hardware acceleration</label>
+            <input type="checkbox" id="cfg-gpu" />
+          </div>
+        </details>
+
         <div class="config-actions">
           <span class="config-note" id="cfg-note"></span>
           <button id="cfg-reset">Reset</button>
@@ -240,7 +290,6 @@
     </details>
 
     <footer>
-      <button id="open-data">Data folder</button>
       <button id="restart">Restart</button>
       <button id="quit">Quit</button>
     </footer>
@@ -264,36 +313,50 @@
       }
 
       function setDot(id, state) {
-        const dot = $(id)
-        dot.className = 'dot ' + state
+        $(id).className = 'dot ' + state
+      }
+
+      // The single, plain-language status at the top of the window.
+      function setOverall(state, headline, sub) {
+        setDot('status-dot', state)
+        $('status-headline').textContent = headline
+        $('status-sub').textContent = sub || ''
+      }
+
+      function setOpenEnabled(enabled) {
+        $('open-frontend').disabled = !enabled
       }
 
       function render(status) {
         if (!status) return
 
-        // While a restart is in flight the old instance is still being torn
-        // down, so its health probe keeps reporting "up". Freeze the UI to a
-        // restarting state instead of repainting green dots that contradict the
-        // "restarting…" label.
+        // While a restart is in flight the old instance is still draining, so its
+        // health probe keeps reporting "up". Freeze to a restarting state rather
+        // than repainting green that contradicts the headline.
         if (restarting) {
-          $('phase').textContent = 'restarting…'
+          setOverall('pending', 'Restarting…', 'This takes a few seconds.')
           setDot('dot-backend', 'pending')
           setDot('dot-database', 'pending')
           setDot('dot-asset', 'pending')
+          setOpenEnabled(false)
           return
         }
 
-        if (status.phase === 'starting') {
-          $('phase').textContent = 'starting services…'
+        const starting = status.phase === 'starting'
+        const allUp =
+          status.backend?.up && status.database?.up && status.assetProcessor?.up
+
+        if (starting) {
+          setOverall('pending', 'Starting up…', 'First launch can take a minute while Modelibr sets up.')
         } else if (status.phase === 'error') {
-          $('phase').textContent = status.error || 'failed to start'
+          setOverall('down', 'Needs attention', status.error || 'Modelibr failed to start.')
+        } else if (allUp) {
+          setOverall('up', 'Modelibr is ready', '')
         } else {
-          const allUp =
-            status.backend?.up && status.database?.up && status.assetProcessor?.up
-          $('phase').textContent = allUp ? 'running' : 'degraded'
+          setOverall('pending', 'Partly running', "Some parts aren't responding yet — open Show details to see which.")
         }
 
-        const starting = status.phase === 'starting'
+        setOpenEnabled(status.phase === 'ready')
 
         const backend = status.backend || {}
         setDot('dot-backend', backend.up ? 'up' : starting ? 'pending' : 'down')
@@ -309,23 +372,19 @@
           : starting ? 'pending' : 'down'
         setDot('dot-asset', assetState)
         $('detail-asset').textContent =
-          asset.configured != null ? `${asset.healthy}/${asset.configured} workers` : ''
+          asset.configured != null ? `${asset.healthy}/${asset.configured} ready` : ''
 
         if (status.frontendUrl) $('frontend-url').textContent = status.frontendUrl
 
-        // A saved port / data-folder change only goes live after a relaunch.
-        // Until then the URL shown above is the *current working* one (the
-        // services are still bound to it), so prompt for a restart rather than
-        // silently pointing at a port nothing is serving yet.
+        // A saved port / data-folder change only goes live after a relaunch, so
+        // nudge the user to restart (the address shown is still the working one).
         const restartBtn = $('restart')
-        if (!restarting) {
-          if (status.pendingRestart) {
-            restartBtn.textContent = 'Restart to apply'
-            restartBtn.classList.add('pending')
-          } else {
-            restartBtn.textContent = 'Restart'
-            restartBtn.classList.remove('pending')
-          }
+        if (status.pendingRestart) {
+          restartBtn.textContent = 'Restart to apply'
+          restartBtn.classList.add('pending')
+        } else {
+          restartBtn.textContent = 'Restart'
+          restartBtn.classList.remove('pending')
         }
       }
 
@@ -398,7 +457,10 @@
             await loadConfig()
           }
         } catch (err) {
-          $('phase').textContent = 'disconnected'
+          if (!restarting) {
+            setOverall('down', 'Disconnected', 'Lost contact with the Modelibr host.')
+            setOpenEnabled(false)
+          }
         }
       }
 
@@ -492,7 +554,7 @@
             $('cfg-note').textContent = result.restartRequired
               ? 'Saved — restart to apply (ports / data folder).'
               : 'Saved.'
-            toast('Configuration saved')
+            toast('Settings saved')
           }
         } finally {
           $('cfg-apply').disabled = false
@@ -502,7 +564,7 @@
       $('open-frontend').addEventListener('click', () => api.openFrontend())
       $('copy-url').addEventListener('click', async () => {
         await api.copyFrontendUrl()
-        toast('Frontend URL copied')
+        toast('Address copied')
       })
       $('open-data').addEventListener('click', () => api.openDataFolder())
 
@@ -566,11 +628,12 @@
         btn.textContent = 'Restarting…'
         btn.classList.remove('pending')
         // Reflect the restarting state immediately (render() keeps it frozen on
-        // the next poll) so the dots don't stay green during the relaunch.
-        $('phase').textContent = 'restarting…'
+        // the next poll) so nothing stays green during the relaunch.
+        setOverall('pending', 'Restarting…', 'This takes a few seconds.')
         setDot('dot-backend', 'pending')
         setDot('dot-database', 'pending')
         setDot('dot-asset', 'pending')
+        setOpenEnabled(false)
         await api.restart()
         // The host relaunches and this window is torn down; nothing else to do.
       })
