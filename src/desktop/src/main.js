@@ -158,7 +158,7 @@ function buildTrayMenu() {
       click: () => performRestart(),
     },
     { type: 'separator' },
-    { label: 'Quit Modelibr', click: () => app.quit() },
+    { label: 'Quit Modelibr', click: () => confirmAndQuit() },
   ])
 }
 
@@ -283,6 +283,35 @@ function performRestart() {
   app.relaunch()
   app.quit()
   return true
+}
+
+// Quitting stops Modelibr and all its services for everyone using this host
+// (browser tabs and connected desktop clients), so confirm before doing it —
+// it's an easy thing to click by accident. Defaults to Cancel for safety.
+let quitConfirmInFlight = false
+async function confirmAndQuit() {
+  if (quitConfirmInFlight) {
+    return
+  }
+  quitConfirmInFlight = true
+  try {
+    const { response } = await dialog.showMessageBox({
+      type: 'question',
+      buttons: ['Cancel', 'Quit Modelibr'],
+      defaultId: 0,
+      cancelId: 0,
+      title: 'Quit Modelibr?',
+      message: 'Quit Modelibr?',
+      detail:
+        'This stops Modelibr and its services. Anything connected — browser ' +
+        'tabs or desktop clients — will lose access until you start it again.',
+    })
+    if (response === 1) {
+      app.quit()
+    }
+  } finally {
+    quitConfirmInFlight = false
+  }
 }
 
 function registerIpc() {
@@ -436,9 +465,7 @@ function registerIpc() {
     return { ok: true, started, alreadyRestarting: !started }
   })
 
-  ipcMain.handle('modelibr:quit', () => {
-    app.quit()
-  })
+  ipcMain.handle('modelibr:quit', () => confirmAndQuit())
 }
 
 // ── Lifecycle ───────────────────────────────────────────────────────────────
