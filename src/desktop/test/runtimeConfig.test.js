@@ -42,6 +42,15 @@ test('hardware acceleration is opt-in (true / "true" only)', () => {
   assert.equal(sanitizeRuntimeConfig({}).enableHardwareAcceleration, false)
 })
 
+test('network access is opt-in (true / "true" only) and needs a restart', () => {
+  assert.equal(sanitizeRuntimeConfig({}).allowNetworkAccess, false)
+  assert.equal(sanitizeRuntimeConfig({ allowNetworkAccess: true }).allowNetworkAccess, true)
+  assert.equal(sanitizeRuntimeConfig({ allowNetworkAccess: 'true' }).allowNetworkAccess, true)
+  assert.equal(sanitizeRuntimeConfig({ allowNetworkAccess: 'yes' }).allowNetworkAccess, false)
+  const base = sanitizeRuntimeConfig({})
+  assert.equal(requiresRestart(base, { ...base, allowNetworkAccess: true }), true)
+})
+
 test('save then load round-trips a config', async () => {
   const dir = await tempDir()
   try {
@@ -112,6 +121,7 @@ test('every setting survives a full save → load round-trip', async () => {
       maxConcurrentJobsPerWorker: 6,
       enableHardwareAcceleration: true,
       dataDirectory: path.join(os.tmpdir(), 'mlbr-roundtrip-data'),
+      allowNetworkAccess: true,
     }
     await saveRuntimeConfig(configPath, desired)
 

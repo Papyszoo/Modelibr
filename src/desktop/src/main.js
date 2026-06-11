@@ -413,6 +413,7 @@ function registerIpc() {
         maxConcurrentJobsPerWorker: config.maxConcurrentJobsPerWorker,
         enableHardwareAcceleration: config.enableHardwareAcceleration,
         dataDirectory: config.dataDirectory,
+        allowNetworkAccess: config.allowNetworkAccess,
       },
     }
   })
