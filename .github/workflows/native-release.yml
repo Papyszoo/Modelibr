@@ -183,6 +183,17 @@ jobs:
           MODELIBR_WEBAPI_PUBLISH_DIR: ${{ github.workspace }}/src/desktop/build-input/webapi
         run: npm run dist -- --${{ matrix.electronArch }}
 
+      # Boot the real WebApi + embedded Postgres from the just-staged runtime,
+      # upload a model, move the data folder, and confirm it survived. Runs on
+      # every OS that built a runtime, so data-folder migration is verified
+      # cross-platform before anything ships.
+      - name: Integration test — data survives a data-folder change
+        working-directory: src/desktop
+        shell: bash
+        env:
+          MODELIBR_RUNTIME_DIR: ${{ github.workspace }}/src/desktop/build/runtime
+        run: npm run test:integration
+
       - name: Upload workflow artifacts
         uses: actions/upload-artifact@v4
         with:
