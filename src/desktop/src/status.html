@@ -115,6 +115,17 @@
       .install .text b { color: var(--text); font-weight: 600; }
       .install button { margin-left: auto; white-space: nowrap; }
 
+      .leftover {
+        background: var(--panel); border: 1px solid var(--border);
+        border-radius: 9px; padding: 10px 11px; margin-bottom: 12px;
+      }
+      .leftover-text { font-size: 11.5px; color: var(--muted); line-height: 1.4; }
+      .leftover-text code {
+        color: var(--text); font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 11px; word-break: break-all;
+      }
+      .leftover-actions { display: flex; gap: 8px; margin-top: 9px; justify-content: flex-end; }
+
       details.config {
         background: var(--panel); border: 1px solid var(--border);
         border-radius: 9px; padding: 0; margin-bottom: 12px; overflow: hidden;
@@ -237,6 +248,17 @@
         <b>Desktop client</b> — <span id="install-text">open Modelibr in its own app window instead of a browser tab.</span>
       </div>
       <button id="install-client">Install</button>
+    </div>
+
+    <div class="leftover" id="leftover-note" style="display:none">
+      <div class="leftover-text">
+        Your previous data folder is still on disk as a backup —
+        <code id="leftover-path"></code>. Safe to delete once you've confirmed everything moved over.
+      </div>
+      <div class="leftover-actions">
+        <button id="leftover-open">Open folder</button>
+        <button id="leftover-dismiss">Dismiss</button>
+      </div>
     </div>
 
     <details class="config">
@@ -573,6 +595,22 @@
       })
       $('open-data').addEventListener('click', () => api.openDataFolder())
 
+      // ── Leftover data folder (after a data-folder move) ──
+      async function refreshLeftoverFolder() {
+        const folder = await api.getPreviousDataFolder().catch(() => null)
+        if (folder) {
+          $('leftover-path').textContent = folder
+          $('leftover-note').style.display = ''
+        } else {
+          $('leftover-note').style.display = 'none'
+        }
+      }
+      $('leftover-open').addEventListener('click', () => api.openPreviousDataFolder())
+      $('leftover-dismiss').addEventListener('click', async () => {
+        await api.dismissPreviousDataFolder()
+        $('leftover-note').style.display = 'none'
+      })
+
       // ── Desktop client install ──
       const installDefaultText =
         'open Modelibr in its own app window instead of a browser tab.'
@@ -647,6 +685,7 @@
 
       refresh()
       refreshClientStatus()
+      refreshLeftoverFolder()
       setInterval(refresh, 1500)
     </script>
   </body>

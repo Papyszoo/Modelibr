@@ -2,9 +2,34 @@ import fs from 'fs/promises'
 import path from 'path'
 
 const MARKER = 'pending-data-migration.json'
+const LEFTOVER = 'previous-data-folder.json'
 
 export function migrationMarkerPath(userDataDir) {
   return path.join(userDataDir, MARKER)
+}
+
+function leftoverPath(userDataDir) {
+  return path.join(userDataDir, LEFTOVER)
+}
+
+// After a successful migration the old folder is left in place as a backup. We
+// record it so the UI can offer to open it and reassure the user it's safe to
+// delete — we never delete a data folder ourselves (too easy to lose the DB).
+export async function writeLeftoverFolder(userDataDir, folder) {
+  await fs.mkdir(userDataDir, { recursive: true })
+  await fs.writeFile(leftoverPath(userDataDir), JSON.stringify({ path: folder }), 'utf8')
+}
+
+export async function readLeftoverFolder(userDataDir) {
+  try {
+    return JSON.parse(await fs.readFile(leftoverPath(userDataDir), 'utf8'))
+  } catch {
+    return null
+  }
+}
+
+export async function clearLeftoverFolder(userDataDir) {
+  await fs.rm(leftoverPath(userDataDir), { force: true })
 }
 
 async function pathExists(target) {

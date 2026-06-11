@@ -9,6 +9,9 @@ import {
   readMigrationMarker,
   writeMigrationMarker,
   clearMigrationMarker,
+  writeLeftoverFolder,
+  readLeftoverFolder,
+  clearLeftoverFolder,
 } from '../src/dataMigration.js'
 
 function tmp() {
@@ -28,6 +31,19 @@ test('migration marker round-trips and clears', async () => {
     assert.deepEqual(await readMigrationMarker(userData), { from: '/old/root', to: '/new/root' })
     await clearMigrationMarker(userData)
     assert.equal(await readMigrationMarker(userData), null)
+  } finally {
+    await fs.rm(userData, { recursive: true, force: true })
+  }
+})
+
+test('leftover-folder record round-trips and clears', async () => {
+  const userData = await tmp()
+  try {
+    assert.equal(await readLeftoverFolder(userData), null)
+    await writeLeftoverFolder(userData, '/old/data')
+    assert.deepEqual(await readLeftoverFolder(userData), { path: '/old/data' })
+    await clearLeftoverFolder(userData)
+    assert.equal(await readLeftoverFolder(userData), null)
   } finally {
     await fs.rm(userData, { recursive: true, force: true })
   }

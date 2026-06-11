@@ -10,6 +10,7 @@ import {
   screen,
   shell,
 } from 'electron'
+import fs from 'fs/promises'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
@@ -19,6 +20,7 @@ import { loadRuntimeConfig, saveRuntimeConfig } from './runtimeConfig.js'
 import { UpdateManager } from './updateManager.js'
 import { installClient, CLIENT_RELEASES_URL } from './clientInstaller.js'
 import { detectInstalledClient } from './clientDetection.js'
+import { readLeftoverFolder, clearLeftoverFolder } from './dataMigration.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -462,6 +464,36 @@ function registerIpc() {
       return null
     }
     return result.filePaths[0]
+  })
+
+  // The folder left behind after a data-folder move. Only surfaced while it
+  // still exists on disk — if the user already deleted it, forget it.
+  ipcMain.handle('modelibr:previous-data-folder', async () => {
+    if (!runtimeManager) return null
+    const record = await readLeftoverFolder(runtimeManager.userDataDir)
+    if (!record?.path) return null
+    try {
+      await fs.access(record.path)
+    } catch {
+      await clearLeftoverFolder(runtimeManager.userDataDir)
+      return null
+    }
+    return record.path
+  })
+
+  ipcMain.handle('modelibr:open-previous-data-folder', async () => {
+    if (!runtimeManager) return { ok: false }
+    const record = await readLeftoverFolder(runtimeManager.userDataDir)
+    if (!record?.path) return { ok: false }
+    const error = await shell.openPath(record.path)
+    return { ok: !error }
+  })
+
+  ipcMain.handle('modelibr:dismiss-previous-data-folder', async () => {
+    if (runtimeManager) {
+      await clearLeftoverFolder(runtimeManager.userDataDir)
+    }
+    return { ok: true }
   })
 
   ipcMain.handle('modelibr:restart', () => {
