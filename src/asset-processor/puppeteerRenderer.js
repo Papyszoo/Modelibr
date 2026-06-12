@@ -40,6 +40,30 @@ export class PuppeteerRenderer {
       process.env.CHROMIUM_PATH ||
       undefined
 
+    // The "software" (non-hardware) WebGL path is platform-specific because the
+    // portable SwiftShader path doesn't work everywhere:
+    //   - macOS: ANGLE → Vulkan → SwiftShader fails to create a context
+    //     ("BindToCurrentSequence failed"); every Mac has a Metal GPU, so use it.
+    //   - Windows: SwiftShader-GL is extremely slow; ANGLE's default D3D11
+    //     backend falls back to WARP (a fast software rasterizer) on GPU-less
+    //     VMs, so it renders correctly and far faster.
+    //   - Linux/headless: SwiftShader is the only thing that works without a GPU.
+    const softwareGpuArgs =
+      process.platform === 'darwin'
+        ? ['--use-angle=metal']
+        : process.platform === 'win32'
+          ? ['--use-angle=d3d11']
+          : ['--disable-gpu', '--use-gl=angle', '--use-angle=swiftshader']
+
+    const gpuArgs = config.rendering.useHardwareAcceleration
+      ? [
+          '--ignore-gpu-blocklist',
+          '--enable-gpu-rasterization',
+          '--enable-zero-copy',
+          '--use-angle=default',
+        ]
+      : softwareGpuArgs
+
     const launchOptions = {
       headless: true,
       args: [
@@ -47,9 +71,7 @@ export class PuppeteerRenderer {
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--js-flags=--max-old-space-size=4096',
-        '--disable-gpu',
-        '--use-gl=angle',
-        '--use-angle=swiftshader',
+        ...gpuArgs,
         '--enable-webgl',
         '--disable-extensions',
         '--disable-web-security',
@@ -121,6 +143,24 @@ export class PuppeteerRenderer {
    */
   async _initializePage() {
     this.page = await this.browser.newPage()
+
+    // Surface why the render template failed to load (e.g. a module/import the
+    // bundle is missing) instead of only seeing the downstream "window.THREE
+    // never defined" timeout.
+    this.page.on('pageerror', error =>
+      logger.error('Render template page error', { error: error.message })
+    )
+    this.page.on('console', message => {
+      if (message.type() === 'error') {
+        logger.error('Render template console error', { text: message.text() })
+      }
+    })
+    this.page.on('requestfailed', request =>
+      logger.error('Render template request failed', {
+        url: request.url(),
+        error: request.failure()?.errorText,
+      })
+    )
 
     await this.page.setViewport({
       width: config.rendering.outputWidth,

@@ -508,4 +508,15 @@ tests/e2e/.shared-state.json
 
 .playwright-mcp
 E2E_REPORT.md
-.claude/
+# Ignore Claude Code local state (worktrees, local settings) but version the
+# project skills and agents so they're shared with the repo.
+.claude/*
+!.claude/skills/
+!.claude/agents/
+
+# Local test mega-runner output (scripts/test-runner) — repo-root only, so it
+# does not also match the source dirs under scripts/.
+/test-report/
+
+# Test Studio generated catalog (scripts/test-catalog)
+/test-catalog/

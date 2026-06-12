@@ -133,6 +133,26 @@ internal sealed class ThumbnailJobRepository : IThumbnailJobRepository
         }
     }
 
+    public async Task<bool> TryClaimPendingJobAsync(int jobId, string workerId, DateTime claimedAtUtc, CancellationToken cancellationToken = default)
+    {
+        // Single atomic statement: UPDATE ... WHERE Id = @id AND Status = Pending.
+        // PostgreSQL row-locks the matching row, so when several workers race only
+        // the first commit changes the row; the rest re-evaluate the predicate
+        // against the now-Processing row and update zero rows. This mirrors the
+        // domain TryClaim transition (status/lock/attempt/timestamp).
+        var rowsAffected = await _context.ThumbnailJobs
+            .Where(tj => tj.Id == jobId && tj.Status == ThumbnailJobStatus.Pending)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(tj => tj.Status, ThumbnailJobStatus.Processing)
+                .SetProperty(tj => tj.LockedBy, workerId)
+                .SetProperty(tj => tj.LockedAt, claimedAtUtc)
+                .SetProperty(tj => tj.AttemptCount, tj => tj.AttemptCount + 1)
+                .SetProperty(tj => tj.UpdatedAt, claimedAtUtc),
+                cancellationToken);
+
+        return rowsAffected == 1;
+    }
+
     public async Task<IEnumerable<ThumbnailJob>> GetJobsWithExpiredLocksAsync(CancellationToken cancellationToken = default)
     {
         var currentTime = DateTime.UtcNow;

@@ -1,7 +1,7 @@
 {
     "name": "modelibr",
     "private": true,
-    "version": "1.0.0",
+    "version": "0.1.0",
     "description": "A modern 3D model file upload service built with .NET 9.0 and React",
     "type": "module",
     "scripts": {
@@ -12,7 +12,16 @@
         "test:frontend": "cd src/frontend && npm test",
         "test:e2e": "cd tests/e2e && npm test",
         "test:e2e:demo": "cd tests/e2e && npm run test:demo",
-        "build:frontend": "cd src/frontend && npm run build"
+        "test:all": "node scripts/test-runner/index.mjs",
+        "test:all:fast": "node scripts/test-runner/index.mjs --tier=fast --yes",
+        "test:all:full": "node scripts/test-runner/index.mjs --all --yes",
+        "test:audit": "node scripts/test-runner/discover.mjs",
+        "test:catalog": "node scripts/test-catalog/build-catalog.mjs",
+        "test:site": "node scripts/test-catalog/build-catalog.mjs && node scripts/test-catalog/server.mjs",
+        "test:site:fast": "node scripts/test-catalog/build-catalog.mjs --no-github && node scripts/test-catalog/server.mjs",
+        "build:frontend": "cd src/frontend && npm run build",
+        "stage:desktop": "cd src/desktop && npm run stage",
+        "build:desktop": "cd src/desktop && npm run dist"
     },
     "repository": {
         "type": "git",
