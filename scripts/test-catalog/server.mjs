@@ -73,7 +73,8 @@ function ensureCatalog(res) {
             catalogDirty = false;
         } catch (e) {
             if (missing) {
-                send(res, 500, { error: `catalog build failed: ${e.message || e}` });
+                console.error("[test-site] catalog build failed:", e);
+                send(res, 500, { error: "catalog build failed (see server log)" });
                 return false;
             }
         }
@@ -141,7 +142,8 @@ function startRun(spec, res) {
     try {
         rs = buildRunSpec(spec);
     } catch (e) {
-        return send(res, 400, { error: String(e.message || e) });
+        console.error("[test-site] invalid run spec:", e);
+        return send(res, 400, { error: "invalid run request (see server log)" });
     }
 
     fs.mkdirSync(rs.workDir, { recursive: true });
@@ -266,7 +268,7 @@ const server = http.createServer(async (req, res) => {
     if (p === "/api/run/stop" && req.method === "POST") return stopRun(res);
     if (p === "/api/run" && req.method === "POST") return startRun(await readBody(req), res);
     if (p === "/api/github/refresh" && req.method === "POST") {
-        try { buildCatalog({ github: true, refreshGh: true, quiet: true }); } catch (e) { return send(res, 500, { error: String(e.message || e) }); }
+        try { buildCatalog({ github: true, refreshGh: true, quiet: true }); } catch (e) { console.error("[test-site] github refresh failed:", e); return send(res, 500, { error: "github refresh failed (see server log)" }); }
         return send(res, 200, { ok: true });
     }
     if (p.startsWith("/report/") && req.method === "GET") return serveReport(req, res, decodeURIComponent(p.slice("/report/".length)));
