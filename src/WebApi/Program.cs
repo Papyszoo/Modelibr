@@ -33,22 +33,39 @@ namespace WebApi
             // Allow uploads up to 1 GB (Kestrel + form options)
             const long maxFileSize = 1L * 1024 * 1024 * 1024; // 1 GB
 
-            // Generate a self-signed certificate once in memory for HTTPS
-            var selfSignedCert = GenerateSelfSignedCertificate();
+            var disableHttpsListener = builder.Configuration.GetValue<bool>("DISABLE_HTTPS_LISTENER");
+            var httpPort = builder.Configuration.GetValue<int?>("HTTP_PORT");
+
+            X509Certificate2? selfSignedCert = null;
+            if (!disableHttpsListener)
+            {
+                // Generate a self-signed certificate once in memory for HTTPS
+                selfSignedCert = GenerateSelfSignedCertificate();
+            }
 
             builder.WebHost.ConfigureKestrel(options =>
             {
                 options.Limits.MaxRequestBodySize = maxFileSize;
 
+                if (httpPort is > 0)
+                {
+                    options.ListenAnyIP(httpPort.Value);
+                }
+
+                if (disableHttpsListener)
+                {
+                    return;
+                }
+
                 var httpsPort = builder.Configuration.GetValue<int>("HTTPS_PORT", 8443);
                 options.ListenAnyIP(httpsPort, listenOptions =>
-                    listenOptions.UseHttps(selfSignedCert));
+                    listenOptions.UseHttps(selfSignedCert!));
 
                 var expose443 = builder.Configuration.GetValue<bool>("EXPOSE_443_PORT", true);
                 if (expose443 && httpsPort != 443)
                 {
                     options.ListenAnyIP(443, listenOptions =>
-                        listenOptions.UseHttps(selfSignedCert));
+                        listenOptions.UseHttps(selfSignedCert!));
                 }
             });
             builder.Services.Configure<FormOptions>(options =>
@@ -113,7 +130,7 @@ namespace WebApi
             // Only use HTTPS redirection when not running in a container
             // This prevents certificate issues with internal Docker communication
             var disableHttpsRedirection = builder.Configuration.GetValue<bool>("DisableHttpsRedirection");
-            if (!disableHttpsRedirection)
+            if (!disableHttpsRedirection && !disableHttpsListener)
             {
                 app.UseHttpsRedirection();
             }

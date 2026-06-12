@@ -1,0 +1,702 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:;" />
+    <title>Modelibr</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #15171c;
+        --panel: #1d2027;
+        --panel-2: #23262f;
+        --border: #2c3038;
+        --text: #e7e9ee;
+        --muted: #9aa0ad;
+        --up: #34d399;
+        --down: #f87171;
+        --pending: #fbbf24;
+        --accent: #6366f1;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; }
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        padding: 14px 14px 10px;
+        overflow-y: auto;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+      header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+      header .logo {
+        width: 28px; height: 28px; border-radius: 7px;
+        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        display: grid; place-items: center; font-weight: 700; color: #fff;
+      }
+      header h1 { font-size: 15px; margin: 0; font-weight: 600; }
+
+      .update-banner {
+        display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--muted);
+        margin-bottom: 12px; padding: 8px 11px;
+        background: var(--panel); border: 1px solid var(--border); border-radius: 9px;
+      }
+      .update-banner.available { color: var(--text); border-color: var(--accent); background: rgba(99,102,241,.12); }
+      .update-banner .ub-text { flex: 1; cursor: pointer; }
+      .update-banner button { padding: 4px 10px; }
+
+      .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; background: var(--muted); }
+      .dot.up { background: var(--up); box-shadow: 0 0 0 3px rgba(52,211,153,.15); }
+      .dot.down { background: var(--down); box-shadow: 0 0 0 3px rgba(248,113,113,.15); }
+      .dot.pending { background: var(--pending); box-shadow: 0 0 0 3px rgba(251,191,36,.15); animation: pulse 1.1s infinite; }
+      @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+      /* One outcome-level status instead of a wall of components. */
+      .status-card {
+        display: flex; align-items: center; gap: 12px;
+        background: var(--panel); border: 1px solid var(--border);
+        border-radius: 11px; padding: 13px 14px; margin-bottom: 8px;
+      }
+      .status-card .dot { width: 14px; height: 14px; }
+      .status-headline { font-size: 14px; font-weight: 600; }
+      .status-sub { font-size: 11px; color: var(--muted); margin-top: 2px; line-height: 1.35; }
+
+      /* Component breakdown, on demand. */
+      details.details { margin-bottom: 12px; }
+      details.details > summary {
+        list-style: none; cursor: pointer; font-size: 11px; color: var(--muted); padding: 2px 2px 6px;
+      }
+      details.details > summary::-webkit-details-marker { display: none; }
+      details.details > summary::before { content: '▸ '; }
+      details.details[open] > summary::before { content: '▾ '; }
+      .services { display: flex; flex-direction: column; gap: 6px; }
+      .service {
+        display: flex; align-items: center; gap: 10px;
+        background: var(--panel); border: 1px solid var(--border);
+        border-radius: 9px; padding: 9px 11px;
+      }
+      .service .name { font-weight: 500; }
+      .service .detail { margin-left: auto; color: var(--muted); font-size: 11px; }
+
+      button {
+        font: inherit; color: var(--text); cursor: pointer;
+        background: var(--panel-2); border: 1px solid var(--border);
+        border-radius: 7px; padding: 6px 10px; transition: background .12s, border-color .12s;
+      }
+      button:hover { background: #2c3038; border-color: #3a3f49; }
+      button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+      button.primary:hover { background: #5457e6; }
+      button.icon { padding: 6px 9px; }
+
+      /* The one thing most people open this window to do. */
+      button.hero {
+        width: 100%; font-size: 14px; font-weight: 600; padding: 11px;
+        background: var(--accent); border-color: var(--accent); color: #fff; margin-bottom: 8px;
+      }
+      button.hero:hover { background: #5457e6; }
+      button.hero:disabled { background: var(--panel-2); border-color: var(--border); color: var(--muted); cursor: default; }
+
+      .address-line { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+      .address-note { font-size: 10.5px; color: var(--pending); margin-bottom: 12px; line-height: 1.35; }
+      .address-line code {
+        flex: 1; font-size: 11px; color: var(--muted);
+        background: #0f1115; border: 1px solid var(--border); border-radius: 6px;
+        padding: 5px 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      .install {
+        display: flex; gap: 8px; align-items: center;
+        background: var(--panel); border: 1px solid var(--border);
+        border-radius: 9px; padding: 10px 11px; margin-bottom: 12px;
+      }
+      .install .text { font-size: 11.5px; color: var(--muted); line-height: 1.35; }
+      .install .text b { color: var(--text); font-weight: 600; }
+      .install button { margin-left: auto; white-space: nowrap; }
+
+      .leftover {
+        background: var(--panel); border: 1px solid var(--border);
+        border-radius: 9px; padding: 10px 11px; margin-bottom: 12px;
+      }
+      .leftover-text { font-size: 11.5px; color: var(--muted); line-height: 1.4; }
+      .leftover-text code {
+        color: var(--text); font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 11px; word-break: break-all;
+      }
+      .leftover-actions { display: flex; gap: 8px; margin-top: 9px; justify-content: flex-end; }
+
+      details.config {
+        background: var(--panel); border: 1px solid var(--border);
+        border-radius: 9px; padding: 0; margin-bottom: 12px; overflow: hidden;
+      }
+      details.config > summary {
+        list-style: none; cursor: pointer; padding: 10px 11px;
+        font-weight: 500; display: flex; align-items: center; gap: 8px;
+      }
+      details.config > summary::-webkit-details-marker { display: none; }
+      details.config > summary::after {
+        content: '▸'; margin-left: auto; color: var(--muted); transition: transform .15s;
+      }
+      details.config[open] > summary::after { transform: rotate(90deg); }
+      .config-body { padding: 4px 11px 11px; border-top: 1px solid var(--border); }
+      .config-field { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+      .config-field label { flex: 1; color: var(--muted); }
+      .config-field input[type="number"] {
+        width: 88px; font: inherit; color: var(--text);
+        background: #0f1115; border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px;
+      }
+      .config-field input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); }
+      .config-subnote { font-size: 10.5px; color: var(--muted); margin-top: 5px; line-height: 1.35; }
+      .config-field.data-folder { margin-top: 12px; }
+      input.data-path {
+        width: 100%; margin-top: 6px; font: inherit; color: var(--text);
+        background: #0f1115; border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px;
+        overflow: hidden; text-overflow: ellipsis;
+      }
+      .link-btn {
+        background: none; border: none; color: var(--accent); padding: 4px 0; margin-top: 4px;
+        font-size: 11px; cursor: pointer;
+      }
+      .link-btn:hover { background: none; text-decoration: underline; }
+      .folder-actions { display: flex; gap: 14px; }
+
+      /* Advanced settings — tucked away so the common fields stay uncluttered. */
+      details.advanced { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 4px; }
+      details.advanced > summary {
+        list-style: none; cursor: pointer; font-size: 11.5px; color: var(--muted); padding: 6px 0;
+      }
+      details.advanced > summary::-webkit-details-marker { display: none; }
+      details.advanced > summary::before { content: '▸ '; }
+      details.advanced[open] > summary::before { content: '▾ '; }
+
+      .config-actions { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+      .config-note { font-size: 11px; color: var(--pending); flex: 1; min-height: 14px; }
+
+      footer { display: flex; gap: 8px; }
+      footer button { flex: 1; }
+      footer button#restart.pending {
+        background: var(--accent); border-color: var(--accent); color: #fff;
+      }
+      footer button#restart.pending:hover { background: #5457e6; }
+      /* A centered, opaque pill so the message stays readable instead of
+         bleeding transparent text over the footer buttons underneath it. */
+      .toast {
+        position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%);
+        max-width: calc(100% - 28px); text-align: center;
+        background: #0f1115; border: 1px solid var(--border); border-radius: 12px;
+        padding: 5px 14px; font-size: 11px; color: var(--up);
+        box-shadow: 0 6px 18px rgba(0,0,0,.5);
+        opacity: 0; transition: opacity .2s; pointer-events: none;
+      }
+      .toast.show { opacity: 1; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="logo">M</div>
+      <h1>Modelibr</h1>
+    </header>
+
+    <div class="update-banner" id="update-banner">
+      <span class="ub-text" id="ub-text" title="Click to check for updates">Checking for updates…</span>
+      <button class="primary" id="ub-action" style="display:none">Update</button>
+    </div>
+
+    <!-- One clear status; the technical breakdown is opt-in below. -->
+    <div class="status-card">
+      <span class="dot pending" id="status-dot"></span>
+      <div>
+        <div class="status-headline" id="status-headline">Connecting…</div>
+        <div class="status-sub" id="status-sub"></div>
+      </div>
+    </div>
+
+    <details class="details">
+      <summary>Show details</summary>
+      <div class="services">
+        <div class="service">
+          <span class="dot pending" id="dot-backend"></span>
+          <span class="name">Modelibr service</span>
+          <span class="detail" id="detail-backend">—</span>
+        </div>
+        <div class="service">
+          <span class="dot pending" id="dot-database"></span>
+          <span class="name">Storage</span>
+          <span class="detail" id="detail-database">—</span>
+        </div>
+        <div class="service">
+          <span class="dot pending" id="dot-asset"></span>
+          <span class="name">Preview generator</span>
+          <span class="detail" id="detail-asset">—</span>
+        </div>
+      </div>
+    </details>
+
+    <button class="hero" id="open-frontend" disabled>Open Modelibr</button>
+    <div class="address-line">
+      <code id="frontend-url">—</code>
+      <button class="icon" id="copy-url" title="Copy address">Copy</button>
+    </div>
+    <div class="address-note" id="address-note" style="display:none">
+      A saved port was in use, so Modelibr is running on a free one.
+    </div>
+
+    <div class="install">
+      <div class="text">
+        <b>Desktop client</b> — <span id="install-text">open Modelibr in its own app window instead of a browser tab.</span>
+      </div>
+      <button id="install-client">Install</button>
+    </div>
+
+    <div class="leftover" id="leftover-note" style="display:none">
+      <div class="leftover-text">
+        Your previous data folder is still on disk as a backup —
+        <code id="leftover-path"></code>. Safe to delete once you've confirmed everything moved over.
+      </div>
+      <div class="leftover-actions">
+        <button id="leftover-open">Open folder</button>
+        <button id="leftover-dismiss">Dismiss</button>
+      </div>
+    </div>
+
+    <details class="config">
+      <summary>Settings</summary>
+      <div class="config-body">
+        <div class="config-field">
+          <label for="cfg-port">App port</label>
+          <input type="number" id="cfg-port" min="1024" max="65535" />
+        </div>
+        <div class="config-subnote">
+          The address you open Modelibr at, and what desktop clients connect to. Change it and clients will need to reconnect.
+        </div>
+
+        <div class="config-field data-folder">
+          <label for="cfg-data">Data folder</label>
+          <button id="cfg-data-browse" class="icon">Browse…</button>
+        </div>
+        <input type="text" id="cfg-data" class="data-path" placeholder="" readonly />
+        <div class="folder-actions">
+          <button id="cfg-data-default" class="link-btn">Use default location</button>
+          <button id="open-data" class="link-btn">Open current folder</button>
+        </div>
+
+        <details class="advanced">
+          <summary>Advanced</summary>
+          <div class="config-subnote">Most people never need to change these.</div>
+          <div class="config-field">
+            <label for="cfg-api-port">Backend port</label>
+            <input type="number" id="cfg-api-port" min="1024" max="65535" />
+          </div>
+          <div class="config-field">
+            <label for="cfg-db-port">Database port</label>
+            <input type="number" id="cfg-db-port" min="1024" max="65535" />
+          </div>
+          <div class="config-field">
+            <label for="cfg-workers">Worker processes</label>
+            <input type="number" id="cfg-workers" min="1" max="16" />
+          </div>
+          <div class="config-field">
+            <label for="cfg-jobs">Jobs per worker</label>
+            <input type="number" id="cfg-jobs" min="1" max="16" />
+          </div>
+          <div class="config-field">
+            <label for="cfg-gpu">Hardware acceleration</label>
+            <input type="checkbox" id="cfg-gpu" />
+          </div>
+          <div class="config-field">
+            <label for="cfg-network">Allow access from my network</label>
+            <input type="checkbox" id="cfg-network" />
+          </div>
+          <div class="config-subnote">
+            Lets a desktop client on another computer connect to this host. Modelibr has no
+            password, so only turn this on for networks you trust.
+          </div>
+        </details>
+
+        <div class="config-actions">
+          <span class="config-note" id="cfg-note"></span>
+          <button id="cfg-reset">Reset</button>
+          <button class="primary" id="cfg-apply">Apply</button>
+        </div>
+      </div>
+    </details>
+
+    <footer>
+      <button id="restart">Restart</button>
+      <button id="quit">Quit</button>
+    </footer>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+      const $ = id => document.getElementById(id)
+      const api = window.modelibr
+
+      // Declared up top so render() (which reads it on every 1.5s refresh) can
+      // never hit it in the temporal dead zone.
+      let restarting = false
+      let toastTimer = null
+      function toast(message) {
+        const el = $('toast')
+        el.textContent = message
+        el.classList.add('show')
+        clearTimeout(toastTimer)
+        toastTimer = setTimeout(() => el.classList.remove('show'), 1400)
+      }
+
+      function setDot(id, state) {
+        $(id).className = 'dot ' + state
+      }
+
+      // The single, plain-language status at the top of the window.
+      function setOverall(state, headline, sub) {
+        setDot('status-dot', state)
+        $('status-headline').textContent = headline
+        $('status-sub').textContent = sub || ''
+      }
+
+      function setOpenEnabled(enabled) {
+        $('open-frontend').disabled = !enabled
+      }
+
+      function render(status) {
+        if (!status) return
+
+        // While a restart is in flight the old instance is still draining, so its
+        // health probe keeps reporting "up". Freeze to a restarting state rather
+        // than repainting green that contradicts the headline.
+        if (restarting) {
+          setOverall('pending', 'Restarting…', 'This takes a few seconds.')
+          setDot('dot-backend', 'pending')
+          setDot('dot-database', 'pending')
+          setDot('dot-asset', 'pending')
+          setOpenEnabled(false)
+          return
+        }
+
+        const starting = status.phase === 'starting'
+        const allUp =
+          status.backend?.up && status.database?.up && status.assetProcessor?.up
+
+        if (starting) {
+          setOverall('pending', 'Starting up…', 'First launch can take a minute while Modelibr sets up.')
+        } else if (status.phase === 'error') {
+          setOverall('down', 'Needs attention', status.error || 'Modelibr failed to start.')
+        } else if (allUp) {
+          setOverall('up', 'Modelibr is ready', '')
+        } else {
+          setOverall('pending', 'Partly running', "Some parts aren't responding yet — open Show details to see which.")
+        }
+
+        setOpenEnabled(status.phase === 'ready')
+
+        const backend = status.backend || {}
+        setDot('dot-backend', backend.up ? 'up' : starting ? 'pending' : 'down')
+        $('detail-backend').textContent = backend.port ? 'port ' + backend.port : ''
+
+        const db = status.database || {}
+        setDot('dot-database', db.up ? 'up' : starting ? 'pending' : 'down')
+        $('detail-database').textContent = db.port ? 'port ' + db.port : ''
+
+        const asset = status.assetProcessor || {}
+        const assetState = asset.up
+          ? asset.healthy === asset.configured ? 'up' : 'pending'
+          : starting ? 'pending' : 'down'
+        setDot('dot-asset', assetState)
+        $('detail-asset').textContent =
+          asset.configured != null ? `${asset.healthy}/${asset.configured} ready` : ''
+
+        if (status.frontendUrl) $('frontend-url').textContent = status.frontendUrl
+        $('address-note').style.display = status.portsAutoAdjusted ? '' : 'none'
+
+        // A saved port / data-folder change only goes live after a relaunch, so
+        // nudge the user to restart (the address shown is still the working one).
+        const restartBtn = $('restart')
+        if (status.pendingRestart) {
+          restartBtn.textContent = 'Restart to apply'
+          restartBtn.classList.add('pending')
+        } else {
+          restartBtn.textContent = 'Restart'
+          restartBtn.classList.remove('pending')
+        }
+      }
+
+      // ── Updates ──
+      function renderUpdate(u) {
+        const banner = $('update-banner')
+        const text = $('ub-text')
+        const action = $('ub-action')
+        banner.classList.remove('available')
+
+        if (!u || u.status === 'idle') {
+          text.textContent = u ? `v${u.currentVersion}` : ''
+          action.style.display = 'none'
+          return
+        }
+
+        if (u.status === 'downloaded') {
+          banner.classList.add('available')
+          text.textContent = `Update ready — v${u.latestVersion}`
+          action.textContent = 'Restart & Install'
+          action.style.display = ''
+        } else if (u.status === 'downloading') {
+          banner.classList.add('available')
+          text.textContent = `Downloading update… ${u.percent || 0}%`
+          action.style.display = 'none'
+        } else if (u.status === 'available') {
+          banner.classList.add('available')
+          text.textContent = `Update available — v${u.latestVersion}`
+          action.textContent = 'Update'
+          action.style.display = ''
+        } else if (u.status === 'checking') {
+          text.textContent = 'Checking for updates…'
+          action.style.display = 'none'
+        } else if (u.status === 'error') {
+          text.textContent = 'Update check failed'
+          action.textContent = 'Retry'
+          action.style.display = ''
+        } else {
+          text.textContent = `v${u.currentVersion} · up to date`
+          action.style.display = 'none'
+        }
+      }
+
+      async function recheckUpdate() {
+        renderUpdate({ status: 'checking' })
+        await api.checkUpdate()
+        renderUpdate(await api.getUpdate())
+      }
+
+      $('ub-action').addEventListener('click', async () => {
+        const u = await api.getUpdate()
+        // 'downloaded' → quit & install; 'available' → open page (manual).
+        if (u?.status === 'downloaded' || u?.status === 'available') api.openUpdate()
+        else recheckUpdate()
+      })
+
+      const busyStatuses = ['available', 'checking', 'downloading', 'downloaded']
+      $('ub-text').addEventListener('click', async () => {
+        const u = await api.getUpdate()
+        if (!busyStatuses.includes(u?.status)) recheckUpdate()
+      })
+
+      async function refresh() {
+        try {
+          const status = await api.getStatus()
+          render(status)
+          renderUpdate(await api.getUpdate())
+          // Config is only available once the host is ready; load it once.
+          if (status?.phase === 'ready' && !loadedConfig) {
+            await loadConfig()
+          }
+        } catch (err) {
+          if (!restarting) {
+            setOverall('down', 'Disconnected', 'Lost contact with the Modelibr host.')
+            setOpenEnabled(false)
+          }
+        }
+      }
+
+      // ── Desktop client presence ──
+      // Whether the client is already installed at its default location. When it
+      // is, the button opens it instead of re-running the installer.
+      let clientInstalled = false
+      async function refreshClientStatus() {
+        const result = await api.getClientStatus().catch(() => null)
+        clientInstalled = !!result?.installed
+        const btn = $('install-client')
+        if (clientInstalled) {
+          btn.textContent = 'Open'
+          $('install-text').textContent = 'installed — open Modelibr in its own app window.'
+        } else {
+          btn.textContent = 'Install'
+          $('install-text').textContent = installDefaultText
+        }
+      }
+
+      // ── Configuration ──
+      let loadedConfig = null
+      // The data-folder override the user has picked but not yet applied. '' means
+      // "use the default location" (shown as a placeholder).
+      let pendingDataDirectory = ''
+      let effectiveDataDirectory = ''
+
+      function renderDataFolder() {
+        const input = $('cfg-data')
+        input.value = pendingDataDirectory
+        input.placeholder = effectiveDataDirectory || 'Default location'
+      }
+
+      function applyConfigToInputs(config) {
+        $('cfg-port').value = config.appPort
+        $('cfg-api-port').value = config.internalApiPort
+        $('cfg-db-port').value = config.postgresPort
+        $('cfg-workers').value = config.workerProcessCount
+        $('cfg-jobs').value = config.maxConcurrentJobsPerWorker
+        $('cfg-gpu').checked = !!config.enableHardwareAcceleration
+        $('cfg-network').checked = !!config.allowNetworkAccess
+        pendingDataDirectory = config.dataDirectory || ''
+        renderDataFolder()
+      }
+
+      function readConfigInputs() {
+        return {
+          appPort: Number($('cfg-port').value),
+          internalApiPort: Number($('cfg-api-port').value),
+          postgresPort: Number($('cfg-db-port').value),
+          workerProcessCount: Number($('cfg-workers').value),
+          maxConcurrentJobsPerWorker: Number($('cfg-jobs').value),
+          enableHardwareAcceleration: $('cfg-gpu').checked,
+          dataDirectory: pendingDataDirectory,
+          allowNetworkAccess: $('cfg-network').checked,
+        }
+      }
+
+      async function loadConfig() {
+        const data = await api.getConfig()
+        if (!data) return
+        loadedConfig = data.config
+        effectiveDataDirectory = data.effectiveDataDirectory || ''
+        applyConfigToInputs(loadedConfig)
+      }
+
+      $('cfg-data-browse').addEventListener('click', async () => {
+        const picked = await api.chooseDataFolder()
+        if (picked) {
+          pendingDataDirectory = picked
+          renderDataFolder()
+        }
+      })
+
+      $('cfg-data-default').addEventListener('click', () => {
+        pendingDataDirectory = ''
+        renderDataFolder()
+      })
+
+      $('cfg-reset').addEventListener('click', () => {
+        if (loadedConfig) applyConfigToInputs(loadedConfig)
+        $('cfg-note').textContent = ''
+      })
+
+      $('cfg-apply').addEventListener('click', async () => {
+        $('cfg-apply').disabled = true
+        $('cfg-note').textContent = ''
+        try {
+          const result = await api.saveConfig(readConfigInputs())
+          if (result?.ok) {
+            loadedConfig = result.config
+            applyConfigToInputs(loadedConfig)
+            $('cfg-note').textContent = result.restartRequired
+              ? 'Saved — restart to apply (ports / data folder).'
+              : 'Saved.'
+            toast('Settings saved')
+          }
+        } finally {
+          $('cfg-apply').disabled = false
+        }
+      })
+
+      $('open-frontend').addEventListener('click', () => api.openFrontend())
+      $('copy-url').addEventListener('click', async () => {
+        await api.copyFrontendUrl()
+        toast('Address copied')
+      })
+      $('open-data').addEventListener('click', () => api.openDataFolder())
+
+      // ── Leftover data folder (after a data-folder move) ──
+      async function refreshLeftoverFolder() {
+        const folder = await api.getPreviousDataFolder().catch(() => null)
+        if (folder) {
+          $('leftover-path').textContent = folder
+          $('leftover-note').style.display = ''
+        } else {
+          $('leftover-note').style.display = 'none'
+        }
+      }
+      $('leftover-open').addEventListener('click', () => api.openPreviousDataFolder())
+      $('leftover-dismiss').addEventListener('click', async () => {
+        await api.dismissPreviousDataFolder()
+        $('leftover-note').style.display = 'none'
+      })
+
+      // ── Desktop client install ──
+      const installDefaultText =
+        'open Modelibr in its own app window instead of a browser tab.'
+      let installing = false
+
+      api.onInstallProgress(progress => {
+        if (!progress) return
+        if (progress.message) $('install-text').textContent = progress.message
+        if (progress.phase === 'error') {
+          installing = false
+          $('install-client').disabled = false
+          $('install-client').textContent = 'Install'
+        }
+      })
+
+      $('install-client').addEventListener('click', async () => {
+        // Already installed → just open it instead of re-running the installer.
+        if (clientInstalled) {
+          const result = await api.openClient()
+          if (!result?.ok) {
+            // The default-location guess was wrong (custom install dir, or it
+            // was removed) — fall back to the install flow next time.
+            await refreshClientStatus()
+          }
+          return
+        }
+
+        if (installing) return
+        installing = true
+        const btn = $('install-client')
+        btn.disabled = true
+        btn.textContent = 'Installing…'
+        $('install-text').textContent = 'Starting…'
+        try {
+          const result = await api.installClient()
+          if (result?.ok) {
+            $('install-text').textContent = 'Installer opened — follow its prompts.'
+          } else if (result?.reason !== 'error') {
+            $('install-text').textContent = installDefaultText
+          }
+        } finally {
+          installing = false
+          btn.disabled = false
+          btn.textContent = 'Install'
+          // Pick up a freshly-completed install so the button becomes "Open".
+          await refreshClientStatus()
+        }
+      })
+
+      $('restart').addEventListener('click', async () => {
+        // Re-entry guard: ignore further clicks once a restart is in flight, so
+        // the host can't be told to relaunch twice. The button is also disabled
+        // below; this covers the keyboard/Enter path too.
+        if (restarting) return
+        restarting = true
+        const btn = $('restart')
+        btn.disabled = true
+        btn.textContent = 'Restarting…'
+        btn.classList.remove('pending')
+        // Reflect the restarting state immediately (render() keeps it frozen on
+        // the next poll) so nothing stays green during the relaunch.
+        setOverall('pending', 'Restarting…', 'This takes a few seconds.')
+        setDot('dot-backend', 'pending')
+        setDot('dot-database', 'pending')
+        setDot('dot-asset', 'pending')
+        setOpenEnabled(false)
+        await api.restart()
+        // The host relaunches and this window is torn down; nothing else to do.
+      })
+
+      $('quit').addEventListener('click', () => api.quit())
+
+      refresh()
+      refreshClientStatus()
+      refreshLeftoverFolder()
+      setInterval(refresh, 1500)
+    </script>
+  </body>
+</html>

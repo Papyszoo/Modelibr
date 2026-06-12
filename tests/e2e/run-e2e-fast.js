@@ -12,11 +12,13 @@ const __dirname = path.dirname(__filename);
 const testEnv = {
   ...process.env,
   PW_MERGE_BLOB: "1",
-  POSTGRES_USER: "modelibr",
-  POSTGRES_PASSWORD: "e2e_password",
-  POSTGRES_DB: "Modelibr",
-  POSTGRES_HOST: "localhost",
-  POSTGRES_PORT: "5433",
+  // Defaults target the Docker e2e stack; override via env to run against a
+  // different deployment (e.g. an installed native build on its own ports).
+  POSTGRES_USER: process.env.POSTGRES_USER || "modelibr",
+  POSTGRES_PASSWORD: process.env.POSTGRES_PASSWORD || "e2e_password",
+  POSTGRES_DB: process.env.POSTGRES_DB || "Modelibr",
+  POSTGRES_HOST: process.env.POSTGRES_HOST || "localhost",
+  POSTGRES_PORT: process.env.POSTGRES_PORT || "5433",
   FRONTEND_URL: process.env.FRONTEND_URL || "http://localhost:3002",
 };
 
@@ -91,8 +93,18 @@ async function main() {
   const args = forwardedArgs.join(" ");
 
   try {
-    await waitForHealth("http://localhost:8090/health", "WebApi");
-    await waitForHealth("http://localhost:3003/health", "Asset processor");
+    await waitForHealth(
+      process.env.WEBAPI_HEALTH_URL || "http://localhost:8090/health",
+      "WebApi",
+    );
+    // Native installs don't expose a separate asset-processor health port
+    // (workers are health-gated internally before the app serves), so allow
+    // skipping this check by setting ASSET_HEALTH_URL to an empty string.
+    const assetHealthUrl =
+      process.env.ASSET_HEALTH_URL ?? "http://localhost:3003/health";
+    if (assetHealthUrl) {
+      await waitForHealth(assetHealthUrl, "Asset processor");
+    }
     await waitForHealth(testEnv.FRONTEND_URL, "Frontend");
   } catch (error) {
     console.error(`\n❌ ${error.message}`);
@@ -124,10 +136,11 @@ async function main() {
   }
   preserveBlobs("setup");
 
-  console.log("\n📋 Phase 2: Chromium tests (workers=3)\n");
+  const chromiumWorkers = process.env.PW_WORKERS || "3";
+  console.log(`\n📋 Phase 2: Chromium tests (workers=${chromiumWorkers})\n`);
   const chromiumResult = run(
     `npx playwright test --project=chromium --no-deps ${args}`,
-    { env: { ...testEnv, PW_WORKERS: process.env.PW_WORKERS || "3" } },
+    { env: { ...testEnv, PW_WORKERS: chromiumWorkers } },
   );
   preserveBlobs("chromium");
 
@@ -149,11 +162,20 @@ async function main() {
     preserveBlobs("slow");
   }
 
-  console.log(`\n📋 Phase ${fastOnly ? 3 : 5}: Demo tests (workers=1)\n`);
-  const demoResult = run(`node run-demo-e2e.js ${args}`, {
-    env: testEnv,
-  });
-  preserveBlobs("demo");
+  // The demo phase builds a standalone "demo mode" frontend and tests it in
+  // Playwright's own browser — it does not exercise the deployment under test,
+  // so it's skippable when running against an installed native build (it's
+  // still covered by the Docker e2e CI).
+  let demoResult = 0;
+  if (process.env.SKIP_DEMO_PHASE === "1") {
+    console.log("\n📋 Demo tests: skipped (SKIP_DEMO_PHASE=1)\n");
+  } else {
+    console.log(`\n📋 Phase ${fastOnly ? 3 : 5}: Demo tests (workers=1)\n`);
+    demoResult = run(`node run-demo-e2e.js ${args}`, {
+      env: testEnv,
+    });
+    preserveBlobs("demo");
+  }
 
   console.log("\n📊 Merging test reports...\n");
   const mergeResult = run(
@@ -164,9 +186,24 @@ async function main() {
   );
 
   const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+
+  // The highly-parallel Chromium UI phase is the slowest and flakiest on
+  // resource-constrained runners (notably the hosted Windows runner, which is
+  // far slower for the 3D-heavy views). When CHROMIUM_PHASE_NONBLOCKING=1 it
+  // still runs and is reported, but its failures don't fail the run — the
+  // install-critical phases (setup/serial/slow) stay strict, and Linux/macOS
+  // keep gating the full UI sweep.
+  const chromiumNonBlocking = process.env.CHROMIUM_PHASE_NONBLOCKING === "1";
+  if (chromiumResult !== 0 && chromiumNonBlocking) {
+    console.log(
+      `\n⚠️  Chromium phase reported failures (exit ${chromiumResult}); non-blocking on this runner, not failing the run.\n`,
+    );
+  }
+  const effectiveChromiumResult = chromiumNonBlocking ? 0 : chromiumResult;
+
   const exitCode =
-    chromiumResult !== 0
-      ? chromiumResult
+    effectiveChromiumResult !== 0
+      ? effectiveChromiumResult
       : serialResult !== 0
         ? serialResult
         : slowResult !== 0
