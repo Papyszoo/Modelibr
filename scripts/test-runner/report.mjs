@@ -14,11 +14,15 @@ const STATUS = {
     "not-present": { label: "NOT PRESENT", color: "#57606a", bg: "#eaeef2" },
 };
 
+// Full HTML entity-escape — covers element AND attribute context (quotes), so
+// esc() is safe to interpolate into "..." attributes (href, style), not just text.
 function esc(s) {
     return String(s)
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
 }
 
 export function writeReport(results, meta) {

@@ -15,7 +15,15 @@
 const state = { catalog: null, history: null, summary: null, interactive: false, q: "" };
 
 const $ = (sel) => document.querySelector(sel);
-const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+// Full HTML entity-escape — covers element AND attribute context (quotes), so
+// esc() is safe to interpolate into "..."/'...' attributes, not just text.
+const esc = (s) =>
+    String(s ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
 // Strip all CSI escape sequences (colors AND cursor/erase codes like \x1b[2K).
 const stripAnsi = (s) => s.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "");
 
@@ -84,7 +92,7 @@ function laneOf(feature, sc) {
 }
 function laneBadge(lane) {
     const l = LANES[lane];
-    return `<span class="badge ${l.cls}" title="${esc(l.desc.replace(/<[^>]+>/g, ""))}">${l.label}</span>`;
+    return `<span class="badge ${l.cls}" title="${esc(l.desc)}">${l.label}</span>`;
 }
 function laneCounts() {
     const c = { pr: 0, nightly: 0, local: 0, manual: 0, setup: 0 };
