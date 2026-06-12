@@ -18,9 +18,15 @@ const envEnum = (v: string | undefined, allowed: string[], dflt: string) =>
 export default defineConfig({
     testDir,
     globalSetup: "./global-setup.ts",
-    timeout: 90000, // 90s to allow for thumbnail generation (Puppeteer cold start + rendering takes 30-40s)
+    // 90s default to allow for thumbnail generation (Puppeteer cold start +
+    // rendering takes 30-40s). Overridable via PW_TEST_TIMEOUT so slower
+    // deployments (e.g. an installed native build on a contended CI runner) can
+    // give UI actions more headroom without changing local/Docker behavior.
+    timeout: parseInt(process.env.PW_TEST_TIMEOUT || "90000", 10),
     fullyParallel: true,
     forbidOnly: !!process.env.CI,
+    // Retries only re-run failed tests, so they don't weaken anything; raising
+    // them via PW_RETRIES helps the flaky-timeout tail on slow runners pass.
     retries: process.env.PW_RETRIES ? parseInt(process.env.PW_RETRIES, 10) : 1,
     // Workers are controlled per-phase by run-e2e.js:
     //   setup    → --workers=1  (sequential, avoids asset-processor overload)

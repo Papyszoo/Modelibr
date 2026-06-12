@@ -35,7 +35,9 @@
          All deferred so they execute before the main module script in document order. -->
     <script defer src="./node_modules/pako/dist/pako.min.js"></script>
     <script defer src="./node_modules/utif2/UTIF.js"></script>
-    <script type="module" src="./lib/tiffDecode.js"></script>
+    <!-- The import map MUST come before any module script. Newer Chrome (e.g.
+         bundled in the native installer) strictly ignores an import map added
+         after a module load has been triggered, breaking `import ... 'three'`. -->
     <script type="importmap">
       {
         "imports": {
@@ -44,6 +46,7 @@
         }
       }
     </script>
+    <script type="module" src="./lib/tiffDecode.js"></script>
     <script type="module">
       import * as THREE from 'three'
       import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'

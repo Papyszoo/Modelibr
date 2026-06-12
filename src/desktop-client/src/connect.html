@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline';" />
+    <title>Connect to Modelibr</title>
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; }
+      body {
+        background: #15171c; color: #e7e9ee;
+        font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        display: grid; place-items: center; padding: 24px;
+      }
+      .card {
+        width: 100%; max-width: 460px; text-align: center;
+        background: #1d2027; border: 1px solid #2c3038; border-radius: 14px; padding: 32px 28px;
+      }
+      .logo {
+        width: 52px; height: 52px; border-radius: 13px; margin: 0 auto 16px;
+        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        display: grid; place-items: center; font-weight: 700; font-size: 24px; color: #fff;
+      }
+      h1 { font-size: 19px; margin: 0 0 6px; }
+      p { color: #9aa0ad; margin: 0 0 20px; font-size: 13px; }
+      label { display: block; text-align: left; font-size: 12px; color: #9aa0ad; margin-bottom: 6px; }
+      .fields { display: flex; gap: 10px; text-align: left; }
+      .fields .host { flex: 1; }
+      .fields .port { width: 110px; }
+      input {
+        width: 100%; font: inherit; color: #e7e9ee;
+        background: #0f1115; border: 1px solid #2c3038; border-radius: 8px; padding: 10px 12px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      .preview { margin-top: 12px; font-size: 12px; color: #9aa0ad; text-align: left; }
+      .preview code { color: #e7e9ee; }
+      .error { color: #f87171; font-size: 12px; min-height: 16px; margin-top: 10px; text-align: left; }
+      .actions { display: flex; gap: 10px; margin-top: 14px; }
+      button {
+        flex: 1; font: inherit; cursor: pointer; color: #e7e9ee;
+        background: #23262f; border: 1px solid #2c3038; border-radius: 8px; padding: 10px 14px;
+      }
+      button:hover { background: #2c3038; }
+      button.primary { background: #6366f1; border-color: #6366f1; color: #fff; }
+      button.primary:hover { background: #5457e6; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="logo">M</div>
+      <h1 id="title">Connect to Modelibr</h1>
+      <p id="subtitle">
+        Point this client at a Modelibr host — on this machine or another
+        computer on your network.
+      </p>
+
+      <div class="fields">
+        <div class="host">
+          <label for="host">Host</label>
+          <input id="host" type="text" placeholder="127.0.0.1 or 192.168.1.50" />
+        </div>
+        <div class="port">
+          <label for="port">Port</label>
+          <input id="port" type="number" min="1" max="65535" placeholder="3010" />
+        </div>
+      </div>
+
+      <div class="preview">Connecting to <code id="preview">http://127.0.0.1:3010</code></div>
+      <div class="error" id="error"></div>
+
+      <div class="actions">
+        <button id="retry">Retry</button>
+        <button class="primary" id="connect">Connect</button>
+      </div>
+    </div>
+
+    <script>
+      const api = window.client
+      const params = new URLSearchParams(location.search)
+      const hostInput = document.getElementById('host')
+      const portInput = document.getElementById('port')
+      const preview = document.getElementById('preview')
+      const error = document.getElementById('error')
+
+      // Shown proactively (Connection Settings) vs. after a failed load.
+      const failed = params.get('failed') === '1'
+      if (failed) {
+        document.getElementById('title').textContent = "Can't reach the Modelibr host"
+        document.getElementById('subtitle').innerHTML =
+          'The host app may be off, or its <b>app port</b> may have changed. ' +
+          "Check the host's status window (the <b>Frontend</b> address) for the " +
+          'current port, update it below, then Connect.'
+      }
+
+      function splitUrl(value) {
+        try {
+          const url = new URL(value)
+          return {
+            host: url.hostname,
+            port: url.port || (url.protocol === 'https:' ? '443' : '3010'),
+            protocol: url.protocol,
+          }
+        } catch {
+          return { host: '127.0.0.1', port: '3010', protocol: 'http:' }
+        }
+      }
+
+      // Preserve the scheme of the current host (defaults to http for LAN hosts).
+      let protocol = 'http:'
+
+      function composeUrl() {
+        const host = hostInput.value.trim() || '127.0.0.1'
+        const port = String(portInput.value || '3010').trim()
+        return `${protocol}//${host}:${port}`
+      }
+
+      function updatePreview() {
+        preview.textContent = composeUrl()
+      }
+
+      function submit() {
+        error.textContent = ''
+        const host = hostInput.value.trim()
+        const port = Number(portInput.value)
+        if (!host) {
+          error.textContent = 'Enter a host name or IP address.'
+          return
+        }
+        if (!Number.isInteger(port) || port < 1 || port > 65535) {
+          error.textContent = 'Enter a valid port (1–65535).'
+          return
+        }
+        api.connect(composeUrl())
+      }
+
+      async function init() {
+        const current = params.get('host') || (await api.getHostUrl())
+        const parts = splitUrl(current || 'http://127.0.0.1:3010')
+        protocol = parts.protocol
+        hostInput.value = parts.host
+        portInput.value = parts.port
+        updatePreview()
+        // After a failed connect the port is the most likely thing to fix, so
+        // put the cursor there ready to edit.
+        if (failed) {
+          portInput.focus()
+          portInput.select()
+        }
+      }
+
+      hostInput.addEventListener('input', updatePreview)
+      portInput.addEventListener('input', updatePreview)
+      document.getElementById('retry').addEventListener('click', () => api.retry())
+      document.getElementById('connect').addEventListener('click', submit)
+      ;[hostInput, portInput].forEach(el =>
+        el.addEventListener('keydown', e => {
+          if (e.key === 'Enter') submit()
+        })
+      )
+
+      init()
+    </script>
+  </body>
+</html>

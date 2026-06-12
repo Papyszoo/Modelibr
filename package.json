@@ -19,7 +19,9 @@
         "test:catalog": "node scripts/test-catalog/build-catalog.mjs",
         "test:site": "node scripts/test-catalog/build-catalog.mjs && node scripts/test-catalog/server.mjs",
         "test:site:fast": "node scripts/test-catalog/build-catalog.mjs --no-github && node scripts/test-catalog/server.mjs",
-        "build:frontend": "cd src/frontend && npm run build"
+        "build:frontend": "cd src/frontend && npm run build",
+        "stage:desktop": "cd src/desktop && npm run stage",
+        "build:desktop": "cd src/desktop && npm run dist"
     },
     "repository": {
         "type": "git",

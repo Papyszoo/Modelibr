@@ -486,17 +486,29 @@ export class ModelListPage {
                 : this.page
                       .locator("#model-grid-filters-panel .p-multiselect")
                       .first();
-        await packsMultiselect.waitFor({ state: "visible", timeout: 10000 });
-        await packsMultiselect.click();
+        await packsMultiselect.waitFor({ state: "visible", timeout: 15000 });
 
         const panel = this.page.locator(".p-multiselect-panel");
-        await panel.waitFor({ state: "visible", timeout: 5000 });
+
+        // PrimeReact fills the panel from an async packs fetch, so it can open
+        // before the requested options have rendered. Rather than assume a
+        // single fixed wait is enough on a slow CI runner, retry: open the
+        // panel if it's closed and wait until every requested option appears.
+        await expect(async () => {
+            if (!(await panel.isVisible())) {
+                await packsMultiselect.click();
+            }
+            for (const packName of packNames) {
+                await expect(
+                    panel.locator(`.p-multiselect-item:has-text("${packName}")`),
+                ).toBeVisible({ timeout: 2000 });
+            }
+        }).toPass({ timeout: 20000 });
 
         for (const packName of packNames) {
             const option = panel.locator(
                 `.p-multiselect-item:has-text("${packName}")`,
             );
-            await expect(option).toBeVisible({ timeout: 5000 });
             // The selected state is reflected on the .p-multiselect-item
             // (PrimeReact adds .p-highlight). Skip if already selected so
             // a re-call doesn't deselect.
