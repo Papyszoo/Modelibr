@@ -189,7 +189,11 @@ test.describe("demo mode e2e", () => {
         expect(await spriteListPage.spriteExists("Demo Sprite")).toBe(true);
 
         await soundListPage.goto();
-        expect(await soundListPage.soundExists("Test Tone")).toBe(true);
+        // Auto-wait for the card to render instead of a point-in-time count
+        // check, which raced the async sound-list load on slow CI runners.
+        await expect(
+            soundListPage.getSoundCardByName("Test Tone").first(),
+        ).toBeVisible({ timeout: 15000 });
         await soundListPage.clickSoundByName("Test Tone");
         await expect(page.locator(".p-dialog")).toContainText("Test Tone");
         await soundListPage.closeDialog();

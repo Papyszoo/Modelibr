@@ -1,4 +1,4 @@
-import { createCanvas } from 'canvas'
+import { createCanvas } from '@napi-rs/canvas'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
 import fs from 'fs/promises'

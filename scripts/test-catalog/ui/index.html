@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Modelibr — Test Studio</title>
+    <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+    <header class="topbar">
+        <a class="brand" href="#/">
+            <span class="logo">🧪</span>
+            <div>
+                <div class="title">Test Studio</div>
+                <div class="subtitle" id="subtitle">loading…</div>
+            </div>
+        </a>
+        <input id="search" class="search" type="search" placeholder="Search tests, scenarios, tags…" />
+        <div class="topbar-right">
+            <span id="mode-badge" class="badge">…</span>
+            <button id="refresh-gh" class="btn ghost" title="Refetch GitHub Actions timings">↻ GitHub data</button>
+        </div>
+    </header>
+
+    <nav id="crumbs" class="crumbs hidden"></nav>
+
+    <main id="page" class="page"></main>
+
+    <section id="console" class="console hidden">
+        <div class="console-head">
+            <span id="console-title">Run</span>
+            <span id="console-status" class="badge">idle</span>
+            <span class="spacer"></span>
+            <a id="console-report" class="btn ghost hidden" target="_blank" rel="noopener">Open report ↗</a>
+            <button id="console-stop" class="btn ghost hidden">■ Stop</button>
+            <button id="console-close" class="btn ghost">✕</button>
+        </div>
+        <pre id="console-out" class="console-out"></pre>
+    </section>
+
+    <script src="app.js"></script>
+</body>
+</html>

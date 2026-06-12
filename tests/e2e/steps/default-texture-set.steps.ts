@@ -111,7 +111,10 @@ When(
                 {
                     message: `Version 1 (id=${v1Id}) thumbnail did not reach Ready state before snapshotting`,
                     intervals: [2000, 3000, 5000],
-                    timeout: 120000,
+                    // Match the 300s the v2 wait below allows: under software
+                    // (swiftshader) rendering a queued thumbnail can take
+                    // minutes, so 120s was too tight against a non-GPU install.
+                    timeout: 300000,
                 },
             )
             .toBe(2);

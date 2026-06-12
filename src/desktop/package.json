@@ -1,0 +1,84 @@
+{
+  "name": "modelibr-desktop",
+  "productName": "Modelibr",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Native Modelibr launcher and installer packaging",
+  "homepage": "https://github.com/Papyszoo/Modelibr",
+  "author": {
+    "name": "Papyszoo",
+    "email": "papyszoo@users.noreply.github.com"
+  },
+  "type": "module",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "stage": "node ./scripts/prepare-bundle.mjs",
+    "test": "node --test test/",
+    "test:integration": "node ./scripts/integration/data-folder-migration.mjs",
+    "pack": "electron-builder --dir --publish never",
+    "dist": "node ./scripts/prepare-bundle.mjs && electron-builder --publish never"
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9",
+    "express": "^4.21.2",
+    "express-rate-limit": "^8.5.2",
+    "http-proxy-middleware": "^3.0.3"
+  },
+  "devDependencies": {
+    "electron": "^35.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.modelibr.desktop",
+    "productName": "Modelibr",
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "build/runtime",
+        "to": "runtime",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "asar": true,
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Papyszoo",
+        "repo": "Modelibr"
+      }
+    ],
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "artifactName": "Modelibr-${version}-macos-${arch}.${ext}",
+      "category": "public.app-category.graphics-design"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "artifactName": "Modelibr-${version}-windows-${arch}.${ext}"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "artifactName": "Modelibr-${version}-linux-${arch}.${ext}",
+      "category": "Graphics"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false
+    }
+  }
+}

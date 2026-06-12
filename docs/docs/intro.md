@@ -19,9 +19,24 @@ Modelibr is a self-hosted game asset library that helps you keep models, texture
 
 ## Quick Start
 
+### Option A: Native installer
+
+If you want the simplest local setup, download the **Modelibr** (host) installer for your platform from the GitHub Releases page. It targets users who can't run the Docker stack.
+
+- Windows, macOS, and Linux installers bundle the frontend, WebApi, asset processor, and PostgreSQL.
+- The host runs from a tray / menu-bar icon. Use its **Show Status** window for live service health (backend, database, asset processor) and the frontend URL.
+- The application and WebDAV are exposed on the same local configurable port.
+- Worker process count, jobs per worker, GPU acceleration, and the app port are configured in the host status window's **Configuration** panel.
+- The host checks GitHub Releases for newer versions and shows an update prompt in the tray and status window.
+- An optional **Modelibr Client** installer opens a running host in its own desktop window instead of a browser tab.
+
+Native installs store data in your operating system's application data folder instead of the repository `data` directory.
+
+### Option B: Docker
+
 ### 1. Prerequisites
 
-Modelibr runs on Docker. This ensures it works on any system without polluting your computer with dependencies.
+Modelibr runs on Docker. This remains the most transparent source-based setup and keeps all runtime data in the repository folder.
 
 <details>
 <summary>**How to install Docker**</summary>
@@ -123,6 +138,8 @@ All your uploaded assets, generated thumbnails, and database files are stored in
 :::warning
 Back up the `data` folder regularly to keep your library safe!
 :::
+
+For native installs, the same data lives in the host-managed application data directory. Open it from the host tray menu's **Open Data Folder** action (or the **Data folder** button in the status window).
 
 ## Next Steps
 

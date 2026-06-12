@@ -1,0 +1,661 @@
+name: Native Installers
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+  # Merge to main → build the installers and smoke-test them on all 3 OS (the
+  # full e2e suite is gated off for push events below). Path-filtered so merges
+  # that don't touch the app don't pay for an installer build.
+  push:
+    branches: [main]
+    paths:
+      - "src/desktop/**"
+      - "src/desktop-client/**"
+      - "src/WebApi/**"
+      - "src/Application/**"
+      - "src/Domain/**"
+      - "src/Infrastructure/**"
+      - "src/asset-processor/**"
+      - "src/frontend/**"
+      - ".github/workflows/native-release.yml"
+  # Nightly: the full installed-app e2e suite on all 3 OS, off the critical path.
+  schedule:
+    - cron: "0 6 * * *"
+
+permissions:
+  contents: write
+
+# Don't stack installer builds: a newer push supersedes an in-flight run.
+concurrency:
+  group: native-installers-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-installers:
+    name: Build ${{ matrix.name }} Installer
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-latest
+            rid: win-x64
+            electronArch: x64
+            # Installer + electron-updater feed (latest.yml) and delta blockmap.
+            artifactGlob: |
+              src/desktop/dist/*.exe
+              src/desktop/dist/latest.yml
+              src/desktop/dist/*.blockmap
+          - name: macOS
+            os: macos-14
+            rid: osx-arm64
+            electronArch: arm64
+            # dmg for fresh installs; zip + latest-mac.yml are the update payload.
+            artifactGlob: |
+              src/desktop/dist/*.dmg
+              src/desktop/dist/*.zip
+              src/desktop/dist/latest-mac.yml
+              src/desktop/dist/*.blockmap
+          - name: Linux
+            os: ubuntu-latest
+            rid: linux-x64
+            electronArch: x64
+            artifactGlob: |
+              src/desktop/dist/*.AppImage
+              src/desktop/dist/*.deb
+              src/desktop/dist/latest-linux.yml
+              src/desktop/dist/*.blockmap
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 9
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Export Node runtime path
+        shell: bash
+        run: echo "MODELIBR_NODE_EXECUTABLE=$(node -p 'process.execPath')" >> "$GITHUB_ENV"
+
+      - name: Prepare build folders
+        shell: bash
+        run: mkdir -p src/desktop/build-input/webapi
+
+      - name: Install frontend dependencies
+        working-directory: src/frontend
+        run: npm ci
+
+      - name: Build frontend bundle for native runtime
+        working-directory: src/frontend
+        run: npm run build
+        env:
+          VITE_API_BASE_URL: /api
+
+      - name: Install asset processor runtime dependencies
+        working-directory: src/asset-processor
+        env:
+          PUPPETEER_CACHE_DIR: ${{ github.workspace }}/src/asset-processor/.cache/puppeteer
+        run: |
+          npm ci --omit=dev
+          npx puppeteer browsers install chrome
+
+      - name: Publish WebApi for native runtime
+        run: >-
+          dotnet publish src/WebApi/WebApi.csproj
+          -c Release
+          -r ${{ matrix.rid }}
+          --self-contained true
+          -o ${{ github.workspace }}/src/desktop/build-input/webapi
+
+      - name: Install PostgreSQL runtime (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # EnterpriseDB (used by Chocolatey's postgresql package) returns 403 to
+          # GitHub's datacenter IPs, so pull portable PostgreSQL 16 binaries from
+          # Maven Central (Zonky) instead — reliable from CI and self-contained.
+          $ver = '16.4.0'
+          $jarUrl = "https://repo1.maven.org/maven2/io/zonky/test/postgres/embedded-postgres-binaries-windows-amd64/$ver/embedded-postgres-binaries-windows-amd64-$ver.jar"
+          $work = Join-Path $env:RUNNER_TEMP 'pg'
+          New-Item -ItemType Directory -Force -Path $work | Out-Null
+          $zip = Join-Path $work 'pg.zip'
+          Invoke-WebRequest -Uri $jarUrl -OutFile $zip
+          Expand-Archive -Path $zip -DestinationPath (Join-Path $work 'jar') -Force
+          $txz = Get-ChildItem -Path (Join-Path $work 'jar') -Filter '*.txz' -Recurse | Select-Object -First 1
+          if (-not $txz) { throw 'PostgreSQL binaries archive not found in jar' }
+          $pgDir = Join-Path $work 'pgsql'
+          New-Item -ItemType Directory -Force -Path $pgDir | Out-Null
+          tar -xf $txz.FullName -C $pgDir
+          if (-not (Test-Path (Join-Path $pgDir 'bin/pg_ctl.exe'))) { throw 'pg_ctl.exe not found after extraction' }
+          "MODELIBR_POSTGRES_RUNTIME_DIR=$pgDir" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      # Self-contained PostgreSQL 16 from Maven Central (Zonky) — relocatable
+      # binaries that bundle their own libs, so they run on clean user machines
+      # and on the test runners (Homebrew/apt builds linked against libs that
+      # aren't present at runtime).
+      - name: Install PostgreSQL runtime (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          ver=16.4.0
+          url="https://repo1.maven.org/maven2/io/zonky/test/postgres/embedded-postgres-binaries-darwin-arm64v8/$ver/embedded-postgres-binaries-darwin-arm64v8-$ver.jar"
+          work="$RUNNER_TEMP/pg"
+          mkdir -p "$work/jar" "$work/pgsql"
+          curl -fsSL "$url" -o "$work/pg.jar"
+          unzip -q "$work/pg.jar" -d "$work/jar"
+          tar -xf "$(ls "$work"/jar/*.txz | head -n1)" -C "$work/pgsql"
+          test -x "$work/pgsql/bin/pg_ctl"
+          echo "MODELIBR_POSTGRES_RUNTIME_DIR=$work/pgsql" >> "$GITHUB_ENV"
+
+      - name: Install PostgreSQL runtime (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          ver=16.4.0
+          url="https://repo1.maven.org/maven2/io/zonky/test/postgres/embedded-postgres-binaries-linux-amd64/$ver/embedded-postgres-binaries-linux-amd64-$ver.jar"
+          work="$RUNNER_TEMP/pg"
+          mkdir -p "$work/jar" "$work/pgsql"
+          curl -fsSL "$url" -o "$work/pg.jar"
+          unzip -q "$work/pg.jar" -d "$work/jar"
+          tar -xf "$(ls "$work"/jar/*.txz | head -n1)" -C "$work/pgsql"
+          test -x "$work/pgsql/bin/pg_ctl"
+          echo "MODELIBR_POSTGRES_RUNTIME_DIR=$work/pgsql" >> "$GITHUB_ENV"
+
+      - name: Install desktop packaging dependencies
+        working-directory: src/desktop
+        run: npm ci
+
+      - name: Build native installers
+        working-directory: src/desktop
+        env:
+          MODELIBR_WEBAPI_PUBLISH_DIR: ${{ github.workspace }}/src/desktop/build-input/webapi
+        run: npm run dist -- --${{ matrix.electronArch }}
+
+      # Boot the real WebApi + embedded Postgres from the just-staged runtime,
+      # upload a model, move the data folder, and confirm it survived. Runs on
+      # every OS that built a runtime, so data-folder migration is verified
+      # cross-platform before anything ships.
+      - name: Integration test — data survives a data-folder change
+        working-directory: src/desktop
+        shell: bash
+        env:
+          MODELIBR_RUNTIME_DIR: ${{ github.workspace }}/src/desktop/build/runtime
+        run: npm run test:integration
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-installers-${{ matrix.name }}
+          path: ${{ matrix.artifactGlob }}
+
+      - name: Upload release assets
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.artifactGlob }}
+
+  test-installers:
+    name: Test ${{ matrix.name }} Installer
+    needs: build-installers
+    runs-on: ${{ matrix.os }}
+    # Smoke + the full Playwright suite against the installed app (incl. the
+    # slow Blender tier) can run long — the Windows runner in particular is much
+    # slower under the parallel UI tests — so keep a generous ceiling.
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-latest
+          - name: macOS
+            os: macos-14
+          - name: Linux
+            os: ubuntu-latest
+
+    steps:
+      - name: Download installer artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: native-installers-${{ matrix.name }}
+          path: installer
+
+      # ───── Install ─────
+      - name: Install (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          sudo dpkg -i installer/*.deb || sudo apt-get install -f -y
+
+      - name: Install (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          DMG=$(ls installer/*.dmg | head -n 1)
+          hdiutil attach "$DMG" -mountpoint /Volumes/Modelibr -nobrowse -quiet
+          cp -R "/Volumes/Modelibr/Modelibr.app" /Applications/
+          hdiutil detach /Volumes/Modelibr -quiet
+          # Strip quarantine attribute — installer isn't notarized in CI
+          # Bundled Puppeteer Chrome + node_modules/.bin contain dangling
+          # symlinks that make recursive xattr exit non-zero; that's harmless.
+          sudo xattr -dr com.apple.quarantine /Applications/Modelibr.app 2>/dev/null || true
+
+      - name: Install (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem installer/*.exe | Select-Object -First 1
+          if (-not $installer) { throw "Installer not found in artifact" }
+          Start-Process -Wait -FilePath $installer.FullName -ArgumentList '/S'
+
+      # ───── Start app ─────
+      - name: Start app (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP_BIN=$(find /opt -type f -executable \( -name 'modelibr*' -o -name 'Modelibr*' \) 2>/dev/null | head -n 1)
+          if [ -z "$APP_BIN" ]; then
+            echo "Could not locate installed binary under /opt"
+            ls -la /opt || true
+            exit 1
+          fi
+          echo "Starting $APP_BIN"
+          Xvfb :99 -screen 0 1280x1024x24 > /tmp/xvfb.log 2>&1 &
+          export DISPLAY=:99
+          nohup "$APP_BIN" --no-sandbox > /tmp/modelibr.log 2>&1 &
+          disown || true
+
+      - name: Start app (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          # Launch the binary directly (not via `open`) so we capture stdout/stderr.
+          nohup "/Applications/Modelibr.app/Contents/MacOS/Modelibr" > /tmp/modelibr.log 2>&1 &
+          disown || true
+
+      - name: Start app (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $candidates = @(
+            "$env:LOCALAPPDATA\Programs\Modelibr\Modelibr.exe",
+            "$env:PROGRAMFILES\Modelibr\Modelibr.exe"
+          )
+          $exe = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $exe) { throw "Modelibr.exe not found in expected locations" }
+          # Plain launch: Modelibr is a GUI-subsystem app, and Start-Process
+          # -RedirectStandardOutput/-Error prevents it from initializing (the
+          # HTTP server never comes up), so don't redirect its streams here.
+          Start-Process -FilePath $exe
+
+      # ───── Wait for HTTP server ─────
+      - name: Wait for app ready
+        shell: bash
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:3010 -o /dev/null; then
+              echo "App responding after ${i} attempts"
+              exit 0
+            fi
+            echo "Waiting for app... ($i/60)"
+            sleep 3
+          done
+          echo "App did not become ready within 180s"
+          exit 1
+
+      # ───── Smoke tests ─────
+      - name: Smoke — frontend served
+        shell: bash
+        run: curl -sf http://127.0.0.1:3010 -o /dev/null
+
+      - name: Smoke — native runtime API
+        shell: bash
+        run: |
+          response=$(curl -sf http://127.0.0.1:3010/api/native/runtime)
+          echo "Runtime snapshot: $response"
+          echo "$response" | grep -q publicAppUrl
+          echo "$response" | grep -q workerHealthUrls
+          echo "$response" | grep -q dataDirectory
+
+      - name: Smoke — WebApi health (proxied)
+        shell: bash
+        run: |
+          # /api/* is rewritten to /* by the edge server, so this hits WebApi /health
+          curl -sf http://127.0.0.1:3010/api/health -o /dev/null
+
+      - name: Smoke — DB-backed endpoint (catches missing migrations)
+        shell: bash
+        run: |
+          # /api/models queries the database, so it returns 200 only when the
+          # schema exists. Health checks don't touch tables, so this is what
+          # catches a database that was never created / migrated.
+          code=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:3010/api/models")
+          echo "GET /api/models -> $code"
+          test "$code" = "200"
+
+      # ───── Full Playwright E2E suite against the installed app ─────
+      # Runs the real test suite (not just smoke checks) against the running
+      # native install on every OS (Windows, macOS, Linux). Skipped on a `main`
+      # push, which only smoke-tests the install (the smoke steps above always
+      # run) — release / nightly schedule / manual dispatch run the full suite.
+      - name: Checkout repo (for E2E suite)
+        if: github.event_name != 'push'
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js for E2E
+        if: github.event_name != 'push'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: tests/e2e/package-lock.json
+
+      - name: Install E2E dependencies
+        if: github.event_name != 'push'
+        working-directory: tests/e2e
+        run: npm ci
+
+      - name: Install Playwright browser
+        if: github.event_name != 'push'
+        working-directory: tests/e2e
+        run: npx playwright install chromium
+
+      - name: Run full E2E suite against installed app
+        if: github.event_name != 'push'
+        working-directory: tests/e2e
+        env:
+          CI: "true"
+          # Point the suite at the running native install (HTTP via the edge
+          # server, Postgres via the loopback port the launcher binds).
+          FRONTEND_URL: http://127.0.0.1:3010
+          API_BASE_URL: http://127.0.0.1:3010/api
+          WEBAPI_HEALTH_URL: http://127.0.0.1:3010/api/health
+          ASSET_HEALTH_URL: ""
+          # The demo phase tests a standalone demo build in Playwright's own
+          # browser, not the installed app — skip it here (covered by Docker CI).
+          SKIP_DEMO_PHASE: "1"
+          # The hosted runners (Windows especially) are CPU-contended running the
+          # native stack alongside parallel browsers, which thrashed and made UI
+          # actions miss their timeouts (the Chromium phase took ~1.6h with flaky
+          # failures even at 2 workers). Run the suite single-worker: no
+          # thrashing, reliable, and still well within the ceiling. A longer
+          # per-test timeout absorbs slow-but-correct actions on slow runners.
+          PW_WORKERS: "1"
+          PW_TEST_TIMEOUT: "180000"
+          # Extra retries to absorb the flaky-timeout tail on slow runners
+          # (retries only re-run failures, so coverage isn't weakened).
+          PW_RETRIES: "2"
+          # The hosted Windows runner is far slower for the 3D-heavy UI, so the
+          # parallel Chromium phase flakes on timeouts there. Keep it running and
+          # reported, but non-blocking on Windows; setup/serial/slow stay strict
+          # everywhere, and Linux/macOS still gate the full UI sweep.
+          CHROMIUM_PHASE_NONBLOCKING: ${{ runner.os == 'Windows' && '1' || '0' }}
+          POSTGRES_HOST: 127.0.0.1
+          POSTGRES_PORT: "35432"
+          POSTGRES_USER: modelibr
+          POSTGRES_PASSWORD: modelibr
+          POSTGRES_DB: Modelibr
+        run: node run-e2e-fast.js
+
+      - name: Upload native E2E report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-e2e-report-${{ matrix.name }}
+          path: tests/e2e/playwright-report/
+          if-no-files-found: ignore
+
+      # ───── Stop app ─────
+      - name: Stop app (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          pkill -f -i modelibr || true
+          sleep 5
+
+      - name: Stop app (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          osascript -e 'quit app "Modelibr"' || true
+          sleep 3
+          pkill -f Modelibr || true
+          sleep 3
+
+      - name: Stop app (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Stop-Process -Name Modelibr -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 5
+
+      # ───── Uninstall ─────
+      - name: Uninstall (Linux)
+        if: runner.os == 'Linux'
+        run: sudo dpkg -r modelibr-desktop || sudo dpkg -r modelibr
+
+      - name: Uninstall (macOS)
+        if: runner.os == 'macOS'
+        run: sudo rm -rf /Applications/Modelibr.app
+
+      - name: Uninstall (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $uninst = Get-ChildItem -Path "$env:LOCALAPPDATA\Programs\Modelibr\Uninstall*.exe","$env:PROGRAMFILES\Modelibr\Uninstall*.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $uninst) { throw "Uninstaller not found" }
+          Start-Process -Wait -FilePath $uninst.FullName -ArgumentList '/S'
+          Start-Sleep -Seconds 5
+
+      # ───── Verify removal ─────
+      - name: Verify app binary removed (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          if [ -e /opt/Modelibr ] || [ -e /opt/modelibr ] || [ -e /opt/modelibr-desktop ]; then
+            echo "App directory still present after uninstall"
+            ls -la /opt
+            exit 1
+          fi
+
+      - name: Verify app binary removed (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          if [ -e /Applications/Modelibr.app ]; then
+            echo "Modelibr.app still present after uninstall"
+            exit 1
+          fi
+
+      - name: Verify app binary removed (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $leftover = @(
+            "$env:LOCALAPPDATA\Programs\Modelibr\Modelibr.exe",
+            "$env:PROGRAMFILES\Modelibr\Modelibr.exe"
+          ) | Where-Object { Test-Path $_ }
+          if ($leftover) { throw "App binary still present: $leftover" }
+
+      # ───── Verify user data preserved (by design) ─────
+      - name: Verify user data preserved (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          if [ ! -d "$HOME/.config/Modelibr" ]; then
+            echo "Warning: user data directory was not preserved"
+            exit 1
+          fi
+
+      - name: Verify user data preserved (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          if [ ! -d "$HOME/Library/Application Support/Modelibr" ]; then
+            echo "Warning: user data directory was not preserved"
+            exit 1
+          fi
+
+      - name: Verify user data preserved (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "$env:APPDATA\Modelibr")) {
+            throw "User data directory was not preserved"
+          }
+
+      # ───── Capture logs on failure ─────
+      - name: Upload diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-diagnostics-${{ matrix.name }}
+          path: |
+            /tmp/modelibr.log
+            /tmp/xvfb.log
+          if-no-files-found: ignore
+
+  build-client:
+    name: Build ${{ matrix.name }} Client
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-latest
+            electronArch: x64
+            # Installer + electron-updater feed (renamed to the client channel,
+            # client.yml, so it doesn't collide with the host's latest.yml in the
+            # shared release) and delta blockmap.
+            artifactGlob: |
+              src/desktop-client/dist/*.exe
+              src/desktop-client/dist/client.yml
+              src/desktop-client/dist/*.blockmap
+          - name: macOS
+            os: macos-14
+            electronArch: arm64
+            # dmg for fresh installs; zip + client-mac.yml are the update payload.
+            artifactGlob: |
+              src/desktop-client/dist/*.dmg
+              src/desktop-client/dist/*.zip
+              src/desktop-client/dist/client-mac.yml
+              src/desktop-client/dist/*.blockmap
+          - name: Linux
+            os: ubuntu-latest
+            electronArch: x64
+            artifactGlob: |
+              src/desktop-client/dist/*.AppImage
+              src/desktop-client/dist/*.deb
+              src/desktop-client/dist/client-linux.yml
+              src/desktop-client/dist/*.blockmap
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # The client bundles no runtime — it's just an Electron shell that loads a
+      # running host, so the build needs nothing but its own dependencies.
+      - name: Install client dependencies
+        working-directory: src/desktop-client
+        run: npm install
+
+      - name: Build client installers
+        working-directory: src/desktop-client
+        run: npm run dist -- --${{ matrix.electronArch }}
+
+      # Rename the client's update feed onto its own channel so it can live in
+      # the same GitHub release as the host without overwriting the host's
+      # latest*.yml. The client sets autoUpdater.channel = 'client', so it
+      # fetches these. The .yml contents (installer name, sha, blockmap) are
+      # unchanged — only the filename differs.
+      - name: Rename client update feed to its own channel
+        working-directory: src/desktop-client/dist
+        shell: bash
+        run: |
+          for f in latest.yml latest-mac.yml latest-linux.yml; do
+            [ -f "$f" ] && mv "$f" "${f/latest/client}"
+          done
+          ls -1 client*.yml || true
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: client-installers-${{ matrix.name }}
+          path: ${{ matrix.artifactGlob }}
+
+      - name: Upload release assets
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.artifactGlob }}
+
+  # On manual (workflow_dispatch) runs there's no GitHub Release to attach
+  # assets to, so the build jobs only leave Actions artifacts — and GitHub
+  # always serves those as a single .zip. This job instead collects every built
+  # installer into one *draft* GitHub Release, where each file is a separate,
+  # directly-downloadable asset (bare .exe / .dmg / .AppImage / .deb) with no
+  # zip wrapper. It's a draft, so it stays private until you click Publish.
+  # Production releases (the `release: published` trigger) keep using the
+  # per-job "Upload release assets" steps above and are unaffected. Gated on the
+  # build jobs only — not the long test-installers suite — so a try-it build is
+  # downloadable as soon as it finishes building (see the warning in the release
+  # body: these binaries are NOT gated on the tests passing).
+  publish-draft-release:
+    name: Publish draft release (manual builds)
+    if: github.event_name == 'workflow_dispatch'
+    needs: [build-installers, build-client]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all installer artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: "*-installers-*"
+
+      - name: Publish draft release
+        uses: softprops/action-gh-release@v2
+        with:
+          # A single, stable draft that every manual run replaces, so these
+          # don't pile up as a new draft per run. (Same-named assets are
+          # overwritten; the constant version keeps names stable.)
+          tag_name: draft-build
+          name: 🚧 Draft build — ${{ github.ref_name }} (run ${{ github.run_number }})
+          draft: true
+          prerelease: true
+          body: |
+            Automated draft from a manual workflow run of `${{ github.ref_name }}`.
+
+            ⚠️ **Not verified** — this is published as soon as the installers
+            *build*; the installer test suite may still be running or may have
+            failed. These binaries are for quick local trials only, and are
+            replaced on every manual run.
+          # Only the user-facing installers — not the electron-updater feed
+          # files (latest*.yml) or delta maps (*.blockmap). Those are machine
+          # -only, and their fixed names (e.g. latest.yml) would collide between
+          # the host and client apps. Each installer name is already unique, so
+          # they all upload as separate assets.
+          files: |
+            artifacts/**/*.exe
+            artifacts/**/*.dmg
+            artifacts/**/*.AppImage
+            artifacts/**/*.deb

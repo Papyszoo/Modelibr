@@ -17,18 +17,15 @@ public static class DatabaseExtensions
         try
         {
             logger.LogInformation("Attempting database initialization...");
-            
-            // Test basic connectivity first
-            var canConnect = await context.Database.CanConnectAsync();
-            if (!canConnect)
-            {
-                logger.LogWarning("Database is not available. Application will start without database connectivity.");
-                return;
-            }
-            
-            // Apply pending migrations to ensure database is up to date
+
+            // MigrateAsync creates the database if it doesn't exist yet and then
+            // applies pending migrations. Do NOT gate this on CanConnectAsync:
+            // that returns false when the database itself is missing (e.g. the
+            // native installer's embedded server, where nothing pre-creates the
+            // "Modelibr" database the way the Docker image's POSTGRES_DB does),
+            // which would skip the very migration meant to create it.
             await context.Database.MigrateAsync();
-            
+
             logger.LogInformation("Database initialization completed successfully");
         }
         catch (Exception ex)
