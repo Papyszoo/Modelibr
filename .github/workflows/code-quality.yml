@@ -14,6 +14,10 @@ on:
             - "src/asset-processor/**"
             - "src/desktop/**"
 
+# Least privilege: every job here only checks out code and runs npm.
+permissions:
+    contents: read
+
 jobs:
     frontend-quality:
         name: Frontend Code Quality
