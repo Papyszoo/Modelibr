@@ -112,23 +112,6 @@ const config: Config = {
                     ],
                 },
                 {
-                    title: "AI Documentation",
-                    items: [
-                        {
-                            label: "Backend API",
-                            href: "/docs/ai-documentation/BACKEND_API",
-                        },
-                        {
-                            label: "Frontend",
-                            href: "/docs/ai-documentation/FRONTEND",
-                        },
-                        {
-                            label: "Worker",
-                            href: "/docs/ai-documentation/WORKER",
-                        },
-                    ],
-                },
-                {
                     title: "Community",
                     items: [
                         {

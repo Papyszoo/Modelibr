@@ -10,6 +10,11 @@ const testDir = defineBddConfig({
 // after all phases, run-e2e.js merges them into a single HTML report.
 const useBlobReporter = !!process.env.PW_MERGE_BLOB;
 
+// Only honour a known value for an env-driven enum, else fall back to the default
+// — so a typo (e.g. PW_TRACE=true) can't make Playwright throw at config load.
+const envEnum = (v: string | undefined, allowed: string[], dflt: string) =>
+    v && allowed.includes(v) ? v : dflt;
+
 export default defineConfig({
     testDir,
     globalSetup: "./global-setup.ts",
@@ -22,7 +27,7 @@ export default defineConfig({
     forbidOnly: !!process.env.CI,
     // Retries only re-run failed tests, so they don't weaken anything; raising
     // them via PW_RETRIES helps the flaky-timeout tail on slow runners pass.
-    retries: parseInt(process.env.PW_RETRIES || "1", 10),
+    retries: process.env.PW_RETRIES ? parseInt(process.env.PW_RETRIES, 10) : 1,
     // Workers are controlled per-phase by run-e2e.js:
     //   setup    → --workers=1  (sequential, avoids asset-processor overload)
     //   chromium → --workers=2  (local) / --workers=4  (CI)
@@ -36,9 +41,13 @@ export default defineConfig({
         : [["html", { open: "never" }]],
     use: {
         baseURL: process.env.FRONTEND_URL || "http://localhost:3002",
-        trace: "on-first-retry",
-        screenshot: "on",
-        video: "retain-on-failure",
+        // Defaults are preserved when the env vars are absent or invalid; the Test
+        // Studio run builder sets these to capture artifacts on demand (PW_VIDEO=on).
+        trace: envEnum(process.env.PW_TRACE, ["off", "on", "on-first-retry", "retain-on-failure"], "on-first-retry") as any,
+        screenshot: envEnum(process.env.PW_SCREENSHOT, ["off", "on", "only-on-failure"], "on") as any,
+        video: envEnum(process.env.PW_VIDEO, ["off", "on", "retain-on-failure", "on-first-retry"], "retain-on-failure") as any,
+        // Strict compare: PW_HEADED=0 must not mean headed.
+        headless: process.env.PW_HEADED === "1" ? false : undefined,
     },
     // NOTE: Per-worker DB isolation (PARALLEL_DB=true / TEST_WORKER_INDEX) is
     // NOT active. The e2e stack uses a single WebAPI + single PostgreSQL container,
