@@ -94,10 +94,12 @@ export async function startEdgeServer({ runtimeDir, configPath, runtimeManager, 
     standardHeaders: true,
     legacyHeaders: false,
   })
-  app.use(staticLimiter)
 
-  app.use(express.static(frontendDir, { index: false }))
-  app.get('*', (_request, response) => {
+  // Attach the limiter directly to the two handlers that touch the file system
+  // (static assets + the SPA catch-all sendFile) so the rate limiting is applied
+  // at the route level CodeQL recognizes, not only as upstream app.use middleware.
+  app.use(staticLimiter, express.static(frontendDir, { index: false }))
+  app.get('*', staticLimiter, (_request, response) => {
     response.sendFile(path.join(frontendDir, 'index.html'))
   })
 
