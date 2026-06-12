@@ -32,6 +32,13 @@ public class ModelibrWebFactory : WebApplicationFactory<Program>
         _uploadPath = Path.Combine(Path.GetTempPath(), "modelibr_concurrency_tests", Path.GetRandomFileName());
         Directory.CreateDirectory(_uploadPath);
 
+        // RestoreOnBootProcessor runs in Program.Main right after CreateBuilder —
+        // BEFORE the factory's deferred ConfigureAppConfiguration is applied — so
+        // at that point it can only see environment variables. Without these it
+        // falls back to /var/lib/modelibr/* and dies on a dev machine.
+        Environment.SetEnvironmentVariable("RESTORE_STORAGE_PATH", Path.Combine(_uploadPath, "restore"));
+        Environment.SetEnvironmentVariable("THUMBNAIL_STORAGE_PATH", Path.Combine(_uploadPath, "thumbnails"));
+
         EnsureTestDatabaseCreated();
     }
 
@@ -45,6 +52,10 @@ public class ModelibrWebFactory : WebApplicationFactory<Program>
             {
                 ["ConnectionStrings:Default"] = TestConnectionString,
                 ["UPLOAD_STORAGE_PATH"] = _uploadPath,
+                // RestoreOnBootProcessor defaults these to /var/lib/modelibr/*,
+                // which isn't writable when the host boots on a dev machine.
+                ["RESTORE_STORAGE_PATH"] = Path.Combine(_uploadPath, "restore"),
+                ["THUMBNAIL_STORAGE_PATH"] = Path.Combine(_uploadPath, "thumbnails"),
                 ["HTTPS_PORT"] = "0",
                 ["EXPOSE_443_PORT"] = "false",
                 ["DisableHttpsRedirection"] = "true",
