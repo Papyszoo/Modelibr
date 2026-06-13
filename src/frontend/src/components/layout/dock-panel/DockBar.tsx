@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef } from 'react'
 
 import { DraggableTab } from '@/components/layout/DraggableTab'
 import { useDockContext } from '@/contexts/DockContext'
+import { openGlobalSearch } from '@/features/search'
 import { type Tab } from '@/types'
 
 import { useDockPanelActions } from './DockPanelActionsContext'
@@ -142,6 +143,14 @@ export function DockBar({
       {/* Add tab button — opens the New Tab page. Right-click on the bar
           shows the same shortcut as a context menu entry. */}
       <div className="dock-add">
+        <Button
+          icon="pi pi-search"
+          className="p-button-text p-button-rounded dock-add-button"
+          onClick={openGlobalSearch}
+          aria-label="Search all assets"
+          tooltip="Search all assets (Ctrl+K)"
+          tooltipOptions={{ position: 'bottom' }}
+        />
         <Button
           icon="pi pi-plus"
           className="p-button-text p-button-rounded dock-add-button"

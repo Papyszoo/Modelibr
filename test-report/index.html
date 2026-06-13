@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Modelibr — Local Test Report</title>
+<style>
+  :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
+  body { margin: 0; background: #f6f8fa; color: #1f2328; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 32px 20px 64px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: #57606a; font-size: 13px; margin-bottom: 24px; }
+  .hero { display:flex; align-items:center; gap:16px; padding:18px 20px; border-radius:10px;
+          background:#ffebe9; color:#cf222e; font-weight:700; font-size:18px; margin-bottom:24px; }
+  .hero .pills { margin-left:auto; display:flex; gap:8px; font-size:13px; font-weight:600; }
+  .pill { background:rgba(255,255,255,.6); border-radius:20px; padding:3px 12px; color:#1f2328; }
+  table { width:100%; border-collapse: collapse; background:#fff; border:1px solid #d0d7de; border-radius:10px; overflow:hidden; }
+  th, td { text-align:left; padding:11px 14px; font-size:13px; border-bottom:1px solid #eaeef2; }
+  th { background:#f6f8fa; color:#57606a; font-weight:600; text-transform:uppercase; font-size:11px; letter-spacing:.04em; }
+  tr:last-child td { border-bottom:none; }
+  .badge { font-size:11px; font-weight:700; padding:3px 9px; border-radius:20px; white-space:nowrap; }
+  .name { font-weight:600; }
+  .note { font-weight:400; color:#9a6700; font-size:11px; margin-top:3px; }
+  .tier { color:#57606a; }
+  .dur, .counts { color:#57606a; white-space:nowrap; }
+  .links a { color:#0969da; text-decoration:none; }
+  .links a:hover { text-decoration:underline; }
+  footer { color:#8c959f; font-size:12px; margin-top:20px; }
+</style></head>
+<body><div class="wrap">
+  <h1>Modelibr — Local Test Report</h1>
+  <div class="sub">devmachine.home · darwin arm64 · node v20.20.2 · branch feat/local-test-runner · 6/11/2026, 2:22:22 AM</div>
+  <div class="hero">
+    FAILED
+    <div class="pills">
+      <span class="pill">7 passed</span>
+      <span class="pill">2 failed</span>
+      <span class="pill">0 skipped</span>
+      <span class="pill">1 n/a</span>
+      <span class="pill">24m 54s total</span>
+    </div>
+  </div>
+  <table>
+    <thead><tr><th>Status</th><th>Suite</th><th>Tier</th><th>Tests</th><th>Time</th><th>Artifacts</th></tr></thead>
+    <tbody>
+<tr>
+        <td><span class="badge" style="color:#1a7f37;background:#dafbe1">PASSED</span></td>
+        <td class="name">Backend unit (.NET / xUnit)</td>
+        <td class="tier">fast</td>
+        <td class="counts">467/467</td>
+        <td class="dur">3.0s</td>
+        <td class="links"><a href="logs/backend.log">log</a></td>
+      </tr>
+<tr>
+        <td><span class="badge" style="color:#1a7f37;background:#dafbe1">PASSED</span></td>
+        <td class="name">Frontend unit (Jest)</td>
+        <td class="tier">fast</td>
+        <td class="counts">274/274</td>
+        <td class="dur">2.3s</td>
+        <td class="links"><a href="logs/frontend.log">log</a></td>
+      </tr>
+<tr>
+        <td><span class="badge" style="color:#1a7f37;background:#dafbe1">PASSED</span></td>
+        <td class="name">Asset processor (Vitest)</td>
+        <td class="tier">fast</td>
+        <td class="counts">73/73</td>
+        <td class="dur">575ms</td>
+        <td class="links"><a href="logs/asset-processor.log">log</a></td>
+      </tr>
+<tr>
+        <td><span class="badge" style="color:#57606a;background:#eaeef2">NOT PRESENT</span></td>
+        <td class="name">Desktop / tray host (node --test)</td>
+        <td class="tier">fast</td>
+        <td class="counts">—</td>
+        <td class="dur">—</td>
+        <td class="links">—</td>
+      </tr>
+<tr>
+        <td><span class="badge" style="color:#1a7f37;background:#dafbe1">PASSED</span></td>
+        <td class="name">E2E — fast tiers (Playwright + BDD, Docker)</td>
+        <td class="tier">fast</td>
+        <td class="counts">—</td>
+        <td class="dur">4m 12s</td>
+        <td class="links"><a href="logs/e2e-fast.log">log</a> · <a href="../tests/e2e/playwright-report/index.html">report</a></td>
+      </tr>
+<tr>
+        <td><span class="badge" style="color:#1a7f37;background:#dafbe1">PASSED</span></td>
+        <td class="name">Backend integration (.NET, needs Postgres)<div class="note">Starts the dev Postgres container automatically (left running — it's the dev database).</div></td>
+        <td class="tier">slow</td>
+        <td class="counts">6/6</td>
+        <td class="dur">6.3s</td>
+        <td class="links"><a href="logs/backend-integration.log">log</a></td>
+      </tr>
+<tr>
+        <td><span class="badge" style="color:#1a7f37;background:#dafbe1">PASSED</span></td>
+        <td class="name">E2E — all tiers incl. @slow Blender (Docker)</td>
+        <td class="tier">slow</td>
+        <td class="counts">—</td>
+        <td class="dur">14m 49s</td>
+        <td class="links"><a href="logs/e2e-full.log">log</a> · <a href="../tests/e2e/playwright-report/index.html">report</a></td>
+      </tr>
+<tr>
+        <td><span class="badge" style="color:#cf222e;background:#ffebe9">FAILED</span></td>
+        <td class="name">Backup/restore E2E (Docker)</td>
+        <td class="tier">slow</td>
+        <td class="counts">—</td>
+        <td class="dur">1m 52s</td>
+        <td class="links"><a href="logs/backup-restore.log">log</a> · <a href="../tests/backup-restore-e2e/playwright-report/index.html">report</a></td>
+      </tr>
+<tr>
+        <td><span class="badge" style="color:#cf222e;background:#ffebe9">FAILED</span></td>
+        <td class="name">Storybook visual regression (Playwright)<div class="note">Needs Playwright chromium installed (npx playwright install chromium).</div></td>
+        <td class="tier">visual</td>
+        <td class="counts">—</td>
+        <td class="dur">44.0s</td>
+        <td class="links"><a href="logs/storybook-visual.log">log</a></td>
+      </tr>
+<tr>
+        <td><span class="badge" style="color:#1a7f37;background:#dafbe1">PASSED</span></td>
+        <td class="name">E2E — performance / throughput (Docker)</td>
+        <td class="tier">perf</td>
+        <td class="counts">—</td>
+        <td class="dur">3m 5s</td>
+        <td class="links"><a href="logs/e2e-performance.log">log</a> · <a href="../tests/e2e/playwright-report/index.html">report</a></td>
+      </tr>
+    </tbody>
+  </table>
+  <footer>Generated by scripts/test-runner · re-run with <code>npm run test:all</code></footer>
+</div></body></html>

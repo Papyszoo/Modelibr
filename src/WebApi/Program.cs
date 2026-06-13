@@ -168,6 +168,7 @@ namespace WebApi
             app.MapBlenderEndpoints();
             app.MapAudioSelectionEndpoints();
             app.MapBackupEndpoints();
+            app.MapSearchEndpoints();
 
             // Map SignalR hubs
             app.MapHub<ThumbnailHub>("/thumbnailHub");
