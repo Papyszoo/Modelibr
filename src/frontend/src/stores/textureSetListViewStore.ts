@@ -17,6 +17,8 @@ export interface TextureSetListViewState {
   selectedCategoryKeys: PersistedModelCategorySelectionKeys
   /** Subset of `TextureType` enum values (numeric). */
   selectedTextureTypes: number[]
+  /** Tag names (shared vocabulary) used as an any-of filter. */
+  selectedTagNames: string[]
   /** Persists across tab navigation so a selection survives re-mount. */
   selectedTextureSetIds: number[]
 }
@@ -38,6 +40,7 @@ export const DEFAULT_TEXTURE_SET_LIST_VIEW_STATE: TextureSetListViewState = {
   selectedProjectIds: [],
   selectedCategoryKeys: {},
   selectedTextureTypes: [],
+  selectedTagNames: [],
   selectedTextureSetIds: [],
 }
 

@@ -58,11 +58,14 @@ interface TexturesFiltersProps {
   selectedProjectIds: number[]
   selectedCategoryKeys: CategorySelectionKeys
   selectedTextureTypes: number[]
+  availableTags: string[]
+  selectedTagNames: string[]
   onPackFilterChange: (packIds: number[]) => void
   onProjectFilterChange: (projectIds: number[]) => void
   onCategoryChange: (keys: CategorySelectionKeys) => void
   onManageCategoriesClick: () => void
   onTextureTypesChange: (types: number[]) => void
+  onTagChange: (tags: string[]) => void
   cardWidth: number
   onCardWidthChange: (width: number) => void
   count: number
@@ -91,11 +94,14 @@ export function TexturesFilters({
   selectedProjectIds,
   selectedCategoryKeys,
   selectedTextureTypes,
+  availableTags,
+  selectedTagNames,
   onPackFilterChange,
   onProjectFilterChange,
   onCategoryChange,
   onManageCategoriesClick,
   onTextureTypesChange,
+  onTagChange,
   cardWidth,
   onCardWidthChange,
   count,
@@ -122,17 +128,20 @@ export function TexturesFilters({
   const selectedCategoryCount = Object.values(selectedCategoryKeys).filter(
     state => state?.checked
   ).length
+  const tagOptions = availableTags.map(tag => ({ label: tag, value: tag }))
   const hasActiveFilters =
     selectedPackIds.length > 0 ||
     selectedProjectIds.length > 0 ||
     selectedCategoryCount > 0 ||
-    selectedTextureTypes.length > 0
+    selectedTextureTypes.length > 0 ||
+    selectedTagNames.length > 0
 
   const activeFilterCount = [
     selectedPackIds.length > 0,
     selectedProjectIds.length > 0,
     selectedCategoryCount > 0,
     selectedTextureTypes.length > 0,
+    selectedTagNames.length > 0,
   ].filter(Boolean).length
 
   const selectedCountLabel = `${selectedCount} ${unitLabel}${selectedCount === 1 ? '' : 's'}`
@@ -294,6 +303,20 @@ export function TexturesFilters({
             filter
             filterPlaceholder="Search types..."
           />
+          {availableTags.length > 0 && (
+            <MultiSelect
+              value={selectedTagNames}
+              options={tagOptions}
+              onChange={e => onTagChange(e.value || [])}
+              placeholder="Tags"
+              className="list-filters-control"
+              display="chip"
+              showClear
+              filter
+              filterPlaceholder="Search tags..."
+              data-testid="texture-set-tag-filter"
+            />
+          )}
           {hasActiveFilters ? (
             <Button
               icon="pi pi-times"
@@ -305,6 +328,7 @@ export function TexturesFilters({
                 onProjectFilterChange([])
                 onCategoryChange({})
                 onTextureTypesChange([])
+                onTagChange([])
               }}
             />
           ) : null}

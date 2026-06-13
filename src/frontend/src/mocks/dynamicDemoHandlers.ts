@@ -494,8 +494,15 @@ export const dynamicDemoHandlers = [
   }),
 
   http.get('*/model-tags', async () => {
+    // The shared tag vocabulary spans every asset type that can be tagged.
     const models = await getAll('models')
-    const tags = [...new Set(models.flatMap(model => model.tags ?? []))]
+    const textureSets = await getAll('textureSets')
+    const tags = [
+      ...new Set([
+        ...models.flatMap(model => model.tags ?? []),
+        ...textureSets.flatMap(ts => ts.tags ?? []),
+      ]),
+    ]
       .sort((left, right) => left.localeCompare(right))
       .map(name => ({ name }))
 
@@ -1406,6 +1413,10 @@ export const dynamicDemoHandlers = [
     const searchName = (url.searchParams.get('searchName') ?? '')
       .trim()
       .toLowerCase()
+    const tagFilters = url.searchParams
+      .getAll('tag')
+      .map(t => t.trim().toLowerCase())
+      .filter(Boolean)
 
     let sets = await getAll('textureSets')
 
@@ -1441,6 +1452,11 @@ export const dynamicDemoHandlers = [
     if (searchName) {
       sets = sets.filter(ts =>
         (ts.name ?? '').toLowerCase().includes(searchName)
+      )
+    }
+    if (tagFilters.length > 0) {
+      sets = sets.filter(ts =>
+        (ts.tags ?? []).some(tag => tagFilters.includes(tag.toLowerCase()))
       )
     }
 
@@ -1623,6 +1639,27 @@ export const dynamicDemoHandlers = [
     ts.updatedAt = now()
     await put('textureSets', ts)
     return new HttpResponse(null, { status: 204 })
+  }),
+
+  http.put('*/texture-sets/:id/tags', async ({ params, request }) => {
+    const ts = await getById('textureSets', Number(params.id))
+    if (!ts) return new HttpResponse(null, { status: 404 })
+    const body = (await request.json()) as { tags?: string[] }
+    // De-duplicate by lowercase, preserving the first-seen casing.
+    const seen = new Set<string>()
+    const tags: string[] = []
+    for (const raw of body.tags ?? []) {
+      const trimmed = raw.trim()
+      const key = trimmed.toLowerCase()
+      if (trimmed && !seen.has(key)) {
+        seen.add(key)
+        tags.push(trimmed)
+      }
+    }
+    ts.tags = tags
+    ts.updatedAt = now()
+    await put('textureSets', ts)
+    return HttpResponse.json({ textureSetId: ts.id, tags })
   }),
 
   http.put('*/texture-sets/:id', async ({ params, request }) => {

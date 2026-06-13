@@ -37,6 +37,7 @@ export async function getTextureSetsPaginated(options: {
   textureTypes?: number[]
   kind?: number
   searchName?: string
+  tags?: string[]
 }): Promise<{
   textureSets: TextureSetDto[]
   totalCount: number
@@ -58,6 +59,9 @@ export async function getTextureSetsPaginated(options: {
   if (options.kind !== undefined) params.append('kind', options.kind.toString())
   if (options.searchName && options.searchName.trim()) {
     params.append('searchName', options.searchName.trim())
+  }
+  for (const tag of options.tags ?? []) {
+    params.append('tag', tag)
   }
 
   const response = await client.get(`/texture-sets?${params.toString()}`)
@@ -169,6 +173,14 @@ export async function updateTextureSet(
     request
   )
 
+  return response.data
+}
+
+export async function updateTextureSetTags(
+  id: number,
+  tags: string[]
+): Promise<{ textureSetId: number; tags: string[] }> {
+  const response = await client.put(`/texture-sets/${id}/tags`, { tags })
   return response.data
 }
 

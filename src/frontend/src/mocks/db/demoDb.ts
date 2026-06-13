@@ -110,6 +110,7 @@ export interface DemoTextureSet {
   isEmpty: boolean
   thumbnailPath: string | null
   pngThumbnailPath: string | null
+  tags?: string[]
   textures: DemoTexture[]
   associatedModels: {
     id: number
@@ -908,6 +909,7 @@ export async function seedIfEmpty(): Promise<void> {
       isEmpty: false,
       thumbnailPath: null,
       pngThumbnailPath: null,
+      tags: ['basic', 'test'],
       textures: [
         {
           id: 1,

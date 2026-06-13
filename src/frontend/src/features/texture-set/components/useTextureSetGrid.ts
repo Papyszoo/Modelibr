@@ -126,6 +126,10 @@ export function useTextureSetGrid({
     () => [...selectedCategoryIds].sort((a, b) => a - b),
     [selectedCategoryIds]
   )
+  const sortedTagNames = useMemo(
+    () => [...(viewState.selectedTagNames ?? [])].sort(),
+    [viewState.selectedTagNames]
+  )
 
   // Debounce the search query for the server side so each keystroke doesn't
   // spawn its own fetch. Client-side filtering of already-loaded pages
@@ -152,6 +156,7 @@ export function useTextureSetGrid({
         projectIds: sortedProjectIds,
         categoryIds: sortedCategoryIds,
         textureTypes: sortedTextureTypes,
+        tags: sortedTagNames,
         searchName: debouncedSearchName || undefined,
       },
     ],
@@ -166,6 +171,7 @@ export function useTextureSetGrid({
           sortedCategoryIds.length > 0 ? sortedCategoryIds : undefined,
         textureTypes:
           sortedTextureTypes.length > 0 ? sortedTextureTypes : undefined,
+        tags: sortedTagNames.length > 0 ? sortedTagNames : undefined,
         searchName: debouncedSearchName || undefined,
       }),
     initialPageParam: 1,
@@ -218,6 +224,10 @@ export function useTextureSetGrid({
   )
   const setSelectedTextureTypes = useCallback(
     (types: number[]) => setView({ selectedTextureTypes: types }),
+    [setView]
+  )
+  const setSelectedTagNames = useCallback(
+    (tags: string[]) => setView({ selectedTagNames: tags }),
     [setView]
   )
   const setSelectedTextureSetIds = useCallback(
@@ -401,6 +411,8 @@ export function useTextureSetGrid({
     selectedCategoryIds,
     selectedTextureTypes: viewState.selectedTextureTypes as TextureType[],
     setSelectedTextureTypes,
+    selectedTagNames: viewState.selectedTagNames ?? [],
+    setSelectedTagNames,
 
     // Selection
     selectedTextureSetIds: viewState.selectedTextureSetIds,

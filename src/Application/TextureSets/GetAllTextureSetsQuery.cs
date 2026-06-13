@@ -1,6 +1,7 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.TextureSetCategories;
+using Domain.Models;
 using Domain.ValueObjects;
 using SharedKernel;
 
@@ -22,6 +23,10 @@ internal class GetAllTextureSetsQueryHandler : IQueryHandler<GetAllTextureSetsQu
         IEnumerable<Domain.Models.TextureSet> textureSets;
         int? totalCount = null;
 
+        var normalizedTags = ModelTag.SanitizeNames(query.Tags)
+            .Select(ModelTag.NormalizeName)
+            .ToArray();
+
         if (query.Page.HasValue && query.PageSize.HasValue)
         {
             var result = await _textureSetRepository.GetPagedAsync(
@@ -31,6 +36,7 @@ internal class GetAllTextureSetsQueryHandler : IQueryHandler<GetAllTextureSetsQu
                 query.TextureTypes,
                 query.Kind,
                 query.SearchName,
+                normalizedTags,
                 cancellationToken);
             textureSets = result.Items;
             totalCount = result.TotalCount;
@@ -58,6 +64,9 @@ internal class GetAllTextureSetsQueryHandler : IQueryHandler<GetAllTextureSetsQu
                 textureSets = textureSets.Where(ts =>
                     ts.Name.Contains(search, StringComparison.OrdinalIgnoreCase));
             }
+            if (normalizedTags.Length > 0)
+                textureSets = textureSets.Where(ts =>
+                    ts.Tags.Any(tag => normalizedTags.Contains(tag.NormalizedName)));
         }
 
         var categories = await _textureSetCategoryRepository.GetAllAsync(cancellationToken);
@@ -76,6 +85,7 @@ internal class GetAllTextureSetsQueryHandler : IQueryHandler<GetAllTextureSetsQu
             TextureCount = tp.TextureCount,
             IsEmpty = tp.IsEmpty,
             ThumbnailPath = tp.ThumbnailPath,
+            Tags = tp.Tags.Select(t => t.Name).OrderBy(name => name).ToList(),
             Textures = tp.Textures.Select(t => new TextureListDto
             {
                 Id = t.Id,
@@ -110,7 +120,8 @@ public record GetAllTextureSetsQuery(
     int? Page = null,
     int? PageSize = null,
     TextureSetKind? Kind = null,
-    string? SearchName = null) : IQuery<GetAllTextureSetsResponse>;
+    string? SearchName = null,
+    IReadOnlyCollection<string>? Tags = null) : IQuery<GetAllTextureSetsResponse>;
 public record GetAllTextureSetsResponse(IEnumerable<TextureSetListDto> TextureSets, int? TotalCount = null, int? Page = null, int? PageSize = null, int? TotalPages = null);
 
 /// <summary>
@@ -130,6 +141,7 @@ public record TextureSetListDto
     public int TextureCount { get; init; }
     public bool IsEmpty { get; init; }
     public string? ThumbnailPath { get; init; }
+    public IReadOnlyList<string> Tags { get; init; } = Array.Empty<string>();
     public ICollection<TextureListDto> Textures { get; init; } = new List<TextureListDto>();
     public ICollection<ModelSummaryListDto> AssociatedModels { get; init; } = new List<ModelSummaryListDto>();
 }
