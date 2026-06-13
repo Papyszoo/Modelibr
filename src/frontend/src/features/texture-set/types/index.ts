@@ -80,6 +80,7 @@ export interface TextureSetDto {
   isEmpty: boolean
   thumbnailPath?: string
   pngThumbnailPath?: string
+  tags?: string[]
   textures: TextureDto[]
   associatedModels: ModelSummaryDto[]
   packs?: PackSummaryDto[]

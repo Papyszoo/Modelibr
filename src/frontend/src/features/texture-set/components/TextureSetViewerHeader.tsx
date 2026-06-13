@@ -7,9 +7,12 @@ import { SetStats } from '@/features/texture-set/dialogs/SetStats'
 import type { QualityOption } from '@/features/texture-set/hooks/useTextureSetViewerData'
 import { type TextureSetDto, TextureSetKind } from '@/types'
 
+import { TextureSetTags } from './TextureSetTags'
+
 interface TextureSetViewerHeaderProps {
   textureSet: TextureSetDto
   onNameUpdate: (newName: string) => Promise<void>
+  onTagsUpdate: (tags: string[]) => Promise<void>
   updating: boolean
   textureQuality: number
   onQualityChange: (value: number) => void
@@ -22,6 +25,7 @@ interface TextureSetViewerHeaderProps {
 export function TextureSetViewerHeader({
   textureSet,
   onNameUpdate,
+  onTagsUpdate,
   updating,
   textureQuality,
   onQualityChange,
@@ -72,6 +76,10 @@ export function TextureSetViewerHeader({
             updating={updating}
           />
           <SetStats textureSet={textureSet} />
+          <TextureSetTags
+            tags={textureSet.tags ?? []}
+            onTagsUpdate={onTagsUpdate}
+          />
         </div>
         {textureSet.kind === TextureSetKind.Universal && (
           <div className="set-viewer-quality">

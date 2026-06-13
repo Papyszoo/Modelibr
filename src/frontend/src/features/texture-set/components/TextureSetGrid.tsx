@@ -34,6 +34,7 @@ import { useTabContext } from '@/hooks/useTabContext'
 import { baseURL } from '@/lib/apiBase'
 import { SelectPackDialog } from '@/shared/components/dialogs/SelectPackDialog'
 import { SelectProjectDialog } from '@/shared/components/dialogs/SelectProjectDialog'
+import { useTagVocabulary } from '@/shared/hooks/useTagVocabulary'
 import {
   type TextureChannel,
   type TextureSetDto,
@@ -163,6 +164,8 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
     setSelectedCategoryKeys,
     selectedTextureTypes,
     setSelectedTextureTypes,
+    selectedTagNames,
+    setSelectedTagNames,
     selectedTextureSetIds,
     setSelectedTextureSetIds,
     cardWidth,
@@ -174,6 +177,8 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
     handleFileDrop,
     toast,
   } = useTextureSetGrid({ kind, viewStateScope })
+
+  const tagVocabulary = useTagVocabulary()
 
   const selectedIdSet = useMemo(
     () => new Set(selectedTextureSetIds),
@@ -839,11 +844,14 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
         selectedProjectIds={selectedProjectIds}
         selectedCategoryKeys={selectedCategoryKeys}
         selectedTextureTypes={selectedTextureTypes}
+        availableTags={tagVocabulary.data ?? []}
+        selectedTagNames={selectedTagNames}
         onPackFilterChange={setSelectedPackIds}
         onProjectFilterChange={setSelectedProjectIds}
         onCategoryChange={setSelectedCategoryKeys}
         onManageCategoriesClick={() => setShowCategoryManager(true)}
         onTextureTypesChange={setSelectedTextureTypes}
+        onTagChange={setSelectedTagNames}
         cardWidth={cardWidth}
         onCardWidthChange={handleCardWidthChange}
         count={totalCount || filteredTextureSets.length}
