@@ -19,6 +19,8 @@ export interface TextureSetListViewState {
   selectedTextureTypes: number[]
   /** Minimum largest-side resolution filter (e.g. 4096 = "4K and up"); null = any. */
   minResolution: number | null
+  /** Tag names (shared vocabulary) used as an any-of filter. */
+  selectedTagNames: string[]
   /** Persists across tab navigation so a selection survives re-mount. */
   selectedTextureSetIds: number[]
 }
@@ -41,6 +43,7 @@ export const DEFAULT_TEXTURE_SET_LIST_VIEW_STATE: TextureSetListViewState = {
   selectedCategoryKeys: {},
   selectedTextureTypes: [],
   minResolution: null,
+  selectedTagNames: [],
   selectedTextureSetIds: [],
 }
 
