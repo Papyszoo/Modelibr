@@ -62,6 +62,12 @@ export interface DemoModelVersion {
   vertexCount?: number | null
   meshCount?: number | null
   materialCount?: number | null
+  boundingBoxX?: number | null
+  boundingBoxY?: number | null
+  boundingBoxZ?: number | null
+  animationCount?: number | null
+  animationNames?: string[]
+  boneCount?: number | null
   technicalDetailsUpdatedAt?: string | null
   thumbnailUrl: string | null
   pngThumbnailUrl: string | null
@@ -777,6 +783,12 @@ export async function seedIfEmpty(): Promise<void> {
       vertexCount: 64,
       meshCount: 1,
       materialCount: 1,
+      boundingBoxX: 1.2,
+      boundingBoxY: 2.4,
+      boundingBoxZ: 1.2,
+      animationCount: 2,
+      animationNames: ['Idle', 'Walk'],
+      boneCount: 18,
       technicalDetailsUpdatedAt: now,
       thumbnailUrl: null,
       pngThumbnailUrl: null,

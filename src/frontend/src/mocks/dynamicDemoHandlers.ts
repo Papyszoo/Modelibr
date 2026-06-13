@@ -429,6 +429,9 @@ export const dynamicDemoHandlers = [
       .map(tag => tag.trim().toLowerCase())
       .filter(Boolean)
     const hasConceptImages = url.searchParams.get('hasConceptImages')
+    const hasAnimations = url.searchParams.get('hasAnimations')
+    const minTriangleCount = url.searchParams.get('minTriangleCount')
+    const maxTriangleCount = url.searchParams.get('maxTriangleCount')
     const searchName = (url.searchParams.get('searchName') ?? '')
       .trim()
       .toLowerCase()
@@ -478,7 +481,24 @@ export const dynamicDemoHandlers = [
       )
     }
 
-    const enriched = await Promise.all(models.map(model => enrichModel(model)))
+    let enriched = await Promise.all(models.map(model => enrichModel(model)))
+
+    if (hasAnimations !== null) {
+      const wantsAnimations = hasAnimations === 'true'
+      enriched = enriched.filter(
+        m => (m.animationCount ?? 0) > 0 === wantsAnimations
+      )
+    }
+    if (minTriangleCount !== null) {
+      const min = Number(minTriangleCount)
+      enriched = enriched.filter(m => (m.triangleCount ?? 0) >= min)
+    }
+    if (maxTriangleCount !== null) {
+      const max = Number(maxTriangleCount)
+      enriched = enriched.filter(
+        m => m.triangleCount != null && m.triangleCount <= max
+      )
+    }
 
     if (url.searchParams.has('page')) {
       const result = paginate(enriched, page, pageSize)

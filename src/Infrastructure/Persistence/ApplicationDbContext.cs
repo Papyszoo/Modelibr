@@ -273,7 +273,17 @@ namespace Infrastructure.Persistence
                 entity.Property(v => v.VertexCount).IsRequired(false);
                 entity.Property(v => v.MeshCount).IsRequired(false);
                 entity.Property(v => v.MaterialCount).IsRequired(false);
+                entity.Property(v => v.BoundingBoxX).IsRequired(false);
+                entity.Property(v => v.BoundingBoxY).IsRequired(false);
+                entity.Property(v => v.BoundingBoxZ).IsRequired(false);
+                entity.Property(v => v.AnimationCount).IsRequired(false);
+                entity.Property(v => v.BoneCount).IsRequired(false);
                 entity.Property(v => v.TechnicalDetailsUpdatedAt).IsRequired(false);
+
+                // Map AnimationNames as a PostgreSQL text array column
+                entity.Property(v => v.AnimationNames)
+                    .HasColumnType("text[]")
+                    .HasDefaultValueSql("'{}'::text[]");
 
                 // Create unique index on ModelId and VersionNumber
                 entity.HasIndex(v => new { v.ModelId, v.VersionNumber }).IsUnique();

@@ -2,8 +2,11 @@ export default {
   testEnvironment: 'jsdom',
   setupFilesAfterEnv: ['<rootDir>/src/setupTests.ts'],
   moduleNameMapper: {
-    '^@/(.*)$': '<rootDir>/src/$1',
+    // CSS rule must precede the '@/' alias: Jest uses first-match-wins, and
+    // an '@/...css' import would otherwise resolve to a real file and fail to
+    // parse. Keep style stubs ahead of path aliases.
     '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
+    '^@/(.*)$': '<rootDir>/src/$1',
   },
   transform: {
     '^.+\\.(ts|tsx|js|jsx|mjs)$': 'babel-jest',

@@ -62,4 +62,57 @@ public class UpdateTechnicalMetadataCommandHandlerTests
                 v.MaterialNames.Count == 2),
             It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    [Fact]
+    public async Task Handle_WhenAnimationAndGeometryProvided_PersistsThoseFields()
+    {
+        var version = ModelVersion.Create(1, 1, "v1", DateTime.UtcNow);
+        version.WithId(1);
+
+        _mockModelVersionRepository.Setup(x => x.GetByIdAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(version);
+        _mockModelVersionRepository.Setup(x => x.UpdateAsync(It.IsAny<ModelVersion>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ModelVersion mv, CancellationToken _) => mv);
+
+        var command = new UpdateTechnicalMetadataCommand(
+            1, new List<string> { "Metal" }, 1200, 600, 5, 1,
+            BoundingBoxX: 1.5, BoundingBoxY: 2.0, BoundingBoxZ: 0.5,
+            AnimationCount: 2, AnimationNames: new List<string> { "Idle", "Walk" }, BoneCount: 18);
+
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        _mockModelVersionRepository.Verify(
+            x => x.UpdateAsync(It.Is<ModelVersion>(v =>
+                v.BoundingBoxX == 1.5 &&
+                v.BoundingBoxY == 2.0 &&
+                v.BoundingBoxZ == 0.5 &&
+                v.AnimationCount == 2 &&
+                v.AnimationNames.Count == 2 &&
+                v.BoneCount == 18),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_WhenAnimationCountOmittedButNamesPresent_DerivesCountFromNames()
+    {
+        var version = ModelVersion.Create(1, 1, "v1", DateTime.UtcNow);
+        version.WithId(1);
+
+        _mockModelVersionRepository.Setup(x => x.GetByIdAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(version);
+        _mockModelVersionRepository.Setup(x => x.UpdateAsync(It.IsAny<ModelVersion>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ModelVersion mv, CancellationToken _) => mv);
+
+        var command = new UpdateTechnicalMetadataCommand(
+            1, new List<string>(), null, null, null, null,
+            AnimationNames: new List<string> { "Run", "Jump", "Crouch" });
+
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        _mockModelVersionRepository.Verify(
+            x => x.UpdateAsync(It.Is<ModelVersion>(v => v.AnimationCount == 3),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
 }
