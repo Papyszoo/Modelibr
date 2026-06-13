@@ -120,6 +120,9 @@ export async function getModelsPaginated(options: {
   categoryIds?: number[]
   tags?: string[]
   hasConceptImages?: boolean
+  hasAnimations?: boolean
+  minTriangleCount?: number
+  maxTriangleCount?: number
   searchName?: string
 }): Promise<PaginatedResponse<Model>> {
   const params = new URLSearchParams()
@@ -137,6 +140,15 @@ export async function getModelsPaginated(options: {
   }
   if (typeof options.hasConceptImages === 'boolean') {
     params.append('hasConceptImages', String(options.hasConceptImages))
+  }
+  if (typeof options.hasAnimations === 'boolean') {
+    params.append('hasAnimations', String(options.hasAnimations))
+  }
+  if (typeof options.minTriangleCount === 'number') {
+    params.append('minTriangleCount', String(options.minTriangleCount))
+  }
+  if (typeof options.maxTriangleCount === 'number') {
+    params.append('maxTriangleCount', String(options.maxTriangleCount))
   }
   if (options.searchName && options.searchName.trim()) {
     params.append('searchName', options.searchName.trim())

@@ -102,6 +102,10 @@
   padding: 0 0.125rem;
 }
 
+.models-filter-triangle-input {
+  width: 6rem;
+}
+
 .list-filters-empty {
   color: var(--text-color-secondary);
   font-size: 0.875rem;

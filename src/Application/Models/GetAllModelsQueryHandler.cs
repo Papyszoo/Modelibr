@@ -29,6 +29,7 @@ namespace Application.Models
                     query.Page.Value, query.PageSize.Value,
                     query.PackIds, query.ProjectIds, query.TextureSetId, query.CategoryIds, normalizedTags, query.HasConceptImages,
                     query.SearchName,
+                    query.MinTriangleCount, query.MaxTriangleCount, query.HasAnimations,
                     cancellationToken);
                 modelListDtos = result.Items;
                 totalCount = result.TotalCount;
@@ -79,6 +80,23 @@ namespace Application.Models
                         m.Name.Contains(search, StringComparison.OrdinalIgnoreCase));
                 }
 
+                if (query.MinTriangleCount.HasValue)
+                {
+                    models = models.Where(m => m.GetLatestVersion()?.TriangleCount >= query.MinTriangleCount.Value);
+                }
+
+                if (query.MaxTriangleCount.HasValue)
+                {
+                    models = models.Where(m => m.GetLatestVersion()?.TriangleCount <= query.MaxTriangleCount.Value);
+                }
+
+                if (query.HasAnimations.HasValue)
+                {
+                    models = query.HasAnimations.Value
+                        ? models.Where(m => m.GetLatestVersion()?.AnimationCount > 0)
+                        : models.Where(m => (m.GetLatestVersion()?.AnimationCount ?? 0) == 0);
+                }
+
                 // NOTE: Keep this mapping in sync with ModelRepository.GetPagedListAsync
                 modelListDtos = models.Select(m =>
                 {
@@ -102,6 +120,8 @@ namespace Application.Models
                         VertexCount = latest?.VertexCount,
                         MeshCount = latest?.MeshCount,
                         MaterialCount = latest?.MaterialCount,
+                        AnimationCount = latest?.AnimationCount,
+                        BoneCount = latest?.BoneCount,
                         ThumbnailUrl = m.ActiveVersion?.Thumbnail?.Status == ThumbnailStatus.Ready 
                             ? $"/model-versions/{m.ActiveVersion.Id}/thumbnail/file?t={m.ActiveVersion.Thumbnail.UpdatedAt:yyyyMMddHHmmss}" 
                             : null,
@@ -130,7 +150,10 @@ namespace Application.Models
         bool? HasConceptImages = null,
         int? Page = null,
         int? PageSize = null,
-        string? SearchName = null) : IQuery<GetAllModelsQueryResponse>;
+        string? SearchName = null,
+        int? MinTriangleCount = null,
+        int? MaxTriangleCount = null,
+        bool? HasAnimations = null) : IQuery<GetAllModelsQueryResponse>;
     
     public record GetAllModelsQueryResponse(IEnumerable<ModelListDto> Models, int? TotalCount = null, int? Page = null, int? PageSize = null, int? TotalPages = null);
     
@@ -156,6 +179,8 @@ namespace Application.Models
         public int? VertexCount { get; init; }
         public int? MeshCount { get; init; }
         public int? MaterialCount { get; init; }
+        public int? AnimationCount { get; init; }
+        public int? BoneCount { get; init; }
         public string? ThumbnailUrl { get; init; }
         public string? PngThumbnailUrl { get; init; }
     }

@@ -27,6 +27,13 @@ export function useModelFilters({
     []
   )
   const [localHasConceptImages, setLocalHasConceptImages] = useState(false)
+  const [localAnimatedOnly, setLocalAnimatedOnly] = useState(false)
+  const [localMinTriangleCount, setLocalMinTriangleCount] = useState<
+    number | null
+  >(null)
+  const [localMaxTriangleCount, setLocalMaxTriangleCount] = useState<
+    number | null
+  >(null)
   const [selectedPackIds, setSelectedPackIds] = useState<number[]>(
     packId ? [packId] : []
   )
@@ -57,6 +64,11 @@ export function useModelFilters({
     persistedViewState?.selectedTagNames ?? localSelectedTagNames
   const hasConceptImages =
     persistedViewState?.hasConceptImages ?? localHasConceptImages
+  const animatedOnly = persistedViewState?.animatedOnly ?? localAnimatedOnly
+  const minTriangleCount =
+    persistedViewState?.minTriangleCount ?? localMinTriangleCount
+  const maxTriangleCount =
+    persistedViewState?.maxTriangleCount ?? localMaxTriangleCount
 
   const effectivePackIds = packId ? [packId] : currentSelectedPackIds
   const effectiveProjectIds = projectId
@@ -175,6 +187,42 @@ export function useModelFilters({
     [onPersistedViewStateChange, persistedViewState]
   )
 
+  const setAnimatedOnly = useCallback(
+    (value: boolean) => {
+      if (persistedViewState && onPersistedViewStateChange) {
+        onPersistedViewStateChange({ animatedOnly: value })
+        return
+      }
+
+      setLocalAnimatedOnly(value)
+    },
+    [onPersistedViewStateChange, persistedViewState]
+  )
+
+  const setMinTriangleCount = useCallback(
+    (value: number | null) => {
+      if (persistedViewState && onPersistedViewStateChange) {
+        onPersistedViewStateChange({ minTriangleCount: value })
+        return
+      }
+
+      setLocalMinTriangleCount(value)
+    },
+    [onPersistedViewStateChange, persistedViewState]
+  )
+
+  const setMaxTriangleCount = useCallback(
+    (value: number | null) => {
+      if (persistedViewState && onPersistedViewStateChange) {
+        onPersistedViewStateChange({ maxTriangleCount: value })
+        return
+      }
+
+      setLocalMaxTriangleCount(value)
+    },
+    [onPersistedViewStateChange, persistedViewState]
+  )
+
   const handleCardWidthChange = useCallback(
     (width: number) => {
       setCardWidth(storeKey, width)
@@ -215,6 +263,12 @@ export function useModelFilters({
     setSelectedTagNames,
     hasConceptImages,
     setHasConceptImages,
+    animatedOnly,
+    setAnimatedOnly,
+    minTriangleCount,
+    setMinTriangleCount,
+    maxTriangleCount,
+    setMaxTriangleCount,
     effectivePackIds,
     effectiveProjectIds,
     handlePackFilterChange,

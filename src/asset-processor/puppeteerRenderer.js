@@ -396,6 +396,12 @@ export class PuppeteerRenderer {
             // Normalize and add to scene
             const normInfo = window.normalizeModel(model, 2.0)
             window.modelRenderer.model = model
+            // Pre-normalization size in source units, for technical metadata
+            window.modelRenderer.originalSize = {
+              x: normInfo.size.x,
+              y: normInfo.size.y,
+              z: normInfo.size.z,
+            }
             // Add the container (which holds the model) to the scene
             window.modelRenderer.scene.add(window.modelRenderer.modelContainer)
             window.modelRenderer.isReady = true
@@ -1636,8 +1642,13 @@ attribute vec3 aDispNormal;`
         let triangleCount = 0
         let vertexCount = 0
         let meshCount = 0
+        let boneCount = 0
 
         model.traverse(child => {
+          if (child.isBone) {
+            boneCount += 1
+            return
+          }
           if (!child.isMesh || !child.geometry) return
 
           meshCount += 1
@@ -1664,6 +1675,15 @@ attribute vec3 aDispNormal;`
           }
         })
 
+        const animations = Array.isArray(model.animations)
+          ? model.animations
+          : []
+        const animationNames = animations.map(
+          (clip, index) => clip.name || `Animation ${index + 1}`
+        )
+
+        const originalSize = window.modelRenderer.originalSize || null
+
         return {
           success: true,
           materialNames: [...materialNames],
@@ -1671,6 +1691,12 @@ attribute vec3 aDispNormal;`
           vertexCount,
           meshCount,
           materialCount: materialKeys.size,
+          boundingBoxX: originalSize ? originalSize.x : null,
+          boundingBoxY: originalSize ? originalSize.y : null,
+          boundingBoxZ: originalSize ? originalSize.z : null,
+          animationCount: animations.length,
+          animationNames,
+          boneCount,
         }
       })
 
@@ -1687,6 +1713,13 @@ attribute vec3 aDispNormal;`
         vertexCount: result.vertexCount,
         meshCount: result.meshCount,
         distinctMaterialCount: result.materialCount,
+        animationCount: result.animationCount,
+        boneCount: result.boneCount,
+        boundingBox: [
+          result.boundingBoxX,
+          result.boundingBoxY,
+          result.boundingBoxZ,
+        ],
       })
 
       return result
