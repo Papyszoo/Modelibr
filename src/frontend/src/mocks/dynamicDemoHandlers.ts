@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw'
 
+import { type StoreNames } from './db/demoDb'
 import { containerHandlers } from './dynamic-demo/containerHandlers'
 import {
   addRecycledItem,
@@ -500,6 +501,81 @@ export const dynamicDemoHandlers = [
       .map(name => ({ name }))
 
     return HttpResponse.json({ tags })
+  }),
+
+  // Global cross-asset search (mirrors GET /search on the backend)
+  http.get('*/search', async ({ request }) => {
+    const url = new URL(request.url)
+    const term = (url.searchParams.get('q') ?? '').trim().toLowerCase()
+    const perType = Number(url.searchParams.get('perType') || '8')
+    if (!term) {
+      return HttpResponse.json({ groups: [] })
+    }
+
+    const matchesName = (name: string) =>
+      (name ?? '').toLowerCase().includes(term)
+
+    const groups: {
+      type: string
+      totalCount: number
+      items: { type: string; id: number; name: string; matchedOn: string }[]
+    }[] = []
+
+    const pushGroup = (
+      type: string,
+      rows: { id: number; name: string; matchedOn?: string }[]
+    ) => {
+      if (rows.length === 0) return
+      groups.push({
+        type,
+        totalCount: rows.length,
+        items: rows.slice(0, perType).map(r => ({
+          type,
+          id: r.id,
+          name: r.name,
+          matchedOn: r.matchedOn ?? 'name',
+        })),
+      })
+    }
+
+    const models = await getAll('models')
+    pushGroup(
+      'model',
+      models
+        .filter(
+          m =>
+            matchesName(m.name) ||
+            (m.tags ?? []).some(t => t.toLowerCase().includes(term))
+        )
+        .map(m => ({
+          id: m.id,
+          name: m.name,
+          matchedOn: matchesName(m.name) ? 'name' : 'tag',
+        }))
+    )
+
+    const simpleStores: { store: StoreNames; type: string }[] = [
+      { store: 'textureSets', type: 'textureSet' },
+      { store: 'environmentMaps', type: 'environmentMap' },
+      { store: 'sprites', type: 'sprite' },
+      { store: 'sounds', type: 'sound' },
+      { store: 'packs', type: 'pack' },
+      { store: 'projects', type: 'project' },
+    ]
+    for (const { store, type } of simpleStores) {
+      const rows = await getAll(store)
+      pushGroup(
+        type,
+        rows
+          .filter((r: { name?: string }) => matchesName(r.name ?? ''))
+          .map((r: { id: number; name?: string }) => ({
+            id: r.id,
+            name: r.name ?? '',
+          }))
+      )
+    }
+
+    return HttpResponse.json({ groups })
   }),
 
   // Get single model
