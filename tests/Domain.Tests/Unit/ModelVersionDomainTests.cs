@@ -381,6 +381,47 @@ public class ModelVersionDomainTests
     }
 
     [Fact]
+    public void UpdateTechnicalMetadata_PersistsGeometryAnimationAndBoneFields()
+    {
+        // Arrange
+        var version = ModelVersion.Create(1, 1, null, DateTime.UtcNow);
+        var updatedAt = DateTime.UtcNow;
+
+        // Act
+        version.UpdateTechnicalMetadata(
+            new List<string> { "Body" }, 1000, 500, 2, 1,
+            boundingBoxX: 1.5, boundingBoxY: 2.5, boundingBoxZ: 0.75,
+            animationCount: 2, animationNames: new List<string> { "Idle", "Walk" }, boneCount: 24,
+            updatedAt: updatedAt);
+
+        // Assert
+        Assert.Equal(1.5, version.BoundingBoxX);
+        Assert.Equal(2.5, version.BoundingBoxY);
+        Assert.Equal(0.75, version.BoundingBoxZ);
+        Assert.Equal(2, version.AnimationCount);
+        Assert.Equal(2, version.AnimationNames.Count);
+        Assert.Contains("Walk", version.AnimationNames);
+        Assert.Equal(24, version.BoneCount);
+    }
+
+    [Fact]
+    public void UpdateTechnicalMetadata_WhenAnimationCountNullButNamesPresent_DerivesCount()
+    {
+        // Arrange
+        var version = ModelVersion.Create(1, 1, null, DateTime.UtcNow);
+
+        // Act
+        version.UpdateTechnicalMetadata(
+            new List<string>(), null, null, null, null,
+            boundingBoxX: null, boundingBoxY: null, boundingBoxZ: null,
+            animationCount: null, animationNames: new List<string> { "A", "B", "C" }, boneCount: null,
+            updatedAt: DateTime.UtcNow);
+
+        // Assert
+        Assert.Equal(3, version.AnimationCount);
+    }
+
+    [Fact]
     public void RemoveTextureMappingByMaterial_RemovesSpecificMaterialMapping()
     {
         // Arrange
