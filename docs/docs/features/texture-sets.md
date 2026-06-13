@@ -79,6 +79,15 @@ Each model version maintains its **own** default texture set independently:
 
 This allows you to preserve the intended look for each version of your model.
 
+## Tagging Texture Sets
+
+Texture sets share the same tag vocabulary as models and environment maps, so
+a label like `stylized` or `metal` works across every asset type. Open a
+texture set and use the tag editor in its header to add or remove tags; the
+input suggests tags already in use anywhere in the library. The Texture Sets
+list has a **Tags** filter that narrows the grid to sets carrying any of the
+selected tags.
+
 ## Previewing Textures
 
 You can preview different textures without setting them as default:
