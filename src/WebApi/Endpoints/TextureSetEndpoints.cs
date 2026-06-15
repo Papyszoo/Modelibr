@@ -509,7 +509,11 @@ public static class TextureSetEndpoints
 
         if (result.IsFailure)
         {
-            return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+            // The set may have been deleted between job submission and completion,
+            // so a missing set is Not Found rather than a bad request.
+            return result.Error.Code == "TextureSet.NotFound"
+                ? Results.NotFound(new { error = result.Error.Code, message = result.Error.Message })
+                : Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
         }
 
         return Results.NoContent();

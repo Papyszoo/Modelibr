@@ -140,7 +140,10 @@ public class Texture
     {
         Width = width is > 0 ? width : null;
         Height = height is > 0 ? height : null;
-        Format = string.IsNullOrWhiteSpace(format) ? null : format.Trim().ToLowerInvariant();
+        // Clamp to the Format column cap (20). Image format names are short
+        // (png, jpeg, webp, exr…); the clamp just guards a best-effort write.
+        var normalizedFormat = string.IsNullOrWhiteSpace(format) ? null : format.Trim().ToLowerInvariant();
+        Format = normalizedFormat is { Length: > 20 } ? normalizedFormat[..20] : normalizedFormat;
         UpdatedAt = updatedAt;
     }
 

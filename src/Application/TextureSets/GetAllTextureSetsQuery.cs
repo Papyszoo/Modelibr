@@ -59,6 +59,9 @@ internal class GetAllTextureSetsQueryHandler : IQueryHandler<GetAllTextureSetsQu
                 textureSets = textureSets.Where(ts =>
                     ts.Name.Contains(search, StringComparison.OrdinalIgnoreCase));
             }
+            // Keep the set if any texture's largest side meets the threshold
+            // (matches the MaxResolution badge, which is the max side); NULL
+            // dimensions compare false and are excluded. Mirrors TextureSetRepository.
             if (query.MinResolution.HasValue)
                 textureSets = textureSets.Where(ts =>
                     ts.Textures.Any(t => t.Width >= query.MinResolution.Value || t.Height >= query.MinResolution.Value));
