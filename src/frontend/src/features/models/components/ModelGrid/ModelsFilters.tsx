@@ -306,6 +306,7 @@ export function ModelsFilters({
             <InputSwitch
               checked={hasConceptImages}
               onChange={e => onHasConceptImagesChange(Boolean(e.value))}
+              data-testid="concept-art-filter"
             />
             <span>Concept art</span>
           </div>

@@ -40,9 +40,15 @@ export class WaveformGeneratorService {
         height,
       })
 
-      // Step 1: Extract audio metadata (duration)
-      const duration = await this.getAudioDuration(audioFilePath)
-      logger.debug('Audio duration extracted', { duration })
+      // Step 1: Extract audio metadata (duration, sample rate, channels, format)
+      const { duration, sampleRate, channels, format } =
+        await this.getAudioMetadata(audioFilePath)
+      logger.debug('Audio metadata extracted', {
+        duration,
+        sampleRate,
+        channels,
+        format,
+      })
 
       // Step 2: Extract peaks data from audio
       const peaks = await this.extractPeaks(audioFilePath, 200)
@@ -72,6 +78,9 @@ export class WaveformGeneratorService {
       return {
         peaks,
         duration,
+        sampleRate,
+        channels,
+        format,
       }
     } catch (error) {
       logger.error('Waveform generation failed', {
@@ -83,34 +92,60 @@ export class WaveformGeneratorService {
   }
 
   /**
-   * Get audio duration using ffprobe
+   * Extract audio metadata using a single ffprobe JSON probe.
+   * Duration is required (the waveform job cannot complete without it); the
+   * sample rate / channels / format fields are best-effort and degrade to null
+   * when the probe omits them so a partial probe never fails the job.
    * @param {string} audioFilePath - Path to audio file
-   * @returns {Promise<number>} Duration in seconds
+   * @returns {Promise<{duration: number, sampleRate: number|null, channels: number|null, format: string|null}>}
    */
-  async getAudioDuration(audioFilePath) {
+  async getAudioMetadata(audioFilePath) {
+    let probe
     try {
       const { stdout } = await execFileAsync('ffprobe', [
         '-v',
         'error',
+        '-select_streams',
+        'a:0',
         '-show_entries',
-        'format=duration',
+        'format=duration,format_name:stream=sample_rate,channels',
         '-of',
-        'default=noprint_wrappers=1:nokey=1',
+        'json',
         audioFilePath,
       ])
-
-      const duration = parseFloat(stdout.trim())
-      if (isNaN(duration) || duration <= 0) {
-        throw new Error(`Invalid duration: ${stdout}`)
-      }
-
-      return duration
+      probe = JSON.parse(stdout)
     } catch (error) {
-      logger.error('Failed to get audio duration', {
-        error: error.message,
-      })
-      throw new Error(`Failed to get audio duration: ${error.message}`)
+      logger.error('Failed to probe audio metadata', { error: error.message })
+      throw new Error(`Failed to probe audio metadata: ${error.message}`)
     }
+
+    const duration = parseFloat(probe?.format?.duration)
+    if (isNaN(duration) || duration <= 0) {
+      throw new Error(
+        `Invalid duration from ffprobe: ${probe?.format?.duration}`
+      )
+    }
+
+    const stream = Array.isArray(probe?.streams) ? probe.streams[0] : undefined
+    const sampleRate = this._parsePositiveInt(stream?.sample_rate)
+    const channels = this._parsePositiveInt(stream?.channels)
+    // format_name can be a comma-separated list (e.g. "mov,mp4,m4a,..."); keep the first token.
+    const format =
+      typeof probe?.format?.format_name === 'string'
+        ? probe.format.format_name.split(',')[0].trim().toLowerCase() || null
+        : null
+
+    return { duration, sampleRate, channels, format }
+  }
+
+  /**
+   * Parse a value to a positive integer, returning null on failure.
+   * @param {unknown} value
+   * @returns {number|null}
+   */
+  _parsePositiveInt(value) {
+    const parsed = parseInt(value, 10)
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null
   }
 
   /**

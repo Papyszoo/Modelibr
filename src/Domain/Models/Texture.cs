@@ -25,6 +25,24 @@ public class Texture
     public bool IsDeleted { get; private set; }
     public DateTime? DeletedAt { get; private set; }
 
+    /// <summary>
+    /// Pixel width of the source image. Captured at upload time (backend) for
+    /// non-Universal sets, or by the worker thumbnail job for Universal sets.
+    /// Null until extracted, or if the image could not be read.
+    /// </summary>
+    public int? Width { get; private set; }
+
+    /// <summary>
+    /// Pixel height of the source image. See <see cref="Width"/> for when it is set.
+    /// </summary>
+    public int? Height { get; private set; }
+
+    /// <summary>
+    /// Image format (e.g. "png", "jpeg", "webp", "exr"). See <see cref="Width"/> for
+    /// when it is set.
+    /// </summary>
+    public string? Format { get; private set; }
+
     // Foreign key for optional TextureSet relationship
     public int? TextureSetId { get; internal set; }
 
@@ -106,6 +124,23 @@ public class Texture
         ValidateChannelTypeCompatibility(sourceChannel, TextureType);
         
         SourceChannel = sourceChannel;
+        UpdatedAt = updatedAt;
+    }
+
+    /// <summary>
+    /// Persists extracted image metadata (pixel dimensions and format), from either
+    /// the backend at upload time or the worker thumbnail job. Extraction failures
+    /// degrade to null and leave the corresponding field unset.
+    /// </summary>
+    /// <param name="width">Pixel width, or null if unavailable</param>
+    /// <param name="height">Pixel height, or null if unavailable</param>
+    /// <param name="format">Image format, or null if unavailable</param>
+    /// <param name="updatedAt">When the update occurred</param>
+    public void SetImageMetadata(int? width, int? height, string? format, DateTime updatedAt)
+    {
+        Width = width is > 0 ? width : null;
+        Height = height is > 0 ? height : null;
+        Format = string.IsNullOrWhiteSpace(format) ? null : format.Trim().ToLowerInvariant();
         UpdatedAt = updatedAt;
     }
 

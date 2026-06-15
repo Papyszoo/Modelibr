@@ -19,6 +19,8 @@ public interface ISoundRepository
         IReadOnlyCollection<int>? projectIds = null,
         IReadOnlyCollection<int>? categoryIds = null,
         string? searchName = null,
+        double? minDuration = null,
+        double? maxDuration = null,
         CancellationToken cancellationToken = default);
     Task<Sound> UpdateAsync(Sound sound, CancellationToken cancellationToken = default);
     Task DeleteAsync(int id, CancellationToken cancellationToken = default);

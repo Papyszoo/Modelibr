@@ -17,6 +17,11 @@ public record FinishSoundWaveformJobCommand(
     // Success fields (nullable - required when Success=true)
     string? WaveformPath,
     long? SizeBytes,
+    // Audio metadata extracted by the worker (best-effort; all nullable)
+    double? Duration,
+    int? SampleRate,
+    int? Channels,
+    string? Format,
     // Failure fields (nullable - required when Success=false)
     string? ErrorMessage) : ICommand<FinishSoundWaveformJobResponse>;
 
@@ -28,15 +33,18 @@ public record FinishSoundWaveformJobResponse(int JobId, string Status);
 public class FinishSoundWaveformJobCommandHandler : ICommandHandler<FinishSoundWaveformJobCommand, FinishSoundWaveformJobResponse>
 {
     private readonly IThumbnailJobRepository _thumbnailJobRepository;
+    private readonly ISoundRepository _soundRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly ILogger<FinishSoundWaveformJobCommandHandler> _logger;
 
     public FinishSoundWaveformJobCommandHandler(
         IThumbnailJobRepository thumbnailJobRepository,
+        ISoundRepository soundRepository,
         IDateTimeProvider dateTimeProvider,
         ILogger<FinishSoundWaveformJobCommandHandler> logger)
     {
         _thumbnailJobRepository = thumbnailJobRepository ?? throw new ArgumentNullException(nameof(thumbnailJobRepository));
+        _soundRepository = soundRepository ?? throw new ArgumentNullException(nameof(soundRepository));
         _dateTimeProvider = dateTimeProvider ?? throw new ArgumentNullException(nameof(dateTimeProvider));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
@@ -86,6 +94,35 @@ public class FinishSoundWaveformJobCommandHandler : ICommandHandler<FinishSoundW
             job.MarkAsCompleted(now);
             _logger.LogInformation("Sound waveform job {JobId} completed successfully (SoundId: {SoundId}, Path: {Path})",
                 command.JobId, job.SoundId.Value, command.WaveformPath);
+
+            // Persist the audio metadata the worker extracted while decoding the
+            // file. Best-effort: neither a missing sound nor a persistence error
+            // may fail job completion — the waveform is already uploaded and
+            // metadata is non-essential, so we swallow failures here.
+            try
+            {
+                var sound = await _soundRepository.GetByIdAsync(job.SoundId.Value, cancellationToken);
+                if (sound is not null)
+                {
+                    sound.UpdateAudioMetadata(
+                        command.SampleRate,
+                        command.Channels,
+                        command.Format,
+                        command.Duration ?? 0,
+                        now);
+                    await _soundRepository.UpdateAsync(sound, cancellationToken);
+                }
+                else
+                {
+                    _logger.LogWarning("Sound {SoundId} not found while persisting audio metadata for job {JobId}",
+                        job.SoundId.Value, command.JobId);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to persist audio metadata for sound {SoundId} (job {JobId}); completing job anyway",
+                    job.SoundId.Value, command.JobId);
+            }
         }
         else
         {

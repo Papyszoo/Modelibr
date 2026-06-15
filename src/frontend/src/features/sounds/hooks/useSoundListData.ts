@@ -22,6 +22,9 @@ export function useSoundListData(_showToast: ShowToast) {
     UNASSIGNED_CATEGORY_ID
   )
   const [searchQuery, setSearchQuery] = useState('')
+  // Duration filter (seconds); null = unbounded on that end.
+  const [minDuration, setMinDuration] = useState<number | null>(null)
+  const [maxDuration, setMaxDuration] = useState<number | null>(null)
 
   const queryClient = useQueryClient()
 
@@ -36,12 +39,21 @@ export function useSoundListData(_showToast: ShowToast) {
     isFetchingNextPage,
     isLoading,
   } = useInfiniteQuery({
-    queryKey: ['sounds', { searchName: debouncedSearchName || undefined }],
+    queryKey: [
+      'sounds',
+      {
+        searchName: debouncedSearchName || undefined,
+        minDuration: minDuration ?? undefined,
+        maxDuration: maxDuration ?? undefined,
+      },
+    ],
     queryFn: ({ pageParam }) =>
       getSoundsPaginated({
         page: pageParam,
         pageSize: PAGE_SIZE,
         searchName: debouncedSearchName || undefined,
+        minDuration: minDuration ?? undefined,
+        maxDuration: maxDuration ?? undefined,
       }),
     initialPageParam: 1,
     getNextPageParam: (lastPage, allPages) => {
@@ -84,6 +96,10 @@ export function useSoundListData(_showToast: ShowToast) {
     setActiveCategoryId,
     searchQuery,
     setSearchQuery,
+    minDuration,
+    setMinDuration,
+    maxDuration,
+    setMaxDuration,
     filteredSounds,
     invalidateSounds,
     loadCategories,

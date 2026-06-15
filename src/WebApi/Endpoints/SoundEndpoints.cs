@@ -72,6 +72,8 @@ public static class SoundEndpoints
         [FromQuery(Name = "projectIds")] int[]? projectIds,
         [FromQuery(Name = "categoryIds")] int[]? categoryIds,
         string? searchName,
+        double? minDuration,
+        double? maxDuration,
         int? page,
         int? pageSize,
         IQueryHandler<GetAllSoundsQuery, GetAllSoundsResponse> queryHandler,
@@ -83,6 +85,8 @@ public static class SoundEndpoints
                 ProjectIds: projectIds is { Length: > 0 } ? projectIds : null,
                 CategoryIds: categoryIds is { Length: > 0 } ? categoryIds : null,
                 SearchName: string.IsNullOrWhiteSpace(searchName) ? null : searchName,
+                MinDuration: minDuration,
+                MaxDuration: maxDuration,
                 Page: page,
                 PageSize: pageSize),
             cancellationToken);
