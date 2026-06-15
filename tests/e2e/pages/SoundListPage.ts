@@ -91,6 +91,44 @@ export class SoundListPage {
         });
     }
 
+    /** Locate a sound card by its data-sound-id. */
+    getSoundCardById(soundId: number) {
+        return this.page.locator(`[data-sound-id="${soundId}"]`);
+    }
+
+    private async ensureFiltersOpen(): Promise<void> {
+        const panel = this.page.locator("#sound-list-filters-panel");
+        if (await panel.isVisible().catch(() => false)) return;
+        await this.page.getByRole("button", { name: /^filters$/i }).click();
+        await panel.waitFor({ state: "visible", timeout: 5000 });
+    }
+
+    /** Set the minimum-duration (seconds) filter. */
+    async setMinDuration(seconds: number): Promise<void> {
+        await this.ensureFiltersOpen();
+        // PrimeReact InputNumber forwards data-testid to a wrapper; target the
+        // inner <input> (whichever element carries the testid).
+        const input = this.page
+            .locator(
+                'input[data-testid="min-duration-filter"], [data-testid="min-duration-filter"] input',
+            )
+            .first();
+        await input.scrollIntoViewIfNeeded();
+        await input.click();
+        await input.fill(String(seconds));
+        await input.press("Enter");
+        await this.page.waitForLoadState("domcontentloaded");
+    }
+
+    /** Clear the duration filter via the panel's clear button. */
+    async clearDurationFilter(): Promise<void> {
+        await this.ensureFiltersOpen();
+        await this.page
+            .getByRole("button", { name: /clear duration filter/i })
+            .click();
+        await this.page.waitForLoadState("domcontentloaded");
+    }
+
     /**
      * Right-click on a sound card to show context menu
      */

@@ -355,6 +355,9 @@ namespace Infrastructure.Persistence
                 entity.Property(t => t.TextureSetId).IsRequired(false); // Optional relationship
                 entity.Property(t => t.IsDeleted).IsRequired();
                 entity.Property(t => t.DeletedAt);
+                entity.Property(t => t.Width).IsRequired(false);
+                entity.Property(t => t.Height).IsRequired(false);
+                entity.Property(t => t.Format).IsRequired(false).HasMaxLength(20);
 
                 // Configure relationship with File
                 entity.HasOne(t => t.File)
@@ -865,6 +868,9 @@ namespace Infrastructure.Persistence
                 entity.Property(s => s.FileId).IsRequired();
                 entity.Property(s => s.Duration).IsRequired();
                 entity.Property(s => s.Peaks);
+                entity.Property(s => s.SampleRate).IsRequired(false);
+                entity.Property(s => s.Channels).IsRequired(false);
+                entity.Property(s => s.Format).IsRequired(false).HasMaxLength(20);
                 entity.Property(s => s.CreatedAt).IsRequired();
                 entity.Property(s => s.UpdatedAt).IsRequired();
                 entity.Property(s => s.IsDeleted).IsRequired();

@@ -153,6 +153,38 @@ public class TextureDomainTests
         Assert.Contains("Base color map", description); // Description of Albedo type
     }
 
+    [Fact]
+    public void SetImageMetadata_WithValidValues_StoresDimensionsAndLowercasesFormat()
+    {
+        // Arrange
+        var texture = Texture.Create(CreateValidTextureFile(), TextureType.Albedo, DateTime.UtcNow);
+        var updatedAt = DateTime.UtcNow.AddMinutes(5);
+
+        // Act
+        texture.SetImageMetadata(2048, 1024, "PNG", updatedAt);
+
+        // Assert
+        Assert.Equal(2048, texture.Width);
+        Assert.Equal(1024, texture.Height);
+        Assert.Equal("png", texture.Format);
+        Assert.Equal(updatedAt, texture.UpdatedAt);
+    }
+
+    [Fact]
+    public void SetImageMetadata_WithNonPositiveOrBlankValues_StoresNull()
+    {
+        // Arrange
+        var texture = Texture.Create(CreateValidTextureFile(), TextureType.Albedo, DateTime.UtcNow);
+
+        // Act
+        texture.SetImageMetadata(0, -5, "   ", DateTime.UtcNow);
+
+        // Assert
+        Assert.Null(texture.Width);
+        Assert.Null(texture.Height);
+        Assert.Null(texture.Format);
+    }
+
     private static DomainFile CreateValidTextureFile()
     {
         return DomainFile.Create(

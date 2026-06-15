@@ -152,4 +152,34 @@ export class TextureSetApiService {
 
     return result
   }
+
+  /**
+   * Persist source-image metadata (dimensions + format) for textures in a set.
+   * @param {number} textureSetId
+   * @param {Array<{textureId: number, width: number, height: number, format: string|null}>} items
+   * @returns {Promise<{success: boolean, error?: string}>}
+   */
+  async updateTextureMetadata(textureSetId, items) {
+    if (!Array.isArray(items) || items.length === 0) {
+      return { success: true }
+    }
+
+    try {
+      await this.client.put(`/texture-sets/${textureSetId}/texture-metadata`, {
+        textures: items,
+      })
+      logger.info('Texture metadata updated', {
+        textureSetId,
+        count: items.length,
+      })
+      return { success: true }
+    } catch (error) {
+      logger.error('Failed to update texture metadata', {
+        textureSetId,
+        error: error.message,
+        response: error.response?.data,
+      })
+      return { success: false, error: error.message }
+    }
+  }
 }

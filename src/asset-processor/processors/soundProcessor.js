@@ -47,19 +47,23 @@ export class SoundProcessor extends BaseProcessor {
       // Step 2: Generate waveform PNG
       jobLogger.info('Generating waveform thumbnail')
       const tempOutputPath = `${tempFilePath}.waveform.png`
-      const { peaks, duration } = await this.waveformGenerator.generateWaveform(
-        tempFilePath,
-        tempOutputPath,
-        {
-          width: 800,
-          height: 150,
-          peakCount: 200,
-          color: '#3b82f6',
-        }
-      )
+      const { peaks, duration, sampleRate, channels, format } =
+        await this.waveformGenerator.generateWaveform(
+          tempFilePath,
+          tempOutputPath,
+          {
+            width: 800,
+            height: 150,
+            peakCount: 200,
+            color: '#3b82f6',
+          }
+        )
 
       jobLogger.info('Waveform generated', {
         duration,
+        sampleRate,
+        channels,
+        format,
         peakCount: peaks.length,
       })
 
@@ -85,6 +89,10 @@ export class SoundProcessor extends BaseProcessor {
       return {
         waveformPath: uploadResult.storagePath,
         sizeBytes: uploadResult.sizeBytes,
+        duration,
+        sampleRate,
+        channels,
+        format,
       }
     } finally {
       if (tempFilePath) {

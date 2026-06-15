@@ -1,6 +1,7 @@
 using Application.Abstractions.Files;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Abstractions.Services;
 using Application.Services;
 using Domain.Models;
 using Domain.Services;
@@ -26,13 +27,15 @@ internal sealed class AddTextureToProjectWithFileCommandHandler
     private readonly IBatchUploadRepository _batchUploadRepository;
     private readonly IFileCreationService _fileCreationService;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly ITextureImageMetadataReader _textureImageMetadataReader;
 
     public AddTextureToProjectWithFileCommandHandler(
         IProjectRepository projectRepository,
         ITextureSetRepository textureSetRepository,
         IBatchUploadRepository batchUploadRepository,
         IFileCreationService fileCreationService,
-        IDateTimeProvider dateTimeProvider
+        IDateTimeProvider dateTimeProvider,
+        ITextureImageMetadataReader textureImageMetadataReader
     )
     {
         _projectRepository = projectRepository;
@@ -40,6 +43,7 @@ internal sealed class AddTextureToProjectWithFileCommandHandler
         _batchUploadRepository = batchUploadRepository;
         _fileCreationService = fileCreationService;
         _dateTimeProvider = dateTimeProvider;
+        _textureImageMetadataReader = textureImageMetadataReader;
     }
 
     public async Task<Result<int>> Handle(
@@ -90,13 +94,21 @@ internal sealed class AddTextureToProjectWithFileCommandHandler
         }
         else
         {
-            // Create new texture set
+            // Create new texture set (ModelSpecific — no worker thumbnail pass)
             textureSet = TextureSet.Create(request.TextureSetName, now);
             await _textureSetRepository.AddAsync(textureSet, cancellationToken);
 
             // Add texture to set
             var texture = Texture.Create(file, request.TextureType, now);
             textureSet.AddTexture(texture, now);
+
+            // Capture source-image resolution at upload time (no worker pass for
+            // ModelSpecific sets). Best-effort: degrades to null on read failure.
+            var metadata = await _textureImageMetadataReader.ReadAsync(file, cancellationToken);
+            if (metadata != null)
+            {
+                texture.SetImageMetadata(metadata.Width, metadata.Height, metadata.Format, now);
+            }
         }
 
         // Add texture set to project

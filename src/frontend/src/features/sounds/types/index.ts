@@ -8,6 +8,9 @@ export interface SoundDto {
   categoryName: string | null
   duration: number
   peaks: string | null
+  sampleRate: number | null
+  channels: number | null
+  format: string | null
   fileName: string
   fileSizeBytes: number
   createdAt: string

@@ -21,6 +21,7 @@ internal class CreateTextureSetWithFileCommandHandler : ICommandHandler<CreateTe
     private readonly ISettingRepository _settingRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IThumbnailQueue _thumbnailQueue;
+    private readonly ITextureImageMetadataReader _textureImageMetadataReader;
     private readonly ILogger<CreateTextureSetWithFileCommandHandler> _logger;
 
     public CreateTextureSetWithFileCommandHandler(
@@ -31,6 +32,7 @@ internal class CreateTextureSetWithFileCommandHandler : ICommandHandler<CreateTe
         ISettingRepository settingRepository,
         IDateTimeProvider dateTimeProvider,
         IThumbnailQueue thumbnailQueue,
+        ITextureImageMetadataReader textureImageMetadataReader,
         ILogger<CreateTextureSetWithFileCommandHandler> logger)
     {
         _textureSetRepository = textureSetRepository;
@@ -40,6 +42,7 @@ internal class CreateTextureSetWithFileCommandHandler : ICommandHandler<CreateTe
         _settingRepository = settingRepository;
         _dateTimeProvider = dateTimeProvider;
         _thumbnailQueue = thumbnailQueue;
+        _textureImageMetadataReader = textureImageMetadataReader;
         _logger = logger;
     }
 
@@ -100,6 +103,18 @@ internal class CreateTextureSetWithFileCommandHandler : ICommandHandler<CreateTe
             // 4. Create and add texture to the set
             var texture = Texture.Create(file, command.TextureType, _dateTimeProvider.UtcNow);
             createdTextureSet.AddTexture(texture, _dateTimeProvider.UtcNow);
+
+            // Non-Universal sets never get a worker thumbnail pass, so capture the
+            // source-image resolution here at upload time. Universal sets get this
+            // from the worker job (enqueued below) instead.
+            if (createdTextureSet.Kind != TextureSetKind.Universal)
+            {
+                var metadata = await _textureImageMetadataReader.ReadAsync(file, cancellationToken);
+                if (metadata != null)
+                {
+                    texture.SetImageMetadata(metadata.Width, metadata.Height, metadata.Format, _dateTimeProvider.UtcNow);
+                }
+            }
 
             // Update the texture set with the texture
             var updatedTextureSet = await _textureSetRepository.UpdateAsync(createdTextureSet, cancellationToken);

@@ -98,6 +98,8 @@ export interface DemoTexture {
   fileName: string
   createdAt: string
   proxies: { fileId: number; size: number }[]
+  width?: number | null
+  height?: number | null
 }
 
 export interface DemoTextureSet {
@@ -116,6 +118,7 @@ export interface DemoTextureSet {
   isEmpty: boolean
   thumbnailPath: string | null
   pngThumbnailPath: string | null
+  maxResolution?: number | null
   textures: DemoTexture[]
   associatedModels: {
     id: number
@@ -148,6 +151,9 @@ export interface DemoSound {
   categoryName: string | null
   duration: number
   peaks: string | null
+  sampleRate?: number | null
+  channels?: number | null
+  format?: string | null
   fileName: string
   fileSizeBytes: number
   createdAt: string
@@ -929,6 +935,8 @@ export async function seedIfEmpty(): Promise<void> {
           fileName: 'texture_albedo.png',
           createdAt: now,
           proxies: [],
+          width: 1024,
+          height: 1024,
         },
       ],
       associatedModels: [
@@ -966,6 +974,8 @@ export async function seedIfEmpty(): Promise<void> {
           fileName: 'red_color.png',
           createdAt: now,
           proxies: [],
+          width: 2048,
+          height: 2048,
         },
         {
           id: 4,
@@ -1022,6 +1032,8 @@ export async function seedIfEmpty(): Promise<void> {
           fileName: 'diffuse.jpg',
           createdAt: now,
           proxies: [],
+          width: 4096,
+          height: 4096,
         },
         {
           id: 7,
@@ -1092,8 +1104,28 @@ export async function seedIfEmpty(): Promise<void> {
       categoryName: null,
       duration: 2,
       peaks: null,
+      sampleRate: 44100,
+      channels: 1,
+      format: 'wav',
       fileName: 'test-tone.wav',
       fileSizeBytes: 88200,
+      createdAt: now,
+      updatedAt: now,
+      waveformUrl: null,
+    },
+    {
+      id: 2,
+      name: 'Ambient Loop',
+      fileId: 502,
+      categoryId: null,
+      categoryName: null,
+      duration: 48,
+      peaks: null,
+      sampleRate: 48000,
+      channels: 2,
+      format: 'mp3',
+      fileName: 'ambient-loop.mp3',
+      fileSizeBytes: 768000,
       createdAt: now,
       updatedAt: now,
       waveformUrl: null,

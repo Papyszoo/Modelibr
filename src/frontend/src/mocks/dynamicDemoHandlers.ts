@@ -1426,6 +1426,7 @@ export const dynamicDemoHandlers = [
     const searchName = (url.searchParams.get('searchName') ?? '')
       .trim()
       .toLowerCase()
+    const minResolution = url.searchParams.get('minResolution')
 
     let sets = await getAll('textureSets')
 
@@ -1463,6 +1464,24 @@ export const dynamicDemoHandlers = [
         (ts.name ?? '').toLowerCase().includes(searchName)
       )
     }
+    if (minResolution !== null) {
+      const min = Number(minResolution)
+      sets = sets.filter(ts =>
+        (ts.textures ?? []).some(
+          t => (t.width ?? 0) >= min || (t.height ?? 0) >= min
+        )
+      )
+    }
+
+    // Surface the largest texture side as maxResolution (the backend computes
+    // this server-side) so the resolution badge renders in demo mode.
+    sets = sets.map(ts => {
+      const maxSide = (ts.textures ?? []).reduce(
+        (max, t) => Math.max(max, t.width ?? 0, t.height ?? 0),
+        0
+      )
+      return { ...ts, maxResolution: maxSide > 0 ? maxSide : null }
+    })
 
     if (url.searchParams.has('page')) {
       const result = paginate(sets, page, pageSize)
@@ -3031,6 +3050,8 @@ export const dynamicDemoHandlers = [
     const searchName = (url.searchParams.get('searchName') ?? '')
       .trim()
       .toLowerCase()
+    const minDuration = url.searchParams.get('minDuration')
+    const maxDuration = url.searchParams.get('maxDuration')
 
     let sounds = await getAll('sounds')
 
@@ -3057,6 +3078,14 @@ export const dynamicDemoHandlers = [
       sounds = sounds.filter(s =>
         (s.name ?? '').toLowerCase().includes(searchName)
       )
+    }
+    if (minDuration !== null) {
+      const min = Number(minDuration)
+      sounds = sounds.filter(s => (s.duration ?? 0) >= min)
+    }
+    if (maxDuration !== null) {
+      const max = Number(maxDuration)
+      sounds = sounds.filter(s => (s.duration ?? 0) <= max)
     }
 
     if (url.searchParams.has('page')) {

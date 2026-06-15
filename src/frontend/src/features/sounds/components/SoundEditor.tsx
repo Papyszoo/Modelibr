@@ -375,6 +375,33 @@ export function SoundEditor({
         </div>
       </div>
 
+      {(sound.format || sound.sampleRate || sound.channels) && (
+        <div className="sound-editor-metadata" data-testid="sound-metadata">
+          {sound.format && (
+            <span className="sound-metadata-item">
+              {sound.format.toUpperCase()}
+            </span>
+          )}
+          {sound.sampleRate && (
+            <span className="sound-metadata-item">
+              {(sound.sampleRate / 1000).toLocaleString(undefined, {
+                maximumFractionDigits: 1,
+              })}{' '}
+              kHz
+            </span>
+          )}
+          {sound.channels && (
+            <span className="sound-metadata-item">
+              {sound.channels === 1
+                ? 'Mono'
+                : sound.channels === 2
+                  ? 'Stereo'
+                  : `${sound.channels} ch`}
+            </span>
+          )}
+        </div>
+      )}
+
       <div className="sound-editor-actions">
         <div
           className={`drag-handle ${sliceUrl ? 'active' : 'disabled'}`}

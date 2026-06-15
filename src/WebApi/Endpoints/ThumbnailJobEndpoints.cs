@@ -98,6 +98,10 @@ public static class ThumbnailJobEndpoints
                 request.Success,
                 request.WaveformPath,
                 request.SizeBytes,
+                request.Duration,
+                request.SampleRate,
+                request.Channels,
+                request.Format,
                 request.ErrorMessage), cancellationToken);
             
             if (result.IsFailure)
@@ -249,6 +253,10 @@ public record FinishSoundJobRequest(
     bool Success,
     string? WaveformPath = null,
     long? SizeBytes = null,
+    double? Duration = null,
+    int? SampleRate = null,
+    int? Channels = null,
+    string? Format = null,
     string? ErrorMessage = null);
 
 /// <summary>
