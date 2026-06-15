@@ -8,6 +8,11 @@ namespace Infrastructure.Images;
 /// Standard formats go through ImageSharp's <see cref="Image.IdentifyAsync(string, CancellationToken)"/>;
 /// HDR/EXR files (which ImageSharp cannot decode) fall back to Magick.NET.
 /// Shared by the texture and environment-map metadata flows.
+///
+/// <para><b>Throws</b> on an unreadable/unidentifiable file. Callers choose the
+/// contract: <c>TextureImageMetadataReader</c> wraps this and degrades to null
+/// (best-effort, must never fail an upload), while environment-map size labelling
+/// lets it propagate (the label is required, not best-effort).</para>
 /// </summary>
 internal static class ImageDimensionReader
 {

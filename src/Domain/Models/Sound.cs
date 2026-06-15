@@ -149,7 +149,11 @@ public class Sound : AggregateRoot
     {
         SampleRate = sampleRate is > 0 ? sampleRate : null;
         Channels = channels is > 0 ? channels : null;
-        Format = string.IsNullOrWhiteSpace(format) ? null : format.Trim().ToLowerInvariant();
+        // Clamp to the Format column cap (20). Real audio format tokens are short
+        // (mp3, wav, ogg…); the clamp just guards against a pathological probe value
+        // tripping a DB length error on a best-effort metadata write.
+        var normalizedFormat = string.IsNullOrWhiteSpace(format) ? null : format.Trim().ToLowerInvariant();
+        Format = normalizedFormat is { Length: > 20 } ? normalizedFormat[..20] : normalizedFormat;
         if (durationFromWorker > 0)
             Duration = durationFromWorker;
         UpdatedAt = updatedAt;

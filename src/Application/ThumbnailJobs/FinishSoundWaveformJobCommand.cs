@@ -131,6 +131,11 @@ public class FinishSoundWaveformJobCommandHandler : ICommandHandler<FinishSoundW
                 command.JobId, job.SoundId.Value, command.ErrorMessage);
         }
 
+        // Persist job status last. If the process crashes after the metadata save
+        // above but before this one, the job stays unfinished and is reprocessed —
+        // the metadata write is idempotent, so that's harmless. The reverse order
+        // (finish the job first) would instead risk permanently losing metadata on
+        // a crash, since a completed job is never reprocessed.
         await _thumbnailJobRepository.UpdateAsync(job, cancellationToken);
 
         return Result.Success(new FinishSoundWaveformJobResponse(

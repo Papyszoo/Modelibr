@@ -89,7 +89,10 @@ internal sealed class AddTextureToPackWithFileCommandHandler
         TextureSet textureSet;
         if (existingTextureSet != null)
         {
-            // Use existing texture set
+            // Reuse the set found by file hash — no new texture is created here, so
+            // there is nothing to extract. The existing texture already captured its
+            // dimensions when it was first uploaded; we don't back-fill (that's the
+            // separate backfill task).
             textureSet = existingTextureSet;
         }
         else
