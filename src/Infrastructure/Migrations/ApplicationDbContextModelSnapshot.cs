@@ -511,6 +511,27 @@ namespace Infrastructure.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("AnimationCount")
+                        .HasColumnType("integer");
+
+                    b.PrimitiveCollection<List<string>>("AnimationNames")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text[]")
+                        .HasDefaultValueSql("'{}'::text[]");
+
+                    b.Property<int?>("BoneCount")
+                        .HasColumnType("integer");
+
+                    b.Property<double?>("BoundingBoxX")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("BoundingBoxY")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("BoundingBoxZ")
+                        .HasColumnType("double precision");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -772,6 +793,9 @@ namespace Infrastructure.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("Channels")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -784,6 +808,10 @@ namespace Infrastructure.Migrations
                     b.Property<int>("FileId")
                         .HasColumnType("integer");
 
+                    b.Property<string>("Format")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
@@ -794,6 +822,9 @@ namespace Infrastructure.Migrations
 
                     b.Property<string>("Peaks")
                         .HasColumnType("text");
+
+                    b.Property<int?>("SampleRate")
+                        .HasColumnType("integer");
 
                     b.Property<int?>("SoundCategoryId")
                         .HasColumnType("integer");
@@ -981,6 +1012,13 @@ namespace Infrastructure.Migrations
                     b.Property<int>("FileId")
                         .HasColumnType("integer");
 
+                    b.Property<string>("Format")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int?>("Height")
+                        .HasColumnType("integer");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
@@ -997,6 +1035,9 @@ namespace Infrastructure.Migrations
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("Width")
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 

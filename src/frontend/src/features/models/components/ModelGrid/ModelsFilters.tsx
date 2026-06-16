@@ -1,6 +1,7 @@
 import '@/shared/components/FilterPanel.css'
 
 import { Button } from 'primereact/button'
+import { InputNumber } from 'primereact/inputnumber'
 import { InputSwitch } from 'primereact/inputswitch'
 import { MultiSelect } from 'primereact/multiselect'
 import { type MouseEvent as ReactMouseEvent, useState } from 'react'
@@ -45,11 +46,17 @@ interface ModelsFiltersProps {
   selectedCategoryIds: number[]
   selectedTagNames: string[]
   hasConceptImages: boolean
+  animatedOnly: boolean
+  minTriangleCount: number | null
+  maxTriangleCount: number | null
   onPackFilterChange: (packIds: number[]) => void
   onProjectFilterChange: (projectIds: number[]) => void
   onCategoryChange: (keys: ModelCategorySelectionKeys) => void
   onTagChange: (tags: string[]) => void
   onHasConceptImagesChange: (value: boolean) => void
+  onAnimatedOnlyChange: (value: boolean) => void
+  onMinTriangleCountChange: (value: number | null) => void
+  onMaxTriangleCountChange: (value: number | null) => void
   packFilterDisabled?: boolean
   projectFilterDisabled?: boolean
   cardWidth: number
@@ -81,11 +88,17 @@ export function ModelsFilters({
   selectedCategoryIds,
   selectedTagNames,
   hasConceptImages,
+  animatedOnly,
+  minTriangleCount,
+  maxTriangleCount,
   onPackFilterChange,
   onProjectFilterChange,
   onCategoryChange,
   onTagChange,
   onHasConceptImagesChange,
+  onAnimatedOnlyChange,
+  onMinTriangleCountChange,
+  onMaxTriangleCountChange,
   packFilterDisabled = false,
   projectFilterDisabled = false,
   cardWidth,
@@ -115,12 +128,15 @@ export function ModelsFilters({
     value: tag.name,
   }))
   const hasActiveSearch = searchQuery.trim().length > 0
+  const hasTriangleRange = minTriangleCount != null || maxTriangleCount != null
   const hasActiveFilters =
     selectedPackIds.length > 0 ||
     selectedProjectIds.length > 0 ||
     selectedCategoryIds.length > 0 ||
     selectedTagNames.length > 0 ||
-    hasConceptImages
+    hasConceptImages ||
+    animatedOnly ||
+    hasTriangleRange
 
   const activeFilterCount = [
     selectedPackIds.length > 0,
@@ -128,6 +144,8 @@ export function ModelsFilters({
     selectedCategoryIds.length > 0,
     selectedTagNames.length > 0,
     hasConceptImages,
+    animatedOnly,
+    hasTriangleRange,
   ].filter(Boolean).length
   const selectedCountLabel = `${selectedModelCount} model${selectedModelCount === 1 ? '' : 's'}`
 
@@ -288,13 +306,45 @@ export function ModelsFilters({
             <InputSwitch
               checked={hasConceptImages}
               onChange={e => onHasConceptImagesChange(Boolean(e.value))}
+              data-testid="concept-art-filter"
             />
             <span>Concept art</span>
+          </div>
+          <div className="list-filters-switch models-filter-switch">
+            <InputSwitch
+              checked={animatedOnly}
+              onChange={e => onAnimatedOnlyChange(Boolean(e.value))}
+              data-testid="animated-only-filter"
+            />
+            <span>Animated</span>
+          </div>
+          <div className="list-filters-switch models-filter-switch">
+            <span>Triangles</span>
+            <InputNumber
+              value={minTriangleCount}
+              onValueChange={e => onMinTriangleCountChange(e.value ?? null)}
+              placeholder="Min"
+              min={0}
+              useGrouping
+              inputClassName="models-filter-triangle-input"
+              data-testid="min-triangle-filter"
+            />
+            <span>–</span>
+            <InputNumber
+              value={maxTriangleCount}
+              onValueChange={e => onMaxTriangleCountChange(e.value ?? null)}
+              placeholder="Max"
+              min={0}
+              useGrouping
+              inputClassName="models-filter-triangle-input"
+              data-testid="max-triangle-filter"
+            />
           </div>
           {hasActiveFilters ? (
             <Button
               icon="pi pi-times"
               className="p-button-text p-button-sm list-filters-clear"
+              aria-label="Clear all filters"
               tooltip="Clear all filters"
               tooltipOptions={{ position: 'bottom' }}
               onClick={() => {
@@ -303,6 +353,9 @@ export function ModelsFilters({
                 onCategoryChange({})
                 onTagChange([])
                 onHasConceptImagesChange(false)
+                onAnimatedOnlyChange(false)
+                onMinTriangleCountChange(null)
+                onMaxTriangleCountChange(null)
               }}
             />
           ) : null}

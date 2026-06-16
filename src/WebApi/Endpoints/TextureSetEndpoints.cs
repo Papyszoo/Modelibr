@@ -114,6 +114,12 @@ public static class TextureSetEndpoints
             .WithSummary("Updates the tiling scale for a universal texture set")
             .WithOpenApi();
 
+        // Source-image metadata (dimensions/format) — called by the worker
+        app.MapPut("/texture-sets/{id}/texture-metadata", UpdateTextureSetFileMetadata)
+            .WithName("Update Texture Set File Metadata")
+            .WithSummary("Persists per-texture image dimensions and format (called by worker service)")
+            .AddEndpointFilter<WorkerApiKeyFilter>();
+
         // Thumbnail endpoints
         app.MapPost("/texture-sets/{id}/thumbnail/upload", UploadTextureSetThumbnail)
             .WithName("Upload Texture Set Thumbnail")
@@ -149,6 +155,7 @@ public static class TextureSetEndpoints
         int? pageSize,
         int? kind,
         string? searchName,
+        int? minResolution,
         IQueryHandler<GetAllTextureSetsQuery, GetAllTextureSetsResponse> queryHandler,
         CancellationToken cancellationToken)
     {
@@ -165,7 +172,8 @@ public static class TextureSetEndpoints
                 Page: page,
                 PageSize: pageSize,
                 Kind: textureSetKind,
-                SearchName: string.IsNullOrWhiteSpace(searchName) ? null : searchName),
+                SearchName: string.IsNullOrWhiteSpace(searchName) ? null : searchName,
+                MinResolution: minResolution is > 0 ? minResolution : null),
             cancellationToken);
 
         if (result.IsFailure)
@@ -485,6 +493,32 @@ public static class TextureSetEndpoints
         return Results.Ok(result.Value);
     }
 
+    private static async Task<IResult> UpdateTextureSetFileMetadata(
+        int id,
+        [FromBody] UpdateTextureSetFileMetadataRequest request,
+        ICommandHandler<UpdateTextureSetFileMetadataCommand> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var items = (request.Textures ?? new List<TextureFileMetadataRequestItem>())
+            .Select(t => new TextureFileMetadataItem(t.TextureId, t.Width, t.Height, t.Format))
+            .ToList();
+
+        var result = await commandHandler.Handle(
+            new UpdateTextureSetFileMetadataCommand(id, items),
+            cancellationToken);
+
+        if (result.IsFailure)
+        {
+            // The set may have been deleted between job submission and completion,
+            // so a missing set is Not Found rather than a bad request.
+            return result.Error.Code == "TextureSet.NotFound"
+                ? Results.NotFound(new { error = result.Error.Code, message = result.Error.Message })
+                : Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+        }
+
+        return Results.NoContent();
+    }
+
     private static async Task<IResult> UpdateTilingScale(
         int id,
         [FromBody] UpdateTilingScaleRequest request,
@@ -616,3 +650,5 @@ public record AddTextureToTextureSetRequest(int FileId, TextureType TextureType,
 public record ChangeTextureTypeRequest(TextureType? TextureType);
 public record ChangeTextureChannelRequest(TextureChannel SourceChannel);
 public record RegenerateTextureSetThumbnailRequest(float? UvScale = null, string? GeometryType = null, int? ProxySize = null);
+public record UpdateTextureSetFileMetadataRequest(List<TextureFileMetadataRequestItem>? Textures);
+public record TextureFileMetadataRequestItem(int TextureId, int? Width, int? Height, string? Format);

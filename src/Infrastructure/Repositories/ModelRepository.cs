@@ -123,6 +123,9 @@ internal sealed class ModelRepository : IModelRepository
         IReadOnlyCollection<string>? normalizedTagNames = null,
         bool? hasConceptImages = null,
         string? searchName = null,
+        int? minTriangleCount = null,
+        int? maxTriangleCount = null,
+        bool? hasAnimations = null,
         CancellationToken cancellationToken = default)
     {
         var query = _context.Models.AsNoTracking().AsQueryable();
@@ -152,6 +155,33 @@ internal sealed class ModelRepository : IModelRepository
         {
             var pattern = $"%{searchName.Trim()}%";
             query = query.Where(m => EF.Functions.ILike(m.Name, pattern));
+        }
+
+        // Technical-metadata filters apply to the latest version, matching
+        // the values the list DTO projects below.
+        if (minTriangleCount.HasValue)
+            query = query.Where(m => m.Versions
+                .OrderByDescending(v => v.VersionNumber)
+                .Select(v => v.TriangleCount)
+                .FirstOrDefault() >= minTriangleCount.Value);
+
+        if (maxTriangleCount.HasValue)
+            query = query.Where(m => m.Versions
+                .OrderByDescending(v => v.VersionNumber)
+                .Select(v => v.TriangleCount)
+                .FirstOrDefault() <= maxTriangleCount.Value);
+
+        if (hasAnimations.HasValue)
+        {
+            query = hasAnimations.Value
+                ? query.Where(m => m.Versions
+                    .OrderByDescending(v => v.VersionNumber)
+                    .Select(v => v.AnimationCount)
+                    .FirstOrDefault() > 0)
+                : query.Where(m => (m.Versions
+                    .OrderByDescending(v => v.VersionNumber)
+                    .Select(v => v.AnimationCount)
+                    .FirstOrDefault() ?? 0) == 0);
         }
 
         var totalCount = await query.CountAsync(cancellationToken);
@@ -200,6 +230,14 @@ internal sealed class ModelRepository : IModelRepository
                 MaterialCount = m.Versions
                     .OrderByDescending(v => v.VersionNumber)
                     .Select(v => v.MaterialCount)
+                    .FirstOrDefault(),
+                AnimationCount = m.Versions
+                    .OrderByDescending(v => v.VersionNumber)
+                    .Select(v => v.AnimationCount)
+                    .FirstOrDefault(),
+                BoneCount = m.Versions
+                    .OrderByDescending(v => v.VersionNumber)
+                    .Select(v => v.BoneCount)
                     .FirstOrDefault(),
                 ThumbnailUrl = m.ActiveVersion != null && m.ActiveVersion.Thumbnail != null && m.ActiveVersion.Thumbnail.Status == ThumbnailStatus.Ready
                     ? "/model-versions/" + m.ActiveVersion.Id + "/thumbnail/file?t=" + m.ActiveVersion.Thumbnail.UpdatedAt.ToString("yyyyMMddHHmmss")

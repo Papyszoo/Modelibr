@@ -349,6 +349,25 @@ export class TextureSetsPage {
             .waitFor({ state: "visible", timeout: 10000 });
     }
 
+    /**
+     * Filter the grid by a minimum-resolution bucket (e.g. "2K+", "Any
+     * resolution") via the resolution dropdown in the filters panel.
+     */
+    async filterByMinResolution(optionLabel: string): Promise<void> {
+        await this.openFiltersPanel();
+        const dropdown = this.page.getByTestId("texture-resolution-filter");
+        await dropdown.scrollIntoViewIfNeeded();
+        await dropdown.click();
+        const panel = this.page.locator(".p-dropdown-panel");
+        await panel.waitFor({ state: "visible", timeout: 5000 });
+        await panel
+            .locator(".p-dropdown-item", { hasText: optionLabel })
+            .first()
+            .click();
+        await panel.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+        await this.page.waitForLoadState("domcontentloaded");
+    }
+
     /** Filter the grid by a category using the filter-picker popover. */
     async filterByCategory(categoryName: string): Promise<void> {
         await this.openFiltersPanel();

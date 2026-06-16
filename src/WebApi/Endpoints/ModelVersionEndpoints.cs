@@ -268,7 +268,13 @@ public static class ModelVersionEndpoints
                 request.TriangleCount,
                 request.VertexCount,
                 request.MeshCount,
-                request.MaterialCount),
+                request.MaterialCount,
+                request.BoundingBoxX,
+                request.BoundingBoxY,
+                request.BoundingBoxZ,
+                request.AnimationCount,
+                request.AnimationNames,
+                request.BoneCount),
             cancellationToken);
 
         if (result.IsFailure)
@@ -281,6 +287,17 @@ public static class ModelVersionEndpoints
 }
 
 public record UpdateMaterialNamesRequest(List<string> MaterialNames);
-public record UpdateTechnicalMetadataRequest(List<string>? MaterialNames, int? TriangleCount, int? VertexCount, int? MeshCount, int? MaterialCount);
+public record UpdateTechnicalMetadataRequest(
+    List<string>? MaterialNames,
+    int? TriangleCount,
+    int? VertexCount,
+    int? MeshCount,
+    int? MaterialCount,
+    double? BoundingBoxX = null,
+    double? BoundingBoxY = null,
+    double? BoundingBoxZ = null,
+    int? AnimationCount = null,
+    List<string>? AnimationNames = null,
+    int? BoneCount = null);
 public record SetMainVariantRequest(string VariantName);
 public record AddVariantNameRequest(string VariantName);

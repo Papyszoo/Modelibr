@@ -106,6 +106,10 @@ export class JobApiClient {
    * @param {Object} metadata - Waveform metadata (required when success=true)
    * @param {string} metadata.waveformPath - Path to the stored waveform
    * @param {number} metadata.sizeBytes - Size of the waveform in bytes
+   * @param {number} [metadata.duration] - Authoritative audio duration in seconds
+   * @param {number} [metadata.sampleRate] - Audio sample rate in Hz
+   * @param {number} [metadata.channels] - Audio channel count
+   * @param {string} [metadata.format] - Audio container/codec format
    * @param {string} errorMessage - Error message (required when success=false)
    */
   async finishSoundJob(jobId, success, metadata = {}, errorMessage = null) {
@@ -114,6 +118,10 @@ export class JobApiClient {
         success,
         waveformPath: metadata?.waveformPath || null,
         sizeBytes: metadata?.sizeBytes || null,
+        duration: metadata?.duration ?? null,
+        sampleRate: metadata?.sampleRate ?? null,
+        channels: metadata?.channels ?? null,
+        format: metadata?.format ?? null,
         errorMessage,
       }
 

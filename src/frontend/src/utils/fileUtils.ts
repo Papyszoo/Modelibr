@@ -41,6 +41,12 @@ export interface ModelTechnicalMetadata {
   vertexCount?: number | null
   meshCount?: number | null
   materialCount?: number | null
+  boundingBoxX?: number | null
+  boundingBoxY?: number | null
+  boundingBoxZ?: number | null
+  animationCount?: number | null
+  animationNames?: string[]
+  boneCount?: number | null
   updatedAt?: string | null
 }
 
@@ -70,6 +76,8 @@ export interface Model {
   vertexCount?: number | null
   meshCount?: number | null
   materialCount?: number | null
+  animationCount?: number | null
+  boneCount?: number | null
   thumbnailUrl?: string | null
   pngThumbnailUrl?: string | null
   textureSets?: { id: number; name: string }[]

@@ -153,6 +153,7 @@ export function useTextureSetGrid({
         categoryIds: sortedCategoryIds,
         textureTypes: sortedTextureTypes,
         searchName: debouncedSearchName || undefined,
+        minResolution: viewState.minResolution ?? undefined,
       },
     ],
     queryFn: ({ pageParam }) =>
@@ -167,6 +168,7 @@ export function useTextureSetGrid({
         textureTypes:
           sortedTextureTypes.length > 0 ? sortedTextureTypes : undefined,
         searchName: debouncedSearchName || undefined,
+        minResolution: viewState.minResolution ?? undefined,
       }),
     initialPageParam: 1,
     getNextPageParam: (lastPage, allPages) => {
@@ -218,6 +220,10 @@ export function useTextureSetGrid({
   )
   const setSelectedTextureTypes = useCallback(
     (types: number[]) => setView({ selectedTextureTypes: types }),
+    [setView]
+  )
+  const setMinResolution = useCallback(
+    (value: number | null) => setView({ minResolution: value }),
     [setView]
   )
   const setSelectedTextureSetIds = useCallback(
@@ -401,6 +407,8 @@ export function useTextureSetGrid({
     selectedCategoryIds,
     selectedTextureTypes: viewState.selectedTextureTypes as TextureType[],
     setSelectedTextureTypes,
+    minResolution: viewState.minResolution,
+    setMinResolution,
 
     // Selection
     selectedTextureSetIds: viewState.selectedTextureSetIds,

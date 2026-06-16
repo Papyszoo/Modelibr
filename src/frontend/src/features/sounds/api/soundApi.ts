@@ -34,6 +34,8 @@ export async function getSoundsPaginated(options: {
   projectIds?: number[]
   categoryIds?: number[]
   searchName?: string
+  minDuration?: number
+  maxDuration?: number
 }): Promise<{
   sounds: SoundDto[]
   totalCount: number
@@ -51,6 +53,12 @@ export async function getSoundsPaginated(options: {
   )
   if (options.searchName && options.searchName.trim()) {
     params.append('searchName', options.searchName.trim())
+  }
+  if (options.minDuration != null) {
+    params.append('minDuration', options.minDuration.toString())
+  }
+  if (options.maxDuration != null) {
+    params.append('maxDuration', options.maxDuration.toString())
   }
 
   const response = await client.get(`/sounds?${params.toString()}`)
