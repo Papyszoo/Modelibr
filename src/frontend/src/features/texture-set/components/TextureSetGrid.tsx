@@ -59,6 +59,16 @@ interface ChannelMergeRequest {
 
 const ALL_PROXY_SIZES = [256, 512, 1024, 2048]
 
+/**
+ * Compact label for a texture's largest side: 2048 → "2K", 512 → "512px".
+ */
+function formatResolution(maxSide: number): string {
+  if (maxSide >= 1024 && maxSide % 1024 === 0) {
+    return `${maxSide / 1024}K`
+  }
+  return `${maxSide}px`
+}
+
 interface GridContext {
   cardWidth: number
   isLoadingMore: boolean
@@ -163,6 +173,8 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
     setSelectedCategoryKeys,
     selectedTextureTypes,
     setSelectedTextureTypes,
+    minResolution,
+    setMinResolution,
     selectedTextureSetIds,
     setSelectedTextureSetIds,
     cardWidth,
@@ -839,11 +851,13 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
         selectedProjectIds={selectedProjectIds}
         selectedCategoryKeys={selectedCategoryKeys}
         selectedTextureTypes={selectedTextureTypes}
+        minResolution={minResolution}
         onPackFilterChange={setSelectedPackIds}
         onProjectFilterChange={setSelectedProjectIds}
         onCategoryChange={setSelectedCategoryKeys}
         onManageCategoriesClick={() => setShowCategoryManager(true)}
         onTextureTypesChange={setSelectedTextureTypes}
+        onMinResolutionChange={setMinResolution}
         cardWidth={cardWidth}
         onCardWidthChange={handleCardWidthChange}
         count={totalCount || filteredTextureSets.length}
@@ -893,6 +907,7 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
         selectedPackIds.length > 0 ||
         selectedProjectIds.length > 0 ||
         selectedTextureTypes.length > 0 ||
+        minResolution != null ||
         Object.values(selectedCategoryKeys).some(s => s?.checked) ? (
           <div className="no-results">
             <i className="pi pi-search" />
@@ -1018,6 +1033,15 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
                           {textureSet.textureCount || 0} texture
                           {textureSet.textureCount !== 1 ? 's' : ''}
                         </span>
+                        {textureSet.maxResolution ? (
+                          <span
+                            className="texture-resolution"
+                            data-testid="texture-set-resolution"
+                          >
+                            <i className="pi pi-expand" />
+                            {formatResolution(textureSet.maxResolution)}
+                          </span>
+                        ) : null}
                       </div>
                     </div>
                     {proxySizes.size > 0 ? (

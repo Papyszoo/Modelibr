@@ -646,6 +646,12 @@ export async function enrichModel(model: DemoModel, stringId = false) {
       vertexCount: latestVersion?.vertexCount ?? null,
       meshCount: latestVersion?.meshCount ?? null,
       materialCount: latestVersion?.materialCount ?? null,
+      boundingBoxX: latestVersion?.boundingBoxX ?? null,
+      boundingBoxY: latestVersion?.boundingBoxY ?? null,
+      boundingBoxZ: latestVersion?.boundingBoxZ ?? null,
+      animationCount: latestVersion?.animationCount ?? null,
+      animationNames: latestVersion?.animationNames ?? [],
+      boneCount: latestVersion?.boneCount ?? null,
       updatedAt: latestVersion?.technicalDetailsUpdatedAt ?? null,
     },
     latestVersionId: latestVersion?.id ?? null,
@@ -654,6 +660,8 @@ export async function enrichModel(model: DemoModel, stringId = false) {
     vertexCount: latestVersion?.vertexCount ?? null,
     meshCount: latestVersion?.meshCount ?? null,
     materialCount: latestVersion?.materialCount ?? null,
+    animationCount: latestVersion?.animationCount ?? null,
+    boneCount: latestVersion?.boneCount ?? null,
   }
 }
 

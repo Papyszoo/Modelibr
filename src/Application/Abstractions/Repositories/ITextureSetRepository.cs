@@ -22,6 +22,7 @@ public interface ITextureSetRepository
         IReadOnlyCollection<TextureType>? textureTypes = null,
         TextureSetKind? kind = null,
         string? searchName = null,
+        int? minResolution = null,
         CancellationToken cancellationToken = default);
     Task<TextureSet> UpdateAsync(TextureSet textureSet, CancellationToken cancellationToken = default);
     Task DeleteAsync(int id, CancellationToken cancellationToken = default);
