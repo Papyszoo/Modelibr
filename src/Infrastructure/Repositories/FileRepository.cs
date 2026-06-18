@@ -149,6 +149,16 @@ internal sealed class FileRepository : IFileRepository
 
         if (soundExists) return true;
 
+        // Check if any non-deleted Script references this file. Scripts are
+        // content-addressed and can share a File (e.g. two scripts edited to
+        // identical content), and Scripts.FileId cascades on delete — so this
+        // check prevents hard-deleting a File a live Script still points at.
+        var scriptExists = await _context.Scripts
+            .Where(s => s.FileId == fileId)
+            .AnyAsync(cancellationToken);
+
+        if (scriptExists) return true;
+
         return await _context.EnvironmentMapVariants
             .Where(v => v.FileId == fileId)
             .AnyAsync(cancellationToken);
