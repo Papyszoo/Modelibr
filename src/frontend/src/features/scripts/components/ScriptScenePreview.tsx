@@ -25,7 +25,14 @@ function transformUserSource(src: string): string {
   const moduleVar = (mod: string): string =>
     mod === 'three/tsl' ? '__TSL' : '__THREE'
 
-  const importTransformed = src
+  // Collapse multi-line imports (common with IDE auto-formatting) onto one line
+  // so the line-based matcher below handles them too.
+  const collapsed = src.replace(
+    /import\s+(?:\*\s+as\s+\w+|\{[^}]*\}|\w+)\s+from\s+['"][^'"]+['"]/g,
+    match => match.replace(/\s*\n\s*/g, ' ')
+  )
+
+  const importTransformed = collapsed
     .split('\n')
     .map(line => {
       let m = line.match(

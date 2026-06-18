@@ -78,16 +78,17 @@ export function ScriptEditor({ script, onScriptUpdated }: ScriptEditorProps) {
 
   const isDirty = content !== savedContent
 
+  // Reset drafts only when switching to a different script. Keying on the
+  // name/description values too would discard an in-progress edit whenever a
+  // background refetch pushes a new (even unchanged) script object.
   useEffect(() => {
     setNameDraft(script.name)
     setIsEditingName(false)
-  }, [script.id, script.name])
-
-  useEffect(() => {
     setDescription(script.description ?? '')
     setDescriptionDraft(script.description ?? '')
     setIsEditingDescription(false)
-  }, [script.id, script.description])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [script.id])
 
   useEffect(() => {
     setShowPreview(getPreviewKind(script.language) === 'shader')
@@ -149,7 +150,12 @@ export function ScriptEditor({ script, onScriptUpdated }: ScriptEditorProps) {
 
     try {
       setIsSavingName(true)
-      const updated = await updateScript(script.id, { name: trimmedName })
+      // categoryId is authoritative on the backend (omitting it clears the
+      // category), so always send the current one when editing other metadata.
+      const updated = await updateScript(script.id, {
+        name: trimmedName,
+        categoryId: script.categoryId,
+      })
       setNameDraft(updated.name)
       onScriptUpdated?.(script.id, { name: updated.name })
       setIsEditingName(false)
@@ -170,7 +176,10 @@ export function ScriptEditor({ script, onScriptUpdated }: ScriptEditorProps) {
     }
     try {
       setIsSavingDescription(true)
-      const updated = await updateScript(script.id, { description: trimmed })
+      const updated = await updateScript(script.id, {
+        description: trimmed,
+        categoryId: script.categoryId,
+      })
       setDescription(updated.description ?? '')
       setDescriptionDraft(updated.description ?? '')
       onScriptUpdated?.(script.id, { description: updated.description })

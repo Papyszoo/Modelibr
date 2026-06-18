@@ -15,6 +15,7 @@ import {
   permanentlyDeleteEntity,
   restoreEntity,
 } from '@/features/recycled-files/api/recycledApi'
+import { getLanguageLabel } from '@/features/scripts/utils/languages'
 import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
 import { ThumbnailDisplay } from '@/shared/thumbnail'
 import { getVersionThumbnailUrl } from '@/shared/thumbnail/api/thumbnailApi'
@@ -61,6 +62,14 @@ interface RecycledSound {
   deletedAt: string
 }
 
+interface RecycledScript {
+  id: number
+  name: string
+  fileId: number
+  language: string
+  deletedAt: string
+}
+
 interface RecycledEnvironmentMap {
   id: number
   name: string
@@ -95,6 +104,7 @@ interface DeletePreviewItem {
     | 'textureSet'
     | 'sprite'
     | 'sound'
+    | 'script'
     | 'environmentMap'
     | 'environmentMapVariant'
     | 'file'
@@ -158,6 +168,13 @@ export function RecycledFilesList() {
     duration: s.duration,
     deletedAt: s.deletedAt,
   }))
+  const scripts = (recycledData?.scripts ?? []).map(s => ({
+    id: s.id,
+    name: s.name,
+    fileId: s.fileId,
+    language: s.language,
+    deletedAt: s.deletedAt,
+  }))
   const environmentMaps = (recycledData?.environmentMaps ?? []).map(envMap => ({
     id: envMap.id,
     name: envMap.name,
@@ -189,6 +206,7 @@ export function RecycledFilesList() {
     | 'textureSet'
     | 'sprite'
     | 'sound'
+    | 'script'
     | 'environmentMap'
     | 'environmentMapVariant'
     | 'file'
@@ -269,6 +287,8 @@ export function RecycledFilesList() {
         await queryClient.invalidateQueries({ queryKey: ['sprites'] })
       } else if (vars.item.type === 'sound') {
         await queryClient.invalidateQueries({ queryKey: ['sounds'] })
+      } else if (vars.item.type === 'script') {
+        await queryClient.invalidateQueries({ queryKey: ['scripts'] })
       } else if (vars.item.type === 'environmentMap') {
         await queryClient.invalidateQueries({ queryKey: ['environmentMaps'] })
       } else if (vars.item.type === 'environmentMapVariant') {
@@ -389,6 +409,24 @@ export function RecycledFilesList() {
     })
   }
 
+  const handleRestoreScript = async (script: RecycledScript) => {
+    await restoreEntityMutation.mutateAsync({
+      entityType: 'script',
+      entityId: script.id,
+      successDetail: `${script.name} has been restored`,
+      errorDetail: 'Failed to restore script',
+      invalidateQueryKeys: [['scripts']],
+    })
+  }
+
+  const handleDeletePreviewScript = async (script: RecycledScript) => {
+    deletePreviewMutation.mutate({
+      entityType: 'script',
+      entityId: script.id,
+      item: { ...script, type: 'script' },
+    })
+  }
+
   const handleRestoreEnvironmentMap = async (
     environmentMap: RecycledEnvironmentMap
   ) => {
@@ -487,6 +525,7 @@ export function RecycledFilesList() {
     textureSets.length === 0 &&
     sprites.length === 0 &&
     sounds.length === 0 &&
+    scripts.length === 0 &&
     environmentMaps.length === 0 &&
     environmentMapVariants.length === 0 &&
     files.length === 0
@@ -891,6 +930,62 @@ export function RecycledFilesList() {
                         </span>
                         <span className="recycled-card-meta">
                           Deleted {formatDate(sound.deletedAt)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Scripts Section */}
+          {scripts.length > 0 && (
+            <div className="recycled-section" data-section="scripts">
+              <h3 className="recycled-section-title">
+                <i className="pi pi-code" />
+                Scripts ({scripts.length})
+              </h3>
+              <div
+                className="recycled-cards-grid"
+                style={{
+                  gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))`,
+                }}
+              >
+                {scripts.map(script => (
+                  <div key={script.id} className="recycled-card">
+                    <div className="recycled-card-thumbnail">
+                      <div className="sound-placeholder">
+                        <i className="pi pi-code" />
+                        <span className="sound-duration">
+                          {getLanguageLabel(script.language)}
+                        </span>
+                      </div>
+                      <div className="recycled-card-actions">
+                        <Button
+                          icon="pi pi-replay"
+                          className="p-button-success p-button-rounded"
+                          onClick={() => handleRestoreScript(script)}
+                          tooltip="Restore"
+                          tooltipOptions={{ position: 'bottom' }}
+                        />
+                        <Button
+                          icon="pi pi-trash"
+                          className="p-button-danger p-button-rounded"
+                          onClick={() => handleDeletePreviewScript(script)}
+                          tooltip="Delete Forever"
+                          tooltipOptions={{ position: 'bottom' }}
+                        />
+                      </div>
+                      <div className="recycled-card-overlay">
+                        <span
+                          className="recycled-card-name"
+                          title={script.name}
+                        >
+                          {script.name}
+                        </span>
+                        <span className="recycled-card-meta">
+                          Deleted {formatDate(script.deletedAt)}
                         </span>
                       </div>
                     </div>
