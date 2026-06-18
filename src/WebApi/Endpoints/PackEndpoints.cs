@@ -89,6 +89,17 @@ public static class PackEndpoints
             .WithSummary("Removes a sound from the specified pack")
             .WithOpenApi();
 
+        // Pack-Script association
+        app.MapPost("/packs/{packId}/scripts/{scriptId}", AddScriptToPack)
+            .WithName("Add Script to Pack")
+            .WithSummary("Adds a script to the specified pack")
+            .WithOpenApi();
+
+        app.MapDelete("/packs/{packId}/scripts/{scriptId}", RemoveScriptFromPack)
+            .WithName("Remove Script from Pack")
+            .WithSummary("Removes a script from the specified pack")
+            .WithOpenApi();
+
         app.MapPost("/packs/{packId}/environment-maps/{environmentMapId}", AddEnvironmentMapToPack)
             .WithName("Add Environment Map to Pack")
             .WithSummary("Adds an environment map to the specified pack")
@@ -296,6 +307,34 @@ public static class PackEndpoints
         CancellationToken cancellationToken)
     {
         var command = new RemoveSoundFromPackCommand(packId, soundId);
+        var result = await commandHandler.Handle(command, cancellationToken);
+
+        return result.IsSuccess
+            ? Results.NoContent()
+            : Results.BadRequest(result.Error);
+    }
+
+    private static async Task<IResult> AddScriptToPack(
+        int packId,
+        int scriptId,
+        ICommandHandler<AddScriptToPackCommand> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var command = new AddScriptToPackCommand(packId, scriptId);
+        var result = await commandHandler.Handle(command, cancellationToken);
+
+        return result.IsSuccess
+            ? Results.NoContent()
+            : Results.BadRequest(result.Error);
+    }
+
+    private static async Task<IResult> RemoveScriptFromPack(
+        int packId,
+        int scriptId,
+        ICommandHandler<RemoveScriptFromPackCommand> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var command = new RemoveScriptFromPackCommand(packId, scriptId);
         var result = await commandHandler.Handle(command, cancellationToken);
 
         return result.IsSuccess

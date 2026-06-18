@@ -52,6 +52,28 @@ public sealed class FileType : IEquatable<FileType>
     public static readonly FileType Aac = new("aac", "AAC Audio", false, FileTypeCategory.Audio);
     public static readonly FileType M4a = new("m4a", "M4A Audio", false, FileTypeCategory.Audio);
 
+    // Script / source-code types. `Value` is the highlight language id consumed
+    // by the frontend editor; multiple extensions may share one language.
+    public static readonly FileType JavaScript = new("javascript", "JavaScript Source", false, FileTypeCategory.Script);
+    public static readonly FileType TypeScript = new("typescript", "TypeScript Source", false, FileTypeCategory.Script);
+    public static readonly FileType Python = new("python", "Python Source", false, FileTypeCategory.Script);
+    public static readonly FileType CSharp = new("csharp", "C# Source", false, FileTypeCategory.Script);
+    public static readonly FileType Cpp = new("cpp", "C/C++ Source", false, FileTypeCategory.Script);
+    public static readonly FileType Lua = new("lua", "Lua Source", false, FileTypeCategory.Script);
+    public static readonly FileType Java = new("java", "Java Source", false, FileTypeCategory.Script);
+    public static readonly FileType Go = new("go", "Go Source", false, FileTypeCategory.Script);
+    public static readonly FileType Rust = new("rust", "Rust Source", false, FileTypeCategory.Script);
+    public static readonly FileType Ruby = new("ruby", "Ruby Source", false, FileTypeCategory.Script);
+    public static readonly FileType Php = new("php", "PHP Source", false, FileTypeCategory.Script);
+    public static readonly FileType Shell = new("shell", "Shell Script", false, FileTypeCategory.Script);
+    public static readonly FileType Sql = new("sql", "SQL Script", false, FileTypeCategory.Script);
+    public static readonly FileType Json = new("json", "JSON", false, FileTypeCategory.Script);
+    public static readonly FileType Yaml = new("yaml", "YAML", false, FileTypeCategory.Script);
+    public static readonly FileType Xml = new("xml", "XML", false, FileTypeCategory.Script);
+    public static readonly FileType Glsl = new("glsl", "GLSL Shader", false, FileTypeCategory.Script);
+    public static readonly FileType Hlsl = new("hlsl", "HLSL Shader", false, FileTypeCategory.Script);
+    public static readonly FileType GdScript = new("gdscript", "GDScript Source", false, FileTypeCategory.Script);
+
     private static readonly Dictionary<string, FileType> ExtensionMapping = new(StringComparer.OrdinalIgnoreCase)
     {
         { ".obj", Obj },
@@ -79,12 +101,50 @@ public sealed class FileType : IEquatable<FileType>
         { ".ogg", Ogg },
         { ".flac", Flac },
         { ".aac", Aac },
-        { ".m4a", M4a }
+        { ".m4a", M4a },
+        // Scripts / source code
+        { ".js", JavaScript },
+        { ".jsx", JavaScript },
+        { ".mjs", JavaScript },
+        { ".cjs", JavaScript },
+        { ".ts", TypeScript },
+        { ".tsx", TypeScript },
+        { ".py", Python },
+        { ".cs", CSharp },
+        { ".cpp", Cpp },
+        { ".cc", Cpp },
+        { ".cxx", Cpp },
+        { ".c", Cpp },
+        { ".h", Cpp },
+        { ".hpp", Cpp },
+        { ".lua", Lua },
+        { ".java", Java },
+        { ".go", Go },
+        { ".rs", Rust },
+        { ".rb", Ruby },
+        { ".php", Php },
+        { ".sh", Shell },
+        { ".sql", Sql },
+        { ".json", Json },
+        { ".yaml", Yaml },
+        { ".yml", Yaml },
+        { ".xml", Xml },
+        { ".glsl", Glsl },
+        { ".vert", Glsl },
+        { ".frag", Glsl },
+        { ".hlsl", Hlsl },
+        { ".shader", Hlsl },
+        { ".gd", GdScript }
     };
 
     private static readonly FileType[] RenderableTypes = { Obj, Fbx, Gltf, Glb };
     private static readonly FileType[] SpriteTypes = { Sprite, SpriteSheet, Gif, Apng, WebP, Texture };
     private static readonly FileType[] AudioTypes = { Mp3, Wav, Ogg, Flac, Aac, M4a };
+    private static readonly FileType[] ScriptTypes =
+    {
+        JavaScript, TypeScript, Python, CSharp, Cpp, Lua, Java, Go, Rust, Ruby,
+        Php, Shell, Sql, Json, Yaml, Xml, Glsl, Hlsl, GdScript
+    };
 
     public static Result<FileType> FromExtension(string extension)
     {
@@ -141,10 +201,59 @@ public sealed class FileType : IEquatable<FileType>
     }
 
     public static IReadOnlyList<FileType> GetRenderableTypes() => RenderableTypes;
-    
+
     public static IReadOnlyList<FileType> GetSpriteTypes() => SpriteTypes;
-    
+
     public static IReadOnlyList<FileType> GetAudioTypes() => AudioTypes;
+
+    public static IReadOnlyList<FileType> GetScriptTypes() => ScriptTypes;
+
+    // Canonical extension for each script language id — used when authoring a
+    // script in-app (no uploaded file), to synthesize a file name.
+    private static readonly Dictionary<string, string> ScriptLanguageExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        { "javascript", ".js" },
+        { "typescript", ".ts" },
+        { "python", ".py" },
+        { "csharp", ".cs" },
+        { "cpp", ".cpp" },
+        { "lua", ".lua" },
+        { "java", ".java" },
+        { "go", ".go" },
+        { "rust", ".rs" },
+        { "ruby", ".rb" },
+        { "php", ".php" },
+        { "shell", ".sh" },
+        { "sql", ".sql" },
+        { "json", ".json" },
+        { "yaml", ".yaml" },
+        { "xml", ".xml" },
+        { "glsl", ".glsl" },
+        { "hlsl", ".hlsl" },
+        { "gdscript", ".gd" }
+    };
+
+    /// <summary>Returns the canonical file extension (with dot) for a script language id, or null if unknown.</summary>
+    public static string? GetExtensionForScriptLanguage(string language)
+        => string.IsNullOrWhiteSpace(language)
+            ? null
+            : ScriptLanguageExtensions.TryGetValue(language.Trim(), out var ext) ? ext : null;
+
+    public static Result<FileType> ValidateForScriptUpload(string fileName)
+    {
+        var fileTypeResult = FromFileName(fileName);
+        if (fileTypeResult.IsFailure)
+            return fileTypeResult;
+
+        var fileType = fileTypeResult.Value;
+        if (fileType.Category != FileTypeCategory.Script)
+        {
+            return Result.Failure<FileType>(
+                new Error("InvalidFileType", $"File type '{fileType.Description}' is not supported for script upload. Only source-code files (.js, .ts, .lua, .py, .cs, .cpp, .glsl, etc.) are allowed."));
+        }
+
+        return Result.Success(fileType);
+    }
 
     public static Result<FileType> ValidateForEnvironmentMapUpload(string fileName)
     {
@@ -225,6 +334,10 @@ public sealed class FileType : IEquatable<FileType>
 
     public string GetMimeType()
     {
+        // Source-code files are served and edited as plain UTF-8 text.
+        if (Category == FileTypeCategory.Script)
+            return "text/plain";
+
         return Value switch
         {
             "obj" => "model/obj",
@@ -261,5 +374,6 @@ public enum FileTypeCategory
     Material,
     Sprite,
     Audio,
+    Script,
     Other
 }

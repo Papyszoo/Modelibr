@@ -161,6 +161,33 @@ export interface DemoSound {
   waveformUrl: string | null
 }
 
+export interface DemoScript {
+  id: number
+  name: string
+  fileId: number
+  categoryId: number | null
+  categoryName: string | null
+  language: string
+  lineCount: number
+  fileName: string
+  fileSizeBytes: number
+  description: string | null
+  createdAt: string
+  updatedAt: string
+  /** Raw source text; the demo serves/edits this directly (no binary blob). */
+  content: string
+}
+
+export interface DemoScriptTemplate {
+  id: number
+  name: string
+  language: string
+  description: string | null
+  content: string
+  createdAt: string
+  updatedAt: string
+}
+
 export interface DemoEnvironmentMapVariant {
   id: number
   sizeLabel: string
@@ -238,6 +265,7 @@ export interface DemoPack {
   multiModelTextureCount: number
   spriteCount: number
   soundCount: number
+  scriptCount: number
   environmentMapCount?: number
   isEmpty: boolean
   customThumbnailFileId?: number | null
@@ -246,6 +274,7 @@ export interface DemoPack {
   textureSets: { id: number; name: string }[]
   sprites: { id: number; name: string }[]
   sounds: { id: number; name: string }[]
+  scripts: { id: number; name: string }[]
   environmentMaps?: { id: number; name: string }[]
 }
 
@@ -261,6 +290,7 @@ export interface DemoProject {
   multiModelTextureCount: number
   spriteCount: number
   soundCount: number
+  scriptCount: number
   environmentMapCount?: number
   isEmpty: boolean
   customThumbnailFileId?: number | null
@@ -270,6 +300,7 @@ export interface DemoProject {
   textureSets: { id: number; name: string }[]
   sprites: { id: number; name: string }[]
   sounds: { id: number; name: string }[]
+  scripts: { id: number; name: string }[]
   environmentMaps?: { id: number; name: string }[]
 }
 
@@ -338,6 +369,8 @@ interface DemoDbSchema extends DBSchema {
   textureSets: { key: number; value: DemoTextureSet }
   sprites: { key: number; value: DemoSprite }
   sounds: { key: number; value: DemoSound }
+  scripts: { key: number; value: DemoScript }
+  scriptTemplates: { key: number; value: DemoScriptTemplate }
   environmentMaps: { key: number; value: DemoEnvironmentMap }
   packs: { key: number; value: DemoPack }
   projects: { key: number; value: DemoProject }
@@ -346,6 +379,7 @@ interface DemoDbSchema extends DBSchema {
   environmentMapCategories: { key: number; value: DemoCategory }
   spriteCategories: { key: number; value: DemoCategory }
   soundCategories: { key: number; value: DemoCategory }
+  scriptCategories: { key: number; value: DemoCategory }
   fileBlobs: { key: number; value: DemoFileBlob }
   thumbnails: { key: string; value: DemoThumbnail }
   uploadHistory: { key: number; value: DemoUploadHistoryEntry }
@@ -359,7 +393,7 @@ let dbPromise: Promise<IDBPDatabase<DemoDbSchema>> | null = null
 
 export function getDb(): Promise<IDBPDatabase<DemoDbSchema>> {
   if (!dbPromise) {
-    dbPromise = openDB<DemoDbSchema>('modelibr-demo', 6, {
+    dbPromise = openDB<DemoDbSchema>('modelibr-demo', 8, {
       upgrade(db, oldVersion) {
         if (oldVersion < 1) {
           db.createObjectStore('models', { keyPath: 'id' })
@@ -407,6 +441,19 @@ export function getDb(): Promise<IDBPDatabase<DemoDbSchema>> {
             db.createObjectStore('environmentMapCategories', { keyPath: 'id' })
           }
         }
+        if (oldVersion < 7) {
+          if (!db.objectStoreNames.contains('scripts')) {
+            db.createObjectStore('scripts', { keyPath: 'id' })
+          }
+          if (!db.objectStoreNames.contains('scriptCategories')) {
+            db.createObjectStore('scriptCategories', { keyPath: 'id' })
+          }
+        }
+        if (oldVersion < 8) {
+          if (!db.objectStoreNames.contains('scriptTemplates')) {
+            db.createObjectStore('scriptTemplates', { keyPath: 'id' })
+          }
+        }
       },
     })
   }
@@ -444,6 +491,8 @@ type StoreNames =
   | 'textureSets'
   | 'sprites'
   | 'sounds'
+  | 'scripts'
+  | 'scriptTemplates'
   | 'environmentMaps'
   | 'packs'
   | 'projects'
@@ -452,6 +501,7 @@ type StoreNames =
   | 'environmentMapCategories'
   | 'spriteCategories'
   | 'soundCategories'
+  | 'scriptCategories'
 
 export async function getAll<T extends StoreNames>(
   storeName: T
@@ -1132,6 +1182,70 @@ export async function seedIfEmpty(): Promise<void> {
     },
   ]
 
+  const playerControllerLua = `local PlayerController = {}
+
+function PlayerController.new(speed)
+  local self = { speed = speed or 5, x = 0, y = 0 }
+  setmetatable(self, { __index = PlayerController })
+  return self
+end
+
+function PlayerController:move(dx, dy)
+  self.x = self.x + dx * self.speed
+  self.y = self.y + dy * self.speed
+end
+
+return PlayerController
+`
+  const enemyCs = `using UnityEngine;
+
+public class Enemy : MonoBehaviour
+{
+    public float Health = 100f;
+
+    public void TakeDamage(float amount)
+    {
+        Health -= amount;
+        if (Health <= 0f)
+        {
+            Destroy(gameObject);
+        }
+    }
+}
+`
+  const seedScripts: DemoScript[] = [
+    {
+      id: 1,
+      name: 'player_controller',
+      fileId: 511,
+      categoryId: 1,
+      categoryName: 'Gameplay',
+      language: 'lua',
+      lineCount: playerControllerLua.split('\n').length,
+      fileName: 'player_controller.lua',
+      fileSizeBytes: playerControllerLua.length,
+      description: 'Top-down player movement and input handling.',
+      createdAt: now,
+      updatedAt: now,
+      content: playerControllerLua,
+    },
+    {
+      id: 2,
+      name: 'Enemy',
+      fileId: 512,
+      categoryId: null,
+      categoryName: null,
+      language: 'csharp',
+      lineCount: enemyCs.split('\n').length,
+      fileName: 'Enemy.cs',
+      fileSizeBytes: enemyCs.length,
+      description: null,
+      createdAt: now,
+      updatedAt: now,
+      content: enemyCs,
+    },
+  ]
+
   const seedEnvironmentMaps: DemoEnvironmentMap[] = [
     {
       id: 1,
@@ -1188,6 +1302,7 @@ export async function seedIfEmpty(): Promise<void> {
       multiModelTextureCount: 0,
       spriteCount: 0,
       soundCount: 0,
+      scriptCount: 1,
       environmentMapCount: 1,
       isEmpty: false,
       customThumbnailFileId: 206,
@@ -1199,6 +1314,7 @@ export async function seedIfEmpty(): Promise<void> {
       textureSets: [],
       sprites: [],
       sounds: [],
+      scripts: [{ id: 1, name: 'player_controller' }],
       environmentMaps: [{ id: 1, name: 'City Night Lights' }],
     },
     {
@@ -1214,6 +1330,7 @@ export async function seedIfEmpty(): Promise<void> {
       multiModelTextureCount: 1,
       spriteCount: 0,
       soundCount: 0,
+      scriptCount: 0,
       environmentMapCount: 0,
       isEmpty: false,
       customThumbnailFileId: null,
@@ -1222,6 +1339,7 @@ export async function seedIfEmpty(): Promise<void> {
       textureSets: [{ id: 2, name: 'Color Textures' }],
       sprites: [],
       sounds: [],
+      scripts: [],
       environmentMaps: [],
     },
   ]
@@ -1239,6 +1357,7 @@ export async function seedIfEmpty(): Promise<void> {
       multiModelTextureCount: 1,
       spriteCount: 1,
       soundCount: 1,
+      scriptCount: 1,
       environmentMapCount: 1,
       isEmpty: false,
       customThumbnailFileId: 207,
@@ -1261,6 +1380,7 @@ export async function seedIfEmpty(): Promise<void> {
       textureSets: [{ id: 1, name: 'Basic Texture Set' }],
       sprites: [{ id: 1, name: 'Demo Sprite' }],
       sounds: [{ id: 1, name: 'Test Tone' }],
+      scripts: [{ id: 2, name: 'Enemy' }],
       environmentMaps: [{ id: 1, name: 'City Night Lights' }],
     },
   ]
@@ -1346,6 +1466,25 @@ export async function seedIfEmpty(): Promise<void> {
     },
   ]
 
+  const seedScriptCategories: DemoCategory[] = [
+    {
+      id: 1,
+      name: 'Gameplay',
+      description: 'Core gameplay scripts',
+      parentId: null,
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: 2,
+      name: 'Shaders',
+      description: 'GLSL / HLSL shader sources',
+      parentId: null,
+      createdAt: now,
+      updatedAt: now,
+    },
+  ]
+
   // Seeded as Universal (Global Materials, kind=1) to match the backend
   // backfill default; the Multi-Model pool starts empty in the demo.
   const seedTextureSetCategories: DemoCategory[] = [
@@ -1413,6 +1552,7 @@ export async function seedIfEmpty(): Promise<void> {
       'textureSets',
       'sprites',
       'sounds',
+      'scripts',
       'environmentMaps',
       'packs',
       'projects',
@@ -1421,6 +1561,7 @@ export async function seedIfEmpty(): Promise<void> {
       'environmentMapCategories',
       'spriteCategories',
       'soundCategories',
+      'scriptCategories',
       'meta',
     ],
     'readwrite'
@@ -1430,6 +1571,7 @@ export async function seedIfEmpty(): Promise<void> {
   for (const ts of seedTextureSets) await tx.objectStore('textureSets').put(ts)
   for (const sp of seedSprites) await tx.objectStore('sprites').put(sp)
   for (const sn of seedSounds) await tx.objectStore('sounds').put(sn)
+  for (const scr of seedScripts) await tx.objectStore('scripts').put(scr)
   for (const em of seedEnvironmentMaps)
     await tx.objectStore('environmentMaps').put(em)
   for (const pk of seedPacks) await tx.objectStore('packs').put(pk)
@@ -1444,6 +1586,8 @@ export async function seedIfEmpty(): Promise<void> {
     await tx.objectStore('spriteCategories').put(sc)
   for (const sc of seedSoundCategories)
     await tx.objectStore('soundCategories').put(sc)
+  for (const sc of seedScriptCategories)
+    await tx.objectStore('scriptCategories').put(sc)
 
   // Initialize ID sequences past seed data
   const metaStore = tx.objectStore('meta')
@@ -1453,6 +1597,7 @@ export async function seedIfEmpty(): Promise<void> {
   await metaStore.put({ key: 'seq_textures', value: 100 })
   await metaStore.put({ key: 'seq_sprites', value: 100 })
   await metaStore.put({ key: 'seq_sounds', value: 100 })
+  await metaStore.put({ key: 'seq_scripts', value: 100 })
   await metaStore.put({ key: 'seq_environmentMaps', value: 100 })
   await metaStore.put({ key: 'seq_environmentMapVariants', value: 100 })
   await metaStore.put({ key: 'seq_packs', value: 100 })
@@ -1463,6 +1608,7 @@ export async function seedIfEmpty(): Promise<void> {
   await metaStore.put({ key: 'seq_environmentMapCategories', value: 100 })
   await metaStore.put({ key: 'seq_spriteCategories', value: 100 })
   await metaStore.put({ key: 'seq_soundCategories', value: 100 })
+  await metaStore.put({ key: 'seq_scriptCategories', value: 100 })
 
   await tx.done
 }

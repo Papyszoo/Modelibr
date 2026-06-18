@@ -7,7 +7,14 @@ export interface UploadItem {
   status: 'pending' | 'uploading' | 'completed' | 'error'
   result?: unknown
   error?: Error
-  fileType: 'model' | 'texture' | 'file' | 'sprite' | 'sound' | 'environmentMap'
+  fileType:
+    | 'model'
+    | 'texture'
+    | 'file'
+    | 'sprite'
+    | 'sound'
+    | 'script'
+    | 'environmentMap'
   batchId?: string // ID of the batch this upload belongs to
 }
 
