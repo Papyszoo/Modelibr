@@ -14,6 +14,8 @@ import {
   type DemoModelVersion,
   type DemoPack,
   type DemoProject,
+  type DemoScript,
+  type DemoScriptTemplate,
   type DemoSound,
   type DemoSprite,
   type DemoTextureSet,
@@ -78,6 +80,8 @@ export type {
   DemoModelVersion,
   DemoPack,
   DemoProject,
+  DemoScript,
+  DemoScriptTemplate,
   DemoSound,
   DemoSprite,
   DemoTextureSet,
@@ -312,6 +316,7 @@ export async function recomputePackCounts(pack: DemoPack) {
   pack.multiModelTextureCount = multiModelTextureCount
   pack.spriteCount = pack.sprites.length
   pack.soundCount = pack.sounds.length
+  pack.scriptCount = (pack.scripts ?? []).length
   pack.environmentMapCount = (pack.environmentMaps ?? []).length
   pack.isEmpty =
     pack.modelCount +
@@ -319,6 +324,7 @@ export async function recomputePackCounts(pack: DemoPack) {
       pack.multiModelTextureCount +
       pack.spriteCount +
       pack.soundCount +
+      pack.scriptCount +
       (pack.environmentMapCount ?? 0) ===
     0
 }
@@ -331,6 +337,7 @@ export async function recomputeProjectCounts(project: DemoProject) {
   project.multiModelTextureCount = multiModelTextureCount
   project.spriteCount = project.sprites.length
   project.soundCount = project.sounds.length
+  project.scriptCount = (project.scripts ?? []).length
   project.environmentMapCount = (project.environmentMaps ?? []).length
   project.isEmpty =
     project.modelCount +
@@ -338,6 +345,7 @@ export async function recomputeProjectCounts(project: DemoProject) {
       project.multiModelTextureCount +
       project.spriteCount +
       project.soundCount +
+      project.scriptCount +
       (project.environmentMapCount ?? 0) ===
     0
 }
@@ -903,6 +911,11 @@ export async function ensureDemoDataShape(): Promise<void> {
       pack.sounds = []
       changed = true
     }
+    if (!Array.isArray(pack.scripts)) {
+      pack.scripts = []
+      pack.scriptCount = 0
+      changed = true
+    }
     if (!Array.isArray(pack.environmentMaps)) {
       pack.environmentMaps = []
       changed = true
@@ -979,6 +992,11 @@ export async function ensureDemoDataShape(): Promise<void> {
     }
     if (!Array.isArray(project.sounds)) {
       project.sounds = []
+      changed = true
+    }
+    if (!Array.isArray(project.scripts)) {
+      project.scripts = []
+      project.scriptCount = 0
       changed = true
     }
     if (!Array.isArray(project.environmentMaps)) {

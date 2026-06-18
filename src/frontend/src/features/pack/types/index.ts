@@ -31,6 +31,7 @@ export interface PackDto {
   multiModelTextureCount: number
   spriteCount: number
   soundCount: number
+  scriptCount: number
   environmentMapCount?: number
   isEmpty: boolean
   customThumbnailUrl?: string | null

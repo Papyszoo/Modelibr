@@ -1,6 +1,7 @@
 import { type ReactNode } from 'react'
 
 import { type EnvironmentMapDto } from '@/features/environment-map/types'
+import { type ScriptDto } from '@/features/scripts/types'
 import { type SoundDto } from '@/features/sounds/types'
 import { type SpriteDto } from '@/features/sprite/types'
 import { type TextureSetDto } from '@/features/texture-set/types'
@@ -29,6 +30,7 @@ export interface ContainerDto {
   multiModelTextureCount: number
   spriteCount: number
   soundCount: number
+  scriptCount: number
   environmentMapCount?: number
   isEmpty: boolean
   customThumbnailUrl?: string | null
@@ -64,6 +66,7 @@ export interface ContainerAdapter {
   loadTextureSets: (id: number) => Promise<TextureSetDto[]>
   loadSprites: (id: number) => Promise<SpriteDto[]>
   loadSounds: (id: number) => Promise<SoundDto[]>
+  loadScripts: (id: number) => Promise<ScriptDto[]>
   loadEnvironmentMaps: (id: number) => Promise<EnvironmentMapDto[]>
 
   // Association mutations
@@ -75,6 +78,8 @@ export interface ContainerAdapter {
   removeSprite: (containerId: number, spriteId: number) => Promise<void>
   addSound: (containerId: number, soundId: number) => Promise<void>
   removeSound: (containerId: number, soundId: number) => Promise<void>
+  addScript: (containerId: number, scriptId: number) => Promise<void>
+  removeScript: (containerId: number, scriptId: number) => Promise<void>
   addEnvironmentMap: (
     containerId: number,
     environmentMapId: number
@@ -96,6 +101,10 @@ export interface ContainerAdapter {
     projectId?: number
   }
   createSoundOptions: (containerId: number) => {
+    packId?: number
+    projectId?: number
+  }
+  createScriptOptions: (containerId: number) => {
     packId?: number
     projectId?: number
   }

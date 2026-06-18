@@ -50,6 +50,9 @@ namespace Infrastructure
             services.AddScoped<ISpriteCategoryRepository, SpriteCategoryRepository>();
             services.AddScoped<ISoundRepository, SoundRepository>();
             services.AddScoped<ISoundCategoryRepository, SoundCategoryRepository>();
+            services.AddScoped<IScriptRepository, ScriptRepository>();
+            services.AddScoped<IScriptCategoryRepository, ScriptCategoryRepository>();
+            services.AddScoped<IScriptTemplateRepository, ScriptTemplateRepository>();
             services.AddScoped<IEnvironmentMapRepository, EnvironmentMapRepository>();
             services.AddScoped<IEnvironmentMapCategoryRepository, EnvironmentMapCategoryRepository>();
             services.AddScoped<ITextureSetCategoryRepository, TextureSetCategoryRepository>();

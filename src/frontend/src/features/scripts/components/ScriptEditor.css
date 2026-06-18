@@ -1,0 +1,174 @@
+.script-editor {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-card);
+}
+
+/* Page variant fills the host tab. */
+.script-editor-page {
+  height: 100%;
+  min-height: 0;
+}
+
+.script-editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--surface-border);
+}
+
+.script-editor-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.script-editor-title h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.script-editor-language {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--primary-color);
+  background: var(--primary-50);
+  border: 1px solid var(--primary-200);
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+}
+
+.script-editor-category {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--text-color-secondary);
+}
+
+.script-title-input {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.script-title-actions {
+  display: flex;
+  gap: 0.125rem;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+/* Description row */
+.script-editor-description {
+  padding: 0.5rem 1.25rem;
+  border-bottom: 1px solid var(--surface-border);
+}
+
+.script-description-display {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: var(--text-color);
+  font-size: 0.85rem;
+  cursor: text;
+  padding: 0.25rem 0;
+}
+
+.script-description-empty {
+  color: var(--text-color-secondary);
+  font-style: italic;
+}
+
+.script-description-edit {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.script-description-edit .p-inputtextarea {
+  flex: 1;
+  font-size: 0.85rem;
+}
+
+.script-description-actions {
+  display: flex;
+  gap: 0.125rem;
+}
+
+/* Body: editor + optional preview side-by-side */
+.script-editor-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+}
+
+.script-editor-code {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+
+.script-editor-body.has-preview .script-editor-code {
+  flex: 1 1 55%;
+  border-right: 1px solid var(--surface-border);
+}
+
+.script-editor-preview {
+  flex: 1 1 45%;
+  min-width: 0;
+  min-height: 0;
+}
+
+.script-editor-body .cm-editor {
+  font-size: 0.85rem;
+  height: 100%;
+}
+
+.script-editor-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  height: 100%;
+  min-height: 240px;
+  color: var(--text-color-secondary);
+}
+
+.script-editor-error {
+  padding: 0.5rem 1.25rem;
+  color: var(--red-500);
+  font-size: 0.85rem;
+}
+
+.script-editor-statusbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 1.25rem;
+  border-top: 1px solid var(--surface-border);
+}
+
+.script-editor-status,
+.script-editor-metrics {
+  font-size: 0.8rem;
+  color: var(--text-color-secondary);
+}

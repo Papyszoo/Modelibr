@@ -20,6 +20,7 @@ internal sealed class RestoreEntityCommandHandler : ICommandHandler<RestoreEntit
     private readonly ITextureSetRepository _textureSetRepository;
     private readonly ISpriteRepository _spriteRepository;
     private readonly ISoundRepository _soundRepository;
+    private readonly IScriptRepository _scriptRepository;
     private readonly IEnvironmentMapRepository _environmentMapRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
 
@@ -30,6 +31,7 @@ internal sealed class RestoreEntityCommandHandler : ICommandHandler<RestoreEntit
         ITextureSetRepository textureSetRepository,
         ISpriteRepository spriteRepository,
         ISoundRepository soundRepository,
+        IScriptRepository scriptRepository,
         IEnvironmentMapRepository environmentMapRepository,
         IDateTimeProvider dateTimeProvider)
     {
@@ -39,6 +41,7 @@ internal sealed class RestoreEntityCommandHandler : ICommandHandler<RestoreEntit
         _textureSetRepository = textureSetRepository;
         _spriteRepository = spriteRepository;
         _soundRepository = soundRepository;
+        _scriptRepository = scriptRepository;
         _environmentMapRepository = environmentMapRepository;
         _dateTimeProvider = dateTimeProvider;
     }
@@ -102,6 +105,15 @@ internal sealed class RestoreEntityCommandHandler : ICommandHandler<RestoreEntit
                 sound.Restore(now);
                 await _soundRepository.UpdateAsync(sound, cancellationToken);
                 return Result.Success(new RestoreEntityResponse(true, "Sound restored successfully"));
+
+            case "script":
+                var script = await _scriptRepository.GetDeletedByIdAsync(request.EntityId, cancellationToken);
+                if (script == null)
+                    return Result.Failure<RestoreEntityResponse>(new Error("ScriptNotFound", "Script not found"));
+
+                script.Restore(now);
+                await _scriptRepository.UpdateAsync(script, cancellationToken);
+                return Result.Success(new RestoreEntityResponse(true, "Script restored successfully"));
 
             case "environmentmap":
                 var environmentMap = await _environmentMapRepository.GetDeletedByIdAsync(request.EntityId, cancellationToken);

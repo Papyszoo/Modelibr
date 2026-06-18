@@ -133,6 +133,21 @@ export const TabProvider = ({
     setActiveTab(newTab.id)
   }
 
+  const openScriptDetailsTab = (scriptId: string, name?: string): void => {
+    const existingTab = tabs.find(
+      tab => tab.type === 'scriptViewer' && tab.scriptId === scriptId
+    )
+
+    if (existingTab) {
+      setActiveTab(existingTab.id)
+      return
+    }
+
+    const newTab = createTab('scriptViewer', scriptId, name)
+    setTabs([...tabs, newTab])
+    setActiveTab(newTab.id)
+  }
+
   const openTab = (
     type: Tab['type'],
     title: string,
@@ -181,6 +196,7 @@ export const TabProvider = ({
     openEnvironmentMapDetailsTab,
     openPackDetailsTab,
     openProjectDetailsTab,
+    openScriptDetailsTab,
     openTab,
   }
 

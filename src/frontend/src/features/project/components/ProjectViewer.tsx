@@ -3,6 +3,7 @@ import { useMemo } from 'react'
 import {
   addEnvironmentMapToProject,
   addModelToProject,
+  addScriptToProject,
   addSoundToProject,
   addSpriteToProject,
   addTextureSetToProject,
@@ -10,11 +11,13 @@ import {
   getEnvironmentMapsByProject,
   getModelsByProject,
   getProjectById,
+  getScriptsByProject,
   getSoundsByProject,
   getSpritesByProject,
   getTextureSetsByProject,
   removeEnvironmentMapFromProject,
   removeModelFromProject,
+  removeScriptFromProject,
   removeSoundFromProject,
   removeSpriteFromProject,
   removeTextureSetFromProject,
@@ -46,6 +49,7 @@ function toContainerDto(project: ProjectDetailDto): ContainerDto {
     multiModelTextureCount: project.multiModelTextureCount,
     spriteCount: project.spriteCount,
     soundCount: project.soundCount,
+    scriptCount: project.scriptCount ?? 0,
     environmentMapCount: project.environmentMapCount ?? 0,
     isEmpty: project.isEmpty,
     customThumbnailUrl: project.customThumbnailUrl,
@@ -80,6 +84,7 @@ export function ProjectViewer({ projectId, tabId }: ProjectViewerProps) {
       loadTextureSets: id => getTextureSetsByProject(id),
       loadSprites: id => getSpritesByProject(id),
       loadSounds: id => getSoundsByProject(id),
+      loadScripts: id => getScriptsByProject(id),
       loadEnvironmentMaps: id => getEnvironmentMapsByProject(id),
       addModel: (cId, mId) => addModelToProject(cId, mId),
       removeModel: (cId, mId) => removeModelFromProject(cId, mId),
@@ -89,6 +94,8 @@ export function ProjectViewer({ projectId, tabId }: ProjectViewerProps) {
       removeSprite: (cId, sId) => removeSpriteFromProject(cId, sId),
       addSound: (cId, sId) => addSoundToProject(cId, sId),
       removeSound: (cId, sId) => removeSoundFromProject(cId, sId),
+      addScript: (cId, sId) => addScriptToProject(cId, sId),
+      removeScript: (cId, sId) => removeScriptFromProject(cId, sId),
       addEnvironmentMap: (cId, environmentMapId) =>
         addEnvironmentMapToProject(cId, environmentMapId),
       removeEnvironmentMap: (cId, environmentMapId) =>
@@ -103,6 +110,7 @@ export function ProjectViewer({ projectId, tabId }: ProjectViewerProps) {
       ) => addTextureToProjectWithFile(cId, file, name, textureType, batchId),
       createSpriteOptions: cId => ({ projectId: cId }),
       createSoundOptions: cId => ({ projectId: cId }),
+      createScriptOptions: cId => ({ projectId: cId }),
     }),
     [projectId]
   )

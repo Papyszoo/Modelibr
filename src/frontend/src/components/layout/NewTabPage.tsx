@@ -106,6 +106,15 @@ const TILES: Tile[] = [
     targetLabel: 'Sounds',
   },
   {
+    key: 'scripts',
+    group: 'assets',
+    icon: 'pi-code',
+    label: 'Scripts',
+    description: 'Source code — Lua, C#, Python, shaders, and more.',
+    targetType: 'scripts',
+    targetLabel: 'Scripts',
+  },
+  {
     key: 'stages',
     group: 'assets',
     icon: 'pi-th-large',
