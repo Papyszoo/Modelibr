@@ -149,11 +149,15 @@ internal sealed class FileRepository : IFileRepository
 
         if (soundExists) return true;
 
-        // Check if any non-deleted Script references this file. Scripts are
-        // content-addressed and can share a File (e.g. two scripts edited to
-        // identical content), and Scripts.FileId cascades on delete — so this
-        // check prevents hard-deleting a File a live Script still points at.
+        // Check if ANY Script (including soft-deleted/recycled) references this
+        // file. Scripts are content-addressed and can share a File (e.g. two
+        // scripts edited to identical content), and Scripts.FileId cascades on
+        // delete. IgnoreQueryFilters is deliberate: a recycled script still in
+        // the bin must keep its file alive, otherwise permanently deleting a
+        // live sibling would yank the shared file and cascade-delete the bin
+        // entry (making it unrestorable).
         var scriptExists = await _context.Scripts
+            .IgnoreQueryFilters()
             .Where(s => s.FileId == fileId)
             .AnyAsync(cancellationToken);
 
