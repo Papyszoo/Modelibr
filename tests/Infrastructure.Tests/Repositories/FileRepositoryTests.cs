@@ -56,6 +56,30 @@ public class FileRepositoryTests
     }
 
     [Fact]
+    public async Task IsFileHashReferencedByOthersAsync_ReturnsTrue_WhenOnlyReferencingScriptIsSoftDeleted()
+    {
+        // Regression: a recycled (soft-deleted) script still in the bin shares
+        // a content-addressed File with a sibling. Permanently deleting the
+        // sibling must NOT hard-delete the File — the global query filter would
+        // hide the recycled script, so the reference check ignores filters.
+        await using var context = NewContext();
+        var file = CreateFile("cc33dd44ee55ff66aa11bb22cc33dd44ee55ff66aa11bb22cc33dd44ee55ff66");
+        context.Files.Add(file);
+        await context.SaveChangesAsync();
+
+        var recycled = Script.Create("recycled", file, "lua", 1, 1, DateTime.UtcNow);
+        recycled.SoftDelete(DateTime.UtcNow);
+        context.Scripts.Add(recycled);
+        await context.SaveChangesAsync();
+
+        var repository = new FileRepository(context);
+
+        var referenced = await repository.IsFileHashReferencedByOthersAsync(file.Id);
+
+        Assert.True(referenced);
+    }
+
+    [Fact]
     public async Task IsFileHashReferencedByOthersAsync_ReturnsFalse_WhenNoOtherEntityReferencesTheFile()
     {
         await using var context = NewContext();

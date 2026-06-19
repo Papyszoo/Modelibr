@@ -45,9 +45,16 @@ interface ScriptEditorProps {
     scriptId: number,
     patch: { name?: string; description?: string | null }
   ) => void
+  /** When provided (e.g. the editor is shown in a container modal), render a
+   *  close button in the header. Tab-hosted usage omits it. */
+  onClose?: () => void
 }
 
-export function ScriptEditor({ script, onScriptUpdated }: ScriptEditorProps) {
+export function ScriptEditor({
+  script,
+  onScriptUpdated,
+  onClose,
+}: ScriptEditorProps) {
   const [content, setContent] = useState('')
   const [savedContent, setSavedContent] = useState('')
   const [isLoading, setIsLoading] = useState(true)
@@ -86,7 +93,9 @@ export function ScriptEditor({ script, onScriptUpdated }: ScriptEditorProps) {
     staleTime: 60_000,
   })
   const modelOptions = useMemo(
-    () => (pickerModels ?? []).map(m => ({ id: m.id, name: m.name })),
+    // Model.id is a string; the preview store keys models by number, so convert
+    // at the boundary to keep the picker/check-state comparisons consistent.
+    () => (pickerModels ?? []).map(m => ({ id: Number(m.id), name: m.name })),
     [pickerModels]
   )
 
@@ -413,6 +422,16 @@ export function ScriptEditor({ script, onScriptUpdated }: ScriptEditorProps) {
             )}
           </div>
         </div>
+        {onClose && (
+          <Button
+            icon="pi pi-times"
+            className="p-button-text p-button-rounded"
+            onClick={onClose}
+            tooltip="Close"
+            aria-label="Close"
+            data-testid="script-editor-close"
+          />
+        )}
       </div>
 
       <ScriptViewerMenubar
