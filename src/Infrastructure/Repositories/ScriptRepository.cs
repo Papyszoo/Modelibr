@@ -66,7 +66,9 @@ internal sealed class ScriptRepository : IScriptRepository
         if (!string.IsNullOrWhiteSpace(searchName))
         {
             var pattern = $"%{searchName.Trim()}%";
-            query = query.Where(s => EF.Functions.ILike(s.Name, pattern));
+            query = query.Where(s =>
+                EF.Functions.ILike(s.Name, pattern) ||
+                (s.Description != null && EF.Functions.ILike(s.Description, pattern)));
         }
 
         if (!string.IsNullOrWhiteSpace(language))

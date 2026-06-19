@@ -108,9 +108,13 @@ export class ScriptListPage {
             .catch(() => false);
     }
 
-    /** The description text shown on a script card in the list, if any. */
-    getCardDescription(name: string) {
-        return this.getScriptCardByName(name).locator(".script-description");
+    /**
+     * The card's tooltip (its `title` attribute). The description is shown
+     * here rather than inline so the card stays icon-forward; the title holds
+     * "<name>\n\n<description>".
+     */
+    getScriptCardTooltip(name: string) {
+        return this.getScriptCardByName(name);
     }
 
     /** Open a script card (by id) to launch the editor modal. */

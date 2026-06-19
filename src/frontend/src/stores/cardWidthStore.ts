@@ -41,7 +41,7 @@ const DEFAULT_WIDTHS: CardWidthSettings = {
   models: 180,
   sprites: 200,
   sounds: 280,
-  scripts: 240,
+  scripts: 150,
   environmentMaps: 320,
   packs: 280,
   projects: 280,

@@ -9,6 +9,7 @@ import {
   type DragEvent,
   type MouseEvent,
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -108,15 +109,40 @@ export function ScriptList() {
   )
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [isFiltersOpen, setIsFiltersOpen] = useState(false)
+  const [isCategoryPanelOpen, setIsCategoryPanelOpen] = useState(true)
   const hasActiveLanguageFilter = language != null
 
-  // Languages present in the loaded scripts, for the filter dropdown.
-  const languageOptions = useMemo(() => {
-    const present = Array.from(new Set(scripts.map(s => s.language)))
-    return present
-      .sort()
-      .map(value => ({ value, label: getLanguageLabel(value) }))
-  }, [scripts])
+  // Union of every language we've ever loaded. The list query filters scripts
+  // server-side by `language`, so deriving options from the *current* result
+  // would collapse the dropdown to just the selected language and make it
+  // impossible to switch. Accumulating (never shrinking) keeps every option
+  // selectable; the active filter is always included even on a fresh load.
+  const [seenLanguages, setSeenLanguages] = useState<Set<string>>(new Set())
+  useEffect(() => {
+    setSeenLanguages(prev => {
+      const next = new Set(prev)
+      let changed = false
+      for (const s of scripts) {
+        if (!next.has(s.language)) {
+          next.add(s.language)
+          changed = true
+        }
+      }
+      if (language && !next.has(language)) {
+        next.add(language)
+        changed = true
+      }
+      return changed ? next : prev
+    })
+  }, [scripts, language])
+
+  const languageOptions = useMemo(
+    () =>
+      Array.from(seenLanguages)
+        .sort()
+        .map(value => ({ value, label: getLanguageLabel(value) })),
+    [seenLanguages]
+  )
 
   // Per-category counts for the tree sidebar (from the loaded scripts).
   const categoryCounts = useMemo(() => {
@@ -449,6 +475,13 @@ export function ScriptList() {
         <ListToolbarRow>
           <ListToolbarActions>
             <ListToolbarButton
+              icon="pi pi-file-edit"
+              label="New Script"
+              onClick={() => setShowCreateDialog(true)}
+              tooltip="Write a new script in-app"
+              ariaLabel="New Script"
+            />
+            <ListToolbarButton
               icon="pi pi-search"
               label="Search"
               active={isSearchOpen || searchQuery.trim().length > 0}
@@ -469,8 +502,8 @@ export function ScriptList() {
             />
             <OptionsButton
               cardWidth={cardWidth}
-              minCardWidth={200}
-              maxCardWidth={500}
+              minCardWidth={120}
+              maxCardWidth={400}
               onCardWidthChange={width => setCardWidth('scripts', width)}
               showThumbnailAnimation={false}
             />
@@ -482,18 +515,13 @@ export function ScriptList() {
               ariaLabel="Refresh"
             />
             <ListToolbarButton
-              icon="pi pi-file-edit"
-              label="New Script"
-              onClick={() => setShowCreateDialog(true)}
-              tooltip="Write a new script in-app"
-              ariaLabel="New Script"
-            />
-            <ListToolbarButton
               icon="pi pi-folder"
               label="Categories"
-              onClick={() => setShowCategoryManager(true)}
-              tooltip="Manage script categories"
-              ariaLabel="Manage Categories"
+              active={isCategoryPanelOpen}
+              onClick={() => setIsCategoryPanelOpen(open => !open)}
+              tooltip="Toggle category panel"
+              ariaLabel="Toggle categories"
+              ariaExpanded={isCategoryPanelOpen}
             />
           </ListToolbarActions>
 
@@ -524,7 +552,8 @@ export function ScriptList() {
           <ListToolbarSearchInput
             value={searchQuery}
             onChange={setSearchQuery}
-            placeholder="Search scripts..."
+            placeholder="Search name or description..."
+            autoFocus={isSearchOpen}
           />
         </ListToolbarPanel>
 
@@ -549,19 +578,31 @@ export function ScriptList() {
       </ListToolbar>
 
       <div className="script-list-body">
-        <CategoryTreePanel
-          categories={categories}
-          activeCategoryId={activeCategoryId}
-          dragOverCategoryId={dragOverCategoryId}
-          categoryCounts={categoryCounts}
-          unassignedCount={unassignedCount}
-          onCategoryChange={setActiveCategoryId}
-          onCategoryDragOver={handleCategoryDragOver}
-          onCategoryDragLeave={handleCategoryDragLeave}
-          onCategoryDrop={handleCategoryDrop}
-          unassignedCategoryId={UNASSIGNED_CATEGORY_ID}
-          unassignedLabel="All scripts"
-        />
+        {isCategoryPanelOpen && (
+          <div className="script-category-sidebar">
+            <CategoryTreePanel
+              categories={categories}
+              activeCategoryId={activeCategoryId}
+              dragOverCategoryId={dragOverCategoryId}
+              categoryCounts={categoryCounts}
+              unassignedCount={unassignedCount}
+              onCategoryChange={setActiveCategoryId}
+              onCategoryDragOver={handleCategoryDragOver}
+              onCategoryDragLeave={handleCategoryDragLeave}
+              onCategoryDrop={handleCategoryDrop}
+              unassignedCategoryId={UNASSIGNED_CATEGORY_ID}
+              unassignedLabel="Uncategorized"
+            />
+            <button
+              type="button"
+              className="script-category-manage-btn"
+              onClick={() => setShowCategoryManager(true)}
+            >
+              <i className="pi pi-cog" aria-hidden="true" />
+              <span>Manage categories</span>
+            </button>
+          </div>
+        )}
 
         <div className="script-list-main">
           {loading ? (

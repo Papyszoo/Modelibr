@@ -40,12 +40,19 @@ export const ScriptCard = memo(function ScriptCard({
   onDragStart,
   onDragEnd,
 }: ScriptCardProps) {
+  // Description lives in the card tooltip (and is searchable) rather than
+  // taking up card space — the card itself stays icon-forward.
+  const tooltip = script.description
+    ? `${script.name}\n\n${script.description}`
+    : script.name
+
   return (
     <div
       className={`script-card ${isSelected ? 'selected' : ''} ${isDragging ? 'dragging' : ''}`}
       data-script-id={script.id}
       data-testid="script-card"
       data-language={script.language}
+      title={tooltip}
       onClick={onClick}
       onContextMenu={onContextMenu}
       draggable
@@ -66,14 +73,7 @@ export const ScriptCard = memo(function ScriptCard({
       </div>
 
       <div className="script-info">
-        <h3 className="script-name" title={script.name}>
-          {script.name}
-        </h3>
-        {script.description && (
-          <p className="script-description" title={script.description}>
-            {script.description}
-          </p>
-        )}
+        <h3 className="script-name">{script.name}</h3>
         <div className="script-meta">
           <span className="script-lines">{script.lineCount} lines</span>
           <span className="script-size">

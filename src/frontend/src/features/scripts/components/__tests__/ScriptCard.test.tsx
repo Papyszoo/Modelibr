@@ -59,6 +59,53 @@ describe('ScriptCard', () => {
     expect(screen.getByTestId('script-language-badge')).toHaveTextContent('C#')
   })
 
+  it('puts the description in the card tooltip, not inline on the card', () => {
+    const { container } = render(
+      <ScriptCard
+        script={{ ...baseScript, description: 'Handles player movement' }}
+        isSelected={false}
+        isDragging={false}
+        onSelect={noop}
+        onClick={noop}
+        onContextMenu={noop}
+        onDragStart={noop}
+        onDragEnd={noop}
+      />
+    )
+
+    // Tooltip carries the description (kept off the card to stay icon-forward).
+    const card = screen.getByTestId('script-card')
+    expect(card).toHaveAttribute(
+      'title',
+      expect.stringContaining('Handles player movement')
+    )
+    // It must NOT be rendered as visible card text.
+    expect(
+      screen.queryByText('Handles player movement')
+    ).not.toBeInTheDocument()
+    expect(container.querySelector('.script-description')).toBeNull()
+  })
+
+  it('uses just the name as the tooltip when there is no description', () => {
+    render(
+      <ScriptCard
+        script={baseScript}
+        isSelected={false}
+        isDragging={false}
+        onSelect={noop}
+        onClick={noop}
+        onContextMenu={noop}
+        onDragStart={noop}
+        onDragEnd={noop}
+      />
+    )
+
+    expect(screen.getByTestId('script-card')).toHaveAttribute(
+      'title',
+      'player_controller'
+    )
+  })
+
   it('fires onClick when the card is clicked', () => {
     const onClick = jest.fn()
     render(

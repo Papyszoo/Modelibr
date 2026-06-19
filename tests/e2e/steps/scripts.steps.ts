@@ -181,10 +181,10 @@ Then(
     "the script {string} card should show description {string}",
     async ({ page }, scriptName: string, expected: string) => {
         const scriptsPage = new ScriptListPage(page);
-        await expect(scriptsPage.getCardDescription(scriptName)).toHaveText(
-            new RegExp(expected),
-            { timeout: 10000 },
-        );
+        // Description now lives in the card tooltip (title attribute).
+        await expect(
+            scriptsPage.getScriptCardTooltip(scriptName),
+        ).toHaveAttribute("title", new RegExp(expected), { timeout: 10000 });
     },
 );
 
