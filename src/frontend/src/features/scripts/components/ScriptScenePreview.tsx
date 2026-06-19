@@ -1,9 +1,26 @@
 import './ScriptPreview.css'
 
-import { Component, type ReactNode, useEffect, useRef, useState } from 'react'
+import { OrbitControls } from '@react-three/drei'
+import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber'
+import {
+  Component,
+  type ReactNode,
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import * as THREE_CORE from 'three'
+import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
+import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader'
 import * as TSL from 'three/tsl'
 import * as THREE_GPU from 'three/webgpu'
+
+import { safeLoadingManager } from '@/shared/three/safeLoadingManager'
+import { type PreviewGeometry } from '@/stores/scriptPreviewStore'
+import { useViewerSettingsStore } from '@/stores/viewerSettingsStore'
 
 import { transformUserSource } from '../utils/transformUserSource'
 
@@ -13,8 +30,49 @@ const THREE = Object.assign({}, THREE_CORE, THREE_GPU) as typeof THREE_CORE &
   typeof THREE_GPU
 
 interface ScriptScenePreviewProps {
-  language: string
-  content: string
+  /** Snapshot of the source to run (updated only on Run, never on keystroke). */
+  source: string
+  geometry: PreviewGeometry
+  /** When set, the material is applied to this model instead of a primitive. */
+  modelUrl?: string
+  modelExtension?: string
+}
+
+type Compiled =
+  | { kind: 'material'; material: THREE_CORE.Material }
+  | { kind: 'setup'; setup: (ctx: unknown) => void }
+  | { kind: 'error'; message: string }
+
+/** Runs the user source once and classifies the result. No GL needed here. */
+function compileUserSource(source: string): Compiled {
+  if (!source.trim()) {
+    return { kind: 'error', message: 'Press Run to render this script.' }
+  }
+  let value: unknown
+  try {
+    const factory = new Function(
+      '__THREE',
+      '__TSL',
+      transformUserSource(source)
+    )
+    value = factory(THREE, TSL)
+  } catch (err) {
+    return {
+      kind: 'error',
+      message: `Failed to run script: ${(err as Error).message}`,
+    }
+  }
+  if (value && (value as { isMaterial?: boolean }).isMaterial) {
+    return { kind: 'material', material: value as THREE_CORE.Material }
+  }
+  if (typeof value === 'function') {
+    return { kind: 'setup', setup: value as (ctx: unknown) => void }
+  }
+  return {
+    kind: 'error',
+    message:
+      'Preview expects the script to `export default` a THREE material (or a setup function).',
+  }
 }
 
 class PreviewErrorBoundary extends Component<
@@ -38,161 +96,245 @@ class PreviewErrorBoundary extends Component<
   }
 }
 
-function SceneRunner({ content }: { content: string }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [paused, setPaused] = useState(false)
-  const pausedRef = useRef(false)
-
-  useEffect(() => {
-    pausedRef.current = paused
-  }, [paused])
-
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-
-    let renderer: THREE_GPU.WebGPURenderer | null = null
-    let disposed = false
-    let raf = 0
-
-    // 1. Build the user's material/scene exactly once, guarded.
-    let userValue: unknown
-    try {
-      const factory = new Function(
-        '__THREE',
-        '__TSL',
-        transformUserSource(content)
-      )
-      userValue = factory(THREE, TSL)
-    } catch (err) {
-      setError(`Failed to run script: ${(err as Error).message}`)
-      return
-    }
-
-    const material =
-      userValue && (userValue as { isMaterial?: boolean }).isMaterial
-        ? (userValue as THREE_CORE.Material)
-        : null
-
-    if (!material && typeof userValue !== 'function') {
-      setError(
-        'Preview expects the script to `export default` a THREE material.'
-      )
-      return
-    }
-
-    const scene = new THREE.Scene()
-    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100)
-    camera.position.set(0, 0, 3)
-    scene.add(new THREE.AmbientLight(0xffffff, 0.6))
-    const dir = new THREE.DirectionalLight(0xffffff, 1.2)
-    dir.position.set(2, 3, 4)
-    scene.add(dir)
-
-    let mesh: THREE_CORE.Mesh | null = null
-    if (material) {
-      mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 48), material)
-      scene.add(mesh)
-    }
-
-    setError(null)
-
-    // 2. Init the renderer (WebGPU, falling back to WebGL2) then animate.
-    ;(async () => {
-      try {
-        renderer = new THREE_GPU.WebGPURenderer({ canvas, antialias: true })
-        renderer.setClearColor(0x101015, 1)
-        await renderer.init()
-        if (disposed) return
-
-        // Allow a custom-scene setup function (`export default ({...}) => {}`).
-        if (typeof userValue === 'function') {
-          ;(userValue as (ctx: unknown) => void)({
-            THREE,
-            TSL,
-            scene,
-            camera,
-            renderer,
-          })
-        }
-
-        const render = async () => {
-          if (disposed) {
-            raf = 0
-            return
-          }
-          // Keep the loop alive while paused so Play can resume it; just skip
-          // the work. (User code already ran once at build — nothing runs here.)
-          if (!pausedRef.current) {
-            const w = canvas.clientWidth || 1
-            const h = canvas.clientHeight || 1
-            if (canvas.width !== w || canvas.height !== h) {
-              renderer!.setSize(w, h, false)
-              camera.aspect = w / h
-              camera.updateProjectionMatrix()
-            }
-            if (mesh) mesh.rotation.y += 0.01
-            try {
-              await renderer!.renderAsync(scene, camera)
-            } catch (err) {
-              setError(`Render error: ${(err as Error).message}`)
-              return
-            }
-          }
-          raf = requestAnimationFrame(() => void render())
-        }
-        void render()
-      } catch (err) {
-        if (!disposed)
-          setError(`Could not start 3D preview: ${(err as Error).message}`)
-      }
-    })()
-
-    return () => {
-      disposed = true
-      if (raf) cancelAnimationFrame(raf)
-      mesh?.geometry.dispose()
-      material?.dispose()
-      renderer?.dispose()
-    }
-  }, [content])
-
+function PrimitiveMesh({
+  geometry,
+  material,
+  rotationSpeed,
+  paused,
+}: {
+  geometry: PreviewGeometry
+  material: THREE_CORE.Material
+  rotationSpeed: number
+  paused: boolean
+}) {
+  const ref = useRef<THREE_CORE.Mesh>(null)
+  useFrame(() => {
+    if (ref.current && !paused) ref.current.rotation.y += rotationSpeed
+  })
   return (
-    <div className="script-preview" data-testid="script-preview">
-      <div className="script-preview-toolbar">
-        <span className="script-preview-label">Scene preview</span>
-        <button
-          type="button"
-          className="script-preview-toggle"
-          onClick={() => setPaused(p => !p)}
-          data-testid="script-preview-toggle"
-        >
-          <i className={`pi ${paused ? 'pi-play' : 'pi-pause'}`} />
-          {paused ? 'Play' : 'Pause'}
-        </button>
-      </div>
-      <div className="script-preview-canvas-wrap">
-        <canvas ref={canvasRef} className="script-preview-canvas" />
-        {error && (
-          <pre
-            className="script-preview-error"
-            data-testid="script-preview-error"
-          >
-            {error}
-          </pre>
-        )}
-      </div>
-    </div>
+    <mesh ref={ref}>
+      {geometry === 'sphere' && <sphereGeometry args={[1, 48, 48]} />}
+      {geometry === 'box' && <boxGeometry args={[1.4, 1.4, 1.4]} />}
+      {geometry === 'plane' && <planeGeometry args={[2, 2]} />}
+      {geometry === 'cylinder' && (
+        <cylinderGeometry args={[0.9, 0.9, 1.8, 48]} />
+      )}
+      {geometry === 'torus' && <torusGeometry args={[0.85, 0.35, 32, 64]} />}
+      <primitive object={material} attach="material" />
+    </mesh>
   )
 }
 
-export function ScriptScenePreview({ content }: ScriptScenePreviewProps) {
-  // The runner rebuilds (dispose + re-run user code) whenever content changes;
-  // the boundary is a backstop for any render-time throw it can't catch itself.
+function ModelMesh({
+  url,
+  extension,
+  material,
+  rotationSpeed,
+  paused,
+}: {
+  url: string
+  extension: string
+  material: THREE_CORE.Material
+  rotationSpeed: number
+  paused: boolean
+}) {
+  const group = useRef<THREE_CORE.Group>(null)
+  useFrame(() => {
+    if (group.current && !paused) group.current.rotation.y += rotationSpeed
+  })
+
+  const loader =
+    extension === 'obj'
+      ? OBJLoader
+      : extension === 'fbx'
+        ? FBXLoader
+        : GLTFLoader
+  const loaded = useLoader(loader, url, l => {
+    l.manager = safeLoadingManager
+  })
+
+  const object = useMemo(() => {
+    const raw = loaded as unknown as { scene?: THREE_CORE.Object3D }
+    const root = (raw.scene ?? (loaded as THREE_CORE.Object3D)).clone()
+
+    // Apply the user material to every mesh.
+    root.traverse(child => {
+      if ((child as THREE_CORE.Mesh).isMesh) {
+        ;(child as THREE_CORE.Mesh).material = material
+      }
+    })
+
+    // Normalise to ~2 units and centre on the origin.
+    const box = new THREE.Box3().setFromObject(root)
+    const size = box.getSize(new THREE.Vector3())
+    const maxDim = Math.max(size.x, size.y, size.z) || 1
+    root.scale.multiplyScalar(2 / maxDim)
+    const scaledBox = new THREE.Box3().setFromObject(root)
+    const center = scaledBox.getCenter(new THREE.Vector3())
+    root.position.sub(center)
+    return root
+  }, [loaded, material])
+
+  return (
+    <group ref={group}>
+      <primitive object={object} />
+    </group>
+  )
+}
+
+/** Runs a user setup function against the live scene and cleans up after itself. */
+function SetupRunner({ setup }: { setup: (ctx: unknown) => void }) {
+  const { scene, camera, gl } = useThree()
+  useEffect(() => {
+    const before = new Set(scene.children)
+    try {
+      setup({ THREE, TSL, scene, camera, renderer: gl })
+    } catch (err) {
+      console.error('Scene setup failed:', err)
+    }
+    return () => {
+      // Remove whatever the setup added so a re-run starts clean.
+      for (const child of [...scene.children]) {
+        if (!before.has(child)) scene.remove(child)
+      }
+    }
+  }, [setup, scene, camera, gl])
+  return null
+}
+
+function SceneContents({
+  compiled,
+  geometry,
+  modelUrl,
+  modelExtension,
+  paused,
+}: {
+  compiled: Compiled
+  geometry: PreviewGeometry
+  modelUrl?: string
+  modelExtension?: string
+  paused: boolean
+}) {
+  const settings = useViewerSettingsStore(s => s.settings)
+  const rotationSpeed = settings.modelRotationSpeed
+
+  return (
+    <>
+      <color attach="background" args={['#101015']} />
+      <ambientLight intensity={settings.ambientIntensity} />
+      <directionalLight
+        position={[2, 3, 4]}
+        intensity={settings.directionalIntensity}
+      />
+
+      {compiled.kind === 'setup' && <SetupRunner setup={compiled.setup} />}
+
+      {compiled.kind === 'material' && (
+        <Suspense fallback={null}>
+          {modelUrl && modelExtension ? (
+            <ModelMesh
+              url={modelUrl}
+              extension={modelExtension}
+              material={compiled.material}
+              rotationSpeed={rotationSpeed}
+              paused={paused}
+            />
+          ) : (
+            <PrimitiveMesh
+              geometry={geometry}
+              material={compiled.material}
+              rotationSpeed={rotationSpeed}
+              paused={paused}
+            />
+          )}
+        </Suspense>
+      )}
+
+      <OrbitControls
+        makeDefault
+        enablePan
+        enableZoom
+        enableRotate
+        rotateSpeed={settings.orbitSpeed}
+        zoomSpeed={settings.zoomSpeed}
+        panSpeed={settings.panSpeed}
+        maxDistance={50}
+        minDistance={0.2}
+      />
+    </>
+  )
+}
+
+// R3F v9 accepts an async gl factory; we use it to spin up a WebGPU renderer so
+// TSL / node materials work. (This integration needs a real GPU — it can't be
+// exercised in jsdom/CI; the error boundary is the backstop if it fails.)
+async function createWebGpuRenderer(
+  props: ConstructorParameters<typeof THREE_GPU.WebGPURenderer>[0]
+): Promise<THREE_GPU.WebGPURenderer> {
+  const renderer = new THREE_GPU.WebGPURenderer(props)
+  await renderer.init()
+  return renderer
+}
+
+export function ScriptScenePreview({
+  source,
+  geometry,
+  modelUrl,
+  modelExtension,
+}: ScriptScenePreviewProps) {
+  const [paused, setPaused] = useState(false)
+
+  const compiled = useMemo(() => compileUserSource(source), [source])
+
+  // Dispose a previously-built material when the source (and thus material)
+  // changes or the component unmounts.
+  useEffect(() => {
+    return () => {
+      if (compiled.kind === 'material') compiled.material.dispose()
+    }
+  }, [compiled])
+
   return (
     <PreviewErrorBoundary>
-      <SceneRunner content={content} />
+      <div className="script-preview" data-testid="script-preview">
+        <div className="script-preview-toolbar">
+          <span className="script-preview-label">Scene preview</span>
+          <button
+            type="button"
+            className="script-preview-toggle"
+            onClick={() => setPaused(p => !p)}
+            data-testid="script-preview-toggle"
+          >
+            <i className={`pi ${paused ? 'pi-play' : 'pi-pause'}`} />
+            {paused ? 'Play' : 'Pause'}
+          </button>
+        </div>
+        <div className="script-preview-canvas-wrap">
+          {compiled.kind === 'error' ? (
+            <pre
+              className="script-preview-error"
+              data-testid="script-preview-error"
+            >
+              {compiled.message}
+            </pre>
+          ) : (
+            <Canvas
+              className="script-preview-canvas"
+              camera={{ position: [0, 0, 3.2], fov: 50 }}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              gl={createWebGpuRenderer as any}
+            >
+              <SceneContents
+                compiled={compiled}
+                geometry={geometry}
+                modelUrl={modelUrl}
+                modelExtension={modelExtension}
+                paused={paused}
+              />
+            </Canvas>
+          )}
+        </div>
+      </div>
     </PreviewErrorBoundary>
   )
 }

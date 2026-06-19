@@ -1,5 +1,6 @@
 import './ScriptEditor.css'
 
+import { useQuery } from '@tanstack/react-query'
 import { vscodeDark } from '@uiw/codemirror-theme-vscode'
 import CodeMirror from '@uiw/react-codemirror'
 import { Button } from 'primereact/button'
@@ -15,20 +16,25 @@ import {
   useState,
 } from 'react'
 
+import { getModelFileUrl, getModels } from '@/features/models/api/modelApi'
 import {
   getScriptContent,
   updateScript,
   updateScriptContent,
 } from '@/features/scripts/api/scriptApi'
+import { useScriptPreviewStore } from '@/stores/scriptPreviewStore'
 import { type ScriptDto } from '@/types'
+import { getFileExtension } from '@/utils/fileUtils'
 
 import {
   getLanguageExtension,
   getLanguageLabel,
   getPreviewKind,
-  isPreviewableLanguage,
 } from '../utils/languages'
 import { ScriptPreview } from './ScriptPreview'
+import { ScriptViewerMenubar } from './ScriptViewerMenubar'
+
+const SUPPORTED_MODEL_FORMATS = ['obj', 'fbx', 'gltf', 'glb']
 
 // three/webgpu is heavy, so the scene preview loads only when actually shown.
 const ScriptScenePreview = lazy(() =>
@@ -61,11 +67,43 @@ export function ScriptEditor({ script, onScriptUpdated }: ScriptEditorProps) {
   const [description, setDescription] = useState(script.description ?? '')
   const [isSavingDescription, setIsSavingDescription] = useState(false)
 
-  const previewable = isPreviewableLanguage(script.language)
   const previewKind = getPreviewKind(script.language)
   // Shader previews are cheap + safe, so default them on; scene previews run JS,
   // so they stay opt-in (the toggle is still offered).
   const [showPreview, setShowPreview] = useState(previewKind === 'shader')
+
+  // Scene previews execute user JS, so they run only from an explicit snapshot
+  // (Run button / first reveal) — never on keystroke. Shader previews stay live.
+  const [runSource, setRunSource] = useState('')
+
+  const {
+    panelPosition,
+    setPanelPosition,
+    geometry,
+    setGeometry,
+    modelId,
+    setModelId,
+  } = useScriptPreviewStore()
+
+  // Library models for the "apply material to my model" picker.
+  const { data: pickerModels } = useQuery({
+    queryKey: ['models', 'script-preview-picker'],
+    queryFn: () => getModels({}),
+    staleTime: 60_000,
+  })
+  const modelOptions = useMemo(
+    () => (pickerModels ?? []).map(m => ({ id: m.id, name: m.name })),
+    [pickerModels]
+  )
+  const modelPreview = useMemo(() => {
+    if (modelId == null) return null
+    const model = (pickerModels ?? []).find(m => m.id === modelId)
+    const fileName = model?.files?.[0]?.originalFileName
+    if (!fileName) return null
+    const extension = getFileExtension(fileName).toLowerCase()
+    if (!SUPPORTED_MODEL_FORMATS.includes(extension)) return null
+    return { url: getModelFileUrl(String(modelId)), extension }
+  }, [pickerModels, modelId])
 
   // Avoids marking the editor dirty for the programmatic onChange that fires
   // when we first push loaded content into CodeMirror.
@@ -87,6 +125,7 @@ export function ScriptEditor({ script, onScriptUpdated }: ScriptEditorProps) {
     setDescription(script.description ?? '')
     setDescriptionDraft(script.description ?? '')
     setIsEditingDescription(false)
+    setRunSource('')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [script.id])
 
@@ -125,6 +164,20 @@ export function ScriptEditor({ script, onScriptUpdated }: ScriptEditorProps) {
     }
     setContent(value)
   }, [])
+
+  // Snapshot the current source into the scene preview (explicit Run).
+  const handleRun = useCallback(() => {
+    setRunSource(content)
+  }, [content])
+
+  const handleTogglePreview = () => {
+    const next = !showPreview
+    setShowPreview(next)
+    // First reveal of a scene preview gets an initial run so it isn't blank.
+    if (next && previewKind === 'scene' && !runSource.trim()) {
+      setRunSource(content)
+    }
+  }
 
   const handleSave = async () => {
     if (!isDirty || isSaving) return
@@ -270,33 +323,27 @@ export function ScriptEditor({ script, onScriptUpdated }: ScriptEditorProps) {
             />
           )}
         </div>
-
-        <div className="action-buttons">
-          {previewable && (
-            <Button
-              label={showPreview ? 'Hide Preview' : 'Show Preview'}
-              icon="pi pi-eye"
-              className="p-button-outlined"
-              onClick={() => setShowPreview(v => !v)}
-              data-testid="script-preview-button"
-            />
-          )}
-          <Button
-            label="Download"
-            icon="pi pi-download"
-            className="p-button-outlined"
-            onClick={handleDownload}
-            disabled={isLoading}
-          />
-          <Button
-            label={isSaving ? 'Saving...' : 'Save'}
-            icon="pi pi-save"
-            onClick={handleSave}
-            disabled={!isDirty || isSaving || isLoading}
-            data-testid="script-save"
-          />
-        </div>
       </div>
+
+      <ScriptViewerMenubar
+        previewKind={previewKind}
+        showPreview={showPreview}
+        onTogglePreview={handleTogglePreview}
+        onRun={handleRun}
+        runDisabled={isLoading || !content.trim()}
+        geometry={geometry}
+        onGeometryChange={setGeometry}
+        modelId={modelId}
+        models={modelOptions}
+        onModelChange={setModelId}
+        panelPosition={panelPosition}
+        onPanelPositionChange={setPanelPosition}
+        onDownload={handleDownload}
+        downloadDisabled={isLoading}
+        onSave={handleSave}
+        saveDisabled={!isDirty || isSaving || isLoading}
+        isSaving={isSaving}
+      />
 
       <div
         className="script-editor-description"
@@ -353,7 +400,9 @@ export function ScriptEditor({ script, onScriptUpdated }: ScriptEditorProps) {
 
       {error && <div className="script-editor-error">{error}</div>}
 
-      <div className={`script-editor-body${showPreview ? ' has-preview' : ''}`}>
+      <div
+        className={`script-editor-body${showPreview ? ` has-preview preview-${panelPosition}` : ''}`}
+      >
         {isLoading ? (
           <div className="script-editor-loading">
             <i className="pi pi-spin pi-spinner" />
@@ -383,8 +432,10 @@ export function ScriptEditor({ script, onScriptUpdated }: ScriptEditorProps) {
                     }
                   >
                     <ScriptScenePreview
-                      language={script.language}
-                      content={content}
+                      source={runSource}
+                      geometry={geometry}
+                      modelUrl={modelPreview?.url}
+                      modelExtension={modelPreview?.extension}
                     />
                   </Suspense>
                 ) : (
