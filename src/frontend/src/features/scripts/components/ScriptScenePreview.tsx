@@ -371,6 +371,9 @@ export function ScriptScenePreview({
             <Canvas
               className="script-preview-canvas"
               camera={{ position: [0, 0, 3.2], fov: 50 }}
+              // Pause = stop the render loop entirely (freezes rotation AND any
+              // time-driven TSL animation); "demand" still re-renders on orbit.
+              frameloop={paused ? 'demand' : 'always'}
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               gl={createWebGpuRenderer as any}
             >

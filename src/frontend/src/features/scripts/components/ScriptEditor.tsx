@@ -5,6 +5,7 @@ import { vscodeDark } from '@uiw/codemirror-theme-vscode'
 import CodeMirror from '@uiw/react-codemirror'
 import { Button } from 'primereact/button'
 import { InputText } from 'primereact/inputtext'
+import { Splitter, SplitterPanel } from 'primereact/splitter'
 import {
   lazy,
   Suspense,
@@ -15,7 +16,7 @@ import {
   useState,
 } from 'react'
 
-import { getModelFileUrl, getModels } from '@/features/models/api/modelApi'
+import { getModelById, getModels } from '@/features/models/api/modelApi'
 import {
   getScriptContent,
   updateScript,
@@ -23,17 +24,15 @@ import {
 } from '@/features/scripts/api/scriptApi'
 import { useScriptPreviewStore } from '@/stores/scriptPreviewStore'
 import { type ScriptDto } from '@/types'
-import { getFileExtension } from '@/utils/fileUtils'
 
 import {
   getLanguageExtension,
   getLanguageLabel,
   getPreviewKind,
 } from '../utils/languages'
+import { resolveModelPreview } from '../utils/resolveModelPreview'
 import { ScriptPreview } from './ScriptPreview'
 import { ScriptViewerMenubar } from './ScriptViewerMenubar'
-
-const SUPPORTED_MODEL_FORMATS = ['obj', 'fbx', 'gltf', 'glb']
 
 // three/webgpu is heavy, so the scene preview loads only when actually shown.
 const ScriptScenePreview = lazy(() =>
@@ -90,15 +89,18 @@ export function ScriptEditor({ script, onScriptUpdated }: ScriptEditorProps) {
     () => (pickerModels ?? []).map(m => ({ id: m.id, name: m.name })),
     [pickerModels]
   )
-  const modelPreview = useMemo(() => {
-    if (modelId == null) return null
-    const model = (pickerModels ?? []).find(m => m.id === modelId)
-    const fileName = model?.files?.[0]?.originalFileName
-    if (!fileName) return null
-    const extension = getFileExtension(fileName).toLowerCase()
-    if (!SUPPORTED_MODEL_FORMATS.includes(extension)) return null
-    return { url: getModelFileUrl(String(modelId)), extension }
-  }, [pickerModels, modelId])
+
+  // The list response doesn't carry per-file detail, so fetch the selected
+  // model to find its renderable file (the one the 3D viewer would load).
+  const { data: selectedModel } = useQuery({
+    queryKey: ['models', 'detail', modelId],
+    queryFn: () => getModelById(String(modelId)),
+    enabled: modelId != null,
+  })
+  const modelPreview = useMemo(
+    () => (modelId == null ? null : resolveModelPreview(selectedModel)),
+    [modelId, selectedModel]
+  )
 
   // Avoids marking the editor dirty for the programmatic onChange that fires
   // when we first push loaded content into CodeMirror.
@@ -253,6 +255,41 @@ export function ScriptEditor({ script, onScriptUpdated }: ScriptEditorProps) {
     URL.revokeObjectURL(url)
   }
 
+  const codeEditor = (
+    <div className="script-editor-code">
+      <CodeMirror
+        value={content}
+        theme={vscodeDark}
+        height="100%"
+        style={{ height: '100%' }}
+        extensions={languageExtensions}
+        onChange={handleChange}
+        data-testid="script-codemirror"
+      />
+    </div>
+  )
+
+  const previewPane =
+    previewKind === 'scene' ? (
+      <Suspense
+        fallback={
+          <div className="script-editor-loading">
+            <i className="pi pi-spin pi-spinner" /> Loading preview…
+          </div>
+        }
+      >
+        <ScriptScenePreview
+          source={runSource}
+          geometry={geometry}
+          modelUrl={modelPreview?.url}
+          modelExtension={modelPreview?.extension}
+          onRun={handleRun}
+        />
+      </Suspense>
+    ) : (
+      <ScriptPreview language={script.language} content={content} />
+    )
+
   return (
     <div
       className="script-editor script-editor-page"
@@ -396,51 +433,37 @@ export function ScriptEditor({ script, onScriptUpdated }: ScriptEditorProps) {
 
       {error && <div className="script-editor-error">{error}</div>}
 
-      <div
-        className={`script-editor-body${showPreview ? ` has-preview preview-${panelPosition}` : ''}`}
-      >
+      <div className="script-editor-body">
         {isLoading ? (
           <div className="script-editor-loading">
             <i className="pi pi-spin pi-spinner" />
             <span>Loading source...</span>
           </div>
+        ) : showPreview ? (
+          <Splitter
+            className="script-editor-splitter"
+            layout={panelPosition === 'bottom' ? 'vertical' : 'horizontal'}
+            // Persist the split per layout so each remembers its own ratio.
+            stateKey={`modelibr-script-split-${panelPosition}`}
+            stateStorage="local"
+          >
+            <SplitterPanel
+              size={55}
+              minSize={20}
+              className="script-editor-pane"
+            >
+              {codeEditor}
+            </SplitterPanel>
+            <SplitterPanel
+              size={45}
+              minSize={15}
+              className="script-editor-pane"
+            >
+              <div className="script-editor-preview">{previewPane}</div>
+            </SplitterPanel>
+          </Splitter>
         ) : (
-          <>
-            <div className="script-editor-code">
-              <CodeMirror
-                value={content}
-                theme={vscodeDark}
-                height="100%"
-                style={{ height: '100%' }}
-                extensions={languageExtensions}
-                onChange={handleChange}
-                data-testid="script-codemirror"
-              />
-            </div>
-            {showPreview && (
-              <div className="script-editor-preview">
-                {previewKind === 'scene' ? (
-                  <Suspense
-                    fallback={
-                      <div className="script-editor-loading">
-                        <i className="pi pi-spin pi-spinner" /> Loading preview…
-                      </div>
-                    }
-                  >
-                    <ScriptScenePreview
-                      source={runSource}
-                      geometry={geometry}
-                      modelUrl={modelPreview?.url}
-                      modelExtension={modelPreview?.extension}
-                      onRun={handleRun}
-                    />
-                  </Suspense>
-                ) : (
-                  <ScriptPreview language={script.language} content={content} />
-                )}
-              </div>
-            )}
-          </>
+          codeEditor
         )}
       </div>
 
