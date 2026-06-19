@@ -3550,8 +3550,10 @@ export const dynamicDemoHandlers = [
       scripts = scripts.filter(s => s.categoryId === Number(categoryId))
     }
     if (searchName) {
-      scripts = scripts.filter(s =>
-        (s.name ?? '').toLowerCase().includes(searchName)
+      scripts = scripts.filter(
+        s =>
+          (s.name ?? '').toLowerCase().includes(searchName) ||
+          (s.description ?? '').toLowerCase().includes(searchName)
       )
     }
     if (language) {

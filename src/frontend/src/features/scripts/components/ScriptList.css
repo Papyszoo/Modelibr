@@ -4,6 +4,9 @@
   height: 100%;
   position: relative;
   background: var(--surface-ground);
+  box-sizing: border-box;
+  padding: 1rem;
+  gap: 0.75rem;
 }
 
 .script-list-loading {
@@ -13,20 +16,84 @@
   height: 100%;
 }
 
-/* Body: category tree sidebar + scripts grid, mirroring the Models layout. */
+/* Body: category tree sidebar + scripts grid, framed as a card so the page
+   has clear margins (mirroring the Models layout). */
 .script-list-body {
   display: flex;
   flex: 1;
   min-height: 0;
+  border: 1px solid var(--surface-border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface-card);
 }
 
-.script-list-body .category-tree-panel {
-  width: 240px;
+/* Left category panel: a quiet sidebar with a "Manage categories" footer. */
+.script-category-sidebar {
+  width: 220px;
   flex-shrink: 0;
-  overflow: auto;
-  padding: 0.5rem;
-  background: var(--surface-card);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   border-right: 1px solid var(--surface-border);
+  background: var(--surface-card);
+}
+
+.script-category-sidebar .category-tree-panel {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  gap: 0.25rem;
+  padding: 0.5rem;
+  background: transparent;
+  border: none;
+}
+
+/* The "Uncategorized" row should read as part of the panel, not a button:
+   transparent until hovered/active, with tight padding. */
+.script-category-sidebar .category-tree-unassigned {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 0.3rem 0.5rem;
+}
+
+.script-category-sidebar .category-tree-unassigned:hover {
+  background: var(--surface-hover);
+}
+
+.script-category-sidebar .category-tree-unassigned.is-active {
+  background: rgba(var(--primary-color-rgb), 0.12);
+  border-color: rgba(var(--primary-color-rgb), 0.24);
+  color: var(--text-color);
+}
+
+.script-category-sidebar
+  .category-tree-unassigned.is-active
+  .category-tree-count {
+  color: var(--text-color-secondary);
+}
+
+.script-category-manage-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  border: none;
+  border-top: 1px solid var(--surface-border);
+  background: transparent;
+  color: var(--text-color-secondary);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.script-category-manage-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text-color);
 }
 
 .script-list-main {

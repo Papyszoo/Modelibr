@@ -46,7 +46,9 @@ internal class GetAllScriptsQueryHandler : IQueryHandler<GetAllScriptsQuery, Get
             {
                 var search = query.SearchName.Trim();
                 filtered = filtered.Where(s =>
-                    s.Name.Contains(search, StringComparison.OrdinalIgnoreCase));
+                    s.Name.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    (s.Description != null &&
+                     s.Description.Contains(search, StringComparison.OrdinalIgnoreCase)));
             }
             if (!string.IsNullOrWhiteSpace(query.Language))
                 filtered = filtered.Where(s =>
