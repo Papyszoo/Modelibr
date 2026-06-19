@@ -148,12 +148,17 @@ export class ScriptListPage {
         await editor.pressSequentially(text);
     }
 
-    /** Click Save in the editor and wait for the saved state. */
+    /** Click Save in the viewer menubar and wait for the saved state. */
     async saveEditor(): Promise<void> {
-        await this.page.locator('[data-testid="script-save"]').click();
-        await expect(
-            this.page.locator('[data-testid="script-save"]'),
-        ).toBeDisabled({ timeout: 10000 });
+        // Save is a menu item in the viewer menubar (not a standalone button).
+        const saveItem = this.page
+            .locator('[data-testid="script-viewer-menubar"] .p-menuitem-link')
+            .filter({ hasText: /Save|Saving/ });
+        await saveItem.click();
+        // It disables itself once there are no unsaved changes.
+        await expect(saveItem).toHaveAttribute("aria-disabled", "true", {
+            timeout: 10000,
+        });
     }
 
     async closeDialog(): Promise<void> {

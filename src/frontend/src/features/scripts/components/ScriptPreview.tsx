@@ -3,6 +3,7 @@ import './ScriptPreview.css'
 import { useEffect, useRef, useState } from 'react'
 
 import { isPreviewableLanguage } from '../utils/languages'
+import { PreviewLayoutToggle } from './PreviewLayoutToggle'
 
 interface ScriptPreviewProps {
   language: string
@@ -187,15 +188,18 @@ export function ScriptPreview({ language, content }: ScriptPreviewProps) {
     <div className="script-preview" data-testid="script-preview">
       <div className="script-preview-toolbar">
         <span className="script-preview-label">Shader preview</span>
-        <button
-          type="button"
-          className="script-preview-toggle"
-          onClick={() => setPaused(p => !p)}
-          data-testid="script-preview-toggle"
-        >
-          <i className={`pi ${paused ? 'pi-play' : 'pi-pause'}`} />
-          {paused ? 'Play' : 'Pause'}
-        </button>
+        <div className="script-preview-controls">
+          <button
+            type="button"
+            className="script-preview-toggle"
+            onClick={() => setPaused(p => !p)}
+            data-testid="script-preview-toggle"
+          >
+            <i className={`pi ${paused ? 'pi-play' : 'pi-pause'}`} />
+            {paused ? 'Play' : 'Pause'}
+          </button>
+          <PreviewLayoutToggle />
+        </div>
       </div>
       <div className="script-preview-canvas-wrap">
         <canvas ref={canvasRef} className="script-preview-canvas" />

@@ -50,6 +50,23 @@
   background: var(--surface-hover, #2a2a2a);
 }
 
+.script-preview-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.script-preview-backend {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-color-secondary, #9aa0a6);
+  border: 1px solid var(--surface-border, #333);
+  border-radius: 999px;
+  padding: 0.05rem 0.4rem;
+}
+
 .script-preview-canvas-wrap {
   position: relative;
   flex: 1;

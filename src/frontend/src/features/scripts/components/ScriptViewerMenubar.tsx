@@ -2,16 +2,12 @@
 // popover layout) so the script preview matches it.
 import '@/features/model-viewer/components/ViewerMenubar.css'
 
-import { Button } from 'primereact/button'
 import { Menubar } from 'primereact/menubar'
 import { type MenuItem } from 'primereact/menuitem'
 import { Slider } from 'primereact/slider'
 import { useMemo } from 'react'
 
-import {
-  type PreviewGeometry,
-  type PreviewPanelPosition,
-} from '@/stores/scriptPreviewStore'
+import { type PreviewGeometry } from '@/stores/scriptPreviewStore'
 import { useViewerSettingsStore } from '@/stores/viewerSettingsStore'
 
 import { type PreviewKind } from '../utils/languages'
@@ -25,15 +21,11 @@ interface ScriptViewerMenubarProps {
   previewKind: PreviewKind | null
   showPreview: boolean
   onTogglePreview: () => void
-  onRun: () => void
-  runDisabled: boolean
   geometry: PreviewGeometry
   onGeometryChange: (geometry: PreviewGeometry) => void
   modelId: number | null
   models: PreviewModelOption[]
   onModelChange: (modelId: number | null) => void
-  panelPosition: PreviewPanelPosition
-  onPanelPositionChange: (position: PreviewPanelPosition) => void
   onDownload: () => void
   downloadDisabled: boolean
   onSave: () => void
@@ -57,15 +49,11 @@ export function ScriptViewerMenubar({
   previewKind,
   showPreview,
   onTogglePreview,
-  onRun,
-  runDisabled,
   geometry,
   onGeometryChange,
   modelId,
   models,
   onModelChange,
-  panelPosition,
-  onPanelPositionChange,
   onDownload,
   downloadDisabled,
   onSave,
@@ -169,21 +157,26 @@ export function ScriptViewerMenubar({
       })
     }
 
+    if (previewKind) {
+      items.push({
+        label: showPreview ? 'Hide Preview' : 'Show Preview',
+        icon: 'pi pi-eye',
+        command: onTogglePreview,
+      })
+    }
+
     items.push({
-      label: 'Layout',
-      icon: 'pi pi-table',
-      items: [
-        {
-          label: 'Preview on the right',
-          icon: check(panelPosition === 'right', 'pi pi-arrow-right'),
-          command: () => onPanelPositionChange('right'),
-        },
-        {
-          label: 'Preview below',
-          icon: check(panelPosition === 'bottom', 'pi pi-arrow-down'),
-          command: () => onPanelPositionChange('bottom'),
-        },
-      ],
+      label: 'Download',
+      icon: 'pi pi-download',
+      disabled: downloadDisabled,
+      command: onDownload,
+    })
+
+    items.push({
+      label: isSaving ? 'Saving...' : 'Save',
+      icon: 'pi pi-save',
+      disabled: saveDisabled,
+      command: onSave,
     })
 
     return items
@@ -197,62 +190,26 @@ export function ScriptViewerMenubar({
     }
   }, [
     isScene,
+    previewKind,
+    showPreview,
     geometry,
     modelId,
     models,
-    panelPosition,
     settings,
+    isSaving,
+    downloadDisabled,
+    saveDisabled,
+    onTogglePreview,
     onGeometryChange,
     onModelChange,
-    onPanelPositionChange,
+    onDownload,
+    onSave,
     setSetting,
   ])
-
-  const end = (
-    <div className="script-viewer-actions">
-      {previewKind && (
-        <Button
-          label={showPreview ? 'Hide Preview' : 'Show Preview'}
-          icon="pi pi-eye"
-          className="p-button-text p-button-sm"
-          onClick={onTogglePreview}
-          data-testid="script-preview-button"
-        />
-      )}
-      {isScene && showPreview && (
-        <Button
-          label="Run"
-          icon="pi pi-play"
-          className="p-button-sm"
-          onClick={onRun}
-          disabled={runDisabled}
-          tooltip="Run the script in the preview"
-          tooltipOptions={{ position: 'bottom' }}
-          data-testid="script-run"
-        />
-      )}
-      <Button
-        label="Download"
-        icon="pi pi-download"
-        className="p-button-text p-button-sm"
-        onClick={onDownload}
-        disabled={downloadDisabled}
-      />
-      <Button
-        label={isSaving ? 'Saving...' : 'Save'}
-        icon="pi pi-save"
-        className="p-button-sm"
-        onClick={onSave}
-        disabled={saveDisabled}
-        data-testid="script-save"
-      />
-    </div>
-  )
 
   return (
     <Menubar
       model={menuItems}
-      end={end}
       className="viewer-menubar script-viewer-menubar"
       data-testid="script-viewer-menubar"
     />

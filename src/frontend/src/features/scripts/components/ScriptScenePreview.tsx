@@ -23,6 +23,7 @@ import { type PreviewGeometry } from '@/stores/scriptPreviewStore'
 import { useViewerSettingsStore } from '@/stores/viewerSettingsStore'
 
 import { transformUserSource } from '../utils/transformUserSource'
+import { PreviewLayoutToggle } from './PreviewLayoutToggle'
 
 // Merge core three with the WebGPU/node entry so user code can reach both node
 // materials (e.g. MeshBasicNodeMaterial) and classic ones via one `THREE`.
@@ -36,6 +37,31 @@ interface ScriptScenePreviewProps {
   /** When set, the material is applied to this model instead of a primitive. */
   modelUrl?: string
   modelExtension?: string
+  /** Re-snapshots the editor content into the preview. */
+  onRun: () => void
+}
+
+type Backend = 'WebGPU' | 'WebGL2'
+
+/**
+ * Reports whether the WebGPU renderer actually initialised a WebGPU backend or
+ * fell back to WebGL2, so the header can show which is live.
+ */
+function BackendReporter({ onBackend }: { onBackend: (b: Backend) => void }) {
+  const gl = useThree(s => s.gl)
+  useEffect(() => {
+    const backend = (
+      gl as unknown as {
+        backend?: { isWebGPUBackend?: boolean; constructor?: { name?: string } }
+      }
+    ).backend
+    const isWebGPU = !!(
+      backend &&
+      (backend.isWebGPUBackend || backend.constructor?.name === 'WebGPUBackend')
+    )
+    onBackend(isWebGPU ? 'WebGPU' : 'WebGL2')
+  }, [gl, onBackend])
+  return null
 }
 
 type Compiled =
@@ -281,8 +307,10 @@ export function ScriptScenePreview({
   geometry,
   modelUrl,
   modelExtension,
+  onRun,
 }: ScriptScenePreviewProps) {
   const [paused, setPaused] = useState(false)
+  const [backend, setBackend] = useState<Backend | null>(null)
 
   const compiled = useMemo(() => compileUserSource(source), [source])
 
@@ -298,16 +326,38 @@ export function ScriptScenePreview({
     <PreviewErrorBoundary>
       <div className="script-preview" data-testid="script-preview">
         <div className="script-preview-toolbar">
-          <span className="script-preview-label">Scene preview</span>
-          <button
-            type="button"
-            className="script-preview-toggle"
-            onClick={() => setPaused(p => !p)}
-            data-testid="script-preview-toggle"
-          >
-            <i className={`pi ${paused ? 'pi-play' : 'pi-pause'}`} />
-            {paused ? 'Play' : 'Pause'}
-          </button>
+          <div className="script-preview-controls">
+            <button
+              type="button"
+              className="script-preview-toggle"
+              onClick={onRun}
+              data-testid="script-run"
+            >
+              <i className="pi pi-play" />
+              Run
+            </button>
+            <button
+              type="button"
+              className="script-preview-toggle"
+              onClick={() => setPaused(p => !p)}
+              data-testid="script-preview-toggle"
+            >
+              <i className={`pi ${paused ? 'pi-play' : 'pi-pause'}`} />
+              {paused ? 'Play' : 'Pause'}
+            </button>
+          </div>
+          <div className="script-preview-controls">
+            {backend && (
+              <span
+                className="script-preview-backend"
+                data-testid="script-preview-backend"
+                title="Active render backend"
+              >
+                {backend}
+              </span>
+            )}
+            <PreviewLayoutToggle />
+          </div>
         </div>
         <div className="script-preview-canvas-wrap">
           {compiled.kind === 'error' ? (
@@ -324,6 +374,7 @@ export function ScriptScenePreview({
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               gl={createWebGpuRenderer as any}
             >
+              <BackendReporter onBackend={setBackend} />
               <SceneContents
                 compiled={compiled}
                 geometry={geometry}
