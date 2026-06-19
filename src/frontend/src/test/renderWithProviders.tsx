@@ -20,6 +20,20 @@ export function createTestQueryClient(): QueryClient {
   })
 }
 
+/**
+ * Wrapper component for `renderHook` — gives a hook a real React Query client so
+ * its query/mutation behaviour (pagination, cache keys, refetch) can be driven
+ * and asserted. Create the client once per test (in beforeEach) so cache state
+ * doesn't leak between cases.
+ */
+export function createQueryWrapper(queryClient: QueryClient) {
+  return function Wrapper({ children }: { children: ReactNode }) {
+    return (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    )
+  }
+}
+
 interface ProvidersOptions extends Omit<RenderOptions, 'wrapper'> {
   queryClient?: QueryClient
 }
