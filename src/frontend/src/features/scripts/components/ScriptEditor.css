@@ -24,6 +24,36 @@
   align-items: center;
   gap: 0.5rem;
   min-width: 0;
+  flex: 1;
+}
+
+/* Description shown inline in the header, after the name + badges. */
+.script-editor-desc-inline {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.script-editor-desc-inline .script-description-display {
+  width: auto;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0.25rem 0.4rem;
+  border-radius: 4px;
+}
+
+.script-editor-desc-inline .script-description-display:hover {
+  background: var(--surface-hover);
+}
+
+.script-desc-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.85rem;
 }
 
 .script-editor-title h2 {

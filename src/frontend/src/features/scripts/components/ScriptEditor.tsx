@@ -5,7 +5,6 @@ import { vscodeDark } from '@uiw/codemirror-theme-vscode'
 import CodeMirror from '@uiw/react-codemirror'
 import { Button } from 'primereact/button'
 import { InputText } from 'primereact/inputtext'
-import { InputTextarea } from 'primereact/inputtextarea'
 import {
   lazy,
   Suspense,
@@ -76,14 +75,10 @@ export function ScriptEditor({ script, onScriptUpdated }: ScriptEditorProps) {
   // (Run button / first reveal) — never on keystroke. Shader previews stay live.
   const [runSource, setRunSource] = useState('')
 
-  const {
-    panelPosition,
-    setPanelPosition,
-    geometry,
-    setGeometry,
-    modelId,
-    setModelId,
-  } = useScriptPreviewStore()
+  // panelPosition drives the body layout; the toggle itself lives in the
+  // preview header (PreviewLayoutToggle reads/writes the store directly).
+  const { panelPosition, geometry, setGeometry, modelId, setModelId } =
+    useScriptPreviewStore()
 
   // Library models for the "apply material to my model" picker.
   const { data: pickerModels } = useQuery({
@@ -322,6 +317,64 @@ export function ScriptEditor({ script, onScriptUpdated }: ScriptEditorProps) {
               data-testid="script-name-edit"
             />
           )}
+
+          <div
+            className="script-editor-desc-inline"
+            data-testid="script-description"
+          >
+            {isEditingDescription ? (
+              <>
+                <InputText
+                  value={descriptionDraft}
+                  onChange={e => setDescriptionDraft(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') handleSaveDescription()
+                    if (e.key === 'Escape') {
+                      setDescriptionDraft(description)
+                      setIsEditingDescription(false)
+                    }
+                  }}
+                  autoFocus
+                  placeholder="Describe what this script does…"
+                  className="script-desc-input"
+                  data-testid="script-description-input"
+                />
+                <Button
+                  icon="pi pi-check"
+                  className="p-button-text p-button-rounded"
+                  onClick={handleSaveDescription}
+                  disabled={isSavingDescription}
+                  tooltip="Save description"
+                  data-testid="script-description-save"
+                />
+                <Button
+                  icon="pi pi-times"
+                  className="p-button-text p-button-rounded"
+                  onClick={() => {
+                    setDescriptionDraft(description)
+                    setIsEditingDescription(false)
+                  }}
+                  disabled={isSavingDescription}
+                  tooltip="Cancel"
+                />
+              </>
+            ) : (
+              <button
+                type="button"
+                className="script-description-display"
+                onClick={() => setIsEditingDescription(true)}
+                title="Edit description"
+              >
+                {description ? (
+                  <span>{description}</span>
+                ) : (
+                  <span className="script-description-empty">
+                    <i className="pi pi-pencil" /> Add a description…
+                  </span>
+                )}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -329,74 +382,17 @@ export function ScriptEditor({ script, onScriptUpdated }: ScriptEditorProps) {
         previewKind={previewKind}
         showPreview={showPreview}
         onTogglePreview={handleTogglePreview}
-        onRun={handleRun}
-        runDisabled={isLoading || !content.trim()}
         geometry={geometry}
         onGeometryChange={setGeometry}
         modelId={modelId}
         models={modelOptions}
         onModelChange={setModelId}
-        panelPosition={panelPosition}
-        onPanelPositionChange={setPanelPosition}
         onDownload={handleDownload}
         downloadDisabled={isLoading}
         onSave={handleSave}
         saveDisabled={!isDirty || isSaving || isLoading}
         isSaving={isSaving}
       />
-
-      <div
-        className="script-editor-description"
-        data-testid="script-description"
-      >
-        {isEditingDescription ? (
-          <div className="script-description-edit">
-            <InputTextarea
-              value={descriptionDraft}
-              onChange={e => setDescriptionDraft(e.target.value)}
-              rows={2}
-              autoResize
-              placeholder="Describe what this script does…"
-              data-testid="script-description-input"
-            />
-            <div className="script-description-actions">
-              <Button
-                icon="pi pi-check"
-                className="p-button-text p-button-rounded"
-                onClick={handleSaveDescription}
-                disabled={isSavingDescription}
-                tooltip="Save description"
-                data-testid="script-description-save"
-              />
-              <Button
-                icon="pi pi-times"
-                className="p-button-text p-button-rounded"
-                onClick={() => {
-                  setDescriptionDraft(description)
-                  setIsEditingDescription(false)
-                }}
-                disabled={isSavingDescription}
-                tooltip="Cancel"
-              />
-            </div>
-          </div>
-        ) : (
-          <button
-            type="button"
-            className="script-description-display"
-            onClick={() => setIsEditingDescription(true)}
-            title="Edit description"
-          >
-            {description ? (
-              <span>{description}</span>
-            ) : (
-              <span className="script-description-empty">
-                <i className="pi pi-pencil" /> Add a description…
-              </span>
-            )}
-          </button>
-        )}
-      </div>
 
       {error && <div className="script-editor-error">{error}</div>}
 
@@ -436,6 +432,7 @@ export function ScriptEditor({ script, onScriptUpdated }: ScriptEditorProps) {
                       geometry={geometry}
                       modelUrl={modelPreview?.url}
                       modelExtension={modelPreview?.extension}
+                      onRun={handleRun}
                     />
                   </Suspense>
                 ) : (
