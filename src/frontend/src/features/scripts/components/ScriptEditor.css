@@ -137,6 +137,36 @@
   min-height: 0;
 }
 
+/* Preview below the editor instead of to the right. */
+.script-editor-body.preview-bottom {
+  flex-direction: column;
+}
+
+.script-editor-body.preview-bottom.has-preview .script-editor-code {
+  flex: 1 1 55%;
+  border-right: none;
+  border-bottom: 1px solid var(--surface-border);
+}
+
+.script-editor-body.preview-bottom .script-editor-preview {
+  width: 100%;
+  height: auto;
+}
+
+/* Viewer menubar row (reuses .viewer-menubar chrome from the model page). */
+.script-viewer-menubar.viewer-menubar {
+  border-radius: 0;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+}
+
+.script-viewer-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .script-editor-body .cm-editor {
   font-size: 0.85rem;
   height: 100%;
