@@ -11,7 +11,12 @@ vi.mock('../logger.js', () => ({
   default: { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn() },
 }))
 
-const jobLogger = { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn() }
+const jobLogger = {
+  info: vi.fn(),
+  warn: vi.fn(),
+  debug: vi.fn(),
+  error: vi.fn(),
+}
 
 describe('extractTextureDimensions', () => {
   let tmpDir
