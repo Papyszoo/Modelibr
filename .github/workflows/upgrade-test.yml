@@ -1,0 +1,368 @@
+name: Upgrade Test
+
+# Proves a real version-to-version upgrade keeps user data. Two complementary jobs:
+#
+#   reinstall   — installs the FROM release, seeds one of every asset type, then
+#                 installs the TO release *over* it (data folder lives in the user
+#                 profile, so it persists) and verifies everything survived. Covers
+#                 all 3 OS and is the only coverage for the Linux .deb and the
+#                 macOS data path.
+#
+#   self-update — exercises the real in-app electron-updater: installs FROM, seeds,
+#                 then drives the app's own "download + install" over CDP and
+#                 confirms the relaunched build is the new version with data intact.
+#                 Windows + Linux only — macOS can't self-update while the app is
+#                 unsigned (Squirrel.Mac requires code signing; planned for 1.0).
+#
+# Installers come straight from GitHub Releases — no build step. Defaults to
+# "v0.1.0 → latest published release".
+on:
+  workflow_dispatch:
+    inputs:
+      from_tag:
+        # NOTE: move this to v0.2.1 after a few releases so the self-update job
+        # exercises the opt-in updater rather than v0.1.0's old forced one.
+        description: "Release tag to upgrade FROM"
+        required: false
+        default: "v0.1.0"
+        type: string
+      to_tag:
+        description: "Release tag to upgrade TO (blank = latest published release)"
+        required: false
+        type: string
+  # Nightly safety net so a data-losing upgrade is caught within a day of release.
+  schedule:
+    - cron: "0 7 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: upgrade-test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reinstall:
+    name: Reinstall ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-latest
+          - name: macOS
+            os: macos-14
+          - name: Linux
+            os: ubuntu-latest
+    env:
+      MODELIBR_API_BASE: http://127.0.0.1:3010/api
+    steps:
+      - name: Checkout repo (seed/verify scripts)
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+
+      - name: Resolve FROM / TO release tags
+        id: tags
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_FROM: ${{ inputs.from_tag }}
+          INPUT_TO: ${{ inputs.to_tag }}
+        run: |
+          set -euo pipefail
+          from="${INPUT_FROM:-v0.1.0}"
+          to="${INPUT_TO:-}"
+          if [ -z "$to" ]; then
+            to=$(gh release list --exclude-drafts --exclude-pre-releases --limit 1 \
+              --json tagName --jq '.[0].tagName // empty')
+          fi
+          [ -n "$to" ] || { echo "Could not resolve a TO release tag"; exit 1; }
+          if [ "$from" = "$to" ]; then
+            echo "FROM ($from) equals TO ($to) — nothing to upgrade."; exit 1
+          fi
+          echo "Upgrading: $from  ->  $to"
+          echo "from=$from" >> "$GITHUB_OUTPUT"
+          echo "to=$to" >> "$GITHUB_OUTPUT"
+
+      - name: Download FROM and TO installers
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          case "${{ runner.os }}" in
+            Linux)   pat='*linux-amd64.deb' ;;
+            macOS)   pat='*macos-arm64.dmg' ;;
+            Windows) pat='*windows-x64.exe' ;;
+          esac
+          mkdir -p old-installer new-installer
+          gh release download "${{ steps.tags.outputs.from }}" --dir old-installer --pattern "$pat"
+          gh release download "${{ steps.tags.outputs.to }}"   --dir new-installer --pattern "$pat"
+          echo "── FROM ──"; ls -la old-installer
+          echo "── TO ──";   ls -la new-installer
+
+      - name: Reinstall scenario (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update && sudo apt-get install -y xvfb >/dev/null
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          Xvfb :99 -screen 0 1280x1024x24 >/tmp/xvfb.log 2>&1 &
+          export DISPLAY=:99
+
+          install_deb() { sudo dpkg -i "$1" || sudo apt-get install -f -y; }
+          start_app() {
+            local bin
+            bin=$(find /opt -type f -executable \( -name 'modelibr*' -o -name 'Modelibr*' \) 2>/dev/null | head -n1)
+            [ -n "$bin" ] || { echo "binary not found under /opt"; ls -la /opt || true; exit 1; }
+            nohup "$bin" --no-sandbox >/tmp/modelibr.log 2>&1 & disown || true
+          }
+          wait_ready() {
+            for i in $(seq 1 60); do curl -sf http://127.0.0.1:3010 -o /dev/null && return 0; sleep 3; done
+            echo "app not ready"; tail -n 60 /tmp/modelibr.log || true; exit 1
+          }
+          stop_app() { pkill -f -i modelibr || true; sleep 5; }
+
+          OLD=$(ls old-installer/*.deb | grep -iv client | head -n1)
+          NEW=$(ls new-installer/*.deb | grep -iv client | head -n1)
+          echo "OLD=$OLD  NEW=$NEW"
+
+          echo "::group::Install FROM + seed"; install_deb "$OLD"; start_app; wait_ready
+          node tests/upgrade/seed-assets.mjs; stop_app; echo "::endgroup::"
+          echo "::group::Install TO (upgrade) + verify"; install_deb "$NEW"; start_app; wait_ready
+          node tests/upgrade/verify-assets.mjs; stop_app; echo "::endgroup::"
+
+      - name: Reinstall scenario (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          install_dmg() {
+            hdiutil attach "$1" -mountpoint /Volumes/ModelibrUp -nobrowse -quiet
+            rm -rf /Applications/Modelibr.app
+            cp -R "/Volumes/ModelibrUp/Modelibr.app" /Applications/
+            hdiutil detach /Volumes/ModelibrUp -quiet
+            sudo xattr -dr com.apple.quarantine /Applications/Modelibr.app 2>/dev/null || true
+          }
+          start_app() { nohup "/Applications/Modelibr.app/Contents/MacOS/Modelibr" >/tmp/modelibr.log 2>&1 & disown || true; }
+          wait_ready() {
+            for i in $(seq 1 60); do curl -sf http://127.0.0.1:3010 -o /dev/null && return 0; sleep 3; done
+            echo "app not ready"; tail -n 60 /tmp/modelibr.log || true; exit 1
+          }
+          stop_app() { osascript -e 'quit app "Modelibr"' || true; sleep 3; pkill -f Modelibr || true; sleep 3; }
+
+          OLD=$(ls old-installer/*.dmg | grep -iv client | head -n1)
+          NEW=$(ls new-installer/*.dmg | grep -iv client | head -n1)
+          echo "OLD=$OLD  NEW=$NEW"
+
+          echo "::group::Install FROM + seed"; install_dmg "$OLD"; start_app; wait_ready
+          node tests/upgrade/seed-assets.mjs; stop_app; echo "::endgroup::"
+          echo "::group::Install TO (upgrade) + verify"; install_dmg "$NEW"; start_app; wait_ready
+          node tests/upgrade/verify-assets.mjs; stop_app; echo "::endgroup::"
+
+      - name: Reinstall scenario (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $old = Get-ChildItem old-installer/*.exe | Where-Object { $_.Name -notlike '*Client*' } | Select-Object -First 1
+          $new = Get-ChildItem new-installer/*.exe | Where-Object { $_.Name -notlike '*Client*' } | Select-Object -First 1
+          if (-not $old) { throw "FROM installer not found" }
+          if (-not $new) { throw "TO installer not found" }
+          Write-Host "OLD=$($old.FullName)  NEW=$($new.FullName)"
+
+          function Install-App($installer) { Start-Process -Wait -FilePath $installer.FullName -ArgumentList '/S' }
+          function Start-App {
+            $exe = @("$env:LOCALAPPDATA\Programs\Modelibr\Modelibr.exe", "$env:PROGRAMFILES\Modelibr\Modelibr.exe") |
+              Where-Object { Test-Path $_ } | Select-Object -First 1
+            if (-not $exe) { throw "Modelibr.exe not found" }
+            Start-Process -FilePath $exe
+          }
+          function Wait-Ready {
+            for ($i = 0; $i -lt 60; $i++) {
+              try { Invoke-WebRequest -UseBasicParsing http://127.0.0.1:3010 -TimeoutSec 5 | Out-Null; return } catch { Start-Sleep 3 }
+            }
+            throw "app not ready"
+          }
+          function Stop-App { Stop-Process -Name Modelibr -Force -ErrorAction SilentlyContinue; Start-Sleep 5 }
+
+          Install-App $old; Start-App; Wait-Ready
+          node tests/upgrade/seed-assets.mjs; if ($LASTEXITCODE -ne 0) { throw "seed failed" }; Stop-App
+          Install-App $new; Start-App; Wait-Ready
+          node tests/upgrade/verify-assets.mjs; if ($LASTEXITCODE -ne 0) { throw "verify failed" }; Stop-App
+
+      - name: Upload manifest + logs
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: reinstall-${{ matrix.name }}
+          path: |
+            upgrade-manifest.json
+            /tmp/modelibr.log
+          if-no-files-found: ignore
+
+  self-update:
+    name: Self-update ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-latest
+          - name: Linux
+            os: ubuntu-latest
+    env:
+      MODELIBR_API_BASE: http://127.0.0.1:3010/api
+    steps:
+      - name: Checkout repo (seed/verify/driver scripts)
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+
+      - name: Install CDP driver dependency
+        run: npm install --no-save playwright-core
+
+      - name: Resolve FROM tag (and confirm a newer release exists)
+        id: tags
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_FROM: ${{ inputs.from_tag }}
+          INPUT_TO: ${{ inputs.to_tag }}
+        run: |
+          set -euo pipefail
+          from="${INPUT_FROM:-v0.1.0}"
+          to="${INPUT_TO:-}"
+          if [ -z "$to" ]; then
+            to=$(gh release list --exclude-drafts --exclude-pre-releases --limit 1 \
+              --json tagName --jq '.[0].tagName // empty')
+          fi
+          [ -n "$to" ] || { echo "Could not resolve a newer release"; exit 1; }
+          if [ "$from" = "$to" ]; then
+            echo "FROM ($from) equals latest ($to) — nothing to self-update to."; exit 1
+          fi
+          echo "Self-update: $from  ->  $to (updater picks latest from the feed)"
+          echo "from=$from" >> "$GITHUB_OUTPUT"
+
+      - name: Download FROM installer
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Linux self-update needs the AppImage (the .deb is dpkg-managed and
+          # cannot self-update); Windows uses the NSIS .exe.
+          case "${{ runner.os }}" in
+            Linux)   pat='*linux-x86_64.AppImage' ;;
+            Windows) pat='*windows-x64.exe' ;;
+          esac
+          mkdir -p old-installer
+          gh release download "${{ steps.tags.outputs.from }}" --dir old-installer --pattern "$pat"
+          ls -la old-installer
+
+      - name: Self-update scenario (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          # libfuse2 lets the AppImage run normally so it sets $APPIMAGE — which
+          # electron-updater needs to know which file to replace on self-update.
+          sudo apt-get install -y xvfb libfuse2 >/dev/null
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          Xvfb :99 -screen 0 1280x1024x24 >/tmp/xvfb.log 2>&1 &
+          export DISPLAY=:99
+
+          APP=$(readlink -f "$(ls old-installer/*.AppImage | grep -iv client | head -n1)")
+          chmod +x "$APP"
+          echo "FROM AppImage: $APP"
+
+          start_app() { nohup "$APP" --no-sandbox --remote-debugging-port=9222 >>/tmp/modelibr.log 2>&1 & disown || true; }
+          http_code() { curl -s -o /dev/null -w "%{http_code}" "$1"; }
+          wait_ready() {
+            for i in $(seq 1 80); do curl -sf http://127.0.0.1:3010 -o /dev/null && return 0; sleep 3; done
+            return 1
+          }
+
+          echo "::group::Launch FROM + seed"
+          start_app
+          wait_ready || { echo "FROM app not ready"; tail -n 80 /tmp/modelibr.log || true; exit 1; }
+          echo "/api/scripts on FROM (expect 404): $(http_code http://127.0.0.1:3010/api/scripts)"
+          node tests/upgrade/seed-assets.mjs
+          echo "::endgroup::"
+
+          echo "::group::Drive the in-app updater (download → install → relaunch)"
+          node tests/upgrade/drive-update.mjs
+          echo "::endgroup::"
+
+          echo "::group::Verify the relaunched build is the NEW version, data intact"
+          sleep 15  # quitAndInstall relaunches; give it a moment
+          if ! wait_ready; then
+            echo "did not auto-relaunch — launching the (updated) AppImage"
+            start_app; wait_ready || { echo "not ready after update"; tail -n 80 /tmp/modelibr.log || true; exit 1; }
+          fi
+          code=$(http_code http://127.0.0.1:3010/api/scripts)
+          echo "/api/scripts after self-update (expect 200): $code"
+          test "$code" = "200" || { echo "self-update did NOT apply (scripts=$code)"; tail -n 80 /tmp/modelibr.log || true; exit 1; }
+          node tests/upgrade/verify-assets.mjs
+          pkill -f -i modelibr || true
+          echo "::endgroup::"
+
+      - name: Self-update scenario (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $old = Get-ChildItem old-installer/*.exe | Where-Object { $_.Name -notlike '*Client*' } | Select-Object -First 1
+          if (-not $old) { throw "FROM installer not found" }
+          Start-Process -Wait -FilePath $old.FullName -ArgumentList '/S'
+
+          function Exe { @("$env:LOCALAPPDATA\Programs\Modelibr\Modelibr.exe", "$env:PROGRAMFILES\Modelibr\Modelibr.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1 }
+          function Start-App { $e = Exe; if (-not $e) { throw "Modelibr.exe not found" }; Start-Process -FilePath $e -ArgumentList '--remote-debugging-port=9222' }
+          function Wait-Ready {
+            for ($i = 0; $i -lt 90; $i++) { try { Invoke-WebRequest -UseBasicParsing http://127.0.0.1:3010 -TimeoutSec 5 | Out-Null; return $true } catch { Start-Sleep 3 } }
+            return $false
+          }
+          function HttpCode($u) { try { [int](Invoke-WebRequest -UseBasicParsing $u -TimeoutSec 5).StatusCode } catch { if ($_.Exception.Response) { [int]$_.Exception.Response.StatusCode } else { 0 } } }
+
+          Start-App
+          if (-not (Wait-Ready)) { throw "FROM app not ready" }
+          Write-Host "/api/scripts on FROM (expect 404): $(HttpCode 'http://127.0.0.1:3010/api/scripts')"
+          node tests/upgrade/seed-assets.mjs; if ($LASTEXITCODE -ne 0) { throw "seed failed" }
+
+          node tests/upgrade/drive-update.mjs; if ($LASTEXITCODE -ne 0) { throw "drive-update failed" }
+
+          # quitAndInstall runs the NSIS update silently and relaunches the new version.
+          Start-Sleep 25
+          if (-not (Wait-Ready)) {
+            Write-Host "did not auto-relaunch — starting the (updated) app"
+            Start-App
+            if (-not (Wait-Ready)) { throw "app not ready after update" }
+          }
+          $code = HttpCode 'http://127.0.0.1:3010/api/scripts'
+          Write-Host "/api/scripts after self-update (expect 200): $code"
+          if ($code -ne 200) { throw "self-update did NOT apply (scripts=$code)" }
+          node tests/upgrade/verify-assets.mjs; if ($LASTEXITCODE -ne 0) { throw "verify failed" }
+          Stop-Process -Name Modelibr -Force -ErrorAction SilentlyContinue
+
+      - name: Upload manifest + logs
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: self-update-${{ matrix.name }}
+          path: |
+            upgrade-manifest.json
+            /tmp/modelibr.log
+          if-no-files-found: ignore
