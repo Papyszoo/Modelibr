@@ -1,27 +1,38 @@
-import { app, shell } from 'electron'
-import electronUpdater from 'electron-updater'
-
-const { autoUpdater } = electronUpdater
-
 const REPO = 'Papyszoo/Modelibr'
 const RELEASES_PAGE_URL = `https://github.com/${REPO}/releases`
 
-// Wraps electron-updater so the host can check GitHub Releases, download a newer
-// version in the background, and install it on quit. The "update action" becomes
-// a real one-click "Restart & Install" once a build is downloaded.
+// Wraps electron-updater so the host can check GitHub Releases for a newer build
+// and surface it in the tray. Updates are *opt-in*: we keep checking on launch,
+// but nothing downloads or installs until the user clicks — first "Download
+// update", then "Restart & Install". A user may have good reasons to stay on a
+// stable build, so we never download in the background or install on quit.
 //
 // Note: macOS auto-install requires the app to be code-signed (Squirrel.Mac
 // verifies the signature). On unsigned macOS builds the download/install step
 // errors; we catch it and fall back to opening the releases page so the user can
 // update manually. Windows (NSIS) and Linux (AppImage) update without signing.
+//
+// electron is injected (autoUpdater / currentVersion / isPackaged / openExternal)
+// so this module stays free of the `electron` import and is unit-testable under
+// `node --test`, like the other desktop modules.
 export class UpdateManager {
-  constructor({ log = console.log, onChange } = {}) {
+  constructor({
+    autoUpdater,
+    currentVersion = '0.0.0',
+    isPackaged = true,
+    openExternal = () => {},
+    log = console.log,
+    onChange,
+  } = {}) {
+    this.autoUpdater = autoUpdater
+    this.isPackaged = isPackaged
+    this.openExternal = openExternal
     this.log = log
     this.onChange = onChange
     this.state = {
-      // idle | checking | downloading | downloaded | up-to-date | error
+      // idle | checking | available | downloading | downloaded | up-to-date | error
       status: 'idle',
-      currentVersion: app.getVersion(),
+      currentVersion,
       latestVersion: null,
       percent: 0,
       releaseUrl: RELEASES_PAGE_URL,
@@ -45,34 +56,36 @@ export class UpdateManager {
     }
     this._wired = true
 
-    autoUpdater.autoDownload = true
-    autoUpdater.autoInstallOnAppQuit = true
-    autoUpdater.logger = {
+    // Opt-in: don't pull a build down or slip it in on quit behind the user.
+    this.autoUpdater.autoDownload = false
+    this.autoUpdater.autoInstallOnAppQuit = false
+    this.autoUpdater.logger = {
       info: msg => this.log('[ModelibrDesktop][update]', msg),
       warn: msg => this.log('[ModelibrDesktop][update][warn]', msg),
       error: msg => this.log('[ModelibrDesktop][update][error]', msg),
       debug: () => {},
     }
 
-    autoUpdater.on('checking-for-update', () =>
+    this.autoUpdater.on('checking-for-update', () =>
       this.setState({ status: 'checking', error: null })
     )
-    autoUpdater.on('update-available', info =>
-      this.setState({ status: 'downloading', latestVersion: info?.version ?? null, percent: 0 })
+    // A newer build exists but we DON'T download it — wait for the user.
+    this.autoUpdater.on('update-available', info =>
+      this.setState({ status: 'available', latestVersion: info?.version ?? null, percent: 0 })
     )
-    autoUpdater.on('update-not-available', info =>
+    this.autoUpdater.on('update-not-available', info =>
       this.setState({
         status: 'up-to-date',
         latestVersion: info?.version ?? this.state.currentVersion,
       })
     )
-    autoUpdater.on('download-progress', progress =>
+    this.autoUpdater.on('download-progress', progress =>
       this.setState({ status: 'downloading', percent: Math.round(progress?.percent ?? 0) })
     )
-    autoUpdater.on('update-downloaded', info =>
+    this.autoUpdater.on('update-downloaded', info =>
       this.setState({ status: 'downloaded', latestVersion: info?.version ?? null, percent: 100 })
     )
-    autoUpdater.on('error', error => {
+    this.autoUpdater.on('error', error => {
       const message = error instanceof Error ? error.message : String(error)
       this.log('[ModelibrDesktop][update] Error', { error: message })
       this.setState({ status: 'error', error: message })
@@ -81,7 +94,7 @@ export class UpdateManager {
 
   async check() {
     // electron-updater only works on packaged builds with update metadata.
-    if (!app.isPackaged) {
+    if (!this.isPackaged) {
       this.setState({ status: 'up-to-date' })
       return
     }
@@ -90,7 +103,7 @@ export class UpdateManager {
     this.setState({ status: 'checking', error: null })
 
     try {
-      await autoUpdater.checkForUpdates()
+      await this.autoUpdater.checkForUpdates()
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       this.log('[ModelibrDesktop][update] Check failed', { error: message })
@@ -98,12 +111,28 @@ export class UpdateManager {
     }
   }
 
-  // The "Update" button: install a downloaded build, otherwise open the releases
-  // page (covers unsigned macOS and the "not downloaded yet" case).
+  // The "Download update" button: start pulling the available build down. On
+  // unsigned macOS the download can error — fall back to the releases page so the
+  // user can grab the installer manually.
+  async download() {
+    this._wire()
+    this.setState({ status: 'downloading', percent: 0, error: null })
+    try {
+      await this.autoUpdater.downloadUpdate()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      this.log('[ModelibrDesktop][update] Download failed', { error: message })
+      this.setState({ status: 'error', error: message })
+      this.openExternal(this.releaseUrl)
+    }
+  }
+
+  // The "Restart & Install" button: install a downloaded build, otherwise open
+  // the releases page (covers unsigned macOS and the "not downloaded yet" case).
   install() {
     if (this.state.status === 'downloaded') {
       try {
-        autoUpdater.quitAndInstall()
+        this.autoUpdater.quitAndInstall()
         return
       } catch (error) {
         this.log('[ModelibrDesktop][update] quitAndInstall failed', {
@@ -112,6 +141,6 @@ export class UpdateManager {
       }
     }
 
-    void shell.openExternal(this.releaseUrl)
+    this.openExternal(this.releaseUrl)
   }
 }
