@@ -155,8 +155,10 @@ export class ScriptListPage {
             .locator('[data-testid="script-viewer-menubar"] .p-menuitem-link')
             .filter({ hasText: /Save|Saving/ });
         await saveItem.click();
-        // It disables itself once there are no unsaved changes.
-        await expect(saveItem).toHaveAttribute("aria-disabled", "true", {
+        // It disables itself once there are no unsaved changes. PrimeReact marks
+        // a disabled menubar item with the `p-disabled` class (not an
+        // `aria-disabled` attribute), so assert on the class it actually emits.
+        await expect(saveItem).toHaveClass(/p-disabled/, {
             timeout: 10000,
         });
     }
