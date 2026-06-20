@@ -725,6 +725,9 @@ export const dynamicDemoHandlers = [
       })
     }
 
+    // Unlike the backend (which filters `!IsDeleted`), the demo stores hard-
+    // delete records from IndexedDB, so getAll() never returns deleted assets
+    // and no soft-delete filter is needed here.
     const models = await getAll('models')
     pushGroup(
       'model',

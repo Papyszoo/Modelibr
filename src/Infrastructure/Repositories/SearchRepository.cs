@@ -97,6 +97,10 @@ internal sealed class SearchRepository : ISearchRepository
         IQueryable<SearchResultItem> query,
         CancellationToken cancellationToken)
     {
+        // Deliberately a separate COUNT before the capped fetch: it keeps
+        // totalCount exact so the palette can show "N total" when results are
+        // truncated. Two round-trips per matched type is fine for a local-first,
+        // single-user, debounced search; we don't trade the exact count away.
         var total = await query.CountAsync(cancellationToken);
         if (total == 0)
         {
