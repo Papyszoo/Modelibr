@@ -10,6 +10,8 @@ import {
   type DemoEnvironmentMap,
   type DemoModel,
   type DemoModelVersion,
+  type DemoScript,
+  type DemoScriptTemplate,
   type DemoSound,
   type DemoSprite,
   type DemoTextureSet,
@@ -62,6 +64,7 @@ type DemoCategoryStoreName =
   | 'environmentMapCategories'
   | 'spriteCategories'
   | 'soundCategories'
+  | 'scriptCategories'
 
 type DemoCategorizedAssetStoreName =
   | 'models'
@@ -69,6 +72,7 @@ type DemoCategorizedAssetStoreName =
   | 'environmentMaps'
   | 'sprites'
   | 'sounds'
+  | 'scripts'
 
 const toCategoryDto = (category: DemoCategory, categories: DemoCategory[]) => ({
   id: category.id,
@@ -77,6 +81,169 @@ const toCategoryDto = (category: DemoCategory, categories: DemoCategory[]) => ({
   parentId: category.parentId ?? null,
   path: buildCategoryPath(category, categories),
 })
+
+// Mirrors the backend FileType extension→language mapping for demo uploads.
+const DEMO_SCRIPT_LANGUAGES: Record<string, string> = {
+  js: 'javascript',
+  jsx: 'javascript',
+  mjs: 'javascript',
+  cjs: 'javascript',
+  ts: 'typescript',
+  tsx: 'typescript',
+  py: 'python',
+  cs: 'csharp',
+  cpp: 'cpp',
+  cc: 'cpp',
+  cxx: 'cpp',
+  c: 'cpp',
+  h: 'cpp',
+  hpp: 'cpp',
+  lua: 'lua',
+  java: 'java',
+  go: 'go',
+  rs: 'rust',
+  rb: 'ruby',
+  php: 'php',
+  sh: 'shell',
+  sql: 'sql',
+  json: 'json',
+  yaml: 'yaml',
+  yml: 'yaml',
+  xml: 'xml',
+  glsl: 'glsl',
+  vert: 'glsl',
+  frag: 'glsl',
+  hlsl: 'hlsl',
+  shader: 'hlsl',
+  gd: 'gdscript',
+}
+
+function detectDemoScriptLanguage(fileName: string): string {
+  const ext = fileName.split('.').pop()?.toLowerCase() ?? ''
+  return DEMO_SCRIPT_LANGUAGES[ext] ?? 'plaintext'
+}
+
+/** Picks a representative file extension for a language id (in-app authoring). */
+function demoScriptExtension(language: string): string {
+  const match = Object.entries(DEMO_SCRIPT_LANGUAGES).find(
+    ([, lang]) => lang === language
+  )
+  return match?.[0] ?? 'txt'
+}
+
+/** Built-in script templates for demo mode (mirrors the backend catalog). */
+const DEMO_BUILTIN_SCRIPT_TEMPLATES = [
+  {
+    id: 'builtin:unity-monobehaviour',
+    name: 'Unity MonoBehaviour',
+    language: 'csharp',
+    description: 'A standard Unity component with Start and Update.',
+    content: `using UnityEngine;
+
+public class NewBehaviour : MonoBehaviour
+{
+    void Start()
+    {
+    }
+
+    void Update()
+    {
+    }
+}
+`,
+    isBuiltIn: true,
+  },
+  {
+    id: 'builtin:threejs-fragment-shader',
+    name: 'three.js Fragment Shader (GLSL)',
+    language: 'glsl',
+    description:
+      'ShaderToy-compatible fragment shader; renders live in the preview pane.',
+    content: `// Fragment shader — animated gradient.
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+    vec2 uv = fragCoord / iResolution.xy;
+    vec3 col = 0.5 + 0.5 * cos(iTime + uv.xyx + vec3(0.0, 2.0, 4.0));
+    fragColor = vec4(col, 1.0);
+}
+`,
+    isBuiltIn: true,
+  },
+  {
+    id: 'builtin:threejs-vertex-shader',
+    name: 'three.js Vertex Shader (GLSL)',
+    language: 'glsl',
+    description: 'A pass-through vertex shader using three.js built-ins.',
+    content: `// Vertex shader — passes UVs through to the fragment stage.
+varying vec2 vUv;
+
+void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+`,
+    isBuiltIn: true,
+  },
+  {
+    id: 'builtin:threejs-tsl-material',
+    name: 'three.js TSL Material',
+    language: 'javascript',
+    description: 'A node material authored with the Three Shading Language.',
+    content: `import * as THREE from 'three'
+import { color, uv, sin, time, mix } from 'three/tsl'
+
+const material = new THREE.MeshBasicNodeMaterial()
+material.colorNode = mix(
+  color(0x001133),
+  color(0x33ddff),
+  sin(uv().y.mul(10.0).add(time)).mul(0.5).add(0.5)
+)
+
+export default material
+`,
+    isBuiltIn: true,
+  },
+  {
+    id: 'builtin:lua-module',
+    name: 'Lua Module',
+    language: 'lua',
+    description: 'A minimal Lua module skeleton.',
+    content: `local M = {}
+
+function M.new()
+  local self = {}
+  return self
+end
+
+return M
+`,
+    isBuiltIn: true,
+  },
+  {
+    id: 'builtin:python-script',
+    name: 'Python Script',
+    language: 'python',
+    description: 'A Python script with a main entry point.',
+    content: `def main():
+    pass
+
+
+if __name__ == "__main__":
+    main()
+`,
+    isBuiltIn: true,
+  },
+]
+
+function toDemoTemplateDto(t: DemoScriptTemplate) {
+  return {
+    id: String(t.id),
+    name: t.name,
+    language: t.language,
+    description: t.description,
+    content: t.content,
+    isBuiltIn: false,
+  }
+}
 
 async function listCategoryStore(
   storeName: DemoCategoryStoreName,
@@ -3333,6 +3500,393 @@ export const dynamicDemoHandlers = [
   http.delete('*/sound-categories/:id', async ({ params }) =>
     deleteCategoryFromStore('soundCategories', Number(params.id), 'sounds')
   ),
+
+  // ─── Scripts ──────────────────────────────────────────────────────────
+  http.get('*/scripts', async ({ request }) => {
+    const url = new URL(request.url)
+    const page = Number(url.searchParams.get('page') || '1')
+    const pageSize = Number(url.searchParams.get('pageSize') || '50')
+    const packIds = [
+      ...url.searchParams.getAll('packIds'),
+      ...(url.searchParams.get('packId')
+        ? [url.searchParams.get('packId') as string]
+        : []),
+    ]
+      .map(Number)
+      .filter(Number.isFinite)
+    const projectIds = [
+      ...url.searchParams.getAll('projectIds'),
+      ...(url.searchParams.get('projectId')
+        ? [url.searchParams.get('projectId') as string]
+        : []),
+    ]
+      .map(Number)
+      .filter(Number.isFinite)
+    const categoryId = url.searchParams.get('categoryId')
+    const searchName = (url.searchParams.get('searchName') ?? '')
+      .trim()
+      .toLowerCase()
+    const language = url.searchParams.get('language')
+
+    let scripts = await getAll('scripts')
+
+    if (packIds.length > 0) {
+      const allowed = new Set<number>()
+      for (const id of packIds) {
+        const pack = await getById('packs', id)
+        ;(pack?.scripts ?? []).forEach(s => allowed.add(s.id))
+      }
+      scripts = scripts.filter(s => allowed.has(s.id))
+    }
+    if (projectIds.length > 0) {
+      const allowed = new Set<number>()
+      for (const id of projectIds) {
+        const project = await getById('projects', id)
+        ;(project?.scripts ?? []).forEach(s => allowed.add(s.id))
+      }
+      scripts = scripts.filter(s => allowed.has(s.id))
+    }
+    if (categoryId) {
+      scripts = scripts.filter(s => s.categoryId === Number(categoryId))
+    }
+    if (searchName) {
+      scripts = scripts.filter(
+        s =>
+          (s.name ?? '').toLowerCase().includes(searchName) ||
+          (s.description ?? '').toLowerCase().includes(searchName)
+      )
+    }
+    if (language) {
+      scripts = scripts.filter(s => s.language === language)
+    }
+
+    if (url.searchParams.has('page')) {
+      const result = paginate(scripts, page, pageSize)
+      return HttpResponse.json({
+        scripts: result.items,
+        totalCount: result.totalCount,
+        page: result.page,
+        pageSize: result.pageSize,
+        totalPages: result.totalPages,
+      })
+    }
+    return HttpResponse.json({ scripts })
+  }),
+
+  http.get('*/scripts/:id', async ({ params }) => {
+    const script = await getById('scripts', Number(params.id))
+    if (!script) return new HttpResponse(null, { status: 404 })
+    return HttpResponse.json(script)
+  }),
+
+  http.get('*/scripts/:id/file', async ({ params }) => {
+    const script = await getById('scripts', Number(params.id))
+    if (!script) return new HttpResponse(null, { status: 404 })
+    return new HttpResponse(script.content, {
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+    })
+  }),
+
+  http.post('*/scripts/with-file', async ({ request }) => {
+    const url = new URL(request.url)
+    const formData = await request.formData()
+    const file = formData.get('file') as File | null
+    if (!file) return HttpResponse.json({ error: 'No file' }, { status: 400 })
+
+    const scriptId = await nextId('scripts')
+    const fileId = await nextId('files')
+    const ts = now()
+    const name =
+      url.searchParams.get('name') || file.name.replace(/\.[^.]+$/, '')
+    const categoryId = url.searchParams.get('categoryId')
+      ? Number(url.searchParams.get('categoryId'))
+      : null
+
+    const content = await file.text()
+    const language = detectDemoScriptLanguage(file.name)
+
+    let categoryName: string | null = null
+    if (categoryId) {
+      const cat = await getById('scriptCategories', categoryId)
+      categoryName = cat?.name ?? null
+    }
+
+    const script: DemoScript = {
+      id: scriptId,
+      name,
+      fileId,
+      categoryId,
+      categoryName,
+      language,
+      lineCount: content.length === 0 ? 0 : content.split('\n').length,
+      fileName: file.name,
+      fileSizeBytes: file.size,
+      description: null,
+      createdAt: ts,
+      updatedAt: ts,
+      content,
+    }
+
+    await put('scripts', script)
+
+    return HttpResponse.json(
+      {
+        scriptId,
+        name,
+        fileId,
+        language,
+        fileSizeBytes: file.size,
+      },
+      { status: 201 }
+    )
+  }),
+
+  // In-app authoring: create a script from name + language + (optional) content.
+  http.post('*/scripts', async ({ request }) => {
+    const body = (await request.json().catch(() => ({}))) as {
+      name?: string
+      language?: string
+      content?: string
+      categoryId?: number | null
+      description?: string | null
+    }
+    if (!body.name || !body.language) {
+      return HttpResponse.json(
+        { error: 'InvalidInput', message: 'Name and language are required.' },
+        { status: 400 }
+      )
+    }
+
+    const scriptId = await nextId('scripts')
+    const fileId = await nextId('files')
+    const ts = now()
+    const content = body.content ?? ''
+    const categoryId = body.categoryId ?? null
+
+    let categoryName: string | null = null
+    if (categoryId) {
+      const cat = await getById('scriptCategories', categoryId)
+      categoryName = cat?.name ?? null
+    }
+
+    const script: DemoScript = {
+      id: scriptId,
+      name: body.name,
+      fileId,
+      categoryId,
+      categoryName,
+      language: body.language,
+      lineCount: content.length === 0 ? 0 : content.split('\n').length,
+      fileName: `${body.name}.${demoScriptExtension(body.language)}`,
+      fileSizeBytes: content.length,
+      description: body.description ?? null,
+      createdAt: ts,
+      updatedAt: ts,
+      content,
+    }
+
+    await put('scripts', script)
+
+    return HttpResponse.json(
+      {
+        scriptId,
+        name: script.name,
+        fileId,
+        language: script.language,
+        fileSizeBytes: script.fileSizeBytes,
+      },
+      { status: 201 }
+    )
+  }),
+
+  http.put('*/scripts/:id', async ({ params, request }) => {
+    const script = await getById('scripts', Number(params.id))
+    if (!script) return new HttpResponse(null, { status: 404 })
+    const body = (await request.json()) as {
+      name?: string
+      categoryId?: number | null
+      description?: string | null
+    }
+    if (body.name !== undefined) script.name = body.name
+    if (body.categoryId !== undefined) {
+      script.categoryId = body.categoryId
+      if (body.categoryId) {
+        const cat = await getById('scriptCategories', body.categoryId)
+        script.categoryName = cat?.name ?? null
+      } else {
+        script.categoryName = null
+      }
+    }
+    // Only touch description when the field is present (null/'' clears it).
+    if (body.description !== undefined) {
+      const trimmed = (body.description ?? '').trim()
+      script.description = trimmed.length > 0 ? trimmed : null
+    }
+    script.updatedAt = now()
+    await put('scripts', script)
+    return HttpResponse.json({
+      id: script.id,
+      name: script.name,
+      description: script.description,
+    })
+  }),
+
+  http.put('*/scripts/:id/content', async ({ params, request }) => {
+    const script = await getById('scripts', Number(params.id))
+    if (!script) return new HttpResponse(null, { status: 404 })
+    const body = (await request.json()) as { content?: string }
+    const content = body.content ?? ''
+    script.content = content
+    script.lineCount = content.length === 0 ? 0 : content.split('\n').length
+    script.fileSizeBytes = content.length
+    script.updatedAt = now()
+    await put('scripts', script)
+    return HttpResponse.json({
+      id: script.id,
+      fileId: script.fileId,
+      lineCount: script.lineCount,
+      fileSizeBytes: script.fileSizeBytes,
+    })
+  }),
+
+  http.delete('*/scripts/:id/soft', async ({ params }) => {
+    const id = Number(params.id)
+    const script = await getById('scripts', id)
+    if (script) {
+      const recycledId = await nextId('recycledItems')
+      await addRecycledItem({
+        id: recycledId,
+        type: 'script',
+        entityId: id,
+        name: script.name,
+        deletedAt: now(),
+        entity: { ...script } as unknown as Record<string, unknown>,
+        extra: { fileId: script.fileId, language: script.language },
+      })
+      // Clean up pack/project associations
+      const packs = await getAll('packs')
+      for (const pack of packs) {
+        const before = (pack.scripts ?? []).length
+        pack.scripts = (pack.scripts ?? []).filter(s => s.id !== id)
+        if (pack.scripts.length !== before) {
+          await recomputePackCounts(pack)
+          await put('packs', pack)
+        }
+      }
+      const projects = await getAll('projects')
+      for (const proj of projects) {
+        const before = (proj.scripts ?? []).length
+        proj.scripts = (proj.scripts ?? []).filter(s => s.id !== id)
+        if (proj.scripts.length !== before) {
+          await recomputeProjectCounts(proj)
+          await put('projects', proj)
+        }
+      }
+    }
+    await remove('scripts', id)
+    return new HttpResponse(null, { status: 204 })
+  }),
+
+  http.delete('*/scripts/:id', async ({ params }) => {
+    await remove('scripts', Number(params.id))
+    return new HttpResponse(null, { status: 204 })
+  }),
+
+  // Script categories
+  http.get('*/script-categories', async () =>
+    listCategoryStore('scriptCategories')
+  ),
+
+  http.post('*/script-categories', async ({ request }) => {
+    const body = (await request.json()) as {
+      name: string
+      description?: string
+      parentId?: number | null
+    }
+    return createCategoryInStore('scriptCategories', 'script', body)
+  }),
+
+  http.put('*/script-categories/:id', async ({ params, request }) => {
+    const body = (await request.json()) as {
+      name: string
+      description?: string
+      parentId?: number | null
+    }
+    return updateCategoryInStore(
+      'scriptCategories',
+      'script',
+      Number(params.id),
+      body
+    )
+  }),
+
+  http.delete('*/script-categories/:id', async ({ params }) =>
+    deleteCategoryFromStore('scriptCategories', Number(params.id), 'scripts')
+  ),
+
+  // ── Script templates (built-in catalog + custom in IndexedDB) ──
+  http.get('*/script-templates', async () => {
+    const custom = await getAll('scriptTemplates')
+    const customDtos = [...custom]
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map(toDemoTemplateDto)
+    return HttpResponse.json({
+      templates: [...DEMO_BUILTIN_SCRIPT_TEMPLATES, ...customDtos],
+    })
+  }),
+
+  http.post('*/script-templates', async ({ request }) => {
+    const body = (await request.json().catch(() => ({}))) as {
+      name?: string
+      language?: string
+      content?: string
+      description?: string | null
+    }
+    if (!body.name || !body.language) {
+      return HttpResponse.json(
+        { error: 'InvalidInput', message: 'Name and language are required.' },
+        { status: 400 }
+      )
+    }
+    const id = await nextId('scriptTemplates')
+    const ts = now()
+    const template: DemoScriptTemplate = {
+      id,
+      name: body.name,
+      language: body.language,
+      content: body.content ?? '',
+      description: (body.description ?? '').trim() || null,
+      createdAt: ts,
+      updatedAt: ts,
+    }
+    await put('scriptTemplates', template)
+    return HttpResponse.json(toDemoTemplateDto(template), { status: 201 })
+  }),
+
+  http.put('*/script-templates/:id', async ({ params, request }) => {
+    const template = await getById('scriptTemplates', Number(params.id))
+    if (!template) return new HttpResponse(null, { status: 404 })
+    const body = (await request.json()) as {
+      name?: string
+      language?: string
+      content?: string
+      description?: string | null
+    }
+    if (body.name !== undefined) template.name = body.name
+    if (body.language !== undefined) template.language = body.language
+    if (body.content !== undefined) template.content = body.content ?? ''
+    if (body.description !== undefined) {
+      template.description = (body.description ?? '').trim() || null
+    }
+    template.updatedAt = now()
+    await put('scriptTemplates', template)
+    return HttpResponse.json(toDemoTemplateDto(template))
+  }),
+
+  http.delete('*/script-templates/:id', async ({ params }) => {
+    await remove('scriptTemplates', Number(params.id))
+    return new HttpResponse(null, { status: 204 })
+  }),
 
   ...containerHandlers,
   ...systemHandlers,

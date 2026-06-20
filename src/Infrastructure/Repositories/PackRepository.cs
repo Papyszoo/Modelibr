@@ -30,8 +30,12 @@ internal sealed class PackRepository : IPackRepository
             .Include(p => p.TextureSets)
             .Include(p => p.Sprites)
             .Include(p => p.Sounds)
+            .Include(p => p.Scripts)
             .Include(p => p.EnvironmentMaps)
             .Include(p => p.CustomThumbnailFile)
+            // Six collection includes — split to avoid a cartesian explosion
+            // (and the latency that widens reactive-count races in the UI).
+            .AsSplitQuery()
             .ToListAsync(cancellationToken);
     }
 
@@ -42,8 +46,10 @@ internal sealed class PackRepository : IPackRepository
             .Include(p => p.TextureSets)
             .Include(p => p.Sprites)
             .Include(p => p.Sounds)
+            .Include(p => p.Scripts)
             .Include(p => p.EnvironmentMaps)
             .Include(p => p.CustomThumbnailFile)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
     }
 
@@ -54,8 +60,10 @@ internal sealed class PackRepository : IPackRepository
             .Include(p => p.TextureSets)
             .Include(p => p.Sprites)
             .Include(p => p.Sounds)
+            .Include(p => p.Scripts)
             .Include(p => p.EnvironmentMaps)
             .Include(p => p.CustomThumbnailFile)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(p => p.Name == name, cancellationToken);
     }
 

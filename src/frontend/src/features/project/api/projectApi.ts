@@ -7,12 +7,14 @@ import {
   type EnvironmentMapDto,
   type GetAllEnvironmentMapsResponse,
   type GetAllProjectsResponse,
+  type GetAllScriptsResponse,
   type GetAllSoundsResponse,
   type GetAllSpritesResponse,
   type GetAllTextureSetsResponse,
   type ProjectConceptImageDto,
   type ProjectDetailDto,
   type ProjectDto,
+  type ScriptDto,
   type SoundDto,
   type SpriteDto,
   type TextureSetDto,
@@ -195,6 +197,29 @@ export async function getSoundsByProject(
     `/sounds?projectIds=${projectId}`
   )
   return response.data.sounds
+}
+
+export async function addScriptToProject(
+  projectId: number,
+  scriptId: number
+): Promise<void> {
+  await client.post(`/projects/${projectId}/scripts/${scriptId}`)
+}
+
+export async function removeScriptFromProject(
+  projectId: number,
+  scriptId: number
+): Promise<void> {
+  await client.delete(`/projects/${projectId}/scripts/${scriptId}`)
+}
+
+export async function getScriptsByProject(
+  projectId: number
+): Promise<ScriptDto[]> {
+  const response = await client.get<GetAllScriptsResponse>(
+    `/scripts?projectIds=${projectId}`
+  )
+  return response.data.scripts
 }
 
 export async function addEnvironmentMapToProject(

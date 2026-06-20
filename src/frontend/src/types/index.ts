@@ -56,6 +56,15 @@ export {
   type UpdateProjectRequest,
 } from '@/features/project/types'
 export {
+  type GetAllScriptCategoriesResponse,
+  type GetAllScriptsResponse,
+  type GetAllScriptsResponsePaginated,
+  type GetAllScriptTemplatesResponse,
+  type ScriptCategoryDto,
+  type ScriptDto,
+  type ScriptTemplateDto,
+} from '@/features/scripts/types'
+export {
   type GetAllSoundCategoriesResponse,
   type GetAllSoundsResponse,
   type GetAllSoundsResponsePaginated,

@@ -1,7 +1,12 @@
 import './ListToolbar.css'
 
 import { Button } from 'primereact/button'
-import { type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
+import {
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+  useEffect,
+  useRef,
+} from 'react'
 
 /**
  * Outer wrapper that stacks the toolbar row, optional selection bar, and
@@ -142,6 +147,13 @@ interface ListToolbarSearchInputProps {
   value: string
   onChange: (value: string) => void
   placeholder?: string
+  /**
+   * Focus the input when this flips to true — used to put the caret straight
+   * into the field when the collapsible search panel is opened. The input
+   * stays mounted (panel only animates height), so an effect, not the native
+   * `autoFocus` attribute, is what actually moves focus on each open.
+   */
+  autoFocus?: boolean
 }
 
 /** Search input chrome — magnifier icon + bare input on a card surface. */
@@ -149,11 +161,21 @@ export function ListToolbarSearchInput({
   value,
   onChange,
   placeholder = 'Search...',
+  autoFocus = false,
 }: ListToolbarSearchInputProps) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (!autoFocus) return
+    // Defer a tick so focus lands after the panel begins opening.
+    const id = window.setTimeout(() => inputRef.current?.focus(), 0)
+    return () => window.clearTimeout(id)
+  }, [autoFocus])
+
   return (
     <div className="list-filters-search list-toolbar-search-panel">
       <i className="pi pi-search" />
       <input
+        ref={inputRef}
         type="text"
         placeholder={placeholder}
         value={value}
