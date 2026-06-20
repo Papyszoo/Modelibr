@@ -25,9 +25,9 @@ export function request(method, url, { headers = {}, body = null } = {}) {
         path: u.pathname + u.search,
         method,
         headers,
-        // The local docker stack serves a self-signed cert on :3010; the installed
-        // app is plain http. Accept self-signed so the same script covers both.
-        rejectUnauthorized: false,
+        // CI hits the installed app over plain http, so TLS validation stays on.
+        // For local runs against the self-signed docker stack (https on :3010),
+        // export NODE_TLS_REJECT_UNAUTHORIZED=0 rather than disabling it here.
       },
       res => {
         const chunks = []

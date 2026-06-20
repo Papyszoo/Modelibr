@@ -24,6 +24,7 @@ contextBridge.exposeInMainWorld('modelibr', {
   dismissPreviousDataFolder: () => ipcRenderer.invoke('modelibr:dismiss-previous-data-folder'),
   getUpdate: () => ipcRenderer.invoke('modelibr:get-update'),
   checkUpdate: () => ipcRenderer.invoke('modelibr:check-update'),
+  downloadUpdate: () => ipcRenderer.invoke('modelibr:download-update'),
   openUpdate: () => ipcRenderer.invoke('modelibr:open-update'),
   restart: () => ipcRenderer.invoke('modelibr:restart'),
   quit: () => ipcRenderer.invoke('modelibr:quit'),
