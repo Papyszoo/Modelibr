@@ -8,9 +8,76 @@ import { loadClientConfig, saveClientConfig } from './clientConfig.js'
 const { autoUpdater } = electronUpdater
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
-// Background auto-update: check on launch, download in the background, and
-// install on quit. Safe no-op in dev (unpackaged). macOS auto-install needs a
-// signed build; the error is caught so it never blocks the client.
+let updateHandlersWired = false
+
+// Opt-in auto-update: we check on launch, but a new build is only downloaded and
+// installed when the user agrees — first "Download", then "Restart & Install". A
+// user may have reasons to stay on a stable build, so nothing happens behind
+// their back. Handlers are wired once; checkForUpdates() can be called repeatedly
+// (launch + the "Check for Updates…" menu item).
+function wireUpdateHandlers() {
+  if (updateHandlersWired) {
+    return
+  }
+  updateHandlersWired = true
+
+  // The host and client ship in the same GitHub repo/release. electron-updater's
+  // default feed file is latest.yml for both, which would collide. Put the
+  // client on its own channel so it fetches client*.yml (the release workflow
+  // renames the client's feed to match); the host keeps the default latest*.yml.
+  autoUpdater.channel = 'client'
+  autoUpdater.autoDownload = false
+  autoUpdater.autoInstallOnAppQuit = false
+
+  autoUpdater.on('update-available', info => {
+    const version = info?.version ? ` (v${info.version})` : ''
+    void dialog
+      .showMessageBox({
+        type: 'info',
+        buttons: ['Download', 'Later'],
+        defaultId: 0,
+        cancelId: 1,
+        message: `A new version of Modelibr Client${version} is available.`,
+        detail: 'Download it now? Nothing installs until you choose to restart.',
+      })
+      .then(({ response }) => {
+        if (response === 0) {
+          autoUpdater.downloadUpdate().catch(error => {
+            console.error('[ModelibrClient][update]', error)
+            void dialog.showMessageBox({
+              type: 'error',
+              message: 'Update download failed',
+              detail: error instanceof Error ? error.message : String(error),
+            })
+          })
+        }
+      })
+  })
+
+  autoUpdater.on('update-downloaded', info => {
+    const version = info?.version ? ` (v${info.version})` : ''
+    void dialog
+      .showMessageBox({
+        type: 'info',
+        buttons: ['Restart & Install', 'Later'],
+        defaultId: 0,
+        cancelId: 1,
+        message: `Modelibr Client${version} is ready to install.`,
+        detail: 'The app will restart to finish updating.',
+      })
+      .then(({ response }) => {
+        if (response === 0) {
+          autoUpdater.quitAndInstall()
+        }
+      })
+  })
+
+  autoUpdater.on('error', error => {
+    console.error('[ModelibrClient][update]', error)
+  })
+}
+
+// Safe no-op in dev (unpackaged). Errors never block the client.
 function checkForUpdates({ notifyNoUpdate = false } = {}) {
   if (!app.isPackaged) {
     if (notifyNoUpdate) {
@@ -22,13 +89,7 @@ function checkForUpdates({ notifyNoUpdate = false } = {}) {
     return
   }
 
-  // The host and client ship in the same GitHub repo/release. electron-updater's
-  // default feed file is latest.yml for both, which would collide. Put the
-  // client on its own channel so it fetches client*.yml (the release workflow
-  // renames the client's feed to match); the host keeps the default latest*.yml.
-  autoUpdater.channel = 'client'
-  autoUpdater.autoDownload = true
-  autoUpdater.autoInstallOnAppQuit = true
+  wireUpdateHandlers()
 
   if (notifyNoUpdate) {
     autoUpdater.once('update-not-available', () =>
@@ -36,7 +97,7 @@ function checkForUpdates({ notifyNoUpdate = false } = {}) {
     )
   }
 
-  autoUpdater.checkForUpdatesAndNotify().catch(error => {
+  autoUpdater.checkForUpdates().catch(error => {
     console.error('[ModelibrClient][update]', error)
     if (notifyNoUpdate) {
       void dialog.showMessageBox({
