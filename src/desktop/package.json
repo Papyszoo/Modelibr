@@ -2,7 +2,7 @@
   "name": "modelibr-desktop",
   "productName": "Modelibr",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Native Modelibr launcher and installer packaging",
   "homepage": "https://github.com/Papyszoo/Modelibr",
   "author": {
