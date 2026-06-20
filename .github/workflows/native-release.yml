@@ -70,15 +70,15 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up .NET 9
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 9.0.x
 
       - name: Set up Node.js 20
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 20
 
@@ -195,7 +195,7 @@ jobs:
         run: npm run test:integration
 
       - name: Upload workflow artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: native-installers-${{ matrix.name }}
           path: ${{ matrix.artifactGlob }}
@@ -227,7 +227,7 @@ jobs:
 
     steps:
       - name: Download installer artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: native-installers-${{ matrix.name }}
           path: installer
@@ -358,11 +358,11 @@ jobs:
       # run) — release / nightly schedule / manual dispatch run the full suite.
       - name: Checkout repo (for E2E suite)
         if: github.event_name != 'push'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Node.js for E2E
         if: github.event_name != 'push'
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: "20"
           cache: "npm"
@@ -417,7 +417,7 @@ jobs:
 
       - name: Upload native E2E report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: native-e2e-report-${{ matrix.name }}
           path: tests/e2e/playwright-report/
@@ -521,7 +521,7 @@ jobs:
       # ───── Capture logs on failure ─────
       - name: Upload diagnostics on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: test-diagnostics-${{ matrix.name }}
           path: |
@@ -566,10 +566,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Node.js 20
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 20
 
@@ -598,7 +598,7 @@ jobs:
           ls -1 client*.yml || true
 
       - name: Upload workflow artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: client-installers-${{ matrix.name }}
           path: ${{ matrix.artifactGlob }}
@@ -627,7 +627,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download all installer artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           path: artifacts
           pattern: "*-installers-*"
