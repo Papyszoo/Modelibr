@@ -293,6 +293,12 @@ jobs:
                   path: test-results/asset-processor-results.json
                   retention-days: 30
 
+            # Gate formatting here (this job is required and runs on every PR), so
+            # Prettier drift is caught at PR time instead of surfacing on the
+            # release merge. Code Quality stays non-required (it's path-filtered).
+            - name: Check Prettier formatting
+              run: npm run format:check
+
     build-storybook:
         name: Build Storybook
         runs-on: ubuntu-latest
