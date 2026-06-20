@@ -511,6 +511,27 @@ namespace Infrastructure.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("AnimationCount")
+                        .HasColumnType("integer");
+
+                    b.PrimitiveCollection<List<string>>("AnimationNames")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text[]")
+                        .HasDefaultValueSql("'{}'::text[]");
+
+                    b.Property<int?>("BoneCount")
+                        .HasColumnType("integer");
+
+                    b.Property<double?>("BoundingBoxX")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("BoundingBoxY")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("BoundingBoxZ")
+                        .HasColumnType("double precision");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -728,6 +749,138 @@ namespace Infrastructure.Migrations
                     b.ToTable("ProjectConceptImages");
                 });
 
+            modelBuilder.Entity("Domain.Models.Script", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<int>("FileId")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Language")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<int>("LineCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int?>("ScriptCategoryId")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FileId");
+
+                    b.HasIndex("IsDeleted");
+
+                    b.HasIndex("Name");
+
+                    b.HasIndex("ScriptCategoryId");
+
+                    b.ToTable("Scripts");
+                });
+
+            modelBuilder.Entity("Domain.Models.ScriptCategory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int?>("ParentId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ParentId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("ScriptCategories");
+                });
+
+            modelBuilder.Entity("Domain.Models.ScriptTemplate", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("Language")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name");
+
+                    b.ToTable("ScriptTemplates");
+                });
+
             modelBuilder.Entity("Domain.Models.Setting", b =>
                 {
                     b.Property<int>("Id")
@@ -772,6 +925,9 @@ namespace Infrastructure.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("Channels")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -784,6 +940,10 @@ namespace Infrastructure.Migrations
                     b.Property<int>("FileId")
                         .HasColumnType("integer");
 
+                    b.Property<string>("Format")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
@@ -794,6 +954,9 @@ namespace Infrastructure.Migrations
 
                     b.Property<string>("Peaks")
                         .HasColumnType("text");
+
+                    b.Property<int?>("SampleRate")
+                        .HasColumnType("integer");
 
                     b.Property<int?>("SoundCategoryId")
                         .HasColumnType("integer");
@@ -981,6 +1144,13 @@ namespace Infrastructure.Migrations
                     b.Property<int>("FileId")
                         .HasColumnType("integer");
 
+                    b.Property<string>("Format")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int?>("Height")
+                        .HasColumnType("integer");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
@@ -997,6 +1167,9 @@ namespace Infrastructure.Migrations
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("Width")
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
@@ -1469,6 +1642,21 @@ namespace Infrastructure.Migrations
                     b.ToTable("ModelTextureSets", (string)null);
                 });
 
+            modelBuilder.Entity("PackScript", b =>
+                {
+                    b.Property<int>("PacksId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ScriptsId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("PacksId", "ScriptsId");
+
+                    b.HasIndex("ScriptsId");
+
+                    b.ToTable("PackScripts", (string)null);
+                });
+
             modelBuilder.Entity("PackSound", b =>
                 {
                     b.Property<int>("PacksId")
@@ -1512,6 +1700,21 @@ namespace Infrastructure.Migrations
                     b.HasIndex("TextureSetsId");
 
                     b.ToTable("PackTextureSets", (string)null);
+                });
+
+            modelBuilder.Entity("ProjectScript", b =>
+                {
+                    b.Property<int>("ProjectsId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ScriptsId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("ProjectsId", "ScriptsId");
+
+                    b.HasIndex("ScriptsId");
+
+                    b.ToTable("ProjectScripts", (string)null);
                 });
 
             modelBuilder.Entity("ProjectSound", b =>
@@ -1820,6 +2023,34 @@ namespace Infrastructure.Migrations
                     b.Navigation("Project");
                 });
 
+            modelBuilder.Entity("Domain.Models.Script", b =>
+                {
+                    b.HasOne("Domain.Models.File", "File")
+                        .WithMany()
+                        .HasForeignKey("FileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Models.ScriptCategory", "Category")
+                        .WithMany()
+                        .HasForeignKey("ScriptCategoryId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Category");
+
+                    b.Navigation("File");
+                });
+
+            modelBuilder.Entity("Domain.Models.ScriptCategory", b =>
+                {
+                    b.HasOne("Domain.Models.ScriptCategory", "Parent")
+                        .WithMany("Children")
+                        .HasForeignKey("ParentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Parent");
+                });
+
             modelBuilder.Entity("Domain.Models.Sound", b =>
                 {
                     b.HasOne("Domain.Models.File", "File")
@@ -2098,6 +2329,21 @@ namespace Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("PackScript", b =>
+                {
+                    b.HasOne("Domain.Models.Pack", null)
+                        .WithMany()
+                        .HasForeignKey("PacksId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Models.Script", null)
+                        .WithMany()
+                        .HasForeignKey("ScriptsId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("PackSound", b =>
                 {
                     b.HasOne("Domain.Models.Pack", null)
@@ -2139,6 +2385,21 @@ namespace Infrastructure.Migrations
                     b.HasOne("Domain.Models.TextureSet", null)
                         .WithMany()
                         .HasForeignKey("TextureSetsId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ProjectScript", b =>
+                {
+                    b.HasOne("Domain.Models.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectsId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Models.Script", null)
+                        .WithMany()
+                        .HasForeignKey("ScriptsId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
@@ -2230,6 +2491,11 @@ namespace Infrastructure.Migrations
             modelBuilder.Entity("Domain.Models.Project", b =>
                 {
                     b.Navigation("ConceptImages");
+                });
+
+            modelBuilder.Entity("Domain.Models.ScriptCategory", b =>
+                {
+                    b.Navigation("Children");
                 });
 
             modelBuilder.Entity("Domain.Models.SoundCategory", b =>

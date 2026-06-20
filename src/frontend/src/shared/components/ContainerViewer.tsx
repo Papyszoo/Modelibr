@@ -12,6 +12,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ModelGrid } from '@/features/models/components/ModelGrid'
 import { useTabUiState } from '@/hooks/useTabUiState'
 import { ContainerEnvironmentMapsTab } from '@/shared/components/container-tabs/ContainerEnvironmentMapsTab'
+import { ContainerScriptsTab } from '@/shared/components/container-tabs/ContainerScriptsTab'
 import { ContainerSoundsTab } from '@/shared/components/container-tabs/ContainerSoundsTab'
 import { ContainerSpritesTab } from '@/shared/components/container-tabs/ContainerSpritesTab'
 import { ContainerTextureSetsTab } from '@/shared/components/container-tabs/ContainerTextureSetsTab'
@@ -58,6 +59,7 @@ export function ContainerViewer({ adapter, tabId }: ContainerViewerProps) {
     useState(0)
   const [spriteTotalCount, setSpriteTotalCount] = useState(0)
   const [soundTotalCount, setSoundTotalCount] = useState(0)
+  const [scriptTotalCount, setScriptTotalCount] = useState(0)
   const [environmentMapTotalCount, setEnvironmentMapTotalCount] = useState(0)
 
   const showToast = useCallback(
@@ -90,6 +92,7 @@ export function ContainerViewer({ adapter, tabId }: ContainerViewerProps) {
       setMultiModelTextureTotalCount(container.multiModelTextureCount)
       setSpriteTotalCount(container.spriteCount)
       setSoundTotalCount(container.soundCount)
+      setScriptTotalCount(container.scriptCount ?? 0)
       setEnvironmentMapTotalCount(container.environmentMapCount ?? 0)
     }
   }, [container])
@@ -248,6 +251,22 @@ export function ContainerViewer({ adapter, tabId }: ContainerViewerProps) {
               showToast={showToast}
               refetchContainer={refetchContainer}
               onTotalCountChange={setSoundTotalCount}
+            />
+          </TabPanel>
+
+          <TabPanel
+            header="Scripts"
+            headerTemplate={renderTabHeader(
+              'pi-code',
+              'Scripts',
+              scriptTotalCount
+            )}
+          >
+            <ContainerScriptsTab
+              adapter={adapter}
+              showToast={showToast}
+              refetchContainer={refetchContainer}
+              onTotalCountChange={setScriptTotalCount}
             />
           </TabPanel>
 

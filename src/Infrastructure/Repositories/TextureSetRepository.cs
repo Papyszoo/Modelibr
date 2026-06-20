@@ -50,6 +50,7 @@ internal sealed class TextureSetRepository : ITextureSetRepository
         IReadOnlyCollection<TextureType>? textureTypes = null,
         TextureSetKind? kind = null,
         string? searchName = null,
+        int? minResolution = null,
         CancellationToken cancellationToken = default)
     {
         var query = _context.TextureSets.AsNoTracking().AsQueryable();
@@ -73,6 +74,13 @@ internal sealed class TextureSetRepository : ITextureSetRepository
 
         if (kind.HasValue)
             query = query.Where(ts => ts.Kind == kind.Value);
+
+        // Keep the set if any texture's largest side meets the threshold
+        // (e.g. minResolution=4096 → "4K and up"). NULL dimensions (unprocessed
+        // or undecodable formats) compare false and are excluded.
+        if (minResolution.HasValue)
+            query = query.Where(ts =>
+                ts.Textures.Any(t => t.Width >= minResolution.Value || t.Height >= minResolution.Value));
 
         // EF.Functions.ILike — case-insensitive Contains on Postgres.
         if (!string.IsNullOrWhiteSpace(searchName))

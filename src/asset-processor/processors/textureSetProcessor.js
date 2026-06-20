@@ -3,7 +3,10 @@ import { ModelDataService } from '../modelDataService.js'
 import { RendererPool } from '../rendererPool.js'
 import { TextureSetApiService } from '../textureSetApiService.js'
 import { FrameEncoderService } from '../frameEncoderService.js'
-import { generateTextureProxies } from '../textureProxyGenerator.js'
+import {
+  extractTextureDimensions,
+  generateTextureProxies,
+} from '../textureProxyGenerator.js'
 
 /**
  * Processor for generating texture set preview thumbnails.
@@ -78,6 +81,23 @@ export class TextureSetProcessor extends BaseProcessor {
         downloadedCount: Object.keys(texturePaths).length,
         types: Object.keys(texturePaths),
       })
+
+      // Step 2b: Extract source-image metadata (dimensions/format) — non-blocking,
+      // independent of rendering/proxy so resolution is captured even for HDR sets.
+      try {
+        const dimensionItems = await extractTextureDimensions(
+          texturePaths,
+          jobLogger
+        )
+        await this.textureSetApiService.updateTextureMetadata(
+          textureSetId,
+          dimensionItems
+        )
+      } catch (metadataError) {
+        jobLogger.warn('Texture metadata extraction failed (non-blocking)', {
+          error: metadataError.message,
+        })
+      }
 
       // Step 3: Acquire an exclusive renderer from the pool and load geometry
       if (!this.rendererPool) {

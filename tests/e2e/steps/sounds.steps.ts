@@ -1035,3 +1035,97 @@ Then("the play button should change to a pause icon", async ({ page }) => {
         "[Verify] Play button changed to pause icon (audio is playing)",
     );
 });
+
+// ============= Duration Filter Steps =============
+
+Given(
+    "the sound {string} has an analyzed duration",
+    async ({ page }, soundName: string) => {
+        const sound = getScenarioState(page).getSound(soundName);
+        if (!sound) {
+            throw new Error(`Sound "${soundName}" not found in shared state`);
+        }
+
+        // The waveform worker job extracts the authoritative duration with
+        // ffprobe and writes it back; poll until it lands so the filter
+        // boundary is computed from a real value (deterministic, no fixed sleep).
+        let duration = 0;
+        await expect
+            .poll(
+                async () => {
+                    const res = await page.request.get(
+                        `${API_BASE}/sounds/${sound.id}`,
+                    );
+                    if (!res.ok()) return 0;
+                    const body = await res.json();
+                    duration = body.duration ?? 0;
+                    return duration;
+                },
+                {
+                    message: `Waiting for sound ${sound.id} duration to be analyzed`,
+                    timeout: 60000,
+                    intervals: [1000, 2000, 5000],
+                },
+            )
+            .toBeGreaterThan(0);
+
+        getScenarioState(page).saveSound(soundName, { ...sound, duration });
+        console.log(
+            `[Precondition] Sound "${soundName}" analyzed duration = ${duration}s`,
+        );
+    },
+);
+
+When(
+    "I filter sounds by a minimum duration longer than {string}",
+    async ({ page }, soundName: string) => {
+        const sound = getScenarioState(page).getSound(soundName);
+        if (!sound?.duration) {
+            throw new Error(
+                `Sound "${soundName}" has no analyzed duration in shared state`,
+            );
+        }
+        const threshold = Math.ceil(sound.duration) + 10;
+        const soundListPage = new SoundListPage(page);
+        await soundListPage.setMinDuration(threshold);
+        console.log(
+            `[Action] Filtered sounds by minimum duration ${threshold}s`,
+        );
+    },
+);
+
+When("I clear the sound duration filter", async ({ page }) => {
+    const soundListPage = new SoundListPage(page);
+    await soundListPage.clearDurationFilter();
+    console.log("[Action] Cleared sound duration filter");
+});
+
+Then(
+    "the sounds list should not show {string}",
+    async ({ page }, soundName: string) => {
+        const sound = getScenarioState(page).getSound(soundName);
+        if (!sound) {
+            throw new Error(`Sound "${soundName}" not found in shared state`);
+        }
+        const soundListPage = new SoundListPage(page);
+        await expect(
+            soundListPage.getSoundCardById(sound.id),
+        ).not.toBeVisible({ timeout: 10000 });
+        console.log(`[UI] Sound "${soundName}" is not visible ✓`);
+    },
+);
+
+Then(
+    "the sounds list should show {string}",
+    async ({ page }, soundName: string) => {
+        const sound = getScenarioState(page).getSound(soundName);
+        if (!sound) {
+            throw new Error(`Sound "${soundName}" not found in shared state`);
+        }
+        const soundListPage = new SoundListPage(page);
+        await expect(
+            soundListPage.getSoundCardById(sound.id),
+        ).toBeVisible({ timeout: 10000 });
+        console.log(`[UI] Sound "${soundName}" is visible ✓`);
+    },
+);

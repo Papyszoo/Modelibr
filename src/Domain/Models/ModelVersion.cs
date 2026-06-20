@@ -19,7 +19,17 @@ public class ModelVersion
     public int? VertexCount { get; private set; }
     public int? MeshCount { get; private set; }
     public int? MaterialCount { get; private set; }
+    public double? BoundingBoxX { get; private set; }
+    public double? BoundingBoxY { get; private set; }
+    public double? BoundingBoxZ { get; private set; }
+    public int? AnimationCount { get; private set; }
+    public int? BoneCount { get; private set; }
     public DateTime? TechnicalDetailsUpdatedAt { get; private set; }
+
+    /// <summary>
+    /// Animation clip names extracted from the 3D model file.
+    /// </summary>
+    public List<string> AnimationNames { get; private set; } = new();
     
     /// <summary>
     /// Material names extracted from the 3D model file (e.g. from GLB/GLTF materials).
@@ -123,7 +133,10 @@ public class ModelVersion
     /// </summary>
     public void SetMaterialNames(List<string> materialNames, DateTime updatedAt)
     {
-        UpdateTechnicalMetadata(materialNames, TriangleCount, VertexCount, MeshCount, materialNames?.Count, updatedAt);
+        UpdateTechnicalMetadata(
+            materialNames, TriangleCount, VertexCount, MeshCount, materialNames?.Count,
+            BoundingBoxX, BoundingBoxY, BoundingBoxZ, AnimationCount, AnimationNames, BoneCount,
+            updatedAt);
     }
 
     public void UpdateTechnicalMetadata(
@@ -132,6 +145,12 @@ public class ModelVersion
         int? vertexCount,
         int? meshCount,
         int? materialCount,
+        double? boundingBoxX,
+        double? boundingBoxY,
+        double? boundingBoxZ,
+        int? animationCount,
+        List<string>? animationNames,
+        int? boneCount,
         DateTime updatedAt)
     {
         MaterialNames = (materialNames ?? new List<string>())
@@ -143,6 +162,16 @@ public class ModelVersion
         VertexCount = vertexCount;
         MeshCount = meshCount;
         MaterialCount = materialCount ?? MaterialNames.Count;
+        BoundingBoxX = boundingBoxX;
+        BoundingBoxY = boundingBoxY;
+        BoundingBoxZ = boundingBoxZ;
+        AnimationNames = (animationNames ?? new List<string>())
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Select(name => name.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        AnimationCount = animationCount ?? (AnimationNames.Count > 0 ? AnimationNames.Count : null);
+        BoneCount = boneCount;
         TechnicalDetailsUpdatedAt = updatedAt;
         UpdatedAt = updatedAt;
     }

@@ -1030,16 +1030,30 @@ Then(
             .locator('[data-testid="container-tab-details"]')
             .click();
 
-        // Check sprite count in container details
+        // Check sprite count in container details.
         const statSpan = page
             .locator('.container-detail-assets span:has-text("sprite")')
             .first();
         // Wait for Details tab content to render
         await statSpan.waitFor({ state: "visible", timeout: 5000 });
-        const text = (await statSpan.textContent()) || "0";
-        const count = parseInt(text.match(/\d+/)?.[0] || "0", 10);
-        expect(count).toBe(expectedCount);
-        console.log(`[UI] Pack sprite count is ${count} ✓`);
+
+        // The count is refreshed asynchronously via refetchContainer() after an
+        // add/remove, so the span can briefly show the pre-mutation value. Poll
+        // the rendered text until it settles instead of reading it once.
+        await expect
+            .poll(
+                async () => {
+                    const text = (await statSpan.textContent()) || "0";
+                    return parseInt(text.match(/\d+/)?.[0] || "0", 10);
+                },
+                {
+                    message: `Waiting for pack sprite count to settle at ${expectedCount}`,
+                    timeout: 10000,
+                    intervals: [200, 500, 1000],
+                },
+            )
+            .toBe(expectedCount);
+        console.log(`[UI] Pack sprite count is ${expectedCount} ✓`);
     },
 );
 

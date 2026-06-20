@@ -177,6 +177,12 @@ export function ModelGrid({
     setSelectedTagNames,
     hasConceptImages,
     setHasConceptImages,
+    animatedOnly,
+    setAnimatedOnly,
+    minTriangleCount,
+    setMinTriangleCount,
+    maxTriangleCount,
+    setMaxTriangleCount,
     effectivePackIds,
     effectiveProjectIds,
     handlePackFilterChange,
@@ -491,11 +497,17 @@ export function ModelGrid({
         selectedCategoryIds={selectedCategoryIds}
         selectedTagNames={selectedTagNames}
         hasConceptImages={hasConceptImages}
+        animatedOnly={animatedOnly}
+        minTriangleCount={minTriangleCount}
+        maxTriangleCount={maxTriangleCount}
         onPackFilterChange={handlePackFilterChange}
         onProjectFilterChange={handleProjectFilterChange}
         onCategoryChange={setSelectedCategoryKeys}
         onTagChange={setSelectedTagNames}
         onHasConceptImagesChange={setHasConceptImages}
+        onAnimatedOnlyChange={setAnimatedOnly}
+        onMinTriangleCountChange={setMinTriangleCount}
+        onMaxTriangleCountChange={setMaxTriangleCount}
         packFilterDisabled={packFilterDisabled}
         projectFilterDisabled={projectFilterDisabled}
         cardWidth={cardWidth}
@@ -628,6 +640,15 @@ export function ModelGrid({
                         modelId={model.id}
                         modelName={model.name}
                       />
+                      {(model.animationCount ?? 0) > 0 ? (
+                        <span
+                          className="model-card-badge model-card-badge-animated"
+                          title={`${model.animationCount} animation${model.animationCount === 1 ? '' : 's'}`}
+                          data-testid="model-animated-badge"
+                        >
+                          <i className="pi pi-play-circle" />
+                        </span>
+                      ) : null}
                       <div className="model-card-overlay">
                         <span className="model-card-name">{modelName}</span>
                       </div>

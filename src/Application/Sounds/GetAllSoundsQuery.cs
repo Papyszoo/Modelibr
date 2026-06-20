@@ -29,6 +29,7 @@ internal class GetAllSoundsQueryHandler : IQueryHandler<GetAllSoundsQuery, GetAl
             var result = await _soundRepository.GetPagedAsync(
                 query.Page.Value, query.PageSize.Value,
                 query.PackIds, query.ProjectIds, query.CategoryIds, query.SearchName,
+                query.MinDuration, query.MaxDuration,
                 cancellationToken);
             soundsList = result.Items;
             totalCount = result.TotalCount;
@@ -52,6 +53,10 @@ internal class GetAllSoundsQueryHandler : IQueryHandler<GetAllSoundsQuery, GetAl
                 filteredSounds = filteredSounds.Where(s =>
                     s.Name.Contains(search, StringComparison.OrdinalIgnoreCase));
             }
+            if (query.MinDuration.HasValue)
+                filteredSounds = filteredSounds.Where(s => s.Duration >= query.MinDuration.Value);
+            if (query.MaxDuration.HasValue)
+                filteredSounds = filteredSounds.Where(s => s.Duration <= query.MaxDuration.Value);
 
             soundsList = filteredSounds.ToList();
         }
@@ -75,6 +80,9 @@ internal class GetAllSoundsQueryHandler : IQueryHandler<GetAllSoundsQuery, GetAl
                 s.Category?.Name,
                 s.Duration,
                 s.Peaks,
+                s.SampleRate,
+                s.Channels,
+                s.Format,
                 s.File?.OriginalFileName ?? "",
                 s.File?.SizeBytes ?? 0,
                 s.CreatedAt,
@@ -95,6 +103,8 @@ public record GetAllSoundsQuery(
     IReadOnlyCollection<int>? ProjectIds = null,
     IReadOnlyCollection<int>? CategoryIds = null,
     string? SearchName = null,
+    double? MinDuration = null,
+    double? MaxDuration = null,
     int? Page = null,
     int? PageSize = null) : IQuery<GetAllSoundsResponse>;
 
@@ -108,6 +118,9 @@ public record SoundDto(
     string? CategoryName,
     double Duration,
     string? Peaks,
+    int? SampleRate,
+    int? Channels,
+    string? Format,
     string FileName,
     long FileSizeBytes,
     DateTime CreatedAt,

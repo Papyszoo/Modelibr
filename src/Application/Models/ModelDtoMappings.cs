@@ -52,6 +52,12 @@ internal static class ModelDtoMappings
             VertexCount = version?.VertexCount,
             MeshCount = version?.MeshCount,
             MaterialCount = version?.MaterialCount,
+            BoundingBoxX = version?.BoundingBoxX,
+            BoundingBoxY = version?.BoundingBoxY,
+            BoundingBoxZ = version?.BoundingBoxZ,
+            AnimationCount = version?.AnimationCount,
+            AnimationNames = version?.AnimationNames ?? new List<string>(),
+            BoneCount = version?.BoneCount,
             UpdatedAt = version?.TechnicalDetailsUpdatedAt
         };
     }
@@ -84,5 +90,11 @@ public record ModelTechnicalMetadataDto
     public int? VertexCount { get; init; }
     public int? MeshCount { get; init; }
     public int? MaterialCount { get; init; }
+    public double? BoundingBoxX { get; init; }
+    public double? BoundingBoxY { get; init; }
+    public double? BoundingBoxZ { get; init; }
+    public int? AnimationCount { get; init; }
+    public IReadOnlyList<string> AnimationNames { get; init; } = Array.Empty<string>();
+    public int? BoneCount { get; init; }
     public DateTime? UpdatedAt { get; init; }
 }

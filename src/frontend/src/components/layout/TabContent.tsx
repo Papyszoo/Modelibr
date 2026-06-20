@@ -64,6 +64,16 @@ const SoundList = lazy(() =>
     default: module.SoundList,
   }))
 )
+const ScriptList = lazy(() =>
+  import('@/features/scripts').then(module => ({
+    default: module.ScriptList,
+  }))
+)
+const ScriptViewer = lazy(() =>
+  import('@/features/scripts').then(module => ({
+    default: module.ScriptViewer,
+  }))
+)
 const StageList = lazy(() =>
   import('@/features/stage-editor').then(module => ({
     default: module.StageList,
@@ -196,6 +206,15 @@ export function TabContent({ tab }: TabContentProps): JSX.Element {
 
       case 'sounds':
         return <SoundList />
+
+      case 'scripts':
+        return <ScriptList />
+
+      case 'scriptViewer':
+        if (!tab.scriptId) {
+          return <div>Error: No script ID provided</div>
+        }
+        return <ScriptViewer scriptId={parseInt(tab.scriptId)} tabId={tab.id} />
 
       case 'stageList':
         return <StageList />

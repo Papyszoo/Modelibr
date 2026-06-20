@@ -37,6 +37,7 @@ internal class GetPackByIdQueryHandler : IQueryHandler<GetPackByIdQuery, PackDet
             MultiModelTextureCount = pack.MultiModelTextureCount,
             SpriteCount = pack.SpriteCount,
             SoundCount = pack.SoundCount,
+            ScriptCount = pack.ScriptCount,
             EnvironmentMapCount = pack.EnvironmentMapCount,
             IsEmpty = pack.IsEmpty,
             CustomThumbnailUrl = pack.CustomThumbnailFileId.HasValue ? $"/files/{pack.CustomThumbnailFileId.Value}/preview?channel=rgb" : null,
@@ -85,6 +86,7 @@ public record PackDetailDto
     public int MultiModelTextureCount { get; init; }
     public int SpriteCount { get; init; }
     public int SoundCount { get; init; }
+    public int ScriptCount { get; init; }
     public int EnvironmentMapCount { get; init; }
     public bool IsEmpty { get; init; }
     public string? CustomThumbnailUrl { get; init; }

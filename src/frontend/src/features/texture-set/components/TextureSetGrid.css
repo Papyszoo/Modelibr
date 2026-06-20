@@ -217,6 +217,18 @@
   font-size: 0.75rem;
 }
 
+.texture-set-card-info .texture-resolution {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.texture-set-card-info .texture-resolution .pi {
+  font-size: 0.75rem;
+}
+
 .texture-set-card-badges {
   position: absolute;
   top: 4px;

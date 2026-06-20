@@ -3,6 +3,7 @@ import { useMemo } from 'react'
 import {
   addEnvironmentMapToPack,
   addModelToPack,
+  addScriptToPack,
   addSoundToPack,
   addSpriteToPack,
   addTextureSetToPack,
@@ -10,11 +11,13 @@ import {
   getEnvironmentMapsByPack,
   getModelsByPack,
   getPackById,
+  getScriptsByPack,
   getSoundsByPack,
   getSpritesByPack,
   getTextureSetsByPack,
   removeEnvironmentMapFromPack,
   removeModelFromPack,
+  removeScriptFromPack,
   removeSoundFromPack,
   removeSpriteFromPack,
   removeTextureSetFromPack,
@@ -47,6 +50,7 @@ function toContainerDto(pack: PackDetailDto): ContainerDto {
     multiModelTextureCount: pack.multiModelTextureCount,
     spriteCount: pack.spriteCount,
     soundCount: pack.soundCount,
+    scriptCount: pack.scriptCount ?? 0,
     environmentMapCount: pack.environmentMapCount ?? 0,
     isEmpty: pack.isEmpty,
     customThumbnailUrl: pack.customThumbnailUrl,
@@ -79,6 +83,7 @@ export function PackViewer({ packId, tabId }: PackViewerProps) {
       loadTextureSets: id => getTextureSetsByPack(id),
       loadSprites: id => getSpritesByPack(id),
       loadSounds: id => getSoundsByPack(id),
+      loadScripts: id => getScriptsByPack(id),
       loadEnvironmentMaps: id => getEnvironmentMapsByPack(id),
       addModel: (cId, mId) => addModelToPack(cId, mId),
       removeModel: (cId, mId) => removeModelFromPack(cId, mId),
@@ -88,6 +93,8 @@ export function PackViewer({ packId, tabId }: PackViewerProps) {
       removeSprite: (cId, sId) => removeSpriteFromPack(cId, sId),
       addSound: (cId, sId) => addSoundToPack(cId, sId),
       removeSound: (cId, sId) => removeSoundFromPack(cId, sId),
+      addScript: (cId, sId) => addScriptToPack(cId, sId),
+      removeScript: (cId, sId) => removeScriptFromPack(cId, sId),
       addEnvironmentMap: (cId, environmentMapId) =>
         addEnvironmentMapToPack(cId, environmentMapId),
       removeEnvironmentMap: (cId, environmentMapId) =>
@@ -102,6 +109,7 @@ export function PackViewer({ packId, tabId }: PackViewerProps) {
       ) => addTextureToPackWithFile(cId, file, name, textureType, batchId),
       createSpriteOptions: cId => ({ packId: cId }),
       createSoundOptions: cId => ({ packId: cId }),
+      createScriptOptions: cId => ({ packId: cId }),
     }),
     [packId]
   )

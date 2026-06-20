@@ -31,6 +31,7 @@ internal class GetAllPacksQueryHandler : IQueryHandler<GetAllPacksQuery, GetAllP
             MultiModelTextureCount = p.MultiModelTextureCount,
             SpriteCount = p.SpriteCount,
             SoundCount = p.SoundCount,
+            ScriptCount = p.ScriptCount,
             EnvironmentMapCount = p.EnvironmentMapCount,
             CustomThumbnailUrl = p.CustomThumbnailFileId.HasValue ? $"/files/{p.CustomThumbnailFileId.Value}/preview?channel=rgb" : null,
             IsEmpty = p.IsEmpty
@@ -60,6 +61,7 @@ public record PackListDto
     public int MultiModelTextureCount { get; init; }
     public int SpriteCount { get; init; }
     public int SoundCount { get; init; }
+    public int ScriptCount { get; init; }
     public int EnvironmentMapCount { get; init; }
     public string? CustomThumbnailUrl { get; init; }
     public bool IsEmpty { get; init; }

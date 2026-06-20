@@ -20,6 +20,9 @@ export interface ModelListViewState {
   selectedCategoryKeys: PersistedModelCategorySelectionKeys
   selectedTagNames: string[]
   hasConceptImages: boolean
+  animatedOnly: boolean
+  minTriangleCount: number | null
+  maxTriangleCount: number | null
   selectedModelIds: string[]
 }
 
@@ -38,6 +41,9 @@ export const DEFAULT_MODEL_LIST_VIEW_STATE: ModelListViewState = {
   selectedCategoryKeys: {},
   selectedTagNames: [],
   hasConceptImages: false,
+  animatedOnly: false,
+  minTriangleCount: null,
+  maxTriangleCount: null,
   selectedModelIds: [],
 }
 

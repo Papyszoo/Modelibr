@@ -24,6 +24,7 @@ export interface TabContextValue {
   ) => void
   openPackDetailsTab: (packId: string) => void
   openProjectDetailsTab: (projectId: string) => void
+  openScriptDetailsTab: (scriptId: string, name?: string) => void
   openTab: (type: Tab['type'], title: string, data?: unknown) => void
 }
 
