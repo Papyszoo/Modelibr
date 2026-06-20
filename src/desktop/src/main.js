@@ -10,6 +10,7 @@ import {
   screen,
   shell,
 } from 'electron'
+import electronUpdater from 'electron-updater'
 import fs from 'fs/promises'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -23,6 +24,7 @@ import { detectInstalledClient } from './clientDetection.js'
 import { readLeftoverFolder, clearLeftoverFolder } from './dataMigration.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const { autoUpdater } = electronUpdater
 
 // The desktop client ships as its own installer in the same GitHub release.
 const DESKTOP_CLIENT_URL = CLIENT_RELEASES_URL
@@ -122,6 +124,12 @@ function buildTrayMenu() {
     updateItem = {
       label: `Downloading update… ${update.percent ?? 0}%`,
       enabled: false,
+    }
+  } else if (update?.status === 'available') {
+    // A newer build exists but we don't pull it down until the user asks.
+    updateItem = {
+      label: `Download update v${update.latestVersion}`,
+      click: () => void updateManager?.download(),
     }
   } else {
     updateItem = {
@@ -390,6 +398,11 @@ function registerIpc() {
     return updateManager?.state ?? null
   })
 
+  ipcMain.handle('modelibr:download-update', async () => {
+    await updateManager?.download()
+    return updateManager?.state ?? null
+  })
+
   ipcMain.handle('modelibr:open-update', () => {
     updateManager?.install()
   })
@@ -541,6 +554,10 @@ async function bootstrap() {
   runtimeConfigPath = configPath
 
   updateManager = new UpdateManager({
+    autoUpdater,
+    currentVersion: app.getVersion(),
+    isPackaged: app.isPackaged,
+    openExternal: url => void shell.openExternal(url),
     log: runtimeLog,
     onChange: () => refreshTray(),
   })
