@@ -1,0 +1,205 @@
+name: Upgrade Test
+
+# Proves a real version-to-version upgrade keeps user data. On Windows/macOS/Linux
+# it installs the FROM release, seeds one of every asset type through the host
+# API, installs the TO release *over* it (the data folder lives in the user
+# profile, so it persists), then verifies every asset survived byte-for-byte and
+# the upgraded app still works.
+#
+# Both installers come straight from GitHub Releases — no build step — so this is
+# fast and can be run on demand. Defaults to "v0.1.0 → latest published release".
+on:
+  workflow_dispatch:
+    inputs:
+      from_tag:
+        description: "Release tag to upgrade FROM"
+        required: false
+        default: "v0.1.0"
+        type: string
+      to_tag:
+        description: "Release tag to upgrade TO (blank = latest published release)"
+        required: false
+        type: string
+  # Nightly safety net so a data-losing upgrade is caught within a day of release.
+  schedule:
+    - cron: "0 7 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: upgrade-test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  upgrade-test:
+    name: Upgrade ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-latest
+          - name: macOS
+            os: macos-14
+          - name: Linux
+            os: ubuntu-latest
+    env:
+      # Both seed/verify scripts default to this; the installed host serves its
+      # edge-proxied public API on plain http here.
+      MODELIBR_API_BASE: http://127.0.0.1:3010/api
+    steps:
+      - name: Checkout repo (seed/verify scripts)
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Resolve FROM / TO release tags
+        id: tags
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_FROM: ${{ inputs.from_tag }}
+          INPUT_TO: ${{ inputs.to_tag }}
+        run: |
+          set -euo pipefail
+          from="${INPUT_FROM:-v0.1.0}"
+          to="${INPUT_TO:-}"
+          if [ -z "$to" ]; then
+            # Newest published, non-draft, non-prerelease release.
+            to=$(gh release list --exclude-drafts --exclude-pre-releases --limit 1 \
+              --json tagName --jq '.[0].tagName // empty')
+          fi
+          [ -n "$to" ] || { echo "Could not resolve a TO release tag"; exit 1; }
+          if [ "$from" = "$to" ]; then
+            echo "FROM ($from) equals TO ($to) — nothing to upgrade."
+            exit 1
+          fi
+          echo "Upgrading: $from  ->  $to"
+          echo "from=$from" >> "$GITHUB_OUTPUT"
+          echo "to=$to" >> "$GITHUB_OUTPUT"
+
+      - name: Download FROM and TO installers
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          case "${{ runner.os }}" in
+            Linux)   pat='*linux-amd64.deb' ;;
+            macOS)   pat='*macos-arm64.dmg' ;;
+            Windows) pat='*windows-x64.exe' ;;
+          esac
+          mkdir -p old-installer new-installer
+          # Each release carries both host and Client assets matching the pattern;
+          # the per-OS scenario below picks the host one (filters out *Client*).
+          gh release download "${{ steps.tags.outputs.from }}" --dir old-installer --pattern "$pat"
+          gh release download "${{ steps.tags.outputs.to }}"   --dir new-installer --pattern "$pat"
+          echo "── FROM ──"; ls -la old-installer
+          echo "── TO ──";   ls -la new-installer
+
+      - name: Upgrade scenario (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update && sudo apt-get install -y xvfb >/dev/null
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          Xvfb :99 -screen 0 1280x1024x24 >/tmp/xvfb.log 2>&1 &
+          export DISPLAY=:99
+
+          install_deb() { sudo dpkg -i "$1" || sudo apt-get install -f -y; }
+          start_app() {
+            local bin
+            bin=$(find /opt -type f -executable \( -name 'modelibr*' -o -name 'Modelibr*' \) 2>/dev/null | head -n1)
+            [ -n "$bin" ] || { echo "binary not found under /opt"; ls -la /opt || true; exit 1; }
+            nohup "$bin" --no-sandbox >/tmp/modelibr.log 2>&1 & disown || true
+          }
+          wait_ready() {
+            for i in $(seq 1 60); do curl -sf http://127.0.0.1:3010 -o /dev/null && return 0; sleep 3; done
+            echo "app not ready"; tail -n 60 /tmp/modelibr.log || true; exit 1
+          }
+          stop_app() { pkill -f -i modelibr || true; sleep 5; }
+
+          OLD=$(ls old-installer/*.deb | grep -iv client | head -n1)
+          NEW=$(ls new-installer/*.deb | grep -iv client | head -n1)
+          echo "OLD=$OLD  NEW=$NEW"
+
+          echo "::group::Install FROM + seed"; install_deb "$OLD"; start_app; wait_ready
+          node tests/upgrade/seed-assets.mjs; stop_app; echo "::endgroup::"
+          echo "::group::Install TO (upgrade) + verify"; install_deb "$NEW"; start_app; wait_ready
+          node tests/upgrade/verify-assets.mjs; stop_app; echo "::endgroup::"
+
+      - name: Upgrade scenario (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          install_dmg() {
+            hdiutil attach "$1" -mountpoint /Volumes/ModelibrUp -nobrowse -quiet
+            rm -rf /Applications/Modelibr.app
+            cp -R "/Volumes/ModelibrUp/Modelibr.app" /Applications/
+            hdiutil detach /Volumes/ModelibrUp -quiet
+            sudo xattr -dr com.apple.quarantine /Applications/Modelibr.app 2>/dev/null || true
+          }
+          start_app() { nohup "/Applications/Modelibr.app/Contents/MacOS/Modelibr" >/tmp/modelibr.log 2>&1 & disown || true; }
+          wait_ready() {
+            for i in $(seq 1 60); do curl -sf http://127.0.0.1:3010 -o /dev/null && return 0; sleep 3; done
+            echo "app not ready"; tail -n 60 /tmp/modelibr.log || true; exit 1
+          }
+          stop_app() { osascript -e 'quit app "Modelibr"' || true; sleep 3; pkill -f Modelibr || true; sleep 3; }
+
+          OLD=$(ls old-installer/*.dmg | grep -iv client | head -n1)
+          NEW=$(ls new-installer/*.dmg | grep -iv client | head -n1)
+          echo "OLD=$OLD  NEW=$NEW"
+
+          echo "::group::Install FROM + seed"; install_dmg "$OLD"; start_app; wait_ready
+          node tests/upgrade/seed-assets.mjs; stop_app; echo "::endgroup::"
+          echo "::group::Install TO (upgrade) + verify"; install_dmg "$NEW"; start_app; wait_ready
+          node tests/upgrade/verify-assets.mjs; stop_app; echo "::endgroup::"
+
+      - name: Upgrade scenario (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $old = Get-ChildItem old-installer/*.exe | Where-Object { $_.Name -notlike '*Client*' } | Select-Object -First 1
+          $new = Get-ChildItem new-installer/*.exe | Where-Object { $_.Name -notlike '*Client*' } | Select-Object -First 1
+          if (-not $old) { throw "FROM installer not found" }
+          if (-not $new) { throw "TO installer not found" }
+          Write-Host "OLD=$($old.FullName)  NEW=$($new.FullName)"
+
+          function Install-App($installer) { Start-Process -Wait -FilePath $installer.FullName -ArgumentList '/S' }
+          function Start-App {
+            $exe = @("$env:LOCALAPPDATA\Programs\Modelibr\Modelibr.exe", "$env:PROGRAMFILES\Modelibr\Modelibr.exe") |
+              Where-Object { Test-Path $_ } | Select-Object -First 1
+            if (-not $exe) { throw "Modelibr.exe not found" }
+            Start-Process -FilePath $exe
+          }
+          function Wait-Ready {
+            for ($i = 0; $i -lt 60; $i++) {
+              try { Invoke-WebRequest -UseBasicParsing http://127.0.0.1:3010 -TimeoutSec 5 | Out-Null; return } catch { Start-Sleep 3 }
+            }
+            throw "app not ready"
+          }
+          function Stop-App { Stop-Process -Name Modelibr -Force -ErrorAction SilentlyContinue; Start-Sleep 5 }
+
+          Install-App $old; Start-App; Wait-Ready
+          node tests/upgrade/seed-assets.mjs; if ($LASTEXITCODE -ne 0) { throw "seed failed" }; Stop-App
+          Install-App $new; Start-App; Wait-Ready
+          node tests/upgrade/verify-assets.mjs; if ($LASTEXITCODE -ne 0) { throw "verify failed" }; Stop-App
+
+      - name: Upload upgrade manifest + logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: upgrade-test-${{ matrix.name }}
+          path: |
+            upgrade-manifest.json
+            /tmp/modelibr.log
+          if-no-files-found: ignore
