@@ -36,9 +36,15 @@ export default defineConfig({
     // eliminating most parallel timing issues while keeping run time reasonable.
     // When running manually, default to 2.
     workers: parseInt(process.env.PW_WORKERS || "2", 10),
+    // The JSON reporter writes a machine-readable run summary (incl. each
+    // failure's message + the path to its trace/screenshot under test-results/)
+    // that an AI agent or script can parse directly — see the e2e-authoring skill.
     reporter: useBlobReporter
         ? [["blob", { outputDir: "blob-report" }]]
-        : [["html", { open: "never" }]],
+        : [
+              ["html", { open: "never" }],
+              ["json", { outputFile: "test-results/results.json" }],
+          ],
     use: {
         baseURL: process.env.FRONTEND_URL || "http://localhost:3002",
         // Defaults are preserved when the env vars are absent or invalid; the Test

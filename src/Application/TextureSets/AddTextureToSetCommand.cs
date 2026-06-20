@@ -16,6 +16,7 @@ internal class AddTextureToTextureSetCommandHandler : ICommandHandler<AddTexture
     private readonly IBatchUploadRepository _batchUploadRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IThumbnailQueue _thumbnailQueue;
+    private readonly ITextureImageMetadataReader _textureImageMetadataReader;
     private readonly ILogger<AddTextureToTextureSetCommandHandler> _logger;
 
     public AddTextureToTextureSetCommandHandler(
@@ -24,6 +25,7 @@ internal class AddTextureToTextureSetCommandHandler : ICommandHandler<AddTexture
         IBatchUploadRepository batchUploadRepository,
         IDateTimeProvider dateTimeProvider,
         IThumbnailQueue thumbnailQueue,
+        ITextureImageMetadataReader textureImageMetadataReader,
         ILogger<AddTextureToTextureSetCommandHandler> logger)
     {
         _textureSetRepository = textureSetRepository;
@@ -31,6 +33,7 @@ internal class AddTextureToTextureSetCommandHandler : ICommandHandler<AddTexture
         _batchUploadRepository = batchUploadRepository;
         _dateTimeProvider = dateTimeProvider;
         _thumbnailQueue = thumbnailQueue;
+        _textureImageMetadataReader = textureImageMetadataReader;
         _logger = logger;
     }
 
@@ -77,6 +80,14 @@ internal class AddTextureToTextureSetCommandHandler : ICommandHandler<AddTexture
             // Add texture to the set (domain will enforce business rules)
             textureSet.AddTexture(texture, _dateTimeProvider.UtcNow);
 
+            // Non-Universal sets never get a worker thumbnail pass, so capture the
+            // source-image resolution here at upload time. Universal sets get this
+            // from the worker job (enqueued below) instead.
+            if (textureSet.Kind != TextureSetKind.Universal)
+            {
+                await ApplyImageMetadataAsync(texture, file, cancellationToken);
+            }
+
             // Update the texture set
             var updatedTextureSet = await _textureSetRepository.UpdateAsync(textureSet, cancellationToken);
 
@@ -113,6 +124,15 @@ internal class AddTextureToTextureSetCommandHandler : ICommandHandler<AddTexture
         {
             return Result.Failure<AddTextureToTextureSetResponse>(
                 new Error("BusinessRuleViolation", ex.Message));
+        }
+    }
+
+    private async Task ApplyImageMetadataAsync(Domain.Models.Texture texture, Domain.Models.File file, CancellationToken cancellationToken)
+    {
+        var metadata = await _textureImageMetadataReader.ReadAsync(file, cancellationToken);
+        if (metadata != null)
+        {
+            texture.SetImageMetadata(metadata.Width, metadata.Height, metadata.Format, _dateTimeProvider.UtcNow);
         }
     }
 }

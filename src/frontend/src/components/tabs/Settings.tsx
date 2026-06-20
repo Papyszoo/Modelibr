@@ -16,6 +16,7 @@ import { useForm } from 'react-hook-form'
 import { type z } from 'zod'
 
 import { useModelsQuery } from '@/features/models/api/queries'
+import { ScriptTemplatesSection } from '@/features/scripts/components/ScriptTemplatesSection'
 import { useSettingsQuery } from '@/features/settings/api/queries'
 import type {
   BlenderInstallStatus,
@@ -56,6 +57,7 @@ type SectionKey =
   | 'blender'
   | 'ssl'
   | 'webdav'
+  | 'scriptTemplates'
   | 'backup'
 
 interface SectionMeta {
@@ -144,6 +146,15 @@ const SECTIONS: SectionMeta[] = [
     fields: ['WebDAV URLs', 'Map as network drive'],
     hasFormSave: false,
     demoLocked: true,
+  },
+  {
+    key: 'scriptTemplates',
+    label: 'Script Templates',
+    icon: 'pi-code',
+    desc: 'Reusable starter code for new scripts',
+    fields: ['Script templates', 'Unity MonoBehaviour', 'three.js shader'],
+    hasFormSave: false,
+    demoLocked: false,
   },
   {
     key: 'backup',
@@ -1386,6 +1397,12 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
                   probeResults={probeResults}
                   probeLoading={probeLoading}
                 />
+              </div>
+            )}
+
+            {currentSection.key === 'scriptTemplates' && (
+              <div className="section-fields">
+                <ScriptTemplatesSection />
               </div>
             )}
 

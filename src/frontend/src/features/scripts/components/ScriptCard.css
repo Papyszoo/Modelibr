@@ -1,0 +1,159 @@
+.script-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-card);
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 2px solid transparent;
+  user-select: none;
+}
+
+.script-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.script-card.selected {
+  border-color: var(--primary-color);
+}
+
+.script-card.dragging {
+  opacity: 0.5;
+}
+
+.script-select-checkbox {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 2;
+  opacity: 0;
+  transition: opacity 0.2s;
+  width: 1.25rem;
+  height: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.script-select-checkbox i {
+  font-size: 1rem;
+  color: var(--text-color);
+}
+
+.script-card:hover .script-select-checkbox,
+.script-card.selected .script-select-checkbox {
+  opacity: 1;
+}
+
+.script-card.selected .script-select-checkbox i {
+  color: var(--primary-color);
+}
+
+/* The "sheet" looks like a page: a tall panel with a folded top-right corner
+   and the file extension shown like a document glyph. */
+.script-file-sheet {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  height: 78px;
+  margin: 0.45rem 0.45rem 0;
+  border-radius: 6px;
+  background: linear-gradient(160deg, #f7f8fb 0%, #e9edf5 100%);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  overflow: hidden;
+}
+
+/* Faux ruled lines to reinforce the "document" feel. */
+.script-file-sheet::before {
+  content: '';
+  position: absolute;
+  inset: 1.1rem 0.9rem auto 0.9rem;
+  height: 2px;
+  background:
+    linear-gradient(currentColor, currentColor) left / 60% 1px no-repeat,
+    linear-gradient(currentColor, currentColor) left 0 bottom 0 / 40% 1px
+      no-repeat;
+  color: rgba(40, 50, 70, 0.12);
+  box-shadow:
+    0 8px 0 rgba(40, 50, 70, 0.1),
+    0 16px 0 rgba(40, 50, 70, 0.08);
+}
+
+/* Folded dog-ear corner. */
+.script-file-fold {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 20px;
+  height: 20px;
+  background: linear-gradient(
+    225deg,
+    var(--surface-card) 0%,
+    var(--surface-card) 50%,
+    rgba(0, 0, 0, 0.12) 50%,
+    rgba(0, 0, 0, 0.12) 100%
+  );
+  border-bottom-left-radius: 4px;
+}
+
+.script-file-ext {
+  position: relative;
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--primary-color);
+}
+
+.script-file-lang {
+  position: relative;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--primary-color);
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--primary-200);
+  padding: 0.02rem 0.4rem;
+  border-radius: 999px;
+}
+
+.script-info {
+  padding: 0.4rem 0.5rem 0.5rem;
+}
+
+.script-name {
+  margin: 0 0 0.2rem 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.script-meta {
+  display: flex;
+  gap: 0.4rem;
+  font-size: 0.68rem;
+  color: var(--text-color-secondary);
+  align-items: center;
+}
+
+.script-lines {
+  background: var(--surface-ground);
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+}
+
+.script-size {
+  opacity: 0.7;
+}

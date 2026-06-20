@@ -44,6 +44,8 @@ internal sealed class SoundRepository : ISoundRepository
         IReadOnlyCollection<int>? projectIds = null,
         IReadOnlyCollection<int>? categoryIds = null,
         string? searchName = null,
+        double? minDuration = null,
+        double? maxDuration = null,
         CancellationToken cancellationToken = default)
     {
         var query = _context.Sounds.AsNoTracking().AsQueryable();
@@ -67,6 +69,12 @@ internal sealed class SoundRepository : ISoundRepository
             var pattern = $"%{searchName.Trim()}%";
             query = query.Where(s => EF.Functions.ILike(s.Name, pattern));
         }
+
+        if (minDuration.HasValue)
+            query = query.Where(s => s.Duration >= minDuration.Value);
+
+        if (maxDuration.HasValue)
+            query = query.Where(s => s.Duration <= maxDuration.Value);
 
         var totalCount = await query.CountAsync(cancellationToken);
 

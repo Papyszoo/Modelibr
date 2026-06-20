@@ -15,6 +15,22 @@ public class Sound : AggregateRoot
     public int? SoundCategoryId { get; private set; }
     public double Duration { get; private set; }
     public string? Peaks { get; private set; }
+
+    /// <summary>
+    /// Audio sample rate in Hz (e.g. 44100), extracted by the worker. Null until processed.
+    /// </summary>
+    public int? SampleRate { get; private set; }
+
+    /// <summary>
+    /// Number of audio channels (1 = mono, 2 = stereo), extracted by the worker. Null until processed.
+    /// </summary>
+    public int? Channels { get; private set; }
+
+    /// <summary>
+    /// Audio container/codec format (e.g. "wav", "mp3", "ogg"), extracted by the worker. Null until processed.
+    /// </summary>
+    public string? Format { get; private set; }
+
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
     public bool IsDeleted { get; private set; }
@@ -114,6 +130,32 @@ public class Sound : AggregateRoot
     public void UpdatePeaks(string? peaks, DateTime updatedAt)
     {
         Peaks = peaks;
+        UpdatedAt = updatedAt;
+    }
+
+    /// <summary>
+    /// Persists audio metadata extracted by the worker (sample rate, channels, format).
+    /// The worker decodes the file with ffprobe, so its duration is authoritative —
+    /// it overwrites the create-time duration when a positive value is provided
+    /// (create-time duration is frequently 0 before processing).
+    /// Extraction failures degrade to null and simply leave the corresponding field unset.
+    /// </summary>
+    /// <param name="sampleRate">Sample rate in Hz, or null if unavailable</param>
+    /// <param name="channels">Channel count, or null if unavailable</param>
+    /// <param name="format">Container/codec format, or null if unavailable</param>
+    /// <param name="durationFromWorker">Authoritative duration in seconds; ignored when not positive</param>
+    /// <param name="updatedAt">When the update occurred</param>
+    public void UpdateAudioMetadata(int? sampleRate, int? channels, string? format, double durationFromWorker, DateTime updatedAt)
+    {
+        SampleRate = sampleRate is > 0 ? sampleRate : null;
+        Channels = channels is > 0 ? channels : null;
+        // Clamp to the Format column cap (20). Real audio format tokens are short
+        // (mp3, wav, ogg…); the clamp just guards against a pathological probe value
+        // tripping a DB length error on a best-effort metadata write.
+        var normalizedFormat = string.IsNullOrWhiteSpace(format) ? null : format.Trim().ToLowerInvariant();
+        Format = normalizedFormat is { Length: > 20 } ? normalizedFormat[..20] : normalizedFormat;
+        if (durationFromWorker > 0)
+            Duration = durationFromWorker;
         UpdatedAt = updatedAt;
     }
 

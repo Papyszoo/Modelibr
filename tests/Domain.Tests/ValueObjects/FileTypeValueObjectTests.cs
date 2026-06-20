@@ -174,4 +174,64 @@ public class FileTypeValueObjectTests
         // Act & Assert
         Assert.Equal(fileType1.GetHashCode(), fileType2.GetHashCode());
     }
+
+    [Theory]
+    [InlineData("player.lua", "lua")]
+    [InlineData("main.py", "python")]
+    [InlineData("Enemy.cs", "csharp")]
+    [InlineData("engine.cpp", "cpp")]
+    [InlineData("header.h", "cpp")]
+    [InlineData("app.js", "javascript")]
+    [InlineData("app.mjs", "javascript")]
+    [InlineData("types.ts", "typescript")]
+    [InlineData("shader.glsl", "glsl")]
+    [InlineData("surface.hlsl", "hlsl")]
+    [InlineData("ai.gd", "gdscript")]
+    public void FromFileName_WithScriptExtensions_ReturnsScriptLanguage(string fileName, string expectedValue)
+    {
+        // Act
+        var result = FileType.FromFileName(fileName);
+
+        // Assert
+        Assert.True(result.IsSuccess);
+        Assert.Equal(expectedValue, result.Value.Value);
+        Assert.Equal(FileTypeCategory.Script, result.Value.Category);
+    }
+
+    [Theory]
+    [InlineData("player.lua")]
+    [InlineData("main.py")]
+    [InlineData("Enemy.cs")]
+    [InlineData("engine.cpp")]
+    public void ValidateForScriptUpload_WithSourceFiles_ReturnsSuccess(string fileName)
+    {
+        // Act
+        var result = FileType.ValidateForScriptUpload(fileName);
+
+        // Assert
+        Assert.True(result.IsSuccess);
+        Assert.Equal(FileTypeCategory.Script, result.Value.Category);
+    }
+
+    [Theory]
+    [InlineData("texture.png")]
+    [InlineData("clip.wav")]
+    [InlineData("model.fbx")]
+    [InlineData("unknown.xyz")]
+    public void ValidateForScriptUpload_WithNonScriptFiles_ReturnsFailure(string fileName)
+    {
+        // Act
+        var result = FileType.ValidateForScriptUpload(fileName);
+
+        // Assert
+        Assert.False(result.IsSuccess);
+        Assert.Equal("InvalidFileType", result.Error.Code);
+    }
+
+    [Fact]
+    public void GetMimeType_ForScriptTypes_ReturnsPlainText()
+    {
+        Assert.Equal("text/plain", FileType.Lua.GetMimeType());
+        Assert.Equal("text/plain", FileType.CSharp.GetMimeType());
+    }
 }

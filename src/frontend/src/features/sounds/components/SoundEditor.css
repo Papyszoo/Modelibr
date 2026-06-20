@@ -179,3 +179,20 @@
   display: flex;
   gap: 0.5rem;
 }
+
+.sound-editor-metadata {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.sound-metadata-item {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-color-secondary);
+  background: var(--surface-100);
+  border-radius: 4px;
+  padding: 0.125rem 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}

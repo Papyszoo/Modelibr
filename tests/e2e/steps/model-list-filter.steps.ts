@@ -78,6 +78,87 @@ When(
     },
 );
 
+Given(
+    "the model {string} has {int} triangles and {int} animations",
+    async ({ page }, modelStateName: string, triangles: number, animations: number) => {
+        const model = getScenarioState(page).getModel(modelStateName);
+        if (!model) {
+            throw new Error(`Model "${modelStateName}" not found in shared state`);
+        }
+        if (!model.versionId) {
+            throw new Error(
+                `Model "${modelStateName}" has no versionId in shared state`,
+            );
+        }
+
+        // The thumbnail render pass writes its own technical metadata via the
+        // same endpoint, so we must be the LAST writer or the worker clobbers
+        // our seed. Wait for the worker's write to land (TechnicalDetailsUpdatedAt
+        // set), then override deterministically. This keeps the scenario stable
+        // without a fixed sleep.
+        const { DbHelper } = await import("../fixtures/db-helper");
+        const db = new DbHelper();
+        await expect
+            .poll(
+                async () =>
+                    (
+                        await db.query(
+                            `SELECT "TechnicalDetailsUpdatedAt" FROM "ModelVersions" WHERE "Id" = $1`,
+                            [model.versionId],
+                        )
+                    ).rows[0]?.TechnicalDetailsUpdatedAt ?? null,
+                {
+                    message: `Waiting for worker to populate technical metadata for version ${model.versionId}`,
+                    timeout: 60000,
+                    intervals: [1000, 2000, 5000],
+                },
+            )
+            .not.toBeNull();
+
+        const animationNames = Array.from(
+            { length: animations },
+            (_, i) => `Clip ${i + 1}`,
+        );
+        const response = await page.request.put(
+            `${API_BASE}/model-versions/${model.versionId}/technical-metadata`,
+            {
+                data: {
+                    triangleCount: triangles,
+                    animationCount: animations,
+                    animationNames,
+                },
+            },
+        );
+        expect(response.ok()).toBeTruthy();
+
+        // Reload so the list reflects the freshly seeded metadata.
+        await navigateToAppClean(page);
+        await page.waitForLoadState("domcontentloaded");
+        console.log(
+            `[Precondition] Model "${model.name}" set to ${triangles} triangles, ${animations} animations`,
+        );
+    },
+);
+
+When("I enable the animated-only filter", async ({ page }) => {
+    const modelListPage = new ModelListPage(page);
+    await modelListPage.enableAnimatedFilter();
+    await page.waitForLoadState("domcontentloaded");
+    console.log("[Action] Enabled animated-only filter");
+});
+
+When(
+    "I filter the model list by minimum {int} triangles",
+    async ({ page }, minTriangles: number) => {
+        const modelListPage = new ModelListPage(page);
+        await modelListPage.setMinTriangleCount(minTriangles);
+        await page.waitForLoadState("domcontentloaded");
+        console.log(
+            `[Action] Filtered model list by minimum ${minTriangles} triangles`,
+        );
+    },
+);
+
 When("I clear the model list filter", async ({ page }) => {
     const modelListPage = new ModelListPage(page);
     await modelListPage.clearFilters();

@@ -30,7 +30,38 @@ folders are numbered (`00-texture-sets/` …) to control ordering.
   `npx bddgen && npx playwright test --grep "<scenario name>" --no-deps`
   (seed first with `PW_WORKERS=1 npx playwright test --project=setup`).
 - Artifact env knobs: `PW_VIDEO`, `PW_TRACE`, `PW_SCREENSHOT`, `PW_RETRIES`,
-  `PW_HEADED`, `PW_WORKERS`.
+  `PW_HEADED`, `PW_WORKERS`. Default trace is `on-first-retry`; force capture on a
+  single run with `PW_TRACE=on` (or `retain-on-failure`).
+
+## Results & traces (read your own run output)
+A machine-readable **JSON report** (`status`, `error.message`, `attachments[]`)
+is emitted at `tests/e2e/test-results/results.json` for both run paths — grep it
+for `"status":"failed"` / `"error"` to find the failing spec + message without a
+browser. (Demo config → `test-results/demo-results.json`.)
+
+**Artifact location depends on HOW you ran** — this trips people up:
+
+- **Direct run** (`npx bddgen && npx playwright test --grep ...`): per-failure
+  artifacts in `tests/e2e/test-results/<test-dir>/` — `error-context.md` (page
+  a11y snapshot at failure; note it does NOT contain the error message),
+  `test-failed-1.png`, `video.webm`, `trace.zip`.
+- **Full run** (`npm test` → blob phases merged via `playwright.merge.config.ts`):
+  `test-results/` is cleared, so there are NO per-test dirs. Instead:
+  `playwright-report/index.html` (merged) embeds the full report, and per-test
+  artifacts (incl. traces) land as hashed files under `playwright-report/data/`,
+  referenced from `results.json` `attachments[].path`. To read the report JSON
+  without a browser, the merge now also writes `test-results/results.json`
+  directly — use that.
+
+Inspecting a `trace.zip`:
+- GUI: `cd tests/e2e && npx playwright show-trace <path>`.
+- Headless/agent: `unzip -o trace.zip -d /tmp/tr` then grep the `*.trace` files
+  (JSONL) — the failure is an `"error":{"message": ...}` entry (e.g. a strict-mode
+  locator violation or a failed `expect`). The `error-context.md` alone is often
+  not enough; the trace is where the actual error lives.
+
+For deeper triage (history, regression-vs-long-broken, infra signatures) use the
+`test-triage` skill.
 
 ## Data and state
 - Every `Given` self-provisions its resources through the app; never rely on

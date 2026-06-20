@@ -23,6 +23,13 @@ import { resolveApiAssetUrl } from '@/lib/apiBase'
 import { ImageLightboxDialog } from '@/shared/components/ImageLightboxDialog'
 import { getModelFileFormat } from '@/utils/fileUtils'
 
+// Source units differ per format (glTF is meters, FBX/OBJ vary by DCC tool),
+// so dimensions are shown unitless.
+function formatDimension(value?: number | null): string {
+  if (value == null) return '?'
+  return value >= 100 ? Math.round(value).toString() : value.toPrecision(3)
+}
+
 export function ModelInfo({ model, onModelUpdated }) {
   const [tags, setTags] = useState(model.tags ?? [])
   const [description, setDescription] = useState(model.description || '')
@@ -206,6 +213,30 @@ export function ModelInfo({ model, onModelUpdated }) {
             <div className="model-info-item">
               <label>Materials</label>
               <span>{technicalMetadata.materialCount ?? 'Unknown'}</span>
+            </div>
+            <div className="model-info-item">
+              <label>Dimensions</label>
+              <span>
+                {technicalMetadata.boundingBoxX != null
+                  ? `${formatDimension(technicalMetadata.boundingBoxX)} × ${formatDimension(technicalMetadata.boundingBoxY)} × ${formatDimension(technicalMetadata.boundingBoxZ)}`
+                  : 'Unknown'}
+              </span>
+            </div>
+            <div className="model-info-item">
+              <label>Bones</label>
+              <span>{technicalMetadata.boneCount ?? 'Unknown'}</span>
+            </div>
+            <div className="model-info-item model-info-item-wide">
+              <label>Animations</label>
+              <span>
+                {technicalMetadata.animationCount == null
+                  ? 'Unknown'
+                  : technicalMetadata.animationCount === 0
+                    ? 'None'
+                    : (technicalMetadata.animationNames?.length ?? 0) > 0
+                      ? technicalMetadata.animationNames.join(', ')
+                      : `${technicalMetadata.animationCount}`}
+              </span>
             </div>
             <div className="model-info-item model-info-item-wide">
               <label>Based On</label>

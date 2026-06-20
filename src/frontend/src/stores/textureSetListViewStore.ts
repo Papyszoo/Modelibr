@@ -17,6 +17,8 @@ export interface TextureSetListViewState {
   selectedCategoryKeys: PersistedModelCategorySelectionKeys
   /** Subset of `TextureType` enum values (numeric). */
   selectedTextureTypes: number[]
+  /** Minimum largest-side resolution filter (e.g. 4096 = "4K and up"); null = any. */
+  minResolution: number | null
   /** Persists across tab navigation so a selection survives re-mount. */
   selectedTextureSetIds: number[]
 }
@@ -38,6 +40,7 @@ export const DEFAULT_TEXTURE_SET_LIST_VIEW_STATE: TextureSetListViewState = {
   selectedProjectIds: [],
   selectedCategoryKeys: {},
   selectedTextureTypes: [],
+  minResolution: null,
   selectedTextureSetIds: [],
 }
 

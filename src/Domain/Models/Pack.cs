@@ -12,6 +12,7 @@ public class Pack : AggregateRoot
     private readonly List<TextureSet> _textureSets = new();
     private readonly List<Sprite> _sprites = new();
     private readonly List<Sound> _sounds = new();
+    private readonly List<Script> _scripts = new();
     private readonly List<EnvironmentMap> _environmentMaps = new();
 
     public int Id { get; private set; }
@@ -70,6 +71,18 @@ public class Pack : AggregateRoot
             _sounds.Clear();
             if (value != null)
                 _sounds.AddRange(value);
+        }
+    }
+
+    // Navigation property for many-to-many relationship with Scripts - EF Core requires this to be settable
+    public ICollection<Script> Scripts
+    {
+        get => _scripts;
+        set
+        {
+            _scripts.Clear();
+            if (value != null)
+                _scripts.AddRange(value);
         }
     }
 
@@ -358,6 +371,43 @@ public class Pack : AggregateRoot
         return _sounds.AsReadOnly();
     }
 
+    /// <summary>Adds a script to this pack.</summary>
+    public void AddScript(Script script, DateTime updatedAt)
+    {
+        if (script == null)
+            throw new ArgumentNullException(nameof(script));
+
+        if (_scripts.Any(s => s.Id == script.Id))
+            return; // Script already in pack
+
+        _scripts.Add(script);
+        UpdatedAt = updatedAt;
+    }
+
+    /// <summary>Removes a script from this pack.</summary>
+    public void RemoveScript(Script script, DateTime updatedAt)
+    {
+        if (script == null)
+            throw new ArgumentNullException(nameof(script));
+
+        if (_scripts.Remove(script))
+        {
+            UpdatedAt = updatedAt;
+        }
+    }
+
+    /// <summary>Checks if this pack contains a script with the specified ID.</summary>
+    public bool HasScript(int scriptId)
+    {
+        return _scripts.Any(s => s.Id == scriptId);
+    }
+
+    /// <summary>Gets all scripts in this pack.</summary>
+    public IReadOnlyList<Script> GetScripts()
+    {
+        return _scripts.AsReadOnly();
+    }
+
     public void AddEnvironmentMap(EnvironmentMap environmentMap, DateTime updatedAt)
     {
         if (environmentMap == null)
@@ -413,6 +463,11 @@ public class Pack : AggregateRoot
     /// Gets the count of sounds in this pack.
     /// </summary>
     public int SoundCount => _sounds.Count;
+
+    /// <summary>
+    /// Gets the count of scripts in this pack.
+    /// </summary>
+    public int ScriptCount => _scripts.Count;
 
     public int EnvironmentMapCount => _environmentMaps.Count;
 

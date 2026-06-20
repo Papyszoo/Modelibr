@@ -18,6 +18,12 @@ export interface ModelTechnicalMetadataDto {
   vertexCount?: number | null
   meshCount?: number | null
   materialCount?: number | null
+  boundingBoxX?: number | null
+  boundingBoxY?: number | null
+  boundingBoxZ?: number | null
+  animationCount?: number | null
+  animationNames?: string[]
+  boneCount?: number | null
   updatedAt?: string | null
 }
 

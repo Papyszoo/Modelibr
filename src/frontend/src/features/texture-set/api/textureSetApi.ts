@@ -37,6 +37,7 @@ export async function getTextureSetsPaginated(options: {
   textureTypes?: number[]
   kind?: number
   searchName?: string
+  minResolution?: number
 }): Promise<{
   textureSets: TextureSetDto[]
   totalCount: number
@@ -58,6 +59,9 @@ export async function getTextureSetsPaginated(options: {
   if (options.kind !== undefined) params.append('kind', options.kind.toString())
   if (options.searchName && options.searchName.trim()) {
     params.append('searchName', options.searchName.trim())
+  }
+  if (options.minResolution != null) {
+    params.append('minResolution', options.minResolution.toString())
   }
 
   const response = await client.get(`/texture-sets?${params.toString()}`)

@@ -119,12 +119,14 @@ export function getTabLabel(
     packId?: string
     projectId?: string
     stageId?: string
+    scriptId?: string
     modelName?: string
     setName?: string
     environmentMapName?: string
     packName?: string
     projectName?: string
     stageName?: string
+    scriptName?: string
   } = {}
 ): string {
   const {
@@ -134,12 +136,14 @@ export function getTabLabel(
     packId,
     projectId,
     stageId,
+    scriptId,
     modelName,
     setName,
     environmentMapName,
     packName,
     projectName,
     stageName,
+    scriptName,
   } = options
   switch (type) {
     case 'newTab':
@@ -179,6 +183,11 @@ export function getTabLabel(
       return 'Sprites'
     case 'sounds':
       return 'Sounds'
+    case 'scripts':
+      return 'Scripts'
+    case 'scriptViewer':
+      if (scriptName) return scriptName
+      return scriptId ? `Script ${scriptId}` : 'Script'
     case 'stageList':
       return 'Stages'
     case 'stageEditor':
@@ -230,6 +239,10 @@ export function createTab(
         tabId = `stage-${id}`
         params.stageId = id
         break
+      case 'scriptViewer':
+        tabId = `script-${id}`
+        params.scriptId = id
+        break
     }
   }
 
@@ -245,6 +258,7 @@ export function createTab(
         packId: type === 'packViewer' ? id : undefined,
         projectId: type === 'projectViewer' ? id : undefined,
         stageId: type === 'stageEditor' ? id : undefined,
+        scriptId: type === 'scriptViewer' ? id : undefined,
         modelName: type === 'modelViewer' && name ? name : undefined,
         setName: type === 'textureSetViewer' && name ? name : undefined,
         environmentMapName:
@@ -252,6 +266,7 @@ export function createTab(
         packName: type === 'packViewer' && name ? name : undefined,
         projectName: type === 'projectViewer' && name ? name : undefined,
         stageName: type === 'stageEditor' && name ? name : undefined,
+        scriptName: type === 'scriptViewer' && name ? name : undefined,
       }),
     params,
     internalUiState,
@@ -262,6 +277,7 @@ export function createTab(
     packId: params.packId,
     projectId: params.projectId,
     stageId: params.stageId,
+    scriptId: params.scriptId,
   }
 }
 
