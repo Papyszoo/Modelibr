@@ -21,6 +21,13 @@ const mockResponse: GlobalSearchResponse = {
         { type: 'sound', id: 9, name: 'Barrel Roll SFX', matchedOn: 'name' },
       ],
     },
+    {
+      type: 'script',
+      totalCount: 1,
+      items: [
+        { type: 'script', id: 5, name: 'barrel_spawner', matchedOn: 'name' },
+      ],
+    },
   ],
 }
 
@@ -52,10 +59,14 @@ describe('SearchPalette', () => {
     })
 
     await waitFor(() =>
-      expect(screen.getAllByTestId('search-palette-result')).toHaveLength(3)
+      expect(screen.getAllByTestId('search-palette-result')).toHaveLength(4)
     )
     expect(screen.getByText('Models')).toBeInTheDocument()
     expect(screen.getByText('Sounds')).toBeInTheDocument()
+    // Scripts are a searchable asset type too; a missing TYPE_META entry
+    // for a backend group type would crash the palette.
+    expect(screen.getByText('Scripts')).toBeInTheDocument()
+    expect(screen.getByText('barrel_spawner')).toBeInTheDocument()
     // The tag-matched model shows a 'tag' badge.
     expect(screen.getByText('tag')).toBeInTheDocument()
   })
@@ -66,7 +77,7 @@ describe('SearchPalette', () => {
     fireEvent.change(input, { target: { value: 'barrel' } })
 
     await waitFor(() =>
-      expect(screen.getAllByTestId('search-palette-result')).toHaveLength(3)
+      expect(screen.getAllByTestId('search-palette-result')).toHaveLength(4)
     )
 
     // Arrow down once → second item, then Enter.

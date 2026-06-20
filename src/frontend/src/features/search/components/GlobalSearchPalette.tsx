@@ -18,6 +18,7 @@ const RESULT_TAB: Record<SearchResultType, { type: TabType; usesId: boolean }> =
     project: { type: 'projectViewer', usesId: true },
     sprite: { type: 'sprites', usesId: false },
     sound: { type: 'sounds', usesId: false },
+    script: { type: 'scriptViewer', usesId: true },
   }
 
 interface GlobalSearchPaletteProps {

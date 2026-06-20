@@ -4,6 +4,7 @@ export type SearchResultType =
   | 'environmentMap'
   | 'sprite'
   | 'sound'
+  | 'script'
   | 'pack'
   | 'project'
 
