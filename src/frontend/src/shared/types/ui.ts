@@ -14,6 +14,8 @@ export type TabType =
   | 'projectViewer'
   | 'sprites'
   | 'sounds'
+  | 'scripts'
+  | 'scriptViewer'
   | 'stageList'
   | 'stageEditor'
   | 'settings'
@@ -35,6 +37,7 @@ export interface Tab {
   packId?: string
   projectId?: string
   stageId?: string
+  scriptId?: string
 }
 
 export interface SplitterEvent {

@@ -42,6 +42,7 @@ internal sealed class GetDeletePreviewQueryHandler : IQueryHandler<GetDeletePrev
     private readonly ITextureSetRepository _textureSetRepository;
     private readonly ISpriteRepository _spriteRepository;
     private readonly ISoundRepository _soundRepository;
+    private readonly IScriptRepository _scriptRepository;
     private readonly IEnvironmentMapRepository _environmentMapRepository;
 
     public GetDeletePreviewQueryHandler(
@@ -51,6 +52,7 @@ internal sealed class GetDeletePreviewQueryHandler : IQueryHandler<GetDeletePrev
         ITextureSetRepository textureSetRepository,
         ISpriteRepository spriteRepository,
         ISoundRepository soundRepository,
+        IScriptRepository scriptRepository,
         IEnvironmentMapRepository environmentMapRepository)
     {
         _modelRepository = modelRepository;
@@ -59,6 +61,7 @@ internal sealed class GetDeletePreviewQueryHandler : IQueryHandler<GetDeletePrev
         _textureSetRepository = textureSetRepository;
         _spriteRepository = spriteRepository;
         _soundRepository = soundRepository;
+        _scriptRepository = scriptRepository;
         _environmentMapRepository = environmentMapRepository;
     }
 
@@ -135,6 +138,15 @@ internal sealed class GetDeletePreviewQueryHandler : IQueryHandler<GetDeletePrev
                 filesToDelete.Add(new DeletedFileInfo(sound.File.FilePath, sound.File.OriginalFileName, sound.File.SizeBytes));
                 break;
 
+            case "script":
+                var script = await _scriptRepository.GetDeletedByIdAsync(request.EntityId, cancellationToken);
+                if (script == null)
+                    return Result.Failure<GetDeletePreviewResponse>(new Error("ScriptNotFound", "Script not found"));
+
+                entityName = script.Name;
+                filesToDelete.Add(new DeletedFileInfo(script.File.FilePath, script.File.OriginalFileName, script.File.SizeBytes));
+                break;
+
             case "environmentmap":
                 var environmentMap = await _environmentMapRepository.GetDeletedByIdAsync(request.EntityId, cancellationToken);
                 if (environmentMap == null)
@@ -172,6 +184,7 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
     private readonly ITextureSetRepository _textureSetRepository;
     private readonly ISpriteRepository _spriteRepository;
     private readonly ISoundRepository _soundRepository;
+    private readonly IScriptRepository _scriptRepository;
     private readonly IEnvironmentMapRepository _environmentMapRepository;
     private readonly IFileStorage _fileStorage;
     private readonly IThumbnailQueue _thumbnailQueue;
@@ -183,6 +196,7 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
         ITextureSetRepository textureSetRepository,
         ISpriteRepository spriteRepository,
         ISoundRepository soundRepository,
+        IScriptRepository scriptRepository,
         IEnvironmentMapRepository environmentMapRepository,
         IFileStorage fileStorage,
         IThumbnailQueue thumbnailQueue)
@@ -193,6 +207,7 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
         _textureSetRepository = textureSetRepository;
         _spriteRepository = spriteRepository;
         _soundRepository = soundRepository;
+        _scriptRepository = scriptRepository;
         _environmentMapRepository = environmentMapRepository;
         _fileStorage = fileStorage;
         _thumbnailQueue = thumbnailQueue;
@@ -344,6 +359,31 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
                 }
                 
                 return Result.Success(new PermanentDeleteEntityResponse(true, "Sound permanently deleted", deletedFiles));
+
+            case "script":
+                var scriptToDelete = await _scriptRepository.GetDeletedByIdAsync(request.EntityId, cancellationToken);
+                if (scriptToDelete == null)
+                    return Result.Failure<PermanentDeleteEntityResponse>(new Error("ScriptNotFound", "Script not found"));
+
+                // Collect file info before deletion
+                var scriptFileId = scriptToDelete.File.Id;
+                var scriptFilePath = scriptToDelete.File.FilePath;
+                var scriptFileName = scriptToDelete.File.OriginalFileName;
+                var scriptFileSize = scriptToDelete.File.SizeBytes;
+
+                // Delete script entity from database
+                await _scriptRepository.DeleteAsync(scriptToDelete.Id, cancellationToken);
+
+                // Check if the file is still referenced by other entities
+                var isScriptFileReferenced = await _fileRepository.IsFileHashReferencedByOthersAsync(scriptFileId, cancellationToken);
+                if (!isScriptFileReferenced)
+                {
+                    await _fileStorage.DeleteFileAsync(scriptFilePath, cancellationToken);
+                    deletedFiles.Add(new DeletedFileInfo(scriptFilePath, scriptFileName, scriptFileSize));
+                    await _fileRepository.HardDeleteAsync(scriptFileId, cancellationToken);
+                }
+
+                return Result.Success(new PermanentDeleteEntityResponse(true, "Script permanently deleted", deletedFiles));
 
             case "environmentmap":
                 var environmentMap = await _environmentMapRepository.GetDeletedByIdAsync(request.EntityId, cancellationToken);

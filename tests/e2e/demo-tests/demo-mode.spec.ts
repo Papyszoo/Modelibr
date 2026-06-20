@@ -144,11 +144,11 @@ test.describe("demo mode e2e", () => {
         await expect(page.getByText("Test Cube").first()).toBeVisible();
         await expect(page.getByText("Test Torus").first()).toBeVisible();
         await page.getByRole("button", { name: /^filters$/i }).click();
-        await page
-            .locator(
-                "#model-grid-filters-panel .models-filter-switch .p-inputswitch",
-            )
-            .click();
+        // Target the Concept-art switch by testid: the filter panel now also has
+        // an Animated switch (added with model metadata), so a generic
+        // `.models-filter-switch .p-inputswitch` locator matches two elements.
+        // Demo model 1 (Test Cube) has concept art, model 2 (Test Cone) does not.
+        await page.getByTestId("concept-art-filter").click();
         await expect(page.locator('[data-model-id="1"]')).toBeVisible();
         await expect(page.locator('[data-model-id="2"]')).toHaveCount(0);
 

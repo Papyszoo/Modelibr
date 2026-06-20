@@ -157,6 +157,29 @@
   transform: scale(1.1);
 }
 
+/* Corner badge (e.g. animated indicator) */
+.model-card-badge {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  font-size: 0.8rem;
+  pointer-events: none;
+}
+
+.model-card-badge-animated {
+  color: var(--primary-color, #3b82f6);
+  background: rgba(0, 0, 0, 0.65);
+}
+
 /* Overlay with model name */
 .model-card-overlay {
   position: absolute;

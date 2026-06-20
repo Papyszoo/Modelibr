@@ -19,6 +19,9 @@ interface UseModelDataOptions {
   selectedCategoryIds: number[]
   selectedTagNames: string[]
   hasConceptImages: boolean
+  animatedOnly?: boolean
+  minTriangleCount?: number | null
+  maxTriangleCount?: number | null
   textureSetId?: number
   searchQuery?: string
 }
@@ -29,6 +32,9 @@ export function useModelData({
   selectedCategoryIds,
   selectedTagNames,
   hasConceptImages,
+  animatedOnly = false,
+  minTriangleCount = null,
+  maxTriangleCount = null,
   textureSetId,
   searchQuery = '',
 }: UseModelDataOptions) {
@@ -62,6 +68,9 @@ export function useModelData({
         categoryIds: sortedCategoryIds,
         tags: sortedTagNames,
         hasConceptImages,
+        animatedOnly,
+        minTriangleCount,
+        maxTriangleCount,
         searchName: debouncedSearchName || undefined,
       },
     ],
@@ -76,6 +85,9 @@ export function useModelData({
           sortedCategoryIds.length > 0 ? sortedCategoryIds : undefined,
         tags: sortedTagNames.length > 0 ? sortedTagNames : undefined,
         hasConceptImages: hasConceptImages || undefined,
+        hasAnimations: animatedOnly || undefined,
+        minTriangleCount: minTriangleCount ?? undefined,
+        maxTriangleCount: maxTriangleCount ?? undefined,
         searchName: debouncedSearchName || undefined,
       }),
     initialPageParam: 1,

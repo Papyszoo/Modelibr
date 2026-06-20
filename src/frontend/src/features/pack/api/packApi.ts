@@ -7,11 +7,13 @@ import {
   type EnvironmentMapDto,
   type GetAllEnvironmentMapsResponse,
   type GetAllPacksResponse,
+  type GetAllScriptsResponse,
   type GetAllSoundsResponse,
   type GetAllSpritesResponse,
   type GetAllTextureSetsResponse,
   type PackDetailDto,
   type PackDto,
+  type ScriptDto,
   type SoundDto,
   type SpriteDto,
   type TextureSetDto,
@@ -173,6 +175,27 @@ export async function getSoundsByPack(packId: number): Promise<SoundDto[]> {
     `/sounds?packIds=${packId}`
   )
   return response.data.sounds
+}
+
+export async function addScriptToPack(
+  packId: number,
+  scriptId: number
+): Promise<void> {
+  await client.post(`/packs/${packId}/scripts/${scriptId}`)
+}
+
+export async function removeScriptFromPack(
+  packId: number,
+  scriptId: number
+): Promise<void> {
+  await client.delete(`/packs/${packId}/scripts/${scriptId}`)
+}
+
+export async function getScriptsByPack(packId: number): Promise<ScriptDto[]> {
+  const response = await client.get<GetAllScriptsResponse>(
+    `/scripts?packIds=${packId}`
+  )
+  return response.data.scripts
 }
 
 export async function addEnvironmentMapToPack(

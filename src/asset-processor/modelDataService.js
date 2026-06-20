@@ -378,6 +378,12 @@ export class ModelDataService {
           vertexCount: metadata.vertexCount,
           meshCount: metadata.meshCount,
           materialCount: metadata.materialCount,
+          boundingBoxX: metadata.boundingBoxX ?? null,
+          boundingBoxY: metadata.boundingBoxY ?? null,
+          boundingBoxZ: metadata.boundingBoxZ ?? null,
+          animationCount: metadata.animationCount ?? null,
+          animationNames: metadata.animationNames ?? [],
+          boneCount: metadata.boneCount ?? null,
         },
         {
           headers: {

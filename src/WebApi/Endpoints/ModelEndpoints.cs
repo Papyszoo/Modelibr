@@ -52,6 +52,9 @@ public static class ModelEndpoints
             int? page,
             int? pageSize,
             string? searchName,
+            int? minTriangleCount,
+            int? maxTriangleCount,
+            bool? hasAnimations,
             IQueryHandler<GetAllModelsQuery, GetAllModelsQueryResponse> queryHandler,
             CancellationToken cancellationToken) =>
         {
@@ -65,7 +68,10 @@ public static class ModelEndpoints
                     HasConceptImages: hasConceptImages,
                     Page: page,
                     PageSize: pageSize,
-                    SearchName: string.IsNullOrWhiteSpace(searchName) ? null : searchName),
+                    SearchName: string.IsNullOrWhiteSpace(searchName) ? null : searchName,
+                    MinTriangleCount: minTriangleCount,
+                    MaxTriangleCount: maxTriangleCount,
+                    HasAnimations: hasAnimations),
                 cancellationToken);
             
             if (result.IsFailure)

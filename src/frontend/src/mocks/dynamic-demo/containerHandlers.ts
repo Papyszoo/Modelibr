@@ -59,6 +59,7 @@ export const containerHandlers = [
       multiModelTextureCount: 0,
       spriteCount: 0,
       soundCount: 0,
+      scriptCount: 0,
       isEmpty: true,
       customThumbnailFileId: null,
       customThumbnailUrl: null,
@@ -66,6 +67,7 @@ export const containerHandlers = [
       textureSets: [],
       sprites: [],
       sounds: [],
+      scripts: [],
     }
     await put('packs', pack)
     return HttpResponse.json(toPackDto(pack), { status: 201 })
@@ -217,6 +219,35 @@ export const containerHandlers = [
     const pack = await getById('packs', Number(params.packId))
     if (!pack) return new HttpResponse(null, { status: 404 })
     pack.sounds = pack.sounds.filter(s => s.id !== Number(params.soundId))
+    await recomputePackCounts(pack)
+    pack.updatedAt = now()
+    await put('packs', pack)
+    return new HttpResponse(null, { status: 204 })
+  }),
+
+  // Pack ↔ Script
+  http.post('*/packs/:packId/scripts/:scriptId', async ({ params }) => {
+    const pack = await getById('packs', Number(params.packId))
+    const script = await getById('scripts', Number(params.scriptId))
+    if (!pack || !script) return new HttpResponse(null, { status: 404 })
+    if (!(pack.scripts ?? []).some(s => s.id === script.id)) {
+      pack.scripts = [
+        ...(pack.scripts ?? []),
+        { id: script.id, name: script.name },
+      ]
+      await recomputePackCounts(pack)
+      pack.updatedAt = now()
+      await put('packs', pack)
+    }
+    return new HttpResponse(null, { status: 204 })
+  }),
+
+  http.delete('*/packs/:packId/scripts/:scriptId', async ({ params }) => {
+    const pack = await getById('packs', Number(params.packId))
+    if (!pack) return new HttpResponse(null, { status: 404 })
+    pack.scripts = (pack.scripts ?? []).filter(
+      s => s.id !== Number(params.scriptId)
+    )
     await recomputePackCounts(pack)
     pack.updatedAt = now()
     await put('packs', pack)
@@ -379,6 +410,7 @@ export const containerHandlers = [
       multiModelTextureCount: 0,
       spriteCount: 0,
       soundCount: 0,
+      scriptCount: 0,
       isEmpty: true,
       customThumbnailFileId: null,
       customThumbnailUrl: null,
@@ -387,6 +419,7 @@ export const containerHandlers = [
       textureSets: [],
       sprites: [],
       sounds: [],
+      scripts: [],
     }
     await put('projects', project)
     return HttpResponse.json(toProjectDto(project), { status: 201 })
@@ -565,6 +598,35 @@ export const containerHandlers = [
     const project = await getById('projects', Number(params.projectId))
     if (!project) return new HttpResponse(null, { status: 404 })
     project.sounds = project.sounds.filter(s => s.id !== Number(params.soundId))
+    await recomputeProjectCounts(project)
+    project.updatedAt = now()
+    await put('projects', project)
+    return new HttpResponse(null, { status: 204 })
+  }),
+
+  // Project ↔ Script
+  http.post('*/projects/:projectId/scripts/:scriptId', async ({ params }) => {
+    const project = await getById('projects', Number(params.projectId))
+    const script = await getById('scripts', Number(params.scriptId))
+    if (!project || !script) return new HttpResponse(null, { status: 404 })
+    if (!(project.scripts ?? []).some(s => s.id === script.id)) {
+      project.scripts = [
+        ...(project.scripts ?? []),
+        { id: script.id, name: script.name },
+      ]
+      await recomputeProjectCounts(project)
+      project.updatedAt = now()
+      await put('projects', project)
+    }
+    return new HttpResponse(null, { status: 204 })
+  }),
+
+  http.delete('*/projects/:projectId/scripts/:scriptId', async ({ params }) => {
+    const project = await getById('projects', Number(params.projectId))
+    if (!project) return new HttpResponse(null, { status: 404 })
+    project.scripts = (project.scripts ?? []).filter(
+      s => s.id !== Number(params.scriptId)
+    )
     await recomputeProjectCounts(project)
     project.updatedAt = now()
     await put('projects', project)

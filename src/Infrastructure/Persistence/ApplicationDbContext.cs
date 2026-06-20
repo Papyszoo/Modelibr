@@ -29,6 +29,9 @@ namespace Infrastructure.Persistence
         public DbSet<SpriteCategory> SpriteCategories => Set<SpriteCategory>();
         public DbSet<Sound> Sounds => Set<Sound>();
         public DbSet<SoundCategory> SoundCategories => Set<SoundCategory>();
+        public DbSet<Script> Scripts => Set<Script>();
+        public DbSet<ScriptTemplate> ScriptTemplates => Set<ScriptTemplate>();
+        public DbSet<ScriptCategory> ScriptCategories => Set<ScriptCategory>();
         public DbSet<EnvironmentMapCategory> EnvironmentMapCategories => Set<EnvironmentMapCategory>();
         public DbSet<EnvironmentMap> EnvironmentMaps => Set<EnvironmentMap>();
         public DbSet<EnvironmentMapVariant> EnvironmentMapVariants => Set<EnvironmentMapVariant>();
@@ -116,6 +119,18 @@ namespace Infrastructure.Persistence
                 .HasMany(s => s.Projects)
                 .WithMany(p => p.Sounds)
                 .UsingEntity(j => j.ToTable("ProjectSounds"));
+
+            // Configure many-to-many relationship between Script and Pack
+            modelBuilder.Entity<Script>()
+                .HasMany(s => s.Packs)
+                .WithMany(p => p.Scripts)
+                .UsingEntity(j => j.ToTable("PackScripts"));
+
+            // Configure many-to-many relationship between Script and Project
+            modelBuilder.Entity<Script>()
+                .HasMany(s => s.Projects)
+                .WithMany(p => p.Scripts)
+                .UsingEntity(j => j.ToTable("ProjectScripts"));
 
             modelBuilder.Entity<EnvironmentMap>()
                 .HasMany(e => e.Packs)
@@ -273,7 +288,17 @@ namespace Infrastructure.Persistence
                 entity.Property(v => v.VertexCount).IsRequired(false);
                 entity.Property(v => v.MeshCount).IsRequired(false);
                 entity.Property(v => v.MaterialCount).IsRequired(false);
+                entity.Property(v => v.BoundingBoxX).IsRequired(false);
+                entity.Property(v => v.BoundingBoxY).IsRequired(false);
+                entity.Property(v => v.BoundingBoxZ).IsRequired(false);
+                entity.Property(v => v.AnimationCount).IsRequired(false);
+                entity.Property(v => v.BoneCount).IsRequired(false);
                 entity.Property(v => v.TechnicalDetailsUpdatedAt).IsRequired(false);
+
+                // Map AnimationNames as a PostgreSQL text array column
+                entity.Property(v => v.AnimationNames)
+                    .HasColumnType("text[]")
+                    .HasDefaultValueSql("'{}'::text[]");
 
                 // Create unique index on ModelId and VersionNumber
                 entity.HasIndex(v => new { v.ModelId, v.VersionNumber }).IsUnique();
@@ -345,6 +370,9 @@ namespace Infrastructure.Persistence
                 entity.Property(t => t.TextureSetId).IsRequired(false); // Optional relationship
                 entity.Property(t => t.IsDeleted).IsRequired();
                 entity.Property(t => t.DeletedAt);
+                entity.Property(t => t.Width).IsRequired(false);
+                entity.Property(t => t.Height).IsRequired(false);
+                entity.Property(t => t.Format).IsRequired(false).HasMaxLength(20);
 
                 // Configure relationship with File
                 entity.HasOne(t => t.File)
@@ -855,6 +883,9 @@ namespace Infrastructure.Persistence
                 entity.Property(s => s.FileId).IsRequired();
                 entity.Property(s => s.Duration).IsRequired();
                 entity.Property(s => s.Peaks);
+                entity.Property(s => s.SampleRate).IsRequired(false);
+                entity.Property(s => s.Channels).IsRequired(false);
+                entity.Property(s => s.Format).IsRequired(false).HasMaxLength(20);
                 entity.Property(s => s.CreatedAt).IsRequired();
                 entity.Property(s => s.UpdatedAt).IsRequired();
                 entity.Property(s => s.IsDeleted).IsRequired();
@@ -884,6 +915,73 @@ namespace Infrastructure.Persistence
 
             // Configure SoundCategory entity
             modelBuilder.Entity<SoundCategory>(entity =>
+            {
+                entity.HasKey(c => c.Id);
+                entity.Property(c => c.Name).IsRequired().HasMaxLength(100);
+                entity.Property(c => c.Description).HasMaxLength(500);
+                entity.Property(c => c.CreatedAt).IsRequired();
+                entity.Property(c => c.UpdatedAt).IsRequired();
+
+                entity.HasOne(c => c.Parent)
+                    .WithMany(c => c.Children)
+                    .HasForeignKey(c => c.ParentId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasIndex(c => new { c.ParentId, c.Name }).IsUnique();
+            });
+
+            // Configure Script entity
+            modelBuilder.Entity<Script>(entity =>
+            {
+                entity.HasKey(s => s.Id);
+                entity.Property(s => s.Name).IsRequired().HasMaxLength(200);
+                entity.Property(s => s.FileId).IsRequired();
+                entity.Property(s => s.Language).IsRequired().HasMaxLength(50);
+                entity.Property(s => s.LineCount).IsRequired();
+                entity.Property(s => s.SizeBytes).IsRequired();
+                entity.Property(s => s.Description).HasMaxLength(2000);
+                entity.Property(s => s.CreatedAt).IsRequired();
+                entity.Property(s => s.UpdatedAt).IsRequired();
+                entity.Property(s => s.IsDeleted).IsRequired();
+                entity.Property(s => s.DeletedAt);
+
+                // Configure relationship with File
+                entity.HasOne(s => s.File)
+                    .WithMany()
+                    .HasForeignKey(s => s.FileId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                // Configure optional relationship with ScriptCategory
+                entity.HasOne(s => s.Category)
+                    .WithMany()
+                    .HasForeignKey(s => s.ScriptCategoryId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                // Create index for efficient querying by name
+                entity.HasIndex(s => s.Name);
+
+                // Add index for efficient soft delete queries
+                entity.HasIndex(s => s.IsDeleted);
+
+                // Global query filter for soft deletes
+                entity.HasQueryFilter(s => !s.IsDeleted);
+            });
+
+            // Configure ScriptTemplate entity
+            modelBuilder.Entity<ScriptTemplate>(entity =>
+            {
+                entity.HasKey(t => t.Id);
+                entity.Property(t => t.Name).IsRequired().HasMaxLength(200);
+                entity.Property(t => t.Language).IsRequired().HasMaxLength(50);
+                entity.Property(t => t.Content).IsRequired();
+                entity.Property(t => t.Description).HasMaxLength(2000);
+                entity.Property(t => t.CreatedAt).IsRequired();
+                entity.Property(t => t.UpdatedAt).IsRequired();
+                entity.HasIndex(t => t.Name);
+            });
+
+            // Configure ScriptCategory entity
+            modelBuilder.Entity<ScriptCategory>(entity =>
             {
                 entity.HasKey(c => c.Id);
                 entity.Property(c => c.Name).IsRequired().HasMaxLength(100);

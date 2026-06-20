@@ -39,6 +39,14 @@ export interface RecycledSoundDto {
   deletedAt: string
 }
 
+export interface RecycledScriptDto {
+  id: number
+  name: string
+  fileId: number
+  language: string
+  deletedAt: string
+}
+
 export interface RecycledEnvironmentMapDto {
   id: number
   name: string
@@ -72,6 +80,7 @@ export interface GetAllRecycledFilesResponse {
   textures: unknown[]
   sprites: RecycledSpriteDto[]
   sounds: RecycledSoundDto[]
+  scripts?: RecycledScriptDto[]
   environmentMaps?: RecycledEnvironmentMapDto[]
   environmentMapVariants?: RecycledEnvironmentMapVariantDto[]
 }
