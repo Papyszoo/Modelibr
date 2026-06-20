@@ -2,6 +2,7 @@ import { getEnvironmentMapById } from '@/features/environment-map/api/environmen
 import { getModelById } from '@/features/models/api/modelApi'
 import { getPackById } from '@/features/pack/api/packApi'
 import { getProjectById } from '@/features/project/api/projectApi'
+import { getScriptById } from '@/features/scripts/api/scriptApi'
 import { getStageById } from '@/features/stage-editor/api/stageApi'
 import { getTextureSetById } from '@/features/texture-set/api/textureSetApi'
 import { createTab } from '@/stores/navigationStore'
@@ -66,6 +67,10 @@ export function parseCompactTabFormat(
         tabs.push(createTab('stageEditor', tabId.substring(6)))
         continue
       }
+      if (tabId.startsWith('script-')) {
+        tabs.push(createTab('scriptViewer', tabId.substring(7)))
+        continue
+      }
 
       const tabType = tabId as Tab['type']
       if (
@@ -82,6 +87,7 @@ export function parseCompactTabFormat(
           'projectViewer',
           'sprites',
           'sounds',
+          'scripts',
           'stageList',
           'stageEditor',
           'history',
@@ -218,6 +224,19 @@ export async function parseCompactTabFormatAsync(
         continue
       }
 
+      if (tabId.startsWith('script-')) {
+        const scriptId = tabId.substring(7)
+        let scriptName: string | undefined
+        try {
+          const script = await getScriptById(Number(scriptId))
+          scriptName = script.name
+        } catch {
+          /* fall back to ID-based label */
+        }
+        tabs.push(createTab('scriptViewer', scriptId, scriptName))
+        continue
+      }
+
       const tabType = tabId as Tab['type']
       if (
         ![
@@ -233,6 +252,7 @@ export async function parseCompactTabFormatAsync(
           'projectViewer',
           'sprites',
           'sounds',
+          'scripts',
           'stageList',
           'stageEditor',
           'history',

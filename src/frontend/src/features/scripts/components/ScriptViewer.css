@@ -1,0 +1,22 @@
+.script-viewer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.script-viewer-loading,
+.script-viewer-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  height: 100%;
+  color: var(--text-color-secondary, #9aa0a6);
+}
+
+.script-viewer-error i {
+  font-size: 2rem;
+  color: var(--yellow-500, #f9c74f);
+}

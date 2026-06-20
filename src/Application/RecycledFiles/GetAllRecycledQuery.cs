@@ -14,6 +14,7 @@ public record GetAllRecycledQueryResponse(
     IEnumerable<RecycledTextureDto> Textures,
     IEnumerable<RecycledSpriteDto> Sprites,
     IEnumerable<RecycledSoundDto> Sounds,
+    IEnumerable<RecycledScriptDto> Scripts,
     IEnumerable<RecycledEnvironmentMapDto> EnvironmentMaps,
     IEnumerable<RecycledEnvironmentMapVariantDto> EnvironmentMapVariants
 );
@@ -72,6 +73,14 @@ public record RecycledSoundDto(
     DateTime DeletedAt
 );
 
+public record RecycledScriptDto(
+    int Id,
+    string Name,
+    int FileId,
+    string Language,
+    DateTime DeletedAt
+);
+
 public record RecycledEnvironmentMapDto(
     int Id,
     string Name,
@@ -97,6 +106,7 @@ internal sealed class GetAllRecycledQueryHandler : IQueryHandler<GetAllRecycledQ
     private readonly ITextureSetRepository _textureSetRepository;
     private readonly ISpriteRepository _spriteRepository;
     private readonly ISoundRepository _soundRepository;
+    private readonly IScriptRepository _scriptRepository;
     private readonly IEnvironmentMapRepository _environmentMapRepository;
 
     public GetAllRecycledQueryHandler(
@@ -106,6 +116,7 @@ internal sealed class GetAllRecycledQueryHandler : IQueryHandler<GetAllRecycledQ
         ITextureSetRepository textureSetRepository,
         ISpriteRepository spriteRepository,
         ISoundRepository soundRepository,
+        IScriptRepository scriptRepository,
         IEnvironmentMapRepository environmentMapRepository)
     {
         _modelRepository = modelRepository;
@@ -114,6 +125,7 @@ internal sealed class GetAllRecycledQueryHandler : IQueryHandler<GetAllRecycledQ
         _textureSetRepository = textureSetRepository;
         _spriteRepository = spriteRepository;
         _soundRepository = soundRepository;
+        _scriptRepository = scriptRepository;
         _environmentMapRepository = environmentMapRepository;
     }
 
@@ -191,6 +203,16 @@ internal sealed class GetAllRecycledQueryHandler : IQueryHandler<GetAllRecycledQ
             s.DeletedAt!.Value
         )).ToList();
 
+        // Get deleted scripts
+        var scripts = await _scriptRepository.GetAllDeletedAsync(cancellationToken);
+        var scriptDtos = scripts.Select(s => new RecycledScriptDto(
+            s.Id,
+            s.Name,
+            s.FileId,
+            s.Language,
+            s.DeletedAt!.Value
+        )).ToList();
+
         var environmentMaps = await _environmentMapRepository.GetAllDeletedAsync(cancellationToken);
         var environmentMapDtos = environmentMaps.Select(e =>
         {
@@ -231,6 +253,7 @@ internal sealed class GetAllRecycledQueryHandler : IQueryHandler<GetAllRecycledQ
             textureDtos,
             spriteDtos,
             soundDtos,
+            scriptDtos,
             environmentMapDtos,
             environmentMapVariantDtos
         );

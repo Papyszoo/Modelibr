@@ -501,10 +501,9 @@ export function SoundList() {
     sound: SoundDto
   ) => {
     e.preventDefault()
-    // If right-clicked sound is not in selection, select only that sound
-    if (!selectedSoundIds.has(sound.id)) {
-      setSelectedSoundIds(new Set([sound.id]))
-    }
+    // Right-click only targets the card for the menu; it does not change the
+    // checkbox selection. Menu actions fall back to this target when nothing
+    // is explicitly selected (see handleRecycleSounds).
     setContextMenuTarget(sound)
     contextMenuRef.current?.show(e)
   }
