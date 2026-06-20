@@ -160,6 +160,9 @@ export function SearchPalette({
           ) : (
             groups.map(group => {
               const meta = TYPE_META[group.type]
+              // Skip unknown types (e.g. a backend asset type added before the
+              // frontend mapping) rather than crashing on meta.label/icon.
+              if (!meta) return null
               return (
                 <div key={group.type} className="search-palette-group">
                   <div className="search-palette-group-header">
