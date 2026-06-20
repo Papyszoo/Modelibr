@@ -485,7 +485,7 @@ export async function nextId(entity: string): Promise<number> {
 
 // ─── Generic CRUD ───────────────────────────────────────────────────────
 
-type StoreNames =
+export type StoreNames =
   | 'models'
   | 'modelVersions'
   | 'textureSets'

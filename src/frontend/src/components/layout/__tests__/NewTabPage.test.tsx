@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 
 import { NewTabPage } from '@/components/layout/NewTabPage'
 import { DockContext } from '@/contexts/DockContext'
+import { OPEN_SEARCH_EVENT } from '@/features/search/searchEvents'
 import { TabContext, type TabContextValue } from '@/contexts/TabContext'
 import {
   type ClosedWindowEntry,
@@ -113,6 +114,25 @@ describe('NewTabPage', () => {
     expect(updated[0]).toMatchObject({ type: 'modelList', label: 'Models' })
     expect(updated[0].id).not.toBe('newTab')
     expect(setActiveTab).toHaveBeenCalledWith(updated[0].id)
+  })
+
+  it('opens the global search palette from the System tile without replacing the tab', () => {
+    const setTabs = jest.fn()
+    const ctx = makeContextValue({
+      tabs: [newTab],
+      activeTab: 'newTab',
+      setTabs,
+    })
+    renderWithContext(<NewTabPage tabId="newTab" />, ctx)
+
+    const onOpenSearch = jest.fn()
+    window.addEventListener(OPEN_SEARCH_EVENT, onOpenSearch)
+    fireEvent.click(screen.getByText('Global Search'))
+    window.removeEventListener(OPEN_SEARCH_EVENT, onOpenSearch)
+
+    expect(onOpenSearch).toHaveBeenCalledTimes(1)
+    // Action tiles open an overlay — the host New Tab page is not converted.
+    expect(setTabs).not.toHaveBeenCalled()
   })
 
   it('activates an existing singleton tab and drops the placeholder', () => {

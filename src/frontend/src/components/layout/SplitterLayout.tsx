@@ -4,6 +4,7 @@ import { Splitter, SplitterPanel } from 'primereact/splitter'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { DockProvider } from '@/contexts/DockContext'
+import { GlobalSearchPalette } from '@/features/search'
 import { useDeepLinkHandler } from '@/hooks/useDeepLinkHandler'
 import { useWindowInit } from '@/hooks/useWindowInit'
 import { createTab, useNavigationStore } from '@/stores/navigationStore'
@@ -259,6 +260,7 @@ export function SplitterLayout() {
 
   return (
     <DockProvider>
+      <GlobalSearchPalette windowId={windowId} side="left" />
       <div className="splitter-layout">
         <Splitter layout="horizontal" onResizeEnd={handleSplitterResizeEnd}>
           <SplitterPanel size={leftSize} minSize={20}>

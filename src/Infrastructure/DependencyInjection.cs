@@ -56,6 +56,7 @@ namespace Infrastructure
             services.AddScoped<IEnvironmentMapRepository, EnvironmentMapRepository>();
             services.AddScoped<IEnvironmentMapCategoryRepository, EnvironmentMapCategoryRepository>();
             services.AddScoped<ITextureSetCategoryRepository, TextureSetCategoryRepository>();
+            services.AddScoped<ISearchRepository, SearchRepository>();
             services.AddScoped<IEnvironmentMapSizeLabelService, EnvironmentMapSizeLabelService>();
             services.AddScoped<ITextureImageMetadataReader, TextureImageMetadataReader>();
             services.AddScoped<IThumbnailQueue, ThumbnailQueue>();
