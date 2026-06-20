@@ -66,6 +66,13 @@ internal sealed class SearchRepository : ISearchRepository
                 .Select(s => new SearchResultItem("sound", s.Id, s.Name, "name")),
             cancellationToken);
 
+        await AddGroupAsync(groups, "script", perTypeLimit,
+            _context.Scripts.AsNoTracking()
+                .Where(s => !s.IsDeleted && EF.Functions.ILike(s.Name, pattern))
+                .OrderBy(s => s.Name)
+                .Select(s => new SearchResultItem("script", s.Id, s.Name, "name")),
+            cancellationToken);
+
         await AddGroupAsync(groups, "pack", perTypeLimit,
             _context.Packs.AsNoTracking()
                 .Where(p => EF.Functions.ILike(p.Name, pattern))

@@ -746,6 +746,7 @@ export const dynamicDemoHandlers = [
       { store: 'environmentMaps', type: 'environmentMap' },
       { store: 'sprites', type: 'sprite' },
       { store: 'sounds', type: 'sound' },
+      { store: 'scripts', type: 'script' },
       { store: 'packs', type: 'pack' },
       { store: 'projects', type: 'project' },
     ]

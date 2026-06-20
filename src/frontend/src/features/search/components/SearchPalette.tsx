@@ -14,6 +14,7 @@ const TYPE_META: Record<SearchResultType, { label: string; icon: string }> = {
   environmentMap: { label: 'Environment Maps', icon: 'pi pi-globe' },
   sprite: { label: 'Sprites', icon: 'pi pi-th-large' },
   sound: { label: 'Sounds', icon: 'pi pi-volume-up' },
+  script: { label: 'Scripts', icon: 'pi pi-code' },
   pack: { label: 'Packs', icon: 'pi pi-folder' },
   project: { label: 'Projects', icon: 'pi pi-briefcase' },
 }
