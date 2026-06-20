@@ -477,6 +477,9 @@
               let model
               if (fileType === 'gltf' || fileType === 'glb') {
                 model = result.scene
+                // GLTFLoader keeps clips on the result, not the scene —
+                // carry them over so metadata extraction can see them.
+                model.animations = result.animations || []
               } else {
                 model = result
               }

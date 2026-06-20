@@ -31,6 +31,7 @@ internal class GetAllTextureSetsQueryHandler : IQueryHandler<GetAllTextureSetsQu
                 query.TextureTypes,
                 query.Kind,
                 query.SearchName,
+                query.MinResolution,
                 cancellationToken);
             textureSets = result.Items;
             totalCount = result.TotalCount;
@@ -58,6 +59,12 @@ internal class GetAllTextureSetsQueryHandler : IQueryHandler<GetAllTextureSetsQu
                 textureSets = textureSets.Where(ts =>
                     ts.Name.Contains(search, StringComparison.OrdinalIgnoreCase));
             }
+            // Keep the set if any texture's largest side meets the threshold
+            // (matches the MaxResolution badge, which is the max side); NULL
+            // dimensions compare false and are excluded. Mirrors TextureSetRepository.
+            if (query.MinResolution.HasValue)
+                textureSets = textureSets.Where(ts =>
+                    ts.Textures.Any(t => t.Width >= query.MinResolution.Value || t.Height >= query.MinResolution.Value));
         }
 
         var categories = await _textureSetCategoryRepository.GetAllAsync(cancellationToken);
@@ -76,13 +83,23 @@ internal class GetAllTextureSetsQueryHandler : IQueryHandler<GetAllTextureSetsQu
             TextureCount = tp.TextureCount,
             IsEmpty = tp.IsEmpty,
             ThumbnailPath = tp.ThumbnailPath,
+            // Largest texture side in the set (max over width/height of all textures);
+            // null when no texture has extracted dimensions yet.
+            MaxResolution = tp.Textures
+                .SelectMany(t => new[] { t.Width, t.Height })
+                .Where(d => d.HasValue)
+                .Select(d => d!.Value)
+                .DefaultIfEmpty(0)
+                .Max() is var maxSide && maxSide > 0 ? maxSide : null,
             Textures = tp.Textures.Select(t => new TextureListDto
             {
                 Id = t.Id,
                 TextureType = t.TextureType,
                 SourceChannel = t.SourceChannel,
                 FileId = t.FileId,
-                FileName = t.File != null ? t.File.OriginalFileName : null
+                FileName = t.File != null ? t.File.OriginalFileName : null,
+                Width = t.Width,
+                Height = t.Height
             }).ToList(),
             AssociatedModels = tp.ModelVersionMappings.Select(m => new ModelSummaryListDto
             {
@@ -110,7 +127,8 @@ public record GetAllTextureSetsQuery(
     int? Page = null,
     int? PageSize = null,
     TextureSetKind? Kind = null,
-    string? SearchName = null) : IQuery<GetAllTextureSetsResponse>;
+    string? SearchName = null,
+    int? MinResolution = null) : IQuery<GetAllTextureSetsResponse>;
 public record GetAllTextureSetsResponse(IEnumerable<TextureSetListDto> TextureSets, int? TotalCount = null, int? Page = null, int? PageSize = null, int? TotalPages = null);
 
 /// <summary>
@@ -130,6 +148,12 @@ public record TextureSetListDto
     public int TextureCount { get; init; }
     public bool IsEmpty { get; init; }
     public string? ThumbnailPath { get; init; }
+
+    /// <summary>
+    /// Largest texture side (max of width/height across all textures in the set),
+    /// used by the resolution filter and badge. Null until dimensions are extracted.
+    /// </summary>
+    public int? MaxResolution { get; init; }
     public ICollection<TextureListDto> Textures { get; init; } = new List<TextureListDto>();
     public ICollection<ModelSummaryListDto> AssociatedModels { get; init; } = new List<ModelSummaryListDto>();
 }
@@ -148,6 +172,8 @@ public record TextureListDto
     public TextureChannel SourceChannel { get; init; }
     public int FileId { get; init; }
     public string? FileName { get; init; }
+    public int? Width { get; init; }
+    public int? Height { get; init; }
 }
 
 /// <summary>

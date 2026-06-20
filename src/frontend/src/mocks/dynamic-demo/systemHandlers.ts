@@ -3,6 +3,7 @@ import { http, HttpResponse } from 'msw'
 import {
   type DemoEnvironmentMap,
   type DemoModel,
+  type DemoScript,
   type DemoSound,
   type DemoSprite,
   type DemoTextureSet,
@@ -206,6 +207,15 @@ export const systemHandlers = [
         deletedAt: r.deletedAt,
         previewFileId: (r.extra?.previewFileId as number) ?? null,
       }))
+    const scripts = allRecycled
+      .filter(r => r.type === 'script')
+      .map(r => ({
+        id: r.entityId,
+        name: r.name,
+        fileId: (r.extra?.fileId as number) ?? 0,
+        language: (r.extra?.language as string) ?? 'plaintext',
+        deletedAt: r.deletedAt,
+      }))
     return HttpResponse.json({
       models,
       modelVersions: [],
@@ -214,6 +224,7 @@ export const systemHandlers = [
       textures: [],
       sprites,
       sounds,
+      scripts,
       environmentMaps,
       environmentMapVariants: [],
     })
@@ -234,6 +245,8 @@ export const systemHandlers = [
           await put('sprites', item.entity as unknown as DemoSprite)
         } else if (type === 'sound') {
           await put('sounds', item.entity as unknown as DemoSound)
+        } else if (type === 'script') {
+          await put('scripts', item.entity as unknown as DemoScript)
         } else if (type === 'environmentMap') {
           const environmentMap = item.entity as unknown as DemoEnvironmentMap
           await put('environmentMaps', environmentMap)
@@ -338,6 +351,13 @@ export const systemHandlers = [
           filePath: sound.fileName,
           originalFileName: sound.fileName,
           sizeBytes: sound.fileSizeBytes ?? 0,
+        })
+      } else if (type === 'script') {
+        const script = item.entity as unknown as DemoScript
+        filesToDelete.push({
+          filePath: script.fileName,
+          originalFileName: script.fileName,
+          sizeBytes: script.fileSizeBytes ?? 0,
         })
       } else if (type === 'environmentMap') {
         const environmentMap = item.entity as unknown as DemoEnvironmentMap

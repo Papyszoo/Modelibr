@@ -55,7 +55,14 @@ const getExtensionIcon = (
 
 // Map file type to icon
 const getFileTypeIcon = (
-  fileType: 'model' | 'texture' | 'file' | 'sprite' | 'sound' | 'environmentMap'
+  fileType:
+    | 'model'
+    | 'texture'
+    | 'file'
+    | 'sprite'
+    | 'sound'
+    | 'script'
+    | 'environmentMap'
 ): string => {
   const typeIconMap = {
     model: 'pi-box',
@@ -63,6 +70,7 @@ const getFileTypeIcon = (
     file: 'pi-file',
     sprite: 'pi-image',
     sound: 'pi-volume-up',
+    script: 'pi-code',
     environmentMap: 'pi-globe',
   }
   return typeIconMap[fileType]

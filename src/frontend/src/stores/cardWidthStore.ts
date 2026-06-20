@@ -4,6 +4,7 @@ export type PageType =
   | 'models'
   | 'sprites'
   | 'sounds'
+  | 'scripts'
   | 'environmentMaps'
   | 'packs'
   | 'projects'
@@ -18,6 +19,7 @@ interface CardWidthSettings {
   models: number
   sprites: number
   sounds: number
+  scripts: number
   environmentMaps: number
   packs: number
   projects: number
@@ -39,6 +41,7 @@ const DEFAULT_WIDTHS: CardWidthSettings = {
   models: 180,
   sprites: 200,
   sounds: 280,
+  scripts: 150,
   environmentMaps: 320,
   packs: 280,
   projects: 280,

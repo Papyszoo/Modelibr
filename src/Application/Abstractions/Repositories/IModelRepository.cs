@@ -34,6 +34,9 @@ public interface IModelRepository
         IReadOnlyCollection<string>? normalizedTagNames = null,
         bool? hasConceptImages = null,
         string? searchName = null,
+        int? minTriangleCount = null,
+        int? maxTriangleCount = null,
+        bool? hasAnimations = null,
         CancellationToken cancellationToken = default);
     Task<(int? ActiveVersionId, Domain.Models.Thumbnail? Thumbnail)?> GetThumbnailDataAsync(
         int modelId, CancellationToken cancellationToken = default);

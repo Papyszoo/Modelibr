@@ -163,11 +163,15 @@ namespace WebApi
             app.MapSpriteCategoryEndpoints();
             app.MapSoundEndpoints();
             app.MapSoundCategoryEndpoints();
+            app.MapScriptEndpoints();
+            app.MapScriptCategoryEndpoints();
+            app.MapScriptTemplateEndpoints();
             app.MapEnvironmentMapCategoryEndpoints();
             app.MapEnvironmentMapEndpoints();
             app.MapBlenderEndpoints();
             app.MapAudioSelectionEndpoints();
             app.MapBackupEndpoints();
+            app.MapSearchEndpoints();
 
             // Map SignalR hubs
             app.MapHub<ThumbnailHub>("/thumbnailHub");

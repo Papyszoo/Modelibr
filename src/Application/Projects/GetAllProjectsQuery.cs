@@ -30,6 +30,7 @@ internal class GetAllProjectsQueryHandler : IQueryHandler<GetAllProjectsQuery, G
             MultiModelTextureCount = p.MultiModelTextureCount,
             SpriteCount = p.SpriteCount,
             SoundCount = p.SoundCount,
+            ScriptCount = p.ScriptCount,
             EnvironmentMapCount = p.EnvironmentMapCount,
             IsEmpty = p.IsEmpty
             ,CustomThumbnailUrl = p.CustomThumbnailFileId.HasValue ? $"/files/{p.CustomThumbnailFileId.Value}/preview?channel=rgb" : null
@@ -59,6 +60,7 @@ public record ProjectListDto
     public int MultiModelTextureCount { get; init; }
     public int SpriteCount { get; init; }
     public int SoundCount { get; init; }
+    public int ScriptCount { get; init; }
     public int EnvironmentMapCount { get; init; }
     public bool IsEmpty { get; init; }
     public string? CustomThumbnailUrl { get; init; }

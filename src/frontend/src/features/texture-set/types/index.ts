@@ -48,6 +48,8 @@ export interface TextureDto {
   fileName?: string
   createdAt: string
   proxies?: TextureProxyDto[]
+  width?: number | null
+  height?: number | null
 }
 
 export interface ModelSummaryDto {
@@ -80,6 +82,8 @@ export interface TextureSetDto {
   isEmpty: boolean
   thumbnailPath?: string
   pngThumbnailPath?: string
+  /** Largest texture side across the set; null until dimensions are extracted. */
+  maxResolution?: number | null
   textures: TextureDto[]
   associatedModels: ModelSummaryDto[]
   packs?: PackSummaryDto[]

@@ -32,6 +32,12 @@ internal sealed class UpdateTechnicalMetadataCommandHandler : ICommandHandler<Up
             command.VertexCount,
             command.MeshCount,
             command.MaterialCount,
+            command.BoundingBoxX,
+            command.BoundingBoxY,
+            command.BoundingBoxZ,
+            command.AnimationCount,
+            command.AnimationNames,
+            command.BoneCount,
             _dateTimeProvider.UtcNow);
 
         await _modelVersionRepository.UpdateAsync(version, cancellationToken);
@@ -45,4 +51,10 @@ public record UpdateTechnicalMetadataCommand(
     int? TriangleCount,
     int? VertexCount,
     int? MeshCount,
-    int? MaterialCount) : ICommand;
+    int? MaterialCount,
+    double? BoundingBoxX = null,
+    double? BoundingBoxY = null,
+    double? BoundingBoxZ = null,
+    int? AnimationCount = null,
+    List<string>? AnimationNames = null,
+    int? BoneCount = null) : ICommand;

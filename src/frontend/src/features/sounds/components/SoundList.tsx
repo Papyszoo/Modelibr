@@ -1,9 +1,12 @@
 import './SoundList.css'
+import '@/shared/components/FilterPanel.css'
 
 import { zodResolver } from '@hookform/resolvers/zod'
+import { Button } from 'primereact/button'
 import { confirmDialog } from 'primereact/confirmdialog'
 import { type ContextMenu } from 'primereact/contextmenu'
 import { Dialog } from 'primereact/dialog'
+import { InputNumber } from 'primereact/inputnumber'
 import { ProgressSpinner } from 'primereact/progressspinner'
 import { Toast } from 'primereact/toast'
 import {
@@ -83,6 +86,10 @@ export function SoundList() {
     setActiveCategoryId,
     searchQuery,
     setSearchQuery,
+    minDuration,
+    setMinDuration,
+    maxDuration,
+    setMaxDuration,
     filteredSounds,
     invalidateSounds,
     loadCategories,
@@ -111,6 +118,8 @@ export function SoundList() {
     null
   )
   const [isSearchOpen, setIsSearchOpen] = useState(false)
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false)
+  const hasActiveDurationFilter = minDuration != null || maxDuration != null
 
   const {
     register: registerCategory,
@@ -492,10 +501,9 @@ export function SoundList() {
     sound: SoundDto
   ) => {
     e.preventDefault()
-    // If right-clicked sound is not in selection, select only that sound
-    if (!selectedSoundIds.has(sound.id)) {
-      setSelectedSoundIds(new Set([sound.id]))
-    }
+    // Right-click only targets the card for the menu; it does not change the
+    // checkbox selection. Menu actions fall back to this target when nothing
+    // is explicitly selected (see handleRecycleSounds).
     setContextMenuTarget(sound)
     contextMenuRef.current?.show(e)
   }
@@ -528,6 +536,16 @@ export function SoundList() {
               ariaLabel="Search"
               ariaExpanded={isSearchOpen}
               ariaControls="sound-list-search-panel"
+            />
+            <ListToolbarButton
+              icon="pi pi-sliders-h"
+              label="Filters"
+              active={isFiltersOpen || hasActiveDurationFilter}
+              onClick={() => setIsFiltersOpen(open => !open)}
+              ariaLabel="Filters"
+              ariaExpanded={isFiltersOpen}
+              ariaControls="sound-list-filters-panel"
+              badge={hasActiveDurationFilter ? 1 : undefined}
             />
             <OptionsButton
               cardWidth={cardWidth}
@@ -581,6 +599,45 @@ export function SoundList() {
             onChange={setSearchQuery}
             placeholder="Search sounds..."
           />
+        </ListToolbarPanel>
+
+        <ListToolbarPanel id="sound-list-filters-panel" open={isFiltersOpen}>
+          <div className="list-filters-row">
+            <div
+              className="list-filters-switch"
+              data-testid="sound-duration-filter"
+            >
+              <span>Duration (s)</span>
+              <InputNumber
+                value={minDuration}
+                onValueChange={e => setMinDuration(e.value ?? null)}
+                placeholder="Min"
+                min={0}
+                data-testid="min-duration-filter"
+              />
+              <span>–</span>
+              <InputNumber
+                value={maxDuration}
+                onValueChange={e => setMaxDuration(e.value ?? null)}
+                placeholder="Max"
+                min={0}
+                data-testid="max-duration-filter"
+              />
+            </div>
+            {hasActiveDurationFilter ? (
+              <Button
+                icon="pi pi-times"
+                className="p-button-text p-button-sm list-filters-clear"
+                aria-label="Clear duration filter"
+                tooltip="Clear duration filter"
+                tooltipOptions={{ position: 'bottom' }}
+                onClick={() => {
+                  setMinDuration(null)
+                  setMaxDuration(null)
+                }}
+              />
+            ) : null}
+          </div>
         </ListToolbarPanel>
       </ListToolbar>
 

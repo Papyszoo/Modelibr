@@ -1,6 +1,7 @@
 import '@/shared/components/FilterPanel.css'
 
 import { Button } from 'primereact/button'
+import { Dropdown } from 'primereact/dropdown'
 import { MultiSelect } from 'primereact/multiselect'
 import { type MouseEvent as ReactMouseEvent } from 'react'
 
@@ -29,6 +30,17 @@ import {
 // Texture types exposed in the filter. SplitChannel is an implementation
 // detail (a single source file fanned out across channels) — hiding it
 // keeps the picker focused on user-meaningful map types.
+// Minimum-resolution buckets keyed off a texture's largest side. "1K" means
+// "at least 1024px on the longest side", matching how artists shop for maps.
+const MIN_RESOLUTION_FILTER_OPTIONS: { label: string; value: number | null }[] =
+  [
+    { label: 'Any resolution', value: null },
+    { label: '512+', value: 512 },
+    { label: '1K+', value: 1024 },
+    { label: '2K+', value: 2048 },
+    { label: '4K+', value: 4096 },
+  ]
+
 const TEXTURE_TYPE_FILTER_OPTIONS: { label: string; value: number }[] = [
   { label: 'Albedo', value: TextureType.Albedo },
   { label: 'Normal', value: TextureType.Normal },
@@ -58,11 +70,13 @@ interface TexturesFiltersProps {
   selectedProjectIds: number[]
   selectedCategoryKeys: CategorySelectionKeys
   selectedTextureTypes: number[]
+  minResolution: number | null
   onPackFilterChange: (packIds: number[]) => void
   onProjectFilterChange: (projectIds: number[]) => void
   onCategoryChange: (keys: CategorySelectionKeys) => void
   onManageCategoriesClick: () => void
   onTextureTypesChange: (types: number[]) => void
+  onMinResolutionChange: (value: number | null) => void
   cardWidth: number
   onCardWidthChange: (width: number) => void
   count: number
@@ -91,11 +105,13 @@ export function TexturesFilters({
   selectedProjectIds,
   selectedCategoryKeys,
   selectedTextureTypes,
+  minResolution,
   onPackFilterChange,
   onProjectFilterChange,
   onCategoryChange,
   onManageCategoriesClick,
   onTextureTypesChange,
+  onMinResolutionChange,
   cardWidth,
   onCardWidthChange,
   count,
@@ -126,13 +142,15 @@ export function TexturesFilters({
     selectedPackIds.length > 0 ||
     selectedProjectIds.length > 0 ||
     selectedCategoryCount > 0 ||
-    selectedTextureTypes.length > 0
+    selectedTextureTypes.length > 0 ||
+    minResolution != null
 
   const activeFilterCount = [
     selectedPackIds.length > 0,
     selectedProjectIds.length > 0,
     selectedCategoryCount > 0,
     selectedTextureTypes.length > 0,
+    minResolution != null,
   ].filter(Boolean).length
 
   const selectedCountLabel = `${selectedCount} ${unitLabel}${selectedCount === 1 ? '' : 's'}`
@@ -294,10 +312,19 @@ export function TexturesFilters({
             filter
             filterPlaceholder="Search types..."
           />
+          <Dropdown
+            value={minResolution}
+            options={MIN_RESOLUTION_FILTER_OPTIONS}
+            onChange={e => onMinResolutionChange(e.value ?? null)}
+            placeholder="Min resolution"
+            className="list-filters-control"
+            data-testid="texture-resolution-filter"
+          />
           {hasActiveFilters ? (
             <Button
               icon="pi pi-times"
               className="p-button-text p-button-sm list-filters-clear"
+              aria-label="Clear all filters"
               tooltip="Clear all filters"
               tooltipOptions={{ position: 'bottom' }}
               onClick={() => {
@@ -305,6 +332,7 @@ export function TexturesFilters({
                 onProjectFilterChange([])
                 onCategoryChange({})
                 onTextureTypesChange([])
+                onMinResolutionChange(null)
               }}
             />
           ) : null}

@@ -34,6 +34,31 @@ export class ModelListPage {
         await filterPanel.waitFor({ state: "visible", timeout: 5000 });
     }
 
+    /** Toggle the "Animated" only filter on. */
+    async enableAnimatedFilter(): Promise<void> {
+        await this.ensureFiltersOpen();
+        const toggle = this.page.getByTestId("animated-only-filter");
+        await toggle.scrollIntoViewIfNeeded();
+        await toggle.click();
+    }
+
+    /** Set the minimum triangle-count filter (clears it when value is null). */
+    async setMinTriangleCount(value: number | null): Promise<void> {
+        await this.ensureFiltersOpen();
+        // PrimeReact InputNumber forwards data-testid to a wrapper, so target
+        // the inner <input> (matching whichever element carries the testid).
+        const input = this.page
+            .locator(
+                'input[data-testid="min-triangle-filter"], [data-testid="min-triangle-filter"] input',
+            )
+            .first();
+        await input.scrollIntoViewIfNeeded();
+        await input.click();
+        await input.fill(value === null ? "" : String(value));
+        // Commit the value so PrimeReact's onValueChange fires.
+        await input.press("Enter");
+    }
+
     /**
      * Open the model category manager. Mirrors the texture-set flow: the
      * toolbar panel is `pointer-events: none` until it has `.is-open`, so we

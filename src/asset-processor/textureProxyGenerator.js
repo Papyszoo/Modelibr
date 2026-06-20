@@ -280,6 +280,49 @@ async function generateNormalMapProxy(
 }
 
 /**
+ * Reads source-image dimensions and format for each downloaded texture.
+ *
+ * Runs independently of proxy generation (which skips HDR formats and is
+ * best-effort) so resolution metadata is captured even when no proxy is made.
+ * Formats sharp cannot decode (e.g. EXR) degrade to a skipped entry rather than
+ * failing the set.
+ *
+ * @param {Object} texturePaths - Map of textureType → {filePath, textureId, ...}
+ * @param {Object} jobLogger - Logger with job context
+ * @returns {Promise<Array<{textureId: number, width: number, height: number, format: string|null}>>}
+ */
+export async function extractTextureDimensions(texturePaths, jobLogger) {
+  const items = []
+
+  for (const textureInfo of Object.values(texturePaths)) {
+    const { filePath, textureId } = textureInfo
+    if (!textureId || !filePath || !fs.existsSync(filePath)) {
+      continue
+    }
+
+    try {
+      const metadata = await sharp(filePath).metadata()
+      if (metadata.width > 0 && metadata.height > 0) {
+        items.push({
+          textureId,
+          width: metadata.width,
+          height: metadata.height,
+          format: metadata.format ? metadata.format.toLowerCase() : null,
+        })
+      }
+    } catch (error) {
+      jobLogger.warn('Could not read texture dimensions, skipping', {
+        textureId,
+        ext: path.extname(filePath),
+        error: error.message,
+      })
+    }
+  }
+
+  return items
+}
+
+/**
  * Generates web proxies for all textures in a texture set and uploads them to the API.
  *
  * @param {Object} textureSet - TextureSet data from the API

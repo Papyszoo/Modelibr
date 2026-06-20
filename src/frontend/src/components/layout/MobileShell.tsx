@@ -3,6 +3,7 @@ import './MobileShell.css'
 import { useCallback, useState } from 'react'
 
 import { DockProvider } from '@/contexts/DockContext'
+import { GlobalSearchPalette } from '@/features/search'
 import { useDeepLinkHandler } from '@/hooks/useDeepLinkHandler'
 import { useWindowInit } from '@/hooks/useWindowInit'
 import { createTab, useNavigationStore } from '@/stores/navigationStore'
@@ -70,6 +71,7 @@ export function MobileShell() {
 
   return (
     <DockProvider>
+      <GlobalSearchPalette windowId={windowId} side="left" />
       <div className="mobile-shell">
         <DockPanelContent
           side="left"

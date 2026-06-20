@@ -24,6 +24,43 @@ create_placeholder_json() {
   echo "{\"total\": 0, \"passed\": 0, \"failed\": 0, \"framework\": \"${framework}\", \"failures\": [], \"notAvailable\": true}" > "$filepath"
 }
 
+# Download a GitHub Actions artifact zip and extract it into a directory.
+# Best-effort: historical artifacts expire after their retention period, in which
+# case the API answers with a small non-zip error body (e.g. 410 Gone). Without
+# this guard, curl (no -f) would save that body and the subsequent unzip would
+# exit non-zero, aborting the whole docs build under `set -e`. Returns non-zero
+# (handled by callers) instead of failing the script.
+download_and_extract() {
+  local url="$1"
+  local dest_dir="$2"
+  local label="$3"
+  local tmp_zip
+  tmp_zip="$(mktemp /tmp/report-artifact-XXXXXX.zip)"
+
+  if ! curl -fsSL -H "Authorization: token ${TOKEN}" \
+        -H "Accept: application/vnd.github.v3+json" \
+        "${url}" -o "${tmp_zip}"; then
+    echo "  WARN: download failed for ${label} (artifact missing or expired); skipping"
+    rm -f "${tmp_zip}"
+    return 1
+  fi
+
+  if ! unzip -tq "${tmp_zip}" >/dev/null 2>&1; then
+    echo "  WARN: ${label} is not a valid zip (likely expired); skipping"
+    rm -f "${tmp_zip}"
+    return 1
+  fi
+
+  if ! unzip -oq "${tmp_zip}" -d "${dest_dir}"; then
+    echo "  WARN: failed to extract ${label}; skipping"
+    rm -f "${tmp_zip}"
+    return 1
+  fi
+
+  rm -f "${tmp_zip}"
+  return 0
+}
+
 # Check if current run report already exists (prepared by workflow)
 CURRENT_RUN_EXISTS=false
 if [ -n "${CURRENT_RUN_NUMBER}" ] && [ -d "${REPORTS_DIR}/run-${CURRENT_RUN_NUMBER}" ]; then
@@ -105,16 +142,15 @@ while IFS='|' read -r RUN_ID RUN_NUMBER CREATED_AT CONCLUSION BRANCH; do
     REPORT_DIR="${REPORTS_DIR}/run-${RUN_NUMBER}"
     mkdir -p "${REPORT_DIR}"
     
-    # Download the playwright report artifact
-    TEMP_ZIP="/tmp/playwright-report-${RUN_NUMBER}.zip"
-    curl -L -H "Authorization: token ${TOKEN}" \
-      -H "Accept: application/vnd.github.v3+json" \
-      "${ARTIFACT_URL}" -o "${TEMP_ZIP}"
-    
-    # Extract the artifact
-    unzip -q "${TEMP_ZIP}" -d "${REPORT_DIR}"
-    rm "${TEMP_ZIP}"
-    
+    # Download + extract the playwright report. If it's missing or expired
+    # (GitHub serves a non-zip error body), skip this run rather than failing
+    # the whole docs build.
+    if ! download_and_extract "${ARTIFACT_URL}" "${REPORT_DIR}" "playwright-report run ${RUN_NUMBER}"; then
+      echo "Skipping run ${RUN_NUMBER}: Playwright report unavailable"
+      rm -rf "${REPORT_DIR}"
+      continue
+    fi
+
     # Store metadata
     echo "${CREATED_AT}" > "${REPORT_DIR}/timestamp.txt"
     echo "${CONCLUSION}" > "${REPORT_DIR}/conclusion.txt"
@@ -126,12 +162,9 @@ while IFS='|' read -r RUN_ID RUN_NUMBER CREATED_AT CONCLUSION BRANCH; do
     BACKEND_ARTIFACT_URL=$(echo "${ARTIFACTS}" | jq -r '.artifacts[] | select(.name | startswith("backend-test-results")) | .archive_download_url' | head -1)
     if [ -n "${BACKEND_ARTIFACT_URL}" ] && [ "${BACKEND_ARTIFACT_URL}" != "null" ]; then
       echo "Found backend test results for run ${RUN_NUMBER}"
-      TEMP_ZIP="/tmp/backend-results-${RUN_NUMBER}.zip"
-      curl -L -H "Authorization: token ${TOKEN}" \
-        -H "Accept: application/vnd.github.v3+json" \
-        "${BACKEND_ARTIFACT_URL}" -o "${TEMP_ZIP}"
-      unzip -q "${TEMP_ZIP}" -d "${REPORT_DIR}"
-      rm "${TEMP_ZIP}"
+      if ! download_and_extract "${BACKEND_ARTIFACT_URL}" "${REPORT_DIR}" "backend-results run ${RUN_NUMBER}"; then
+        create_placeholder_json "${REPORT_DIR}/backend-results.json" ".NET 9.0"
+      fi
     else
       create_placeholder_json "${REPORT_DIR}/backend-results.json" ".NET 9.0"
     fi
@@ -140,12 +173,9 @@ while IFS='|' read -r RUN_ID RUN_NUMBER CREATED_AT CONCLUSION BRANCH; do
     FRONTEND_ARTIFACT_URL=$(echo "${ARTIFACTS}" | jq -r '.artifacts[] | select(.name | startswith("frontend-test-results")) | .archive_download_url' | head -1)
     if [ -n "${FRONTEND_ARTIFACT_URL}" ] && [ "${FRONTEND_ARTIFACT_URL}" != "null" ]; then
       echo "Found frontend test results for run ${RUN_NUMBER}"
-      TEMP_ZIP="/tmp/frontend-results-${RUN_NUMBER}.zip"
-      curl -L -H "Authorization: token ${TOKEN}" \
-        -H "Accept: application/vnd.github.v3+json" \
-        "${FRONTEND_ARTIFACT_URL}" -o "${TEMP_ZIP}"
-      unzip -q "${TEMP_ZIP}" -d "${REPORT_DIR}"
-      rm "${TEMP_ZIP}"
+      if ! download_and_extract "${FRONTEND_ARTIFACT_URL}" "${REPORT_DIR}" "frontend-results run ${RUN_NUMBER}"; then
+        create_placeholder_json "${REPORT_DIR}/frontend-results.json" "Jest"
+      fi
     else
       create_placeholder_json "${REPORT_DIR}/frontend-results.json" "Jest"
     fi
@@ -154,12 +184,9 @@ while IFS='|' read -r RUN_ID RUN_NUMBER CREATED_AT CONCLUSION BRANCH; do
     BLENDER_ARTIFACT_URL=$(echo "${ARTIFACTS}" | jq -r '.artifacts[] | select(.name | startswith("blender-test-results")) | .archive_download_url' | head -1)
     if [ -n "${BLENDER_ARTIFACT_URL}" ] && [ "${BLENDER_ARTIFACT_URL}" != "null" ]; then
       echo "Found blender test results for run ${RUN_NUMBER}"
-      TEMP_ZIP="/tmp/blender-results-${RUN_NUMBER}.zip"
-      curl -L -H "Authorization: token ${TOKEN}" \
-        -H "Accept: application/vnd.github.v3+json" \
-        "${BLENDER_ARTIFACT_URL}" -o "${TEMP_ZIP}"
-      unzip -q "${TEMP_ZIP}" -d "${REPORT_DIR}"
-      rm "${TEMP_ZIP}"
+      if ! download_and_extract "${BLENDER_ARTIFACT_URL}" "${REPORT_DIR}" "blender-results run ${RUN_NUMBER}"; then
+        create_placeholder_json "${REPORT_DIR}/blender-results.json" "pytest"
+      fi
     else
       create_placeholder_json "${REPORT_DIR}/blender-results.json" "pytest"
     fi
@@ -168,12 +195,9 @@ while IFS='|' read -r RUN_ID RUN_NUMBER CREATED_AT CONCLUSION BRANCH; do
     ASSET_PROCESSOR_ARTIFACT_URL=$(echo "${ARTIFACTS}" | jq -r '.artifacts[] | select(.name | startswith("asset-processor-test-results")) | .archive_download_url' | head -1)
     if [ -n "${ASSET_PROCESSOR_ARTIFACT_URL}" ] && [ "${ASSET_PROCESSOR_ARTIFACT_URL}" != "null" ]; then
       echo "Found asset processor test results for run ${RUN_NUMBER}"
-      TEMP_ZIP="/tmp/asset-processor-results-${RUN_NUMBER}.zip"
-      curl -L -H "Authorization: token ${TOKEN}" \
-        -H "Accept: application/vnd.github.v3+json" \
-        "${ASSET_PROCESSOR_ARTIFACT_URL}" -o "${TEMP_ZIP}"
-      unzip -q "${TEMP_ZIP}" -d "${REPORT_DIR}"
-      rm "${TEMP_ZIP}"
+      if ! download_and_extract "${ASSET_PROCESSOR_ARTIFACT_URL}" "${REPORT_DIR}" "asset-processor-results run ${RUN_NUMBER}"; then
+        create_placeholder_json "${REPORT_DIR}/asset-processor-results.json" "Vitest"
+      fi
     else
       create_placeholder_json "${REPORT_DIR}/asset-processor-results.json" "Vitest"
     fi

@@ -99,6 +99,17 @@ public static class ProjectEndpoints
             .WithSummary("Removes a sound from the specified project")
             .WithOpenApi();
 
+        // Project-Script association
+        app.MapPost("/projects/{projectId}/scripts/{scriptId}", AddScriptToProject)
+            .WithName("Add Script to Project")
+            .WithSummary("Adds a script to the specified project")
+            .WithOpenApi();
+
+        app.MapDelete("/projects/{projectId}/scripts/{scriptId}", RemoveScriptFromProject)
+            .WithName("Remove Script from Project")
+            .WithSummary("Removes a script from the specified project")
+            .WithOpenApi();
+
         app.MapPost("/projects/{projectId}/environment-maps/{environmentMapId}", AddEnvironmentMapToProject)
             .WithName("Add Environment Map to Project")
             .WithSummary("Adds an environment map to the specified project")
@@ -306,6 +317,34 @@ public static class ProjectEndpoints
         CancellationToken cancellationToken)
     {
         var command = new RemoveSoundFromProjectCommand(projectId, soundId);
+        var result = await commandHandler.Handle(command, cancellationToken);
+
+        return result.IsSuccess
+            ? Results.NoContent()
+            : Results.BadRequest(result.Error);
+    }
+
+    private static async Task<IResult> AddScriptToProject(
+        int projectId,
+        int scriptId,
+        ICommandHandler<AddScriptToProjectCommand> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var command = new AddScriptToProjectCommand(projectId, scriptId);
+        var result = await commandHandler.Handle(command, cancellationToken);
+
+        return result.IsSuccess
+            ? Results.NoContent()
+            : Results.BadRequest(result.Error);
+    }
+
+    private static async Task<IResult> RemoveScriptFromProject(
+        int projectId,
+        int scriptId,
+        ICommandHandler<RemoveScriptFromProjectCommand> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var command = new RemoveScriptFromProjectCommand(projectId, scriptId);
         var result = await commandHandler.Handle(command, cancellationToken);
 
         return result.IsSuccess
