@@ -95,7 +95,16 @@
 }
 
 .search-palette-item.is-active {
-  background: rgba(var(--primary-color-rgb), 0.14);
+  background: rgba(var(--primary-color-rgb), 0.18);
+  box-shadow: inset 3px 0 0 var(--primary-color);
+}
+
+.search-palette-item.is-active .search-palette-item-icon {
+  color: var(--primary-color);
+}
+
+.search-palette-item.is-active .search-palette-item-name {
+  font-weight: 600;
 }
 
 .search-palette-item-icon {

@@ -32,6 +32,7 @@ export function SearchPalette({
   const [term, setTerm] = useState('')
   const [activeIndex, setActiveIndex] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
+  const activeItemRef = useRef<HTMLButtonElement>(null)
   const debouncedTerm = useDebouncedValue(term.trim(), 250)
 
   const { data, isFetching } = useQuery({
@@ -65,6 +66,12 @@ export function SearchPalette({
       flatItems.length === 0 ? 0 : Math.min(index, flatItems.length - 1)
     )
   }, [flatItems.length])
+
+  // Keep the highlighted result visible as the user arrows through the list.
+  // (Guarded — jsdom and a few browsers don't implement scrollIntoView.)
+  useEffect(() => {
+    activeItemRef.current?.scrollIntoView?.({ block: 'nearest' })
+  }, [activeIndex])
 
   if (!visible) {
     return null
@@ -169,6 +176,7 @@ export function SearchPalette({
                       <button
                         type="button"
                         key={`${item.type}-${item.id}`}
+                        ref={isActive ? activeItemRef : undefined}
                         className={`search-palette-item${isActive ? ' is-active' : ''}`}
                         role="option"
                         aria-selected={isActive}

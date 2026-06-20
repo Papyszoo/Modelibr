@@ -12,6 +12,7 @@ import {
 } from 'react'
 
 import { useDockContext } from '@/contexts/DockContext'
+import { openGlobalSearch } from '@/features/search'
 import { useTabContext } from '@/hooks/useTabContext'
 import {
   type ClosedWindowEntry,
@@ -29,6 +30,9 @@ import { type Tab, type TabType } from '@/types'
 //
 type TileGroup = 'assets' | 'organize' | 'system'
 
+/** Non-tab tile actions — open an overlay instead of converting the host tab. */
+type TileAction = 'global-search'
+
 interface Tile {
   /** Stable key, drives React lists + tests */
   key: string
@@ -36,10 +40,12 @@ interface Tile {
   icon: string
   label: string
   description: string
-  /** Tab type the tile resolves to when clicked */
-  targetType: TabType
+  /** Tab type the tile resolves to when clicked. Omit for action tiles. */
+  targetType?: TabType
   /** Optional label override for the new tab (defaults to `label`) */
   targetLabel?: string
+  /** Action tiles fire this instead of opening a tab (no `targetType`). */
+  action?: TileAction
   /**
    * Disabled tiles render greyed-out and ignore clicks. Used to keep
    * incomplete features visible without letting users open them yet.
@@ -155,6 +161,15 @@ const TILES: Tile[] = [
   },
 
   // ── System ────────────────────────────────────────────────────────────────
+  {
+    key: 'global-search',
+    group: 'system',
+    icon: 'pi-search',
+    label: 'Global Search',
+    description:
+      'Search every asset type by name (models also by tag). Shortcut: Ctrl/⌘ + K.',
+    action: 'global-search',
+  },
   {
     key: 'settings',
     group: 'system',
@@ -275,6 +290,15 @@ export function NewTabPage({ tabId }: NewTabPageProps): JSX.Element {
 
   const handlePick = (tile: Tile): void => {
     if (tile.disabled) return
+
+    // Action tiles open an overlay (e.g. the search palette) and leave the
+    // host New Tab page in place underneath, rather than converting it.
+    if (tile.action === 'global-search') {
+      openGlobalSearch()
+      return
+    }
+    if (!tile.targetType) return
+
     const existing = tabs.find(
       t => t.type === tile.targetType && t.id !== tabId
     )
