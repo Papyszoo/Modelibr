@@ -4,7 +4,7 @@
     "description": "E2E tests for Modelibr using Playwright and BDD",
     "type": "module",
     "scripts": {
-        "test": "node run-e2e.js",
+        "test": "node run-e2e.js --with-backup-restore",
         "test:demo": "node run-demo-e2e.js",
         "test:quick": "node run-e2e-fast.js",
         "test:ci": "node run-e2e-fast.js --fast-only",

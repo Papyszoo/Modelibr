@@ -100,7 +100,10 @@ export const suites = [
         name: "E2E — all tiers incl. @slow Blender (Docker)",
         kind: "playwright",
         cwd: "tests/e2e",
-        command: "npm test",
+        // `node run-e2e.js` (not `npm test`) so the mega-runner runs the main
+        // E2E only — backup-restore is tracked as its own suite below, so it
+        // must not be double-run via the package's --with-backup-restore flag.
+        command: "node run-e2e.js",
         tier: "slow",
         requiresDocker: true,
         detectPath: "tests/e2e/package.json",
