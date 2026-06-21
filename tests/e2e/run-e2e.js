@@ -118,6 +118,23 @@ function preserveBlobs(phase) {
   }
 }
 
+/**
+ * Run the sibling backup-restore E2E suite. It lives in its own package with a
+ * separate Docker stack (ports 3102/8190) and restarts the webapi mid-test, so
+ * it cannot share the main run — its `test:full` script self-provisions
+ * setup → specs → teardown. Returns the suite's exit code.
+ */
+function runBackupRestore() {
+  console.log("\n📋 Phase 6: Backup/restore E2E (separate Docker stack)\n");
+  const brDir = path.join(__dirname, "..", "backup-restore-e2e");
+  // Silent leading teardown clears containers/data left by a crashed earlier
+  // run so state can't leak in. Run it as its own step (output suppressed via
+  // stdio, not a POSIX `> /dev/null`) so this stays cross-platform like the
+  // rest of run-e2e.js; its exit code is intentionally ignored.
+  run("npm run test:teardown", { cwd: brDir, stdio: "ignore" });
+  return run("npm run test:full", { cwd: brDir });
+}
+
 async function main() {
   const startTime = Date.now();
 
@@ -170,7 +187,11 @@ async function main() {
   //   to the slowest thumbnail (~10.5min) instead of ~13min with workers=2.
   //   CI uses 3 workers (same as local) — 4 workers caused asset-processor
   //   contention on slower CI hardware, leading to thumbnail generation timeouts.
-  const args = process.argv.slice(2).join(" ");
+  // `--with-backup-restore` runs the sibling backup-restore E2E suite after the
+  // main run (see Phase 6). Strip it from the args forwarded to Playwright.
+  const rawArgs = process.argv.slice(2);
+  const withBackupRestore = rawArgs.includes("--with-backup-restore");
+  const args = rawArgs.filter((a) => a !== "--with-backup-restore").join(" ");
   const setupEnv = { ...testEnv, PW_WORKERS: "1" };
   const chromiumWorkers = process.env.CI ? "3" : "3";
   const chromiumEnv = { ...testEnv, PW_WORKERS: chromiumWorkers };
@@ -230,12 +251,11 @@ async function main() {
     },
   );
 
-  // Cleanup
+  // Tear the main E2E stack down before any further stack comes up so two
+  // Docker environments never run concurrently and compete for resources.
   cleanup();
 
-  const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-
-  const exitCode =
+  const mainExitCode =
     testResult !== 0
       ? testResult
       : serialResult !== 0
@@ -245,6 +265,17 @@ async function main() {
           : demoResult !== 0
             ? demoResult
             : mergeResult;
+
+  // Phase 6 (opt-in): backup-restore E2E on its own stack. The flag is set by
+  // `cd tests/e2e && npm test` so a full local run covers it; the mega-runner
+  // keeps running backup-restore as its own suite, so it isn't double-run there.
+  let backupRestoreExitCode = 0;
+  if (withBackupRestore) {
+    backupRestoreExitCode = runBackupRestore();
+  }
+
+  const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+  const exitCode = mainExitCode !== 0 ? mainExitCode : backupRestoreExitCode;
 
   if (exitCode === 0) {
     console.log(`\n✅ All tests passed in ${duration}s\n`);
