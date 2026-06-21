@@ -73,9 +73,6 @@ if [ -n "${CURRENT_RUN_NUMBER}" ] && [ -d "${REPORTS_DIR}/run-${CURRENT_RUN_NUMB
   if [ ! -f "${REPORTS_DIR}/run-${CURRENT_RUN_NUMBER}/frontend-results.json" ]; then
     create_placeholder_json "${REPORTS_DIR}/run-${CURRENT_RUN_NUMBER}/frontend-results.json" "Jest"
   fi
-  if [ ! -f "${REPORTS_DIR}/run-${CURRENT_RUN_NUMBER}/blender-results.json" ]; then
-    create_placeholder_json "${REPORTS_DIR}/run-${CURRENT_RUN_NUMBER}/blender-results.json" "pytest"
-  fi
   if [ ! -f "${REPORTS_DIR}/run-${CURRENT_RUN_NUMBER}/asset-processor-results.json" ]; then
     create_placeholder_json "${REPORTS_DIR}/run-${CURRENT_RUN_NUMBER}/asset-processor-results.json" "Vitest"
   fi
@@ -178,17 +175,6 @@ while IFS='|' read -r RUN_ID RUN_NUMBER CREATED_AT CONCLUSION BRANCH; do
       fi
     else
       create_placeholder_json "${REPORT_DIR}/frontend-results.json" "Jest"
-    fi
-    
-    # Download blender test results
-    BLENDER_ARTIFACT_URL=$(echo "${ARTIFACTS}" | jq -r '.artifacts[] | select(.name | startswith("blender-test-results")) | .archive_download_url' | head -1)
-    if [ -n "${BLENDER_ARTIFACT_URL}" ] && [ "${BLENDER_ARTIFACT_URL}" != "null" ]; then
-      echo "Found blender test results for run ${RUN_NUMBER}"
-      if ! download_and_extract "${BLENDER_ARTIFACT_URL}" "${REPORT_DIR}" "blender-results run ${RUN_NUMBER}"; then
-        create_placeholder_json "${REPORT_DIR}/blender-results.json" "pytest"
-      fi
-    else
-      create_placeholder_json "${REPORT_DIR}/blender-results.json" "pytest"
     fi
     
     # Download asset processor test results
@@ -545,7 +531,7 @@ cat > "${REPORTS_DIR}/index.html" << 'EOF'
     <div class="info-banner">
       <div class="info-banner-text">
         <div class="info-banner-title">Test Reports Archive</div>
-        <div class="info-banner-desc">E2E, backend, frontend, asset processor, and Blender addon test results</div>
+        <div class="info-banner-desc">E2E, backend, frontend, and asset processor test results</div>
       </div>
       <a href="#" id="workflow-link" class="info-banner-link" target="_blank">
         View All Workflows
@@ -582,7 +568,6 @@ while IFS='|' read -r _ DIR; do
     # Read test results JSON files
     BACKEND_RESULTS=$(cat "${DIR}/backend-results.json" 2>/dev/null || echo '{"total":0,"passed":0,"failed":0,"failures":[],"notAvailable":true}')
     FRONTEND_RESULTS=$(cat "${DIR}/frontend-results.json" 2>/dev/null || echo '{"total":0,"passed":0,"failed":0,"failures":[],"notAvailable":true}')
-    BLENDER_RESULTS=$(cat "${DIR}/blender-results.json" 2>/dev/null || echo '{"total":0,"passed":0,"failed":0,"failures":[],"notAvailable":true}')
     ASSET_PROCESSOR_RESULTS=$(cat "${DIR}/asset-processor-results.json" 2>/dev/null || echo '{"total":0,"passed":0,"failed":0,"failures":[],"notAvailable":true}')
 
     # Convert timestamp to readable format using JavaScript
@@ -602,7 +587,6 @@ while IFS='|' read -r _ DIR; do
         path: 'run-${RUN_NUM}/index.html',
         backendTests: ${BACKEND_RESULTS},
         frontendTests: ${FRONTEND_RESULTS},
-        blenderTests: ${BLENDER_RESULTS},
         assetProcessorTests: ${ASSET_PROCESSOR_RESULTS}
       }
 REPORT_EOF
@@ -735,7 +719,6 @@ cat >> "${REPORTS_DIR}/index.html" << 'EOF'
           <div class="test-sections">
             ${renderTestSection('backend-' + index, 'Backend', '.NET', report.backendTests)}
             ${renderTestSection('frontend-' + index, 'Frontend', 'Jest', report.frontendTests)}
-            ${renderTestSection('blender-' + index, 'Blender Addon', 'pytest', report.blenderTests)}
             ${renderTestSection('asset-processor-' + index, 'Asset Processor', 'Vitest', report.assetProcessorTests)}
           </div>
           <div class="report-actions">
