@@ -21,13 +21,12 @@ export GITHUB_REPOSITORY_OWNER="Papyszoo"
 **Output:**
 - Creates `docs/static/playwright-reports/` directory
 - Downloads up to 10 most recent Playwright reports
-- Downloads unit test results (backend .NET, frontend Jest, Blender addon pytest)
+- Downloads unit test results (backend .NET, frontend Jest)
 - Generates an index.html with comprehensive report listing including:
   - Branch information for each test run
   - E2E test status (passed/failed)
   - Backend unit test results
   - Frontend unit test results
-  - Blender addon test results
 
 **Dependencies:**
 - curl
