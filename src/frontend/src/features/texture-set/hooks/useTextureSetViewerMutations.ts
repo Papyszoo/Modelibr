@@ -5,6 +5,7 @@ import { useState } from 'react'
 import {
   regenerateTextureSetThumbnail,
   updateTextureSet,
+  updateTextureSetTags,
 } from '@/features/texture-set/api/textureSetApi'
 import type { TextureSetDto } from '@/types'
 
@@ -48,6 +49,20 @@ export function useTextureSetViewerMutations({
     },
   })
 
+  const updateTagsMutation = useMutation({
+    mutationFn: (tags: string[]) => {
+      if (!textureSet) {
+        throw new Error('Texture set not found')
+      }
+      return updateTextureSetTags(textureSet.id, tags)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['textureSets'] })
+      // The tag vocabulary may have gained a brand-new tag.
+      queryClient.invalidateQueries({ queryKey: ['tag-vocabulary'] })
+    },
+  })
+
   const handleUpdateName = async (newName: string) => {
     if (!textureSet) return
 
@@ -63,8 +78,21 @@ export function useTextureSetViewerMutations({
     }
   }
 
+  const handleUpdateTags = async (tags: string[]) => {
+    if (!textureSet) return
+
+    try {
+      await updateTagsMutation.mutateAsync(tags)
+      await refreshTextureSet()
+    } catch (error) {
+      console.error('Failed to update texture set tags:', error)
+      throw error
+    }
+  }
+
   return {
     handleUpdateName,
+    handleUpdateTags,
     updating,
     generateProxy: generateProxyMutation.mutate,
     isGeneratingProxy: generateProxyMutation.isPending,

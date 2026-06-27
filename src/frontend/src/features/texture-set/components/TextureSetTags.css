@@ -1,0 +1,24 @@
+.texture-set-tags {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.texture-set-tags-display {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.texture-set-tags-empty {
+  color: var(--text-color-secondary);
+  font-size: 0.85rem;
+}
+
+.texture-set-tags-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}

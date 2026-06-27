@@ -71,12 +71,15 @@ interface TexturesFiltersProps {
   selectedCategoryKeys: CategorySelectionKeys
   selectedTextureTypes: number[]
   minResolution: number | null
+  availableTags: string[]
+  selectedTagNames: string[]
   onPackFilterChange: (packIds: number[]) => void
   onProjectFilterChange: (projectIds: number[]) => void
   onCategoryChange: (keys: CategorySelectionKeys) => void
   onManageCategoriesClick: () => void
   onTextureTypesChange: (types: number[]) => void
   onMinResolutionChange: (value: number | null) => void
+  onTagChange: (tags: string[]) => void
   cardWidth: number
   onCardWidthChange: (width: number) => void
   count: number
@@ -106,12 +109,15 @@ export function TexturesFilters({
   selectedCategoryKeys,
   selectedTextureTypes,
   minResolution,
+  availableTags,
+  selectedTagNames,
   onPackFilterChange,
   onProjectFilterChange,
   onCategoryChange,
   onManageCategoriesClick,
   onTextureTypesChange,
   onMinResolutionChange,
+  onTagChange,
   cardWidth,
   onCardWidthChange,
   count,
@@ -138,12 +144,14 @@ export function TexturesFilters({
   const selectedCategoryCount = Object.values(selectedCategoryKeys).filter(
     state => state?.checked
   ).length
+  const tagOptions = availableTags.map(tag => ({ label: tag, value: tag }))
   const hasActiveFilters =
     selectedPackIds.length > 0 ||
     selectedProjectIds.length > 0 ||
     selectedCategoryCount > 0 ||
     selectedTextureTypes.length > 0 ||
-    minResolution != null
+    minResolution != null ||
+    selectedTagNames.length > 0
 
   const activeFilterCount = [
     selectedPackIds.length > 0,
@@ -151,6 +159,7 @@ export function TexturesFilters({
     selectedCategoryCount > 0,
     selectedTextureTypes.length > 0,
     minResolution != null,
+    selectedTagNames.length > 0,
   ].filter(Boolean).length
 
   const selectedCountLabel = `${selectedCount} ${unitLabel}${selectedCount === 1 ? '' : 's'}`
@@ -320,6 +329,20 @@ export function TexturesFilters({
             className="list-filters-control"
             data-testid="texture-resolution-filter"
           />
+          {availableTags.length > 0 && (
+            <MultiSelect
+              value={selectedTagNames}
+              options={tagOptions}
+              onChange={e => onTagChange(e.value || [])}
+              placeholder="Tags"
+              className="list-filters-control"
+              display="chip"
+              showClear
+              filter
+              filterPlaceholder="Search tags..."
+              data-testid="texture-set-tag-filter"
+            />
+          )}
           {hasActiveFilters ? (
             <Button
               icon="pi pi-times"
@@ -333,6 +356,7 @@ export function TexturesFilters({
                 onCategoryChange({})
                 onTextureTypesChange([])
                 onMinResolutionChange(null)
+                onTagChange([])
               }}
             />
           ) : null}

@@ -672,6 +672,25 @@ export class ApiHelper {
     }
 
     /**
+     * Replace a texture set's tags (shared tag vocabulary).
+     */
+    async updateTextureSetTags(
+        textureSetId: number,
+        tags: string[],
+    ): Promise<void> {
+        const response = await this.client.put(
+            `/texture-sets/${textureSetId}/tags`,
+            { tags },
+        );
+
+        if (response.status !== 200) {
+            throw new Error(
+                `Failed to update texture set tags: ${response.status} ${response.statusText}`,
+            );
+        }
+    }
+
+    /**
      * Get texture sets filtered by kind
      */
     async getTextureSetsByKind(kind: number): Promise<any[]> {

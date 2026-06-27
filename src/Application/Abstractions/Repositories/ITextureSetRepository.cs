@@ -23,6 +23,7 @@ public interface ITextureSetRepository
         TextureSetKind? kind = null,
         string? searchName = null,
         int? minResolution = null,
+        IReadOnlyCollection<string>? normalizedTagNames = null,
         CancellationToken cancellationToken = default);
     Task<TextureSet> UpdateAsync(TextureSet textureSet, CancellationToken cancellationToken = default);
     Task DeleteAsync(int id, CancellationToken cancellationToken = default);

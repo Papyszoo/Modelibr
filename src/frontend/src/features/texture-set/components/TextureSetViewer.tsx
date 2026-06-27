@@ -37,12 +37,17 @@ export function TextureSetViewer({
     qualityOptions,
   } = useTextureSetViewerData(textureSetId)
 
-  const { handleUpdateName, updating, generateProxy, isGeneratingProxy } =
-    useTextureSetViewerMutations({
-      textureSet,
-      refreshTextureSet,
-      showToast: opts => toast.current?.show(opts),
-    })
+  const {
+    handleUpdateName,
+    handleUpdateTags,
+    updating,
+    generateProxy,
+    isGeneratingProxy,
+  } = useTextureSetViewerMutations({
+    textureSet,
+    refreshTextureSet,
+    showToast: opts => toast.current?.show(opts),
+  })
 
   if (loading) {
     return (
@@ -64,6 +69,7 @@ export function TextureSetViewer({
       <TextureSetViewerHeader
         textureSet={textureSet}
         onNameUpdate={handleUpdateName}
+        onTagsUpdate={handleUpdateTags}
         updating={updating}
         textureQuality={textureQuality}
         onQualityChange={setTextureQuality}
