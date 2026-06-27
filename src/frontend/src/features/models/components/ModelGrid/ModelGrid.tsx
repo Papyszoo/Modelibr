@@ -464,7 +464,7 @@ export function ModelGrid({
         ref={fileInputRef}
         style={{ display: 'none' }}
         multiple
-        accept=".glb,.gltf,.fbx,.obj,.stl"
+        accept=".glb,.gltf,.fbx,.obj,.stl,.3mf"
         onChange={handleFileInputChange}
       />
 

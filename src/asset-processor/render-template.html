@@ -52,10 +52,13 @@
       import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
       import { OBJLoader } from 'three/addons/loaders/OBJLoader.js'
       import { FBXLoader } from 'three/addons/loaders/FBXLoader.js'
+      import { STLLoader } from 'three/addons/loaders/STLLoader.js'
+      import { ThreeMFLoader } from 'three/addons/loaders/3MFLoader.js'
       import { EXRLoader } from 'three/addons/loaders/EXRLoader.js'
       import { RGBELoader } from 'three/addons/loaders/RGBELoader.js'
       import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js'
       import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
+      import { buildStlModel } from './lib/stlMesh.js'
 
       // Global state for external control
       window.modelRenderer = {
@@ -455,8 +458,11 @@
         }
       }
 
-      // Load model from data URL or URL
-      async function loadModel(modelData, fileType) {
+      // Load model from data URL or URL.
+      // preserveMaterials=true (the "Embedded" variant) keeps the model's own
+      // materials and vertex colors instead of the neutral override — lets
+      // users choose between the real surface and a clean default thumbnail.
+      async function loadModel(modelData, fileType, preserveMaterials = false) {
         return new Promise((resolve, reject) => {
           let loader
 
@@ -466,6 +472,10 @@
             loader = new OBJLoader()
           } else if (fileType === 'fbx') {
             loader = new FBXLoader()
+          } else if (fileType === 'stl') {
+            loader = new STLLoader()
+          } else if (fileType === '3mf') {
+            loader = new ThreeMFLoader()
           } else {
             reject(new Error(`Unsupported file type: ${fileType}`))
             return
@@ -480,6 +490,12 @@
                 // GLTFLoader keeps clips on the result, not the scene —
                 // carry them over so metadata extraction can see them.
                 model.animations = result.animations || []
+              } else if (fileType === 'stl') {
+                // STLLoader resolves to a raw BufferGeometry — wrap it (and
+                // surface any binary-STL vertex colors) via the shared builder
+                // so the viewer and this thumbnail render shade STL identically.
+                // In the default (override) path the material is replaced below.
+                model = buildStlModel(THREE, result)
               } else {
                 model = result
               }
@@ -492,9 +508,11 @@
               // materials wholesale, so preservation is safe.
               //
               // OBJ/FBX embedded materials are inconsistent across DCC tools,
-              // so keep the neutral-PBR baseline override for those.
+              // so keep the neutral-PBR baseline override for those — unless the
+              // user explicitly picked the "Embedded" variant (preserveMaterials),
+              // which forces the original materials/vertex colors for any format.
               const preserveEmbeddedMaterials =
-                fileType === 'gltf' || fileType === 'glb'
+                preserveMaterials || fileType === 'gltf' || fileType === 'glb'
 
               model.traverse(child => {
                 if (child.isMesh) {

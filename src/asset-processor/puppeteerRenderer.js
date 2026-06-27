@@ -335,10 +335,15 @@ export class PuppeteerRenderer {
   /**
    * Load a model from file path
    * @param {string} filePath - Path to the model file
-   * @param {string} fileType - Type of the file (obj, fbx, gltf, glb)
+   * @param {string} fileType - Type of the file (obj, fbx, gltf, glb, stl, 3mf)
+   * @param {Object} [options] - Load options
+   * @param {boolean} [options.preserveMaterials=false] - Keep the model's own
+   *   materials/vertex colors (the "Embedded" variant) instead of the neutral
+   *   override. glTF/GLB always preserve regardless of this flag.
    * @returns {Promise<number>} Polygon count
    */
-  async loadModel(filePath, fileType) {
+  async loadModel(filePath, fileType, options = {}) {
+    const preserveMaterials = options.preserveMaterials === true
     // Check if page exists, is not closed, AND the frame is still usable
     if (!this.page || this.page.isClosed() || !(await this._isPageUsable())) {
       logger.warn(
@@ -389,9 +394,13 @@ export class PuppeteerRenderer {
 
       // Load model in the browser
       const result = await this.page.evaluate(
-        async (modelData, type) => {
+        async (modelData, type, preserve) => {
           try {
-            const model = await window.loadModelFromData(modelData, type)
+            const model = await window.loadModelFromData(
+              modelData,
+              type,
+              preserve
+            )
 
             // Normalize and add to scene
             const normInfo = window.normalizeModel(model, 2.0)
@@ -425,7 +434,8 @@ export class PuppeteerRenderer {
           }
         },
         dataUrl,
-        fileType
+        fileType,
+        preserveMaterials
       )
 
       if (!result.success) {
@@ -1565,6 +1575,8 @@ attribute vec3 aDispNormal;`
       fbx: 'application/octet-stream',
       gltf: 'model/gltf+json',
       glb: 'model/gltf-binary',
+      stl: 'model/stl',
+      '3mf': 'model/3mf',
     }
     return mimeTypes[fileType.toLowerCase()] || 'application/octet-stream'
   }

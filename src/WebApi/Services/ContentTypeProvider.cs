@@ -14,6 +14,8 @@ public static class ContentTypeProvider
             ".blend" => "application/octet-stream",
             ".gltf" => "application/json",
             ".glb" => "application/octet-stream",
+            ".stl" => "application/octet-stream",
+            ".3mf" => "application/octet-stream",
             ".webp" => "image/webp",
             ".png" => "image/png",
             ".jpg" => "image/jpeg",

@@ -28,6 +28,27 @@ Worker calls: `POST /thumbnail-jobs/dequeue`, `POST /thumbnail-jobs/{id}/finish`
 `POST /thumbnail-jobs/sounds/{id}/finish`, `POST /thumbnail-jobs/texture-sets/{id}/finish`.
 If backend endpoint shapes change, update `JobApiClient` to match (and vice versa).
 
+## Shared cross-runtime code (single source of truth)
+Logic that must behave **identically** in more than one runtime — the frontend
+viewer, this worker's Puppeteer thumbnail render (`render-template.html` +
+`page.evaluate`), and demo mode — lives **once** in `src/asset-processor/lib/`,
+never hand-copied into each. The failure this prevents: the viewer and the
+generated thumbnail drift because the same algorithm was maintained in two
+places. Rule of thumb: writing viewer/render code whose output another runtime
+must match? It's shared code — put it here.
+- **Shape:** a dependency-light ESM that **injects its heavy deps as arguments**
+  (e.g. `THREE`, `UTIF`) so the one file runs in both the Vite bundle and the
+  classic-script `page.evaluate` context; add a `window.modelibr*` side-effect
+  for the page, and a `.d.ts` sibling for the TS frontend.
+- **Consumers:** frontend imports by relative path
+  (`../../../asset-processor/lib/x.js`, allowed via Vite `server.fs.allow`); the
+  render template loads it as `<script type="module">` / `import`.
+- **Examples:** `lib/tiffDecode.js` (TIFF→RGBA, UTIF injected), `lib/stlMesh.js`
+  (STL geometry→mesh, THREE injected). See `lib/README.md`.
+- **Known not-yet-migrated:** the displacement-normal shader is hand-copied
+  between `frontend/src/shared/three/sharedDisplacementNormal.ts` and
+  `puppeteerRenderer.js` — migrate it here when you next touch either.
+
 ## Offline-safe (product invariant)
 Rendering/processing must work with no external network: Puppeteer + Three.js use
 local assets; Blender CLI uses a local install. No CDN imports, external APIs, or
