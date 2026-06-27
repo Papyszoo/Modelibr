@@ -52,6 +52,8 @@
       import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
       import { OBJLoader } from 'three/addons/loaders/OBJLoader.js'
       import { FBXLoader } from 'three/addons/loaders/FBXLoader.js'
+      import { STLLoader } from 'three/addons/loaders/STLLoader.js'
+      import { ThreeMFLoader } from 'three/addons/loaders/3MFLoader.js'
       import { EXRLoader } from 'three/addons/loaders/EXRLoader.js'
       import { RGBELoader } from 'three/addons/loaders/RGBELoader.js'
       import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js'
@@ -455,8 +457,11 @@
         }
       }
 
-      // Load model from data URL or URL
-      async function loadModel(modelData, fileType) {
+      // Load model from data URL or URL.
+      // preserveMaterials=true (the "Embedded" variant) keeps the model's own
+      // materials and vertex colors instead of the neutral override — lets
+      // users choose between the real surface and a clean default thumbnail.
+      async function loadModel(modelData, fileType, preserveMaterials = false) {
         return new Promise((resolve, reject) => {
           let loader
 
@@ -466,6 +471,10 @@
             loader = new OBJLoader()
           } else if (fileType === 'fbx') {
             loader = new FBXLoader()
+          } else if (fileType === 'stl') {
+            loader = new STLLoader()
+          } else if (fileType === '3mf') {
+            loader = new ThreeMFLoader()
           } else {
             reject(new Error(`Unsupported file type: ${fileType}`))
             return
@@ -480,6 +489,29 @@
                 // GLTFLoader keeps clips on the result, not the scene —
                 // carry them over so metadata extraction can see them.
                 model.animations = result.animations || []
+              } else if (fileType === 'stl') {
+                // STLLoader resolves to a raw BufferGeometry (no scene graph,
+                // no materials) — wrap it in a Mesh + Group so the rest of the
+                // pipeline (traverse, normalize, count) works unchanged.
+                // Binary STL can carry per-vertex colors (Materialise/Magics
+                // extension); enable vertexColors so the "Embedded" variant
+                // renders them. In the default (override) path this material is
+                // replaced below, so the flag is harmless there.
+                const stlAlpha = result.alpha ?? 1
+                const mesh = new THREE.Mesh(
+                  result,
+                  new THREE.MeshStandardMaterial({
+                    color: result.hasColors ? 0xffffff : 0xb3b3e6,
+                    vertexColors: !!result.hasColors,
+                    opacity: stlAlpha,
+                    transparent: stlAlpha < 1,
+                    metalness: 0.3,
+                    roughness: 0.4,
+                    envMapIntensity: 1.0,
+                  })
+                )
+                model = new THREE.Group()
+                model.add(mesh)
               } else {
                 model = result
               }
@@ -492,9 +524,11 @@
               // materials wholesale, so preservation is safe.
               //
               // OBJ/FBX embedded materials are inconsistent across DCC tools,
-              // so keep the neutral-PBR baseline override for those.
+              // so keep the neutral-PBR baseline override for those — unless the
+              // user explicitly picked the "Embedded" variant (preserveMaterials),
+              // which forces the original materials/vertex colors for any format.
               const preserveEmbeddedMaterials =
-                fileType === 'gltf' || fileType === 'glb'
+                preserveMaterials || fileType === 'gltf' || fileType === 'glb'
 
               model.traverse(child => {
                 if (child.isMesh) {

@@ -11,6 +11,8 @@ public class FileTypeValueObjectTests
     [InlineData("model.fbx", "fbx")]
     [InlineData("scene.gltf", "gltf")]
     [InlineData("asset.glb", "glb")]
+    [InlineData("part.stl", "stl")]
+    [InlineData("print.3mf", "3mf")]
     [InlineData("project.blend", "blend")]
     [InlineData("scene.max", "max")]
     [InlineData("model.ma", "maya")]
@@ -77,6 +79,8 @@ public class FileTypeValueObjectTests
     [InlineData("model.fbx")]
     [InlineData("scene.gltf")]
     [InlineData("asset.glb")]
+    [InlineData("part.stl")]
+    [InlineData("print.3mf")]
     public void ValidateForModelUpload_WithRenderableFiles_ReturnsSuccess(string fileName)
     {
         // Act
@@ -118,6 +122,8 @@ public class FileTypeValueObjectTests
     [InlineData("model.fbx")]
     [InlineData("scene.gltf")]
     [InlineData("asset.glb")]
+    [InlineData("part.stl")]
+    [InlineData("print.3mf")]
     public void IsRenderable_WithRenderableTypes_ReturnsTrue(string fileName)
     {
         // Arrange

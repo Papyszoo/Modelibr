@@ -1116,6 +1116,8 @@ namespace Infrastructure.Persistence
                 "fbx" => FileType.Fbx,
                 "gltf" => FileType.Gltf,
                 "glb" => FileType.Glb,
+                "stl" => FileType.Stl,
+                "3mf" => FileType.ThreeMf,
                 "blend" => FileType.Blend,
                 "max" => FileType.Max,
                 "maya" => FileType.Maya,
