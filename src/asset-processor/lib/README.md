@@ -39,6 +39,27 @@ not in two places.
 - **`stlMesh.js`** — STL `BufferGeometry` → configured Mesh/Group, including
   binary-STL vertex colors (THREE injected). Shared by the viewer, the worker
   thumbnail, and demo mode.
+- **`sceneLighting.js`** — the balanced model-preview light rig
+  (`DEFAULT_LIGHTING` + `resolveSceneLighting` + `buildSceneLights`, THREE
+  injected). Single source for the ambient/directional/point/spot rig and the
+  IBL `environmentIntensity`. The worker render template builds real lights from
+  it; the frontend viewer maps the resolved descriptor to R3F primitives so the
+  ambient/directional/environment controls land on one rig instead of being
+  swamped by a second one. (Demo mode still has its own simpler no-IBL rig — a
+  candidate to migrate here once its environment is ported.)
+- **`textureMaterial.js`** — texture-set → material pipeline slices shared by
+  the viewer and (eventually) the worker. No THREE import.
+  - `resolveTextureMaterialConfig(presentMaps)` — the metalness/roughness/
+    specular gating rule (keyed on each map, not on the base-color map).
+    Extracted after the viewer drifted to gating metalness on the base-color
+    map, which made textured non-metal surfaces render as black mirrors in the
+    viewer only.
+  - `ensureAoMapUv2(geometry)` — copy `uv` -> `uv2` so an AO map samples the
+    second UV set. Without it the AO term collapses and kills ALL indirect light
+    (ambient + environment IBL), which made those viewer controls look inert.
+  The worker still has equivalent inline rules in `puppeteerRenderer.js`
+  applyTextures and should adopt these when that pipeline is migrated (prompt-16
+  Target 2).
 
 ## Adding to this directory
 

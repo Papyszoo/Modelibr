@@ -1093,12 +1093,11 @@ export class PuppeteerRenderer {
                 }
                 meshCount++
 
-                // AO maps require a second UV set — copy uv to uv2
-                if (loadedTextures.aoMap && child.geometry) {
-                  const uvAttr = child.geometry.getAttribute('uv')
-                  if (uvAttr) {
-                    child.geometry.setAttribute('uv2', uvAttr.clone())
-                  }
+                // AO maps require a second UV set — copy uv to uv2. Shared with
+                // the viewer (asset-processor/lib/textureMaterial.js) so both
+                // runtimes light AO-mapped models identically.
+                if (loadedTextures.aoMap) {
+                  window.modelibrTextureMaterial.ensureAoMapUv2(child.geometry)
                 }
 
                 // Preserve original material name for subsequent per-material calls
@@ -1106,20 +1105,25 @@ export class PuppeteerRenderer {
                   ? child.material[0]?.name || ''
                   : child.material?.name || ''
 
-                // Create new material with white base color for textures.
-                // specularIntensity defaults to 1 on MeshPhysicalMaterial,
-                // which adds a dielectric sheen even without a Specular map
-                // and visibly washes the albedo. Disable it unless a real
-                // specularColorMap is present.
+                // Material config from the shared gating rule (metalness/
+                // roughness/specular keyed on their own maps, not the base-color
+                // map). Same source of truth as the viewer.
+                const matCfg =
+                  window.modelibrTextureMaterial.resolveTextureMaterialConfig({
+                    baseColorMap: loadedTextures.map,
+                    metalnessMap: loadedTextures.metalnessMap,
+                    roughnessMap: loadedTextures.roughnessMap,
+                    specularColorMap: loadedTextures.specularColorMap,
+                  })
                 child.material = new THREE.MeshPhysicalMaterial({
                   name: originalName,
-                  color: loadedTextures.map
+                  color: matCfg.hasBaseColorMap
                     ? 0xffffff
                     : new THREE.Color(0.7, 0.7, 0.9),
-                  metalness: loadedTextures.metalnessMap ? 1 : 0,
-                  roughness: loadedTextures.roughnessMap ? 1 : 0.8,
-                  envMapIntensity: 1.0,
-                  specularIntensity: loadedTextures.specularColorMap ? 1 : 0,
+                  metalness: matCfg.metalness,
+                  roughness: matCfg.roughness,
+                  envMapIntensity: matCfg.envMapIntensity,
+                  specularIntensity: matCfg.specularIntensity,
                 })
 
                 // Apply each loaded texture with proper material settings
