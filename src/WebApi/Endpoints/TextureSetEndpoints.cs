@@ -45,6 +45,11 @@ public static class TextureSetEndpoints
             .WithSummary("Updates an existing texture set")
             .WithOpenApi();
 
+        app.MapPut("/texture-sets/{id}/tags", UpdateTextureSetTags)
+            .WithName("Update Texture Set Tags")
+            .WithSummary("Replaces a texture set's tags (shared tag vocabulary)")
+            .WithOpenApi();
+
         app.MapDelete("/texture-sets/{id}", DeleteTextureSet)
             .WithName("Delete Texture Set")
             .WithSummary("Deletes a texture set")
@@ -156,6 +161,7 @@ public static class TextureSetEndpoints
         int? kind,
         string? searchName,
         int? minResolution,
+        [FromQuery(Name = "tag")] string[]? tag,
         IQueryHandler<GetAllTextureSetsQuery, GetAllTextureSetsResponse> queryHandler,
         CancellationToken cancellationToken)
     {
@@ -173,7 +179,8 @@ public static class TextureSetEndpoints
                 PageSize: pageSize,
                 Kind: textureSetKind,
                 SearchName: string.IsNullOrWhiteSpace(searchName) ? null : searchName,
-                MinResolution: minResolution is > 0 ? minResolution : null),
+                MinResolution: minResolution is > 0 ? minResolution : null,
+                Tags: tag is { Length: > 0 } ? tag : null),
             cancellationToken);
 
         if (result.IsFailure)
@@ -297,6 +304,23 @@ public static class TextureSetEndpoints
         }
 
         var result = await commandHandler.Handle(new UpdateTextureSetCommand(id, request.Name, request.CategoryId), cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+        }
+
+        return Results.Ok(result.Value);
+    }
+
+    private static async Task<IResult> UpdateTextureSetTags(
+        int id,
+        [FromBody] UpdateTextureSetTagsRequest request,
+        ICommandHandler<UpdateTextureSetTagsCommand, UpdateTextureSetTagsResponse> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await commandHandler.Handle(
+            new UpdateTextureSetTagsCommand(id, request.Tags), cancellationToken);
 
         if (result.IsFailure)
         {
@@ -644,6 +668,7 @@ public static class TextureSetEndpoints
 // Request DTOs
 public record CreateTextureSetRequest(string Name, TextureSetKind? Kind = null, int? CategoryId = null);
 public record UpdateTextureSetRequest(string Name, int? CategoryId);
+public record UpdateTextureSetTagsRequest(IReadOnlyCollection<string>? Tags);
 public record UpdateTextureSetKindRequest(TextureSetKind Kind, int? OwnerModelId = null);
 public record UpdateTilingScaleRequest(float TilingScaleX, float TilingScaleY, UvMappingMode? UvMappingMode = null, float? UvScale = null);
 public record AddTextureToTextureSetRequest(int FileId, TextureType TextureType, TextureChannel? SourceChannel = null);

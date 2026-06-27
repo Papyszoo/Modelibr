@@ -84,6 +84,7 @@ export interface TextureSetDto {
   pngThumbnailPath?: string
   /** Largest texture side across the set; null until dimensions are extracted. */
   maxResolution?: number | null
+  tags?: string[]
   textures: TextureDto[]
   associatedModels: ModelSummaryDto[]
   packs?: PackSummaryDto[]
