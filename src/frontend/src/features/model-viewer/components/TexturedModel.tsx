@@ -20,6 +20,8 @@ import {
 } from '@/shared/three/sharedDisplacementNormal'
 import { TextureChannel, type TextureSetDto, TextureType } from '@/types'
 
+import { buildStlModel } from '../../../../../asset-processor/lib/stlMesh.js'
+
 /** Map of material names to their texture sets. Key "" means apply to all meshes. */
 export type MaterialTextureSets = Record<string, TextureSetDto>
 
@@ -479,12 +481,8 @@ function STLModelWithTextures({
   const geometry = useLoader(STLLoader, modelUrl, loader => {
     loader.manager = safeLoadingManager
   })
-  const model = useMemo(() => {
-    const mesh = new THREE.Mesh(geometry, new THREE.MeshPhysicalMaterial())
-    const group = new THREE.Group()
-    group.add(mesh)
-    return group
-  }, [geometry])
+  // Shared wrap; setupModel's per-material textures replace this material.
+  const model = useMemo(() => buildStlModel(THREE, geometry), [geometry])
   const { loadedTextures, texturesReady } = usePerMaterialTextures(
     materialTextureSets,
     renderer,
