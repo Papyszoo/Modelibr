@@ -64,11 +64,13 @@
         ENVIRONMENT_PREVIEW_LIGHTING,
         buildSceneLights,
       } from './lib/sceneLighting.js'
-      // Loaded for its window.modelibrTextureMaterial side-effect: the
-      // applyTextures page.evaluate (puppeteerRenderer.js) runs as a classic
-      // script and can't import, so it reaches the shared texture-material rules
-      // through the window global. Single source of truth with the viewer.
+      // Loaded for their window side-effects: the applyTextures page.evaluate
+      // (puppeteerRenderer.js) runs as a classic script and can't import, so it
+      // reaches these shared rules through window globals
+      // (window.modelibrTextureMaterial / window.modelibrDispNormal). Single
+      // source of truth with the viewer.
       import './lib/textureMaterial.js'
+      import './lib/displacementNormal.js'
 
       // Global state for external control
       window.modelRenderer = {

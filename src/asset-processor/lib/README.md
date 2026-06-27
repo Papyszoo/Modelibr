@@ -45,10 +45,10 @@ not in two places.
   IBL `environmentIntensity`. The worker render template builds real lights from
   it; the frontend viewer maps the resolved descriptor to R3F primitives so the
   ambient/directional/environment controls land on one rig instead of being
-  swamped by a second one. (Demo mode still has its own simpler no-IBL rig — a
-  candidate to migrate here once its environment is ported.)
-- **`textureMaterial.js`** — texture-set → material pipeline slices shared by
-  the viewer and (eventually) the worker. No THREE import.
+  swamped by a second one. Demo mode (browserAssetProcessor) also builds its rig
+  from this (plus a neutral RoomEnvironment IBL) so its thumbnails match.
+- **`textureMaterial.js`** — texture-set → material pipeline slices shared by the
+  viewer and the worker `applyTextures`. No THREE import.
   - `resolveTextureMaterialConfig(presentMaps)` — the metalness/roughness/
     specular gating rule (keyed on each map, not on the base-color map).
     Extracted after the viewer drifted to gating metalness on the base-color
@@ -57,14 +57,19 @@ not in two places.
   - `ensureAoMapUv2(geometry)` — copy `uv` -> `uv2` so an AO map samples the
     second UV set. Without it the AO term collapses and kills ALL indirect light
     (ambient + environment IBL), which made those viewer controls look inert.
-  The worker still has equivalent inline rules in `puppeteerRenderer.js`
-  applyTextures and should adopt these when that pipeline is migrated (prompt-16
-  Target 2).
+- **`displacementNormal.js`** — `addSharedDisplacementNormal(THREE, geometry)` +
+  `applyDispNormalDisplacement(material)`: average the displacement *direction*
+  across coincident-position vertex duplicates (instead of welding) so hard-edged
+  displaced meshes stay watertight without smearing per-face UVs. Holds the two
+  displacement GLSL chunks as the single source. The frontend imports it through
+  the `shared/three/sharedDisplacementNormal.ts` wrapper (which injects THREE);
+  the worker `applyTextures` calls it via `window.modelibrDispNormal`.
 
 ## Adding to this directory
 
 Adding viewer logic that the thumbnail render or demo must match? Put it here,
-not in two places. Known not-yet-migrated case: the displacement-normal shader
-lives in `frontend/src/shared/three/sharedDisplacementNormal.ts` and is currently
-hand-copied into `../puppeteerRenderer.js` — migrate it here when you next touch
-either side.
+not in two places. Remaining not-yet-migrated case: the texture-type → material
+slot map and the channel-extraction shader strings are still duplicated between
+`useChannelExtractedTextures` / `TEXTURE_SLOTS` (frontend) and the
+`applyTextures` `page.evaluate` (worker) — migrate the data/shaders here when you
+next touch either side (the render *orchestration* stays per-runtime).
