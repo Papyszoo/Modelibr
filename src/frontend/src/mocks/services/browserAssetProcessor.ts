@@ -22,19 +22,30 @@ import {
   type Object3D,
   PerspectiveCamera,
   PMREMGenerator,
+  PointLight,
   Scene,
   SphereGeometry,
+  SpotLight,
   type Texture,
   Vector3,
   WebGLRenderer,
 } from 'three'
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 import { ThreeMFLoader } from 'three/addons/loaders/3MFLoader.js'
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js'
 import { STLLoader } from 'three/addons/loaders/STLLoader.js'
 
+import {
+  buildSceneLights,
+  DEFAULT_LIGHTING,
+} from '../../../../asset-processor/lib/sceneLighting.js'
 import { buildStlModel } from '../../../../asset-processor/lib/stlMesh.js'
+import {
+  ensureAoMapUv2,
+  resolveTextureMaterialConfig,
+} from '../../../../asset-processor/lib/textureMaterial.js'
 
 // ─── Model Thumbnails ───────────────────────────────────────────────────
 
@@ -56,6 +67,33 @@ function applyStandardMaterial(model: Object3D) {
   })
 }
 
+// The four light constructors the shared rig builder needs (demo imports named
+// exports from three rather than a namespace).
+const DEMO_LIGHT_CTORS = {
+  AmbientLight,
+  DirectionalLight,
+  PointLight,
+  SpotLight,
+}
+
+/**
+ * Light a demo render scene with the shared cross-runtime rig
+ * (asset-processor/lib/sceneLighting.js) plus the same neutral RoomEnvironment
+ * IBL the worker thumbnail uses — so demo thumbnails match the real worker's
+ * output instead of using a divergent ad-hoc rig.
+ */
+function setupSceneLighting(scene: Scene, renderer: WebGLRenderer): void {
+  const { lights } = buildSceneLights(DEMO_LIGHT_CTORS, DEFAULT_LIGHTING)
+  scene.add(...lights)
+
+  const pmrem = new PMREMGenerator(renderer)
+  const roomEnv = new RoomEnvironment()
+  scene.environment = pmrem.fromScene(roomEnv).texture
+  scene.environmentIntensity = DEFAULT_LIGHTING.environmentIntensity
+  roomEnv.dispose()
+  pmrem.dispose()
+}
+
 /**
  * Normalize a model to fit within a unit box centred at the origin.
  * Matches the real worker's normalizeModel() approach.
@@ -66,7 +104,10 @@ function normalizeModel(model: Object3D, targetScale = 2.0) {
   const maxDim = Math.max(size.x, size.y, size.z)
   if (maxDim > 0) {
     const scaleFactor = targetScale / maxDim
-    model.scale.setScalar(scaleFactor)
+    // Multiply, don't replace: FBX (and some glTF) loaders bake a non-1
+    // unit-conversion scale into the root. setScalar would drop it and shrink
+    // the model to ~1/100 of intended size. Matches the worker's normalizeModel.
+    model.scale.multiplyScalar(scaleFactor)
   }
   // Recalculate after scaling
   const scaledBox = new Box3().setFromObject(model)
@@ -321,6 +362,7 @@ async function applyTextureMaps(
 ): Promise<void> {
   const albedoTex = textures.find(t => t.textureType === 1)
   const normalTex = textures.find(t => t.textureType === 2)
+  const aoTex = textures.find(t => t.textureType === 4)
   const roughnessTex = textures.find(t => t.textureType === 5)
   const metallicTex = textures.find(t => t.textureType === 6)
 
@@ -329,24 +371,40 @@ async function applyTextureMaps(
     return new CanvasTexture(bitmap as unknown as HTMLCanvasElement)
   }
 
-  const [albedoMap, normalMap, roughnessMap, metalnessMap] = await Promise.all([
-    albedoTex ? loadTexture(albedoTex.blob) : Promise.resolve(null),
-    normalTex ? loadTexture(normalTex.blob) : Promise.resolve(null),
-    roughnessTex ? loadTexture(roughnessTex.blob) : Promise.resolve(null),
-    metallicTex ? loadTexture(metallicTex.blob) : Promise.resolve(null),
-  ])
+  const [albedoMap, normalMap, aoMap, roughnessMap, metalnessMap] =
+    await Promise.all([
+      albedoTex ? loadTexture(albedoTex.blob) : Promise.resolve(null),
+      normalTex ? loadTexture(normalTex.blob) : Promise.resolve(null),
+      aoTex ? loadTexture(aoTex.blob) : Promise.resolve(null),
+      roughnessTex ? loadTexture(roughnessTex.blob) : Promise.resolve(null),
+      metallicTex ? loadTexture(metallicTex.blob) : Promise.resolve(null),
+    ])
+
+  // Same gating rule as the viewer and the worker thumbnail (metalness/
+  // roughness keyed on their own maps, not the base-color map).
+  const cfg = resolveTextureMaterialConfig({
+    baseColorMap: albedoMap,
+    metalnessMap,
+    roughnessMap,
+  })
 
   model.traverse(child => {
     if (child instanceof Mesh) {
       child.material = new MeshStandardMaterial({
-        color: albedoMap ? new Color(1, 1, 1) : new Color(0.7, 0.7, 0.9),
+        color: cfg.hasBaseColorMap
+          ? new Color(1, 1, 1)
+          : new Color(0.7, 0.7, 0.9),
         map: albedoMap,
-        normalMap: normalMap,
-        roughnessMap: roughnessMap,
-        metalnessMap: metalnessMap,
-        metalness: metalnessMap ? 1.0 : 0.3,
-        roughness: roughnessMap ? 1.0 : 0.4,
+        normalMap,
+        aoMap,
+        roughnessMap,
+        metalnessMap,
+        metalness: cfg.metalness,
+        roughness: cfg.roughness,
+        envMapIntensity: cfg.envMapIntensity,
       })
+      // AO needs the second UV set or it collapses indirect light (shared helper).
+      if (aoMap) ensureAoMapUv2(child.geometry)
       child.castShadow = true
       child.receiveShadow = true
     }
@@ -405,10 +463,7 @@ async function renderModelWithTextures(
   const scene = new Scene()
   const camera = new PerspectiveCamera(45, width / height, 0.01, 1000)
 
-  scene.add(new AmbientLight(0xffffff, 0.6))
-  const dirLight = new DirectionalLight(0xffffff, 0.8)
-  dirLight.position.set(5, 10, 7)
-  scene.add(dirLight)
+  setupSceneLighting(scene, renderer)
 
   let model: Group
   if (ext === 'fbx') {
@@ -490,10 +545,7 @@ async function renderGltfThumbnail(
   const camera = new PerspectiveCamera(45, width / height, 0.01, 1000)
 
   // Lighting
-  scene.add(new AmbientLight(0xffffff, 0.6))
-  const dirLight = new DirectionalLight(0xffffff, 0.8)
-  dirLight.position.set(5, 10, 7)
-  scene.add(dirLight)
+  setupSceneLighting(scene, renderer)
 
   // Load model
   const loader = new GLTFLoader()
@@ -543,10 +595,7 @@ async function renderFbxThumbnail(
   const scene = new Scene()
   const camera = new PerspectiveCamera(45, width / height, 0.01, 1000)
 
-  scene.add(new AmbientLight(0xffffff, 0.6))
-  const dirLight = new DirectionalLight(0xffffff, 0.8)
-  dirLight.position.set(5, 10, 7)
-  scene.add(dirLight)
+  setupSceneLighting(scene, renderer)
 
   const loader = new FBXLoader()
   const fbxScene = await new Promise<Group>((resolve, reject) => {
@@ -595,10 +644,7 @@ async function renderObjThumbnail(
   const scene = new Scene()
   const camera = new PerspectiveCamera(45, width / height, 0.01, 1000)
 
-  scene.add(new AmbientLight(0xffffff, 0.6))
-  const dirLight = new DirectionalLight(0xffffff, 0.8)
-  dirLight.position.set(5, 10, 7)
-  scene.add(dirLight)
+  setupSceneLighting(scene, renderer)
 
   const loader = new OBJLoader()
   const objScene = await new Promise<Group>((resolve, reject) => {
@@ -704,10 +750,7 @@ export async function generateTextureSetThumbnail(
     camera.position.set(0, 0, 3)
     camera.lookAt(0, 0, 0)
 
-    scene.add(new AmbientLight(0xffffff, 0.6))
-    const dl = new DirectionalLight(0xffffff, 0.8)
-    dl.position.set(3, 5, 4)
-    scene.add(dl)
+    setupSceneLighting(scene, renderer)
 
     // Load albedo as texture
     const imageBitmap = await createImageBitmap(albedoBlob)
