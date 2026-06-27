@@ -756,8 +756,8 @@ export function ModelViewer({
           onChange={fileUpload.handleFileSelect}
           accept={
             blenderEnabled
-              ? '.obj,.fbx,.gltf,.glb,.blend'
-              : '.obj,.fbx,.gltf,.glb'
+              ? '.obj,.fbx,.gltf,.glb,.stl,.3mf,.blend'
+              : '.obj,.fbx,.gltf,.glb,.stl,.3mf'
           }
         />
 

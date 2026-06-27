@@ -11,11 +11,12 @@ import {
   ACESFilmicToneMapping,
   AmbientLight,
   Box3,
+  type BufferGeometry,
   CanvasTexture,
   Color,
   DirectionalLight,
   EquirectangularReflectionMapping,
-  type Group,
+  Group,
   Mesh,
   MeshStandardMaterial,
   type Object3D,
@@ -27,9 +28,13 @@ import {
   Vector3,
   WebGLRenderer,
 } from 'three'
+import { ThreeMFLoader } from 'three/addons/loaders/3MFLoader.js'
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js'
+import { STLLoader } from 'three/addons/loaders/STLLoader.js'
+
+import { buildStlModel } from '../../../../asset-processor/lib/stlMesh.js'
 
 // ─── Model Thumbnails ───────────────────────────────────────────────────
 
@@ -283,6 +288,11 @@ export async function generateModelThumbnail(
       if (ext === 'obj') {
         return await renderObjThumbnail(url, width, height)
       }
+      // STL/3MF share the texture-aware render path (no scene graph quirks);
+      // pass no textures so it falls back to the neutral standard material.
+      if (ext === 'stl' || ext === '3mf') {
+        return await renderModelWithTextures(url, ext, [], width, height)
+      }
       return await renderGltfThumbnail(url, width, height)
     } finally {
       URL.revokeObjectURL(url)
@@ -411,6 +421,19 @@ async function renderModelWithTextures(
     model = await new Promise<Group>((resolve, reject) => {
       loader.load(url, resolve, undefined, reject)
     })
+  } else if (ext === '3mf') {
+    const loader = new ThreeMFLoader()
+    model = await new Promise<Group>((resolve, reject) => {
+      loader.load(url, resolve, undefined, reject)
+    })
+  } else if (ext === 'stl') {
+    // STLLoader resolves to a raw BufferGeometry — wrap it via the shared
+    // builder (same one the viewer and worker thumbnail use).
+    const loader = new STLLoader()
+    const geometry = await new Promise<BufferGeometry>((resolve, reject) => {
+      loader.load(url, resolve, undefined, reject)
+    })
+    model = buildStlModel({ MeshStandardMaterial, Mesh, Group }, geometry)
   } else {
     const loader = new GLTFLoader()
     const gltf = await new Promise<{ scene: Group }>((resolve, reject) => {

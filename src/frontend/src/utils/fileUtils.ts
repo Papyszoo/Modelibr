@@ -138,6 +138,8 @@ export const THREEJS_SUPPORTED_FORMATS = [
   '.fbx', // FBXLoader
   '.gltf', // GLTFLoader
   '.glb', // GLTFLoader
+  '.stl', // STLLoader
+  '.3mf', // ThreeMFLoader
 ] as const
 
 /**
@@ -151,6 +153,8 @@ export const ALL_SUPPORTED_FORMATS = [
   '.blend',
   '.gltf',
   '.glb',
+  '.stl',
+  '.3mf',
 ] as const
 
 /**

@@ -1,9 +1,11 @@
 import { useFrame, useLoader, useThree } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
+import { ThreeMFLoader } from 'three/examples/jsm/loaders/3MFLoader'
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader'
+import { STLLoader } from 'three/examples/jsm/loaders/STLLoader'
 
 import {
   type TextureConfig,
@@ -17,6 +19,8 @@ import {
   applyDispNormalDisplacement,
 } from '@/shared/three/sharedDisplacementNormal'
 import { TextureChannel, type TextureSetDto, TextureType } from '@/types'
+
+import { buildStlModel } from '../../../../../asset-processor/lib/stlMesh.js'
 
 /** Map of material names to their texture sets. Key "" means apply to all meshes. */
 export type MaterialTextureSets = Record<string, TextureSetDto>
@@ -456,6 +460,107 @@ function FBXModelWithTextures({
   return <group ref={meshRef} />
 }
 
+// STL Model with per-material textures. STLLoader returns raw BufferGeometry,
+// so wrap it in a Mesh + Group before the shared setup applies textures.
+function STLModelWithTextures({
+  modelUrl,
+  rotationSpeed,
+  materialTextureSets,
+}: FormatComponentProps) {
+  const meshRef = useRef<THREE.Group>(null)
+  const { setModelObject } = useModelObject()
+  const scaledRef = useRef(false)
+  const { gl: renderer } = useThree()
+
+  useFrame(() => {
+    if (meshRef.current && rotationSpeed > 0) {
+      meshRef.current.rotation.y += rotationSpeed
+    }
+  })
+
+  const geometry = useLoader(STLLoader, modelUrl, loader => {
+    loader.manager = safeLoadingManager
+  })
+  // Shared wrap; setupModel's per-material textures replace this material.
+  const model = useMemo(() => buildStlModel(THREE, geometry), [geometry])
+  const { loadedTextures, texturesReady } = usePerMaterialTextures(
+    materialTextureSets,
+    renderer,
+    true
+  )
+
+  useEffect(() => {
+    scaledRef.current = false
+  }, [model, materialTextureSets, texturesReady])
+
+  useEffect(() => {
+    setupModel(
+      model,
+      materialTextureSets,
+      loadedTextures,
+      texturesReady,
+      meshRef,
+      scaledRef
+    )
+  }, [model, materialTextureSets, loadedTextures, texturesReady])
+
+  useEffect(() => {
+    if (model) setModelObject(model)
+    return () => setModelObject(null)
+  }, [model, setModelObject])
+
+  return <group ref={meshRef} />
+}
+
+// 3MF Model with per-material textures
+function ThreeMFModelWithTextures({
+  modelUrl,
+  rotationSpeed,
+  materialTextureSets,
+}: FormatComponentProps) {
+  const meshRef = useRef<THREE.Group>(null)
+  const { setModelObject } = useModelObject()
+  const scaledRef = useRef(false)
+  const { gl: renderer } = useThree()
+
+  useFrame(() => {
+    if (meshRef.current && rotationSpeed > 0) {
+      meshRef.current.rotation.y += rotationSpeed
+    }
+  })
+
+  const model = useLoader(ThreeMFLoader, modelUrl, loader => {
+    loader.manager = safeLoadingManager
+  })
+  const { loadedTextures, texturesReady } = usePerMaterialTextures(
+    materialTextureSets,
+    renderer,
+    true
+  )
+
+  useEffect(() => {
+    scaledRef.current = false
+  }, [modelUrl, materialTextureSets, texturesReady])
+
+  useEffect(() => {
+    setupModel(
+      model,
+      materialTextureSets,
+      loadedTextures,
+      texturesReady,
+      meshRef,
+      scaledRef
+    )
+  }, [model, materialTextureSets, loadedTextures, texturesReady])
+
+  useEffect(() => {
+    if (model) setModelObject(model)
+    return () => setModelObject(null)
+  }, [model, setModelObject])
+
+  return <group ref={meshRef} />
+}
+
 export function TexturedModel({
   modelUrl,
   fileExtension,
@@ -483,6 +588,24 @@ export function TexturedModel({
   if (fileExtension === 'gltf' || fileExtension === 'glb') {
     return (
       <GLTFModelWithTextures
+        modelUrl={modelUrl}
+        rotationSpeed={rotationSpeed}
+        materialTextureSets={materialTextureSets}
+      />
+    )
+  }
+  if (fileExtension === 'stl') {
+    return (
+      <STLModelWithTextures
+        modelUrl={modelUrl}
+        rotationSpeed={rotationSpeed}
+        materialTextureSets={materialTextureSets}
+      />
+    )
+  }
+  if (fileExtension === '3mf') {
+    return (
+      <ThreeMFModelWithTextures
         modelUrl={modelUrl}
         rotationSpeed={rotationSpeed}
         materialTextureSets={materialTextureSets}

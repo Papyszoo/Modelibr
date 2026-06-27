@@ -18,6 +18,7 @@ internal sealed class FileUtilityService : IFileUtilityService
             ".3ds" => "application/x-3ds",
             ".ply" => "application/octet-stream",
             ".stl" => "model/stl",
+            ".3mf" => "model/3mf",
             ".jpg" => "image/jpeg",
             ".jpeg" => "image/jpeg",
             ".png" => "image/png",
