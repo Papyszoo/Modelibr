@@ -47,6 +47,14 @@ re-exports).
 New tab type = three places: a case in `TabContent.tsx`, an entry in
 `useTabMenuItems()`, and the `TabType` union in `src/shared/types/ui.ts`.
 
+## Shared viewer/worker logic (don't duplicate)
+Three.js / geometry / pixel-decode logic you write for the viewer that the
+worker's thumbnail render or demo mode must produce **identically** (STL mesh
+build, TIFF decode, displacement-normal shader, …) is **shared code** — put it
+once in `src/asset-processor/lib/` as an injected-dep ESM and import it by
+relative path, rather than copying it into both viewers. See the
+`asset-processor-patterns` skill, "Shared cross-runtime code".
+
 ## Design system
 Build shared UI as small composable primitives, not type-aware mega-components;
 the Models tab is the design identity other asset tabs follow.
