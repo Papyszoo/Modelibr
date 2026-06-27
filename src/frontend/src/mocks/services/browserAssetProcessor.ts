@@ -34,6 +34,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js'
 import { STLLoader } from 'three/addons/loaders/STLLoader.js'
 
+import { buildStlModel } from '../../../../asset-processor/lib/stlMesh.js'
+
 // ─── Model Thumbnails ───────────────────────────────────────────────────
 
 /**
@@ -425,13 +427,13 @@ async function renderModelWithTextures(
       loader.load(url, resolve, undefined, reject)
     })
   } else if (ext === 'stl') {
-    // STLLoader resolves to a raw BufferGeometry — wrap it in a Mesh + Group.
+    // STLLoader resolves to a raw BufferGeometry — wrap it via the shared
+    // builder (same one the viewer and worker thumbnail use).
     const loader = new STLLoader()
     const geometry = await new Promise<BufferGeometry>((resolve, reject) => {
       loader.load(url, resolve, undefined, reject)
     })
-    model = new Group()
-    model.add(new Mesh(geometry, new MeshStandardMaterial()))
+    model = buildStlModel({ MeshStandardMaterial, Mesh, Group }, geometry)
   } else {
     const loader = new GLTFLoader()
     const gltf = await new Promise<{ scene: Group }>((resolve, reject) => {

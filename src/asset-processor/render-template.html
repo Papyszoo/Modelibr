@@ -58,6 +58,7 @@
       import { RGBELoader } from 'three/addons/loaders/RGBELoader.js'
       import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js'
       import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
+      import { buildStlModel } from './lib/stlMesh.js'
 
       // Global state for external control
       window.modelRenderer = {
@@ -490,28 +491,11 @@
                 // carry them over so metadata extraction can see them.
                 model.animations = result.animations || []
               } else if (fileType === 'stl') {
-                // STLLoader resolves to a raw BufferGeometry (no scene graph,
-                // no materials) — wrap it in a Mesh + Group so the rest of the
-                // pipeline (traverse, normalize, count) works unchanged.
-                // Binary STL can carry per-vertex colors (Materialise/Magics
-                // extension); enable vertexColors so the "Embedded" variant
-                // renders them. In the default (override) path this material is
-                // replaced below, so the flag is harmless there.
-                const stlAlpha = result.alpha ?? 1
-                const mesh = new THREE.Mesh(
-                  result,
-                  new THREE.MeshStandardMaterial({
-                    color: result.hasColors ? 0xffffff : 0xb3b3e6,
-                    vertexColors: !!result.hasColors,
-                    opacity: stlAlpha,
-                    transparent: stlAlpha < 1,
-                    metalness: 0.3,
-                    roughness: 0.4,
-                    envMapIntensity: 1.0,
-                  })
-                )
-                model = new THREE.Group()
-                model.add(mesh)
+                // STLLoader resolves to a raw BufferGeometry — wrap it (and
+                // surface any binary-STL vertex colors) via the shared builder
+                // so the viewer and this thumbnail render shade STL identically.
+                // In the default (override) path the material is replaced below.
+                model = buildStlModel(THREE, result)
               } else {
                 model = result
               }

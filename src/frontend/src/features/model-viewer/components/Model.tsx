@@ -12,6 +12,8 @@ import { LoadingPlaceholder } from '@/components/LoadingPlaceholder'
 import { useModelObject } from '@/features/model-viewer/hooks/useModelObject'
 import { safeLoadingManager } from '@/shared/three/safeLoadingManager'
 
+import { buildStlModel } from '../../../../../asset-processor/lib/stlMesh.js'
+
 /**
  * Shared presentation logic for every loader: rotate, clone, optionally
  * override materials, scale to a consistent size and sit the model on the
@@ -175,28 +177,10 @@ function STLModel({
   const geometry = useLoader(STLLoader, modelUrl, loader => {
     loader.manager = safeLoadingManager
   })
-  const model = useMemo(() => {
-    // Binary STL can carry per-vertex colors (Materialise/Magics extension).
-    // When present, render them (vertexColors + white base so they aren't
-    // tinted). This material only survives in "Embedded" mode — the default
-    // path overrides it with the neutral material in useRenderedModel.
-    const hasColors = (
-      geometry as THREE.BufferGeometry & { hasColors?: boolean }
-    ).hasColors
-    const mesh = new THREE.Mesh(
-      geometry,
-      new THREE.MeshStandardMaterial({
-        color: hasColors ? 0xffffff : new THREE.Color(0.7, 0.7, 0.9),
-        vertexColors: !!hasColors,
-        metalness: 0.3,
-        roughness: 0.4,
-        envMapIntensity: 1.0,
-      })
-    )
-    const group = new THREE.Group()
-    group.add(mesh)
-    return group
-  }, [geometry])
+  // Shared builder (also used by the worker thumbnail) wraps the raw geometry
+  // and surfaces any binary-STL vertex colors. The material only survives in
+  // "Embedded" mode — the default path overrides it in useRenderedModel.
+  const model = useMemo(() => buildStlModel(THREE, geometry), [geometry])
   const meshRef = useRenderedModel(model, rotationSpeed, preserveMaterials)
 
   return <group ref={meshRef} />
