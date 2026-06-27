@@ -8,48 +8,72 @@ import { useEnvironmentPresets } from '@/features/model-viewer/hooks/useEnvironm
 import { getFileUrl } from '@/features/models/api/modelApi'
 import { type Model as ModelType } from '@/utils/fileUtils'
 
+import {
+  resolveSceneLighting,
+  type SceneLightingDescriptor,
+} from '../../../../../asset-processor/lib/sceneLighting.js'
 import { MeshHighlighter } from './MeshHighlighter'
 import { Model } from './Model'
 import { type MaterialTextureSets, TexturedModel } from './TexturedModel'
 import { type ViewerSettingsType } from './ViewerSettings'
 
-// Directional light with visual helper indicator
-function FillLightWithHelper({
-  position,
-  intensity,
-  color,
-  helperColor,
+/**
+ * The shared cross-runtime light rig (lib/sceneLighting.js — also used by the
+ * worker thumbnail render) mapped to React-Three-Fiber primitives. This is the
+ * ONLY lighting in the scene: drei's <Stage> runs at intensity 0 so its own
+ * lights don't stack on top and swamp these (the bug that made the ambient /
+ * environment sliders look inert). Optional drei helpers visualise each light
+ * when "Show Light Helpers" is on.
+ */
+function SceneLights({
+  descriptor,
+  showHelpers,
 }: {
-  position: [number, number, number]
-  intensity: number
-  color: string
-  helperColor: string
-}) {
-  const lightRef = useRef<THREE.DirectionalLight>(null)
-  useHelper(lightRef, THREE.DirectionalLightHelper, 1, helperColor)
+  descriptor: SceneLightingDescriptor
+  showHelpers: boolean
+}): JSX.Element {
+  const directionalRef = useRef<THREE.DirectionalLight>(null)
+  const pointRef = useRef<THREE.PointLight>(null)
+  const spotRef = useRef<THREE.SpotLight>(null)
 
-  return (
-    <directionalLight
-      ref={lightRef}
-      position={position}
-      intensity={intensity}
-      color={color}
-    />
+  useHelper(
+    showHelpers ? directionalRef : null,
+    THREE.DirectionalLightHelper,
+    1,
+    '#ff8800'
   )
-}
+  useHelper(showHelpers ? pointRef : null, THREE.PointLightHelper, 1, '#00ccff')
+  useHelper(showHelpers ? spotRef : null, THREE.SpotLightHelper, '#ff00ff')
 
-// Directional light without helper
-function FillLight({
-  position,
-  intensity,
-  color,
-}: {
-  position: [number, number, number]
-  intensity: number
-  color: string
-}) {
   return (
-    <directionalLight position={position} intensity={intensity} color={color} />
+    <>
+      <ambientLight
+        intensity={descriptor.ambient.intensity}
+        color={descriptor.ambient.color}
+      />
+      <directionalLight
+        ref={directionalRef}
+        position={descriptor.directional.position}
+        intensity={descriptor.directional.intensity}
+        color={descriptor.directional.color}
+        castShadow={descriptor.directional.castShadow}
+      />
+      <pointLight
+        ref={pointRef}
+        position={descriptor.point.position}
+        intensity={descriptor.point.intensity}
+        color={descriptor.point.color}
+      />
+      <spotLight
+        ref={spotRef}
+        position={descriptor.spot.position}
+        intensity={descriptor.spot.intensity}
+        angle={descriptor.spot.angle}
+        penumbra={descriptor.spot.penumbra}
+        color={descriptor.spot.color}
+        castShadow={descriptor.spot.castShadow}
+      />
+    </>
   )
 }
 
@@ -105,14 +129,25 @@ export function Scene({
   const panSpeed = settings?.panSpeed ?? 1
   const modelRotationSpeed = settings?.modelRotationSpeed ?? 0.002
   const showShadows = settings?.showShadows ?? true
-  const ambientIntensity = settings?.ambientIntensity ?? 0.3
+  // Defaults mirror the shared rig (lib/sceneLighting.js DEFAULT_LIGHTING) so an
+  // unconfigured viewer matches the thumbnail render. ambient/environment are
+  // absolute intensities; directional is a multiplier on the directional triplet.
+  const ambientIntensity = settings?.ambientIntensity ?? 0.35
   const directionalIntensity = settings?.directionalIntensity ?? 1.0
   const showLightHelpers = settings?.showLightHelpers ?? false
   const environmentPreset = settings?.environmentPreset ?? 'city'
   const showEnvironmentBackground = settings?.showEnvironmentBackground ?? false
   const backgroundIntensity = settings?.backgroundIntensity ?? 1.0
-  const environmentIntensity = settings?.environmentIntensity ?? 1.0
+  const environmentIntensity = settings?.environmentIntensity ?? 0.3
   const { envMap } = useEnvironmentPresets(environmentPreset)
+
+  // Resolve the single balanced rig from the user settings. This is what makes
+  // the ambient/directional/environment controls actually move the image.
+  const lighting = resolveSceneLighting({
+    ambientIntensity,
+    directionalIntensity,
+    environmentIntensity,
+  })
 
   useEffect(() => {
     if (!cameraState) {
@@ -167,10 +202,13 @@ export function Scene({
 
   return (
     <>
-      {/* Stage provides automatic lighting, shadows, and environment */}
+      {/* Stage centres the model and casts the contact shadow. Its own lights
+          are disabled (intensity 0) — the shared SceneLights rig below is the
+          single light source, so the viewer matches the thumbnail render and
+          the ambient/environment controls aren't swamped. */}
       <Stage
         key={`stage-${modelUrl}`}
-        intensity={directionalIntensity}
+        intensity={0}
         environment={null}
         shadows={
           showShadows ? { type: 'contact', opacity: 0.4, blur: 2 } : false
@@ -202,72 +240,20 @@ export function Scene({
         </Suspense>
       </Stage>
 
-      {/* Environment map for reflections and optional background */}
+      {/* Environment map for reflections and optional background. The IBL
+          contribution (environmentIntensity) is the resolved value, so the
+          environment slider visibly changes reflections. */}
       {envMap && (
         <Environment
           map={envMap}
           background={showEnvironmentBackground}
           backgroundIntensity={backgroundIntensity}
-          environmentIntensity={environmentIntensity}
+          environmentIntensity={lighting.environmentIntensity}
         />
       )}
 
-      {/* 
-        Three-Point Lighting System
-        Models are normalized to fit in ~2x2x2 bounds (see TexturedModel.tsx)
-        Lights positioned at 3x model radius for consistent illumination
-      */}
-
-      {/* Ambient fill - base illumination */}
-      <ambientLight intensity={ambientIntensity} />
-
-      {/* KEY LIGHT: Main light, warm, from front-right-above (45° azimuth, 45° elevation) */}
-      {showLightHelpers ? (
-        <FillLightWithHelper
-          position={[4, 4, 4]}
-          intensity={1.2 * directionalIntensity}
-          color="#fff5e6"
-          helperColor="#ff8800"
-        />
-      ) : (
-        <FillLight
-          position={[4, 4, 4]}
-          intensity={1.2 * directionalIntensity}
-          color="#fff5e6"
-        />
-      )}
-
-      {/* FILL LIGHT: Softer, cool, from front-left (opposite key) */}
-      {showLightHelpers ? (
-        <FillLightWithHelper
-          position={[-4, 2, 4]}
-          intensity={0.6 * directionalIntensity}
-          color="#e6f0ff"
-          helperColor="#00ccff"
-        />
-      ) : (
-        <FillLight
-          position={[-4, 2, 4]}
-          intensity={0.6 * directionalIntensity}
-          color="#e6f0ff"
-        />
-      )}
-
-      {/* RIM/BACK LIGHT: Edge separation, from behind */}
-      {showLightHelpers ? (
-        <FillLightWithHelper
-          position={[0, 3, -5]}
-          intensity={0.8 * directionalIntensity}
-          color="#ffffff"
-          helperColor="#ff00ff"
-        />
-      ) : (
-        <FillLight
-          position={[0, 3, -5]}
-          intensity={0.8 * directionalIntensity}
-          color="#ffffff"
-        />
-      )}
+      {/* Shared cross-runtime light rig — the single source of illumination. */}
+      <SceneLights descriptor={lighting} showHelpers={showLightHelpers} />
 
       {/* Mesh highlighting from hierarchy panel */}
       <MeshHighlighter />
