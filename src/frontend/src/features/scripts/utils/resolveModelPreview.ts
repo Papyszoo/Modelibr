@@ -2,7 +2,14 @@ import { getFileUrl } from '@/features/models/api/modelApi'
 import { getFileExtension, type Model } from '@/utils/fileUtils'
 
 /** Formats the scene preview can load a material onto (matches Model.tsx loaders). */
-export const SUPPORTED_MODEL_FORMATS = ['obj', 'fbx', 'gltf', 'glb']
+export const SUPPORTED_MODEL_FORMATS = [
+  'obj',
+  'fbx',
+  'gltf',
+  'glb',
+  'stl',
+  '3mf',
+]
 
 export interface ModelPreviewTarget {
   url: string

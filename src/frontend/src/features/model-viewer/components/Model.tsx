@@ -1,14 +1,109 @@
 import { Box } from '@react-three/drei'
 import { useFrame, useLoader } from '@react-three/fiber'
-import { Suspense, useEffect, useRef } from 'react'
+import { Suspense, useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
+import { ThreeMFLoader } from 'three/examples/jsm/loaders/3MFLoader'
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader'
+import { STLLoader } from 'three/examples/jsm/loaders/STLLoader'
 
 import { LoadingPlaceholder } from '@/components/LoadingPlaceholder'
 import { useModelObject } from '@/features/model-viewer/hooks/useModelObject'
 import { safeLoadingManager } from '@/shared/three/safeLoadingManager'
+
+/**
+ * Shared presentation logic for every loader: rotate, clone, optionally
+ * override materials, scale to a consistent size and sit the model on the
+ * floor. Each per-format component calls its own loader hook (so React's
+ * rules of hooks are respected) and hands the resulting Object3D here.
+ */
+function useRenderedModel(
+  model: THREE.Object3D | undefined | null,
+  rotationSpeed: number,
+  preserveMaterials: boolean
+) {
+  const meshRef = useRef<THREE.Group>(null)
+  const { setModelObject } = useModelObject()
+  const scaledRef = useRef(false)
+
+  // Rotate the model with configurable speed
+  useFrame(() => {
+    if (meshRef.current && rotationSpeed > 0) {
+      meshRef.current.rotation.y += rotationSpeed
+    }
+  })
+
+  // Reset the scaled flag when the model changes
+  useEffect(() => {
+    scaledRef.current = false
+  }, [model])
+
+  useEffect(() => {
+    if (model && !scaledRef.current) {
+      // Clone the model to prevent scene conflicts when same model is used in multiple panels
+      const clonedModel = model.clone()
+
+      // Apply a basic TSL-style material with enhanced properties
+      clonedModel.traverse(child => {
+        if (child.isMesh) {
+          if (!preserveMaterials) {
+            child.material = new THREE.MeshStandardMaterial({
+              color: new THREE.Color(0.7, 0.7, 0.9),
+              metalness: 0.3,
+              roughness: 0.4,
+              envMapIntensity: 1.0,
+            })
+          }
+          child.castShadow = true
+          child.receiveShadow = true
+        }
+      })
+
+      // Calculate bounding box and scale the model to consistent size
+      const box = new THREE.Box3().setFromObject(clonedModel)
+      const size = box.getSize(new THREE.Vector3())
+      const maxDim = Math.max(size.x, size.y, size.z)
+      const scale = 2 / maxDim
+
+      // Scale the model first
+      // Multiply, don't replace: some loaders (notably FBX) bake a non-1
+      // unit-conversion scale into the root. setScalar would drop that and
+      // shrink the model to ~1/100 of intended size.
+      clonedModel.scale.multiplyScalar(scale)
+
+      // Recalculate bounding box after scaling
+      const scaledBox = new THREE.Box3().setFromObject(clonedModel)
+      const scaledCenter = scaledBox.getCenter(new THREE.Vector3())
+
+      // Position model so it's centered in X and Z, but bottom is at y=0 (floor level)
+      // Subtract (not assign): FBX bakes a non-zero translation into the root,
+      // and overwriting it would offset the model from the camera target.
+      clonedModel.position.x -= scaledCenter.x
+      clonedModel.position.z -= scaledCenter.z
+      clonedModel.position.y -= scaledBox.min.y
+
+      // Store the cloned model in the ref
+      if (meshRef.current) {
+        // Clear previous children
+        meshRef.current.clear()
+        // Add cloned model
+        meshRef.current.add(clonedModel)
+      }
+
+      scaledRef.current = true
+    }
+  }, [model, preserveMaterials])
+
+  useEffect(() => {
+    if (model) {
+      setModelObject(model)
+    }
+    return () => setModelObject(null)
+  }, [model, setModelObject])
+
+  return meshRef
+}
 
 // Separate components for each model type to avoid conditional hooks
 function OBJModel({
@@ -20,94 +115,12 @@ function OBJModel({
   rotationSpeed: number
   preserveMaterials?: boolean
 }) {
-  const meshRef = useRef<THREE.Group>(null)
-  const { setModelObject } = useModelObject()
-  const scaledRef = useRef(false)
-
-  // Rotate the model with configurable speed
-  useFrame(() => {
-    if (meshRef.current && rotationSpeed > 0) {
-      meshRef.current.rotation.y += rotationSpeed
-    }
-  })
-
   const model = useLoader(OBJLoader, modelUrl, loader => {
     loader.manager = safeLoadingManager
   })
+  const meshRef = useRenderedModel(model, rotationSpeed, preserveMaterials)
 
-  useEffect(() => {
-    // Reset scaled flag when modelUrl changes
-    scaledRef.current = false
-  }, [modelUrl])
-
-  useEffect(() => {
-    if (model && !scaledRef.current) {
-      // Clone the model to prevent scene conflicts when same model is used in multiple panels
-      const clonedModel = model.clone()
-
-      // Apply a basic TSL-style material with enhanced properties
-      clonedModel.traverse(child => {
-        if (child.isMesh) {
-          if (!preserveMaterials) {
-            child.material = new THREE.MeshStandardMaterial({
-              color: new THREE.Color(0.7, 0.7, 0.9),
-              metalness: 0.3,
-              roughness: 0.4,
-              envMapIntensity: 1.0,
-            })
-          }
-          child.castShadow = true
-          child.receiveShadow = true
-        }
-      })
-
-      // Calculate bounding box and scale the model to consistent size
-      const box = new THREE.Box3().setFromObject(clonedModel)
-      const size = box.getSize(new THREE.Vector3())
-      const maxDim = Math.max(size.x, size.y, size.z)
-      const scale = 2 / maxDim
-
-      // Scale the model first
-      // Multiply, don't replace: some loaders (notably FBX) bake a non-1
-      // unit-conversion scale into the root. setScalar would drop that and
-      // shrink the model to ~1/100 of intended size.
-      clonedModel.scale.multiplyScalar(scale)
-
-      // Recalculate bounding box after scaling
-      const scaledBox = new THREE.Box3().setFromObject(clonedModel)
-      const scaledCenter = scaledBox.getCenter(new THREE.Vector3())
-
-      // Position model so it's centered in X and Z, but bottom is at y=0 (floor level)
-      // Subtract (not assign): FBX bakes a non-zero translation into the root,
-      // and overwriting it would offset the model from the camera target.
-      clonedModel.position.x -= scaledCenter.x
-      clonedModel.position.z -= scaledCenter.z
-      clonedModel.position.y -= scaledBox.min.y
-
-      // Store the cloned model in the ref
-      if (meshRef.current) {
-        // Clear previous children
-        meshRef.current.clear()
-        // Add cloned model
-        meshRef.current.add(clonedModel)
-      }
-
-      scaledRef.current = true
-    }
-  }, [model])
-
-  useEffect(() => {
-    if (model) {
-      setModelObject(model)
-    }
-    return () => setModelObject(null)
-  }, [model, setModelObject])
-
-  return (
-    <group ref={meshRef}>
-      {/* Model is added via useEffect to support cloning */}
-    </group>
-  )
+  return <group ref={meshRef} />
 }
 
 function GLTFModel({
@@ -119,95 +132,16 @@ function GLTFModel({
   rotationSpeed: number
   preserveMaterials?: boolean
 }) {
-  const meshRef = useRef<THREE.Group>(null)
-  const { setModelObject } = useModelObject()
-  const scaledRef = useRef(false)
-
-  // Rotate the model with configurable speed
-  useFrame(() => {
-    if (meshRef.current && rotationSpeed > 0) {
-      meshRef.current.rotation.y += rotationSpeed
-    }
-  })
-
   const gltf = useLoader(GLTFLoader, modelUrl, loader => {
     loader.manager = safeLoadingManager
   })
-  const model = gltf?.scene
-
-  useEffect(() => {
-    // Reset scaled flag when modelUrl changes
-    scaledRef.current = false
-  }, [modelUrl])
-
-  useEffect(() => {
-    if (model && !scaledRef.current) {
-      // Clone the model to prevent scene conflicts when same model is used in multiple panels
-      const clonedModel = model.clone()
-
-      // Apply a basic TSL-style material with enhanced properties
-      clonedModel.traverse(child => {
-        if (child.isMesh) {
-          if (!preserveMaterials) {
-            child.material = new THREE.MeshStandardMaterial({
-              color: new THREE.Color(0.7, 0.7, 0.9),
-              metalness: 0.3,
-              roughness: 0.4,
-              envMapIntensity: 1.0,
-            })
-          }
-          child.castShadow = true
-          child.receiveShadow = true
-        }
-      })
-
-      // Calculate bounding box and scale the model to consistent size
-      const box = new THREE.Box3().setFromObject(clonedModel)
-      const size = box.getSize(new THREE.Vector3())
-      const maxDim = Math.max(size.x, size.y, size.z)
-      const scale = 2 / maxDim
-
-      // Scale the model first
-      // Multiply, don't replace: some loaders (notably FBX) bake a non-1
-      // unit-conversion scale into the root. setScalar would drop that and
-      // shrink the model to ~1/100 of intended size.
-      clonedModel.scale.multiplyScalar(scale)
-
-      // Recalculate bounding box after scaling
-      const scaledBox = new THREE.Box3().setFromObject(clonedModel)
-      const scaledCenter = scaledBox.getCenter(new THREE.Vector3())
-
-      // Position model so it's centered in X and Z, but bottom is at y=0 (floor level)
-      // Subtract (not assign): FBX bakes a non-zero translation into the root,
-      // and overwriting it would offset the model from the camera target.
-      clonedModel.position.x -= scaledCenter.x
-      clonedModel.position.z -= scaledCenter.z
-      clonedModel.position.y -= scaledBox.min.y
-
-      // Store the cloned model in the ref
-      if (meshRef.current) {
-        // Clear previous children
-        meshRef.current.clear()
-        // Add cloned model
-        meshRef.current.add(clonedModel)
-      }
-
-      scaledRef.current = true
-    }
-  }, [model])
-
-  useEffect(() => {
-    if (model) {
-      setModelObject(model)
-    }
-    return () => setModelObject(null)
-  }, [model, setModelObject])
-
-  return (
-    <group ref={meshRef}>
-      {/* Model is added via useEffect to support cloning */}
-    </group>
+  const meshRef = useRenderedModel(
+    gltf?.scene,
+    rotationSpeed,
+    preserveMaterials
   )
+
+  return <group ref={meshRef} />
 }
 
 function FBXModel({
@@ -219,93 +153,70 @@ function FBXModel({
   rotationSpeed: number
   preserveMaterials?: boolean
 }) {
-  const meshRef = useRef<THREE.Group>(null)
-  const { setModelObject } = useModelObject()
-  const scaledRef = useRef(false)
-
-  // Rotate the model with configurable speed
-  useFrame(() => {
-    if (meshRef.current && rotationSpeed > 0) {
-      meshRef.current.rotation.y += rotationSpeed
-    }
-  })
-
   const model = useLoader(FBXLoader, modelUrl, loader => {
     loader.manager = safeLoadingManager
   })
+  const meshRef = useRenderedModel(model, rotationSpeed, preserveMaterials)
 
-  useEffect(() => {
-    // Reset scaled flag when modelUrl changes
-    scaledRef.current = false
-  }, [modelUrl])
+  return <group ref={meshRef} />
+}
 
-  useEffect(() => {
-    if (model && !scaledRef.current) {
-      // Clone the model to prevent scene conflicts when same model is used in multiple panels
-      const clonedModel = model.clone()
-
-      // Apply a basic TSL-style material with enhanced properties
-      clonedModel.traverse(child => {
-        if (child.isMesh) {
-          if (!preserveMaterials) {
-            child.material = new THREE.MeshStandardMaterial({
-              color: new THREE.Color(0.7, 0.7, 0.9),
-              metalness: 0.3,
-              roughness: 0.4,
-              envMapIntensity: 1.0,
-            })
-          }
-          child.castShadow = true
-          child.receiveShadow = true
-        }
+// STLLoader returns raw BufferGeometry (no scene graph, no materials), so wrap
+// it in a Mesh + Group before handing it to the shared rendering logic.
+function STLModel({
+  modelUrl,
+  rotationSpeed,
+  preserveMaterials = false,
+}: {
+  modelUrl: string
+  rotationSpeed: number
+  preserveMaterials?: boolean
+}) {
+  const geometry = useLoader(STLLoader, modelUrl, loader => {
+    loader.manager = safeLoadingManager
+  })
+  const model = useMemo(() => {
+    // Binary STL can carry per-vertex colors (Materialise/Magics extension).
+    // When present, render them (vertexColors + white base so they aren't
+    // tinted). This material only survives in "Embedded" mode — the default
+    // path overrides it with the neutral material in useRenderedModel.
+    const hasColors = (
+      geometry as THREE.BufferGeometry & { hasColors?: boolean }
+    ).hasColors
+    const mesh = new THREE.Mesh(
+      geometry,
+      new THREE.MeshStandardMaterial({
+        color: hasColors ? 0xffffff : new THREE.Color(0.7, 0.7, 0.9),
+        vertexColors: !!hasColors,
+        metalness: 0.3,
+        roughness: 0.4,
+        envMapIntensity: 1.0,
       })
+    )
+    const group = new THREE.Group()
+    group.add(mesh)
+    return group
+  }, [geometry])
+  const meshRef = useRenderedModel(model, rotationSpeed, preserveMaterials)
 
-      // Calculate bounding box and scale the model to consistent size
-      const box = new THREE.Box3().setFromObject(clonedModel)
-      const size = box.getSize(new THREE.Vector3())
-      const maxDim = Math.max(size.x, size.y, size.z)
-      const scale = 2 / maxDim
+  return <group ref={meshRef} />
+}
 
-      // Multiply, don't replace: some loaders (notably FBX) bake a non-1
-      // unit-conversion scale into the root. setScalar would drop that and
-      // shrink the model to ~1/100 of intended size.
-      clonedModel.scale.multiplyScalar(scale)
+function ThreeMFModel({
+  modelUrl,
+  rotationSpeed,
+  preserveMaterials = false,
+}: {
+  modelUrl: string
+  rotationSpeed: number
+  preserveMaterials?: boolean
+}) {
+  const model = useLoader(ThreeMFLoader, modelUrl, loader => {
+    loader.manager = safeLoadingManager
+  })
+  const meshRef = useRenderedModel(model, rotationSpeed, preserveMaterials)
 
-      // Recalculate bounding box after scaling
-      const scaledBox = new THREE.Box3().setFromObject(clonedModel)
-      const scaledCenter = scaledBox.getCenter(new THREE.Vector3())
-
-      // Position model so it's centered in X and Z, but bottom is at y=0 (floor level)
-      // Subtract (not assign): FBX bakes a non-zero translation into the root,
-      // and overwriting it would offset the model from the camera target.
-      clonedModel.position.x -= scaledCenter.x
-      clonedModel.position.z -= scaledCenter.z
-      clonedModel.position.y -= scaledBox.min.y
-
-      // Store the cloned model in the ref
-      if (meshRef.current) {
-        // Clear previous children
-        meshRef.current.clear()
-        // Add cloned model
-        meshRef.current.add(clonedModel)
-      }
-
-      scaledRef.current = true
-    }
-  }, [model])
-
-  useEffect(() => {
-    if (model) {
-      setModelObject(model)
-    }
-    return () => setModelObject(null)
-  }, [model, setModelObject])
-
-  return (
-    <group ref={meshRef}>
-      {/* Model is added via useEffect to support cloning */}
-    </group>
-  )
+  return <group ref={meshRef} />
 }
 
 function PlaceholderModel({ rotationSpeed }: { rotationSpeed: number }) {
@@ -329,6 +240,8 @@ function PlaceholderModel({ rotationSpeed }: { rotationSpeed: number }) {
     </Box>
   )
 }
+
+const KNOWN_FORMATS = ['obj', 'fbx', 'gltf', 'glb', 'stl', '3mf']
 
 export function Model({
   modelUrl,
@@ -364,7 +277,21 @@ export function Model({
           preserveMaterials={preserveMaterials}
         />
       )}
-      {!['obj', 'fbx', 'gltf', 'glb'].includes(fileExtension) && (
+      {fileExtension === 'stl' && (
+        <STLModel
+          modelUrl={modelUrl}
+          rotationSpeed={rotationSpeed}
+          preserveMaterials={preserveMaterials}
+        />
+      )}
+      {fileExtension === '3mf' && (
+        <ThreeMFModel
+          modelUrl={modelUrl}
+          rotationSpeed={rotationSpeed}
+          preserveMaterials={preserveMaterials}
+        />
+      )}
+      {!KNOWN_FORMATS.includes(fileExtension) && (
         <PlaceholderModel rotationSpeed={rotationSpeed} />
       )}
     </Suspense>
