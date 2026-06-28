@@ -1,0 +1,56 @@
+/* Live render-stats HUD for the model preview (top-left, opposite the
+   controls-info bubble; drei's FPS Stats sits bottom-left). */
+.viewer-perf-panel {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 50;
+  pointer-events: none;
+  min-width: 9.5rem;
+  padding: 0.4rem 0.55rem;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  color: #e6e6e6;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+  font-size: 0.7rem;
+  line-height: 1.5;
+  user-select: none;
+}
+
+.viewer-perf-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.viewer-perf-row > span:first-child {
+  color: #9aa0a6;
+}
+
+.viewer-perf-backend-row {
+  margin-bottom: 0.2rem;
+  padding-bottom: 0.2rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.viewer-perf-badge {
+  font-weight: 700;
+  padding: 0 0.35rem;
+  border-radius: 4px;
+}
+
+.viewer-perf-badge.is-webgpu {
+  color: #0b3d2e;
+  background: #46e0a8;
+}
+
+.viewer-perf-badge.is-webgl {
+  color: #3a2a00;
+  background: #ffcf66;
+}
+
+.viewer-perf-muted {
+  color: #9aa0a6;
+}
