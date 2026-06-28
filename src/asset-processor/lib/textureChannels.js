@@ -166,8 +166,10 @@ export function channelNeedsExtraction(channel) {
 
 /**
  * Fullscreen-quad passthrough vertex shader for the channel-extraction passes.
- * Writes clip-space directly from the unit quad's position so it works for any
- * camera orchestration (the runtimes set up their ortho camera differently).
+ * Writes clip-space directly from the unit-quad position (a `PlaneGeometry(2, 2)`
+ * whose vertices sit at ±1), so the camera setup is irrelevant — but the source
+ * geometry MUST be that 2×2 quad. The runtimes' ortho cameras differ; this shader
+ * intentionally ignores them.
  * @type {string}
  */
 export const CHANNEL_VERTEX_SHADER = `
