@@ -111,6 +111,7 @@ namespace WebApi
             builder.Services.AddSingleton<IFileStorage, HashBasedFileStorage>();
             builder.Services.AddSingleton<IFilePreviewService, FilePreviewService>();
             builder.Services.AddSingleton<IFileThumbnailGenerator, FileThumbnailGenerator>();
+            builder.Services.AddSingleton<WebApi.Services.IThumbnailWorkerRegistry, WebApi.Services.ThumbnailWorkerRegistry>();
             builder.Services.AddScoped<IThumbnailNotificationService, SignalRThumbnailNotificationService>();
             builder.Services.AddScoped<IThumbnailJobQueueNotificationService, SignalRThumbnailJobQueueNotificationService>();
             builder.Services.AddHostedService<UploadDirectoryInitializer>();

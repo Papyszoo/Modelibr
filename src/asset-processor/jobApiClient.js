@@ -2,6 +2,7 @@ import axios from 'axios'
 import https from 'https'
 import fs from 'fs'
 import FormData from 'form-data'
+import { getCapabilities } from './capabilities.js'
 import { config } from './config.js'
 import logger from './logger.js'
 
@@ -34,6 +35,9 @@ export class JobApiClient {
     try {
       const response = await this.apiClient.post('/thumbnail-jobs/dequeue', {
         workerId: config.workerId,
+        // Report the detected render backend (WebGPU/WebGL2) so the backend can
+        // surface worker capabilities in Settings. null until the first render.
+        renderBackend: getCapabilities().renderBackend,
       })
 
       if (response.status === 204) {

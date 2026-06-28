@@ -17,7 +17,10 @@ import { type z } from 'zod'
 
 import { useModelsQuery } from '@/features/models/api/queries'
 import { ScriptTemplatesSection } from '@/features/scripts/components/ScriptTemplatesSection'
-import { useSettingsQuery } from '@/features/settings/api/queries'
+import {
+  useSettingsQuery,
+  useThumbnailWorkersQuery,
+} from '@/features/settings/api/queries'
 import type {
   BlenderInstallStatus,
   BlenderVersionInfo,
@@ -194,6 +197,7 @@ interface SettingsProps {
 export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
   const queryClient = useQueryClient()
   const settingsQuery = useSettingsQuery()
+  const thumbnailWorkersQuery = useThumbnailWorkersQuery()
   const isLoading = settingsQuery.isLoading
   const isDemo = import.meta.env.VITE_DEMO_MODE === 'true'
 
@@ -1206,6 +1210,49 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
                     {regenerateAssetCountLabel} will be re-rendered using the
                     settings above. Each model uses its current default texture
                     set / material.
+                  </span>
+                </div>
+
+                <div className="settings-field">
+                  <label>Worker rendering backend</label>
+                  {(thumbnailWorkersQuery.data?.length ?? 0) === 0 ? (
+                    <span className="settings-help">
+                      No thumbnail worker has reported in yet.
+                    </span>
+                  ) : (
+                    <ul className="worker-capabilities-list">
+                      {thumbnailWorkersQuery.data?.map(worker => {
+                        const backend = worker.renderBackend
+                        const backendClass =
+                          backend === 'WebGPU'
+                            ? 'is-webgpu'
+                            : backend
+                              ? 'is-webgl'
+                              : 'is-unknown'
+                        return (
+                          <li
+                            key={worker.workerId}
+                            className="worker-capabilities-item"
+                          >
+                            <span className="worker-capabilities-id">
+                              {worker.workerId}
+                            </span>
+                            <span
+                              className={`worker-backend-badge ${backendClass}`}
+                              title="Renderer backend the worker came up on"
+                            >
+                              {backend ?? 'detecting…'}
+                            </span>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
+                  <span className="settings-help">
+                    Thumbnails render on WebGPU when the worker&apos;s host
+                    exposes it (faster for heavy models), falling back to WebGL2
+                    automatically. The backend shows once a worker renders its
+                    first job.
                   </span>
                 </div>
               </div>

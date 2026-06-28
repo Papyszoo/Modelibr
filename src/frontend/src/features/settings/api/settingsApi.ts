@@ -84,6 +84,21 @@ export async function installBlender(
   return response.data
 }
 
+/** A thumbnail worker's last-reported state (see WebApi ThumbnailWorkerRegistry). */
+export interface ThumbnailWorkerInfo {
+  workerId: string
+  /** 'WebGPU' | 'WebGL2', or null until the worker has rendered once. */
+  renderBackend: string | null
+  lastSeenUtc: string
+}
+
+export async function getThumbnailWorkers(): Promise<ThumbnailWorkerInfo[]> {
+  const response = await client.get<{ workers: ThumbnailWorkerInfo[] }>(
+    '/thumbnail-jobs/workers'
+  )
+  return response.data.workers ?? []
+}
+
 export async function uninstallBlender(): Promise<BlenderInstallStatus> {
   const response = await client.post('/settings/blender/uninstall')
   return response.data
