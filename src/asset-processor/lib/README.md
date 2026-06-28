@@ -58,7 +58,7 @@ not in two places.
     second UV set. Without it the AO term collapses and kills ALL indirect light
     (ambient + environment IBL), which made those viewer controls look inert.
 - **`displacementNormal.js`** — `addSharedDisplacementNormal(THREE, geometry)` +
-  `applyDispNormalDisplacement(material)`: average the displacement *direction*
+  `applyDispNormalDisplacement(material)`: average the displacement _direction_
   across coincident-position vertex duplicates (instead of welding) so hard-edged
   displaced meshes stay watertight without smearing per-face UVs. Holds the two
   displacement GLSL chunks as the single source. The frontend imports it through
@@ -79,7 +79,7 @@ not in two places.
     `CHANNEL_VERTEX_SHADER` / `CHANNEL_EXTRACT_FRAGMENT_SHADER` (0-based
     `uChannel`, `uInvert`) / `RGB_INVERT_FRAGMENT_SHADER` GLSL. Previously the
     frontend (0-based) and worker (1-based) extraction shaders used different
-    channel numbering. The render-to-target *orchestration* (render-target size,
+    channel numbering. The render-to-target _orchestration_ (render-target size,
     camera, clone/dispose, color-space assignment) stays per-runtime.
   - `slotIsColorData(slot)` — which slots are sRGB color vs linear data.
 
