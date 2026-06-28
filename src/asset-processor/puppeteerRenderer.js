@@ -1064,15 +1064,21 @@ export class PuppeteerRenderer {
                 if (extracted) {
                   // Single channel (R/G/B/A) → grayscale, inverted for Glossiness.
                   console.log(`Extracting channel ${sourceChannel} for ${type}`)
+                  const sourceTexture = texture
                   texture = await extractChannel(
-                    texture,
+                    sourceTexture,
                     sourceChannel,
                     needsInvert
                   )
+                  // The raw source is consumed by the extraction pass and never
+                  // used again — dispose it now so it doesn't leak across jobs.
+                  sourceTexture.dispose()
                 } else if (needsInvert) {
                   // Glossiness stored as RGB → flip so it behaves as roughness.
                   console.log(`Inverting RGB glossiness for ${type}`)
-                  texture = await invertRgbTexture(texture)
+                  const sourceTexture = texture
+                  texture = await invertRgbTexture(sourceTexture)
+                  sourceTexture.dispose()
                 }
 
                 // Color space: extracted/inverted data maps are linear; otherwise
@@ -1086,6 +1092,12 @@ export class PuppeteerRenderer {
                 }
 
                 loadedTextures[materialProperty] = texture
+                // Register every applied texture so the next clearScene disposes
+                // it — and, for channel-extracted maps, its backing RenderTarget
+                // (disposeRegisteredResources honours __channelRenderTarget).
+                // material.dispose() does not free textures, so without this the
+                // worker leaks a texture/GPU target per map on every job.
+                window.modelRenderer.disposableTextures.push(texture)
                 console.log(
                   `Loaded ${type} -> ${materialProperty} (channel: ${sourceChannel}, invert: ${needsInvert}, exr: ${!!data.isExr}, tiff: ${!!data.isTiff})`
                 )

@@ -257,7 +257,14 @@
       function disposeRegisteredResources() {
         for (const texture of window.modelRenderer.disposableTextures) {
           try {
-            texture.dispose?.()
+            // Channel-extracted textures are backed by a RenderTarget stashed on
+            // userData (textureChannels.extractTextureChannel). Disposing the
+            // target frees both it and its texture; otherwise dispose the texture
+            // directly. Mirrors the viewer's disposeExtractedTexture so the
+            // worker doesn't leak a GPU render target per channel-extracted map.
+            const channelTarget = texture?.userData?.__channelRenderTarget
+            if (channelTarget) channelTarget.dispose()
+            else texture.dispose?.()
           } catch (e) {
             console.warn('Failed to dispose texture:', e)
           }
