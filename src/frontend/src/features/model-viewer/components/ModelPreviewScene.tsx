@@ -1,7 +1,16 @@
 import { Environment, OrbitControls, Stage, useHelper } from '@react-three/drei'
 import { useThree } from '@react-three/fiber'
-import { type JSX, Suspense, useCallback, useEffect, useRef } from 'react'
+import {
+  type JSX,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import * as THREE from 'three'
+import { ShadowNodeMaterial } from 'three/webgpu'
 
 import { LoadingPlaceholder } from '@/components/LoadingPlaceholder'
 import { useEnvironmentPresets } from '@/features/model-viewer/hooks/useEnvironmentPresets'
@@ -57,6 +66,20 @@ function SceneLights({
         intensity={descriptor.directional.intensity}
         color={descriptor.directional.color}
         castShadow={descriptor.directional.castShadow}
+        // Tight ortho frustum around the normalised (~2-unit) model so the
+        // shadow map resolves crisply; a small negative bias + normalBias keeps
+        // the ground catcher free of shadow acne. far comfortably reaches the
+        // light at [20,15,20] (~30 units out).
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
+        shadow-bias={-0.0005}
+        shadow-normalBias={0.02}
+        shadow-camera-near={0.1}
+        shadow-camera-far={80}
+        shadow-camera-left={-3}
+        shadow-camera-right={3}
+        shadow-camera-top={3}
+        shadow-camera-bottom={-3}
       />
       <pointLight
         ref={pointRef}
@@ -141,6 +164,22 @@ export function Scene({
   const environmentIntensity = settings?.environmentIntensity ?? 0.3
   const { envMap } = useEnvironmentPresets(environmentPreset)
 
+  // Ground shadow catcher. drei's <Stage> centres the model's bounding box on
+  // the origin, so its floor sits at y = -height/2; Stage hands us that height
+  // via the Center onCentered callback. ShadowNodeMaterial is the WebGPU-native
+  // shadow catcher — a plain transparent plane that darkens only where a shadow
+  // falls. We use it instead of Stage's built-in `type: 'contact'` shadow, whose
+  // GLSL blur ShaderMaterial can't run on the WebGPURenderer and rendered as an
+  // opaque black plane after the WebGPU migration.
+  const [floorY, setFloorY] = useState(0)
+  const shadowMaterial = useMemo(() => {
+    const material = new ShadowNodeMaterial()
+    material.transparent = true
+    material.opacity = 0.35
+    return material
+  }, [])
+  useEffect(() => () => shadowMaterial.dispose(), [shadowMaterial])
+
   // Resolve the single balanced rig from the user settings. This is what makes
   // the ambient/directional/environment controls actually move the image.
   const lighting = resolveSceneLighting({
@@ -202,18 +241,21 @@ export function Scene({
 
   return (
     <>
-      {/* Stage centres the model and casts the contact shadow. Its own lights
-          are disabled (intensity 0) — the shared SceneLights rig below is the
-          single light source, so the viewer matches the thumbnail render and
-          the ambient/environment controls aren't swamped. */}
+      {/* Stage only centres the model now. Its own lights are disabled
+          (intensity 0) — the shared SceneLights rig below is the single light
+          source, so the viewer matches the thumbnail render and the
+          ambient/environment controls aren't swamped. Shadows are off here: the
+          drei contact shadow is GLSL-based and breaks on the WebGPURenderer
+          (opaque black plane), so the ground shadow is rendered by the
+          ShadowNodeMaterial catcher below instead. onCentered reports the model
+          height so we can park that catcher at the model's feet (y=-height/2). */}
       <Stage
         key={`stage-${modelUrl}`}
         intensity={0}
         environment={null}
-        shadows={
-          showShadows ? { type: 'contact', opacity: 0.4, blur: 2 } : false
-        }
+        shadows={false}
         adjustCamera={false}
+        center={{ onCentered: ({ height }) => setFloorY(-height / 2) }}
       >
         <Suspense fallback={<LoadingPlaceholder />}>
           {materialTextureSets &&
@@ -239,6 +281,21 @@ export function Scene({
           )}
         </Suspense>
       </Stage>
+
+      {/* WebGPU-native ground shadow catcher at the model's feet. The plane is
+          invisible (ShadowNodeMaterial) except where the directional/spot lights
+          throw a shadow, so the model reads as grounded without a visible floor.
+          Gated by the Show Shadows setting; the model meshes already castShadow. */}
+      {showShadows && (
+        <mesh
+          rotation={[-Math.PI / 2, 0, 0]}
+          position={[0, floorY, 0]}
+          receiveShadow
+          material={shadowMaterial}
+        >
+          <planeGeometry args={[20, 20]} />
+        </mesh>
+      )}
 
       {/* Environment map for reflections and optional background. The IBL
           contribution (environmentIntensity) is the resolved value, so the
