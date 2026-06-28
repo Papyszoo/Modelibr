@@ -67,10 +67,11 @@
       // Loaded for their window side-effects: the applyTextures page.evaluate
       // (puppeteerRenderer.js) runs as a classic script and can't import, so it
       // reaches these shared rules through window globals
-      // (window.modelibrTextureMaterial / window.modelibrDispNormal). Single
-      // source of truth with the viewer.
+      // (window.modelibrTextureMaterial / window.modelibrDispNormal /
+      // window.modelibrTextureChannels). Single source of truth with the viewer.
       import './lib/textureMaterial.js'
       import './lib/displacementNormal.js'
+      import './lib/textureChannels.js'
 
       // Global state for external control
       window.modelRenderer = {

@@ -64,12 +64,28 @@ not in two places.
   displacement GLSL chunks as the single source. The frontend imports it through
   the `shared/three/sharedDisplacementNormal.ts` wrapper (which injects THREE);
   the worker `applyTextures` calls it via `window.modelibrDispNormal`.
+- **`textureChannels.js`** — the texture-type → material-slot map and the
+  channel-extraction shaders. No THREE import (plain data + GLSL strings).
+  - `MATERIAL_SLOT_BY_TEXTURE_TYPE` / `resolveMaterialSlot(type)` — which
+    MeshPhysicalMaterial slot each `TextureType` feeds (Height & Displacement →
+    `displacementMap`; Roughness & Glossiness → `roughnessMap`).
+  - `TEXTURE_TYPE` / `TEXTURE_CHANNEL` — enum mirrors of
+    `Domain/ValueObjects/TextureType.cs` / `TextureChannel.cs` (the API
+    serializes the enums as numbers), so no runtime sprinkles magic literals.
+  - `textureTypeNeedsInvert(type)` — Glossiness is inverted roughness, so it
+    feeds `roughnessMap` flipped. The worker had **no** Glossiness slot and was
+    silently dropping it; sharing the map + invert rule fixed that drift.
+  - `getChannelUniformIndex` / `channelNeedsExtraction` + the
+    `CHANNEL_VERTEX_SHADER` / `CHANNEL_EXTRACT_FRAGMENT_SHADER` (0-based
+    `uChannel`, `uInvert`) / `RGB_INVERT_FRAGMENT_SHADER` GLSL. Previously the
+    frontend (0-based) and worker (1-based) extraction shaders used different
+    channel numbering. The render-to-target *orchestration* (render-target size,
+    camera, clone/dispose, color-space assignment) stays per-runtime.
+  - `slotIsColorData(slot)` — which slots are sRGB color vs linear data.
 
 ## Adding to this directory
 
 Adding viewer logic that the thumbnail render or demo must match? Put it here,
-not in two places. Remaining not-yet-migrated case: the texture-type → material
-slot map and the channel-extraction shader strings are still duplicated between
-`useChannelExtractedTextures` / `TEXTURE_SLOTS` (frontend) and the
-`applyTextures` `page.evaluate` (worker) — migrate the data/shaders here when you
-next touch either side (the render *orchestration* stays per-runtime).
+not in two places. The texture-set → material pipeline now lives across
+`textureMaterial.js` (material config + AO uv2) and `textureChannels.js` (slot
+map + channel shaders); only the per-runtime render orchestration stays inline.

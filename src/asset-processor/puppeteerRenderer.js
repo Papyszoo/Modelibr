@@ -857,64 +857,46 @@ export class PuppeteerRenderer {
             const renderer = window.modelRenderer.renderer
             const textureLoader = new THREE.TextureLoader()
 
-            // Map texture type enum values to MeshPhysicalMaterial properties
-            const textureTypeMap = {
-              1: 'map', // Albedo
-              2: 'normalMap',
-              3: 'displacementMap', // Height
-              4: 'aoMap',
-              5: 'roughnessMap',
-              6: 'metalnessMap',
-              7: 'map', // Diffuse (legacy)
-              8: 'specularColorMap', // Specular (MeshPhysicalMaterial)
-              9: 'emissiveMap', // Emissive
-              10: 'bumpMap', // Bump
-              11: 'alphaMap', // Alpha
-              12: 'displacementMap', // Displacement
-              Albedo: 'map',
-              Normal: 'normalMap',
-              Height: 'displacementMap',
-              AO: 'aoMap',
-              Roughness: 'roughnessMap',
-              Metallic: 'metalnessMap',
-              Diffuse: 'map',
-              Specular: 'specularColorMap',
-              BaseColor: 'map',
-              AmbientOcclusion: 'aoMap',
-              Emissive: 'emissiveMap',
-              Bump: 'bumpMap',
-              Alpha: 'alphaMap',
-              Displacement: 'displacementMap',
+            // Shared cross-runtime texture-type → material-slot map and
+            // channel-extraction shaders (asset-processor/lib/textureChannels.js,
+            // reached via the window side-effect because this runs as a classic
+            // page.evaluate script). Single source of truth with the viewer: the
+            // slot map, the extraction GLSL, the 0-based channel numbering, and
+            // the Glossiness-invert rule all live there now.
+            const channels = window.modelibrTextureChannels
+
+            // Extract a single channel (R/G/B/A) to a grayscale texture, with
+            // optional value inversion (Glossiness → Roughness). Render-to-target
+            // orchestration stays per-runtime; the shader + channel index are shared.
+            function extractChannel(sourceTexture, sourceChannel, invert) {
+              return renderToGrayscale(sourceTexture, {
+                fragmentShader: channels.CHANNEL_EXTRACT_FRAGMENT_SHADER,
+                uniforms: {
+                  uTexture: { value: sourceTexture },
+                  uChannel: {
+                    value: channels.getChannelUniformIndex(sourceChannel),
+                  },
+                  uInvert: { value: invert ? 1 : 0 },
+                },
+              })
             }
 
-            // Channel extraction shader
-            const extractChannelShader = {
-              vertexShader: `
-                varying vec2 vUv;
-                void main() {
-                  vUv = uv;
-                  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-                }
-              `,
-              fragmentShader: `
-                uniform sampler2D sourceTexture;
-                uniform int channel; // 1=R, 2=G, 3=B, 4=A
-                varying vec2 vUv;
-                void main() {
-                  vec4 texColor = texture2D(sourceTexture, vUv);
-                  float value;
-                  if (channel == 1) value = texColor.r;
-                  else if (channel == 2) value = texColor.g;
-                  else if (channel == 3) value = texColor.b;
-                  else if (channel == 4) value = texColor.a;
-                  else value = texColor.r; // Default to R
-                  gl_FragColor = vec4(value, value, value, 1.0);
-                }
-              `,
+            // Invert a full-RGB texture (Glossiness stored as RGB grayscale that
+            // must be flipped to behave as roughness).
+            function invertRgbTexture(sourceTexture) {
+              return renderToGrayscale(sourceTexture, {
+                fragmentShader: channels.RGB_INVERT_FRAGMENT_SHADER,
+                uniforms: { uTexture: { value: sourceTexture } },
+              })
             }
 
-            // Function to extract a single channel to grayscale texture
-            function extractChannel(sourceTexture, channelIndex) {
+            // Shared render-to-target plumbing for the channel passes above. The
+            // passthrough vertex shader writes clip-space directly from the unit
+            // quad, so the ortho camera setup is irrelevant.
+            function renderToGrayscale(
+              sourceTexture,
+              { fragmentShader, uniforms }
+            ) {
               const size = 512 // Output texture size
               const renderTarget = new THREE.WebGLRenderTarget(size, size, {
                 minFilter: THREE.LinearFilter,
@@ -923,16 +905,12 @@ export class PuppeteerRenderer {
               })
 
               const scene = new THREE.Scene()
-              const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10)
-              camera.position.z = 1
+              const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
 
               const material = new THREE.ShaderMaterial({
-                uniforms: {
-                  sourceTexture: { value: sourceTexture },
-                  channel: { value: channelIndex },
-                },
-                vertexShader: extractChannelShader.vertexShader,
-                fragmentShader: extractChannelShader.fragmentShader,
+                uniforms,
+                vertexShader: channels.CHANNEL_VERTEX_SHADER,
+                fragmentShader,
               })
 
               const geometry = new THREE.PlaneGeometry(2, 2)
@@ -943,17 +921,17 @@ export class PuppeteerRenderer {
               renderer.render(scene, camera)
               renderer.setRenderTarget(null)
 
-              const extractedTexture = renderTarget.texture
-              extractedTexture.wrapS = sourceTexture.wrapS
-              extractedTexture.wrapT = sourceTexture.wrapT
-              extractedTexture.flipY = sourceTexture.flipY
-              extractedTexture.needsUpdate = true
+              const outputTexture = renderTarget.texture
+              outputTexture.wrapS = sourceTexture.wrapS
+              outputTexture.wrapT = sourceTexture.wrapT
+              outputTexture.flipY = sourceTexture.flipY
+              outputTexture.needsUpdate = true
 
               // Cleanup
               geometry.dispose()
               material.dispose()
 
-              return extractedTexture
+              return outputTexture
             }
 
             // Load standard texture via TextureLoader from HTTP URL
@@ -1029,13 +1007,6 @@ export class PuppeteerRenderer {
               return texture
             }
 
-            // Texture types that carry color data (need sRGB color space)
-            const colorTextureProps = new Set([
-              'map',
-              'emissiveMap',
-              'specularColorMap',
-            ])
-
             const loadedTextures = {}
             for (const [type, data] of Object.entries(textures)) {
               try {
@@ -1047,22 +1018,31 @@ export class PuppeteerRenderer {
                 } else {
                   texture = await loadTexture(data.url, shouldFlipY)
                 }
-                const sourceChannel = data.sourceChannel
 
-                // Extract channel if not RGB (0)
-                if (sourceChannel > 0 && sourceChannel <= 4) {
+                // Object.entries keys are strings; the shared Set lookups key on
+                // the numeric enum value, so coerce.
+                const textureType = Number(type)
+                const sourceChannel = data.sourceChannel
+                const needsInvert = channels.textureTypeNeedsInvert(textureType)
+                const materialProperty =
+                  channels.resolveMaterialSlot(textureType) || type
+                const extracted = channels.channelNeedsExtraction(sourceChannel)
+
+                if (extracted) {
+                  // Single channel (R/G/B/A) → grayscale, inverted for Glossiness.
                   console.log(`Extracting channel ${sourceChannel} for ${type}`)
-                  texture = extractChannel(texture, sourceChannel)
-                  // For grayscale textures, use linear color space
-                  texture.colorSpace = THREE.LinearSRGBColorSpace
+                  texture = extractChannel(texture, sourceChannel, needsInvert)
+                } else if (needsInvert) {
+                  // Glossiness stored as RGB → flip so it behaves as roughness.
+                  console.log(`Inverting RGB glossiness for ${type}`)
+                  texture = invertRgbTexture(texture)
                 }
 
-                const materialProperty = textureTypeMap[type] || type
-
-                // Set correct color space: sRGB for color textures, linear for data textures
-                if (sourceChannel > 0 && sourceChannel <= 4) {
+                // Color space: extracted/inverted data maps are linear; otherwise
+                // sRGB for color slots, linear for data slots (shared rule).
+                if (extracted || needsInvert) {
                   texture.colorSpace = THREE.LinearSRGBColorSpace
-                } else if (colorTextureProps.has(materialProperty)) {
+                } else if (channels.slotIsColorData(materialProperty)) {
                   texture.colorSpace = THREE.SRGBColorSpace
                 } else {
                   texture.colorSpace = THREE.LinearSRGBColorSpace
@@ -1070,7 +1050,7 @@ export class PuppeteerRenderer {
 
                 loadedTextures[materialProperty] = texture
                 console.log(
-                  `Loaded ${type} -> ${materialProperty} (channel: ${sourceChannel}, exr: ${!!data.isExr}, tiff: ${!!data.isTiff})`
+                  `Loaded ${type} -> ${materialProperty} (channel: ${sourceChannel}, invert: ${needsInvert}, exr: ${!!data.isExr}, tiff: ${!!data.isTiff})`
                 )
               } catch (error) {
                 console.warn(`Failed to load ${type} texture:`, error)

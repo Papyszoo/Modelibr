@@ -18,6 +18,10 @@ import { TextureChannel, TextureType } from '@/types'
 
 import { buildStlModel } from '../../../../../asset-processor/lib/stlMesh.js'
 import {
+  MATERIAL_SLOT_BY_TEXTURE_TYPE,
+  textureTypeNeedsInvert,
+} from '../../../../../asset-processor/lib/textureChannels.js'
+import {
   applyMaterialTextures,
   KEY_SEP,
   type MaterialTextureSets,
@@ -32,35 +36,26 @@ interface TexturedModelProps {
   materialTextureSets: MaterialTextureSets
 }
 
-// Material property slot names used by MeshPhysicalMaterial.
-// `fallback` is used when the primary type is absent (mutually-exclusive groups).
-// `invertFallback` means the fallback texture must be channel-inverted at load
-// time (e.g. Glossiness fed through the roughnessMap slot).
+// Texture types in apply order, each with its fallback when the primary is
+// absent (mutually-exclusive groups: Roughness←Glossiness, Displacement←Height).
+// The MeshPhysicalMaterial slot each type feeds and whether it must be inverted
+// at load come from the shared cross-runtime map
+// (asset-processor/lib/textureChannels.js) — the same source the worker
+// thumbnail uses, so the viewer and the thumbnail route textures identically.
 const TEXTURE_SLOTS: Array<{
-  slot: string
   type: TextureType
   fallback?: TextureType
-  invertFallback?: boolean
 }> = [
-  { slot: 'map', type: TextureType.Albedo },
-  { slot: 'normalMap', type: TextureType.Normal },
-  {
-    slot: 'roughnessMap',
-    type: TextureType.Roughness,
-    fallback: TextureType.Glossiness,
-    invertFallback: true,
-  },
-  { slot: 'metalnessMap', type: TextureType.Metallic },
-  { slot: 'specularColorMap', type: TextureType.Specular },
-  { slot: 'aoMap', type: TextureType.AO },
-  { slot: 'emissiveMap', type: TextureType.Emissive },
-  { slot: 'bumpMap', type: TextureType.Bump },
-  { slot: 'alphaMap', type: TextureType.Alpha },
-  {
-    slot: 'displacementMap',
-    type: TextureType.Displacement,
-    fallback: TextureType.Height,
-  },
+  { type: TextureType.Albedo },
+  { type: TextureType.Normal },
+  { type: TextureType.Roughness, fallback: TextureType.Glossiness },
+  { type: TextureType.Metallic },
+  { type: TextureType.Specular },
+  { type: TextureType.AO },
+  { type: TextureType.Emissive },
+  { type: TextureType.Bump },
+  { type: TextureType.Alpha },
+  { type: TextureType.Displacement, fallback: TextureType.Height },
 ]
 
 /**
@@ -77,19 +72,26 @@ function buildCombinedTextureConfigs(
     materialTextureSets
   )) {
     if (!textureSet?.textures) continue
-    for (const { slot, type, fallback, invertFallback } of TEXTURE_SLOTS) {
+    for (const { type, fallback } of TEXTURE_SLOTS) {
+      const slot = MATERIAL_SLOT_BY_TEXTURE_TYPE[type]
       let tex = textureSet.textures.find(t => t.textureType === type)
-      let invert = false
+      let chosenType = type
       if (!tex && fallback) {
-        tex = textureSet.textures.find(t => t.textureType === fallback)
-        if (tex && invertFallback) invert = true
+        const fallbackTex = textureSet.textures.find(
+          t => t.textureType === fallback
+        )
+        if (fallbackTex) {
+          tex = fallbackTex
+          chosenType = fallback
+        }
       }
       if (tex) {
         configs[`${materialName}${KEY_SEP}${slot}`] = {
           url: getFileUrl(tex.fileId.toString()),
           sourceChannel: tex.sourceChannel ?? TextureChannel.RGB,
           fileName: tex.fileName,
-          invert,
+          // Glossiness feeds roughnessMap inverted (shared rule).
+          invert: textureTypeNeedsInvert(chosenType),
         }
       }
     }

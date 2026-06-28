@@ -42,6 +42,7 @@ import {
   DEFAULT_LIGHTING,
 } from '../../../../asset-processor/lib/sceneLighting.js'
 import { buildStlModel } from '../../../../asset-processor/lib/stlMesh.js'
+import { TEXTURE_TYPE } from '../../../../asset-processor/lib/textureChannels.js'
 import {
   ensureAoMapUv2,
   resolveTextureMaterialConfig,
@@ -344,8 +345,8 @@ export async function generateModelThumbnail(
 }
 
 /**
- * Texture map data for applying textures to model thumbnails.
- * TextureType: 1=Albedo, 2=Normal, 5=Roughness, 6=Metallic
+ * Texture map data for applying textures to model thumbnails. `textureType` is
+ * the shared TextureType enum value (see asset-processor/lib/textureChannels.js).
  */
 export interface TextureMapData {
   textureType: number
@@ -355,16 +356,21 @@ export interface TextureMapData {
 /**
  * Apply texture maps to all meshes in model.
  * Uses albedo for map, normal for normalMap, roughness for roughnessMap, metallic for metalnessMap.
+ * Texture-type numbers come from the shared enum so demo, viewer, and worker agree.
  */
 async function applyTextureMaps(
   model: Object3D,
   textures: TextureMapData[]
 ): Promise<void> {
-  const albedoTex = textures.find(t => t.textureType === 1)
-  const normalTex = textures.find(t => t.textureType === 2)
-  const aoTex = textures.find(t => t.textureType === 4)
-  const roughnessTex = textures.find(t => t.textureType === 5)
-  const metallicTex = textures.find(t => t.textureType === 6)
+  const albedoTex = textures.find(t => t.textureType === TEXTURE_TYPE.Albedo)
+  const normalTex = textures.find(t => t.textureType === TEXTURE_TYPE.Normal)
+  const aoTex = textures.find(t => t.textureType === TEXTURE_TYPE.AO)
+  const roughnessTex = textures.find(
+    t => t.textureType === TEXTURE_TYPE.Roughness
+  )
+  const metallicTex = textures.find(
+    t => t.textureType === TEXTURE_TYPE.Metallic
+  )
 
   const loadTexture = async (blob: Blob) => {
     const bitmap = await createImageBitmap(blob)
