@@ -5,72 +5,12 @@ import { TextureChannel } from '@/types'
 import { isTiffFile } from '@/utils/fileUtils'
 import { loadTiffTextureFromUrl } from '@/utils/tiffTextureLoader'
 
-/**
- * Vertex shader - simple passthrough
- */
-const vertexShader = `
-  varying vec2 vUv;
-  void main() {
-    vUv = uv;
-    gl_Position = vec4(position, 1.0);
-  }
-`
-
-/**
- * Fragment shader - extracts a single channel and converts to grayscale.
- * Optionally inverts the value (used for Glossiness → Roughness conversion).
- */
-const fragmentShader = `
-  uniform sampler2D uTexture;
-  uniform int uChannel; // 0=R, 1=G, 2=B, 3=A
-  uniform int uInvert; // 0=no, 1=output 1.0 - value
-  varying vec2 vUv;
-
-  void main() {
-    vec4 texColor = texture2D(uTexture, vUv);
-    float channelValue;
-
-    if (uChannel == 0) channelValue = texColor.r;
-    else if (uChannel == 1) channelValue = texColor.g;
-    else if (uChannel == 2) channelValue = texColor.b;
-    else channelValue = texColor.a;
-
-    float v = uInvert == 1 ? 1.0 - channelValue : channelValue;
-    gl_FragColor = vec4(v, v, v, 1.0);
-  }
-`
-
-/**
- * Fragment shader - inverts RGB channels (255-based). Used when a Glossiness
- * texture is sourced as full-RGB grayscale and no channel extraction is needed.
- */
-const invertFragmentShader = `
-  uniform sampler2D uTexture;
-  varying vec2 vUv;
-
-  void main() {
-    vec4 texColor = texture2D(uTexture, vUv);
-    gl_FragColor = vec4(1.0 - texColor.rgb, texColor.a);
-  }
-`
-
-/**
- * Get channel index for shader uniform
- */
-function getChannelIndex(channel: TextureChannel): number {
-  switch (channel) {
-    case TextureChannel.R:
-      return 0
-    case TextureChannel.G:
-      return 1
-    case TextureChannel.B:
-      return 2
-    case TextureChannel.A:
-      return 3
-    default:
-      return 0
-  }
-}
+import {
+  CHANNEL_EXTRACT_FRAGMENT_SHADER,
+  CHANNEL_VERTEX_SHADER,
+  getChannelUniformIndex,
+  RGB_INVERT_FRAGMENT_SHADER,
+} from '../../../../../asset-processor/lib/textureChannels.js'
 
 /**
  * Extract a single channel from a texture using WebGL rendering.
@@ -100,11 +40,11 @@ function extractChannel(
 
   const geometry = new THREE.PlaneGeometry(2, 2)
   const material = new THREE.ShaderMaterial({
-    vertexShader,
-    fragmentShader,
+    vertexShader: CHANNEL_VERTEX_SHADER,
+    fragmentShader: CHANNEL_EXTRACT_FRAGMENT_SHADER,
     uniforms: {
       uTexture: { value: sourceTexture },
-      uChannel: { value: getChannelIndex(channel) },
+      uChannel: { value: getChannelUniformIndex(channel) },
       uInvert: { value: invert ? 1 : 0 },
     },
   })
@@ -156,8 +96,8 @@ function invertTexture(
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
   const geometry = new THREE.PlaneGeometry(2, 2)
   const material = new THREE.ShaderMaterial({
-    vertexShader,
-    fragmentShader: invertFragmentShader,
+    vertexShader: CHANNEL_VERTEX_SHADER,
+    fragmentShader: RGB_INVERT_FRAGMENT_SHADER,
     uniforms: { uTexture: { value: sourceTexture } },
   })
 
@@ -333,6 +273,7 @@ export function useChannelExtractedTextures(
 }
 
 /**
- * Utility to get channel index for external use (e.g., testing)
+ * Re-exported from the shared cross-runtime module (the worker thumbnail uses the
+ * same channel numbering). Kept under the original name for external use/tests.
  */
-export { getChannelIndex }
+export { getChannelUniformIndex as getChannelIndex }
