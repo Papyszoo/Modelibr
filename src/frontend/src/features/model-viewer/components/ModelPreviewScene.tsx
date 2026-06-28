@@ -171,7 +171,9 @@ export function Scene({
   // falls. We use it instead of Stage's built-in `type: 'contact'` shadow, whose
   // GLSL blur ShaderMaterial can't run on the WebGPURenderer and rendered as an
   // opaque black plane after the WebGPU migration.
-  const [floorY, setFloorY] = useState(0)
+  // null until Stage's Center reports the model height — keeps the catcher
+  // unmounted (rather than flashing at y=0) until we know the real floor.
+  const [floorY, setFloorY] = useState<number | null>(null)
   const shadowMaterial = useMemo(() => {
     const material = new ShadowNodeMaterial()
     material.transparent = true
@@ -286,7 +288,7 @@ export function Scene({
           invisible (ShadowNodeMaterial) except where the directional/spot lights
           throw a shadow, so the model reads as grounded without a visible floor.
           Gated by the Show Shadows setting; the model meshes already castShadow. */}
-      {showShadows && (
+      {showShadows && floorY !== null && (
         <mesh
           rotation={[-Math.PI / 2, 0, 0]}
           position={[0, floorY, 0]}
