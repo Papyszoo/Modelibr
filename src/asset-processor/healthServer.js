@@ -1,4 +1,5 @@
 import express from 'express'
+import { getCapabilities } from './capabilities.js'
 import { config } from './config.js'
 import logger from './logger.js'
 
@@ -32,6 +33,7 @@ export class HealthServer {
           id: config.workerId,
           activeJobs: status.activeJobs,
           isShuttingDown: status.isShuttingDown,
+          capabilities: getCapabilities(),
         },
         configuration: {
           rendering: {

@@ -107,6 +107,20 @@ export const systemHandlers = [
     })
   }),
 
+  http.get('*/thumbnail-jobs/workers', async () => {
+    // Demo renders thumbnails in-browser (browserAssetProcessor) on a
+    // WebGPURenderer with WebGL2 fallback, so report a single WebGPU worker.
+    return HttpResponse.json({
+      workers: [
+        {
+          workerId: 'demo-browser',
+          renderBackend: 'WebGPU',
+          lastSeenUtc: new Date().toISOString(),
+        },
+      ],
+    })
+  }),
+
   http.get('*/settings/webdav/urls', async () => {
     return HttpResponse.json({
       urls: [],

@@ -1,6 +1,7 @@
 using Application.Abstractions.Messaging;
 using Application.ThumbnailJobs;
 using Microsoft.AspNetCore.Mvc;
+using WebApi.Services;
 
 namespace WebApi.Endpoints;
 
@@ -11,8 +12,13 @@ public static class ThumbnailJobEndpoints
         app.MapPost("/thumbnail-jobs/dequeue", async (
             [FromBody] DequeueRequest request,
             ICommandHandler<DequeueThumbnailJobCommand, DequeueThumbnailJobResponse> commandHandler,
+            IThumbnailWorkerRegistry workerRegistry,
             CancellationToken cancellationToken) =>
         {
+            // Record the worker's reported render backend (WebGPU/WebGL2) so it
+            // can be shown as a worker capability in Settings.
+            workerRegistry.Report(request.WorkerId, request.RenderBackend);
+
             var result = await commandHandler.Handle(new DequeueThumbnailJobCommand(request.WorkerId), cancellationToken);
             
             if (result.IsFailure)
@@ -54,6 +60,25 @@ public static class ThumbnailJobEndpoints
             });
         })
         .WithName("Dequeue Thumbnail Job")
+        .WithTags("ThumbnailJobs");
+
+        // Worker capabilities (render backend etc.) for the Settings UI. Fed by
+        // the dequeue polls above; reflects workers seen this process lifetime.
+        app.MapGet("/thumbnail-jobs/workers", (IThumbnailWorkerRegistry workerRegistry) =>
+        {
+            var workers = workerRegistry.GetWorkers()
+                .OrderBy(w => w.WorkerId)
+                .Select(w => new
+                {
+                    w.WorkerId,
+                    w.RenderBackend,
+                    LastSeenUtc = w.LastSeenUtc,
+                })
+                .ToArray();
+
+            return Results.Ok(new { Workers = workers });
+        })
+        .WithName("Get Thumbnail Workers")
         .WithTags("ThumbnailJobs");
 
         app.MapPost("/thumbnail-jobs/{jobId:int}/finish", async (
@@ -233,7 +258,7 @@ public static class ThumbnailJobEndpoints
 /// <summary>
 /// Request model for dequeuing thumbnail jobs.
 /// </summary>
-public record DequeueRequest(string WorkerId);
+public record DequeueRequest(string WorkerId, string? RenderBackend = null);
 
 /// <summary>
 /// Request model for finishing thumbnail jobs (unified complete/fail).

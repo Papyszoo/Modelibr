@@ -1064,3 +1064,58 @@
     min-width: 0;
   }
 }
+
+/* ── Thumbnail worker capabilities ───────────────────────────────── */
+
+.worker-capabilities-list {
+  list-style: none;
+  margin: 0.25rem 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.worker-capabilities-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--surface-border);
+  border-radius: 6px;
+  background: var(--surface-ground);
+}
+
+.worker-capabilities-id {
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+  font-size: 0.8rem;
+  color: var(--text-color);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.worker-backend-badge {
+  flex: none;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.1rem 0.45rem;
+  border-radius: 4px;
+}
+
+.worker-backend-badge.is-webgpu {
+  color: #0b3d2e;
+  background: #46e0a8;
+}
+
+.worker-backend-badge.is-webgl {
+  color: #3a2a00;
+  background: #ffcf66;
+}
+
+.worker-backend-badge.is-unknown {
+  color: var(--text-color-secondary);
+  background: var(--surface-hover);
+}
