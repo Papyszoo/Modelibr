@@ -59,6 +59,19 @@
       import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js'
       import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
       import { buildStlModel } from './lib/stlMesh.js'
+      import {
+        DEFAULT_LIGHTING,
+        ENVIRONMENT_PREVIEW_LIGHTING,
+        buildSceneLights,
+      } from './lib/sceneLighting.js'
+      // Loaded for their window side-effects: the applyTextures page.evaluate
+      // (puppeteerRenderer.js) runs as a classic script and can't import, so it
+      // reaches these shared rules through window globals
+      // (window.modelibrTextureMaterial / window.modelibrDispNormal /
+      // window.modelibrTextureChannels). Single source of truth with the viewer.
+      import './lib/textureMaterial.js'
+      import './lib/displacementNormal.js'
+      import './lib/textureChannels.js'
 
       // Global state for external control
       window.modelRenderer = {
@@ -72,7 +85,7 @@
         disposableMaterials: [],
         disposableGeometries: [],
         defaultEnvironment: null,
-        defaultEnvironmentIntensity: 0.3,
+        defaultEnvironmentIntensity: DEFAULT_LIGHTING.environmentIntensity,
         lights: null,
         orbitMode: 'model',
         isReady: false,
@@ -157,40 +170,22 @@
 
         container.appendChild(renderer.domElement)
 
-        // Setup lighting — balanced to avoid overexposure on PBR materials
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.35)
-        scene.add(ambientLight)
-
-        // Main directional light from front-right
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.45)
-        directionalLight.position.set(20, 15, 20)
-        directionalLight.castShadow = true
-        directionalLight.shadow.mapSize.width = 2048
-        directionalLight.shadow.mapSize.height = 2048
-        scene.add(directionalLight)
-
-        // Fill light from opposite side to reduce hard shadows
-        const pointLight = new THREE.PointLight(0xffffff, 0.2)
-        pointLight.position.set(-15, 5, -15)
-        scene.add(pointLight)
-
-        // Top light for soft fill
-        const spotLight = new THREE.SpotLight(0xffffff, 0.25)
-        spotLight.position.set(0, 20, 0)
-        spotLight.angle = 0.4
-        spotLight.penumbra = 1
-        spotLight.castShadow = true
-        scene.add(spotLight)
+        // Setup lighting from the shared cross-runtime rig (lib/sceneLighting.js)
+        // so the thumbnail and the in-app viewer light models identically.
+        // Balanced to avoid overexposure on PBR materials.
+        const lights = buildSceneLights(THREE, DEFAULT_LIGHTING)
+        scene.add(...lights.lights)
 
         // IBL via PMREMGenerator + neutral studio environment
-        // environmentIntensity is kept low so PBR model thumbnails are not overexposed;
-        // direct lights above carry the primary illumination.
+        // environmentIntensity is kept low (DEFAULT_LIGHTING) so PBR model
+        // thumbnails are not overexposed; direct lights carry the primary
+        // illumination.
         const pmremGenerator = new THREE.PMREMGenerator(renderer)
         pmremGenerator.compileEquirectangularShader()
         const roomEnv = new RoomEnvironment(renderer)
         const envMap = pmremGenerator.fromScene(roomEnv).texture
         scene.environment = envMap
-        scene.environmentIntensity = 0.3
+        scene.environmentIntensity = DEFAULT_LIGHTING.environmentIntensity
         roomEnv.dispose()
 
         window.modelRenderer.scene = scene
@@ -198,12 +193,13 @@
         window.modelRenderer.renderer = renderer
         window.modelRenderer.pmremGenerator = pmremGenerator
         window.modelRenderer.defaultEnvironment = envMap
-        window.modelRenderer.defaultEnvironmentIntensity = 0.3
+        window.modelRenderer.defaultEnvironmentIntensity =
+          DEFAULT_LIGHTING.environmentIntensity
         window.modelRenderer.lights = {
-          ambient: ambientLight,
-          directional: directionalLight,
-          point: pointLight,
-          spot: spotLight,
+          ambient: lights.ambient,
+          directional: lights.directional,
+          point: lights.point,
+          spot: lights.spot,
         }
 
         return true
@@ -274,10 +270,10 @@
 
         const lights = window.modelRenderer.lights
         if (lights) {
-          lights.ambient.intensity = 0.35
-          lights.directional.intensity = 0.45
-          lights.point.intensity = 0.2
-          lights.spot.intensity = 0.25
+          lights.ambient.intensity = DEFAULT_LIGHTING.ambient.intensity
+          lights.directional.intensity = DEFAULT_LIGHTING.directional.intensity
+          lights.point.intensity = DEFAULT_LIGHTING.point.intensity
+          lights.spot.intensity = DEFAULT_LIGHTING.spot.intensity
         }
       }
 
@@ -285,10 +281,10 @@
         const lights = window.modelRenderer.lights
         if (!lights) return
 
-        lights.ambient.intensity = 0.06
-        lights.directional.intensity = 0.12
-        lights.point.intensity = 0.05
-        lights.spot.intensity = 0.08
+        lights.ambient.intensity = ENVIRONMENT_PREVIEW_LIGHTING.ambient
+        lights.directional.intensity = ENVIRONMENT_PREVIEW_LIGHTING.directional
+        lights.point.intensity = ENVIRONMENT_PREVIEW_LIGHTING.point
+        lights.spot.intensity = ENVIRONMENT_PREVIEW_LIGHTING.spot
       }
 
       function createEnvironmentSphere(options = {}) {
