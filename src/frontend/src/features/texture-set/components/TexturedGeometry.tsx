@@ -1,15 +1,21 @@
+import { extend } from '@react-three/fiber'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js'
+import { MeshPhysicalNodeMaterial } from 'three/webgpu'
 
 import { getFileUrl } from '@/features/models/api/modelApi'
-import { applyDispNormalDisplacement } from '@/shared/three/sharedDisplacementNormal'
+import { applyDispNormalDisplacementNode } from '@/shared/three/sharedDisplacementNormal'
 import { TextureChannel, type TextureSetDto, TextureType } from '@/types'
 import { isExrFile, isTiffFile } from '@/utils/fileUtils'
 import { decodeTiffBlobToBitmap } from '@/utils/tiffTextureLoader'
 
 import { createPreviewGeometry } from '../utils/createPreviewGeometry'
 import { type GeometryType } from './GeometrySelector'
+
+// The texture-set preview renders with a WebGPURenderer, so its material is a
+// Node material. Register it for R3F's <meshPhysicalNodeMaterial> JSX element.
+extend({ MeshPhysicalNodeMaterial })
 
 interface GeometryParams {
   type: GeometryType
@@ -562,10 +568,22 @@ function TexturedMesh({
 
   return (
     <mesh ref={meshRef} castShadow receiveShadow geometry={geometry}>
-      <meshPhysicalMaterial
+      <meshPhysicalNodeMaterial
         key={materialKey}
-        ref={(mat: THREE.MeshPhysicalMaterial | null) => {
-          if (mat) applyDispNormalDisplacement(mat)
+        ref={(mat: MeshPhysicalNodeMaterial | null) => {
+          // Displacement via TSL positionNode along the shared aDispNormal
+          // direction. The native displacementMap slot is left unset so the node
+          // material doesn't ALSO displace along the per-vertex normal. The
+          // material remounts (key) on strength change, so scale/bias are live.
+          if (mat && hasDisplacementMap && t.displacementMap) {
+            const scale = getStrength('displacementMap') * 0.02
+            applyDispNormalDisplacementNode(
+              mat,
+              t.displacementMap,
+              scale,
+              -scale / 2
+            )
+          }
         }}
         map={(!isDisabled('map') && t.map) || null}
         normalMap={(!isDisabled('normalMap') && t.normalMap) || null}
@@ -585,13 +603,6 @@ function TexturedMesh({
         bumpMap={(!isDisabled('bumpMap') && t.bumpMap) || null}
         bumpScale={getStrength('bumpMap') * 0.5}
         alphaMap={(!isDisabled('alphaMap') && t.alphaMap) || null}
-        displacementMap={hasDisplacementMap ? t.displacementMap : null}
-        displacementScale={
-          hasDisplacementMap ? getStrength('displacementMap') * 0.02 : 0
-        }
-        displacementBias={
-          hasDisplacementMap ? -(getStrength('displacementMap') * 0.02) / 2 : 0
-        }
         roughness={t.roughnessMap && !isDisabled('roughnessMap') ? 1 : 0.8}
         metalness={t.metalnessMap && !isDisabled('metalnessMap') ? 1 : 0}
         emissive={

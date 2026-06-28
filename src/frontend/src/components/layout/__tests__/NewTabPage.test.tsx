@@ -2,8 +2,8 @@ import { fireEvent, render, screen } from '@testing-library/react'
 
 import { NewTabPage } from '@/components/layout/NewTabPage'
 import { DockContext } from '@/contexts/DockContext'
-import { OPEN_SEARCH_EVENT } from '@/features/search/searchEvents'
 import { TabContext, type TabContextValue } from '@/contexts/TabContext'
+import { OPEN_SEARCH_EVENT } from '@/features/search/searchEvents'
 import {
   type ClosedWindowEntry,
   getWindowId,

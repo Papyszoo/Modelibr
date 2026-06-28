@@ -28,6 +28,7 @@ import { useVersionSelection } from '@/features/model-viewer/hooks/useVersionSel
 import { useTextureSetByIdQuery } from '@/features/texture-set/api/queries'
 import { useTextureSetsByModelVersionQuery } from '@/features/texture-set/api/queries'
 import { useTabUiState } from '@/hooks/useTabUiState'
+import { createWebGPURenderer } from '@/shared/three/createWebGPURenderer'
 import { useModelThumbnailUpdates } from '@/shared/thumbnail'
 import { regenerateThumbnail } from '@/shared/thumbnail/api/thumbnailApi'
 import { useBlenderEnabledStore } from '@/stores/blenderEnabledStore'
@@ -45,6 +46,8 @@ import { type ExpandAction, PanelWrapper } from './PanelWrapper'
 import { type MaterialTextureSets } from './TexturedModel'
 import { VersionStrip } from './VersionStrip'
 import { type PanelContent, ViewerMenubar } from './ViewerMenubar'
+import { PerfDisplay, PerfSampler } from './ViewerPerfPanel'
+import { EMPTY_PERF_STATS, type PerfStats } from './viewerPerfStats'
 import { ViewerSidePanel } from './ViewerSidePanel'
 
 interface ModelViewerProps {
@@ -131,6 +134,7 @@ export function ModelViewer({
   const blenderEnabled = useBlenderEnabledStore(s => s.blenderEnabled)
   const toast = useRef<Toast>(null)
   const statsContainerRef = useRef<HTMLDivElement>(null)
+  const perfStatsRef = useRef<PerfStats>(EMPTY_PERF_STATS)
   const queryClient = useQueryClient()
   const stableTabId =
     tabId ?? (modelId ? `model-viewer-${modelId}` : 'model-viewer-standalone')
@@ -867,11 +871,11 @@ export function ModelViewer({
                         position: cameraState.position,
                         zoom: cameraState.zoom,
                       }}
-                      gl={{
-                        antialias: true,
-                        alpha: true,
-                        powerPreference: 'high-performance',
-                      }}
+                      // WebGPURenderer (WebGL2 auto-fallback) so heavy models
+                      // render fast and node-material displacement/channel
+                      // extraction work. R3F v9 awaits this async gl factory.
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                      gl={createWebGPURenderer as any}
                       dpr={Math.min(window.devicePixelRatio, 2)}
                       onCreated={state => {
                         if (typeof window !== 'undefined') {
@@ -902,6 +906,9 @@ export function ModelViewer({
                         cameraState={cameraState}
                         onCameraChange={handleCameraStateChange}
                       />
+                      {viewerSettings.showPerf && (
+                        <PerfSampler statsRef={perfStatsRef} />
+                      )}
                     </Canvas>
                   </CanvasErrorBoundary>
                   <div ref={statsContainerRef} className="stats-container" />
@@ -912,6 +919,9 @@ export function ModelViewer({
                         statsContainerRef as unknown as React.RefObject<HTMLElement>
                       }
                     />
+                  )}
+                  {viewerSettings.showPerf && (
+                    <PerfDisplay statsRef={perfStatsRef} />
                   )}
                 </>
               )}

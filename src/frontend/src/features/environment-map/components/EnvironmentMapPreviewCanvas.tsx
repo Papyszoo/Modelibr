@@ -17,6 +17,7 @@ import { RGBELoader } from 'three-stdlib'
 
 import { type EnvironmentMapPreviewOption } from '@/features/environment-map/utils/environmentMapUtils'
 import { CanvasErrorBoundary } from '@/features/model-viewer/components/CanvasErrorBoundary'
+import { createWebGPURenderer } from '@/shared/three/createWebGPURenderer'
 
 type LoadedEnvironmentTexture = Texture | CubeTexture | DataTexture
 
@@ -229,11 +230,8 @@ export function EnvironmentMapPreviewCanvas({
             key={option.key}
             className="environment-map-preview-canvas"
             camera={{ position: [0, 0.08, 3.8], fov: 40 }}
-            gl={{
-              antialias: true,
-              alpha: true,
-              powerPreference: 'high-performance',
-            }}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            gl={createWebGPURenderer as any}
             dpr={Math.min(window.devicePixelRatio || 1, 2)}
           >
             <ReflectiveScene environmentTexture={environmentTexture} />
