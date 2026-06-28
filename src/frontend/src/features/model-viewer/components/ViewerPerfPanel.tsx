@@ -3,6 +3,8 @@ import './ViewerPerfPanel.css'
 import { useFrame, useThree } from '@react-three/fiber'
 import { type MutableRefObject, useEffect, useRef, useState } from 'react'
 
+import { isWebGPUBackend } from '@/shared/three/createWebGPURenderer'
+
 import { type PerfStats } from './viewerPerfStats'
 
 /**
@@ -25,16 +27,11 @@ interface RendererInfo {
 }
 
 function readBackend(gl: unknown): PerfStats['backend'] {
-  const backend = (
-    gl as {
-      backend?: { isWebGPUBackend?: boolean; constructor?: { name?: string } }
-    }
-  )?.backend
+  // `backend` is undefined until the renderer has init()-ed; show a placeholder
+  // until then, otherwise reuse the shared WebGPU detection.
+  const backend = (gl as { backend?: unknown })?.backend
   if (!backend) return '—'
-  return backend.isWebGPUBackend ||
-    backend.constructor?.name === 'WebGPUBackend'
-    ? 'WebGPU'
-    : 'WebGL2'
+  return isWebGPUBackend(gl) ? 'WebGPU' : 'WebGL2'
 }
 
 /** Inside the Canvas: sample renderer stats into `statsRef` (no React render). */
