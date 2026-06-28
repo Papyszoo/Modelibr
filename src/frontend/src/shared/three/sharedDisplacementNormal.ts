@@ -1,8 +1,10 @@
 import * as THREE from 'three'
+import * as TSL from 'three/tsl'
 
 import {
   addSharedDisplacementNormal as addSharedImpl,
   applyDispNormalDisplacement as applyDispNormalImpl,
+  applyDispNormalDisplacementNode as applyDispNormalNodeImpl,
 } from '../../../../asset-processor/lib/displacementNormal.js'
 
 /**
@@ -32,6 +34,29 @@ export function addSharedDisplacementNormal(
 /**
  * Swap the displacement direction from `objectNormal` to the `aDispNormal`
  * attribute via an `onBeforeCompile` hook. Idempotent on the same material.
+ * WebGL-only (the GLSL hook); the WebGPU viewer uses {@link
+ * applyDispNormalDisplacementNode} instead.
  */
 export const applyDispNormalDisplacement: (material: THREE.Material) => void =
   applyDispNormalImpl
+
+/**
+ * WebGPU/TSL displacement: express the `aDispNormal`-directed displacement as a
+ * `positionNode` on a Node material (WebGPURenderer ignores the `onBeforeCompile`
+ * GLSL hook). Injects the bundler's `three/tsl` instance so call sites keep a
+ * simple signature.
+ */
+export function applyDispNormalDisplacementNode(
+  material: THREE.Material,
+  displacementMap: THREE.Texture,
+  displacementScale = 1,
+  displacementBias = 0
+): void {
+  applyDispNormalNodeImpl({
+    TSL,
+    material,
+    displacementMap,
+    displacementScale,
+    displacementBias,
+  })
+}

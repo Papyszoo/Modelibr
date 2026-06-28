@@ -20,6 +20,7 @@ import {
   regenerateTextureSetThumbnail,
   updateTilingScale,
 } from '@/features/texture-set/api/textureSetApi'
+import { createWebGPURenderer } from '@/shared/three/createWebGPURenderer'
 import { type TextureSetDto, TextureSetKind } from '@/types'
 
 import { PreviewInfo } from './PreviewInfo'
@@ -233,11 +234,8 @@ export function TexturePreviewPanel({
           shadows
           className="texture-preview-canvas"
           camera={{ position: [3, 2, 3], fov: 45 }}
-          gl={{
-            antialias: true,
-            alpha: true,
-            powerPreference: 'high-performance',
-          }}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          gl={createWebGPURenderer as any}
           dpr={Math.min(window.devicePixelRatio, 2)}
         >
           {/* Stage provides automatic lighting, shadows, and camera positioning */}

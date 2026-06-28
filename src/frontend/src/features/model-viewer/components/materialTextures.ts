@@ -1,8 +1,9 @@
 import * as THREE from 'three'
+import * as THREE_GPU from 'three/webgpu'
 
 import {
   addSharedDisplacementNormal,
-  applyDispNormalDisplacement,
+  applyDispNormalDisplacementNode,
 } from '@/shared/three/sharedDisplacementNormal'
 import { type TextureSetDto } from '@/types'
 
@@ -10,6 +11,14 @@ import {
   ensureAoMapUv2,
   resolveTextureMaterialConfig,
 } from '../../../../../asset-processor/lib/textureMaterial.js'
+
+/**
+ * The viewer renders with a WebGPURenderer, so materials are Node materials
+ * (MeshPhysicalNodeMaterial). It maps every standard PBR slot exactly like
+ * MeshPhysicalMaterial, and additionally lets the displacement push along the
+ * shared `aDispNormal` direction via a TSL positionNode.
+ */
+type ViewerMaterial = THREE_GPU.MeshPhysicalNodeMaterial
 
 /** Map of material names to their texture sets. Key "" means apply to all meshes. */
 export type MaterialTextureSets = Record<string, TextureSetDto>
@@ -30,7 +39,7 @@ function getMeshMaterialNames(mesh: THREE.Mesh): string[] {
 export function buildMaterialFromTextures(
   loadedTextures: Record<string, THREE.Texture | null>,
   materialPrefix: string
-): THREE.MeshPhysicalMaterial {
+): ViewerMaterial {
   const get = (slot: string) =>
     loadedTextures[`${materialPrefix}${KEY_SEP}${slot}`] ?? null
 
@@ -45,7 +54,7 @@ export function buildMaterialFromTextures(
     specularColorMap: get('specularColorMap'),
   })
 
-  const material = new THREE.MeshPhysicalMaterial({
+  const material = new THREE_GPU.MeshPhysicalNodeMaterial({
     color: cfg.hasBaseColorMap ? 0xffffff : new THREE.Color(0.7, 0.7, 0.9),
     metalness: cfg.metalness,
     roughness: cfg.roughness,
@@ -70,16 +79,16 @@ export function buildMaterialFromTextures(
     material.alphaMap = get('alphaMap')
     material.transparent = true
   }
-  if (get('displacementMap')) {
-    material.displacementMap = get('displacementMap')
-    // Bias by -scale/2 so heightmap mid-grey means "no displacement".
-    material.displacementScale = 0.02
-    material.displacementBias = -0.01
-    // Sample displacement direction from an averaged-by-position normal
-    // attribute rather than the face-aligned objectNormal — so hard-edged
-    // meshes (game-asset cubes etc.) stay watertight under displacement
-    // while keeping their original per-face UVs intact for color sampling.
-    applyDispNormalDisplacement(material)
+  const displacementMap = get('displacementMap')
+  if (displacementMap) {
+    // Push along an averaged-by-position normal (aDispNormal) rather than the
+    // face-aligned objectNormal — so hard-edged meshes (game-asset cubes etc.)
+    // stay watertight under displacement while keeping their original per-face
+    // UVs intact for color sampling. Bias by -scale/2 so heightmap mid-grey
+    // means "no displacement". On WebGPU this is a TSL positionNode; the native
+    // displacementMap slot is left unset so it doesn't ALSO displace along the
+    // per-vertex normal.
+    applyDispNormalDisplacementNode(material, displacementMap, 0.02, -0.01)
   }
 
   return material
@@ -101,7 +110,7 @@ export function applyMaterialTextures(
   const hasWildcard = materialNames.includes('')
 
   // Pre-build materials for each material name that has textures
-  const builtMaterials: Record<string, THREE.MeshPhysicalMaterial> = {}
+  const builtMaterials: Record<string, ViewerMaterial> = {}
   if (texturesReady) {
     for (const matName of materialNames) {
       builtMaterials[matName] = buildMaterialFromTextures(
@@ -112,7 +121,7 @@ export function applyMaterialTextures(
   }
 
   // Shared fallback material for unmatched meshes (avoids per-mesh allocation)
-  const fallbackMaterial = new THREE.MeshPhysicalMaterial({
+  const fallbackMaterial = new THREE_GPU.MeshPhysicalNodeMaterial({
     color: new THREE.Color(0.7, 0.7, 0.9),
     metalness: 0.3,
     roughness: 0.4,
@@ -130,7 +139,7 @@ export function applyMaterialTextures(
 
     // Find matching material: check mesh material names against our map
     let matched = false
-    let appliedMaterial: THREE.MeshPhysicalMaterial | null = null
+    let appliedMaterial: ViewerMaterial | null = null
     for (const meshMatName of meshMatNames) {
       if (meshMatName in builtMaterials) {
         appliedMaterial = builtMaterials[meshMatName]

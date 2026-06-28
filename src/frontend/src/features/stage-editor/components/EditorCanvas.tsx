@@ -5,6 +5,7 @@ import { Canvas } from '@react-three/fiber'
 import { type JSX, Suspense, useRef } from 'react'
 
 import { LoadingPlaceholder } from '@/components/LoadingPlaceholder'
+import { createWebGPURenderer } from '@/shared/three/createWebGPURenderer'
 
 import { type StageConfig } from './SceneEditor'
 import { SceneHelpers } from './SceneHelpers'
@@ -30,11 +31,8 @@ export function EditorCanvas({
         ref={canvasRef}
         shadows
         camera={{ position: [10, 10, 10], fov: 50 }}
-        gl={{
-          antialias: true,
-          alpha: true,
-          powerPreference: 'high-performance',
-        }}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        gl={createWebGPURenderer as any}
         dpr={Math.min(window.devicePixelRatio, 2)}
         onPointerMissed={() => onSelectObject(null)}
       >

@@ -4,7 +4,7 @@
  * Replaces the real backend's asset-processor (Puppeteer + Three.js) and
  * audio waveform generation with purely in-browser alternatives.
  *
- * 1. Model Thumbnails — Three.js WebGLRenderer on an OffscreenCanvas
+ * 1. Model Thumbnails — Three.js WebGPURenderer (WebGL2 fallback) on a canvas
  * 2. Audio Waveforms  — OfflineAudioContext peak extraction → Canvas 2D PNG
  */
 import {
@@ -21,14 +21,12 @@ import {
   MeshStandardMaterial,
   type Object3D,
   PerspectiveCamera,
-  PMREMGenerator,
   PointLight,
   Scene,
   SphereGeometry,
   SpotLight,
   type Texture,
   Vector3,
-  WebGLRenderer,
 } from 'three'
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 import { ThreeMFLoader } from 'three/addons/loaders/3MFLoader.js'
@@ -36,6 +34,10 @@ import { FBXLoader } from 'three/addons/loaders/FBXLoader.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js'
 import { STLLoader } from 'three/addons/loaders/STLLoader.js'
+// Renderer + PMREM come from the webgpu build: WebGPURenderer drives a WebGPU
+// backend when available (WebGL2 fallback otherwise), and only the webgpu
+// PMREMGenerator works with it (the core one is WebGLRenderer-only).
+import { PMREMGenerator, WebGPURenderer } from 'three/webgpu'
 
 import {
   buildSceneLights,
@@ -83,7 +85,20 @@ const DEMO_LIGHT_CTORS = {
  * IBL the worker thumbnail uses — so demo thumbnails match the real worker's
  * output instead of using a divergent ad-hoc rig.
  */
-function setupSceneLighting(scene: Scene, renderer: WebGLRenderer): void {
+/**
+ * Create + initialise a WebGPURenderer on the given canvas. WebGPURenderer must
+ * be `init()`-ed before use; it falls back to a WebGL2 backend when the browser
+ * has no WebGPU.
+ */
+async function createDemoRenderer(
+  canvas: HTMLCanvasElement
+): Promise<WebGPURenderer> {
+  const renderer = new WebGPURenderer({ canvas, alpha: true, antialias: true })
+  await renderer.init()
+  return renderer
+}
+
+function setupSceneLighting(scene: Scene, renderer: WebGPURenderer): void {
   const { lights } = buildSceneLights(DEMO_LIGHT_CTORS, DEFAULT_LIGHTING)
   scene.add(...lights)
 
@@ -275,7 +290,7 @@ async function assembleAnimatedWebP(
  * Matches the real asset-processor's 30-frame 360° orbit.
  */
 async function renderOrbitAnimation(
-  renderer: WebGLRenderer,
+  renderer: WebGPURenderer,
   scene: Scene,
   camera: PerspectiveCamera,
   distance: number,
@@ -295,7 +310,7 @@ async function renderOrbitAnimation(
     camera.position.z = distance * cosElev * Math.cos(angleRad)
     camera.lookAt(0, 0, 0)
 
-    renderer.render(scene, camera)
+    await renderer.renderAsync(scene, camera)
 
     const frameBlob = await new Promise<Blob>((resolve, reject) => {
       canvas.toBlob(
@@ -457,12 +472,7 @@ async function renderModelWithTextures(
   canvas.width = width
   canvas.height = height
 
-  const renderer = new WebGLRenderer({
-    canvas,
-    alpha: true,
-    antialias: true,
-    preserveDrawingBuffer: true,
-  })
+  const renderer = await createDemoRenderer(canvas)
   renderer.setSize(width, height)
   renderer.setClearColor(0x2a2a2e, 1)
 
@@ -538,12 +548,7 @@ async function renderGltfThumbnail(
   canvas.width = width
   canvas.height = height
 
-  const renderer = new WebGLRenderer({
-    canvas,
-    alpha: true,
-    antialias: true,
-    preserveDrawingBuffer: true,
-  })
+  const renderer = await createDemoRenderer(canvas)
   renderer.setSize(width, height)
   renderer.setClearColor(0x2a2a2e, 1)
 
@@ -589,12 +594,7 @@ async function renderFbxThumbnail(
   canvas.width = width
   canvas.height = height
 
-  const renderer = new WebGLRenderer({
-    canvas,
-    alpha: true,
-    antialias: true,
-    preserveDrawingBuffer: true,
-  })
+  const renderer = await createDemoRenderer(canvas)
   renderer.setSize(width, height)
   renderer.setClearColor(0x2a2a2e, 1)
 
@@ -638,12 +638,7 @@ async function renderObjThumbnail(
   canvas.width = width
   canvas.height = height
 
-  const renderer = new WebGLRenderer({
-    canvas,
-    alpha: true,
-    antialias: true,
-    preserveDrawingBuffer: true,
-  })
+  const renderer = await createDemoRenderer(canvas)
   renderer.setSize(width, height)
   renderer.setClearColor(0x2a2a2e, 1)
 
@@ -742,12 +737,7 @@ export async function generateTextureSetThumbnail(
     canvas.width = width
     canvas.height = height
 
-    const renderer = new WebGLRenderer({
-      canvas,
-      alpha: true,
-      antialias: true,
-      preserveDrawingBuffer: true,
-    })
+    const renderer = await createDemoRenderer(canvas)
     renderer.setSize(width, height)
     renderer.setClearColor(0x2a2a2e, 1)
 
@@ -768,7 +758,7 @@ export async function generateTextureSetThumbnail(
     const material = new MeshStandardMaterial({ map: texture })
     scene.add(new Mesh(geometry, material))
 
-    renderer.render(scene, camera)
+    await renderer.renderAsync(scene, camera)
 
     const blob = await new Promise<Blob>((resolve, reject) => {
       canvas.toBlob(
@@ -838,12 +828,7 @@ export async function generateEnvironmentMapThumbnail(
     canvas.width = width
     canvas.height = height
 
-    const renderer = new WebGLRenderer({
-      canvas,
-      alpha: true,
-      antialias: true,
-      preserveDrawingBuffer: true,
-    })
+    const renderer = await createDemoRenderer(canvas)
     renderer.setSize(width, height)
     renderer.setClearColor(0x2a2a2e, 1)
     renderer.toneMapping = ACESFilmicToneMapping
