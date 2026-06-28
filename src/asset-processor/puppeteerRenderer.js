@@ -1,6 +1,7 @@
 /* eslint-disable no-undef */
 // Note: 'window' is used within page.evaluate() calls which run in browser context
 import puppeteer from 'puppeteer'
+import { setRenderBackend } from './capabilities.js'
 import { config } from './config.js'
 import logger from './logger.js'
 import path from 'path'
@@ -40,6 +41,25 @@ export class PuppeteerRenderer {
       process.env.CHROMIUM_PATH ||
       undefined
 
+    // WebGPU (a large perf win on heavy models) only negotiates in Chrome when
+    // three conditions hold, so the flag sets below are built to satisfy them:
+    //   (a) the GPU process must be alive — NEVER pair WebGPU with --disable-gpu,
+    //       which kills the adapter outright;
+    //   (b) --enable-unsafe-webgpu must be set — Chrome still gates WebGPU behind
+    //       it under headless/automation;
+    //   (c) on Linux a Vulkan backend must be reachable — Chrome's bundled
+    //       SwiftShader provides a software Vulkan ICD even with no physical GPU,
+    //       so WebGPU can come up headless in Docker.
+    // The WebGPURenderer transparently falls back to a WebGL2 backend when no
+    // adapter materialises, so these flags are safe to pass speculatively.
+    const wantWebGPU = config.rendering.preferWebGPU
+    const webgpuArgs = wantWebGPU
+      ? [
+          '--enable-unsafe-webgpu',
+          ...(process.platform === 'linux' ? ['--enable-features=Vulkan'] : []),
+        ]
+      : []
+
     // The "software" (non-hardware) WebGL path is platform-specific because the
     // portable SwiftShader path doesn't work everywhere:
     //   - macOS: ANGLE → Vulkan → SwiftShader fails to create a context
@@ -48,21 +68,37 @@ export class PuppeteerRenderer {
     //     backend falls back to WARP (a fast software rasterizer) on GPU-less
     //     VMs, so it renders correctly and far faster.
     //   - Linux/headless: SwiftShader is the only thing that works without a GPU.
+    // On Linux we only add --disable-gpu when WebGPU is NOT wanted; condition (a)
+    // above forbids it otherwise. WebGL still resolves to SwiftShader via ANGLE
+    // either way, so this never regresses the WebGL2 fallback render.
     const softwareGpuArgs =
       process.platform === 'darwin'
         ? ['--use-angle=metal']
         : process.platform === 'win32'
           ? ['--use-angle=d3d11']
-          : ['--disable-gpu', '--use-gl=angle', '--use-angle=swiftshader']
+          : wantWebGPU
+            ? ['--use-gl=angle', '--use-angle=swiftshader']
+            : ['--disable-gpu', '--use-gl=angle', '--use-angle=swiftshader']
 
-    const gpuArgs = config.rendering.useHardwareAcceleration
-      ? [
-          '--ignore-gpu-blocklist',
-          '--enable-gpu-rasterization',
-          '--enable-zero-copy',
-          '--use-angle=default',
-        ]
-      : softwareGpuArgs
+    // With a real GPU, force the Vulkan ANGLE backend on Linux when WebGPU is
+    // wanted so WebGL and WebGPU (Dawn → Vulkan) share the same driver; elsewhere
+    // keep ANGLE's default (Metal on macOS, D3D on Windows already drive WebGPU
+    // via Dawn regardless of the ANGLE choice).
+    const hardwareAngle =
+      process.platform === 'linux' && wantWebGPU ? 'vulkan' : 'default'
+    const hardwareGpuArgs = [
+      '--ignore-gpu-blocklist',
+      '--enable-gpu-rasterization',
+      '--enable-zero-copy',
+      `--use-angle=${hardwareAngle}`,
+    ]
+
+    const gpuArgs = [
+      ...(config.rendering.useHardwareAcceleration
+        ? hardwareGpuArgs
+        : softwareGpuArgs),
+      ...webgpuArgs,
+    ]
 
     const launchOptions = {
       headless: true,
@@ -179,9 +215,9 @@ export class PuppeteerRenderer {
     })
 
     const initialized = await this.page.evaluate(
-      async (width, height, bgColor) => {
+      async (width, height, bgColor, preferWebGPU) => {
         try {
-          return await window.initRenderer(width, height, bgColor)
+          return await window.initRenderer(width, height, bgColor, preferWebGPU)
         } catch (error) {
           console.error('Failed to initialize renderer:', error)
           return false
@@ -189,7 +225,8 @@ export class PuppeteerRenderer {
       },
       config.rendering.outputWidth,
       config.rendering.outputHeight,
-      config.rendering.backgroundColor
+      config.rendering.backgroundColor,
+      config.rendering.preferWebGPU
     )
 
     if (!initialized) {
@@ -198,6 +235,25 @@ export class PuppeteerRenderer {
         `Failed to initialize renderer: ${error || 'Unknown error'}`
       )
     }
+
+    // Record which backend the WebGPURenderer actually came up on so the worker
+    // can report its capability (WebGPU vs WebGL2 fallback) to the backend API.
+    // The probe explains a WebGL2 fallback: whether the runtime exposed a
+    // WebGPU adapter at all, and which one.
+    const { useWebGPU, webgpuProbe } = await this.page.evaluate(() => ({
+      useWebGPU: window.modelRenderer.useWebGPU,
+      webgpuProbe: window.modelRenderer.webgpuProbe,
+    }))
+    setRenderBackend(useWebGPU ? 'WebGPU' : 'WebGL2')
+    logger.info('Renderer backend detected', {
+      backend: useWebGPU ? 'WebGPU' : 'WebGL2',
+      webgpuRequested: config.rendering.preferWebGPU,
+      hasNavigatorGpu: webgpuProbe?.hasNavigatorGpu ?? false,
+      adapter: webgpuProbe?.adapter ?? null,
+      softwareAdapter: webgpuProbe?.softwareAdapter ?? false,
+      forcedWebGL: webgpuProbe?.forceWebGL ?? false,
+      probeError: webgpuProbe?.error ?? null,
+    })
   }
 
   /**
@@ -864,74 +920,38 @@ export class PuppeteerRenderer {
             // slot map, the extraction GLSL, the 0-based channel numbering, and
             // the Glossiness-invert rule all live there now.
             const channels = window.modelibrTextureChannels
+            const TSL = window.TSL
 
             // Extract a single channel (R/G/B/A) to a grayscale texture, with
-            // optional value inversion (Glossiness → Roughness). Render-to-target
-            // orchestration stays per-runtime; the shader + channel index are shared.
-            function extractChannel(sourceTexture, sourceChannel, invert) {
-              return renderToGrayscale(sourceTexture, {
-                fragmentShader: channels.CHANNEL_EXTRACT_FRAGMENT_SHADER,
-                uniforms: {
-                  uTexture: { value: sourceTexture },
-                  uChannel: {
-                    value: channels.getChannelUniformIndex(sourceChannel),
-                  },
-                  uInvert: { value: invert ? 1 : 0 },
-                },
+            // optional value inversion (Glossiness → Roughness), via the shared
+            // TSL node pass (asset-processor/lib/textureChannels.js). The
+            // WebGPURenderer can't run a GLSL ShaderMaterial, so the quad is built
+            // from TSL nodes; the render is async on both backends, hence async.
+            async function extractChannel(
+              sourceTexture,
+              sourceChannel,
+              invert
+            ) {
+              return channels.extractTextureChannel({
+                THREE,
+                TSL,
+                renderer,
+                source: sourceTexture,
+                channelIndex: channels.getChannelUniformIndex(sourceChannel),
+                invert,
               })
             }
 
             // Invert a full-RGB texture (Glossiness stored as RGB grayscale that
             // must be flipped to behave as roughness).
-            function invertRgbTexture(sourceTexture) {
-              return renderToGrayscale(sourceTexture, {
-                fragmentShader: channels.RGB_INVERT_FRAGMENT_SHADER,
-                uniforms: { uTexture: { value: sourceTexture } },
+            async function invertRgbTexture(sourceTexture) {
+              return channels.extractTextureChannel({
+                THREE,
+                TSL,
+                renderer,
+                source: sourceTexture,
+                rgbInvert: true,
               })
-            }
-
-            // Shared render-to-target plumbing for the channel passes above. The
-            // passthrough vertex shader writes clip-space directly from the unit
-            // quad, so the ortho camera setup is irrelevant.
-            function renderToGrayscale(
-              sourceTexture,
-              { fragmentShader, uniforms }
-            ) {
-              const size = 512 // Output texture size
-              const renderTarget = new THREE.WebGLRenderTarget(size, size, {
-                minFilter: THREE.LinearFilter,
-                magFilter: THREE.LinearFilter,
-                format: THREE.RGBAFormat,
-              })
-
-              const scene = new THREE.Scene()
-              const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
-
-              const material = new THREE.ShaderMaterial({
-                uniforms,
-                vertexShader: channels.CHANNEL_VERTEX_SHADER,
-                fragmentShader,
-              })
-
-              const geometry = new THREE.PlaneGeometry(2, 2)
-              const mesh = new THREE.Mesh(geometry, material)
-              scene.add(mesh)
-
-              renderer.setRenderTarget(renderTarget)
-              renderer.render(scene, camera)
-              renderer.setRenderTarget(null)
-
-              const outputTexture = renderTarget.texture
-              outputTexture.wrapS = sourceTexture.wrapS
-              outputTexture.wrapT = sourceTexture.wrapT
-              outputTexture.flipY = sourceTexture.flipY
-              outputTexture.needsUpdate = true
-
-              // Cleanup
-              geometry.dispose()
-              material.dispose()
-
-              return outputTexture
             }
 
             // Load standard texture via TextureLoader from HTTP URL
@@ -1044,11 +1064,15 @@ export class PuppeteerRenderer {
                 if (extracted) {
                   // Single channel (R/G/B/A) → grayscale, inverted for Glossiness.
                   console.log(`Extracting channel ${sourceChannel} for ${type}`)
-                  texture = extractChannel(texture, sourceChannel, needsInvert)
+                  texture = await extractChannel(
+                    texture,
+                    sourceChannel,
+                    needsInvert
+                  )
                 } else if (needsInvert) {
                   // Glossiness stored as RGB → flip so it behaves as roughness.
                   console.log(`Inverting RGB glossiness for ${type}`)
-                  texture = invertRgbTexture(texture)
+                  texture = await invertRgbTexture(texture)
                 }
 
                 // Color space: extracted/inverted data maps are linear; otherwise
@@ -1108,7 +1132,10 @@ export class PuppeteerRenderer {
                     roughnessMap: loadedTextures.roughnessMap,
                     specularColorMap: loadedTextures.specularColorMap,
                   })
-                child.material = new THREE.MeshPhysicalMaterial({
+                // Node material (vs MeshPhysicalMaterial) so the WebGPURenderer
+                // can apply the TSL positionNode displacement below; it auto-maps
+                // every standard PBR slot, so the rest of this block is unchanged.
+                child.material = new THREE.MeshPhysicalNodeMaterial({
                   name: originalName,
                   color: matCfg.hasBaseColorMap
                     ? 0xffffff
@@ -1134,24 +1161,31 @@ export class PuppeteerRenderer {
                       child.material.emissiveIntensity = 1.0
                     }
                     if (property === 'displacementMap') {
-                      // Bias by -scale/2 so heightmap mid-grey means "no
-                      // displacement" — without it every vertex inflates
-                      // outward and only the grout *recesses*.
-                      child.material.displacementScale = 0.02
-                      child.material.displacementBias = -0.01
-                      // Push along an averaged-by-position normal so hard
-                      // edges (cube faces, hard-edge user meshes) stay
-                      // watertight while keeping per-face UVs intact for color
-                      // sampling. Shared with the viewer
-                      // (asset-processor/lib/displacementNormal.js) — both
-                      // helpers are idempotent.
+                      // Push along an averaged-by-position normal so hard edges
+                      // (cube faces, hard-edge user meshes) stay watertight while
+                      // keeping per-face UVs intact for color sampling. Shared
+                      // with the viewer (asset-processor/lib/displacementNormal.js)
+                      // — both helpers are idempotent. Bias by -scale/2 so
+                      // heightmap mid-grey means "no displacement"; without it
+                      // every vertex inflates outward and only the grout recesses.
                       window.modelibrDispNormal.addSharedDisplacementNormal(
                         THREE,
                         child.geometry
                       )
-                      window.modelibrDispNormal.applyDispNormalDisplacement(
-                        child.material
+                      window.modelibrDispNormal.applyDispNormalDisplacementNode(
+                        {
+                          THREE,
+                          TSL,
+                          material: child.material,
+                          displacementMap: texture,
+                          displacementScale: 0.02,
+                          displacementBias: -0.01,
+                        }
                       )
+                      // The positionNode now drives displacement along
+                      // aDispNormal; clear the native slot so the node material
+                      // doesn't ALSO displace along the per-vertex normal.
+                      child.material.displacementMap = null
                       child.material.needsUpdate = true
                     }
                     if (property === 'normalMap') {

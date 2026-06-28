@@ -15,3 +15,17 @@ export function addSharedDisplacementNormal(
 ): THREE.BufferGeometry
 
 export function applyDispNormalDisplacement(material: THREE.Material): void
+
+/**
+ * WebGPU/TSL equivalent of {@link applyDispNormalDisplacement}: expresses the
+ * `aDispNormal`-directed displacement as a `positionNode` on a Node material
+ * (WebGPURenderer ignores the `onBeforeCompile` GLSL hook). `TSL` is `three/tsl`.
+ */
+export function applyDispNormalDisplacementNode(args: {
+  THREE?: unknown
+  TSL: unknown
+  material: THREE.Material
+  displacementMap: THREE.Texture
+  displacementScale?: number
+  displacementBias?: number
+}): void

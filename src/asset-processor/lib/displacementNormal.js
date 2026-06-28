@@ -140,11 +140,57 @@ export function applyDispNormalDisplacement(material) {
   }
 }
 
+/**
+ * WebGPU/TSL equivalent of {@link applyDispNormalDisplacement}. `WebGPURenderer`
+ * ignores the `onBeforeCompile` GLSL hook used above (it builds materials from
+ * TSL nodes), so the displacement is expressed as a `positionNode` instead:
+ * push each vertex along the averaged `aDispNormal` direction by
+ * `displacementMap.x * displacementScale + displacementBias` — the same formula
+ * as {@link VERTEX_DISPLACEMENT_INJECTION}.
+ *
+ * `displacementMap` is referenced inside the node and `material.displacementMap`
+ * is deliberately left unset, so the node material's built-in displacement
+ * (which pushes along the per-vertex `normalLocal` and would double-apply) stays
+ * off. Scale/bias are read live from the material via `materialReference`, so the
+ * viewer's displacement controls keep working. Idempotent per material.
+ *
+ * @param {object} args
+ * @param {object} args.THREE - three webgpu namespace (unused today; kept for
+ *   signature parity / future geometry needs).
+ * @param {object} args.TSL - three/tsl namespace.
+ * @param {object} args.material - a Node material (e.g. MeshPhysicalNodeMaterial).
+ * @param {object} args.displacementMap - the displacement Texture to sample.
+ * @param {number} [args.displacementScale]
+ * @param {number} [args.displacementBias]
+ */
+export function applyDispNormalDisplacementNode({
+  TSL,
+  material,
+  displacementMap,
+  displacementScale = 1,
+  displacementBias = 0,
+}) {
+  if (material.userData.dispNormalNodeApplied) return
+  material.userData.dispNormalNodeApplied = true
+
+  const { attribute, positionLocal, texture, uv, materialReference } = TSL
+
+  const direction = attribute(DISP_NORMAL_ATTR, 'vec3').normalize()
+  const amount = texture(displacementMap, uv())
+    .x.mul(materialReference('displacementScale', 'float'))
+    .add(materialReference('displacementBias', 'float'))
+
+  material.positionNode = positionLocal.add(direction.mul(amount))
+  material.displacementScale = displacementScale
+  material.displacementBias = displacementBias
+}
+
 // Side-effect: expose on window for the Puppeteer page.evaluate (classic-script
 // context), parity with the other shared modules.
 if (typeof window !== 'undefined') {
   window.modelibrDispNormal = {
     addSharedDisplacementNormal,
     applyDispNormalDisplacement,
+    applyDispNormalDisplacementNode,
   }
 }
