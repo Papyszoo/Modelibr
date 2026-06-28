@@ -18,6 +18,7 @@ import {
   recomputeProjectCounts,
   removeRecycledItem,
 } from './shared'
+import { getDemoRenderBackend } from '../services/browserAssetProcessor'
 
 export const systemHandlers = [
   // ════════════════════════════════════════════════════════════════════════
@@ -109,12 +110,14 @@ export const systemHandlers = [
 
   http.get('*/thumbnail-jobs/workers', async () => {
     // Demo renders thumbnails in-browser (browserAssetProcessor) on a
-    // WebGPURenderer with WebGL2 fallback, so report a single WebGPU worker.
+    // WebGPURenderer with WebGL2 fallback. Report the backend it actually came
+    // up on — null until it has rendered its first thumbnail ("detecting…"),
+    // then WebGPU or WebGL2 depending on the browser — so the badge is honest.
     return HttpResponse.json({
       workers: [
         {
           workerId: 'demo-browser',
-          renderBackend: 'WebGPU',
+          renderBackend: getDemoRenderBackend(),
           lastSeenUtc: new Date().toISOString(),
         },
       ],

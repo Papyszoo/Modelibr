@@ -39,6 +39,8 @@ import { STLLoader } from 'three/addons/loaders/STLLoader.js'
 // PMREMGenerator works with it (the core one is WebGLRenderer-only).
 import { PMREMGenerator, WebGPURenderer } from 'three/webgpu'
 
+import { isWebGPUBackend } from '@/shared/three/createWebGPURenderer'
+
 import {
   buildSceneLights,
   DEFAULT_LIGHTING,
@@ -90,11 +92,25 @@ const DEMO_LIGHT_CTORS = {
  * be `init()`-ed before use; it falls back to a WebGL2 backend when the browser
  * has no WebGPU.
  */
+/**
+ * The render backend the in-browser demo asset processor came up on, or null
+ * until it has rendered its first thumbnail. Read by the demo `/thumbnail-jobs/
+ * workers` MSW handler so the Settings badge is honest.
+ */
+let demoRenderBackend: 'WebGPU' | 'WebGL2' | null = null
+export function getDemoRenderBackend(): 'WebGPU' | 'WebGL2' | null {
+  return demoRenderBackend
+}
+
 async function createDemoRenderer(
   canvas: HTMLCanvasElement
 ): Promise<WebGPURenderer> {
   const renderer = new WebGPURenderer({ canvas, alpha: true, antialias: true })
   await renderer.init()
+  // Record which backend actually came up so the demo's Settings worker badge
+  // reports the truth (WebGPU on capable browsers, WebGL2 on Firefox/Safari/etc.)
+  // instead of a hard-coded value.
+  demoRenderBackend = isWebGPUBackend(renderer) ? 'WebGPU' : 'WebGL2'
   return renderer
 }
 
