@@ -29,6 +29,7 @@ describe('shared TextureType enum mirror', () => {
   // frontend TextureType) ever renumbers, this fails instead of silently
   // mis-routing textures across runtimes.
   it('matches the frontend TextureType enum value-for-value', () => {
+    expect(TEXTURE_TYPE.SplitChannel).toBe(TextureType.SplitChannel)
     expect(TEXTURE_TYPE.Albedo).toBe(TextureType.Albedo)
     expect(TEXTURE_TYPE.Normal).toBe(TextureType.Normal)
     expect(TEXTURE_TYPE.Height).toBe(TextureType.Height)

@@ -1025,7 +1025,20 @@ export class PuppeteerRenderer {
                 const sourceChannel = data.sourceChannel
                 const needsInvert = channels.textureTypeNeedsInvert(textureType)
                 const materialProperty =
-                  channels.resolveMaterialSlot(textureType) || type
+                  channels.resolveMaterialSlot(textureType)
+
+                // No material slot for this type (e.g. the SplitChannel source
+                // placeholder, or a type the shared map doesn't know yet). Drop it
+                // instead of stashing the texture under a junk key — keeps the
+                // color-space classification from mis-firing on a non-slot string.
+                if (!materialProperty) {
+                  console.warn(
+                    `No material slot for texture type ${type}, skipping`
+                  )
+                  texture.dispose()
+                  continue
+                }
+
                 const extracted = channels.channelNeedsExtraction(sourceChannel)
 
                 if (extracted) {
