@@ -43,3 +43,20 @@ export const CHANNEL_EXTRACT_FRAGMENT_SHADER: string
 
 /** Inverts the RGB channels (alpha preserved); for full-RGB Glossiness. */
 export const RGB_INVERT_FRAGMENT_SHADER: string
+
+/**
+ * WebGPU/TSL channel extraction — node-material equivalent of the GLSL passes.
+ * Renders a fullscreen quad sampling `source` into a linear RenderTarget and
+ * returns the extracted grayscale texture. `THREE` is the webgpu build, `TSL` is
+ * `three/tsl`, `renderer` an initialised WebGPURenderer. The backing render
+ * target is stashed on the result's `userData.__channelRenderTarget`.
+ */
+export function extractTextureChannel(args: {
+  THREE: unknown
+  TSL: unknown
+  renderer: unknown
+  source: unknown
+  channelIndex?: number
+  invert?: boolean
+  rgbInvert?: boolean
+}): Promise<import('three').Texture>

@@ -43,6 +43,15 @@ The service is configured via environment variables. See `.env.example` for all 
 - `RENDER_BACKGROUND`: Background color or 'transparent' for transparent background (default: `transparent`)
 - `CAMERA_DISTANCE`: Camera distance from model (default: `5`)
 - `ENABLE_ANTIALIASING`: Enable antialiasing (default: `true`)
+- `ENABLE_WEBGPU`: Attempt the WebGPU render backend, falling back to WebGL2
+  automatically when no adapter is available (default: `true`). Chrome is
+  launched with the flags WebGPU needs (`--enable-unsafe-webgpu`, plus a Vulkan
+  backend on Linux). Set to `false` to force the legacy WebGL2-only flag set.
+  The reported backend is visible under Settings → Thumbnail Generation.
+- `ENABLE_GPU_RENDERING`: Use a real (hardware) GPU instead of the software
+  rasterizer (default: `false`). Enables hardware acceleration flags; combine
+  with `ENABLE_WEBGPU` for hardware-accelerated WebGPU when a GPU + drivers are
+  reachable.
 
 ### Orbit Animation
 

@@ -28,6 +28,12 @@ export const config = {
     cameraDistance: parseFloat(process.env.CAMERA_DISTANCE) || 5,
     enableAntialiasing: process.env.ENABLE_ANTIALIASING !== 'false',
     useHardwareAcceleration: process.env.ENABLE_GPU_RENDERING === 'true',
+    // Attempt the WebGPU backend (a large perf win on heavy models). Chrome is
+    // launched with the flags WebGPU needs (see PuppeteerRenderer.getLaunchOptions)
+    // and three's WebGPURenderer falls back to a WebGL2 backend automatically
+    // when no adapter comes up, so this is safe to leave on. Set
+    // ENABLE_WEBGPU=false to force the legacy WebGL2-only Chrome flag set.
+    preferWebGPU: process.env.ENABLE_WEBGPU !== 'false',
   },
 
   // Orbit animation settings

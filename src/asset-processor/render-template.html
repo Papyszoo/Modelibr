@@ -41,7 +41,9 @@
     <script type="importmap">
       {
         "imports": {
-          "three": "./node_modules/three/build/three.module.js",
+          "three": "./node_modules/three/build/three.webgpu.js",
+          "three/webgpu": "./node_modules/three/build/three.webgpu.js",
+          "three/tsl": "./node_modules/three/build/three.tsl.js",
           "three/addons/": "./node_modules/three/examples/jsm/"
         }
       }
@@ -49,6 +51,7 @@
     <script type="module" src="./lib/tiffDecode.js"></script>
     <script type="module">
       import * as THREE from 'three'
+      import * as TSL from 'three/tsl'
       import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
       import { OBJLoader } from 'three/addons/loaders/OBJLoader.js'
       import { FBXLoader } from 'three/addons/loaders/FBXLoader.js'
@@ -91,10 +94,17 @@
         isReady: false,
         error: null,
         useWebGPU: false,
+        webgpuProbe: null,
       }
 
-      // Initialize scene with WebGPU or WebGL
-      async function initScene(width, height, backgroundColor) {
+      // Initialize scene with WebGPU or WebGL. preferWebGPU=false (ENABLE_WEBGPU)
+      // forces the WebGL2 backend regardless of adapter.
+      async function initScene(
+        width,
+        height,
+        backgroundColor,
+        preferWebGPU = true
+      ) {
         const container = document.getElementById('canvas-container')
 
         // Create scene
@@ -110,46 +120,66 @@
           1000 // far plane
         )
 
-        // Create renderer with WebGPU or WebGL
-        let renderer
+        // Probe the WebGPU adapter up front. This both explains a WebGL2
+        // fallback (no `navigator.gpu` vs an adapter request that failed) AND
+        // decides whether WebGPU is actually usable. A *software* adapter —
+        // Chrome's bundled SwiftShader in headless Docker, llvmpipe, etc. —
+        // advertises WebGPU but can't even allocate a small mapped buffer; it
+        // throws "createBuffer ... too large when mappedAtCreation" partway
+        // through a render. So when the only adapter is software/fallback we
+        // force the WebGL2 backend, which renders reliably everywhere. Real GPUs
+        // (Apple Metal, a Linux/Windows GPU with a proper driver) pass this
+        // check and get the WebGPU fast path. `renderer.init()` runs first use.
+        const webgpuProbe = {
+          hasNavigatorGpu: !!navigator.gpu,
+          adapter: null,
+          isFallbackAdapter: false,
+          softwareAdapter: false,
+        }
+        const SOFTWARE_ADAPTER_RE =
+          /swiftshader|llvmpipe|lavapipe|software|basic render|microsoft basic/
         try {
-          // Try WebGPU first if available
           if (navigator.gpu) {
-            try {
-              console.log('WebGPU available, attempting to use WebGPU renderer')
-
-              // Import WebGPU renderer dynamically
-              const { WebGPURenderer } = await import(
-                'three/addons/renderers/webgpu/WebGPURenderer.js'
-              )
-
-              renderer = new WebGPURenderer({
-                antialias: true,
-                alpha: true,
-              })
-
-              await renderer.init()
-              window.modelRenderer.useWebGPU = true
-              console.log('WebGPU renderer initialized successfully')
-            } catch (webgpuError) {
-              console.warn(
-                'WebGPU initialization failed, falling back to WebGL:',
-                webgpuError
-              )
-              renderer = null
+            const probeAdapter = await navigator.gpu.requestAdapter()
+            if (probeAdapter) {
+              const info = probeAdapter.info || {}
+              webgpuProbe.adapter = {
+                vendor: info.vendor || '',
+                architecture: info.architecture || '',
+                device: info.device || '',
+                description: info.description || '',
+              }
+              webgpuProbe.isFallbackAdapter =
+                probeAdapter.isFallbackAdapter === true
+              const haystack =
+                `${info.vendor || ''} ${info.architecture || ''} ${info.device || ''} ${info.description || ''}`.toLowerCase()
+              webgpuProbe.softwareAdapter =
+                webgpuProbe.isFallbackAdapter ||
+                SOFTWARE_ADAPTER_RE.test(haystack)
             }
           }
+        } catch (probeError) {
+          webgpuProbe.error = probeError.message
+        }
+        // Force WebGL2 when WebGPU is opted out, when there is no usable adapter,
+        // or when the only adapter is software (the broken SwiftShader path).
+        const forceWebGL =
+          preferWebGPU === false ||
+          !webgpuProbe.adapter ||
+          webgpuProbe.softwareAdapter
+        webgpuProbe.forceWebGL = forceWebGL
+        window.modelRenderer.webgpuProbe = webgpuProbe
 
-          // Fallback to WebGL if WebGPU not available or failed
-          if (!renderer) {
-            console.log('Using WebGL renderer')
-            renderer = new THREE.WebGLRenderer({
-              antialias: true,
-              alpha: true,
-              preserveDrawingBuffer: false,
-            })
-            window.modelRenderer.useWebGPU = false
-          }
+        let renderer
+        try {
+          renderer = new THREE.WebGPURenderer({
+            antialias: true,
+            alpha: true,
+            forceWebGL,
+          })
+          await renderer.init()
+          window.modelRenderer.useWebGPU =
+            renderer.backend?.isWebGPUBackend === true
         } catch (error) {
           console.error('Failed to create renderer:', error)
           window.modelRenderer.error = error.message
@@ -162,8 +192,8 @@
         // Keep autoClear enabled and let Three.js handle it properly
         renderer.autoClear = true
 
-        // Shadow mapping (WebGL specific)
-        if (!window.modelRenderer.useWebGPU && renderer.shadowMap) {
+        // Shadow mapping (supported on both the WebGPU and WebGL2 backends).
+        if (renderer.shadowMap) {
           renderer.shadowMap.enabled = true
           renderer.shadowMap.type = THREE.PCFSoftShadowMap
         }
@@ -176,13 +206,14 @@
         const lights = buildSceneLights(THREE, DEFAULT_LIGHTING)
         scene.add(...lights.lights)
 
-        // IBL via PMREMGenerator + neutral studio environment
+        // IBL via PMREMGenerator + neutral studio environment.
         // environmentIntensity is kept low (DEFAULT_LIGHTING) so PBR model
         // thumbnails are not overexposed; direct lights carry the primary
-        // illumination.
+        // illumination. The sync fromScene works on the WebGPURenderer because
+        // the renderer is already init()-ed above (the *Async PMREM variants are
+        // deprecated in favour of exactly that).
         const pmremGenerator = new THREE.PMREMGenerator(renderer)
-        pmremGenerator.compileEquirectangularShader()
-        const roomEnv = new RoomEnvironment(renderer)
+        const roomEnv = new RoomEnvironment()
         const envMap = pmremGenerator.fromScene(roomEnv).texture
         scene.environment = envMap
         scene.environmentIntensity = DEFAULT_LIGHTING.environmentIntensity
@@ -636,18 +667,12 @@
           return false
         }
 
-        // WebGPU renderer uses async render
-        if (window.modelRenderer.useWebGPU) {
-          await window.modelRenderer.renderer.render(
-            window.modelRenderer.scene,
-            window.modelRenderer.camera
-          )
-        } else {
-          window.modelRenderer.renderer.render(
-            window.modelRenderer.scene,
-            window.modelRenderer.camera
-          )
-        }
+        // WebGPURenderer renders asynchronously on both backends; await it so
+        // the canvas is complete before getCanvasDataURL() reads it back.
+        await window.modelRenderer.renderer.renderAsync(
+          window.modelRenderer.scene,
+          window.modelRenderer.camera
+        )
         return true
       }
 
@@ -749,8 +774,11 @@
         return true
       }
 
-      // Expose THREE and API for Puppeteer
+      // Expose THREE/TSL and API for Puppeteer. TSL is needed by the
+      // applyTextures page.evaluate (classic-script context) to build the
+      // node-material channel-extraction passes via window.modelibrTextureChannels.
       window.THREE = THREE
+      window.TSL = TSL
       window.initRenderer = initScene
       window.loadModelFromData = loadModel
       window.normalizeModel = normalizeModel

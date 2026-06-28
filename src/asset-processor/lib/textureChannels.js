@@ -220,6 +220,104 @@ export const RGB_INVERT_FRAGMENT_SHADER = `
   }
 `
 
+/**
+ * WebGPU/TSL channel extraction — the node-material equivalent of the GLSL
+ * {@link CHANNEL_EXTRACT_FRAGMENT_SHADER}/{@link RGB_INVERT_FRAGMENT_SHADER}
+ * passes above. `WebGPURenderer` cannot run a raw GLSL `ShaderMaterial`, so when
+ * a runtime renders with WebGPU (auto-falling-back to a WebGL2 backend) it builds
+ * the same fullscreen-quad pass from TSL nodes instead.
+ *
+ * Renders `source` into an UnsignedByte `RenderTarget` (linear / NoColorSpace so
+ * data maps like roughness pass through untouched) and returns the target's
+ * texture. The caller owns the texture's lifetime; the backing render target is
+ * stashed on `texture.userData.__channelRenderTarget` so it can be disposed with
+ * the texture. THREE (the webgpu build) and TSL are injected so this module stays
+ * import-free and runs in both the worker page and the bundled frontend.
+ *
+ * @param {object} args
+ * @param {object} args.THREE - three webgpu namespace.
+ * @param {object} args.TSL - three/tsl namespace.
+ * @param {object} args.renderer - a WebGPURenderer (already `init()`-ed).
+ * @param {object} args.source - the source Texture to sample.
+ * @param {number} [args.channelIndex] - 0-based channel (R=0…A=3); see
+ *   {@link getChannelUniformIndex}. Ignored when `rgbInvert` is set.
+ * @param {boolean} [args.invert] - output `1 - value` for the single channel.
+ * @param {boolean} [args.rgbInvert] - invert all three RGB channels (alpha kept).
+ * @returns {Promise<object>} the extracted grayscale Texture.
+ */
+export async function extractTextureChannel({
+  THREE,
+  TSL,
+  renderer,
+  source,
+  channelIndex = 0,
+  invert = false,
+  rgbInvert = false,
+}) {
+  const width = source.image?.width || 1024
+  const height = source.image?.height || 1024
+  const { texture, uv, vec4, float, positionLocal } = TSL
+
+  const renderTarget = new THREE.RenderTarget(width, height, {
+    format: THREE.RGBAFormat,
+    type: THREE.UnsignedByteType,
+    minFilter: THREE.LinearFilter,
+    magFilter: THREE.LinearFilter,
+    colorSpace: THREE.NoColorSpace,
+  })
+
+  const scene = new THREE.Scene()
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
+  const material = new THREE.MeshBasicNodeMaterial()
+  // Passthrough: PlaneGeometry(2,2) vertices are already in clip space, so write
+  // them straight to position and ignore the camera (parity with the GLSL quad).
+  material.vertexNode = vec4(positionLocal.xy, 0.0, 1.0)
+
+  const src = texture(source, uv())
+  let outputNode
+  if (rgbInvert) {
+    outputNode = vec4(
+      float(1).sub(src.r),
+      float(1).sub(src.g),
+      float(1).sub(src.b),
+      src.a
+    )
+  } else {
+    const comp =
+      channelIndex === 0
+        ? src.r
+        : channelIndex === 1
+          ? src.g
+          : channelIndex === 2
+            ? src.b
+            : src.a
+    const v = invert ? float(1).sub(comp) : comp
+    outputNode = vec4(v, v, v, float(1))
+  }
+  // outputNode bypasses tone mapping / output color conversion so the raw
+  // channel value is written verbatim.
+  material.outputNode = outputNode
+
+  const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material)
+  scene.add(quad)
+
+  renderer.setRenderTarget(renderTarget)
+  await renderer.renderAsync(scene, camera)
+  renderer.setRenderTarget(null)
+
+  quad.geometry.dispose()
+  material.dispose()
+
+  const extracted = renderTarget.texture
+  extracted.wrapS = source.wrapS
+  extracted.wrapT = source.wrapT
+  extracted.flipY = source.flipY
+  extracted.needsUpdate = true
+  // Let callers dispose the backing target alongside the texture.
+  extracted.userData.__channelRenderTarget = renderTarget
+  return extracted
+}
+
 // Side-effect: expose on window for the Puppeteer page.evaluate (classic-script
 // context), parity with the other shared lib modules. Lets the worker's
 // applyTextures reach the map + shaders without an import.
@@ -238,5 +336,6 @@ if (typeof window !== 'undefined') {
     CHANNEL_VERTEX_SHADER,
     CHANNEL_EXTRACT_FRAGMENT_SHADER,
     RGB_INVERT_FRAGMENT_SHADER,
+    extractTextureChannel,
   }
 }
