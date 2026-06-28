@@ -36,13 +36,16 @@ const DEFAULT_SETTINGS: ViewerSettingsState = {
   modelRotationSpeed: 0.002,
   showShadows: true,
   showStats: false,
-  ambientIntensity: 0.3,
+  // Defaults mirror the shared rig (asset-processor/lib/sceneLighting.js
+  // DEFAULT_LIGHTING) so an unconfigured viewer matches the thumbnail render.
+  // ambient/environment are absolute intensities; directional is a multiplier.
+  ambientIntensity: 0.35,
   directionalIntensity: 1.0,
   showLightHelpers: false,
   environmentPreset: 'city',
   showEnvironmentBackground: false,
   backgroundIntensity: 1.0,
-  environmentIntensity: 1.0,
+  environmentIntensity: 0.3,
 }
 
 export const useViewerSettingsStore = create<ViewerSettingsStore>()(
