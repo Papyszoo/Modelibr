@@ -13,7 +13,7 @@ import {
   useRef,
   useState,
 } from 'react'
-import * as THREE from 'three'
+import type * as THREE from 'three'
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 import { PMREMGenerator as GPUPMREMGenerator } from 'three/webgpu'
 
@@ -49,17 +49,18 @@ interface TexturePreviewPanelProps {
  * local-first violation that also fails on offline CI runners (the failed load
  * collapses the Canvas, which broke the texture-set video). RoomEnvironment is
  * generated in-process, so material previews keep real reflections with zero
- * network dependency. The PMREM generator must match the active renderer's
- * build (WebGPU node vs classic WebGL).
+ * network dependency. Applied only on a real-GPU WebGPU backend (see below).
  */
 function PreviewEnvironment(): null {
   const gl = useThree(s => s.gl)
   const scene = useThree(s => s.scene)
   useEffect(() => {
-    const PMREMGeneratorCtor = isWebGPUBackend(gl)
-      ? GPUPMREMGenerator
-      : THREE.PMREMGenerator
-    const pmrem = new PMREMGeneratorCtor(gl as THREE.WebGLRenderer)
+    // Only on a real-GPU WebGPU backend. Generating RoomEnvironment + PMREM is a
+    // heavy synchronous render; on the classic WebGL path (software / headless CI
+    // on SwiftShader) it blocks the main thread long enough to stall texture
+    // loading and flake the preview. There the Stage's own lights are enough.
+    if (!isWebGPUBackend(gl)) return
+    const pmrem = new GPUPMREMGenerator(gl as unknown as THREE.WebGLRenderer)
     const room = new RoomEnvironment()
     const envMap = pmrem.fromScene(room).texture
     const previous = scene.environment
