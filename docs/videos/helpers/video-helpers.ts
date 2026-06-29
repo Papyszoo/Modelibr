@@ -5,7 +5,12 @@ import {
 import { getVideoSpec } from "../video-manifest.js";
 import { getRawVideoPath } from "../video-paths.js";
 
-export const ciVideoTimeout = process.env.CI === "true" ? 30000 : 15000;
+// Generous on CI: the texture-set tab renders a live 3D preview, and on the
+// GPU-less CI runner that goes through software WebGL (SwiftShader). Its
+// cold-start + first-frame time varies run-to-run and intermittently crossed a
+// 30s ceiling (the texture-loading overlay / preview-canvas waits), so this
+// absorbs that software-render variance rather than masking a real failure.
+export const ciVideoTimeout = process.env.CI === "true" ? 120000 : 15000;
 const videoPaceFactor = 0.65;
 const LEGACY_NAVIGATION_HASH_KEY = "__docsVideoNavigation";
 const initializedLegacyNavigationPages = new WeakSet<Page>();
