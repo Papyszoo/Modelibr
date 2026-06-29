@@ -23,6 +23,15 @@ export default defineConfig({
         trace: "retain-on-failure",
         screenshot: "only-on-failure",
         video: "retain-on-failure",
+        // Force the reliable software-WebGL path, exactly as playwright.config.ts
+        // does for the main suite. Headless CI has no GPU, so the viewer's WebGPU
+        // only ever comes up on SwiftShader, which is slow/flaky for the 3D
+        // previews (env-map, linked-materials, thumbnails) the demo specs exercise.
+        // Dropping the GPU makes the gl factory deterministically pick the classic
+        // WebGLRenderer. Real users on a GPU keep WebGPU; this is CI-only.
+        launchOptions: {
+            args: ["--disable-gpu", "--use-gl=angle", "--use-angle=swiftshader"],
+        },
     },
     projects: [
         {
