@@ -13,6 +13,7 @@ import {
 } from '@/features/model-viewer/hooks/useChannelExtractedTextures'
 import { useModelObject } from '@/features/model-viewer/hooks/useModelObject'
 import { getFileUrl } from '@/features/models/api/modelApi'
+import { isWebGPUBackend } from '@/shared/three/createWebGPURenderer'
 import { safeLoadingManager } from '@/shared/three/safeLoadingManager'
 import { TextureChannel, TextureType } from '@/types'
 
@@ -134,7 +135,8 @@ function setupModel(
   loadedTextures: Record<string, THREE.Texture | null>,
   texturesReady: boolean,
   meshRef: React.RefObject<THREE.Group | null>,
-  scaledRef: React.MutableRefObject<boolean>
+  scaledRef: React.MutableRefObject<boolean>,
+  isWebGPU: boolean
 ) {
   if (!model || scaledRef.current) return
 
@@ -144,7 +146,8 @@ function setupModel(
     clonedModel,
     materialTextureSets,
     loadedTextures,
-    texturesReady
+    texturesReady,
+    isWebGPU
   )
 
   // Scale and position
@@ -211,9 +214,10 @@ function OBJModelWithTextures({
       loadedTextures,
       texturesReady,
       meshRef,
-      scaledRef
+      scaledRef,
+      isWebGPUBackend(renderer)
     )
-  }, [model, materialTextureSets, loadedTextures, texturesReady])
+  }, [model, materialTextureSets, loadedTextures, texturesReady, renderer])
 
   useEffect(() => {
     if (model) setModelObject(model)
@@ -262,9 +266,10 @@ function GLTFModelWithTextures({
         loadedTextures,
         texturesReady,
         meshRef,
-        scaledRef
+        scaledRef,
+        isWebGPUBackend(renderer)
       )
-  }, [model, materialTextureSets, loadedTextures, texturesReady])
+  }, [model, materialTextureSets, loadedTextures, texturesReady, renderer])
 
   useEffect(() => {
     if (model) setModelObject(model)
@@ -311,9 +316,10 @@ function FBXModelWithTextures({
       loadedTextures,
       texturesReady,
       meshRef,
-      scaledRef
+      scaledRef,
+      isWebGPUBackend(renderer)
     )
-  }, [model, materialTextureSets, loadedTextures, texturesReady])
+  }, [model, materialTextureSets, loadedTextures, texturesReady, renderer])
 
   useEffect(() => {
     if (model) setModelObject(model)
@@ -363,9 +369,10 @@ function STLModelWithTextures({
       loadedTextures,
       texturesReady,
       meshRef,
-      scaledRef
+      scaledRef,
+      isWebGPUBackend(renderer)
     )
-  }, [model, materialTextureSets, loadedTextures, texturesReady])
+  }, [model, materialTextureSets, loadedTextures, texturesReady, renderer])
 
   useEffect(() => {
     if (model) setModelObject(model)
@@ -412,9 +419,10 @@ function ThreeMFModelWithTextures({
       loadedTextures,
       texturesReady,
       meshRef,
-      scaledRef
+      scaledRef,
+      isWebGPUBackend(renderer)
     )
-  }, [model, materialTextureSets, loadedTextures, texturesReady])
+  }, [model, materialTextureSets, loadedTextures, texturesReady, renderer])
 
   useEffect(() => {
     if (model) setModelObject(model)
