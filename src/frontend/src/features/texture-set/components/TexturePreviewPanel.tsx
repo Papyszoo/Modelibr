@@ -1,7 +1,7 @@
 import './TexturePreviewPanel.css'
 
 import { OrbitControls, Stage } from '@react-three/drei'
-import { Canvas } from '@react-three/fiber'
+import { Canvas, useThree } from '@react-three/fiber'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from 'primereact/button'
 import { ProgressBar } from 'primereact/progressbar'
@@ -13,6 +13,9 @@ import {
   useRef,
   useState,
 } from 'react'
+import * as THREE from 'three'
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
+import { PMREMGenerator as GPUPMREMGenerator } from 'three/webgpu'
 
 import { FloatingWindow } from '@/components/FloatingWindow'
 import { LoadingPlaceholder } from '@/components/LoadingPlaceholder'
@@ -20,7 +23,10 @@ import {
   regenerateTextureSetThumbnail,
   updateTilingScale,
 } from '@/features/texture-set/api/textureSetApi'
-import { createWebGPURenderer } from '@/shared/three/createWebGPURenderer'
+import {
+  createWebGPURenderer,
+  isWebGPUBackend,
+} from '@/shared/three/createWebGPURenderer'
 import { type TextureSetDto, TextureSetKind } from '@/types'
 
 import { PreviewInfo } from './PreviewInfo'
@@ -35,6 +41,37 @@ interface TexturePreviewPanelProps {
   textureSet: TextureSetDto
   side?: 'left' | 'right'
   textureQuality: number
+}
+
+/**
+ * Procedural studio IBL for the preview (RoomEnvironment → PMREM). Replaces
+ * drei's `<Stage environment="city">`, which fetches an HDR from a CDN — a
+ * local-first violation that also fails on offline CI runners (the failed load
+ * collapses the Canvas, which broke the texture-set video). RoomEnvironment is
+ * generated in-process, so material previews keep real reflections with zero
+ * network dependency. The PMREM generator must match the active renderer's
+ * build (WebGPU node vs classic WebGL).
+ */
+function PreviewEnvironment(): null {
+  const gl = useThree(s => s.gl)
+  const scene = useThree(s => s.scene)
+  useEffect(() => {
+    const PMREMGeneratorCtor = isWebGPUBackend(gl)
+      ? GPUPMREMGenerator
+      : THREE.PMREMGenerator
+    const pmrem = new PMREMGeneratorCtor(gl as THREE.WebGLRenderer)
+    const room = new RoomEnvironment()
+    const envMap = pmrem.fromScene(room).texture
+    const previous = scene.environment
+    scene.environment = envMap
+    room.dispose()
+    pmrem.dispose()
+    return () => {
+      scene.environment = previous
+      envMap.dispose()
+    }
+  }, [gl, scene])
+  return null
 }
 
 export function TexturePreviewPanel({
@@ -238,8 +275,10 @@ export function TexturePreviewPanel({
           gl={createWebGPURenderer as any}
           dpr={Math.min(window.devicePixelRatio, 2)}
         >
+          {/* Procedural local IBL (no CDN HDR — local-first). */}
+          <PreviewEnvironment />
           {/* Stage provides automatic lighting, shadows, and camera positioning */}
-          <Stage intensity={0.5} environment="city" adjustCamera={false}>
+          <Stage intensity={0.5} environment={null} adjustCamera={false}>
             <Suspense fallback={<LoadingPlaceholder />}>
               <TexturedGeometry
                 geometryType={previewSettings.type}
