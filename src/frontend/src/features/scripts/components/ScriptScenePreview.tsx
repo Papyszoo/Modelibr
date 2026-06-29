@@ -18,6 +18,7 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader'
 import * as TSL from 'three/tsl'
 import * as THREE_GPU from 'three/webgpu'
 
+import { prefersWebGLFallback } from '@/shared/three/createWebGPURenderer'
 import { safeLoadingManager } from '@/shared/three/safeLoadingManager'
 import { type PreviewGeometry } from '@/stores/scriptPreviewStore'
 import { useViewerSettingsStore } from '@/stores/viewerSettingsStore'
@@ -297,7 +298,10 @@ function SceneContents({
 async function createWebGpuRenderer(
   props: ConstructorParameters<typeof THREE_GPU.WebGPURenderer>[0]
 ): Promise<THREE_GPU.WebGPURenderer> {
-  const renderer = new THREE_GPU.WebGPURenderer(props)
+  const renderer = new THREE_GPU.WebGPURenderer({
+    ...props,
+    forceWebGL: props.forceWebGL ?? prefersWebGLFallback(),
+  })
   await renderer.init()
   return renderer
 }

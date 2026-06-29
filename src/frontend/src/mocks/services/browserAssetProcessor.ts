@@ -39,7 +39,10 @@ import { STLLoader } from 'three/addons/loaders/STLLoader.js'
 // PMREMGenerator works with it (the core one is WebGLRenderer-only).
 import { PMREMGenerator, WebGPURenderer } from 'three/webgpu'
 
-import { isWebGPUBackend } from '@/shared/three/createWebGPURenderer'
+import {
+  isWebGPUBackend,
+  prefersWebGLFallback,
+} from '@/shared/three/createWebGPURenderer'
 
 import {
   buildSceneLights,
@@ -105,7 +108,12 @@ export function getDemoRenderBackend(): 'WebGPU' | 'WebGL2' | null {
 async function createDemoRenderer(
   canvas: HTMLCanvasElement
 ): Promise<WebGPURenderer> {
-  const renderer = new WebGPURenderer({ canvas, alpha: true, antialias: true })
+  const renderer = new WebGPURenderer({
+    canvas,
+    alpha: true,
+    antialias: true,
+    forceWebGL: prefersWebGLFallback(),
+  })
   await renderer.init()
   // Record which backend actually came up so the demo's Settings worker badge
   // reports the truth (WebGPU on capable browsers, WebGL2 on Firefox/Safari/etc.)

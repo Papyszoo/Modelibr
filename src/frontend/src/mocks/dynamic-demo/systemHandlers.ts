@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw'
 
+import { getDemoRenderBackend } from '../services/browserAssetProcessor'
 import {
   type DemoEnvironmentMap,
   type DemoModel,
@@ -18,7 +19,6 @@ import {
   recomputeProjectCounts,
   removeRecycledItem,
 } from './shared'
-import { getDemoRenderBackend } from '../services/browserAssetProcessor'
 
 export const systemHandlers = [
   // ════════════════════════════════════════════════════════════════════════
