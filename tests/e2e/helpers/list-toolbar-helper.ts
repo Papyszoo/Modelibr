@@ -125,11 +125,21 @@ export async function narrowVirtualisedList(
  *
  * Pass the container selector that holds the canvas (e.g.
  * `".texture-preview-canvas"`, `".environment-map-preview"`).
+ *
+ * Default budget is 60s, not 30s: the viewer's `gl` factory now probes for a
+ * real WebGPU adapter (async) before falling back to a classic software
+ * WebGLRenderer, and on GPU-less CI runners (SwiftShader) that probe plus the
+ * software context-init and first textured render push canvas mount right up
+ * against the old 30s wait — the canvas provably mounts (call logs resolve to a
+ * visible `<canvas data-engine="three.js r185">`), it's just slower than the
+ * budget assumed when the viewer was classic-only. 60s absorbs that latency
+ * without masking a crash; the test-level timeout (300s for these specs) still
+ * bounds a genuine hang.
  */
 export async function waitForR3FCanvas(
     page: Page,
     containerSelector: string,
-    { timeout = 30000 }: { timeout?: number } = {},
+    { timeout = 60000 }: { timeout?: number } = {},
 ): Promise<void> {
     await page.waitForSelector(`${containerSelector} canvas`, {
         state: "attached",
