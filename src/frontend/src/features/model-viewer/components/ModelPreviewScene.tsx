@@ -15,6 +15,7 @@ import { ShadowNodeMaterial } from 'three/webgpu'
 import { LoadingPlaceholder } from '@/components/LoadingPlaceholder'
 import { useEnvironmentPresets } from '@/features/model-viewer/hooks/useEnvironmentPresets'
 import { getFileUrl } from '@/features/models/api/modelApi'
+import { isWebGPUBackend } from '@/shared/three/createWebGPURenderer'
 import { type Model as ModelType } from '@/utils/fileUtils'
 
 import {
@@ -130,7 +131,7 @@ export function Scene({
   cameraState,
   onCameraChange,
 }: SceneProps): JSX.Element {
-  const { camera } = useThree()
+  const { camera, gl } = useThree()
   const controlsRef = useRef<OrbitControlsHandle | null>(null)
 
   // Find the renderable file - prioritize defaultFileId if set
@@ -175,11 +176,15 @@ export function Scene({
   // unmounted (rather than flashing at y=0) until we know the real floor.
   const [floorY, setFloorY] = useState<number | null>(null)
   const shadowMaterial = useMemo(() => {
-    const material = new ShadowNodeMaterial()
+    // ShadowNodeMaterial is the WebGPU shadow catcher; on the classic
+    // WebGLRenderer (software/Firefox) the equivalent is the core ShadowMaterial.
+    const material = isWebGPUBackend(gl)
+      ? new ShadowNodeMaterial()
+      : new THREE.ShadowMaterial()
     material.transparent = true
     material.opacity = 0.35
     return material
-  }, [])
+  }, [gl])
   useEffect(() => () => shadowMaterial.dispose(), [shadowMaterial])
 
   // Resolve the single balanced rig from the user settings. This is what makes

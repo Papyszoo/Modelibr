@@ -3,6 +3,7 @@ import * as THREE_GPU from 'three/webgpu'
 
 import {
   addSharedDisplacementNormal,
+  applyDispNormalDisplacement,
   applyDispNormalDisplacementNode,
 } from '@/shared/three/sharedDisplacementNormal'
 import { type TextureSetDto } from '@/types'
@@ -13,12 +14,15 @@ import {
 } from '../../../../../asset-processor/lib/textureMaterial.js'
 
 /**
- * The viewer renders with a WebGPURenderer, so materials are Node materials
- * (MeshPhysicalNodeMaterial). It maps every standard PBR slot exactly like
- * MeshPhysicalMaterial, and additionally lets the displacement push along the
- * shared `aDispNormal` direction via a TSL positionNode.
+ * On a real GPU the viewer renders with a WebGPURenderer, so materials are Node
+ * materials (MeshPhysicalNodeMaterial) with the displacement expressed as a TSL
+ * positionNode. On software/Firefox it falls back to the classic WebGLRenderer
+ * and the core MeshPhysicalMaterial with the GLSL onBeforeCompile displacement.
+ * Both expose the same PBR slots, so the slot assignments below are shared.
  */
-type ViewerMaterial = THREE_GPU.MeshPhysicalNodeMaterial
+type ViewerMaterial =
+  | THREE_GPU.MeshPhysicalNodeMaterial
+  | THREE.MeshPhysicalMaterial
 
 /** Map of material names to their texture sets. Key "" means apply to all meshes. */
 export type MaterialTextureSets = Record<string, TextureSetDto>
@@ -38,7 +42,8 @@ function getMeshMaterialNames(mesh: THREE.Mesh): string[] {
  */
 export function buildMaterialFromTextures(
   loadedTextures: Record<string, THREE.Texture | null>,
-  materialPrefix: string
+  materialPrefix: string,
+  isWebGPU: boolean = true
 ): ViewerMaterial {
   const get = (slot: string) =>
     loadedTextures[`${materialPrefix}${KEY_SEP}${slot}`] ?? null
@@ -54,13 +59,16 @@ export function buildMaterialFromTextures(
     specularColorMap: get('specularColorMap'),
   })
 
-  const material = new THREE_GPU.MeshPhysicalNodeMaterial({
+  const materialConfig = {
     color: cfg.hasBaseColorMap ? 0xffffff : new THREE.Color(0.7, 0.7, 0.9),
     metalness: cfg.metalness,
     roughness: cfg.roughness,
     envMapIntensity: cfg.envMapIntensity,
     specularIntensity: cfg.specularIntensity,
-  })
+  }
+  const material: ViewerMaterial = isWebGPU
+    ? new THREE_GPU.MeshPhysicalNodeMaterial(materialConfig)
+    : new THREE.MeshPhysicalMaterial(materialConfig)
 
   if (get('map')) material.map = get('map')
   if (get('normalMap')) material.normalMap = get('normalMap')
@@ -85,10 +93,18 @@ export function buildMaterialFromTextures(
     // face-aligned objectNormal — so hard-edged meshes (game-asset cubes etc.)
     // stay watertight under displacement while keeping their original per-face
     // UVs intact for color sampling. Bias by -scale/2 so heightmap mid-grey
-    // means "no displacement". On WebGPU this is a TSL positionNode; the native
-    // displacementMap slot is left unset so it doesn't ALSO displace along the
-    // per-vertex normal.
-    applyDispNormalDisplacementNode(material, displacementMap, 0.02, -0.01)
+    // means "no displacement". On WebGPU this is a TSL positionNode (native slot
+    // left unset); on the classic WebGLRenderer it is the native displacement
+    // slot plus the GLSL onBeforeCompile hook.
+    if (isWebGPU) {
+      applyDispNormalDisplacementNode(material, displacementMap, 0.02, -0.01)
+    } else {
+      const classic = material as THREE.MeshPhysicalMaterial
+      classic.displacementMap = displacementMap
+      classic.displacementScale = 0.02
+      classic.displacementBias = -0.01
+      applyDispNormalDisplacement(classic)
+    }
   }
 
   return material
@@ -104,7 +120,8 @@ export function applyMaterialTextures(
   clonedModel: THREE.Group | THREE.Object3D,
   materialTextureSets: MaterialTextureSets,
   loadedTextures: Record<string, THREE.Texture | null>,
-  texturesReady: boolean
+  texturesReady: boolean,
+  isWebGPU: boolean = true
 ) {
   const materialNames = Object.keys(materialTextureSets)
   const hasWildcard = materialNames.includes('')
@@ -115,19 +132,23 @@ export function applyMaterialTextures(
     for (const matName of materialNames) {
       builtMaterials[matName] = buildMaterialFromTextures(
         loadedTextures,
-        matName
+        matName,
+        isWebGPU
       )
     }
   }
 
   // Shared fallback material for unmatched meshes (avoids per-mesh allocation)
-  const fallbackMaterial = new THREE_GPU.MeshPhysicalNodeMaterial({
+  const fallbackConfig = {
     color: new THREE.Color(0.7, 0.7, 0.9),
     metalness: 0.3,
     roughness: 0.4,
     envMapIntensity: 1.0,
     specularIntensity: 0,
-  })
+  }
+  const fallbackMaterial: ViewerMaterial = isWebGPU
+    ? new THREE_GPU.MeshPhysicalNodeMaterial(fallbackConfig)
+    : new THREE.MeshPhysicalMaterial(fallbackConfig)
 
   clonedModel.traverse(child => {
     if (!child.isMesh) return

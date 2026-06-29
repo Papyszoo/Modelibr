@@ -124,6 +124,34 @@ export function useChannelExtractedTextures(
     const loadedTextures: ChannelExtractedTextures = {}
     const loadPromises: Promise<void>[] = []
 
+    // Channel extraction renders to a GPU target through the WebGPURenderer. On
+    // a software backend (headless SwiftShader in CI, some locked-down browsers)
+    // that pass can hang or throw, which would otherwise leave the load promise
+    // unresolved and spin the loading overlay forever. Time it out / catch it
+    // and fall back to the un-extracted source so the preview always resolves —
+    // slightly off channels on software, full quality on a real GPU.
+    const EXTRACT_TIMEOUT_MS = 8000
+    const safeExtract = async (
+      run: () => Promise<THREE.Texture>,
+      source: THREE.Texture
+    ): Promise<{ texture: THREE.Texture; extracted: boolean }> => {
+      try {
+        const texture = await Promise.race([
+          run(),
+          new Promise<THREE.Texture>((_, reject) =>
+            setTimeout(
+              () => reject(new Error('channel extraction timed out')),
+              EXTRACT_TIMEOUT_MS
+            )
+          ),
+        ])
+        return { texture, extracted: true }
+      } catch (error) {
+        console.warn('Channel extraction failed; using source texture', error)
+        return { texture: source, extracted: false }
+      }
+    }
+
     const handleLoaded = async (
       slotName: string,
       config: TextureConfig,
@@ -138,25 +166,28 @@ export function useChannelExtractedTextures(
       loadedTexture.wrapT = THREE.RepeatWrapping
       loadedTexture.flipY = flipY
 
-      if (config.sourceChannel === TextureChannel.RGB) {
-        if (config.invert) {
-          loadedTextures[slotName] = await invertTexture(
-            loadedTexture,
-            renderer
-          )
-          loadedTexture.dispose()
-        } else {
-          loadedTextures[slotName] = loadedTexture
-        }
-      } else {
-        loadedTextures[slotName] = await extractChannel(
-          loadedTexture,
-          config.sourceChannel,
-          renderer,
-          config.invert ?? false
-        )
-        loadedTexture.dispose()
+      if (config.sourceChannel === TextureChannel.RGB && !config.invert) {
+        loadedTextures[slotName] = loadedTexture
+        return
       }
+
+      // RGB+invert → invert the whole texture; otherwise extract one channel.
+      const { texture, extracted } = await safeExtract(
+        () =>
+          config.sourceChannel === TextureChannel.RGB
+            ? invertTexture(loadedTexture, renderer)
+            : extractChannel(
+                loadedTexture,
+                config.sourceChannel,
+                renderer,
+                config.invert ?? false
+              ),
+        loadedTexture
+      )
+      loadedTextures[slotName] = texture
+      // Only dispose the source when a new extracted texture replaced it; on
+      // fallback the source IS the slot texture.
+      if (extracted) loadedTexture.dispose()
     }
 
     Object.entries(textureConfigs).forEach(([slotName, config]) => {

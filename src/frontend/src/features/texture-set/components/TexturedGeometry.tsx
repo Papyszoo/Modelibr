@@ -1,11 +1,15 @@
-import { extend } from '@react-three/fiber'
+import { extend, useThree } from '@react-three/fiber'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js'
 import { MeshPhysicalNodeMaterial } from 'three/webgpu'
 
 import { getFileUrl } from '@/features/models/api/modelApi'
-import { applyDispNormalDisplacementNode } from '@/shared/three/sharedDisplacementNormal'
+import { isWebGPUBackend } from '@/shared/three/createWebGPURenderer'
+import {
+  applyDispNormalDisplacement,
+  applyDispNormalDisplacementNode,
+} from '@/shared/three/sharedDisplacementNormal'
 import { TextureChannel, type TextureSetDto, TextureType } from '@/types'
 import { isExrFile, isTiffFile } from '@/utils/fileUtils'
 import { decodeTiffBlobToBitmap } from '@/utils/tiffTextureLoader'
@@ -13,8 +17,10 @@ import { decodeTiffBlobToBitmap } from '@/utils/tiffTextureLoader'
 import { createPreviewGeometry } from '../utils/createPreviewGeometry'
 import { type GeometryType } from './GeometrySelector'
 
-// The texture-set preview renders with a WebGPURenderer, so its material is a
-// Node material. Register it for R3F's <meshPhysicalNodeMaterial> JSX element.
+// On a real GPU the preview renders on a WebGPURenderer with a node material;
+// on software/Firefox it falls back to the classic WebGLRenderer + the core
+// MeshPhysicalMaterial (registered built-in). Register the node material for
+// R3F's <meshPhysicalNodeMaterial> JSX element.
 extend({ MeshPhysicalNodeMaterial })
 
 interface GeometryParams {
@@ -357,6 +363,8 @@ function TexturedMesh({
   onLoadingChange?: (state: TextureLoadingState) => void
 }) {
   const meshRef = useRef<THREE.Mesh>(null)
+  const gl = useThree(s => s.gl)
+  const isWebGPU = isWebGPUBackend(gl)
   const [loadedTextures, setLoadedTextures] = useState<
     Record<string, THREE.Texture>
   >({})
@@ -566,52 +574,79 @@ function TexturedMesh({
   // prop-diffing alone doesn't trigger shader recompilation.
   const materialKey = JSON.stringify([Array.from(disabled).sort(), strengths])
 
+  const dispScale = hasDisplacementMap
+    ? getStrength('displacementMap') * 0.02
+    : 0
+
+  // Identical PBR slot props on the node (WebGPU) and classic (WebGL) physical
+  // materials — only the element name and the displacement wiring differ.
+  const materialProps = {
+    map: (!isDisabled('map') && t.map) || null,
+    normalMap: (!isDisabled('normalMap') && t.normalMap) || null,
+    normalScale,
+    roughnessMap: (!isDisabled('roughnessMap') && t.roughnessMap) || null,
+    metalnessMap: (!isDisabled('metalnessMap') && t.metalnessMap) || null,
+    specularColorMap:
+      (!isDisabled('specularColorMap') && t.specularColorMap) || null,
+    specularIntensity:
+      t.specularColorMap && !isDisabled('specularColorMap') ? 1 : 0,
+    aoMap: (!isDisabled('aoMap') && t.aoMap) || null,
+    aoMapIntensity: getStrength('aoMap'),
+    emissiveMap: (!isDisabled('emissiveMap') && t.emissiveMap) || null,
+    emissiveIntensity: getStrength('emissiveMap'),
+    bumpMap: (!isDisabled('bumpMap') && t.bumpMap) || null,
+    bumpScale: getStrength('bumpMap') * 0.5,
+    alphaMap: (!isDisabled('alphaMap') && t.alphaMap) || null,
+    roughness: t.roughnessMap && !isDisabled('roughnessMap') ? 1 : 0.8,
+    metalness: t.metalnessMap && !isDisabled('metalnessMap') ? 1 : 0,
+    emissive: (t.emissiveMap && !isDisabled('emissiveMap')
+      ? '#ffffff'
+      : '#000000') as THREE.ColorRepresentation,
+    transparent: hasAlphaMap,
+    color: '#ffffff' as THREE.ColorRepresentation,
+    wireframe: geometryParams.wireframe || false,
+  }
+
   return (
     <mesh ref={meshRef} castShadow receiveShadow geometry={geometry}>
-      <meshPhysicalNodeMaterial
-        key={materialKey}
-        ref={(mat: MeshPhysicalNodeMaterial | null) => {
-          // Displacement via TSL positionNode along the shared aDispNormal
-          // direction. The native displacementMap slot is left unset so the node
-          // material doesn't ALSO displace along the per-vertex normal. The
-          // material remounts (key) on strength change, so scale/bias are live.
-          if (mat && hasDisplacementMap && t.displacementMap) {
-            const scale = getStrength('displacementMap') * 0.02
-            applyDispNormalDisplacementNode(
-              mat,
-              t.displacementMap,
-              scale,
-              -scale / 2
-            )
-          }
-        }}
-        map={(!isDisabled('map') && t.map) || null}
-        normalMap={(!isDisabled('normalMap') && t.normalMap) || null}
-        normalScale={normalScale}
-        roughnessMap={(!isDisabled('roughnessMap') && t.roughnessMap) || null}
-        metalnessMap={(!isDisabled('metalnessMap') && t.metalnessMap) || null}
-        specularColorMap={
-          (!isDisabled('specularColorMap') && t.specularColorMap) || null
-        }
-        specularIntensity={
-          t.specularColorMap && !isDisabled('specularColorMap') ? 1 : 0
-        }
-        aoMap={(!isDisabled('aoMap') && t.aoMap) || null}
-        aoMapIntensity={getStrength('aoMap')}
-        emissiveMap={(!isDisabled('emissiveMap') && t.emissiveMap) || null}
-        emissiveIntensity={getStrength('emissiveMap')}
-        bumpMap={(!isDisabled('bumpMap') && t.bumpMap) || null}
-        bumpScale={getStrength('bumpMap') * 0.5}
-        alphaMap={(!isDisabled('alphaMap') && t.alphaMap) || null}
-        roughness={t.roughnessMap && !isDisabled('roughnessMap') ? 1 : 0.8}
-        metalness={t.metalnessMap && !isDisabled('metalnessMap') ? 1 : 0}
-        emissive={
-          t.emissiveMap && !isDisabled('emissiveMap') ? '#ffffff' : '#000000'
-        }
-        transparent={hasAlphaMap}
-        color="#ffffff"
-        wireframe={geometryParams.wireframe || false}
-      />
+      {isWebGPU ? (
+        <meshPhysicalNodeMaterial
+          key={materialKey}
+          ref={(mat: MeshPhysicalNodeMaterial | null) => {
+            // Displacement via TSL positionNode along the shared aDispNormal
+            // direction. The native displacementMap slot is left unset so the
+            // node material doesn't ALSO displace along the per-vertex normal.
+            // The material remounts (key) on strength change, so scale/bias are
+            // live.
+            if (mat && hasDisplacementMap && t.displacementMap) {
+              applyDispNormalDisplacementNode(
+                mat,
+                t.displacementMap,
+                dispScale,
+                -dispScale / 2
+              )
+            }
+          }}
+          {...materialProps}
+        />
+      ) : (
+        <meshPhysicalMaterial
+          key={materialKey}
+          ref={(mat: THREE.MeshPhysicalMaterial | null) => {
+            // Classic GLSL displacement: the native displacementMap slot plus
+            // the onBeforeCompile hook that redirects displacement along
+            // aDispNormal (createPreviewGeometry added the attribute).
+            if (mat && hasDisplacementMap && t.displacementMap) {
+              mat.displacementMap = t.displacementMap
+              mat.displacementScale = dispScale
+              mat.displacementBias = -dispScale / 2
+              applyDispNormalDisplacement(mat)
+              mat.needsUpdate = true
+            }
+          }}
+          {...materialProps}
+        />
+      )}
     </mesh>
   )
 }
