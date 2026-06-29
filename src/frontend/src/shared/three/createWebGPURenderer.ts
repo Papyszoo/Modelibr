@@ -18,6 +18,21 @@ import * as THREE_GPU from 'three/webgpu'
  * the classic `three` loaders render fine on it via three's duck-typed flags —
  * the same cross-build setup the script scene preview already uses.
  */
+/**
+ * Browsers whose WebGPU implementation is too immature for this renderer, where
+ * we fall back to the reliable WebGL2 backend (`forceWebGL`) instead.
+ *
+ * Firefox shipped WebGPU in 2025 but currently mis-sizes the renderer's depth
+ * attachment relative to the canvas color attachment while a model loads —
+ * `GPUValidationError: Attachments have differing sizes (300×150 vs the real
+ * canvas)` — and crashes on a null WebGPU context (`addEventListener` of null).
+ * Chromium and Safari keep the WebGPU fast path. Revisit as Firefox matures.
+ */
+export function prefersWebGLFallback(): boolean {
+  if (typeof navigator === 'undefined') return false
+  return /firefox/i.test(navigator.userAgent)
+}
+
 export async function createWebGPURenderer(
   props: ConstructorParameters<typeof THREE_GPU.WebGPURenderer>[0] = {}
 ): Promise<THREE_GPU.WebGPURenderer> {
@@ -26,6 +41,7 @@ export async function createWebGPURenderer(
     alpha: true,
     powerPreference: 'high-performance',
     ...props,
+    forceWebGL: props.forceWebGL ?? prefersWebGLFallback(),
   })
   await renderer.init()
   return renderer
