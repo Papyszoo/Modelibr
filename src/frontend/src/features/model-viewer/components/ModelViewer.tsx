@@ -45,6 +45,8 @@ import { type ExpandAction, PanelWrapper } from './PanelWrapper'
 import { type MaterialTextureSets } from './TexturedModel'
 import { VersionStrip } from './VersionStrip'
 import { type PanelContent, ViewerMenubar } from './ViewerMenubar'
+import { PerfDisplay, PerfSampler } from './ViewerPerfPanel'
+import { EMPTY_PERF_STATS, type PerfStats } from './viewerPerfStats'
 import { ViewerSidePanel } from './ViewerSidePanel'
 
 interface ModelViewerProps {
@@ -131,6 +133,7 @@ export function ModelViewer({
   const blenderEnabled = useBlenderEnabledStore(s => s.blenderEnabled)
   const toast = useRef<Toast>(null)
   const statsContainerRef = useRef<HTMLDivElement>(null)
+  const perfStatsRef = useRef<PerfStats>(EMPTY_PERF_STATS)
   const queryClient = useQueryClient()
   const stableTabId =
     tabId ?? (modelId ? `model-viewer-${modelId}` : 'model-viewer-standalone')
@@ -902,6 +905,9 @@ export function ModelViewer({
                         cameraState={cameraState}
                         onCameraChange={handleCameraStateChange}
                       />
+                      {viewerSettings.showPerf && (
+                        <PerfSampler statsRef={perfStatsRef} />
+                      )}
                     </Canvas>
                   </CanvasErrorBoundary>
                   <div ref={statsContainerRef} className="stats-container" />
@@ -912,6 +918,9 @@ export function ModelViewer({
                         statsContainerRef as unknown as React.RefObject<HTMLElement>
                       }
                     />
+                  )}
+                  {viewerSettings.showPerf && (
+                    <PerfDisplay statsRef={perfStatsRef} />
                   )}
                 </>
               )}
