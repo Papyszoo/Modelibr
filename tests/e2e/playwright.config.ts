@@ -54,6 +54,15 @@ export default defineConfig({
         video: envEnum(process.env.PW_VIDEO, ["off", "on", "retain-on-failure", "on-first-retry"], "retain-on-failure") as any,
         // Strict compare: PW_HEADED=0 must not mean headed.
         headless: process.env.PW_HEADED === "1" ? false : undefined,
+        // Force the reliable software-WebGL path. Headless CI has no GPU, so the
+        // viewer's WebGPU only ever comes up on SwiftShader, which is slow/flaky
+        // for the texture-set 3D preview (intermittent "preview canvas should be
+        // visible" / loading-overlay timeouts). Dropping navigator.gpu makes the
+        // gl factory deterministically pick the classic WebGLRenderer — the path
+        // version/0.3 used. Real users on a GPU keep WebGPU; this is CI-only.
+        launchOptions: {
+            args: ["--disable-gpu", "--use-gl=angle", "--use-angle=swiftshader"],
+        },
     },
     // NOTE: Per-worker DB isolation (PARALLEL_DB=true / TEST_WORKER_INDEX) is
     // NOT active. The e2e stack uses a single WebAPI + single PostgreSQL container,
