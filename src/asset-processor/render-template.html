@@ -41,7 +41,7 @@
     <script type="importmap">
       {
         "imports": {
-          "three": "./node_modules/three/build/three.webgpu.js",
+          "three": "./node_modules/three/build/three.module.js",
           "three/webgpu": "./node_modules/three/build/three.webgpu.js",
           "three/tsl": "./node_modules/three/build/three.tsl.js",
           "three/addons/": "./node_modules/three/examples/jsm/"
@@ -50,7 +50,15 @@
     </script>
     <script type="module" src="./lib/tiffDecode.js"></script>
     <script type="module">
+      // Dual rendering stack. `three` now resolves to the classic build
+      // (WebGLRenderer + GLSL materials); `three/webgpu` provides the
+      // WebGPURenderer + node materials. A real GPU uses the WebGPU path; every
+      // other host (headless SwiftShader, no adapter, opt-out) uses the classic
+      // WebGL path, which is reliable where the node-material WebGL backend is
+      // not. Scene/loaders/geometry come from the classic build and render on
+      // both — the same cross-build setup the in-app viewer uses.
       import * as THREE from 'three'
+      import * as THREE_GPU from 'three/webgpu'
       import * as TSL from 'three/tsl'
       import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
       import { OBJLoader } from 'three/addons/loaders/OBJLoader.js'
@@ -161,25 +169,39 @@
         } catch (probeError) {
           webgpuProbe.error = probeError.message
         }
-        // Force WebGL2 when WebGPU is opted out, when there is no usable adapter,
-        // or when the only adapter is software (the broken SwiftShader path).
+        // Use the classic WebGL path when WebGPU is opted out, when there is no
+        // usable adapter, or when the only adapter is software (headless
+        // SwiftShader, where the node-material WebGL backend mis-renders /
+        // fails). Only a real WebGPU adapter takes the WebGPURenderer + TSL path.
         const forceWebGL =
           preferWebGPU === false ||
           !webgpuProbe.adapter ||
           webgpuProbe.softwareAdapter
+        const useWebGPU = !forceWebGL
         webgpuProbe.forceWebGL = forceWebGL
         window.modelRenderer.webgpuProbe = webgpuProbe
 
         let renderer
         try {
-          renderer = new THREE.WebGPURenderer({
-            antialias: true,
-            alpha: true,
-            forceWebGL,
-          })
-          await renderer.init()
-          window.modelRenderer.useWebGPU =
-            renderer.backend?.isWebGPUBackend === true
+          if (useWebGPU) {
+            // Real GPU: WebGPURenderer drives node materials (TSL channel
+            // extraction + displacement). Must be init()-ed before first use.
+            renderer = new THREE_GPU.WebGPURenderer({
+              antialias: true,
+              alpha: true,
+            })
+            await renderer.init()
+            window.modelRenderer.useWebGPU =
+              renderer.backend?.isWebGPUBackend === true
+          } else {
+            // Classic, reliable everywhere (incl. headless SwiftShader).
+            renderer = new THREE.WebGLRenderer({
+              antialias: true,
+              alpha: true,
+              preserveDrawingBuffer: false,
+            })
+            window.modelRenderer.useWebGPU = false
+          }
         } catch (error) {
           console.error('Failed to create renderer:', error)
           window.modelRenderer.error = error.message
@@ -212,7 +234,11 @@
         // illumination. The sync fromScene works on the WebGPURenderer because
         // the renderer is already init()-ed above (the *Async PMREM variants are
         // deprecated in favour of exactly that).
-        const pmremGenerator = new THREE.PMREMGenerator(renderer)
+        // PMREM generator must come from the same build as the renderer.
+        const PMREMGeneratorCtor = window.modelRenderer.useWebGPU
+          ? THREE_GPU.PMREMGenerator
+          : THREE.PMREMGenerator
+        const pmremGenerator = new PMREMGeneratorCtor(renderer)
         const roomEnv = new RoomEnvironment()
         const envMap = pmremGenerator.fromScene(roomEnv).texture
         scene.environment = envMap
@@ -674,12 +700,20 @@
           return false
         }
 
-        // WebGPURenderer renders asynchronously on both backends; await it so
-        // the canvas is complete before getCanvasDataURL() reads it back.
-        await window.modelRenderer.renderer.renderAsync(
-          window.modelRenderer.scene,
-          window.modelRenderer.camera
-        )
+        // WebGPURenderer renders asynchronously; the classic WebGLRenderer is
+        // synchronous. Either way the canvas is complete before
+        // getCanvasDataURL() reads it back.
+        if (window.modelRenderer.useWebGPU) {
+          await window.modelRenderer.renderer.renderAsync(
+            window.modelRenderer.scene,
+            window.modelRenderer.camera
+          )
+        } else {
+          window.modelRenderer.renderer.render(
+            window.modelRenderer.scene,
+            window.modelRenderer.camera
+          )
+        }
         return true
       }
 
@@ -785,6 +819,7 @@
       // applyTextures page.evaluate (classic-script context) to build the
       // node-material channel-extraction passes via window.modelibrTextureChannels.
       window.THREE = THREE
+      window.THREE_GPU = THREE_GPU
       window.TSL = TSL
       window.initRenderer = initScene
       window.loadModelFromData = loadModel

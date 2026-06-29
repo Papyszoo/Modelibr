@@ -921,37 +921,100 @@ export class PuppeteerRenderer {
             // the Glossiness-invert rule all live there now.
             const channels = window.modelibrTextureChannels
             const TSL = window.TSL
+            const THREE_GPU = window.THREE_GPU
+            // Branch the textured render path on the active backend (set in
+            // render-template initScene): a real WebGPU adapter uses node
+            // materials + TSL; everything else (incl. headless SwiftShader, where
+            // the node-material WebGL backend mis-renders) uses the classic
+            // WebGLRenderer + GLSL ShaderMaterial path.
+            const useWebGPU = window.modelRenderer.useWebGPU === true
 
-            // Extract a single channel (R/G/B/A) to a grayscale texture, with
-            // optional value inversion (Glossiness → Roughness), via the shared
-            // TSL node pass (asset-processor/lib/textureChannels.js). The
-            // WebGPURenderer can't run a GLSL ShaderMaterial, so the quad is built
-            // from TSL nodes; the render is async on both backends, hence async.
+            // Classic render-to-grayscale: GLSL ShaderMaterial passthrough quad →
+            // WebGLRenderTarget. Stashes the target on userData so the texture
+            // disposer frees it (parity with the TSL pass).
+            function renderToGrayscaleGLSL(
+              sourceTexture,
+              fragmentShader,
+              extra
+            ) {
+              const size = 512
+              const renderTarget = new THREE.WebGLRenderTarget(size, size, {
+                minFilter: THREE.LinearFilter,
+                magFilter: THREE.LinearFilter,
+                format: THREE.RGBAFormat,
+              })
+              const quadScene = new THREE.Scene()
+              const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
+              const material = new THREE.ShaderMaterial({
+                uniforms: { uTexture: { value: sourceTexture }, ...extra },
+                vertexShader: channels.CHANNEL_VERTEX_SHADER,
+                fragmentShader,
+              })
+              const quad = new THREE.Mesh(
+                new THREE.PlaneGeometry(2, 2),
+                material
+              )
+              quadScene.add(quad)
+              renderer.setRenderTarget(renderTarget)
+              renderer.render(quadScene, camera)
+              renderer.setRenderTarget(null)
+              quad.geometry.dispose()
+              material.dispose()
+              const out = renderTarget.texture
+              out.wrapS = sourceTexture.wrapS
+              out.wrapT = sourceTexture.wrapT
+              out.flipY = sourceTexture.flipY
+              out.needsUpdate = true
+              out.userData.__channelRenderTarget = renderTarget
+              return out
+            }
+
+            // Extract a single channel (R/G/B/A) to grayscale, optionally inverted
+            // (Glossiness → Roughness). WebGPU: shared TSL node pass; classic:
+            // GLSL ShaderMaterial. Async either way (TSL render is async).
             async function extractChannel(
               sourceTexture,
               sourceChannel,
               invert
             ) {
-              return channels.extractTextureChannel({
-                THREE,
-                TSL,
-                renderer,
-                source: sourceTexture,
-                channelIndex: channels.getChannelUniformIndex(sourceChannel),
-                invert,
-              })
+              if (useWebGPU) {
+                return channels.extractTextureChannel({
+                  THREE: THREE_GPU,
+                  TSL,
+                  renderer,
+                  source: sourceTexture,
+                  channelIndex: channels.getChannelUniformIndex(sourceChannel),
+                  invert,
+                })
+              }
+              return renderToGrayscaleGLSL(
+                sourceTexture,
+                channels.CHANNEL_EXTRACT_FRAGMENT_SHADER,
+                {
+                  uChannel: {
+                    value: channels.getChannelUniformIndex(sourceChannel),
+                  },
+                  uInvert: { value: invert ? 1 : 0 },
+                }
+              )
             }
 
             // Invert a full-RGB texture (Glossiness stored as RGB grayscale that
             // must be flipped to behave as roughness).
             async function invertRgbTexture(sourceTexture) {
-              return channels.extractTextureChannel({
-                THREE,
-                TSL,
-                renderer,
-                source: sourceTexture,
-                rgbInvert: true,
-              })
+              if (useWebGPU) {
+                return channels.extractTextureChannel({
+                  THREE: THREE_GPU,
+                  TSL,
+                  renderer,
+                  source: sourceTexture,
+                  rgbInvert: true,
+                })
+              }
+              return renderToGrayscaleGLSL(
+                sourceTexture,
+                channels.RGB_INVERT_FRAGMENT_SHADER
+              )
             }
 
             // Load standard texture via TextureLoader from HTTP URL
@@ -1144,10 +1207,11 @@ export class PuppeteerRenderer {
                     roughnessMap: loadedTextures.roughnessMap,
                     specularColorMap: loadedTextures.specularColorMap,
                   })
-                // Node material (vs MeshPhysicalMaterial) so the WebGPURenderer
-                // can apply the TSL positionNode displacement below; it auto-maps
-                // every standard PBR slot, so the rest of this block is unchanged.
-                child.material = new THREE.MeshPhysicalNodeMaterial({
+                // WebGPU: node material so the TSL positionNode displacement
+                // below works. Classic: MeshPhysicalMaterial with the GLSL
+                // onBeforeCompile displacement. Both auto-map every standard PBR
+                // slot, so the rest of this block is shared.
+                const materialConfig = {
                   name: originalName,
                   color: matCfg.hasBaseColorMap
                     ? 0xffffff
@@ -1156,7 +1220,10 @@ export class PuppeteerRenderer {
                   roughness: matCfg.roughness,
                   envMapIntensity: matCfg.envMapIntensity,
                   specularIntensity: matCfg.specularIntensity,
-                })
+                }
+                child.material = useWebGPU
+                  ? new THREE_GPU.MeshPhysicalNodeMaterial(materialConfig)
+                  : new THREE.MeshPhysicalMaterial(materialConfig)
 
                 // Apply each loaded texture with proper material settings
                 for (const [property, texture] of Object.entries(
@@ -1184,20 +1251,30 @@ export class PuppeteerRenderer {
                         THREE,
                         child.geometry
                       )
-                      window.modelibrDispNormal.applyDispNormalDisplacementNode(
-                        {
-                          THREE,
-                          TSL,
-                          material: child.material,
-                          displacementMap: texture,
-                          displacementScale: 0.02,
-                          displacementBias: -0.01,
-                        }
-                      )
-                      // The positionNode now drives displacement along
-                      // aDispNormal; clear the native slot so the node material
-                      // doesn't ALSO displace along the per-vertex normal.
-                      child.material.displacementMap = null
+                      if (useWebGPU) {
+                        window.modelibrDispNormal.applyDispNormalDisplacementNode(
+                          {
+                            THREE: THREE_GPU,
+                            TSL,
+                            material: child.material,
+                            displacementMap: texture,
+                            displacementScale: 0.02,
+                            displacementBias: -0.01,
+                          }
+                        )
+                        // The positionNode now drives displacement along
+                        // aDispNormal; clear the native slot so the node material
+                        // doesn't ALSO displace along the per-vertex normal.
+                        child.material.displacementMap = null
+                      } else {
+                        // Classic: the onBeforeCompile hook reads aDispNormal and
+                        // the native displacementMap/Scale/Bias.
+                        child.material.displacementScale = 0.02
+                        child.material.displacementBias = -0.01
+                        window.modelibrDispNormal.applyDispNormalDisplacement(
+                          child.material
+                        )
+                      }
                       child.material.needsUpdate = true
                     }
                     if (property === 'normalMap') {
