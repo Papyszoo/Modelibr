@@ -200,6 +200,21 @@ export function ViewerMenubar({
                       }
                     />
                   </div>
+
+                  <div className="viewer-option-item viewer-option-checkbox">
+                    <label htmlFor="perf-check">Performance Monitor</label>
+                    <input
+                      id="perf-check"
+                      type="checkbox"
+                      checked={settings.showPerf}
+                      onChange={e =>
+                        setSettings({
+                          ...settings,
+                          showPerf: e.target.checked,
+                        })
+                      }
+                    />
+                  </div>
                 </div>
 
                 <div className="viewer-option-group">

@@ -69,9 +69,13 @@ Then("the 3D canvas should be visible", async ({ page }) => {
     }
     console.log("[UI] Version dropdown visible - model loaded correctly ✓");
 
-    // The canvas is rendered by Three.js/React Three Fiber
+    // The canvas is rendered by Three.js/React Three Fiber. 60s (was 30s):
+    // GPU-less CI renders the viewer on software WebGL, whose context-init +
+    // first render can exceed 30s under load (same software-render latency as
+    // waitForR3FCanvas). The canvas provably mounts; on a real GPU this is
+    // sub-second.
     const canvas = page.locator(".viewer-canvas canvas");
-    await expect(canvas).toBeVisible({ timeout: 30000 });
+    await expect(canvas).toBeVisible({ timeout: 60000 });
     console.log("[UI] 3D canvas element is visible ✓");
 
     // Poll for scene initialization and mesh loading
