@@ -101,12 +101,17 @@ export class ModelListPage {
         // Navigate with clean state — default tab is modelList
         await navigateToAppClean(this.page);
 
-        // Wait for the model list content to be visible
+        // Wait for the model list content to be visible. 30s (was 10s): this is
+        // the shared entry point every demo spec funnels through, and the demo
+        // phase runs last on a drained CI runner where the grid's first render
+        // after navigation regularly exceeds 10s. It renders instantly locally;
+        // 30s absorbs the loaded-runner latency without masking a broken grid
+        // (a genuinely empty/failed list still hits .no-results/.empty-state).
         await this.page.waitForSelector(
             ".model-card, .no-results, .empty-state",
             {
                 state: "visible",
-                timeout: 10000,
+                timeout: 30000,
             },
         );
     }

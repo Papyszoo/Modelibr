@@ -8,6 +8,7 @@ export interface ViewerSettingsState {
   modelRotationSpeed: number
   showShadows: boolean
   showStats: boolean
+  showPerf: boolean
   // Lights
   ambientIntensity: number
   directionalIntensity: number
@@ -36,6 +37,7 @@ const DEFAULT_SETTINGS: ViewerSettingsState = {
   modelRotationSpeed: 0.002,
   showShadows: true,
   showStats: false,
+  showPerf: false,
   // Defaults mirror the shared rig (asset-processor/lib/sceneLighting.js
   // DEFAULT_LIGHTING) so an unconfigured viewer matches the thumbnail render.
   // ambient/environment are absolute intensities; directional is a multiplier.
