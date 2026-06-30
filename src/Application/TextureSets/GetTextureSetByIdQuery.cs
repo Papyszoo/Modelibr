@@ -50,6 +50,7 @@ internal class GetTextureSetByIdQueryHandler : IQueryHandler<GetTextureSetByIdQu
             IsEmpty = textureSet.IsEmpty,
             ThumbnailPath = textureSet.ThumbnailPath,
             PngThumbnailPath = textureSet.PngThumbnailPath,
+            Tags = textureSet.Tags.Select(t => t.Name).OrderBy(name => name).ToList(),
             Textures = textureSet.Textures.Select(t => new TextureDto
             {
                 Id = t.Id,
@@ -112,6 +113,7 @@ public record TextureSetDetailDto
     public bool IsEmpty { get; init; }
     public string? ThumbnailPath { get; init; }
     public string? PngThumbnailPath { get; init; }
+    public IReadOnlyList<string> Tags { get; init; } = Array.Empty<string>();
     public ICollection<TextureDto> Textures { get; init; } = new List<TextureDto>();
     public ICollection<ModelSummaryDto> AssociatedModels { get; init; } = new List<ModelSummaryDto>();
     public ICollection<PackSummaryDto> Packs { get; init; } = new List<PackSummaryDto>();
