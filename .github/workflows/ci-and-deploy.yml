@@ -336,7 +336,7 @@ jobs:
         needs: [detect-changes]
         # GPU-dependent Playwright render tests flake on GPU-less GitHub runners
         # (SwiftShader software GL times out at the drained-runner tail). They run
-        # on the Mac Mini GPU lane via `npm run test:all`; on GitHub they are
+        # on the local GPU lane via `npm run test:all`; on GitHub they are
         # manual-only (workflow_dispatch), so the flake never gates a PR.
         if: github.event_name == 'workflow_dispatch'
         # Successful E2E runs take ~15-20 minutes. A hard ceiling prevents a
