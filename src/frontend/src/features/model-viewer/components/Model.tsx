@@ -11,6 +11,7 @@ import { STLLoader } from 'three/examples/jsm/loaders/STLLoader'
 import { LoadingPlaceholder } from '@/components/LoadingPlaceholder'
 import { useModelObject } from '@/features/model-viewer/hooks/useModelObject'
 import { safeLoadingManager } from '@/shared/three/safeLoadingManager'
+import { THREEJS_SUPPORTED_FORMATS } from '@/utils/fileUtils'
 
 import { buildStlModel } from '../../../../../asset-processor/lib/stlMesh.js'
 
@@ -225,7 +226,9 @@ function PlaceholderModel({ rotationSpeed }: { rotationSpeed: number }) {
   )
 }
 
-const KNOWN_FORMATS = ['obj', 'fbx', 'gltf', 'glb', 'stl', '3mf']
+// Derive the dotless extension list from the single source of truth so adding a
+// loader (e.g. stl/3mf) in fileUtils automatically keeps this dispatch in sync.
+const KNOWN_FORMATS = THREEJS_SUPPORTED_FORMATS.map(ext => ext.slice(1))
 
 export function Model({
   modelUrl,
