@@ -64,6 +64,23 @@ export const useViewerSettingsStore = create<ViewerSettingsStore>()(
     {
       name: 'modelibr_viewer_settings',
       storage: createJSONStorage(() => localStorage),
+      // v1: the ambient/environment defaults changed to match the shared
+      // thumbnail rig (asset-processor/lib/sceneLighting.js). Existing users
+      // have the old values cached for keys they may never have touched, and
+      // the merge below keeps persisted values over defaults — so without a
+      // migration an upgraded viewer would never pick up the new lighting.
+      // Reset just those two keys for pre-v1 state so "unconfigured viewer
+      // matches the render" actually holds on upgrade.
+      version: 1,
+      migrate: (persisted, version) => {
+        const state = persisted as ViewerSettingsStore
+        if (version < 1 && state?.settings) {
+          state.settings.ambientIntensity = DEFAULT_SETTINGS.ambientIntensity
+          state.settings.environmentIntensity =
+            DEFAULT_SETTINGS.environmentIntensity
+        }
+        return state
+      },
       merge: (persisted, current) => ({
         ...current,
         settings: {
