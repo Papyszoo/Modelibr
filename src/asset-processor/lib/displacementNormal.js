@@ -91,11 +91,23 @@ export function addSharedDisplacementNormal(THREE, geometry, tolerance = 1e-4) {
       nx /= len
       ny /= len
       nz /= len
-    }
-    for (const idx of indices) {
-      dispNormals[idx * 3] = nx
-      dispNormals[idx * 3 + 1] = ny
-      dispNormals[idx * 3 + 2] = nz
+      for (const idx of indices) {
+        dispNormals[idx * 3] = nx
+        dispNormals[idx * 3 + 1] = ny
+        dispNormals[idx * 3 + 2] = nz
+      }
+    } else {
+      // The summed normals cancelled to zero — coincident vertices with
+      // opposing normals (a zero-thickness shell, back-to-back face pair, or a
+      // thin seam). Writing (0,0,0) would make the shader's
+      // `normalize(aDispNormal)` produce NaN and collapse those vertices to the
+      // origin, tearing a hole in the displaced mesh. Fall back to each
+      // vertex's own normal so every vertex keeps a finite push direction.
+      for (const idx of indices) {
+        dispNormals[idx * 3] = normal.getX(idx)
+        dispNormals[idx * 3 + 1] = normal.getY(idx)
+        dispNormals[idx * 3 + 2] = normal.getZ(idx)
+      }
     }
   }
 
