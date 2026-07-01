@@ -60,6 +60,40 @@ describe('addSharedDisplacementNormal', () => {
     }
   })
 
+  it('falls back to per-vertex normals when coincident normals cancel to zero', () => {
+    // Two vertices share a position but carry exactly opposing normals, so the
+    // averaged direction is (0,0,0). Writing that would feed normalize() a zero
+    // vector → NaN → collapsed vertex. The fallback must keep each vertex's own
+    // (finite, non-zero) normal instead.
+    const geom = new THREE.BufferGeometry()
+    geom.setAttribute(
+      'position',
+      new THREE.BufferAttribute(new Float32Array([0, 0, 0, 0, 0, 0]), 3)
+    )
+    geom.setAttribute(
+      'normal',
+      new THREE.BufferAttribute(new Float32Array([0, 0, 1, 0, 0, -1]), 3)
+    )
+
+    addSharedDisplacementNormal(geom)
+    const disp = geom.getAttribute('aDispNormal')
+
+    for (let i = 0; i < disp.count * 3; i++) {
+      expect(Number.isNaN(disp.array[i])).toBe(false)
+    }
+    expect(disp.getZ(0)).toBe(1)
+    expect(disp.getZ(1)).toBe(-1)
+    // Each fallback direction is unit-length (no zero vector reaches the shader).
+    expect(Math.hypot(disp.getX(0), disp.getY(0), disp.getZ(0))).toBeCloseTo(
+      1,
+      6
+    )
+    expect(Math.hypot(disp.getX(1), disp.getY(1), disp.getZ(1))).toBeCloseTo(
+      1,
+      6
+    )
+  })
+
   it('is idempotent', () => {
     const geom = makeHardEdgeQuad()
     addSharedDisplacementNormal(geom)
