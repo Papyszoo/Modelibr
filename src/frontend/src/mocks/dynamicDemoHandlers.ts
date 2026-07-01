@@ -682,15 +682,10 @@ export const dynamicDemoHandlers = [
   }),
 
   http.get('*/model-tags', async () => {
-    // The shared tag vocabulary spans every asset type that can be tagged.
+    // Model tag vocabulary only — texture sets have their own pool at
+    // "/texture-sets/tags". Tags are strictly per-asset-type, never shared.
     const models = await getAll('models')
-    const textureSets = await getAll('textureSets')
-    const tags = [
-      ...new Set([
-        ...models.flatMap(model => model.tags ?? []),
-        ...textureSets.flatMap(ts => ts.tags ?? []),
-      ]),
-    ]
+    const tags = [...new Set(models.flatMap(model => model.tags ?? []))]
       .sort((left, right) => left.localeCompare(right))
       .map(name => ({ name }))
 
@@ -1757,6 +1752,18 @@ export const dynamicDemoHandlers = [
       })
     }
     return HttpResponse.json({ textureSets: sets })
+  }),
+
+  // Per-asset-type tag vocabulary: only tags assigned to texture sets (kept
+  // separate from the model tag pool). Registered before "/texture-sets/:id"
+  // so "tags" is not matched as an id.
+  http.get('*/texture-sets/tags', async () => {
+    const textureSets = await getAll('textureSets')
+    const tags = [...new Set(textureSets.flatMap(ts => ts.tags ?? []))]
+      .sort((left, right) => left.localeCompare(right))
+      .map(name => ({ name }))
+
+    return HttpResponse.json({ tags })
   }),
 
   http.get('*/texture-sets/by-file/:fileId', async () => {

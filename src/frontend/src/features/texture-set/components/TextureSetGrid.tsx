@@ -190,7 +190,7 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
     toast,
   } = useTextureSetGrid({ kind, viewStateScope })
 
-  const tagVocabulary = useTagVocabulary()
+  const tagVocabulary = useTagVocabulary('texture-set')
 
   const selectedIdSet = useMemo(
     () => new Set(selectedTextureSetIds),

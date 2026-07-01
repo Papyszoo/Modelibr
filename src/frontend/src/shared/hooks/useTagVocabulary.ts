@@ -7,14 +7,27 @@ interface TagVocabularyResponse {
 }
 
 /**
- * The shared tag vocabulary — the single ModelTag pool drawn from by every
- * asset type. Backed by the `/model-tags` endpoint (the canonical tag list).
+ * Which asset type's tag vocabulary to load. Tags are strictly per-asset-type —
+ * models and texture sets draw suggestions from separate pools, never a shared
+ * one — so the source is explicit.
  */
-export function useTagVocabulary() {
+export type TagVocabularySource = 'model' | 'texture-set'
+
+const ENDPOINT_BY_SOURCE: Record<TagVocabularySource, string> = {
+  model: '/model-tags',
+  'texture-set': '/texture-sets/tags',
+}
+
+/**
+ * The tag vocabulary for a single asset type, used to power tag autocomplete.
+ */
+export function useTagVocabulary(source: TagVocabularySource = 'model') {
   return useQuery({
-    queryKey: ['tag-vocabulary'],
+    queryKey: ['tag-vocabulary', source],
     queryFn: async (): Promise<string[]> => {
-      const response = await client.get<TagVocabularyResponse>('/model-tags')
+      const response = await client.get<TagVocabularyResponse>(
+        ENDPOINT_BY_SOURCE[source]
+      )
       return (response.data.tags ?? []).map(tag => tag.name)
     },
     staleTime: 60_000,
