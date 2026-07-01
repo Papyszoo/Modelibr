@@ -362,29 +362,40 @@ async function applyTextureMaps(
   model: Object3D,
   textures: TextureMapData[]
 ): Promise<void> {
-  const albedoTex = textures.find(t => t.textureType === TEXTURE_TYPE.Albedo)
-  const normalTex = textures.find(t => t.textureType === TEXTURE_TYPE.Normal)
-  const aoTex = textures.find(t => t.textureType === TEXTURE_TYPE.AO)
-  const roughnessTex = textures.find(
-    t => t.textureType === TEXTURE_TYPE.Roughness
-  )
-  const metallicTex = textures.find(
-    t => t.textureType === TEXTURE_TYPE.Metallic
-  )
-
   const loadTexture = async (blob: Blob) => {
     const bitmap = await createImageBitmap(blob)
     return new CanvasTexture(bitmap as unknown as HTMLCanvasElement)
   }
 
-  const [albedoMap, normalMap, aoMap, roughnessMap, metalnessMap] =
-    await Promise.all([
-      albedoTex ? loadTexture(albedoTex.blob) : Promise.resolve(null),
-      normalTex ? loadTexture(normalTex.blob) : Promise.resolve(null),
-      aoTex ? loadTexture(aoTex.blob) : Promise.resolve(null),
-      roughnessTex ? loadTexture(roughnessTex.blob) : Promise.resolve(null),
-      metallicTex ? loadTexture(metallicTex.blob) : Promise.resolve(null),
-    ])
+  // Load every supported map by its shared TextureType so the demo applies the
+  // same slots the viewer/worker do — not just the original five. (Specular
+  // needs MeshPhysicalMaterial, and channel-packed / Glossiness / Displacement
+  // maps need the channel extraction the demo doesn't run, so those remain
+  // demo-only approximations.)
+  const mapFor = (type: number): Promise<CanvasTexture | null> => {
+    const found = textures.find(t => t.textureType === type)
+    return found ? loadTexture(found.blob) : Promise.resolve(null)
+  }
+
+  const [
+    albedoMap,
+    normalMap,
+    aoMap,
+    roughnessMap,
+    metalnessMap,
+    emissiveMap,
+    bumpMap,
+    alphaMap,
+  ] = await Promise.all([
+    mapFor(TEXTURE_TYPE.Albedo),
+    mapFor(TEXTURE_TYPE.Normal),
+    mapFor(TEXTURE_TYPE.AO),
+    mapFor(TEXTURE_TYPE.Roughness),
+    mapFor(TEXTURE_TYPE.Metallic),
+    mapFor(TEXTURE_TYPE.Emissive),
+    mapFor(TEXTURE_TYPE.Bump),
+    mapFor(TEXTURE_TYPE.Alpha),
+  ])
 
   // Same gating rule as the viewer and the worker thumbnail (metalness/
   // roughness keyed on their own maps, not the base-color map).
@@ -396,7 +407,7 @@ async function applyTextureMaps(
 
   model.traverse(child => {
     if (child instanceof Mesh) {
-      child.material = new MeshStandardMaterial({
+      const material = new MeshStandardMaterial({
         color: cfg.hasBaseColorMap
           ? new Color(1, 1, 1)
           : new Color(0.7, 0.7, 0.9),
@@ -409,6 +420,16 @@ async function applyTextureMaps(
         roughness: cfg.roughness,
         envMapIntensity: cfg.envMapIntensity,
       })
+      if (emissiveMap) {
+        material.emissiveMap = emissiveMap
+        material.emissive = new Color(0xffffff)
+      }
+      if (bumpMap) material.bumpMap = bumpMap
+      if (alphaMap) {
+        material.alphaMap = alphaMap
+        material.transparent = true
+      }
+      child.material = material
       // AO needs the second UV set or it collapses indirect light (shared helper).
       if (aoMap) ensureAoMapUv2(child.geometry)
       child.castShadow = true
