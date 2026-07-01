@@ -188,6 +188,18 @@ export const handlers = [
     return HttpResponse.json({ tags })
   }),
 
+  http.get(`${BASE_URL}/texture-sets/tags`, () => {
+    const tags = [
+      ...new Set(
+        mockTextureSets.flatMap((set: { tags?: string[] }) => set.tags ?? [])
+      ),
+    ]
+      .sort((left, right) => left.localeCompare(right))
+      .map(name => ({ name }))
+
+    return HttpResponse.json({ tags })
+  }),
+
   http.post(`${BASE_URL}/models/:id/concept-images`, () => {
     return new HttpResponse(null, { status: 204 })
   }),

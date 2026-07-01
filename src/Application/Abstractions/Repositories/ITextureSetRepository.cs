@@ -14,6 +14,12 @@ public interface ITextureSetRepository
     Task<TextureSet?> GetByFileHashAsync(string sha256Hash, CancellationToken cancellationToken = default);
     Task<bool> ExistsByNameAsync(string name, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<string>> GetNamesByPrefixAsync(string prefix, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Distinct tag names currently assigned to (non-deleted) texture sets.
+    /// This is the texture-set tag vocabulary — kept separate from the model tag
+    /// pool so tag suggestions stay strictly per-asset-type.
+    /// </summary>
+    Task<IReadOnlyList<string>> GetAssignedTagNamesAsync(CancellationToken cancellationToken = default);
     Task<(IEnumerable<TextureSet> Items, int TotalCount)> GetPagedAsync(
         int page, int pageSize,
         IReadOnlyCollection<int>? packIds = null,

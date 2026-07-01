@@ -26,6 +26,19 @@ internal sealed class TextureSetRepository : ITextureSetRepository
         return entityEntry.Entity;
     }
 
+    public async Task<IReadOnlyList<string>> GetAssignedTagNamesAsync(CancellationToken cancellationToken = default)
+    {
+        // Respects the soft-delete global query filter on TextureSets, so only
+        // tags on live sets surface as the texture-set vocabulary.
+        return await _context.TextureSets
+            .AsNoTracking()
+            .SelectMany(ts => ts.Tags)
+            .Select(tag => tag.Name)
+            .Distinct()
+            .OrderBy(name => name)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<IEnumerable<TextureSet>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return await _context.TextureSets
