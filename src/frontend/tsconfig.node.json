@@ -12,7 +12,9 @@
     "jest.config.js",
     "eslint.config.js",
     "playwright.config.ts",
+    "playwright.webgl.config.ts",
     ".storybook/**/*",
-    "visual-tests/**/*"
+    "visual-tests/**/*",
+    "webgl-tests/**/*"
   ]
 }
