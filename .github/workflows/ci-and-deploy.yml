@@ -334,11 +334,12 @@ jobs:
         name: E2E Tests
         runs-on: ubuntu-latest
         needs: [detect-changes]
-        # GPU-dependent Playwright render tests flake on GPU-less GitHub runners
-        # (SwiftShader software GL times out at the drained-runner tail). They run
-        # on the Mac Mini GPU lane via `npm run test:all`; on GitHub they are
-        # manual-only (workflow_dispatch), so the flake never gates a PR.
-        if: github.event_name == 'workflow_dispatch'
+        # Runs the fast tier on relevant PRs. GPU-render-dependent scenarios are
+        # tagged @serial and excluded from this lane (the chromium project
+        # grep-inverts @serial); they run on the local GPU lane via
+        # `npm run test:all`. Keeps the GPU-less-runner render flake off PRs
+        # without dropping the rest of E2E.
+        if: needs.detect-changes.outputs.e2e-relevant == 'true' || github.event_name == 'workflow_dispatch'
         # Successful E2E runs take ~15-20 minutes. A hard ceiling prevents a
         # single hung step (apt mirror flake, stuck Playwright test) from
         # silently consuming the 6h runner default.
