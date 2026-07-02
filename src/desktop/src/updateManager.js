@@ -132,7 +132,13 @@ export class UpdateManager {
   install() {
     if (this.state.status === 'downloaded') {
       try {
-        this.autoUpdater.quitAndInstall()
+        // isSilent=true: the NSIS installer is assisted (oneClick:false), so a
+        // non-silent update pops the full setup wizard and waits for clicks —
+        // which never come on an unattended/relaunching update, so the update
+        // never applies (the app just relaunches the old version). Silent runs
+        // the update in the background; isForceRunAfter=true relaunches into the
+        // new version afterwards.
+        this.autoUpdater.quitAndInstall(true, true)
         return
       } catch (error) {
         this.log('[ModelibrDesktop][update] quitAndInstall failed', {
