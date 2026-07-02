@@ -335,10 +335,15 @@ export class PuppeteerRenderer {
   /**
    * Load a model from file path
    * @param {string} filePath - Path to the model file
-   * @param {string} fileType - Type of the file (obj, fbx, gltf, glb)
+   * @param {string} fileType - Type of the file (obj, fbx, gltf, glb, stl, 3mf)
+   * @param {Object} [options] - Load options
+   * @param {boolean} [options.preserveMaterials=false] - Keep the model's own
+   *   materials/vertex colors (the "Embedded" variant) instead of the neutral
+   *   override. glTF/GLB always preserve regardless of this flag.
    * @returns {Promise<number>} Polygon count
    */
-  async loadModel(filePath, fileType) {
+  async loadModel(filePath, fileType, options = {}) {
+    const preserveMaterials = options.preserveMaterials === true
     // Check if page exists, is not closed, AND the frame is still usable
     if (!this.page || this.page.isClosed() || !(await this._isPageUsable())) {
       logger.warn(
@@ -389,9 +394,13 @@ export class PuppeteerRenderer {
 
       // Load model in the browser
       const result = await this.page.evaluate(
-        async (modelData, type) => {
+        async (modelData, type, preserve) => {
           try {
-            const model = await window.loadModelFromData(modelData, type)
+            const model = await window.loadModelFromData(
+              modelData,
+              type,
+              preserve
+            )
 
             // Normalize and add to scene
             const normInfo = window.normalizeModel(model, 2.0)
@@ -425,7 +434,8 @@ export class PuppeteerRenderer {
           }
         },
         dataUrl,
-        fileType
+        fileType,
+        preserveMaterials
       )
 
       if (!result.success) {
@@ -847,64 +857,46 @@ export class PuppeteerRenderer {
             const renderer = window.modelRenderer.renderer
             const textureLoader = new THREE.TextureLoader()
 
-            // Map texture type enum values to MeshPhysicalMaterial properties
-            const textureTypeMap = {
-              1: 'map', // Albedo
-              2: 'normalMap',
-              3: 'displacementMap', // Height
-              4: 'aoMap',
-              5: 'roughnessMap',
-              6: 'metalnessMap',
-              7: 'map', // Diffuse (legacy)
-              8: 'specularColorMap', // Specular (MeshPhysicalMaterial)
-              9: 'emissiveMap', // Emissive
-              10: 'bumpMap', // Bump
-              11: 'alphaMap', // Alpha
-              12: 'displacementMap', // Displacement
-              Albedo: 'map',
-              Normal: 'normalMap',
-              Height: 'displacementMap',
-              AO: 'aoMap',
-              Roughness: 'roughnessMap',
-              Metallic: 'metalnessMap',
-              Diffuse: 'map',
-              Specular: 'specularColorMap',
-              BaseColor: 'map',
-              AmbientOcclusion: 'aoMap',
-              Emissive: 'emissiveMap',
-              Bump: 'bumpMap',
-              Alpha: 'alphaMap',
-              Displacement: 'displacementMap',
+            // Shared cross-runtime texture-type → material-slot map and
+            // channel-extraction shaders (asset-processor/lib/textureChannels.js,
+            // reached via the window side-effect because this runs as a classic
+            // page.evaluate script). Single source of truth with the viewer: the
+            // slot map, the extraction GLSL, the 0-based channel numbering, and
+            // the Glossiness-invert rule all live there now.
+            const channels = window.modelibrTextureChannels
+
+            // Extract a single channel (R/G/B/A) to a grayscale texture, with
+            // optional value inversion (Glossiness → Roughness). Render-to-target
+            // orchestration stays per-runtime; the shader + channel index are shared.
+            function extractChannel(sourceTexture, sourceChannel, invert) {
+              return renderToGrayscale(sourceTexture, {
+                fragmentShader: channels.CHANNEL_EXTRACT_FRAGMENT_SHADER,
+                uniforms: {
+                  uTexture: { value: sourceTexture },
+                  uChannel: {
+                    value: channels.getChannelUniformIndex(sourceChannel),
+                  },
+                  uInvert: { value: invert ? 1 : 0 },
+                },
+              })
             }
 
-            // Channel extraction shader
-            const extractChannelShader = {
-              vertexShader: `
-                varying vec2 vUv;
-                void main() {
-                  vUv = uv;
-                  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-                }
-              `,
-              fragmentShader: `
-                uniform sampler2D sourceTexture;
-                uniform int channel; // 1=R, 2=G, 3=B, 4=A
-                varying vec2 vUv;
-                void main() {
-                  vec4 texColor = texture2D(sourceTexture, vUv);
-                  float value;
-                  if (channel == 1) value = texColor.r;
-                  else if (channel == 2) value = texColor.g;
-                  else if (channel == 3) value = texColor.b;
-                  else if (channel == 4) value = texColor.a;
-                  else value = texColor.r; // Default to R
-                  gl_FragColor = vec4(value, value, value, 1.0);
-                }
-              `,
+            // Invert a full-RGB texture (Glossiness stored as RGB grayscale that
+            // must be flipped to behave as roughness).
+            function invertRgbTexture(sourceTexture) {
+              return renderToGrayscale(sourceTexture, {
+                fragmentShader: channels.RGB_INVERT_FRAGMENT_SHADER,
+                uniforms: { uTexture: { value: sourceTexture } },
+              })
             }
 
-            // Function to extract a single channel to grayscale texture
-            function extractChannel(sourceTexture, channelIndex) {
+            // Shared render-to-target plumbing for the channel passes above. The
+            // passthrough vertex shader writes clip-space directly from the unit
+            // quad, so the ortho camera setup is irrelevant.
+            function renderToGrayscale(
+              sourceTexture,
+              { fragmentShader, uniforms }
+            ) {
               const size = 512 // Output texture size
               const renderTarget = new THREE.WebGLRenderTarget(size, size, {
                 minFilter: THREE.LinearFilter,
@@ -913,16 +905,12 @@ export class PuppeteerRenderer {
               })
 
               const scene = new THREE.Scene()
-              const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10)
-              camera.position.z = 1
+              const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
 
               const material = new THREE.ShaderMaterial({
-                uniforms: {
-                  sourceTexture: { value: sourceTexture },
-                  channel: { value: channelIndex },
-                },
-                vertexShader: extractChannelShader.vertexShader,
-                fragmentShader: extractChannelShader.fragmentShader,
+                uniforms,
+                vertexShader: channels.CHANNEL_VERTEX_SHADER,
+                fragmentShader,
               })
 
               const geometry = new THREE.PlaneGeometry(2, 2)
@@ -933,17 +921,17 @@ export class PuppeteerRenderer {
               renderer.render(scene, camera)
               renderer.setRenderTarget(null)
 
-              const extractedTexture = renderTarget.texture
-              extractedTexture.wrapS = sourceTexture.wrapS
-              extractedTexture.wrapT = sourceTexture.wrapT
-              extractedTexture.flipY = sourceTexture.flipY
-              extractedTexture.needsUpdate = true
+              const outputTexture = renderTarget.texture
+              outputTexture.wrapS = sourceTexture.wrapS
+              outputTexture.wrapT = sourceTexture.wrapT
+              outputTexture.flipY = sourceTexture.flipY
+              outputTexture.needsUpdate = true
 
               // Cleanup
               geometry.dispose()
               material.dispose()
 
-              return extractedTexture
+              return outputTexture
             }
 
             // Load standard texture via TextureLoader from HTTP URL
@@ -1019,13 +1007,6 @@ export class PuppeteerRenderer {
               return texture
             }
 
-            // Texture types that carry color data (need sRGB color space)
-            const colorTextureProps = new Set([
-              'map',
-              'emissiveMap',
-              'specularColorMap',
-            ])
-
             const loadedTextures = {}
             for (const [type, data] of Object.entries(textures)) {
               try {
@@ -1037,22 +1018,44 @@ export class PuppeteerRenderer {
                 } else {
                   texture = await loadTexture(data.url, shouldFlipY)
                 }
-                const sourceChannel = data.sourceChannel
 
-                // Extract channel if not RGB (0)
-                if (sourceChannel > 0 && sourceChannel <= 4) {
-                  console.log(`Extracting channel ${sourceChannel} for ${type}`)
-                  texture = extractChannel(texture, sourceChannel)
-                  // For grayscale textures, use linear color space
-                  texture.colorSpace = THREE.LinearSRGBColorSpace
+                // Object.entries keys are strings; the shared Set lookups key on
+                // the numeric enum value, so coerce.
+                const textureType = Number(type)
+                const sourceChannel = data.sourceChannel
+                const needsInvert = channels.textureTypeNeedsInvert(textureType)
+                const materialProperty =
+                  channels.resolveMaterialSlot(textureType)
+
+                // No material slot for this type (e.g. the SplitChannel source
+                // placeholder, or a type the shared map doesn't know yet). Drop it
+                // instead of stashing the texture under a junk key — keeps the
+                // color-space classification from mis-firing on a non-slot string.
+                if (!materialProperty) {
+                  console.warn(
+                    `No material slot for texture type ${type}, skipping`
+                  )
+                  texture.dispose()
+                  continue
                 }
 
-                const materialProperty = textureTypeMap[type] || type
+                const extracted = channels.channelNeedsExtraction(sourceChannel)
 
-                // Set correct color space: sRGB for color textures, linear for data textures
-                if (sourceChannel > 0 && sourceChannel <= 4) {
+                if (extracted) {
+                  // Single channel (R/G/B/A) → grayscale, inverted for Glossiness.
+                  console.log(`Extracting channel ${sourceChannel} for ${type}`)
+                  texture = extractChannel(texture, sourceChannel, needsInvert)
+                } else if (needsInvert) {
+                  // Glossiness stored as RGB → flip so it behaves as roughness.
+                  console.log(`Inverting RGB glossiness for ${type}`)
+                  texture = invertRgbTexture(texture)
+                }
+
+                // Color space: extracted/inverted data maps are linear; otherwise
+                // sRGB for color slots, linear for data slots (shared rule).
+                if (extracted || needsInvert) {
                   texture.colorSpace = THREE.LinearSRGBColorSpace
-                } else if (colorTextureProps.has(materialProperty)) {
+                } else if (channels.slotIsColorData(materialProperty)) {
                   texture.colorSpace = THREE.SRGBColorSpace
                 } else {
                   texture.colorSpace = THREE.LinearSRGBColorSpace
@@ -1060,7 +1063,7 @@ export class PuppeteerRenderer {
 
                 loadedTextures[materialProperty] = texture
                 console.log(
-                  `Loaded ${type} -> ${materialProperty} (channel: ${sourceChannel}, exr: ${!!data.isExr}, tiff: ${!!data.isTiff})`
+                  `Loaded ${type} -> ${materialProperty} (channel: ${sourceChannel}, invert: ${needsInvert}, exr: ${!!data.isExr}, tiff: ${!!data.isTiff})`
                 )
               } catch (error) {
                 console.warn(`Failed to load ${type} texture:`, error)
@@ -1083,12 +1086,11 @@ export class PuppeteerRenderer {
                 }
                 meshCount++
 
-                // AO maps require a second UV set — copy uv to uv2
-                if (loadedTextures.aoMap && child.geometry) {
-                  const uvAttr = child.geometry.getAttribute('uv')
-                  if (uvAttr) {
-                    child.geometry.setAttribute('uv2', uvAttr.clone())
-                  }
+                // AO maps require a second UV set — copy uv to uv2. Shared with
+                // the viewer (asset-processor/lib/textureMaterial.js) so both
+                // runtimes light AO-mapped models identically.
+                if (loadedTextures.aoMap) {
+                  window.modelibrTextureMaterial.ensureAoMapUv2(child.geometry)
                 }
 
                 // Preserve original material name for subsequent per-material calls
@@ -1096,20 +1098,25 @@ export class PuppeteerRenderer {
                   ? child.material[0]?.name || ''
                   : child.material?.name || ''
 
-                // Create new material with white base color for textures.
-                // specularIntensity defaults to 1 on MeshPhysicalMaterial,
-                // which adds a dielectric sheen even without a Specular map
-                // and visibly washes the albedo. Disable it unless a real
-                // specularColorMap is present.
+                // Material config from the shared gating rule (metalness/
+                // roughness/specular keyed on their own maps, not the base-color
+                // map). Same source of truth as the viewer.
+                const matCfg =
+                  window.modelibrTextureMaterial.resolveTextureMaterialConfig({
+                    baseColorMap: loadedTextures.map,
+                    metalnessMap: loadedTextures.metalnessMap,
+                    roughnessMap: loadedTextures.roughnessMap,
+                    specularColorMap: loadedTextures.specularColorMap,
+                  })
                 child.material = new THREE.MeshPhysicalMaterial({
                   name: originalName,
-                  color: loadedTextures.map
+                  color: matCfg.hasBaseColorMap
                     ? 0xffffff
                     : new THREE.Color(0.7, 0.7, 0.9),
-                  metalness: loadedTextures.metalnessMap ? 1 : 0,
-                  roughness: loadedTextures.roughnessMap ? 1 : 0.8,
-                  envMapIntensity: 1.0,
-                  specularIntensity: loadedTextures.specularColorMap ? 1 : 0,
+                  metalness: matCfg.metalness,
+                  roughness: matCfg.roughness,
+                  envMapIntensity: matCfg.envMapIntensity,
+                  specularIntensity: matCfg.specularIntensity,
                 })
 
                 // Apply each loaded texture with proper material settings
@@ -1134,95 +1141,17 @@ export class PuppeteerRenderer {
                       child.material.displacementBias = -0.01
                       // Push along an averaged-by-position normal so hard
                       // edges (cube faces, hard-edge user meshes) stay
-                      // watertight while keeping per-face UVs intact for
-                      // color sampling. See the frontend equivalent in
-                      // shared/three/sharedDisplacementNormal.ts.
-                      const geom = child.geometry
-                      if (
-                        geom &&
-                        geom.getAttribute('position') &&
-                        geom.getAttribute('normal') &&
-                        !geom.getAttribute('aDispNormal')
-                      ) {
-                        const pos = geom.getAttribute('position')
-                        const nor = geom.getAttribute('normal')
-                        const cnt = pos.count
-                        const mult = 1 / 1e-4
-                        const groups = new Map()
-                        for (let i = 0; i < cnt; i++) {
-                          const k = `${Math.round(pos.getX(i) * mult)},${Math.round(pos.getY(i) * mult)},${Math.round(pos.getZ(i) * mult)}`
-                          let g = groups.get(k)
-                          if (!g) {
-                            g = []
-                            groups.set(k, g)
-                          }
-                          g.push(i)
-                        }
-                        const out = new Float32Array(cnt * 3)
-                        for (const idxs of groups.values()) {
-                          let x = 0,
-                            y = 0,
-                            z = 0
-                          for (const i of idxs) {
-                            x += nor.getX(i)
-                            y += nor.getY(i)
-                            z += nor.getZ(i)
-                          }
-                          const len = Math.hypot(x, y, z)
-                          if (len > 0) {
-                            x /= len
-                            y /= len
-                            z /= len
-                          }
-                          for (const i of idxs) {
-                            out[i * 3] = x
-                            out[i * 3 + 1] = y
-                            out[i * 3 + 2] = z
-                          }
-                        }
-                        geom.setAttribute(
-                          'aDispNormal',
-                          new THREE.BufferAttribute(out, 3)
-                        )
-                      }
-                      // Idempotence guard: skip if the same material has
-                      // already been wired (e.g. shared across child meshes
-                      // or re-encountered after a hot reload). Without this
-                      // a second pass would overwrite onBeforeCompile and
-                      // drop the previous closure.
-                      if (!child.material.userData.dispNormalShaderApplied) {
-                        child.material.userData.dispNormalShaderApplied = true
-                        const previousOnBeforeCompile =
-                          child.material.onBeforeCompile
-                        child.material.onBeforeCompile = (shader, renderer) => {
-                          if (previousOnBeforeCompile) {
-                            previousOnBeforeCompile.call(
-                              child.material,
-                              shader,
-                              renderer
-                            )
-                          }
-                          shader.vertexShader = shader.vertexShader.replace(
-                            '#include <displacementmap_pars_vertex>',
-                            `#include <displacementmap_pars_vertex>
-attribute vec3 aDispNormal;`
-                          )
-                          shader.vertexShader = shader.vertexShader.replace(
-                            '#include <displacementmap_vertex>',
-                            `#ifdef USE_DISPLACEMENTMAP
-	transformed += normalize( aDispNormal ) * ( texture2D( displacementMap, vDisplacementMapUv ).x * displacementScale + displacementBias );
-#endif`
-                          )
-                        }
-                        const previousCacheKey =
-                          child.material.customProgramCacheKey
-                        child.material.customProgramCacheKey = () => {
-                          const prev = previousCacheKey
-                            ? previousCacheKey.call(child.material)
-                            : ''
-                          return prev ? `disp-normal|${prev}` : 'disp-normal'
-                        }
-                      }
+                      // watertight while keeping per-face UVs intact for color
+                      // sampling. Shared with the viewer
+                      // (asset-processor/lib/displacementNormal.js) — both
+                      // helpers are idempotent.
+                      window.modelibrDispNormal.addSharedDisplacementNormal(
+                        THREE,
+                        child.geometry
+                      )
+                      window.modelibrDispNormal.applyDispNormalDisplacement(
+                        child.material
+                      )
                       child.material.needsUpdate = true
                     }
                     if (property === 'normalMap') {
@@ -1565,6 +1494,8 @@ attribute vec3 aDispNormal;`
       fbx: 'application/octet-stream',
       gltf: 'model/gltf+json',
       glb: 'model/gltf-binary',
+      stl: 'model/stl',
+      '3mf': 'model/3mf',
     }
     return mimeTypes[fileType.toLowerCase()] || 'application/octet-stream'
   }

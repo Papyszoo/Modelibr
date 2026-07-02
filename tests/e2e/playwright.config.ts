@@ -54,6 +54,13 @@ export default defineConfig({
         video: envEnum(process.env.PW_VIDEO, ["off", "on", "retain-on-failure", "on-first-retry"], "retain-on-failure") as any,
         // Strict compare: PW_HEADED=0 must not mean headed.
         headless: process.env.PW_HEADED === "1" ? false : undefined,
+        // Keep WebGL available when Chromium falls back to software rendering
+        // (SwiftShader) on a GPU-less CI runner — recent Chromium disables WebGL
+        // on SwiftShader unless this flag is set. It's a no-op on machines with a
+        // real GPU (the Mac Mini lane), so it doesn't force software rendering.
+        launchOptions: {
+            args: ["--enable-unsafe-swiftshader"],
+        },
     },
     // NOTE: Per-worker DB isolation (PARALLEL_DB=true / TEST_WORKER_INDEX) is
     // NOT active. The e2e stack uses a single WebAPI + single PostgreSQL container,

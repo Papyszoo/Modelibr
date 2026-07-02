@@ -193,9 +193,15 @@ export class ThumbnailProcessor extends BaseProcessor {
 
       renderer = await this.rendererPool.acquire()
 
+      // The "Embedded" variant (__embedded__) means "render the model's own
+      // materials / vertex colors" — keep them instead of the neutral override.
+      // Same signal that makes _applyTextures skip texture application below.
+      const preserveMaterials = (job.mainVariantName || '') === '__embedded__'
+
       const polygonCount = await renderer.loadModel(
         fileInfo.filePath,
-        fileInfo.fileType
+        fileInfo.fileType,
+        { preserveMaterials }
       )
 
       jobLogger.info('Model loaded in browser', { polygonCount })

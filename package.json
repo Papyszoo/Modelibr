@@ -1,7 +1,7 @@
 {
     "name": "modelibr",
     "private": true,
-    "version": "0.2.1",
+    "version": "0.3.0",
     "description": "A modern 3D model file upload service built with .NET 9.0 and React",
     "type": "module",
     "scripts": {

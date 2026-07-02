@@ -8,6 +8,7 @@ export interface ViewerSettingsState {
   modelRotationSpeed: number
   showShadows: boolean
   showStats: boolean
+  showPerf: boolean
   // Lights
   ambientIntensity: number
   directionalIntensity: number
@@ -36,13 +37,17 @@ const DEFAULT_SETTINGS: ViewerSettingsState = {
   modelRotationSpeed: 0.002,
   showShadows: true,
   showStats: false,
-  ambientIntensity: 0.3,
+  showPerf: false,
+  // Defaults mirror the shared rig (asset-processor/lib/sceneLighting.js
+  // DEFAULT_LIGHTING) so an unconfigured viewer matches the thumbnail render.
+  // ambient/environment are absolute intensities; directional is a multiplier.
+  ambientIntensity: 0.35,
   directionalIntensity: 1.0,
   showLightHelpers: false,
   environmentPreset: 'city',
   showEnvironmentBackground: false,
   backgroundIntensity: 1.0,
-  environmentIntensity: 1.0,
+  environmentIntensity: 0.3,
 }
 
 export const useViewerSettingsStore = create<ViewerSettingsStore>()(
@@ -59,6 +64,23 @@ export const useViewerSettingsStore = create<ViewerSettingsStore>()(
     {
       name: 'modelibr_viewer_settings',
       storage: createJSONStorage(() => localStorage),
+      // v1: the ambient/environment defaults changed to match the shared
+      // thumbnail rig (asset-processor/lib/sceneLighting.js). Existing users
+      // have the old values cached for keys they may never have touched, and
+      // the merge below keeps persisted values over defaults — so without a
+      // migration an upgraded viewer would never pick up the new lighting.
+      // Reset just those two keys for pre-v1 state so "unconfigured viewer
+      // matches the render" actually holds on upgrade.
+      version: 1,
+      migrate: (persisted, version) => {
+        const state = persisted as ViewerSettingsStore
+        if (version < 1 && state?.settings) {
+          state.settings.ambientIntensity = DEFAULT_SETTINGS.ambientIntensity
+          state.settings.environmentIntensity =
+            DEFAULT_SETTINGS.environmentIntensity
+        }
+        return state
+      },
       merge: (persisted, current) => ({
         ...current,
         settings: {

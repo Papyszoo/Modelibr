@@ -1,8 +1,8 @@
 # Local test runner
 
 One command to run as many of the project's test suites as possible on this
-machine (great for the Mac Mini M4, which is far faster than GitHub's shared
-runners) and get a single openable HTML report.
+machine (great for a local machine with a real GPU, which is far faster than
+GitHub's shared runners) and get a single openable HTML report.
 
 It does **not** reimplement any test orchestration — it shells out to each
 suite's existing command (e.g. `tests/e2e`'s Docker runners) and aggregates the

@@ -682,6 +682,8 @@ export const dynamicDemoHandlers = [
   }),
 
   http.get('*/model-tags', async () => {
+    // Model tag vocabulary only — texture sets have their own pool at
+    // "/texture-sets/tags". Tags are strictly per-asset-type, never shared.
     const models = await getAll('models')
     const tags = [...new Set(models.flatMap(model => model.tags ?? []))]
       .sort((left, right) => left.localeCompare(right))
@@ -1674,6 +1676,10 @@ export const dynamicDemoHandlers = [
       .trim()
       .toLowerCase()
     const minResolution = url.searchParams.get('minResolution')
+    const tagFilters = url.searchParams
+      .getAll('tag')
+      .map(t => t.trim().toLowerCase())
+      .filter(Boolean)
 
     let sets = await getAll('textureSets')
 
@@ -1719,6 +1725,11 @@ export const dynamicDemoHandlers = [
         )
       )
     }
+    if (tagFilters.length > 0) {
+      sets = sets.filter(ts =>
+        (ts.tags ?? []).some(tag => tagFilters.includes(tag.toLowerCase()))
+      )
+    }
 
     // Surface the largest texture side as maxResolution (the backend computes
     // this server-side) so the resolution badge renders in demo mode.
@@ -1741,6 +1752,18 @@ export const dynamicDemoHandlers = [
       })
     }
     return HttpResponse.json({ textureSets: sets })
+  }),
+
+  // Per-asset-type tag vocabulary: only tags assigned to texture sets (kept
+  // separate from the model tag pool). Registered before "/texture-sets/:id"
+  // so "tags" is not matched as an id.
+  http.get('*/texture-sets/tags', async () => {
+    const textureSets = await getAll('textureSets')
+    const tags = [...new Set(textureSets.flatMap(ts => ts.tags ?? []))]
+      .sort((left, right) => left.localeCompare(right))
+      .map(name => ({ name }))
+
+    return HttpResponse.json({ tags })
   }),
 
   http.get('*/texture-sets/by-file/:fileId', async () => {
@@ -1909,6 +1932,27 @@ export const dynamicDemoHandlers = [
     ts.updatedAt = now()
     await put('textureSets', ts)
     return new HttpResponse(null, { status: 204 })
+  }),
+
+  http.put('*/texture-sets/:id/tags', async ({ params, request }) => {
+    const ts = await getById('textureSets', Number(params.id))
+    if (!ts) return new HttpResponse(null, { status: 404 })
+    const body = (await request.json()) as { tags?: string[] }
+    // De-duplicate by lowercase, preserving the first-seen casing.
+    const seen = new Set<string>()
+    const tags: string[] = []
+    for (const raw of body.tags ?? []) {
+      const trimmed = raw.trim()
+      const key = trimmed.toLowerCase()
+      if (trimmed && !seen.has(key)) {
+        seen.add(key)
+        tags.push(trimmed)
+      }
+    }
+    ts.tags = tags
+    ts.updatedAt = now()
+    await put('textureSets', ts)
+    return HttpResponse.json({ textureSetId: ts.id, tags })
   }),
 
   http.put('*/texture-sets/:id', async ({ params, request }) => {

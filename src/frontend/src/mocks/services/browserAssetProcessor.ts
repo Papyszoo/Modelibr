@@ -11,25 +11,42 @@ import {
   ACESFilmicToneMapping,
   AmbientLight,
   Box3,
+  type BufferGeometry,
   CanvasTexture,
   Color,
   DirectionalLight,
   EquirectangularReflectionMapping,
-  type Group,
+  Group,
   Mesh,
   MeshStandardMaterial,
   type Object3D,
   PerspectiveCamera,
   PMREMGenerator,
+  PointLight,
   Scene,
   SphereGeometry,
+  SpotLight,
   type Texture,
   Vector3,
   WebGLRenderer,
 } from 'three'
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
+import { ThreeMFLoader } from 'three/addons/loaders/3MFLoader.js'
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js'
+import { STLLoader } from 'three/addons/loaders/STLLoader.js'
+
+import {
+  buildSceneLights,
+  DEFAULT_LIGHTING,
+} from '../../../../asset-processor/lib/sceneLighting.js'
+import { buildStlModel } from '../../../../asset-processor/lib/stlMesh.js'
+import { TEXTURE_TYPE } from '../../../../asset-processor/lib/textureChannels.js'
+import {
+  ensureAoMapUv2,
+  resolveTextureMaterialConfig,
+} from '../../../../asset-processor/lib/textureMaterial.js'
 
 // ─── Model Thumbnails ───────────────────────────────────────────────────
 
@@ -51,6 +68,33 @@ function applyStandardMaterial(model: Object3D) {
   })
 }
 
+// The four light constructors the shared rig builder needs (demo imports named
+// exports from three rather than a namespace).
+const DEMO_LIGHT_CTORS = {
+  AmbientLight,
+  DirectionalLight,
+  PointLight,
+  SpotLight,
+}
+
+/**
+ * Light a demo render scene with the shared cross-runtime rig
+ * (asset-processor/lib/sceneLighting.js) plus the same neutral RoomEnvironment
+ * IBL the worker thumbnail uses — so demo thumbnails match the real worker's
+ * output instead of using a divergent ad-hoc rig.
+ */
+function setupSceneLighting(scene: Scene, renderer: WebGLRenderer): void {
+  const { lights } = buildSceneLights(DEMO_LIGHT_CTORS, DEFAULT_LIGHTING)
+  scene.add(...lights)
+
+  const pmrem = new PMREMGenerator(renderer)
+  const roomEnv = new RoomEnvironment()
+  scene.environment = pmrem.fromScene(roomEnv).texture
+  scene.environmentIntensity = DEFAULT_LIGHTING.environmentIntensity
+  roomEnv.dispose()
+  pmrem.dispose()
+}
+
 /**
  * Normalize a model to fit within a unit box centred at the origin.
  * Matches the real worker's normalizeModel() approach.
@@ -61,7 +105,10 @@ function normalizeModel(model: Object3D, targetScale = 2.0) {
   const maxDim = Math.max(size.x, size.y, size.z)
   if (maxDim > 0) {
     const scaleFactor = targetScale / maxDim
-    model.scale.setScalar(scaleFactor)
+    // Multiply, don't replace: FBX (and some glTF) loaders bake a non-1
+    // unit-conversion scale into the root. setScalar would drop it and shrink
+    // the model to ~1/100 of intended size. Matches the worker's normalizeModel.
+    model.scale.multiplyScalar(scaleFactor)
   }
   // Recalculate after scaling
   const scaledBox = new Box3().setFromObject(model)
@@ -283,6 +330,11 @@ export async function generateModelThumbnail(
       if (ext === 'obj') {
         return await renderObjThumbnail(url, width, height)
       }
+      // STL/3MF share the texture-aware render path (no scene graph quirks);
+      // pass no textures so it falls back to the neutral standard material.
+      if (ext === 'stl' || ext === '3mf') {
+        return await renderModelWithTextures(url, ext, [], width, height)
+      }
       return await renderGltfThumbnail(url, width, height)
     } finally {
       URL.revokeObjectURL(url)
@@ -293,8 +345,8 @@ export async function generateModelThumbnail(
 }
 
 /**
- * Texture map data for applying textures to model thumbnails.
- * TextureType: 1=Albedo, 2=Normal, 5=Roughness, 6=Metallic
+ * Texture map data for applying textures to model thumbnails. `textureType` is
+ * the shared TextureType enum value (see asset-processor/lib/textureChannels.js).
  */
 export interface TextureMapData {
   textureType: number
@@ -304,39 +356,82 @@ export interface TextureMapData {
 /**
  * Apply texture maps to all meshes in model.
  * Uses albedo for map, normal for normalMap, roughness for roughnessMap, metallic for metalnessMap.
+ * Texture-type numbers come from the shared enum so demo, viewer, and worker agree.
  */
 async function applyTextureMaps(
   model: Object3D,
   textures: TextureMapData[]
 ): Promise<void> {
-  const albedoTex = textures.find(t => t.textureType === 1)
-  const normalTex = textures.find(t => t.textureType === 2)
-  const roughnessTex = textures.find(t => t.textureType === 5)
-  const metallicTex = textures.find(t => t.textureType === 6)
-
   const loadTexture = async (blob: Blob) => {
     const bitmap = await createImageBitmap(blob)
     return new CanvasTexture(bitmap as unknown as HTMLCanvasElement)
   }
 
-  const [albedoMap, normalMap, roughnessMap, metalnessMap] = await Promise.all([
-    albedoTex ? loadTexture(albedoTex.blob) : Promise.resolve(null),
-    normalTex ? loadTexture(normalTex.blob) : Promise.resolve(null),
-    roughnessTex ? loadTexture(roughnessTex.blob) : Promise.resolve(null),
-    metallicTex ? loadTexture(metallicTex.blob) : Promise.resolve(null),
+  // Load every supported map by its shared TextureType so the demo applies the
+  // same slots the viewer/worker do — not just the original five. (Specular
+  // needs MeshPhysicalMaterial, and channel-packed / Glossiness / Displacement
+  // maps need the channel extraction the demo doesn't run, so those remain
+  // demo-only approximations.)
+  const mapFor = (type: number): Promise<CanvasTexture | null> => {
+    const found = textures.find(t => t.textureType === type)
+    return found ? loadTexture(found.blob) : Promise.resolve(null)
+  }
+
+  const [
+    albedoMap,
+    normalMap,
+    aoMap,
+    roughnessMap,
+    metalnessMap,
+    emissiveMap,
+    bumpMap,
+    alphaMap,
+  ] = await Promise.all([
+    mapFor(TEXTURE_TYPE.Albedo),
+    mapFor(TEXTURE_TYPE.Normal),
+    mapFor(TEXTURE_TYPE.AO),
+    mapFor(TEXTURE_TYPE.Roughness),
+    mapFor(TEXTURE_TYPE.Metallic),
+    mapFor(TEXTURE_TYPE.Emissive),
+    mapFor(TEXTURE_TYPE.Bump),
+    mapFor(TEXTURE_TYPE.Alpha),
   ])
+
+  // Same gating rule as the viewer and the worker thumbnail (metalness/
+  // roughness keyed on their own maps, not the base-color map).
+  const cfg = resolveTextureMaterialConfig({
+    baseColorMap: albedoMap,
+    metalnessMap,
+    roughnessMap,
+  })
 
   model.traverse(child => {
     if (child instanceof Mesh) {
-      child.material = new MeshStandardMaterial({
-        color: albedoMap ? new Color(1, 1, 1) : new Color(0.7, 0.7, 0.9),
+      const material = new MeshStandardMaterial({
+        color: cfg.hasBaseColorMap
+          ? new Color(1, 1, 1)
+          : new Color(0.7, 0.7, 0.9),
         map: albedoMap,
-        normalMap: normalMap,
-        roughnessMap: roughnessMap,
-        metalnessMap: metalnessMap,
-        metalness: metalnessMap ? 1.0 : 0.3,
-        roughness: roughnessMap ? 1.0 : 0.4,
+        normalMap,
+        aoMap,
+        roughnessMap,
+        metalnessMap,
+        metalness: cfg.metalness,
+        roughness: cfg.roughness,
+        envMapIntensity: cfg.envMapIntensity,
       })
+      if (emissiveMap) {
+        material.emissiveMap = emissiveMap
+        material.emissive = new Color(0xffffff)
+      }
+      if (bumpMap) material.bumpMap = bumpMap
+      if (alphaMap) {
+        material.alphaMap = alphaMap
+        material.transparent = true
+      }
+      child.material = material
+      // AO needs the second UV set or it collapses indirect light (shared helper).
+      if (aoMap) ensureAoMapUv2(child.geometry)
       child.castShadow = true
       child.receiveShadow = true
     }
@@ -395,10 +490,7 @@ async function renderModelWithTextures(
   const scene = new Scene()
   const camera = new PerspectiveCamera(45, width / height, 0.01, 1000)
 
-  scene.add(new AmbientLight(0xffffff, 0.6))
-  const dirLight = new DirectionalLight(0xffffff, 0.8)
-  dirLight.position.set(5, 10, 7)
-  scene.add(dirLight)
+  setupSceneLighting(scene, renderer)
 
   let model: Group
   if (ext === 'fbx') {
@@ -411,6 +503,19 @@ async function renderModelWithTextures(
     model = await new Promise<Group>((resolve, reject) => {
       loader.load(url, resolve, undefined, reject)
     })
+  } else if (ext === '3mf') {
+    const loader = new ThreeMFLoader()
+    model = await new Promise<Group>((resolve, reject) => {
+      loader.load(url, resolve, undefined, reject)
+    })
+  } else if (ext === 'stl') {
+    // STLLoader resolves to a raw BufferGeometry — wrap it via the shared
+    // builder (same one the viewer and worker thumbnail use).
+    const loader = new STLLoader()
+    const geometry = await new Promise<BufferGeometry>((resolve, reject) => {
+      loader.load(url, resolve, undefined, reject)
+    })
+    model = buildStlModel({ MeshStandardMaterial, Mesh, Group }, geometry)
   } else {
     const loader = new GLTFLoader()
     const gltf = await new Promise<{ scene: Group }>((resolve, reject) => {
@@ -467,10 +572,7 @@ async function renderGltfThumbnail(
   const camera = new PerspectiveCamera(45, width / height, 0.01, 1000)
 
   // Lighting
-  scene.add(new AmbientLight(0xffffff, 0.6))
-  const dirLight = new DirectionalLight(0xffffff, 0.8)
-  dirLight.position.set(5, 10, 7)
-  scene.add(dirLight)
+  setupSceneLighting(scene, renderer)
 
   // Load model
   const loader = new GLTFLoader()
@@ -520,10 +622,7 @@ async function renderFbxThumbnail(
   const scene = new Scene()
   const camera = new PerspectiveCamera(45, width / height, 0.01, 1000)
 
-  scene.add(new AmbientLight(0xffffff, 0.6))
-  const dirLight = new DirectionalLight(0xffffff, 0.8)
-  dirLight.position.set(5, 10, 7)
-  scene.add(dirLight)
+  setupSceneLighting(scene, renderer)
 
   const loader = new FBXLoader()
   const fbxScene = await new Promise<Group>((resolve, reject) => {
@@ -572,10 +671,7 @@ async function renderObjThumbnail(
   const scene = new Scene()
   const camera = new PerspectiveCamera(45, width / height, 0.01, 1000)
 
-  scene.add(new AmbientLight(0xffffff, 0.6))
-  const dirLight = new DirectionalLight(0xffffff, 0.8)
-  dirLight.position.set(5, 10, 7)
-  scene.add(dirLight)
+  setupSceneLighting(scene, renderer)
 
   const loader = new OBJLoader()
   const objScene = await new Promise<Group>((resolve, reject) => {
@@ -681,10 +777,7 @@ export async function generateTextureSetThumbnail(
     camera.position.set(0, 0, 3)
     camera.lookAt(0, 0, 0)
 
-    scene.add(new AmbientLight(0xffffff, 0.6))
-    const dl = new DirectionalLight(0xffffff, 0.8)
-    dl.position.set(3, 5, 4)
-    scene.add(dl)
+    setupSceneLighting(scene, renderer)
 
     // Load albedo as texture
     const imageBitmap = await createImageBitmap(albedoBlob)

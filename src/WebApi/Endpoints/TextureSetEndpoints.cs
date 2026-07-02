@@ -19,6 +19,21 @@ public static class TextureSetEndpoints
             .WithSummary("Gets all texture sets with their textures and model associations")
             .WithOpenApi();
 
+        // Literal segment; ASP.NET routing prefers it over "/texture-sets/{id}".
+        app.MapGet("/texture-sets/tags", async (
+            IQueryHandler<GetTextureSetTagsQuery, GetTextureSetTagsResponse> queryHandler,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await queryHandler.Handle(new GetTextureSetTagsQuery(), cancellationToken);
+
+            return result.IsFailure
+                ? Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message })
+                : Results.Ok(result.Value);
+        })
+            .WithName("Get Texture Set Tags")
+            .WithSummary("Distinct tags assigned to texture sets (per-asset-type vocabulary)")
+            .WithOpenApi();
+
         app.MapGet("/texture-sets/{id}", GetTextureSetById)
             .WithName("Get Texture Set By ID")
             .WithSummary("Gets a specific texture set by ID")
@@ -43,6 +58,11 @@ public static class TextureSetEndpoints
         app.MapPut("/texture-sets/{id}", UpdateTextureSet)
             .WithName("Update Texture Set")
             .WithSummary("Updates an existing texture set")
+            .WithOpenApi();
+
+        app.MapPut("/texture-sets/{id}/tags", UpdateTextureSetTags)
+            .WithName("Update Texture Set Tags")
+            .WithSummary("Replaces a texture set's tags")
             .WithOpenApi();
 
         app.MapDelete("/texture-sets/{id}", DeleteTextureSet)
@@ -156,6 +176,7 @@ public static class TextureSetEndpoints
         int? kind,
         string? searchName,
         int? minResolution,
+        [FromQuery(Name = "tag")] string[]? tag,
         IQueryHandler<GetAllTextureSetsQuery, GetAllTextureSetsResponse> queryHandler,
         CancellationToken cancellationToken)
     {
@@ -173,7 +194,8 @@ public static class TextureSetEndpoints
                 PageSize: pageSize,
                 Kind: textureSetKind,
                 SearchName: string.IsNullOrWhiteSpace(searchName) ? null : searchName,
-                MinResolution: minResolution is > 0 ? minResolution : null),
+                MinResolution: minResolution is > 0 ? minResolution : null,
+                Tags: tag is { Length: > 0 } ? tag : null),
             cancellationToken);
 
         if (result.IsFailure)
@@ -297,6 +319,23 @@ public static class TextureSetEndpoints
         }
 
         var result = await commandHandler.Handle(new UpdateTextureSetCommand(id, request.Name, request.CategoryId), cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+        }
+
+        return Results.Ok(result.Value);
+    }
+
+    private static async Task<IResult> UpdateTextureSetTags(
+        int id,
+        [FromBody] UpdateTextureSetTagsRequest request,
+        ICommandHandler<UpdateTextureSetTagsCommand, UpdateTextureSetTagsResponse> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await commandHandler.Handle(
+            new UpdateTextureSetTagsCommand(id, request.Tags), cancellationToken);
 
         if (result.IsFailure)
         {
@@ -644,6 +683,7 @@ public static class TextureSetEndpoints
 // Request DTOs
 public record CreateTextureSetRequest(string Name, TextureSetKind? Kind = null, int? CategoryId = null);
 public record UpdateTextureSetRequest(string Name, int? CategoryId);
+public record UpdateTextureSetTagsRequest(IReadOnlyCollection<string>? Tags);
 public record UpdateTextureSetKindRequest(TextureSetKind Kind, int? OwnerModelId = null);
 public record UpdateTilingScaleRequest(float TilingScaleX, float TilingScaleY, UvMappingMode? UvMappingMode = null, float? UvScale = null);
 public record AddTextureToTextureSetRequest(int FileId, TextureType TextureType, TextureChannel? SourceChannel = null);

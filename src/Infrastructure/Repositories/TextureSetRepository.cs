@@ -26,6 +26,19 @@ internal sealed class TextureSetRepository : ITextureSetRepository
         return entityEntry.Entity;
     }
 
+    public async Task<IReadOnlyList<string>> GetAssignedTagNamesAsync(CancellationToken cancellationToken = default)
+    {
+        // Respects the soft-delete global query filter on TextureSets, so only
+        // tags on live sets surface as the texture-set vocabulary.
+        return await _context.TextureSets
+            .AsNoTracking()
+            .SelectMany(ts => ts.Tags)
+            .Select(tag => tag.Name)
+            .Distinct()
+            .OrderBy(name => name)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<IEnumerable<TextureSet>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return await _context.TextureSets
@@ -37,6 +50,7 @@ internal sealed class TextureSetRepository : ITextureSetRepository
             .Include(tp => tp.Category)
             .Include(tp => tp.Packs)
             .Include(tp => tp.Projects)
+            .Include(tp => tp.Tags)
             .AsSplitQuery()
             .OrderBy(tp => tp.Name)
             .ToListAsync(cancellationToken);
@@ -51,9 +65,13 @@ internal sealed class TextureSetRepository : ITextureSetRepository
         TextureSetKind? kind = null,
         string? searchName = null,
         int? minResolution = null,
+        IReadOnlyCollection<string>? normalizedTagNames = null,
         CancellationToken cancellationToken = default)
     {
         var query = _context.TextureSets.AsNoTracking().AsQueryable();
+
+        if (normalizedTagNames is { Count: > 0 })
+            query = query.Where(ts => ts.Tags.Any(t => normalizedTagNames.Contains(t.NormalizedName)));
 
         if (packIds is { Count: > 0 })
             query = query.Where(ts => ts.Packs.Any(p => packIds.Contains(p.Id)));
@@ -104,6 +122,7 @@ internal sealed class TextureSetRepository : ITextureSetRepository
             .Include(tp => tp.Category)
             .Include(tp => tp.Packs)
             .Include(tp => tp.Projects)
+            .Include(tp => tp.Tags)
             .AsSplitQuery()
             .ToListAsync(cancellationToken);
 
@@ -156,6 +175,7 @@ internal sealed class TextureSetRepository : ITextureSetRepository
             .Include(tp => tp.Category)
             .Include(tp => tp.Packs)
             .Include(tp => tp.Projects)
+            .Include(tp => tp.Tags)
             .AsSplitQuery()
             .FirstOrDefaultAsync(tp => tp.Id == id, cancellationToken);
     }

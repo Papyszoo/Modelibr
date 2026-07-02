@@ -293,6 +293,12 @@ jobs:
                   path: test-results/asset-processor-results.json
                   retention-days: 30
 
+            # Gate formatting here (this job is required and runs on every PR), so
+            # Prettier drift is caught at PR time instead of surfacing on the
+            # release merge. Code Quality stays non-required (it's path-filtered).
+            - name: Check Prettier formatting
+              run: npm run format:check
+
     build-storybook:
         name: Build Storybook
         runs-on: ubuntu-latest
@@ -328,6 +334,11 @@ jobs:
         name: E2E Tests
         runs-on: ubuntu-latest
         needs: [detect-changes]
+        # Runs the fast tier on relevant PRs. GPU-render-dependent scenarios are
+        # tagged @serial and excluded from this lane (the chromium project
+        # grep-inverts @serial); they run on the local GPU lane via
+        # `npm run test:all`. Keeps the GPU-less-runner render flake off PRs
+        # without dropping the rest of E2E.
         if: needs.detect-changes.outputs.e2e-relevant == 'true' || github.event_name == 'workflow_dispatch'
         # Successful E2E runs take ~15-20 minutes. A hard ceiling prevents a
         # single hung step (apt mirror flake, stuck Playwright test) from
@@ -455,6 +466,11 @@ jobs:
         name: Generate Feature Videos
         runs-on: ubuntu-latest
         needs: [detect-changes]
+        # Video capture drives the same GPU-dependent WebGL render as the E2E
+        # suite and flakes on GPU-less runners. It is only needed to refresh the
+        # docs-site videos on main, so restrict it to main pushes + manual
+        # dispatch — it no longer runs (or flakes) on PRs.
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
         # Historically this job completes in ~12 minutes. A hard ceiling prevents
         # a single hung step (e.g. apt mirror flake during `playwright install
         # --with-deps`) from silently consuming the 6h runner default.
@@ -635,18 +651,22 @@ jobs:
                   .github/scripts/fetch-test-reports.sh
 
             - name: Fail if feature video generation did not succeed
-              if: needs.generate-videos.result != 'success'
+              # Only a genuine failure is fatal; a skipped video job (on PRs and
+              # non-main branches, where videos aren't regenerated) is expected.
+              if: needs.generate-videos.result == 'failure'
               run: |
                   echo "Feature video generation must succeed before building documentation."
                   exit 1
 
             - name: Download feature videos
+              if: needs.generate-videos.result == 'success'
               uses: actions/download-artifact@v5
               with:
                   name: feature-videos-${{ github.run_number }}
                   path: docs/static/videos/
 
             - name: Verify feature videos
+              if: needs.generate-videos.result == 'success'
               run: |
                   expected_videos=(
                     model-management.webm
@@ -706,8 +726,8 @@ jobs:
         name: Deploy to GitHub Pages
         runs-on: ubuntu-latest
         needs: [build-docs]
-        # Always deploy after docs are built - environment protection must be configured in repo settings
-        if: always() && needs.build-docs.result == 'success'
+        # Deploy only from main; environment protection is also configured in repo settings.
+        if: always() && needs.build-docs.result == 'success' && github.ref == 'refs/heads/main'
 
         steps:
             - name: Deploy to GitHub Pages
