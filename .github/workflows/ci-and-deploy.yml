@@ -471,10 +471,10 @@ jobs:
         # docs-site videos on main, so restrict it to main pushes + manual
         # dispatch — it no longer runs (or flakes) on PRs.
         if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
-        # Historically this job completes in ~12 minutes. A hard ceiling prevents
-        # a single hung step (e.g. apt mirror flake during `playwright install
-        # --with-deps`) from silently consuming the 6h runner default.
-        timeout-minutes: 45
+        # A single attempt completes in ~12 minutes; the generate step retries up
+        # to 3x to absorb the software-WebGL flake, so allow headroom (setup +
+        # 3×~12m) while still capping a hung step well below the 6h default.
+        timeout-minutes: 60
 
         steps:
             - name: Checkout code
@@ -518,8 +518,26 @@ jobs:
             - name: Generate videos
               id: generate
               working-directory: docs/videos
-              timeout-minutes: 25
-              run: npm run generate
+              timeout-minutes: 40
+              # Capture uses SwiftShader software WebGL on the GPU-less runner,
+              # which occasionally flakes mid-render — and a single failed clip
+              # fails the whole run, which then blocks the main docs deploy (the
+              # v0.3.0 push flaked once and passed on a plain re-run). Retry a
+              # couple of times to absorb that transient flake instead of
+              # committing the videos to the repo. Each attempt regenerates the
+              # full set; the running stack is reused across attempts.
+              run: |
+                  for attempt in 1 2 3; do
+                    echo "::group::generate videos (attempt $attempt/3)"
+                    if npm run generate; then
+                      echo "::endgroup::"
+                      exit 0
+                    fi
+                    echo "::endgroup::"
+                    echo "video generation attempt $attempt failed"
+                  done
+                  echo "video generation failed after 3 attempts"
+                  exit 1
               env:
                   FRONTEND_URL: http://localhost:3002
                   API_BASE_URL: http://localhost:8090
