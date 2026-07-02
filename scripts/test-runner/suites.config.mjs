@@ -43,6 +43,20 @@ export const suites = [
         detectPath: "src/frontend/package.json",
     },
     {
+        id: "webgl-extraction",
+        name: "WebGL channel-extraction shaders (Playwright, isolated)",
+        kind: "playwright",
+        cwd: "src/frontend",
+        // Renders the shared channel-extraction GLSL in a forced-SwiftShader
+        // WebGL2 context and reads pixels back — no app, backend, or Docker.
+        // Fast + deterministic, unlike the full-app extraction E2E.
+        command: "npm run test:webgl",
+        tier: "fast",
+        requiresDocker: false,
+        detectPath: "src/frontend/playwright.webgl.config.ts",
+        note: "Needs Playwright chromium installed (npx playwright install chromium).",
+    },
+    {
         id: "asset-processor",
         name: "Asset processor (Vitest)",
         kind: "vitest",
