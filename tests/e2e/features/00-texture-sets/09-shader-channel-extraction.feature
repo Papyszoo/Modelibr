@@ -32,7 +32,7 @@ Feature: Shader-based Channel Extraction in 3D Viewer
     And the file should have channel "B" set to "Metallic"
     And I take a screenshot named "orm-split-channels-configured"
 
-  @viewer @texture-applied
+  @viewer @texture-applied @serial
   Scenario: Texture set textures are applied to 3D model
     # Create texture set with ALL possible texture types
     Given I am on the texture sets page
