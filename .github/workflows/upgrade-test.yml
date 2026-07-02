@@ -329,13 +329,42 @@ jobs:
           if (-not $old) { throw "FROM installer not found" }
           Start-Process -Wait -FilePath $old.FullName -ArgumentList '/S'
 
+          $logDir = Join-Path $env:GITHUB_WORKSPACE 'upgrade-logs'
+          New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+          $script:launchId = 0
+
           function Exe { @("$env:LOCALAPPDATA\Programs\Modelibr\Modelibr.exe", "$env:PROGRAMFILES\Modelibr\Modelibr.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1 }
-          function Start-App { $e = Exe; if (-not $e) { throw "Modelibr.exe not found" }; Start-Process -FilePath $e -ArgumentList '--remote-debugging-port=9222' }
+          function Start-App {
+            $e = Exe; if (-not $e) { throw "Modelibr.exe not found" }
+            $script:launchId++
+            # Capture the app console (electron-updater logs via runtimeLog ->
+            # console) so a failed self-update leaves diagnostics behind.
+            Start-Process -FilePath $e -ArgumentList '--remote-debugging-port=9222' `
+              -RedirectStandardOutput "$logDir\app-out-$($script:launchId).log" `
+              -RedirectStandardError  "$logDir\app-err-$($script:launchId).log"
+          }
           function Wait-Ready {
             for ($i = 0; $i -lt 90; $i++) { try { Invoke-WebRequest -UseBasicParsing http://127.0.0.1:3010 -TimeoutSec 5 | Out-Null; return $true } catch { Start-Sleep 3 } }
             return $false
           }
           function HttpCode($u) { try { [int](Invoke-WebRequest -UseBasicParsing $u -TimeoutSec 5).StatusCode } catch { if ($_.Exception.Response) { [int]$_.Exception.Response.StatusCode } else { 0 } } }
+          # Diagnostics for the Windows self-update failure (root-cause hypothesis:
+          # bundled sidecars keep the install dir locked so the NSIS in-place
+          # update can't overwrite them). Capture whether postgres/WebApi are
+          # still running after quitAndInstall and whether the install dir was
+          # actually updated (ProductVersion still 0.1.0 == update did not apply).
+          function Dump-Diag($tag) {
+            try {
+              Get-Process -Name Modelibr, postgres, WebApi, node -ErrorAction SilentlyContinue |
+                Select-Object Name, Id, Path | Format-Table -AutoSize | Out-String |
+                Out-File "$logDir\processes-$tag.txt"
+              $e = Exe
+              if ($e) {
+                "installed exe: $e (ProductVersion=$((Get-Item $e).VersionInfo.ProductVersion))" |
+                  Out-File "$logDir\installdir-$tag.txt"
+              }
+            } catch { "diag error: $_" | Out-File -Append "$logDir\diag-errors.txt" }
+          }
 
           Start-App
           if (-not (Wait-Ready)) { throw "FROM app not ready" }
@@ -346,6 +375,7 @@ jobs:
 
           # quitAndInstall runs the NSIS update silently and relaunches the new version.
           Start-Sleep 25
+          Dump-Diag 'after-update'
           if (-not (Wait-Ready)) {
             Write-Host "did not auto-relaunch — starting the (updated) app"
             Start-App
@@ -365,4 +395,5 @@ jobs:
           path: |
             upgrade-manifest.json
             /tmp/modelibr.log
+            upgrade-logs/
           if-no-files-found: ignore
