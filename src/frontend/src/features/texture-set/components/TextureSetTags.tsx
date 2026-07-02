@@ -14,13 +14,13 @@ interface TextureSetTagsProps {
 
 /**
  * Tag display + inline editor for a texture set, drawing suggestions from the
- * shared tag vocabulary and persisting via the shared TagInput primitive.
+ * texture-set tag vocabulary and persisting via the shared TagInput primitive.
  */
 export function TextureSetTags({ tags, onTagsUpdate }: TextureSetTagsProps) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<string[]>(tags)
   const [saving, setSaving] = useState(false)
-  const vocabulary = useTagVocabulary()
+  const vocabulary = useTagVocabulary('texture-set')
 
   useEffect(() => {
     setDraft(tags)

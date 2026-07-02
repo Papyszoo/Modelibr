@@ -19,6 +19,21 @@ public static class TextureSetEndpoints
             .WithSummary("Gets all texture sets with their textures and model associations")
             .WithOpenApi();
 
+        // Literal segment; ASP.NET routing prefers it over "/texture-sets/{id}".
+        app.MapGet("/texture-sets/tags", async (
+            IQueryHandler<GetTextureSetTagsQuery, GetTextureSetTagsResponse> queryHandler,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await queryHandler.Handle(new GetTextureSetTagsQuery(), cancellationToken);
+
+            return result.IsFailure
+                ? Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message })
+                : Results.Ok(result.Value);
+        })
+            .WithName("Get Texture Set Tags")
+            .WithSummary("Distinct tags assigned to texture sets (per-asset-type vocabulary)")
+            .WithOpenApi();
+
         app.MapGet("/texture-sets/{id}", GetTextureSetById)
             .WithName("Get Texture Set By ID")
             .WithSummary("Gets a specific texture set by ID")
@@ -47,7 +62,7 @@ public static class TextureSetEndpoints
 
         app.MapPut("/texture-sets/{id}/tags", UpdateTextureSetTags)
             .WithName("Update Texture Set Tags")
-            .WithSummary("Replaces a texture set's tags (shared tag vocabulary)")
+            .WithSummary("Replaces a texture set's tags")
             .WithOpenApi();
 
         app.MapDelete("/texture-sets/{id}", DeleteTextureSet)
