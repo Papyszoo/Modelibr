@@ -21,6 +21,7 @@ Feature: Version Switching
     And version 2 should have a thumbnail image
     And I capture a screenshot of the version dropdown with thumbnails
 
+  @serial
   Scenario: Switching versions updates the viewer
     Given I am on the model viewer page for "multi-version-model"
     And I am viewing version 2
