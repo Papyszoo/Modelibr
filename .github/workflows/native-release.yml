@@ -378,7 +378,7 @@ jobs:
         working-directory: tests/e2e
         run: npx playwright install chromium
 
-      - name: Run full E2E suite against installed app
+      - name: Run E2E smoke against installed app (fast lane, no GPU-render)
         if: github.event_name != 'push'
         working-directory: tests/e2e
         env:
@@ -405,15 +405,22 @@ jobs:
           PW_RETRIES: "2"
           # The hosted Windows runner is far slower for the 3D-heavy UI, so the
           # parallel Chromium phase flakes on timeouts there. Keep it running and
-          # reported, but non-blocking on Windows; setup/serial/slow stay strict
-          # everywhere, and Linux/macOS still gate the full UI sweep.
+          # reported, but non-blocking on Windows; setup stays strict everywhere,
+          # and Linux/macOS still gate the Chromium UI sweep.
           CHROMIUM_PHASE_NONBLOCKING: ${{ runner.os == 'Windows' && '1' || '0' }}
           POSTGRES_HOST: 127.0.0.1
           POSTGRES_PORT: "35432"
           POSTGRES_USER: modelibr
           POSTGRES_PASSWORD: modelibr
           POSTGRES_DB: Modelibr
-        run: node run-e2e-fast.js
+        # --fast-only runs setup + the core Chromium UI flows only. The serial
+        # (@serial) + slow phases are dropped: the @serial scenarios are
+        # GPU-render tests that flake on GitHub's GPU-less runners (SwiftShader
+        # software WebGL) and belong on the local GPU lane, and running the full
+        # ~64-min suite here drained the runner and made even non-render flows
+        # flake at the tail. This keeps a reliable install smoke of the real
+        # native app without the GPU-less flake. Full coverage runs locally.
+        run: node run-e2e-fast.js --fast-only
 
       - name: Upload native E2E report
         if: always()
