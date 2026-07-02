@@ -18,8 +18,9 @@ function makeFakeAutoUpdater(overrides = {}) {
   au.downloadUpdate = async () => {
     au.calls.downloadUpdate++
   }
-  au.quitAndInstall = () => {
+  au.quitAndInstall = (...args) => {
     au.calls.quitAndInstall++
+    au.calls.quitAndInstallArgs = args
   }
   return Object.assign(au, overrides)
 }
@@ -110,6 +111,9 @@ test('install() restarts into a downloaded build', async () => {
 
   mgr.install()
   assert.equal(au.calls.quitAndInstall, 1)
+  // Must install silently: the assisted (oneClick:false) NSIS installer would
+  // otherwise pop the wizard and block an unattended update from applying.
+  assert.deepEqual(au.calls.quitAndInstallArgs, [true, true])
   assert.equal(opened.length, 0, 'should restart, not open a browser')
 })
 
