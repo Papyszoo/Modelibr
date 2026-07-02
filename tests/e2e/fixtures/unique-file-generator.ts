@@ -98,6 +98,9 @@ export class UniqueFileGenerator {
             console.log(
                 `[UniqueFileGenerator] .blend file: appended unique marker (${marker.length} bytes)`,
             );
+        } else if (ext === ".stl") {
+            // Binary STL: mutate the 80-byte header in place (see modifySTL).
+            newBuffer = this.modifySTL(originalBuffer, uniqueId);
         } else {
             // FBX, OBJ, etc — copy without modification.
             // Appending bytes breaks binary formats like FBX (THREE.FBXLoader fails).
@@ -312,6 +315,37 @@ export class UniqueFileGenerator {
         newBuffer.writeUInt32LE(newBuffer.length - 8, 4);
 
         return newBuffer;
+    }
+
+    private static modifySTL(buffer: Buffer, uniqueData: string): Buffer {
+        // Binary STL layout: 80-byte free-form header, uint32 triangle count,
+        // then count*50 bytes of triangle data. Parsers (incl. THREE.STLLoader)
+        // detect "binary" purely by exact byte length (80 + 4 + count*50) and
+        // ignore the header entirely. Overwriting part of the header in place
+        // yields a unique SHA256 without changing the byte length or geometry,
+        // so the file stays a valid, renderable binary STL.
+        const HEADER_SIZE = 80;
+        if (buffer.length >= HEADER_SIZE + 4) {
+            const triangleCount = buffer.readUInt32LE(HEADER_SIZE);
+            const expectedLength = HEADER_SIZE + 4 + triangleCount * 50;
+            if (expectedLength === buffer.length) {
+                const newBuffer = Buffer.from(buffer); // copy; keeps length
+                // Write away from offset 0 so the file can never start with
+                // "solid" (which would flip ASCII detection); fits in the header.
+                const marker = `MODELIBR:${uniqueData}`.slice(0, HEADER_SIZE - 8);
+                newBuffer.write(marker, 8, "ascii");
+                return newBuffer;
+            }
+        }
+
+        // ASCII or malformed STL — append a trailing comment to vary the hash.
+        console.log(
+            "[UniqueFileGenerator] .stl is not binary; appended unique marker",
+        );
+        return Buffer.concat([
+            buffer,
+            Buffer.from(`\nMODELIBR_UNIQUE:${uniqueData}\n`),
+        ]);
     }
 
     /**

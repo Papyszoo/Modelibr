@@ -176,9 +176,14 @@ When("I switch to the Preview tab", async ({ page }) => {
     // positioned R3F wrapper that's briefly 0×0 while the flex parent
     // finishes laying out, so a visibility wait here would race against
     // layout and time out before the assertion step even runs.
+    //
+    // 60s (was 30s) for the same reason as waitForR3FCanvas: GPU-less CI
+    // renders these EXR/TIFF sets on software WebGL, which is slow enough to
+    // race a 30s wait. The canvas provably mounts; this just absorbs the
+    // software-render latency.
     await page.waitForSelector(".texture-preview-canvas canvas", {
         state: "attached",
-        timeout: 30000,
+        timeout: 60000,
     });
     console.log("[UI] Switched to Preview tab ✓");
 });

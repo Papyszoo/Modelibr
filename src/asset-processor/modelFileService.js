@@ -242,6 +242,8 @@ export class ModelFileService {
       '.fbx': 'fbx',
       '.gltf': 'gltf',
       '.glb': 'glb',
+      '.stl': 'stl',
+      '.3mf': '3mf',
       '.blend': 'blend',
     }
 

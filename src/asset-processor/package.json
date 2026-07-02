@@ -1,6 +1,6 @@
 {
   "name": "modelibr-asset-processor",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Node.js asset processor service for thumbnail rendering, waveform generation, and mesh analysis",
   "main": "index.js",
   "type": "module",
@@ -35,7 +35,7 @@
     "node-webpmux": "^3.2.1",
     "puppeteer": "^23.10.4",
     "sharp": "^0.34.4",
-    "three": "^0.180.0",
+    "three": "^0.185.0",
     "utif2": "^4.1.0",
     "winston": "^3.11.0"
   },

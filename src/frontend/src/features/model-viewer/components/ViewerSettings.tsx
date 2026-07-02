@@ -10,6 +10,7 @@ export interface ViewerSettingsType {
   modelRotationSpeed: number
   showShadows: boolean
   showStats: boolean
+  showPerf: boolean
   // Lights
   ambientIntensity: number
   directionalIntensity: number
@@ -133,6 +134,16 @@ export function ViewerSettings({
             <InputSwitch
               checked={settings.showStats}
               onChange={e => handleChange('showStats', e.value as boolean)}
+            />
+          </div>
+        </div>
+
+        <div className="setting-item">
+          <label>Performance Monitor</label>
+          <div className="setting-control">
+            <InputSwitch
+              checked={settings.showPerf}
+              onChange={e => handleChange('showPerf', e.value as boolean)}
             />
           </div>
         </div>

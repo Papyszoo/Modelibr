@@ -93,6 +93,8 @@ describe('fileUtils', () => {
       expect(isThreeJSRenderable('.fbx')).toBe(true)
       expect(isThreeJSRenderable('.gltf')).toBe(true)
       expect(isThreeJSRenderable('.glb')).toBe(true)
+      expect(isThreeJSRenderable('.stl')).toBe(true)
+      expect(isThreeJSRenderable('.3mf')).toBe(true)
     })
 
     it('should handle formats without leading dot', () => {
@@ -192,6 +194,8 @@ describe('fileUtils', () => {
         '.fbx',
         '.gltf',
         '.glb',
+        '.stl',
+        '.3mf',
       ])
     })
 
@@ -204,6 +208,8 @@ describe('fileUtils', () => {
         '.blend',
         '.gltf',
         '.glb',
+        '.stl',
+        '.3mf',
       ])
     })
 

@@ -36,6 +36,43 @@ Then(
 );
 
 Then(
+    "the model {string} should be stored as a renderable {string} file",
+    async ({ page }, stateName: string, expectedFileType: string) => {
+        const model = getScenarioState(page).getModel(stateName);
+        if (!model?.versionId) {
+            throw new Error(
+                `No uploaded model tracked for state "${stateName}"`,
+            );
+        }
+
+        const { DbHelper } = await import("../fixtures/db-helper");
+        const db = new DbHelper();
+        try {
+            // The renderable file the viewer/thumbnail pipeline picks up. Asserts
+            // the backend mapped the extension to its renderable FileType — before
+            // the feature, .stl mapped to a non-renderable type and the upload was
+            // rejected outright, so no row would exist here at all.
+            const result = await db.query(
+                `SELECT f."FileType", f."OriginalFileName"
+                   FROM "Files" f
+                  WHERE f."ModelVersionId" = $1 AND f."IsDeleted" = false
+                  ORDER BY f."Id" DESC
+                  LIMIT 1`,
+                [model.versionId],
+            );
+
+            expect(result.rows.length).toBeGreaterThan(0);
+            expect(result.rows[0].FileType).toBe(expectedFileType);
+            expect(
+                String(result.rows[0].OriginalFileName).toLowerCase(),
+            ).toContain(`.${expectedFileType}`);
+        } finally {
+            await db.close();
+        }
+    },
+);
+
+Then(
     "I should receive a {string} notification via SignalR",
     async ({ page }, target: string) => {
         const signalR = new SignalRHelper(page);

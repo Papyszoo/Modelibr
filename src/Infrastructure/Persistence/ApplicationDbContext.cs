@@ -466,6 +466,29 @@ namespace Infrastructure.Persistence
                     .HasForeignKey(tp => tp.TextureSetCategoryId)
                     .OnDelete(DeleteBehavior.SetNull);
 
+                // Shared tag vocabulary — reuses the ModelTag pool, mirroring
+                // the Model and EnvironmentMap tag joins.
+                entity.HasMany(tp => tp.Tags)
+                    .WithMany()
+                    .UsingEntity<Dictionary<string, object>>(
+                        "TextureSetTagAssignment",
+                        right => right
+                            .HasOne<ModelTag>()
+                            .WithMany()
+                            .HasForeignKey("ModelTagId")
+                            .OnDelete(DeleteBehavior.Cascade),
+                        left => left
+                            .HasOne<TextureSet>()
+                            .WithMany()
+                            .HasForeignKey("TextureSetId")
+                            .OnDelete(DeleteBehavior.Cascade),
+                        join =>
+                        {
+                            join.ToTable("TextureSetTagAssignments");
+                            join.HasKey("TextureSetId", "ModelTagId");
+                            join.HasIndex("ModelTagId");
+                        });
+
                 // Create index for efficient querying by name
                 entity.HasIndex(tp => tp.Name);
                 entity.HasIndex(tp => tp.TextureSetCategoryId);
@@ -1093,6 +1116,8 @@ namespace Infrastructure.Persistence
                 "fbx" => FileType.Fbx,
                 "gltf" => FileType.Gltf,
                 "glb" => FileType.Glb,
+                "stl" => FileType.Stl,
+                "3mf" => FileType.ThreeMf,
                 "blend" => FileType.Blend,
                 "max" => FileType.Max,
                 "maya" => FileType.Maya,

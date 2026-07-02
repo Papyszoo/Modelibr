@@ -45,10 +45,16 @@ the code and fix the skill in the same session.**
 | Layer touched | Command |
 |---|---|
 | Backend | `dotnet build Modelibr.sln && dotnet test Modelibr.sln --no-build --filter "Category!=Integration"` |
-| Frontend | `cd src/frontend && npm test && npm run lint && npm run build` |
-| Worker | `cd src/asset-processor && npm test && npm run lint` |
+| Frontend | `cd src/frontend && npm test && npm run lint && npm run format:check && npm run build` |
+| Worker | `cd src/asset-processor && npm test && npm run lint && npm run format:check` |
 | UI-visible behavior | the affected E2E scope (see testing rules below) |
 | Anything broad | `npm run test:all -- --only=<suite,...> --yes --no-open` |
+
+`npm run format:check` (Prettier) is a **required** CI gate and is **not**
+covered by `npm run lint`: ESLint's `prettier/prettier` rule only runs on the
+files ESLint lints (`**/*.js[x]`/`.ts[x]`, and `tests/` is eslint-ignored), so
+formatting drift in Markdown/JSON/CSS/etc. passes lint locally but fails CI. Run
+`npm run format` to auto-fix.
 
 Never finish with known-failing checks; if a failure is environmental, say so
 explicitly instead of claiming verified.

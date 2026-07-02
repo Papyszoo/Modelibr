@@ -1762,6 +1762,21 @@ namespace Infrastructure.Migrations
                     b.ToTable("ProjectTextureSets", (string)null);
                 });
 
+            modelBuilder.Entity("TextureSetTagAssignment", b =>
+                {
+                    b.Property<int>("TextureSetId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ModelTagId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("TextureSetId", "ModelTagId");
+
+                    b.HasIndex("ModelTagId");
+
+                    b.ToTable("TextureSetTagAssignments", (string)null);
+                });
+
             modelBuilder.Entity("Domain.Models.BatchUpload", b =>
                 {
                     b.HasOne("Domain.Models.EnvironmentMap", "EnvironmentMap")
@@ -2445,6 +2460,21 @@ namespace Infrastructure.Migrations
                     b.HasOne("Domain.Models.TextureSet", null)
                         .WithMany()
                         .HasForeignKey("TextureSetsId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("TextureSetTagAssignment", b =>
+                {
+                    b.HasOne("Domain.Models.ModelTag", null)
+                        .WithMany()
+                        .HasForeignKey("ModelTagId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Models.TextureSet", null)
+                        .WithMany()
+                        .HasForeignKey("TextureSetId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

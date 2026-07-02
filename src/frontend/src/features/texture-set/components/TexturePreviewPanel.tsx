@@ -1,7 +1,7 @@
 import './TexturePreviewPanel.css'
 
 import { OrbitControls, Stage } from '@react-three/drei'
-import { Canvas } from '@react-three/fiber'
+import { Canvas, useThree } from '@react-three/fiber'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from 'primereact/button'
 import { ProgressBar } from 'primereact/progressbar'
@@ -13,6 +13,8 @@ import {
   useRef,
   useState,
 } from 'react'
+import * as THREE from 'three'
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 
 import { FloatingWindow } from '@/components/FloatingWindow'
 import { LoadingPlaceholder } from '@/components/LoadingPlaceholder'
@@ -34,6 +36,32 @@ interface TexturePreviewPanelProps {
   textureSet: TextureSetDto
   side?: 'left' | 'right'
   textureQuality: number
+}
+
+/**
+ * Procedural studio IBL for the preview (RoomEnvironment → PMREM). Replaces
+ * drei's `<Stage environment="city">`, which fetches an HDR from a CDN — a
+ * local-first violation that also breaks on offline / air-gapped installs.
+ * RoomEnvironment is generated in-process, so material previews keep real
+ * reflections with zero network dependency.
+ */
+function PreviewEnvironment(): null {
+  const gl = useThree(s => s.gl)
+  const scene = useThree(s => s.scene)
+  useEffect(() => {
+    const pmrem = new THREE.PMREMGenerator(gl)
+    const room = new RoomEnvironment()
+    const envMap = pmrem.fromScene(room).texture
+    const previous = scene.environment
+    scene.environment = envMap
+    room.dispose()
+    pmrem.dispose()
+    return () => {
+      scene.environment = previous
+      envMap.dispose()
+    }
+  }, [gl, scene])
+  return null
 }
 
 export function TexturePreviewPanel({
@@ -240,8 +268,10 @@ export function TexturePreviewPanel({
           }}
           dpr={Math.min(window.devicePixelRatio, 2)}
         >
+          {/* Procedural local IBL (no CDN HDR — local-first). */}
+          <PreviewEnvironment />
           {/* Stage provides automatic lighting, shadows, and camera positioning */}
-          <Stage intensity={0.5} environment="city" adjustCamera={false}>
+          <Stage intensity={0.5} environment={null} adjustCamera={false}>
             <Suspense fallback={<LoadingPlaceholder />}>
               <TexturedGeometry
                 geometryType={previewSettings.type}

@@ -13,6 +13,7 @@ public class TextureSet : AggregateRoot
     private readonly List<ModelVersionTextureSet> _modelVersionMappings = new();
     private readonly List<Pack> _packs = new();
     private readonly List<Project> _projects = new();
+    private readonly List<ModelTag> _tags = new();
 
     public int Id { get; private set; }
     public string Name { get; private set; } = string.Empty;
@@ -69,6 +70,34 @@ public class TextureSet : AggregateRoot
             if (value != null)
                 _textures.AddRange(value);
         }
+    }
+
+    // Shared tag vocabulary (same ModelTag pool as models and environment maps).
+    public ICollection<ModelTag> Tags
+    {
+        get => _tags;
+        set
+        {
+            _tags.Clear();
+            if (value != null)
+                _tags.AddRange(value);
+        }
+    }
+
+    /// <summary>
+    /// Replaces this texture set's tags with the supplied (already-resolved)
+    /// tag entities, de-duplicated by normalized name.
+    /// </summary>
+    public void SetTags(IEnumerable<ModelTag> tags, DateTime updatedAt)
+    {
+        _tags.Clear();
+        if (tags != null)
+        {
+            foreach (var tag in tags.GroupBy(t => t.NormalizedName).Select(g => g.First()))
+                _tags.Add(tag);
+        }
+
+        UpdatedAt = updatedAt;
     }
 
     // Navigation property for many-to-many relationship with Models - EF Core requires this to be settable

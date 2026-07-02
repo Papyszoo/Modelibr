@@ -25,6 +25,8 @@ public sealed class FileType : IEquatable<FileType>
     public static readonly FileType Fbx = new("fbx", "Autodesk FBX", true, FileTypeCategory.Model3D);
     public static readonly FileType Gltf = new("gltf", "glTF JSON", true, FileTypeCategory.Model3D);
     public static readonly FileType Glb = new("glb", "glTF Binary", true, FileTypeCategory.Model3D);
+    public static readonly FileType Stl = new("stl", "Stereolithography STL", true, FileTypeCategory.Model3D);
+    public static readonly FileType ThreeMf = new("3mf", "3D Manufacturing Format", true, FileTypeCategory.Model3D);
     
     // Project files
     public static readonly FileType Blend = new("blend", "Blender Project", false, FileTypeCategory.Project);
@@ -80,6 +82,8 @@ public sealed class FileType : IEquatable<FileType>
         { ".fbx", Fbx },
         { ".gltf", Gltf },
         { ".glb", Glb },
+        { ".stl", Stl },
+        { ".3mf", ThreeMf },
         { ".blend", Blend },
         { ".max", Max },
         { ".ma", Maya },
@@ -137,7 +141,7 @@ public sealed class FileType : IEquatable<FileType>
         { ".gd", GdScript }
     };
 
-    private static readonly FileType[] RenderableTypes = { Obj, Fbx, Gltf, Glb };
+    private static readonly FileType[] RenderableTypes = { Obj, Fbx, Gltf, Glb, Stl, ThreeMf };
     private static readonly FileType[] SpriteTypes = { Sprite, SpriteSheet, Gif, Apng, WebP, Texture };
     private static readonly FileType[] AudioTypes = { Mp3, Wav, Ogg, Flac, Aac, M4a };
     private static readonly FileType[] ScriptTypes =
@@ -177,7 +181,7 @@ public sealed class FileType : IEquatable<FileType>
         if (!fileType.IsRenderable && fileType.Category != FileTypeCategory.Project)
         {
             return Result.Failure<FileType>(
-                new Error("InvalidFileType", $"File type '{fileType.Description}' is not supported for model upload. Only .obj, .fbx, .gltf, .glb, and .blend files are allowed."));
+                new Error("InvalidFileType", $"File type '{fileType.Description}' is not supported for model upload. Only .obj, .fbx, .gltf, .glb, .stl, .3mf, and .blend files are allowed."));
         }
 
         return Result.Success(fileType);
@@ -344,6 +348,8 @@ public sealed class FileType : IEquatable<FileType>
             "fbx" => "application/octet-stream",
             "gltf" => "model/gltf+json",
             "glb" => "model/gltf-binary",
+            "stl" => "model/stl",
+            "3mf" => "model/3mf",
             "blend" => "application/x-blender",
             "max" => "application/octet-stream",
             "maya" => "application/octet-stream",

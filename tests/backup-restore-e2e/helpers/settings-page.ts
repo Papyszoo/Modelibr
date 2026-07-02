@@ -1,11 +1,15 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 
 /**
- * Page object for the Settings tab and its "Backup & Restore" accordion section.
+ * Page object for the Settings tab and its "Backup & Restore" section.
  *
  * Modelibr opens tabs through a dock-bar "+" button → "New Tab" picker. The
  * Settings tab type is reached by clicking the picker's "Settings" tile.
  * This mirrors the main e2e suite's `openTabViaMenu` helper.
+ *
+ * Since PR #508 the Settings tab is a grid of section cards → detail view (no
+ * accordion). Backup lives behind the "Backup & Restore" card, which opens a
+ * `.section-detail` that renders the `.backups-section` body.
  */
 export class SettingsPage {
     constructor(public readonly page: Page) {}
@@ -18,7 +22,7 @@ export class SettingsPage {
             timeout: 30000,
         });
         await this.openSettingsTab();
-        await this.expandBackupSection();
+        await this.openBackupSection();
     }
 
     private async openSettingsTab(): Promise<void> {
@@ -47,26 +51,34 @@ export class SettingsPage {
             await expect(newtabPage).toBeHidden({ timeout: 10000 });
         }
 
-        await expect(
-            this.page.getByRole("heading", { name: /application settings/i }),
-        ).toBeVisible({ timeout: 30000 });
+        // The redesigned Settings (PR #508) renders inside `.settings-container`,
+        // opening on the grid of section cards.
+        await expect(this.page.locator(".settings-container")).toBeVisible({
+            timeout: 30000,
+        });
     }
 
-    private async expandBackupSection(): Promise<void> {
-        const header = this.page
-            .locator(".settings-section-header")
-            .filter({ hasText: /backup\s*&\s*restore/i })
-            .first();
-        await expect(header).toBeVisible();
-        // Sections default to expanded for non-demo mode. If the body isn't
-        // already in the DOM (different layout, e.g. mobile), expand it.
-        const list = this.page.locator(".backups-section");
-        if (!(await list.isVisible())) {
-            await header.click();
+    private async openBackupSection(): Promise<void> {
+        // Land on the grid. A leftover section-detail from an earlier run is
+        // dismissed via the Back button so the Backup card is reachable.
+        const grid = this.page.locator(".settings-grid");
+        if (!(await grid.isVisible())) {
+            const back = this.page.locator(".btn-back");
+            if (await back.count()) await back.click();
         }
-        await expect(list).toBeVisible();
-        // Scroll the section into view for stable button clicks.
-        await header.scrollIntoViewIfNeeded();
+        await expect(grid).toBeVisible({ timeout: 10000 });
+
+        // Open the "Backup & Restore" section card → detail view. (Real,
+        // non-demo stack, so the card is enabled and renders BackupsSection.)
+        await this.page
+            .locator(".setting-card")
+            .filter({ hasText: /backup\s*&\s*restore/i })
+            .first()
+            .click();
+
+        const list = this.page.locator(".backups-section");
+        await expect(list).toBeVisible({ timeout: 10000 });
+        await list.scrollIntoViewIfNeeded();
     }
 
     // ── Operations ──────────────────────────────────────────────────────

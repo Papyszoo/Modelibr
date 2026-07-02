@@ -1,9 +1,11 @@
 import { useFrame, useLoader, useThree } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
+import { ThreeMFLoader } from 'three/examples/jsm/loaders/3MFLoader'
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader'
+import { STLLoader } from 'three/examples/jsm/loaders/STLLoader'
 
 import {
   type TextureConfig,
@@ -12,14 +14,20 @@ import {
 import { useModelObject } from '@/features/model-viewer/hooks/useModelObject'
 import { getFileUrl } from '@/features/models/api/modelApi'
 import { safeLoadingManager } from '@/shared/three/safeLoadingManager'
-import {
-  addSharedDisplacementNormal,
-  applyDispNormalDisplacement,
-} from '@/shared/three/sharedDisplacementNormal'
-import { TextureChannel, type TextureSetDto, TextureType } from '@/types'
+import { TextureChannel, TextureType } from '@/types'
 
-/** Map of material names to their texture sets. Key "" means apply to all meshes. */
-export type MaterialTextureSets = Record<string, TextureSetDto>
+import { buildStlModel } from '../../../../../asset-processor/lib/stlMesh.js'
+import {
+  MATERIAL_SLOT_BY_TEXTURE_TYPE,
+  textureTypeNeedsInvert,
+} from '../../../../../asset-processor/lib/textureChannels.js'
+import {
+  applyMaterialTextures,
+  KEY_SEP,
+  type MaterialTextureSets,
+} from './materialTextures'
+
+export type { MaterialTextureSets } from './materialTextures'
 
 interface TexturedModelProps {
   modelUrl: string
@@ -28,38 +36,27 @@ interface TexturedModelProps {
   materialTextureSets: MaterialTextureSets
 }
 
-// Material property slot names used by MeshPhysicalMaterial.
-// `fallback` is used when the primary type is absent (mutually-exclusive groups).
-// `invertFallback` means the fallback texture must be channel-inverted at load
-// time (e.g. Glossiness fed through the roughnessMap slot).
+// Texture types in apply order, each with its fallback when the primary is
+// absent (mutually-exclusive groups: Roughness←Glossiness, Displacement←Height).
+// The MeshPhysicalMaterial slot each type feeds and whether it must be inverted
+// at load come from the shared cross-runtime map
+// (asset-processor/lib/textureChannels.js) — the same source the worker
+// thumbnail uses, so the viewer and the thumbnail route textures identically.
 const TEXTURE_SLOTS: Array<{
-  slot: string
   type: TextureType
   fallback?: TextureType
-  invertFallback?: boolean
 }> = [
-  { slot: 'map', type: TextureType.Albedo },
-  { slot: 'normalMap', type: TextureType.Normal },
-  {
-    slot: 'roughnessMap',
-    type: TextureType.Roughness,
-    fallback: TextureType.Glossiness,
-    invertFallback: true,
-  },
-  { slot: 'metalnessMap', type: TextureType.Metallic },
-  { slot: 'specularColorMap', type: TextureType.Specular },
-  { slot: 'aoMap', type: TextureType.AO },
-  { slot: 'emissiveMap', type: TextureType.Emissive },
-  { slot: 'bumpMap', type: TextureType.Bump },
-  { slot: 'alphaMap', type: TextureType.Alpha },
-  {
-    slot: 'displacementMap',
-    type: TextureType.Displacement,
-    fallback: TextureType.Height,
-  },
+  { type: TextureType.Albedo },
+  { type: TextureType.Normal },
+  { type: TextureType.Roughness, fallback: TextureType.Glossiness },
+  { type: TextureType.Metallic },
+  { type: TextureType.Specular },
+  { type: TextureType.AO },
+  { type: TextureType.Emissive },
+  { type: TextureType.Bump },
+  { type: TextureType.Alpha },
+  { type: TextureType.Displacement, fallback: TextureType.Height },
 ]
-
-const KEY_SEP = '::'
 
 /**
  * Build a combined texture config map for all material→textureSet mappings.
@@ -75,162 +72,32 @@ function buildCombinedTextureConfigs(
     materialTextureSets
   )) {
     if (!textureSet?.textures) continue
-    for (const { slot, type, fallback, invertFallback } of TEXTURE_SLOTS) {
+    for (const { type, fallback } of TEXTURE_SLOTS) {
+      const slot = MATERIAL_SLOT_BY_TEXTURE_TYPE[type]
       let tex = textureSet.textures.find(t => t.textureType === type)
-      let invert = false
+      let chosenType = type
       if (!tex && fallback) {
-        tex = textureSet.textures.find(t => t.textureType === fallback)
-        if (tex && invertFallback) invert = true
+        const fallbackTex = textureSet.textures.find(
+          t => t.textureType === fallback
+        )
+        if (fallbackTex) {
+          tex = fallbackTex
+          chosenType = fallback
+        }
       }
       if (tex) {
         configs[`${materialName}${KEY_SEP}${slot}`] = {
           url: getFileUrl(tex.fileId.toString()),
           sourceChannel: tex.sourceChannel ?? TextureChannel.RGB,
           fileName: tex.fileName,
-          invert,
+          // Glossiness feeds roughnessMap inverted (shared rule).
+          invert: textureTypeNeedsInvert(chosenType),
         }
       }
     }
   }
 
   return configs
-}
-
-/** Get the material names from a mesh (handles arrays). */
-function getMeshMaterialNames(mesh: THREE.Mesh): string[] {
-  const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
-  return mats.map(m => m?.name ?? '').filter(Boolean)
-}
-
-/**
- * Build a MeshPhysicalMaterial from loaded textures for a given material key prefix.
- */
-function buildMaterialFromTextures(
-  loadedTextures: Record<string, THREE.Texture | null>,
-  materialPrefix: string
-): THREE.MeshPhysicalMaterial {
-  const get = (slot: string) =>
-    loadedTextures[`${materialPrefix}${KEY_SEP}${slot}`] ?? null
-  const hasMap = get('map') !== null
-
-  const material = new THREE.MeshPhysicalMaterial({
-    color: hasMap ? 0xffffff : new THREE.Color(0.7, 0.7, 0.9),
-    metalness: hasMap ? 1 : 0.3,
-    roughness: hasMap ? 1 : 0.4,
-    envMapIntensity: 1.0,
-    // MeshPhysicalMaterial enables a dielectric specular channel by default
-    // (intensity=1, color=white). Without an explicit Specular texture we
-    // want MeshStandardMaterial-equivalent behavior, otherwise the channel
-    // adds a sheen that washes the albedo toward white.
-    specularIntensity: get('specularColorMap') ? 1 : 0,
-  })
-
-  if (get('map')) material.map = get('map')
-  if (get('normalMap')) material.normalMap = get('normalMap')
-  if (get('roughnessMap')) material.roughnessMap = get('roughnessMap')
-  if (get('metalnessMap')) material.metalnessMap = get('metalnessMap')
-  if (get('specularColorMap')) {
-    material.specularColorMap = get('specularColorMap')
-  }
-  if (get('aoMap')) material.aoMap = get('aoMap')
-  if (get('emissiveMap')) {
-    material.emissiveMap = get('emissiveMap')
-    material.emissive = new THREE.Color(0xffffff)
-  }
-  if (get('bumpMap')) material.bumpMap = get('bumpMap')
-  if (get('alphaMap')) {
-    material.alphaMap = get('alphaMap')
-    material.transparent = true
-  }
-  if (get('displacementMap')) {
-    material.displacementMap = get('displacementMap')
-    // Bias by -scale/2 so heightmap mid-grey means "no displacement".
-    material.displacementScale = 0.02
-    material.displacementBias = -0.01
-    // Sample displacement direction from an averaged-by-position normal
-    // attribute rather than the face-aligned objectNormal — so hard-edged
-    // meshes (game-asset cubes etc.) stay watertight under displacement
-    // while keeping their original per-face UVs intact for color sampling.
-    applyDispNormalDisplacement(material)
-  }
-
-  return material
-}
-
-/**
- * Apply per-material textures to a cloned model.
- * If a material name matches a key in materialTextureSets, that mesh gets textured.
- * A key of "" is a wildcard that applies to meshes with no specific mapping.
- */
-function applyMaterialTextures(
-  clonedModel: THREE.Group | THREE.Object3D,
-  materialTextureSets: MaterialTextureSets,
-  loadedTextures: Record<string, THREE.Texture | null>,
-  texturesReady: boolean
-) {
-  const materialNames = Object.keys(materialTextureSets)
-  const hasWildcard = materialNames.includes('')
-
-  // Pre-build materials for each material name that has textures
-  const builtMaterials: Record<string, THREE.MeshPhysicalMaterial> = {}
-  if (texturesReady) {
-    for (const matName of materialNames) {
-      builtMaterials[matName] = buildMaterialFromTextures(
-        loadedTextures,
-        matName
-      )
-    }
-  }
-
-  // Shared fallback material for unmatched meshes (avoids per-mesh allocation)
-  const fallbackMaterial = new THREE.MeshPhysicalMaterial({
-    color: new THREE.Color(0.7, 0.7, 0.9),
-    metalness: 0.3,
-    roughness: 0.4,
-    envMapIntensity: 1.0,
-    specularIntensity: 0,
-  })
-
-  clonedModel.traverse(child => {
-    if (!child.isMesh) return
-    const mesh = child as THREE.Mesh
-    mesh.castShadow = true
-    mesh.receiveShadow = true
-
-    const meshMatNames = getMeshMaterialNames(mesh)
-
-    // Find matching material: check mesh material names against our map
-    let matched = false
-    let appliedMaterial: THREE.MeshPhysicalMaterial | null = null
-    for (const meshMatName of meshMatNames) {
-      if (meshMatName in builtMaterials) {
-        appliedMaterial = builtMaterials[meshMatName]
-        mesh.material = appliedMaterial
-        matched = true
-        break
-      }
-    }
-
-    // Fallback: use wildcard "" material (applies to all unmatched meshes)
-    if (!matched && hasWildcard && texturesReady) {
-      appliedMaterial = builtMaterials['']
-      mesh.material = appliedMaterial
-    }
-
-    // Strip embedded materials from unmatched meshes to match worker behavior
-    if (!matched && !hasWildcard) {
-      mesh.material = fallbackMaterial
-    }
-
-    // Add the shared-displacement-normal attribute when this mesh is about
-    // to be displaced. The shader uses this attribute as the push direction
-    // so hard-edged meshes (game-asset cubes etc.) stay watertight along
-    // seams while keeping their original per-face UVs / normals intact for
-    // color shading. Idempotent: skipped if the attribute already exists.
-    if (appliedMaterial?.displacementMap) {
-      addSharedDisplacementNormal(mesh.geometry)
-    }
-  })
 }
 
 // Shared props for per-format components
@@ -258,6 +125,30 @@ function usePerMaterialTextures(
   )
   const texturesReady = hasTextures && Object.keys(loadedTextures).length > 0
   return { loadedTextures, texturesReady }
+}
+
+/**
+ * Dispose the materials of a previously-built clone before it is dropped.
+ * applyMaterialTextures allocates fresh MeshPhysicalMaterials on every rebuild
+ * (texture-ready toggle, texture-set change), so without this the old GPU
+ * materials leak for the lifetime of the viewing session. Geometries are NOT
+ * disposed: Object3D.clone() shares geometry with the source model, and the
+ * loaded textures are owned by the extraction hook's cache — disposing either
+ * here would corrupt the still-live original.
+ */
+function disposePreviousClone(group: THREE.Object3D): void {
+  const seen = new Set<THREE.Material>()
+  group.traverse(child => {
+    const mesh = child as THREE.Mesh
+    if (!mesh.isMesh) return
+    const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+    for (const mat of mats) {
+      if (mat && !seen.has(mat)) {
+        seen.add(mat)
+        mat.dispose()
+      }
+    }
+  })
 }
 
 /** Shared logic: clone model, apply per-material textures, scale and center */
@@ -300,6 +191,7 @@ function setupModel(
   clonedModel.position.y -= scaledBox.min.y
 
   if (meshRef.current) {
+    disposePreviousClone(meshRef.current)
     meshRef.current.clear()
     meshRef.current.add(clonedModel)
   }
@@ -456,6 +348,107 @@ function FBXModelWithTextures({
   return <group ref={meshRef} />
 }
 
+// STL Model with per-material textures. STLLoader returns raw BufferGeometry,
+// so wrap it in a Mesh + Group before the shared setup applies textures.
+function STLModelWithTextures({
+  modelUrl,
+  rotationSpeed,
+  materialTextureSets,
+}: FormatComponentProps) {
+  const meshRef = useRef<THREE.Group>(null)
+  const { setModelObject } = useModelObject()
+  const scaledRef = useRef(false)
+  const { gl: renderer } = useThree()
+
+  useFrame(() => {
+    if (meshRef.current && rotationSpeed > 0) {
+      meshRef.current.rotation.y += rotationSpeed
+    }
+  })
+
+  const geometry = useLoader(STLLoader, modelUrl, loader => {
+    loader.manager = safeLoadingManager
+  })
+  // Shared wrap; setupModel's per-material textures replace this material.
+  const model = useMemo(() => buildStlModel(THREE, geometry), [geometry])
+  const { loadedTextures, texturesReady } = usePerMaterialTextures(
+    materialTextureSets,
+    renderer,
+    true
+  )
+
+  useEffect(() => {
+    scaledRef.current = false
+  }, [model, materialTextureSets, texturesReady])
+
+  useEffect(() => {
+    setupModel(
+      model,
+      materialTextureSets,
+      loadedTextures,
+      texturesReady,
+      meshRef,
+      scaledRef
+    )
+  }, [model, materialTextureSets, loadedTextures, texturesReady])
+
+  useEffect(() => {
+    if (model) setModelObject(model)
+    return () => setModelObject(null)
+  }, [model, setModelObject])
+
+  return <group ref={meshRef} />
+}
+
+// 3MF Model with per-material textures
+function ThreeMFModelWithTextures({
+  modelUrl,
+  rotationSpeed,
+  materialTextureSets,
+}: FormatComponentProps) {
+  const meshRef = useRef<THREE.Group>(null)
+  const { setModelObject } = useModelObject()
+  const scaledRef = useRef(false)
+  const { gl: renderer } = useThree()
+
+  useFrame(() => {
+    if (meshRef.current && rotationSpeed > 0) {
+      meshRef.current.rotation.y += rotationSpeed
+    }
+  })
+
+  const model = useLoader(ThreeMFLoader, modelUrl, loader => {
+    loader.manager = safeLoadingManager
+  })
+  const { loadedTextures, texturesReady } = usePerMaterialTextures(
+    materialTextureSets,
+    renderer,
+    true
+  )
+
+  useEffect(() => {
+    scaledRef.current = false
+  }, [modelUrl, materialTextureSets, texturesReady])
+
+  useEffect(() => {
+    setupModel(
+      model,
+      materialTextureSets,
+      loadedTextures,
+      texturesReady,
+      meshRef,
+      scaledRef
+    )
+  }, [model, materialTextureSets, loadedTextures, texturesReady])
+
+  useEffect(() => {
+    if (model) setModelObject(model)
+    return () => setModelObject(null)
+  }, [model, setModelObject])
+
+  return <group ref={meshRef} />
+}
+
 export function TexturedModel({
   modelUrl,
   fileExtension,
@@ -483,6 +476,24 @@ export function TexturedModel({
   if (fileExtension === 'gltf' || fileExtension === 'glb') {
     return (
       <GLTFModelWithTextures
+        modelUrl={modelUrl}
+        rotationSpeed={rotationSpeed}
+        materialTextureSets={materialTextureSets}
+      />
+    )
+  }
+  if (fileExtension === 'stl') {
+    return (
+      <STLModelWithTextures
+        modelUrl={modelUrl}
+        rotationSpeed={rotationSpeed}
+        materialTextureSets={materialTextureSets}
+      />
+    )
+  }
+  if (fileExtension === '3mf') {
+    return (
+      <ThreeMFModelWithTextures
         modelUrl={modelUrl}
         rotationSpeed={rotationSpeed}
         materialTextureSets={materialTextureSets}
