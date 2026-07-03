@@ -1,123 +1,114 @@
+<div align="center">
+
 # Modelibr
 
-[![.NET](https://img.shields.io/badge/.NET-9.0-512BD4)](https://dotnet.microsoft.com/)
-[![React](https://img.shields.io/badge/React-19-61DAFB)](https://react.dev/)
-[![Three.js](https://img.shields.io/badge/Three.js-0.180-000000)](https://threejs.org/)
-[![Docker](https://img.shields.io/badge/Docker-Supported-2496ED)](https://www.docker.com/)
-[![License](https://img.shields.io/badge/License-BSL_1.1-blue)](LICENSE)
+**Every game asset you own — models, textures, sprites, sounds, scripts — in one self-hosted, local-first library.**
 
-Modelibr is a self-hosted game asset library. It keeps **models**, **texture sets**, **environment maps**, **sprites**, and **sounds** in one place, lets you preview them in the browser, and helps you organize them into **projects** and reusable **packs**.
+[![Latest release](https://img.shields.io/github/v/release/Papyszoo/Modelibr?label=release)](https://github.com/Papyszoo/Modelibr/releases/latest)
+[![License](https://img.shields.io/badge/license-BSL_1.1-blue)](LICENSE)
+[![Discord](https://img.shields.io/badge/chat-Discord-5865F2)](https://discord.gg/KgwgTDVP3F)
 
-Native installers for Windows, macOS, and Linux are published in the GitHub Releases page. They bundle the local web UI, WebApi, asset processor, and PostgreSQL so non-technical users can run Modelibr without setting up Docker.
+[**Website**](https://papyszoo.github.io/Modelibr/) · [**Live demo**](https://papyszoo.github.io/Modelibr/demo/) · [**Docs**](https://papyszoo.github.io/Modelibr/docs) · [**Discord**](https://discord.gg/KgwgTDVP3F) · [**Issues**](https://github.com/Papyszoo/Modelibr/issues)
 
-**[Main Site](https://papyszoo.github.io/Modelibr/)** | **[Documentation](https://papyszoo.github.io/Modelibr/docs)** | **[Live Demo](https://papyszoo.github.io/Modelibr/demo/)** | **[Discord](https://discord.gg/KgwgTDVP3F)** | **[GitHub Issues](https://github.com/Papyszoo/Modelibr/issues)**
+<!-- TODO: hero screenshot of a populated library — capture and uncomment:
+![Modelibr library and 3D viewer](docs/static/img/screenshots/hero.png)
+-->
 
-The live demo stores its data in your browser, so what you add there is visible only to you.
+**[Try the live demo →](https://papyszoo.github.io/Modelibr/demo/)**
+No install, no account — demo data stays in your browser.
 
----
-
-## Main features
-
-| Title | Description |
-| --- | --- |
-| **All your asset types in one place** | Store models, texture sets, environment maps, sprites, and sounds in the same library instead of spreading them across different tools. |
-| **Projects and packs** | Group assets into project-specific collections or reusable packs you can use again later. |
-| **Model version history** | Keep multiple versions of the same model and switch between them when needed. |
-| **Built-in previews** | Browse models, environment maps, sprites, and sounds with generated previews, including a lit Three.js environment map viewer. |
-| **Environment map variants** | Upload panoramic files or six cube faces (`px/nx/py/ny/pz/nz`), keep multiple size variants, choose the preview variant, and override it with a custom thumbnail when needed. |
-| **Texture set workflows** | Attach texture sets to model versions, choose defaults, and work with channel-packed maps. |
-| **Dual-panel workspace** | Open tabs side by side and keep your current layout in the URL for easy sharing and return visits. |
-| **WebDAV access** | Work with the library through a file-browser style workflow when that fits better than a browser-only flow. |
-| **Blender CLI at runtime** | Download Blender CLI from Settings when you need it instead of treating it as a fixed install requirement from day one. |
-| **Recycle bin and deduplication** | Restore deleted assets and avoid wasting storage on identical files. |
+</div>
 
 ---
 
-## Quick start
+## Why Modelibr
 
-### Native installers
+Your assets never leave your machine. Modelibr runs fully locally — no cloud, no
+account, no internet required once it's running. Instead of five folders and a
+spreadsheet, you get one searchable library with real previews for everything a
+game project accumulates.
 
-Download the installer for your platform from the GitHub Releases page and run it. Two installers are published:
+- 🗂️ **Every asset type in one place** — 3D models, texture sets, environment maps, sprites, sounds, and scripts
+- 🔍 **Previews built in** — orbit models in a lit Three.js viewer, audition sounds, flip through sprites, inspect environment maps
+- 🎨 **Texture set workflows** — attach texture sets to model versions, choose defaults, and work with channel-packed maps
+- 📜 **Scripts with live previews** — keep shaders and source snippets with syntax highlighting and in-page shader/scene previews
+- 📦 **Projects & packs** — group assets per project, or build reusable packs you'll reach for again
+- 🕘 **Version history** — keep every iteration of a model and switch between them
+- 🖥️ **Dual-panel workspace** — open tabs side by side; your layout lives in the URL for easy sharing and return visits
+- 🪟 **WebDAV drive** — mount the library like a folder and save from Blender straight into it; Blender CLI downloads at runtime from Settings
+- ♻️ **Recycle bin & deduplication** — undo deletes; identical files are stored once
 
-- **Modelibr** (host) — the full self-contained app for users who can't run the Docker stack. It bundles the database, WebApi, and worker runtime and runs from a tray / menu-bar icon. Open its **Show Status** window for live service health, the frontend URL, and a **Configuration** panel (app port, worker process count, jobs per worker, GPU acceleration). The host checks GitHub Releases for newer versions and surfaces an update prompt in the tray and status window.
-- **Modelibr Client** (optional) — a thin desktop window that opens a running host in its own app frame instead of a browser tab. Point it at the host URL shown in the host's status window.
+## Install
 
-The app and WebDAV are exposed on the same local configurable port.
+### Desktop app (easiest)
+
+Download **Modelibr** for your platform from the [latest release](https://github.com/Papyszoo/Modelibr/releases/latest) — Windows `.exe`, macOS `.dmg`, or Linux `.AppImage`/`.deb`. It bundles the database, API, and render worker, lives in your tray, and updates itself. Open **Show Status** for service health, the frontend URL, and configuration (port, worker count, GPU acceleration).
+
+The separate **Modelibr Client** download is an optional thin window for connecting to a host running elsewhere — point it at the URL shown in the host's status window.
+
+> macOS builds are not yet code-signed, so in-app updates are limited on macOS for now — download the new `.dmg` from Releases instead.
 
 ### Docker
 
 ```bash
-git clone https://github.com/Papyszoo/Modelibr.git
-cd Modelibr
+git clone https://github.com/Papyszoo/Modelibr.git && cd Modelibr
 cp .env.example .env
 docker compose up -d
 ```
 
-Open **https://localhost:3010** in your browser. The first visit uses a self-signed certificate, so your browser may ask you to continue manually.
+Then open **https://localhost:3010** (the self-signed certificate will ask you to continue manually).
 
----
+Your data lives in PostgreSQL plus the upload/thumbnail volumes configured in `.env` — back those up and you've backed up everything. To update: `git pull && docker compose up -d --build`.
 
-## WebDAV and Blender
+## Supported formats
 
-- WebDAV gives Modelibr a more file-browser style workflow, which is useful when you want the library to sit closer to art-pipeline tools.
-- Environment maps are exposed through WebDAV globally and inside packs/projects, alongside the rest of the library.
-- Native installers expose WebDAV through the local launcher port by default.
-- Blender-related flows are part of the repository, and Blender CLI can be downloaded at runtime from the Settings page when you want that workflow.
-- If you want more detail, start with the [main site](https://papyszoo.github.io/Modelibr/) and the [documentation](https://papyszoo.github.io/Modelibr/docs).
+| Asset type | Formats |
+| --- | --- |
+| **3D models** | `.obj` `.fbx` `.gltf` `.glb` `.stl` `.3mf`, plus `.blend` project files |
+| **Textures** | `.png` `.jpg` `.tga` `.bmp` `.tif` `.exr`, with channel-packed map support |
+| **Environment maps** | `.hdr` / `.exr` / image panoramas, or six cube faces (`px nx py ny pz nz`) |
+| **Sprites** | `.png` `.gif` `.webp` `.apng`, including sprite sheets |
+| **Sounds** | `.mp3` `.wav` `.ogg` `.flac` `.aac` `.m4a` |
+| **Scripts** | Common source and shader files (JavaScript, TypeScript, Python, C#, Lua, GLSL, HLSL, GDScript, …) |
 
----
+## Learn more
 
-## Read more
+[Getting started](https://papyszoo.github.io/Modelibr/docs) · [Models](https://papyszoo.github.io/Modelibr/docs/features/models) · [Texture sets](https://papyszoo.github.io/Modelibr/docs/features/texture-sets) · [Environment maps](https://papyszoo.github.io/Modelibr/docs/features/environment-maps) · [Packs](https://papyszoo.github.io/Modelibr/docs/features/packs) · [Projects](https://papyszoo.github.io/Modelibr/docs/features/projects) · [WebDAV](https://papyszoo.github.io/Modelibr/docs/features/webdav) · [User interface](https://papyszoo.github.io/Modelibr/docs/features/user-interface) · [Roadmap](https://papyszoo.github.io/Modelibr/docs/roadmap) · [Changelog](https://papyszoo.github.io/Modelibr/docs/changelog)
 
-- [Getting Started](https://papyszoo.github.io/Modelibr/docs)
-- [Model Management](https://papyszoo.github.io/Modelibr/docs/features/models)
-- [Texture Sets](https://papyszoo.github.io/Modelibr/docs/features/texture-sets)
-- [Environment Maps](https://papyszoo.github.io/Modelibr/docs/features/environment-maps)
-- [Packs](https://papyszoo.github.io/Modelibr/docs/features/packs)
-- [Projects](https://papyszoo.github.io/Modelibr/docs/features/projects)
-- [User Interface](https://papyszoo.github.io/Modelibr/docs/features/user-interface)
+## Development
 
----
+<details>
+<summary><strong>Stack, dev loop, and tests</strong></summary>
 
-## Testing
+| Part | Stack |
+| --- | --- |
+| `src/WebApi` + `Application`/`Domain`/`Infrastructure` | .NET 9 minimal API, Clean Architecture, CQRS, PostgreSQL (EF Core) |
+| `src/frontend` | React 19 + TypeScript + Vite, Three.js |
+| `src/asset-processor` | Node.js worker — thumbnails and renders via Puppeteer + Three.js + Blender CLI |
+| `src/desktop` | Electron tray host and thin-client installers |
+
+`docker compose up -d` brings up the full stack for development too.
 
 ```bash
-npm run test:all        # run any subset of the 10 test suites (interactive picker)
+npm run test:all        # run any subset of the test suites (interactive picker)
 npm run test:all:full   # run everything, non-interactive
-npm run test:site       # Test Studio — browse every test, CI lanes, timings; run with live output
-npm run test:audit      # flag test suites not tracked by the runner manifest
+npm run test:site       # Test Studio — browse every test, CI lanes, timings
+npm run test:audit      # flag suites missing from the runner manifest
 ```
 
-Suites are self-contained (Docker stacks start/stop themselves). See
+Suites are self-contained (Docker stacks start and stop themselves). See
 [scripts/test-runner](scripts/test-runner/README.md) and
 [scripts/test-catalog](scripts/test-catalog/README.md).
 
----
+</details>
 
-## Supported model uploads
-
-- `.obj`
-- `.fbx`
-- `.gltf`
-- `.glb`
-- `.blend`
-
-## Supported environment map uploads
-
-- panoramic uploads in common image formats supported by the preview pipeline
-- `.hdr`
-- `.exr`
-- six-face cube uploads using `px`, `nx`, `py`, `ny`, `pz`, and `nz`
-
----
+Contributions are welcome — open PRs against the current `version/x.y.z` branch (`main` tracks released versions), and use [conventional commits](https://www.conventionalcommits.org/).
 
 ## Feedback and bug reports
 
 - **Feature requests and general feedback:** [Discord](https://discord.gg/KgwgTDVP3F)
-- **Bug reports:** [Discord](https://discord.gg/KgwgTDVP3F) or [GitHub Issues](https://github.com/Papyszoo/Modelibr/issues)
-
----
+- **Bug reports:** [GitHub Issues](https://github.com/Papyszoo/Modelibr/issues) or Discord
 
 ## License
 
-Business Source License 1.1 — free to use, modify, and self-host. See [LICENSE](LICENSE) for details.
+[Business Source License 1.1](LICENSE) — free to use, modify, and self-host, including inside commercial teams, forever. The only restriction: you may not use it to run a competing public asset marketplace.
