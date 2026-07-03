@@ -1,10 +1,10 @@
 ---
-sidebar_position: 7
+sidebar_position: 8
 ---
 
 # Projects
 
-Projects in Modelibr let you group related assets together for organized workflows. A project can contain models, texture sets, environment maps, sprites, and sounds — everything needed for a game level, scene, or creative work.
+Projects in Modelibr let you group related assets together for organized workflows. A project can contain models, texture sets, environment maps, sprites, sounds, and scripts — everything needed for a game level, scene, or creative work.
 
 <div className="feature-video-container">
   <video controls width="100%" autoPlay muted loop>
@@ -31,6 +31,7 @@ Click any project card to open the Project Viewer, which shows all assets organi
 | **Environment Maps** | Panoramic or cube-based lighting assets with their variants |
 | **Sprites**      | 2D image assets                 |
 | **Sounds**       | Audio files                     |
+| **Scripts**      | Source code and shader assets   |
 
 ### Adding Assets
 
