@@ -15,7 +15,12 @@ Feature: Model 3D Viewer Rendering
     And the viewer controls should be visible
     And I take a screenshot of the 3D model rendering
 
-  @ui @controls
+  # @serial: opening the viewer page waits for the 3D canvas to become ready.
+  # On GitHub's GPU-less runners the SwiftShader software render times out at
+  # the drained-runner tail (this scenario flaked on the v0.3.0 main push);
+  # it passes on a real GPU, so it runs on the local GPU lane only. See
+  # CLAUDE.md testing rule 3.
+  @ui @controls @serial
   Scenario: Menubar controls are accessible
     Given I am on the model viewer page for "multi-version-model"
     Then the following control buttons should be visible:

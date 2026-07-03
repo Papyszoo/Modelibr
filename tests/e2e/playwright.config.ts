@@ -28,13 +28,11 @@ export default defineConfig({
     // Retries only re-run failed tests, so they don't weaken anything; raising
     // them via PW_RETRIES helps the flaky-timeout tail on slow runners pass.
     retries: process.env.PW_RETRIES ? parseInt(process.env.PW_RETRIES, 10) : 1,
-    // Workers are controlled per-phase by run-e2e.js:
-    //   setup    → --workers=1  (sequential, avoids asset-processor overload)
-    //   chromium → --workers=2  (local) / --workers=4  (CI)
-    //
-    // 2 workers locally reduces database and asset-processor contention,
-    // eliminating most parallel timing issues while keeping run time reasonable.
-    // When running manually, default to 2.
+    // Workers are controlled per-phase by run-e2e.js (see its comments for the
+    // current counts — chromium runs 3 both locally and on CI; 4 caused
+    // asset-processor contention). This value is only the fallback for manual
+    // `npx playwright test` runs without PW_WORKERS; 2 keeps database and
+    // asset-processor contention low for ad-hoc runs.
     workers: parseInt(process.env.PW_WORKERS || "2", 10),
     // The JSON reporter writes a machine-readable run summary (incl. each
     // failure's message + the path to its trace/screenshot under test-results/)
