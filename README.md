@@ -73,7 +73,7 @@ Your data lives in PostgreSQL plus the upload/thumbnail volumes configured in `.
 
 ## Learn more
 
-[Getting started](https://papyszoo.github.io/Modelibr/docs) · [Models](https://papyszoo.github.io/Modelibr/docs/features/models) · [Texture sets](https://papyszoo.github.io/Modelibr/docs/features/texture-sets) · [Environment maps](https://papyszoo.github.io/Modelibr/docs/features/environment-maps) · [Packs](https://papyszoo.github.io/Modelibr/docs/features/packs) · [Projects](https://papyszoo.github.io/Modelibr/docs/features/projects) · [WebDAV](https://papyszoo.github.io/Modelibr/docs/features/webdav) · [User interface](https://papyszoo.github.io/Modelibr/docs/features/user-interface) · [Roadmap](https://papyszoo.github.io/Modelibr/docs/roadmap) · [Changelog](https://papyszoo.github.io/Modelibr/docs/changelog)
+[Getting started](https://papyszoo.github.io/Modelibr/docs) · [Models](https://papyszoo.github.io/Modelibr/docs/features/models) · [Texture sets](https://papyszoo.github.io/Modelibr/docs/features/texture-sets) · [Environment maps](https://papyszoo.github.io/Modelibr/docs/features/environment-maps) · [Packs](https://papyszoo.github.io/Modelibr/docs/features/packs) · [Projects](https://papyszoo.github.io/Modelibr/docs/features/projects) · [WebDAV](https://papyszoo.github.io/Modelibr/docs/features/webdav) · [User interface](https://papyszoo.github.io/Modelibr/docs/features/user-interface) · [Changelog](https://papyszoo.github.io/Modelibr/docs/changelog)
 
 ## Development
 
