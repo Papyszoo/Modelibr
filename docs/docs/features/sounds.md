@@ -19,7 +19,7 @@ Modelibr includes a built-in sound manager for organizing audio assets alongside
 
 Drag audio files directly onto the Sound Library panel to upload them.
 
-**Supported formats:** WAV, MP3, OGG, FLAC
+**Supported formats:** WAV, MP3, OGG, FLAC, AAC, M4A
 
 ### What Happens After Upload
 

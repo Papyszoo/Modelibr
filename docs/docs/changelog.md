@@ -5,7 +5,43 @@ title: Changelog
 
 # Changelog
 
-History of completed features and improvements.
+Full, always-current release notes live on
+[**GitHub Releases**](https://github.com/Papyszoo/Modelibr/releases) — that's
+the canonical changelog. Highlights per release:
+
+## v0.3.1 (2026-07-03)
+
+- Windows in-app self-update now installs silently and relaunches correctly
+- File types are resolved from a single registry when reading from the database, fixing newer asset types being mapped to Unknown
+- CI hardening: installer smoke tests, GPU-render E2E moved to a real-GPU lane, resilient docs-video generation
+
+## v0.3.0 (2026-07-02)
+
+- **STL and 3MF** model support
+- **Tags for every asset type** with per-asset-type vocabularies, plus tag filtering for texture sets
+- three.js r185 with a local-first preview environment (no CDN dependency) and an opt-in performance overlay
+- One shared render pipeline across the viewer, thumbnail worker, and demo, so all three render consistently
+
+## v0.2.1 (2026-06-20)
+
+- **Updates are now opt-in** — Modelibr tells you when a new version is available; you choose when to download and install it
+
+## v0.2.0 (2026-06-20)
+
+- **Global Search (Ctrl/⌘ + K)** across every asset type with result highlighting
+- **Scripts** as a new asset type — code editor, starter templates, live in-page shader/scene preview
+- Richer asset metadata: geometry, animation, and bone data extracted from models and wired into list filters
+
+## v0.1.0 (2026-06-12)
+
+- First release with **native installers** for Windows, macOS, and Linux — a tray host app bundling the full stack, plus an optional thin desktop client
+- Automatic update checks, LAN access opt-in, data that survives upgrades and uninstalls
+
+---
+
+## Pre-release development notes
+
+History of features completed before the first installable release.
 
 ---
 

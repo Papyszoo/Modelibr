@@ -4,7 +4,7 @@ sidebar_position: 3
 
 # Recycled Files
 
-The Recycle Bin provides a safety net for deleted items, allowing you to recover accidentally deleted models, versions, texture sets, environment maps, sprites, and sounds.
+The Recycle Bin provides a safety net for deleted items, allowing you to recover accidentally deleted models, versions, texture sets, environment maps, sprites, sounds, and scripts.
 
 <div className="feature-video-container">
   <video controls width="100%" autoPlay muted loop>
@@ -30,6 +30,7 @@ Navigate to the **Recycled Files** tab in the left panel.
 | **Environment Map Variants** | Single size variant recycled, environment map remains |
 | **Sprites**        | Removed from sprite sheets             |
 | **Sounds**         | Sound entry recycled with its audio file |
+| **Scripts**        | Script recycled with its source file   |
 
 ## Restoring Items
 

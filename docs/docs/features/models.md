@@ -21,7 +21,7 @@ The easiest way to upload models is to drag and drop files directly onto the Mod
 
 ![Model List](/img/screenshots/model-list.png)
 
-**Supported formats:** GLB, GLTF, FBX, OBJ, Blend
+**Supported formats:** GLB, GLTF, FBX, OBJ, STL, 3MF, Blend
 
 ### What Happens After Upload
 
