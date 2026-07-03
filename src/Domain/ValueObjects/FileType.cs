@@ -212,6 +212,37 @@ public sealed class FileType : IEquatable<FileType>
 
     public static IReadOnlyList<FileType> GetScriptTypes() => ScriptTypes;
 
+    // Canonical registry of every predefined FileType. FromValue (the database
+    // read-side lookup) and the drift-guard tests are built from this list — a
+    // new FileType MUST be added here, or it will round-trip from the database
+    // as Unknown (the exact bug this registry exists to prevent; a test asserts
+    // the list matches the static fields above). Lazy so the declaration order
+    // of the static fields can never leave a null in the list.
+    private static readonly Lazy<IReadOnlyList<FileType>> AllTypes = new(() => new[]
+    {
+        Unknown, Obj, Fbx, Gltf, Glb, Stl, ThreeMf,
+        Blend, Max, Maya,
+        Texture, Hdr, Material, Other,
+        Sprite, SpriteSheet, Gif, Apng, WebP,
+        Mp3, Wav, Ogg, Flac, Aac, M4a,
+        JavaScript, TypeScript, Python, CSharp, Cpp, Lua, Java, Go, Rust,
+        Ruby, Php, Shell, Sql, Json, Yaml, Xml, Glsl, Hlsl, GdScript
+    });
+
+    private static readonly Lazy<IReadOnlyDictionary<string, FileType>> ValueMap = new(() =>
+        AllTypes.Value.ToDictionary(t => t.Value, StringComparer.OrdinalIgnoreCase));
+
+    public static IReadOnlyList<FileType> GetAllTypes() => AllTypes.Value;
+
+    /// <summary>
+    /// Resolves a persisted <see cref="Value"/> string back to its FileType.
+    /// Unrecognized values (legacy or corrupt data) fall back to <see cref="Unknown"/>.
+    /// </summary>
+    public static FileType FromValue(string? value)
+        => value is not null && ValueMap.Value.TryGetValue(value, out var fileType)
+            ? fileType
+            : Unknown;
+
     // Canonical extension for each script language id — used when authoring a
     // script in-app (no uploaded file), to synthesize a file name.
     private static readonly Dictionary<string, string> ScriptLanguageExtensions = new(StringComparer.OrdinalIgnoreCase)
