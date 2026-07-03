@@ -132,8 +132,18 @@ async function addModelToOpenPack(page, modelName, modelId) {
     });
 }
 
+// Some demo scenarios open 3D canvases / render-heavy views. On GitHub's
+// GPU-less runners these fall back to SwiftShader software WebGL and time out at
+// the drained-runner tail (they pass 15/15 locally on a real GPU — see the note
+// in playwright.demo.config.ts). Such scenarios are tagged `@serial` so they run
+// on the local GPU lane only and are excluded from the GPU-less CI fast lane
+// (run-e2e-fast.js passes --grep-invert=@serial to the demo phase). The tagged
+// three below all flaked on the v0.3.0 main push. See CLAUDE.md testing rule 3.
 test.describe("demo mode e2e", () => {
-    test("shows seeded demo libraries across tabs", async ({ page }) => {
+    // @serial: demo SPA boot times out under software WebGL at the CI tail.
+    test("shows seeded demo libraries across tabs", { tag: "@serial" }, async ({
+        page,
+    }) => {
         const modelListPage = new ModelListPage(page);
         const environmentMapsPage = new EnvironmentMapsPage(page);
         const textureSetsPage = new TextureSetsPage(page);
@@ -231,7 +241,8 @@ test.describe("demo mode e2e", () => {
         ).toContainText("Basic Texture Set");
     });
 
-    test("uploads a model and records it in upload history", async ({
+    // @serial: asserts the model-viewer <canvas> is visible — GPU render flake.
+    test("uploads a model and records it in upload history", { tag: "@serial" }, async ({
         page,
     }) => {
         const upload = await createUploadCopy(
@@ -260,7 +271,10 @@ test.describe("demo mode e2e", () => {
         }
     });
 
-    test("creates, recycles, and restores a texture set", async ({ page }) => {
+    // @serial: texture-set preview render waits time out under software WebGL.
+    test("creates, recycles, and restores a texture set", { tag: "@serial" }, async ({
+        page,
+    }) => {
         const textureSetsPage = new TextureSetsPage(page);
         const recycledFilesPage = new RecycledFilesPage(page);
         const textureSetName = `Demo Runtime Texture Set ${Date.now()}`;
