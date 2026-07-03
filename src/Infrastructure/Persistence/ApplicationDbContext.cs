@@ -343,11 +343,13 @@ namespace Infrastructure.Persistence
                 entity.Property(f => f.IsDeleted).IsRequired();
                 entity.Property(f => f.DeletedAt);
                 
-                // Configure FileType Value Object to be stored as string
+                // Configure FileType Value Object to be stored as string.
+                // Read side resolves through the FileType registry so both
+                // directions share one source of truth (see FileType.FromValue).
                 entity.Property(f => f.FileType)
                     .HasConversion(
                         v => v.Value,
-                        v => MapFromDatabaseValue(v))
+                        v => FileType.FromValue(v))
                     .IsRequired();
 
                 // Add index for efficient soft delete queries
@@ -1106,38 +1108,6 @@ namespace Infrastructure.Persistence
             });
 
             base.OnModelCreating(modelBuilder);
-        }
-
-        private static FileType MapFromDatabaseValue(string value)
-        {
-            return value switch
-            {
-                "obj" => FileType.Obj,
-                "fbx" => FileType.Fbx,
-                "gltf" => FileType.Gltf,
-                "glb" => FileType.Glb,
-                "stl" => FileType.Stl,
-                "3mf" => FileType.ThreeMf,
-                "blend" => FileType.Blend,
-                "max" => FileType.Max,
-                "maya" => FileType.Maya,
-                "texture" => FileType.Texture,
-                "material" => FileType.Material,
-                "sprite" => FileType.Sprite,
-                "spritesheet" => FileType.SpriteSheet,
-                "gif" => FileType.Gif,
-                "apng" => FileType.Apng,
-                "webp" => FileType.WebP,
-                "mp3" => FileType.Mp3,
-                "wav" => FileType.Wav,
-                "ogg" => FileType.Ogg,
-                "flac" => FileType.Flac,
-                "aac" => FileType.Aac,
-                "m4a" => FileType.M4a,
-                "hdr" => FileType.Hdr,
-                "other" => FileType.Other,
-                _ => FileType.Unknown
-            };
         }
     }
 }

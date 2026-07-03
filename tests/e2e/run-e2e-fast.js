@@ -171,7 +171,12 @@ async function main() {
     console.log("\n📋 Demo tests: skipped (SKIP_DEMO_PHASE=1)\n");
   } else {
     console.log(`\n📋 Phase ${fastOnly ? 3 : 5}: Demo tests (workers=1)\n`);
-    demoResult = run(`node run-demo-e2e.js ${args}`, {
+    // In the fast lane (CI), exclude @serial demo scenarios: they open 3D
+    // canvases / render-heavy views that flake on GitHub's GPU-less runners
+    // (SwiftShader software WebGL). They still run on the local GPU lane via
+    // the full runner (run-e2e.js), which does not pass this filter.
+    const demoArgs = fastOnly ? `${args} --grep-invert=@serial` : args;
+    demoResult = run(`node run-demo-e2e.js ${demoArgs}`, {
       env: testEnv,
     });
     preserveBlobs("demo");
