@@ -30,8 +30,12 @@ folders are numbered (`00-texture-sets/` …) to control ordering.
   `npx bddgen && npx playwright test --grep "<scenario name>" --no-deps`
   (seed first with `PW_WORKERS=1 npx playwright test --project=setup`).
 - Artifact env knobs: `PW_VIDEO`, `PW_TRACE`, `PW_SCREENSHOT`, `PW_RETRIES`,
-  `PW_HEADED`, `PW_WORKERS`. Default trace is `on-first-retry`; force capture on a
-  single run with `PW_TRACE=on` (or `retain-on-failure`).
+  `PW_HEADED`, `PW_WORKERS`, `PW_TEST_TIMEOUT` (per-test ms, default 90s to
+  absorb Puppeteer cold-start). Default trace is `on-first-retry`; force
+  capture on a single run with `PW_TRACE=on` (or `retain-on-failure`).
+- Phase worker counts are set by `run-e2e.js` (chromium currently 3 local AND
+  CI — 4 caused asset-processor contention); trust run-e2e.js over the stale
+  comment in `playwright.config.ts`.
 
 ## Results & traces (read your own run output)
 A machine-readable **JSON report** (`status`, `error.message`, `attachments[]`)
@@ -76,18 +80,48 @@ For deeper triage (history, regression-vs-long-broken, infra signatures) use the
 
 ## Page objects & selectors
 - Page objects live in `tests/e2e/pages/` (fluent Playwright API, explicit
-  stability waits for React hydration and SignalR events). Extend these rather
-  than putting locators in steps.
-- Selector priority: `getByRole` → `data-testid` → `#id`; avoid CSS classes.
-  `data-testid` format: `{component}-{element}-{variant?}`.
+  stability waits for React hydration and SignalR events — page-object
+  `expect()` calls as stability waits are a deliberate convention here).
+  Extend these rather than putting locators in steps.
+- **Contract for NEW selectors:** `data-testid` (format
+  `{component}-{element}-{variant?}`; add the attribute to the frontend
+  component if missing) or `getByRole` where semantics fit. Reality check:
+  ~950 legacy CSS-class locators exist (`.model-card`, `.p-dialog`, …) —
+  they are **grandfathered, do not add more**. Prompt 46 adds a CI
+  drift-audit + a central PrimeReact selector module; until then, `.p-*`
+  classes are the accepted exception for PrimeReact body-mounted overlays
+  (dialogs, dropdown panels, toasts).
 - Grids are virtualized — wait for the specific card/locator, never assume all
   items are rendered (see past `fix(e2e)` commits for hardened wait patterns).
+
+## Waits & control flow (the flake rules)
+- **Web-first assertions are the default idiom**: `await
+  expect(locator).toBeVisible()/toHaveText()/toHaveCount()` — they retry.
+  `waitForSelector` is the legacy pattern (prompt 47 migrates it); don't
+  write new ones.
+- **No `waitForTimeout`** (CLAUDE.md rule 4). A "let React settle" sleep
+  means the NEXT assertion should be a retrying web-first one — write that
+  instead. Fixed intervals inside an explicit bounded poll loop are the one
+  exception; any surviving sleep needs a comment naming the race it absorbs.
+- **No branching on app state** (`if (await x.isVisible())` deciding the
+  test path) — the Given must produce ONE known state; fix provisioning
+  instead. Idempotent cleanup is fine but must be a named helper
+  (`dismissToastIfPresent`), not inline conditionals.
+- For endpoint-coupled actions, scope the wait to the exact request
+  (`waitForResponse` matched to method+path — see ModelViewerPage's
+  create-version pattern), not to generic loading states.
 
 ## Reload policy
 Avoid `page.reload()` when the UI updates reactively (SignalR, query
 invalidation); when unavoidable use `{ waitUntil: "domcontentloaded" }`.
 
 ## Quality bar
-One behavior per scenario; no placeholder assertions; verify full-stack flows at
-every relevant layer (UI + API + DB), not just one. Scenario names are grep keys
-and history identity — keep them stable.
+One behavior per scenario; no placeholder assertions (a `Then` must assert the
+behavior the scenario names — data/content, not just that a container
+rendered); verify full-stack flows at every relevant layer (UI + API + DB —
+`helpers/api-helper.ts` has the methods), not just one. Scenario names are
+grep keys and history identity — keep them stable.
+
+Planned hardening lives in `.claude/prompts/`: 46 (selector contract + CI
+drift audit), 47 (sleep/conditional cleanup, web-first migration, @serial
+reclamation after 41/42). Don't half-implement those as side effects.

@@ -16,8 +16,8 @@ locally; core behavior must never depend on hosted services.
 - Orchestration: Docker Compose (root `docker-compose.yml`; e2e has its own).
 
 **Domain-specific conventions live in skills** (auto-loaded when relevant):
-`backend-patterns`, `frontend-patterns`, `asset-processor-patterns`,
-`e2e-authoring`, `test-triage`. Skills are canonical agent docs — there is no
+`backend-patterns`, `frontend-patterns`, `frontend-test-authoring`,
+`asset-processor-patterns`, `webdav-patterns`, `e2e-authoring`, `test-triage`. Skills are canonical agent docs — there is no
 parallel "AI documentation" set. **If a skill claim contradicts the code, trust
 the code and fix the skill in the same session.**
 
