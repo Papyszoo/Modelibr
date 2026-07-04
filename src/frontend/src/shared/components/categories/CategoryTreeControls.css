@@ -1,15 +1,18 @@
+/* Default look = the quiet sidebar: transparent (sits on whatever surface the
+   page provides), tight rows, primary-tint selection. This is the app-wide
+   categories standard — don't re-add per-page backgrounds or frames. */
 .category-tree-panel {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  background: var(--surface-card);
-  border-bottom: 1px solid var(--surface-border);
+  gap: 0.25rem;
+  padding: 0.5rem;
+  background: transparent;
   flex-shrink: 0;
 }
 
+/* Framed variant for use inside dialogs/popovers where the tree needs its
+   own boundary. */
 .category-tree-panel.is-compact {
-  padding: 0.5rem;
   border: 1px solid var(--surface-border);
   border-radius: 8px;
 }
@@ -22,13 +25,15 @@
   width: 100%;
 }
 
+/* The "Unassigned" row reads as part of the tree, not a button: transparent
+   until hovered, selection = primary tint (matches .p-highlight below). */
 .category-tree-unassigned {
-  border: 1px solid var(--surface-border);
-  border-radius: 8px;
-  padding: 0.625rem 0.875rem;
-  background: var(--surface-ground);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 0.3rem 0.5rem;
+  background: transparent;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background 0.15s ease;
 }
 
 .category-tree-unassigned:hover {
@@ -36,9 +41,9 @@
 }
 
 .category-tree-unassigned.is-active {
-  background: var(--primary-color);
-  color: var(--primary-color-text);
-  border-color: var(--primary-color);
+  background: rgba(var(--primary-color-rgb), 0.12);
+  border-color: rgba(var(--primary-color-rgb), 0.24);
+  color: var(--text-color);
 }
 
 .category-tree-unassigned.is-drag-over,
@@ -62,7 +67,7 @@
 }
 
 .category-tree-unassigned.is-active .category-tree-count {
-  color: inherit;
+  color: var(--text-color-secondary);
 }
 
 .category-tree {

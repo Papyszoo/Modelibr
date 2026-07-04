@@ -197,3 +197,46 @@
     display: none;
   }
 }
+
+/* ── ListToolbarSearchInput chrome ──────────────────────────────────────
+   Moved here from FilterPanel.css: these classes are emitted by
+   ListToolbarSearchInput, so its own stylesheet must style them — the
+   design-system gallery renders primitives in isolation and exposes any
+   styles leaking in from other components' CSS files. */
+.list-filters-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: var(--surface-ground);
+  border: 1px solid var(--surface-border);
+  border-radius: 10px;
+  transition: all 0.2s ease;
+  overflow: hidden;
+}
+
+.list-filters-search:focus-within {
+  border-color: var(--primary-color);
+  background: var(--surface-card);
+  box-shadow: 0 0 0 3px rgba(var(--primary-color-rgb, 100, 108, 255), 0.1);
+}
+
+.list-filters-search .pi-search {
+  color: var(--text-color-secondary);
+  font-size: var(--mod-text-sm);
+  padding: 0.75rem;
+  pointer-events: none;
+}
+
+.list-filters-search-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: var(--mod-text-sm);
+  color: var(--text-color);
+  padding: 0.75rem 0.75rem 0.75rem 0;
+}
+
+.list-filters-search-input::placeholder {
+  color: var(--text-color-secondary);
+}
