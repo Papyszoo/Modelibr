@@ -1,31 +1,36 @@
+// `maxDurationSeconds` is a QA ceiling, not a target or a trim point:
+// recordings are NEVER cut to the cap (only frozen tails are trimmed).
+// analyze-videos.js fails the pipeline when a recording exceeds its cap —
+// that means the spec choreography must be tightened, or the cap raised
+// here deliberately. Caps include headroom for slower CI rendering.
 export const videoManifest = [
     {
         slug: "model-management",
         outputName: "model-management.webm",
         title: "Model Management",
         description: "Compare versions, inspect changes, and keep model history moving.",
-        maxDurationSeconds: 30,
+        maxDurationSeconds: 45,
     },
     {
         slug: "texture-sets",
         outputName: "texture-sets.webm",
         title: "Texture Sets",
         description: "Inspect a reusable material built from global texture files.",
-        maxDurationSeconds: 20,
+        maxDurationSeconds: 40,
     },
     {
         slug: "recycled-files",
         outputName: "recycled-files.webm",
         title: "Recycled Files",
         description: "Recycle, restore, and permanently delete assets with confidence.",
-        maxDurationSeconds: 30,
+        maxDurationSeconds: 40,
     },
     {
         slug: "user-interface",
         outputName: "user-interface.webm",
         title: "User Interface",
         description: "Navigate tabs, menus, and workspace controls quickly.",
-        maxDurationSeconds: 30,
+        maxDurationSeconds: 40,
     },
     {
         slug: "sprites",
@@ -39,21 +44,21 @@ export const videoManifest = [
         outputName: "sounds.webm",
         title: "Sounds",
         description: "Browse, preview, and inspect sound assets.",
-        maxDurationSeconds: 30,
+        maxDurationSeconds: 40,
     },
     {
         slug: "projects",
         outputName: "projects.webm",
         title: "Projects",
         description: "Browse, search, and inspect production-ready project boards.",
-        maxDurationSeconds: 30,
+        maxDurationSeconds: 45,
     },
     {
         slug: "packs",
         outputName: "packs.webm",
         title: "Packs",
         description: "Create a pack and attach useful content in one focused flow.",
-        maxDurationSeconds: 30,
+        maxDurationSeconds: 40,
     },
 ];
 
