@@ -262,6 +262,13 @@ export function DesignSystemGallery() {
             onCategoryDragOver={noop}
             onCategoryDragLeave={noop}
             onCategoryDrop={noop}
+            renderNodeActions={category => (
+              <Button
+                icon="pi pi-pencil"
+                className="p-button-text p-button-sm"
+                aria-label={`Rename category ${category.name}`}
+              />
+            )}
           />
           <div className="dsg-category-demo-content dsg-label">
             content area — sidebar sits flat on the page surface, no frame

@@ -66,6 +66,35 @@
   color: var(--text-color-secondary);
 }
 
+/* Optional per-node actions (rename/delete) — hidden until the row is
+   hovered, focused, or selected, mirroring the manager dialog's rows.
+   Collapsed via max-width (not display) so :focus-within can still reveal,
+   and so the hidden buttons don't reserve width and crush the label. */
+.category-tree-node-actions {
+  display: inline-flex;
+  gap: 0.1rem;
+  flex-shrink: 0;
+  max-width: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition:
+    opacity 0.15s ease,
+    max-width 0.15s ease;
+}
+
+.category-tree .p-treenode-content:hover .category-tree-node-actions,
+.category-tree .p-treenode-content:focus-within .category-tree-node-actions,
+.category-tree .p-highlight .category-tree-node-actions,
+.category-tree .p-treenode-content.p-highlight .category-tree-node-actions {
+  max-width: 4.5rem;
+  opacity: 1;
+}
+
+.category-tree-node-actions .p-button.p-button-icon-only {
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
 .category-tree-unassigned.is-active .category-tree-count {
   color: var(--text-color-secondary);
 }
