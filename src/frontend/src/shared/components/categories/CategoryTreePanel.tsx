@@ -1,7 +1,7 @@
 import './CategoryTreeControls.css'
 
 import { Tree } from 'primereact/tree'
-import { useMemo } from 'react'
+import { type ReactNode, useMemo } from 'react'
 
 import { type HierarchicalCategory } from '@/shared/types/categories'
 import {
@@ -29,6 +29,12 @@ interface CategoryTreePanelProps<TCategory extends HierarchicalCategory> {
   unassignedCategoryId: number
   unassignedLabel?: string
   compact?: boolean
+  /**
+   * Optional per-category actions (e.g. rename/delete icon buttons),
+   * rendered at the end of the node row and revealed on hover/selection.
+   * Not rendered for the unassigned bucket.
+   */
+  renderNodeActions?: (category: TCategory) => ReactNode
 }
 
 export function CategoryTreePanel<TCategory extends HierarchicalCategory>({
@@ -44,6 +50,7 @@ export function CategoryTreePanel<TCategory extends HierarchicalCategory>({
   unassignedCategoryId,
   unassignedLabel = 'Unassigned',
   compact = false,
+  renderNodeActions,
 }: CategoryTreePanelProps<TCategory>) {
   const categoryNodes = useMemo(
     () => buildCategoryTree(categories),
@@ -106,6 +113,14 @@ export function CategoryTreePanel<TCategory extends HierarchicalCategory>({
                 <span className="category-tree-count">
                   ({categoryCounts.get(category.id) ?? 0})
                 </span>
+                {renderNodeActions && (
+                  <span
+                    className="category-tree-node-actions"
+                    onClick={e => e.stopPropagation()}
+                  >
+                    {renderNodeActions(category)}
+                  </span>
+                )}
               </div>
             )
           }}

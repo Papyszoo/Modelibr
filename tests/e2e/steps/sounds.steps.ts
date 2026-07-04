@@ -61,7 +61,11 @@ async function waitForSoundCategoryTab(page: any, categoryName: string) {
     for (let attempt = 0; attempt < 3; attempt += 1) {
         await waitForSoundsUiReady(page);
 
-        const categoryTabs = page.locator(".category-tab");
+        // Category rows in the shared CategoryTreePanel sidebar (unassigned
+        // bucket + tree nodes) — sounds no longer uses .category-tab tabs.
+        const categoryTabs = page.locator(
+            ".sound-category-sidebar .category-tree-unassigned, .sound-category-sidebar .category-tree .p-treenode-content",
+        );
         const tabCount = await categoryTabs.count();
 
         for (let index = 0; index < tabCount; index += 1) {
