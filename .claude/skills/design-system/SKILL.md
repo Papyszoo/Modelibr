@@ -58,6 +58,13 @@ await page.screenshot({ path: '<scratchpad>/gallery.png', fullPage: true })
 Shoot both `--dark` and `--light`. This loop is what catches the bug classes
 below — it found both on the day the gallery was built.
 
+For **page-level** changes (migrating a page onto the design system), use the
+before/after harness instead: `npm run design:snap -- --label before-x`,
+make the change, `npm run design:snap -- --label after-x`, then
+`npm run design:compare -- before-x after-x` and read the shots plus give
+the user the compare HTML (`test-report/design-review/`). Every unification
+slice ships with a before/after the user can review.
+
 ## Tokens — `src/shared/styles/tokens.css`
 
 `--mod-*` variables layered on the PrimeReact Lara theme (light/dark both
