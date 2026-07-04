@@ -11,6 +11,37 @@ of raw values, (2) shared primitives instead of per-feature copies. Both
 exist; historical code predates them — new/edited code must not add to the
 drift (prompts 13/18/20 dismantle it).
 
+## Standardize first — discuss the component before building it
+
+The core failure mode this project fights (user-stated, 2026-07-04): agents
+**duplicate and reinvent instead of making a standard and using React's
+biggest power — components.** Every hand-rolled empty state, drag handler,
+and category UI in this codebase is that failure fossilized. The rule:
+
+1. **Search before writing.** Check the primitive catalog below, then grep
+   `src/shared/` — the thing you need probably exists or almost exists.
+2. **Almost fits? Grow the primitive, don't fork it.** A new prop/slot on
+   the shared component (like `CategoryTreePanel.renderNodeActions`) beats
+   a local copy every time. Change it in its one home so every consumer
+   inherits the improvement.
+3. **Nothing fits? STOP — propose the standard before implementing.**
+   Bring the user a short design discussion, not a diff:
+   - the proposed component's API sketch (props/slots, one paragraph);
+   - which **existing** screens would adopt it (a standard with one
+     consumer is just a private component in a shared folder);
+   - which **queued prompts** (`.claude/prompts/`) would reuse it — and
+     which would strain or break it (e.g. does prompt 18's generic page
+     consume this? does prompt 10's rigs type fit this card?);
+   - what it deliberately does NOT do.
+   Get agreement, then build it with a story + gallery entry.
+4. **One-off truly local UI** (a layout div, a feature-specific panel) —
+   build it in the feature, but any second occurrence anywhere makes it a
+   candidate for rule 3.
+
+Fixing a bug in a pattern? Grep for the pattern's clones first — the same
+bug usually lives in every copy (a drop-affordance-on-hover bug was fixed
+in ModelGrid and lived on in EnvironmentMapList for months).
+
 ## Density — this is an application, not a website
 
 Modelibr is a dense desktop tool. The recurring agent failure mode is
