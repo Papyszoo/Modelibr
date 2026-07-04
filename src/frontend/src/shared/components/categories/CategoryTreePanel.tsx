@@ -53,10 +53,13 @@ export function CategoryTreePanel<TCategory extends HierarchicalCategory>({
     () => buildExpandedKeys(categoryNodes),
     [categoryNodes]
   )
+  // PrimeReact Tree in `selectionMode="single"` expects selectionKeys to be
+  // the selected key as a string — the `{ key: true }` map form is only for
+  // multiple/checkbox modes and silently never highlights in single mode.
   const selectedTreeKeys =
     activeCategoryId !== null && activeCategoryId !== unassignedCategoryId
-      ? { [String(activeCategoryId)]: true }
-      : {}
+      ? String(activeCategoryId)
+      : null
 
   return (
     <div className={`category-tree-panel${compact ? ' is-compact' : ''}`}>
