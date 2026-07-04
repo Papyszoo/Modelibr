@@ -8,6 +8,14 @@
   padding: 0.5rem;
   background: transparent;
   flex-shrink: 0;
+  /* Rows are UI chrome, not prose — sm, and compact PrimeReact togglers. */
+  font-size: var(--mod-text-sm);
+}
+
+.category-tree-panel .p-tree-toggler {
+  width: 1.5rem;
+  height: 1.5rem;
+  margin-right: 0.25rem;
 }
 
 /* Framed variant for use inside dialogs/popovers where the tree needs its
@@ -30,7 +38,7 @@
 .category-tree-unassigned {
   border: 1px solid transparent;
   border-radius: 6px;
-  padding: 0.3rem 0.5rem;
+  padding: 0.25rem 0.4rem;
   background: transparent;
   cursor: pointer;
   transition: background 0.15s ease;
@@ -106,8 +114,8 @@
 }
 
 .category-tree .p-treenode-content {
-  padding: 0.25rem 0.5rem;
-  border-radius: 8px;
+  padding: 0.15rem 0.4rem;
+  border-radius: 6px;
   border: 1px solid transparent;
   transition: background 0.2s ease;
 }
