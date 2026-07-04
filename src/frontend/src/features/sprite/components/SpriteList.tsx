@@ -14,6 +14,7 @@ import {
   type DragEvent,
   type MouseEvent,
   useCallback,
+  useMemo,
   useRef,
   useState,
 } from 'react'
@@ -25,6 +26,7 @@ import { useSpriteListData } from '@/features/sprite/hooks/useSpriteListData'
 import { useSpriteMutations } from '@/features/sprite/hooks/useSpriteMutations'
 import { useSpriteUpload } from '@/features/sprite/hooks/useSpriteUpload'
 import { useUploadProgress } from '@/hooks/useUploadProgress'
+import { CategoryTreePanel } from '@/shared/components/categories/CategoryTreePanel'
 import {
   ListToolbar,
   ListToolbarActions,
@@ -51,7 +53,6 @@ import {
   openInFileExplorer,
 } from '@/utils/webdavUtils'
 
-import { SpriteCategoryTabs } from './SpriteCategoryTabs'
 import { SpriteGridContent } from './SpriteGridContent'
 
 const UNASSIGNED_CATEGORY_ID = -1
@@ -494,6 +495,21 @@ export function SpriteList() {
     ]
   }
 
+  // Per-category counts for the sidebar tree (from the loaded sprites).
+  const categoryCounts = useMemo(() => {
+    const counts = new Map<number, number>()
+    for (const sprite of sprites) {
+      if (sprite.categoryId != null) {
+        counts.set(sprite.categoryId, (counts.get(sprite.categoryId) ?? 0) + 1)
+      }
+    }
+    return counts
+  }, [sprites])
+  const unassignedCount = useMemo(
+    () => sprites.filter(s => s.categoryId == null).length,
+    [sprites]
+  )
+
   const handleSpriteContextMenu = (
     e: React.MouseEvent<HTMLDivElement>,
     sprite: SpriteDto
@@ -584,49 +600,72 @@ export function SpriteList() {
         </ListToolbarPanel>
       </ListToolbar>
 
-      {/* Category Tabs */}
-      <SpriteCategoryTabs
-        categories={categories}
-        sprites={sprites}
-        activeCategoryId={activeCategoryId}
-        dragOverCategoryId={dragOverCategoryId}
-        onCategoryChange={setActiveCategoryId}
-        onCategoryDragOver={handleCategoryDragOver}
-        onCategoryDragLeave={handleCategoryDragLeave}
-        onCategoryDrop={handleCategoryDrop}
-        onEditCategory={openEditCategoryDialog}
-        onDeleteCategory={handleDeleteCategory}
-      />
+      <div className="sprite-list-body">
+        <aside className="sprite-category-sidebar">
+          <CategoryTreePanel
+            categories={categories}
+            activeCategoryId={activeCategoryId}
+            dragOverCategoryId={dragOverCategoryId}
+            categoryCounts={categoryCounts}
+            unassignedCount={unassignedCount}
+            unassignedCategoryId={UNASSIGNED_CATEGORY_ID}
+            unassignedLabel="Unassigned"
+            onCategoryChange={setActiveCategoryId}
+            onCategoryDragOver={handleCategoryDragOver}
+            onCategoryDragLeave={handleCategoryDragLeave}
+            onCategoryDrop={handleCategoryDrop}
+            renderNodeActions={category => (
+              <>
+                <Button
+                  icon="pi pi-pencil"
+                  className="p-button-text p-button-sm"
+                  onClick={() => openEditCategoryDialog(category)}
+                  tooltip="Rename category"
+                  aria-label={`Rename category ${category.name}`}
+                />
+                <Button
+                  icon="pi pi-trash"
+                  className="p-button-text p-button-sm p-button-danger"
+                  onClick={() => handleDeleteCategory(category)}
+                  tooltip="Delete category"
+                  aria-label={`Delete category ${category.name}`}
+                />
+              </>
+            )}
+          />
+        </aside>
 
-      {/* Grid Content */}
-      {loading ? (
-        <div className="sprite-list-loading">
-          <ProgressSpinner />
+        <div className="sprite-list-main">
+          {loading ? (
+            <div className="sprite-list-loading">
+              <ProgressSpinner />
+            </div>
+          ) : (
+            <SpriteGridContent
+              filteredSprites={filteredSprites}
+              cardWidth={cardWidth}
+              selectedSpriteIds={selectedSpriteIds}
+              draggedSpriteId={draggedSpriteId}
+              spriteGridRef={spriteGridRef}
+              isAreaSelecting={isAreaSelecting}
+              selectionBox={selectionBox}
+              hasNextPage={hasNextPage}
+              isFetchingNextPage={isFetchingNextPage}
+              totalCount={totalCount}
+              totalSpritesCount={sprites.length}
+              onToggleSelection={toggleSpriteSelection}
+              onSpriteClick={openSpriteModal}
+              onContextMenu={handleSpriteContextMenu}
+              onSpriteDragStart={handleSpriteDragStart}
+              onSpriteDragEnd={handleSpriteDragEnd}
+              onGridMouseDown={handleGridMouseDown}
+              onGridMouseMove={handleGridMouseMove}
+              onGridMouseUp={handleGridMouseUp}
+              onLoadMore={() => fetchNextPage()}
+            />
+          )}
         </div>
-      ) : (
-        <SpriteGridContent
-          filteredSprites={filteredSprites}
-          cardWidth={cardWidth}
-          selectedSpriteIds={selectedSpriteIds}
-          draggedSpriteId={draggedSpriteId}
-          spriteGridRef={spriteGridRef}
-          isAreaSelecting={isAreaSelecting}
-          selectionBox={selectionBox}
-          hasNextPage={hasNextPage}
-          isFetchingNextPage={isFetchingNextPage}
-          totalCount={totalCount}
-          totalSpritesCount={sprites.length}
-          onToggleSelection={toggleSpriteSelection}
-          onSpriteClick={openSpriteModal}
-          onContextMenu={handleSpriteContextMenu}
-          onSpriteDragStart={handleSpriteDragStart}
-          onSpriteDragEnd={handleSpriteDragEnd}
-          onGridMouseDown={handleGridMouseDown}
-          onGridMouseMove={handleGridMouseMove}
-          onGridMouseUp={handleGridMouseUp}
-          onLoadMore={() => fetchNextPage()}
-        />
-      )}
+      </div>
 
       <div className="sprite-drop-overlay">
         <i className="pi pi-upload" />
