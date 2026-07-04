@@ -148,13 +148,14 @@ export async function analyzeVideoDirectory(rootDir) {
         if (blackRatio >= 0.85) {
             issues.push("black-video");
         }
-        if (
-            tailFreeze &&
-            duration - recommendedEnd >= 4 &&
-            duration > spec.maxDurationSeconds
-        ) {
+        // A long frozen tail is an issue on its own (trim should have
+        // removed it), independent of the duration cap.
+        if (tailFreeze && duration - recommendedEnd >= 4) {
             issues.push("frozen-tail");
         }
+        // The cap is a QA ceiling with headroom built into the manifest,
+        // not a trim point — exceeding it means the spec choreography got
+        // too long and must be tightened (or the cap raised deliberately).
         if (duration > spec.maxDurationSeconds) {
             issues.push("over-max-duration");
         }
