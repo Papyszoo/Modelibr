@@ -40,14 +40,19 @@
   --mod-color-info-bg: rgba(59, 130, 246, 0.12);
 
   /* ── Spacing scale ────────────────────────────────────────────── */
-  --mod-space-2xs: 0.25rem; /*  4px */
-  --mod-space-xs: 0.5rem; /*  8px */
-  --mod-space-sm: 0.75rem; /* 12px */
-  --mod-space-md: 1rem; /* 16px */
-  --mod-space-lg: 1.5rem; /* 24px */
-  --mod-space-xl: 2rem; /* 32px */
-  --mod-space-2xl: 3rem; /* 48px */
-  --mod-space-3xl: 4rem; /* 64px */
+  /* Modelibr is a dense desktop application, not a website. The workhorses
+     are 2xs–md (the app's real distribution: gap 0.5rem ≫ 0.75 ≫ 1rem;
+     padding 1rem ≥ 0.5 ≥ 0.75rem). lg and up are reserved for empty states,
+     dialogs, and centered placeholders — never for headers, toolbars, or
+     anything that repeats down the page. */
+  --mod-space-2xs: 0.25rem; /*  4px — inline icon/label gaps */
+  --mod-space-xs: 0.5rem; /*  8px — default gap between controls */
+  --mod-space-sm: 0.75rem; /* 12px — panel/toolbar padding */
+  --mod-space-md: 1rem; /* 16px — page/section padding ceiling */
+  --mod-space-lg: 1.5rem; /* 24px — dialog padding */
+  --mod-space-xl: 2rem; /* 32px — empty states only */
+  --mod-space-2xl: 3rem; /* 48px — empty states only */
+  --mod-space-3xl: 4rem; /* 64px — empty states only */
 
   /* ── Radius ───────────────────────────────────────────────────── */
   --mod-radius-sm: 4px;
@@ -57,13 +62,17 @@
   --mod-radius-pill: 9999px;
 
   /* ── Typography ───────────────────────────────────────────────── */
-  --mod-text-xs: 0.75rem;
-  --mod-text-sm: 0.875rem;
-  --mod-text-md: 1rem;
-  --mod-text-lg: 1.125rem;
-  --mod-text-xl: 1.25rem;
-  --mod-text-2xl: 1.5rem;
-  --mod-text-3xl: 2rem;
+  /* sm (0.875rem) is the app's default UI text size by a wide margin; xs is
+     for counts/captions/badges. 2xl (1.5rem) is the largest text in the app
+     — the Models page title — and the hard ceiling: there is deliberately
+     no 3xl. If a heading feels like it needs more, the layout is drifting
+     toward "website"; don't. */
+  --mod-text-xs: 0.75rem; /* counts, captions, badges */
+  --mod-text-sm: 0.875rem; /* DEFAULT body/UI text */
+  --mod-text-md: 1rem; /* inputs, emphasized body */
+  --mod-text-lg: 1.125rem; /* section/panel titles */
+  --mod-text-xl: 1.25rem; /* tab page titles */
+  --mod-text-2xl: 1.5rem; /* page title ceiling (Models h1) */
 
   --mod-font-weight-regular: 400;
   --mod-font-weight-medium: 500;

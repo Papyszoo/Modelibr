@@ -5,8 +5,8 @@
   position: relative;
   background: var(--surface-ground);
   box-sizing: border-box;
-  padding: 1rem;
-  gap: 0.75rem;
+  padding: 0.75rem;
+  gap: 0.5rem;
 }
 
 .script-list-loading {
@@ -16,16 +16,13 @@
   height: 100%;
 }
 
-/* Body: category tree sidebar + scripts grid, framed as a card so the page
-   has clear margins (mirroring the Models layout). */
+/* Body: category tree sidebar + scripts grid, flat on the page background —
+   the quiet CategoryTreePanel default provides the sidebar look; only a
+   border separates it from the grid. */
 .script-list-body {
   display: flex;
   flex: 1;
   min-height: 0;
-  border: 1px solid var(--surface-border);
-  border-radius: 8px;
-  overflow: hidden;
-  background: var(--surface-card);
 }
 
 /* Left category panel: a quiet sidebar with a "Manage categories" footer. */
@@ -36,42 +33,12 @@
   flex-direction: column;
   min-height: 0;
   border-right: 1px solid var(--surface-border);
-  background: var(--surface-card);
 }
 
 .script-category-sidebar .category-tree-panel {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  gap: 0.25rem;
-  padding: 0.5rem;
-  background: transparent;
-  border: none;
-}
-
-/* The "Uncategorized" row should read as part of the panel, not a button:
-   transparent until hovered/active, with tight padding. */
-.script-category-sidebar .category-tree-unassigned {
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  padding: 0.3rem 0.5rem;
-}
-
-.script-category-sidebar .category-tree-unassigned:hover {
-  background: var(--surface-hover);
-}
-
-.script-category-sidebar .category-tree-unassigned.is-active {
-  background: rgba(var(--primary-color-rgb), 0.12);
-  border-color: rgba(var(--primary-color-rgb), 0.24);
-  color: var(--text-color);
-}
-
-.script-category-sidebar
-  .category-tree-unassigned.is-active
-  .category-tree-count {
-  color: var(--text-color-secondary);
 }
 
 .script-category-manage-btn {
@@ -84,7 +51,7 @@
   border-top: 1px solid var(--surface-border);
   background: transparent;
   color: var(--text-color-secondary);
-  font-size: 0.82rem;
+  font-size: var(--mod-text-xs);
   cursor: pointer;
   transition:
     background 0.15s ease,
@@ -108,7 +75,7 @@
 .script-grid-container {
   flex: 1;
   overflow: auto;
-  padding: 1rem;
+  padding: 0.75rem;
   position: relative;
 }
 
