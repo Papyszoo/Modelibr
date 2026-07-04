@@ -14,6 +14,13 @@ const { Given, When, Then } = createBdd();
 
 const API_BASE = process.env.API_BASE_URL || "http://localhost:8090";
 
+// Category rows in the shared CategoryTreePanel sidebar (unassigned bucket +
+// tree nodes) — sprites no longer uses .category-tab chips.
+const CATEGORY_ROW_SELECTOR =
+    ".sprite-category-sidebar .category-tree-unassigned, .sprite-category-sidebar .category-tree .p-treenode-content";
+const CATEGORY_LABEL_SELECTOR =
+    ".category-tree-unassigned-label, .category-tree-node-label";
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -776,7 +783,7 @@ When(
 
         // Click the category tab to filter
         const categoryTab = page
-            .locator(".category-tab")
+            .locator(CATEGORY_ROW_SELECTOR)
             .filter({ hasText: categoryName });
         await categoryTab.click();
         // Wait for filter to apply reactively
@@ -1087,7 +1094,7 @@ Then(
     "the category {string} should be visible in the category list",
     async ({ page }, categoryName: string) => {
         const categoryTab = page
-            .locator(".category-tab")
+            .locator(CATEGORY_ROW_SELECTOR)
             .filter({ hasText: categoryName })
             .first();
         await expect(async () => {
@@ -1232,18 +1239,21 @@ When("I edit the category {string}", async ({ page }, categoryName: string) => {
     }
 
     // Wait for category tabs to be rendered
-    await page.waitForSelector(".category-tab", {
+    await page.waitForSelector(CATEGORY_ROW_SELECTOR, {
         state: "visible",
         timeout: 10000,
     });
 
     // Use polling to wait for the specific category tab to appear (may need re-render)
     const findCategoryTabIndex = async () => {
-        const allTabs = page.locator(".category-tab");
+        const allTabs = page.locator(CATEGORY_ROW_SELECTOR);
         const tabCount = await allTabs.count();
         for (let i = 0; i < tabCount; i++) {
             const tab = allTabs.nth(i);
-            const tabText = await tab.locator("span").first().textContent();
+            const tabText = await tab
+                .locator(CATEGORY_LABEL_SELECTOR)
+                .first()
+                .textContent();
             const rawName = tabText?.trim();
             if (rawName === categoryName) {
                 return i;
@@ -1267,7 +1277,7 @@ When("I edit the category {string}", async ({ page }, categoryName: string) => {
             `Category tab "${categoryName}" not found (exact match)`,
         );
     }
-    const targetTab: any = page.locator(".category-tab").nth(targetTabIndex);
+    const targetTab: any = page.locator(CATEGORY_ROW_SELECTOR).nth(targetTabIndex);
     await targetTab.click();
 
     // Click the edit (pencil) button on the category tab
@@ -1403,7 +1413,7 @@ When(
 
         // First select the category tab
         const categoryTab = page
-            .locator(".category-tab")
+            .locator(CATEGORY_ROW_SELECTOR)
             .filter({ hasText: categoryName });
         await categoryTab.waitFor({ state: "visible", timeout: 5000 });
         await categoryTab.click();
