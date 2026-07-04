@@ -11,6 +11,8 @@
         "format:check": "cd src/frontend && npm run format:check && cd ../asset-processor && npm run format:check",
         "test:frontend": "cd src/frontend && npm test",
         "design": "cd src/frontend && npm run design",
+        "design:snap": "node scripts/design-review/snap.mjs",
+        "design:compare": "node scripts/design-review/compare.mjs",
         "test:e2e": "cd tests/e2e && npm test",
         "test:e2e:demo": "cd tests/e2e && npm run test:demo",
         "videos:generate": "(cd tests/e2e && npm run test:teardown >/dev/null 2>&1); (cd tests/e2e && npm run test:setup) && (cd docs/videos && ([ -d node_modules ] || npm ci) && npx playwright install chromium && npm run generate); ec=$?; (cd tests/e2e && npm run test:teardown); exit $ec",
