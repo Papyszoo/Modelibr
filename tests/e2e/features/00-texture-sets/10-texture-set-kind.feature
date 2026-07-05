@@ -123,8 +123,10 @@ Feature: Texture Set Kind (Multi-Model vs Global Materials)
     When I create a model-specific texture set "persist_ms" via API
     And I create a universal texture set "persist_uni" via API
     And I reload the page
-    Then the "Global Materials" kind tab should be active
-    And I should see texture set "persist_uni" in the grid
+    # Kinds are separate app tabs now — the active tab persists across
+    # reload (the old in-page switcher reset to Global Materials instead).
+    Then the "Multi-Model" kind tab should be active
+    And I should see texture set "persist_ms" in the grid
     Then the API should return texture set "persist_ms" for kind ModelSpecific
     And the API should return texture set "persist_uni" for kind Universal
     And the API should not return texture set "persist_ms" for kind Universal
