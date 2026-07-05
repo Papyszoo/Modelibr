@@ -47,7 +47,9 @@ export class TextureSetsPage {
      * Navigate to the Texture Sets tab via UI interaction.
      */
     async goto(): Promise<void> {
-        await navigateToTab(this.page, "textureSets");
+        // The combined textureSets view no longer exists — texture-set CRUD
+        // flows run on the Multi-Model Textures page (the split default).
+        await navigateToTab(this.page, "modelTextures");
 
         // Wait for the page to load
         await this.page.waitForSelector(".texture-set-list", {

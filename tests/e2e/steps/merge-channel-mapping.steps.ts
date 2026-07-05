@@ -55,7 +55,7 @@ async function openTextureSetViewerForVerification(
 
         if (!viewerOpened) {
             await page.reload({ waitUntil: "domcontentloaded" });
-            await navigateToTab(page, "textureSets");
+            await navigateToTab(page, "modelTextures");
             await page.waitForSelector(".texture-set-list, .texture-set-card", {
                 state: "visible",
                 timeout: 15000,

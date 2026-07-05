@@ -94,7 +94,7 @@ GivenBdd(
 ThenBdd("I take a screenshot of the texture sets list", async ({ page }) => {
     // Navigate to texture sets via UI
     const { navigateToTab } = await import("../helpers/navigation-helper");
-    await navigateToTab(page, "textureSets");
+    await navigateToTab(page, "modelTextures");
     // Wait for texture sets page to fully load
     await page.waitForLoadState("domcontentloaded");
     await takeScreenshotToReport(
@@ -129,7 +129,7 @@ ThenBdd(
     async ({ page }) => {
         // Navigate to texture sets and verify not visible
         const { navigateToTab } = await import("../helpers/navigation-helper");
-        await navigateToTab(page, "textureSets");
+        await navigateToTab(page, "modelTextures");
         // Wait for texture sets page to fully load
         await page.waitForLoadState("domcontentloaded");
 
@@ -243,7 +243,7 @@ ThenBdd(
 
 WhenBdd("I navigate to the Texture Sets page", async ({ page }) => {
     const { navigateToTab } = await import("../helpers/navigation-helper");
-    await navigateToTab(page, "textureSets");
+    await navigateToTab(page, "modelTextures");
     // Wait for texture sets page to fully load
     await page.waitForLoadState("domcontentloaded");
     console.log("[Navigation] Navigated to Texture Sets page");
