@@ -32,10 +32,14 @@ const frontendDir = path.join(repoRoot, 'src/frontend')
 const frontendRequire = createRequire(path.join(frontendDir, 'package.json'))
 const { chromium } = frontendRequire('@playwright/test')
 
-// The main design surfaces. Tab ids = TabType union (src/shared/types/ui.ts).
+// The main design surfaces — keep in sync with the New Tab page's tiles
+// (components/layout/NewTabPage.tsx), NOT the TabType union: the union
+// carries legacy tab types users can no longer open (e.g. 'textureSets',
+// which was split into Global Materials + Multi-Model Textures).
 const PAGES = [
   { id: 'modelList', label: 'Models' },
-  { id: 'textureSets', label: 'Texture Sets' },
+  { id: 'globalMaterials', label: 'Global Materials' },
+  { id: 'modelTextures', label: 'Multi-Model Textures' },
   { id: 'environmentMaps', label: 'Environment Maps' },
   { id: 'sounds', label: 'Sounds' },
   { id: 'sprites', label: 'Sprites' },
