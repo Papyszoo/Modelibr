@@ -20,6 +20,7 @@
         "test:all:fast": "node scripts/test-runner/index.mjs --tier=fast --yes",
         "test:all:full": "node scripts/test-runner/index.mjs --all --yes",
         "test:audit": "node scripts/test-runner/discover.mjs",
+        "docs:audit": "node scripts/docs-audit/index.mjs",
         "test:catalog": "node scripts/test-catalog/build-catalog.mjs",
         "test:site": "node scripts/test-catalog/build-catalog.mjs && node scripts/test-catalog/server.mjs",
         "test:site:fast": "node scripts/test-catalog/build-catalog.mjs --no-github && node scripts/test-catalog/server.mjs",

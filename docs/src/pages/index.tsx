@@ -17,19 +17,20 @@ function HomepageHeader() {
                 <div className={styles.heroContent}>
                     <div className={styles.badge}>
                         <span className={styles.badgeIcon}>✨</span>
-                        Open Source &amp; Self-Hosted
+                        Self-Hosted &amp; Local-First
                     </div>
                     <Heading as="h1" className={styles.heroTitle}>
                         Your Personal
                         <br />
                         <span className={styles.heroGradient}>
-                            3D Asset Library
+                            Game Asset Library
                         </span>
                     </Heading>
                     <p className={styles.heroSubtitle}>
-                        Organize, preview, and manage your 3D models with
-                        automatic animated thumbnails, version control, and
-                        seamless Blender integration. All on your own hardware.
+                        Organize and preview your 3D models, textures, sprites,
+                        sounds, and scripts in one place — with animated
+                        thumbnails, version history, and a Blender-ready WebDAV
+                        drive. All on your own hardware.
                     </p>
                     <div className={styles.buttons}>
                         <Link
@@ -37,20 +38,20 @@ function HomepageHeader() {
                                 "button button--lg",
                                 styles.primaryButton,
                             )}
-                            to="/docs"
+                            href="https://papyszoo.github.io/Modelibr/demo/"
                         >
-                            <span className={styles.buttonIcon}>🚀</span>
-                            Get Started
+                            <span className={styles.buttonIcon}>🎮</span>
+                            Try the Live Demo
                         </Link>
                         <Link
                             className={clsx(
                                 "button button--lg",
                                 styles.secondaryButton,
                             )}
-                            href="https://discord.gg/KgwgTDVP3F"
+                            to="/docs"
                         >
-                            <span className={styles.buttonIcon}>💬</span>
-                            Join Discord
+                            <span className={styles.buttonIcon}>🚀</span>
+                            Get Started
                         </Link>
                     </div>
                     <div className={styles.heroStats}>
@@ -65,8 +66,8 @@ function HomepageHeader() {
                         </div>
                         <div className={styles.statDivider}></div>
                         <div className={styles.stat}>
-                            <span className={styles.statValue}>Open</span>
-                            <span className={styles.statLabel}>Source</span>
+                            <span className={styles.statValue}>Source</span>
+                            <span className={styles.statLabel}>Available</span>
                         </div>
                     </div>
                 </div>
@@ -169,34 +170,34 @@ type FeatureItem = {
 
 const FeatureList: FeatureItem[] = [
     {
+        title: "Every Asset Type",
+        icon: "🗂️",
+        description:
+            "Models, texture sets, environment maps, sprites, sounds, and scripts — one searchable library instead of scattered folders.",
+    },
+    {
         title: "Animated Thumbnails",
         icon: "🎬",
         description:
-            "Every model gets a rotating 360° preview. No more guessing what's inside a file.",
+            "Every model gets a rotating 360° preview, sounds get waveforms. No more guessing what's inside a file.",
     },
     {
         title: "Version Control",
         icon: "📚",
         description:
-            "Keep multiple versions of each model. Rollback anytime, never lose work.",
+            "Keep multiple versions of each model and roll back anytime. Identical files are deduplicated automatically.",
     },
     {
         title: "PBR Texture Sets",
         icon: "🎨",
         description:
-            "Organize your materials with full PBR support. Preview on any shape in real-time.",
+            "Organize your materials with full PBR and channel-packed map support. Preview on any shape in real-time.",
     },
     {
-        title: "Blender Addon",
+        title: "WebDAV + Blender",
         icon: "🔌",
         description:
-            "Import and export directly from Blender. Your library, one click away.",
-    },
-    {
-        title: "Smart Deduplication",
-        icon: "💾",
-        description:
-            "Upload the same file twice? Storage is shared automatically. Save disk space.",
+            "Mount your library like a network drive. Save a .blend into it and Modelibr creates a new model version automatically.",
     },
     {
         title: "Self-Hosted & Private",
@@ -253,22 +254,23 @@ type StepItem = {
 const StepList: StepItem[] = [
     {
         number: "01",
-        title: "Run with Docker",
+        title: "Install Modelibr",
         description:
-            "One command. Requires Docker installed. Works on any platform.",
-        code: "docker compose up -d",
+            "Download the desktop app for Windows, macOS, or Linux from GitHub Releases — it bundles everything. Prefer Docker? Clone the repo and run:",
+        code: "cp .env.example .env && docker compose up -d",
     },
     {
         number: "02",
-        title: "Access the App",
-        description: "Open your browser and go to:",
-        code: "http://localhost:3000",
+        title: "Open the App",
+        description:
+            "Desktop app: open it from the tray icon. Docker: point your browser at:",
+        code: "https://localhost:3010",
     },
     {
         number: "03",
         title: "Drag & Drop",
         description:
-            "Upload your 3D models by dragging them into the browser. Browse with animated thumbnails.",
+            "Upload models, textures, sprites, and sounds by dragging them into the browser. Everything gets a generated preview.",
     },
 ];
 
@@ -339,10 +341,12 @@ function CTASection() {
             <div className={styles.ctaGlow}></div>
             <div className="container">
                 <div className={styles.ctaContent}>
-                    <Heading as="h2">Ready to organize your 3D assets?</Heading>
+                    <Heading as="h2">
+                        Ready to organize your game assets?
+                    </Heading>
                     <p>
-                        Free and open source. No account needed. No data leaves
-                        your machine.
+                        Free and source-available. No account needed. No data
+                        leaves your machine.
                     </p>
                     <div className={styles.buttons}>
                         <Link
@@ -373,8 +377,8 @@ function CTASection() {
 export default function Home(): ReactNode {
     return (
         <Layout
-            title="Your Personal 3D Asset Library"
-            description="Self-hosted 3D model library. Organize, preview, and manage your 3D assets with automatic thumbnails, version control, and Blender integration."
+            title="Your Personal Game Asset Library"
+            description="Self-hosted game asset library. Organize and preview 3D models, textures, sprites, sounds, and scripts with automatic thumbnails, version history, and Blender integration."
         >
             <HomepageHeader />
             <main>

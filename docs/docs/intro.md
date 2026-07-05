@@ -13,6 +13,7 @@ Modelibr is a self-hosted game asset library that helps you keep models, texture
 - **Texture sets** - Manage PBR textures, defaults, and channel-packed maps
 - **Environment maps** - Upload panoramic HDRIs or cube faces, keep multiple variants, and preview lighting in the browser
 - **Sprites and sounds** - Keep 2D and audio assets in the same library as your models
+- **Scripts** - Store shaders and source code with syntax highlighting and live shader previews
 - **Projects and packs** - Group assets either for a specific job or for reuse across jobs
 - **Recycle bin and deduplication** - Recover mistakes without wasting storage
 - **Optional Blender workflow** - Use Blender-related tooling and WebDAV when it fits your process

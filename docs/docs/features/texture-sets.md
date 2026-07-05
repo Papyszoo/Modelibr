@@ -28,6 +28,15 @@ A Texture Set is a collection of texture images that define a material's appeara
 | **Height** | Displacement mapping |
 | **Opacity** | Transparency |
 
+## Texture Set Kinds
+
+Modelibr distinguishes two kinds of texture sets, and the tab system gives each its own view:
+
+- **Global Materials** — reusable PBR materials that aren't tied to a particular model and can be shared across many models.
+- **Multi-Model Textures** — texture sets created for specific models (for example baked maps), which can still be linked to more than one model.
+
+The **Texture Sets** tab shows everything; the **Global Materials** and **Multi-Model Textures** tabs filter the same library down to one kind. You can open any of the three from the New Tab page.
+
 ## Creating Texture Sets
 
 ### From the Texture Sets Panel
@@ -81,12 +90,12 @@ This allows you to preserve the intended look for each version of your model.
 
 ## Tagging Texture Sets
 
-Texture sets share the same tag vocabulary as models and environment maps, so
-a label like `stylized` or `metal` works across every asset type. Open a
-texture set and use the tag editor in its header to add or remove tags; the
-input suggests tags already in use anywhere in the library. The Texture Sets
-list has a **Tags** filter that narrows the grid to sets carrying any of the
-selected tags.
+Each asset type keeps its **own tag vocabulary** — texture set tags are
+separate from model tags and environment map tags, so vocabularies stay small
+and relevant to each type. Open a texture set and use the tag editor in its
+header to add or remove tags; the input suggests tags already used on other
+texture sets. The Texture Sets list has a **Tags** filter that narrows the
+grid to sets carrying any of the selected tags.
 
 ## Previewing Textures
 

@@ -50,6 +50,7 @@ the code and fix the skill in the same session.**
 | Frontend | `cd src/frontend && npm test && npm run lint && npm run format:check && npm run build` |
 | Worker | `cd src/asset-processor && npm test && npm run lint && npm run format:check` |
 | UI-visible behavior | the affected E2E scope (see testing rules below) |
+| Docs site / README / formats / tabs | `npm run docs:audit` (CI-gated; checks docs against FileType registry, TabType union, ports, video manifest) |
 | Anything broad | `npm run test:all -- --only=<suite,...> --yes --no-open` |
 
 `npm run format:check` (Prettier) is a **required** CI gate and is **not**
@@ -70,6 +71,9 @@ explicitly instead of claiming verified.
   `docs/videos/`, and the orphaned suites (rule 10 below).
 - **Env/config/build paths** → `.env.example`, `.env.demo`, typed env files,
   GitHub workflows.
+- **Supported formats, tab types, ports** → feature docs + README;
+  `npm run docs:audit` fails CI on drift (extend the audit when adding new
+  machine-checkable doc facts).
 
 ## Working with tests
 
