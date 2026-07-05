@@ -1,8 +1,11 @@
 import {
   createTab,
   getTabLabel,
+  migrateNavigationState,
   useNavigationStore,
+  type WindowState,
 } from '@/stores/navigationStore'
+import { type Tab } from '@/types'
 
 const store = () => useNavigationStore.getState()
 const win = (id = 'w1') => store().activeWindows[id]
@@ -168,5 +171,76 @@ describe('recently-closed cap', () => {
     expect(ids).toHaveLength(10)
     expect(ids[0]).toBe('model-11')
     expect(ids).not.toContain('model-0')
+  })
+})
+
+describe('migrateNavigationState (v0 → v1)', () => {
+  // Regression guard: the legacy 'textureSets' tab type was removed from the
+  // TabType union after the Global Materials / Multi-Model Textures split.
+  // Without this migration, a years-old persisted layout containing such a
+  // tab would fall through TabContent's switch and render an empty tab.
+  const legacyTab = {
+    id: 'textureSets',
+    type: 'textureSets',
+    label: 'Texture Sets',
+    params: {},
+    internalUiState: {},
+  } as unknown as Tab
+
+  const windowWith = (tabs: Tab[]): WindowState => ({
+    tabs,
+    activeTabId: tabs[0]?.id ?? null,
+    activeRightTabId: null,
+    splitterSize: 50,
+    lastActiveAt: new Date().toISOString(),
+  })
+
+  it('rewrites legacy textureSets tabs everywhere they can be persisted', () => {
+    const modelTab = createTab('modelList')
+    const migrated = migrateNavigationState(
+      {
+        activeWindows: { w1: windowWith([legacyTab, modelTab]) },
+        recentlyClosedTabs: [legacyTab],
+        recentlyClosedWindows: [
+          {
+            closedAt: '2026-01-01T00:00:00Z',
+            windowId: 'w0',
+            state: windowWith([legacyTab]),
+          },
+        ],
+      },
+      0
+    ) as {
+      activeWindows: Record<string, WindowState>
+      recentlyClosedTabs: Tab[]
+      recentlyClosedWindows: { state: WindowState }[]
+    }
+
+    const openTabs = migrated.activeWindows.w1.tabs
+    expect(openTabs[0].type).toBe('modelTextures')
+    expect(openTabs[0].label).toBe('Multi-Model Textures')
+    // Singleton ids follow the type, and the active-tab pointer follows the id.
+    expect(openTabs[0].id).toBe('modelTextures')
+    expect(migrated.activeWindows.w1.activeTabId).toBe('modelTextures')
+    // Untouched tabs pass through unchanged.
+    expect(openTabs[1]).toEqual(modelTab)
+    expect(migrated.recentlyClosedTabs[0].type).toBe('modelTextures')
+    expect(migrated.recentlyClosedWindows[0].state.tabs[0].type).toBe(
+      'modelTextures'
+    )
+  })
+
+  it('keeps a user-renamed label instead of forcing the successor label', () => {
+    const renamed = { ...legacyTab, label: 'My textures' }
+    const migrated = migrateNavigationState(
+      { activeWindows: { w1: windowWith([renamed as Tab]) } },
+      0
+    ) as { activeWindows: Record<string, WindowState> }
+    expect(migrated.activeWindows.w1.tabs[0].label).toBe('My textures')
+  })
+
+  it('leaves already-migrated state untouched', () => {
+    const state = { activeWindows: {}, recentlyClosedTabs: [] }
+    expect(migrateNavigationState(state, 1)).toBe(state)
   })
 })

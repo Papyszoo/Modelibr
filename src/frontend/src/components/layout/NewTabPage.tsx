@@ -206,7 +206,6 @@ const RECENT_TAB_ICON: Partial<Record<TabType, string>> = {
   newTab: 'pi-home',
   modelList: 'pi-list',
   modelViewer: 'pi-box',
-  textureSets: 'pi-folder',
   globalMaterials: 'pi-palette',
   modelTextures: 'pi-images',
   textureSetViewer: 'pi-image',
