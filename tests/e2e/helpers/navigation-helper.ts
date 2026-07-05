@@ -20,10 +20,11 @@ import { Page, expect } from "@playwright/test";
  * Tile titles in the New Tab page. Used to locate the tile button when
  * opening a tab via UI.
  *
- * Tab types not in this map (`textureSets`, `stageList`) have no tile —
- * `textureSets` was split into Global Materials / Multi-Model Textures, and
- * `stageList` is disabled while the feature is incomplete. Tests that need
- * them inject the tab via localStorage state — see `injectAndActivateTab`.
+ * Tab types not in this map (`stageList`) have no tile — `stageList` is
+ * disabled while the feature is incomplete. Tests that need it inject the
+ * tab via localStorage state — see `injectAndActivateTab`. (The legacy
+ * `textureSets` type was removed from the app entirely; a persisted-state
+ * migration rewrites it to `modelTextures`.)
  */
 const TILE_LABELS: Record<string, string> = {
     modelList: "Models",
@@ -40,12 +41,11 @@ const TILE_LABELS: Record<string, string> = {
     settings: "Settings",
 };
 
-const STATE_INJECTABLE_TYPES = new Set(["textureSets", "stageList"]);
+const STATE_INJECTABLE_TYPES = new Set(["stageList"]);
 
 const TAB_ICONS: Record<string, string> = {
     modelList: "pi-list",
     modelViewer: "pi-box",
-    textureSets: "pi-folder",
     globalMaterials: "pi-palette",
     modelTextures: "pi-images",
     textureSetViewer: "pi-image",
@@ -219,7 +219,6 @@ async function injectAndActivateTab(
                 activeWindows[windowId] || defaultWindowState;
 
             const labels: Record<string, string> = {
-                textureSets: "Texture Sets",
                 stageList: "Stages",
             };
 

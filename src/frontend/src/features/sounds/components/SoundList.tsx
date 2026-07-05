@@ -7,12 +7,12 @@ import { confirmDialog } from 'primereact/confirmdialog'
 import { type ContextMenu } from 'primereact/contextmenu'
 import { Dialog } from 'primereact/dialog'
 import { InputNumber } from 'primereact/inputnumber'
-import { ProgressSpinner } from 'primereact/progressspinner'
 import { Toast } from 'primereact/toast'
 import {
   type DragEvent,
   type MouseEvent,
   useCallback,
+  useMemo,
   useRef,
   useState,
 } from 'react'
@@ -23,6 +23,8 @@ import { getFileUrl } from '@/features/models/api/modelApi'
 import { useSoundListData } from '@/features/sounds/hooks/useSoundListData'
 import { useSoundMutations } from '@/features/sounds/hooks/useSoundMutations'
 import { useSoundUpload } from '@/features/sounds/hooks/useSoundUpload'
+import { CategoryTreePanel } from '@/shared/components/categories/CategoryTreePanel'
+import { LoadingState } from '@/shared/components/feedback'
 import {
   ListToolbar,
   ListToolbarActions,
@@ -46,7 +48,6 @@ import {
 } from '@/utils/webdavUtils'
 
 import { SoundCategoryDialog } from './SoundCategoryDialog'
-import { SoundCategoryTabs } from './SoundCategoryTabs'
 import { SoundContextMenu } from './SoundContextMenu'
 import { SoundEditor } from './SoundEditor'
 import { SoundGridContent } from './SoundGridContent'
@@ -495,6 +496,21 @@ export function SoundList() {
     })
   }
 
+  // Per-category counts for the sidebar tree (from the loaded sounds).
+  const categoryCounts = useMemo(() => {
+    const counts = new Map<number, number>()
+    for (const sound of sounds) {
+      if (sound.categoryId != null) {
+        counts.set(sound.categoryId, (counts.get(sound.categoryId) ?? 0) + 1)
+      }
+    }
+    return counts
+  }, [sounds])
+  const unassignedCount = useMemo(
+    () => sounds.filter(s => s.categoryId == null).length,
+    [sounds]
+  )
+
   // Handle right-click on sound card
   const handleSoundContextMenu = (
     e: React.MouseEvent<HTMLDivElement>,
@@ -641,47 +657,73 @@ export function SoundList() {
         </ListToolbarPanel>
       </ListToolbar>
 
-      <SoundCategoryTabs
-        categories={categories}
-        sounds={sounds}
-        activeCategoryId={activeCategoryId}
-        dragOverCategoryId={dragOverCategoryId}
-        onCategoryChange={setActiveCategoryId}
-        onCategoryDragOver={handleCategoryDragOver}
-        onCategoryDragLeave={handleCategoryDragLeave}
-        onCategoryDrop={handleCategoryDrop}
-        onEditCategory={openEditCategoryDialog}
-        onDeleteCategory={handleDeleteCategory}
-      />
+      <div className="sound-list-body">
+        <aside className="sound-category-sidebar">
+          <CategoryTreePanel
+            categories={categories}
+            activeCategoryId={activeCategoryId}
+            dragOverCategoryId={dragOverCategoryId}
+            categoryCounts={categoryCounts}
+            unassignedCount={unassignedCount}
+            unassignedCategoryId={UNASSIGNED_CATEGORY_ID}
+            unassignedLabel="Unassigned"
+            onCategoryChange={setActiveCategoryId}
+            onCategoryDragOver={handleCategoryDragOver}
+            onCategoryDragLeave={handleCategoryDragLeave}
+            onCategoryDrop={handleCategoryDrop}
+            renderNodeActions={category => (
+              <>
+                <Button
+                  icon="pi pi-pencil"
+                  className="p-button-text p-button-sm"
+                  onClick={() => openEditCategoryDialog(category)}
+                  tooltip="Rename category"
+                  aria-label={`Rename category ${category.name}`}
+                />
+                <Button
+                  icon="pi pi-trash"
+                  className="p-button-text p-button-sm p-button-danger"
+                  onClick={() => handleDeleteCategory(category)}
+                  tooltip="Delete category"
+                  aria-label={`Delete category ${category.name}`}
+                />
+              </>
+            )}
+          />
+        </aside>
 
-      {loading ? (
-        <div className="sound-list-loading">
-          <ProgressSpinner />
+        <div className="sound-list-main">
+          {loading ? (
+            <LoadingState
+              className="sound-list-loading"
+              message="Loading sounds…"
+            />
+          ) : (
+            <SoundGridContent
+              filteredSounds={filteredSounds}
+              cardWidth={cardWidth}
+              selectedSoundIds={selectedSoundIds}
+              draggedSoundId={draggedSoundId}
+              soundGridRef={soundGridRef}
+              isAreaSelecting={isAreaSelecting}
+              selectionBox={selectionBox}
+              hasNextPage={hasNextPage}
+              isFetchingNextPage={isFetchingNextPage}
+              totalCount={totalCount}
+              totalSoundsCount={sounds.length}
+              onToggleSelection={toggleSoundSelection}
+              onSoundClick={openSoundModal}
+              onContextMenu={handleSoundContextMenu}
+              onSoundDragStart={handleSoundDragStart}
+              onSoundDragEnd={handleSoundDragEnd}
+              onGridMouseDown={handleGridMouseDown}
+              onGridMouseMove={handleGridMouseMove}
+              onGridMouseUp={handleGridMouseUp}
+              onLoadMore={() => fetchNextPage()}
+            />
+          )}
         </div>
-      ) : (
-        <SoundGridContent
-          filteredSounds={filteredSounds}
-          cardWidth={cardWidth}
-          selectedSoundIds={selectedSoundIds}
-          draggedSoundId={draggedSoundId}
-          soundGridRef={soundGridRef}
-          isAreaSelecting={isAreaSelecting}
-          selectionBox={selectionBox}
-          hasNextPage={hasNextPage}
-          isFetchingNextPage={isFetchingNextPage}
-          totalCount={totalCount}
-          totalSoundsCount={sounds.length}
-          onToggleSelection={toggleSoundSelection}
-          onSoundClick={openSoundModal}
-          onContextMenu={handleSoundContextMenu}
-          onSoundDragStart={handleSoundDragStart}
-          onSoundDragEnd={handleSoundDragEnd}
-          onGridMouseDown={handleGridMouseDown}
-          onGridMouseMove={handleGridMouseMove}
-          onGridMouseUp={handleGridMouseUp}
-          onLoadMore={() => fetchNextPage()}
-        />
-      )}
+      </div>
 
       <div className="sound-drop-overlay">
         <i className="pi pi-upload" />

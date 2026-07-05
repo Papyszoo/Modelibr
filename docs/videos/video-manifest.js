@@ -16,7 +16,10 @@ export const videoManifest = [
         outputName: "texture-sets.webm",
         title: "Texture Sets",
         description: "Inspect a reusable material built from global texture files.",
-        maxDurationSeconds: 40,
+        // Deliberate raise from 40: the choreography measures a stable ~44s
+        // locally (43.6s/44.6s over two runs, zero freeze/black frames), and
+        // main-push CI renders on software GL, which runs longer than local.
+        maxDurationSeconds: 55,
     },
     {
         slug: "recycled-files",

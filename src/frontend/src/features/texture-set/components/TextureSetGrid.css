@@ -60,21 +60,25 @@
 }
 
 /* Texture Set Card */
+/* Card identity — keep in sync with AssetTile.css (design-system skill). */
 .texture-set-card {
   background: var(--surface-card);
   border: 2px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--mod-radius-lg);
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
+  box-shadow: var(--mod-shadow-sm);
+  transition:
+    transform var(--mod-transition-fast),
+    box-shadow var(--mod-transition-fast),
+    border-color var(--mod-transition-fast);
   cursor: pointer;
   position: relative;
   user-select: none;
 }
 
 .texture-set-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(var(--asset-card-hover-lift));
+  box-shadow: var(--mod-shadow-md);
 }
 
 .texture-set-card.selected {
@@ -289,29 +293,6 @@
   font-size: 0.875rem;
 }
 
-/* No results state */
-.no-results {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  gap: 0.75rem;
-  padding: 4rem 2rem;
-  color: var(--text-color-secondary);
-}
-
-.no-results .pi {
-  font-size: 3rem;
-  margin-bottom: 1rem;
-  opacity: 0.5;
-}
-
-.no-results p {
-  font-size: 1rem;
-  margin: 0;
-}
-
 /* Loading state */
 .texture-set-grid-loading,
 .texture-set-grid-error {
@@ -333,47 +314,6 @@
 
 .texture-set-grid-error .pi-exclamation-triangle {
   color: var(--orange-500, #f97316);
-}
-
-/* Empty state */
-.texture-set-grid-empty {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 4rem 2rem;
-  gap: 1rem;
-  border: 2px dashed var(--surface-border);
-  border-radius: 8px;
-  margin: 1rem;
-  transition: all 0.2s ease;
-}
-
-.texture-set-grid-empty .pi {
-  font-size: 4rem;
-  color: var(--text-color-secondary);
-  opacity: 0.5;
-}
-
-.texture-set-grid-empty h3 {
-  font-size: 1.5rem;
-  color: var(--text-color);
-  margin: 0;
-}
-
-.texture-set-grid-empty p {
-  font-size: 1rem;
-  color: var(--text-color-secondary);
-  margin: 0;
-  max-width: 400px;
-  text-align: center;
-}
-
-.texture-set-grid-empty .hint {
-  font-size: 0.875rem;
-  color: var(--text-color-secondary);
-  font-style: italic;
 }
 
 /* Tab content specific styles */

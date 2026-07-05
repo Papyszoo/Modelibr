@@ -31,7 +31,7 @@ When("I click the Models tab in the left panel", async ({ page }) => {
 });
 
 When("I click the Texture Sets tab in the left panel", async ({ page }) => {
-    await clickTab(page, "textureSets", "left");
+    await clickTab(page, "modelTextures", "left");
     console.log("[UI] Clicked Texture Sets tab in left panel ✓");
 });
 
@@ -86,7 +86,7 @@ Then(
     async ({ page }) => {
         // Small delay to let any potential state changes propagate
         await page.waitForTimeout(300);
-        const active = await isTabActive(page, "textureSets", "left");
+        const active = await isTabActive(page, "modelTextures", "left");
         expect(active).toBe(true);
         console.log(
             "[UI] Texture Sets tab is still active in left panel (cross-panel independence) ✓",

@@ -125,8 +125,9 @@ test.describe("Sprites", () => {
             await viewerPause(page, 220);
         }
 
+        // Categories live in the shared CategoryTreePanel sidebar.
         const uiKitTab = page
-            .locator(".category-tab")
+            .locator(".sprite-category-sidebar .p-treenode-content")
             .filter({ hasText: /UI Kit/i })
             .first();
         await expect(uiKitTab).toBeVisible({ timeout: ciVideoTimeout });
@@ -164,8 +165,7 @@ test.describe("Sprites", () => {
         await mediumPause(page);
 
         const unassignedTab = page
-            .locator(".category-tab")
-            .filter({ hasText: /^Unassigned/i })
+            .locator(".sprite-category-sidebar .category-tree-unassigned")
             .first();
         await clickLocator(page, unassignedTab);
         await expect(

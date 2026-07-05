@@ -145,7 +145,8 @@ type LegacyNavigationSnapshot = {
 
 const STATIC_TAB_LABELS: Record<string, string> = {
     modelList: "Models",
-    textureSets: "Texture Sets",
+    globalMaterials: "Global Materials",
+    modelTextures: "Multi-Model Textures",
     packs: "Packs",
     projects: "Projects",
     sprites: "Sprites",

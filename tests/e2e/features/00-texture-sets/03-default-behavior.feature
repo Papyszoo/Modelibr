@@ -11,7 +11,11 @@ Feature: Default Texture Set Behavior
       | name        |
       | blue_color  |
 
-  @three-js @textures @timeout:720000
+  # @serial: blocks on a real asset-processor render (waits for the version
+  # thumbnail to regenerate to "Ready") and inspects the Three.js scene under
+  # software WebGL — the render-blocking class that times out on GitHub's
+  # GPU-less PR runners (July 2026). Runs on the local GPU lane instead.
+  @three-js @textures @timeout:720000 @serial
   Scenario: Setting a default texture set for a model version
     # This test verifies:
     # 1. A texture set can be set as default for a model version

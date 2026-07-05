@@ -34,6 +34,7 @@ import { useTabContext } from '@/hooks/useTabContext'
 import { baseURL } from '@/lib/apiBase'
 import { SelectPackDialog } from '@/shared/components/dialogs/SelectPackDialog'
 import { SelectProjectDialog } from '@/shared/components/dialogs/SelectProjectDialog'
+import { EmptyState } from '@/shared/components/feedback'
 import { useTagVocabulary } from '@/shared/hooks/useTagVocabulary'
 import {
   type TextureChannel,
@@ -936,20 +937,19 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
             ) : null}
           </div>
         ) : (
-          <div className="texture-set-grid-empty">
-            <i className="pi pi-images" />
-            <h3>No Texture Sets</h3>
-            <p>Drag and drop texture files here to create new sets</p>
-            <p className="hint">
-              Each file will create a new texture set with an albedo texture
-            </p>
-          </div>
+          <EmptyState
+            className="texture-set-grid-empty"
+            icon="pi-images"
+            title="No Texture Sets"
+            message="Drag and drop texture files here to create new sets — each file becomes a set with an albedo texture"
+          />
         )
       ) : filteredTextureSets.length === 0 ? (
-        <div className="no-results">
-          <i className="pi pi-search" />
-          <p>No texture sets match the current filters.</p>
-        </div>
+        <EmptyState
+          className="no-results"
+          icon="pi-search"
+          title="No texture sets match the current filters"
+        />
       ) : (
         <div
           ref={selectionSurfaceRef}
