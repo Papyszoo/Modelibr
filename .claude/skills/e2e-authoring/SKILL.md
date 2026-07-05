@@ -23,6 +23,16 @@ Tag honestly: adding `@serial`/`@slow` removes the scenario from PR protection �
 always add a source comment with the root cause (see existing examples). Feature
 folders are numbered (`00-texture-sets/` …) to control ordering.
 
+**No render-blocking steps on the PR lane.** The `setup` phase runs on GitHub's
+GPU-less runners unconditionally, and untagged scenarios run there on every PR —
+neither may wait for real asset-processor renders (thumbnail "Ready" DB polls,
+loaded-thumbnail image asserts): those repeatedly timed out at 4 minutes on PR
+CI (July 2026). Setup only creates data + shared state; render assertions live
+in `@serial`/`@slow` scenarios (owner decision, 2026-07-05 — e.g.
+`01-model-viewer/03-model-card-thumbnail.feature`). Client-side canvas mounts
+under software WebGL are allowed on the PR lane but need generous waits with a
+comment naming what they absorb (see dock-system.steps.ts).
+
 ## Running
 - Whole suite incl. Docker lifecycle: `npm test` (in `tests/e2e/`); reuse a running
   stack with `npm run test:quick`.

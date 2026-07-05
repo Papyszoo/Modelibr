@@ -15,7 +15,10 @@ export class SoundListPage {
     private readonly soundName = ".sound-name";
     private readonly contextMenu = ".p-contextmenu";
     private readonly recycleMenuItem = ".p-menuitem";
-    private readonly categoryTab = ".category-tab";
+    // Categories render in the shared CategoryTreePanel sidebar: the
+    // "Unassigned" bucket row plus one PrimeReact tree node per category.
+    private readonly categoryTab =
+        ".sound-category-sidebar .category-tree-unassigned, .sound-category-sidebar .category-tree .p-treenode-content";
     private readonly toastMessage = ".p-toast-message";
     private readonly dialog = ".p-dialog";
 

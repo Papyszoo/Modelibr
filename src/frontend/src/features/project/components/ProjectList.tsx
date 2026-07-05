@@ -11,8 +11,17 @@ import { deleteProject } from '@/features/project/api/projectApi'
 import { useProjectsQuery } from '@/features/project/api/queries'
 import { useTabContext } from '@/hooks/useTabContext'
 import { resolveApiAssetUrl } from '@/lib/apiBase'
-import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
-import { FilterPanel } from '@/shared/components/FilterPanel'
+import { EmptyState, LoadingState } from '@/shared/components/feedback'
+import {
+  ListToolbar,
+  ListToolbarActions,
+  ListToolbarButton,
+  ListToolbarCount,
+  ListToolbarPanel,
+  ListToolbarRow,
+  ListToolbarSearchInput,
+  OptionsButton,
+} from '@/shared/components/list-toolbar'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
 import { type ProjectDto } from '@/types'
 
@@ -26,6 +35,8 @@ export function ProjectList() {
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [onlyWithConceptArt, setOnlyWithConceptArt] = useState(false)
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false)
   const toast = useRef<Toast>(null)
   const { openProjectDetailsTab } = useTabContext()
 
@@ -98,75 +109,98 @@ export function ProjectList() {
     <div className="project-list">
       <Toast ref={toast} />
 
-      <div className="project-list-header">
-        <h2>Projects</h2>
-        <Button
-          label="Create Project"
-          icon="pi pi-plus"
-          onClick={() => setShowCreateDialog(true)}
-        />
-      </div>
+      <ListToolbar>
+        <ListToolbarRow>
+          <ListToolbarActions>
+            <ListToolbarButton
+              icon="pi pi-search"
+              label="Search"
+              active={isSearchOpen || searchQuery.trim().length > 0}
+              onClick={() => setIsSearchOpen(open => !open)}
+              ariaLabel="Search"
+              ariaExpanded={isSearchOpen}
+              ariaControls="project-list-search-panel"
+            />
+            <ListToolbarButton
+              icon="pi pi-sliders-h"
+              label="Filters"
+              active={isFiltersOpen || onlyWithConceptArt}
+              onClick={() => setIsFiltersOpen(open => !open)}
+              ariaLabel="Filters"
+              ariaExpanded={isFiltersOpen}
+              ariaControls="project-list-filters-panel"
+              badge={onlyWithConceptArt ? 1 : undefined}
+            />
+            <OptionsButton
+              cardWidth={cardWidth}
+              minCardWidth={200}
+              maxCardWidth={500}
+              onCardWidthChange={width => setCardWidth('projects', width)}
+              showThumbnailAnimation={false}
+            />
+            <ListToolbarButton
+              icon="pi pi-plus"
+              label="Create Project"
+              onClick={() => setShowCreateDialog(true)}
+              ariaLabel="Create Project"
+            />
+          </ListToolbarActions>
 
-      <FilterPanel
-        activeCount={activeFilterCount}
-        summaryLabel="Project Filters"
-      >
-        <div className="list-filters-search">
-          <i className="pi pi-search" />
-          <input
-            type="text"
+          <ListToolbarCount
+            icon="pi pi-folder"
+            count={filteredProjects.length}
+            unitLabel="project"
+          />
+        </ListToolbarRow>
+
+        <ListToolbarPanel id="project-list-search-panel" open={isSearchOpen}>
+          <ListToolbarSearchInput
             value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Search projects"
-            className="list-filters-search-input"
+            onChange={setSearchQuery}
+            placeholder="Search projects..."
           />
-        </div>
+        </ListToolbarPanel>
 
-        <div className="list-filters-row">
-          <div className="list-filters-switch">
-            <InputSwitch
-              checked={onlyWithConceptArt}
-              onChange={e => setOnlyWithConceptArt(Boolean(e.value))}
-            />
-            <span>Concept art</span>
+        <ListToolbarPanel id="project-list-filters-panel" open={isFiltersOpen}>
+          <div className="list-filters-row">
+            <div className="list-filters-switch">
+              <InputSwitch
+                checked={onlyWithConceptArt}
+                onChange={e => setOnlyWithConceptArt(Boolean(e.value))}
+              />
+              <span>Concept art</span>
+            </div>
+            {activeFilterCount > 0 ? (
+              <Button
+                icon="pi pi-times"
+                className="p-button-text p-button-sm list-filters-clear"
+                tooltip="Clear project filters"
+                tooltipOptions={{ position: 'bottom' }}
+                onClick={() => {
+                  setSearchQuery('')
+                  setOnlyWithConceptArt(false)
+                }}
+              />
+            ) : null}
           </div>
-          <CardWidthSlider
-            value={cardWidth}
-            min={200}
-            max={500}
-            onChange={width => setCardWidth('projects', width)}
-          />
-          {activeFilterCount > 0 ? (
-            <Button
-              icon="pi pi-times"
-              className="p-button-text p-button-sm list-filters-clear"
-              tooltip="Clear project filters"
-              tooltipOptions={{ position: 'bottom' }}
-              onClick={() => {
-                setSearchQuery('')
-                setOnlyWithConceptArt(false)
-              }}
-            />
-          ) : null}
-        </div>
-      </FilterPanel>
+        </ListToolbarPanel>
+      </ListToolbar>
 
       {loading ? (
-        <div className="project-list-loading">
-          <i className="pi pi-spin pi-spinner" style={{ fontSize: '2rem' }} />
-          <p>Loading projects...</p>
-        </div>
+        <LoadingState message="Loading projects…" />
       ) : filteredProjects.length === 0 ? (
-        <div className="project-list-empty">
-          <i className="pi pi-box" style={{ fontSize: '3rem' }} />
-          <h3>No Matching Projects</h3>
-          <p>Adjust the filters or create a new project.</p>
-          <Button
-            label="Create Project"
-            icon="pi pi-plus"
-            onClick={() => setShowCreateDialog(true)}
-          />
-        </div>
+        <EmptyState
+          icon="pi-folder"
+          title="No matching projects"
+          message="Adjust the filters or create a new project."
+          action={
+            <Button
+              label="Create Project"
+              icon="pi pi-plus"
+              onClick={() => setShowCreateDialog(true)}
+            />
+          }
+        />
       ) : (
         <div
           className="project-grid"

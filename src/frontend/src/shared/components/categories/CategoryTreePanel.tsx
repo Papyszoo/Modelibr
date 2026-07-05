@@ -1,7 +1,7 @@
 import './CategoryTreeControls.css'
 
 import { Tree } from 'primereact/tree'
-import { useMemo } from 'react'
+import { type ReactNode, useMemo } from 'react'
 
 import { type HierarchicalCategory } from '@/shared/types/categories'
 import {
@@ -29,6 +29,12 @@ interface CategoryTreePanelProps<TCategory extends HierarchicalCategory> {
   unassignedCategoryId: number
   unassignedLabel?: string
   compact?: boolean
+  /**
+   * Optional per-category actions (e.g. rename/delete icon buttons),
+   * rendered at the end of the node row and revealed on hover/selection.
+   * Not rendered for the unassigned bucket.
+   */
+  renderNodeActions?: (category: TCategory) => ReactNode
 }
 
 export function CategoryTreePanel<TCategory extends HierarchicalCategory>({
@@ -44,6 +50,7 @@ export function CategoryTreePanel<TCategory extends HierarchicalCategory>({
   unassignedCategoryId,
   unassignedLabel = 'Unassigned',
   compact = false,
+  renderNodeActions,
 }: CategoryTreePanelProps<TCategory>) {
   const categoryNodes = useMemo(
     () => buildCategoryTree(categories),
@@ -53,10 +60,13 @@ export function CategoryTreePanel<TCategory extends HierarchicalCategory>({
     () => buildExpandedKeys(categoryNodes),
     [categoryNodes]
   )
+  // PrimeReact Tree in `selectionMode="single"` expects selectionKeys to be
+  // the selected key as a string — the `{ key: true }` map form is only for
+  // multiple/checkbox modes and silently never highlights in single mode.
   const selectedTreeKeys =
     activeCategoryId !== null && activeCategoryId !== unassignedCategoryId
-      ? { [String(activeCategoryId)]: true }
-      : {}
+      ? String(activeCategoryId)
+      : null
 
   return (
     <div className={`category-tree-panel${compact ? ' is-compact' : ''}`}>
@@ -103,6 +113,14 @@ export function CategoryTreePanel<TCategory extends HierarchicalCategory>({
                 <span className="category-tree-count">
                   ({categoryCounts.get(category.id) ?? 0})
                 </span>
+                {renderNodeActions && (
+                  <span
+                    className="category-tree-node-actions"
+                    onClick={e => e.stopPropagation()}
+                  >
+                    {renderNodeActions(category)}
+                  </span>
+                )}
               </div>
             )
           }}

@@ -50,6 +50,9 @@ half-implement it as a side effect.
   neighbors do.
 
 ## Styling
+- Full rules — token vocabulary, shared-primitive catalog, density/identity
+  rules, Storybook gallery + themes — live in the **`design-system`** skill;
+  read it before writing any CSS or UI component. Highlights:
 - Design tokens: `src/shared/styles/tokens.css` — use `var(--token)`; no new
   hardcoded colors (a sweep + lint gate is prompt 20; don't add to the pile).
 - Component CSS files are **global scope** — prefix class names with the

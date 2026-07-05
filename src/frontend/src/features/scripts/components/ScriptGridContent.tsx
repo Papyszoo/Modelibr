@@ -1,6 +1,7 @@
 import { Button } from 'primereact/button'
 import { type DragEvent, type MouseEvent, type RefObject } from 'react'
 
+import { EmptyState } from '@/shared/components/feedback'
 import { type ScriptDto } from '@/types'
 
 import { ScriptCard } from './ScriptCard'
@@ -56,15 +57,14 @@ export function ScriptGridContent({
   onLoadMore,
 }: ScriptGridContentProps) {
   if (filteredScripts.length === 0) {
+    // Legacy class kept as an e2e selector alias (prompt 46).
     return (
-      <div className="script-list-empty">
-        <i
-          className="pi pi-code"
-          style={{ fontSize: '3rem', marginBottom: '1rem' }}
-        />
-        <p>No scripts in this category</p>
-        <p className="hint">Drag and drop source-code files here to upload</p>
-      </div>
+      <EmptyState
+        className="script-list-empty"
+        icon="pi-code"
+        title="No scripts in this category"
+        message="Drag and drop source-code files here to upload"
+      />
     )
   }
 

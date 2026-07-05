@@ -39,7 +39,7 @@ export class PacksPage {
     async navigateToPackList(): Promise<void> {
         await navigateToTab(this.page, "packs");
         await this.page.waitForSelector(
-            ".pack-list-header, .pack-list-empty, .pack-grid",
+            ".pack-list .list-toolbar, .pack-list .mod-empty-state, .pack-grid",
             {
                 state: "visible",
                 timeout: 15000,
@@ -72,7 +72,7 @@ export class PacksPage {
         }
 
         // Wait for the page to be fully loaded
-        await this.page.waitForSelector(".pack-list-header, .pack-list-empty", {
+        await this.page.waitForSelector(".pack-list .list-toolbar, .pack-list .mod-empty-state", {
             timeout: 10000,
         });
 

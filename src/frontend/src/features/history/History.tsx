@@ -8,6 +8,7 @@ import { useMemo, useState } from 'react'
 import { getEnvironmentMapById } from '@/features/environment-map/api/environmentMapApi'
 import { getModelById } from '@/features/models/api/modelApi'
 import { getTextureSetById } from '@/features/texture-set/api/textureSetApi'
+import { EmptyState } from '@/shared/components/feedback'
 import { openTabInPanel } from '@/utils/tabNavigation'
 
 import { useUploadHistoryQuery } from './api/queries'
@@ -381,10 +382,12 @@ export function History() {
       </div>
 
       {batchGroups.length === 0 ? (
-        <div className="history-empty">
-          <i className="pi pi-history" />
-          <p>No upload history found</p>
-        </div>
+        <EmptyState
+          className="history-empty"
+          icon="pi-history"
+          title="No upload history found"
+          variant="compact"
+        />
       ) : (
         <div className="history-list">
           {batchGroups.map(batch => renderBatch(batch))}

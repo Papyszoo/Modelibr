@@ -68,7 +68,7 @@ export const TextureSets: Story = {
   args: {
     tab: {
       id: 'texture-sets-1',
-      type: 'textureSets',
+      type: 'modelTextures',
       label: 'Texture Sets',
       params: {},
       internalUiState: {},

@@ -155,15 +155,16 @@ test.describe("Sounds", () => {
         await page.getByTestId("sound-category-dialog-save").click();
         await mediumPause(page);
 
+        // Categories live in the shared CategoryTreePanel sidebar (tree nodes
+        // plus the Unassigned bucket row) — sounds no longer uses tab chips.
         const categoryTab = page
-            .locator(".category-tab")
+            .locator(".sound-category-sidebar .p-treenode-content")
             .filter({ hasText: categoryName })
             .first();
         await categoryTab.waitFor({ state: "visible", timeout: ciVideoTimeout });
 
         const unassignedTab = page
-            .locator(".category-tab")
-            .filter({ hasText: "Unassigned" })
+            .locator(".sound-category-sidebar .category-tree-unassigned")
             .first();
         await unassignedTab.click();
         await expect(soundCard(renamedSound)).toBeVisible({

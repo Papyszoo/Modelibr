@@ -2,7 +2,6 @@ export type TabType =
   | 'newTab'
   | 'modelList'
   | 'modelViewer'
-  | 'textureSets'
   | 'globalMaterials'
   | 'modelTextures'
   | 'textureSetViewer'

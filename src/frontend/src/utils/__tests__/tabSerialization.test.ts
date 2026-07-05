@@ -67,7 +67,8 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
   describe('getTabLabel', () => {
     it('should return correct labels for different tab types', () => {
       expect(getTabLabel('modelList')).toBe('Models')
-      expect(getTabLabel('textureSets')).toBe('Texture Sets')
+      expect(getTabLabel('modelTextures')).toBe('Multi-Model Textures')
+      expect(getTabLabel('globalMaterials')).toBe('Global Materials')
       expect(getTabLabel('environmentMaps')).toBe('Environment Maps')
       expect(getTabLabel('packs')).toBe('Packs')
       expect(getTabLabel('modelViewer')).toBe('Model Viewer')
@@ -121,14 +122,23 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
 
     it('should parse multiple tabs', () => {
       const result = parseCompactTabFormat(
-        'modelList,textureSets,environmentMaps,model-456'
+        'modelList,modelTextures,environmentMaps,model-456'
       )
       expect(result).toHaveLength(4)
       expect(result[0].type).toBe('modelList')
-      expect(result[1].type).toBe('textureSets')
+      expect(result[1].type).toBe('modelTextures')
       expect(result[2].type).toBe('environmentMaps')
       expect(result[3].type).toBe('modelViewer')
       expect(result[3].modelId).toBe('456')
+    })
+
+    it('maps the legacy textureSets URL id to modelTextures', () => {
+      // Regression guard: the 'textureSets' tab type was split into
+      // globalMaterials/modelTextures and removed from the TabType union —
+      // bookmarks from before the split must still restore a working tab.
+      const result = parseCompactTabFormat('textureSets')
+      expect(result).toHaveLength(1)
+      expect(result[0].type).toBe('modelTextures')
     })
 
     it('should parse environment map viewer tabs', () => {
@@ -140,8 +150,8 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
     })
 
     it('should generate deterministic IDs for same input', () => {
-      const result1 = parseCompactTabFormat('modelList,textureSets')
-      const result2 = parseCompactTabFormat('modelList,textureSets')
+      const result1 = parseCompactTabFormat('modelList,modelTextures')
+      const result2 = parseCompactTabFormat('modelList,modelTextures')
 
       expect(result1[0].id).toBe(result2[0].id)
       expect(result1[1].id).toBe(result2[1].id)
@@ -185,15 +195,15 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
 
     it('should deduplicate tabs with same id when parsing', () => {
       // This tests the fix for the bug where duplicate tabs appear in the UI
-      // If the URL somehow contains duplicates (e.g., modelList,textureSets,set-1,model-1,model-1)
+      // If the URL somehow contains duplicates (e.g., modelList,modelTextures,set-1,model-1,model-1)
       // the parser should deduplicate them to prevent rendering duplicate tabs
       const result = parseCompactTabFormat(
-        'modelList,model-123,model-123,textureSets'
+        'modelList,model-123,model-123,modelTextures'
       )
       expect(result).toHaveLength(3)
       expect(result[0].id).toBe('modelList')
       expect(result[1].id).toBe('model-123')
-      expect(result[2].id).toBe('textureSets')
+      expect(result[2].id).toBe('modelTextures')
 
       // Ensure no duplicates exist
       const ids = result.map(tab => tab.id)
@@ -213,9 +223,9 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
           internalUiState: {},
         },
         {
-          id: 'textureSets',
-          type: 'textureSets',
-          label: 'Texture Sets',
+          id: 'modelTextures',
+          type: 'modelTextures',
+          label: 'Multi-Model Textures',
           params: {},
           internalUiState: {},
         },
@@ -228,7 +238,7 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
         },
       ]
       expect(serializeToCompactFormat(tabs)).toBe(
-        'modelList,textureSets,environmentMaps'
+        'modelList,modelTextures,environmentMaps'
       )
     })
 
@@ -283,9 +293,9 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
           internalUiState: {},
         }, // duplicate
         {
-          id: 'textureSets',
-          type: 'textureSets',
-          label: 'Texture Sets',
+          id: 'modelTextures',
+          type: 'modelTextures',
+          label: 'Multi-Model Textures',
           params: {},
           internalUiState: {},
         },
@@ -299,7 +309,7 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
         },
       ]
       expect(serializeToCompactFormat(tabs)).toBe(
-        'modelList,model-123,textureSets,environment-map-42'
+        'modelList,model-123,modelTextures,environment-map-42'
       )
     })
 
@@ -344,9 +354,9 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
           internalUiState: {},
         },
         {
-          id: 'textureSets',
-          type: 'textureSets',
-          label: 'Texture Sets',
+          id: 'modelTextures',
+          type: 'modelTextures',
+          label: 'Multi-Model Textures',
           params: {},
           internalUiState: {},
         },
@@ -369,7 +379,9 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
 
       // Serialize tabs to URL format
       const serialized = serializeToCompactFormat(originalTabs)
-      expect(serialized).toBe('modelList,textureSets,model-123,environmentMaps')
+      expect(serialized).toBe(
+        'modelList,modelTextures,model-123,environmentMaps'
+      )
 
       // Parse back from URL format (simulating browser refresh)
       const parsedTabs = parseCompactTabFormat(serialized)
@@ -377,7 +389,7 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
       // Verify that parsed tabs have consistent structure
       expect(parsedTabs).toHaveLength(4)
       expect(parsedTabs[0].type).toBe('modelList')
-      expect(parsedTabs[1].type).toBe('textureSets')
+      expect(parsedTabs[1].type).toBe('modelTextures')
       expect(parsedTabs[2].type).toBe('modelViewer')
       expect(parsedTabs[2].modelId).toBe('123')
       expect(parsedTabs[3].type).toBe('environmentMaps')
@@ -478,15 +490,15 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
       mockGetModelById.mockResolvedValue({ id: 123, name: 'My Model' })
 
       const result = await parseCompactTabFormatAsync(
-        'modelList,model-123,textureSets'
+        'modelList,model-123,modelTextures'
       )
       expect(result).toHaveLength(3)
       expect(result[0].type).toBe('modelList')
       expect(result[0].label).toBe('Models')
       expect(result[1].type).toBe('modelViewer')
       expect(result[1].label).toBe('My Model')
-      expect(result[2].type).toBe('textureSets')
-      expect(result[2].label).toBe('Texture Sets')
+      expect(result[2].type).toBe('modelTextures')
+      expect(result[2].label).toBe('Multi-Model Textures')
     })
 
     it('should handle legacy JSON format', async () => {
