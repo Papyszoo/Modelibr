@@ -169,9 +169,12 @@ When(
 
         const clickTarget = page.locator(`text="${modelData.name}"`).first();
         await clickTarget.dblclick();
+        // 30s absorbs the model-viewer mount: three.js initializes on software
+        // WebGL on GPU-less CI runners and can block well past 10s (PR-lane
+        // timeouts on 2026-07-04). The app is converging, not broken.
         await page.waitForSelector(
             ".model-viewer, .viewer-canvas, .p-menubar",
-            { state: "visible", timeout: 10000 },
+            { state: "visible", timeout: 30000 },
         );
         console.log(`[UI] Clicked on model "${modelName}" again ✓`);
     },
@@ -180,11 +183,14 @@ When(
 Then(
     "there should be exactly {int} model viewer tab visible",
     async ({ page }, expectedCount: number) => {
-        // Wait for React state to settle after tab deduplication
+        // Wait for React state to settle after tab deduplication. 45s absorbs
+        // the model-viewer tab mount on GPU-less CI runners, where three.js
+        // initializes on software WebGL and can starve the main thread well
+        // past the old 10s budget (3× PR-lane timeouts on 2026-07-04).
         await expect(async () => {
             const count = await countTabsByType(page, "modelViewer");
             expect(count).toBe(expectedCount);
-        }).toPass({ timeout: 10000, intervals: [500, 1000, 2000] });
+        }).toPass({ timeout: 45000, intervals: [500, 1000, 2000] });
         console.log(
             `[UI] Found ${expectedCount} model viewer tab(s) ✓`,
         );
