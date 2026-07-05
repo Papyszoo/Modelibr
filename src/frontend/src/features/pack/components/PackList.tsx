@@ -11,8 +11,17 @@ import { deletePack } from '@/features/pack/api/packApi'
 import { usePacksQuery } from '@/features/pack/api/queries'
 import { useTabContext } from '@/hooks/useTabContext'
 import { resolveApiAssetUrl } from '@/lib/apiBase'
-import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
-import { FilterPanel } from '@/shared/components/FilterPanel'
+import { EmptyState, LoadingState } from '@/shared/components/feedback'
+import {
+  ListToolbar,
+  ListToolbarActions,
+  ListToolbarButton,
+  ListToolbarCount,
+  ListToolbarPanel,
+  ListToolbarRow,
+  ListToolbarSearchInput,
+  OptionsButton,
+} from '@/shared/components/list-toolbar'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
 import { type PackDto } from '@/types'
 
@@ -26,6 +35,8 @@ export function PackList() {
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedLicense, setSelectedLicense] = useState<string | null>(null)
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false)
   const toast = useRef<Toast>(null)
   const { openPackDetailsTab } = useTabContext()
 
@@ -99,73 +110,99 @@ export function PackList() {
     <div className="pack-list">
       <Toast ref={toast} />
 
-      <div className="pack-list-header">
-        <h2>Packs</h2>
-        <Button
-          label="Create Pack"
-          icon="pi pi-plus"
-          onClick={() => setShowCreateDialog(true)}
-        />
-      </div>
-
-      <FilterPanel activeCount={activeFilterCount} summaryLabel="Pack Filters">
-        <div className="list-filters-search">
-          <i className="pi pi-search" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Search packs"
-            className="list-filters-search-input"
-          />
-        </div>
-
-        <div className="list-filters-row">
-          <Dropdown
-            value={selectedLicense}
-            options={licenseOptions}
-            onChange={e => setSelectedLicense(e.value ?? null)}
-            placeholder="License"
-            showClear
-            className="list-filters-control"
-          />
-          <CardWidthSlider
-            value={cardWidth}
-            min={200}
-            max={500}
-            onChange={width => setCardWidth('packs', width)}
-          />
-          {activeFilterCount > 0 ? (
-            <Button
-              icon="pi pi-times"
-              className="p-button-text p-button-sm list-filters-clear"
-              tooltip="Clear pack filters"
-              tooltipOptions={{ position: 'bottom' }}
-              onClick={() => {
-                setSearchQuery('')
-                setSelectedLicense(null)
-              }}
+      <ListToolbar>
+        <ListToolbarRow>
+          <ListToolbarActions>
+            <ListToolbarButton
+              icon="pi pi-search"
+              label="Search"
+              active={isSearchOpen || searchQuery.trim().length > 0}
+              onClick={() => setIsSearchOpen(open => !open)}
+              ariaLabel="Search"
+              ariaExpanded={isSearchOpen}
+              ariaControls="pack-list-search-panel"
             />
-          ) : null}
-        </div>
-      </FilterPanel>
+            <ListToolbarButton
+              icon="pi pi-sliders-h"
+              label="Filters"
+              active={isFiltersOpen || selectedLicense !== null}
+              onClick={() => setIsFiltersOpen(open => !open)}
+              ariaLabel="Filters"
+              ariaExpanded={isFiltersOpen}
+              ariaControls="pack-list-filters-panel"
+              badge={selectedLicense !== null ? 1 : undefined}
+            />
+            <OptionsButton
+              cardWidth={cardWidth}
+              minCardWidth={200}
+              maxCardWidth={500}
+              onCardWidthChange={width => setCardWidth('packs', width)}
+              showThumbnailAnimation={false}
+            />
+            <ListToolbarButton
+              icon="pi pi-plus"
+              label="Create Pack"
+              onClick={() => setShowCreateDialog(true)}
+              ariaLabel="Create Pack"
+            />
+          </ListToolbarActions>
+
+          <ListToolbarCount
+            icon="pi pi-box"
+            count={filteredPacks.length}
+            unitLabel="pack"
+          />
+        </ListToolbarRow>
+
+        <ListToolbarPanel id="pack-list-search-panel" open={isSearchOpen}>
+          <ListToolbarSearchInput
+            value={searchQuery}
+            onChange={setSearchQuery}
+            placeholder="Search packs..."
+          />
+        </ListToolbarPanel>
+
+        <ListToolbarPanel id="pack-list-filters-panel" open={isFiltersOpen}>
+          <div className="list-filters-row">
+            <Dropdown
+              value={selectedLicense}
+              options={licenseOptions}
+              onChange={e => setSelectedLicense(e.value ?? null)}
+              placeholder="License"
+              showClear
+              className="list-filters-control"
+            />
+            {activeFilterCount > 0 ? (
+              <Button
+                icon="pi pi-times"
+                className="p-button-text p-button-sm list-filters-clear"
+                tooltip="Clear pack filters"
+                tooltipOptions={{ position: 'bottom' }}
+                onClick={() => {
+                  setSearchQuery('')
+                  setSelectedLicense(null)
+                }}
+              />
+            ) : null}
+          </div>
+        </ListToolbarPanel>
+      </ListToolbar>
 
       {loading ? (
-        <div className="pack-list-loading">
-          <i className="pi pi-spin pi-spinner" style={{ fontSize: '2rem' }} />
-          <p>Loading packs...</p>
-        </div>
+        <LoadingState message="Loading packs…" />
       ) : filteredPacks.length === 0 ? (
-        <div className="pack-list-empty">
-          <i className="pi pi-box" style={{ fontSize: '3rem' }} />
-          <h3>No Matching Packs</h3>
-          <p>Adjust the filters or create a new pack.</p>
-          <Button
-            label="Create Pack"
-            icon="pi pi-plus"
-            onClick={() => setShowCreateDialog(true)}
-          />
-        </div>
+        <EmptyState
+          icon="pi-box"
+          title="No matching packs"
+          message="Adjust the filters or create a new pack."
+          action={
+            <Button
+              label="Create Pack"
+              icon="pi pi-plus"
+              onClick={() => setShowCreateDialog(true)}
+            />
+          }
+        />
       ) : (
         <div
           className="pack-grid"
