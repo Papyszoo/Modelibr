@@ -162,7 +162,9 @@ test.describe("Texture Sets", () => {
         await clearTextureVideoData(request);
         const { textureSetName } = await createGlobalTextureSet(request);
 
-        await navigateTo(page, "/?leftTabs=textureSets&activeLeft=textureSets");
+        // The combined Texture Sets tab was split; this video demos a GLOBAL
+        // texture set, which lives on the Global Materials page.
+        await navigateTo(page, "/?leftTabs=globalMaterials&activeLeft=globalMaterials");
         await disableHighlights(page);
 
         const leftPanel = page.locator(".p-splitter-panel").nth(0);
