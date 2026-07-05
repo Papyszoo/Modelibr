@@ -19,7 +19,7 @@ Modelibr includes a built-in sprite manager for organizing 2D image assets along
 
 Drag image files directly onto the Sprite Library panel to upload them.
 
-**Supported formats:** PNG, JPG, JPEG, WebP, BMP, GIF
+**Supported formats:** common image formats — PNG, JPG, WebP, GIF, APNG, BMP
 
 ### What Happens After Upload
 

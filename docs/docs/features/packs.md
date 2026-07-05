@@ -1,5 +1,5 @@
 ---
-sidebar_position: 8
+sidebar_position: 9
 ---
 
 # Packs
@@ -31,6 +31,7 @@ Click any pack card to open the Pack Viewer, which shows all assets organized by
 | **Environment Maps** | Panoramic or cube-based lighting assets with their variants |
 | **Sprites**      | 2D image assets                 |
 | **Sounds**       | Audio files                     |
+| **Scripts**      | Source code and shader assets   |
 
 ### Adding Assets
 
