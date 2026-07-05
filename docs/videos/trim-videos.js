@@ -23,20 +23,20 @@ for (const result of results) {
         continue;
     }
 
+    // Trim ONLY frozen tails (recommendedEnd from freeze detection).
+    // The manifest cap is a QA gate enforced by analyze-videos.js, not a
+    // trim point: cutting a recording at the cap chops the demo mid-action,
+    // which is worse than shipping a slightly longer video. Over-cap
+    // recordings must be fixed in the spec (or the cap raised deliberately).
     const shouldTrim =
-        result.duration > result.maxDurationSeconds ||
-        (result.recommendedEnd && result.recommendedEnd < result.duration - 1);
+        result.recommendedEnd && result.recommendedEnd < result.duration - 1;
 
     if (!shouldTrim) {
         fs.copyFileSync(sourcePath, destPath);
         continue;
     }
 
-    const trimEnd = Math.min(
-        result.duration,
-        result.maxDurationSeconds,
-        result.recommendedEnd || result.duration,
-    );
+    const trimEnd = Math.min(result.duration, result.recommendedEnd);
 
     const trimResult = spawnSync(
         ffmpegPath,
