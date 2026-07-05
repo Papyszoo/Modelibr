@@ -8,7 +8,6 @@ import { Dialog } from 'primereact/dialog'
 import { InputText } from 'primereact/inputtext'
 import { InputTextarea } from 'primereact/inputtextarea'
 import { type MenuItem } from 'primereact/menuitem'
-import { ProgressSpinner } from 'primereact/progressspinner'
 import { Toast } from 'primereact/toast'
 import {
   type DragEvent,
@@ -27,6 +26,7 @@ import { useSpriteMutations } from '@/features/sprite/hooks/useSpriteMutations'
 import { useSpriteUpload } from '@/features/sprite/hooks/useSpriteUpload'
 import { useUploadProgress } from '@/hooks/useUploadProgress'
 import { CategoryTreePanel } from '@/shared/components/categories/CategoryTreePanel'
+import { LoadingState } from '@/shared/components/feedback'
 import {
   ListToolbar,
   ListToolbarActions,
@@ -637,9 +637,10 @@ export function SpriteList() {
 
         <div className="sprite-list-main">
           {loading ? (
-            <div className="sprite-list-loading">
-              <ProgressSpinner />
-            </div>
+            <LoadingState
+              className="sprite-list-loading"
+              message="Loading sprites…"
+            />
           ) : (
             <SpriteGridContent
               filteredSprites={filteredSprites}

@@ -3,7 +3,6 @@ import '@/shared/components/FilterPanel.css'
 
 import { type ContextMenu } from 'primereact/contextmenu'
 import { Dropdown } from 'primereact/dropdown'
-import { ProgressSpinner } from 'primereact/progressspinner'
 import { Toast } from 'primereact/toast'
 import {
   type DragEvent,
@@ -21,6 +20,7 @@ import { useScriptMutations } from '@/features/scripts/hooks/useScriptMutations'
 import { useScriptUpload } from '@/features/scripts/hooks/useScriptUpload'
 import { useTabContext } from '@/hooks/useTabContext'
 import { CategoryTreePanel } from '@/shared/components/categories/CategoryTreePanel'
+import { LoadingState } from '@/shared/components/feedback'
 import {
   ListToolbar,
   ListToolbarActions,
@@ -606,9 +606,10 @@ export function ScriptList() {
 
         <div className="script-list-main">
           {loading ? (
-            <div className="script-list-loading">
-              <ProgressSpinner />
-            </div>
+            <LoadingState
+              className="script-list-loading"
+              message="Loading scripts…"
+            />
           ) : (
             <ScriptGridContent
               filteredScripts={filteredScripts}

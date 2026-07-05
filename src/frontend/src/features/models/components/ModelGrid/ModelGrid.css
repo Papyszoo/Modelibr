@@ -68,21 +68,25 @@
 }
 
 /* Model Card */
+/* Card identity — keep in sync with AssetTile.css (design-system skill). */
 .model-card {
   background: var(--surface-card);
   border: 2px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--mod-radius-lg);
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
+  box-shadow: var(--mod-shadow-sm);
+  transition:
+    transform var(--mod-transition-fast),
+    box-shadow var(--mod-transition-fast),
+    border-color var(--mod-transition-fast);
   cursor: pointer;
   position: relative;
   user-select: none;
 }
 
 .model-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(var(--asset-card-hover-lift));
+  box-shadow: var(--mod-shadow-md);
 }
 
 .model-card.selected {
@@ -388,24 +392,6 @@
 .model-category-single-actions {
   display: flex;
   justify-content: flex-end;
-}
-
-/* No results state */
-.no-results {
-  text-align: center;
-  padding: 4rem 2rem;
-  color: var(--text-color-secondary);
-}
-
-.no-results .pi {
-  font-size: 3rem;
-  margin-bottom: 1rem;
-  opacity: 0.5;
-}
-
-.no-results p {
-  font-size: 1rem;
-  margin: 0;
 }
 
 /* Add Model Card */

@@ -1,19 +1,24 @@
+/* Card identity — keep in sync with AssetTile.css (design-system skill). */
 .script-card {
   position: relative;
   display: flex;
   flex-direction: column;
   background: var(--surface-card);
-  border-radius: 8px;
+  border-radius: var(--mod-radius-lg);
   overflow: hidden;
   cursor: pointer;
-  transition: all 0.2s;
+  box-shadow: var(--mod-shadow-sm);
+  transition:
+    transform var(--mod-transition-fast),
+    box-shadow var(--mod-transition-fast),
+    border-color var(--mod-transition-fast);
   border: 2px solid transparent;
   user-select: none;
 }
 
 .script-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(var(--asset-card-hover-lift));
+  box-shadow: var(--mod-shadow-md);
 }
 
 .script-card.selected {

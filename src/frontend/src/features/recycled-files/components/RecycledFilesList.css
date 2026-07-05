@@ -38,34 +38,6 @@
   margin: 0;
 }
 
-/* Empty state */
-.recycled-files-empty {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
-  padding: 4rem 2rem;
-  color: var(--text-color-secondary);
-}
-
-.recycled-files-empty .pi {
-  font-size: 4rem;
-  opacity: 0.5;
-}
-
-.recycled-files-empty h3 {
-  font-size: 1.5rem;
-  color: var(--text-color);
-  margin: 0;
-}
-
-.recycled-files-empty p {
-  font-size: 1rem;
-  margin: 0;
-}
-
 /* Content container */
 .recycled-files-content {
   flex: 1;
