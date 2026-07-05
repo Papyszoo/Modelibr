@@ -330,7 +330,10 @@ GivenBdd(
         await page.waitForLoadState("domcontentloaded");
 
         // Navigation lands directly on the kind-locked Multi-Model
-        // Textures tab — the in-page kind switcher no longer exists.
+        // Textures tab — the in-page kind switcher no longer exists. Wait
+        // for the list to render before the toolbar-search helper runs
+        // (the removed switcher block used to provide this wait).
+        await page.waitForSelector(".texture-set-list", { timeout: 10000 });
 
         // Narrow the (virtualised) grid by name so the card is in DOM
         // even when >50 sets sit alphabetically before this one.
