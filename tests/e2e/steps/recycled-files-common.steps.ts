@@ -326,7 +326,7 @@ GivenBdd(
     async ({ page }, name: string) => {
         const { openTabViaMenu } = await import("../helpers/navigation-helper");
         // Open texture sets in the left panel
-        await openTabViaMenu(page, "textureSets", "left");
+        await openTabViaMenu(page, "modelTextures", "left");
         await page.waitForLoadState("domcontentloaded");
 
         // The texture sets created in test setup are Multi-Model (backend default).

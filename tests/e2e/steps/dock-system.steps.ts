@@ -71,7 +71,7 @@ Then("the Texture Sets content should be visible", async ({ page }) => {
     // Texture Sets tab first to make sure it is the active left-panel tab.
     const textureSetsTab = page
         .locator(".dock-bar-left")
-        .locator(".draggable-tab:has(.pi-folder)")
+        .locator(".draggable-tab:has(.pi-images)")
         .first();
     if (
         await textureSetsTab
@@ -95,7 +95,7 @@ Then("the Texture Sets content should be visible", async ({ page }) => {
 Then(
     "a Texture Sets tab should be visible in the dock bar",
     async ({ page }) => {
-        const count = await countTabsByType(page, "textureSets");
+        const count = await countTabsByType(page, "modelTextures");
         expect(count).toBeGreaterThanOrEqual(1);
         console.log("[UI] Texture Sets tab visible in dock bar ✓");
     },
@@ -134,7 +134,7 @@ When("I open the Texture Sets tab in the left panel", async ({ page }) => {
     // Check if already open — just click it
     const existingTab = page
         .locator(".dock-bar-left")
-        .locator(".draggable-tab:has(.pi-folder)");
+        .locator(".draggable-tab:has(.pi-images)");
     if (
         await existingTab
             .waitFor({ state: "visible", timeout: 1000 })
@@ -148,7 +148,7 @@ When("I open the Texture Sets tab in the left panel", async ({ page }) => {
     }
 
     // Otherwise add it via menu
-    await openTabViaMenu(page, "textureSets", "left");
+    await openTabViaMenu(page, "modelTextures", "left");
     console.log("[UI] Opened Texture Sets tab ✓");
 });
 
@@ -194,7 +194,7 @@ Then(
 Then(
     "there should be exactly {int} Texture Sets tab visible",
     async ({ page }, expectedCount: number) => {
-        const count = await countTabsByType(page, "textureSets");
+        const count = await countTabsByType(page, "modelTextures");
         expect(count).toBe(expectedCount);
         console.log(
             `[UI] Found ${count} Texture Sets tab(s) (expected ${expectedCount}) ✓`,
@@ -283,7 +283,7 @@ Then(
 Then(
     "the Texture Sets tab should be active in the left panel",
     async ({ page }) => {
-        const active = await isTabActive(page, "textureSets", "left");
+        const active = await isTabActive(page, "modelTextures", "left");
         expect(active).toBe(true);
         console.log("[UI] Texture Sets tab is active ✓");
     },
