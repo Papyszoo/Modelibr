@@ -48,24 +48,26 @@
   cursor: crosshair;
 }
 
+/* Card identity — keep in sync with AssetTile.css (design-system skill). */
 .environment-map-card {
   min-width: 0;
   border: 2px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--mod-radius-lg);
   overflow: hidden;
   background: var(--surface-card);
+  box-shadow: var(--mod-shadow-sm);
   cursor: pointer;
   position: relative;
   user-select: none;
   transition:
-    transform 0.3s ease,
-    box-shadow 0.3s ease,
-    border-color 0.2s ease;
+    transform var(--mod-transition-fast),
+    box-shadow var(--mod-transition-fast),
+    border-color var(--mod-transition-fast);
 }
 
 .environment-map-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(var(--asset-card-hover-lift));
+  box-shadow: var(--mod-shadow-md);
 }
 
 .environment-map-card.selected {
@@ -256,24 +258,6 @@
 .environment-map-category-empty-state {
   padding: 0.75rem 0;
   color: var(--text-color-secondary);
-}
-
-.environment-map-list-empty,
-.environment-map-list-loading {
-  flex: 1;
-  min-height: 260px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
-  text-align: center;
-  color: var(--text-color-secondary);
-}
-
-.environment-map-list-empty h3 {
-  margin: 0;
-  color: var(--text-color);
 }
 
 /* Mirror ModelGrid mobile pattern: single-row icon-only toolbar with the

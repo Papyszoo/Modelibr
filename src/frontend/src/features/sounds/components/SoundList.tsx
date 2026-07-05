@@ -7,7 +7,6 @@ import { confirmDialog } from 'primereact/confirmdialog'
 import { type ContextMenu } from 'primereact/contextmenu'
 import { Dialog } from 'primereact/dialog'
 import { InputNumber } from 'primereact/inputnumber'
-import { ProgressSpinner } from 'primereact/progressspinner'
 import { Toast } from 'primereact/toast'
 import {
   type DragEvent,
@@ -25,6 +24,7 @@ import { useSoundListData } from '@/features/sounds/hooks/useSoundListData'
 import { useSoundMutations } from '@/features/sounds/hooks/useSoundMutations'
 import { useSoundUpload } from '@/features/sounds/hooks/useSoundUpload'
 import { CategoryTreePanel } from '@/shared/components/categories/CategoryTreePanel'
+import { LoadingState } from '@/shared/components/feedback'
 import {
   ListToolbar,
   ListToolbarActions,
@@ -694,9 +694,10 @@ export function SoundList() {
 
         <div className="sound-list-main">
           {loading ? (
-            <div className="sound-list-loading">
-              <ProgressSpinner />
-            </div>
+            <LoadingState
+              className="sound-list-loading"
+              message="Loading sounds…"
+            />
           ) : (
             <SoundGridContent
               filteredSounds={filteredSounds}

@@ -1,6 +1,7 @@
 import { Button } from 'primereact/button'
 import { type DragEvent, type MouseEvent, type RefObject } from 'react'
 
+import { EmptyState } from '@/shared/components/feedback'
 import { type SoundDto } from '@/types'
 
 import { SoundCard } from './SoundCard'
@@ -56,15 +57,14 @@ export function SoundGridContent({
   onLoadMore,
 }: SoundGridContentProps) {
   if (filteredSounds.length === 0) {
+    // Legacy class kept as an e2e selector alias (prompt 46).
     return (
-      <div className="sound-list-empty">
-        <i
-          className="pi pi-volume-up"
-          style={{ fontSize: '3rem', marginBottom: '1rem' }}
-        />
-        <p>No sounds in this category</p>
-        <p className="hint">Drag and drop audio files here to upload</p>
-      </div>
+      <EmptyState
+        className="sound-list-empty"
+        icon="pi-volume-up"
+        title="No sounds in this category"
+        message="Drag and drop audio files here to upload"
+      />
     )
   }
 

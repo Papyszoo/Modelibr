@@ -14,6 +14,7 @@ import {
 import { type GridComponents, VirtuosoGrid } from 'react-virtuoso'
 
 import { useTabContext } from '@/hooks/useTabContext'
+import { EmptyState } from '@/shared/components/feedback'
 import { ThumbnailDisplay } from '@/shared/thumbnail'
 import {
   DEFAULT_MODEL_LIST_VIEW_STATE,
@@ -530,14 +531,18 @@ export function ModelGrid({
       )}
 
       {filteredModels.length === 0 && !isContainerContext ? (
-        <div className="no-results">
-          <i className="pi pi-search" />
-          <p>
-            {searchQuery
+        <EmptyState
+          className="no-results"
+          icon={searchQuery ? 'pi-search' : 'pi-box'}
+          title={
+            searchQuery
               ? `No models found matching "${searchQuery}"`
-              : 'No models found. Drag & drop files here to upload.'}
-          </p>
-        </div>
+              : 'No models found'
+          }
+          message={
+            searchQuery ? undefined : 'Drag & drop files here to upload.'
+          }
+        />
       ) : (
         <div
           ref={selectionSurfaceRef}

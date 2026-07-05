@@ -33,6 +33,7 @@ import {
 import { uploadFile } from '@/features/models/api/modelApi'
 import { useTabContext } from '@/hooks/useTabContext'
 import { useUploadProgress } from '@/hooks/useUploadProgress'
+import { EmptyState, LoadingState } from '@/shared/components/feedback'
 import { useDragAndDrop } from '@/shared/hooks/useFileUpload'
 import { collectCategoryBranchIds } from '@/shared/utils/categoryTree'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
@@ -613,20 +614,21 @@ export function EnvironmentMapList() {
       />
 
       {loading ? (
-        <div className="environment-map-list-loading">
-          <i className="pi pi-spin pi-spinner" />
-          <p>Loading environment maps...</p>
-        </div>
+        <LoadingState
+          className="environment-map-list-loading"
+          message="Loading environment maps…"
+        />
       ) : filteredEnvironmentMaps.length === 0 ? (
-        <div className="environment-map-list-empty">
-          <i className="pi pi-globe" />
-          <h3>No Environment Maps</h3>
-          <p>
-            {environmentMaps.length > 0
+        <EmptyState
+          className="environment-map-list-empty"
+          icon="pi-globe"
+          title="No Environment Maps"
+          message={
+            environmentMaps.length > 0
               ? 'Try adjusting your search or filters.'
-              : 'Drag and drop files here or upload a panorama or cube map to get started.'}
-          </p>
-        </div>
+              : 'Drag and drop files here or upload a panorama or cube map to get started.'
+          }
+        />
       ) : (
         <EnvironmentMapGrid
           environmentMaps={filteredEnvironmentMaps}
