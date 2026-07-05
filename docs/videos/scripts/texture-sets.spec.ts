@@ -187,7 +187,30 @@ test.describe("Texture Sets", () => {
         await expect(textureSetCard.getByText(/3 textures?/i)).toBeVisible({
             timeout: ciVideoTimeout,
         });
+
+        // ── Off-camera prewarm ────────────────────────────────────────────
+        // Open the viewer and the Preview tab once BEFORE recording so the
+        // EXR decode + GPU texture upload cost is paid off-camera. Without
+        // this, the recorded Preview beat spends many seconds on a barely
+        // moving canvas (and synthetic drag steps crawl while the render
+        // loop is saturated). Then restore the pre-recording UI state.
+        await textureSetCard.click();
+        const prewarmViewer = page.locator(".texture-set-viewer");
+        await expect(prewarmViewer).toBeVisible({ timeout: ciVideoTimeout });
+        await page.getByRole("tab", { name: "Preview" }).click();
+        await expect(
+            prewarmViewer.locator(".texture-preview-canvas"),
+        ).toBeVisible({ timeout: ciVideoTimeout });
+        await expect(
+            prewarmViewer.locator(".texture-loading-overlay"),
+        ).toBeHidden({ timeout: ciVideoTimeout });
+        // Restore: back to the default tab, then back to the list tab (the
+        // first dock tab) so the recording starts from the library grid.
+        await page.getByRole("tab", { name: "Texture Types" }).click();
+        await leftPanel.locator(".dock-bar .draggable-tab").first().click();
+        await expect(textureSetCard).toBeVisible({ timeout: ciVideoTimeout });
         await mediumPause(page);
+
         await startFeatureRecording(page, testInfo, { slug: "texture-sets" });
 
         const cardBox = await textureSetCard.boundingBox();
@@ -241,48 +264,23 @@ test.describe("Texture Sets", () => {
         });
         await viewerPause(page, 900);
 
-        // Wait for canvas to have actual layout dimensions before getting bounding box
-        await page.waitForFunction(
-            () => {
-                const el = document.querySelector(
-                    ".texture-set-viewer .texture-preview-canvas",
-                );
-                if (!el) return false;
-                const rect = el.getBoundingClientRect();
-                return rect.width > 0 && rect.height > 0;
-            },
-            { timeout: ciVideoTimeout },
-        );
-
-        // Use evaluate to get bounding rect directly (avoids actionTimeout constraint)
-        const previewBox = await page.evaluate(() => {
-            const el = document.querySelector(
-                ".texture-set-viewer .texture-preview-canvas",
-            );
-            if (!el) return null;
-            const rect = el.getBoundingClientRect();
-            if (rect.width === 0 || rect.height === 0) return null;
-            return {
-                x: rect.x,
-                y: rect.y,
-                width: rect.width,
-                height: rect.height,
-            };
+        // Final beat: switch the preview geometry via Preview Settings — a
+        // visible 3D payoff. Deliberately NOT an orbit drag, and deliberately
+        // plain clicks instead of humanClick: this canvas renders with
+        // frameloop="always", and under software WebGL (headless recording,
+        // CI) every synthetic pointer step over it waits ~2s for the render
+        // loop, so glide paths crossing the canvas turn into slow motion.
+        await page.locator('[aria-label="Open preview settings"]').click();
+        await expect(page.locator("#preview-settings")).toBeVisible({
+            timeout: ciVideoTimeout,
         });
-        if (previewBox) {
-            await page.mouse.move(
-                previewBox.x + previewBox.width * 0.55,
-                previewBox.y + previewBox.height * 0.55,
-                { steps: 12 },
-            );
-            await page.mouse.down();
-            await page.mouse.move(
-                previewBox.x + previewBox.width * 0.72,
-                previewBox.y + previewBox.height * 0.44,
-                { steps: 16 },
-            );
-            await page.mouse.up();
-        }
+        await mediumPause(page);
+        await page.locator("#preview-settings .p-dropdown").click();
+        await page
+            .locator('.p-dropdown-panel .p-dropdown-item:has-text("Sphere")')
+            .click();
+        await viewerPause(page, 700);
+        await page.locator('#preview-settings [title="Close"]').click();
 
         await viewerPause(page, 1200);
         await stopFeatureRecording(page);

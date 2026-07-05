@@ -16,6 +16,13 @@ for (const result of results) {
         console.error(
             `${result.outputName}: ${result.issues.join(", ")} (duration ${result.duration}s, recommendedEnd ${result.recommendedEnd}s)`,
         );
+        if (result.issues.includes("over-max-duration")) {
+            console.error(
+                `  → recording exceeds its manifest cap (${result.maxDurationSeconds}s). ` +
+                    "Content is never trimmed to the cap; tighten the spec choreography " +
+                    "or raise maxDurationSeconds in video-manifest.js deliberately.",
+            );
+        }
         hasFailure = true;
         continue;
     }

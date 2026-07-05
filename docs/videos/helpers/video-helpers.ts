@@ -9,6 +9,93 @@ export const ciVideoTimeout = process.env.CI === "true" ? 30000 : 15000;
 const videoPaceFactor = 0.65;
 const LEGACY_NAVIGATION_HASH_KEY = "__docsVideoNavigation";
 const initializedLegacyNavigationPages = new WeakSet<Page>();
+const cursorOverlayPages = new WeakSet<Page>();
+
+/**
+ * Playwright's screencast does not render the mouse pointer, so smooth
+ * mouse movements are invisible and every click looks like teleportation.
+ * Inject a synthetic cursor that follows mousemove events and pulses on
+ * clicks — this is what makes the recorded interactions readable.
+ */
+async function ensureCursorOverlayInitScript(page: Page) {
+    if (cursorOverlayPages.has(page)) {
+        return;
+    }
+
+    await page.addInitScript(() => {
+        function attach() {
+            if (!document.body) {
+                requestAnimationFrame(attach);
+                return;
+            }
+            if (document.getElementById("__docsVideoCursor")) {
+                return;
+            }
+
+            const style = document.createElement("style");
+            style.textContent = `
+                #__docsVideoCursor {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 18px;
+                    height: 18px;
+                    margin: -9px 0 0 -9px;
+                    border-radius: 50%;
+                    background: rgba(255, 255, 255, 0.9);
+                    border: 2px solid rgba(30, 41, 59, 0.85);
+                    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+                    pointer-events: none;
+                    z-index: 2147483647;
+                    opacity: 0;
+                    transition: opacity 0.15s ease;
+                }
+                #__docsVideoCursor.visible { opacity: 1; }
+                #__docsVideoCursor .ripple {
+                    position: absolute;
+                    inset: -6px;
+                    border-radius: 50%;
+                    border: 2px solid rgba(59, 130, 246, 0.9);
+                    animation: __docsVideoRipple 0.45s ease-out forwards;
+                    pointer-events: none;
+                }
+                @keyframes __docsVideoRipple {
+                    from { transform: scale(0.6); opacity: 1; }
+                    to { transform: scale(2.2); opacity: 0; }
+                }
+            `;
+            document.head.appendChild(style);
+
+            const cursor = document.createElement("div");
+            cursor.id = "__docsVideoCursor";
+            document.body.appendChild(cursor);
+
+            window.addEventListener(
+                "mousemove",
+                (event) => {
+                    cursor.classList.add("visible");
+                    cursor.style.transform = `translate3d(${event.clientX}px, ${event.clientY}px, 0)`;
+                },
+                { capture: true, passive: true },
+            );
+
+            window.addEventListener(
+                "mousedown",
+                () => {
+                    const ripple = document.createElement("div");
+                    ripple.className = "ripple";
+                    cursor.appendChild(ripple);
+                    setTimeout(() => ripple.remove(), 500);
+                },
+                { capture: true, passive: true },
+            );
+        }
+
+        attach();
+    });
+
+    cursorOverlayPages.add(page);
+}
 
 function paceDuration(ms: number) {
     return Math.max(120, Math.round(ms * videoPaceFactor));
@@ -423,6 +510,7 @@ export async function dragElementTo(
 export async function navigateTo(page: Page, path: string) {
     // Use localhost (not 127.0.0.1) so browser origin matches CORS allowed origins
     const baseUrl = process.env.FRONTEND_URL || "http://localhost:3002";
+    await ensureCursorOverlayInitScript(page);
     const usedLegacyNavigation = await applyLegacyNavigationState(
         page,
         path,
