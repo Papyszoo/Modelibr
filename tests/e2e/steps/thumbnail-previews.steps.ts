@@ -129,23 +129,10 @@ Given("I have a sprite with an uploaded image", async () => {
 
 // ============= UI navigation steps =============
 
-/** After navigating to texture sets page, switch to Multi-Model tab
- *  (the default is Global Materials, but our API creates Multi-Model sets)
- *  Optionally searches for a specific card name to handle pagination (>50 sets). */
+/** Navigation lands directly on the kind-locked Multi-Model Textures tab
+ *  (the in-page kind switcher no longer exists). Optionally searches for a
+ *  specific card name to handle pagination (>50 sets). */
 async function switchToModelSpecificKind(page: any, searchText?: string) {
-    const modelSpecificBtn = page.locator(".kind-filter-select button").filter({
-        hasText: "Multi-Model",
-    });
-    await expect(modelSpecificBtn).toBeVisible({ timeout: 5000 });
-    const isActive = await modelSpecificBtn.evaluate((el: Element) =>
-        el.classList.contains("p-highlight"),
-    );
-    if (!isActive) {
-        await modelSpecificBtn.click();
-        // Wait for the kind-switch's data query to resolve instead of
-        // sleeping a fixed 500ms.
-        await waitForCountLabelStable(page);
-    }
     // If a search text is provided, filter the grid so the card appears
     // on the first page (the grid is virtualised).
     if (searchText) {

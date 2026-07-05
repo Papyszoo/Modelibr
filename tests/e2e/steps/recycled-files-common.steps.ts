@@ -329,20 +329,8 @@ GivenBdd(
         await openTabViaMenu(page, "modelTextures", "left");
         await page.waitForLoadState("domcontentloaded");
 
-        // The texture sets created in test setup are Multi-Model (backend default).
-        // The default tab is Global Materials, so we must switch to Multi-Model first.
-        const modelSpecificBtn = page
-            .locator(".kind-filter-select button")
-            .filter({ hasText: "Multi-Model" });
-        await expect(modelSpecificBtn).toBeVisible({ timeout: 10000 });
-        const isActive = await modelSpecificBtn.evaluate((el: Element) =>
-            el.classList.contains("p-highlight"),
-        );
-        if (!isActive) {
-            await modelSpecificBtn.click();
-            // Wait for the new tab's data to load instead of sleeping.
-            await waitForCountLabelStable(page);
-        }
+        // Navigation lands directly on the kind-locked Multi-Model
+        // Textures tab — the in-page kind switcher no longer exists.
 
         // Narrow the (virtualised) grid by name so the card is in DOM
         // even when >50 sets sit alphabetically before this one.
