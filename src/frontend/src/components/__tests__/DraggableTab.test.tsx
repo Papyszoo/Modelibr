@@ -184,22 +184,22 @@ describe('DraggableTab', () => {
     expect(defaultProps.onClose).not.toHaveBeenCalled()
   })
 
-  it('should render textureSets tab with folder icon', () => {
-    const textureSetsTab: Tab = {
+  it('should render modelTextures tab with images icon', () => {
+    const modelTexturesTab: Tab = {
       id: 'test-tab-3',
-      type: 'textureSets',
-      label: 'Texture Sets',
+      type: 'modelTextures',
+      label: 'Multi-Model Textures',
       params: {},
       internalUiState: {},
     }
 
-    render(<DraggableTab {...defaultProps} tab={textureSetsTab} />)
+    render(<DraggableTab {...defaultProps} tab={modelTexturesTab} />)
 
-    const tabElement = getByTooltip('Texture Sets')
+    const tabElement = getByTooltip('Multi-Model Textures')
     expect(tabElement).toBeInTheDocument()
 
     const icon = tabElement.querySelector('.tab-icon')
-    expect(icon).toHaveClass('pi', 'pi-folder')
+    expect(icon).toHaveClass('pi', 'pi-images')
   })
 
   it('should render textureSetViewer tab with image icon', () => {

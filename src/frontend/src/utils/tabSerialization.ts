@@ -72,12 +72,16 @@ export function parseCompactTabFormat(
         continue
       }
 
-      const tabType = tabId as Tab['type']
+      // Legacy URL id from before the texture-set split.
+      const tabType = (
+        tabId === 'textureSets' ? 'modelTextures' : tabId
+      ) as Tab['type']
       if (
         ![
           'modelList',
           'modelViewer',
-          'textureSets',
+          'globalMaterials',
+          'modelTextures',
           'textureSetViewer',
           'environmentMaps',
           'environmentMapViewer',
@@ -237,12 +241,16 @@ export async function parseCompactTabFormatAsync(
         continue
       }
 
-      const tabType = tabId as Tab['type']
+      // Legacy URL id from before the texture-set split.
+      const tabType = (
+        tabId === 'textureSets' ? 'modelTextures' : tabId
+      ) as Tab['type']
       if (
         ![
           'modelList',
           'modelViewer',
-          'textureSets',
+          'globalMaterials',
+          'modelTextures',
           'textureSetViewer',
           'environmentMaps',
           'environmentMapViewer',

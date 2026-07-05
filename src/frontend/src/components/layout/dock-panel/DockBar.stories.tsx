@@ -42,7 +42,7 @@ const sampleTabs: Tab[] = [
   },
   {
     id: 'texture-sets',
-    type: 'textureSets',
+    type: 'modelTextures',
     label: 'Texture Sets',
     params: {},
     internalUiState: {},
