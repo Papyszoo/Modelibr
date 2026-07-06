@@ -10,16 +10,6 @@ export const textureSetNameFormSchema = z.object({
   name: textureSetNameSchema,
 })
 
-export const spriteCategoryFormSchema = z
-  .object({
-    name: z.string().trim().min(1, 'Category name is required').max(200),
-    description: z.string().trim(),
-  })
-  .transform(values => ({
-    name: values.name,
-    description: values.description || undefined,
-  }))
-
 export const spriteRenameFormSchema = z.object({
   name: z.string().trim().max(200, 'Name cannot exceed 200 characters'),
 })
@@ -79,16 +69,6 @@ export const settingsFormSchema = z.object({
       })
   ),
 })
-
-export const soundCategoryFormSchema = z
-  .object({
-    name: z.string().trim().min(1, 'Category name is required'),
-    description: z.string().trim(),
-  })
-  .transform(values => ({
-    name: values.name,
-    description: values.description || undefined,
-  }))
 
 export const hierarchicalCategoryFormSchema = z
   .object({

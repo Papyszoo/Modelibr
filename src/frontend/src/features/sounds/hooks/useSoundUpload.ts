@@ -3,9 +3,8 @@ import { useRef } from 'react'
 import { createSoundWithFile } from '@/features/sounds/api/soundApi'
 import { useUploadProgress } from '@/hooks/useUploadProgress'
 import { useDragAndDrop } from '@/shared/hooks/useFileUpload'
+import { isRealCategoryId } from '@/shared/types/categories'
 import { decodeAudio, extractPeaks } from '@/utils/audioUtils'
-
-const UNASSIGNED_CATEGORY_ID = -1
 
 interface ShowToast {
   (opts: {
@@ -50,10 +49,10 @@ export function useSoundUpload({
     }
 
     const batchId = uploadProgressContext?.createBatch() || undefined
-    const categoryIdToAssign =
-      activeCategoryId === UNASSIGNED_CATEGORY_ID
-        ? undefined
-        : (activeCategoryId ?? undefined)
+    // "All"/"Unassigned" are sentinel rows, not assignable categories.
+    const categoryIdToAssign = isRealCategoryId(activeCategoryId)
+      ? activeCategoryId
+      : undefined
 
     for (const file of audioFiles) {
       let uploadId: string | null = null

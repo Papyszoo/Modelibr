@@ -4,13 +4,16 @@ import { useCallback, useState } from 'react'
 import { useSpriteCategoriesQuery } from '@/features/sprite/api/queries'
 import { getSpritesPaginated } from '@/features/sprite/api/spriteApi'
 import { useDebouncedValue } from '@/shared/hooks'
+import {
+  ALL_CATEGORIES_ID,
+  UNASSIGNED_CATEGORY_ID,
+} from '@/shared/types/categories'
 
-const UNASSIGNED_CATEGORY_ID = -1
 const PAGE_SIZE = 50
 
 export function useSpriteListData() {
   const [activeCategoryId, setActiveCategoryId] = useState<number | null>(
-    UNASSIGNED_CATEGORY_ID
+    ALL_CATEGORIES_ID
   )
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -54,6 +57,9 @@ export function useSpriteListData() {
   }, [queryClient])
 
   const filteredSprites = sprites.filter(sprite => {
+    if (activeCategoryId === ALL_CATEGORIES_ID) {
+      return true
+    }
     if (activeCategoryId === UNASSIGNED_CATEGORY_ID) {
       return sprite.categoryId === null
     }

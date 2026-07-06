@@ -149,11 +149,13 @@ export async function getAllSoundCategories(): Promise<GetAllSoundCategoriesResp
 
 export async function createSoundCategory(
   name: string,
-  description?: string
+  description?: string,
+  parentId?: number | null
 ): Promise<{ id: number; name: string }> {
   const response = await client.post('/sound-categories', {
     name,
     description,
+    parentId: parentId ?? null,
   })
   return response.data
 }
@@ -161,11 +163,13 @@ export async function createSoundCategory(
 export async function updateSoundCategory(
   id: number,
   name: string,
-  description?: string
+  description?: string,
+  parentId?: number | null
 ): Promise<{ id: number; name: string }> {
   const response = await client.put(`/sound-categories/${id}`, {
     name,
     description,
+    parentId: parentId ?? null,
   })
   return response.data
 }
