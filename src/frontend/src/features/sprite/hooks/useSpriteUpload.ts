@@ -2,8 +2,7 @@ import { type RefObject } from 'react'
 
 import { createSpriteWithFile } from '@/features/sprite/api/spriteApi'
 import { type useUploadProgress } from '@/hooks/useUploadProgress'
-
-const UNASSIGNED_CATEGORY_ID = -1
+import { isRealCategoryId } from '@/shared/types/categories'
 const SPRITE_TYPE_STATIC = 1
 const SPRITE_TYPE_GIF = 3
 
@@ -47,10 +46,10 @@ export function useSpriteUpload({
     }
 
     const batchId = uploadProgressContext?.createBatch() || undefined
-    const categoryIdToAssign =
-      activeCategoryId === UNASSIGNED_CATEGORY_ID
-        ? undefined
-        : (activeCategoryId ?? undefined)
+    // "All"/"Unassigned" are sentinel rows, not assignable categories.
+    const categoryIdToAssign = isRealCategoryId(activeCategoryId)
+      ? activeCategoryId
+      : undefined
 
     for (const file of imageFiles) {
       let uploadId: string | null = null

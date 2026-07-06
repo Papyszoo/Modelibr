@@ -34,28 +34,6 @@
   overflow: auto;
 }
 
-.script-category-manage-btn {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  width: 100%;
-  padding: 0.55rem 0.75rem;
-  border: none;
-  border-top: 1px solid var(--surface-border);
-  background: transparent;
-  color: var(--text-color-secondary);
-  font-size: var(--mod-text-xs);
-  cursor: pointer;
-  transition:
-    background 0.15s ease,
-    color 0.15s ease;
-}
-
-.script-category-manage-btn:hover {
-  background: var(--surface-hover);
-  color: var(--text-color);
-}
-
 .script-list-main {
   display: flex;
   flex-direction: column;

@@ -1,8 +1,15 @@
 import { client } from '@/lib/apiBase'
 
-import { getAllSounds, getSoundsPaginated, updateSound } from '../soundApi'
+import {
+  createSoundCategory,
+  getAllSounds,
+  getSoundsPaginated,
+  updateSound,
+  updateSoundCategory,
+} from '../soundApi'
 
 const mockGet = client.get as jest.Mock
+const mockPost = client.post as jest.Mock
 const mockPut = client.put as jest.Mock
 
 const lastGetUrl = () => mockGet.mock.calls.at(-1)?.[0] as string
@@ -10,6 +17,7 @@ const lastGetUrl = () => mockGet.mock.calls.at(-1)?.[0] as string
 beforeEach(() => {
   jest.clearAllMocks()
   mockGet.mockResolvedValue({ data: { sounds: [], totalCount: 0 } })
+  mockPost.mockResolvedValue({ data: {} })
   mockPut.mockResolvedValue({ data: {} })
 })
 
@@ -66,5 +74,38 @@ describe('updateSound payload contract', () => {
   it('forwards categoryId null to clear the category', async () => {
     await updateSound(8, { categoryId: null })
     expect(mockPut).toHaveBeenCalledWith('/sounds/8', { categoryId: null })
+  })
+})
+
+describe('sound category payload contract', () => {
+  // The backend treats a missing/null parentId as "root" on create and as
+  // "move to root" on update — so create must serialize the chosen parent,
+  // and update must echo the current parent or a rename would silently
+  // re-root a subcategory (shipped-bug class caught on scripts first).
+  it('creates a category with an explicit parent', async () => {
+    await createSoundCategory('Crates', undefined, 7)
+    expect(mockPost).toHaveBeenCalledWith('/sound-categories', {
+      name: 'Crates',
+      description: undefined,
+      parentId: 7,
+    })
+  })
+
+  it('defaults the parent to null (root) when omitted', async () => {
+    await createSoundCategory('Ambient')
+    expect(mockPost).toHaveBeenCalledWith('/sound-categories', {
+      name: 'Ambient',
+      description: undefined,
+      parentId: null,
+    })
+  })
+
+  it('forwards the existing parent on update', async () => {
+    await updateSoundCategory(3, 'Renamed', 'desc', 7)
+    expect(mockPut).toHaveBeenCalledWith('/sound-categories/3', {
+      name: 'Renamed',
+      description: 'desc',
+      parentId: 7,
+    })
   })
 })

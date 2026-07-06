@@ -2,6 +2,7 @@ import { type QueryClient } from '@tanstack/react-query'
 import { act, renderHook, waitFor } from '@testing-library/react'
 
 import { client } from '@/lib/apiBase'
+import { UNASSIGNED_CATEGORY_ID } from '@/shared/types/categories'
 import {
   createQueryWrapper,
   createTestQueryClient,
@@ -73,7 +74,7 @@ describe('useScriptListData pagination', () => {
 })
 
 describe('useScriptListData client-side category filter', () => {
-  it('shows only uncategorized scripts by default, then narrows to a chosen category', async () => {
+  it('shows every script by default (All), then narrows to unassigned or a chosen category', async () => {
     const scripts = [
       ...makeScripts(1, 2, null), // uncategorized
       ...makeScripts(3, 3, 5), // in category 5
@@ -88,8 +89,13 @@ describe('useScriptListData client-side category filter', () => {
     const { result } = renderHook(() => useScriptListData(noop), { wrapper })
 
     await waitFor(() => expect(result.current.scripts).toHaveLength(3))
-    // Default view (Uncategorized) → only the two null-category scripts.
-    expect(result.current.filteredScripts.map(s => s.id)).toEqual([1, 2])
+    // Default view (All) → every script regardless of category.
+    expect(result.current.filteredScripts.map(s => s.id)).toEqual([1, 2, 3])
+
+    act(() => result.current.setActiveCategoryId(UNASSIGNED_CATEGORY_ID))
+    await waitFor(() =>
+      expect(result.current.filteredScripts.map(s => s.id)).toEqual([1, 2])
+    )
 
     act(() => result.current.setActiveCategoryId(5))
     await waitFor(() =>

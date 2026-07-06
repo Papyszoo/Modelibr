@@ -4,8 +4,11 @@ import { useCallback, useState } from 'react'
 import { useScriptCategoriesQuery } from '@/features/scripts/api/queries'
 import { getScriptsPaginated } from '@/features/scripts/api/scriptApi'
 import { useDebouncedValue } from '@/shared/hooks'
+import {
+  ALL_CATEGORIES_ID,
+  UNASSIGNED_CATEGORY_ID,
+} from '@/shared/types/categories'
 
-const UNASSIGNED_CATEGORY_ID = -1
 const PAGE_SIZE = 50
 
 interface ShowToast {
@@ -19,7 +22,7 @@ interface ShowToast {
 
 export function useScriptListData(_showToast: ShowToast) {
   const [activeCategoryId, setActiveCategoryId] = useState<number | null>(
-    UNASSIGNED_CATEGORY_ID
+    ALL_CATEGORIES_ID
   )
   const [searchQuery, setSearchQuery] = useState('')
   // Language filter; null = all languages.
@@ -75,6 +78,9 @@ export function useScriptListData(_showToast: ShowToast) {
   }, [queryClient])
 
   const filteredScripts = scripts.filter(script => {
+    if (activeCategoryId === ALL_CATEGORIES_ID) {
+      return true
+    }
     if (activeCategoryId === UNASSIGNED_CATEGORY_ID) {
       return script.categoryId === null
     }
