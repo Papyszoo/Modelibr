@@ -49,10 +49,13 @@ Right-click a sprite card and select **Rename** to change its display name.
 
 Use the category sidebar (left of the grid) to organize sprites into groups:
 
-- Click **Add Category** in the toolbar to create a new category
+- Right-click anywhere in the sidebar and choose **Add category**, then type
+  the name directly in the tree
+- Right-click a category to **Add subcategory**, **Rename**, or **Delete** it
+  — deleting removes the whole branch, and its sprites become uncategorized
 - Drag sprites onto a category in the sidebar to move them
-- Hover a category to rename or delete it
-- **Unassigned** collects sprites that aren't in any category
+- **All** shows every one of your sprites; **Unassigned** collects sprites
+  that aren't in any category
 
 ### Recycling
 

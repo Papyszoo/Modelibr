@@ -18,7 +18,7 @@ const __dirname = path.dirname(__filename);
 async function waitForScriptsUiReady(page: any): Promise<void> {
     await page
         .waitForSelector(
-            ".script-list, .script-grid, .script-list-empty, button:has-text('Add Category'), input[type='file']",
+            ".script-list, .script-grid, .script-list-empty, .script-category-sidebar, input[type='file']",
             { timeout: 15000 },
         )
         .catch(() => {});
