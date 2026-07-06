@@ -15,10 +15,6 @@ export class SoundListPage {
     private readonly soundName = ".sound-name";
     private readonly contextMenu = ".p-contextmenu";
     private readonly recycleMenuItem = ".p-menuitem";
-    // Categories render in the shared CategoryTreePanel sidebar: the
-    // "Unassigned" bucket row plus one PrimeReact tree node per category.
-    private readonly categoryTab =
-        ".sound-category-sidebar .category-tree-unassigned, .sound-category-sidebar .category-tree .p-treenode-content";
     private readonly toastMessage = ".p-toast-message";
     private readonly dialog = ".p-dialog";
 
@@ -30,7 +26,7 @@ export class SoundListPage {
 
         await this.page
             .waitForSelector(
-                ".sound-list, .sound-grid, .sound-list-empty, button:has-text('Add Category'), input[type='file']",
+                ".sound-list, .sound-grid, .sound-list-empty, .sound-category-sidebar, input[type='file']",
                 {
                     state: "attached",
                     timeout: 15000,
@@ -243,104 +239,6 @@ export class SoundListPage {
         );
         await saveButton.click();
         await dialog.waitFor({ state: "hidden", timeout: 10000 });
-    }
-
-    // ===== Category Methods =====
-
-    /**
-     * Click the Add Category button to open category dialog
-     */
-    async openCategoryDialog(): Promise<void> {
-        const addCategoryButton = this.page.locator(
-            "button:has-text('Add Category')",
-        );
-        await addCategoryButton.click();
-        await expect(this.page.locator(this.dialog)).toBeVisible({
-            timeout: 5000,
-        });
-    }
-
-    /**
-     * Create a category with name and optional description
-     */
-    async createCategory(name: string, description?: string): Promise<void> {
-        const dialog = this.page.locator(this.dialog);
-        await dialog.waitFor({ state: "visible", timeout: 5000 });
-
-        const nameInput = dialog.locator("#categoryName");
-        await nameInput.waitFor({ state: "visible", timeout: 10000 });
-        await nameInput.fill(name);
-
-        if (description) {
-            const descInput = dialog.locator("#categoryDescription");
-            if (await descInput.isVisible()) {
-                await descInput.fill(description);
-            }
-        }
-
-        const saveButton = dialog.locator("button:has-text('Save')");
-        await saveButton.click();
-        await dialog.waitFor({ state: "hidden", timeout: 10000 });
-    }
-
-    /**
-     * Get a category tab by name
-     */
-    getCategoryTab(name: string) {
-        return this.page.locator(this.categoryTab).filter({ hasText: name });
-    }
-
-    /**
-     * Check if a category tab is visible
-     */
-    async isCategoryVisible(name: string): Promise<boolean> {
-        return await this.getCategoryTab(name).isVisible();
-    }
-
-    /**
-     * Click on a category tab to filter sounds
-     */
-    async filterByCategory(name: string): Promise<void> {
-        const tab = this.getCategoryTab(name);
-        await tab.click();
-        await this.page.waitForLoadState("domcontentloaded");
-    }
-
-    /**
-     * Edit a category (click the pencil icon on the category tab)
-     */
-    async editCategory(name: string): Promise<void> {
-        await this.page.keyboard.press("Escape");
-        const tab = this.getCategoryTab(name);
-        await tab.waitFor({ state: "visible", timeout: 5000 });
-        await tab.click();
-        const editButton = tab.locator("button:has(.pi-pencil)");
-        await editButton.click();
-        const dialog = this.page.locator(
-            '[data-testid="category-dialog"], .p-dialog',
-        );
-        await dialog.waitFor({ state: "visible", timeout: 5000 });
-    }
-
-    /**
-     * Delete a category (click the trash icon on the category tab)
-     */
-    async deleteCategory(name: string): Promise<void> {
-        await this.page.keyboard.press("Escape");
-        const tab = this.getCategoryTab(name);
-        await tab.waitFor({ state: "visible", timeout: 5000 });
-        await tab.click();
-        const deleteButton = tab.locator("button:has(.pi-trash)");
-        await deleteButton.click();
-
-        // Confirm deletion in dialog
-        const confirmDialog = this.page.locator(".p-confirm-dialog, .p-dialog");
-        await confirmDialog.waitFor({ state: "visible", timeout: 5000 });
-        const confirmButton = confirmDialog.locator(
-            "button.p-button-danger, button:has-text('Yes'), button:has-text('Delete')",
-        );
-        await confirmButton.click();
-        await confirmDialog.waitFor({ state: "hidden", timeout: 10000 });
     }
 
     /**

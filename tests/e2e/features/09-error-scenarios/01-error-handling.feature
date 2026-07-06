@@ -23,8 +23,6 @@ Feature: Error Scenarios
   @error-duplicate-category
   Scenario: Creating a duplicate sprite category shows error
     Given I am on the sprites page for error test
-    When I open the category management dialog for error test
-    And I create a category named "error-test-category" for error test
-    And I open the category management dialog for error test
+    When I create a category named "error-test-category" for error test
     And I attempt to create a duplicate category named "error-test-category"
-    Then a category error should be displayed or creation should be prevented
+    Then a category error should be displayed and no duplicate should be created
