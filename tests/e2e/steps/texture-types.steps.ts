@@ -131,10 +131,14 @@ Given("I have a texture set with ORM packed texture", async ({ page }) => {
     // Navigation lands directly on the kind-locked Multi-Model Textures
     // tab — the in-page kind switcher no longer exists.
 
-    // Verify the card is visible
+    // Verify the card is visible. Reveal it first: the sidebar-open grid
+    // renders fewer columns, so a set past the first rows is virtualised out
+    // of the DOM until its scroll container reaches it (the sibling Givens
+    // narrow by name; here the card is located by id, so scroll-reveal fits).
     const card = page.locator(
         `.texture-set-card[data-texture-set-id="${result.textureSetId}"]`,
     );
+    await revealVirtualizedCard(page, ".texture-set-list-main", card);
     await expect(card).toBeVisible({ timeout: 15000 });
 });
 
