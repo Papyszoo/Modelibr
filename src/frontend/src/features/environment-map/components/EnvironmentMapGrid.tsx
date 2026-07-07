@@ -53,6 +53,12 @@ interface EnvironmentMapGridProps {
   onMouseMove: (event: React.MouseEvent<HTMLDivElement>) => void
   onMouseUp: () => void
   onEndReached: () => void
+  draggedId: number | null
+  onCardDragStart: (
+    event: React.DragEvent<HTMLElement>,
+    environmentMap: EnvironmentMapDto
+  ) => void
+  onCardDragEnd: () => void
 }
 
 export function EnvironmentMapGrid({
@@ -70,6 +76,9 @@ export function EnvironmentMapGrid({
   onMouseMove,
   onMouseUp,
   onEndReached,
+  draggedId,
+  onCardDragStart,
+  onCardDragEnd,
 }: EnvironmentMapGridProps) {
   return (
     <div
@@ -94,10 +103,15 @@ export function EnvironmentMapGrid({
           const environmentMapId = String(environmentMap.id)
           const isSelected = selectedIds.has(environmentMapId)
 
+          const isDragging = draggedId === environmentMap.id
+
           return (
             <article
-              className={`environment-map-card${isSelected ? ' selected' : ''}`}
+              className={`environment-map-card${isSelected ? ' selected' : ''}${isDragging ? ' dragging' : ''}`}
               data-environment-map-id={environmentMap.id}
+              draggable
+              onDragStart={event => onCardDragStart(event, environmentMap)}
+              onDragEnd={onCardDragEnd}
               onClick={() =>
                 onCardClick(environmentMap.id, environmentMap.name)
               }
