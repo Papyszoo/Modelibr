@@ -1154,30 +1154,9 @@ export const dynamicDemoHandlers = [
     return new HttpResponse(null, { status: 204 })
   }),
 
-  http.delete('*/model-categories/:id', async ({ params }) => {
-    const categoryId = Number(params.id)
-    const categories = await getAll('modelCategories')
-    if (categories.some(category => category.parentId === categoryId)) {
-      return HttpResponse.json(
-        {
-          error: 'CategoryHasChildren',
-          message:
-            'Delete or move child categories before removing this category.',
-        },
-        { status: 400 }
-      )
-    }
-
-    await remove('modelCategories', categoryId)
-    const models = await getAll('models')
-    for (const model of models) {
-      if (model.categoryId === categoryId) {
-        model.categoryId = null
-        await put('models', model)
-      }
-    }
-    return new HttpResponse(null, { status: 204 })
-  }),
+  http.delete('*/model-categories/:id', async ({ params }) =>
+    deleteCategoryFromStore('modelCategories', Number(params.id), 'models')
+  ),
 
   http.get('*/texture-set-categories', async ({ request }) => {
     const kindParam = new URL(request.url).searchParams.get('kind')

@@ -37,7 +37,6 @@ export function useModelGrid({
   const data = useModelData({
     effectivePackIds: filters.effectivePackIds,
     effectiveProjectIds: filters.effectiveProjectIds,
-    selectedCategoryIds: filters.selectedCategoryIds,
     selectedTagNames: filters.selectedTagNames,
     hasConceptImages: filters.hasConceptImages,
     animatedOnly: filters.animatedOnly,
@@ -55,8 +54,22 @@ export function useModelGrid({
     onUploadComplete: () => data.fetchModels(),
   })
 
-  // Client-side search filter
+  // Client-side search + active-category filter
   const filteredModels = filters.filterModels(data.models)
+
+  // Per-category counts for the sidebar tree (from the loaded set).
+  const categoryCounts = new Map<number, number>()
+  let unassignedCount = 0
+  for (const model of data.models) {
+    if (model.categoryId != null) {
+      categoryCounts.set(
+        model.categoryId,
+        (categoryCounts.get(model.categoryId) ?? 0) + 1
+      )
+    } else {
+      unassignedCount += 1
+    }
+  }
 
   // Build path prefix for context menu's "Copy Folder Path"
   const buildPathPrefix = useCallback((): string | undefined => {
@@ -85,6 +98,8 @@ export function useModelGrid({
     // Data
     models: data.models,
     filteredModels,
+    categoryCounts,
+    unassignedCount,
     loading: data.loading,
     error: data.error,
     packs: data.packs,
@@ -112,9 +127,8 @@ export function useModelGrid({
     setIsFiltersOpen: filters.setIsFiltersOpen,
     searchQuery: filters.searchQuery,
     setSearchQuery: filters.setSearchQuery,
-    selectedCategoryKeys: filters.selectedCategoryKeys,
-    setSelectedCategoryKeys: filters.setSelectedCategoryKeys,
-    selectedCategoryIds: filters.selectedCategoryIds,
+    activeCategoryId: filters.activeCategoryId,
+    setActiveCategoryId: filters.setActiveCategoryId,
     selectedTagNames: filters.selectedTagNames,
     setSelectedTagNames: filters.setSelectedTagNames,
     hasConceptImages: filters.hasConceptImages,

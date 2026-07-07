@@ -1,6 +1,9 @@
 import { useCallback, useMemo, useState } from 'react'
 
-import { type CategorySelectionKeys as ModelCategorySelectionKeys } from '@/shared/types/categories'
+import {
+  ALL_CATEGORIES_ID,
+  UNASSIGNED_CATEGORY_ID,
+} from '@/shared/types/categories'
 import { type PageType, useCardWidthStore } from '@/stores/cardWidthStore'
 import { type ModelListViewState } from '@/stores/modelListViewStore'
 import { type Model } from '@/utils/fileUtils'
@@ -21,8 +24,9 @@ export function useModelFilters({
   const [localIsSearchOpen, setLocalIsSearchOpen] = useState(false)
   const [localIsFiltersOpen, setLocalIsFiltersOpen] = useState(false)
   const [localSearchQuery, setLocalSearchQuery] = useState('')
-  const [selectedCategoryKeys, setSelectedCategoryKeys] =
-    useState<ModelCategorySelectionKeys>({})
+  const [localActiveCategoryId, setLocalActiveCategoryId] = useState<
+    number | null
+  >(ALL_CATEGORIES_ID)
   const [localSelectedTagNames, setLocalSelectedTagNames] = useState<string[]>(
     []
   )
@@ -57,9 +61,8 @@ export function useModelFilters({
     persistedViewState?.selectedPackIds ?? selectedPackIds
   const currentSelectedProjectIds =
     persistedViewState?.selectedProjectIds ?? selectedProjectIds
-  const currentSelectedCategoryKeys =
-    (persistedViewState?.selectedCategoryKeys as ModelCategorySelectionKeys) ??
-    selectedCategoryKeys
+  const activeCategoryId =
+    persistedViewState?.activeCategoryId ?? localActiveCategoryId
   const selectedTagNames =
     persistedViewState?.selectedTagNames ?? localSelectedTagNames
   const hasConceptImages =
@@ -74,15 +77,6 @@ export function useModelFilters({
   const effectiveProjectIds = projectId
     ? [projectId]
     : currentSelectedProjectIds
-  const selectedCategoryIds = useMemo(
-    () =>
-      Object.entries(currentSelectedCategoryKeys)
-        .filter(([, state]) => state?.checked)
-        .map(([key]) => Number(key))
-        .filter(Number.isFinite),
-    [currentSelectedCategoryKeys]
-  )
-
   const setIsSearchOpen = useCallback(
     (value: boolean) => {
       if (persistedViewState && onPersistedViewStateChange) {
@@ -151,14 +145,14 @@ export function useModelFilters({
     [onPersistedViewStateChange, persistedViewState, projectId]
   )
 
-  const setSelectedCategoryKeysState = useCallback(
-    (keys: ModelCategorySelectionKeys) => {
+  const setActiveCategoryId = useCallback(
+    (id: number | null) => {
       if (persistedViewState && onPersistedViewStateChange) {
-        onPersistedViewStateChange({ selectedCategoryKeys: keys })
+        onPersistedViewStateChange({ activeCategoryId: id })
         return
       }
 
-      setSelectedCategoryKeys(keys)
+      setLocalActiveCategoryId(id)
     },
     [onPersistedViewStateChange, persistedViewState]
   )
@@ -239,14 +233,20 @@ export function useModelFilters({
 
   const filterModels = useCallback(
     (models: Model[]) => {
-      if (!searchQuery) return models
-      const query = searchQuery.toLowerCase()
+      const query = searchQuery.trim().toLowerCase()
       return models.filter(model => {
-        const modelName = getModelName(model).toLowerCase()
-        return modelName.includes(query)
+        const nameMatches =
+          !query || getModelName(model).toLowerCase().includes(query)
+        const categoryMatches =
+          activeCategoryId === ALL_CATEGORIES_ID
+            ? true
+            : activeCategoryId === UNASSIGNED_CATEGORY_ID
+              ? model.categoryId == null
+              : model.categoryId === activeCategoryId
+        return nameMatches && categoryMatches
       })
     },
-    [searchQuery, getModelName]
+    [searchQuery, getModelName, activeCategoryId]
   )
 
   return {
@@ -256,9 +256,8 @@ export function useModelFilters({
     setIsFiltersOpen,
     searchQuery,
     setSearchQuery,
-    selectedCategoryKeys: currentSelectedCategoryKeys,
-    setSelectedCategoryKeys: setSelectedCategoryKeysState,
-    selectedCategoryIds,
+    activeCategoryId,
+    setActiveCategoryId,
     selectedTagNames,
     setSelectedTagNames,
     hasConceptImages,

@@ -14,12 +14,18 @@ import {
 import { type GridComponents, VirtuosoGrid } from 'react-virtuoso'
 
 import { useTabContext } from '@/hooks/useTabContext'
+import { CategoryTreePanel } from '@/shared/components/categories/CategoryTreePanel'
 import { EmptyState } from '@/shared/components/feedback'
 import { ThumbnailDisplay } from '@/shared/thumbnail'
+import {
+  ALL_CATEGORIES_ID,
+  UNASSIGNED_CATEGORY_ID,
+} from '@/shared/types/categories'
 import {
   DEFAULT_MODEL_LIST_VIEW_STATE,
   useModelListViewStore,
 } from '@/stores/modelListViewStore'
+import { type Model } from '@/utils/fileUtils'
 
 import { AddModelDialog } from './AddModelDialog'
 import {
@@ -28,6 +34,7 @@ import {
 } from './ModelContextMenu'
 import { ModelsFilters } from './ModelsFilters'
 import { type ModelGridProps } from './types'
+import { useModelCategoryMutations } from './useModelCategoryMutations'
 import { useModelGrid } from './useModelGrid'
 
 // VirtuosoGrid components with CSS Grid layout.
@@ -101,8 +108,16 @@ export function ModelGrid({
     currentX: number
     currentY: number
   } | null>(null)
+  const [draggedModelId, setDraggedModelId] = useState<string | null>(null)
+  const [dragOverCategoryId, setDragOverCategoryId] = useState<number | null>(
+    null
+  )
   const isContainerContext = !!packId || !!projectId
   const isSelectionEnabled = !isContainerContext && !textureSetId
+  // The category sidebar (single active category + management) is the primary
+  // Models-tab navigation; embedded pack/project/texture-set model grids keep
+  // their scoped behavior without it.
+  const showCategorySidebar = isSelectionEnabled
 
   const areSelectionSetsEqual = useCallback(
     (left: Set<string>, right: Set<string>) => {
@@ -153,6 +168,7 @@ export function ModelGrid({
   }, [])
 
   const {
+    models,
     filteredModels,
     loading,
     error,
@@ -171,9 +187,10 @@ export function ModelGrid({
     onDragLeave,
     searchQuery,
     setSearchQuery,
-    selectedCategoryKeys,
-    setSelectedCategoryKeys,
-    selectedCategoryIds,
+    activeCategoryId,
+    setActiveCategoryId,
+    categoryCounts,
+    unassignedCount,
     selectedTagNames,
     setSelectedTagNames,
     hasConceptImages,
@@ -213,6 +230,95 @@ export function ModelGrid({
     () =>
       filteredModels.filter(model => selectedModelIds.has(String(model.id))),
     [filteredModels, selectedModelIds]
+  )
+
+  const {
+    createCategoryMutation,
+    renameCategoryMutation,
+    deleteCategoryMutation,
+    moveToCategoryMutation,
+  } = useModelCategoryMutations({
+    showToast: opts =>
+      toast.current?.show(opts as Parameters<Toast['show']>[0]),
+    activeCategoryId,
+    setActiveCategoryId,
+    categories,
+    clearSelection: () => setSelectedModelIdsState(new Set()),
+  })
+
+  // --- Drag a card onto a category to (re)assign it ---
+  const handleCardDragStart = useCallback(
+    (event: React.DragEvent<HTMLElement>, model: Model) => {
+      if (!isSelectionEnabled) return
+      // Deliberately do NOT mutate selection here — a mid-drag layout shift can
+      // make Chromium cancel the drag before drop fires (see SoundList).
+      setDraggedModelId(String(model.id))
+      event.dataTransfer.effectAllowed = 'move'
+      const idsToMove = selectedModelIds.has(String(model.id))
+        ? [...selectedModelIds]
+        : [String(model.id)]
+      event.dataTransfer.setData('text/plain', idsToMove.join(','))
+    },
+    [isSelectionEnabled, selectedModelIds]
+  )
+
+  const handleCardDragEnd = useCallback(() => {
+    setDraggedModelId(null)
+    setDragOverCategoryId(null)
+  }, [])
+
+  const handleCategoryDragOver = useCallback(
+    (event: React.DragEvent<HTMLDivElement>, categoryId: number | null) => {
+      event.preventDefault()
+      event.stopPropagation()
+      if (draggedModelId !== null) {
+        setDragOverCategoryId(categoryId)
+      }
+    },
+    [draggedModelId]
+  )
+
+  const handleCategoryDragLeave = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      event.preventDefault()
+      event.stopPropagation()
+      setDragOverCategoryId(null)
+    },
+    []
+  )
+
+  const handleCategoryDrop = useCallback(
+    (
+      event: React.DragEvent<HTMLDivElement>,
+      targetCategoryId: number | null
+    ) => {
+      event.preventDefault()
+      event.stopPropagation()
+      setDragOverCategoryId(null)
+
+      if (draggedModelId === null) return
+
+      const newCategoryId =
+        targetCategoryId === UNASSIGNED_CATEGORY_ID ? null : targetCategoryId
+
+      const idsToMove = selectedModelIds.has(draggedModelId)
+        ? [...selectedModelIds]
+        : [draggedModelId]
+      const modelsToMove = filteredModels.filter(
+        model =>
+          idsToMove.includes(String(model.id)) &&
+          model.categoryId !== newCategoryId
+      )
+
+      setDraggedModelId(null)
+      if (modelsToMove.length === 0) return
+
+      moveToCategoryMutation.mutate({
+        models: modelsToMove,
+        categoryId: newCategoryId,
+      })
+    },
+    [draggedModelId, filteredModels, moveToCategoryMutation, selectedModelIds]
   )
 
   // Report total count to parent when pagination changes
@@ -451,7 +557,6 @@ export function ModelGrid({
 
   return (
     <div
-      ref={setScrollParent}
       className="model-grid-container"
       onDrop={onDrop}
       onDragOver={onDragOver}
@@ -490,12 +595,9 @@ export function ModelGrid({
         onSearchChange={setSearchQuery}
         packs={packs}
         projects={projects}
-        categories={categories}
         tags={tags}
         selectedPackIds={effectivePackIds}
         selectedProjectIds={effectiveProjectIds}
-        selectedCategoryKeys={selectedCategoryKeys}
-        selectedCategoryIds={selectedCategoryIds}
         selectedTagNames={selectedTagNames}
         hasConceptImages={hasConceptImages}
         animatedOnly={animatedOnly}
@@ -503,7 +605,6 @@ export function ModelGrid({
         maxTriangleCount={maxTriangleCount}
         onPackFilterChange={handlePackFilterChange}
         onProjectFilterChange={handleProjectFilterChange}
-        onCategoryChange={setSelectedCategoryKeys}
         onTagChange={setSelectedTagNames}
         onHasConceptImagesChange={setHasConceptImages}
         onAnimatedOnlyChange={setAnimatedOnly}
@@ -523,160 +624,204 @@ export function ModelGrid({
         visibleModelCount={filteredModels.length}
       />
 
-      {uploading && (
-        <div className="upload-progress">
-          <p>Uploading files...</p>
-          <ProgressBar value={uploadProgress} />
-        </div>
-      )}
-
-      {filteredModels.length === 0 && !isContainerContext ? (
-        <EmptyState
-          className="no-results"
-          icon={searchQuery ? 'pi-search' : 'pi-box'}
-          title={
-            searchQuery
-              ? `No models found matching "${searchQuery}"`
-              : 'No models found'
-          }
-          message={
-            searchQuery ? undefined : 'Drag & drop files here to upload.'
-          }
-        />
-      ) : (
-        <div
-          ref={selectionSurfaceRef}
-          className={`model-grid-selection-surface${isAreaSelecting ? ' is-selecting' : ''}`}
-          onMouseDown={handleGridMouseDown}
-          onMouseMove={handleGridMouseMove}
-          onMouseUp={handleGridMouseUp}
-          onMouseLeave={handleGridMouseUp}
-        >
-          <div className="model-grid-selection-content">
-            <VirtuosoGrid
-              customScrollParent={scrollParent ?? undefined}
-              totalCount={filteredModels.length + (isContainerContext ? 1 : 0)}
-              overscan={200}
-              components={gridComponents}
-              context={{ cardWidth, isLoadingMore }}
-              endReached={() => {
-                if (pagination.hasMore && !isLoadingMore) {
-                  fetchModels(true)
-                }
-              }}
-              itemContent={index => {
-                // Last item is the "Add" card in container context
-                if (isContainerContext && index === filteredModels.length) {
-                  return (
-                    <div
-                      className="model-card model-card-add"
-                      onClick={openAddModelDialog}
-                    >
-                      <div className="model-card-add-content">
-                        <i className="pi pi-plus" />
-                        <span>Add Model</span>
-                      </div>
-                    </div>
-                  )
-                }
-
-                const model = filteredModels[index]
-                if (!model) return null
-
-                const modelId = String(model.id)
-                const isSelected = selectedModelIds.has(modelId)
-                const modelName = getModelName(model)
-
-                return (
-                  <div
-                    className={`model-card${isSelected ? ' selected' : ''}`}
-                    data-model-id={model.id}
-                    onClick={() => handleModelSelect(model)}
-                    onMouseDown={event => {
-                      // Suppress middle-click autoscroll so we can use it
-                      // to open the model in a background tab.
-                      if (event.button === 1) {
-                        event.preventDefault()
-                      }
-                    }}
-                    onAuxClick={event => {
-                      if (event.button !== 1) {
-                        return
-                      }
-                      event.preventDefault()
-                      openModelDetailsTab(model.id, model.name, {
-                        activate: false,
-                      })
-                    }}
-                    onContextMenu={event => {
-                      if (isSelectionEnabled && selectedModels.length > 1) {
-                        contextMenuRef.current?.show(event, {
-                          models: selectedModels,
-                          mode: 'bulk',
-                        })
-                        return
-                      }
-
-                      contextMenuRef.current?.show(event, {
-                        models: [model],
-                        mode: 'single',
-                      })
-                    }}
-                  >
-                    <div className="model-card-thumbnail">
-                      {isSelectionEnabled ? (
-                        <button
-                          type="button"
-                          className="model-select-checkbox"
-                          onMouseDown={event => event.stopPropagation()}
-                          onClick={event =>
-                            toggleModelSelection(modelId, event)
-                          }
-                          aria-label={`${isSelected ? 'Deselect' : 'Select'} ${modelName}`}
-                          aria-pressed={isSelected}
-                        >
-                          <i
-                            className={`pi ${isSelected ? 'pi-check-square' : 'pi-stop'}`}
-                          />
-                        </button>
-                      ) : null}
-
-                      <ThumbnailDisplay
-                        modelId={model.id}
-                        modelName={model.name}
-                      />
-                      {(model.animationCount ?? 0) > 0 ? (
-                        <span
-                          className="model-card-badge model-card-badge-animated"
-                          title={`${model.animationCount} animation${model.animationCount === 1 ? '' : 's'}`}
-                          data-testid="model-animated-badge"
-                        >
-                          <i className="pi pi-play-circle" />
-                        </span>
-                      ) : null}
-                      <div className="model-card-overlay">
-                        <span className="model-card-name">{modelName}</span>
-                      </div>
-                    </div>
-                  </div>
-                )
-              }}
+      <div className="model-grid-body">
+        {showCategorySidebar && (
+          <aside className="model-category-sidebar">
+            <CategoryTreePanel
+              categories={categories}
+              activeCategoryId={activeCategoryId}
+              dragOverCategoryId={dragOverCategoryId}
+              categoryCounts={categoryCounts}
+              unassignedCount={unassignedCount}
+              allCount={models.length}
+              allCategoryId={ALL_CATEGORIES_ID}
+              unassignedCategoryId={UNASSIGNED_CATEGORY_ID}
+              unassignedLabel="Unassigned"
+              itemNoun="model"
+              onCategoryChange={setActiveCategoryId}
+              onCategoryDragOver={handleCategoryDragOver}
+              onCategoryDragLeave={handleCategoryDragLeave}
+              onCategoryDrop={handleCategoryDrop}
+              onCreateCategory={(name, parentId) =>
+                createCategoryMutation.mutate({ name, parentId })
+              }
+              onRenameCategory={(category, name) =>
+                renameCategoryMutation.mutate({ category, name })
+              }
+              onDeleteCategory={category =>
+                deleteCategoryMutation.mutate(category.id)
+              }
             />
-          </div>
+          </aside>
+        )}
 
-          {isSelectionEnabled && isAreaSelecting && selectionBox ? (
+        <div ref={setScrollParent} className="model-grid-main">
+          {uploading && (
+            <div className="upload-progress">
+              <p>Uploading files...</p>
+              <ProgressBar value={uploadProgress} />
+            </div>
+          )}
+
+          {filteredModels.length === 0 && !isContainerContext ? (
+            <EmptyState
+              className="no-results"
+              icon={searchQuery ? 'pi-search' : 'pi-box'}
+              title={
+                searchQuery
+                  ? `No models found matching "${searchQuery}"`
+                  : 'No models found'
+              }
+              message={
+                searchQuery ? undefined : 'Drag & drop files here to upload.'
+              }
+            />
+          ) : (
             <div
-              className="model-grid-selection-box"
-              style={{
-                left: Math.min(selectionBox.startX, selectionBox.currentX),
-                top: Math.min(selectionBox.startY, selectionBox.currentY),
-                width: Math.abs(selectionBox.currentX - selectionBox.startX),
-                height: Math.abs(selectionBox.currentY - selectionBox.startY),
-              }}
-            />
-          ) : null}
+              ref={selectionSurfaceRef}
+              className={`model-grid-selection-surface${isAreaSelecting ? ' is-selecting' : ''}`}
+              onMouseDown={handleGridMouseDown}
+              onMouseMove={handleGridMouseMove}
+              onMouseUp={handleGridMouseUp}
+              onMouseLeave={handleGridMouseUp}
+            >
+              <div className="model-grid-selection-content">
+                <VirtuosoGrid
+                  customScrollParent={scrollParent ?? undefined}
+                  totalCount={
+                    filteredModels.length + (isContainerContext ? 1 : 0)
+                  }
+                  overscan={200}
+                  components={gridComponents}
+                  context={{ cardWidth, isLoadingMore }}
+                  endReached={() => {
+                    if (pagination.hasMore && !isLoadingMore) {
+                      fetchModels(true)
+                    }
+                  }}
+                  itemContent={index => {
+                    // Last item is the "Add" card in container context
+                    if (isContainerContext && index === filteredModels.length) {
+                      return (
+                        <div
+                          className="model-card model-card-add"
+                          onClick={openAddModelDialog}
+                        >
+                          <div className="model-card-add-content">
+                            <i className="pi pi-plus" />
+                            <span>Add Model</span>
+                          </div>
+                        </div>
+                      )
+                    }
+
+                    const model = filteredModels[index]
+                    if (!model) return null
+
+                    const modelId = String(model.id)
+                    const isSelected = selectedModelIds.has(modelId)
+                    const modelName = getModelName(model)
+                    const isDragging = draggedModelId === modelId
+
+                    return (
+                      <div
+                        className={`model-card${isSelected ? ' selected' : ''}${isDragging ? ' dragging' : ''}`}
+                        data-model-id={model.id}
+                        draggable={isSelectionEnabled}
+                        onDragStart={event => handleCardDragStart(event, model)}
+                        onDragEnd={handleCardDragEnd}
+                        onClick={() => handleModelSelect(model)}
+                        onMouseDown={event => {
+                          // Suppress middle-click autoscroll so we can use it
+                          // to open the model in a background tab.
+                          if (event.button === 1) {
+                            event.preventDefault()
+                          }
+                        }}
+                        onAuxClick={event => {
+                          if (event.button !== 1) {
+                            return
+                          }
+                          event.preventDefault()
+                          openModelDetailsTab(model.id, model.name, {
+                            activate: false,
+                          })
+                        }}
+                        onContextMenu={event => {
+                          if (isSelectionEnabled && selectedModels.length > 1) {
+                            contextMenuRef.current?.show(event, {
+                              models: selectedModels,
+                              mode: 'bulk',
+                            })
+                            return
+                          }
+
+                          contextMenuRef.current?.show(event, {
+                            models: [model],
+                            mode: 'single',
+                          })
+                        }}
+                      >
+                        <div className="model-card-thumbnail">
+                          {isSelectionEnabled ? (
+                            <button
+                              type="button"
+                              className="model-select-checkbox"
+                              onMouseDown={event => event.stopPropagation()}
+                              onClick={event =>
+                                toggleModelSelection(modelId, event)
+                              }
+                              aria-label={`${isSelected ? 'Deselect' : 'Select'} ${modelName}`}
+                              aria-pressed={isSelected}
+                            >
+                              <i
+                                className={`pi ${isSelected ? 'pi-check-square' : 'pi-stop'}`}
+                              />
+                            </button>
+                          ) : null}
+
+                          <ThumbnailDisplay
+                            modelId={model.id}
+                            modelName={model.name}
+                          />
+                          {(model.animationCount ?? 0) > 0 ? (
+                            <span
+                              className="model-card-badge model-card-badge-animated"
+                              title={`${model.animationCount} animation${model.animationCount === 1 ? '' : 's'}`}
+                              data-testid="model-animated-badge"
+                            >
+                              <i className="pi pi-play-circle" />
+                            </span>
+                          ) : null}
+                          <div className="model-card-overlay">
+                            <span className="model-card-name">{modelName}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  }}
+                />
+              </div>
+
+              {isSelectionEnabled && isAreaSelecting && selectionBox ? (
+                <div
+                  className="model-grid-selection-box"
+                  style={{
+                    left: Math.min(selectionBox.startX, selectionBox.currentX),
+                    top: Math.min(selectionBox.startY, selectionBox.currentY),
+                    width: Math.abs(
+                      selectionBox.currentX - selectionBox.startX
+                    ),
+                    height: Math.abs(
+                      selectionBox.currentY - selectionBox.startY
+                    ),
+                  }}
+                />
+              ) : null}
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       {isContainerContext && (
         <AddModelDialog
