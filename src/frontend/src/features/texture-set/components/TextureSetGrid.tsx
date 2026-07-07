@@ -26,16 +26,21 @@ import {
   softDeleteTextureSet,
   updateTextureSet,
 } from '@/features/texture-set/api/textureSetApi'
-import { TextureSetCategoryManagerDialog } from '@/features/texture-set/components/TextureSetCategoryManagerDialog'
 import { ChangeTextureSetCategoryDialog } from '@/features/texture-set/dialogs/ChangeTextureSetCategoryDialog'
 import { CreateTextureSetDialog } from '@/features/texture-set/dialogs/CreateTextureSetDialog'
 import { MergeTextureSetDialog } from '@/features/texture-set/dialogs/MergeTextureSetDialog'
+import { useTextureSetCategoryMutations } from '@/features/texture-set/hooks/useTextureSetCategoryMutations'
 import { useTabContext } from '@/hooks/useTabContext'
 import { baseURL } from '@/lib/apiBase'
+import { CategoryTreePanel } from '@/shared/components/categories/CategoryTreePanel'
 import { SelectPackDialog } from '@/shared/components/dialogs/SelectPackDialog'
 import { SelectProjectDialog } from '@/shared/components/dialogs/SelectProjectDialog'
 import { EmptyState } from '@/shared/components/feedback'
 import { useTagVocabulary } from '@/shared/hooks/useTagVocabulary'
+import {
+  ALL_CATEGORIES_ID,
+  UNASSIGNED_CATEGORY_ID,
+} from '@/shared/types/categories'
 import {
   type TextureChannel,
   type TextureSetDto,
@@ -117,13 +122,15 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
   const [showPackDialog, setShowPackDialog] = useState(false)
   const [showProjectDialog, setShowProjectDialog] = useState(false)
   const [showMergeDialog, setShowMergeDialog] = useState(false)
-  const [showCategoryManager, setShowCategoryManager] = useState(false)
   const [showChangeCategory, setShowChangeCategory] = useState(false)
   const [draggedTextureSet, setDraggedTextureSet] =
     useState<TextureSetDto | null>(null)
   const [dropTargetTextureSet, setDropTargetTextureSet] =
     useState<TextureSetDto | null>(null)
   const [dragOverCardId, setDragOverCardId] = useState<number | null>(null)
+  const [dragOverCategoryId, setDragOverCategoryId] = useState<number | null>(
+    null
+  )
   const [activeContextSet, setActiveContextSet] =
     useState<TextureSetDto | null>(null)
   const [contextMode, setContextMode] = useState<'single' | 'bulk'>('single')
@@ -150,6 +157,8 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
   const {
     textureSets,
     filteredTextureSets,
+    categoryCounts,
+    unassignedCount,
     totalCount,
     isLoading,
     error,
@@ -171,8 +180,8 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
     setSelectedPackIds,
     selectedProjectIds,
     setSelectedProjectIds,
-    selectedCategoryKeys,
-    setSelectedCategoryKeys,
+    activeCategoryId,
+    setActiveCategoryId,
     selectedTextureTypes,
     setSelectedTextureTypes,
     minResolution,
@@ -202,6 +211,72 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
     () => filteredTextureSets.filter(set => selectedIdSet.has(set.id)),
     [filteredTextureSets, selectedIdSet]
   )
+
+  const {
+    createCategoryMutation,
+    renameCategoryMutation,
+    deleteCategoryMutation,
+    moveToCategoryMutation,
+  } = useTextureSetCategoryMutations({
+    showToast: opts =>
+      toast.current?.show(opts as Parameters<Toast['show']>[0]),
+    categoriesKind,
+    activeCategoryId,
+    setActiveCategoryId,
+    categories,
+    clearSelection: () => setSelectedTextureSetIds([]),
+  })
+
+  // --- Drag a card onto a category to (re)assign it. Reuses the same
+  // `application/x-texture-set-id` payload the card sets for merge/kind-switch;
+  // the sidebar is just another drop target. ---
+  const handleCategoryDragOver = (
+    e: React.DragEvent<HTMLDivElement>,
+    categoryId: number | null
+  ) => {
+    if (e.dataTransfer.types.includes('application/x-texture-set-id')) {
+      e.preventDefault()
+      e.stopPropagation()
+      setDragOverCategoryId(categoryId)
+    }
+  }
+
+  const handleCategoryDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragOverCategoryId(null)
+  }
+
+  const handleCategoryDrop = (
+    e: React.DragEvent<HTMLDivElement>,
+    targetCategoryId: number | null
+  ) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragOverCategoryId(null)
+
+    const draggedId = Number(
+      e.dataTransfer.getData('application/x-texture-set-id')
+    )
+    setDraggedTextureSet(null)
+    if (Number.isNaN(draggedId)) return
+
+    const newCategoryId =
+      targetCategoryId === UNASSIGNED_CATEGORY_ID ? null : targetCategoryId
+
+    const idsToMove = selectedIdSet.has(draggedId)
+      ? [...selectedIdSet]
+      : [draggedId]
+    const setsToMove = textureSets.filter(
+      set => idsToMove.includes(set.id) && set.categoryId !== newCategoryId
+    )
+    if (setsToMove.length === 0) return
+
+    moveToCategoryMutation.mutate({
+      textureSets: setsToMove,
+      categoryId: newCategoryId,
+    })
+  }
 
   // --- Page identity (count chip label) ---
   const unitLabel =
@@ -823,7 +898,6 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
 
   return (
     <div
-      ref={setScrollParent}
       className="texture-set-grid-container"
       onDrop={dragHandlers.onDrop}
       onDragOver={dragHandlers.onDragOver}
@@ -852,18 +926,14 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
         onSearchChange={setSearchQuery}
         packs={packs}
         projects={projects}
-        categories={categories}
         selectedPackIds={selectedPackIds}
         selectedProjectIds={selectedProjectIds}
-        selectedCategoryKeys={selectedCategoryKeys}
         selectedTextureTypes={selectedTextureTypes}
         minResolution={minResolution}
         availableTags={tagVocabulary.data ?? []}
         selectedTagNames={selectedTagNames}
         onPackFilterChange={setSelectedPackIds}
         onProjectFilterChange={setSelectedProjectIds}
-        onCategoryChange={setSelectedCategoryKeys}
-        onManageCategoriesClick={() => setShowCategoryManager(true)}
         onTextureTypesChange={setSelectedTextureTypes}
         onMinResolutionChange={setMinResolution}
         onTagChange={setSelectedTagNames}
@@ -881,210 +951,248 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
         onDeselectAllClick={handleDeselectAll}
       />
 
-      {isLoading ? (
-        <div className="texture-set-grid-loading">
-          <i className="pi pi-spin pi-spinner" style={{ fontSize: '2rem' }} />
-          <p>Loading texture sets...</p>
-        </div>
-      ) : error ? (
-        <div className="texture-set-grid-error">
-          <i
-            className="pi pi-exclamation-triangle"
-            style={{ fontSize: '2rem' }}
+      <div className="texture-set-list-body">
+        <aside className="texture-set-category-sidebar">
+          <CategoryTreePanel
+            categories={categories}
+            activeCategoryId={activeCategoryId}
+            dragOverCategoryId={dragOverCategoryId}
+            categoryCounts={categoryCounts}
+            unassignedCount={unassignedCount}
+            allCount={textureSets.length}
+            allCategoryId={ALL_CATEGORIES_ID}
+            unassignedCategoryId={UNASSIGNED_CATEGORY_ID}
+            unassignedLabel="Unassigned"
+            itemNoun={unitLabel}
+            onCategoryChange={setActiveCategoryId}
+            onCategoryDragOver={handleCategoryDragOver}
+            onCategoryDragLeave={handleCategoryDragLeave}
+            onCategoryDrop={handleCategoryDrop}
+            onCreateCategory={(name, parentId) =>
+              createCategoryMutation.mutate({ name, parentId })
+            }
+            onRenameCategory={(category, name) =>
+              renameCategoryMutation.mutate({ category, name })
+            }
+            onDeleteCategory={category =>
+              deleteCategoryMutation.mutate(category.id)
+            }
           />
-          <p>{error}</p>
-          <Button
-            label="Retry"
-            icon="pi pi-refresh"
-            className="p-button-outlined"
-            onClick={() => refetch()}
-          />
-        </div>
-      ) : textureSets.length === 0 ? (
-        // The server returned zero items. Two distinct cases:
-        //   1. No texture sets exist for this kind/scope and no filter
-        //      is active → render the drop-zone empty state (dashed
-        //      border invites a drag-drop).
-        //   2. A search or filter is active and narrowed everything
-        //      out → render the "no-results" state instead. The dashed
-        //      drop-zone framing is misleading here because the user's
-        //      data does exist; surface the active query and a Clear
-        //      button so a collapsed search panel doesn't become a
-        //      hidden trap ("user could forget that he searched for
-        //      something").
-        searchQuery.trim().length > 0 ||
-        selectedPackIds.length > 0 ||
-        selectedProjectIds.length > 0 ||
-        selectedTextureTypes.length > 0 ||
-        minResolution != null ||
-        Object.values(selectedCategoryKeys).some(s => s?.checked) ? (
-          <div className="no-results">
-            <i className="pi pi-search" />
-            <p>
-              No texture sets match the current filters
-              {searchQuery.trim().length > 0
-                ? ` for "${searchQuery.trim()}"`
-                : ''}
-              .
-            </p>
-            {searchQuery.trim().length > 0 ? (
-              <Button
-                label="Clear search"
-                icon="pi pi-times"
-                className="p-button-text p-button-sm"
-                onClick={() => setSearchQuery('')}
+        </aside>
+
+        <div ref={setScrollParent} className="texture-set-list-main">
+          {isLoading ? (
+            <div className="texture-set-grid-loading">
+              <i
+                className="pi pi-spin pi-spinner"
+                style={{ fontSize: '2rem' }}
               />
-            ) : null}
-          </div>
-        ) : (
-          <EmptyState
-            className="texture-set-grid-empty"
-            icon="pi-images"
-            title="No Texture Sets"
-            message="Drag and drop texture files here to create new sets — each file becomes a set with an albedo texture"
-          />
-        )
-      ) : filteredTextureSets.length === 0 ? (
-        <EmptyState
-          className="no-results"
-          icon="pi-search"
-          title="No texture sets match the current filters"
-        />
-      ) : (
-        <div
-          ref={selectionSurfaceRef}
-          className={`texture-set-grid-selection-surface${isAreaSelecting ? ' is-selecting' : ''}`}
-          onMouseDown={handleGridMouseDown}
-          onMouseMove={handleGridMouseMove}
-          onMouseUp={handleGridMouseUp}
-          onMouseLeave={handleGridMouseUp}
-        >
-          <VirtuosoGrid
-            customScrollParent={scrollParent ?? undefined}
-            totalCount={filteredTextureSets.length}
-            overscan={200}
-            components={gridComponents}
-            context={{ cardWidth, isLoadingMore: isFetchingNextPage }}
-            endReached={() => {
-              if (hasNextPage && !isFetchingNextPage) {
-                fetchNextPage()
-              }
-            }}
-            itemContent={index => {
-              const textureSet = filteredTextureSets[index]
-              if (!textureSet) return null
-              const albedoUrl = getAlbedoTextureUrl(textureSet)
-              const isDraggedOver = dragOverCardId === textureSet.id
-              const isSelected = selectedIdSet.has(textureSet.id)
-              const proxySizes = new Set<number>()
-              textureSet.textures?.forEach(t => {
-                ;(t.proxies ?? []).forEach(p => proxySizes.add(p.size))
-              })
+              <p>Loading texture sets...</p>
+            </div>
+          ) : error ? (
+            <div className="texture-set-grid-error">
+              <i
+                className="pi pi-exclamation-triangle"
+                style={{ fontSize: '2rem' }}
+              />
+              <p>{error}</p>
+              <Button
+                label="Retry"
+                icon="pi pi-refresh"
+                className="p-button-outlined"
+                onClick={() => refetch()}
+              />
+            </div>
+          ) : textureSets.length === 0 ? (
+            // The server returned zero items. Two distinct cases:
+            //   1. No texture sets exist for this kind/scope and no filter
+            //      is active → render the drop-zone empty state (dashed
+            //      border invites a drag-drop).
+            //   2. A search or filter is active and narrowed everything
+            //      out → render the "no-results" state instead. The dashed
+            //      drop-zone framing is misleading here because the user's
+            //      data does exist; surface the active query and a Clear
+            //      button so a collapsed search panel doesn't become a
+            //      hidden trap ("user could forget that he searched for
+            //      something").
+            searchQuery.trim().length > 0 ||
+            selectedPackIds.length > 0 ||
+            selectedProjectIds.length > 0 ||
+            selectedTextureTypes.length > 0 ||
+            minResolution != null ? (
+              <div className="no-results">
+                <i className="pi pi-search" />
+                <p>
+                  No texture sets match the current filters
+                  {searchQuery.trim().length > 0
+                    ? ` for "${searchQuery.trim()}"`
+                    : ''}
+                  .
+                </p>
+                {searchQuery.trim().length > 0 ? (
+                  <Button
+                    label="Clear search"
+                    icon="pi pi-times"
+                    className="p-button-text p-button-sm"
+                    onClick={() => setSearchQuery('')}
+                  />
+                ) : null}
+              </div>
+            ) : (
+              <EmptyState
+                className="texture-set-grid-empty"
+                icon="pi-images"
+                title="No Texture Sets"
+                message="Drag and drop texture files here to create new sets — each file becomes a set with an albedo texture"
+              />
+            )
+          ) : filteredTextureSets.length === 0 ? (
+            <EmptyState
+              className="no-results"
+              icon="pi-search"
+              title="No texture sets match the current filters"
+            />
+          ) : (
+            <div
+              ref={selectionSurfaceRef}
+              className={`texture-set-grid-selection-surface${isAreaSelecting ? ' is-selecting' : ''}`}
+              onMouseDown={handleGridMouseDown}
+              onMouseMove={handleGridMouseMove}
+              onMouseUp={handleGridMouseUp}
+              onMouseLeave={handleGridMouseUp}
+            >
+              <VirtuosoGrid
+                customScrollParent={scrollParent ?? undefined}
+                totalCount={filteredTextureSets.length}
+                overscan={200}
+                components={gridComponents}
+                context={{ cardWidth, isLoadingMore: isFetchingNextPage }}
+                endReached={() => {
+                  if (hasNextPage && !isFetchingNextPage) {
+                    fetchNextPage()
+                  }
+                }}
+                itemContent={index => {
+                  const textureSet = filteredTextureSets[index]
+                  if (!textureSet) return null
+                  const albedoUrl = getAlbedoTextureUrl(textureSet)
+                  const isDraggedOver = dragOverCardId === textureSet.id
+                  const isSelected = selectedIdSet.has(textureSet.id)
+                  const proxySizes = new Set<number>()
+                  textureSet.textures?.forEach(t => {
+                    ;(t.proxies ?? []).forEach(p => proxySizes.add(p.size))
+                  })
 
-              return (
-                <div
-                  key={textureSet.id}
-                  className={`texture-set-card${isSelected ? ' selected' : ''}${isDraggedOver ? ' drag-over-card' : ''}`}
-                  data-texture-set-id={textureSet.id}
-                  draggable={true}
-                  onDragStart={e => handleCardDragStart(e, textureSet)}
-                  onDragEnd={handleCardDragEnd}
-                  onDragOver={e => handleCardDragOver(e, textureSet)}
-                  onDragLeave={e => handleCardDragLeave(e, textureSet)}
-                  onDrop={e => handleCardDrop(e, textureSet)}
-                  onClick={() => handleCardClick(textureSet)}
-                  onMouseDown={event => {
-                    if (event.button === 1) {
-                      event.preventDefault()
-                    }
-                  }}
-                  onAuxClick={e => handleCardAuxClick(e, textureSet)}
-                  onContextMenu={e => handleCardContextMenu(e, textureSet)}
-                >
-                  <div className="texture-set-card-thumbnail">
-                    <button
-                      type="button"
-                      className="texture-set-select-checkbox"
-                      onMouseDown={e => e.stopPropagation()}
-                      onClick={e => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        toggleSelection(textureSet.id)
+                  return (
+                    <div
+                      key={textureSet.id}
+                      className={`texture-set-card${isSelected ? ' selected' : ''}${isDraggedOver ? ' drag-over-card' : ''}`}
+                      data-texture-set-id={textureSet.id}
+                      draggable={true}
+                      onDragStart={e => handleCardDragStart(e, textureSet)}
+                      onDragEnd={handleCardDragEnd}
+                      onDragOver={e => handleCardDragOver(e, textureSet)}
+                      onDragLeave={e => handleCardDragLeave(e, textureSet)}
+                      onDrop={e => handleCardDrop(e, textureSet)}
+                      onClick={() => handleCardClick(textureSet)}
+                      onMouseDown={event => {
+                        if (event.button === 1) {
+                          event.preventDefault()
+                        }
                       }}
-                      aria-label={`${isSelected ? 'Deselect' : 'Select'} ${textureSet.name}`}
-                      aria-pressed={isSelected}
+                      onAuxClick={e => handleCardAuxClick(e, textureSet)}
+                      onContextMenu={e => handleCardContextMenu(e, textureSet)}
                     >
-                      <i
-                        className={`pi ${isSelected ? 'pi-check-square' : 'pi-stop'}`}
-                      />
-                    </button>
+                      <div className="texture-set-card-thumbnail">
+                        <button
+                          type="button"
+                          className="texture-set-select-checkbox"
+                          onMouseDown={e => e.stopPropagation()}
+                          onClick={e => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            toggleSelection(textureSet.id)
+                          }}
+                          aria-label={`${isSelected ? 'Deselect' : 'Select'} ${textureSet.name}`}
+                          aria-pressed={isSelected}
+                        >
+                          <i
+                            className={`pi ${isSelected ? 'pi-check-square' : 'pi-stop'}`}
+                          />
+                        </button>
 
-                    {albedoUrl ? (
-                      <img
-                        src={albedoUrl}
-                        alt={textureSet.name}
-                        className="texture-set-image"
-                      />
-                    ) : (
-                      <div className="texture-set-placeholder">
-                        <i className="pi pi-image" />
-                        <span>No Preview</span>
-                      </div>
-                    )}
-                    <div className="texture-set-card-overlay">
-                      <span className="texture-set-card-name">
-                        {textureSet.name}
-                      </span>
-                      <div className="texture-set-card-info">
-                        <span className="texture-count">
-                          <i className="pi pi-palette" />
-                          {textureSet.textureCount || 0} texture
-                          {textureSet.textureCount !== 1 ? 's' : ''}
-                        </span>
-                        {textureSet.maxResolution ? (
-                          <span
-                            className="texture-resolution"
-                            data-testid="texture-set-resolution"
-                          >
-                            <i className="pi pi-expand" />
-                            {formatResolution(textureSet.maxResolution)}
+                        {albedoUrl ? (
+                          <img
+                            src={albedoUrl}
+                            alt={textureSet.name}
+                            className="texture-set-image"
+                          />
+                        ) : (
+                          <div className="texture-set-placeholder">
+                            <i className="pi pi-image" />
+                            <span>No Preview</span>
+                          </div>
+                        )}
+                        <div className="texture-set-card-overlay">
+                          <span className="texture-set-card-name">
+                            {textureSet.name}
                           </span>
+                          <div className="texture-set-card-info">
+                            <span className="texture-count">
+                              <i className="pi pi-palette" />
+                              {textureSet.textureCount || 0} texture
+                              {textureSet.textureCount !== 1 ? 's' : ''}
+                            </span>
+                            {textureSet.maxResolution ? (
+                              <span
+                                className="texture-resolution"
+                                data-testid="texture-set-resolution"
+                              >
+                                <i className="pi pi-expand" />
+                                {formatResolution(textureSet.maxResolution)}
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+                        {proxySizes.size > 0 ? (
+                          <div className="texture-set-card-badges">
+                            {ALL_PROXY_SIZES.filter(s => proxySizes.has(s)).map(
+                              size => (
+                                <Tag
+                                  key={size}
+                                  value={`${size}`}
+                                  severity="success"
+                                  className="grid-proxy-badge"
+                                />
+                              )
+                            )}
+                          </div>
                         ) : null}
                       </div>
                     </div>
-                    {proxySizes.size > 0 ? (
-                      <div className="texture-set-card-badges">
-                        {ALL_PROXY_SIZES.filter(s => proxySizes.has(s)).map(
-                          size => (
-                            <Tag
-                              key={size}
-                              value={`${size}`}
-                              severity="success"
-                              className="grid-proxy-badge"
-                            />
-                          )
-                        )}
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-              )
-            }}
-          />
+                  )
+                }}
+              />
 
-          {isAreaSelecting && selectionBox ? (
-            <div
-              className="texture-set-grid-selection-box"
-              style={{
-                left: Math.min(selectionBox.startX, selectionBox.currentX),
-                top: Math.min(selectionBox.startY, selectionBox.currentY),
-                width: Math.abs(selectionBox.currentX - selectionBox.startX),
-                height: Math.abs(selectionBox.currentY - selectionBox.startY),
-              }}
-            />
-          ) : null}
+              {isAreaSelecting && selectionBox ? (
+                <div
+                  className="texture-set-grid-selection-box"
+                  style={{
+                    left: Math.min(selectionBox.startX, selectionBox.currentX),
+                    top: Math.min(selectionBox.startY, selectionBox.currentY),
+                    width: Math.abs(
+                      selectionBox.currentX - selectionBox.startX
+                    ),
+                    height: Math.abs(
+                      selectionBox.currentY - selectionBox.startY
+                    ),
+                  }}
+                />
+              ) : null}
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       <SelectPackDialog
         visible={showPackDialog}
@@ -1123,17 +1231,6 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
         }
         onHide={() => setShowChangeCategory(false)}
         onConfirm={handleChangeCategory}
-        onManageCategories={() => {
-          setShowChangeCategory(false)
-          setShowCategoryManager(true)
-        }}
-      />
-
-      <TextureSetCategoryManagerDialog
-        visible={showCategoryManager}
-        categories={categories}
-        kind={categoriesKind}
-        onHide={() => setShowCategoryManager(false)}
       />
 
       {showCreateDialog && (

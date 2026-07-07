@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
-import { type PersistedModelCategorySelectionKeys } from './modelListViewStore'
+import { ALL_CATEGORIES_ID } from '@/shared/types/categories'
 
 /**
  * Persisted state for a single texture-set list "view" (one tab on one
@@ -14,7 +14,8 @@ export interface TextureSetListViewState {
   searchQuery: string
   selectedPackIds: number[]
   selectedProjectIds: number[]
-  selectedCategoryKeys: PersistedModelCategorySelectionKeys
+  /** Single active category; ALL_CATEGORIES_ID = all, UNASSIGNED = uncategorized. */
+  activeCategoryId: number | null
   /** Subset of `TextureType` enum values (numeric). */
   selectedTextureTypes: number[]
   /** Minimum largest-side resolution filter (e.g. 4096 = "4K and up"); null = any. */
@@ -40,7 +41,7 @@ export const DEFAULT_TEXTURE_SET_LIST_VIEW_STATE: TextureSetListViewState = {
   searchQuery: '',
   selectedPackIds: [],
   selectedProjectIds: [],
-  selectedCategoryKeys: {},
+  activeCategoryId: ALL_CATEGORIES_ID,
   selectedTextureTypes: [],
   minResolution: null,
   selectedTagNames: [],
@@ -74,16 +75,25 @@ export const useTextureSetListViewStore = create<TextureSetListViewStore>()(
       storage: createJSONStorage(() => localStorage),
       partialize: state => ({ views: state.views }),
       // Backfill fields added after a view was first persisted (e.g.
-      // selectedProjectIds) so consumers can read them without guards.
+      // selectedProjectIds) so consumers can read them without guards. Also
+      // drops the legacy multi-select `selectedCategoryKeys` — the category
+      // filter is now the single-select `activeCategoryId` sidebar, defaulted
+      // to "All" for any view persisted before the switch.
       merge: (persisted, current) => {
         const persistedViews =
-          (persisted as { views?: Record<string, TextureSetListViewState> })
+          (persisted as { views?: Record<string, Record<string, unknown>> })
             ?.views ?? {}
         const views = Object.fromEntries(
-          Object.entries(persistedViews).map(([scope, view]) => [
-            scope,
-            { ...DEFAULT_TEXTURE_SET_LIST_VIEW_STATE, ...view },
-          ])
+          Object.entries(persistedViews).map(([scope, view]) => {
+            const { selectedCategoryKeys: _drop, ...rest } = view
+            return [
+              scope,
+              {
+                ...DEFAULT_TEXTURE_SET_LIST_VIEW_STATE,
+                ...(rest as Partial<TextureSetListViewState>),
+              },
+            ]
+          })
         )
         return { ...current, views }
       },
