@@ -5,6 +5,7 @@ import {
     type UploadFilePayload,
 } from "../helpers/file-payload-helper";
 import { navigateToAppClean } from "../helpers/navigation-helper";
+import { UploadProgressPage } from "./UploadProgressPage";
 
 interface EnvironmentMapDialogValues {
     name?: string;
@@ -180,6 +181,13 @@ export class EnvironmentMapsPage {
         mapName: string,
         categoryName: string,
     ): Promise<void> {
+        // The floating "File Uploads" progress window overlays the (narrower,
+        // sidebar-open) grid and swallows pointer events, so a right-click on a
+        // card behind it hangs until the test times out. Dismiss it, then
+        // reveal the card — in the narrower grid it may be virtualised out of
+        // the DOM, and a right-click on a non-rendered card also hangs.
+        await new UploadProgressPage(this.page).closeWindowIfVisible();
+        await this.waitForEnvironmentMapByName(mapName, 15000);
         await this.getEnvironmentMapCardByName(mapName)
             .first()
             .click({ button: "right" });
