@@ -35,7 +35,13 @@ When(
             .first();
         await revealVirtualizedCard(page, ".model-grid-main", modelCardForReveal);
 
-        // Find and double-click on the model in the grid
+        // Find and double-click on the model in the grid. `force: true` skips
+        // Playwright's actionability (stable + receives-events) wait: once a
+        // model viewer is open its `frameloop=always` canvas starves the main
+        // thread under software WebGL (prompt 48), so that wait can never
+        // resolve and a plain dblclick hangs to the test timeout. The event
+        // still dispatches; React opens the tab once the thread yields, and the
+        // viewer wait below covers that.
         const clickTarget = page.locator(`text="${modelData.name}"`).first();
         if (
             await clickTarget
@@ -43,7 +49,7 @@ When(
                 .then(() => true)
                 .catch(() => false)
         ) {
-            await clickTarget.dblclick();
+            await clickTarget.dblclick({ force: true });
         } else {
             // Fall back to model card locator
             const modelCard = page
@@ -51,7 +57,7 @@ When(
                     `.model-card, .model-grid-item, [data-model-name="${modelName}"]`,
                 )
                 .first();
-            await modelCard.dblclick();
+            await modelCard.dblclick({ force: true });
         }
 
         // Wait for model viewer to load
@@ -184,7 +190,11 @@ When(
         await revealVirtualizedCard(page, ".model-grid-main", modelCardForReveal);
 
         const clickTarget = page.locator(`text="${modelData.name}"`).first();
-        await clickTarget.dblclick();
+        // force: true — the first viewer's frameloop=always canvas starves the
+        // main thread under software WebGL, so the actionability wait never
+        // resolves and a plain dblclick hangs (prompt 48). The event still
+        // dispatches; the viewer wait below covers the mount.
+        await clickTarget.dblclick({ force: true });
         // 30s absorbs the model-viewer mount: three.js initializes on software
         // WebGL on GPU-less CI runners and can block well past 10s (PR-lane
         // timeouts on 2026-07-04). The app is converging, not broken.
