@@ -18,7 +18,10 @@ import {
 import { useUploadProgress } from '@/hooks/useUploadProgress'
 import { useDebouncedValue } from '@/shared/hooks'
 import { useDragAndDrop } from '@/shared/hooks/useFileUpload'
-import { type CategorySelectionKeys } from '@/shared/types/categories'
+import {
+  ALL_CATEGORIES_ID,
+  UNASSIGNED_CATEGORY_ID,
+} from '@/shared/types/categories'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
 import {
   DEFAULT_TEXTURE_SET_LIST_VIEW_STATE,
@@ -95,17 +98,6 @@ export function useTextureSetGrid({
     queryFn: () => getAllTextureSetCategories(categoriesKind),
   })
 
-  // --- Derived filter state ---
-
-  const selectedCategoryIds = useMemo(
-    () =>
-      Object.entries(viewState.selectedCategoryKeys)
-        .filter(([, state]) => state?.checked)
-        .map(([key]) => Number(key))
-        .filter(Number.isFinite),
-    [viewState.selectedCategoryKeys]
-  )
-
   // --- Data: texture sets ---
 
   // Stable, ordered filter parameter arrays for the React Query cache key.
@@ -121,10 +113,6 @@ export function useTextureSetGrid({
   const sortedTextureTypes = useMemo(
     () => [...viewState.selectedTextureTypes].sort((a, b) => a - b),
     [viewState.selectedTextureTypes]
-  )
-  const sortedCategoryIds = useMemo(
-    () => [...selectedCategoryIds].sort((a, b) => a - b),
-    [selectedCategoryIds]
   )
   const sortedTagNames = useMemo(
     () => [...(viewState.selectedTagNames ?? [])].sort(),
@@ -154,7 +142,6 @@ export function useTextureSetGrid({
         kind,
         packIds: sortedPackIds,
         projectIds: sortedProjectIds,
-        categoryIds: sortedCategoryIds,
         textureTypes: sortedTextureTypes,
         tags: sortedTagNames,
         searchName: debouncedSearchName || undefined,
@@ -168,8 +155,6 @@ export function useTextureSetGrid({
         kind,
         packIds: sortedPackIds.length > 0 ? sortedPackIds : undefined,
         projectIds: sortedProjectIds.length > 0 ? sortedProjectIds : undefined,
-        categoryIds:
-          sortedCategoryIds.length > 0 ? sortedCategoryIds : undefined,
         textureTypes:
           sortedTextureTypes.length > 0 ? sortedTextureTypes : undefined,
         tags: sortedTagNames.length > 0 ? sortedTagNames : undefined,
@@ -189,14 +174,39 @@ export function useTextureSetGrid({
   )
   const totalCount = paginatedData?.pages[0]?.totalCount ?? 0
 
-  // --- Client-side filtering: name search only. Pack/category/texture-type
-  // filtering runs server-side via the query params above. ---
+  // --- Client-side filtering: name search + the single active category.
+  // Pack/texture-type/tag/resolution filtering runs server-side above. ---
+
+  const activeCategoryId = viewState.activeCategoryId
 
   const filteredTextureSets = useMemo(() => {
     const search = viewState.searchQuery.trim().toLowerCase()
-    if (!search) return textureSets
-    return textureSets.filter(set => set.name.toLowerCase().includes(search))
-  }, [textureSets, viewState.searchQuery])
+    return textureSets.filter(set => {
+      const nameMatches = !search || set.name.toLowerCase().includes(search)
+      const categoryMatches =
+        activeCategoryId === ALL_CATEGORIES_ID
+          ? true
+          : activeCategoryId === UNASSIGNED_CATEGORY_ID
+            ? set.categoryId == null
+            : set.categoryId === activeCategoryId
+      return nameMatches && categoryMatches
+    })
+  }, [textureSets, viewState.searchQuery, activeCategoryId])
+
+  // Per-category counts for the sidebar tree (from the loaded set).
+  const categoryCounts = useMemo(() => {
+    const counts = new Map<number, number>()
+    for (const set of textureSets) {
+      if (set.categoryId != null) {
+        counts.set(set.categoryId, (counts.get(set.categoryId) ?? 0) + 1)
+      }
+    }
+    return counts
+  }, [textureSets])
+  const unassignedCount = useMemo(
+    () => textureSets.filter(set => set.categoryId == null).length,
+    [textureSets]
+  )
 
   // --- Setters that route through view-state ---
 
@@ -220,8 +230,8 @@ export function useTextureSetGrid({
     (ids: number[]) => setView({ selectedProjectIds: ids }),
     [setView]
   )
-  const setSelectedCategoryKeys = useCallback(
-    (keys: CategorySelectionKeys) => setView({ selectedCategoryKeys: keys }),
+  const setActiveCategoryId = useCallback(
+    (id: number | null) => setView({ activeCategoryId: id }),
     [setView]
   )
   const setSelectedTextureTypes = useCallback(
@@ -387,6 +397,8 @@ export function useTextureSetGrid({
     // Data
     textureSets,
     filteredTextureSets,
+    categoryCounts,
+    unassignedCount,
     totalCount,
     isLoading,
     error: queryError
@@ -412,9 +424,8 @@ export function useTextureSetGrid({
     setSelectedPackIds,
     selectedProjectIds: viewState.selectedProjectIds,
     setSelectedProjectIds,
-    selectedCategoryKeys: viewState.selectedCategoryKeys,
-    setSelectedCategoryKeys,
-    selectedCategoryIds,
+    activeCategoryId,
+    setActiveCategoryId,
     selectedTextureTypes: viewState.selectedTextureTypes as TextureType[],
     setSelectedTextureTypes,
     minResolution: viewState.minResolution,
