@@ -16,7 +16,6 @@ const PAGE_SIZE = 50
 interface UseModelDataOptions {
   effectivePackIds: number[]
   effectiveProjectIds: number[]
-  selectedCategoryIds: number[]
   selectedTagNames: string[]
   hasConceptImages: boolean
   animatedOnly?: boolean
@@ -29,7 +28,6 @@ interface UseModelDataOptions {
 export function useModelData({
   effectivePackIds,
   effectiveProjectIds,
-  selectedCategoryIds,
   selectedTagNames,
   hasConceptImages,
   animatedOnly = false,
@@ -44,7 +42,6 @@ export function useModelData({
   // before stringification means [1,2] and [2,1] share a cache slot.
   const sortedPackIds = [...effectivePackIds].sort((a, b) => a - b)
   const sortedProjectIds = [...effectiveProjectIds].sort((a, b) => a - b)
-  const sortedCategoryIds = [...selectedCategoryIds].sort((a, b) => a - b)
   const sortedTagNames = [...selectedTagNames].sort()
 
   // Debounce typing — server fetch waits 300ms past the last keystroke.
@@ -65,7 +62,6 @@ export function useModelData({
         packIds: sortedPackIds,
         projectIds: sortedProjectIds,
         textureSetId,
-        categoryIds: sortedCategoryIds,
         tags: sortedTagNames,
         hasConceptImages,
         animatedOnly,
@@ -81,8 +77,6 @@ export function useModelData({
         packIds: sortedPackIds.length > 0 ? sortedPackIds : undefined,
         projectIds: sortedProjectIds.length > 0 ? sortedProjectIds : undefined,
         textureSetId,
-        categoryIds:
-          sortedCategoryIds.length > 0 ? sortedCategoryIds : undefined,
         tags: sortedTagNames.length > 0 ? sortedTagNames : undefined,
         hasConceptImages: hasConceptImages || undefined,
         hasAnimations: animatedOnly || undefined,
