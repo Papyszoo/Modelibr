@@ -626,6 +626,9 @@ export function ModelGrid({
         showCategoryToggle={showCategorySidebar}
         isCategoryPanelOpen={isCategoryPanelOpen}
         onCategoryPanelToggle={() => setIsCategoryPanelOpen(open => !open)}
+        categoryFilterActive={
+          activeCategoryId != null && activeCategoryId !== ALL_CATEGORIES_ID
+        }
       />
 
       <div className="model-grid-body">

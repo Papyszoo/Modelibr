@@ -60,6 +60,7 @@ interface ModelsFiltersProps {
   isCategoryPanelOpen: boolean
   onCategoryPanelToggle: () => void
   showCategoryToggle?: boolean
+  categoryFilterActive?: boolean
 }
 
 export function ModelsFilters({
@@ -101,6 +102,7 @@ export function ModelsFilters({
   isCategoryPanelOpen,
   onCategoryPanelToggle,
   showCategoryToggle = false,
+  categoryFilterActive = false,
 }: ModelsFiltersProps) {
   const packOptions = packs.map(pack => ({
     label: pack.name,
@@ -189,6 +191,7 @@ export function ModelsFilters({
               tooltip="Toggle category panel"
               ariaLabel="Toggle categories"
               ariaExpanded={isCategoryPanelOpen}
+              badge={categoryFilterActive ? 1 : undefined}
             />
           ) : null}
         </ListToolbarActions>

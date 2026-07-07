@@ -53,6 +53,7 @@ interface EnvironmentMapToolbarProps {
   onDeselectAllClick: () => void
   isCategoryPanelOpen: boolean
   onCategoryPanelToggle: () => void
+  categoryFilterActive?: boolean
 }
 
 export function EnvironmentMapToolbar({
@@ -85,6 +86,7 @@ export function EnvironmentMapToolbar({
   onProjectIdsChange,
   isCategoryPanelOpen,
   onCategoryPanelToggle,
+  categoryFilterActive = false,
 }: EnvironmentMapToolbarProps) {
   const hasActiveSearch = searchQuery.trim().length > 0
   const hasActiveFilters =
@@ -160,6 +162,7 @@ export function EnvironmentMapToolbar({
             tooltip="Toggle category panel"
             ariaLabel="Toggle categories"
             ariaExpanded={isCategoryPanelOpen}
+            badge={categoryFilterActive ? 1 : undefined}
           />
         </ListToolbarActions>
 
