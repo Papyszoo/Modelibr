@@ -301,32 +301,6 @@ export class TextureSetsPage {
     }
 
     /**
-     * Open the category manager. Works whether or not categories exist:
-     * with categories it opens the filter-picker popover and clicks the cog,
-     * otherwise it clicks the standalone "Manage categories" button.
-     */
-    async openCategoryManager(): Promise<void> {
-        await this.openFiltersPanel();
-        const trigger = this.filtersPanel.locator(
-            'button[aria-label="Filter by texture-set categories"]',
-        );
-        if (await trigger.count()) {
-            await trigger.scrollIntoViewIfNeeded();
-            await trigger.click();
-            const overlay = this.page.locator(".p-overlaypanel");
-            await overlay.waitFor({ state: "visible" });
-            await overlay
-                .locator('button[aria-label="Manage categories"]')
-                .click();
-        } else {
-            await this.filtersPanel
-                .getByRole("button", { name: "Manage categories" })
-                .click();
-        }
-        await this.categoryManagerDialog.waitFor({ state: "visible" });
-    }
-
-    /**
      * Assign a texture set to a category via the right-click "Change
      * Category" dialog.
      */
@@ -372,28 +346,6 @@ export class TextureSetsPage {
             .click();
         await panel.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
         await this.page.waitForLoadState("domcontentloaded");
-    }
-
-    /** Filter the grid by a category using the filter-picker popover. */
-    async filterByCategory(categoryName: string): Promise<void> {
-        await this.openFiltersPanel();
-        const trigger = this.filtersPanel.locator(
-            'button[aria-label="Filter by texture-set categories"]',
-        );
-        await trigger.scrollIntoViewIfNeeded();
-        await trigger.click();
-        const overlay = this.page.locator(".p-overlaypanel");
-        await overlay.waitFor({ state: "visible" });
-        await overlay
-            .locator(".category-tree .p-treenode-content", {
-                hasText: categoryName,
-            })
-            .first()
-            .locator(".p-checkbox")
-            .click();
-        // Close the overlay so it doesn't intercept later interactions.
-        await this.page.keyboard.press("Escape");
-        await overlay.waitFor({ state: "hidden" });
     }
 
     /**

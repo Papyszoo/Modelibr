@@ -2,11 +2,12 @@ import { createBdd } from "playwright-bdd";
 import { expect } from "@playwright/test";
 import { ApiHelper } from "../helpers/api-helper";
 import {
-    categoryNode,
-    createCategory,
-    deleteCategory,
-    renameCategory,
-} from "../helpers/category-manager-helper";
+    categoryTreeRow,
+    clickCategoryInTree,
+    createCategoryViaTree,
+    deleteCategoryViaTree,
+    renameCategoryViaTree,
+} from "../helpers/category-tree-helper";
 import { createUniqueSolidHdrPayload } from "../helpers/file-payload-helper";
 import { EnvironmentMapsPage } from "../pages/EnvironmentMapsPage";
 
@@ -14,8 +15,8 @@ const { Given, When, Then } = createBdd();
 
 const apiHelper = new ApiHelper();
 
-// Title of the shared CategoryManagerDialog on the environment maps page.
-const TITLE = "Manage Environment Map Categories";
+// The Environment Maps tab's category tree lives in this sidebar.
+const SIDEBAR = ".environment-map-category-sidebar";
 
 const runId = Date.now().toString(36).slice(-4);
 const uniqueNames: Record<string, string> = {};
@@ -36,48 +37,50 @@ function resolve(base: string): string {
     return name;
 }
 
-// ── Manage (shared dialog) ────────────────────────────────────────────
-
-When("I open the environment map category manager", async ({ page }) => {
-    await new EnvironmentMapsPage(page).openCategoryManager();
-});
+// ── Manage via the sidebar context menu ───────────────────────────────
 
 When(
-    "I create the environment map category {string}",
+    "I create an environment map category {string} via the context menu",
     async ({ page }, base: string) => {
-        await createCategory(page, TITLE, unique(base));
+        await createCategoryViaTree(page, SIDEBAR, unique(base));
     },
 );
 
 Then(
-    "the environment map category {string} is listed",
+    "the environment map category {string} is visible in the sidebar",
     async ({ page }, base: string) => {
-        await expect(categoryNode(page, TITLE, resolve(base))).toBeVisible({
+        await expect(categoryTreeRow(page, SIDEBAR, resolve(base))).toBeVisible({
             timeout: 10000,
         });
     },
 );
 
 Then(
-    "the environment map category {string} is not listed",
+    "the environment map category {string} is not visible in the sidebar",
     async ({ page }, base: string) => {
-        await expect(categoryNode(page, TITLE, resolve(base))).toHaveCount(0, {
-            timeout: 10000,
-        });
+        await expect(categoryTreeRow(page, SIDEBAR, resolve(base))).toHaveCount(
+            0,
+            { timeout: 10000 },
+        );
     },
 );
 
 When(
-    "I rename the environment map category {string} to {string}",
+    "I rename the environment map category {string} to {string} via the context menu",
     async ({ page }, fromBase: string, toBase: string) => {
-        await renameCategory(page, TITLE, resolve(fromBase), unique(toBase));
+        await renameCategoryViaTree(
+            page,
+            SIDEBAR,
+            resolve(fromBase),
+            unique(toBase),
+        );
     },
 );
 
 When(
-    "I delete the environment map category {string}",
+    "I delete the environment map category {string} via the context menu",
     async ({ page }, base: string) => {
-        await deleteCategory(page, TITLE, resolve(base));
+        await deleteCategoryViaTree(page, SIDEBAR, resolve(base));
     },
 );
 
@@ -121,9 +124,7 @@ When(
 When(
     "I filter environment maps by category {string}",
     async ({ page }, categoryBase: string) => {
-        await new EnvironmentMapsPage(page).filterByCategory(
-            resolve(categoryBase),
-        );
+        await clickCategoryInTree(page, SIDEBAR, resolve(categoryBase));
     },
 );
 
