@@ -855,6 +855,11 @@ Then(
         await modelListPage.goto();
         await page.waitForLoadState("domcontentloaded");
 
+        // Reveal the card first: with the category sidebar open the grid is
+        // narrower, so a card past the first rows is virtualised out of the DOM
+        // until scrolled to — its thumbnail would never appear otherwise.
+        await modelListPage.expectModelVisible(model.name);
+
         const modelCard = page
             .locator(".model-grid .model-card, .model-card")
             .filter({ hasText: model.name });

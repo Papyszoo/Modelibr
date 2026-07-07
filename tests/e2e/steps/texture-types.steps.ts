@@ -186,6 +186,14 @@ When("I open the texture set viewer", async ({ page }) => {
     const lastTsName = getScenarioState(page).getCustom<string>(
         "lastCreatedTextureSetName",
     );
+    // Narrow the (virtualised) grid by name first. The category sidebar now
+    // ships open by default, so the grid renders fewer columns; without
+    // narrowing, a set that sorts past the first viewport rows is scrolled
+    // out of the VirtuosoGrid DOM and `toBeVisible` times out.
+    if (lastTsName) {
+        await narrowVirtualisedList(page, lastTsName);
+    }
+
     let card;
     if (lastTsId) {
         card = page.locator(

@@ -1,5 +1,6 @@
 import { Page, expect, Locator } from "@playwright/test";
 import { navigateToAppClean } from "../helpers/navigation-helper";
+import { revealVirtualizedCard } from "../helpers/reveal-virtualized-card";
 
 export class ModelListPage {
     constructor(private page: Page) {}
@@ -211,6 +212,16 @@ export class ModelListPage {
         await expect(async () => {
             const visible = await modelCard.isVisible().catch(() => false);
             if (!visible) {
+                // The card may simply be virtualised out of the DOM: the
+                // category-sidebar rework narrows the grid (fewer columns), so
+                // cards past the first viewport rows aren't rendered until the
+                // scroll container (`.model-grid-main`) scrolls to them. Try a
+                // progressive scroll before falling back to a reload.
+                await this.scrollGridToFindCard(modelCard);
+                if (await modelCard.isVisible().catch(() => false)) {
+                    await expect(modelCard).toBeVisible({ timeout: 5000 });
+                    return;
+                }
                 await this.page.reload({ waitUntil: "domcontentloaded" });
                 await this.page.waitForSelector(
                     ".model-card, .model-grid, .no-results, .empty-state",
@@ -219,10 +230,21 @@ export class ModelListPage {
                         timeout: 15000,
                     },
                 );
+                await this.scrollGridToFindCard(modelCard);
             }
 
             await expect(modelCard).toBeVisible({ timeout: 5000 });
         }).toPass({ timeout: 60000, intervals: [1000, 2000, 5000] });
+    }
+
+    /**
+     * Progressively scroll the (virtualised) model grid so an off-viewport
+     * card is rendered into the DOM. The scrollable region is
+     * `.model-grid-main` (the category-sidebar rework moved the scroll there;
+     * `.model-grid-container` is now the non-scrolling outer shell).
+     */
+    private async scrollGridToFindCard(card: Locator): Promise<void> {
+        await revealVirtualizedCard(this.page, ".model-grid-main", card);
     }
 
     async openModel(modelName: string) {
@@ -238,6 +260,11 @@ export class ModelListPage {
             .locator('[class*="model-card"], [class*="model-list-item"]')
             .filter({ hasText: nameWithoutExt })
             .first();
+
+        // The card may be virtualised out of the DOM (the category sidebar
+        // narrows the grid, so cards past the first rows only render once
+        // scrolled to). Reveal it before probing for it.
+        await this.scrollGridToFindCard(modelCard);
 
         // If no specific card class, try finding clickable container with the text
         const fallbackCard = this.page

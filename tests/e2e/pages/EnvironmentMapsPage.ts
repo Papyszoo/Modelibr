@@ -328,8 +328,13 @@ export class EnvironmentMapsPage {
     ): Promise<void> {
         const findCard = async (): Promise<boolean> => {
             // VirtuosoGrid virtualises cards — scroll progressively to
-            // bring off-viewport items into the DOM.
-            const scrollContainer = this.page.locator(".environment-map-list");
+            // bring off-viewport items into the DOM. The scroll container is
+            // `.environment-map-list-main` (the category-sidebar rework moved
+            // the scrollable region there; `.environment-map-list` is now the
+            // non-scrolling flex shell around the toolbar + body).
+            const scrollContainer = this.page.locator(
+                ".environment-map-list-main",
+            );
             const card = this.getEnvironmentMapCardByName(name);
             if (await card.isVisible().catch(() => false)) return true;
 

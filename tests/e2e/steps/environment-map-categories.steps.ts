@@ -10,6 +10,7 @@ import {
 } from "../helpers/category-tree-helper";
 import { createUniqueSolidHdrPayload } from "../helpers/file-payload-helper";
 import { EnvironmentMapsPage } from "../pages/EnvironmentMapsPage";
+import { revealVirtualizedCard } from "../helpers/reveal-virtualized-card";
 
 const { Given, When, Then } = createBdd();
 
@@ -134,6 +135,9 @@ Then(
         const card = new EnvironmentMapsPage(page).getEnvironmentMapCardByName(
             maps[mapBase].name,
         );
+        // The filtered card can sit below the fold in the narrower
+        // sidebar-open grid — reveal it in the virtualised list first.
+        await revealVirtualizedCard(page, ".environment-map-list-main", card);
         await expect(card.first()).toBeVisible({ timeout: 10000 });
     },
 );
