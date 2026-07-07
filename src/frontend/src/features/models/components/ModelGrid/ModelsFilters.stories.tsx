@@ -101,6 +101,9 @@ const meta: Meta<typeof ModelsFilters> = {
     onUploadClick: noop,
     onRefreshClick: noop,
     onBulkActionsClick: noop,
+    isCategoryPanelOpen: true,
+    onCategoryPanelToggle: noop,
+    showCategoryToggle: true,
   },
 }
 

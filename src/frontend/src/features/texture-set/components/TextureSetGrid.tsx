@@ -118,6 +118,7 @@ interface TextureSetGridProps {
 
 export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
   const [scrollParent, setScrollParent] = useState<HTMLDivElement | null>(null)
+  const [isCategoryPanelOpen, setIsCategoryPanelOpen] = useState(true)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showPackDialog, setShowPackDialog] = useState(false)
   const [showProjectDialog, setShowProjectDialog] = useState(false)
@@ -949,36 +950,40 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
         onBulkActionsClick={handleBulkActionsClick}
         onSelectAllClick={handleSelectAll}
         onDeselectAllClick={handleDeselectAll}
+        isCategoryPanelOpen={isCategoryPanelOpen}
+        onCategoryPanelToggle={() => setIsCategoryPanelOpen(open => !open)}
       />
 
       <div className="texture-set-list-body">
-        <aside className="texture-set-category-sidebar">
-          <CategoryTreePanel
-            categories={categories}
-            activeCategoryId={activeCategoryId}
-            dragOverCategoryId={dragOverCategoryId}
-            categoryCounts={categoryCounts}
-            unassignedCount={unassignedCount}
-            allCount={textureSets.length}
-            allCategoryId={ALL_CATEGORIES_ID}
-            unassignedCategoryId={UNASSIGNED_CATEGORY_ID}
-            unassignedLabel="Unassigned"
-            itemNoun={unitLabel}
-            onCategoryChange={setActiveCategoryId}
-            onCategoryDragOver={handleCategoryDragOver}
-            onCategoryDragLeave={handleCategoryDragLeave}
-            onCategoryDrop={handleCategoryDrop}
-            onCreateCategory={(name, parentId) =>
-              createCategoryMutation.mutate({ name, parentId })
-            }
-            onRenameCategory={(category, name) =>
-              renameCategoryMutation.mutate({ category, name })
-            }
-            onDeleteCategory={category =>
-              deleteCategoryMutation.mutate(category.id)
-            }
-          />
-        </aside>
+        {isCategoryPanelOpen && (
+          <aside className="texture-set-category-sidebar">
+            <CategoryTreePanel
+              categories={categories}
+              activeCategoryId={activeCategoryId}
+              dragOverCategoryId={dragOverCategoryId}
+              categoryCounts={categoryCounts}
+              unassignedCount={unassignedCount}
+              allCount={textureSets.length}
+              allCategoryId={ALL_CATEGORIES_ID}
+              unassignedCategoryId={UNASSIGNED_CATEGORY_ID}
+              unassignedLabel="Unassigned"
+              itemNoun={unitLabel}
+              onCategoryChange={setActiveCategoryId}
+              onCategoryDragOver={handleCategoryDragOver}
+              onCategoryDragLeave={handleCategoryDragLeave}
+              onCategoryDrop={handleCategoryDrop}
+              onCreateCategory={(name, parentId) =>
+                createCategoryMutation.mutate({ name, parentId })
+              }
+              onRenameCategory={(category, name) =>
+                renameCategoryMutation.mutate({ category, name })
+              }
+              onDeleteCategory={category =>
+                deleteCategoryMutation.mutate(category.id)
+              }
+            />
+          </aside>
+        )}
 
         <div ref={setScrollParent} className="texture-set-list-main">
           {isLoading ? (

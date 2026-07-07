@@ -72,6 +72,7 @@ export function EnvironmentMapList() {
   )
 
   const [showUploadDialog, setShowUploadDialog] = useState(false)
+  const [isCategoryPanelOpen, setIsCategoryPanelOpen] = useState(true)
   const [selectedEnvironmentMapIds, setSelectedEnvironmentMapIds] = useState<
     Set<string>
   >(new Set())
@@ -703,36 +704,40 @@ export function EnvironmentMapList() {
         onBulkActionsClick={handleBulkActionsClick}
         onSelectAllClick={handleSelectAll}
         onDeselectAllClick={handleDeselectAll}
+        isCategoryPanelOpen={isCategoryPanelOpen}
+        onCategoryPanelToggle={() => setIsCategoryPanelOpen(open => !open)}
       />
 
       <div className="environment-map-list-body">
-        <aside className="environment-map-category-sidebar">
-          <CategoryTreePanel
-            categories={categories}
-            activeCategoryId={activeCategoryId}
-            dragOverCategoryId={dragOverCategoryId}
-            categoryCounts={categoryCounts}
-            unassignedCount={unassignedCount}
-            allCount={environmentMaps.length}
-            allCategoryId={ALL_CATEGORIES_ID}
-            unassignedCategoryId={UNASSIGNED_CATEGORY_ID}
-            unassignedLabel="Unassigned"
-            itemNoun="environment map"
-            onCategoryChange={setActiveCategoryId}
-            onCategoryDragOver={handleCategoryDragOver}
-            onCategoryDragLeave={handleCategoryDragLeave}
-            onCategoryDrop={handleCategoryDrop}
-            onCreateCategory={(name, parentId) =>
-              createCategoryMutation.mutate({ name, parentId })
-            }
-            onRenameCategory={(category, name) =>
-              renameCategoryMutation.mutate({ category, name })
-            }
-            onDeleteCategory={category =>
-              deleteCategoryMutation.mutate(category.id)
-            }
-          />
-        </aside>
+        {isCategoryPanelOpen && (
+          <aside className="environment-map-category-sidebar">
+            <CategoryTreePanel
+              categories={categories}
+              activeCategoryId={activeCategoryId}
+              dragOverCategoryId={dragOverCategoryId}
+              categoryCounts={categoryCounts}
+              unassignedCount={unassignedCount}
+              allCount={environmentMaps.length}
+              allCategoryId={ALL_CATEGORIES_ID}
+              unassignedCategoryId={UNASSIGNED_CATEGORY_ID}
+              unassignedLabel="Unassigned"
+              itemNoun="environment map"
+              onCategoryChange={setActiveCategoryId}
+              onCategoryDragOver={handleCategoryDragOver}
+              onCategoryDragLeave={handleCategoryDragLeave}
+              onCategoryDrop={handleCategoryDrop}
+              onCreateCategory={(name, parentId) =>
+                createCategoryMutation.mutate({ name, parentId })
+              }
+              onRenameCategory={(category, name) =>
+                renameCategoryMutation.mutate({ category, name })
+              }
+              onDeleteCategory={category =>
+                deleteCategoryMutation.mutate(category.id)
+              }
+            />
+          </aside>
+        )}
 
         <div ref={listScrollRef} className="environment-map-list-main">
           {loading ? (

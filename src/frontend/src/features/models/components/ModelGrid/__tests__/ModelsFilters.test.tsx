@@ -47,6 +47,9 @@ function renderFilters(overrides = {}) {
     onSelectAllClick: noop,
     onDeselectAllClick: noop,
     visibleModelCount: 0,
+    isCategoryPanelOpen: true,
+    onCategoryPanelToggle: noop,
+    showCategoryToggle: true,
     ...overrides,
   }
   render(withQueryClient(<ModelsFilters {...props} />))

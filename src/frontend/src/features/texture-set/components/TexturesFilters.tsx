@@ -81,6 +81,8 @@ interface TexturesFiltersProps {
   onBulkActionsClick: (event: ReactMouseEvent<HTMLElement>) => void
   onSelectAllClick: () => void
   onDeselectAllClick: () => void
+  isCategoryPanelOpen: boolean
+  onCategoryPanelToggle: () => void
 }
 
 export function TexturesFilters({
@@ -115,6 +117,8 @@ export function TexturesFilters({
   onBulkActionsClick,
   onSelectAllClick,
   onDeselectAllClick,
+  isCategoryPanelOpen,
+  onCategoryPanelToggle,
 }: TexturesFiltersProps) {
   const packOptions = packs.map(pack => ({
     label: pack.name,
@@ -197,6 +201,15 @@ export function TexturesFilters({
             onClick={onRefreshClick}
             tooltip="Refresh list"
             ariaLabel="Refresh"
+          />
+          <ListToolbarButton
+            icon="pi pi-folder"
+            label="Categories"
+            active={isCategoryPanelOpen}
+            onClick={onCategoryPanelToggle}
+            tooltip="Toggle category panel"
+            ariaLabel="Toggle categories"
+            ariaExpanded={isCategoryPanelOpen}
           />
         </ListToolbarActions>
 
