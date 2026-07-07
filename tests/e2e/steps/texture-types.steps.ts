@@ -131,14 +131,17 @@ Given("I have a texture set with ORM packed texture", async ({ page }) => {
     // Navigation lands directly on the kind-locked Multi-Model Textures
     // tab — the in-page kind switcher no longer exists.
 
-    // Verify the card is visible. Reveal it first: the sidebar-open grid
-    // renders fewer columns, so a set past the first rows is virtualised out
-    // of the DOM until its scroll container reaches it (the sibling Givens
-    // narrow by name; here the card is located by id, so scroll-reveal fits).
+    // Narrow the (virtualised) grid by the unique name — same as the sibling
+    // Givens. This waits for the count label to settle (so we don't probe a
+    // still-loading list) AND filters the just-created set into the DOM, which
+    // a bare scroll-reveal can't do when it runs before the list has loaded and
+    // the grid then stays scrolled to the top past the new card.
+    await narrowVirtualisedList(page, uniqueName);
+
+    // Verify the card is visible
     const card = page.locator(
         `.texture-set-card[data-texture-set-id="${result.textureSetId}"]`,
     );
-    await revealVirtualizedCard(page, ".texture-set-list-main", card);
     await expect(card).toBeVisible({ timeout: 15000 });
 });
 
