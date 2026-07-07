@@ -9,6 +9,7 @@ import {
     closeTabByType,
     isTabActive,
 } from "../helpers/navigation-helper";
+import { revealVirtualizedCard } from "../helpers/reveal-virtualized-card";
 
 const { Given, When, Then } = createBdd();
 
@@ -24,6 +25,15 @@ When(
         if (!modelData) {
             throw new Error(`Model "${modelName}" not found in shared state`);
         }
+
+        // The card may be virtualised out of the DOM — the category sidebar
+        // narrows the grid, so cards past the first rows render only once the
+        // `.model-grid-main` scroll container reaches them.
+        const modelCardForReveal = page
+            .locator('[class*="model-card"], [class*="model-list-item"]')
+            .filter({ hasText: modelData.name })
+            .first();
+        await revealVirtualizedCard(page, ".model-grid-main", modelCardForReveal);
 
         // Find and double-click on the model in the grid
         const clickTarget = page.locator(`text="${modelData.name}"`).first();
@@ -166,6 +176,12 @@ When(
         if (!modelData) {
             throw new Error(`Model "${modelName}" not found in shared state`);
         }
+
+        const modelCardForReveal = page
+            .locator('[class*="model-card"], [class*="model-list-item"]')
+            .filter({ hasText: modelData.name })
+            .first();
+        await revealVirtualizedCard(page, ".model-grid-main", modelCardForReveal);
 
         const clickTarget = page.locator(`text="${modelData.name}"`).first();
         await clickTarget.dblclick();
