@@ -37,6 +37,8 @@ function renderFilters(overrides = {}) {
     onBulkActionsClick: noop,
     onSelectAllClick: noop,
     onDeselectAllClick: noop,
+    isCategoryPanelOpen: true,
+    onCategoryPanelToggle: noop,
     ...overrides,
   }
   render(<TexturesFilters {...props} />)

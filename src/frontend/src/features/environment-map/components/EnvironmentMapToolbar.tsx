@@ -51,6 +51,8 @@ interface EnvironmentMapToolbarProps {
   onBulkActionsClick: (event: React.MouseEvent<HTMLElement>) => void
   onSelectAllClick: () => void
   onDeselectAllClick: () => void
+  isCategoryPanelOpen: boolean
+  onCategoryPanelToggle: () => void
 }
 
 export function EnvironmentMapToolbar({
@@ -81,6 +83,8 @@ export function EnvironmentMapToolbar({
   onPreviewSizesChange,
   onPackIdsChange,
   onProjectIdsChange,
+  isCategoryPanelOpen,
+  onCategoryPanelToggle,
 }: EnvironmentMapToolbarProps) {
   const hasActiveSearch = searchQuery.trim().length > 0
   const hasActiveFilters =
@@ -147,6 +151,15 @@ export function EnvironmentMapToolbar({
             onClick={onRefreshClick}
             tooltip="Refresh list"
             ariaLabel="Refresh"
+          />
+          <ListToolbarButton
+            icon="pi pi-folder"
+            label="Categories"
+            active={isCategoryPanelOpen}
+            onClick={onCategoryPanelToggle}
+            tooltip="Toggle category panel"
+            ariaLabel="Toggle categories"
+            ariaExpanded={isCategoryPanelOpen}
           />
         </ListToolbarActions>
 

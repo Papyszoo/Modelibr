@@ -114,6 +114,7 @@ export function ModelGrid({
   )
   const isContainerContext = !!packId || !!projectId
   const isSelectionEnabled = !isContainerContext && !textureSetId
+  const [isCategoryPanelOpen, setIsCategoryPanelOpen] = useState(true)
   // The category sidebar (single active category + management) is the primary
   // Models-tab navigation; embedded pack/project/texture-set model grids keep
   // their scoped behavior without it.
@@ -622,10 +623,13 @@ export function ModelGrid({
         onSelectAllClick={handleSelectAll}
         onDeselectAllClick={handleDeselectAll}
         visibleModelCount={filteredModels.length}
+        showCategoryToggle={showCategorySidebar}
+        isCategoryPanelOpen={isCategoryPanelOpen}
+        onCategoryPanelToggle={() => setIsCategoryPanelOpen(open => !open)}
       />
 
       <div className="model-grid-body">
-        {showCategorySidebar && (
+        {showCategorySidebar && isCategoryPanelOpen && (
           <aside className="model-category-sidebar">
             <CategoryTreePanel
               categories={categories}

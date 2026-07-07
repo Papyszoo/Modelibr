@@ -57,6 +57,9 @@ interface ModelsFiltersProps {
   onSelectAllClick: () => void
   onDeselectAllClick: () => void
   visibleModelCount: number
+  isCategoryPanelOpen: boolean
+  onCategoryPanelToggle: () => void
+  showCategoryToggle?: boolean
 }
 
 export function ModelsFilters({
@@ -95,6 +98,9 @@ export function ModelsFilters({
   onSelectAllClick,
   onDeselectAllClick,
   visibleModelCount,
+  isCategoryPanelOpen,
+  onCategoryPanelToggle,
+  showCategoryToggle = false,
 }: ModelsFiltersProps) {
   const packOptions = packs.map(pack => ({
     label: pack.name,
@@ -174,6 +180,17 @@ export function ModelsFilters({
             tooltip="Refresh models"
             ariaLabel="Refresh"
           />
+          {showCategoryToggle ? (
+            <ListToolbarButton
+              icon="pi pi-folder"
+              label="Categories"
+              active={isCategoryPanelOpen}
+              onClick={onCategoryPanelToggle}
+              tooltip="Toggle category panel"
+              ariaLabel="Toggle categories"
+              ariaExpanded={isCategoryPanelOpen}
+            />
+          ) : null}
         </ListToolbarActions>
 
         <ListToolbarCount count={modelCount} unitLabel="model" />
