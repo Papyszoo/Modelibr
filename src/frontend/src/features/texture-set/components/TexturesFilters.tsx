@@ -83,6 +83,7 @@ interface TexturesFiltersProps {
   onDeselectAllClick: () => void
   isCategoryPanelOpen: boolean
   onCategoryPanelToggle: () => void
+  categoryFilterActive?: boolean
 }
 
 export function TexturesFilters({
@@ -119,6 +120,7 @@ export function TexturesFilters({
   onDeselectAllClick,
   isCategoryPanelOpen,
   onCategoryPanelToggle,
+  categoryFilterActive = false,
 }: TexturesFiltersProps) {
   const packOptions = packs.map(pack => ({
     label: pack.name,
@@ -210,6 +212,7 @@ export function TexturesFilters({
             tooltip="Toggle category panel"
             ariaLabel="Toggle categories"
             ariaExpanded={isCategoryPanelOpen}
+            badge={categoryFilterActive ? 1 : undefined}
           />
         </ListToolbarActions>
 

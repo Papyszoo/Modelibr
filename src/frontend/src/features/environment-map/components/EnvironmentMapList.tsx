@@ -706,6 +706,9 @@ export function EnvironmentMapList() {
         onDeselectAllClick={handleDeselectAll}
         isCategoryPanelOpen={isCategoryPanelOpen}
         onCategoryPanelToggle={() => setIsCategoryPanelOpen(open => !open)}
+        categoryFilterActive={
+          activeCategoryId != null && activeCategoryId !== ALL_CATEGORIES_ID
+        }
       />
 
       <div className="environment-map-list-body">

@@ -952,6 +952,9 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
         onDeselectAllClick={handleDeselectAll}
         isCategoryPanelOpen={isCategoryPanelOpen}
         onCategoryPanelToggle={() => setIsCategoryPanelOpen(open => !open)}
+        categoryFilterActive={
+          activeCategoryId != null && activeCategoryId !== ALL_CATEGORIES_ID
+        }
       />
 
       <div className="texture-set-list-body">
