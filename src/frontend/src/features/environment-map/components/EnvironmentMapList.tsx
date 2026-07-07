@@ -8,7 +8,6 @@ import {
   useCreateEnvironmentMapWithFileMutation,
   useSetEnvironmentMapCustomThumbnailMutation,
 } from '@/features/environment-map/api/queries'
-import { EnvironmentMapCategoryManagerDialog } from '@/features/environment-map/components/EnvironmentMapCategoryManagerDialog'
 import {
   EnvironmentMapContextMenu,
   type EnvironmentMapContextMenuHandle,
@@ -22,6 +21,7 @@ import {
   EnvironmentMapUploadDialog,
   type EnvironmentMapUploadDialogSubmitValues,
 } from '@/features/environment-map/components/EnvironmentMapUploadDialog'
+import { useEnvironmentMapCategoryMutations } from '@/features/environment-map/hooks/useEnvironmentMapCategoryMutations'
 import { useEnvironmentMapData } from '@/features/environment-map/hooks/useEnvironmentMapData'
 import { type EnvironmentMapDto } from '@/features/environment-map/types'
 import { type EnvironmentMapUploadItem } from '@/features/environment-map/utils/environmentMapUploadUtils'
@@ -33,9 +33,13 @@ import {
 import { uploadFile } from '@/features/models/api/modelApi'
 import { useTabContext } from '@/hooks/useTabContext'
 import { useUploadProgress } from '@/hooks/useUploadProgress'
+import { CategoryTreePanel } from '@/shared/components/categories/CategoryTreePanel'
 import { EmptyState, LoadingState } from '@/shared/components/feedback'
 import { useDragAndDrop } from '@/shared/hooks/useFileUpload'
-import { collectCategoryBranchIds } from '@/shared/utils/categoryTree'
+import {
+  ALL_CATEGORIES_ID,
+  UNASSIGNED_CATEGORY_ID,
+} from '@/shared/types/categories'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
 import {
   DEFAULT_ENV_MAP_LIST_VIEW_STATE,
@@ -61,30 +65,26 @@ export function EnvironmentMapList() {
     [setViewState]
   )
 
+  const activeCategoryId = viewState.activeCategoryId
+  const setActiveCategoryId = useCallback(
+    (id: number | null) => updateView({ activeCategoryId: id }),
+    [updateView]
+  )
+
   const [showUploadDialog, setShowUploadDialog] = useState(false)
-  const [showCategoryManager, setShowCategoryManager] = useState(false)
   const [selectedEnvironmentMapIds, setSelectedEnvironmentMapIds] = useState<
     Set<string>
   >(new Set())
   const [isAreaSelecting, setIsAreaSelecting] = useState(false)
   const [selectionBox, setSelectionBox] = useState<SelectionBox | null>(null)
+  const [draggedId, setDraggedId] = useState<number | null>(null)
+  const [dragOverCategoryId, setDragOverCategoryId] = useState<number | null>(
+    null
+  )
   const { openEnvironmentMapDetailsTab } = useTabContext()
   const { settings, setCardWidth } = useCardWidthStore()
   const uploadProgress = useUploadProgress()
   const cardWidth = settings.environmentMaps
-
-  // Server-side category filter uses the raw checked leaves; the cascade
-  // expansion below (selectedCategoryIds, with child branches collected)
-  // still drives the *visible* set on the page in case selectedCategoryKeys
-  // changes between the server request and the next render.
-  const checkedCategoryIds = useMemo(
-    () =>
-      Object.entries(viewState.selectedCategoryKeys)
-        .filter(([, state]) => state?.checked)
-        .map(([key]) => Number(key))
-        .filter(Number.isFinite),
-    [viewState.selectedCategoryKeys]
-  )
 
   const {
     environmentMaps,
@@ -97,13 +97,31 @@ export function EnvironmentMapList() {
   } = useEnvironmentMapData({
     effectivePackIds: viewState.selectedPackIds,
     effectiveProjectIds: viewState.selectedProjectIds,
-    selectedCategoryIds: checkedCategoryIds,
     searchQuery: viewState.searchQuery,
   })
 
   const createEnvironmentMapMutation = useCreateEnvironmentMapWithFileMutation()
   const setThumbnailMutation = useSetEnvironmentMapCustomThumbnailMutation()
   const queryClient = useQueryClient()
+
+  const clearSelection = useCallback(
+    () => setSelectedEnvironmentMapIds(new Set()),
+    []
+  )
+
+  const {
+    createCategoryMutation,
+    renameCategoryMutation,
+    deleteCategoryMutation,
+    moveToCategoryMutation,
+  } = useEnvironmentMapCategoryMutations({
+    showToast: opts =>
+      toast.current?.show(opts as Parameters<Toast['show']>[0]),
+    activeCategoryId,
+    setActiveCategoryId,
+    categories,
+    clearSelection,
+  })
 
   const previewSizeOptions = useMemo(
     () =>
@@ -148,18 +166,23 @@ export function EnvironmentMapList() {
     [environmentMaps]
   )
 
-  const selectedCategoryIds = useMemo(() => {
-    const checkedIds = Object.entries(viewState.selectedCategoryKeys)
-      .filter(([, state]) => state?.checked)
-      .map(([key]) => Number(key))
-      .filter(Number.isFinite)
-
-    return new Set(
-      checkedIds.flatMap(categoryId => [
-        ...collectCategoryBranchIds(categories, categoryId),
-      ])
-    )
-  }, [categories, viewState.selectedCategoryKeys])
+  // Per-category counts for the sidebar tree (from the loaded set).
+  const categoryCounts = useMemo(() => {
+    const counts = new Map<number, number>()
+    for (const environmentMap of environmentMaps) {
+      if (environmentMap.categoryId != null) {
+        counts.set(
+          environmentMap.categoryId,
+          (counts.get(environmentMap.categoryId) ?? 0) + 1
+        )
+      }
+    }
+    return counts
+  }, [environmentMaps])
+  const unassignedCount = useMemo(
+    () => environmentMaps.filter(m => m.categoryId == null).length,
+    [environmentMaps]
+  )
 
   const filteredEnvironmentMaps = useMemo(() => {
     const query = viewState.searchQuery.trim().toLowerCase()
@@ -183,9 +206,11 @@ export function EnvironmentMapList() {
           viewState.selectedProjectIds.includes(project.id)
         )
       const categoryMatches =
-        selectedCategoryIds.size === 0 ||
-        (environmentMap.categoryId != null &&
-          selectedCategoryIds.has(environmentMap.categoryId))
+        activeCategoryId === ALL_CATEGORIES_ID
+          ? true
+          : activeCategoryId === UNASSIGNED_CATEGORY_ID
+            ? environmentMap.categoryId == null
+            : environmentMap.categoryId === activeCategoryId
       const thumbnailMatches =
         !viewState.onlyCustomThumbnail ||
         Boolean(getEnvironmentMapCustomThumbnailUrl(environmentMap))
@@ -201,9 +226,9 @@ export function EnvironmentMapList() {
     })
   }, [
     environmentMaps,
+    activeCategoryId,
     viewState.onlyCustomThumbnail,
     viewState.searchQuery,
-    selectedCategoryIds,
     viewState.selectedPackIds,
     viewState.selectedPreviewSizes,
     viewState.selectedProjectIds,
@@ -504,6 +529,88 @@ export function EnvironmentMapList() {
     setSelectedEnvironmentMapIds(new Set())
   }, [])
 
+  // --- Drag a card onto a category to (re)assign it ---
+  const handleCardDragStart = useCallback(
+    (
+      event: React.DragEvent<HTMLElement>,
+      environmentMap: EnvironmentMapDto
+    ) => {
+      // Deliberately do NOT mutate selection here — a mid-drag layout shift
+      // (e.g. a new selection bar row) can make Chromium cancel the drag before
+      // drop fires. See SoundList.handleSoundDragStart for the full story.
+      setDraggedId(environmentMap.id)
+      event.dataTransfer.effectAllowed = 'move'
+      const idsToMove = selectedEnvironmentMapIds.has(String(environmentMap.id))
+        ? [...selectedEnvironmentMapIds]
+        : [String(environmentMap.id)]
+      event.dataTransfer.setData('text/plain', idsToMove.join(','))
+    },
+    [selectedEnvironmentMapIds]
+  )
+
+  const handleCardDragEnd = useCallback(() => {
+    setDraggedId(null)
+    setDragOverCategoryId(null)
+  }, [])
+
+  const handleCategoryDragOver = useCallback(
+    (event: React.DragEvent<HTMLDivElement>, categoryId: number | null) => {
+      event.preventDefault()
+      event.stopPropagation()
+      if (draggedId !== null) {
+        setDragOverCategoryId(categoryId)
+      }
+    },
+    [draggedId]
+  )
+
+  const handleCategoryDragLeave = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      event.preventDefault()
+      event.stopPropagation()
+      setDragOverCategoryId(null)
+    },
+    []
+  )
+
+  const handleCategoryDrop = useCallback(
+    (
+      event: React.DragEvent<HTMLDivElement>,
+      targetCategoryId: number | null
+    ) => {
+      event.preventDefault()
+      event.stopPropagation()
+      setDragOverCategoryId(null)
+
+      if (draggedId === null) return
+
+      const newCategoryId =
+        targetCategoryId === UNASSIGNED_CATEGORY_ID ? null : targetCategoryId
+
+      const idsToMove = selectedEnvironmentMapIds.has(String(draggedId))
+        ? [...selectedEnvironmentMapIds]
+        : [String(draggedId)]
+
+      const mapsToMove = environmentMaps.filter(
+        m => idsToMove.includes(String(m.id)) && m.categoryId !== newCategoryId
+      )
+
+      setDraggedId(null)
+      if (mapsToMove.length === 0) return
+
+      moveToCategoryMutation.mutate({
+        environmentMaps: mapsToMove,
+        categoryId: newCategoryId,
+      })
+    },
+    [
+      draggedId,
+      environmentMaps,
+      moveToCategoryMutation,
+      selectedEnvironmentMapIds,
+    ]
+  )
+
   const handleBulkActionsClick = useCallback(
     (event: React.MouseEvent<HTMLElement>) => {
       if (selectedEnvironmentMaps.length === 0) {
@@ -541,17 +648,12 @@ export function EnvironmentMapList() {
   )
 
   return (
-    <div
-      ref={listScrollRef}
-      className="environment-map-list"
-      {...pageDragAndDropHandlers}
-    >
+    <div className="environment-map-list" {...pageDragAndDropHandlers}>
       <Toast ref={toast} />
       <EnvironmentMapContextMenu
         ref={contextMenuRef}
         categories={categories}
         tags={tags}
-        onManageCategories={() => setShowCategoryManager(true)}
       />
 
       <EnvironmentMapUploadDialog
@@ -567,12 +669,6 @@ export function EnvironmentMapList() {
         onSubmit={handleDialogSubmit}
       />
 
-      <EnvironmentMapCategoryManagerDialog
-        visible={showCategoryManager}
-        categories={categories}
-        onHide={() => setShowCategoryManager(false)}
-      />
-
       <EnvironmentMapToolbar
         isSearchOpen={viewState.isSearchOpen}
         onSearchToggle={value => updateView({ isSearchOpen: value })}
@@ -583,11 +679,9 @@ export function EnvironmentMapList() {
         previewSizeOptions={previewSizeOptions}
         packOptions={packOptions}
         projectOptions={projectOptions}
-        categories={categories}
         selectedPreviewSizes={viewState.selectedPreviewSizes}
         selectedPackIds={viewState.selectedPackIds}
         selectedProjectIds={viewState.selectedProjectIds}
-        selectedCategoryKeys={viewState.selectedCategoryKeys}
         onlyCustomThumbnail={viewState.onlyCustomThumbnail}
         onPreviewSizesChange={values =>
           updateView({ selectedPreviewSizes: values })
@@ -596,8 +690,6 @@ export function EnvironmentMapList() {
         onProjectIdsChange={values =>
           updateView({ selectedProjectIds: values })
         }
-        onCategoryChange={keys => updateView({ selectedCategoryKeys: keys })}
-        onManageCategoriesClick={() => setShowCategoryManager(true)}
         onOnlyCustomThumbnailChange={value =>
           updateView({ onlyCustomThumbnail: value })
         }
@@ -613,44 +705,79 @@ export function EnvironmentMapList() {
         onDeselectAllClick={handleDeselectAll}
       />
 
-      {loading ? (
-        <LoadingState
-          className="environment-map-list-loading"
-          message="Loading environment maps…"
-        />
-      ) : filteredEnvironmentMaps.length === 0 ? (
-        <EmptyState
-          className="environment-map-list-empty"
-          icon="pi-globe"
-          title="No Environment Maps"
-          message={
-            environmentMaps.length > 0
-              ? 'Try adjusting your search or filters.'
-              : 'Drag and drop files here or upload a panorama or cube map to get started.'
-          }
-        />
-      ) : (
-        <EnvironmentMapGrid
-          environmentMaps={filteredEnvironmentMaps}
-          cardWidth={cardWidth}
-          selectedIds={selectedEnvironmentMapIds}
-          isAreaSelecting={isAreaSelecting}
-          selectionBox={selectionBox}
-          selectionSurfaceRef={selectionSurfaceRef}
-          scrollParent={listScrollRef.current}
-          onCardClick={openEnvironmentMapDetailsTab}
-          onCardContextMenu={handleCardContextMenu}
-          onToggleSelection={toggleSelection}
-          onMouseDown={handleGridMouseDown}
-          onMouseMove={handleGridMouseMove}
-          onMouseUp={handleGridMouseUp}
-          onEndReached={() => {
-            if (pagination.hasMore && !isLoadingMore) {
-              void fetchEnvironmentMaps(true)
+      <div className="environment-map-list-body">
+        <aside className="environment-map-category-sidebar">
+          <CategoryTreePanel
+            categories={categories}
+            activeCategoryId={activeCategoryId}
+            dragOverCategoryId={dragOverCategoryId}
+            categoryCounts={categoryCounts}
+            unassignedCount={unassignedCount}
+            allCount={environmentMaps.length}
+            allCategoryId={ALL_CATEGORIES_ID}
+            unassignedCategoryId={UNASSIGNED_CATEGORY_ID}
+            unassignedLabel="Unassigned"
+            itemNoun="environment map"
+            onCategoryChange={setActiveCategoryId}
+            onCategoryDragOver={handleCategoryDragOver}
+            onCategoryDragLeave={handleCategoryDragLeave}
+            onCategoryDrop={handleCategoryDrop}
+            onCreateCategory={(name, parentId) =>
+              createCategoryMutation.mutate({ name, parentId })
             }
-          }}
-        />
-      )}
+            onRenameCategory={(category, name) =>
+              renameCategoryMutation.mutate({ category, name })
+            }
+            onDeleteCategory={category =>
+              deleteCategoryMutation.mutate(category.id)
+            }
+          />
+        </aside>
+
+        <div ref={listScrollRef} className="environment-map-list-main">
+          {loading ? (
+            <LoadingState
+              className="environment-map-list-loading"
+              message="Loading environment maps…"
+            />
+          ) : filteredEnvironmentMaps.length === 0 ? (
+            <EmptyState
+              className="environment-map-list-empty"
+              icon="pi-globe"
+              title="No Environment Maps"
+              message={
+                environmentMaps.length > 0
+                  ? 'Try adjusting your search or filters.'
+                  : 'Drag and drop files here or upload a panorama or cube map to get started.'
+              }
+            />
+          ) : (
+            <EnvironmentMapGrid
+              environmentMaps={filteredEnvironmentMaps}
+              cardWidth={cardWidth}
+              selectedIds={selectedEnvironmentMapIds}
+              isAreaSelecting={isAreaSelecting}
+              selectionBox={selectionBox}
+              selectionSurfaceRef={selectionSurfaceRef}
+              scrollParent={listScrollRef.current}
+              draggedId={draggedId}
+              onCardDragStart={handleCardDragStart}
+              onCardDragEnd={handleCardDragEnd}
+              onCardClick={openEnvironmentMapDetailsTab}
+              onCardContextMenu={handleCardContextMenu}
+              onToggleSelection={toggleSelection}
+              onMouseDown={handleGridMouseDown}
+              onMouseMove={handleGridMouseMove}
+              onMouseUp={handleGridMouseUp}
+              onEndReached={() => {
+                if (pagination.hasMore && !isLoadingMore) {
+                  void fetchEnvironmentMaps(true)
+                }
+              }}
+            />
+          )}
+        </div>
+      </div>
     </div>
   )
 }

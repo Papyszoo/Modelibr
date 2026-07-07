@@ -12,14 +12,12 @@ const PAGE_SIZE = 50
 interface UseEnvironmentMapDataOptions {
   effectivePackIds: number[]
   effectiveProjectIds: number[]
-  selectedCategoryIds?: number[]
   searchQuery?: string
 }
 
 export function useEnvironmentMapData({
   effectivePackIds,
   effectiveProjectIds,
-  selectedCategoryIds = [],
   searchQuery = '',
 }: UseEnvironmentMapDataOptions) {
   const queryClient = useQueryClient()
@@ -27,7 +25,6 @@ export function useEnvironmentMapData({
   // Stable, sorted filter keys so [1,2] and [2,1] share a cache slot.
   const sortedPackIds = [...effectivePackIds].sort((a, b) => a - b)
   const sortedProjectIds = [...effectiveProjectIds].sort((a, b) => a - b)
-  const sortedCategoryIds = [...selectedCategoryIds].sort((a, b) => a - b)
 
   const debouncedSearchName = useDebouncedValue(searchQuery.trim(), 300)
 
@@ -44,7 +41,6 @@ export function useEnvironmentMapData({
       {
         packIds: sortedPackIds,
         projectIds: sortedProjectIds,
-        categoryIds: sortedCategoryIds,
         searchName: debouncedSearchName || undefined,
       },
     ],
@@ -54,8 +50,6 @@ export function useEnvironmentMapData({
         pageSize: PAGE_SIZE,
         packIds: sortedPackIds.length > 0 ? sortedPackIds : undefined,
         projectIds: sortedProjectIds.length > 0 ? sortedProjectIds : undefined,
-        categoryIds:
-          sortedCategoryIds.length > 0 ? sortedCategoryIds : undefined,
         searchName: debouncedSearchName || undefined,
       }),
     initialPageParam: 1,
