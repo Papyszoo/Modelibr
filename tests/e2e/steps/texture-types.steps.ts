@@ -10,8 +10,10 @@
 import { createBdd } from "playwright-bdd";
 import { expect } from "@playwright/test";
 import { TextureSetsPage } from "../pages/TextureSetsPage";
+import { UploadProgressPage } from "../pages/UploadProgressPage";
 import { ApiHelper } from "../helpers/api-helper";
 import { narrowVirtualisedList } from "../helpers/list-toolbar-helper";
+import { revealVirtualizedCard } from "../helpers/reveal-virtualized-card";
 import { getScenarioState } from "../fixtures/shared-state";
 import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
 import path from "path";
@@ -186,13 +188,6 @@ When("I open the texture set viewer", async ({ page }) => {
     const lastTsName = getScenarioState(page).getCustom<string>(
         "lastCreatedTextureSetName",
     );
-    // Narrow the (virtualised) grid by name first. The category sidebar now
-    // ships open by default, so the grid renders fewer columns; without
-    // narrowing, a set that sorts past the first viewport rows is scrolled
-    // out of the VirtuosoGrid DOM and `toBeVisible` times out.
-    if (lastTsName) {
-        await narrowVirtualisedList(page, lastTsName);
-    }
 
     let card;
     if (lastTsId) {
@@ -215,6 +210,18 @@ When("I open the texture set viewer", async ({ page }) => {
             "[Navigation] Opening first texture set card (no name stored)",
         );
     }
+
+    // The floating "File Uploads" progress window overlays the (now narrower,
+    // sidebar-open) grid and intercepts pointer events, so a dblclick on a card
+    // behind it hangs until the test times out. Dismiss it first.
+    await new UploadProgressPage(page).closeWindowIfVisible();
+
+    // The card may be virtualised out of the DOM: the category sidebar ships
+    // open by default, so the grid renders fewer columns and a set past the
+    // first viewport rows only renders once its scroll container reaches it.
+    // Scroll to reveal it — name-independent, and with no search side effects
+    // (search-narrowing was fragile under parallel runs with duplicate names).
+    await revealVirtualizedCard(page, ".texture-set-list-main", card);
 
     await expect(card).toBeVisible({ timeout: 10000 });
     await card.dblclick();
