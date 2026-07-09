@@ -13,10 +13,8 @@ async function loadStoreWith(persisted: unknown) {
   let views: Record<string, Record<string, unknown>> = {}
   await jest.isolateModulesAsync(async () => {
     const mod = await import('@/stores/textureSetListViewStore')
-    views = mod.useTextureSetListViewStore.getState().views as Record<
-      string,
-      Record<string, unknown>
-    >
+    views = mod.useTextureSetListViewStore.getState()
+      .views as unknown as Record<string, Record<string, unknown>>
   })
   return views
 }
