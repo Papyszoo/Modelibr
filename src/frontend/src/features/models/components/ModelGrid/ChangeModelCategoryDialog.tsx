@@ -16,7 +16,6 @@ interface ChangeModelCategoryDialogProps {
   initialCategoryId?: number | null
   onHide: () => void
   onConfirm: (categoryId: number) => Promise<void>
-  onManageCategories?: () => void
 }
 
 export function ChangeModelCategoryDialog({
@@ -26,7 +25,6 @@ export function ChangeModelCategoryDialog({
   initialCategoryId = null,
   onHide,
   onConfirm,
-  onManageCategories,
 }: ChangeModelCategoryDialogProps) {
   const [selectedId, setSelectedId] = useState<number | null>(initialCategoryId)
   const [isSaving, setIsSaving] = useState(false)
@@ -107,28 +105,10 @@ export function ChangeModelCategoryDialog({
         ) : (
           <div className="model-category-empty-state">
             <span>No categories available yet.</span>
-            {onManageCategories ? (
-              <Button
-                label="Manage categories"
-                icon="pi pi-sitemap"
-                text
-                onClick={onManageCategories}
-              />
-            ) : null}
           </div>
         )}
 
         <div className="model-change-category-actions">
-          {onManageCategories && categories.length > 0 ? (
-            <Button
-              label="Manage categories"
-              icon="pi pi-sitemap"
-              text
-              onClick={onManageCategories}
-              disabled={isSaving}
-              style={{ marginRight: 'auto' }}
-            />
-          ) : null}
           <Button label="Cancel" text onClick={onHide} disabled={isSaving} />
           <Button
             label="Move"
