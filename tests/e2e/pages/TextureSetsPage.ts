@@ -272,11 +272,6 @@ export class TextureSetsPage {
 
     // ── Categories ────────────────────────────────────────────────────
 
-    /** The shared "Manage Categories" dialog (CategoryManagerDialog). */
-    get categoryManagerDialog(): Locator {
-        return this.page.getByRole("dialog", { name: "Manage Categories" });
-    }
-
     /** The Filters toolbar panel (collapsed by default). */
     get filtersPanel(): Locator {
         return this.page.locator("#texture-set-grid-filters-panel");

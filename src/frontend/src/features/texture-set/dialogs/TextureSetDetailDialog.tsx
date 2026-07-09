@@ -9,7 +9,6 @@ import { Toast } from 'primereact/toast'
 import { useEffect, useRef, useState } from 'react'
 
 import { getAllTextureSetCategories } from '@/features/texture-set/api/textureSetApi'
-import { TextureSetCategoryManagerDialog } from '@/features/texture-set/components/TextureSetCategoryManagerDialog'
 import { useTextureSets } from '@/features/texture-set/hooks/useTextureSets'
 import { CategorySinglePicker } from '@/shared/components/categories/CategorySinglePicker'
 import {
@@ -45,7 +44,6 @@ export function TextureSetDetailDialog({
   const [showAddTextureDialog, setShowAddTextureDialog] = useState(false)
   const [showModelAssociationDialog, setShowModelAssociationDialog] =
     useState(false)
-  const [showCategoryManager, setShowCategoryManager] = useState(false)
   const toast = useRef<Toast>(null)
   const textureSetsApi = useTextureSets()
 
@@ -228,15 +226,6 @@ export function TextureSetDetailDialog({
                   onChange={categoryId => void handleUpdateCategory(categoryId)}
                   ariaLabel="Select texture set category"
                 />
-                <Button
-                  icon="pi pi-cog"
-                  text
-                  rounded
-                  aria-label="Manage categories"
-                  tooltip="Manage categories"
-                  tooltipOptions={{ position: 'left' }}
-                  onClick={() => setShowCategoryManager(true)}
-                />
               </div>
             ) : null}
             <SetStats textureSet={currentSet} />
@@ -283,15 +272,6 @@ export function TextureSetDetailDialog({
             setShowModelAssociationDialog(false)
             onSetUpdated()
           }}
-        />
-      )}
-
-      {categoriesEnabled && (
-        <TextureSetCategoryManagerDialog
-          visible={showCategoryManager}
-          categories={categories}
-          kind={currentSet.kind}
-          onHide={() => setShowCategoryManager(false)}
         />
       )}
     </>

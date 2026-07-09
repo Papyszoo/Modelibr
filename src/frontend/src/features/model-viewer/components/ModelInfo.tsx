@@ -17,7 +17,6 @@ import {
   uploadFile,
 } from '@/features/models/api/modelApi'
 import { useModelCategoriesQuery } from '@/features/models/api/queries'
-import { ModelCategoryManagerDialog } from '@/features/models/components/ModelCategoryManagerDialog'
 import { ModelCategorySinglePicker } from '@/features/models/components/ModelCategorySinglePicker'
 import { resolveApiAssetUrl } from '@/lib/apiBase'
 import { ImageLightboxDialog } from '@/shared/components/ImageLightboxDialog'
@@ -37,7 +36,6 @@ export function ModelInfo({ model, onModelUpdated }) {
     model.category?.id ?? model.categoryId ?? null
   )
   const [newTag, setNewTag] = useState('')
-  const [showCategoryManager, setShowCategoryManager] = useState(false)
   const [activeConceptImageIndex, setActiveConceptImageIndex] = useState<
     number | null
   >(null)
@@ -148,12 +146,6 @@ export function ModelInfo({ model, onModelUpdated }) {
 
   return (
     <div className="model-info">
-      <ModelCategoryManagerDialog
-        visible={showCategoryManager}
-        categories={categories}
-        onHide={() => setShowCategoryManager(false)}
-      />
-
       <div className="model-info-body">
         <div className="model-info-section">
           <div className="model-info-grid">
@@ -180,15 +172,6 @@ export function ModelInfo({ model, onModelUpdated }) {
                   categories={categories}
                   selectedCategoryId={selectedCategoryId}
                   onChange={setSelectedCategoryId}
-                />
-                <Button
-                  icon="pi pi-cog"
-                  text
-                  rounded
-                  aria-label="Manage model categories"
-                  tooltip="Manage model categories"
-                  tooltipOptions={{ position: 'left' }}
-                  onClick={() => setShowCategoryManager(true)}
                 />
               </div>
             </div>
