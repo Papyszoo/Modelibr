@@ -66,3 +66,22 @@ describe('TexturesFilters — resolution filter', () => {
     ).toBeInTheDocument()
   })
 })
+
+describe('TexturesFilters — Categories toggle badge', () => {
+  // Regression: the "1" badge signals an active category filter while the
+  // sidebar is collapsed. An inverted condition or an always-on badge would
+  // mislead the user about whether the grid is being narrowed.
+  it('shows the "1" badge on the Categories toggle when a category filter is active', () => {
+    renderFilters({ categoryFilterActive: true })
+    const toggle = screen.getByRole('button', { name: 'Toggle categories' })
+    const badge = toggle.querySelector('.list-toolbar-badge')
+    expect(badge).not.toBeNull()
+    expect(badge).toHaveTextContent('1')
+  })
+
+  it('omits the badge when no category filter is active', () => {
+    renderFilters({ categoryFilterActive: false })
+    const toggle = screen.getByRole('button', { name: 'Toggle categories' })
+    expect(toggle.querySelector('.list-toolbar-badge')).toBeNull()
+  })
+})
