@@ -38,6 +38,7 @@ internal class GetAllTextureSetsQueryHandler : IQueryHandler<GetAllTextureSetsQu
                 query.SearchName,
                 query.MinResolution,
                 normalizedTags,
+                query.Uncategorized,
                 cancellationToken);
             textureSets = result.Items;
             totalCount = result.TotalCount;
@@ -50,7 +51,9 @@ internal class GetAllTextureSetsQueryHandler : IQueryHandler<GetAllTextureSetsQu
                 textureSets = textureSets.Where(ts => ts.Packs.Any(p => query.PackIds.Contains(p.Id)));
             if (query.ProjectIds is { Count: > 0 })
                 textureSets = textureSets.Where(ts => ts.Projects.Any(p => query.ProjectIds.Contains(p.Id)));
-            if (query.CategoryIds is { Count: > 0 })
+            if (query.Uncategorized == true)
+                textureSets = textureSets.Where(ts => !ts.TextureSetCategoryId.HasValue);
+            else if (query.CategoryIds is { Count: > 0 })
                 textureSets = textureSets.Where(ts =>
                     ts.TextureSetCategoryId.HasValue &&
                     query.CategoryIds.Contains(ts.TextureSetCategoryId.Value));
@@ -139,7 +142,8 @@ public record GetAllTextureSetsQuery(
     TextureSetKind? Kind = null,
     string? SearchName = null,
     int? MinResolution = null,
-    IReadOnlyCollection<string>? Tags = null) : IQuery<GetAllTextureSetsResponse>;
+    IReadOnlyCollection<string>? Tags = null,
+    bool? Uncategorized = null) : IQuery<GetAllTextureSetsResponse>;
 public record GetAllTextureSetsResponse(IEnumerable<TextureSetListDto> TextureSets, int? TotalCount = null, int? Page = null, int? PageSize = null, int? TotalPages = null);
 
 /// <summary>

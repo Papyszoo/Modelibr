@@ -160,6 +160,7 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
     filteredTextureSets,
     categoryCounts,
     unassignedCount,
+    allCount,
     totalCount,
     isLoading,
     error,
@@ -966,7 +967,7 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
               dragOverCategoryId={dragOverCategoryId}
               categoryCounts={categoryCounts}
               unassignedCount={unassignedCount}
-              allCount={textureSets.length}
+              allCount={allCount}
               allCategoryId={ALL_CATEGORIES_ID}
               unassignedCategoryId={UNASSIGNED_CATEGORY_ID}
               unassignedLabel="Unassigned"

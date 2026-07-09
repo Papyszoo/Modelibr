@@ -119,6 +119,7 @@ public static class EnvironmentMapEndpoints
         string? searchName,
         int? page,
         int? pageSize,
+        bool? uncategorized,
         IQueryHandler<GetAllEnvironmentMapsQuery, GetAllEnvironmentMapsResponse> queryHandler,
         CancellationToken cancellationToken)
     {
@@ -129,7 +130,8 @@ public static class EnvironmentMapEndpoints
                 CategoryIds: categoryIds is { Length: > 0 } ? categoryIds : null,
                 SearchName: string.IsNullOrWhiteSpace(searchName) ? null : searchName,
                 Page: page,
-                PageSize: pageSize),
+                PageSize: pageSize,
+                Uncategorized: uncategorized),
             cancellationToken);
 
         if (result.IsFailure)

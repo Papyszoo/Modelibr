@@ -30,6 +30,7 @@ namespace Application.Models
                     query.PackIds, query.ProjectIds, query.TextureSetId, query.CategoryIds, normalizedTags, query.HasConceptImages,
                     query.SearchName,
                     query.MinTriangleCount, query.MaxTriangleCount, query.HasAnimations,
+                    query.Uncategorized,
                     cancellationToken);
                 modelListDtos = result.Items;
                 totalCount = result.TotalCount;
@@ -56,7 +57,11 @@ namespace Application.Models
                     models = models.Where(m => m.TextureSets.Any(ts => ts.Id == query.TextureSetId.Value));
                 }
 
-                if (query.CategoryIds != null && query.CategoryIds.Count > 0)
+                if (query.Uncategorized == true)
+                {
+                    models = models.Where(m => !m.ModelCategoryId.HasValue);
+                }
+                else if (query.CategoryIds != null && query.CategoryIds.Count > 0)
                 {
                     models = models.Where(m => m.ModelCategoryId.HasValue && query.CategoryIds.Contains(m.ModelCategoryId.Value));
                 }
@@ -153,7 +158,8 @@ namespace Application.Models
         string? SearchName = null,
         int? MinTriangleCount = null,
         int? MaxTriangleCount = null,
-        bool? HasAnimations = null) : IQuery<GetAllModelsQueryResponse>;
+        bool? HasAnimations = null,
+        bool? Uncategorized = null) : IQuery<GetAllModelsQueryResponse>;
     
     public record GetAllModelsQueryResponse(IEnumerable<ModelListDto> Models, int? TotalCount = null, int? Page = null, int? PageSize = null, int? TotalPages = null);
     

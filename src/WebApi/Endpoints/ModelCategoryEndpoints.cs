@@ -13,6 +13,10 @@ public static class ModelCategoryEndpoints
             .WithName("Get All Model Categories")
             .WithOpenApi();
 
+        app.MapGet("/model-categories/counts", GetCategoryCounts)
+            .WithName("Get Model Category Counts")
+            .WithOpenApi();
+
         app.MapPost("/model-categories", CreateCategory)
             .WithName("Create Model Category")
             .WithOpenApi();
@@ -31,6 +35,16 @@ public static class ModelCategoryEndpoints
         CancellationToken cancellationToken)
     {
         var result = await queryHandler.Handle(new GetAllModelCategoriesQuery(), cancellationToken);
+        return result.IsSuccess
+            ? Results.Ok(result.Value)
+            : Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+    }
+
+    private static async Task<IResult> GetCategoryCounts(
+        IQueryHandler<GetModelCategoryCountsQuery, Application.Categories.CategoryCountsResponse> queryHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await queryHandler.Handle(new GetModelCategoryCountsQuery(), cancellationToken);
         return result.IsSuccess
             ? Results.Ok(result.Value)
             : Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
