@@ -91,6 +91,9 @@ export function EnvironmentMapList() {
     environmentMaps,
     loading,
     categories,
+    categoryCounts,
+    unassignedCount,
+    allCount,
     tags,
     pagination,
     isLoadingMore,
@@ -99,6 +102,7 @@ export function EnvironmentMapList() {
     effectivePackIds: viewState.selectedPackIds,
     effectiveProjectIds: viewState.selectedProjectIds,
     searchQuery: viewState.searchQuery,
+    activeCategoryId,
   })
 
   const createEnvironmentMapMutation = useCreateEnvironmentMapWithFileMutation()
@@ -167,24 +171,6 @@ export function EnvironmentMapList() {
     [environmentMaps]
   )
 
-  // Per-category counts for the sidebar tree (from the loaded set).
-  const categoryCounts = useMemo(() => {
-    const counts = new Map<number, number>()
-    for (const environmentMap of environmentMaps) {
-      if (environmentMap.categoryId != null) {
-        counts.set(
-          environmentMap.categoryId,
-          (counts.get(environmentMap.categoryId) ?? 0) + 1
-        )
-      }
-    }
-    return counts
-  }, [environmentMaps])
-  const unassignedCount = useMemo(
-    () => environmentMaps.filter(m => m.categoryId == null).length,
-    [environmentMaps]
-  )
-
   const filteredEnvironmentMaps = useMemo(() => {
     const query = viewState.searchQuery.trim().toLowerCase()
 
@@ -206,12 +192,7 @@ export function EnvironmentMapList() {
         (environmentMap.projects ?? []).some(project =>
           viewState.selectedProjectIds.includes(project.id)
         )
-      const categoryMatches =
-        activeCategoryId === ALL_CATEGORIES_ID
-          ? true
-          : activeCategoryId === UNASSIGNED_CATEGORY_ID
-            ? environmentMap.categoryId == null
-            : environmentMap.categoryId === activeCategoryId
+      // Category scoping runs server-side (useEnvironmentMapData).
       const thumbnailMatches =
         !viewState.onlyCustomThumbnail ||
         Boolean(getEnvironmentMapCustomThumbnailUrl(environmentMap))
@@ -221,13 +202,11 @@ export function EnvironmentMapList() {
         previewSizeMatches &&
         packMatches &&
         projectMatches &&
-        categoryMatches &&
         thumbnailMatches
       )
     })
   }, [
     environmentMaps,
-    activeCategoryId,
     viewState.onlyCustomThumbnail,
     viewState.searchQuery,
     viewState.selectedPackIds,
@@ -720,7 +699,7 @@ export function EnvironmentMapList() {
               dragOverCategoryId={dragOverCategoryId}
               categoryCounts={categoryCounts}
               unassignedCount={unassignedCount}
-              allCount={environmentMaps.length}
+              allCount={allCount}
               allCategoryId={ALL_CATEGORIES_ID}
               unassignedCategoryId={UNASSIGNED_CATEGORY_ID}
               unassignedLabel="Unassigned"

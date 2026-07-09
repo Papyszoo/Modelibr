@@ -26,7 +26,9 @@ public interface IEnvironmentMapRepository
         IReadOnlyCollection<int>? projectIds = null,
         IReadOnlyCollection<int>? categoryIds = null,
         string? searchName = null,
+        bool? uncategorized = null,
         CancellationToken cancellationToken = default);
+    Task<CategoryAssetCounts> GetCategoryAssetCountsAsync(CancellationToken cancellationToken = default);
     Task<EnvironmentMap> UpdateAsync(EnvironmentMap environmentMap, CancellationToken cancellationToken = default);
     Task DeleteAsync(int id, CancellationToken cancellationToken = default);
 }

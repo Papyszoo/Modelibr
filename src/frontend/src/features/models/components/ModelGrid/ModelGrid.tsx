@@ -169,7 +169,6 @@ export function ModelGrid({
   }, [])
 
   const {
-    models,
     filteredModels,
     loading,
     error,
@@ -192,6 +191,7 @@ export function ModelGrid({
     setActiveCategoryId,
     categoryCounts,
     unassignedCount,
+    allCount,
     selectedTagNames,
     setSelectedTagNames,
     hasConceptImages,
@@ -640,7 +640,7 @@ export function ModelGrid({
               dragOverCategoryId={dragOverCategoryId}
               categoryCounts={categoryCounts}
               unassignedCount={unassignedCount}
-              allCount={models.length}
+              allCount={allCount}
               allCategoryId={ALL_CATEGORIES_ID}
               unassignedCategoryId={UNASSIGNED_CATEGORY_ID}
               unassignedLabel="Unassigned"

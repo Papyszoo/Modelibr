@@ -1,9 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 
-import {
-  ALL_CATEGORIES_ID,
-  UNASSIGNED_CATEGORY_ID,
-} from '@/shared/types/categories'
+import { ALL_CATEGORIES_ID } from '@/shared/types/categories'
 import { type PageType, useCardWidthStore } from '@/stores/cardWidthStore'
 import { type ModelListViewState } from '@/stores/modelListViewStore'
 import { type Model } from '@/utils/fileUtils'
@@ -231,22 +228,19 @@ export function useModelFilters({
     return `Model ${model.id}`
   }, [])
 
+  // Category scoping is server-side (useModelData); only the name search stays
+  // client-side to keep typing snappy while the debounced fetch catches up.
   const filterModels = useCallback(
     (models: Model[]) => {
       const query = searchQuery.trim().toLowerCase()
-      return models.filter(model => {
-        const nameMatches =
-          !query || getModelName(model).toLowerCase().includes(query)
-        const categoryMatches =
-          activeCategoryId === ALL_CATEGORIES_ID
-            ? true
-            : activeCategoryId === UNASSIGNED_CATEGORY_ID
-              ? model.categoryId == null
-              : model.categoryId === activeCategoryId
-        return nameMatches && categoryMatches
-      })
+      if (!query) {
+        return models
+      }
+      return models.filter(model =>
+        getModelName(model).toLowerCase().includes(query)
+      )
     },
-    [searchQuery, getModelName, activeCategoryId]
+    [searchQuery, getModelName]
   )
 
   return {

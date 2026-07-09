@@ -1,4 +1,5 @@
 import { baseURL, client, UPLOAD_TIMEOUT } from '@/lib/apiBase'
+import { type CategoryCountsResponse } from '@/shared/types/categories'
 import {
   type AddEnvironmentMapVariantWithFileResponse,
   type CreateEnvironmentMapWithFileResponse,
@@ -15,6 +16,7 @@ function buildEnvironmentMapQueryString(options: {
   packIds?: number[]
   projectIds?: number[]
   categoryIds?: number[]
+  uncategorized?: boolean
   searchName?: string
 }) {
   const params = new URLSearchParams()
@@ -24,9 +26,13 @@ function buildEnvironmentMapQueryString(options: {
     params.append('pageSize', options.pageSize.toString())
   options.packIds?.forEach(id => params.append('packIds', id.toString()))
   options.projectIds?.forEach(id => params.append('projectIds', id.toString()))
-  options.categoryIds?.forEach(id =>
-    params.append('categoryIds', id.toString())
-  )
+  if (options.uncategorized) {
+    params.append('uncategorized', 'true')
+  } else {
+    options.categoryIds?.forEach(id =>
+      params.append('categoryIds', id.toString())
+    )
+  }
   if (options.searchName && options.searchName.trim()) {
     params.append('searchName', options.searchName.trim())
   }
@@ -52,11 +58,19 @@ export async function getEnvironmentMapsPaginated(options: {
   packIds?: number[]
   projectIds?: number[]
   categoryIds?: number[]
+  uncategorized?: boolean
   searchName?: string
 }): Promise<GetAllEnvironmentMapsResponsePaginated> {
   const query = buildEnvironmentMapQueryString(options)
   const response = await client.get<GetAllEnvironmentMapsResponsePaginated>(
     `/environment-maps?${query}`
+  )
+  return response.data
+}
+
+export async function getEnvironmentMapCategoryCounts(): Promise<CategoryCountsResponse> {
+  const response = await client.get<CategoryCountsResponse>(
+    '/environment-map-categories/counts'
   )
   return response.data
 }

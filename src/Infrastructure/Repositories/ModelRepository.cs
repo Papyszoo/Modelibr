@@ -126,6 +126,7 @@ internal sealed class ModelRepository : IModelRepository
         int? minTriangleCount = null,
         int? maxTriangleCount = null,
         bool? hasAnimations = null,
+        bool? uncategorized = null,
         CancellationToken cancellationToken = default)
     {
         var query = _context.Models.AsNoTracking().AsQueryable();
@@ -139,7 +140,9 @@ internal sealed class ModelRepository : IModelRepository
         if (textureSetId.HasValue)
             query = query.Where(m => m.TextureSets.Any(ts => ts.Id == textureSetId.Value));
 
-        if (categoryIds != null && categoryIds.Count > 0)
+        if (uncategorized == true)
+            query = query.Where(m => m.ModelCategoryId == null);
+        else if (categoryIds != null && categoryIds.Count > 0)
             query = query.Where(m => m.ModelCategoryId.HasValue && categoryIds.Contains(m.ModelCategoryId.Value));
 
         if (normalizedTagNames != null && normalizedTagNames.Count > 0)
@@ -249,6 +252,28 @@ internal sealed class ModelRepository : IModelRepository
             .ToListAsync(cancellationToken);
 
         return (items, totalCount);
+    }
+
+    public async Task<CategoryAssetCounts> GetCategoryAssetCountsAsync(CancellationToken cancellationToken = default)
+    {
+        // One grouped pass over the (soft-delete-filtered) set: direct count per
+        // category id plus the uncategorized bucket. Independent of any list
+        // filter so the sidebar badges show true library totals.
+        var grouped = await _context.Models
+            .AsNoTracking()
+            .GroupBy(m => m.ModelCategoryId)
+            .Select(g => new { CategoryId = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+
+        var perCategory = grouped
+            .Where(g => g.CategoryId.HasValue)
+            .ToDictionary(g => g.CategoryId!.Value, g => g.Count);
+        var uncategorized = grouped
+            .Where(g => !g.CategoryId.HasValue)
+            .Sum(g => g.Count);
+        var total = grouped.Sum(g => g.Count);
+
+        return new CategoryAssetCounts(perCategory, uncategorized, total);
     }
 
     public async Task<Model?> GetByIdAsync(int id, CancellationToken cancellationToken = default)

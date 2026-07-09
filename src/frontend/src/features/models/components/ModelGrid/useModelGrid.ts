@@ -44,6 +44,7 @@ export function useModelGrid({
     maxTriangleCount: filters.maxTriangleCount,
     textureSetId,
     searchQuery: filters.searchQuery,
+    activeCategoryId: filters.activeCategoryId,
   })
 
   // Upload with auto-association to pack/project
@@ -54,22 +55,8 @@ export function useModelGrid({
     onUploadComplete: () => data.fetchModels(),
   })
 
-  // Client-side search + active-category filter
+  // Client-side name search only; category scoping is server-side.
   const filteredModels = filters.filterModels(data.models)
-
-  // Per-category counts for the sidebar tree (from the loaded set).
-  const categoryCounts = new Map<number, number>()
-  let unassignedCount = 0
-  for (const model of data.models) {
-    if (model.categoryId != null) {
-      categoryCounts.set(
-        model.categoryId,
-        (categoryCounts.get(model.categoryId) ?? 0) + 1
-      )
-    } else {
-      unassignedCount += 1
-    }
-  }
 
   // Build path prefix for context menu's "Copy Folder Path"
   const buildPathPrefix = useCallback((): string | undefined => {
@@ -98,8 +85,9 @@ export function useModelGrid({
     // Data
     models: data.models,
     filteredModels,
-    categoryCounts,
-    unassignedCount,
+    categoryCounts: data.categoryCounts,
+    unassignedCount: data.unassignedCount,
+    allCount: data.allCount,
     loading: data.loading,
     error: data.error,
     packs: data.packs,

@@ -5,6 +5,7 @@ import { containerHandlers } from './dynamic-demo/containerHandlers'
 import {
   addRecycledItem,
   assetUrl,
+  buildCategoryCounts,
   buildCategoryPath,
   buildConceptImage,
   type DemoCategory,
@@ -607,6 +608,7 @@ export const dynamicDemoHandlers = [
       .getAll('categoryId')
       .map(value => Number(value))
       .filter(Number.isFinite)
+    const uncategorized = url.searchParams.get('uncategorized') === 'true'
     const tags = url.searchParams
       .getAll('tag')
       .map(tag => tag.trim().toLowerCase())
@@ -642,7 +644,9 @@ export const dynamicDemoHandlers = [
         m.textureSets?.some(ts => ts.id === Number(textureSetId))
       )
     }
-    if (categoryIds.length > 0) {
+    if (uncategorized) {
+      models = models.filter(model => model.categoryId == null)
+    } else if (categoryIds.length > 0) {
       models = models.filter(
         model => model.categoryId && categoryIds.includes(model.categoryId)
       )
@@ -1038,6 +1042,11 @@ export const dynamicDemoHandlers = [
     return new HttpResponse(null, { status: 204 })
   }),
 
+  http.get('*/model-categories/counts', async () => {
+    const models = await getAll('models')
+    return HttpResponse.json(buildCategoryCounts(models))
+  }),
+
   http.get('*/model-categories', async () => {
     const categories = await getAll('modelCategories')
     return HttpResponse.json({
@@ -1158,6 +1167,15 @@ export const dynamicDemoHandlers = [
     deleteCategoryFromStore('modelCategories', Number(params.id), 'models')
   ),
 
+  http.get('*/texture-set-categories/counts', async ({ request }) => {
+    const kindParam = new URL(request.url).searchParams.get('kind')
+    const kind = kindParam !== null ? Number(kindParam) : undefined
+    const sets = await getAll('textureSets')
+    const scoped =
+      kind !== undefined ? sets.filter(ts => ts.kind === kind) : sets
+    return HttpResponse.json(buildCategoryCounts(scoped))
+  }),
+
   http.get('*/texture-set-categories', async ({ request }) => {
     const kindParam = new URL(request.url).searchParams.get('kind')
     const kind = kindParam !== null ? Number(kindParam) : undefined
@@ -1200,6 +1218,11 @@ export const dynamicDemoHandlers = [
       'textureSets'
     )
   ),
+
+  http.get('*/environment-map-categories/counts', async () => {
+    const maps = await getAll('environmentMaps')
+    return HttpResponse.json(buildCategoryCounts(maps))
+  }),
 
   http.get('*/environment-map-categories', async () =>
     listCategoryStore('environmentMapCategories')
@@ -1662,6 +1685,7 @@ export const dynamicDemoHandlers = [
       .getAll('categoryIds')
       .map(value => Number(value))
       .filter(Number.isFinite)
+    const uncategorized = url.searchParams.get('uncategorized') === 'true'
     const textureTypes = url.searchParams
       .getAll('textureTypes')
       .map(value => Number(value))
@@ -1696,7 +1720,9 @@ export const dynamicDemoHandlers = [
     if (kind !== null && kind !== undefined) {
       sets = sets.filter(ts => ts.kind === Number(kind))
     }
-    if (categoryIds.length > 0) {
+    if (uncategorized) {
+      sets = sets.filter(ts => ts.categoryId == null)
+    } else if (categoryIds.length > 0) {
       sets = sets.filter(
         ts => ts.categoryId != null && categoryIds.includes(ts.categoryId)
       )
@@ -2329,6 +2355,11 @@ export const dynamicDemoHandlers = [
     ]
       .map(Number)
       .filter(Number.isFinite)
+    const categoryIds = url.searchParams
+      .getAll('categoryIds')
+      .map(value => Number(value))
+      .filter(Number.isFinite)
+    const uncategorized = url.searchParams.get('uncategorized') === 'true'
     const searchName = (url.searchParams.get('searchName') ?? '')
       .trim()
       .toLowerCase()
@@ -2346,6 +2377,14 @@ export const dynamicDemoHandlers = [
         (environmentMap.projects ?? []).some(project =>
           projectIds.includes(project.id)
         )
+      )
+    }
+
+    if (uncategorized) {
+      environmentMaps = environmentMaps.filter(em => em.categoryId == null)
+    } else if (categoryIds.length > 0) {
+      environmentMaps = environmentMaps.filter(
+        em => em.categoryId != null && categoryIds.includes(em.categoryId)
       )
     }
 
