@@ -74,28 +74,30 @@ export const useTextureSetListViewStore = create<TextureSetListViewStore>()(
       name: 'texture-set-list-view-state',
       storage: createJSONStorage(() => localStorage),
       partialize: state => ({ views: state.views }),
-      // Backfill fields added after a view was first persisted (e.g.
-      // selectedProjectIds) so consumers can read them without guards. Also
-      // drops the legacy multi-select `selectedCategoryKeys` — the category
-      // filter is now the single-select `activeCategoryId` sidebar, defaulted
-      // to "All" for any view persisted before the switch.
-      merge: (persisted, current) => {
-        const persistedViews =
-          (persisted as { views?: Record<string, Record<string, unknown>> })
-            ?.views ?? {}
-        const views = Object.fromEntries(
-          Object.entries(persistedViews).map(([scope, view]) => {
-            const { selectedCategoryKeys: _drop, ...rest } = view
-            return [
-              scope,
-              {
-                ...DEFAULT_TEXTURE_SET_LIST_VIEW_STATE,
-                ...(rest as Partial<TextureSetListViewState>),
-              },
-            ]
-          })
-        )
-        return { ...current, views }
+      // v1: the multi-select `selectedCategoryKeys` filter was replaced by a
+      // single-select `activeCategoryId` sidebar. Drop the old key and default
+      // every persisted view to "All" so stale checkbox state can't leak in.
+      // Spreading DEFAULT first also backfills fields added after a view was
+      // first persisted (e.g. selectedProjectIds). Matches the model and
+      // environment-map stores' version+migrate convention.
+      version: 1,
+      migrate: persisted => {
+        const state = persisted as
+          | { views?: Record<string, Record<string, unknown>> }
+          | undefined
+        if (!state?.views) {
+          return { views: {} }
+        }
+        const views: Record<string, TextureSetListViewState> = {}
+        for (const [scope, view] of Object.entries(state.views)) {
+          const { selectedCategoryKeys: _drop, ...rest } = view
+          views[scope] = {
+            ...DEFAULT_TEXTURE_SET_LIST_VIEW_STATE,
+            ...(rest as Partial<TextureSetListViewState>),
+            activeCategoryId: ALL_CATEGORIES_ID,
+          }
+        }
+        return { views }
       },
     }
   )
