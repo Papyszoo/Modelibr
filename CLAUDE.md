@@ -18,7 +18,8 @@ locally; core behavior must never depend on hosted services.
 **Domain-specific conventions live in skills** (auto-loaded when relevant):
 `backend-patterns`, `frontend-patterns`, `frontend-test-authoring`,
 `design-system`, `asset-processor-patterns`, `webdav-patterns`,
-`e2e-authoring`, `test-triage`, `video-authoring`. Skills are canonical agent
+`e2e-authoring`, `test-triage`, `video-authoring`, `skill-authoring` (when
+editing skills themselves). Skills are canonical agent
 docs — there is no
 parallel "AI documentation" set. **If a skill claim contradicts the code, trust
 the code and fix the skill in the same session.**
