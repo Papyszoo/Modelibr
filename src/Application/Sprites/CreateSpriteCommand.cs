@@ -1,5 +1,6 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Models;
 using Domain.Models;
 using Domain.Services;
 using Domain.ValueObjects;
@@ -12,17 +13,20 @@ internal class CreateSpriteCommandHandler : ICommandHandler<CreateSpriteCommand,
     private readonly ISpriteRepository _spriteRepository;
     private readonly ISpriteCategoryRepository _spriteCategoryRepository;
     private readonly IFileRepository _fileRepository;
+    private readonly ISettingRepository _settingRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
 
     public CreateSpriteCommandHandler(
         ISpriteRepository spriteRepository,
         ISpriteCategoryRepository spriteCategoryRepository,
         IFileRepository fileRepository,
+        ISettingRepository settingRepository,
         IDateTimeProvider dateTimeProvider)
     {
         _spriteRepository = spriteRepository;
         _spriteCategoryRepository = spriteCategoryRepository;
         _fileRepository = fileRepository;
+        _settingRepository = settingRepository;
         _dateTimeProvider = dateTimeProvider;
     }
 
@@ -30,8 +34,14 @@ internal class CreateSpriteCommandHandler : ICommandHandler<CreateSpriteCommand,
     {
         try
         {
-            var existingSprite = await _spriteRepository.GetByNameAsync(command.Name, cancellationToken);
-            if (existingSprite != null)
+            // Resolve name collision based on DuplicateNamePolicy setting (same as the
+            // upload path): Allow keeps the name, Reject fails, AutoRename suffixes.
+            var nameResult = await AssetNameService.ResolveNameAsync(
+                command.Name, "Sprite",
+                _spriteRepository.ExistsByNameAsync,
+                _spriteRepository.GetNamesByPrefixAsync,
+                _settingRepository, cancellationToken);
+            if (nameResult.IsFailure)
             {
                 return Result.Failure<CreateSpriteResponse>(
                     new Error("SpriteAlreadyExists", $"A sprite with the name '{command.Name}' already exists."));
@@ -55,7 +65,7 @@ internal class CreateSpriteCommandHandler : ICommandHandler<CreateSpriteCommand,
             }
 
             var sprite = Sprite.Create(
-                command.Name,
+                nameResult.Value,
                 file,
                 command.SpriteType,
                 _dateTimeProvider.UtcNow,
