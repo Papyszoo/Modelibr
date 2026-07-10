@@ -12,7 +12,6 @@ export class ScriptListPage {
     private readonly scriptCard = ".script-card";
     private readonly scriptName = ".script-name";
     private readonly contextMenu = ".p-contextmenu";
-    private readonly categoryTab = ".category-tab";
     private readonly dialog = ".p-dialog";
 
     /** Navigate to the scripts page via UI (fresh app state). */
@@ -175,28 +174,6 @@ export class ScriptListPage {
                 .waitFor({ state: "hidden", timeout: 5000 })
                 .catch(() => {});
         }
-    }
-
-    // ===== Categories =====
-
-    async openCategoryDialog(): Promise<void> {
-        await this.page.locator("button:has-text('Add Category')").click();
-        await expect(this.page.locator(this.dialog)).toBeVisible({
-            timeout: 5000,
-        });
-    }
-
-    async createCategory(name: string): Promise<void> {
-        const dialog = this.page.locator(this.dialog);
-        const nameInput = dialog.locator("#categoryName");
-        await nameInput.waitFor({ state: "visible", timeout: 10000 });
-        await nameInput.fill(name);
-        await dialog.locator("button:has-text('Save')").click();
-        await dialog.waitFor({ state: "hidden", timeout: 10000 });
-    }
-
-    getCategoryTab(name: string) {
-        return this.page.locator(this.categoryTab).filter({ hasText: name });
     }
 
     async rightClickScriptByName(name: string): Promise<void> {

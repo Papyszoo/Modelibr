@@ -2,11 +2,9 @@ import './SpriteList.css'
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Button } from 'primereact/button'
-import { confirmDialog } from 'primereact/confirmdialog'
 import { ContextMenu } from 'primereact/contextmenu'
 import { Dialog } from 'primereact/dialog'
 import { InputText } from 'primereact/inputtext'
-import { InputTextarea } from 'primereact/inputtextarea'
 import { type MenuItem } from 'primereact/menuitem'
 import { Toast } from 'primereact/toast'
 import {
@@ -42,11 +40,12 @@ import {
 } from '@/shared/components/list-toolbar'
 import { useDragAndDrop } from '@/shared/hooks/useFileUpload'
 import {
-  spriteCategoryFormSchema,
-  spriteRenameFormSchema,
-} from '@/shared/validation/formSchemas'
+  ALL_CATEGORIES_ID,
+  UNASSIGNED_CATEGORY_ID,
+} from '@/shared/types/categories'
+import { spriteRenameFormSchema } from '@/shared/validation/formSchemas'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
-import { type SpriteCategoryDto, type SpriteDto } from '@/types'
+import { type SpriteDto } from '@/types'
 import {
   copyPathToClipboard,
   getCopyPathSuccessMessage,
@@ -55,18 +54,11 @@ import {
 
 import { SpriteGridContent } from './SpriteGridContent'
 
-const UNASSIGNED_CATEGORY_ID = -1
-
 export function SpriteList() {
-  type SpriteCategoryFormInput = z.input<typeof spriteCategoryFormSchema>
-  type SpriteCategoryFormOutput = z.output<typeof spriteCategoryFormSchema>
   type SpriteRenameFormValues = z.infer<typeof spriteRenameFormSchema>
 
   // ── UI State ────────────────────────────────────────────────────────
-  const [showCategoryDialog, setShowCategoryDialog] = useState(false)
   const [showSpriteModal, setShowSpriteModal] = useState(false)
-  const [editingCategory, setEditingCategory] =
-    useState<SpriteCategoryDto | null>(null)
   const [selectedSprite, setSelectedSprite] = useState<SpriteDto | null>(null)
   const [isEditingSpriteName, setIsEditingSpriteName] = useState(false)
   const [isSavingSpriteName, setIsSavingSpriteName] = useState(false)
@@ -96,16 +88,6 @@ export function SpriteList() {
   const contextMenuRef = useRef<ContextMenu>(null)
 
   // ── Forms ───────────────────────────────────────────────────────────
-  const {
-    register: registerCategory,
-    handleSubmit: handleCategorySubmit,
-    reset: resetCategoryForm,
-  } = useForm<SpriteCategoryFormInput, unknown, SpriteCategoryFormOutput>({
-    resolver: zodResolver(spriteCategoryFormSchema),
-    mode: 'onChange',
-    defaultValues: { name: '', description: '' },
-  })
-
   const {
     register: registerSpriteRename,
     handleSubmit: handleSpriteRenameSubmit,
@@ -141,7 +123,8 @@ export function SpriteList() {
 
   // ── Mutations Hook ──────────────────────────────────────────────────
   const {
-    saveCategoryMutation,
+    createCategoryMutation,
+    renameCategoryMutation,
     deleteCategoryMutation,
     moveSpritesToCategoryMutation,
     recycleSpritesMutation,
@@ -156,7 +139,6 @@ export function SpriteList() {
     setIsEditingSpriteName,
     resetSpriteRenameForm,
     setIsSavingSpriteName,
-    setShowCategoryDialog,
     invalidateSprites,
     loadCategories,
     showToast: opts => toast.current?.show(opts),
@@ -173,52 +155,6 @@ export function SpriteList() {
 
   const { onDrop, onDragOver, onDragEnter, onDragLeave } =
     useDragAndDrop(handleFileDrop)
-
-  // ── Category Dialog Handlers ────────────────────────────────────────
-  const openCreateCategoryDialog = () => {
-    setEditingCategory(null)
-    resetCategoryForm({ name: '', description: '' })
-    setShowCategoryDialog(true)
-  }
-
-  const openEditCategoryDialog = (category: SpriteCategoryDto) => {
-    setEditingCategory(category)
-    resetCategoryForm({
-      name: category.name,
-      description: category.description || '',
-    })
-    setShowCategoryDialog(true)
-  }
-
-  const handleSaveCategory = handleCategorySubmit(
-    values => {
-      saveCategoryMutation.mutate({
-        editingCategory,
-        name: values.name,
-        description: values.description,
-      })
-    },
-    () => {
-      toast.current?.show({
-        severity: 'warn',
-        summary: 'Validation Error',
-        detail: 'Category name is required',
-        life: 3000,
-      })
-    }
-  )
-
-  const handleDeleteCategory = (category: SpriteCategoryDto) => {
-    confirmDialog({
-      message: `Are you sure you want to delete the category "${category.name}"? Sprites in this category will become unassigned.`,
-      header: 'Delete Category',
-      icon: 'pi pi-exclamation-triangle',
-      acceptClassName: 'p-button-danger',
-      accept: async () => {
-        await deleteCategoryMutation.mutateAsync(category.id)
-      },
-    })
-  }
 
   // ── Sprite Modal Handlers ──────────────────────────────────────────
   const openSpriteModal = (sprite: SpriteDto) => {
@@ -559,13 +495,6 @@ export function SpriteList() {
               tooltip="Refresh list"
               ariaLabel="Refresh"
             />
-            <ListToolbarButton
-              icon="pi pi-plus"
-              label="Add Category"
-              onClick={openCreateCategoryDialog}
-              tooltip="Add a sprite category"
-              ariaLabel="Add Category"
-            />
           </ListToolbarActions>
 
           <ListToolbarCount
@@ -608,30 +537,24 @@ export function SpriteList() {
             dragOverCategoryId={dragOverCategoryId}
             categoryCounts={categoryCounts}
             unassignedCount={unassignedCount}
+            allCount={sprites.length}
+            allCategoryId={ALL_CATEGORIES_ID}
             unassignedCategoryId={UNASSIGNED_CATEGORY_ID}
             unassignedLabel="Unassigned"
+            itemNoun="sprite"
             onCategoryChange={setActiveCategoryId}
             onCategoryDragOver={handleCategoryDragOver}
             onCategoryDragLeave={handleCategoryDragLeave}
             onCategoryDrop={handleCategoryDrop}
-            renderNodeActions={category => (
-              <>
-                <Button
-                  icon="pi pi-pencil"
-                  className="p-button-text p-button-sm"
-                  onClick={() => openEditCategoryDialog(category)}
-                  tooltip="Rename category"
-                  aria-label={`Rename category ${category.name}`}
-                />
-                <Button
-                  icon="pi pi-trash"
-                  className="p-button-text p-button-sm p-button-danger"
-                  onClick={() => handleDeleteCategory(category)}
-                  tooltip="Delete category"
-                  aria-label={`Delete category ${category.name}`}
-                />
-              </>
-            )}
+            onCreateCategory={(name, parentId) =>
+              createCategoryMutation.mutate({ name, parentId })
+            }
+            onRenameCategory={(category, name) =>
+              renameCategoryMutation.mutate({ category, name })
+            }
+            onDeleteCategory={category =>
+              deleteCategoryMutation.mutate(category.id)
+            }
           />
         </aside>
 
@@ -672,63 +595,6 @@ export function SpriteList() {
         <i className="pi pi-upload" />
         <span>Drop images here</span>
       </div>
-
-      {/* Create/Edit Category Dialog */}
-      <Dialog
-        header={editingCategory ? 'Rename Category' : 'Add Category'}
-        visible={showCategoryDialog}
-        onHide={() => setShowCategoryDialog(false)}
-        style={{ width: '400px' }}
-        data-testid="category-dialog"
-        footer={
-          <div>
-            <Button
-              label="Cancel"
-              icon="pi pi-times"
-              className="p-button-text"
-              onClick={() => {
-                setShowCategoryDialog(false)
-                if (editingCategory) {
-                  resetCategoryForm({
-                    name: editingCategory.name,
-                    description: editingCategory.description || '',
-                  })
-                } else {
-                  resetCategoryForm({ name: '', description: '' })
-                }
-              }}
-              data-testid="category-dialog-cancel"
-            />
-            <Button
-              label="Save"
-              icon="pi pi-check"
-              onClick={handleSaveCategory}
-              data-testid="category-dialog-save"
-            />
-          </div>
-        }
-      >
-        <div className="p-fluid">
-          <div className="field">
-            <label htmlFor="categoryName">Name *</label>
-            <InputText
-              id="categoryName"
-              {...registerCategory('name')}
-              autoFocus
-              data-testid="category-name-input"
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="categoryDescription">Description</label>
-            <InputTextarea
-              id="categoryDescription"
-              {...registerCategory('description')}
-              rows={3}
-              data-testid="category-description-input"
-            />
-          </div>
-        </div>
-      </Dialog>
 
       {/* Sprite Detail Modal */}
       <Dialog

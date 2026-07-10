@@ -120,13 +120,51 @@ internal static class CategoryCommandHandlers
                 new Error("CategoryNotFound", $"{categoryTypeName} with ID {id} was not found."));
         }
 
-        if (category.Children.Any())
+        // Deleting a category removes its whole branch. Descendants are
+        // deleted children-first to satisfy the Restrict FK on ParentId;
+        // assets assigned anywhere in the branch become uncategorized via
+        // the SetNull FK on the asset -> category relationship.
+        var allCategories = await repository.GetAllAsync(cancellationToken);
+        foreach (var descendantId in CollectDescendantIdsChildrenFirst(allCategories, id))
         {
-            return Result.Failure(
-                new Error("CategoryHasChildren", "Delete or move child categories before removing this category."));
+            // Re-fetch per id so each delete works on the context's tracked
+            // instance (GetAllAsync snapshots are untracked duplicates).
+            var descendant = await repository.GetByIdAsync(descendantId, cancellationToken);
+            if (descendant != null)
+            {
+                await repository.DeleteAsync(descendant, cancellationToken);
+            }
         }
 
         await repository.DeleteAsync(category, cancellationToken);
         return Result.Success();
+    }
+
+    /// <summary>
+    /// Ids of every descendant of <paramref name="rootId"/> (excluding the
+    /// root itself), ordered so children always precede their parent.
+    /// </summary>
+    private static List<int> CollectDescendantIdsChildrenFirst<TCategory>(
+        IReadOnlyList<TCategory> categories,
+        int rootId)
+        where TCategory : class, IHierarchicalCategory<TCategory>
+    {
+        var byParent = categories
+            .Where(c => c.ParentId.HasValue)
+            .ToLookup(c => c.ParentId!.Value, c => c.Id);
+
+        var ordered = new List<int>();
+
+        void Visit(int categoryId)
+        {
+            foreach (var childId in byParent[categoryId])
+            {
+                Visit(childId);
+                ordered.Add(childId);
+            }
+        }
+
+        Visit(rootId);
+        return ordered;
     }
 }

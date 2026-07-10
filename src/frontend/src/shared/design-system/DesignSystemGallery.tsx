@@ -26,7 +26,11 @@ import {
   ListToolbarSearchInput,
 } from '@/shared/components/list-toolbar'
 import { TagInput } from '@/shared/components/tags/TagInput'
-import type { HierarchicalCategory } from '@/shared/types/categories'
+import {
+  ALL_CATEGORIES_ID,
+  type HierarchicalCategory,
+  UNASSIGNED_CATEGORY_ID,
+} from '@/shared/types/categories'
 
 /**
  * One page showing the whole design system — token vocabulary plus every
@@ -256,22 +260,21 @@ export function DesignSystemGallery() {
             dragOverCategoryId={null}
             categoryCounts={SAMPLE_CATEGORY_COUNTS}
             unassignedCount={4}
-            unassignedCategoryId={-1}
+            allCount={32}
+            allCategoryId={ALL_CATEGORIES_ID}
+            unassignedCategoryId={UNASSIGNED_CATEGORY_ID}
             unassignedLabel="Uncategorized"
             onCategoryChange={id => setActiveCategoryId(id)}
             onCategoryDragOver={noop}
             onCategoryDragLeave={noop}
             onCategoryDrop={noop}
-            renderNodeActions={category => (
-              <Button
-                icon="pi pi-pencil"
-                className="p-button-text p-button-sm"
-                aria-label={`Rename category ${category.name}`}
-              />
-            )}
+            onCreateCategory={noop}
+            onRenameCategory={noop}
+            onDeleteCategory={noop}
           />
           <div className="dsg-category-demo-content dsg-label">
-            content area — sidebar sits flat on the page surface, no frame
+            content area — sidebar sits flat on the page surface, no frame; add
+            / rename / delete live in the tree&apos;s right-click menu
           </div>
         </div>
       </Section>

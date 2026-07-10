@@ -387,23 +387,38 @@ async function deleteCategoryFromStore(
   categoryId: number,
   assetStoreName: DemoCategorizedAssetStoreName
 ) {
+  // Matches the backend's branch delete: the category and all of its
+  // descendants are removed, and assets assigned anywhere in the branch
+  // become uncategorized.
   const categories = await getAll(storeName)
-  if (categories.some(category => category.parentId === categoryId)) {
-    return HttpResponse.json(
-      {
-        error: 'CategoryHasChildren',
-        message:
-          'Delete or move child categories before removing this category.',
-      },
-      { status: 400 }
-    )
+  const branchIds = new Set<number>([categoryId])
+  let grew = true
+  while (grew) {
+    grew = false
+    for (const category of categories) {
+      if (
+        category.parentId !== null &&
+        category.parentId !== undefined &&
+        branchIds.has(category.parentId) &&
+        !branchIds.has(category.id)
+      ) {
+        branchIds.add(category.id)
+        grew = true
+      }
+    }
   }
 
-  await remove(storeName, categoryId)
+  for (const branchId of branchIds) {
+    await remove(storeName, branchId)
+  }
 
   const assets = await getAll(assetStoreName)
   for (const asset of assets) {
-    if (!('categoryId' in asset) || asset.categoryId !== categoryId) {
+    if (
+      !('categoryId' in asset) ||
+      asset.categoryId == null ||
+      !branchIds.has(asset.categoryId)
+    ) {
       continue
     }
 
