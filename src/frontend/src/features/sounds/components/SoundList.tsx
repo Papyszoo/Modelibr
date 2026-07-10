@@ -1,9 +1,7 @@
 import './SoundList.css'
 import '@/shared/components/FilterPanel.css'
 
-import { zodResolver } from '@hookform/resolvers/zod'
 import { Button } from 'primereact/button'
-import { confirmDialog } from 'primereact/confirmdialog'
 import { type ContextMenu } from 'primereact/contextmenu'
 import { Dialog } from 'primereact/dialog'
 import { InputNumber } from 'primereact/inputnumber'
@@ -16,8 +14,6 @@ import {
   useRef,
   useState,
 } from 'react'
-import { useForm } from 'react-hook-form'
-import { type z } from 'zod'
 
 import { getFileUrl } from '@/features/models/api/modelApi'
 import { useSoundListData } from '@/features/sounds/hooks/useSoundListData'
@@ -38,24 +34,21 @@ import {
   ListToolbarSelectionSummary,
   OptionsButton,
 } from '@/shared/components/list-toolbar'
-import { soundCategoryFormSchema } from '@/shared/validation/formSchemas'
+import {
+  ALL_CATEGORIES_ID,
+  UNASSIGNED_CATEGORY_ID,
+} from '@/shared/types/categories'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
-import { type SoundCategoryDto, type SoundDto } from '@/types'
+import { type SoundDto } from '@/types'
 import {
   copyPathToClipboard,
   getCopyPathSuccessMessage,
   openInFileExplorer,
 } from '@/utils/webdavUtils'
 
-import { SoundCategoryDialog } from './SoundCategoryDialog'
 import { SoundContextMenu } from './SoundContextMenu'
 import { SoundEditor } from './SoundEditor'
 import { SoundGridContent } from './SoundGridContent'
-
-const UNASSIGNED_CATEGORY_ID = -1
-
-type SoundCategoryFormInput = z.input<typeof soundCategoryFormSchema>
-type SoundCategoryFormOutput = z.output<typeof soundCategoryFormSchema>
 
 export function SoundList() {
   const toast = useRef<Toast>(null)
@@ -96,10 +89,7 @@ export function SoundList() {
     loadCategories,
   } = useSoundListData(showToast)
 
-  const [showCategoryDialog, setShowCategoryDialog] = useState(false)
   const [showSoundModal, setShowSoundModal] = useState(false)
-  const [editingCategory, setEditingCategory] =
-    useState<SoundCategoryDto | null>(null)
   const [selectedSound, setSelectedSound] = useState<SoundDto | null>(null)
   const [dragOverCategoryId, setDragOverCategoryId] = useState<number | null>(
     null
@@ -122,24 +112,12 @@ export function SoundList() {
   const [isFiltersOpen, setIsFiltersOpen] = useState(false)
   const hasActiveDurationFilter = minDuration != null || maxDuration != null
 
-  const {
-    register: registerCategory,
-    handleSubmit: handleCategorySubmit,
-    reset: resetCategoryForm,
-  } = useForm<SoundCategoryFormInput, unknown, SoundCategoryFormOutput>({
-    resolver: zodResolver(soundCategoryFormSchema),
-    mode: 'onChange',
-    defaultValues: {
-      name: '',
-      description: '',
-    },
-  })
-
   const { settings, setCardWidth } = useCardWidthStore()
   const cardWidth = settings.sounds
 
   const {
-    saveCategoryMutation,
+    createCategoryMutation,
+    renameCategoryMutation,
     deleteCategoryMutation,
     moveSoundsToCategoryMutation,
     recycleSoundsMutation,
@@ -166,58 +144,6 @@ export function SoundList() {
     activeCategoryId,
     loadSounds: invalidateSounds,
   })
-
-  const openCreateCategoryDialog = () => {
-    setEditingCategory(null)
-    resetCategoryForm({ name: '', description: '' })
-    setShowCategoryDialog(true)
-  }
-
-  const openEditCategoryDialog = (category: SoundCategoryDto) => {
-    setEditingCategory(category)
-    resetCategoryForm({
-      name: category.name,
-      description: category.description || '',
-    })
-    setShowCategoryDialog(true)
-  }
-
-  const handleSaveCategory = handleCategorySubmit(
-    values => {
-      saveCategoryMutation.mutate(
-        {
-          editingCategory,
-          name: values.name,
-          description: values.description,
-        },
-        {
-          onSuccess: () => {
-            setShowCategoryDialog(false)
-          },
-        }
-      )
-    },
-    () => {
-      showToast({
-        severity: 'warn',
-        summary: 'Validation Error',
-        detail: 'Category name is required',
-        life: 3000,
-      })
-    }
-  )
-
-  const handleDeleteCategory = (category: SoundCategoryDto) => {
-    confirmDialog({
-      message: `Are you sure you want to delete the category "${category.name}"? Sounds in this category will become unassigned.`,
-      header: 'Delete Category',
-      icon: 'pi pi-exclamation-triangle',
-      acceptClassName: 'p-button-danger',
-      accept: async () => {
-        await deleteCategoryMutation.mutateAsync(category.id)
-      },
-    })
-  }
 
   const openSoundModal = (sound: SoundDto) => {
     setSelectedSound(sound)
@@ -577,13 +503,6 @@ export function SoundList() {
               tooltip="Refresh list"
               ariaLabel="Refresh"
             />
-            <ListToolbarButton
-              icon="pi pi-plus"
-              label="Add Category"
-              onClick={openCreateCategoryDialog}
-              tooltip="Add a sound category"
-              ariaLabel="Add Category"
-            />
           </ListToolbarActions>
 
           <ListToolbarCount
@@ -665,30 +584,24 @@ export function SoundList() {
             dragOverCategoryId={dragOverCategoryId}
             categoryCounts={categoryCounts}
             unassignedCount={unassignedCount}
+            allCount={sounds.length}
+            allCategoryId={ALL_CATEGORIES_ID}
             unassignedCategoryId={UNASSIGNED_CATEGORY_ID}
             unassignedLabel="Unassigned"
+            itemNoun="sound"
             onCategoryChange={setActiveCategoryId}
             onCategoryDragOver={handleCategoryDragOver}
             onCategoryDragLeave={handleCategoryDragLeave}
             onCategoryDrop={handleCategoryDrop}
-            renderNodeActions={category => (
-              <>
-                <Button
-                  icon="pi pi-pencil"
-                  className="p-button-text p-button-sm"
-                  onClick={() => openEditCategoryDialog(category)}
-                  tooltip="Rename category"
-                  aria-label={`Rename category ${category.name}`}
-                />
-                <Button
-                  icon="pi pi-trash"
-                  className="p-button-text p-button-sm p-button-danger"
-                  onClick={() => handleDeleteCategory(category)}
-                  tooltip="Delete category"
-                  aria-label={`Delete category ${category.name}`}
-                />
-              </>
-            )}
+            onCreateCategory={(name, parentId) =>
+              createCategoryMutation.mutate({ name, parentId })
+            }
+            onRenameCategory={(category, name) =>
+              renameCategoryMutation.mutate({ category, name })
+            }
+            onDeleteCategory={category =>
+              deleteCategoryMutation.mutate(category.id)
+            }
           />
         </aside>
 
@@ -729,14 +642,6 @@ export function SoundList() {
         <i className="pi pi-upload" />
         <span>Drop audio files here</span>
       </div>
-
-      <SoundCategoryDialog
-        visible={showCategoryDialog}
-        isEditing={editingCategory !== null}
-        onHide={() => setShowCategoryDialog(false)}
-        onSave={handleSaveCategory}
-        registerCategory={registerCategory}
-      />
 
       {/* Sound Editor Modal */}
       <Dialog

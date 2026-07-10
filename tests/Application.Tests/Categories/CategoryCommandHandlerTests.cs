@@ -248,6 +248,10 @@ public class CategoryCommandHandlerTests
             .ReturnsAsync(category);
 
         _repository
+            .Setup(x => x.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<EnvironmentMapCategory> { category });
+
+        _repository
             .Setup(x => x.DeleteAsync(It.IsAny<EnvironmentMapCategory>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
@@ -280,24 +284,39 @@ public class CategoryCommandHandlerTests
     }
 
     [Fact]
-    public async Task Delete_When_CategoryHasChildren_Returns_Failure_CategoryHasChildren()
+    public async Task Delete_When_CategoryHasDescendants_Deletes_WholeBranch_ChildrenFirst()
     {
+        // parent(1) -> child(2) -> grandchild(3); unrelated(4) must survive.
         var parent = EnvironmentMapCategory.Create("Outdoor", null, null, _now).WithId(1);
         var child = EnvironmentMapCategory.Create("Sunset", null, 1, _now).WithId(2);
-        parent.Children = new List<EnvironmentMapCategory> { child };
+        var grandchild = EnvironmentMapCategory.Create("Golden hour", null, 2, _now).WithId(3);
+        var unrelated = EnvironmentMapCategory.Create("Indoor", null, null, _now).WithId(4);
+        var all = new List<EnvironmentMapCategory> { parent, child, grandchild, unrelated };
+
+        foreach (var category in all)
+        {
+            var captured = category;
+            _repository
+                .Setup(x => x.GetByIdAsync(captured.Id, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(captured);
+        }
 
         _repository
-            .Setup(x => x.GetByIdAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(parent);
+            .Setup(x => x.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(all);
+
+        var deletedIds = new List<int>();
+        _repository
+            .Setup(x => x.DeleteAsync(It.IsAny<EnvironmentMapCategory>(), It.IsAny<CancellationToken>()))
+            .Callback((EnvironmentMapCategory category, CancellationToken _) => deletedIds.Add(category.Id))
+            .Returns(Task.CompletedTask);
 
         var handler = new DeleteEnvironmentMapCategoryCommandHandler(_repository.Object);
 
-        var command = new DeleteEnvironmentMapCategoryCommand(1);
+        var result = await handler.Handle(new DeleteEnvironmentMapCategoryCommand(1), CancellationToken.None);
 
-        var result = await handler.Handle(command, CancellationToken.None);
-
-        Assert.True(result.IsFailure);
-        Assert.Equal("CategoryHasChildren", result.Error.Code);
-        _repository.Verify(x => x.DeleteAsync(It.IsAny<EnvironmentMapCategory>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.True(result.IsSuccess);
+        // Children are deleted before their parent (Restrict FK on ParentId).
+        Assert.Equal(new[] { 3, 2, 1 }, deletedIds);
     }
 }

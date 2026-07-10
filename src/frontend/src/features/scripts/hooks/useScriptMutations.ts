@@ -7,6 +7,8 @@ import {
   updateScript,
   updateScriptCategory,
 } from '@/features/scripts/api/scriptApi'
+import { ALL_CATEGORIES_ID } from '@/shared/types/categories'
+import { collectCategoryBranchIds } from '@/shared/utils/categoryTree'
 import { type ScriptCategoryDto } from '@/types'
 
 interface ShowToast {
@@ -29,8 +31,6 @@ interface UseScriptMutationsOptions {
   setContextMenuTarget: (target: null) => void
 }
 
-const UNASSIGNED_CATEGORY_ID = -1
-
 export function useScriptMutations({
   showToast,
   loadScripts,
@@ -42,47 +42,58 @@ export function useScriptMutations({
   setContextMenuTarget,
 }: UseScriptMutationsOptions) {
   const queryClient = useQueryClient()
-  const saveCategoryMutation = useMutation({
-    mutationFn: async (vars: {
-      editingCategory: ScriptCategoryDto | null
-      name: string
-      description?: string
-    }): Promise<{ type: 'create' | 'update'; createdId?: number }> => {
-      if (vars.editingCategory) {
-        await updateScriptCategory(
-          vars.editingCategory.id,
-          vars.name,
-          vars.description
-        )
-        return { type: 'update' }
-      }
-
-      const created = await createScriptCategory(vars.name, vars.description)
-      return { type: 'create', createdId: created.id }
-    },
-    onSuccess: async (result, vars) => {
+  const createCategoryMutation = useMutation({
+    mutationFn: async (vars: { name: string; parentId: number | null }) =>
+      createScriptCategory(vars.name, undefined, vars.parentId),
+    onSuccess: async created => {
       showToast({
         severity: 'success',
         summary: 'Success',
-        detail: vars.editingCategory
-          ? 'Category updated successfully'
-          : 'Category created successfully',
+        detail: 'Category created successfully',
         life: 3000,
       })
-
-      if (result.type === 'create' && typeof result.createdId === 'number') {
-        setActiveCategoryId(result.createdId)
-      }
-
+      setActiveCategoryId(created.id)
       await loadCategories()
       await loadScripts()
     },
     onError: error => {
-      console.error('Failed to save category:', error)
+      console.error('Failed to create category:', error)
       showToast({
         severity: 'error',
         summary: 'Error',
-        detail: 'Failed to save category',
+        detail: 'Failed to create category',
+        life: 3000,
+      })
+    },
+  })
+
+  const renameCategoryMutation = useMutation({
+    // Description and parent are passed through unchanged — the update
+    // endpoint treats a null parentId as "move to root", so omitting the
+    // current parent would silently re-parent the category.
+    mutationFn: async (vars: { category: ScriptCategoryDto; name: string }) =>
+      updateScriptCategory(
+        vars.category.id,
+        vars.name,
+        vars.category.description ?? undefined,
+        vars.category.parentId ?? null
+      ),
+    onSuccess: async () => {
+      showToast({
+        severity: 'success',
+        summary: 'Success',
+        detail: 'Category renamed successfully',
+        life: 3000,
+      })
+      await loadCategories()
+      await loadScripts()
+    },
+    onError: error => {
+      console.error('Failed to rename category:', error)
+      showToast({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to rename category',
         life: 3000,
       })
     },
@@ -99,8 +110,11 @@ export function useScriptMutations({
         detail: 'Category deleted successfully',
         life: 3000,
       })
-      if (activeCategoryId === categoryId) {
-        setActiveCategoryId(UNASSIGNED_CATEGORY_ID)
+      // Deleting removes the whole branch, so a selection anywhere inside
+      // it (not just the deleted node) must fall back to "All".
+      const deletedBranch = collectCategoryBranchIds(categories, categoryId)
+      if (activeCategoryId !== null && deletedBranch.has(activeCategoryId)) {
+        setActiveCategoryId(ALL_CATEGORIES_ID)
       }
       await loadCategories()
       await loadScripts()
@@ -189,7 +203,8 @@ export function useScriptMutations({
   })
 
   return {
-    saveCategoryMutation,
+    createCategoryMutation,
+    renameCategoryMutation,
     deleteCategoryMutation,
     moveScriptsToCategoryMutation,
     recycleScriptsMutation,

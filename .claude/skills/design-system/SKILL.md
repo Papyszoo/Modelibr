@@ -21,9 +21,9 @@ and category UI in this codebase is that failure fossilized. The rule:
 1. **Search before writing.** Check the primitive catalog below, then grep
    `src/shared/` — the thing you need probably exists or almost exists.
 2. **Almost fits? Grow the primitive, don't fork it.** A new prop/slot on
-   the shared component (like `CategoryTreePanel.renderNodeActions`) beats
-   a local copy every time. Change it in its one home so every consumer
-   inherits the improvement.
+   the shared component (like `CategoryTreePanel.onCreateCategory` /
+   `onRenameCategory` / `onDeleteCategory`) beats a local copy every time.
+   Change it in its one home so every consumer inherits the improvement.
 3. **Nothing fits? STOP — propose the standard before implementing.**
    Bring the user a short design discussion, not a diff:
    - the proposed component's API sketch (props/slots, one paragraph);
@@ -143,7 +143,16 @@ page surface (**no** card frame or own background behind it), tight
 0.3rem-padded rows, hover = `--surface-hover`, selection = primary *tint*
 (`rgba(var(--primary-color-rgb), 0.12)` + 0.24 border), never solid primary.
 A `border-right` separates a sidebar from the grid. `compact` prop = framed
-variant for dialogs only.
+variant for dialogs only. Management (user-set, 2026-07-06): everything
+happens **in the tree** — an "All" bucket above "Unassigned", and
+add/add-subcategory/rename/delete via the right-click context menu with an
+inline name editor (no manager dialog, no toolbar "Add Category" button, no
+hover icon buttons, no empty-state text). Wire it via the panel's
+`onCreateCategory`/`onRenameCategory`/`onDeleteCategory` props; sentinel ids
++ `isRealCategoryId` live in `@/shared/types/categories` — never send a
+sentinel id to the backend as a real categoryId (upload-while-All bug
+class). Deleting recursively removes the branch; assets become
+uncategorized (backend `CategoryCommandHandlers.DeleteAsync`).
 
 **Card identity** (encoded in `AssetTile.css` — change it there or nowhere):
 radius `--mod-radius-lg`, shadow `--mod-shadow-sm`, hover lift
@@ -199,6 +208,13 @@ state feature dead — no error, no type failure in some cases. Known cases:
 - `Tree selectionMode="single"` takes `selectionKeys` as a **string** (the
   key) — the `{ key: true }` map is only for multiple/checkbox modes; passing
   it means selection never highlights (shipped bug, found by the gallery).
+- `Tree expandedKeys` without `onToggle` is **uncontrolled after mount** —
+  the prop seeds internal state once and later updates are ignored, so a
+  node that gains its first child stays collapsed no matter what you pass.
+  Provide `onToggle` (fully controlled) when expansion must react to data
+  (found by e2e: the category inline-create placeholder never showed under
+  a childless parent; jsdom tests missed it because their parent already
+  had a child).
 - Disabled state renders as the `p-disabled` **class**, not
   `aria-disabled`/`disabled` attributes (known from the e2e suite).
 - Overlay components (Dropdown panels, Dialogs) portal to `document.body` —
