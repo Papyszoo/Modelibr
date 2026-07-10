@@ -125,12 +125,44 @@ public sealed class VirtualAssetStore : IStore
     }
 
     /// <summary>
+    /// Resolves a WebDAV path segment to a project id using the shared disambiguation
+    /// contract (id-suffix first, else an unambiguous case-insensitive name match).
+    /// Projects have their own creation-time uniqueness check and are never rendered
+    /// with an id suffix — but WebDAV clients on Windows/macOS treat paths
+    /// case-insensitively, so a case-only collision must never be guessed at.
+    /// </summary>
+    private static async Task<int?> ResolveProjectIdAsync(ApplicationDbContext dbContext, string segment)
+    {
+        if (WebDavUtilities.TryParseIdSuffix(segment, out var baseName, out var suffixId))
+        {
+            var byId = await dbContext.Projects.AsNoTracking()
+                .Where(p => p.Id == suffixId)
+                .Select(p => new { p.Id, p.Name })
+                .FirstOrDefaultAsync();
+            if (byId != null && string.Equals(byId.Name, baseName, StringComparison.OrdinalIgnoreCase))
+                return byId.Id;
+        }
+
+        var matches = await dbContext.Projects.AsNoTracking()
+            .Where(p => p.Name.ToLower() == segment.ToLower())
+            .Select(p => p.Id)
+            .Take(2)
+            .ToListAsync();
+
+        return matches.Count == 1 ? matches[0] : null;
+    }
+
+    /// <summary>
     /// WebDAV-specific query that loads a project with the full asset graph.
     /// Uses AsNoTracking for read-only access and AsSplitQuery to avoid cartesian explosion.
     /// </summary>
-    private static async Task<Domain.Models.Project?> GetProjectForWebDavAsync(IServiceProvider sp, string name)
+    private static async Task<Domain.Models.Project?> GetProjectForWebDavAsync(IServiceProvider sp, string segment)
     {
         var dbContext = sp.GetRequiredService<ApplicationDbContext>();
+
+        var projectId = await ResolveProjectIdAsync(dbContext, segment);
+        if (projectId == null)
+            return null;
 
         return await dbContext.Projects
             .AsNoTracking()
@@ -148,7 +180,7 @@ public sealed class VirtualAssetStore : IStore
                 .ThenInclude(e => e.Variants)
                     .ThenInclude(v => v.File)
             .AsSplitQuery()
-            .FirstOrDefaultAsync(p => p.Name == name);
+            .FirstOrDefaultAsync(p => p.Id == projectId);
     }
 
     private IStoreItem? ResolveSelectionPath(string[] segments)
@@ -247,16 +279,18 @@ public sealed class VirtualAssetStore : IStore
     /// /Projects/{P}/Models/{ModelName}/v{N}/{FileName} → actual file
     /// /Projects/{P}/Models/{ModelName}/newest/{FileName} → actual file from newest version
     /// </summary>
-    private IStoreItem? ResolveModelPath(Domain.Models.Project project, string modelName, string[] segments)
+    private IStoreItem? ResolveModelPath(Domain.Models.Project project, string modelSegment, string[] segments)
     {
-        var model = project.Models.FirstOrDefault(m => !m.IsDeleted && m.Name == modelName);
+        var siblings = project.Models.Where(m => !m.IsDeleted).ToList();
+        var model = WebDavUtilities.ResolveSegment(modelSegment, siblings, m => m.Id, m => m.Name);
         if (model == null)
             return null;
 
         // /Projects/{P}/Models/{ModelName} → show versions
         if (segments.Length == 4)
         {
-            return new VirtualModelCollection(_collectionPropertyManager, _lockingManager, model, _itemPropertyManager, _pathProvider, _blendFileGenerator, _logger);
+            var displayName = WebDavUtilities.ComputeDisplayNames(siblings, m => m.Id, m => m.Name)[model.Id];
+            return new VirtualModelCollection(_collectionPropertyManager, _lockingManager, model, _itemPropertyManager, _pathProvider, _blendFileGenerator, _logger, displayName);
         }
 
         // /Projects/{P}/Models/{ModelName}/v{N} or /Projects/{P}/Models/{ModelName}/newest or generated-/uploaded-{ModelName}.blend
@@ -378,16 +412,18 @@ public sealed class VirtualAssetStore : IStore
     /// /Projects/{P}/TextureSets/{SetName}/TextureTypes → files named by type (AO.png, Roughness.png)
     /// /Projects/{P}/TextureSets/{SetName}/Files → original uploaded files
     /// </summary>
-    private IStoreItem? ResolveTextureSetPath(Domain.Models.Project project, string setName, string[] segments)
+    private IStoreItem? ResolveTextureSetPath(Domain.Models.Project project, string setSegment, string[] segments)
     {
-        var textureSet = project.TextureSets.FirstOrDefault(ts => !ts.IsDeleted && ts.Name == setName);
+        var siblings = project.TextureSets.Where(ts => !ts.IsDeleted).ToList();
+        var textureSet = WebDavUtilities.ResolveSegment(setSegment, siblings, ts => ts.Id, ts => ts.Name);
         if (textureSet == null)
             return null;
 
         // /Projects/{P}/TextureSets/{SetName} → show TextureTypes and Files subdirs
         if (segments.Length == 4)
         {
-            return new VirtualTextureSetCollection(_collectionPropertyManager, _lockingManager, textureSet, _itemPropertyManager, _pathProvider);
+            var displayName = WebDavUtilities.ComputeDisplayNames(siblings, ts => ts.Id, ts => ts.Name)[textureSet.Id];
+            return new VirtualTextureSetCollection(_collectionPropertyManager, _lockingManager, textureSet, _itemPropertyManager, _pathProvider, displayName);
         }
 
         // /Projects/{P}/TextureSets/{SetName}/{SubDir}
@@ -489,9 +525,9 @@ public sealed class VirtualAssetStore : IStore
         }
 
         // /Sounds/{CategoryName} or /Sounds/Unassigned
-        var categoryName = Uri.UnescapeDataString(segments[1]);
+        var categorySegment = Uri.UnescapeDataString(segments[1]);
 
-        if (categoryName.Equals("Unassigned", StringComparison.OrdinalIgnoreCase))
+        if (categorySegment.Equals("Unassigned", StringComparison.OrdinalIgnoreCase))
         {
             if (segments.Length == 2)
             {
@@ -501,20 +537,21 @@ public sealed class VirtualAssetStore : IStore
             }
 
             // /Sounds/Unassigned/{FileName}
-            var fileName = Uri.UnescapeDataString(segments[2]);
+            var fileSegment = Uri.UnescapeDataString(segments[2]);
             var allSoundsForFile = await soundRepo.GetAllAsync();
-            var sound = allSoundsForFile.FirstOrDefault(s =>
-                s.SoundCategoryId == null &&
-                !s.IsDeleted &&
-                WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName) == fileName);
+            var unassignedSiblings = allSoundsForFile.Where(s => s.SoundCategoryId == null && !s.IsDeleted).ToList();
+            var sound = WebDavUtilities.ResolveSegment(fileSegment, unassignedSiblings, s => s.Id,
+                s => WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName));
 
             if (sound == null)
                 return null;
 
+            var unassignedDisplayName = ComputeSoundFileName(unassignedSiblings, sound.Id);
+
             return new VirtualAssetFile(
                 _itemPropertyManager,
                 _lockingManager,
-                WebDavUtilities.GetVirtualFileName(sound.Name, sound.File.OriginalFileName),
+                unassignedDisplayName,
                 sound.File.Sha256Hash,
                 sound.File.SizeBytes,
                 sound.File.MimeType,
@@ -523,7 +560,11 @@ public sealed class VirtualAssetStore : IStore
                 _pathProvider);
         }
 
-        var category = await categoryRepo.GetByNameAsync(categoryName, null);
+        // Category names are enforced unique per-parent at the DB level (case-sensitively),
+        // so a case-only collision is possible for WebDAV clients that treat paths
+        // case-insensitively (Windows/macOS) — never guess among duplicates.
+        var allCategories = await categoryRepo.GetAllAsync();
+        var category = WebDavUtilities.ResolveSegment(categorySegment, allCategories.ToList(), c => c.Id, c => c.Name);
         if (category == null)
             return null;
 
@@ -536,12 +577,11 @@ public sealed class VirtualAssetStore : IStore
         }
 
         // /Sounds/{CategoryName}/{SoundName}
-        var soundName = Uri.UnescapeDataString(segments[2]);
+        var soundSegment = Uri.UnescapeDataString(segments[2]);
         var sounds = await soundRepo.GetAllAsync();
-        var foundSound = sounds.FirstOrDefault(s =>
-            s.SoundCategoryId == category.Id &&
-            !s.IsDeleted &&
-            WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName) == soundName);
+        var categorySiblings = sounds.Where(s => s.SoundCategoryId == category.Id && !s.IsDeleted).ToList();
+        var foundSound = WebDavUtilities.ResolveSegment(soundSegment, categorySiblings, s => s.Id,
+            s => WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName));
 
         if (foundSound == null)
             return null;
@@ -549,7 +589,7 @@ public sealed class VirtualAssetStore : IStore
         return new VirtualAssetFile(
             _itemPropertyManager,
             _lockingManager,
-            WebDavUtilities.GetVirtualFileName(foundSound.Name, foundSound.File.OriginalFileName),
+            ComputeSoundFileName(categorySiblings, foundSound.Id),
             foundSound.File.Sha256Hash,
             foundSound.File.SizeBytes,
             foundSound.File.MimeType,
@@ -558,9 +598,18 @@ public sealed class VirtualAssetStore : IStore
             _pathProvider);
     }
 
-    private IStoreItem? ResolveProjectSpriteFile(Domain.Models.Project project, string fileName)
+    private static string ComputeSoundFileName(List<Domain.Models.Sound> siblings, int soundId)
     {
-        var sprite = project.Sprites.FirstOrDefault(s => !s.IsDeleted && WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName) == fileName);
+        var names = WebDavUtilities.ComputeDisplayNames(siblings, s => s.Id, s => s.Name);
+        var sound = siblings.First(s => s.Id == soundId);
+        return WebDavUtilities.GetVirtualFileName(names[soundId], sound.File.OriginalFileName);
+    }
+
+    private IStoreItem? ResolveProjectSpriteFile(Domain.Models.Project project, string fileSegment)
+    {
+        var siblings = project.Sprites.Where(s => !s.IsDeleted).ToList();
+        var sprite = WebDavUtilities.ResolveSegment(fileSegment, siblings, s => s.Id,
+            s => WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName));
 
         if (sprite == null)
             return null;
@@ -568,7 +617,7 @@ public sealed class VirtualAssetStore : IStore
         return new VirtualAssetFile(
             _itemPropertyManager,
             _lockingManager,
-            WebDavUtilities.GetVirtualFileName(sprite.Name, sprite.File.OriginalFileName),
+            ComputeSpriteFileName(siblings, sprite.Id),
             sprite.File.Sha256Hash,
             sprite.File.SizeBytes,
             sprite.File.MimeType,
@@ -577,9 +626,11 @@ public sealed class VirtualAssetStore : IStore
             _pathProvider);
     }
 
-    private IStoreItem? ResolveProjectSoundFile(Domain.Models.Project project, string fileName)
+    private IStoreItem? ResolveProjectSoundFile(Domain.Models.Project project, string fileSegment)
     {
-        var sound = project.Sounds.FirstOrDefault(s => !s.IsDeleted && WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName) == fileName);
+        var siblings = project.Sounds.Where(s => !s.IsDeleted).ToList();
+        var sound = WebDavUtilities.ResolveSegment(fileSegment, siblings, s => s.Id,
+            s => WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName));
 
         if (sound == null)
             return null;
@@ -587,7 +638,7 @@ public sealed class VirtualAssetStore : IStore
         return new VirtualAssetFile(
             _itemPropertyManager,
             _lockingManager,
-            WebDavUtilities.GetVirtualFileName(sound.Name, sound.File.OriginalFileName),
+            ComputeSoundFileName(siblings, sound.Id),
             sound.File.Sha256Hash,
             sound.File.SizeBytes,
             sound.File.MimeType,
@@ -596,13 +647,52 @@ public sealed class VirtualAssetStore : IStore
             _pathProvider);
     }
 
+    private static string ComputeSpriteFileName(List<Domain.Models.Sprite> siblings, int spriteId)
+    {
+        var names = WebDavUtilities.ComputeDisplayNames(siblings, s => s.Id, s => s.Name);
+        var sprite = siblings.First(s => s.Id == spriteId);
+        return WebDavUtilities.GetVirtualFileName(names[spriteId], sprite.File.OriginalFileName);
+    }
+
+    /// <summary>
+    /// Resolves a WebDAV path segment to a pack id using the shared disambiguation
+    /// contract (id-suffix first, else an unambiguous case-insensitive name match).
+    /// Packs have their own creation-time uniqueness check and are never rendered
+    /// with an id suffix — but WebDAV clients on Windows/macOS treat paths
+    /// case-insensitively, so a case-only collision must never be guessed at.
+    /// </summary>
+    private static async Task<int?> ResolvePackIdAsync(ApplicationDbContext dbContext, string segment)
+    {
+        if (WebDavUtilities.TryParseIdSuffix(segment, out var baseName, out var suffixId))
+        {
+            var byId = await dbContext.Packs.AsNoTracking()
+                .Where(p => p.Id == suffixId)
+                .Select(p => new { p.Id, p.Name })
+                .FirstOrDefaultAsync();
+            if (byId != null && string.Equals(byId.Name, baseName, StringComparison.OrdinalIgnoreCase))
+                return byId.Id;
+        }
+
+        var matches = await dbContext.Packs.AsNoTracking()
+            .Where(p => p.Name.ToLower() == segment.ToLower())
+            .Select(p => p.Id)
+            .Take(2)
+            .ToListAsync();
+
+        return matches.Count == 1 ? matches[0] : null;
+    }
+
     /// <summary>
     /// WebDAV-specific query that loads a pack with the full asset graph.
     /// Uses AsNoTracking for read-only access and AsSplitQuery to avoid cartesian explosion.
     /// </summary>
-    private static async Task<Domain.Models.Pack?> GetPackForWebDavAsync(IServiceProvider sp, string name)
+    private static async Task<Domain.Models.Pack?> GetPackForWebDavAsync(IServiceProvider sp, string segment)
     {
         var dbContext = sp.GetRequiredService<ApplicationDbContext>();
+
+        var packId = await ResolvePackIdAsync(dbContext, segment);
+        if (packId == null)
+            return null;
 
         return await dbContext.Packs
             .AsNoTracking()
@@ -620,7 +710,7 @@ public sealed class VirtualAssetStore : IStore
                 .ThenInclude(e => e.Variants)
                     .ThenInclude(v => v.File)
             .AsSplitQuery()
-            .FirstOrDefaultAsync(p => p.Name == name);
+            .FirstOrDefaultAsync(p => p.Id == packId);
     }
 
     /// <summary>
@@ -643,18 +733,59 @@ public sealed class VirtualAssetStore : IStore
     /// <summary>
     /// WebDAV-specific query that loads a single model with full version information.
     /// Uses AsNoTracking for read-only access and AsSplitQuery to avoid cartesian explosion.
+    /// Resolves the segment via the shared disambiguation contract (id-suffix first,
+    /// else an unambiguous case-insensitive name match — never guesses among duplicates).
     /// </summary>
-    private static async Task<Domain.Models.Model?> GetModelForWebDavAsync(IServiceProvider sp, string name)
+    private static async Task<Domain.Models.Model?> GetModelForWebDavAsync(IServiceProvider sp, string segment)
     {
         var dbContext = sp.GetRequiredService<ApplicationDbContext>();
 
+        int? modelId = null;
+
+        if (WebDavUtilities.TryParseIdSuffix(segment, out var baseName, out var suffixId))
+        {
+            var byId = await dbContext.Models.AsNoTracking()
+                .Where(m => !m.IsDeleted && m.Id == suffixId)
+                .Select(m => new { m.Id, m.Name })
+                .FirstOrDefaultAsync();
+            if (byId != null && string.Equals(byId.Name, baseName, StringComparison.OrdinalIgnoreCase))
+                modelId = byId.Id;
+        }
+
+        if (modelId == null)
+        {
+            var matches = await dbContext.Models.AsNoTracking()
+                .Where(m => !m.IsDeleted && m.Name.ToLower() == segment.ToLower())
+                .Select(m => m.Id)
+                .Take(2)
+                .ToListAsync();
+
+            if (matches.Count != 1)
+                return null;
+
+            modelId = matches[0];
+        }
+
         return await dbContext.Models
             .AsNoTracking()
-            .Where(m => !m.IsDeleted && m.Name == name)
+            .Where(m => !m.IsDeleted && m.Id == modelId)
             .Include(m => m.Versions)
                 .ThenInclude(v => v.Files)
             .AsSplitQuery()
             .FirstOrDefaultAsync();
+    }
+
+    /// <summary>
+    /// Computes a globally-resolved model's WebDAV display name, appending the "[id]"
+    /// suffix only if another non-deleted model shares its name case-insensitively.
+    /// A lightweight existence check — avoids loading every model just to render one.
+    /// </summary>
+    private static async Task<string> ComputeGlobalModelDisplayNameAsync(ApplicationDbContext dbContext, Domain.Models.Model model)
+    {
+        var collides = await dbContext.Models.AsNoTracking()
+            .AnyAsync(m => !m.IsDeleted && m.Id != model.Id && m.Name.ToLower() == model.Name.ToLower());
+
+        return collides ? WebDavUtilities.FormatWithIdSuffix(model.Name, model.Id) : model.Name;
     }
 
     private async Task<IStoreItem?> ResolvePackPathAsync(IServiceProvider sp, string[] segments)
@@ -709,15 +840,17 @@ public sealed class VirtualAssetStore : IStore
         };
     }
 
-    private IStoreItem? ResolvePackModelPath(Domain.Models.Pack pack, string modelName, string[] segments)
+    private IStoreItem? ResolvePackModelPath(Domain.Models.Pack pack, string modelSegment, string[] segments)
     {
-        var model = pack.Models.FirstOrDefault(m => !m.IsDeleted && m.Name == modelName);
+        var siblings = pack.Models.Where(m => !m.IsDeleted).ToList();
+        var model = WebDavUtilities.ResolveSegment(modelSegment, siblings, m => m.Id, m => m.Name);
         if (model == null)
             return null;
 
         if (segments.Length == 4)
         {
-            return new VirtualModelCollection(_collectionPropertyManager, _lockingManager, model, _itemPropertyManager, _pathProvider, _blendFileGenerator, _logger);
+            var displayName = WebDavUtilities.ComputeDisplayNames(siblings, m => m.Id, m => m.Name)[model.Id];
+            return new VirtualModelCollection(_collectionPropertyManager, _lockingManager, model, _itemPropertyManager, _pathProvider, _blendFileGenerator, _logger, displayName);
         }
 
         var versionName = Uri.UnescapeDataString(segments[4]);
@@ -769,15 +902,17 @@ public sealed class VirtualAssetStore : IStore
             _pathProvider);
     }
 
-    private IStoreItem? ResolvePackTextureSetPath(Domain.Models.Pack pack, string setName, string[] segments)
+    private IStoreItem? ResolvePackTextureSetPath(Domain.Models.Pack pack, string setSegment, string[] segments)
     {
-        var textureSet = pack.TextureSets.FirstOrDefault(ts => !ts.IsDeleted && ts.Name == setName);
+        var siblings = pack.TextureSets.Where(ts => !ts.IsDeleted).ToList();
+        var textureSet = WebDavUtilities.ResolveSegment(setSegment, siblings, ts => ts.Id, ts => ts.Name);
         if (textureSet == null)
             return null;
 
         if (segments.Length == 4)
         {
-            return new VirtualTextureSetCollection(_collectionPropertyManager, _lockingManager, textureSet, _itemPropertyManager, _pathProvider);
+            var displayName = WebDavUtilities.ComputeDisplayNames(siblings, ts => ts.Id, ts => ts.Name)[textureSet.Id];
+            return new VirtualTextureSetCollection(_collectionPropertyManager, _lockingManager, textureSet, _itemPropertyManager, _pathProvider, displayName);
         }
 
         var subDir = Uri.UnescapeDataString(segments[4]).ToLowerInvariant();
@@ -802,16 +937,18 @@ public sealed class VirtualAssetStore : IStore
         };
     }
 
-    private IStoreItem? ResolvePackSpriteFile(Domain.Models.Pack pack, string fileName)
+    private IStoreItem? ResolvePackSpriteFile(Domain.Models.Pack pack, string fileSegment)
     {
-        var sprite = pack.Sprites.FirstOrDefault(s => !s.IsDeleted && WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName) == fileName);
+        var siblings = pack.Sprites.Where(s => !s.IsDeleted).ToList();
+        var sprite = WebDavUtilities.ResolveSegment(fileSegment, siblings, s => s.Id,
+            s => WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName));
         if (sprite == null)
             return null;
 
         return new VirtualAssetFile(
             _itemPropertyManager,
             _lockingManager,
-            WebDavUtilities.GetVirtualFileName(sprite.Name, sprite.File.OriginalFileName),
+            ComputeSpriteFileName(siblings, sprite.Id),
             sprite.File.Sha256Hash,
             sprite.File.SizeBytes,
             sprite.File.MimeType,
@@ -820,16 +957,18 @@ public sealed class VirtualAssetStore : IStore
             _pathProvider);
     }
 
-    private IStoreItem? ResolvePackSoundFile(Domain.Models.Pack pack, string fileName)
+    private IStoreItem? ResolvePackSoundFile(Domain.Models.Pack pack, string fileSegment)
     {
-        var sound = pack.Sounds.FirstOrDefault(s => !s.IsDeleted && WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName) == fileName);
+        var siblings = pack.Sounds.Where(s => !s.IsDeleted).ToList();
+        var sound = WebDavUtilities.ResolveSegment(fileSegment, siblings, s => s.Id,
+            s => WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName));
         if (sound == null)
             return null;
 
         return new VirtualAssetFile(
             _itemPropertyManager,
             _lockingManager,
-            WebDavUtilities.GetVirtualFileName(sound.Name, sound.File.OriginalFileName),
+            ComputeSoundFileName(siblings, sound.Id),
             sound.File.Sha256Hash,
             sound.File.SizeBytes,
             sound.File.MimeType,
@@ -848,14 +987,15 @@ public sealed class VirtualAssetStore : IStore
         }
 
         // /Models/{ModelName} - use WebDAV-specific query with full includes
-        var modelName = Uri.UnescapeDataString(segments[1]);
-        var model = await GetModelForWebDavAsync(sp, modelName);
+        var modelSegment = Uri.UnescapeDataString(segments[1]);
+        var model = await GetModelForWebDavAsync(sp, modelSegment);
         if (model == null)
             return null;
 
         if (segments.Length == 2)
         {
-            return new VirtualModelCollection(_collectionPropertyManager, _lockingManager, model, _itemPropertyManager, _pathProvider, _blendFileGenerator, _logger);
+            var displayName = await ComputeGlobalModelDisplayNameAsync(sp.GetRequiredService<ApplicationDbContext>(), model);
+            return new VirtualModelCollection(_collectionPropertyManager, _lockingManager, model, _itemPropertyManager, _pathProvider, _blendFileGenerator, _logger, displayName);
         }
 
         // /Models/{ModelName}/v{N} or /Models/{ModelName}/newest
@@ -973,22 +1113,27 @@ public sealed class VirtualAssetStore : IStore
     {
         var textureSetRepo = sp.GetRequiredService<ITextureSetRepository>();
 
+        // Both listing and single-item resolution need the full sibling set to compute
+        // disambiguated names — GetAllAsync already loads the includes callers need, so
+        // reuse it instead of a separate (case-sensitive) GetByNameAsync lookup.
+        var allTextureSets = (await textureSetRepo.GetAllAsync()).Where(ts => !ts.IsDeleted).ToList();
+
         // /TextureSets
         if (segments.Length == 1)
         {
-            var textureSets = await textureSetRepo.GetAllAsync();
-            return new VirtualAllTextureSetsCollection(_collectionPropertyManager, _lockingManager, textureSets.ToList(), _itemPropertyManager, _pathProvider);
+            return new VirtualAllTextureSetsCollection(_collectionPropertyManager, _lockingManager, allTextureSets, _itemPropertyManager, _pathProvider);
         }
 
         // /TextureSets/{SetName}
-        var setName = Uri.UnescapeDataString(segments[1]);
-        var textureSet = await textureSetRepo.GetByNameAsync(setName);
-        if (textureSet == null || textureSet.IsDeleted)
+        var setSegment = Uri.UnescapeDataString(segments[1]);
+        var textureSet = WebDavUtilities.ResolveSegment(setSegment, allTextureSets, ts => ts.Id, ts => ts.Name);
+        if (textureSet == null)
             return null;
 
         if (segments.Length == 2)
         {
-            return new VirtualTextureSetCollection(_collectionPropertyManager, _lockingManager, textureSet, _itemPropertyManager, _pathProvider);
+            var displayName = WebDavUtilities.ComputeDisplayNames(allTextureSets, ts => ts.Id, ts => ts.Name)[textureSet.Id];
+            return new VirtualTextureSetCollection(_collectionPropertyManager, _lockingManager, textureSet, _itemPropertyManager, _pathProvider, displayName);
         }
 
         // /TextureSets/{SetName}/{SubDir}
@@ -1019,31 +1164,41 @@ public sealed class VirtualAssetStore : IStore
     {
         var environmentMapRepository = sp.GetRequiredService<IEnvironmentMapRepository>();
 
+        // Both listing and single-item resolution need the full sibling set to compute
+        // disambiguated names — GetAllAsync already loads the includes callers need, so
+        // reuse it instead of a separate (case-sensitive) GetByNameAsync lookup.
+        var allEnvironmentMaps = (await environmentMapRepository.GetAllAsync()).Where(e => !e.IsDeleted).ToList();
+
         if (segments.Length == 1)
         {
-            var environmentMaps = await environmentMapRepository.GetAllAsync();
-            return new VirtualAllEnvironmentMapsCollection(_collectionPropertyManager, _lockingManager, environmentMaps.ToList(), _itemPropertyManager, _pathProvider);
+            return new VirtualAllEnvironmentMapsCollection(_collectionPropertyManager, _lockingManager, allEnvironmentMaps, _itemPropertyManager, _pathProvider);
         }
 
-        var mapName = Uri.UnescapeDataString(segments[1]);
-        var environmentMap = await environmentMapRepository.GetByNameAsync(mapName);
-        if (environmentMap == null || environmentMap.IsDeleted)
+        var mapSegment = Uri.UnescapeDataString(segments[1]);
+        var environmentMap = WebDavUtilities.ResolveSegment(mapSegment, allEnvironmentMaps, e => e.Id, e => e.Name);
+        if (environmentMap == null)
             return null;
 
-        return ResolveEnvironmentMapCollection(environmentMap, segments, 2);
+        var displayName = WebDavUtilities.ComputeDisplayNames(allEnvironmentMaps, e => e.Id, e => e.Name)[environmentMap.Id];
+        return ResolveEnvironmentMapCollection(environmentMap, segments, 2, displayName);
     }
 
-    private IStoreItem? ResolveEnvironmentMapPath(IEnumerable<Domain.Models.EnvironmentMap> environmentMaps, string name, string[] segments, int baseIndex)
+    private IStoreItem? ResolveEnvironmentMapPath(IEnumerable<Domain.Models.EnvironmentMap> environmentMaps, string nameSegment, string[] segments, int baseIndex)
     {
-        var environmentMap = environmentMaps.FirstOrDefault(e => !e.IsDeleted && e.Name == name);
-        return environmentMap == null ? null : ResolveEnvironmentMapCollection(environmentMap, segments, baseIndex);
+        var siblings = environmentMaps.Where(e => !e.IsDeleted).ToList();
+        var environmentMap = WebDavUtilities.ResolveSegment(nameSegment, siblings, e => e.Id, e => e.Name);
+        if (environmentMap == null)
+            return null;
+
+        var displayName = WebDavUtilities.ComputeDisplayNames(siblings, e => e.Id, e => e.Name)[environmentMap.Id];
+        return ResolveEnvironmentMapCollection(environmentMap, segments, baseIndex, displayName);
     }
 
-    private IStoreItem? ResolveEnvironmentMapCollection(Domain.Models.EnvironmentMap environmentMap, string[] segments, int subDirIndex)
+    private IStoreItem? ResolveEnvironmentMapCollection(Domain.Models.EnvironmentMap environmentMap, string[] segments, int subDirIndex, string? displayName = null)
     {
         if (segments.Length == subDirIndex)
         {
-            return new VirtualEnvironmentMapCollection(_collectionPropertyManager, _lockingManager, environmentMap, _itemPropertyManager, _pathProvider);
+            return new VirtualEnvironmentMapCollection(_collectionPropertyManager, _lockingManager, environmentMap, _itemPropertyManager, _pathProvider, displayName);
         }
 
         var subDir = Uri.UnescapeDataString(segments[subDirIndex]).ToLowerInvariant();
@@ -1125,9 +1280,9 @@ public sealed class VirtualAssetStore : IStore
         }
 
         // /Sprites/{CategoryName} or /Sprites/Unassigned
-        var categoryName = Uri.UnescapeDataString(segments[1]);
+        var categorySegment = Uri.UnescapeDataString(segments[1]);
 
-        if (categoryName.Equals("Unassigned", StringComparison.OrdinalIgnoreCase))
+        if (categorySegment.Equals("Unassigned", StringComparison.OrdinalIgnoreCase))
         {
             if (segments.Length == 2)
             {
@@ -1137,12 +1292,11 @@ public sealed class VirtualAssetStore : IStore
             }
 
             // /Sprites/Unassigned/{FileName}
-            var fileName = Uri.UnescapeDataString(segments[2]);
+            var fileSegment = Uri.UnescapeDataString(segments[2]);
             var allSpritesForFile = await spriteRepo.GetAllAsync();
-            var sprite = allSpritesForFile.FirstOrDefault(s =>
-                s.SpriteCategoryId == null &&
-                !s.IsDeleted &&
-                WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName) == fileName);
+            var unassignedSiblings = allSpritesForFile.Where(s => s.SpriteCategoryId == null && !s.IsDeleted).ToList();
+            var sprite = WebDavUtilities.ResolveSegment(fileSegment, unassignedSiblings, s => s.Id,
+                s => WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName));
 
             if (sprite == null)
                 return null;
@@ -1150,7 +1304,7 @@ public sealed class VirtualAssetStore : IStore
             return new VirtualAssetFile(
                 _itemPropertyManager,
                 _lockingManager,
-                WebDavUtilities.GetVirtualFileName(sprite.Name, sprite.File.OriginalFileName),
+                ComputeSpriteFileName(unassignedSiblings, sprite.Id),
                 sprite.File.Sha256Hash,
                 sprite.File.SizeBytes,
                 sprite.File.MimeType,
@@ -1159,7 +1313,11 @@ public sealed class VirtualAssetStore : IStore
                 _pathProvider);
         }
 
-        var category = await categoryRepo.GetByNameAsync(categoryName, null);
+        // Category names are enforced unique per-parent at the DB level (case-sensitively),
+        // so a case-only collision is possible for WebDAV clients that treat paths
+        // case-insensitively (Windows/macOS) — never guess among duplicates.
+        var allCategories = await categoryRepo.GetAllAsync();
+        var category = WebDavUtilities.ResolveSegment(categorySegment, allCategories.ToList(), c => c.Id, c => c.Name);
         if (category == null)
             return null;
 
@@ -1171,12 +1329,11 @@ public sealed class VirtualAssetStore : IStore
         }
 
         // /Sprites/{CategoryName}/{FileName}
-        var spriteFileName = Uri.UnescapeDataString(segments[2]);
+        var spriteFileSegment = Uri.UnescapeDataString(segments[2]);
         var spritesForFile = await spriteRepo.GetAllAsync();
-        var foundSprite = spritesForFile.FirstOrDefault(s =>
-            s.SpriteCategoryId == category.Id &&
-            !s.IsDeleted &&
-            WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName) == spriteFileName);
+        var categorySiblings = spritesForFile.Where(s => s.SpriteCategoryId == category.Id && !s.IsDeleted).ToList();
+        var foundSprite = WebDavUtilities.ResolveSegment(spriteFileSegment, categorySiblings, s => s.Id,
+            s => WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName));
 
         if (foundSprite == null)
             return null;
@@ -1184,7 +1341,7 @@ public sealed class VirtualAssetStore : IStore
         return new VirtualAssetFile(
             _itemPropertyManager,
             _lockingManager,
-            WebDavUtilities.GetVirtualFileName(foundSprite.Name, foundSprite.File.OriginalFileName),
+            ComputeSpriteFileName(categorySiblings, foundSprite.Id),
             foundSprite.File.Sha256Hash,
             foundSprite.File.SizeBytes,
             foundSprite.File.MimeType,

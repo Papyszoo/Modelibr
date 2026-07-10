@@ -39,7 +39,10 @@ public sealed class VirtualSpriteCategoriesCollection : VirtualCollectionBase
                 null!));
         }
 
-        var category = _categories.FirstOrDefault(c => c.Name == name);
+        // Category names are enforced unique per-parent at the DB level (case-sensitively),
+        // so a case-only collision is possible for WebDAV clients that treat paths
+        // case-insensitively (Windows/macOS) — never guess among duplicates.
+        var category = WebDavUtilities.ResolveSegment(name, _categories, c => c.Id, c => c.Name);
         if (category == null)
             return Task.FromResult<IStoreItem?>(null);
 
@@ -112,14 +115,17 @@ public sealed class VirtualSpriteCategoryCollection : VirtualCollectionBase
         if (_itemPropertyManager == null || _pathProvider == null)
             return Task.FromResult<IStoreItem?>(null);
 
-        var sprite = _sprites.FirstOrDefault(s => WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName) == name);
+        var sprite = WebDavUtilities.ResolveSegment(name, _sprites, s => s.Id,
+            s => WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName));
         if (sprite == null)
             return Task.FromResult<IStoreItem?>(null);
+
+        var displayNames = ComputeSpriteFileNames(_sprites);
 
         return Task.FromResult<IStoreItem?>(new VirtualAssetFile(
             _itemPropertyManager,
             LockingManager,
-            WebDavUtilities.GetVirtualFileName(sprite.Name, sprite.File.OriginalFileName),
+            displayNames[sprite.Id],
             sprite.File.Sha256Hash,
             sprite.File.SizeBytes,
             sprite.File.MimeType,
@@ -133,10 +139,12 @@ public sealed class VirtualSpriteCategoryCollection : VirtualCollectionBase
         if (_itemPropertyManager == null || _pathProvider == null)
             return Task.FromResult<IEnumerable<IStoreItem>>(Array.Empty<IStoreItem>());
 
+        var displayNames = ComputeSpriteFileNames(_sprites);
+
         var items = _sprites.Select(s => (IStoreItem)new VirtualAssetFile(
             _itemPropertyManager,
             LockingManager,
-            WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName),
+            displayNames[s.Id],
             s.File.Sha256Hash,
             s.File.SizeBytes,
             s.File.MimeType,
@@ -145,6 +153,12 @@ public sealed class VirtualSpriteCategoryCollection : VirtualCollectionBase
             _pathProvider));
 
         return Task.FromResult(items);
+    }
+
+    private static IReadOnlyDictionary<int, string> ComputeSpriteFileNames(List<Sprite> siblings)
+    {
+        var names = WebDavUtilities.ComputeDisplayNames(siblings, s => s.Id, s => s.Name);
+        return siblings.ToDictionary(s => s.Id, s => WebDavUtilities.GetVirtualFileName(names[s.Id], s.File.OriginalFileName));
     }
 }
 
@@ -177,14 +191,17 @@ public sealed class VirtualUnassignedSpritesCollection : VirtualCollectionBase
         if (_itemPropertyManager == null || _pathProvider == null)
             return Task.FromResult<IStoreItem?>(null);
 
-        var sprite = _sprites.FirstOrDefault(s => WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName) == name);
+        var sprite = WebDavUtilities.ResolveSegment(name, _sprites, s => s.Id,
+            s => WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName));
         if (sprite == null)
             return Task.FromResult<IStoreItem?>(null);
+
+        var displayNames = ComputeSpriteFileNames(_sprites);
 
         return Task.FromResult<IStoreItem?>(new VirtualAssetFile(
             _itemPropertyManager,
             LockingManager,
-            WebDavUtilities.GetVirtualFileName(sprite.Name, sprite.File.OriginalFileName),
+            displayNames[sprite.Id],
             sprite.File.Sha256Hash,
             sprite.File.SizeBytes,
             sprite.File.MimeType,
@@ -198,10 +215,12 @@ public sealed class VirtualUnassignedSpritesCollection : VirtualCollectionBase
         if (_itemPropertyManager == null || _pathProvider == null)
             return Task.FromResult<IEnumerable<IStoreItem>>(Array.Empty<IStoreItem>());
 
+        var displayNames = ComputeSpriteFileNames(_sprites);
+
         var items = _sprites.Select(s => (IStoreItem)new VirtualAssetFile(
             _itemPropertyManager,
             LockingManager,
-            WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName),
+            displayNames[s.Id],
             s.File.Sha256Hash,
             s.File.SizeBytes,
             s.File.MimeType,
@@ -210,5 +229,11 @@ public sealed class VirtualUnassignedSpritesCollection : VirtualCollectionBase
             _pathProvider));
 
         return Task.FromResult(items);
+    }
+
+    private static IReadOnlyDictionary<int, string> ComputeSpriteFileNames(List<Sprite> siblings)
+    {
+        var names = WebDavUtilities.ComputeDisplayNames(siblings, s => s.Id, s => s.Name);
+        return siblings.ToDictionary(s => s.Id, s => WebDavUtilities.GetVirtualFileName(names[s.Id], s.File.OriginalFileName));
     }
 }

@@ -46,14 +46,18 @@ public sealed class WritableProjectSpritesCollection : VirtualCollectionBase
 
     public override Task<IStoreItem?> GetItemAsync(string name, IHttpContext httpContext)
     {
-        var sprite = _project.Sprites.FirstOrDefault(s => !s.IsDeleted && WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName) == name);
+        var siblings = _project.Sprites.Where(s => !s.IsDeleted).ToList();
+        var sprite = WebDavUtilities.ResolveSegment(name, siblings, s => s.Id,
+            s => WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName));
         if (sprite == null)
             return Task.FromResult<IStoreItem?>(null);
+
+        var displayNames = ComputeSpriteFileNames(siblings);
 
         return Task.FromResult<IStoreItem?>(new VirtualAssetFile(
             _itemPropertyManager,
             LockingManager,
-            WebDavUtilities.GetVirtualFileName(sprite.Name, sprite.File.OriginalFileName),
+            displayNames[sprite.Id],
             sprite.File.Sha256Hash,
             sprite.File.SizeBytes,
             sprite.File.MimeType,
@@ -64,12 +68,14 @@ public sealed class WritableProjectSpritesCollection : VirtualCollectionBase
 
     public override Task<IEnumerable<IStoreItem>> GetItemsAsync(IHttpContext httpContext)
     {
-        var items = _project.Sprites
-            .Where(s => !s.IsDeleted)
+        var siblings = _project.Sprites.Where(s => !s.IsDeleted).ToList();
+        var displayNames = ComputeSpriteFileNames(siblings);
+
+        var items = siblings
             .Select(s => (IStoreItem)new VirtualAssetFile(
                 _itemPropertyManager,
                 LockingManager,
-                WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName),
+                displayNames[s.Id],
                 s.File.Sha256Hash,
                 s.File.SizeBytes,
                 s.File.MimeType,
@@ -78,6 +84,12 @@ public sealed class WritableProjectSpritesCollection : VirtualCollectionBase
                 _pathProvider));
 
         return Task.FromResult(items);
+    }
+
+    private static IReadOnlyDictionary<int, string> ComputeSpriteFileNames(List<Sprite> siblings)
+    {
+        var names = WebDavUtilities.ComputeDisplayNames(siblings, s => s.Id, s => s.Name);
+        return siblings.ToDictionary(s => s.Id, s => WebDavUtilities.GetVirtualFileName(names[s.Id], s.File.OriginalFileName));
     }
 
     /// <summary>
@@ -192,14 +204,18 @@ public sealed class WritableProjectSoundsCollection : VirtualCollectionBase
 
     public override Task<IStoreItem?> GetItemAsync(string name, IHttpContext httpContext)
     {
-        var sound = _project.Sounds.FirstOrDefault(s => !s.IsDeleted && WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName) == name);
+        var siblings = _project.Sounds.Where(s => !s.IsDeleted).ToList();
+        var sound = WebDavUtilities.ResolveSegment(name, siblings, s => s.Id,
+            s => WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName));
         if (sound == null)
             return Task.FromResult<IStoreItem?>(null);
+
+        var displayNames = ComputeSoundFileNames(siblings);
 
         return Task.FromResult<IStoreItem?>(new VirtualAssetFile(
             _itemPropertyManager,
             LockingManager,
-            WebDavUtilities.GetVirtualFileName(sound.Name, sound.File.OriginalFileName),
+            displayNames[sound.Id],
             sound.File.Sha256Hash,
             sound.File.SizeBytes,
             sound.File.MimeType,
@@ -210,12 +226,14 @@ public sealed class WritableProjectSoundsCollection : VirtualCollectionBase
 
     public override Task<IEnumerable<IStoreItem>> GetItemsAsync(IHttpContext httpContext)
     {
-        var items = _project.Sounds
-            .Where(s => !s.IsDeleted)
+        var siblings = _project.Sounds.Where(s => !s.IsDeleted).ToList();
+        var displayNames = ComputeSoundFileNames(siblings);
+
+        var items = siblings
             .Select(s => (IStoreItem)new VirtualAssetFile(
                 _itemPropertyManager,
                 LockingManager,
-                WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName),
+                displayNames[s.Id],
                 s.File.Sha256Hash,
                 s.File.SizeBytes,
                 s.File.MimeType,
@@ -224,6 +242,12 @@ public sealed class WritableProjectSoundsCollection : VirtualCollectionBase
                 _pathProvider));
 
         return Task.FromResult(items);
+    }
+
+    private static IReadOnlyDictionary<int, string> ComputeSoundFileNames(List<Sound> siblings)
+    {
+        var names = WebDavUtilities.ComputeDisplayNames(siblings, s => s.Id, s => s.Name);
+        return siblings.ToDictionary(s => s.Id, s => WebDavUtilities.GetVirtualFileName(names[s.Id], s.File.OriginalFileName));
     }
 
     /// <summary>
