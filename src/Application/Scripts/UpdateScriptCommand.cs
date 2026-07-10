@@ -1,5 +1,6 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Models;
 using Domain.Services;
 using SharedKernel;
 
@@ -9,15 +10,18 @@ internal class UpdateScriptCommandHandler : ICommandHandler<UpdateScriptCommand,
 {
     private readonly IScriptRepository _scriptRepository;
     private readonly IScriptCategoryRepository _scriptCategoryRepository;
+    private readonly ISettingRepository _settingRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
 
     public UpdateScriptCommandHandler(
         IScriptRepository scriptRepository,
         IScriptCategoryRepository scriptCategoryRepository,
+        ISettingRepository settingRepository,
         IDateTimeProvider dateTimeProvider)
     {
         _scriptRepository = scriptRepository;
         _scriptCategoryRepository = scriptCategoryRepository;
+        _settingRepository = settingRepository;
         _dateTimeProvider = dateTimeProvider;
     }
 
@@ -34,14 +38,26 @@ internal class UpdateScriptCommandHandler : ICommandHandler<UpdateScriptCommand,
 
             if (!string.IsNullOrWhiteSpace(command.Name) && command.Name != script.Name)
             {
-                var existingScript = await _scriptRepository.GetByNameAsync(command.Name, cancellationToken);
-                if (existingScript != null && existingScript.Id != script.Id)
+                // Renames follow the same DuplicateNamePolicy as creation: Allow keeps the
+                // name as-is, Reject fails, AutoRename appends a numeric suffix. The
+                // existence check excludes this script itself so it can keep or re-case
+                // its own name without tripping the Reject policy.
+                var nameResult = await AssetNameService.ResolveNameAsync(
+                    command.Name, "Script",
+                    async (name, ct) =>
+                    {
+                        var other = await _scriptRepository.GetByNameAsync(name, ct);
+                        return other != null && other.Id != script.Id;
+                    },
+                    _scriptRepository.GetNamesByPrefixAsync,
+                    _settingRepository, cancellationToken);
+                if (nameResult.IsFailure)
                 {
                     return Result.Failure<UpdateScriptResponse>(
                         new Error("ScriptAlreadyExists", $"A script with the name '{command.Name}' already exists."));
                 }
 
-                script.UpdateName(command.Name, _dateTimeProvider.UtcNow);
+                script.UpdateName(nameResult.Value, _dateTimeProvider.UtcNow);
             }
 
             if (command.CategoryId != script.ScriptCategoryId)

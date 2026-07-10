@@ -1,5 +1,6 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Models;
 using Domain.Services;
 using SharedKernel;
 
@@ -9,15 +10,18 @@ internal class UpdateTextureSetCommandHandler : ICommandHandler<UpdateTextureSet
 {
     private readonly ITextureSetRepository _textureSetRepository;
     private readonly ITextureSetCategoryRepository _textureSetCategoryRepository;
+    private readonly ISettingRepository _settingRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
 
     public UpdateTextureSetCommandHandler(
         ITextureSetRepository textureSetRepository,
         ITextureSetCategoryRepository textureSetCategoryRepository,
+        ISettingRepository settingRepository,
         IDateTimeProvider dateTimeProvider)
     {
         _textureSetRepository = textureSetRepository;
         _textureSetCategoryRepository = textureSetCategoryRepository;
+        _settingRepository = settingRepository;
         _dateTimeProvider = dateTimeProvider;
     }
 
@@ -32,12 +36,30 @@ internal class UpdateTextureSetCommandHandler : ICommandHandler<UpdateTextureSet
                     new Error("TextureSetNotFound", $"Texture set with ID {command.Id} was not found."));
             }
 
-            // Check if another texture set with the same name already exists (excluding current one)
-            var existingTextureSet = await _textureSetRepository.GetByNameAsync(command.Name, cancellationToken);
-            if (existingTextureSet != null && existingTextureSet.Id != command.Id)
+            // Renames follow the same DuplicateNamePolicy as creation: Allow keeps the
+            // name as-is, Reject fails, AutoRename appends a numeric suffix. Only checked
+            // when the name actually changed, and the existence check excludes this
+            // texture set itself so it can keep or re-case its own name without tripping
+            // the Reject policy.
+            var resolvedName = command.Name;
+            if (command.Name != textureSet.Name)
             {
-                return Result.Failure<UpdateTextureSetResponse>(
-                    new Error("TextureSetNameAlreadyExists", $"A texture set with the name '{command.Name}' already exists."));
+                var nameResult = await AssetNameService.ResolveNameAsync(
+                    command.Name, "TextureSet",
+                    async (name, ct) =>
+                    {
+                        var other = await _textureSetRepository.GetByNameAsync(name, ct);
+                        return other != null && other.Id != command.Id;
+                    },
+                    _textureSetRepository.GetNamesByPrefixAsync,
+                    _settingRepository, cancellationToken);
+                if (nameResult.IsFailure)
+                {
+                    return Result.Failure<UpdateTextureSetResponse>(
+                        new Error("TextureSetNameAlreadyExists", $"A texture set with the name '{command.Name}' already exists."));
+                }
+
+                resolvedName = nameResult.Value;
             }
 
             if (command.CategoryId.HasValue)
@@ -57,7 +79,7 @@ internal class UpdateTextureSetCommandHandler : ICommandHandler<UpdateTextureSet
             }
 
             // Update the texture set name
-            textureSet.UpdateName(command.Name, _dateTimeProvider.UtcNow);
+            textureSet.UpdateName(resolvedName, _dateTimeProvider.UtcNow);
             textureSet.AssignCategory(command.CategoryId, _dateTimeProvider.UtcNow);
 
             var updatedTextureSet = await _textureSetRepository.UpdateAsync(textureSet, cancellationToken);
