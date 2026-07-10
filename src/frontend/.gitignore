@@ -40,3 +40,6 @@ visual-tests/test-results/
 # Environment files (may contain secrets)
 .env
 !.env.example
+# Visual-regression baselines are machine-local (design-system skill) —
+# regenerate with `npm run test-storybook:update`, never commit them.
+visual-tests/__snapshots__/

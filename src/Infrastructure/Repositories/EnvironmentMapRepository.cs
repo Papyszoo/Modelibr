@@ -130,6 +130,7 @@ internal sealed class EnvironmentMapRepository : IEnvironmentMapRepository
         IReadOnlyCollection<int>? projectIds = null,
         IReadOnlyCollection<int>? categoryIds = null,
         string? searchName = null,
+        bool? uncategorized = null,
         CancellationToken cancellationToken = default)
     {
         var query = _context.EnvironmentMaps.AsNoTracking().AsQueryable();
@@ -140,7 +141,9 @@ internal sealed class EnvironmentMapRepository : IEnvironmentMapRepository
         if (projectIds is { Count: > 0 })
             query = query.Where(e => e.Projects.Any(p => projectIds.Contains(p.Id)));
 
-        if (categoryIds is { Count: > 0 })
+        if (uncategorized == true)
+            query = query.Where(e => e.EnvironmentMapCategoryId == null);
+        else if (categoryIds is { Count: > 0 })
             query = query.Where(e =>
                 e.EnvironmentMapCategoryId.HasValue &&
                 categoryIds.Contains(e.EnvironmentMapCategoryId.Value));
@@ -173,6 +176,25 @@ internal sealed class EnvironmentMapRepository : IEnvironmentMapRepository
             .ToListAsync(cancellationToken);
 
         return (items, totalCount);
+    }
+
+    public async Task<CategoryAssetCounts> GetCategoryAssetCountsAsync(CancellationToken cancellationToken = default)
+    {
+        var grouped = await _context.EnvironmentMaps
+            .AsNoTracking()
+            .GroupBy(e => e.EnvironmentMapCategoryId)
+            .Select(g => new { CategoryId = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+
+        var perCategory = grouped
+            .Where(g => g.CategoryId.HasValue)
+            .ToDictionary(g => g.CategoryId!.Value, g => g.Count);
+        var uncategorized = grouped
+            .Where(g => !g.CategoryId.HasValue)
+            .Sum(g => g.Count);
+        var total = grouped.Sum(g => g.Count);
+
+        return new CategoryAssetCounts(perCategory, uncategorized, total);
     }
 
     public async Task<EnvironmentMap> UpdateAsync(EnvironmentMap environmentMap, CancellationToken cancellationToken = default)

@@ -10,8 +10,10 @@
 import { createBdd } from "playwright-bdd";
 import { expect } from "@playwright/test";
 import { TextureSetsPage } from "../pages/TextureSetsPage";
+import { UploadProgressPage } from "../pages/UploadProgressPage";
 import { ApiHelper } from "../helpers/api-helper";
 import { narrowVirtualisedList } from "../helpers/list-toolbar-helper";
+import { revealVirtualizedCard } from "../helpers/reveal-virtualized-card";
 import { getScenarioState } from "../fixtures/shared-state";
 import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
 import path from "path";
@@ -129,6 +131,13 @@ Given("I have a texture set with ORM packed texture", async ({ page }) => {
     // Navigation lands directly on the kind-locked Multi-Model Textures
     // tab — the in-page kind switcher no longer exists.
 
+    // Narrow the (virtualised) grid by the unique name — same as the sibling
+    // Givens. This waits for the count label to settle (so we don't probe a
+    // still-loading list) AND filters the just-created set into the DOM, which
+    // a bare scroll-reveal can't do when it runs before the list has loaded and
+    // the grid then stays scrolled to the top past the new card.
+    await narrowVirtualisedList(page, uniqueName);
+
     // Verify the card is visible
     const card = page.locator(
         `.texture-set-card[data-texture-set-id="${result.textureSetId}"]`,
@@ -186,6 +195,7 @@ When("I open the texture set viewer", async ({ page }) => {
     const lastTsName = getScenarioState(page).getCustom<string>(
         "lastCreatedTextureSetName",
     );
+
     let card;
     if (lastTsId) {
         card = page.locator(
@@ -207,6 +217,18 @@ When("I open the texture set viewer", async ({ page }) => {
             "[Navigation] Opening first texture set card (no name stored)",
         );
     }
+
+    // The floating "File Uploads" progress window overlays the (now narrower,
+    // sidebar-open) grid and intercepts pointer events, so a dblclick on a card
+    // behind it hangs until the test times out. Dismiss it first.
+    await new UploadProgressPage(page).closeWindowIfVisible();
+
+    // The card may be virtualised out of the DOM: the category sidebar ships
+    // open by default, so the grid renders fewer columns and a set past the
+    // first viewport rows only renders once its scroll container reaches it.
+    // Scroll to reveal it — name-independent, and with no search side effects
+    // (search-narrowing was fragile under parallel runs with duplicate names).
+    await revealVirtualizedCard(page, ".texture-set-list-main", card);
 
     await expect(card).toBeVisible({ timeout: 10000 });
     await card.dblclick();

@@ -177,6 +177,7 @@ public static class TextureSetEndpoints
         string? searchName,
         int? minResolution,
         [FromQuery(Name = "tag")] string[]? tag,
+        bool? uncategorized,
         IQueryHandler<GetAllTextureSetsQuery, GetAllTextureSetsResponse> queryHandler,
         CancellationToken cancellationToken)
     {
@@ -195,7 +196,8 @@ public static class TextureSetEndpoints
                 Kind: textureSetKind,
                 SearchName: string.IsNullOrWhiteSpace(searchName) ? null : searchName,
                 MinResolution: minResolution is > 0 ? minResolution : null,
-                Tags: tag is { Length: > 0 } ? tag : null),
+                Tags: tag is { Length: > 0 } ? tag : null,
+                Uncategorized: uncategorized),
             cancellationToken);
 
         if (result.IsFailure)

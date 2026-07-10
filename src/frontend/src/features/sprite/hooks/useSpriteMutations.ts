@@ -8,8 +8,7 @@ import {
   updateSprite,
   updateSpriteCategory,
 } from '@/features/sprite/api/spriteApi'
-import { ALL_CATEGORIES_ID } from '@/shared/types/categories'
-import { collectCategoryBranchIds } from '@/shared/utils/categoryTree'
+import { useCategoryMutations } from '@/shared/hooks/useCategoryMutations'
 import { type SpriteCategoryDto, type SpriteDto } from '@/types'
 
 interface ShowToast {
@@ -59,132 +58,48 @@ export function useSpriteMutations({
   toast,
 }: UseSpriteMutationsOptions) {
   const queryClient = useQueryClient()
-  const createCategoryMutation = useMutation({
-    mutationFn: async (vars: { name: string; parentId: number | null }) =>
-      createSpriteCategory(vars.name, undefined, vars.parentId),
-    onSuccess: async created => {
-      toast.current?.show({
-        severity: 'success',
-        summary: 'Success',
-        detail: 'Category created successfully',
-        life: 3000,
-      })
-      setActiveCategoryId(created.id)
+
+  const showToast: ShowToast = opts => toast.current?.show(opts)
+
+  const {
+    createCategoryMutation,
+    renameCategoryMutation,
+    deleteCategoryMutation,
+    moveToCategoryMutation,
+  } = useCategoryMutations<
+    SpriteCategoryDto,
+    { id: number },
+    { spriteIds: number[]; categoryId: number | null }
+  >({
+    showToast,
+    categories,
+    activeCategoryId,
+    setActiveCategoryId,
+    clearSelection: () => setSelectedSpriteIds(new Set()),
+    noun: 'sprite',
+    // Sprites refetch imperatively rather than via query-key invalidation.
+    onCategoriesChanged: async () => {
       await loadCategories()
       await invalidateSprites()
     },
-    onError: error => {
-      console.error('Failed to create category:', error)
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to create category',
-        life: 3000,
-      })
-    },
-  })
-
-  const renameCategoryMutation = useMutation({
-    // Description and parent are passed through unchanged — the update
-    // endpoint treats a null parentId as "move to root", so omitting the
-    // current parent would silently re-parent the category.
-    mutationFn: async (vars: { category: SpriteCategoryDto; name: string }) =>
+    onAssetsChanged: invalidateSprites,
+    createCategory: vars =>
+      createSpriteCategory(vars.name, undefined, vars.parentId),
+    renameCategory: vars =>
       updateSpriteCategory(
         vars.category.id,
         vars.name,
         vars.category.description ?? undefined,
         vars.category.parentId ?? null
       ),
-    onSuccess: async () => {
-      toast.current?.show({
-        severity: 'success',
-        summary: 'Success',
-        detail: 'Category renamed successfully',
-        life: 3000,
-      })
-      await loadCategories()
-      await invalidateSprites()
-    },
-    onError: error => {
-      console.error('Failed to rename category:', error)
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to rename category',
-        life: 3000,
-      })
-    },
-  })
-
-  const deleteCategoryMutation = useMutation({
-    mutationFn: async (categoryId: number) => {
-      await deleteSpriteCategory(categoryId)
-    },
-    onSuccess: async (_data, categoryId) => {
-      toast.current?.show({
-        severity: 'success',
-        summary: 'Success',
-        detail: 'Category deleted successfully',
-        life: 3000,
-      })
-      // Deleting removes the whole branch, so a selection anywhere inside
-      // it (not just the deleted node) must fall back to "All".
-      const deletedBranch = collectCategoryBranchIds(categories, categoryId)
-      if (activeCategoryId !== null && deletedBranch.has(activeCategoryId)) {
-        setActiveCategoryId(ALL_CATEGORIES_ID)
-      }
-      await loadCategories()
-      await invalidateSprites()
-    },
-    onError: error => {
-      console.error('Failed to delete category:', error)
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to delete category',
-        life: 3000,
-      })
-    },
-  })
-
-  const moveSpritesToCategoryMutation = useMutation({
-    mutationFn: async (vars: {
-      spriteIds: number[]
-      categoryId: number | null
-    }) => {
+    deleteCategory: deleteSpriteCategory,
+    moveToCategory: async vars => {
       await Promise.all(
         vars.spriteIds.map(id =>
           updateSprite(id, { categoryId: vars.categoryId })
         )
       )
-    },
-    onSuccess: async (_data, vars) => {
-      const targetCategoryName =
-        vars.categoryId === null
-          ? 'Unassigned'
-          : categories.find(c => c.id === vars.categoryId)?.name ||
-            'Unknown Category'
-      const message =
-        vars.spriteIds.length === 1
-          ? `Sprite moved to ${targetCategoryName}`
-          : `${vars.spriteIds.length} sprites moved to ${targetCategoryName}`
-      toast.current?.show({
-        severity: 'success',
-        summary: 'Success',
-        detail: message,
-        life: 3000,
-      })
-      setSelectedSpriteIds(new Set())
-      await invalidateSprites()
-    },
-    onError: error => {
-      console.error('Failed to update sprite category:', error)
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to update sprite category',
-        life: 3000,
-      })
+      return vars.spriteIds.length
     },
   })
 
@@ -257,7 +172,7 @@ export function useSpriteMutations({
     createCategoryMutation,
     renameCategoryMutation,
     deleteCategoryMutation,
-    moveSpritesToCategoryMutation,
+    moveSpritesToCategoryMutation: moveToCategoryMutation,
     recycleSpritesMutation,
     renameSpriteMutation,
   }

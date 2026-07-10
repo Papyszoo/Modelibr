@@ -1,6 +1,7 @@
 import { type AxiosResponse } from 'axios'
 
 import { client, UPLOAD_TIMEOUT } from '@/lib/apiBase'
+import { type CategoryCountsResponse } from '@/shared/types/categories'
 
 import {
   type AddTextureToSetRequest,
@@ -34,6 +35,7 @@ export async function getTextureSetsPaginated(options: {
   packIds?: number[]
   projectIds?: number[]
   categoryIds?: number[]
+  uncategorized?: boolean
   textureTypes?: number[]
   kind?: number
   searchName?: string
@@ -51,9 +53,13 @@ export async function getTextureSetsPaginated(options: {
   params.append('pageSize', options.pageSize.toString())
   options.packIds?.forEach(id => params.append('packIds', id.toString()))
   options.projectIds?.forEach(id => params.append('projectIds', id.toString()))
-  options.categoryIds?.forEach(id =>
-    params.append('categoryIds', id.toString())
-  )
+  if (options.uncategorized) {
+    params.append('uncategorized', 'true')
+  } else {
+    options.categoryIds?.forEach(id =>
+      params.append('categoryIds', id.toString())
+    )
+  }
   options.textureTypes?.forEach(t =>
     params.append('textureTypes', t.toString())
   )
@@ -78,6 +84,15 @@ export async function getAllTextureSetCategories(
   const response: AxiosResponse<GetAllTextureSetCategoriesResponse> =
     await client.get(`/texture-set-categories?kind=${kind}`)
   return response.data.categories
+}
+
+export async function getTextureSetCategoryCounts(
+  kind: TextureSetKind
+): Promise<CategoryCountsResponse> {
+  const response = await client.get<CategoryCountsResponse>(
+    `/texture-set-categories/counts?kind=${kind}`
+  )
+  return response.data
 }
 
 export async function createTextureSetCategory(

@@ -1,7 +1,12 @@
 import type { Meta, StoryObj } from '@storybook/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 import { TexturePreviewPanel } from '@/features/texture-set/components/TexturePreviewPanel'
 import { type TextureSetDto, TextureType } from '@/types'
+
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { retry: false } },
+})
 
 const mockTextureSet: TextureSetDto = {
   id: 1,
@@ -43,6 +48,16 @@ const meta = {
     layout: 'fullscreen',
   },
   tags: ['autodocs'],
+  // The panel reads settings via React Query — without a provider the story
+  // throws "No QueryClient set" and (until the visual suite's error gate)
+  // silently broke every alphabetically-later story's snapshot.
+  decorators: [
+    Story => (
+      <QueryClientProvider client={queryClient}>
+        <Story />
+      </QueryClientProvider>
+    ),
+  ],
 } satisfies Meta<typeof TexturePreviewPanel>
 
 export default meta

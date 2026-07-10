@@ -22,12 +22,9 @@ function renderFilters(overrides = {}) {
     onSearchChange: noop,
     packs: [],
     projects: [],
-    categories: [],
     tags: [],
     selectedPackIds: [],
     selectedProjectIds: [],
-    selectedCategoryKeys: {},
-    selectedCategoryIds: [],
     selectedTagNames: [],
     hasConceptImages: false,
     animatedOnly: false,
@@ -35,7 +32,6 @@ function renderFilters(overrides = {}) {
     maxTriangleCount: null,
     onPackFilterChange: noop,
     onProjectFilterChange: noop,
-    onCategoryChange: noop,
     onTagChange: noop,
     onHasConceptImagesChange: noop,
     onAnimatedOnlyChange: jest.fn(),
@@ -51,6 +47,9 @@ function renderFilters(overrides = {}) {
     onSelectAllClick: noop,
     onDeselectAllClick: noop,
     visibleModelCount: 0,
+    isCategoryPanelOpen: true,
+    onCategoryPanelToggle: noop,
+    showCategoryToggle: true,
     ...overrides,
   }
   render(withQueryClient(<ModelsFilters {...props} />))
@@ -82,5 +81,25 @@ describe('ModelsFilters — technical-metadata filters', () => {
     expect(
       screen.getByRole('button', { name: /clear all filters/i })
     ).toBeInTheDocument()
+  })
+})
+
+describe('ModelsFilters — Categories toggle badge', () => {
+  // Regression: the "1" badge tells the user a category filter is narrowing
+  // the grid while the sidebar is hidden. A flipped condition
+  // (`badge={active ? undefined : 1}`) or a badge rendered unconditionally
+  // would light it up with no filter — or hide it when one is active.
+  it('shows the "1" badge on the Categories toggle when a category filter is active', () => {
+    renderFilters({ categoryFilterActive: true })
+    const toggle = screen.getByRole('button', { name: 'Toggle categories' })
+    const badge = toggle.querySelector('.list-toolbar-badge')
+    expect(badge).not.toBeNull()
+    expect(badge).toHaveTextContent('1')
+  })
+
+  it('omits the badge when no category filter is active', () => {
+    renderFilters({ categoryFilterActive: false })
+    const toggle = screen.getByRole('button', { name: 'Toggle categories' })
+    expect(toggle.querySelector('.list-toolbar-badge')).toBeNull()
   })
 })

@@ -30,7 +30,14 @@ public interface ITextureSetRepository
         string? searchName = null,
         int? minResolution = null,
         IReadOnlyCollection<string>? normalizedTagNames = null,
+        bool? uncategorized = null,
         CancellationToken cancellationToken = default);
+    /// <summary>
+    /// True per-category texture-set counts for one kind (Universal or
+    /// ModelSpecific) — drives the category sidebar's count badges.
+    /// </summary>
+    Task<CategoryAssetCounts> GetCategoryAssetCountsAsync(
+        TextureSetKind kind, CancellationToken cancellationToken = default);
     Task<TextureSet> UpdateAsync(TextureSet textureSet, CancellationToken cancellationToken = default);
     Task DeleteAsync(int id, CancellationToken cancellationToken = default);
     /// <summary>

@@ -1,15 +1,7 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
-export interface PersistedModelCategorySelectionState {
-  checked?: boolean
-  partialChecked?: boolean
-}
-
-export type PersistedModelCategorySelectionKeys = Record<
-  string,
-  PersistedModelCategorySelectionState
->
+import { ALL_CATEGORIES_ID } from '@/shared/types/categories'
 
 export interface ModelListViewState {
   isSearchOpen: boolean
@@ -17,7 +9,8 @@ export interface ModelListViewState {
   searchQuery: string
   selectedPackIds: number[]
   selectedProjectIds: number[]
-  selectedCategoryKeys: PersistedModelCategorySelectionKeys
+  /** Single active category; ALL_CATEGORIES_ID = all, UNASSIGNED = uncategorized. */
+  activeCategoryId: number | null
   selectedTagNames: string[]
   hasConceptImages: boolean
   animatedOnly: boolean
@@ -38,7 +31,7 @@ export const DEFAULT_MODEL_LIST_VIEW_STATE: ModelListViewState = {
   searchQuery: '',
   selectedPackIds: [],
   selectedProjectIds: [],
-  selectedCategoryKeys: {},
+  activeCategoryId: ALL_CATEGORIES_ID,
   selectedTagNames: [],
   hasConceptImages: false,
   animatedOnly: false,
@@ -73,6 +66,28 @@ export const useModelListViewStore = create<ModelListViewStore>()(
       name: 'model-list-view-state',
       storage: createJSONStorage(() => localStorage),
       partialize: state => ({ views: state.views }),
+      // v1: the multi-select `selectedCategoryKeys` filter was replaced by a
+      // single-select `activeCategoryId` sidebar. Drop the old key and default
+      // every persisted view to "All" so stale checkbox state can't leak in.
+      version: 1,
+      migrate: persisted => {
+        const state = persisted as
+          | { views?: Record<string, Record<string, unknown>> }
+          | undefined
+        if (!state?.views) {
+          return { views: {} }
+        }
+        const views: Record<string, ModelListViewState> = {}
+        for (const [scope, view] of Object.entries(state.views)) {
+          const { selectedCategoryKeys: _drop, ...rest } = view
+          views[scope] = {
+            ...DEFAULT_MODEL_LIST_VIEW_STATE,
+            ...(rest as Partial<ModelListViewState>),
+            activeCategoryId: ALL_CATEGORIES_ID,
+          }
+        }
+        return { views }
+      },
     }
   )
 )
