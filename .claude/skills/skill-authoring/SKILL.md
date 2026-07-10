@@ -10,6 +10,7 @@ behavior is context pollution. The litmus for each line: **"would an agent
 do something wrong without this?"** If no — delete it.
 
 ## Budget & tone
+
 - Target one screen (~90 lines) per skill. Hard signal to trim: scrolling.
 - No history, no changelogs, no "recently changed/added in PR #X", no
   narrative, no praise. Git holds the history.
@@ -18,6 +19,7 @@ do something wrong without this?"** If no — delete it.
   can verify against code in seconds.
 
 ## Structure template (in this order, sections optional)
+
 1. **Cardinal rule / traps** — the things that break production or data if
    an agent doesn't know them. First, always.
 2. **Map** — files with one-line roles. No file trees.
@@ -26,6 +28,7 @@ do something wrong without this?"** If no — delete it.
 5. **Verify** — exact commands to run before claiming done.
 
 ## Maintenance rules
+
 - **Code wins.** If a skill claim contradicts the code, fix the skill in the
   same session (CLAUDE.md rule). Don't soften with "may have changed".
 - **Prefer replace/delete over append.** A feature that changes behavior
@@ -41,6 +44,7 @@ do something wrong without this?"** If no — delete it.
   it's a different skill (or belongs in none).
 
 ## Review checklist before committing a skill edit
+
 - [ ] Every new line passes the litmus test
 - [ ] No stale claims left in touched sections (grep the named symbols)
 - [ ] Still one screen-ish; something got deleted if something got added
