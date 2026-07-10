@@ -6,6 +6,7 @@ description: Modelibr WebDAV virtual drive — middleware interception (Blender 
 # WebDAV patterns (virtual asset drive)
 
 ## The cardinal rule
+
 Every odd-looking branch here is a **client-compat shim debugged against real
 Finder / Windows Explorer / Blender traffic**, and its comment explains which
 client demands it. Never simplify or remove a shim because it looks
@@ -14,6 +15,7 @@ real client — name the client/OS in the PR (generically; no machine-specific
 details in public content).
 
 ## Map
+
 - `WebApi/Infrastructure/WebDavMiddleware.cs` (~830 lines) — mounted at
   `/modelibr` (`app.UseWebDav`). Intercepts special flows itself; everything
   else dispatches to NWebDav (`0.1.36` — dormant package, wrapped
@@ -22,11 +24,12 @@ details in public content).
   / `CustomWebDavHandler` (OPTIONS/GET/HEAD).
 - `Infrastructure/WebDav/VirtualAssetStore` (~1,200 lines) — DB-driven
   virtual tree: `Projects/ Packs/ Models/ TextureSets/ EnvironmentMaps/
-  Sprites/ Sounds/ Selection/`. Per-type `Virtual*Collections` classes
+Sprites/ Sounds/ Selection/`. Per-type `Virtual*Collections` classes
   (mirrors the six-clone problem — prompt 18 note; don't add a seventh
   without reading it).
 
 ## Intercepted flows (order matters in `InvokeAsync`)
+
 1. `._*` AppleDouble noise → discarded with per-method status codes.
 2. Blender Safe Save: PUT `*.blend@` (temp) → HEAD/PROPFIND/PROPPATCH
    verification (Windows MiniRedirector requires these or reports the write
@@ -44,9 +47,11 @@ details in public content).
    201 WITHOUT creating a model** — the real content PUT follows.
 
 ## Name resolution (names are NOT unique)
+
 Duplicate asset names are allowed (policy default "Allow"). WebDAV segments
 follow one shared contract — `WebDavUtilities` `TryParseIdSuffix` /
 `ComputeDisplayNames` / `ResolveSegment`:
+
 - Listings: plain name while unique among same-type siblings; on a
   case-insensitive collision ALL colliders render `{name} [{id}]` (flat
   files: `Name [17].wav`). Id = DB int id, stable.
@@ -58,9 +63,10 @@ follow one shared contract — `WebDavUtilities` `TryParseIdSuffix` /
   the plain model name — the folder segment already disambiguates.
 
 ## Data-safety rules
+
 - **Never delete an unprocessed Blender temp file.** Failure paths
   quarantine via `BlenderTempFileQuarantine` → `{uploads}/webdav-blend-
-  orphans/` + JSON sidecar (request path, timestamp, reason, candidate ids);
+orphans/` + JSON sidecar (request path, timestamp, reason, candidate ids);
   the quarantine write is uncancellable (no request token). Ambiguous-name
   saves refuse + quarantine, never guess a model.
 - Retention: `BlenderRetentionSweeper` (hosted, startup + 24h) — temp >24h
@@ -74,6 +80,7 @@ follow one shared contract — `WebDavUtilities` `TryParseIdSuffix` /
   it that way.
 
 ## Store rules
+
 - `VirtualAssetStore` is a **singleton**; all DB access via
   `_scopeFactory.CreateScope()` per request — never cache a scoped service.
 - Virtual filenames = asset name + original file's extension
@@ -87,6 +94,7 @@ follow one shared contract — `WebDavUtilities` `TryParseIdSuffix` /
   prompt 28).
 
 ## NWebDav quirks (why the wrappers exist)
+
 - Writes responses **synchronously** → middleware opts in
   `AllowSynchronousIO` per request. Keep that; Kestrel blocks sync IO
   otherwise.
@@ -95,6 +103,7 @@ follow one shared contract — `WebDavUtilities` `TryParseIdSuffix` /
   with `/` (Finder requirement).
 
 ## Testing
+
 Unit coverage: path resolution + ambiguity refusal (`VirtualAssetStoreTests`),
 the disambiguation contract (`WebDavUtilitiesTests`), quarantine + retention
 sweep, missing-blob 404. E2E: `tests/e2e/features/15-blend-upload` (@slow)
@@ -106,6 +115,7 @@ smoke). This surface is unauthenticated by design (prompt 23) — never
 add write endpoints here without checking the threat-model page.
 
 ## Verify
+
 `dotnet build Modelibr.sln && dotnet test Modelibr.sln --no-build --filter
 "Category!=Integration"` + backend-integration suite if integration tests
 were touched + the manual client check above.

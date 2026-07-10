@@ -45,14 +45,14 @@ the code and fix the skill in the same session.**
 
 ## Verification — run before claiming done
 
-| Layer touched | Command |
-|---|---|
-| Backend | `dotnet build Modelibr.sln && dotnet test Modelibr.sln --no-build --filter "Category!=Integration"` |
-| Frontend | `cd src/frontend && npm test && npm run lint && npm run format:check && npm run build` |
-| Worker | `cd src/asset-processor && npm test && npm run lint && npm run format:check` |
-| UI-visible behavior | the affected E2E scope (see testing rules below) |
+| Layer touched                       | Command                                                                                                      |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Backend                             | `dotnet build Modelibr.sln && dotnet test Modelibr.sln --no-build --filter "Category!=Integration"`          |
+| Frontend                            | `cd src/frontend && npm test && npm run lint && npm run format:check && npm run build`                       |
+| Worker                              | `cd src/asset-processor && npm test && npm run lint && npm run format:check`                                 |
+| UI-visible behavior                 | the affected E2E scope (see testing rules below)                                                             |
 | Docs site / README / formats / tabs | `npm run docs:audit` (CI-gated; checks docs against FileType registry, TabType union, ports, video manifest) |
-| Anything broad | `npm run test:all -- --only=<suite,...> --yes --no-open` |
+| Anything broad                      | `npm run test:all -- --only=<suite,...> --yes --no-open`                                                     |
 
 `npm run format:check` (Prettier) is a **required** CI gate and is **not**
 covered by `npm run lint`: ESLint's `prettier/prettier` rule only runs on the
