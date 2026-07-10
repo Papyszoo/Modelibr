@@ -213,7 +213,8 @@ public sealed class VirtualAssetStore : IStore
                 _lockingManager,
                 _audioSelectionService,
                 _scopeFactory,
-                _pathProvider);
+                _pathProvider,
+                _logger);
         }
 
         return null;
@@ -345,11 +346,13 @@ public sealed class VirtualAssetStore : IStore
                     _lockingManager,
                     $"uploaded-{model.Name}.blend",
                     blendFile.Sha256Hash,
+                    blendFile.FilePath,
                     blendFile.SizeBytes,
                     blendFile.MimeType,
                     blendFile.CreatedAt,
                     blendFile.UpdatedAt,
-                    _pathProvider);
+                    _pathProvider,
+                    _logger);
             }
 
             return null;
@@ -399,11 +402,13 @@ public sealed class VirtualAssetStore : IStore
             _lockingManager,
             file.OriginalFileName,
             file.Sha256Hash,
+            file.FilePath,
             file.SizeBytes,
             file.MimeType,
             file.CreatedAt,
             file.UpdatedAt,
-            _pathProvider);
+            _pathProvider,
+            _logger);
     }
 
     /// <summary>
@@ -471,6 +476,7 @@ public sealed class VirtualAssetStore : IStore
                 _lockingManager,
                 fileName,
                 texture.File.Sha256Hash,
+                texture.File.FilePath,
                 texture.File.SizeBytes,
                 texture.File.CreatedAt,
                 texture.File.UpdatedAt,
@@ -484,11 +490,13 @@ public sealed class VirtualAssetStore : IStore
             _lockingManager,
             fileName,
             texture.File.Sha256Hash,
+            texture.File.FilePath,
             texture.File.SizeBytes,
             texture.File.MimeType,
             texture.File.CreatedAt,
             texture.File.UpdatedAt,
-            _pathProvider);
+            _pathProvider,
+            _logger);
     }
 
     private IStoreItem? ResolveTextureOriginalFile(Domain.Models.TextureSet textureSet, string fileName)
@@ -502,11 +510,13 @@ public sealed class VirtualAssetStore : IStore
             _lockingManager,
             texture.File.OriginalFileName,
             texture.File.Sha256Hash,
+            texture.File.FilePath,
             texture.File.SizeBytes,
             texture.File.MimeType,
             texture.File.CreatedAt,
             texture.File.UpdatedAt,
-            _pathProvider);
+            _pathProvider,
+            _logger);
     }
 
 
@@ -553,11 +563,13 @@ public sealed class VirtualAssetStore : IStore
                 _lockingManager,
                 unassignedDisplayName,
                 sound.File.Sha256Hash,
+                sound.File.FilePath,
                 sound.File.SizeBytes,
                 sound.File.MimeType,
                 sound.CreatedAt,
                 sound.UpdatedAt,
-                _pathProvider);
+                _pathProvider,
+                _logger);
         }
 
         // Category names are enforced unique per-parent at the DB level (case-sensitively),
@@ -591,11 +603,13 @@ public sealed class VirtualAssetStore : IStore
             _lockingManager,
             ComputeSoundFileName(categorySiblings, foundSound.Id),
             foundSound.File.Sha256Hash,
+            foundSound.File.FilePath,
             foundSound.File.SizeBytes,
             foundSound.File.MimeType,
             foundSound.CreatedAt,
             foundSound.UpdatedAt,
-            _pathProvider);
+            _pathProvider,
+            _logger);
     }
 
     private static string ComputeSoundFileName(List<Domain.Models.Sound> siblings, int soundId)
@@ -619,11 +633,13 @@ public sealed class VirtualAssetStore : IStore
             _lockingManager,
             ComputeSpriteFileName(siblings, sprite.Id),
             sprite.File.Sha256Hash,
+            sprite.File.FilePath,
             sprite.File.SizeBytes,
             sprite.File.MimeType,
             sprite.File.CreatedAt,
             sprite.File.UpdatedAt,
-            _pathProvider);
+            _pathProvider,
+            _logger);
     }
 
     private IStoreItem? ResolveProjectSoundFile(Domain.Models.Project project, string fileSegment)
@@ -640,11 +656,13 @@ public sealed class VirtualAssetStore : IStore
             _lockingManager,
             ComputeSoundFileName(siblings, sound.Id),
             sound.File.Sha256Hash,
+            sound.File.FilePath,
             sound.File.SizeBytes,
             sound.File.MimeType,
             sound.File.CreatedAt,
             sound.File.UpdatedAt,
-            _pathProvider);
+            _pathProvider,
+            _logger);
     }
 
     private static string ComputeSpriteFileName(List<Domain.Models.Sprite> siblings, int spriteId)
@@ -895,11 +913,13 @@ public sealed class VirtualAssetStore : IStore
             _lockingManager,
             file.OriginalFileName,
             file.Sha256Hash,
+            file.FilePath,
             file.SizeBytes,
             file.MimeType,
             file.CreatedAt,
             file.UpdatedAt,
-            _pathProvider);
+            _pathProvider,
+            _logger);
     }
 
     private IStoreItem? ResolvePackTextureSetPath(Domain.Models.Pack pack, string setSegment, string[] segments)
@@ -950,11 +970,13 @@ public sealed class VirtualAssetStore : IStore
             _lockingManager,
             ComputeSpriteFileName(siblings, sprite.Id),
             sprite.File.Sha256Hash,
+            sprite.File.FilePath,
             sprite.File.SizeBytes,
             sprite.File.MimeType,
             sprite.File.CreatedAt,
             sprite.File.UpdatedAt,
-            _pathProvider);
+            _pathProvider,
+            _logger);
     }
 
     private IStoreItem? ResolvePackSoundFile(Domain.Models.Pack pack, string fileSegment)
@@ -970,11 +992,13 @@ public sealed class VirtualAssetStore : IStore
             _lockingManager,
             ComputeSoundFileName(siblings, sound.Id),
             sound.File.Sha256Hash,
+            sound.File.FilePath,
             sound.File.SizeBytes,
             sound.File.MimeType,
             sound.File.CreatedAt,
             sound.File.UpdatedAt,
-            _pathProvider);
+            _pathProvider,
+            _logger);
     }
 
     private async Task<IStoreItem?> ResolveGlobalModelsPathAsync(IServiceProvider sp, string[] segments)
@@ -1050,11 +1074,13 @@ public sealed class VirtualAssetStore : IStore
                     _lockingManager,
                     $"uploaded-{model.Name}.blend",
                     blendFile.Sha256Hash,
+                    blendFile.FilePath,
                     blendFile.SizeBytes,
                     blendFile.MimeType,
                     blendFile.CreatedAt,
                     blendFile.UpdatedAt,
-                    _pathProvider);
+                    _pathProvider,
+                    _logger);
             }
 
             return null;
@@ -1102,11 +1128,13 @@ public sealed class VirtualAssetStore : IStore
             _lockingManager,
             file.OriginalFileName,
             file.Sha256Hash,
+            file.FilePath,
             file.SizeBytes,
             file.MimeType,
             file.CreatedAt,
             file.UpdatedAt,
-            _pathProvider);
+            _pathProvider,
+            _logger);
     }
 
     private async Task<IStoreItem?> ResolveGlobalTextureSetsPathAsync(IServiceProvider sp, string[] segments)
@@ -1236,11 +1264,13 @@ public sealed class VirtualAssetStore : IStore
                 _lockingManager,
                 fileName,
                 file.Sha256Hash,
+                file.FilePath,
                 file.SizeBytes,
                 file.MimeType,
                 file.CreatedAt,
                 file.UpdatedAt,
-                _pathProvider);
+                _pathProvider,
+                _logger);
     }
 
     private IStoreItem? ResolveEnvironmentMapOriginalFile(Domain.Models.EnvironmentMap environmentMap, string fileName)
@@ -1258,11 +1288,13 @@ public sealed class VirtualAssetStore : IStore
                 _lockingManager,
                 file.OriginalFileName,
                 file.Sha256Hash,
+                file.FilePath,
                 file.SizeBytes,
                 file.MimeType,
                 file.CreatedAt,
                 file.UpdatedAt,
-                _pathProvider);
+                _pathProvider,
+                _logger);
     }
 
     private async Task<IStoreItem?> ResolveSpriteCategoryPathAsync(IServiceProvider sp, string[] segments)
@@ -1306,11 +1338,13 @@ public sealed class VirtualAssetStore : IStore
                 _lockingManager,
                 ComputeSpriteFileName(unassignedSiblings, sprite.Id),
                 sprite.File.Sha256Hash,
+                sprite.File.FilePath,
                 sprite.File.SizeBytes,
                 sprite.File.MimeType,
                 sprite.CreatedAt,
                 sprite.UpdatedAt,
-                _pathProvider);
+                _pathProvider,
+                _logger);
         }
 
         // Category names are enforced unique per-parent at the DB level (case-sensitively),
@@ -1343,11 +1377,13 @@ public sealed class VirtualAssetStore : IStore
             _lockingManager,
             ComputeSpriteFileName(categorySiblings, foundSprite.Id),
             foundSprite.File.Sha256Hash,
+            foundSprite.File.FilePath,
             foundSprite.File.SizeBytes,
             foundSprite.File.MimeType,
             foundSprite.CreatedAt,
             foundSprite.UpdatedAt,
-            _pathProvider);
+            _pathProvider,
+            _logger);
     }
 
     // Internal methods for creating collections accessible to child items

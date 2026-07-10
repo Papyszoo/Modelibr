@@ -68,7 +68,13 @@ public sealed class VirtualGeneratedBlendFile : IStoreItem, IVirtualFileMetadata
 
             if (!File.Exists(result.FilePath))
             {
-                _logger.LogWarning("Generated .blend file not found: {Path}", result.FilePath);
+                // Unlike a normal generation failure (Blender unavailable, bad source
+                // file — logged as a warning above), the generator reported success but
+                // the output vanished before we could read it. That's the same class of
+                // anomaly as a missing persisted blob (VirtualAssetFile), so it gets the
+                // same Error level. Stream.Null still drives CustomWebDavHandler to 404,
+                // never a bogus empty download.
+                _logger.LogError("Generated .blend file not found: {Path}", result.FilePath);
                 return Stream.Null;
             }
 

@@ -260,4 +260,57 @@ public class VirtualAssetStoreTests : IDisposable
         Assert.NotNull(result);
         Assert.Equal("UniqueChair", result.Name);
     }
+
+    // ── Physical path resolution (prompt 30, item 4): the resolved VirtualAssetFile
+    // must read bytes from the persisted File.FilePath, never re-derive root/aa/bb/hash. ──
+
+    [Fact]
+    public async Task GetItemAsync_ModelVersionFile_StreamsFromPersistedFilePath_NotFromHashLayout()
+    {
+        // Arrange — a real upload root on disk, since this test exercises the resolved
+        // VirtualAssetFile's actual stream, not just its type.
+        var uploadRoot = Path.Combine(Path.GetTempPath(), "modelibr-store-tests-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(uploadRoot);
+        try
+        {
+            _mockPathProvider.Setup(p => p.UploadRootPath).Returns(uploadRoot);
+
+            var now = DateTime.UtcNow;
+            var model = Model.Create("Chair", now);
+            var version = model.CreateVersion("v1", now);
+
+            const string hash = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
+            // Relative path deliberately does NOT match the hash-derived root/aa/bb/hash
+            // layout, so a pass would only happen by honoring the persisted FilePath.
+            var relativePath = "zz/yy/renamed-on-disk.glb";
+            var file = Domain.Models.File.Create(
+                "Chair.glb", "renamed-on-disk.glb", relativePath, "model/gltf-binary",
+                Domain.ValueObjects.FileType.Glb, sizeBytes: 3, sha256Hash: hash, createdAt: now);
+            version.AddFile(file);
+
+            _dbContext.Models.Add(model);
+            await _dbContext.SaveChangesAsync();
+
+            var content = new byte[] { 7, 7, 7 };
+            var fullPath = Path.Combine(uploadRoot, "zz", "yy", "renamed-on-disk.glb");
+            Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+            await System.IO.File.WriteAllBytesAsync(fullPath, content);
+
+            var uri = new Uri("http://localhost/Models/Chair/v1/Chair.glb");
+
+            // Act
+            var item = await _store.GetItemAsync(uri, _mockHttpContext.Object);
+
+            // Assert
+            var assetFile = Assert.IsType<VirtualAssetFile>(item);
+            var stream = await assetFile.GetReadableStreamAsync(_mockHttpContext.Object);
+            using var ms = new MemoryStream();
+            await stream.CopyToAsync(ms);
+            Assert.Equal(content, ms.ToArray());
+        }
+        finally
+        {
+            Directory.Delete(uploadRoot, recursive: true);
+        }
+    }
 }
