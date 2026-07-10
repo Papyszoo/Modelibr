@@ -287,10 +287,12 @@ public class CreateModelFromBlendCommandHandlerTests
             .Setup(x => x.ExistsByNameAsync("Chair", It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
-        // Policy is Reject (default)
+        // Policy is explicitly Reject (no longer the default — "Allow" is; see
+        // Handle_WithDuplicateName_WhenPolicyIsUnset_DefaultsToAllow_CreatesModelWithSameName)
+        var policySetting = Setting.Create(SettingKeys.DuplicateNamePolicy, "Reject", now);
         _mockSettingRepository
             .Setup(x => x.GetByKeyAsync(SettingKeys.DuplicateNamePolicy, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((Setting?)null);
+            .ReturnsAsync(policySetting);
 
         // Act
         var result = await _handler.Handle(command, CancellationToken.None);
@@ -299,6 +301,75 @@ public class CreateModelFromBlendCommandHandlerTests
         Assert.True(result.IsFailure);
         Assert.Equal("ModelNameAlreadyExists", result.Error.Code);
         _mockModelRepository.Verify(x => x.AddAsync(It.IsAny<Model>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_WithDuplicateName_WhenPolicyIsUnset_DefaultsToAllow_CreatesModelWithSameName()
+    {
+        // Arrange — "Allow" is the default duplicate-name policy now that WebDAV
+        // disambiguates colliding names by id; an unset policy must not reject or rename.
+        var now = DateTime.UtcNow;
+        _mockDateTimeProvider.Setup(x => x.UtcNow).Returns(now);
+
+        var fileUpload = CreateFakeBlendUpload("Chair.blend");
+        var command = new CreateModelFromBlendCommand("Chair", fileUpload);
+
+        var hash = "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
+        var fileEntity = DomainFile.Create(
+            "Chair.blend", "Chair.blend", "/uploads/ab/cd/" + hash,
+            "application/octet-stream", FileType.Blend, 7, hash, now);
+        typeof(DomainFile).GetProperty("Id")!.SetValue(fileEntity, 1);
+
+        _mockFileCreationService
+            .Setup(x => x.CreateOrGetExistingFileAsync(fileUpload, It.IsAny<FileType>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success(fileEntity));
+
+        _mockModelRepository
+            .Setup(x => x.GetByFileHashAsync(hash, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Model?)null);
+
+        // Policy is unset (default)
+        _mockSettingRepository
+            .Setup(x => x.GetByKeyAsync(SettingKeys.DuplicateNamePolicy, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Setting?)null);
+
+        Model? capturedModel = null;
+        _mockModelRepository
+            .Setup(x => x.AddAsync(It.IsAny<Model>(), It.IsAny<CancellationToken>()))
+            .Callback<Model, CancellationToken>((m, _) => capturedModel = m)
+            .ReturnsAsync((Model m, CancellationToken _) =>
+            {
+                typeof(Model).GetProperty("Id")!.SetValue(m, 42);
+                return m;
+            });
+
+        _mockVersionRepository
+            .Setup(x => x.AddAsync(It.IsAny<ModelVersion>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ModelVersion v, CancellationToken _) =>
+            {
+                typeof(ModelVersion).GetProperty("Id")!.SetValue(v, 100);
+                return v;
+            });
+
+        _mockModelRepository
+            .Setup(x => x.UpdateAsync(It.IsAny<Model>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        _mockEventDispatcher
+            .Setup(x => x.PublishAsync(It.IsAny<IEnumerable<IDomainEvent>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success());
+
+        // Act
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        Assert.True(result.IsSuccess);
+        Assert.Equal(42, result.Value.ModelId);
+        Assert.False(result.Value.AlreadyExists);
+        Assert.NotNull(capturedModel);
+        Assert.Equal("Chair", capturedModel!.Name);
+        // Allow skips the existence check entirely — it must never be consulted.
+        _mockModelRepository.Verify(x => x.ExistsByNameAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

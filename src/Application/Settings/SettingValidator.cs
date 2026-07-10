@@ -128,8 +128,8 @@ internal static class SettingValidator
 
     private static Result ValidateDuplicateNamePolicy(string value)
     {
-        if (value is not ("Reject" or "AutoRename"))
-            return Result.Failure(new Error("InvalidSetting", "DuplicateNamePolicy must be 'Reject' or 'AutoRename'."));
+        if (value is not ("Reject" or "AutoRename" or "Allow"))
+            return Result.Failure(new Error("InvalidSetting", "DuplicateNamePolicy must be 'Reject', 'AutoRename', or 'Allow'."));
 
         return Result.Success();
     }
