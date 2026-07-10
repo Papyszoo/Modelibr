@@ -44,8 +44,7 @@ public class BlenderTempFileQuarantineTests : IDisposable
             tempFile,
             requestPath: "/modelibr/Models/Chair/uploaded-Chair.blend@",
             reason: "unresolvable model path",
-            candidateModelIds: null,
-            CancellationToken.None);
+            candidateModelIds: null);
 
         Assert.False(File.Exists(tempFile), "The temp file must be moved out of the temp directory, not copied.");
 
@@ -63,8 +62,7 @@ public class BlenderTempFileQuarantineTests : IDisposable
             tempFile,
             requestPath: "/modelibr/Models/Chair/uploaded-Chair.blend@",
             reason: "ambiguous model name",
-            candidateModelIds: new[] { 42, 57 },
-            CancellationToken.None);
+            candidateModelIds: new[] { 42, 57 });
 
         var orphanDir = Path.Combine(_uploadRoot, "webdav-blend-orphans");
         var sidecarPath = Directory.GetFiles(orphanDir, "*.json").Single();
@@ -89,8 +87,7 @@ public class BlenderTempFileQuarantineTests : IDisposable
             tempFile,
             requestPath: "/modelibr/Models/Chair/uploaded-Chair.blend@",
             reason: "unresolvable model path",
-            candidateModelIds: null,
-            CancellationToken.None);
+            candidateModelIds: null);
 
         var orphanDir = Path.Combine(_uploadRoot, "webdav-blend-orphans");
         var sidecarPath = Directory.GetFiles(orphanDir, "*.json").Single();
@@ -109,8 +106,7 @@ public class BlenderTempFileQuarantineTests : IDisposable
             tempFile,
             requestPath: "/modelibr/Models/Chair/uploaded-Chair.blend@",
             reason: "unresolvable model path",
-            candidateModelIds: null,
-            CancellationToken.None);
+            candidateModelIds: null);
 
         var orphanDir = Path.Combine(_uploadRoot, "webdav-blend-orphans");
         var orphanFile = Directory.GetFiles(orphanDir, "*.blend").Single();
@@ -127,8 +123,7 @@ public class BlenderTempFileQuarantineTests : IDisposable
             missingPath,
             requestPath: "/modelibr/Models/Chair/uploaded-Chair.blend@",
             reason: "unresolvable model path",
-            candidateModelIds: null,
-            CancellationToken.None));
+            candidateModelIds: null));
 
         Assert.Null(exception);
 

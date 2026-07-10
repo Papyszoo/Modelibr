@@ -483,8 +483,10 @@ public class WebDavMiddleware
         {
             if (quarantineReason != null)
             {
+                // No cancellation token on purpose — a client that disconnects mid-failure
+                // must not be able to cancel the data-safety move/sidecar write.
                 await _orphanQuarantine.QuarantineAsync(
-                    tempFilePath, requestPath, quarantineReason, quarantineCandidateIds, context.RequestAborted);
+                    tempFilePath, requestPath, quarantineReason, quarantineCandidateIds);
             }
             else
             {
