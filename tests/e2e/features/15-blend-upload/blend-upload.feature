@@ -139,3 +139,25 @@ Feature: Blend File Upload and Processing
     And a model "RestDupRejectModel" was created via WebDAV with "test.blend"
     When I upload "test3.blend" as a new model named "RestDupRejectModel" via REST API
     Then the REST upload should have returned HTTP 409
+
+  # ── Duplicate-name disambiguation: WebDAV Safe Save must target one model ──
+
+  @blend-duplicate-disambiguation
+  Scenario: WebDAV Safe Save into one id-suffixed duplicate only versions that duplicate
+    Given the backend has Blender integration enabled
+    And the DuplicateNamePolicy setting is "Allow"
+    And two models named "DuplicateDisambigModel" were created via WebDAV with the same name
+    Then a PROPFIND on the Models WebDAV folder should list both "DuplicateDisambigModel" duplicates with their id suffixes
+    When I save new content to the first duplicate via its id-suffixed WebDAV Safe Save path
+    Then the first duplicate should have 2 versions
+    And the second duplicate should still have 1 version
+
+  # ── Orphan quarantine: unresolvable Safe Save never loses the artist's bytes ──
+
+  @blend-orphan-quarantine
+  Scenario: WebDAV Safe Save MOVE to a nonexistent model path quarantines the bytes as an orphan
+    Given the backend has Blender integration enabled
+    When I perform a Blender Safe Save into a model path that does not exist
+    Then the MOVE response should return HTTP 204
+    And the uploaded bytes should be quarantined under webdav-blend-orphans with a matching sidecar
+    And no model should have been created from the orphaned save

@@ -6,6 +6,7 @@
 import { createBdd } from "playwright-bdd";
 import { expect } from "@playwright/test";
 import { ApiHelper } from "../helpers/api-helper";
+import { DockerHelper } from "../helpers/docker-helper";
 import { getScenarioState } from "../fixtures/shared-state";
 import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
 import fs from "fs";
@@ -19,11 +20,52 @@ const { Given, When, Then, After } = createBdd();
 
 const ASSETS_DIR = path.join(__dirname, "..", "assets");
 const api = new ApiHelper();
+const dockerHelper = new DockerHelper();
+
+// Container + physical paths for the e2e webapi (see docker-compose.e2e.yml).
+// The uploads volume is a NAMED docker volume there (not a host bind mount),
+// so orphan-quarantine inspection goes through `docker exec` rather than fs.*.
+const WEBAPI_CONTAINER = "webapi-e2e";
+const UPLOAD_ROOT = "/var/lib/modelibr/uploads";
+const ORPHAN_DIR = `${UPLOAD_ROOT}/webdav-blend-orphans`;
+
+// Per-process unique suffix so scenario data (model names, orphan request
+// paths) doesn't collide with leftovers from a previous run — required for
+// the orphan scenario, whose sidecar-based cleanup identifies "its" orphan
+// files by exact original request path (see e2e-authoring skill's
+// unique-data rule).
+const runId = Date.now().toString(36).slice(-4);
 
 // Restore AutoRename policy after duplicate-name scenarios to prevent poisoning later tests
-After({ tags: "@blend-duplicate-reject or @blend-duplicate-autorename or @blend-duplicate-rest-reject" }, async () => {
-    await api.updateSetting("DuplicateNamePolicy", "AutoRename");
-    console.log("[Cleanup] Restored DuplicateNamePolicy to AutoRename");
+After(
+    {
+        tags: "@blend-duplicate-reject or @blend-duplicate-autorename or @blend-duplicate-rest-reject or @blend-duplicate-disambiguation",
+    },
+    async () => {
+        await api.updateSetting("DuplicateNamePolicy", "AutoRename");
+        console.log("[Cleanup] Restored DuplicateNamePolicy to AutoRename");
+    },
+);
+
+// Remove only the orphan files THIS scenario quarantined (never a wholesale
+// directory wipe — other scenarios' orphans may coexist in the same folder).
+After("@blend-orphan-quarantine", async ({ page }) => {
+    const ctx = getBlendContext(page);
+    if (ctx.orphanJsonFileName) {
+        await dockerHelper.removeContainerFile(
+            WEBAPI_CONTAINER,
+            `${ORPHAN_DIR}/${ctx.orphanJsonFileName}`,
+        );
+    }
+    if (ctx.orphanBlendFileName) {
+        await dockerHelper.removeContainerFile(
+            WEBAPI_CONTAINER,
+            `${ORPHAN_DIR}/${ctx.orphanBlendFileName}`,
+        );
+    }
+    console.log(
+        `[Cleanup] Removed orphan quarantine files for request path "${ctx.orphanRequestPath}" (if found)`,
+    );
 });
 
 const BLENDER_VERSION = "5.1.0";
@@ -42,6 +84,22 @@ interface BlendTestContext {
     webdavPutStatus?: number;
     /** Path to the file used to create the initial model (for "same content" tests) */
     initialFilePath?: string;
+    /** Base name shared by the two duplicate models (before id-suffix disambiguation) */
+    duplicateBaseName?: string;
+    /** Id of the first duplicate model created */
+    duplicateModelId1?: number;
+    /** Id of the second duplicate model created */
+    duplicateModelId2?: number;
+    /** WebDAV request path used for the orphan-quarantine Safe Save attempt */
+    orphanRequestPath?: string;
+    /** Model name referenced by the (nonexistent) orphan Safe Save path */
+    orphanModelName?: string;
+    /** HTTP status of the orphan-quarantine MOVE */
+    orphanMoveStatus?: number;
+    /** Quarantined sidecar filename found under webdav-blend-orphans/ */
+    orphanJsonFileName?: string;
+    /** Quarantined .blend filename found under webdav-blend-orphans/ */
+    orphanBlendFileName?: string;
 }
 
 function getBlendContext(page: any): BlendTestContext {
@@ -777,6 +835,259 @@ Then(
         expect(ctx.webdavPutStatus).toBe(expectedStatus);
         console.log(
             `[Verify Dup] REST upload status=${ctx.webdavPutStatus} matches expected ${expectedStatus} ✓`,
+        );
+    },
+);
+
+// ── Duplicate-name disambiguation: Safe Save must target one model ──────
+
+/**
+ * Extracts the raw (still percent-encoded) text content of every WebDAV
+ * <D:href> element from a PROPFIND multistatus XML body, tolerant of the
+ * namespace prefix NWebDav emits (normally "D:", but matched loosely here).
+ */
+function extractHrefs(xml: string): string[] {
+    const matches = xml.matchAll(
+        /<[^:<>]*:?href[^>]*>([^<]*)<\/[^:<>]*:?href>/gi,
+    );
+    return [...matches].map((m) => m[1]);
+}
+
+Given(
+    "two models named {string} were created via WebDAV with the same name",
+    async ({ page }, baseName: string) => {
+        const actualName = `${baseName}-${runId}`;
+        // Clean up any leftover pair from a previous failed run.
+        await api.softDeleteModelsByName(actualName);
+
+        const fileA = await UniqueFileGenerator.generate("test.blend");
+        const resultA = await api.createModelViaWebDavBlend(fileA, actualName);
+        expect(resultA.status).toBe(201);
+        const modelA = await api.findModelByName(actualName);
+        expect(modelA).not.toBeNull();
+
+        const fileB = await UniqueFileGenerator.generate("test2.blend");
+        const resultB = await api.createModelViaWebDavBlend(fileB, actualName);
+        expect(resultB.status).toBe(201);
+
+        // Both models now share the same name (DuplicateNamePolicy=Allow does not
+        // rename). Fetch all matches and pick the one that isn't modelA to get
+        // the second duplicate's id — never assume creation order survives the API.
+        const allModels = await api.getModels();
+        const duplicates = allModels.filter((m: any) => m.name === actualName);
+        expect(duplicates.length).toBe(2);
+        const modelB = duplicates.find((m: any) => m.id !== modelA.id);
+        expect(modelB).toBeDefined();
+
+        updateBlendContext(page, {
+            duplicateBaseName: actualName,
+            duplicateModelId1: modelA.id,
+            duplicateModelId2: modelB.id,
+        });
+        console.log(
+            `[Blend Duplicate] Created two models named "${actualName}": id1=${modelA.id}, id2=${modelB.id}`,
+        );
+    },
+);
+
+Then(
+    "a PROPFIND on the Models WebDAV folder should list both {string} duplicates with their id suffixes",
+    async ({ page }, _baseName: string) => {
+        const ctx = getBlendContext(page);
+        expect(ctx.duplicateBaseName).toBeDefined();
+        expect(ctx.duplicateModelId1).toBeDefined();
+        expect(ctx.duplicateModelId2).toBeDefined();
+
+        const result = await api.webdavPropfind("/modelibr/Models/", "1");
+        expect(result.status).toBe(207);
+
+        const hrefs = extractHrefs(String(result.data));
+        const names = hrefs.map((h) =>
+            decodeURIComponent(h).replace(/\/$/, "").split("/").pop(),
+        );
+
+        const expectedA = `${ctx.duplicateBaseName} [${ctx.duplicateModelId1}]`;
+        const expectedB = `${ctx.duplicateBaseName} [${ctx.duplicateModelId2}]`;
+        expect(names).toContain(expectedA);
+        expect(names).toContain(expectedB);
+        console.log(
+            `[Verify Duplicate] PROPFIND /modelibr/Models lists "${expectedA}" and "${expectedB}" ✓`,
+        );
+    },
+);
+
+When(
+    "I save new content to the first duplicate via its id-suffixed WebDAV Safe Save path",
+    async ({ page }) => {
+        const ctx = getBlendContext(page);
+        expect(ctx.duplicateBaseName).toBeDefined();
+        expect(ctx.duplicateModelId1).toBeDefined();
+
+        const folderSegment = `${ctx.duplicateBaseName} [${ctx.duplicateModelId1}]`;
+        const filePath = await UniqueFileGenerator.generate("test3.blend");
+        const result = await api.createVersionViaWebDavBlendSaveAtFolder(
+            filePath,
+            folderSegment,
+            ctx.duplicateBaseName!,
+        );
+        console.log(
+            `[Blend Duplicate] Safe Save into id-suffixed folder "${folderSegment}": PUT=${result.putStatus}, MOVE=${result.moveStatus}`,
+        );
+        expect(result.moveStatus).toBe(204);
+    },
+);
+
+Then(
+    "the first duplicate should have {int} version(s)",
+    async ({ page }, expectedCount: number) => {
+        const ctx = getBlendContext(page);
+        expect(ctx.duplicateModelId1).toBeDefined();
+        const versions = await api.getModelVersions(ctx.duplicateModelId1!);
+        console.log(
+            `[Verify Duplicate] First duplicate (id=${ctx.duplicateModelId1}) has ${versions.length} version(s) (expected ${expectedCount})`,
+        );
+        expect(versions.length).toBe(expectedCount);
+    },
+);
+
+Then(
+    "the second duplicate should still have {int} version(s)",
+    async ({ page }, expectedCount: number) => {
+        const ctx = getBlendContext(page);
+        expect(ctx.duplicateModelId2).toBeDefined();
+        const versions = await api.getModelVersions(ctx.duplicateModelId2!);
+        // Wrong-model-corruption regression guard: a Safe Save addressed at
+        // duplicate #1's id-suffixed folder must never touch duplicate #2.
+        console.log(
+            `[Verify Duplicate] Second duplicate (id=${ctx.duplicateModelId2}) still has ${versions.length} version(s) (expected ${expectedCount})`,
+        );
+        expect(versions.length).toBe(expectedCount);
+    },
+);
+
+// ── Orphan quarantine: unresolvable Safe Save never loses the artist's bytes ──
+
+/**
+ * Scans webdav-blend-orphans/ for the sidecar whose `originalRequestPath`
+ * matches the given WebDAV request path. This is the server-side inspection
+ * mechanism for orphan files — the sibling of how @blend-temp-lifecycle
+ * inspects webdav-blend-temp/, extended (via DockerHelper) to reach a
+ * directory that has no WebDAV-routable address of its own.
+ */
+async function findOrphanSidecarByRequestPath(requestPath: string): Promise<{
+    jsonFileName: string;
+    blendFileName: string;
+    sidecar: { originalRequestPath: string; reason: string };
+} | null> {
+    const entries = await dockerHelper.listContainerDir(
+        WEBAPI_CONTAINER,
+        ORPHAN_DIR,
+    );
+    const jsonFiles = entries.filter((f) => f.endsWith(".json"));
+
+    for (const jsonFileName of jsonFiles) {
+        try {
+            const text = await dockerHelper.readContainerTextFile(
+                WEBAPI_CONTAINER,
+                `${ORPHAN_DIR}/${jsonFileName}`,
+            );
+            const sidecar = JSON.parse(text);
+            if (sidecar.originalRequestPath === requestPath) {
+                return {
+                    jsonFileName,
+                    blendFileName: jsonFileName.replace(/\.json$/, ".blend"),
+                    sidecar,
+                };
+            }
+        } catch {
+            // Not ours (unreadable/malformed) — keep scanning.
+        }
+    }
+    return null;
+}
+
+When(
+    "I perform a Blender Safe Save into a model path that does not exist",
+    async ({ page }) => {
+        const modelName = `NoSuchModel-${runId}`;
+        const encodedName = encodeURIComponent(modelName);
+        const uploadedFileName = `uploaded-${modelName}`;
+        const encodedFileName = encodeURIComponent(uploadedFileName);
+        const requestPath = `/modelibr/Models/${encodedName}/${encodedFileName}.blend@`;
+
+        const filePath = await UniqueFileGenerator.generate("test.blend");
+        const fileBuffer = fs.readFileSync(filePath);
+
+        const putResult = await api.webdavPut(requestPath, fileBuffer);
+        expect(putResult.status).toBeGreaterThanOrEqual(200);
+        expect(putResult.status).toBeLessThan(300);
+
+        const moveResult = await api.webdavMove(
+            requestPath,
+            `/modelibr/Models/${encodedName}/${encodedFileName}.blend`,
+        );
+
+        updateBlendContext(page, {
+            orphanRequestPath: requestPath,
+            orphanModelName: modelName,
+            orphanMoveStatus: moveResult.status,
+        });
+        console.log(
+            `[Blend Orphan] Safe Save to nonexistent model "${modelName}": PUT=${putResult.status}, MOVE=${moveResult.status}`,
+        );
+    },
+);
+
+Then(
+    "the MOVE response should return HTTP {int}",
+    async ({ page }, expectedStatus: number) => {
+        const ctx = getBlendContext(page);
+        expect(ctx.orphanMoveStatus).toBe(expectedStatus);
+        console.log(
+            `[Verify Orphan] MOVE status=${ctx.orphanMoveStatus} matches expected ${expectedStatus} ✓`,
+        );
+    },
+);
+
+Then(
+    "the uploaded bytes should be quarantined under webdav-blend-orphans with a matching sidecar",
+    async ({ page }) => {
+        const ctx = getBlendContext(page);
+        expect(ctx.orphanRequestPath).toBeDefined();
+
+        const match = await findOrphanSidecarByRequestPath(ctx.orphanRequestPath!);
+        expect(match).not.toBeNull();
+
+        const { jsonFileName, blendFileName, sidecar } = match!;
+        expect(sidecar.originalRequestPath).toBe(ctx.orphanRequestPath);
+        expect(sidecar.reason).toContain("unresolvable model path");
+
+        const blendExists = await dockerHelper.containerFileExists(
+            WEBAPI_CONTAINER,
+            `${ORPHAN_DIR}/${blendFileName}`,
+        );
+        expect(blendExists).toBe(true);
+
+        // Stash the exact filenames so the After hook cleans up only these files.
+        updateBlendContext(page, {
+            orphanJsonFileName: jsonFileName,
+            orphanBlendFileName: blendFileName,
+        });
+        console.log(
+            `[Verify Orphan] Quarantined "${blendFileName}" + sidecar "${jsonFileName}" with matching originalRequestPath ✓`,
+        );
+    },
+);
+
+Then(
+    "no model should have been created from the orphaned save",
+    async ({ page }) => {
+        const ctx = getBlendContext(page);
+        expect(ctx.orphanModelName).toBeDefined();
+        const model = await api.findModelByName(ctx.orphanModelName!);
+        expect(model).toBeNull();
+        console.log(
+            `[Verify Orphan] No model named "${ctx.orphanModelName}" was created ✓`,
         );
     },
 );
