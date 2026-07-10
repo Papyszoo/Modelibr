@@ -39,17 +39,36 @@ details in public content).
    trade-off. OPTIONS advertises `DAV: 1, 2`; changing that or lock behavior
    is compat-sensitive — test against Windows write flows first.
 4. PUT `/modelibr/Models/{name}.blend` = create model (403 if Blender
-   integration disabled/installing, 409 on name conflict). **0-byte PUT is a
-   client pre-create stub → 201 WITHOUT creating a model** — the real
-   content PUT follows.
+   integration disabled/installing; 409 only under the Reject duplicate-name
+   policy — default is Allow). **0-byte PUT is a client pre-create stub →
+   201 WITHOUT creating a model** — the real content PUT follows.
+
+## Name resolution (names are NOT unique)
+Duplicate asset names are allowed (policy default "Allow"). WebDAV segments
+follow one shared contract — `WebDavUtilities` `TryParseIdSuffix` /
+`ComputeDisplayNames` / `ResolveSegment`:
+- Listings: plain name while unique among same-type siblings; on a
+  case-insensitive collision ALL colliders render `{name} [{id}]` (flat
+  files: `Name [17].wav`). Id = DB int id, stable.
+- Resolution: id-suffix match first (name must still match), else
+  case-insensitive plain-name match that must be **exactly one** — zero or
+  multiple = null/404/refuse. **Never `FirstOrDefault` by name.** Use the
+  shared helpers, not a local copy.
+- Inner filenames (`generated-/uploaded-{name}.blend`, version folders) use
+  the plain model name — the folder segment already disambiguates.
 
 ## Data-safety rules
-- **Never delete an unprocessed Blender temp file.** Failure paths must
-  quarantine, not destroy (prompt 30 — if not yet landed, its findings still
-  apply: unresolvable-model MOVE currently deletes + 204s, and name-based
-  model resolution has no ambiguity guard; don't extend those paths without
-  fixing them).
-- Missing physical blob must become 404, never an empty stream.
+- **Never delete an unprocessed Blender temp file.** Failure paths
+  quarantine via `BlenderTempFileQuarantine` → `{uploads}/webdav-blend-
+  orphans/` + JSON sidecar (request path, timestamp, reason, candidate ids);
+  the quarantine write is uncancellable (no request token). Ambiguous-name
+  saves refuse + quarantine, never guess a model.
+- Retention: `BlenderRetentionSweeper` (hosted, startup + 24h) — temp >24h
+  → quarantined (not deleted), orphans >30d → deleted (the ONE place bytes
+  disappear). Backups exclude `webdav-blend-temp/`, keep orphans.
+- Missing physical blob = 404 via the `Stream.Null` contract in
+  `CustomWebDavHandler.WriteFileAsync` + Error log with hash/path. Never
+  return an empty/zero-length stream any other way.
 - Temp files: `{uploads}/webdav-blend-temp/`, keyed by SHA256 of the
   normalized path (`GetTempFileKey`) — traversal-safe by construction; keep
   it that way.
@@ -59,10 +78,10 @@ details in public content).
   `_scopeFactory.CreateScope()` per request — never cache a scoped service.
 - Virtual filenames = asset name + original file's extension
   (`WebDavUtilities.GetVirtualFileName`) so listings show asset names, not
-  upload filenames.
-- Physical paths = hash-based layout `root/aa/bb/{hash}` and MUST match
-  `HashBasedFileStorage` (duplicated knowledge until prompt 30 switches to
-  persisted `File.RelativePath`).
+  upload filenames — plus the id-suffix contract above when names collide.
+- Physical paths come from the persisted `File.FilePath` (written by
+  `HashBasedFileStorage`, non-nullable since the initial migration). Never
+  re-derive the `root/aa/bb/{hash}` layout in WebDAV code.
 - Perf: resolvers load full aggregate graphs per request and clients send
   PROPFIND storms — don't add `Include`s casually (read-model plan:
   prompt 28).
@@ -76,11 +95,14 @@ details in public content).
   with `/` (Finder requirement).
 
 ## Testing
-Coverage is thin (path-resolution unit tests only) until prompt 31's
-client-replay suite lands — sequences per client dance through
-`WebApplicationFactory`, `Category=Integration`. Until then: any middleware/
-handler change = manual client verification (Blender save is the highest-
-value smoke). This surface is unauthenticated by design (prompt 23) — never
+Unit coverage: path resolution + ambiguity refusal (`VirtualAssetStoreTests`),
+the disambiguation contract (`WebDavUtilitiesTests`), quarantine + retention
+sweep, missing-blob 404. E2E: `tests/e2e/features/15-blend-upload` (@slow)
+covers the real PUT/Safe-Save/lock/0-byte dances. Still missing until prompt
+31's client-replay suite lands: recorded Finder/Explorer sequences through
+`WebApplicationFactory`, `Category=Integration`. Any middleware/handler
+change = manual client verification (Blender save is the highest-value
+smoke). This surface is unauthenticated by design (prompt 23) — never
 add write endpoints here without checking the threat-model page.
 
 ## Verify
