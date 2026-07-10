@@ -79,6 +79,24 @@ Each model version maintains its **own** default texture set independently:
 
 This allows you to preserve the intended look for each version of your model.
 
+## Organizing with Categories
+
+Use the category sidebar (left of the grid) to organize texture sets into
+groups:
+
+- Right-click anywhere in the sidebar and choose **Add category**, then type
+  the name directly in the tree
+- Right-click a category to **Add subcategory**, **Rename**, or **Delete** it
+  — deleting removes the whole branch, and its sets become uncategorized
+- Drag a texture set card onto a category in the sidebar to move it
+- **All** shows every set of the page's kind; **Unassigned** collects sets
+  that aren't in any category
+
+The **Categories** toolbar button hides or shows the sidebar; a badge on it
+reminds you that a category filter is active while the sidebar is hidden.
+Categories are kept per kind — Global Materials and Multi-Model Textures each
+have their own category tree, and model-owned sets are not categorized.
+
 ## Tagging Texture Sets
 
 Texture sets share the same tag vocabulary as models and environment maps, so

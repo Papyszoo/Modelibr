@@ -33,6 +33,24 @@ The easiest way to upload models is to drag and drop files directly onto the Mod
 You can drag multiple files at once. Each file becomes a separate model.
 :::
 
+## Organizing with Categories
+
+Use the category sidebar (left of the grid) to organize models into groups:
+
+- Right-click anywhere in the sidebar and choose **Add category**, then type
+  the name directly in the tree
+- Right-click a category to **Add subcategory**, **Rename**, or **Delete** it
+  — deleting removes the whole branch, and its models become uncategorized
+- Drag model cards onto a category in the sidebar to move them — dragging a
+  selected card moves the whole selection
+- **All** shows every one of your models; **Unassigned** collects models
+  that aren't in any category
+
+The **Categories** toolbar button hides or shows the sidebar; a badge on it
+reminds you that a category filter is active while the sidebar is hidden. The
+sidebar appears on the standalone Models tab — model grids embedded in packs
+and projects are not category-filtered.
+
 ## Viewing Models
 
 Click any model card to open it in the 3D viewer:
