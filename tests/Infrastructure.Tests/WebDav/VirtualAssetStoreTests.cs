@@ -188,7 +188,7 @@ public class VirtualAssetStoreTests : IDisposable
         // Arrange - URI path after /dav prefix is stripped
         var projectName = "NonExistent";
         var uri = new Uri($"http://localhost/Projects/{projectName}");
-        
+
         // No project added to database - it should not exist
 
         // Act
@@ -196,5 +196,68 @@ public class VirtualAssetStoreTests : IDisposable
 
         // Assert
         Assert.Null(result);
+    }
+
+    // ── Duplicate-name disambiguation (Allow policy allows real duplicates now) ──
+
+    [Fact]
+    public async Task GetCollectionAsync_TwoModelsWithSameName_PlainNameResolution_ReturnsNull()
+    {
+        // Arrange — two non-deleted models sharing a name is now legal under the
+        // "Allow" duplicate-name policy. WebDAV must never guess which one a plain,
+        // undisambiguated name refers to.
+        var now = DateTime.UtcNow;
+        var model1 = Model.Create("Chair", now);
+        var model2 = Model.Create("Chair", now);
+        _dbContext.Models.AddRange(model1, model2);
+        await _dbContext.SaveChangesAsync();
+
+        var uri = new Uri("http://localhost/Models/Chair");
+
+        // Act
+        var result = await _store.GetCollectionAsync(uri, _mockHttpContext.Object);
+
+        // Assert
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetCollectionAsync_TwoModelsWithSameName_IdSuffixedSegment_ResolvesTheExactModel()
+    {
+        // Arrange
+        var now = DateTime.UtcNow;
+        var model1 = Model.Create("Chair", now);
+        var model2 = Model.Create("Chair", now);
+        _dbContext.Models.AddRange(model1, model2);
+        await _dbContext.SaveChangesAsync();
+
+        var uri = new Uri($"http://localhost/Models/Chair%20%5B{model2.Id}%5D");
+
+        // Act
+        var result = await _store.GetCollectionAsync(uri, _mockHttpContext.Object);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.IsType<VirtualModelCollection>(result);
+        Assert.Equal($"Chair [{model2.Id}]", result.Name);
+    }
+
+    [Fact]
+    public async Task GetCollectionAsync_SingleModelNoCollision_ResolvesWithPlainName()
+    {
+        // Arrange
+        var now = DateTime.UtcNow;
+        var model = Model.Create("UniqueChair", now);
+        _dbContext.Models.Add(model);
+        await _dbContext.SaveChangesAsync();
+
+        var uri = new Uri("http://localhost/Models/UniqueChair");
+
+        // Act
+        var result = await _store.GetCollectionAsync(uri, _mockHttpContext.Object);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal("UniqueChair", result.Name);
     }
 }
