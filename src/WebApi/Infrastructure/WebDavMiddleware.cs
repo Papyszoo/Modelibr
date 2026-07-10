@@ -7,6 +7,7 @@ using Application.Abstractions.Storage;
 using Application.Models;
 using Application.Settings;
 using Infrastructure.Persistence;
+using Infrastructure.WebDav;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -30,6 +31,7 @@ public class WebDavMiddleware
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IUploadPathProvider _pathProvider;
     private readonly ILogger<WebDavMiddleware> _logger;
+    private readonly BlenderTempFileQuarantine _orphanQuarantine;
 
     public WebDavMiddleware(
         RequestDelegate next,
@@ -47,6 +49,7 @@ public class WebDavMiddleware
         _scopeFactory = scopeFactory;
         _pathProvider = pathProvider;
         _logger = logger;
+        _orphanQuarantine = new BlenderTempFileQuarantine(pathProvider, logger);
     }
 
     public async Task InvokeAsync(HttpContext context)
@@ -377,11 +380,19 @@ public class WebDavMiddleware
 
         if (!System.IO.File.Exists(tempFilePath))
         {
+            // No bytes were ever saved for this MOVE — nothing to quarantine or delete,
+            // just let Blender continue (it has nothing to lose here).
             _logger.LogWarning("Blender MOVE intercepted but temp file not found at {TempPath}", tempFilePath);
-            // Return success anyway so Blender is not confused
             context.Response.StatusCode = 204;
             return;
         }
+
+        // Data-safety rule: an unprocessed temp file is never deleted on failure — it is
+        // quarantined (moved + sidecar) so the artist's bytes survive. quarantineReason
+        // stays null on every success/no-op path, so the `finally` below only quarantines
+        // when something actually went wrong.
+        string? quarantineReason = null;
+        IReadOnlyCollection<int>? quarantineCandidateIds = null;
 
         try
         {
@@ -389,16 +400,18 @@ public class WebDavMiddleware
             var sp = scope.ServiceProvider;
 
             // Resolve the model from the path (e.g. /modelibr/Projects/P/Models/M/uploaded-{modelName}.blend@)
-            var modelInfo = await ResolveModelInfoFromPathAsync(sp, requestPath);
-            if (modelInfo == null)
+            var resolution = await ResolveModelInfoFromPathAsync(sp, requestPath);
+            if (resolution.Model == null)
             {
-                _logger.LogWarning("Could not resolve model from path {RequestPath}", requestPath);
-                System.IO.File.Delete(tempFilePath);
+                quarantineReason = resolution.Ambiguous ? "ambiguous model name" : "unresolvable model path";
+                quarantineCandidateIds = resolution.CandidateModelIds;
+                _logger.LogWarning(
+                    "Could not resolve model from path {RequestPath} (reason={Reason})", requestPath, quarantineReason);
                 context.Response.StatusCode = 204;
                 return;
             }
 
-            var (modelId, modelName, currentBlendHash) = modelInfo.Value;
+            var (modelId, modelName, currentBlendHash) = resolution.Model.Value;
 
             // Calculate hash of the uploaded temp file
             var uploadedHash = await ComputeSha256Async(tempFilePath);
@@ -425,7 +438,8 @@ public class WebDavMiddleware
                 {
                     // DuplicateFile means the saved content already exists in a previous version.
                     // Treat as success (204) so Blender is not confused — the data is already stored.
-                    // All other failures are real errors and should surface as 500.
+                    // All other failures are real errors and should surface as 500 — and the bytes
+                    // must be quarantined, not discarded, since they were never persisted.
                     if (createResult.Error?.Code == "DuplicateFile")
                     {
                         _logger.LogInformation("Blender save: file content matches an existing version for model {ModelId}, treating as no-op", modelId);
@@ -433,6 +447,8 @@ public class WebDavMiddleware
                     else
                     {
                         _logger.LogError("Failed to create new model version for model {ModelId}: {Error}", modelId, createResult.Error?.Message);
+                        quarantineReason = $"CreateModelVersion failed: {createResult.Error?.Code}";
+                        quarantineCandidateIds = new[] { modelId };
                         context.Response.StatusCode = 500;
                         return;
                     }
@@ -459,12 +475,22 @@ public class WebDavMiddleware
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error processing Blender save MOVE for {RequestPath}", requestPath);
+            quarantineReason = $"unhandled exception: {ex.GetType().Name}";
             context.Response.StatusCode = 500;
             return;
         }
         finally
         {
-            try { System.IO.File.Delete(tempFilePath); } catch (Exception ex) { _logger.LogWarning(ex, "Failed to cleanup Blender temp file {Path}", tempFilePath); }
+            if (quarantineReason != null)
+            {
+                await _orphanQuarantine.QuarantineAsync(
+                    tempFilePath, requestPath, quarantineReason, quarantineCandidateIds, context.RequestAborted);
+            }
+            else
+            {
+                // Content is safely persisted (or was a no-op) — the temp copy is no longer needed.
+                try { System.IO.File.Delete(tempFilePath); } catch (Exception ex) { _logger.LogWarning(ex, "Failed to cleanup Blender temp file {Path}", tempFilePath); }
+            }
         }
 
         context.Response.StatusCode = 204;
@@ -689,14 +715,33 @@ public class WebDavMiddleware
     }
 
     /// <summary>
+    /// Result of resolving a model from a WebDAV request path. <see cref="Model"/> is null
+    /// when the model could not be resolved; <see cref="Ambiguous"/> distinguishes "matched
+    /// nothing" from "matched more than one" (the plain-name fallback never guesses among
+    /// duplicates) so the caller can pick the right quarantine reason and log the candidates.
+    /// </summary>
+    private readonly record struct ModelPathResolution(
+        (int ModelId, string ModelName, string? CurrentBlendHash)? Model,
+        bool Ambiguous,
+        IReadOnlyCollection<int>? CandidateModelIds)
+    {
+        public static readonly ModelPathResolution NotFound = new(null, false, null);
+    }
+
+    /// <summary>
     /// Resolves the model ID, name, and current blend file hash from the WebDAV request path.
     /// Supports both project-based and global model paths:
     ///   /modelibr/Projects/{ProjectName}/Models/{ModelName}/generated-{modelName}.blend@
     ///   /modelibr/Projects/{ProjectName}/Models/{ModelName}/uploaded-{modelName}.blend@
     ///   /modelibr/Models/{ModelName}/generated-{modelName}.blend@
     ///   /modelibr/Models/{ModelName}/uploaded-{modelName}.blend@
+    /// The {ModelName} segment is resolved via the shared WebDAV disambiguation contract:
+    /// an "{name} [{id}]" suffix resolves directly by id; otherwise the plain segment is
+    /// matched case-insensitively (WebDAV clients on Windows/macOS treat paths
+    /// case-insensitively) and must match exactly one non-deleted model — an ambiguous
+    /// match refuses the save rather than guessing which model to overwrite.
     /// </summary>
-    private async Task<(int ModelId, string ModelName, string? CurrentBlendHash)?> ResolveModelInfoFromPathAsync(IServiceProvider sp, string requestPath)
+    private async Task<ModelPathResolution> ResolveModelInfoFromPathAsync(IServiceProvider sp, string requestPath)
     {
         // Normalize path: strip prefix and decode segments
         var path = requestPath;
@@ -709,7 +754,7 @@ public class WebDavMiddleware
                            .ToArray();
 
         string? projectName = null;
-        string? modelName = null;
+        string? modelSegment = null;
 
         // Project-based path: Projects / {ProjectName} / Models / {ModelName} / generated-/uploaded-{modelName}.blend@
         if (segments.Length >= 5 &&
@@ -717,59 +762,100 @@ public class WebDavMiddleware
             segments[2].Equals("Models", StringComparison.OrdinalIgnoreCase))
         {
             projectName = segments[1];
-            modelName = segments[3];
+            modelSegment = segments[3];
         }
         // Global model path: Models / {ModelName} / generated-/uploaded-{modelName}.blend@
         else if (segments.Length >= 3 &&
                  segments[0].Equals("Models", StringComparison.OrdinalIgnoreCase))
         {
-            modelName = segments[1];
+            modelSegment = segments[1];
         }
         else
         {
             _logger.LogWarning("ResolveModelInfo: unrecognized path structure: {Segments}", string.Join("/", segments));
-            return null;
+            return ModelPathResolution.NotFound;
         }
 
-        _logger.LogInformation("ResolveModelInfo: project={Project}, model={Model}", projectName ?? "(global)", modelName);
+        _logger.LogInformation("ResolveModelInfo: project={Project}, model={Model}", projectName ?? "(global)", modelSegment);
 
         var dbContext = sp.GetRequiredService<ApplicationDbContext>();
 
-        // Build query: filter by project name if project-based, else by model name only
-        var modelQuery = dbContext.Set<Domain.Models.Model>()
+        var baseQuery = dbContext.Set<Domain.Models.Model>()
             .AsNoTracking()
-            .Where(m => !m.IsDeleted && m.Name == modelName);
+            .Where(m => !m.IsDeleted);
 
+        // Case-insensitive for the same reason as the model name below — Windows/macOS
+        // WebDAV clients treat paths case-insensitively. Projects don't get an id-suffix
+        // disambiguation UI (their own creation-time check is still case-sensitive), so
+        // this stays a simple case-insensitive filter rather than a full ambiguity guard.
         if (projectName != null)
-            modelQuery = modelQuery.Where(m => m.Projects.Any(p => p.Name == projectName));
+            baseQuery = baseQuery.Where(m => m.Projects.Any(p => p.Name.ToLower() == projectName.ToLower()));
 
-        var model = await modelQuery
-            .Select(m => new { m.Id, m.Name })
-            .FirstOrDefaultAsync();
+        Domain.Models.Model? model = null;
+
+        // 1. "{name} [{id}]" suffix — resolve directly by id if the name still matches.
+        if (WebDavUtilities.TryParseIdSuffix(modelSegment!, out var suffixBaseName, out var suffixId))
+        {
+            var byId = await baseQuery
+                .Where(m => m.Id == suffixId)
+                .Include(m => m.Versions)
+                    .ThenInclude(v => v.Files)
+                .AsSplitQuery()
+                .FirstOrDefaultAsync();
+
+            if (byId != null && string.Equals(byId.Name, suffixBaseName, StringComparison.OrdinalIgnoreCase))
+                model = byId;
+        }
+
+        // 2. Plain-name fallback, case-insensitive. Duplicate names are allowed by policy
+        // now, so this must never guess: exactly one match resolves, anything else refuses.
+        if (model == null)
+        {
+            var matches = await baseQuery
+                .Where(m => m.Name.ToLower() == modelSegment!.ToLower())
+                .Select(m => m.Id)
+                .Take(2)
+                .ToListAsync();
+
+            if (matches.Count > 1)
+            {
+                _logger.LogWarning("ResolveModelInfo: ambiguous model name '{Model}' (2+ matches)", modelSegment);
+                return new ModelPathResolution(null, Ambiguous: true, CandidateModelIds: matches);
+            }
+
+            if (matches.Count == 1)
+            {
+                model = await dbContext.Set<Domain.Models.Model>()
+                    .AsNoTracking()
+                    .Where(m => m.Id == matches[0])
+                    .Include(m => m.Versions)
+                        .ThenInclude(v => v.Files)
+                    .AsSplitQuery()
+                    .FirstOrDefaultAsync();
+            }
+        }
 
         if (model == null)
         {
-            _logger.LogWarning("ResolveModelInfo: model '{Model}' not found", modelName);
-            return null;
+            _logger.LogWarning("ResolveModelInfo: model '{Model}' not found", modelSegment);
+            return ModelPathResolution.NotFound;
         }
 
-        var newestVersion = await dbContext.Set<Domain.Models.ModelVersion>()
-            .AsNoTracking()
-            .Include(v => v.Files)
-            .Where(v => !v.IsDeleted && v.ModelId == model.Id)
+        var newestVersion = model.Versions
+            .Where(v => !v.IsDeleted)
             .OrderByDescending(v => v.VersionNumber)
-            .FirstOrDefaultAsync();
+            .FirstOrDefault();
 
         if (newestVersion == null)
         {
-            _logger.LogWarning("ResolveModelInfo: no versions for model {ModelId}", model.Id); 
-            return null;
+            _logger.LogWarning("ResolveModelInfo: no versions for model {ModelId}", model.Id);
+            return ModelPathResolution.NotFound;
         }
 
         var blendFile = newestVersion.Files
             .FirstOrDefault(f => f.OriginalFileName.EndsWith(".blend", StringComparison.OrdinalIgnoreCase));
 
-        return (model.Id, model.Name, blendFile?.Sha256Hash);
+        return new ModelPathResolution((model.Id, model.Name, blendFile?.Sha256Hash), Ambiguous: false, CandidateModelIds: null);
     }
 
     private static async Task<string> ComputeSha256Async(string filePath)
