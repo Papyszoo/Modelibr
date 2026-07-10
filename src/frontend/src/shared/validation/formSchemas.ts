@@ -70,18 +70,6 @@ export const settingsFormSchema = z.object({
   ),
 })
 
-export const hierarchicalCategoryFormSchema = z
-  .object({
-    name: z.string().trim().min(1, 'Category name is required').max(200),
-    description: z.string().trim(),
-    parentId: z.number().int().nullable(),
-  })
-  .transform(values => ({
-    name: values.name,
-    description: values.description || undefined,
-    parentId: values.parentId,
-  }))
-
 export const packCreateFormSchema = z
   .object({
     name: z.string().trim().min(1, 'Pack name is required').max(200),

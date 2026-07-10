@@ -37,7 +37,9 @@ public interface IModelRepository
         int? minTriangleCount = null,
         int? maxTriangleCount = null,
         bool? hasAnimations = null,
+        bool? uncategorized = null,
         CancellationToken cancellationToken = default);
+    Task<CategoryAssetCounts> GetCategoryAssetCountsAsync(CancellationToken cancellationToken = default);
     Task<(int? ActiveVersionId, Domain.Models.Thumbnail? Thumbnail)?> GetThumbnailDataAsync(
         int modelId, CancellationToken cancellationToken = default);
     Task UpdateAsync(Model model, CancellationToken cancellationToken = default);

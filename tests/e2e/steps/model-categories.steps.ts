@@ -4,11 +4,12 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { ApiHelper } from "../helpers/api-helper";
 import {
-    categoryNode,
-    createCategory,
-    deleteCategory,
-    renameCategory,
-} from "../helpers/category-manager-helper";
+    categoryTreeRow,
+    clickCategoryInTree,
+    createCategoryViaTree,
+    deleteCategoryViaTree,
+    renameCategoryViaTree,
+} from "../helpers/category-tree-helper";
 import { ModelListPage } from "../pages/ModelListPage";
 
 const { Given, When, Then } = createBdd();
@@ -16,8 +17,8 @@ const { Given, When, Then } = createBdd();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const apiHelper = new ApiHelper();
 
-// Title of the shared CategoryManagerDialog on the models page.
-const TITLE = "Manage Model Categories";
+// The Models tab's category tree lives in this sidebar.
+const SIDEBAR = ".model-category-sidebar";
 
 const runId = Date.now().toString(36).slice(-4);
 const uniqueNames: Record<string, string> = {};
@@ -38,42 +39,52 @@ function resolve(base: string): string {
     return name;
 }
 
-When("I open the model category manager", async ({ page }) => {
-    await new ModelListPage(page).openCategoryManager();
-});
+// ── Manage via the sidebar context menu ───────────────────────────────
 
-When("I create the model category {string}", async ({ page }, base: string) => {
-    await createCategory(page, TITLE, unique(base));
-});
+When(
+    "I create a model category {string} via the context menu",
+    async ({ page }, base: string) => {
+        await createCategoryViaTree(page, SIDEBAR, unique(base));
+    },
+);
 
 Then(
-    "the model category {string} is listed",
+    "the model category {string} is visible in the sidebar",
     async ({ page }, base: string) => {
-        await expect(categoryNode(page, TITLE, resolve(base))).toBeVisible({
+        await expect(categoryTreeRow(page, SIDEBAR, resolve(base))).toBeVisible({
             timeout: 10000,
         });
     },
 );
 
 Then(
-    "the model category {string} is not listed",
+    "the model category {string} is not visible in the sidebar",
     async ({ page }, base: string) => {
-        await expect(categoryNode(page, TITLE, resolve(base))).toHaveCount(0, {
-            timeout: 10000,
-        });
+        await expect(categoryTreeRow(page, SIDEBAR, resolve(base))).toHaveCount(
+            0,
+            { timeout: 10000 },
+        );
     },
 );
 
 When(
-    "I rename the model category {string} to {string}",
+    "I rename the model category {string} to {string} via the context menu",
     async ({ page }, fromBase: string, toBase: string) => {
-        await renameCategory(page, TITLE, resolve(fromBase), unique(toBase));
+        await renameCategoryViaTree(
+            page,
+            SIDEBAR,
+            resolve(fromBase),
+            unique(toBase),
+        );
     },
 );
 
-When("I delete the model category {string}", async ({ page }, base: string) => {
-    await deleteCategory(page, TITLE, resolve(base));
-});
+When(
+    "I delete the model category {string} via the context menu",
+    async ({ page }, base: string) => {
+        await deleteCategoryViaTree(page, SIDEBAR, resolve(base));
+    },
+);
 
 // ── Assign + filter ───────────────────────────────────────────────────
 
@@ -102,7 +113,7 @@ When(
 When(
     "I filter models by category {string}",
     async ({ page }, categoryBase: string) => {
-        await new ModelListPage(page).filterByCategory(resolve(categoryBase));
+        await clickCategoryInTree(page, SIDEBAR, resolve(categoryBase));
     },
 );
 

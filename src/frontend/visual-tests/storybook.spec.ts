@@ -38,6 +38,11 @@ test.describe('Visual Regression', () => {
 
     expect(stories.length).toBeGreaterThan(0)
 
+    // One test walks EVERY story, so the default 30s test budget can't fit
+    // the whole catalog (navigation + settle + screenshot per story). Scale
+    // the budget with the story count instead of a magic constant.
+    test.setTimeout(60_000 + stories.length * 5_000)
+
     for (const story of stories) {
       await test.step(`${story.title} / ${story.name}`, async () => {
         // Navigate to the story's isolated iframe URL
@@ -45,10 +50,18 @@ test.describe('Visual Regression', () => {
           waitUntil: 'networkidle',
         })
 
-        // Wait for the Storybook root to be present
+        // Wait for Storybook's own "story rendered" signal: it puts
+        // `sb-show-main` on <body> once the story mounted cleanly (a render
+        // error flips it to `sb-show-errordisplay`, so broken stories still
+        // fail here). TRAP: do NOT gate on #storybook-root being 'visible'
+        // or having children — a story whose only child is fixed-positioned
+        // collapses root to a zero-size box (Layout/FloatingWindow), and a
+        // portal-only story leaves root empty (Models/FileUploadModal);
+        // both render fine. A root-based gate aborts the whole loop and
+        // leaves every later story un-snapshotted.
         await page
-          .locator('#storybook-root')
-          .waitFor({ state: 'visible', timeout: 10_000 })
+          .locator('body.sb-show-main')
+          .waitFor({ state: 'attached', timeout: 10_000 })
 
         // Small delay for animations/renders to settle
         await page.waitForTimeout(500)

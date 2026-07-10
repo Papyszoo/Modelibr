@@ -7,8 +7,7 @@ import {
   updateSound,
   updateSoundCategory,
 } from '@/features/sounds/api/soundApi'
-import { ALL_CATEGORIES_ID } from '@/shared/types/categories'
-import { collectCategoryBranchIds } from '@/shared/utils/categoryTree'
+import { useCategoryMutations } from '@/shared/hooks/useCategoryMutations'
 import { type SoundCategoryDto } from '@/types'
 
 interface ShowToast {
@@ -42,133 +41,46 @@ export function useSoundMutations({
   setContextMenuTarget,
 }: UseSoundMutationsOptions) {
   const queryClient = useQueryClient()
-  const createCategoryMutation = useMutation({
-    mutationFn: async (vars: { name: string; parentId: number | null }) =>
-      createSoundCategory(vars.name, undefined, vars.parentId),
-    onSuccess: async created => {
-      showToast({
-        severity: 'success',
-        summary: 'Success',
-        detail: 'Category created successfully',
-        life: 3000,
-      })
-      setActiveCategoryId(created.id)
+
+  const {
+    createCategoryMutation,
+    renameCategoryMutation,
+    deleteCategoryMutation,
+    moveToCategoryMutation,
+  } = useCategoryMutations<
+    SoundCategoryDto,
+    { id: number },
+    { soundIds: number[]; categoryId: number | null }
+  >({
+    showToast,
+    categories,
+    activeCategoryId,
+    setActiveCategoryId,
+    clearSelection: () => setSelectedSoundIds(new Set()),
+    noun: 'sound',
+    // Sounds refetch imperatively rather than via query-key invalidation.
+    onCategoriesChanged: async () => {
       await loadCategories()
       await loadSounds()
     },
-    onError: error => {
-      console.error('Failed to create category:', error)
-      showToast({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to create category',
-        life: 3000,
-      })
-    },
-  })
-
-  const renameCategoryMutation = useMutation({
-    // Description and parent are passed through unchanged — the update
-    // endpoint treats a null parentId as "move to root", so omitting the
-    // current parent would silently re-parent the category.
-    mutationFn: async (vars: { category: SoundCategoryDto; name: string }) =>
+    onAssetsChanged: loadSounds,
+    createCategory: vars =>
+      createSoundCategory(vars.name, undefined, vars.parentId),
+    renameCategory: vars =>
       updateSoundCategory(
         vars.category.id,
         vars.name,
         vars.category.description ?? undefined,
         vars.category.parentId ?? null
       ),
-    onSuccess: async () => {
-      showToast({
-        severity: 'success',
-        summary: 'Success',
-        detail: 'Category renamed successfully',
-        life: 3000,
-      })
-      await loadCategories()
-      await loadSounds()
-    },
-    onError: error => {
-      console.error('Failed to rename category:', error)
-      showToast({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to rename category',
-        life: 3000,
-      })
-    },
-  })
-
-  const deleteCategoryMutation = useMutation({
-    mutationFn: async (categoryId: number) => {
-      await deleteSoundCategory(categoryId)
-    },
-    onSuccess: async (_data, categoryId) => {
-      showToast({
-        severity: 'success',
-        summary: 'Success',
-        detail: 'Category deleted successfully',
-        life: 3000,
-      })
-      // Deleting removes the whole branch, so a selection anywhere inside
-      // it (not just the deleted node) must fall back to "All".
-      const deletedBranch = collectCategoryBranchIds(categories, categoryId)
-      if (activeCategoryId !== null && deletedBranch.has(activeCategoryId)) {
-        setActiveCategoryId(ALL_CATEGORIES_ID)
-      }
-      await loadCategories()
-      await loadSounds()
-    },
-    onError: error => {
-      console.error('Failed to delete category:', error)
-      showToast({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to delete category',
-        life: 3000,
-      })
-    },
-  })
-
-  const moveSoundsToCategoryMutation = useMutation({
-    mutationFn: async (vars: {
-      soundIds: number[]
-      categoryId: number | null
-    }) => {
+    deleteCategory: deleteSoundCategory,
+    moveToCategory: async vars => {
       await Promise.all(
         vars.soundIds.map(id =>
           updateSound(id, { categoryId: vars.categoryId })
         )
       )
-    },
-    onSuccess: async (_data, vars) => {
-      const targetCategoryName =
-        vars.categoryId === null
-          ? 'Unassigned'
-          : categories.find(c => c.id === vars.categoryId)?.name ||
-            'Unknown Category'
-      const message =
-        vars.soundIds.length === 1
-          ? `Sound moved to ${targetCategoryName}`
-          : `${vars.soundIds.length} sounds moved to ${targetCategoryName}`
-
-      showToast({
-        severity: 'success',
-        summary: 'Success',
-        detail: message,
-        life: 3000,
-      })
-      setSelectedSoundIds(new Set())
-      await loadSounds()
-    },
-    onError: error => {
-      console.error('Failed to update sound category:', error)
-      showToast({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to update sound category',
-        life: 3000,
-      })
+      return vars.soundIds.length
     },
   })
 
@@ -206,7 +118,7 @@ export function useSoundMutations({
     createCategoryMutation,
     renameCategoryMutation,
     deleteCategoryMutation,
-    moveSoundsToCategoryMutation,
+    moveSoundsToCategoryMutation: moveToCategoryMutation,
     recycleSoundsMutation,
   }
 }

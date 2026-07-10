@@ -14,6 +14,7 @@ import {
   createEnvironmentMapWithFile,
   getAllEnvironmentMaps,
   getEnvironmentMapById,
+  getEnvironmentMapCategoryCounts,
   getEnvironmentMapsPaginated,
   regenerateEnvironmentMapThumbnail,
   setEnvironmentMapCustomThumbnail,
@@ -58,6 +59,20 @@ export function getEnvironmentMapCategoriesQueryOptions() {
     queryKey: ['environment-map-categories'] as const,
     queryFn: () => getEnvironmentMapCategories(),
   })
+}
+
+// True per-category counts for the sidebar badges. Keyed UNDER
+// ['environmentMaps'] so any invalidateQueries(['environmentMaps']) — upload,
+// recycle, move, refresh — also refreshes the counts.
+export function getEnvironmentMapCategoryCountsQueryOptions() {
+  return queryOptions({
+    queryKey: ['environmentMaps', 'category-counts'] as const,
+    queryFn: () => getEnvironmentMapCategoryCounts(),
+  })
+}
+
+export function useEnvironmentMapCategoryCountsQuery() {
+  return useQuery(getEnvironmentMapCategoryCountsQueryOptions())
 }
 
 type UseEnvironmentMapsQueryOptions = {

@@ -37,7 +37,6 @@ export function useModelGrid({
   const data = useModelData({
     effectivePackIds: filters.effectivePackIds,
     effectiveProjectIds: filters.effectiveProjectIds,
-    selectedCategoryIds: filters.selectedCategoryIds,
     selectedTagNames: filters.selectedTagNames,
     hasConceptImages: filters.hasConceptImages,
     animatedOnly: filters.animatedOnly,
@@ -45,6 +44,7 @@ export function useModelGrid({
     maxTriangleCount: filters.maxTriangleCount,
     textureSetId,
     searchQuery: filters.searchQuery,
+    activeCategoryId: filters.activeCategoryId,
   })
 
   // Upload with auto-association to pack/project
@@ -55,7 +55,7 @@ export function useModelGrid({
     onUploadComplete: () => data.fetchModels(),
   })
 
-  // Client-side search filter
+  // Client-side name search only; category scoping is server-side.
   const filteredModels = filters.filterModels(data.models)
 
   // Build path prefix for context menu's "Copy Folder Path"
@@ -85,6 +85,9 @@ export function useModelGrid({
     // Data
     models: data.models,
     filteredModels,
+    categoryCounts: data.categoryCounts,
+    unassignedCount: data.unassignedCount,
+    allCount: data.allCount,
     loading: data.loading,
     error: data.error,
     packs: data.packs,
@@ -112,9 +115,8 @@ export function useModelGrid({
     setIsFiltersOpen: filters.setIsFiltersOpen,
     searchQuery: filters.searchQuery,
     setSearchQuery: filters.setSearchQuery,
-    selectedCategoryKeys: filters.selectedCategoryKeys,
-    setSelectedCategoryKeys: filters.setSelectedCategoryKeys,
-    selectedCategoryIds: filters.selectedCategoryIds,
+    activeCategoryId: filters.activeCategoryId,
+    setActiveCategoryId: filters.setActiveCategoryId,
     selectedTagNames: filters.selectedTagNames,
     setSelectedTagNames: filters.setSelectedTagNames,
     hasConceptImages: filters.hasConceptImages,

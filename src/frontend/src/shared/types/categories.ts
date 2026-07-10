@@ -30,3 +30,31 @@ export interface CategorySelectionState {
 }
 
 export type CategorySelectionKeys = Record<string, CategorySelectionState>
+
+/** One category's direct asset count (server-computed true total). */
+export interface CategoryCountEntry {
+  categoryId: number
+  count: number
+}
+
+/**
+ * True per-category asset totals for one asset type, from the backend
+ * `/{type}-categories/counts` endpoint. Drives the sidebar count badges so
+ * they show real library totals rather than loaded-page counts.
+ */
+export interface CategoryCountsResponse {
+  categories: CategoryCountEntry[]
+  uncategorizedCount: number
+  totalCount: number
+}
+
+/** Convert the server counts list into the `Map` the sidebar consumes. */
+export function toCategoryCountMap(
+  response: CategoryCountsResponse | undefined
+): Map<number, number> {
+  const map = new Map<number, number>()
+  for (const entry of response?.categories ?? []) {
+    map.set(entry.categoryId, entry.count)
+  }
+  return map
+}

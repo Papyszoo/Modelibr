@@ -1,31 +1,27 @@
 @texture-set @texture-set-categories @serial
 Feature: Texture Set Categories (per-kind)
   Categories are scoped per texture-set kind: Global Materials (Universal)
-  and Multi-Model (ModelSpecific) keep separate category pools. A category
-  created for one kind must not appear for the other, sets can be assigned
-  to a category of their own kind, and the grid can be filtered by it.
+  and Multi-Model (ModelSpecific) keep separate category pools shown in the
+  sidebar for the active kind. Management is inline via the sidebar's
+  right-click context menu; a category created for one kind must not appear
+  for the other, sets can be assigned to a category of their own kind, and
+  clicking a category filters the grid to it.
 
   Scenario: A category created for Multi-Model is not shared with Global Materials
     Given I am on the texture sets page
     And I switch to the "Multi-Model" kind tab
-    When I open the category manager
-    And I create the category "mm-only"
-    Then the category "mm-only" is listed in the manager
-    When I close the category manager
-    And I switch to the "Global Materials" kind tab
-    And I open the category manager
-    Then the category "mm-only" is not listed in the manager
+    When I create a texture set category "mm-only" via the context menu
+    Then the texture set category "mm-only" is visible in the sidebar
+    When I switch to the "Global Materials" kind tab
+    Then the texture set category "mm-only" is not visible in the sidebar
 
   Scenario: A category created for Global Materials is not shared with Multi-Model
     Given I am on the texture sets page
     And I switch to the "Global Materials" kind tab
-    When I open the category manager
-    And I create the category "gm-only"
-    Then the category "gm-only" is listed in the manager
-    When I close the category manager
-    And I switch to the "Multi-Model" kind tab
-    And I open the category manager
-    Then the category "gm-only" is not listed in the manager
+    When I create a texture set category "gm-only" via the context menu
+    Then the texture set category "gm-only" is visible in the sidebar
+    When I switch to the "Multi-Model" kind tab
+    Then the texture set category "gm-only" is not visible in the sidebar
 
   Scenario: Assign and filter a Multi-Model texture set by category
     Given I have a model-specific texture set category "mm-assign"
@@ -48,39 +44,35 @@ Feature: Texture Set Categories (per-kind)
   Scenario: Rename a texture set category
     Given I am on the texture sets page
     And I switch to the "Multi-Model" kind tab
-    When I open the category manager
-    And I create the category "rename-src"
-    And I rename the category "rename-src" to "rename-dst"
-    Then the category "rename-dst" is listed in the manager
-    And the category "rename-src" is not listed in the manager
+    When I create a texture set category "rename-src" via the context menu
+    And I rename the texture set category "rename-src" to "rename-dst" via the context menu
+    Then the texture set category "rename-dst" is visible in the sidebar
+    And the texture set category "rename-src" is not visible in the sidebar
 
   Scenario: Renaming a Multi-Model category to a name used by Global Materials is allowed
     Given I have a universal texture set category "xkind-shared"
     And I am on the texture sets page
     And I switch to the "Multi-Model" kind tab
-    When I open the category manager
-    And I create the category "xkind-src"
-    And I rename the category "xkind-src" to "xkind-shared"
-    Then the category "xkind-shared" is listed in the manager
+    When I create a texture set category "xkind-src" via the context menu
+    And I rename the texture set category "xkind-src" to "xkind-shared" via the context menu
+    Then the texture set category "xkind-shared" is visible in the sidebar
 
   Scenario: Renaming a category to a duplicate name in the same kind is rejected
     Given I have a model-specific texture set category "rej-a"
     And I have a model-specific texture set category "rej-b"
     Then renaming category "rej-b" to "rej-a" is rejected
 
-  Scenario: The category manager surfaces a save error when the rename collides
+  Scenario: A colliding rename in the sidebar surfaces an error and keeps the original
     Given I have a model-specific texture set category "uirej-a"
+    And I have a model-specific texture set category "uirej-b"
     And I am on the texture sets page
     And I switch to the "Multi-Model" kind tab
-    When I open the category manager
-    And I create the category "uirej-b"
-    Then renaming the category "uirej-b" to "uirej-a" fails in the manager
-    And the category "uirej-b" is listed in the manager
+    Then renaming the texture set category "uirej-b" to "uirej-a" via the context menu surfaces an error
+    And the texture set category "uirej-b" is visible in the sidebar
 
   Scenario: Delete a texture set category
     Given I am on the texture sets page
     And I switch to the "Multi-Model" kind tab
-    When I open the category manager
-    And I create the category "del-target"
-    And I delete the texture set category "del-target"
-    Then the category "del-target" is not listed in the manager
+    When I create a texture set category "del-target" via the context menu
+    And I delete the texture set category "del-target" via the context menu
+    Then the texture set category "del-target" is not visible in the sidebar

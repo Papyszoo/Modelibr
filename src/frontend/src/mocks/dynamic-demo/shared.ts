@@ -609,6 +609,39 @@ export function buildCategoryPath(
   return segments.join(' / ')
 }
 
+/**
+ * Mirror the backend `/{type}-categories/counts` endpoint: true per-category
+ * totals over the whole asset set, independent of any list filter.
+ */
+export function buildCategoryCounts(
+  assets: ReadonlyArray<{ categoryId?: number | null }>
+): {
+  categories: { categoryId: number; count: number }[]
+  uncategorizedCount: number
+  totalCount: number
+} {
+  const perCategory = new Map<number, number>()
+  let uncategorizedCount = 0
+  for (const asset of assets) {
+    if (asset.categoryId == null) {
+      uncategorizedCount += 1
+    } else {
+      perCategory.set(
+        asset.categoryId,
+        (perCategory.get(asset.categoryId) ?? 0) + 1
+      )
+    }
+  }
+  return {
+    categories: [...perCategory.entries()].map(([categoryId, count]) => ({
+      categoryId,
+      count,
+    })),
+    uncategorizedCount,
+    totalCount: assets.length,
+  }
+}
+
 export async function enrichModel(model: DemoModel, stringId = false) {
   const versions = await getVersionsByModelId(model.id)
   const latestVersion = versions.reduce<DemoModelVersion | null>(

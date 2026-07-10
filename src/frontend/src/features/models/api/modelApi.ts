@@ -1,6 +1,7 @@
 import { type AxiosResponse } from 'axios'
 
 import { baseURL, client, UPLOAD_TIMEOUT } from '@/lib/apiBase'
+import { type CategoryCountsResponse } from '@/shared/types/categories'
 import { type PaginatedResponse } from '@/types'
 import {
   type GetAllModelCategoriesResponse,
@@ -118,6 +119,7 @@ export async function getModelsPaginated(options: {
   projectIds?: number[]
   textureSetId?: number
   categoryIds?: number[]
+  uncategorized?: boolean
   tags?: string[]
   hasConceptImages?: boolean
   hasAnimations?: boolean
@@ -132,8 +134,12 @@ export async function getModelsPaginated(options: {
   options.projectIds?.forEach(id => params.append('projectIds', id.toString()))
   if (options.textureSetId)
     params.append('textureSetId', options.textureSetId.toString())
-  for (const categoryId of options.categoryIds ?? []) {
-    params.append('categoryId', categoryId.toString())
+  if (options.uncategorized) {
+    params.append('uncategorized', 'true')
+  } else {
+    for (const categoryId of options.categoryIds ?? []) {
+      params.append('categoryId', categoryId.toString())
+    }
   }
   for (const tag of options.tags ?? []) {
     params.append('tag', tag)
@@ -205,6 +211,13 @@ export async function getModelCategories(): Promise<ModelCategoryDto[]> {
   const response =
     await client.get<GetAllModelCategoriesResponse>('/model-categories')
   return response.data.categories
+}
+
+export async function getModelCategoryCounts(): Promise<CategoryCountsResponse> {
+  const response = await client.get<CategoryCountsResponse>(
+    '/model-categories/counts'
+  )
+  return response.data
 }
 
 export async function getModelTags(): Promise<ModelTagDto[]> {
