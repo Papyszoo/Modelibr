@@ -1,5 +1,6 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Models;
 using Domain.Services;
 using SharedKernel;
 
@@ -9,15 +10,18 @@ internal class UpdateSpriteCommandHandler : ICommandHandler<UpdateSpriteCommand,
 {
     private readonly ISpriteRepository _spriteRepository;
     private readonly ISpriteCategoryRepository _spriteCategoryRepository;
+    private readonly ISettingRepository _settingRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
 
     public UpdateSpriteCommandHandler(
         ISpriteRepository spriteRepository,
         ISpriteCategoryRepository spriteCategoryRepository,
+        ISettingRepository settingRepository,
         IDateTimeProvider dateTimeProvider)
     {
         _spriteRepository = spriteRepository;
         _spriteCategoryRepository = spriteCategoryRepository;
+        _settingRepository = settingRepository;
         _dateTimeProvider = dateTimeProvider;
     }
 
@@ -34,14 +38,26 @@ internal class UpdateSpriteCommandHandler : ICommandHandler<UpdateSpriteCommand,
 
             if (!string.IsNullOrWhiteSpace(command.Name) && command.Name != sprite.Name)
             {
-                var existingSprite = await _spriteRepository.GetByNameAsync(command.Name, cancellationToken);
-                if (existingSprite != null && existingSprite.Id != sprite.Id)
+                // Renames follow the same DuplicateNamePolicy as creation: Allow keeps the
+                // name as-is, Reject fails, AutoRename appends a numeric suffix. The
+                // existence check excludes this sprite itself so it can keep or re-case
+                // its own name without tripping the Reject policy.
+                var nameResult = await AssetNameService.ResolveNameAsync(
+                    command.Name, "Sprite",
+                    async (name, ct) =>
+                    {
+                        var other = await _spriteRepository.GetByNameAsync(name, ct);
+                        return other != null && other.Id != sprite.Id;
+                    },
+                    _spriteRepository.GetNamesByPrefixAsync,
+                    _settingRepository, cancellationToken);
+                if (nameResult.IsFailure)
                 {
                     return Result.Failure<UpdateSpriteResponse>(
                         new Error("SpriteAlreadyExists", $"A sprite with the name '{command.Name}' already exists."));
                 }
 
-                sprite.UpdateName(command.Name, _dateTimeProvider.UtcNow);
+                sprite.UpdateName(nameResult.Value, _dateTimeProvider.UtcNow);
             }
 
             if (command.SpriteType.HasValue)
