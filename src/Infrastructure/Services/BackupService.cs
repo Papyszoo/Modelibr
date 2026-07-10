@@ -15,6 +15,11 @@ public sealed class BackupService : IBackupService
     public const string UploadsPrefix = "uploads/";
     public const string ThumbnailsPrefix = "thumbnails/";
 
+    // Top-level directories under the uploads root excluded from backups entirely.
+    // See the exclusion comment at the WriteDirectoryEntriesAsync call site for why each
+    // one is here (and, just as importantly, why webdav-blend-orphans is NOT).
+    private static readonly string[] UploadSkipDirNames = ["tmp", "webdav-blend-temp"];
+
     private readonly ILogger<BackupService> _logger;
     private readonly BackupPaths _paths;
     private readonly PostgresConnectionInfo _postgres;
@@ -250,15 +255,21 @@ public sealed class BackupService : IBackupService
 
                 if (Directory.Exists(_paths.UploadRoot))
                 {
-                    // Skip uploads/tmp/ — that's HashBasedFileStorage's staging directory for in-flight uploads.
+                    // Skip uploads/tmp/ (HashBasedFileStorage's staging dir for in-flight
+                    // uploads) and uploads/webdav-blend-temp/ (in-flight Blender Safe-Save
+                    // uploads — unprocessed, ages out via BlenderRetentionSweeper, and
+                    // restoring it would just replay half-finished saves). Deliberately
+                    // NOT skipping uploads/webdav-blend-orphans/: those are quarantined
+                    // user bytes that survived a failed save — real user data that a
+                    // restore must bring back (prompt 30, item 5).
                     (uploadsCount, uploadsBytes) = await WriteDirectoryEntriesAsync(
-                        tar, _paths.UploadRoot, UploadsPrefix, skipDirName: "tmp");
+                        tar, _paths.UploadRoot, UploadsPrefix, skipDirNames: UploadSkipDirNames);
                 }
 
                 if (scope.IncludeThumbnails && Directory.Exists(_paths.ThumbnailRoot))
                 {
                     (thumbsCount, thumbsBytes) = await WriteDirectoryEntriesAsync(
-                        tar, _paths.ThumbnailRoot, ThumbnailsPrefix, skipDirName: null);
+                        tar, _paths.ThumbnailRoot, ThumbnailsPrefix);
                 }
 
                 var manifest = new BackupManifest(
@@ -375,7 +386,7 @@ public sealed class BackupService : IBackupService
         TarWriter tar,
         string rootDir,
         string entryPrefix,
-        string? skipDirName)
+        IReadOnlyCollection<string>? skipDirNames = null)
     {
         var count = 0;
         long bytes = 0;
@@ -383,10 +394,10 @@ public sealed class BackupService : IBackupService
 
         foreach (var path in Directory.EnumerateFiles(rootDir, "*", SearchOption.AllDirectories))
         {
-            if (skipDirName != null)
+            if (skipDirNames is { Count: > 0 })
             {
                 var rel = Path.GetRelativePath(rootFull, path).Replace('\\', '/');
-                if (rel.StartsWith(skipDirName + "/", StringComparison.Ordinal)) continue;
+                if (skipDirNames.Any(skip => rel.StartsWith(skip + "/", StringComparison.Ordinal))) continue;
             }
             var relative = Path.GetRelativePath(rootFull, path).Replace('\\', '/');
             var entryName = entryPrefix + relative;
