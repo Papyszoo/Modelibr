@@ -31,13 +31,15 @@ internal sealed class BlenderTempFileQuarantine
     /// and writes a JSON sidecar with the original request path, timestamp, reason, and
     /// candidate model ids (when the failure was an ambiguous name match). No-ops (with
     /// a warning) if the temp file no longer exists — there are no bytes to protect.
+    /// Deliberately takes no CancellationToken: quarantine is a data-safety operation,
+    /// and a client that disconnects mid-failure (aborting the request) must not be
+    /// able to cancel the move or the sidecar write.
     /// </summary>
     public async Task QuarantineAsync(
         string tempFilePath,
         string requestPath,
         string reason,
-        IReadOnlyCollection<int>? candidateModelIds,
-        CancellationToken cancellationToken)
+        IReadOnlyCollection<int>? candidateModelIds)
     {
         if (!File.Exists(tempFilePath))
         {
@@ -69,7 +71,7 @@ internal sealed class BlenderTempFileQuarantine
             await File.WriteAllTextAsync(
                 sidecarPath,
                 JsonSerializer.Serialize(sidecar, SidecarJsonOptions),
-                cancellationToken);
+                CancellationToken.None);
 
             _logger.LogWarning(
                 "Quarantined unresolvable Blender save temp file to {OrphanPath} (reason={Reason}, requestPath={RequestPath})",
