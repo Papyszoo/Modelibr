@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
@@ -14,6 +15,7 @@ internal class AssociateTextureSetWithModelVersionCommandHandler : ICommandHandl
     private readonly IThumbnailQueue _thumbnailQueue;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IBlendFileGenerator _blendFileGenerator;
+    private readonly IUnitOfWork _unitOfWork;
 
     public AssociateTextureSetWithModelVersionCommandHandler(
         ITextureSetRepository textureSetRepository,
@@ -21,7 +23,8 @@ internal class AssociateTextureSetWithModelVersionCommandHandler : ICommandHandl
         IThumbnailRepository thumbnailRepository,
         IThumbnailQueue thumbnailQueue,
         IDateTimeProvider dateTimeProvider,
-        IBlendFileGenerator blendFileGenerator)
+        IBlendFileGenerator blendFileGenerator,
+        IUnitOfWork unitOfWork)
     {
         _textureSetRepository = textureSetRepository;
         _modelVersionRepository = modelVersionRepository;
@@ -29,6 +32,7 @@ internal class AssociateTextureSetWithModelVersionCommandHandler : ICommandHandl
         _thumbnailQueue = thumbnailQueue;
         _dateTimeProvider = dateTimeProvider;
         _blendFileGenerator = blendFileGenerator;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(AssociateTextureSetWithModelVersionCommand command, CancellationToken cancellationToken)
@@ -107,6 +111,8 @@ internal class AssociateTextureSetWithModelVersionCommandHandler : ICommandHandl
                         cancellationToken: cancellationToken);
                 }
             }
+
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             return Result.Success();
         }

@@ -54,12 +54,11 @@ public class RepositoriesDontSelfCommitTests
         // env maps
         "EnvironmentMapRepository.cs",
         "EnvironmentMapCategoryRepository.cs",
-        // thumbnails — ThumbnailJobRepository also has a legitimate explicit
-        // BeginTransactionAsync for claim semantics (GetNextPendingJobAsync);
-        // that one call is expected to remain even after this area migrates.
-        "ThumbnailRepository.cs",
+        // thumbnails — migrated except ThumbnailJobRepository's
+        // GetNextPendingJobAsync, whose explicit BeginTransactionAsync +
+        // SaveChangesAsync (claim semantics: the expired-lock reset must be
+        // durable inside the claim boundary) stays permanently.
         "ThumbnailJobRepository.cs",
-        "ThumbnailJobEventRepository.cs",
         // misc — File/FilePersistence migration interacts with
         // FileCreationService's disk<->DB compensation behavior (explicitly
         // out of scope for prompt 25); Stage has no handler audit yet

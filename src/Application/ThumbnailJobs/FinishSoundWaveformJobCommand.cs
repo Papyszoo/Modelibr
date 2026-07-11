@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
@@ -36,17 +37,20 @@ public class FinishSoundWaveformJobCommandHandler : ICommandHandler<FinishSoundW
     private readonly ISoundRepository _soundRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly ILogger<FinishSoundWaveformJobCommandHandler> _logger;
+    private readonly IUnitOfWork _unitOfWork;
 
     public FinishSoundWaveformJobCommandHandler(
         IThumbnailJobRepository thumbnailJobRepository,
         ISoundRepository soundRepository,
         IDateTimeProvider dateTimeProvider,
-        ILogger<FinishSoundWaveformJobCommandHandler> logger)
+        ILogger<FinishSoundWaveformJobCommandHandler> logger,
+        IUnitOfWork unitOfWork)
     {
         _thumbnailJobRepository = thumbnailJobRepository ?? throw new ArgumentNullException(nameof(thumbnailJobRepository));
         _soundRepository = soundRepository ?? throw new ArgumentNullException(nameof(soundRepository));
         _dateTimeProvider = dateTimeProvider ?? throw new ArgumentNullException(nameof(dateTimeProvider));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<FinishSoundWaveformJobResponse>> Handle(FinishSoundWaveformJobCommand command, CancellationToken cancellationToken)
@@ -137,6 +141,7 @@ public class FinishSoundWaveformJobCommandHandler : ICommandHandler<FinishSoundW
         // (finish the job first) would instead risk permanently losing metadata on
         // a crash, since a completed job is never reprocessed.
         await _thumbnailJobRepository.UpdateAsync(job, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new FinishSoundWaveformJobResponse(
             command.JobId,

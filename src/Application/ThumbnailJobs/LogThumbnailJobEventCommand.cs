@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Models;
@@ -29,17 +30,20 @@ public class LogThumbnailJobEventCommandHandler : ICommandHandler<LogThumbnailJo
     private readonly IThumbnailJobRepository _thumbnailJobRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly ILogger<LogThumbnailJobEventCommandHandler> _logger;
+    private readonly IUnitOfWork _unitOfWork;
 
     public LogThumbnailJobEventCommandHandler(
         IThumbnailJobEventRepository thumbnailJobEventRepository,
         IThumbnailJobRepository thumbnailJobRepository,
         IDateTimeProvider dateTimeProvider,
-        ILogger<LogThumbnailJobEventCommandHandler> logger)
+        ILogger<LogThumbnailJobEventCommandHandler> logger,
+        IUnitOfWork unitOfWork)
     {
         _thumbnailJobEventRepository = thumbnailJobEventRepository ?? throw new ArgumentNullException(nameof(thumbnailJobEventRepository));
         _thumbnailJobRepository = thumbnailJobRepository ?? throw new ArgumentNullException(nameof(thumbnailJobRepository));
         _dateTimeProvider = dateTimeProvider ?? throw new ArgumentNullException(nameof(dateTimeProvider));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<LogThumbnailJobEventResponse>> Handle(LogThumbnailJobEventCommand command, CancellationToken cancellationToken)
@@ -68,6 +72,7 @@ public class LogThumbnailJobEventCommandHandler : ICommandHandler<LogThumbnailJo
 
             // Save the event
             var savedEvent = await _thumbnailJobEventRepository.AddAsync(jobEvent, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             _logger.LogInformation("Logged event {EventType} for thumbnail job {JobId}", 
                 command.EventType, command.JobId);

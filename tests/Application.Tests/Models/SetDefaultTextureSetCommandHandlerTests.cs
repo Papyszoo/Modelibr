@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
 using Application.Models;
@@ -18,6 +19,7 @@ public class SetDefaultTextureSetCommandHandlerTests
     private readonly Mock<IThumbnailQueue> _mockThumbnailQueue;
     private readonly Mock<IDateTimeProvider> _mockDateTimeProvider;
     private readonly Mock<IBlendFileGenerator> _mockBlendFileGenerator;
+    private readonly Mock<IUnitOfWork> _mockUnitOfWork = new();
     private readonly SetDefaultTextureSetCommandHandler _handler;
 
     public SetDefaultTextureSetCommandHandlerTests()
@@ -35,7 +37,8 @@ public class SetDefaultTextureSetCommandHandlerTests
             _mockThumbnailRepository.Object,
             _mockThumbnailQueue.Object,
             _mockDateTimeProvider.Object,
-            _mockBlendFileGenerator.Object);
+            _mockBlendFileGenerator.Object,
+            _mockUnitOfWork.Object);
     }
 
     [Fact]
