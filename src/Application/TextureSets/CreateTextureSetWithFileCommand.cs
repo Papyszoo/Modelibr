@@ -120,8 +120,11 @@ internal class CreateTextureSetWithFileCommandHandler : ICommandHandler<CreateTe
                 }
             }
 
-            // Update the texture set with the texture
+            // Update the texture set with the texture. Commit now: the set's real
+            // database-assigned id is needed below as a raw scalar (BatchUpload,
+            // thumbnail-job enqueue, response DTO).
             var updatedTextureSet = await _textureSetRepository.UpdateAsync(createdTextureSet, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             // 5. Track batch upload if batchId provided
             if (!string.IsNullOrWhiteSpace(command.BatchId))

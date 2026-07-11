@@ -21,7 +21,6 @@ internal sealed class TextureSetRepository : ITextureSetRepository
             throw new ArgumentNullException(nameof(textureSet));
 
         var entityEntry = await _context.TextureSets.AddAsync(textureSet, cancellationToken);
-        await _context.SaveChangesAsync(cancellationToken);
         
         return entityEntry.Entity;
     }
@@ -256,15 +255,14 @@ internal sealed class TextureSetRepository : ITextureSetRepository
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<TextureSet> UpdateAsync(TextureSet textureSet, CancellationToken cancellationToken = default)
+    public Task<TextureSet> UpdateAsync(TextureSet textureSet, CancellationToken cancellationToken = default)
     {
         if (textureSet == null)
             throw new ArgumentNullException(nameof(textureSet));
 
         _context.TextureSets.Update(textureSet);
-        await _context.SaveChangesAsync(cancellationToken);
-        
-        return textureSet;
+
+        return Task.FromResult(textureSet);
     }
 
     public async Task DeleteAsync(int id, CancellationToken cancellationToken = default)
@@ -277,7 +275,6 @@ internal sealed class TextureSetRepository : ITextureSetRepository
         if (textureSet != null)
         {
             _context.TextureSets.Remove(textureSet);
-            await _context.SaveChangesAsync(cancellationToken);
         }
     }
 
@@ -295,7 +292,6 @@ internal sealed class TextureSetRepository : ITextureSetRepository
             _context.Textures.RemoveRange(textureSet.Textures);
             // Remove the texture set
             _context.TextureSets.Remove(textureSet);
-            await _context.SaveChangesAsync(cancellationToken);
         }
     }
 }

@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Services;
@@ -10,15 +11,18 @@ internal class UpdateTextureSetCommandHandler : ICommandHandler<UpdateTextureSet
     private readonly ITextureSetRepository _textureSetRepository;
     private readonly ITextureSetCategoryRepository _textureSetCategoryRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public UpdateTextureSetCommandHandler(
         ITextureSetRepository textureSetRepository,
         ITextureSetCategoryRepository textureSetCategoryRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _textureSetRepository = textureSetRepository;
         _textureSetCategoryRepository = textureSetCategoryRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<UpdateTextureSetResponse>> Handle(UpdateTextureSetCommand command, CancellationToken cancellationToken)
@@ -61,6 +65,7 @@ internal class UpdateTextureSetCommandHandler : ICommandHandler<UpdateTextureSet
             textureSet.AssignCategory(command.CategoryId, _dateTimeProvider.UtcNow);
 
             var updatedTextureSet = await _textureSetRepository.UpdateAsync(textureSet, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             return Result.Success(new UpdateTextureSetResponse(updatedTextureSet.Id, updatedTextureSet.Name, updatedTextureSet.TextureSetCategoryId));
         }
