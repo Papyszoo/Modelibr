@@ -131,6 +131,9 @@ internal class CreateSoundWithFileCommandHandler : ICommandHandler<CreateSoundWi
                 command.CategoryId);
 
             var createdSound = await _soundRepository.AddAsync(sound, cancellationToken);
+            // Commit now: the sound's real database-assigned id feeds the waveform-job
+            // enqueue and the BatchUpload raw scalar below.
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             // 5. Enqueue waveform thumbnail generation job
             try

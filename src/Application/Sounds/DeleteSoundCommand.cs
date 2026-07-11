@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using SharedKernel;
@@ -7,10 +8,13 @@ namespace Application.Sounds;
 internal class DeleteSoundCommandHandler : ICommandHandler<DeleteSoundCommand>
 {
     private readonly ISoundRepository _soundRepository;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public DeleteSoundCommandHandler(ISoundRepository soundRepository)
+    public DeleteSoundCommandHandler(ISoundRepository soundRepository,
+        IUnitOfWork unitOfWork)
     {
         _soundRepository = soundRepository;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(DeleteSoundCommand command, CancellationToken cancellationToken)
@@ -23,6 +27,7 @@ internal class DeleteSoundCommandHandler : ICommandHandler<DeleteSoundCommand>
         }
 
         await _soundRepository.DeleteAsync(command.Id, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success();
     }
