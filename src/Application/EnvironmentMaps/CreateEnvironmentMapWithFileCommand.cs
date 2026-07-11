@@ -117,9 +117,13 @@ internal sealed class CreateEnvironmentMapWithFileCommandHandler : ICommandHandl
             environmentMap.AddVariant(variant, now);
 
             var created = await _environmentMapRepository.AddAsync(environmentMap, cancellationToken);
+            // Commit immediately: created.Id / variant.Id are database-assigned and
+            // are needed below by SetPreviewVariant and the thumbnail-job enqueue.
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             created.SetPreviewVariant(variant.Id, now);
             await _environmentMapRepository.UpdateAsync(created, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             await _thumbnailQueue.EnqueueEnvironmentMapThumbnailAsync(created.Id, variant.Id, cancellationToken: cancellationToken);
 

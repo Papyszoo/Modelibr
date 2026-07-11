@@ -65,15 +65,18 @@ internal sealed class AddEnvironmentMapVariantWithFileCommandHandler : ICommandH
             var variant = resolvedFilesResult.Value.CreateVariant(sizeLabelResult.Value, now);
             environmentMap.AddVariant(variant, now);
             await _environmentMapRepository.UpdateAsync(environmentMap, cancellationToken);
+            // Commit immediately: variant.Id is database-assigned and is needed below
+            // by the PreviewVariantId check/set and the thumbnail-job enqueue.
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             if (!environmentMap.PreviewVariantId.HasValue && variant.Id > 0)
             {
                 environmentMap.SetPreviewVariant(variant.Id, now);
                 await _environmentMapRepository.UpdateAsync(environmentMap, cancellationToken);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
             }
 
             await _thumbnailQueue.EnqueueEnvironmentMapThumbnailAsync(environmentMap.Id, variant.Id, forceRegenerate: true, cancellationToken: cancellationToken);
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             return Result.Success(new AddEnvironmentMapVariantResponse(
                 variant.Id,

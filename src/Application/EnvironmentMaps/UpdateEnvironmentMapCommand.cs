@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Services;
@@ -9,13 +10,16 @@ internal sealed class UpdateEnvironmentMapCommandHandler : ICommandHandler<Updat
 {
     private readonly IEnvironmentMapRepository _environmentMapRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public UpdateEnvironmentMapCommandHandler(
         IEnvironmentMapRepository environmentMapRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _environmentMapRepository = environmentMapRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<UpdateEnvironmentMapResponse>> Handle(UpdateEnvironmentMapCommand command, CancellationToken cancellationToken)
@@ -47,6 +51,7 @@ internal sealed class UpdateEnvironmentMapCommandHandler : ICommandHandler<Updat
                 environmentMap.SetPreviewVariant(command.PreviewVariantId, now);
 
             await _environmentMapRepository.UpdateAsync(environmentMap, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             return Result.Success(new UpdateEnvironmentMapResponse(environmentMap.Id, environmentMap.Name, environmentMap.PreviewVariantId));
         }

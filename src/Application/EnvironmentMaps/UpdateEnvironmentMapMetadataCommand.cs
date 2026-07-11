@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Models;
@@ -25,17 +26,20 @@ internal sealed class UpdateEnvironmentMapMetadataCommandHandler
     private readonly IModelTagRepository _modelTagRepository;
     private readonly IEnvironmentMapCategoryRepository _environmentMapCategoryRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public UpdateEnvironmentMapMetadataCommandHandler(
         IEnvironmentMapRepository environmentMapRepository,
         IModelTagRepository modelTagRepository,
         IEnvironmentMapCategoryRepository environmentMapCategoryRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _environmentMapRepository = environmentMapRepository;
         _modelTagRepository = modelTagRepository;
         _environmentMapCategoryRepository = environmentMapCategoryRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<UpdateEnvironmentMapMetadataResponse>> Handle(
@@ -91,6 +95,7 @@ internal sealed class UpdateEnvironmentMapMetadataCommandHandler
         environmentMap.AssignCategory(command.CategoryId, now);
 
         await _environmentMapRepository.UpdateAsync(environmentMap, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new UpdateEnvironmentMapMetadataResponse(
             environmentMap.Id,
