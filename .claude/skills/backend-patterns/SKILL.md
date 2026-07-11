@@ -10,9 +10,10 @@ description: Modelibr backend conventions — Clean Architecture boundaries, Res
   SharedKernel stay free of EF Core attributes, HTTP concerns, and infrastructure refs.
 - One command/query handler per operation; business rules live on entities and value
   objects; repositories stay thin.
-- Known debt + planned refactors live in `.claude/prompts/` (15, 25–29). Before
-  reworking error mapping, transactions, event dispatch, or FileType, read the
-  matching prompt — don't half-implement it as a side effect.
+- Known debt + planned refactors live in `.claude/prompts/` (15, 26–29). Before
+  reworking error mapping or FileType, read the matching prompt — don't
+  half-implement it as a side effect. Transactions/event dispatch (prompt 25) are
+  covered below — it's an in-progress migration, not a "read the prompt first" item.
 
 ## Result/Error
 - Handlers return `Task<Result>` / `Task<Result<T>>` (`SharedKernel/Result.cs`, `Error.cs`).
@@ -27,19 +28,42 @@ description: Modelibr backend conventions — Clean Architecture boundaries, Res
 
 ## Domain events
 - Extend `DomainEvent` (SharedKernel), defined in `Domain/Events/`; handlers implement
-  `IDomainEventHandler<TEvent>` in `Application/EventHandlers/`.
-- TRAP — dispatch is manual and easy to forget: after persisting, the command handler
-  itself must call `IDomainEventDispatcher.PublishAsync(aggregate.DomainEvents)` then
-  `aggregate.ClearDomainEvents()`. If you mutate an aggregate that raises events and
-  skip this, the events are silently dropped. (Prompt 25 moves this into the save
-  pipeline; until then, copy the pattern from `CreateModelVersionCommandHandler`.)
+  `IDomainEventHandler<TEvent>` in `Application/EventHandlers/` — assembly-scanned, no
+  registration needed. Raising the event via `RaiseDomainEvent(...)` on an
+  `AggregateRoot` is the entire contract.
+- Dispatch is NOT manual. `Infrastructure/Persistence/DomainEventsInterceptor.cs` (an EF
+  `SaveChangesInterceptor`) collects `DomainEvents` off every tracked `AggregateRoot`
+  after a successful commit, dispatches via `IDomainEventDispatcher`, then clears them —
+  for every `SaveChangesAsync` call, whoever makes it. **Never call
+  `IDomainEventDispatcher.PublishAsync` or `ClearDomainEvents` from a command handler** —
+  the interceptor already does it.
+- Dispatch is after-commit (side effects only fire for durable state), so raise the
+  event before the LAST mutation your handler will save, not after (see
+  `CreateModelVersionCommandHandler`). No outbox — the commit/dispatch crash window is
+  accepted by design for a local-first app. A handler that stages further writes while
+  reacting to an event (e.g. enqueuing a job) gets them flushed automatically — the
+  interceptor recurses one more SaveChanges round when changes remain after dispatch.
 
-## Transactions — there is NO unit of work
-- Every repository commits internally (`SaveChangesAsync` inside repo methods). A
-  handler calling two mutating repo methods = two independent commits; if the second
-  fails, the first is already durable. Until prompt 25: keep multi-entity writes
-  inside ONE repository method (single SaveChanges), and say so in the PR if you
-  can't. `ThumbnailJobRepository` shows the explicit-transaction escape hatch.
+## Transactions — unit of work
+- `IUnitOfWork` (`Application/Abstractions/IUnitOfWork.cs`, one `SaveChangesAsync`
+  method) is implemented by `ApplicationDbContext`. Repositories stage mutations
+  (`Add`/`Update`/`Remove` on the context) and do **not** call `SaveChangesAsync`
+  themselves; command handlers inject `IUnitOfWork` and call `SaveChangesAsync` exactly
+  once, after every repo call — that's what makes a multi-repo handler atomic.
+- TRAP — a freshly `Add`ed entity's `Id` is an EF temporary placeholder until
+  `SaveChangesAsync` runs. If your handler needs the real id for anything that isn't
+  just building the same EF change-tracked graph (a raw scalar FK on another entity, a
+  response DTO), call `SaveChangesAsync` right after that `Add`, not only at the end —
+  see `AddTextureToPackWithFileCommandHandler`.
+- Migration lands one bounded area at a time (settings, packs, projects done);
+  `tests/Infrastructure.Tests/Architecture/RepositoriesDontSelfCommitTests.cs` is the
+  live source of truth for which repositories still self-commit — check its allowlist,
+  don't assume. A repo outside that allowlist that self-commits fails the build.
+- `ThumbnailJobRepository.GetNextPendingJobAsync`'s explicit `BeginTransactionAsync`
+  (claim semantics) is not part of the UoW and stays even once that area migrates.
+  `ApplicationDbContext.SaveChangesAsync` also swallows one specific known-benign race
+  (concurrent "add model to pack" duplicating the `PackModels` join PK) — name the exact
+  constraint in the `when` clause if you add another.
 
 ## Validation
 - No FluentValidation. Handler-level: validate early, return `Result.Failure(error)`.
