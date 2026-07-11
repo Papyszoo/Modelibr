@@ -8,18 +8,19 @@ namespace Infrastructure.Persistence
 {
     public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : DbContext(options), IUnitOfWork
     {
-        // Explicit interface implementation: Application-layer command handlers
-        // depend on IUnitOfWork.SaveChangesAsync (Task); EF's own
-        // DbContext.SaveChangesAsync (Task<int>) stays available for
-        // Infrastructure code and design-time tooling. Both resolve to the same
-        // method, so domain-event dispatch (wired via DomainEventsInterceptor,
-        // see Infrastructure/DependencyInjection.cs) runs no matter which path
-        // a caller uses.
-        async Task IUnitOfWork.SaveChangesAsync(CancellationToken cancellationToken)
+        // Overridden (not just exposed via the explicit IUnitOfWork member below)
+        // so the known-benign-race handling applies no matter which caller
+        // reaches SaveChanges: Application-layer command handlers going through
+        // IUnitOfWork.SaveChangesAsync, AND repositories that haven't been
+        // migrated off self-committing yet (prompt 25 migrates them one bounded
+        // area at a time) and call this directly. Domain-event dispatch is wired
+        // separately via DomainEventsInterceptor (see
+        // Infrastructure/DependencyInjection.cs) and runs regardless of path too.
+        public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {
             try
             {
-                await SaveChangesAsync(cancellationToken);
+                return await base.SaveChangesAsync(cancellationToken);
             }
             catch (DbUpdateException ex) when (IsDuplicatePackModelAssociation(ex))
             {
@@ -30,8 +31,12 @@ namespace Infrastructure.Persistence
                 // self-committing (prompt 25); this is the one known-benign
                 // race the app deliberately swallows at the commit boundary.
                 ChangeTracker.Clear();
+                return 0;
             }
         }
+
+        Task IUnitOfWork.SaveChangesAsync(CancellationToken cancellationToken) =>
+            SaveChangesAsync(cancellationToken);
 
         private static bool IsDuplicatePackModelAssociation(DbUpdateException ex)
             => ex.InnerException is PostgresException
