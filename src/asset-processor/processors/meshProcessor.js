@@ -79,7 +79,7 @@ export class MeshAnalysisProcessor extends BaseProcessor {
    * @returns {Promise<Object>} Mesh analysis result.
    */
   // eslint-disable-next-line no-unused-vars
-  async process(job, jobLogger) {
+  async process(job, jobLogger, signal) {
     // Guard: Blender must be installed
     if (!config.blender.enabled) {
       throw new Error(

@@ -29,9 +29,14 @@ export class BaseProcessor {
   /**
    * Execute the full job lifecycle: start → process → complete/fail.
    * @param {Object} job - The dequeued job object from the API.
+   * @param {AbortSignal} [signal] - Aborted by the job queue when this job's
+   *   timeout fires. Threaded through to process() so cancellable awaits can
+   *   stop early; also used here to avoid double-reporting a job's outcome
+   *   to the backend (which has no guard against being finished twice) once
+   *   the queue's timeout handler has already reported it as failed.
    * @returns {Promise<void>}
    */
-  async execute(job) {
+  async execute(job, signal) {
     const assetId =
       job.modelId ||
       job.soundId ||
@@ -49,7 +54,18 @@ export class BaseProcessor {
         job.modelHash || job.soundHash
       )
 
-      const result = await this.process(job, jobLogger)
+      const result = await this.process(job, jobLogger, signal)
+
+      if (signal?.aborted) {
+        // The job queue already timed this job out and reported it failed
+        // while we were still running. Discard this late result instead of
+        // double-finishing the job — a different worker may have already
+        // reclaimed it for retry.
+        jobLogger.warn(
+          `${this.processorType} processing finished after the job had already timed out — discarding stale result`
+        )
+        return
+      }
 
       await this.markCompleted(job, result)
 
@@ -68,12 +84,18 @@ export class BaseProcessor {
         error.stack
       )
 
-      try {
-        await this.markFailed(job, error.message)
-      } catch (markFailedError) {
-        jobLogger.error('Failed to mark job as failed', {
-          markFailedError: markFailedError.message,
-        })
+      if (signal?.aborted) {
+        jobLogger.warn(
+          'Skipping markFailed — job was already finished by the timeout handler'
+        )
+      } else {
+        try {
+          await this.markFailed(job, error.message)
+        } catch (markFailedError) {
+          jobLogger.error('Failed to mark job as failed', {
+            markFailedError: markFailedError.message,
+          })
+        }
       }
 
       throw error
@@ -84,11 +106,47 @@ export class BaseProcessor {
    * Process the job. Must be overridden by subclasses.
    * @param {Object} job - The job to process.
    * @param {Object} jobLogger - Logger with job context.
+   * @param {AbortSignal} [signal] - Set when the job queue times this job
+   *   out. Renderer-backed processors should listen for 'abort' and hand
+   *   their held renderer to `_armRendererAbort()` so the pool slot is
+   *   force-reinitialized instead of left hung.
    * @returns {Promise<Object>} Result metadata.
    */
   // eslint-disable-next-line no-unused-vars
-  async process(job, jobLogger) {
+  async process(job, jobLogger, signal) {
     throw new Error('Subclass must implement process()')
+  }
+
+  /**
+   * Arm an abort listener that force-reinitializes a RendererPool slot when
+   * the job holding it times out. Puppeteer's in-flight page.evaluate()
+   * calls reject once the page is torn down, which unwinds the processor's
+   * own try/finally and returns the slot via the normal `rendererPool
+   * .release()` path — but with a fresh, usable page instead of a hung one.
+   * @param {AbortSignal|undefined} signal
+   * @param {import('../rendererPool.js').RendererPool} rendererPool
+   * @param {*} renderer - The renderer this job currently holds.
+   * @param {Object} jobLogger
+   * @returns {() => void} Disarm function — call it once the renderer has
+   *   been released normally so a later abort (there shouldn't be one) is
+   *   a no-op.
+   */
+  _armRendererAbort(signal, rendererPool, renderer, jobLogger) {
+    if (!signal || !renderer) {
+      return () => {}
+    }
+
+    const onAbort = () => {
+      jobLogger.warn('Job aborted — force-reinitializing renderer pool slot')
+      rendererPool.forceReinit(renderer).catch(reinitError => {
+        jobLogger.error('Failed to force-reinitialize renderer after abort', {
+          error: reinitError.message,
+        })
+      })
+    }
+
+    signal.addEventListener('abort', onAbort)
+    return () => signal.removeEventListener('abort', onAbort)
   }
 
   /**

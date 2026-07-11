@@ -33,12 +33,15 @@ export class TextureSetProcessor extends BaseProcessor {
    * Process a texture set thumbnail job.
    * @param {Object} job - The dequeued job object (must have textureSetId).
    * @param {Object} jobLogger - Logger with job context.
+   * @param {AbortSignal} [signal] - Set when the job times out; used to
+   *   force-reinitialize the held renderer instead of leaving it hung.
    * @returns {Promise<Object>} Thumbnail metadata.
    */
-  async process(job, jobLogger) {
+  async process(job, jobLogger, signal) {
     let texturePaths = null
 
     let renderer = null
+    let disarmAbort = () => {}
 
     try {
       const textureSetId = job.textureSetId
@@ -106,6 +109,12 @@ export class TextureSetProcessor extends BaseProcessor {
       }
 
       renderer = await this.rendererPool.acquire()
+      disarmAbort = this._armRendererAbort(
+        signal,
+        this.rendererPool,
+        renderer,
+        jobLogger
+      )
 
       // Use the stored preview geometry type (defaults to plane)
       const geometryType = textureSet.previewGeometryType || 'plane'
@@ -197,6 +206,7 @@ export class TextureSetProcessor extends BaseProcessor {
         'Thumbnail upload failed — no valid thumbnail data available'
       )
     } finally {
+      disarmAbort()
       if (renderer) {
         this.rendererPool.release(renderer)
       }
