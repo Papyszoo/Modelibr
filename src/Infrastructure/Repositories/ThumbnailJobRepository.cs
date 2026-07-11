@@ -26,7 +26,7 @@ internal sealed class ThumbnailJobRepository : IThumbnailJobRepository
 
     public Task UpdateAsync(ThumbnailJob job, CancellationToken cancellationToken = default)
     {
-        _context.ThumbnailJobs.Update(job);
+        _context.UpdateIfDetached(job);
         return Task.CompletedTask;
     }
 

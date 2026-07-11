@@ -85,7 +85,7 @@ internal sealed class ModelVersionRepository : IModelVersionRepository
 
     public Task<ModelVersion> UpdateAsync(ModelVersion version, CancellationToken cancellationToken = default)
     {
-        _context.ModelVersions.Update(version);
+        _context.UpdateIfDetached(version);
         return Task.FromResult(version);
     }
 

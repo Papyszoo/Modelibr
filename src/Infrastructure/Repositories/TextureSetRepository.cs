@@ -260,7 +260,7 @@ internal sealed class TextureSetRepository : ITextureSetRepository
         if (textureSet == null)
             throw new ArgumentNullException(nameof(textureSet));
 
-        _context.TextureSets.Update(textureSet);
+        _context.UpdateIfDetached(textureSet);
 
         return Task.FromResult(textureSet);
     }

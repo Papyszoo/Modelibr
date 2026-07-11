@@ -177,7 +177,7 @@ internal sealed class ScriptRepository : IScriptRepository
         if (script == null)
             throw new ArgumentNullException(nameof(script));
 
-        _context.Scripts.Update(script);
+        _context.UpdateIfDetached(script);
 
         return Task.FromResult(script);
     }

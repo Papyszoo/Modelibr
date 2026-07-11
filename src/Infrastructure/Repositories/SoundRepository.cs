@@ -179,7 +179,7 @@ internal sealed class SoundRepository : ISoundRepository
         if (sound == null)
             throw new ArgumentNullException(nameof(sound));
 
-        _context.Sounds.Update(sound);
+        _context.UpdateIfDetached(sound);
 
         return Task.FromResult(sound);
     }

@@ -36,7 +36,7 @@ internal sealed class ScriptTemplateRepository : IScriptTemplateRepository
 
     public Task<ScriptTemplate> UpdateAsync(ScriptTemplate template, CancellationToken cancellationToken = default)
     {
-        _context.ScriptTemplates.Update(template);
+        _context.UpdateIfDetached(template);
         return Task.FromResult(template);
     }
 

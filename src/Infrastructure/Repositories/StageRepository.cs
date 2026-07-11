@@ -35,7 +35,7 @@ internal sealed class StageRepository : IStageRepository
 
     public Task UpdateAsync(Stage stage, CancellationToken cancellationToken = default)
     {
-        _context.Stages.Update(stage);
+        _context.UpdateIfDetached(stage);
         return Task.CompletedTask;
     }
 

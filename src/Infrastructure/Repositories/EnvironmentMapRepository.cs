@@ -198,7 +198,7 @@ internal sealed class EnvironmentMapRepository : IEnvironmentMapRepository
 
     public Task<EnvironmentMap> UpdateAsync(EnvironmentMap environmentMap, CancellationToken cancellationToken = default)
     {
-        _context.EnvironmentMaps.Update(environmentMap);
+        _context.UpdateIfDetached(environmentMap);
         return Task.FromResult(environmentMap);
     }
 

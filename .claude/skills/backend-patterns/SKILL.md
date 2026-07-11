@@ -56,6 +56,19 @@ description: Modelibr backend conventions — Clean Architecture boundaries, Res
   just building the same EF change-tracked graph (a raw scalar FK on another entity, a
   response DTO), call `SaveChangesAsync` right after that `Add`, not only at the end —
   see `AddTextureToPackWithFileCommandHandler`.
+- TRAP (repository-level, caused a production 500 — PR #568) — a repository's
+  `UpdateAsync` must NOT call `_context.Set<T>().Update(entity)` unconditionally.
+  `AddAsync` → mutate → `UpdateAsync` on the SAME reference, before any
+  `SaveChangesAsync`, is a normal shape (e.g. add an aggregate, add a child to its
+  collection, then "update" it) — but the entity is already tracked as `Added` with a
+  temporary key, and forcing it to `Modified` throws "has a temporary value while
+  attempting to change the entity's state to 'Modified'". Every `UpdateAsync` instead
+  calls `_context.UpdateIfDetached(entity)` (`Infrastructure/Persistence/
+  DbContextTrackingExtensions.cs`): a no-op when the entity is already tracked (its
+  current state — Added or Modified — is what `SaveChangesAsync` will persist), and
+  only attaches + marks `Modified` when the entity is genuinely `Detached` (loaded/
+  rehydrated outside this context). Use this helper in every new repository's
+  `UpdateAsync` — don't reintroduce a bare `.Update(entity)` call.
 - Migration is done: every repository under `src/Infrastructure/Repositories` stages
   mutations only. `tests/Infrastructure.Tests/Architecture/RepositoriesDontSelfCommitTests.cs`
   is the live source of truth — its allowlist holds exactly two permanent exceptions

@@ -360,7 +360,7 @@ internal sealed class ModelRepository : IModelRepository
 
     public Task UpdateAsync(Model model, CancellationToken cancellationToken = default)
     {
-        _context.Models.Update(model);
+        _context.UpdateIfDetached(model);
         return Task.CompletedTask;
     }
 

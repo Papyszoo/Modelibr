@@ -43,10 +43,7 @@ internal sealed class ModelCategoryRepository : IModelCategoryRepository
 
     public Task UpdateAsync(ModelCategory category, CancellationToken cancellationToken = default)
     {
-        if (_context.Entry(category).State == EntityState.Detached)
-        {
-            _context.ModelCategories.Update(category);
-        }
+        _context.UpdateIfDetached(category);
 
         return Task.CompletedTask;
     }
