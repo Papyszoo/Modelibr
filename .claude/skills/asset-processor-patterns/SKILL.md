@@ -7,8 +7,8 @@ description: Modelibr asset-processor (Node.js worker) conventions — config.js
 
 ESM (`"type": "module"`), Vitest (NOT Jest — the frontend is the inverse),
 structured winston `logger` + `withJobContext(jobId)` — never `console.log`.
-Known debt + planned refactors: prompts 24 (folder grouping), 41 (dead code +
-timeout cancellation), 42 (client factory + hygiene) in `.claude/prompts/`.
+Known debt + planned refactors: prompt 24 (folder grouping), 42 (client
+factory + hygiene) in `.claude/prompts/`.
 
 ## Configuration
 - ALL runtime config lives in `config.js` (rendering, orbit, encoding,
@@ -27,24 +27,33 @@ timeout cancellation), 42 (client factory + hygiene) in `.claude/prompts/`.
   Registered: `Model`, `Sound`, `TextureSet`, `EnvironmentMap`,
   `MeshAnalysis` (stub — logs not-implemented; `meshProcessor.js` documents
   the planned shape).
-- `BaseProcessor` is the template method: `execute()` wraps your `process()`
-  with error handling, `withJobContext` logging, and `JobApiClient`
-  callbacks. New processor = extend it, implement `get processorType()` +
-  `async process(job, jobLogger)`, register in the registry constructor.
-- TRAP — `jobProcessor.js` still contains a full LEGACY inline pipeline
-  (`processModelJobAsync`/`processSoundJobAsync`/`processModel`/
-  `processSound`, ~580 lines) that nothing calls; dispatch goes through the
-  registry. Don't fix or extend the legacy path — prompt 41 deletes it.
+- `BaseProcessor` is the template method: `execute(job, signal)` wraps your
+  `process()` with error handling, `withJobContext` logging, and
+  `JobApiClient` callbacks. New processor = extend it, implement
+  `get processorType()` + `async process(job, jobLogger, signal)`, register
+  in the registry constructor.
+- `jobProcessor.js` dispatch goes exclusively through `ProcessorRegistry` —
+  there is no other code path; don't add one.
 
 ## Job lifecycle (how work arrives and runs)
 - Delivery is belt-and-braces: SignalR push notification → worker CLAIMS via
   `POST /thumbnail-jobs/dequeue` (backend arbitrates racing workers) →
   local queue (cap 50; full = drop notification, fallback polling sweeps
   later) → up to `config.maxConcurrentJobs` (default 3) run concurrently.
-- TRAP — the job timeout is a `Promise.race`: it marks the job failed but
-  does NOT cancel the work; a hung render keeps its pool renderer (slot
-  starvation). Prompt 41 fixes this — until then never rely on the timeout
-  to free resources; make your processor's awaits fail rather than hang.
+- The job timeout (`processQueue` in `jobProcessor.js`) actually cancels: it
+  aborts an `AbortController` whose `signal` flows into `process()`.
+  Renderer-backed processors (Thumbnail/TextureSet/EnvironmentMap) MUST arm
+  it right after acquiring: `disarmAbort = this._armRendererAbort(signal,
+  this.rendererPool, renderer, jobLogger)`, then call `disarmAbort()` in
+  `finally` before `release()`. Skipping this reintroduces slot starvation.
+  On abort it calls `rendererPool.forceReinit(renderer)` →
+  `PuppeteerRenderer.reinitialize()` (the crash-recovery path), so the slot
+  comes back usable instead of hung.
+- `BaseProcessor.execute()` checks `signal?.aborted` before calling
+  `markCompleted`/`markFailed` — the backend has no double-finish guard
+  (`ThumbnailJob.MarkAsCompleted`/`MarkAsFailed` unconditionally overwrite
+  status), so a late result from an aborted job is discarded, not
+  re-reported.
 - Retry/dead-letter logic is backend-side (`FinishThumbnailJobCommand`) —
   the worker just reports finish/fail honestly.
 
