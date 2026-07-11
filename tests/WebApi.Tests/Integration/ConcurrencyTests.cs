@@ -10,6 +10,7 @@ namespace WebApi.Tests.Integration;
 /// Runs against a real PostgreSQL database via WebApplicationFactory.
 /// </summary>
 [Trait("Category", "Integration")]
+[Collection(PostgresIntegrationCollection.Name)]
 public class ConcurrencyTests : IClassFixture<ModelibrWebFactory>
 {
     private readonly ModelibrWebFactory _factory;
