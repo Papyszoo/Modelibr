@@ -20,7 +20,6 @@ internal sealed class ScriptRepository : IScriptRepository
             throw new ArgumentNullException(nameof(script));
 
         var entityEntry = await _context.Scripts.AddAsync(script, cancellationToken);
-        await _context.SaveChangesAsync(cancellationToken);
 
         return entityEntry.Entity;
     }
@@ -173,15 +172,14 @@ internal sealed class ScriptRepository : IScriptRepository
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<Script> UpdateAsync(Script script, CancellationToken cancellationToken = default)
+    public Task<Script> UpdateAsync(Script script, CancellationToken cancellationToken = default)
     {
         if (script == null)
             throw new ArgumentNullException(nameof(script));
 
         _context.Scripts.Update(script);
-        await _context.SaveChangesAsync(cancellationToken);
 
-        return script;
+        return Task.FromResult(script);
     }
 
     public async Task DeleteAsync(int id, CancellationToken cancellationToken = default)
@@ -195,7 +193,6 @@ internal sealed class ScriptRepository : IScriptRepository
         if (script != null)
         {
             _context.Scripts.Remove(script);
-            await _context.SaveChangesAsync(cancellationToken);
         }
     }
 }
