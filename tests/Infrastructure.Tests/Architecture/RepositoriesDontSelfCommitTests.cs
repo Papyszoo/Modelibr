@@ -43,10 +43,8 @@ public class RepositoriesDontSelfCommitTests
         "SoundCategoryRepository.cs",
         // sprites (category repo migrates with the categories slice)
         "SpriteCategoryRepository.cs",
-        // scripts
-        "ScriptRepository.cs",
+        // scripts (category repo migrates with the categories slice)
         "ScriptCategoryRepository.cs",
-        "ScriptTemplateRepository.cs",
         // env maps
         "EnvironmentMapRepository.cs",
         "EnvironmentMapCategoryRepository.cs",

@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using SharedKernel;
@@ -7,10 +8,12 @@ namespace Application.ScriptTemplates;
 internal class DeleteScriptTemplateCommandHandler : ICommandHandler<DeleteScriptTemplateCommand>
 {
     private readonly IScriptTemplateRepository _repository;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public DeleteScriptTemplateCommandHandler(IScriptTemplateRepository repository)
+    public DeleteScriptTemplateCommandHandler(IScriptTemplateRepository repository, IUnitOfWork unitOfWork)
     {
         _repository = repository;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(DeleteScriptTemplateCommand command, CancellationToken cancellationToken)
@@ -23,6 +26,7 @@ internal class DeleteScriptTemplateCommandHandler : ICommandHandler<DeleteScript
         }
 
         await _repository.DeleteAsync(command.Id, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }
 }

@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Services;
@@ -10,15 +11,18 @@ internal class UpdateScriptCommandHandler : ICommandHandler<UpdateScriptCommand,
     private readonly IScriptRepository _scriptRepository;
     private readonly IScriptCategoryRepository _scriptCategoryRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public UpdateScriptCommandHandler(
         IScriptRepository scriptRepository,
         IScriptCategoryRepository scriptCategoryRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _scriptRepository = scriptRepository;
         _scriptCategoryRepository = scriptCategoryRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<UpdateScriptResponse>> Handle(UpdateScriptCommand command, CancellationToken cancellationToken)
@@ -68,6 +72,7 @@ internal class UpdateScriptCommandHandler : ICommandHandler<UpdateScriptCommand,
             }
 
             var savedScript = await _scriptRepository.UpdateAsync(script, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             return Result.Success(new UpdateScriptResponse(savedScript.Id, savedScript.Name, savedScript.Description));
         }

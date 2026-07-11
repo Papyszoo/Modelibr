@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Files;
 using Application.Abstractions.Repositories;
 using Application.Scripts;
@@ -17,6 +18,7 @@ public class UpdateScriptContentCommandHandlerTests
     private readonly Mock<IScriptRepository> _scriptRepository = new();
     private readonly Mock<IFileCreationService> _fileCreationService = new();
     private readonly Mock<IDateTimeProvider> _dateTimeProvider = new();
+    private readonly Mock<IUnitOfWork> _unitOfWork = new();
     private readonly UpdateScriptContentCommandHandler _handler;
 
     public UpdateScriptContentCommandHandlerTests()
@@ -25,7 +27,8 @@ public class UpdateScriptContentCommandHandlerTests
         _handler = new UpdateScriptContentCommandHandler(
             _scriptRepository.Object,
             _fileCreationService.Object,
-            _dateTimeProvider.Object);
+            _dateTimeProvider.Object,
+            _unitOfWork.Object);
     }
 
     [Fact]
