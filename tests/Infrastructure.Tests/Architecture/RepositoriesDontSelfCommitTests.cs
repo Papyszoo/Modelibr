@@ -41,8 +41,7 @@ public class RepositoriesDontSelfCommitTests
         "TextureSetCategoryRepository.cs",
         // sounds (category repo migrates with the categories slice)
         "SoundCategoryRepository.cs",
-        // sprites
-        "SpriteRepository.cs",
+        // sprites (category repo migrates with the categories slice)
         "SpriteCategoryRepository.cs",
         // scripts
         "ScriptRepository.cs",
