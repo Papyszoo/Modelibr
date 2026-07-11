@@ -134,6 +134,7 @@ export const suites = [
         requiresDocker: true,
         detectPath: "tests/backup-restore-e2e/package.json",
         reportPath: "tests/backup-restore-e2e/playwright-report",
+        note: "Gating nightly on GitHub (.github/workflows/nightly-e2e.yml, job backup-restore-drill) — needs no GPU, unlike storybook-visual/e2e-full which stay local-only.",
     },
     {
         id: "storybook-visual",
