@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Files;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
@@ -16,19 +17,22 @@ internal sealed class AddEnvironmentMapVariantWithFileCommandHandler : ICommandH
     private readonly IEnvironmentMapSizeLabelService _sizeLabelService;
     private readonly IThumbnailQueue _thumbnailQueue;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public AddEnvironmentMapVariantWithFileCommandHandler(
         IEnvironmentMapRepository environmentMapRepository,
         IFileCreationService fileCreationService,
         IEnvironmentMapSizeLabelService sizeLabelService,
         IThumbnailQueue thumbnailQueue,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _environmentMapRepository = environmentMapRepository;
         _fileCreationService = fileCreationService;
         _sizeLabelService = sizeLabelService;
         _thumbnailQueue = thumbnailQueue;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<AddEnvironmentMapVariantResponse>> Handle(AddEnvironmentMapVariantWithFileCommand command, CancellationToken cancellationToken)
@@ -69,6 +73,7 @@ internal sealed class AddEnvironmentMapVariantWithFileCommandHandler : ICommandH
             }
 
             await _thumbnailQueue.EnqueueEnvironmentMapThumbnailAsync(environmentMap.Id, variant.Id, forceRegenerate: true, cancellationToken: cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             return Result.Success(new AddEnvironmentMapVariantResponse(
                 variant.Id,

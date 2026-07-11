@@ -29,10 +29,13 @@ public class RepositoriesDontSelfCommitTests
     // regressing one of those must fail this test.
     private static readonly HashSet<string> StillSelfCommitting = new(StringComparer.OrdinalIgnoreCase)
     {
-        // models
-        "ModelRepository.cs",
+        // models — migrated except ModelVersionRepository's ModelVersionTextureSet
+        // mapping methods, which stay self-committing on purpose: the variant-aware
+        // AddTextureMappingAsync is an idempotent-insert primitive that must save
+        // immediately to catch its unique violation and recover by loading the
+        // existing row (see the comment block in the file).
         "ModelVersionRepository.cs",
-        "ModelTagRepository.cs",
+        // categories (all types — slice pending)
         "ModelCategoryRepository.cs",
         // texture sets
         "TextureSetRepository.cs",
@@ -57,9 +60,6 @@ public class RepositoriesDontSelfCommitTests
         "ThumbnailRepository.cs",
         "ThumbnailJobRepository.cs",
         "ThumbnailJobEventRepository.cs",
-        // packs/projects area's shared dependency — used by handlers across
-        // every asset type, so it migrates alongside them, not with packs/projects
-        "BatchUploadRepository.cs",
         // misc — File/FilePersistence migration interacts with
         // FileCreationService's disk<->DB compensation behavior (explicitly
         // out of scope for prompt 25); Stage has no handler audit yet

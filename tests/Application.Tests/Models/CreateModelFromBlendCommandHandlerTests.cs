@@ -1,4 +1,5 @@
 using Application.Abstractions.Files;
+using Application.Abstractions;
 using Application.Abstractions.Repositories;
 using Application.Models;
 using Application.Services;
@@ -20,6 +21,7 @@ public class CreateModelFromBlendCommandHandlerTests
     private readonly Mock<IFileCreationService> _mockFileCreationService;
     private readonly Mock<IDateTimeProvider> _mockDateTimeProvider;
     private readonly Mock<ISettingRepository> _mockSettingRepository;
+    private readonly Mock<IUnitOfWork> _mockUnitOfWork = new();
     private readonly CreateModelFromBlendCommandHandler _handler;
 
     public CreateModelFromBlendCommandHandlerTests()
@@ -35,7 +37,8 @@ public class CreateModelFromBlendCommandHandlerTests
             _mockVersionRepository.Object,
             _mockFileCreationService.Object,
             _mockDateTimeProvider.Object,
-            _mockSettingRepository.Object);
+            _mockSettingRepository.Object,
+            _mockUnitOfWork.Object);
     }
 
     private static IFileUpload CreateFakeBlendUpload(string fileName = "MyModel.blend")
