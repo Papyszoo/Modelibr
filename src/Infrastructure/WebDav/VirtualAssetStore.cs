@@ -305,27 +305,10 @@ public sealed class VirtualAssetStore : IStore
                 .OrderByDescending(v => v.VersionNumber)
                 .FirstOrDefault();
 
-            if (newestVersion != null && _blendFileGenerator.IsAvailable)
-            {
-                var renderableFile = newestVersion.Files
-                    .FirstOrDefault(f => f.FileType.IsRenderable);
+            if (newestVersion == null)
+                return null;
 
-                if (renderableFile != null)
-                {
-                    return new VirtualGeneratedBlendFile(
-                        _lockingManager,
-                        $"generated-{model.Name}.blend",
-                        renderableFile.SizeBytes,
-                        renderableFile.CreatedAt,
-                        renderableFile.UpdatedAt,
-                        _blendFileGenerator,
-                        model.Id,
-                        newestVersion.Id,
-                        _logger);
-                }
-            }
-
-            return null;
+            return VirtualGeneratedBlendFile.TryCreate(_lockingManager, model, newestVersion, _blendFileGenerator, _logger);
         }
 
         // /Projects/{P}/Models/{ModelName}/uploaded-{ModelName}.blend → actual .blend file from newest version
@@ -1033,27 +1016,10 @@ public sealed class VirtualAssetStore : IStore
                 .OrderByDescending(v => v.VersionNumber)
                 .FirstOrDefault();
 
-            if (newestVer != null && _blendFileGenerator.IsAvailable)
-            {
-                var renderableFile = newestVer.Files
-                    .FirstOrDefault(f => f.FileType.IsRenderable);
+            if (newestVer == null)
+                return null;
 
-                if (renderableFile != null)
-                {
-                    return new VirtualGeneratedBlendFile(
-                        _lockingManager,
-                        $"generated-{model.Name}.blend",
-                        renderableFile.SizeBytes,
-                        renderableFile.CreatedAt,
-                        renderableFile.UpdatedAt,
-                        _blendFileGenerator,
-                        model.Id,
-                        newestVer.Id,
-                        _logger);
-                }
-            }
-
-            return null;
+            return VirtualGeneratedBlendFile.TryCreate(_lockingManager, model, newestVer, _blendFileGenerator, _logger);
         }
 
         // /Models/{ModelName}/uploaded-{ModelName}.blend → actual .blend file from newest version
