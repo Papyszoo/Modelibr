@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Files;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
@@ -17,6 +18,7 @@ namespace Application.Models
         private readonly IDateTimeProvider _dateTimeProvider;
         private readonly IBatchUploadRepository _batchUploadRepository;
         private readonly ISettingRepository _settingRepository;
+        private readonly IUnitOfWork _unitOfWork;
 
         public AddModelCommandHandler(
             IModelRepository modelRepository,
@@ -24,7 +26,8 @@ namespace Application.Models
             IFileCreationService fileCreationService,
             IDateTimeProvider dateTimeProvider,
             IBatchUploadRepository batchUploadRepository,
-            ISettingRepository settingRepository)
+            ISettingRepository settingRepository,
+            IUnitOfWork unitOfWork)
         {
             _modelRepository = modelRepository;
             _versionRepository = versionRepository;
@@ -32,6 +35,7 @@ namespace Application.Models
             _dateTimeProvider = dateTimeProvider;
             _batchUploadRepository = batchUploadRepository;
             _settingRepository = settingRepository;
+            _unitOfWork = unitOfWork;
         }
 
         public async Task<Result<AddModelCommandResponse>> Handle(AddModelCommand command, CancellationToken cancellationToken)
@@ -75,7 +79,8 @@ namespace Application.Models
                     modelId: existingModel.Id);
                 
                 await _batchUploadRepository.AddAsync(batchUpload, cancellationToken);
-                
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
+
                 return Result.Success(new AddModelCommandResponse(existingModel.Id, true));
             }
 
@@ -97,15 +102,24 @@ namespace Application.Models
             try
             {
                 var model = Model.Create(modelName, _dateTimeProvider.UtcNow);
-                
-                // Save the model first to get an ID
+
+                // Save the model first — it must be committed BEFORE CreateVersion runs:
+                // the first version sets Model.ActiveVersion, and if model and version
+                // are both still Added in one save, EF hits the circular
+                // Model.ActiveVersionId <-> ModelVersion.ModelId FK dependency and throws.
                 var savedModel = await _modelRepository.AddAsync(model, cancellationToken);
-                
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
+
                 // Create version 1 automatically for new models
                 var version1 = savedModel.CreateVersion("Initial version", _dateTimeProvider.UtcNow);
                 version1.AddFile(fileEntity);
                 await _versionRepository.AddAsync(version1, cancellationToken);
-                
+
+                // Commit again so version1 gets its real database-assigned id —
+                // SetModelVersion below copies it into a raw scalar FK (see the
+                // backend-patterns skill's temporary-key trap).
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
+
                 // Link file to version
                 fileEntity.SetModelVersion(version1.Id);
                 await _modelRepository.UpdateAsync(savedModel, cancellationToken);
@@ -125,7 +139,8 @@ namespace Application.Models
                     modelId: savedModel.Id);
                 
                 await _batchUploadRepository.AddAsync(batchUpload, cancellationToken);
-                
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
+
                 return Result.Success(new AddModelCommandResponse(savedModel.Id, false));
             }
             catch (ArgumentException ex)

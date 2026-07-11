@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
@@ -18,6 +19,7 @@ internal class AddTextureToTextureSetCommandHandler : ICommandHandler<AddTexture
     private readonly IThumbnailQueue _thumbnailQueue;
     private readonly ITextureImageMetadataReader _textureImageMetadataReader;
     private readonly ILogger<AddTextureToTextureSetCommandHandler> _logger;
+    private readonly IUnitOfWork _unitOfWork;
 
     public AddTextureToTextureSetCommandHandler(
         ITextureSetRepository textureSetRepository,
@@ -26,7 +28,8 @@ internal class AddTextureToTextureSetCommandHandler : ICommandHandler<AddTexture
         IDateTimeProvider dateTimeProvider,
         IThumbnailQueue thumbnailQueue,
         ITextureImageMetadataReader textureImageMetadataReader,
-        ILogger<AddTextureToTextureSetCommandHandler> logger)
+        ILogger<AddTextureToTextureSetCommandHandler> logger,
+        IUnitOfWork unitOfWork)
     {
         _textureSetRepository = textureSetRepository;
         _fileRepository = fileRepository;
@@ -35,6 +38,7 @@ internal class AddTextureToTextureSetCommandHandler : ICommandHandler<AddTexture
         _thumbnailQueue = thumbnailQueue;
         _textureImageMetadataReader = textureImageMetadataReader;
         _logger = logger;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<AddTextureToTextureSetResponse>> Handle(AddTextureToTextureSetCommand command, CancellationToken cancellationToken)
@@ -97,6 +101,7 @@ internal class AddTextureToTextureSetCommandHandler : ICommandHandler<AddTexture
             {
                 batchUpload.TextureSetId = command.TextureSetId;
                 await _batchUploadRepository.UpdateAsync(batchUpload, cancellationToken);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
             }
 
             // Auto-enqueue thumbnail generation for Universal texture sets

@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
@@ -17,17 +18,20 @@ internal sealed class SoftDeleteModelCommandHandler : ICommandHandler<SoftDelete
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IThumbnailQueue _thumbnailQueue;
     private readonly ILogger<SoftDeleteModelCommandHandler> _logger;
+    private readonly IUnitOfWork _unitOfWork;
 
     public SoftDeleteModelCommandHandler(
         IModelRepository modelRepository,
         IDateTimeProvider dateTimeProvider,
         IThumbnailQueue thumbnailQueue,
-        ILogger<SoftDeleteModelCommandHandler> logger)
+        ILogger<SoftDeleteModelCommandHandler> logger,
+        IUnitOfWork unitOfWork)
     {
         _modelRepository = modelRepository;
         _dateTimeProvider = dateTimeProvider;
         _thumbnailQueue = thumbnailQueue;
         _logger = logger;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<SoftDeleteModelResponse>> Handle(SoftDeleteModelCommand request, CancellationToken cancellationToken)
@@ -50,6 +54,7 @@ internal sealed class SoftDeleteModelCommandHandler : ICommandHandler<SoftDelete
 
         model.SoftDelete(_dateTimeProvider.UtcNow);
         await _modelRepository.UpdateAsync(model, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new SoftDeleteModelResponse(true, "Model soft deleted successfully"));
     }

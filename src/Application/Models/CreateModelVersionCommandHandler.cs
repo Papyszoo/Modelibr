@@ -1,4 +1,5 @@
 using Application.Abstractions.Files;
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Services;
@@ -14,17 +15,20 @@ internal class CreateModelVersionCommandHandler : ICommandHandler<CreateModelVer
     private readonly IModelVersionRepository _versionRepository;
     private readonly IFileCreationService _fileCreationService;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public CreateModelVersionCommandHandler(
         IModelRepository modelRepository,
         IModelVersionRepository versionRepository,
         IFileCreationService fileCreationService,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _modelRepository = modelRepository;
         _versionRepository = versionRepository;
         _fileCreationService = fileCreationService;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<CreateModelVersionResponse>> Handle(
@@ -82,8 +86,12 @@ internal class CreateModelVersionCommandHandler : ICommandHandler<CreateModelVer
         var version = model.CreateVersion(nextVersionNumber, command.Description, _dateTimeProvider.UtcNow);
         version.AddFile(fileEntity);
 
-        // Save version
+        // Save version. Commit immediately: savedVersion.Id is copied into raw
+        // scalar FKs below (SetModelVersion, SetActiveVersion), carried in the
+        // ModelUploadedEvent, and returned in the response — all need the real
+        // database-assigned id, not EF's temporary key.
         var savedVersion = await _versionRepository.AddAsync(version, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         // Link file to version only if not already linked to another version
         // This prevents overwriting the ModelVersionId for deduplicated files
@@ -111,6 +119,7 @@ internal class CreateModelVersionCommandHandler : ICommandHandler<CreateModelVer
         }
 
         await _modelRepository.UpdateAsync(model, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new CreateModelVersionResponse(
             savedVersion.Id,

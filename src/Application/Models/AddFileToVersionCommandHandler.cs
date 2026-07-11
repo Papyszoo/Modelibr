@@ -1,4 +1,5 @@
 using Application.Abstractions.Files;
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Services;
@@ -14,17 +15,20 @@ internal class AddFileToVersionCommandHandler : ICommandHandler<AddFileToVersion
     private readonly IModelVersionRepository _versionRepository;
     private readonly IFileCreationService _fileCreationService;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public AddFileToVersionCommandHandler(
         IModelRepository modelRepository,
         IModelVersionRepository versionRepository,
         IFileCreationService fileCreationService,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _modelRepository = modelRepository;
         _versionRepository = versionRepository;
         _fileCreationService = fileCreationService;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<AddFileToVersionResponse>> Handle(
@@ -83,6 +87,7 @@ internal class AddFileToVersionCommandHandler : ICommandHandler<AddFileToVersion
         // Update
         await _versionRepository.UpdateAsync(version, cancellationToken);
         await _modelRepository.UpdateAsync(model, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new AddFileToVersionResponse(
             version.Id,
