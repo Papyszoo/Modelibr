@@ -1,6 +1,5 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
-using Application.Abstractions.Services;
 using Domain.Services;
 using SharedKernel;
 
@@ -11,18 +10,15 @@ internal class SetActiveVersionCommandHandler : ICommandHandler<SetActiveVersion
     private readonly IModelRepository _modelRepository;
     private readonly IModelVersionRepository _versionRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
-    private readonly IDomainEventDispatcher _domainEventDispatcher;
 
     public SetActiveVersionCommandHandler(
         IModelRepository modelRepository,
         IModelVersionRepository versionRepository,
-        IDateTimeProvider dateTimeProvider,
-        IDomainEventDispatcher domainEventDispatcher)
+        IDateTimeProvider dateTimeProvider)
     {
         _modelRepository = modelRepository;
         _versionRepository = versionRepository;
         _dateTimeProvider = dateTimeProvider;
-        _domainEventDispatcher = domainEventDispatcher;
     }
 
     public async Task<Result> Handle(SetActiveVersionCommand command, CancellationToken cancellationToken)
@@ -47,12 +43,12 @@ internal class SetActiveVersionCommandHandler : ICommandHandler<SetActiveVersion
         try
         {
             model.SetActiveVersion(version.Id, _dateTimeProvider.UtcNow);
+
+            // ActiveVersionChangedEvent is dispatched from the save pipeline once
+            // this UpdateAsync's SaveChanges commits (see DomainEventsInterceptor);
+            // no manual publish here.
             await _modelRepository.UpdateAsync(model, cancellationToken);
-            
-            // Dispatch domain events (including ActiveVersionChangedEvent)
-            await _domainEventDispatcher.PublishAsync(model.DomainEvents, cancellationToken);
-            model.ClearDomainEvents();
-            
+
             return Result.Success();
         }
         catch (Exception ex)

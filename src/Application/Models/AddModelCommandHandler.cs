@@ -1,7 +1,6 @@
 using Application.Abstractions.Files;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
-using Application.Abstractions.Services;
 using Application.Services;
 using Domain.Models;
 using Domain.Services;
@@ -16,7 +15,6 @@ namespace Application.Models
         private readonly IModelVersionRepository _versionRepository;
         private readonly IFileCreationService _fileCreationService;
         private readonly IDateTimeProvider _dateTimeProvider;
-        private readonly IDomainEventDispatcher _domainEventDispatcher;
         private readonly IBatchUploadRepository _batchUploadRepository;
         private readonly ISettingRepository _settingRepository;
 
@@ -25,7 +23,6 @@ namespace Application.Models
             IModelVersionRepository versionRepository,
             IFileCreationService fileCreationService,
             IDateTimeProvider dateTimeProvider,
-            IDomainEventDispatcher domainEventDispatcher,
             IBatchUploadRepository batchUploadRepository,
             ISettingRepository settingRepository)
         {
@@ -33,7 +30,6 @@ namespace Application.Models
             _versionRepository = versionRepository;
             _fileCreationService = fileCreationService;
             _dateTimeProvider = dateTimeProvider;
-            _domainEventDispatcher = domainEventDispatcher;
             _batchUploadRepository = batchUploadRepository;
             _settingRepository = settingRepository;
         }
@@ -64,13 +60,11 @@ namespace Application.Models
             var existingModel = await _modelRepository.GetByFileHashAsync(fileEntity.Sha256Hash, cancellationToken);
             if (existingModel != null)
             {
-            // Raise domain event for existing model upload
+            // Raise domain event for existing model upload — dispatched from the
+                // save pipeline once this aggregate is persisted (see
+                // DomainEventsInterceptor); no manual publish here.
                 existingModel.RaiseModelUploadedEvent(existingModel.ActiveVersion!.Id, fileEntity.Sha256Hash, false);
-                
-                // Publish domain events
-                await _domainEventDispatcher.PublishAsync(existingModel.DomainEvents, cancellationToken);
-                existingModel.ClearDomainEvents();
-                
+
                 // Always track batch upload - generate batch ID if not provided
                 var batchId = command.BatchId ?? Guid.NewGuid().ToString();
                 var batchUpload = BatchUpload.Create(
@@ -116,13 +110,11 @@ namespace Application.Models
                 fileEntity.SetModelVersion(version1.Id);
                 await _modelRepository.UpdateAsync(savedModel, cancellationToken);
                 
-                // Raise domain event for new model upload after both model and file are persisted
+                // Raise domain event for new model upload after both model and file are
+                // persisted — dispatched from the save pipeline (see DomainEventsInterceptor);
+                // no manual publish here.
                 savedModel.RaiseModelUploadedEvent(version1.Id, fileEntity.Sha256Hash, true);
-                
-                // Publish domain events
-                await _domainEventDispatcher.PublishAsync(savedModel.DomainEvents, cancellationToken);
-                savedModel.ClearDomainEvents();
-                
+
                 // Always track batch upload - generate batch ID if not provided
                 var batchId = command.BatchId ?? Guid.NewGuid().ToString();
                 var batchUpload = BatchUpload.Create(
