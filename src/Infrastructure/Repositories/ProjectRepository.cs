@@ -71,9 +71,7 @@ internal sealed class ProjectRepository : IProjectRepository
 
     public Task UpdateAsync(Project project, CancellationToken cancellationToken = default)
     {
-        // Only call Update for detached entities; tracked entities are saved automatically
-        if (_context.Entry(project).State == Microsoft.EntityFrameworkCore.EntityState.Detached)
-            _context.Projects.Update(project);
+        _context.UpdateIfDetached(project);
         return Task.CompletedTask;
     }
 

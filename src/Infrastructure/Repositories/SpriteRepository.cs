@@ -170,7 +170,7 @@ internal sealed class SpriteRepository : ISpriteRepository
         if (sprite == null)
             throw new ArgumentNullException(nameof(sprite));
 
-        _context.Sprites.Update(sprite);
+        _context.UpdateIfDetached(sprite);
 
         return Task.FromResult(sprite);
     }

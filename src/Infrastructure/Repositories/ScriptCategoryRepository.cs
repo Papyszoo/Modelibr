@@ -46,8 +46,7 @@ internal sealed class ScriptCategoryRepository : IScriptCategoryRepository
 
     public Task UpdateAsync(ScriptCategory category, CancellationToken cancellationToken = default)
     {
-        if (_context.Entry(category).State == EntityState.Detached)
-            _context.ScriptCategories.Update(category);
+        _context.UpdateIfDetached(category);
 
         return Task.CompletedTask;
     }

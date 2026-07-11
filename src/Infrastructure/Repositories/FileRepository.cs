@@ -66,7 +66,7 @@ internal sealed class FileRepository : IFileRepository
 
     public Task UpdateAsync(Domain.Models.File file, CancellationToken cancellationToken = default)
     {
-        _context.Files.Update(file);
+        _context.UpdateIfDetached(file);
         return Task.CompletedTask;
     }
 

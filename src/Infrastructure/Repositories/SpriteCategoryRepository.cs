@@ -46,8 +46,7 @@ internal sealed class SpriteCategoryRepository : ISpriteCategoryRepository
 
     public Task UpdateAsync(SpriteCategory category, CancellationToken cancellationToken = default)
     {
-        if (_context.Entry(category).State == EntityState.Detached)
-            _context.SpriteCategories.Update(category);
+        _context.UpdateIfDetached(category);
 
         return Task.CompletedTask;
     }

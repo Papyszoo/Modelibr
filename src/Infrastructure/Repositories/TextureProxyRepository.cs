@@ -39,7 +39,7 @@ public class TextureProxyRepository : ITextureProxyRepository
 
     public Task<TextureProxy> UpdateAsync(TextureProxy proxy, CancellationToken cancellationToken = default)
     {
-        _context.TextureProxies.Update(proxy);
+        _context.UpdateIfDetached(proxy);
         return Task.FromResult(proxy);
     }
 

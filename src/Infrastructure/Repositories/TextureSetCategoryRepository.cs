@@ -59,8 +59,7 @@ internal sealed class TextureSetCategoryRepository : ITextureSetCategoryReposito
 
     public Task UpdateAsync(TextureSetCategory category, CancellationToken cancellationToken = default)
     {
-        if (_context.Entry(category).State == EntityState.Detached)
-            _context.TextureSetCategories.Update(category);
+        _context.UpdateIfDetached(category);
 
         return Task.CompletedTask;
     }

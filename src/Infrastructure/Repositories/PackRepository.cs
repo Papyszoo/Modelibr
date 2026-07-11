@@ -67,9 +67,7 @@ internal sealed class PackRepository : IPackRepository
 
     public Task UpdateAsync(Pack pack, CancellationToken cancellationToken = default)
     {
-        // Only call Update for detached entities; tracked entities are saved automatically
-        if (_context.Entry(pack).State == Microsoft.EntityFrameworkCore.EntityState.Detached)
-            _context.Packs.Update(pack);
+        _context.UpdateIfDetached(pack);
 
         // Note: this used to catch a DbUpdateException for a duplicate
         // PackModels PK here (concurrent "add model to pack" requests racing

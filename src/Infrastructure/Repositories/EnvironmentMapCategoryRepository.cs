@@ -43,8 +43,7 @@ internal sealed class EnvironmentMapCategoryRepository : IEnvironmentMapCategory
 
     public Task UpdateAsync(EnvironmentMapCategory category, CancellationToken cancellationToken = default)
     {
-        if (_context.Entry(category).State == EntityState.Detached)
-            _context.EnvironmentMapCategories.Update(category);
+        _context.UpdateIfDetached(category);
 
         return Task.CompletedTask;
     }

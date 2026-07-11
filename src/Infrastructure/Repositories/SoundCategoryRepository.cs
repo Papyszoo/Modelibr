@@ -46,8 +46,7 @@ internal sealed class SoundCategoryRepository : ISoundCategoryRepository
 
     public Task UpdateAsync(SoundCategory category, CancellationToken cancellationToken = default)
     {
-        if (_context.Entry(category).State == EntityState.Detached)
-            _context.SoundCategories.Update(category);
+        _context.UpdateIfDetached(category);
 
         return Task.CompletedTask;
     }

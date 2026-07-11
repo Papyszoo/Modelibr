@@ -36,7 +36,7 @@ internal sealed class SettingRepository : ISettingRepository
 
     public Task<Setting> UpdateAsync(Setting setting, CancellationToken cancellationToken = default)
     {
-        _context.Settings.Update(setting);
+        _context.UpdateIfDetached(setting);
         return Task.FromResult(setting);
     }
 
