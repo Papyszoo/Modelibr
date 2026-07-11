@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Models;
@@ -10,13 +11,16 @@ internal class UpdateSettingCommandHandler : ICommandHandler<UpdateSettingComman
 {
     private readonly ISettingRepository _settingRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public UpdateSettingCommandHandler(
         ISettingRepository settingRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _settingRepository = settingRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<UpdateSettingResponse>> Handle(UpdateSettingCommand command, CancellationToken cancellationToken)
@@ -44,6 +48,8 @@ internal class UpdateSettingCommandHandler : ICommandHandler<UpdateSettingComman
                 existingSetting.UpdateValue(command.Value, now);
                 setting = await _settingRepository.UpdateAsync(existingSetting, cancellationToken);
             }
+
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             return Result.Success(new UpdateSettingResponse(
                 setting.Key,
