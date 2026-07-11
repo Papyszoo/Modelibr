@@ -55,8 +55,11 @@ namespace Application.Files
             var fileEntity = fileResult.Value;
             bool alreadyExists = fileEntity.Id != 0;
 
-            // Persist the file to the database if it's new
+            // Persist the file to the database if it's new. Commit immediately:
+            // fileEntity.Id is database-assigned and is needed below for the
+            // BatchUpload FK and the response.
             await _filePersistence.PersistAsync(fileEntity, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             // Always track batch upload - generate batch ID if not provided
             var batchId = command.BatchId ?? Guid.NewGuid().ToString();

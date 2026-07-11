@@ -64,10 +64,10 @@ internal sealed class FileRepository : IFileRepository
             .FirstOrDefaultAsync(f => f.Id == id, cancellationToken);
     }
 
-    public async Task UpdateAsync(Domain.Models.File file, CancellationToken cancellationToken = default)
+    public Task UpdateAsync(Domain.Models.File file, CancellationToken cancellationToken = default)
     {
         _context.Files.Update(file);
-        await _context.SaveChangesAsync(cancellationToken);
+        return Task.CompletedTask;
     }
 
     public async Task<IEnumerable<Domain.Models.File>> GetFilesByModelIdAsync(int modelId, CancellationToken cancellationToken = default)
@@ -86,7 +86,6 @@ internal sealed class FileRepository : IFileRepository
         if (file != null)
         {
             _context.Files.Remove(file);
-            await _context.SaveChangesAsync(cancellationToken);
         }
     }
 
@@ -176,7 +175,6 @@ internal sealed class FileRepository : IFileRepository
         if (file != null)
         {
             _context.Files.Remove(file);
-            await _context.SaveChangesAsync(cancellationToken);
         }
     }
 }
