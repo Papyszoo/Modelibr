@@ -1,11 +1,22 @@
-﻿using Domain.Models;
+﻿using Application.Abstractions;
+using Domain.Models;
 using Domain.ValueObjects;
 using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Persistence
 {
-    public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : DbContext(options)
+    public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : DbContext(options), IUnitOfWork
     {
+        // Explicit interface implementation: Application-layer command handlers
+        // depend on IUnitOfWork.SaveChangesAsync (Task); EF's own
+        // DbContext.SaveChangesAsync (Task<int>) stays available for
+        // Infrastructure code and design-time tooling. Both resolve to the same
+        // method, so domain-event dispatch (wired via DomainEventsInterceptor,
+        // see Infrastructure/DependencyInjection.cs) runs no matter which path
+        // a caller uses.
+        Task IUnitOfWork.SaveChangesAsync(CancellationToken cancellationToken) =>
+            SaveChangesAsync(cancellationToken);
+
         public DbSet<Model> Models => Set<Model>();
         public DbSet<ModelVersion> ModelVersions => Set<ModelVersion>();
         public DbSet<Domain.Models.File> Files => Set<Domain.Models.File>();
