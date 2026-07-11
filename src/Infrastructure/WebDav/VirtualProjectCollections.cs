@@ -327,12 +327,13 @@ public sealed class VirtualModelCollection : VirtualCollectionBase
     }
 
     /// <summary>
-    /// Creates a VirtualGeneratedBlendFile if Blender CLI is available and the newest version
-    /// has a renderable file.
+    /// Creates a VirtualGeneratedBlendFile if Blender CLI is available, the newest version
+    /// has a renderable file, AND the generated .blend is already cached — see
+    /// <see cref="VirtualGeneratedBlendFile.TryCreate"/> for why the cache check is required.
     /// </summary>
     private IStoreItem? TryCreateGeneratedBlendItem()
     {
-        if (_blendFileGenerator == null || !_blendFileGenerator.IsAvailable)
+        if (_blendFileGenerator == null)
             return null;
 
         var newestVersion = _model.Versions
@@ -343,21 +344,11 @@ public sealed class VirtualModelCollection : VirtualCollectionBase
         if (newestVersion == null)
             return null;
 
-        var renderableFile = newestVersion.Files
-            .FirstOrDefault(f => f.FileType.IsRenderable);
-
-        if (renderableFile == null)
-            return null;
-
-        return new VirtualGeneratedBlendFile(
+        return VirtualGeneratedBlendFile.TryCreate(
             LockingManager,
-            GeneratedBlendFileName,
-            renderableFile.SizeBytes,
-            renderableFile.CreatedAt,
-            renderableFile.UpdatedAt,
+            _model,
+            newestVersion,
             _blendFileGenerator,
-            _model.Id,
-            newestVersion.Id,
             _logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
     }
 

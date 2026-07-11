@@ -14,6 +14,7 @@ internal class UpdateTextureSetKindCommandHandler : ICommandHandler<UpdateTextur
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IThumbnailQueue _thumbnailQueue;
     private readonly IBlendFileGenerator _blendFileGenerator;
+    private readonly IBlendFileGenerationQueue _blendFileGenerationQueue;
     private readonly ILogger<UpdateTextureSetKindCommandHandler> _logger;
 
     public UpdateTextureSetKindCommandHandler(
@@ -21,12 +22,14 @@ internal class UpdateTextureSetKindCommandHandler : ICommandHandler<UpdateTextur
         IDateTimeProvider dateTimeProvider,
         IThumbnailQueue thumbnailQueue,
         IBlendFileGenerator blendFileGenerator,
+        IBlendFileGenerationQueue blendFileGenerationQueue,
         ILogger<UpdateTextureSetKindCommandHandler> logger)
     {
         _textureSetRepository = textureSetRepository;
         _dateTimeProvider = dateTimeProvider;
         _thumbnailQueue = thumbnailQueue;
         _blendFileGenerator = blendFileGenerator;
+        _blendFileGenerationQueue = blendFileGenerationQueue;
         _logger = logger;
     }
 
@@ -71,6 +74,8 @@ internal class UpdateTextureSetKindCommandHandler : ICommandHandler<UpdateTextur
                 foreach (var mapping in removed.DistinctBy(m => m.ModelVersionId))
                 {
                     _blendFileGenerator.InvalidateCache(
+                        mapping.ModelVersion.Model.Id, mapping.ModelVersionId);
+                    _blendFileGenerationQueue.Enqueue(
                         mapping.ModelVersion.Model.Id, mapping.ModelVersionId);
                 }
             }

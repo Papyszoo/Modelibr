@@ -1,6 +1,7 @@
 using Application.Abstractions.Files;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Abstractions.Services;
 using Application.Services;
 using Domain.Services;
 using Domain.ValueObjects;
@@ -14,17 +15,20 @@ internal class AddFileToVersionCommandHandler : ICommandHandler<AddFileToVersion
     private readonly IModelVersionRepository _versionRepository;
     private readonly IFileCreationService _fileCreationService;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IBlendFileGenerationQueue _blendFileGenerationQueue;
 
     public AddFileToVersionCommandHandler(
         IModelRepository modelRepository,
         IModelVersionRepository versionRepository,
         IFileCreationService fileCreationService,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IBlendFileGenerationQueue blendFileGenerationQueue)
     {
         _modelRepository = modelRepository;
         _versionRepository = versionRepository;
         _fileCreationService = fileCreationService;
         _dateTimeProvider = dateTimeProvider;
+        _blendFileGenerationQueue = blendFileGenerationQueue;
     }
 
     public async Task<Result<AddFileToVersionResponse>> Handle(
@@ -83,6 +87,17 @@ internal class AddFileToVersionCommandHandler : ICommandHandler<AddFileToVersion
         // Update
         await _versionRepository.UpdateAsync(version, cancellationToken);
         await _modelRepository.UpdateAsync(model, cancellationToken);
+
+        // This is the asset-processor worker's landing point for the .glb it extracts
+        // from a Blender-saved version (the version is created with only a .blend —
+        // see WebDavMiddleware's Safe-Save MOVE handling — and has no renderable file
+        // until this call attaches one). Schedule background .blend regeneration now so
+        // generated-{name}.blend reappears in WebDAV listings without waiting for a
+        // client GET to trigger generation synchronously.
+        if (fileType.IsRenderable)
+        {
+            _blendFileGenerationQueue.Enqueue(command.ModelId, version.Id);
+        }
 
         return Result.Success(new AddFileToVersionResponse(
             version.Id,
