@@ -28,18 +28,16 @@ internal sealed class SettingRepository : ISettingRepository
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<Setting> AddAsync(Setting setting, CancellationToken cancellationToken = default)
+    public Task<Setting> AddAsync(Setting setting, CancellationToken cancellationToken = default)
     {
         _context.Settings.Add(setting);
-        await _context.SaveChangesAsync(cancellationToken);
-        return setting;
+        return Task.FromResult(setting);
     }
 
-    public async Task<Setting> UpdateAsync(Setting setting, CancellationToken cancellationToken = default)
+    public Task<Setting> UpdateAsync(Setting setting, CancellationToken cancellationToken = default)
     {
         _context.Settings.Update(setting);
-        await _context.SaveChangesAsync(cancellationToken);
-        return setting;
+        return Task.FromResult(setting);
     }
 
     public async Task DeleteAsync(string key, CancellationToken cancellationToken = default)
@@ -48,7 +46,6 @@ internal sealed class SettingRepository : ISettingRepository
         if (setting != null)
         {
             _context.Settings.Remove(setting);
-            await _context.SaveChangesAsync(cancellationToken);
         }
     }
 }
