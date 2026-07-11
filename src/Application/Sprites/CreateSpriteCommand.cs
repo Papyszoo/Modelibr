@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Models;
@@ -13,17 +14,20 @@ internal class CreateSpriteCommandHandler : ICommandHandler<CreateSpriteCommand,
     private readonly ISpriteCategoryRepository _spriteCategoryRepository;
     private readonly IFileRepository _fileRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public CreateSpriteCommandHandler(
         ISpriteRepository spriteRepository,
         ISpriteCategoryRepository spriteCategoryRepository,
         IFileRepository fileRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _spriteRepository = spriteRepository;
         _spriteCategoryRepository = spriteCategoryRepository;
         _fileRepository = fileRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<CreateSpriteResponse>> Handle(CreateSpriteCommand command, CancellationToken cancellationToken)
@@ -62,6 +66,7 @@ internal class CreateSpriteCommandHandler : ICommandHandler<CreateSpriteCommand,
                 command.CategoryId);
 
             var savedSprite = await _spriteRepository.AddAsync(sprite, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             return Result.Success(new CreateSpriteResponse(savedSprite.Id, savedSprite.Name));
         }

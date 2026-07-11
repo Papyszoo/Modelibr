@@ -121,6 +121,9 @@ internal class CreateSpriteWithFileCommandHandler : ICommandHandler<CreateSprite
                 command.CategoryId);
 
             var createdSprite = await _spriteRepository.AddAsync(sprite, cancellationToken);
+            // Commit now: the sprite's real database-assigned id feeds the BatchUpload
+            // raw scalar and the response below.
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             // 6. Track batch upload if batchId provided
             if (!string.IsNullOrWhiteSpace(command.BatchId))
