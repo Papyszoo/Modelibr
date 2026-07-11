@@ -14,11 +14,10 @@ internal sealed class SpriteCategoryRepository : ISpriteCategoryRepository
         _context = context ?? throw new ArgumentNullException(nameof(context));
     }
 
-    public async Task<SpriteCategory> AddAsync(SpriteCategory category, CancellationToken cancellationToken = default)
+    public Task<SpriteCategory> AddAsync(SpriteCategory category, CancellationToken cancellationToken = default)
     {
         _context.SpriteCategories.Add(category);
-        await _context.SaveChangesAsync(cancellationToken);
-        return category;
+        return Task.FromResult(category);
     }
 
     public async Task<IReadOnlyList<SpriteCategory>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -45,17 +44,17 @@ internal sealed class SpriteCategoryRepository : ISpriteCategoryRepository
             .FirstOrDefaultAsync(c => c.Name == name.Trim() && c.ParentId == parentId, cancellationToken);
     }
 
-    public async Task UpdateAsync(SpriteCategory category, CancellationToken cancellationToken = default)
+    public Task UpdateAsync(SpriteCategory category, CancellationToken cancellationToken = default)
     {
         if (_context.Entry(category).State == EntityState.Detached)
             _context.SpriteCategories.Update(category);
 
-        await _context.SaveChangesAsync(cancellationToken);
+        return Task.CompletedTask;
     }
 
-    public async Task DeleteAsync(SpriteCategory category, CancellationToken cancellationToken = default)
+    public Task DeleteAsync(SpriteCategory category, CancellationToken cancellationToken = default)
     {
         _context.SpriteCategories.Remove(category);
-        await _context.SaveChangesAsync(cancellationToken);
+        return Task.CompletedTask;
     }
 }

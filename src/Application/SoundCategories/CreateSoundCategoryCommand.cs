@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Categories;
@@ -11,20 +12,23 @@ internal class CreateSoundCategoryCommandHandler : ICommandHandler<CreateSoundCa
 {
     private readonly ISoundCategoryRepository _categoryRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public CreateSoundCategoryCommandHandler(
         ISoundCategoryRepository categoryRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _categoryRepository = categoryRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<SoundCategorySummaryDto>> Handle(CreateSoundCategoryCommand command, CancellationToken cancellationToken)
     {
         var result = await CategoryCommandHandlers.CreateAsync(
             _categoryRepository, command.Name, command.Description, command.ParentId,
-            "sound category", SoundCategory.Create, _dateTimeProvider.UtcNow, cancellationToken);
+            "sound category", SoundCategory.Create, _dateTimeProvider.UtcNow, _unitOfWork, cancellationToken);
 
         return result.IsSuccess
             ? Result.Success(new SoundCategorySummaryDto
