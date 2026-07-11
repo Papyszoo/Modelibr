@@ -14,11 +14,10 @@ internal sealed class ProjectRepository : IProjectRepository
         _context = context;
     }
 
-    public async Task<Project> AddAsync(Project project, CancellationToken cancellationToken = default)
+    public Task<Project> AddAsync(Project project, CancellationToken cancellationToken = default)
     {
         _context.Projects.Add(project);
-        await _context.SaveChangesAsync(cancellationToken);
-        return project;
+        return Task.FromResult(project);
     }
 
     public async Task<IEnumerable<Project>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -70,17 +69,17 @@ internal sealed class ProjectRepository : IProjectRepository
             .FirstOrDefaultAsync(p => p.Name == name, cancellationToken);
     }
 
-    public async Task UpdateAsync(Project project, CancellationToken cancellationToken = default)
+    public Task UpdateAsync(Project project, CancellationToken cancellationToken = default)
     {
         // Only call Update for detached entities; tracked entities are saved automatically
         if (_context.Entry(project).State == Microsoft.EntityFrameworkCore.EntityState.Detached)
             _context.Projects.Update(project);
-        await _context.SaveChangesAsync(cancellationToken);
+        return Task.CompletedTask;
     }
 
-    public async Task DeleteAsync(Project project, CancellationToken cancellationToken = default)
+    public Task DeleteAsync(Project project, CancellationToken cancellationToken = default)
     {
         _context.Projects.Remove(project);
-        await _context.SaveChangesAsync(cancellationToken);
+        return Task.CompletedTask;
     }
 }

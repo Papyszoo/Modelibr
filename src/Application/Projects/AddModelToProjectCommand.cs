@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Services;
@@ -11,17 +12,20 @@ internal class AddModelToProjectCommandHandler : ICommandHandler<AddModelToProje
     private readonly IModelRepository _modelRepository;
     private readonly IBatchUploadRepository _batchUploadRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public AddModelToProjectCommandHandler(
         IProjectRepository projectRepository,
         IModelRepository modelRepository,
         IBatchUploadRepository batchUploadRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _projectRepository = projectRepository;
         _modelRepository = modelRepository;
         _batchUploadRepository = batchUploadRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(AddModelToProjectCommand command, CancellationToken cancellationToken)
@@ -54,6 +58,8 @@ internal class AddModelToProjectCommandHandler : ICommandHandler<AddModelToProje
             batchUpload.UpdateUploadType("project");
             await _batchUploadRepository.UpdateAsync(batchUpload, cancellationToken);
         }
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success();
     }

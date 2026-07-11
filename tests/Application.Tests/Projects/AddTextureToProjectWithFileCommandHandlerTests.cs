@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Files;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
@@ -27,6 +28,7 @@ public class AddTextureToProjectWithFileCommandHandlerTests
     private readonly Mock<IFileCreationService> _fileCreationService = new();
     private readonly Mock<IDateTimeProvider> _dateTimeProvider = new();
     private readonly Mock<ITextureImageMetadataReader> _metadataReader = new();
+    private readonly Mock<IUnitOfWork> _unitOfWork = new();
 
     public AddTextureToProjectWithFileCommandHandlerTests()
     {
@@ -41,7 +43,8 @@ public class AddTextureToProjectWithFileCommandHandlerTests
         _batchUploadRepository.Object,
         _fileCreationService.Object,
         _dateTimeProvider.Object,
-        _metadataReader.Object);
+        _metadataReader.Object,
+        _unitOfWork.Object);
 
     [Fact]
     public async Task Handle_NewTextureSet_ExtractsAndPersistsImageMetadata()

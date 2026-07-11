@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Services;
@@ -10,15 +11,18 @@ internal class AddScriptToProjectCommandHandler : ICommandHandler<AddScriptToPro
     private readonly IProjectRepository _projectRepository;
     private readonly IScriptRepository _scriptRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public AddScriptToProjectCommandHandler(
         IProjectRepository projectRepository,
         IScriptRepository scriptRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _projectRepository = projectRepository;
         _scriptRepository = scriptRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(AddScriptToProjectCommand command, CancellationToken cancellationToken)
@@ -41,6 +45,7 @@ internal class AddScriptToProjectCommandHandler : ICommandHandler<AddScriptToPro
 
         await _projectRepository.UpdateAsync(project, cancellationToken);
 
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }
 }
