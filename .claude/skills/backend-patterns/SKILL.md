@@ -13,7 +13,8 @@ description: Modelibr backend conventions — Clean Architecture boundaries, Res
 - Known debt + planned refactors live in `.claude/prompts/` (15, 26–29). Before
   reworking error mapping or FileType, read the matching prompt — don't
   half-implement it as a side effect. Transactions/event dispatch (prompt 25) are
-  covered below — it's an in-progress migration, not a "read the prompt first" item.
+  covered below and DONE (every repository migrated except the two permanent,
+  individually-justified exceptions) — not a "read the prompt first" item.
 
 ## Result/Error
 - Handlers return `Task<Result>` / `Task<Result<T>>` (`SharedKernel/Result.cs`, `Error.cs`).
@@ -55,15 +56,24 @@ description: Modelibr backend conventions — Clean Architecture boundaries, Res
   just building the same EF change-tracked graph (a raw scalar FK on another entity, a
   response DTO), call `SaveChangesAsync` right after that `Add`, not only at the end —
   see `AddTextureToPackWithFileCommandHandler`.
-- Migration lands one bounded area at a time (settings, packs, projects done);
-  `tests/Infrastructure.Tests/Architecture/RepositoriesDontSelfCommitTests.cs` is the
-  live source of truth for which repositories still self-commit — check its allowlist,
-  don't assume. A repo outside that allowlist that self-commits fails the build.
+- Migration is done: every repository under `src/Infrastructure/Repositories` stages
+  mutations only. `tests/Infrastructure.Tests/Architecture/RepositoriesDontSelfCommitTests.cs`
+  is the live source of truth — its allowlist holds exactly two permanent exceptions
+  (`ModelVersionRepository.cs`, `ThumbnailJobRepository.cs`, both justified inline). A
+  new repository that self-commits, or a regression in an already-migrated one, fails
+  the build; don't add to the allowlist for a new repo — give it `IUnitOfWork` instead.
 - `ThumbnailJobRepository.GetNextPendingJobAsync`'s explicit `BeginTransactionAsync`
-  (claim semantics) is not part of the UoW and stays even once that area migrates.
-  `ApplicationDbContext.SaveChangesAsync` also swallows one specific known-benign race
-  (concurrent "add model to pack" duplicating the `PackModels` join PK) — name the exact
-  constraint in the `when` clause if you add another.
+  (claim semantics) is permanently outside the UoW. `ThumbnailQueue` (the service, not
+  the repo) deliberately commits its own writes via `IUnitOfWork` too — enqueue/complete/
+  fail/retry are durable-queue primitives that must persist before workers are notified,
+  and some callers (the domain-event pipeline) have no command handler to commit
+  afterwards. `ApplicationDbContext.SaveChangesAsync` also swallows one specific
+  known-benign race (concurrent "add model to pack" duplicating the `PackModels` join
+  PK) — name the exact constraint in the `when` clause if you add another.
+- A hierarchical delete (categories, and similar branch/tree deletes) that used to issue
+  one self-commit per row now lands in a single commit — a failure partway through
+  leaves the whole branch untouched instead of a partial delete. That's the atomicity
+  guarantee working as intended, not a bug to work around.
 
 ## Validation
 - No FluentValidation. Handler-level: validate early, return `Result.Failure(error)`.
