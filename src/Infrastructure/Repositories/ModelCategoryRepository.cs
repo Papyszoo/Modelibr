@@ -14,11 +14,10 @@ internal sealed class ModelCategoryRepository : IModelCategoryRepository
         _context = context;
     }
 
-    public async Task<ModelCategory> AddAsync(ModelCategory category, CancellationToken cancellationToken = default)
+    public Task<ModelCategory> AddAsync(ModelCategory category, CancellationToken cancellationToken = default)
     {
         _context.ModelCategories.Add(category);
-        await _context.SaveChangesAsync(cancellationToken);
-        return category;
+        return Task.FromResult(category);
     }
 
     public async Task<IReadOnlyList<ModelCategory>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -42,19 +41,19 @@ internal sealed class ModelCategoryRepository : IModelCategoryRepository
             .FirstOrDefaultAsync(c => c.Name == name && c.ParentId == parentId, cancellationToken);
     }
 
-    public async Task UpdateAsync(ModelCategory category, CancellationToken cancellationToken = default)
+    public Task UpdateAsync(ModelCategory category, CancellationToken cancellationToken = default)
     {
         if (_context.Entry(category).State == EntityState.Detached)
         {
             _context.ModelCategories.Update(category);
         }
 
-        await _context.SaveChangesAsync(cancellationToken);
+        return Task.CompletedTask;
     }
 
-    public async Task DeleteAsync(ModelCategory category, CancellationToken cancellationToken = default)
+    public Task DeleteAsync(ModelCategory category, CancellationToken cancellationToken = default)
     {
         _context.ModelCategories.Remove(category);
-        await _context.SaveChangesAsync(cancellationToken);
+        return Task.CompletedTask;
     }
 }

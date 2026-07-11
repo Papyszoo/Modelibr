@@ -35,18 +35,6 @@ public class RepositoriesDontSelfCommitTests
         // immediately to catch its unique violation and recover by loading the
         // existing row (see the comment block in the file).
         "ModelVersionRepository.cs",
-        // categories (all types — slice pending)
-        "ModelCategoryRepository.cs",
-        // texture sets (category repo migrates with the categories slice)
-        "TextureSetCategoryRepository.cs",
-        // sounds (category repo migrates with the categories slice)
-        "SoundCategoryRepository.cs",
-        // sprites (category repo migrates with the categories slice)
-        "SpriteCategoryRepository.cs",
-        // scripts (category repo migrates with the categories slice)
-        "ScriptCategoryRepository.cs",
-        // env maps (category repo migrates with the categories slice)
-        "EnvironmentMapCategoryRepository.cs",
         // thumbnails — migrated except ThumbnailJobRepository's
         // GetNextPendingJobAsync, whose explicit BeginTransactionAsync +
         // SaveChangesAsync (claim semantics: the expired-lock reset must be

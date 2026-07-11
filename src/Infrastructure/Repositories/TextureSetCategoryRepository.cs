@@ -15,11 +15,10 @@ internal sealed class TextureSetCategoryRepository : ITextureSetCategoryReposito
         _context = context;
     }
 
-    public async Task<TextureSetCategory> AddAsync(TextureSetCategory category, CancellationToken cancellationToken = default)
+    public Task<TextureSetCategory> AddAsync(TextureSetCategory category, CancellationToken cancellationToken = default)
     {
         _context.TextureSetCategories.Add(category);
-        await _context.SaveChangesAsync(cancellationToken);
-        return category;
+        return Task.FromResult(category);
     }
 
     public async Task<IReadOnlyList<TextureSetCategory>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -58,17 +57,17 @@ internal sealed class TextureSetCategoryRepository : ITextureSetCategoryReposito
             .FirstOrDefaultAsync(c => c.Name == name && c.ParentId == parentId && c.Kind == kind, cancellationToken);
     }
 
-    public async Task UpdateAsync(TextureSetCategory category, CancellationToken cancellationToken = default)
+    public Task UpdateAsync(TextureSetCategory category, CancellationToken cancellationToken = default)
     {
         if (_context.Entry(category).State == EntityState.Detached)
             _context.TextureSetCategories.Update(category);
 
-        await _context.SaveChangesAsync(cancellationToken);
+        return Task.CompletedTask;
     }
 
-    public async Task DeleteAsync(TextureSetCategory category, CancellationToken cancellationToken = default)
+    public Task DeleteAsync(TextureSetCategory category, CancellationToken cancellationToken = default)
     {
         _context.TextureSetCategories.Remove(category);
-        await _context.SaveChangesAsync(cancellationToken);
+        return Task.CompletedTask;
     }
 }

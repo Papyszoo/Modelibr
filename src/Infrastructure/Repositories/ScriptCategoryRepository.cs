@@ -14,11 +14,10 @@ internal sealed class ScriptCategoryRepository : IScriptCategoryRepository
         _context = context ?? throw new ArgumentNullException(nameof(context));
     }
 
-    public async Task<ScriptCategory> AddAsync(ScriptCategory category, CancellationToken cancellationToken = default)
+    public Task<ScriptCategory> AddAsync(ScriptCategory category, CancellationToken cancellationToken = default)
     {
         _context.ScriptCategories.Add(category);
-        await _context.SaveChangesAsync(cancellationToken);
-        return category;
+        return Task.FromResult(category);
     }
 
     public async Task<IReadOnlyList<ScriptCategory>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -45,17 +44,17 @@ internal sealed class ScriptCategoryRepository : IScriptCategoryRepository
             .FirstOrDefaultAsync(c => c.Name == name.Trim() && c.ParentId == parentId, cancellationToken);
     }
 
-    public async Task UpdateAsync(ScriptCategory category, CancellationToken cancellationToken = default)
+    public Task UpdateAsync(ScriptCategory category, CancellationToken cancellationToken = default)
     {
         if (_context.Entry(category).State == EntityState.Detached)
             _context.ScriptCategories.Update(category);
 
-        await _context.SaveChangesAsync(cancellationToken);
+        return Task.CompletedTask;
     }
 
-    public async Task DeleteAsync(ScriptCategory category, CancellationToken cancellationToken = default)
+    public Task DeleteAsync(ScriptCategory category, CancellationToken cancellationToken = default)
     {
         _context.ScriptCategories.Remove(category);
-        await _context.SaveChangesAsync(cancellationToken);
+        return Task.CompletedTask;
     }
 }
