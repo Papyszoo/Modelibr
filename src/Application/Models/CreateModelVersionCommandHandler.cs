@@ -1,7 +1,6 @@
 using Application.Abstractions.Files;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
-using Application.Abstractions.Services;
 using Application.Services;
 using Domain.Services;
 using Domain.ValueObjects;
@@ -15,20 +14,17 @@ internal class CreateModelVersionCommandHandler : ICommandHandler<CreateModelVer
     private readonly IModelVersionRepository _versionRepository;
     private readonly IFileCreationService _fileCreationService;
     private readonly IDateTimeProvider _dateTimeProvider;
-    private readonly IDomainEventDispatcher _domainEventDispatcher;
 
     public CreateModelVersionCommandHandler(
         IModelRepository modelRepository,
         IModelVersionRepository versionRepository,
         IFileCreationService fileCreationService,
-        IDateTimeProvider dateTimeProvider,
-        IDomainEventDispatcher domainEventDispatcher)
+        IDateTimeProvider dateTimeProvider)
     {
         _modelRepository = modelRepository;
         _versionRepository = versionRepository;
         _fileCreationService = fileCreationService;
         _dateTimeProvider = dateTimeProvider;
-        _domainEventDispatcher = domainEventDispatcher;
     }
 
     public async Task<Result<CreateModelVersionResponse>> Handle(
@@ -102,22 +98,19 @@ internal class CreateModelVersionCommandHandler : ICommandHandler<CreateModelVer
             model.SetActiveVersion(savedVersion.Id, _dateTimeProvider.UtcNow);
         }
 
-        await _modelRepository.UpdateAsync(model, cancellationToken);
-
-        // Raise domain event to trigger thumbnail generation for the new version
+        // Raise domain event to trigger thumbnail generation for the new version.
         // Trigger for renderable files (direct thumbnail) and project files like .blend
-        // (asset-processor converts .blend → .glb first, then generates thumbnail)
+        // (asset-processor converts .blend → .glb first, then generates thumbnail).
+        // Must happen before the SaveChanges below (includes ActiveVersionChangedEvent
+        // if SetAsActive was true) — the save pipeline dispatches whatever events are
+        // on the aggregate at that point (see DomainEventsInterceptor); no manual
+        // publish here.
         if (fileType.IsRenderable || fileType.Category == Domain.ValueObjects.FileTypeCategory.Project)
         {
             model.RaiseModelUploadedEvent(savedVersion.Id, fileEntity.Sha256Hash, true);
         }
-        
-        // Always publish domain events (includes ActiveVersionChangedEvent if SetAsActive was true)
-        if (model.DomainEvents.Any())
-        {
-            await _domainEventDispatcher.PublishAsync(model.DomainEvents, cancellationToken);
-            model.ClearDomainEvents();
-        }
+
+        await _modelRepository.UpdateAsync(model, cancellationToken);
 
         return Result.Success(new CreateModelVersionResponse(
             savedVersion.Id,

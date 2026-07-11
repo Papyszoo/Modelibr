@@ -1,7 +1,6 @@
 using Application.Abstractions.Files;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
-using Application.Abstractions.Services;
 using Application.Services;
 using Domain.Models;
 using Domain.Services;
@@ -16,7 +15,6 @@ internal class CreateModelFromBlendCommandHandler : ICommandHandler<CreateModelF
     private readonly IModelVersionRepository _versionRepository;
     private readonly IFileCreationService _fileCreationService;
     private readonly IDateTimeProvider _dateTimeProvider;
-    private readonly IDomainEventDispatcher _domainEventDispatcher;
     private readonly ISettingRepository _settingRepository;
 
     public CreateModelFromBlendCommandHandler(
@@ -24,14 +22,12 @@ internal class CreateModelFromBlendCommandHandler : ICommandHandler<CreateModelF
         IModelVersionRepository versionRepository,
         IFileCreationService fileCreationService,
         IDateTimeProvider dateTimeProvider,
-        IDomainEventDispatcher domainEventDispatcher,
         ISettingRepository settingRepository)
     {
         _modelRepository = modelRepository;
         _versionRepository = versionRepository;
         _fileCreationService = fileCreationService;
         _dateTimeProvider = dateTimeProvider;
-        _domainEventDispatcher = domainEventDispatcher;
         _settingRepository = settingRepository;
     }
 
@@ -86,16 +82,14 @@ internal class CreateModelFromBlendCommandHandler : ICommandHandler<CreateModelF
             await _versionRepository.AddAsync(version, cancellationToken);
 
             fileEntity.SetModelVersion(version.Id);
-            await _modelRepository.UpdateAsync(savedModel, cancellationToken);
 
-            // Always dispatch ModelUploadedEvent for .blend — asset-processor will convert
+            // Always raise ModelUploadedEvent for .blend — asset-processor will convert.
+            // Must happen before the SaveChanges below: the save pipeline dispatches
+            // whatever events are on the aggregate at that point (see
+            // DomainEventsInterceptor); no manual publish here.
             savedModel.RaiseModelUploadedEvent(version.Id, fileEntity.Sha256Hash, true);
 
-            if (savedModel.DomainEvents.Any())
-            {
-                await _domainEventDispatcher.PublishAsync(savedModel.DomainEvents, cancellationToken);
-                savedModel.ClearDomainEvents();
-            }
+            await _modelRepository.UpdateAsync(savedModel, cancellationToken);
 
             return Result.Success(new CreateModelFromBlendResponse(savedModel.Id, false));
         }
