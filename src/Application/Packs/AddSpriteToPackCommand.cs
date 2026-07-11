@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Services;
@@ -10,15 +11,18 @@ internal class AddSpriteToPackCommandHandler : ICommandHandler<AddSpriteToPackCo
     private readonly IPackRepository _packRepository;
     private readonly ISpriteRepository _spriteRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public AddSpriteToPackCommandHandler(
         IPackRepository packRepository,
         ISpriteRepository spriteRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _packRepository = packRepository;
         _spriteRepository = spriteRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(AddSpriteToPackCommand command, CancellationToken cancellationToken)

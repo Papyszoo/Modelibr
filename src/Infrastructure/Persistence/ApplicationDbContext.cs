@@ -2,6 +2,7 @@
 using Domain.Models;
 using Domain.ValueObjects;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Infrastructure.Persistence
 {
@@ -14,8 +15,30 @@ namespace Infrastructure.Persistence
         // method, so domain-event dispatch (wired via DomainEventsInterceptor,
         // see Infrastructure/DependencyInjection.cs) runs no matter which path
         // a caller uses.
-        Task IUnitOfWork.SaveChangesAsync(CancellationToken cancellationToken) =>
-            SaveChangesAsync(cancellationToken);
+        async Task IUnitOfWork.SaveChangesAsync(CancellationToken cancellationToken)
+        {
+            try
+            {
+                await SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException ex) when (IsDuplicatePackModelAssociation(ex))
+            {
+                // Concurrent identical "add model to pack" requests can race on
+                // the PackModels join table's composite PK. Treat the duplicate
+                // insert as an idempotent no-op — moved here from
+                // PackRepository.UpdateAsync when repositories stopped
+                // self-committing (prompt 25); this is the one known-benign
+                // race the app deliberately swallows at the commit boundary.
+                ChangeTracker.Clear();
+            }
+        }
+
+        private static bool IsDuplicatePackModelAssociation(DbUpdateException ex)
+            => ex.InnerException is PostgresException
+            {
+                SqlState: PostgresErrorCodes.UniqueViolation,
+                ConstraintName: "PK_PackModels"
+            };
 
         public DbSet<Model> Models => Set<Model>();
         public DbSet<ModelVersion> ModelVersions => Set<ModelVersion>();

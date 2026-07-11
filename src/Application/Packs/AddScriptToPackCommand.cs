@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Services;
@@ -10,15 +11,18 @@ internal class AddScriptToPackCommandHandler : ICommandHandler<AddScriptToPackCo
     private readonly IPackRepository _packRepository;
     private readonly IScriptRepository _scriptRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public AddScriptToPackCommandHandler(
         IPackRepository packRepository,
         IScriptRepository scriptRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _packRepository = packRepository;
         _scriptRepository = scriptRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(AddScriptToPackCommand command, CancellationToken cancellationToken)
@@ -41,6 +45,7 @@ internal class AddScriptToPackCommandHandler : ICommandHandler<AddScriptToPackCo
 
         await _packRepository.UpdateAsync(pack, cancellationToken);
 
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }
 }
