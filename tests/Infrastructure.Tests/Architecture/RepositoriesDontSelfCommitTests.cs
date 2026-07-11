@@ -37,10 +37,8 @@ public class RepositoriesDontSelfCommitTests
         "ModelVersionRepository.cs",
         // categories (all types — slice pending)
         "ModelCategoryRepository.cs",
-        // texture sets
-        "TextureSetRepository.cs",
+        // texture sets (category repo migrates with the categories slice)
         "TextureSetCategoryRepository.cs",
-        "TextureProxyRepository.cs",
         // sounds
         "SoundRepository.cs",
         "SoundCategoryRepository.cs",

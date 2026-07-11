@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Repositories;
 using Application.TextureSets;
 using Domain.Models;
@@ -12,6 +13,7 @@ public class UpdateTextureSetTagsCommandHandlerTests
     private readonly Mock<ITextureSetRepository> _textureSetRepository = new();
     private readonly Mock<IModelTagRepository> _modelTagRepository = new();
     private readonly Mock<IDateTimeProvider> _dateTimeProvider = new();
+    private readonly Mock<IUnitOfWork> _unitOfWork = new();
     private readonly UpdateTextureSetTagsCommandHandler _handler;
 
     public UpdateTextureSetTagsCommandHandlerTests()
@@ -20,7 +22,8 @@ public class UpdateTextureSetTagsCommandHandlerTests
         _handler = new UpdateTextureSetTagsCommandHandler(
             _textureSetRepository.Object,
             _modelTagRepository.Object,
-            _dateTimeProvider.Object);
+            _dateTimeProvider.Object,
+            _unitOfWork.Object);
     }
 
     [Fact]
