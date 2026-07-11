@@ -162,6 +162,131 @@ describe('BaseProcessor', () => {
     })
   })
 
+  describe('abort signal (timeout cancellation)', () => {
+    it('passes the abort signal through to process()', async () => {
+      const controller = new AbortController()
+      processor.process = vi.fn().mockResolvedValue({ ok: true })
+
+      await processor.execute(mockJob, controller.signal)
+
+      expect(processor.process).toHaveBeenCalledWith(
+        mockJob,
+        expect.anything(),
+        controller.signal
+      )
+    })
+
+    it('discards a stale success instead of double-completing an aborted job', async () => {
+      const controller = new AbortController()
+      controller.abort()
+      processor._processResult = { thumbnailPath: '/path' }
+
+      await processor.execute(mockJob, controller.signal)
+
+      expect(mockMarkJobCompleted).not.toHaveBeenCalled()
+      expect(mockLogJobCompleted).not.toHaveBeenCalled()
+    })
+
+    it('does not call markFailed a second time for an already-timed-out job', async () => {
+      const controller = new AbortController()
+      controller.abort()
+      processor.process = vi.fn().mockRejectedValue(new Error('boom'))
+
+      await expect(
+        processor.execute(mockJob, controller.signal)
+      ).rejects.toThrow('boom')
+
+      // The job queue's timeout handler already reported this job failed —
+      // the backend has no double-finish guard, so a second markFailed call
+      // here could clobber a job a different worker has since reclaimed.
+      expect(mockMarkJobFailed).not.toHaveBeenCalled()
+      // Still logs the failure event for visibility.
+      expect(mockLogJobFailed).toHaveBeenCalledWith(
+        42,
+        'boom',
+        expect.any(String)
+      )
+    })
+
+    it('still marks completed/failed normally when no signal is provided', async () => {
+      const result = { thumbnailPath: '/path' }
+      processor._processResult = result
+
+      await processor.execute(mockJob)
+
+      expect(mockMarkJobCompleted).toHaveBeenCalledWith(42, result)
+    })
+  })
+
+  describe('_armRendererAbort', () => {
+    it('is a no-op when no signal or no renderer is provided', () => {
+      const jobLogger = { warn: vi.fn(), error: vi.fn() }
+      const pool = { forceReinit: vi.fn() }
+
+      expect(() =>
+        processor._armRendererAbort(undefined, pool, {}, jobLogger)()
+      ).not.toThrow()
+      expect(() =>
+        processor._armRendererAbort(
+          new AbortController().signal,
+          pool,
+          null,
+          jobLogger
+        )()
+      ).not.toThrow()
+      expect(pool.forceReinit).not.toHaveBeenCalled()
+    })
+
+    it('force-reinitializes the renderer pool slot when the signal aborts', () => {
+      const controller = new AbortController()
+      const renderer = { id: 'renderer-1' }
+      const jobLogger = { warn: vi.fn(), error: vi.fn() }
+      const forceReinit = vi.fn().mockResolvedValue(undefined)
+      const pool = { forceReinit }
+
+      processor._armRendererAbort(controller.signal, pool, renderer, jobLogger)
+      controller.abort()
+
+      expect(forceReinit).toHaveBeenCalledWith(renderer)
+    })
+
+    it('logs but does not throw when force-reinit fails', async () => {
+      const controller = new AbortController()
+      const jobLogger = { warn: vi.fn(), error: vi.fn() }
+      const forceReinit = vi.fn().mockRejectedValue(new Error('reinit boom'))
+      const pool = { forceReinit }
+
+      processor._armRendererAbort(controller.signal, pool, {}, jobLogger)
+      controller.abort()
+
+      // Let the fire-and-forget rejection handler run.
+      await new Promise(resolve => setTimeout(resolve, 0))
+
+      expect(jobLogger.error).toHaveBeenCalledWith(
+        'Failed to force-reinitialize renderer after abort',
+        expect.objectContaining({ error: 'reinit boom' })
+      )
+    })
+
+    it('disarm() removes the abort listener', () => {
+      const controller = new AbortController()
+      const jobLogger = { warn: vi.fn(), error: vi.fn() }
+      const forceReinit = vi.fn().mockResolvedValue(undefined)
+      const pool = { forceReinit }
+
+      const disarm = processor._armRendererAbort(
+        controller.signal,
+        pool,
+        {},
+        jobLogger
+      )
+      disarm()
+      controller.abort()
+
+      expect(forceReinit).not.toHaveBeenCalled()
+    })
+  })
+
   describe('cleanup', () => {
     it('should be a no-op by default', async () => {
       await expect(processor.cleanup()).resolves.toBeUndefined()

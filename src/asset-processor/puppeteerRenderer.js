@@ -258,6 +258,16 @@ export class PuppeteerRenderer {
   }
 
   /**
+   * Public entry point for forcing reinitialization from outside this
+   * renderer — used by RendererPool.forceReinit() when the job holding
+   * this renderer times out. Same crash-recovery path as the internal
+   * page-crash/frame-detach handling.
+   */
+  async reinitialize() {
+    await this._reinitialize()
+  }
+
+  /**
    * Start a local HTTP file server for serving texture files to the browser.
    * This avoids encoding all textures as base64 and sending them through CDP,
    * which causes Chromium OOM crashes with large (4K) textures.
