@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
@@ -15,19 +16,22 @@ public class RegenerateAllThumbnailsCommandHandler
     private readonly IThumbnailRepository _thumbnailRepository;
     private readonly IThumbnailQueue _thumbnailQueue;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public RegenerateAllThumbnailsCommandHandler(
         IModelRepository modelRepository,
         IModelVersionRepository modelVersionRepository,
         IThumbnailRepository thumbnailRepository,
         IThumbnailQueue thumbnailQueue,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _modelRepository = modelRepository;
         _modelVersionRepository = modelVersionRepository;
         _thumbnailRepository = thumbnailRepository;
         _thumbnailQueue = thumbnailQueue;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<RegenerateAllThumbnailsCommandResponse>> Handle(
@@ -76,6 +80,11 @@ public class RegenerateAllThumbnailsCommandHandler
                 var newThumbnail = Thumbnail.Create(model.Id, targetVersion.Id, now);
                 thumbnailRow = await _thumbnailRepository.AddAsync(newThumbnail, cancellationToken);
             }
+
+            // Commit so thumbnailRow.Id is real before SetThumbnailIdAsync's raw
+            // ExecuteUpdate uses it (and to keep each loop iteration durable, as
+            // the per-repo commits used to).
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             // The Thumbnails table's FK is ModelVersion.ThumbnailId — without
             // updating it, the subsequent worker upload (UploadThumbnailCommand)

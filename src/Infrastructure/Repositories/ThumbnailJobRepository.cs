@@ -18,17 +18,16 @@ internal sealed class ThumbnailJobRepository : IThumbnailJobRepository
         _context = context ?? throw new ArgumentNullException(nameof(context));
     }
 
-    public async Task<ThumbnailJob> AddAsync(ThumbnailJob job, CancellationToken cancellationToken = default)
+    public Task<ThumbnailJob> AddAsync(ThumbnailJob job, CancellationToken cancellationToken = default)
     {
         _context.ThumbnailJobs.Add(job);
-        await _context.SaveChangesAsync(cancellationToken);
-        return job;
+        return Task.FromResult(job);
     }
 
-    public async Task UpdateAsync(ThumbnailJob job, CancellationToken cancellationToken = default)
+    public Task UpdateAsync(ThumbnailJob job, CancellationToken cancellationToken = default)
     {
         _context.ThumbnailJobs.Update(job);
-        await _context.SaveChangesAsync(cancellationToken);
+        return Task.CompletedTask;
     }
 
     public async Task<ThumbnailJob?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
@@ -95,7 +94,14 @@ internal sealed class ThumbnailJobRepository : IThumbnailJobRepository
 
     public async Task<ThumbnailJob?> GetNextPendingJobAsync(CancellationToken cancellationToken = default)
     {
-        // Use a database transaction to ensure atomicity when claiming jobs
+        // Use a database transaction to ensure atomicity when claiming jobs.
+        // This explicit transaction (and the SaveChangesAsync inside it) stays even
+        // though repositories otherwise no longer self-commit (prompt 25): the
+        // expired-lock reset must be durable within the same claim boundary.
+        // COORDINATION (prompt 27): if EnableRetryOnFailure lands on the Npgsql
+        // provider, BeginTransactionAsync here must be wrapped in
+        // Database.CreateExecutionStrategy().ExecuteAsync(...) — user-initiated
+        // transactions are incompatible with a retrying execution strategy otherwise.
         using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
         
         try
@@ -167,8 +173,4 @@ internal sealed class ThumbnailJobRepository : IThumbnailJobRepository
             .ToListAsync(cancellationToken);
     }
 
-    public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
-    {
-        await _context.SaveChangesAsync(cancellationToken);
-    }
 }

@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
@@ -15,19 +16,22 @@ internal class SetMainVariantCommandHandler : ICommandHandler<SetMainVariantComm
     private readonly IThumbnailQueue _thumbnailQueue;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IBlendFileGenerator _blendFileGenerator;
+    private readonly IUnitOfWork _unitOfWork;
 
     public SetMainVariantCommandHandler(
         IModelVersionRepository modelVersionRepository,
         IThumbnailRepository thumbnailRepository,
         IThumbnailQueue thumbnailQueue,
         IDateTimeProvider dateTimeProvider,
-        IBlendFileGenerator blendFileGenerator)
+        IBlendFileGenerator blendFileGenerator,
+        IUnitOfWork unitOfWork)
     {
         _modelVersionRepository = modelVersionRepository;
         _thumbnailRepository = thumbnailRepository;
         _thumbnailQueue = thumbnailQueue;
         _dateTimeProvider = dateTimeProvider;
         _blendFileGenerator = blendFileGenerator;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(SetMainVariantCommand command, CancellationToken cancellationToken)
@@ -72,6 +76,8 @@ internal class SetMainVariantCommandHandler : ICommandHandler<SetMainVariantComm
 
             // Invalidate cached .blend so it regenerates with new variant's textures
             _blendFileGenerator.InvalidateCache(modelVersion.ModelId, modelVersion.Id);
+
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             return Result.Success();
         }
