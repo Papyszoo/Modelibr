@@ -23,29 +23,24 @@ namespace Infrastructure.Tests.Architecture;
 /// </summary>
 public class RepositoriesDontSelfCommitTests
 {
-    // Files still calling _context.SaveChangesAsync() internally, grouped by
-    // the bounded area prompt 25 hasn't reached yet. Settings, Packs, and
-    // Projects have already migrated (and are deliberately absent here) —
-    // regressing one of those must fail this test.
+    // Files still calling _context.SaveChangesAsync() internally. Every other
+    // area (settings, packs, projects, models, thumbnails, texture sets,
+    // sounds, sprites, scripts, env maps, categories, files, stages) has
+    // migrated — regressing one of those must fail this test. Only two
+    // permanent, individually-justified exceptions remain:
     private static readonly HashSet<string> StillSelfCommitting = new(StringComparer.OrdinalIgnoreCase)
     {
-        // models — migrated except ModelVersionRepository's ModelVersionTextureSet
-        // mapping methods, which stay self-committing on purpose: the variant-aware
-        // AddTextureMappingAsync is an idempotent-insert primitive that must save
-        // immediately to catch its unique violation and recover by loading the
-        // existing row (see the comment block in the file).
+        // ModelVersionRepository's ModelVersionTextureSet mapping methods stay
+        // self-committing on purpose: the variant-aware AddTextureMappingAsync
+        // is an idempotent-insert primitive that must save immediately to catch
+        // its unique violation and recover by loading the existing row (see the
+        // comment block in the file).
         "ModelVersionRepository.cs",
-        // thumbnails — migrated except ThumbnailJobRepository's
-        // GetNextPendingJobAsync, whose explicit BeginTransactionAsync +
-        // SaveChangesAsync (claim semantics: the expired-lock reset must be
-        // durable inside the claim boundary) stays permanently.
+        // ThumbnailJobRepository's GetNextPendingJobAsync opens an explicit
+        // BeginTransactionAsync + SaveChangesAsync for claim semantics: the
+        // expired-lock reset must be durable inside the claim boundary. Stays
+        // permanently.
         "ThumbnailJobRepository.cs",
-        // misc — File/FilePersistence migration interacts with
-        // FileCreationService's disk<->DB compensation behavior (explicitly
-        // out of scope for prompt 25); Stage has no handler audit yet
-        "FileRepository.cs",
-        "FilePersistence.cs",
-        "StageRepository.cs",
     };
 
     [Fact]
