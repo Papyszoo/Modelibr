@@ -106,3 +106,54 @@ jobs:
             - name: Fail if tests failed
               if: steps.slow-tests.outcome == 'failure'
               run: exit 1
+
+    backup-restore-drill:
+        name: Backup & Restore Drill (Nightly)
+        runs-on: ubuntu-latest
+        timeout-minutes: 30
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v5
+              with:
+                  ref: ${{ github.event.inputs.branch || github.ref }}
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v5
+              with:
+                  node-version: "20"
+                  cache: "npm"
+                  cache-dependency-path: tests/backup-restore-e2e/package-lock.json
+
+            - name: Install dependencies
+              working-directory: tests/backup-restore-e2e
+              run: npm ci
+
+            # Needs no GPU (unlike the main e2e/storybook-visual suites, which is
+            # why they stay local-only) — this is a plain Docker + Playwright drill,
+            # so a GitHub-hosted runner can run it. Self-contained: same command as
+            # `npm run test:all -- --only=backup-restore` locally (builds its own
+            # stack, runs every spec — create/list/download, restore round-trip,
+            # concurrent conflict, bad-archive rejection, pre-migration snapshot on
+            # first boot — then tears the stack down). This is the ONLY place the
+            # full create→backup→wipe→restore→verify trust loop actually gates
+            # anything; it was non-gating before and had silently rotted (see
+            # CLAUDE.md rule 10).
+            - name: Run backup/restore trust drill
+              id: backup-restore
+              continue-on-error: true
+              working-directory: tests/backup-restore-e2e
+              run: npm run test:teardown >/dev/null 2>&1; npm run test:full
+
+            - name: Upload Playwright report
+              uses: actions/upload-artifact@v5
+              if: always()
+              with:
+                  name: backup-restore-playwright-report-${{ github.run_number }}
+                  path: tests/backup-restore-e2e/playwright-report/
+                  retention-days: 14
+                  if-no-files-found: ignore
+
+            - name: Fail if backup/restore drill failed
+              if: steps.backup-restore.outcome == 'failure'
+              run: exit 1
