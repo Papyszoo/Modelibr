@@ -30,28 +30,35 @@ public sealed class VirtualAllEnvironmentMapsCollection : VirtualCollectionBase
 
     public override Task<IStoreItem?> GetItemAsync(string name, IHttpContext httpContext)
     {
-        var environmentMap = _environmentMaps.FirstOrDefault(e => !e.IsDeleted && e.Name == name);
+        var siblings = _environmentMaps.Where(e => !e.IsDeleted).ToList();
+        var environmentMap = WebDavUtilities.ResolveSegment(name, siblings, e => e.Id, e => e.Name);
         if (environmentMap == null)
             return Task.FromResult<IStoreItem?>(null);
+
+        var displayNames = WebDavUtilities.ComputeDisplayNames(siblings, e => e.Id, e => e.Name);
 
         return Task.FromResult<IStoreItem?>(new VirtualEnvironmentMapCollection(
             (VirtualCollectionPropertyManager)PropertyManager,
             LockingManager,
             environmentMap,
             _itemPropertyManager,
-            _pathProvider));
+            _pathProvider,
+            displayNames[environmentMap.Id]));
     }
 
     public override Task<IEnumerable<IStoreItem>> GetItemsAsync(IHttpContext httpContext)
     {
-        var items = _environmentMaps
-            .Where(e => !e.IsDeleted)
+        var siblings = _environmentMaps.Where(e => !e.IsDeleted).ToList();
+        var displayNames = WebDavUtilities.ComputeDisplayNames(siblings, e => e.Id, e => e.Name);
+
+        var items = siblings
             .Select(e => (IStoreItem)new VirtualEnvironmentMapCollection(
                 (VirtualCollectionPropertyManager)PropertyManager,
                 LockingManager,
                 e,
                 _itemPropertyManager,
-                _pathProvider));
+                _pathProvider,
+                displayNames[e.Id]));
 
         return Task.FromResult(items);
     }
@@ -68,8 +75,9 @@ public sealed class VirtualEnvironmentMapCollection : VirtualCollectionBase
         ILockingManager lockingManager,
         EnvironmentMap environmentMap,
         VirtualItemPropertyManager itemPropertyManager,
-        IUploadPathProvider pathProvider)
-        : base(propertyManager, lockingManager, environmentMap.Name)
+        IUploadPathProvider pathProvider,
+        string? displayName = null)
+        : base(propertyManager, lockingManager, displayName ?? environmentMap.Name)
     {
         _environmentMap = environmentMap;
         _itemPropertyManager = itemPropertyManager;
@@ -145,6 +153,7 @@ public sealed class VirtualEnvironmentMapVariantsCollection : VirtualCollectionB
             LockingManager,
             name,
             file.Sha256Hash,
+            file.FilePath,
             file.SizeBytes,
             file.MimeType,
             file.CreatedAt,
@@ -200,6 +209,7 @@ public sealed class VirtualEnvironmentMapFilesCollection : VirtualCollectionBase
             LockingManager,
             file.OriginalFileName,
             file.Sha256Hash,
+            file.FilePath,
             file.SizeBytes,
             file.MimeType,
             file.CreatedAt,
@@ -230,15 +240,21 @@ public sealed class VirtualPackEnvironmentMapsCollection : VirtualCollectionBase
 
     public override Task<IStoreItem?> GetItemAsync(string name, IHttpContext httpContext)
     {
-        var environmentMap = _pack.EnvironmentMaps.FirstOrDefault(e => !e.IsDeleted && e.Name == name);
-        return Task.FromResult<IStoreItem?>(environmentMap == null ? null : new VirtualEnvironmentMapCollection((VirtualCollectionPropertyManager)PropertyManager, LockingManager, environmentMap, _itemPropertyManager, _pathProvider));
+        var siblings = _pack.EnvironmentMaps.Where(e => !e.IsDeleted).ToList();
+        var environmentMap = WebDavUtilities.ResolveSegment(name, siblings, e => e.Id, e => e.Name);
+        if (environmentMap == null)
+            return Task.FromResult<IStoreItem?>(null);
+
+        var displayNames = WebDavUtilities.ComputeDisplayNames(siblings, e => e.Id, e => e.Name);
+        return Task.FromResult<IStoreItem?>(new VirtualEnvironmentMapCollection((VirtualCollectionPropertyManager)PropertyManager, LockingManager, environmentMap, _itemPropertyManager, _pathProvider, displayNames[environmentMap.Id]));
     }
 
     public override Task<IEnumerable<IStoreItem>> GetItemsAsync(IHttpContext httpContext)
     {
-        var items = _pack.EnvironmentMaps
-            .Where(e => !e.IsDeleted)
-            .Select(e => (IStoreItem)new VirtualEnvironmentMapCollection((VirtualCollectionPropertyManager)PropertyManager, LockingManager, e, _itemPropertyManager, _pathProvider));
+        var siblings = _pack.EnvironmentMaps.Where(e => !e.IsDeleted).ToList();
+        var displayNames = WebDavUtilities.ComputeDisplayNames(siblings, e => e.Id, e => e.Name);
+        var items = siblings
+            .Select(e => (IStoreItem)new VirtualEnvironmentMapCollection((VirtualCollectionPropertyManager)PropertyManager, LockingManager, e, _itemPropertyManager, _pathProvider, displayNames[e.Id]));
         return Task.FromResult(items);
     }
 }
@@ -266,15 +282,21 @@ public sealed class VirtualProjectEnvironmentMapsCollection : VirtualCollectionB
 
     public override Task<IStoreItem?> GetItemAsync(string name, IHttpContext httpContext)
     {
-        var environmentMap = _project.EnvironmentMaps.FirstOrDefault(e => !e.IsDeleted && e.Name == name);
-        return Task.FromResult<IStoreItem?>(environmentMap == null ? null : new VirtualEnvironmentMapCollection((VirtualCollectionPropertyManager)PropertyManager, LockingManager, environmentMap, _itemPropertyManager, _pathProvider));
+        var siblings = _project.EnvironmentMaps.Where(e => !e.IsDeleted).ToList();
+        var environmentMap = WebDavUtilities.ResolveSegment(name, siblings, e => e.Id, e => e.Name);
+        if (environmentMap == null)
+            return Task.FromResult<IStoreItem?>(null);
+
+        var displayNames = WebDavUtilities.ComputeDisplayNames(siblings, e => e.Id, e => e.Name);
+        return Task.FromResult<IStoreItem?>(new VirtualEnvironmentMapCollection((VirtualCollectionPropertyManager)PropertyManager, LockingManager, environmentMap, _itemPropertyManager, _pathProvider, displayNames[environmentMap.Id]));
     }
 
     public override Task<IEnumerable<IStoreItem>> GetItemsAsync(IHttpContext httpContext)
     {
-        var items = _project.EnvironmentMaps
-            .Where(e => !e.IsDeleted)
-            .Select(e => (IStoreItem)new VirtualEnvironmentMapCollection((VirtualCollectionPropertyManager)PropertyManager, LockingManager, e, _itemPropertyManager, _pathProvider));
+        var siblings = _project.EnvironmentMaps.Where(e => !e.IsDeleted).ToList();
+        var displayNames = WebDavUtilities.ComputeDisplayNames(siblings, e => e.Id, e => e.Name);
+        var items = siblings
+            .Select(e => (IStoreItem)new VirtualEnvironmentMapCollection((VirtualCollectionPropertyManager)PropertyManager, LockingManager, e, _itemPropertyManager, _pathProvider, displayNames[e.Id]));
         return Task.FromResult(items);
     }
 }

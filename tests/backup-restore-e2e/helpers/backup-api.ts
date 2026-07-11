@@ -249,4 +249,38 @@ export class BackupApi {
         const r = await this.client.put(`/settings/${encodeURIComponent(key)}`, { value });
         return r.status;
     }
+
+    // ── WebDAV (Blender Safe-Save temp/orphan seeding) ─────────────────
+
+    /**
+     * Send a raw WebDAV PUT. Used to seed an in-flight Blender Safe-Save temp
+     * file (PUT ".blend@" without a following MOVE) — no model needs to exist
+     * for this: HandleBlenderTempPutAsync writes straight to webdav-blend-temp/
+     * keyed by the request path, with no DB lookup at PUT time.
+     */
+    async webdavPut(path: string, content: Buffer): Promise<{ status: number }> {
+        const r = await this.client.put(path, content, {
+            headers: { "Content-Type": "application/octet-stream" },
+            maxContentLength: Infinity,
+            maxBodyLength: Infinity,
+        });
+        return { status: r.status };
+    }
+
+    /**
+     * Send a WebDAV MOVE (Blender Safe-Save's second step). MOVE-ing a temp
+     * file into a model path that doesn't resolve to exactly one model
+     * quarantines the bytes under webdav-blend-orphans/ instead of losing them.
+     */
+    async webdavMove(sourcePath: string, destinationPath: string): Promise<{ status: number }> {
+        const r = await this.client.request({
+            method: "MOVE",
+            url: sourcePath,
+            headers: {
+                Destination: `${this.baseURL}${destinationPath}`,
+                Overwrite: "T",
+            },
+        });
+        return { status: r.status };
+    }
 }

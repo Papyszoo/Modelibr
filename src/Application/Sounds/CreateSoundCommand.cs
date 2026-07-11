@@ -1,5 +1,6 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Models;
 using Domain.Models;
 using Domain.Services;
 using SharedKernel;
@@ -11,17 +12,20 @@ internal class CreateSoundCommandHandler : ICommandHandler<CreateSoundCommand, C
     private readonly ISoundRepository _soundRepository;
     private readonly ISoundCategoryRepository _soundCategoryRepository;
     private readonly IFileRepository _fileRepository;
+    private readonly ISettingRepository _settingRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
 
     public CreateSoundCommandHandler(
         ISoundRepository soundRepository,
         ISoundCategoryRepository soundCategoryRepository,
         IFileRepository fileRepository,
+        ISettingRepository settingRepository,
         IDateTimeProvider dateTimeProvider)
     {
         _soundRepository = soundRepository;
         _soundCategoryRepository = soundCategoryRepository;
         _fileRepository = fileRepository;
+        _settingRepository = settingRepository;
         _dateTimeProvider = dateTimeProvider;
     }
 
@@ -29,8 +33,14 @@ internal class CreateSoundCommandHandler : ICommandHandler<CreateSoundCommand, C
     {
         try
         {
-            var existingSound = await _soundRepository.GetByNameAsync(command.Name, cancellationToken);
-            if (existingSound != null)
+            // Resolve name collision based on DuplicateNamePolicy setting (same as the
+            // upload path): Allow keeps the name, Reject fails, AutoRename suffixes.
+            var nameResult = await AssetNameService.ResolveNameAsync(
+                command.Name, "Sound",
+                _soundRepository.ExistsByNameAsync,
+                _soundRepository.GetNamesByPrefixAsync,
+                _settingRepository, cancellationToken);
+            if (nameResult.IsFailure)
             {
                 return Result.Failure<CreateSoundResponse>(
                     new Error("SoundAlreadyExists", $"A sound with the name '{command.Name}' already exists."));
@@ -54,7 +64,7 @@ internal class CreateSoundCommandHandler : ICommandHandler<CreateSoundCommand, C
             }
 
             var sound = Sound.Create(
-                command.Name,
+                nameResult.Value,
                 file,
                 command.Duration,
                 command.Peaks,

@@ -18,14 +18,20 @@ namespace Infrastructure.WebDav;
 public sealed class VirtualExtractedTextureFile : IStoreItem, IVirtualFileMetadata
 {
     private readonly IUploadPathProvider _pathProvider;
+    private readonly string _relativePath;
     private readonly TextureChannel _channel;
     private readonly ILogger<VirtualExtractedTextureFile> _logger;
 
+    /// <param name="relativePath">
+    /// The source <c>File.FilePath</c> persisted by <c>HashBasedFileStorage</c> — single
+    /// source of truth for the physical layout; see item 4 of prompt 30.
+    /// </param>
     public VirtualExtractedTextureFile(
         VirtualItemPropertyManager propertyManager,
         ILockingManager lockingManager,
         string name,
         string sourceSha256Hash,
+        string relativePath,
         long sourceSizeBytes,
         DateTime createdAt,
         DateTime updatedAt,
@@ -37,13 +43,14 @@ public sealed class VirtualExtractedTextureFile : IStoreItem, IVirtualFileMetada
         LockingManager = lockingManager;
         Name = name;
         Sha256Hash = sourceSha256Hash;
-        // We report source size as an approximation for PROPFIND. 
+        // We report source size as an approximation for PROPFIND.
         // Actual stream length will differ.
         SizeBytes = sourceSizeBytes;
         MimeType = "image/png"; // Extracted channels are always served as PNG
         CreatedAt = createdAt;
         UpdatedAt = updatedAt;
         _pathProvider = pathProvider;
+        _relativePath = relativePath;
         _channel = channel;
         _logger = logger;
     }
@@ -64,6 +71,12 @@ public sealed class VirtualExtractedTextureFile : IStoreItem, IVirtualFileMetada
 
         if (!File.Exists(physicalPath))
         {
+            // See VirtualAssetFile.GetReadableStreamAsync for why Stream.Null is the
+            // right return here: CustomWebDavHandler treats it as a 404, never as an
+            // empty 200 body.
+            _logger.LogError(
+                "Missing physical source blob for extracted texture {Name} channel {Channel} (hash {Hash}): expected at {ExpectedPath}",
+                Name, _channel, Sha256Hash, physicalPath);
             return Stream.Null;
         }
 
@@ -121,14 +134,5 @@ public sealed class VirtualExtractedTextureFile : IStoreItem, IVirtualFileMetada
         return Task.FromResult(new StoreItemResult(DavStatusCode.Forbidden));
     }
 
-    private string GetPhysicalPath()
-    {
-        // Hash-based storage: root/aa/bb/hash
-        var hash = Sha256Hash.ToLowerInvariant();
-        if (hash.Length < 4) return string.Empty;
-        
-        var a = hash[..2];
-        var b = hash[2..4];
-        return Path.Combine(_pathProvider.UploadRootPath, a, b, hash);
-    }
+    private string GetPhysicalPath() => Path.Combine(_pathProvider.UploadRootPath, _relativePath);
 }
