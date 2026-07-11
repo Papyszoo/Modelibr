@@ -13,19 +13,22 @@ internal class AssociateTextureSetWithAllModelVersionsCommandHandler : ICommandH
     private readonly IModelVersionRepository _modelVersionRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IBlendFileGenerator _blendFileGenerator;
+    private readonly IBlendFileGenerationQueue _blendFileGenerationQueue;
 
     public AssociateTextureSetWithAllModelVersionsCommandHandler(
         ITextureSetRepository textureSetRepository,
         IModelRepository modelRepository,
         IModelVersionRepository modelVersionRepository,
         IDateTimeProvider dateTimeProvider,
-        IBlendFileGenerator blendFileGenerator)
+        IBlendFileGenerator blendFileGenerator,
+        IBlendFileGenerationQueue blendFileGenerationQueue)
     {
         _textureSetRepository = textureSetRepository;
         _modelRepository = modelRepository;
         _modelVersionRepository = modelVersionRepository;
         _dateTimeProvider = dateTimeProvider;
         _blendFileGenerator = blendFileGenerator;
+        _blendFileGenerationQueue = blendFileGenerationQueue;
     }
 
     public async Task<Result> Handle(AssociateTextureSetWithAllModelVersionsCommand command, CancellationToken cancellationToken)
@@ -75,8 +78,10 @@ internal class AssociateTextureSetWithAllModelVersionsCommandHandler : ICommandH
                 await _modelVersionRepository.AddTextureMappingAsync(
                     version.Id, command.TextureSetId, materialName, cancellationToken);
 
-                // Invalidate cached .blend so it regenerates with new textures
+                // Invalidate cached .blend so it regenerates with new textures, then
+                // schedule the regeneration in the background so it reappears without needing a client GET.
                 _blendFileGenerator.InvalidateCache(command.ModelId, version.Id);
+                _blendFileGenerationQueue.Enqueue(command.ModelId, version.Id);
             }
 
             return Result.Success();

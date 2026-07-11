@@ -40,9 +40,12 @@ public sealed class VirtualAllModelsCollection : VirtualCollectionBase
 
     public override Task<IStoreItem?> GetItemAsync(string name, IHttpContext httpContext)
     {
-        var model = _models.FirstOrDefault(m => !m.IsDeleted && m.Name == name);
+        var siblings = _models.Where(m => !m.IsDeleted).ToList();
+        var model = WebDavUtilities.ResolveSegment(name, siblings, m => m.Id, m => m.Name);
         if (model == null)
             return Task.FromResult<IStoreItem?>(null);
+
+        var displayNames = WebDavUtilities.ComputeDisplayNames(siblings, m => m.Id, m => m.Name);
 
         return Task.FromResult<IStoreItem?>(new VirtualModelCollection(
             (VirtualCollectionPropertyManager)PropertyManager,
@@ -51,13 +54,16 @@ public sealed class VirtualAllModelsCollection : VirtualCollectionBase
             _itemPropertyManager,
             _pathProvider,
             _blendFileGenerator,
-            _logger));
+            _logger,
+            displayNames[model.Id]));
     }
 
     public override Task<IEnumerable<IStoreItem>> GetItemsAsync(IHttpContext httpContext)
     {
-        var items = _models
-            .Where(m => !m.IsDeleted)
+        var siblings = _models.Where(m => !m.IsDeleted).ToList();
+        var displayNames = WebDavUtilities.ComputeDisplayNames(siblings, m => m.Id, m => m.Name);
+
+        var items = siblings
             .Select(m => (IStoreItem)new VirtualModelCollection(
                 (VirtualCollectionPropertyManager)PropertyManager,
                 LockingManager,
@@ -65,7 +71,8 @@ public sealed class VirtualAllModelsCollection : VirtualCollectionBase
                 _itemPropertyManager,
                 _pathProvider,
                 _blendFileGenerator,
-                _logger));
+                _logger,
+                displayNames[m.Id]));
 
         return Task.FromResult(items);
     }
@@ -97,28 +104,35 @@ public sealed class VirtualAllTextureSetsCollection : VirtualCollectionBase
 
     public override Task<IStoreItem?> GetItemAsync(string name, IHttpContext httpContext)
     {
-        var textureSet = _textureSets.FirstOrDefault(ts => !ts.IsDeleted && ts.Name == name);
+        var siblings = _textureSets.Where(ts => !ts.IsDeleted).ToList();
+        var textureSet = WebDavUtilities.ResolveSegment(name, siblings, ts => ts.Id, ts => ts.Name);
         if (textureSet == null)
             return Task.FromResult<IStoreItem?>(null);
+
+        var displayNames = WebDavUtilities.ComputeDisplayNames(siblings, ts => ts.Id, ts => ts.Name);
 
         return Task.FromResult<IStoreItem?>(new VirtualTextureSetCollection(
             (VirtualCollectionPropertyManager)PropertyManager,
             LockingManager,
             textureSet,
             _itemPropertyManager,
-            _pathProvider));
+            _pathProvider,
+            displayNames[textureSet.Id]));
     }
 
     public override Task<IEnumerable<IStoreItem>> GetItemsAsync(IHttpContext httpContext)
     {
-        var items = _textureSets
-            .Where(ts => !ts.IsDeleted)
+        var siblings = _textureSets.Where(ts => !ts.IsDeleted).ToList();
+        var displayNames = WebDavUtilities.ComputeDisplayNames(siblings, ts => ts.Id, ts => ts.Name);
+
+        var items = siblings
             .Select(ts => (IStoreItem)new VirtualTextureSetCollection(
                 (VirtualCollectionPropertyManager)PropertyManager,
                 LockingManager,
                 ts,
                 _itemPropertyManager,
-                _pathProvider));
+                _pathProvider,
+                displayNames[ts.Id]));
 
         return Task.FromResult(items);
     }

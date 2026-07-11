@@ -435,7 +435,7 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
   const hasValidationErrors = (): boolean => !isValid
 
   // ── Models duplicate-name policy ────────────────────────────────────
-  const [duplicateNamePolicy, setDuplicateNamePolicy] = useState('Reject')
+  const [duplicateNamePolicy, setDuplicateNamePolicy] = useState('Allow')
   const [duplicateNamePolicySaving, setDuplicateNamePolicySaving] =
     useState(false)
 
@@ -508,7 +508,7 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
       textureProxySize: data.textureProxySize ?? 512,
     }
     setOriginalValues(original)
-    setDuplicateNamePolicy(data.duplicateNamePolicy ?? 'Reject')
+    setDuplicateNamePolicy(data.duplicateNamePolicy ?? 'Allow')
 
     // First hydration after mount: prefer the persisted draft (typed but
     // not yet saved) over the server snapshot so a tab switch doesn't wipe
@@ -1079,6 +1079,9 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
                     disabled={duplicateNamePolicySaving || isDemo}
                     className="settings-select"
                   >
+                    <option value="Allow">
+                      Allow duplicates (disambiguated by ID in WebDAV)
+                    </option>
                     <option value="Reject">Reject duplicate names</option>
                     <option value="AutoRename">
                       Auto-rename duplicates (e.g. Chair → Chair (2))
@@ -1087,11 +1090,13 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
                   <span className="settings-help">
                     Controls what happens when uploading an asset with a name
                     that already exists. Applies to all asset types.{' '}
+                    <strong>Allow</strong> keeps the name as-is — WebDAV
+                    disambiguates colliding names with an ID suffix.{' '}
                     <strong>Reject</strong> blocks the upload.{' '}
                     <strong>Auto-rename</strong> appends a numeric suffix.
                   </span>
                   <span className="settings-default">
-                    Default: Reject duplicate names
+                    Default: Allow duplicates
                   </span>
                 </div>
               </div>

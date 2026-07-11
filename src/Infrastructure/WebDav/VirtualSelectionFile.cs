@@ -2,6 +2,8 @@ using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
 using Application.Abstractions.Storage;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using NWebDav.Server;
 using NWebDav.Server.Http;
 using NWebDav.Server.Locking;
@@ -19,19 +21,22 @@ public sealed class VirtualAudioSelectionFile : IStoreItem
     private readonly IAudioSelectionService _selectionService;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IUploadPathProvider _pathProvider;
+    private readonly ILogger _logger;
 
     public VirtualAudioSelectionFile(
         VirtualItemPropertyManager propertyManager,
         ILockingManager lockingManager,
         IAudioSelectionService selectionService,
         IServiceScopeFactory scopeFactory,
-        IUploadPathProvider pathProvider)
+        IUploadPathProvider pathProvider,
+        ILogger? logger = null)
     {
         PropertyManager = propertyManager;
         LockingManager = lockingManager;
         _selectionService = selectionService;
         _scopeFactory = scopeFactory;
         _pathProvider = pathProvider;
+        _logger = logger ?? NullLogger.Instance;
     }
 
     public string Name
@@ -71,12 +76,23 @@ public sealed class VirtualAudioSelectionFile : IStoreItem
         var file = await fileRepository.GetByIdAsync(selection.FileId);
         if (file == null)
         {
+            // The selection points at a FileId that no longer resolves — an orphaned
+            // reference, not routine "nothing selected" (that's the selection == null
+            // branch above). Worth an Error: it means selection state and the Files
+            // table have drifted apart.
+            _logger.LogError("Audio selection references missing File {FileId}", selection.FileId);
             return Stream.Null;
         }
 
-        var physicalPath = GetPhysicalPath(file.Sha256Hash);
+        var physicalPath = GetPhysicalPath(file.FilePath);
         if (!File.Exists(physicalPath))
         {
+            // Same data-safety event as VirtualAssetFile's missing-blob case: log loudly
+            // and return Stream.Null so CustomWebDavHandler answers 404, not an empty
+            // "success" download.
+            _logger.LogError(
+                "Missing physical blob for audio selection (File {FileId}, hash {Hash}): expected at {ExpectedPath}",
+                file.Id, file.Sha256Hash, physicalPath);
             return Stream.Null;
         }
 
@@ -104,13 +120,7 @@ public sealed class VirtualAudioSelectionFile : IStoreItem
         return Task.FromResult(new StoreItemResult(DavStatusCode.Forbidden));
     }
 
-    private string GetPhysicalPath(string sha256Hash)
-    {
-        var hash = sha256Hash.ToLowerInvariant();
-        var a = hash[..2];
-        var b = hash[2..4];
-        return Path.Combine(_pathProvider.UploadRootPath, a, b, hash);
-    }
+    private string GetPhysicalPath(string relativePath) => Path.Combine(_pathProvider.UploadRootPath, relativePath);
 }
 
 /// <summary>
