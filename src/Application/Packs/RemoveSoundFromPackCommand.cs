@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Services;
@@ -10,15 +11,18 @@ internal class RemoveSoundFromPackCommandHandler : ICommandHandler<RemoveSoundFr
     private readonly IPackRepository _packRepository;
     private readonly ISoundRepository _soundRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public RemoveSoundFromPackCommandHandler(
         IPackRepository packRepository,
         ISoundRepository soundRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _packRepository = packRepository;
         _soundRepository = soundRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(RemoveSoundFromPackCommand command, CancellationToken cancellationToken)
@@ -41,6 +45,7 @@ internal class RemoveSoundFromPackCommandHandler : ICommandHandler<RemoveSoundFr
 
         await _packRepository.UpdateAsync(pack, cancellationToken);
 
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }
 }

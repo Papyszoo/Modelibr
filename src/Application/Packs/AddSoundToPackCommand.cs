@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Services;
@@ -10,15 +11,18 @@ internal class AddSoundToPackCommandHandler : ICommandHandler<AddSoundToPackComm
     private readonly IPackRepository _packRepository;
     private readonly ISoundRepository _soundRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public AddSoundToPackCommandHandler(
         IPackRepository packRepository,
         ISoundRepository soundRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _packRepository = packRepository;
         _soundRepository = soundRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(AddSoundToPackCommand command, CancellationToken cancellationToken)
@@ -40,6 +44,7 @@ internal class AddSoundToPackCommandHandler : ICommandHandler<AddSoundToPackComm
         pack.AddSound(sound, _dateTimeProvider.UtcNow);
 
         await _packRepository.UpdateAsync(pack, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success();
     }

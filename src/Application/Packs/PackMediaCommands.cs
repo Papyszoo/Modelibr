@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Services;
@@ -10,15 +11,18 @@ internal sealed class SetPackCustomThumbnailCommandHandler : ICommandHandler<Set
     private readonly IPackRepository _packRepository;
     private readonly IFileRepository _fileRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public SetPackCustomThumbnailCommandHandler(
         IPackRepository packRepository,
         IFileRepository fileRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _packRepository = packRepository;
         _fileRepository = fileRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(SetPackCustomThumbnailCommand command, CancellationToken cancellationToken)
@@ -41,6 +45,7 @@ internal sealed class SetPackCustomThumbnailCommandHandler : ICommandHandler<Set
 
         pack.SetCustomThumbnail(file, _dateTimeProvider.UtcNow);
         await _packRepository.UpdateAsync(pack, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }
 }
