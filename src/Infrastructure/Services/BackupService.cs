@@ -52,7 +52,7 @@ public sealed class BackupService : IBackupService
         }
 
         var createdAt = DateTime.UtcNow;
-        var fileName = $"modelibr-{createdAt:yyyy-MM-dd-HHmmss}.tar";
+        var fileName = $"{BackupNaming.ManualBackupPrefix}{createdAt:yyyy-MM-dd-HHmmss}.tar";
         var finalPath = Path.Combine(_paths.BackupRoot, fileName);
         var tmpPath = Path.Combine(_paths.BackupTmp, fileName);
 
@@ -217,6 +217,80 @@ public sealed class BackupService : IBackupService
         finally
         {
             _stageLock.Release();
+        }
+    }
+
+    public async Task<BackupSummary> CreateSnapshotAsync(BackupScope scope, string fileNamePrefix, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(fileNamePrefix))
+            throw new ArgumentException("Snapshot filename prefix must not be empty.", nameof(fileNamePrefix));
+
+        if (!_runLock.Wait(0, cancellationToken))
+        {
+            throw new InvalidOperationException("A backup is already in progress.");
+        }
+
+        var createdAt = DateTime.UtcNow;
+        var fileName = $"{fileNamePrefix}{createdAt:yyyy-MM-dd-HHmmss}.tar";
+        var finalPath = Path.Combine(_paths.BackupRoot, fileName);
+        var tmpPath = Path.Combine(_paths.BackupTmp, fileName);
+
+        try
+        {
+            await RunBackupAsync(scope, tmpPath, finalPath, createdAt);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Automatic snapshot failed: {FileName}", fileName);
+            try { if (File.Exists(tmpPath)) File.Delete(tmpPath); } catch { /* swallow */ }
+            throw;
+        }
+        finally
+        {
+            _runLock.Release();
+        }
+
+        var info = new FileInfo(finalPath);
+        _logger.LogInformation("Automatic snapshot completed: {FileName} ({SizeBytes} bytes)", fileName, info.Length);
+
+        return new BackupSummary(
+            FileName: fileName,
+            SizeBytes: info.Length,
+            CreatedAtUtc: createdAt,
+            Status: "ready",
+            HostPath: _paths.HostRelativeBackupPath(fileName),
+            ContainerPath: finalPath,
+            IncludesThumbnails: scope.IncludeThumbnails,
+            Error: null);
+    }
+
+    public void CleanupSnapshots(string fileNamePrefix, int keepCount)
+    {
+        if (string.IsNullOrWhiteSpace(fileNamePrefix))
+            throw new ArgumentException("Snapshot filename prefix must not be empty.", nameof(fileNamePrefix));
+        if (keepCount < 0)
+            throw new ArgumentOutOfRangeException(nameof(keepCount), keepCount, "Retention count cannot be negative.");
+
+        if (!Directory.Exists(_paths.BackupRoot)) return;
+
+        // The filename embeds the creation timestamp (yyyy-MM-dd-HHmmss), so an
+        // ordinal sort of the name is already chronological — no need to hit the
+        // filesystem for LastWriteTimeUtc.
+        var candidates = Directory.EnumerateFiles(_paths.BackupRoot, $"{fileNamePrefix}*.tar")
+            .OrderByDescending(path => Path.GetFileName(path), StringComparer.Ordinal)
+            .ToList();
+
+        foreach (var stale in candidates.Skip(keepCount))
+        {
+            try
+            {
+                File.Delete(stale);
+                _logger.LogInformation("Pruned old automatic snapshot: {FileName}", Path.GetFileName(stale));
+            }
+            catch (IOException ex)
+            {
+                _logger.LogWarning(ex, "Failed to prune old automatic snapshot {Path}", stale);
+            }
         }
     }
 
@@ -505,8 +579,9 @@ public sealed class BackupService : IBackupService
     {
         if (string.IsNullOrWhiteSpace(name)) return false;
         if (name.Contains('/') || name.Contains('\\') || name.Contains("..", StringComparison.Ordinal)) return false;
-        return name.EndsWith(".tar", StringComparison.OrdinalIgnoreCase)
-            && name.StartsWith("modelibr-", StringComparison.OrdinalIgnoreCase);
+        if (!name.EndsWith(".tar", StringComparison.OrdinalIgnoreCase)) return false;
+        return name.StartsWith(BackupNaming.ManualBackupPrefix, StringComparison.OrdinalIgnoreCase)
+            || name.StartsWith(BackupNaming.PreMigrationSnapshotPrefix, StringComparison.OrdinalIgnoreCase);
     }
 
     // ── nested config types ─────────────────────────────────────────────
