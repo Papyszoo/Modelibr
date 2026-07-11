@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
@@ -11,15 +12,18 @@ internal sealed class RegenerateEnvironmentMapThumbnailCommandHandler : ICommand
     private readonly IEnvironmentMapRepository _environmentMapRepository;
     private readonly IThumbnailQueue _thumbnailQueue;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public RegenerateEnvironmentMapThumbnailCommandHandler(
         IEnvironmentMapRepository environmentMapRepository,
         IThumbnailQueue thumbnailQueue,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _environmentMapRepository = environmentMapRepository;
         _thumbnailQueue = thumbnailQueue;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<RegenerateEnvironmentMapThumbnailResponse>> Handle(RegenerateEnvironmentMapThumbnailCommand command, CancellationToken cancellationToken)
@@ -41,6 +45,10 @@ internal sealed class RegenerateEnvironmentMapThumbnailCommandHandler : ICommand
 
         environmentMap.Touch(now);
         await _environmentMapRepository.UpdateAsync(environmentMap, cancellationToken);
+        // Commit before enqueueing: previously this update self-committed ahead of
+        // the thumbnail-job writes below, which also commit their own (separate)
+        // change via IThumbnailQueue's internal IUnitOfWork use — preserve that order.
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         var activeVariantIds = environmentMap.Variants
             .Where(v => !v.IsDeleted)

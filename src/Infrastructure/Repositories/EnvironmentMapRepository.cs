@@ -17,7 +17,6 @@ internal sealed class EnvironmentMapRepository : IEnvironmentMapRepository
     public async Task<EnvironmentMap> AddAsync(EnvironmentMap environmentMap, CancellationToken cancellationToken = default)
     {
         var entry = await _context.EnvironmentMaps.AddAsync(environmentMap, cancellationToken);
-        await _context.SaveChangesAsync(cancellationToken);
         return entry.Entity;
     }
 
@@ -197,11 +196,10 @@ internal sealed class EnvironmentMapRepository : IEnvironmentMapRepository
         return new CategoryAssetCounts(perCategory, uncategorized, total);
     }
 
-    public async Task<EnvironmentMap> UpdateAsync(EnvironmentMap environmentMap, CancellationToken cancellationToken = default)
+    public Task<EnvironmentMap> UpdateAsync(EnvironmentMap environmentMap, CancellationToken cancellationToken = default)
     {
         _context.EnvironmentMaps.Update(environmentMap);
-        await _context.SaveChangesAsync(cancellationToken);
-        return environmentMap;
+        return Task.FromResult(environmentMap);
     }
 
     public async Task DeleteAsync(int id, CancellationToken cancellationToken = default)
@@ -214,7 +212,6 @@ internal sealed class EnvironmentMapRepository : IEnvironmentMapRepository
         if (environmentMap != null)
         {
             _context.EnvironmentMaps.Remove(environmentMap);
-            await _context.SaveChangesAsync(cancellationToken);
         }
     }
 

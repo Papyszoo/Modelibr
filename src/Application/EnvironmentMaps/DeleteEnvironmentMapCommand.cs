@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using SharedKernel;
@@ -7,10 +8,12 @@ namespace Application.EnvironmentMaps;
 internal sealed class DeleteEnvironmentMapCommandHandler : ICommandHandler<DeleteEnvironmentMapCommand>
 {
     private readonly IEnvironmentMapRepository _environmentMapRepository;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public DeleteEnvironmentMapCommandHandler(IEnvironmentMapRepository environmentMapRepository)
+    public DeleteEnvironmentMapCommandHandler(IEnvironmentMapRepository environmentMapRepository, IUnitOfWork unitOfWork)
     {
         _environmentMapRepository = environmentMapRepository;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(DeleteEnvironmentMapCommand command, CancellationToken cancellationToken)
@@ -22,6 +25,7 @@ internal sealed class DeleteEnvironmentMapCommandHandler : ICommandHandler<Delet
         }
 
         await _environmentMapRepository.DeleteAsync(command.Id, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }
 }

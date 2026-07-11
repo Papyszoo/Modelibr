@@ -45,8 +45,7 @@ public class RepositoriesDontSelfCommitTests
         "SpriteCategoryRepository.cs",
         // scripts (category repo migrates with the categories slice)
         "ScriptCategoryRepository.cs",
-        // env maps
-        "EnvironmentMapRepository.cs",
+        // env maps (category repo migrates with the categories slice)
         "EnvironmentMapCategoryRepository.cs",
         // thumbnails — migrated except ThumbnailJobRepository's
         // GetNextPendingJobAsync, whose explicit BeginTransactionAsync +

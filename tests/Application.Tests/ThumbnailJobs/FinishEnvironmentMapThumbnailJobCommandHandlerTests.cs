@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
 using Application.Tests;
@@ -19,6 +20,7 @@ public class FinishEnvironmentMapThumbnailJobCommandHandlerTests
     private readonly Mock<IDateTimeProvider> _dateTimeProvider = new();
     private readonly Mock<IThumbnailNotificationService> _thumbnailNotificationService = new();
     private readonly Mock<ILogger<FinishEnvironmentMapThumbnailJobCommandHandler>> _logger = new();
+    private readonly Mock<IUnitOfWork> _unitOfWork = new();
 
     [Fact]
     public async Task Handle_WhenSuccess_UpdatesVariantThumbnailPathAndCompletesJob()
@@ -46,7 +48,8 @@ public class FinishEnvironmentMapThumbnailJobCommandHandlerTests
             _thumbnailQueue.Object,
             _dateTimeProvider.Object,
             _thumbnailNotificationService.Object,
-            _logger.Object);
+            _logger.Object,
+            _unitOfWork.Object);
 
         var result = await handler.Handle(new FinishEnvironmentMapThumbnailJobCommand(job.Id, true, "previews/environment-maps/11/31.webp"), CancellationToken.None);
 
@@ -91,7 +94,8 @@ public class FinishEnvironmentMapThumbnailJobCommandHandlerTests
             _thumbnailQueue.Object,
             _dateTimeProvider.Object,
             _thumbnailNotificationService.Object,
-            _logger.Object);
+            _logger.Object,
+            _unitOfWork.Object);
 
         var result = await handler.Handle(new FinishEnvironmentMapThumbnailJobCommand(job.Id, false, ErrorMessage: "renderer failed"), CancellationToken.None);
 

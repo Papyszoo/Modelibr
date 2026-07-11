@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
@@ -14,19 +15,22 @@ internal sealed class AddEnvironmentMapVariantCommandHandler : ICommandHandler<A
     private readonly IEnvironmentMapSizeLabelService _sizeLabelService;
     private readonly IThumbnailQueue _thumbnailQueue;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public AddEnvironmentMapVariantCommandHandler(
         IEnvironmentMapRepository environmentMapRepository,
         IFileRepository fileRepository,
         IEnvironmentMapSizeLabelService sizeLabelService,
         IThumbnailQueue thumbnailQueue,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _environmentMapRepository = environmentMapRepository;
         _fileRepository = fileRepository;
         _sizeLabelService = sizeLabelService;
         _thumbnailQueue = thumbnailQueue;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<AddEnvironmentMapVariantResponse>> Handle(AddEnvironmentMapVariantCommand command, CancellationToken cancellationToken)
@@ -59,11 +63,15 @@ internal sealed class AddEnvironmentMapVariantCommandHandler : ICommandHandler<A
             var variant = resolvedFilesResult.Value.CreateVariant(sizeLabelResult.Value, now);
             environmentMap.AddVariant(variant, now);
             await _environmentMapRepository.UpdateAsync(environmentMap, cancellationToken);
+            // Commit immediately: variant.Id is database-assigned and is needed below
+            // by the PreviewVariantId check/set and the thumbnail-job enqueue.
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             if (!environmentMap.PreviewVariantId.HasValue && variant.Id > 0)
             {
                 environmentMap.SetPreviewVariant(variant.Id, now);
                 await _environmentMapRepository.UpdateAsync(environmentMap, cancellationToken);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
             }
 
             await _thumbnailQueue.EnqueueEnvironmentMapThumbnailAsync(environmentMap.Id, variant.Id, forceRegenerate: true, cancellationToken: cancellationToken);
