@@ -11,7 +11,7 @@ locally; core behavior must never depend on hosted services.
 - `src/frontend` — React + TypeScript + Vite; React Query + Zustand; Jest.
 - `src/asset-processor` — Node.js worker (thumbnails/renders via Puppeteer +
   Three.js + Blender CLI); Vitest.
-- `src/desktop` (branch `feat/tray-host`) — Electron tray host + installers.
+- `src/desktop` — Electron tray host + installers.
 - `tests/` — xUnit projects, `tests/e2e` (Playwright-BDD), `tests/backup-restore-e2e`.
 - Orchestration: Docker Compose (root `docker-compose.yml`; e2e has its own).
 
