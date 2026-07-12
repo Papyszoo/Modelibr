@@ -21,6 +21,9 @@ const API_BASE_URL = process.env.API_BASE_URL || "http://127.0.0.1:8090";
 
 async function getLocatorCenter(locator: Locator) {
     await locator.waitFor({ state: "visible", timeout: ciVideoTimeout });
+    // Raw mouse events don't auto-scroll like locator.click does; an
+    // off-screen target would make the synthetic click miss silently.
+    await locator.scrollIntoViewIfNeeded();
     const box = await locator.boundingBox();
     if (!box) {
         throw new Error("Could not resolve visible bounding box for locator");
@@ -116,7 +119,10 @@ test.describe("Sprites", () => {
         await disableHighlights(page);
 
         const spriteCards = page.locator(".sprite-card");
-        await expect(spriteCards).toHaveCount(2, { timeout: ciVideoTimeout });
+        // The default category bucket is "All", so the categorized hero
+        // sprite (button-base, moved to UI Kit above) shows alongside the
+        // two unassigned ones.
+        await expect(spriteCards).toHaveCount(3, { timeout: ciVideoTimeout });
         await mediumPause(page);
         await startFeatureRecording(page, testInfo, { slug: "sprites" });
 
