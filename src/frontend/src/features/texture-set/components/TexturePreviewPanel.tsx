@@ -261,6 +261,11 @@ export function TexturePreviewPanel({
           shadows
           className="texture-preview-canvas"
           camera={{ position: [3, 2, 3], fov: 45 }}
+          // Static scene (no useFrame anywhere): render only when something
+          // changes. A continuous loop starves input for seconds per event
+          // under software GL; drei's OrbitControls and React state changes
+          // (texture loads, geometry switches) invalidate on their own.
+          frameloop="demand"
           gl={{
             antialias: true,
             alpha: true,
