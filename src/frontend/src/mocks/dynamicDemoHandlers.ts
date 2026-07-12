@@ -47,6 +47,7 @@ import {
   removeThumbnail,
   seedAssetUrl,
   seedFileAssets,
+  seedRemoteThumbnails,
   serveFile,
   storeFileBlob,
   storeThumbnail,
@@ -805,6 +806,11 @@ export const dynamicDemoHandlers = [
         headers: { 'Content-Type': thumb.type || 'image/webp' },
       })
     }
+    // Seed data with pre-rendered remote thumbnails (Base Meshes pack)
+    const remoteThumb = seedRemoteThumbnails[`model:${id}`]
+    if (remoteThumb) {
+      return fetchStaticAsset(remoteThumb, 'image/webp')
+    }
     // Generate a real thumbnail for seed models on first request
     const model = await getById('models', id)
     if (model?.files[0]) {
@@ -1462,6 +1468,11 @@ export const dynamicDemoHandlers = [
       return new HttpResponse(thumb, {
         headers: { 'Content-Type': thumb.type || 'image/webp' },
       })
+    }
+    // Seed data with pre-rendered remote thumbnails (Base Meshes pack)
+    const remoteThumb = seedRemoteThumbnails[`version:${versionId}`]
+    if (remoteThumb) {
+      return fetchStaticAsset(remoteThumb, 'image/webp')
     }
     // Generate a real thumbnail for seed versions on first request
     const allVersions = await getAll('modelVersions')
