@@ -33,7 +33,10 @@ export function prepare(suite, workDir) {
             return { command, parse: () => parseJestLike(out) };
         }
         case "node-test": {
-            const command = `${suite.command} -- --test-reporter=tap`;
+            // `npm test -- --test-reporter=tap` puts the flag after the test-dir
+            // positional and node treats it as a test path; NODE_OPTIONS reaches
+            // the node --test process regardless of argument order.
+            const command = `NODE_OPTIONS="--test-reporter=tap" ${suite.command}`;
             return { command, parse: (result) => parseTap(result.output) };
         }
         case "playwright":

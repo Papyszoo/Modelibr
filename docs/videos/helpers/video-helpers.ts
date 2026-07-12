@@ -412,6 +412,10 @@ export async function smoothMoveTo(
     options?: { offsetX?: number; offsetY?: number },
 ) {
     const element = page.locator(selector).first();
+    // Raw mouse events (unlike locator.click) don't auto-scroll; an
+    // off-screen target yields coordinates outside the viewport and the
+    // click/right-click silently misses.
+    await element.scrollIntoViewIfNeeded();
     const box = await element.boundingBox();
     if (!box) throw new Error(`Element not found: ${selector}`);
 
