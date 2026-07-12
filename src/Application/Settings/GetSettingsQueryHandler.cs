@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Services;
@@ -10,15 +11,18 @@ internal class GetSettingsQueryHandler : IQueryHandler<GetSettingsQuery, GetSett
     private readonly IApplicationSettingsRepository _settingsRepository;
     private readonly ISettingRepository _settingRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public GetSettingsQueryHandler(
         IApplicationSettingsRepository settingsRepository,
         ISettingRepository settingRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _settingsRepository = settingsRepository;
         _settingRepository = settingRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<GetSettingsQueryResponse>> Handle(GetSettingsQuery query, CancellationToken cancellationToken)
@@ -60,9 +64,16 @@ internal class GetSettingsQueryHandler : IQueryHandler<GetSettingsQuery, GetSett
                 return Result.Success(response);
             }
 
-            // If no settings exist in either table, create default settings
+            // If no settings exist in either table, create default settings.
+            // This is a query that writes (pre-existing design: get-or-create
+            // defaults) — SaveAsync only stages the new row now that
+            // repositories don't self-commit, so it must be followed by an
+            // explicit commit or the defaults vanish at the end of the
+            // request and every subsequent GetSettings call recreates them
+            // in memory without ever persisting them.
             settings = Domain.Models.ApplicationSettings.CreateDefault(_dateTimeProvider.UtcNow);
             settings = await _settingsRepository.SaveAsync(settings, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
         }
 
         var finalResponse = new GetSettingsQueryResponse(

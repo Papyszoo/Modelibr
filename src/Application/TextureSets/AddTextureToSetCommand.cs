@@ -95,14 +95,26 @@ internal class AddTextureToTextureSetCommandHandler : ICommandHandler<AddTexture
             // Update the texture set
             var updatedTextureSet = await _textureSetRepository.UpdateAsync(textureSet, cancellationToken);
 
-            // Update batch upload record to associate with texture set
+            // Update batch upload record to associate with texture set, if one
+            // exists for this file (uploads that go through the merge/split-
+            // channel flow reuse an existing FileId with no BatchUpload row at
+            // all — that's the normal case, not an error).
             var batchUpload = await _batchUploadRepository.GetByFileIdAsync(command.FileId, cancellationToken);
             if (batchUpload != null)
             {
                 batchUpload.TextureSetId = command.TextureSetId;
                 await _batchUploadRepository.UpdateAsync(batchUpload, cancellationToken);
-                await _unitOfWork.SaveChangesAsync(cancellationToken);
             }
+
+            // Commit unconditionally: texture.Id is database-assigned and read
+            // in the response below, and the texture set/texture mutations
+            // above must persist regardless of whether a batch upload record
+            // existed to update. Previously this commit lived only inside the
+            // `if (batchUpload != null)` block above, so the merge/split-
+            // channel flow — which adds textures for a FileId with no
+            // BatchUpload row — silently never persisted anything (CI:
+            // "Merge ORM packed texture using Split Channels").
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             // Auto-enqueue thumbnail generation for Universal texture sets
             if (textureSet.Kind == TextureSetKind.Universal)
