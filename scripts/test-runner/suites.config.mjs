@@ -74,8 +74,7 @@ export const suites = [
         command: "npm test",
         tier: "fast",
         requiresDocker: false,
-        // Only present on branches with the native installer work (feat/tray-host).
-        // Absent elsewhere -> reported as "not-present", runs automatically once merged.
+        // Absent on branches without src/desktop -> reported as "not-present".
         detectPath: "src/desktop/package.json",
     },
     {

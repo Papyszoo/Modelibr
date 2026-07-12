@@ -163,6 +163,9 @@ async function removeRevealOverlay(page: Page) {
 async function moveToLocator(page: Page, locator: Locator, pause = 250) {
     const target = locator.first();
     await target.waitFor({ state: "visible", timeout: ciVideoTimeout });
+    // Raw mouse events don't auto-scroll like locator.click does; an
+    // off-screen target would make the cursor drift off-frame.
+    await target.scrollIntoViewIfNeeded();
     const box = await target.boundingBox();
     if (!box) {
         throw new Error("Unable to move to target locator.");
@@ -329,12 +332,14 @@ test.describe("Projects", () => {
             .filter({ has: page.getByRole("heading", { name: "Sky Harbor Launch" }) });
 
         await moveToLocator(page, featuredCard, 320);
-        const openFiltersButton = page.getByRole("button", { name: "Open Filters" });
-        if (await openFiltersButton.isVisible().catch(() => false)) {
-            await moveToLocator(page, openFiltersButton, 220);
-            await openFiltersButton.click();
-            await viewerPause(page, 350);
-        }
+        // The search input lives in a collapsed ListToolbarPanel; the shared
+        // toolbar's "Search" button expands it (the old "Open Filters" panel
+        // is gone from this page).
+        const searchToggle = page.getByRole("button", { name: "Search" });
+        await moveToLocator(page, searchToggle, 220);
+        await searchToggle.click();
+        await expect(searchInput).toBeVisible({ timeout: ciVideoTimeout });
+        await viewerPause(page, 350);
         await moveToLocator(page, searchInput, 220);
         await searchInput.click();
         await searchInput.pressSequentially("sky", { delay: 55 });
