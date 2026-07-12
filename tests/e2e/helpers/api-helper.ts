@@ -866,6 +866,55 @@ export class ApiHelper {
     }
 
     /**
+     * Same Blender Safe Save dance as {@link createVersionViaWebDavBlendSave}, but
+     * targets an explicit WebDAV folder segment instead of the bare model name.
+     * Needed once duplicate model names are allowed: two models can share a name,
+     * so the folder segment must be the disambiguated "{modelName} [{id}]" form to
+     * address one specific model (see WebDavUtilities id-suffix contract). The
+     * inner filename still uses the PLAIN model name — the folder segment already
+     * disambiguates, per the shared convention.
+     */
+    async createVersionViaWebDavBlendSaveAtFolder(
+        filePath: string,
+        folderSegment: string,
+        modelName: string,
+    ): Promise<{ putStatus: number; moveStatus: number }> {
+        const fileBuffer = fs.readFileSync(filePath);
+        const baseUrl = process.env.API_BASE_URL || "http://localhost:8090";
+        const encodedFolder = encodeURIComponent(folderSegment);
+        const uploadedFileName = `uploaded-${modelName}`;
+        const encodedFileName = encodeURIComponent(uploadedFileName);
+
+        // Step 1: PUT the temp file (uploaded-{modelName}.blend@) into the id-suffixed folder
+        const putResponse = await this.client.put(
+            `/modelibr/Models/${encodedFolder}/${encodedFileName}.blend@`,
+            fileBuffer,
+            {
+                headers: {
+                    "Content-Type": "application/octet-stream",
+                },
+                maxContentLength: Infinity,
+                maxBodyLength: Infinity,
+            },
+        );
+
+        // Step 2: MOVE temp → uploaded-{modelName}.blend, still inside the id-suffixed folder
+        const moveResponse = await this.client.request({
+            method: "MOVE",
+            url: `/modelibr/Models/${encodedFolder}/${encodedFileName}.blend@`,
+            headers: {
+                Destination: `${baseUrl}/modelibr/Models/${encodedFolder}/${encodedFileName}.blend`,
+                Overwrite: "T",
+            },
+        });
+
+        return {
+            putStatus: putResponse.status,
+            moveStatus: moveResponse.status,
+        };
+    }
+
+    /**
      * Create a new model version by uploading a file via POST /models/{modelId}/versions.
      * This is the HTTP API path the frontend uses (drag-drop onto model viewer).
      */
@@ -1111,13 +1160,17 @@ export class ApiHelper {
     }
 
     /**
-     * Send a WebDAV PROPFIND request.
+     * Send a WebDAV PROPFIND request. Depth defaults to "0" (the resource itself);
+     * pass "1" to list a collection's immediate children.
      */
-    async webdavPropfind(path: string): Promise<{ status: number; data: any }> {
+    async webdavPropfind(
+        path: string,
+        depth: "0" | "1" = "0",
+    ): Promise<{ status: number; data: any }> {
         const response = await this.client.request({
             method: "PROPFIND",
             url: path,
-            headers: { Depth: "0", "Content-Type": "application/xml" },
+            headers: { Depth: depth, "Content-Type": "application/xml" },
         });
         return { status: response.status, data: response.data };
     }

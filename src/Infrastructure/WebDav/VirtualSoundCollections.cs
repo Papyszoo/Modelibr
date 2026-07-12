@@ -39,7 +39,10 @@ public sealed class VirtualSoundCategoriesCollection : VirtualCollectionBase
                 null!));
         }
 
-        var category = _categories.FirstOrDefault(c => c.Name == name);
+        // Category names are enforced unique per-parent at the DB level (case-sensitively),
+        // so a case-only collision is possible for WebDAV clients that treat paths
+        // case-insensitively (Windows/macOS) — never guess among duplicates.
+        var category = WebDavUtilities.ResolveSegment(name, _categories, c => c.Id, c => c.Name);
         if (category == null)
             return Task.FromResult<IStoreItem?>(null);
 
@@ -113,15 +116,19 @@ public sealed class VirtualSoundCategoryCollection : VirtualCollectionBase
         if (_itemPropertyManager == null || _pathProvider == null)
             return Task.FromResult<IStoreItem?>(null);
 
-        var sound = _sounds.FirstOrDefault(s => WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName) == name);
+        var sound = WebDavUtilities.ResolveSegment(name, _sounds, s => s.Id,
+            s => WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName));
         if (sound == null)
             return Task.FromResult<IStoreItem?>(null);
+
+        var displayNames = ComputeSoundFileNames(_sounds);
 
         return Task.FromResult<IStoreItem?>(new VirtualAssetFile(
             _itemPropertyManager,
             LockingManager,
-            WebDavUtilities.GetVirtualFileName(sound.Name, sound.File.OriginalFileName),
+            displayNames[sound.Id],
             sound.File.Sha256Hash,
+            sound.File.FilePath,
             sound.File.SizeBytes,
             sound.File.MimeType,
             sound.File.CreatedAt,
@@ -134,11 +141,14 @@ public sealed class VirtualSoundCategoryCollection : VirtualCollectionBase
         if (_itemPropertyManager == null || _pathProvider == null)
             return Task.FromResult<IEnumerable<IStoreItem>>(Array.Empty<IStoreItem>());
 
+        var displayNames = ComputeSoundFileNames(_sounds);
+
         var items = _sounds.Select(s => (IStoreItem)new VirtualAssetFile(
             _itemPropertyManager,
             LockingManager,
-            WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName),
+            displayNames[s.Id],
             s.File.Sha256Hash,
+            s.File.FilePath,
             s.File.SizeBytes,
             s.File.MimeType,
             s.File.CreatedAt,
@@ -146,6 +156,12 @@ public sealed class VirtualSoundCategoryCollection : VirtualCollectionBase
             _pathProvider));
 
         return Task.FromResult(items);
+    }
+
+    private static IReadOnlyDictionary<int, string> ComputeSoundFileNames(List<Sound> siblings)
+    {
+        var names = WebDavUtilities.ComputeDisplayNames(siblings, s => s.Id, s => s.Name);
+        return siblings.ToDictionary(s => s.Id, s => WebDavUtilities.GetVirtualFileName(names[s.Id], s.File.OriginalFileName));
     }
 }
 
@@ -178,15 +194,19 @@ public sealed class VirtualUnassignedSoundsCollection : VirtualCollectionBase
         if (_itemPropertyManager == null || _pathProvider == null)
             return Task.FromResult<IStoreItem?>(null);
 
-        var sound = _sounds.FirstOrDefault(s => WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName) == name);
+        var sound = WebDavUtilities.ResolveSegment(name, _sounds, s => s.Id,
+            s => WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName));
         if (sound == null)
             return Task.FromResult<IStoreItem?>(null);
+
+        var displayNames = ComputeSoundFileNames(_sounds);
 
         return Task.FromResult<IStoreItem?>(new VirtualAssetFile(
             _itemPropertyManager,
             LockingManager,
-            WebDavUtilities.GetVirtualFileName(sound.Name, sound.File.OriginalFileName),
+            displayNames[sound.Id],
             sound.File.Sha256Hash,
+            sound.File.FilePath,
             sound.File.SizeBytes,
             sound.File.MimeType,
             sound.File.CreatedAt,
@@ -199,11 +219,14 @@ public sealed class VirtualUnassignedSoundsCollection : VirtualCollectionBase
         if (_itemPropertyManager == null || _pathProvider == null)
             return Task.FromResult<IEnumerable<IStoreItem>>(Array.Empty<IStoreItem>());
 
+        var displayNames = ComputeSoundFileNames(_sounds);
+
         var items = _sounds.Select(s => (IStoreItem)new VirtualAssetFile(
             _itemPropertyManager,
             LockingManager,
-            WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName),
+            displayNames[s.Id],
             s.File.Sha256Hash,
+            s.File.FilePath,
             s.File.SizeBytes,
             s.File.MimeType,
             s.File.CreatedAt,
@@ -211,5 +234,11 @@ public sealed class VirtualUnassignedSoundsCollection : VirtualCollectionBase
             _pathProvider));
 
         return Task.FromResult(items);
+    }
+
+    private static IReadOnlyDictionary<int, string> ComputeSoundFileNames(List<Sound> siblings)
+    {
+        var names = WebDavUtilities.ComputeDisplayNames(siblings, s => s.Id, s => s.Name);
+        return siblings.ToDictionary(s => s.Id, s => WebDavUtilities.GetVirtualFileName(names[s.Id], s.File.OriginalFileName));
     }
 }

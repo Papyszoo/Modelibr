@@ -2,6 +2,7 @@ using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
+using Application.Models;
 using Domain.Models;
 using Domain.Services;
 using SharedKernel;
@@ -14,6 +15,7 @@ internal sealed class CreateEnvironmentMapCommandHandler : ICommandHandler<Creat
     private readonly IFileRepository _fileRepository;
     private readonly IEnvironmentMapSizeLabelService _sizeLabelService;
     private readonly IThumbnailQueue _thumbnailQueue;
+    private readonly ISettingRepository _settingRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IUnitOfWork _unitOfWork;
 
@@ -22,6 +24,7 @@ internal sealed class CreateEnvironmentMapCommandHandler : ICommandHandler<Creat
         IFileRepository fileRepository,
         IEnvironmentMapSizeLabelService sizeLabelService,
         IThumbnailQueue thumbnailQueue,
+        ISettingRepository settingRepository,
         IDateTimeProvider dateTimeProvider,
         IUnitOfWork unitOfWork)
     {
@@ -29,6 +32,7 @@ internal sealed class CreateEnvironmentMapCommandHandler : ICommandHandler<Creat
         _fileRepository = fileRepository;
         _sizeLabelService = sizeLabelService;
         _thumbnailQueue = thumbnailQueue;
+        _settingRepository = settingRepository;
         _dateTimeProvider = dateTimeProvider;
         _unitOfWork = unitOfWork;
     }
@@ -37,8 +41,14 @@ internal sealed class CreateEnvironmentMapCommandHandler : ICommandHandler<Creat
     {
         try
         {
-            var existingByName = await _environmentMapRepository.GetByNameAsync(command.Name, cancellationToken);
-            if (existingByName != null)
+            // Resolve name collision based on DuplicateNamePolicy setting (same as the
+            // upload path): Allow keeps the name, Reject fails, AutoRename suffixes.
+            var nameResult = await AssetNameService.ResolveNameAsync(
+                command.Name, "EnvironmentMap",
+                _environmentMapRepository.ExistsByNameAsync,
+                _environmentMapRepository.GetNamesByPrefixAsync,
+                _settingRepository, cancellationToken);
+            if (nameResult.IsFailure)
             {
                 return Result.Failure<CreateEnvironmentMapResponse>(
                     new Error("EnvironmentMapAlreadyExists", $"An environment map with the name '{command.Name}' already exists."));
@@ -60,7 +70,7 @@ internal sealed class CreateEnvironmentMapCommandHandler : ICommandHandler<Creat
             if (sizeLabelResult.IsFailure)
                 return Result.Failure<CreateEnvironmentMapResponse>(sizeLabelResult.Error);
 
-            var environmentMap = EnvironmentMap.Create(command.Name, now);
+            var environmentMap = EnvironmentMap.Create(nameResult.Value, now);
             var variant = resolvedFilesResult.Value.CreateVariant(sizeLabelResult.Value, now);
             environmentMap.AddVariant(variant, now);
 

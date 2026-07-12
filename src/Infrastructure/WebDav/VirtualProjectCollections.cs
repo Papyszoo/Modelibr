@@ -26,7 +26,11 @@ public sealed class VirtualProjectsCollection : VirtualCollectionBase
 
     public override Task<IStoreItem?> GetItemAsync(string name, IHttpContext httpContext)
     {
-        var project = _projects.FirstOrDefault(p => p.Name == name);
+        // Projects have their own (case-sensitive, DB-enforced-at-creation-time) uniqueness
+        // check and are not disambiguated with an id suffix — but WebDAV clients on
+        // Windows/macOS address paths case-insensitively, so a case-only collision must
+        // never be guessed at: resolve unambiguously or 404.
+        var project = WebDavUtilities.ResolveSegment(name, _projects, p => p.Id, p => p.Name);
         if (project == null)
             return Task.FromResult<IStoreItem?>(null);
 
@@ -127,9 +131,12 @@ public sealed class VirtualProjectModelsCollection : VirtualCollectionBase
 
     public override Task<IStoreItem?> GetItemAsync(string name, IHttpContext httpContext)
     {
-        var model = _project.Models.FirstOrDefault(m => !m.IsDeleted && m.Name == name);
+        var siblings = _project.Models.Where(m => !m.IsDeleted).ToList();
+        var model = WebDavUtilities.ResolveSegment(name, siblings, m => m.Id, m => m.Name);
         if (model == null)
             return Task.FromResult<IStoreItem?>(null);
+
+        var displayNames = WebDavUtilities.ComputeDisplayNames(siblings, m => m.Id, m => m.Name);
 
         return Task.FromResult<IStoreItem?>(new VirtualModelCollection(
             (VirtualCollectionPropertyManager)PropertyManager,
@@ -138,13 +145,16 @@ public sealed class VirtualProjectModelsCollection : VirtualCollectionBase
             _itemPropertyManager,
             _pathProvider,
             _blendFileGenerator,
-            _logger));
+            _logger,
+            displayNames[model.Id]));
     }
 
     public override Task<IEnumerable<IStoreItem>> GetItemsAsync(IHttpContext httpContext)
     {
-        var items = _project.Models
-            .Where(m => !m.IsDeleted)
+        var siblings = _project.Models.Where(m => !m.IsDeleted).ToList();
+        var displayNames = WebDavUtilities.ComputeDisplayNames(siblings, m => m.Id, m => m.Name);
+
+        var items = siblings
             .Select(m => (IStoreItem)new VirtualModelCollection(
                 (VirtualCollectionPropertyManager)PropertyManager,
                 LockingManager,
@@ -152,7 +162,8 @@ public sealed class VirtualProjectModelsCollection : VirtualCollectionBase
                 _itemPropertyManager,
                 _pathProvider,
                 _blendFileGenerator,
-                _logger));
+                _logger,
+                displayNames[m.Id]));
 
         return Task.FromResult(items);
     }
@@ -170,11 +181,13 @@ public sealed class VirtualModelCollection : VirtualCollectionBase
     private readonly IBlendFileGenerator? _blendFileGenerator;
     private readonly ILogger? _logger;
 
+    // Inner filenames always use the model's plain name — the folder segment (Name,
+    // possibly "{model.Name} [{id}]") already disambiguates the model itself.
     private string GeneratedBlendFileName => $"generated-{_model.Name}.blend";
     private string UploadedBlendFileName => $"uploaded-{_model.Name}.blend";
 
-    public VirtualModelCollection(VirtualCollectionPropertyManager propertyManager, ILockingManager lockingManager, Model model, VirtualItemPropertyManager itemPropertyManager, IUploadPathProvider pathProvider, IBlendFileGenerator? blendFileGenerator = null, ILogger? logger = null)
-        : base(propertyManager, lockingManager, model.Name)
+    public VirtualModelCollection(VirtualCollectionPropertyManager propertyManager, ILockingManager lockingManager, Model model, VirtualItemPropertyManager itemPropertyManager, IUploadPathProvider pathProvider, IBlendFileGenerator? blendFileGenerator = null, ILogger? logger = null, string? displayName = null)
+        : base(propertyManager, lockingManager, displayName ?? model.Name)
     {
         _model = model;
         _itemPropertyManager = itemPropertyManager;
@@ -208,6 +221,7 @@ public sealed class VirtualModelCollection : VirtualCollectionBase
                     LockingManager,
                     UploadedBlendFileName,
                     newestBlendFile.Sha256Hash,
+                    newestBlendFile.FilePath,
                     newestBlendFile.SizeBytes,
                     newestBlendFile.MimeType,
                     newestBlendFile.CreatedAt,
@@ -300,6 +314,7 @@ public sealed class VirtualModelCollection : VirtualCollectionBase
                     LockingManager,
                     UploadedBlendFileName,
                     newestBlendFile.Sha256Hash,
+                    newestBlendFile.FilePath,
                     newestBlendFile.SizeBytes,
                     newestBlendFile.MimeType,
                     newestBlendFile.CreatedAt,
@@ -312,12 +327,13 @@ public sealed class VirtualModelCollection : VirtualCollectionBase
     }
 
     /// <summary>
-    /// Creates a VirtualGeneratedBlendFile if Blender CLI is available and the newest version
-    /// has a renderable file.
+    /// Creates a VirtualGeneratedBlendFile if Blender CLI is available, the newest version
+    /// has a renderable file, AND the generated .blend is already cached — see
+    /// <see cref="VirtualGeneratedBlendFile.TryCreate"/> for why the cache check is required.
     /// </summary>
     private IStoreItem? TryCreateGeneratedBlendItem()
     {
-        if (_blendFileGenerator == null || !_blendFileGenerator.IsAvailable)
+        if (_blendFileGenerator == null)
             return null;
 
         var newestVersion = _model.Versions
@@ -328,21 +344,11 @@ public sealed class VirtualModelCollection : VirtualCollectionBase
         if (newestVersion == null)
             return null;
 
-        var renderableFile = newestVersion.Files
-            .FirstOrDefault(f => f.FileType.IsRenderable);
-
-        if (renderableFile == null)
-            return null;
-
-        return new VirtualGeneratedBlendFile(
+        return VirtualGeneratedBlendFile.TryCreate(
             LockingManager,
-            GeneratedBlendFileName,
-            renderableFile.SizeBytes,
-            renderableFile.CreatedAt,
-            renderableFile.UpdatedAt,
+            _model,
+            newestVersion,
             _blendFileGenerator,
-            _model.Id,
-            newestVersion.Id,
             _logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
     }
 
@@ -390,6 +396,7 @@ public sealed class VirtualModelVersionCollection : VirtualCollectionBase
             LockingManager,
             file.OriginalFileName,
             file.Sha256Hash,
+            file.FilePath,
             file.SizeBytes,
             file.MimeType,
             file.CreatedAt,
@@ -404,6 +411,7 @@ public sealed class VirtualModelVersionCollection : VirtualCollectionBase
             LockingManager,
             f.OriginalFileName,
             f.Sha256Hash,
+            f.FilePath,
             f.SizeBytes,
             f.MimeType,
             f.CreatedAt,
@@ -447,6 +455,7 @@ public sealed class VirtualNewestVersionCollection : VirtualCollectionBase
             LockingManager,
             file.OriginalFileName,
             file.Sha256Hash,
+            file.FilePath,
             file.SizeBytes,
             file.MimeType,
             file.CreatedAt,
@@ -461,6 +470,7 @@ public sealed class VirtualNewestVersionCollection : VirtualCollectionBase
             LockingManager,
             f.OriginalFileName,
             f.Sha256Hash,
+            f.FilePath,
             f.SizeBytes,
             f.MimeType,
             f.CreatedAt,
@@ -492,28 +502,35 @@ public sealed class VirtualProjectTextureSetsCollection : VirtualCollectionBase
 
     public override Task<IStoreItem?> GetItemAsync(string name, IHttpContext httpContext)
     {
-        var textureSet = _project.TextureSets.FirstOrDefault(ts => !ts.IsDeleted && ts.Name == name);
+        var siblings = _project.TextureSets.Where(ts => !ts.IsDeleted).ToList();
+        var textureSet = WebDavUtilities.ResolveSegment(name, siblings, ts => ts.Id, ts => ts.Name);
         if (textureSet == null)
             return Task.FromResult<IStoreItem?>(null);
+
+        var displayNames = WebDavUtilities.ComputeDisplayNames(siblings, ts => ts.Id, ts => ts.Name);
 
         return Task.FromResult<IStoreItem?>(new VirtualTextureSetCollection(
             (VirtualCollectionPropertyManager)PropertyManager,
             LockingManager,
             textureSet,
             _itemPropertyManager,
-            _pathProvider));
+            _pathProvider,
+            displayNames[textureSet.Id]));
     }
 
     public override Task<IEnumerable<IStoreItem>> GetItemsAsync(IHttpContext httpContext)
     {
-        var items = _project.TextureSets
-            .Where(ts => !ts.IsDeleted)
+        var siblings = _project.TextureSets.Where(ts => !ts.IsDeleted).ToList();
+        var displayNames = WebDavUtilities.ComputeDisplayNames(siblings, ts => ts.Id, ts => ts.Name);
+
+        var items = siblings
             .Select(ts => (IStoreItem)new VirtualTextureSetCollection(
                 (VirtualCollectionPropertyManager)PropertyManager,
                 LockingManager,
                 ts,
                 _itemPropertyManager,
-                _pathProvider));
+                _pathProvider,
+                displayNames[ts.Id]));
 
         return Task.FromResult(items);
     }
@@ -528,8 +545,8 @@ public sealed class VirtualTextureSetCollection : VirtualCollectionBase
     private readonly VirtualItemPropertyManager _itemPropertyManager;
     private readonly IUploadPathProvider _pathProvider;
 
-    public VirtualTextureSetCollection(VirtualCollectionPropertyManager propertyManager, ILockingManager lockingManager, TextureSet textureSet, VirtualItemPropertyManager itemPropertyManager, IUploadPathProvider pathProvider)
-        : base(propertyManager, lockingManager, textureSet.Name)
+    public VirtualTextureSetCollection(VirtualCollectionPropertyManager propertyManager, ILockingManager lockingManager, TextureSet textureSet, VirtualItemPropertyManager itemPropertyManager, IUploadPathProvider pathProvider, string? displayName = null)
+        : base(propertyManager, lockingManager, displayName ?? textureSet.Name)
     {
         _textureSet = textureSet;
         _itemPropertyManager = itemPropertyManager;
@@ -617,6 +634,7 @@ public sealed class VirtualTextureTypesCollection : VirtualCollectionBase
             LockingManager,
             name,
             texture.File.Sha256Hash,
+            texture.File.FilePath,
             texture.File.SizeBytes,
             texture.File.MimeType,
             texture.File.CreatedAt,
@@ -636,6 +654,7 @@ public sealed class VirtualTextureTypesCollection : VirtualCollectionBase
                 LockingManager,
                 fileName,
                 t.File.Sha256Hash,
+                t.File.FilePath,
                 t.File.SizeBytes,
                 t.File.MimeType,
                 t.File.CreatedAt,
@@ -677,6 +696,7 @@ public sealed class VirtualTextureFilesCollection : VirtualCollectionBase
             LockingManager,
             texture.File.OriginalFileName,
             texture.File.Sha256Hash,
+            texture.File.FilePath,
             texture.File.SizeBytes,
             texture.File.MimeType,
             texture.File.CreatedAt,
@@ -693,6 +713,7 @@ public sealed class VirtualTextureFilesCollection : VirtualCollectionBase
             LockingManager,
             t.File.OriginalFileName,
             t.File.Sha256Hash,
+            t.File.FilePath,
             t.File.SizeBytes,
             t.File.MimeType,
             t.File.CreatedAt,
@@ -724,15 +745,20 @@ public sealed class VirtualProjectSpritesCollection : VirtualCollectionBase
 
     public override Task<IStoreItem?> GetItemAsync(string name, IHttpContext httpContext)
     {
-        var sprite = _project.Sprites.FirstOrDefault(s => !s.IsDeleted && WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName) == name);
+        var siblings = _project.Sprites.Where(s => !s.IsDeleted).ToList();
+        var sprite = WebDavUtilities.ResolveSegment(name, siblings, s => s.Id,
+            s => WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName));
         if (sprite == null)
             return Task.FromResult<IStoreItem?>(null);
+
+        var displayNames = ComputeSpriteFileNames(siblings);
 
         return Task.FromResult<IStoreItem?>(new VirtualAssetFile(
             _itemPropertyManager,
             LockingManager,
-            WebDavUtilities.GetVirtualFileName(sprite.Name, sprite.File.OriginalFileName),
+            displayNames[sprite.Id],
             sprite.File.Sha256Hash,
+            sprite.File.FilePath,
             sprite.File.SizeBytes,
             sprite.File.MimeType,
             sprite.File.CreatedAt,
@@ -742,13 +768,16 @@ public sealed class VirtualProjectSpritesCollection : VirtualCollectionBase
 
     public override Task<IEnumerable<IStoreItem>> GetItemsAsync(IHttpContext httpContext)
     {
-        var items = _project.Sprites
-            .Where(s => !s.IsDeleted)
+        var siblings = _project.Sprites.Where(s => !s.IsDeleted).ToList();
+        var displayNames = ComputeSpriteFileNames(siblings);
+
+        var items = siblings
             .Select(s => (IStoreItem)new VirtualAssetFile(
                 _itemPropertyManager,
                 LockingManager,
-                WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName),
+                displayNames[s.Id],
                 s.File.Sha256Hash,
+                s.File.FilePath,
                 s.File.SizeBytes,
                 s.File.MimeType,
                 s.File.CreatedAt,
@@ -756,6 +785,12 @@ public sealed class VirtualProjectSpritesCollection : VirtualCollectionBase
                 _pathProvider));
 
         return Task.FromResult(items);
+    }
+
+    private static IReadOnlyDictionary<int, string> ComputeSpriteFileNames(List<Sprite> siblings)
+    {
+        var names = WebDavUtilities.ComputeDisplayNames(siblings, s => s.Id, s => s.Name);
+        return siblings.ToDictionary(s => s.Id, s => WebDavUtilities.GetVirtualFileName(names[s.Id], s.File.OriginalFileName));
     }
 }
 
@@ -780,15 +815,20 @@ public sealed class VirtualProjectSoundsCollection : VirtualCollectionBase
 
     public override Task<IStoreItem?> GetItemAsync(string name, IHttpContext httpContext)
     {
-        var sound = _project.Sounds.FirstOrDefault(s => !s.IsDeleted && WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName) == name);
+        var siblings = _project.Sounds.Where(s => !s.IsDeleted).ToList();
+        var sound = WebDavUtilities.ResolveSegment(name, siblings, s => s.Id,
+            s => WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName));
         if (sound == null)
             return Task.FromResult<IStoreItem?>(null);
+
+        var displayNames = ComputeSoundFileNames(siblings);
 
         return Task.FromResult<IStoreItem?>(new VirtualAssetFile(
             _itemPropertyManager,
             LockingManager,
-            WebDavUtilities.GetVirtualFileName(sound.Name, sound.File.OriginalFileName),
+            displayNames[sound.Id],
             sound.File.Sha256Hash,
+            sound.File.FilePath,
             sound.File.SizeBytes,
             sound.File.MimeType,
             sound.File.CreatedAt,
@@ -798,13 +838,16 @@ public sealed class VirtualProjectSoundsCollection : VirtualCollectionBase
 
     public override Task<IEnumerable<IStoreItem>> GetItemsAsync(IHttpContext httpContext)
     {
-        var items = _project.Sounds
-            .Where(s => !s.IsDeleted)
+        var siblings = _project.Sounds.Where(s => !s.IsDeleted).ToList();
+        var displayNames = ComputeSoundFileNames(siblings);
+
+        var items = siblings
             .Select(s => (IStoreItem)new VirtualAssetFile(
                 _itemPropertyManager,
                 LockingManager,
-                WebDavUtilities.GetVirtualFileName(s.Name, s.File.OriginalFileName),
+                displayNames[s.Id],
                 s.File.Sha256Hash,
+                s.File.FilePath,
                 s.File.SizeBytes,
                 s.File.MimeType,
                 s.File.CreatedAt,
@@ -812,5 +855,11 @@ public sealed class VirtualProjectSoundsCollection : VirtualCollectionBase
                 _pathProvider));
 
         return Task.FromResult(items);
+    }
+
+    private static IReadOnlyDictionary<int, string> ComputeSoundFileNames(List<Sound> siblings)
+    {
+        var names = WebDavUtilities.ComputeDisplayNames(siblings, s => s.Id, s => s.Name);
+        return siblings.ToDictionary(s => s.Id, s => WebDavUtilities.GetVirtualFileName(names[s.Id], s.File.OriginalFileName));
     }
 }

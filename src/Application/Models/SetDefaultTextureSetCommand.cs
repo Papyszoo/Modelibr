@@ -19,6 +19,7 @@ namespace Application.Models
         private readonly IThumbnailQueue _thumbnailQueue;
         private readonly IDateTimeProvider _dateTimeProvider;
         private readonly IBlendFileGenerator _blendFileGenerator;
+        private readonly IBlendFileGenerationQueue _blendFileGenerationQueue;
         private readonly IUnitOfWork _unitOfWork;
 
         public SetDefaultTextureSetCommandHandler(
@@ -28,6 +29,7 @@ namespace Application.Models
             IThumbnailQueue thumbnailQueue,
             IDateTimeProvider dateTimeProvider,
             IBlendFileGenerator blendFileGenerator,
+            IBlendFileGenerationQueue blendFileGenerationQueue,
             IUnitOfWork unitOfWork)
         {
             _modelRepository = modelRepository;
@@ -36,6 +38,7 @@ namespace Application.Models
             _thumbnailQueue = thumbnailQueue;
             _dateTimeProvider = dateTimeProvider;
             _blendFileGenerator = blendFileGenerator;
+            _blendFileGenerationQueue = blendFileGenerationQueue;
             _unitOfWork = unitOfWork;
         }
 
@@ -114,8 +117,10 @@ namespace Application.Models
                         cancellationToken: cancellationToken);
                 }
 
-                // Invalidate cached .blend so it regenerates with new textures
+                // Invalidate cached .blend so it regenerates with new textures, then
+                // schedule the regeneration in the background so it reappears without needing a client GET.
                 _blendFileGenerator.InvalidateCache(command.ModelId, targetVersion.Id);
+                _blendFileGenerationQueue.Enqueue(command.ModelId, targetVersion.Id);
 
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
 

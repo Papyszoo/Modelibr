@@ -16,6 +16,7 @@ internal class SetMainVariantCommandHandler : ICommandHandler<SetMainVariantComm
     private readonly IThumbnailQueue _thumbnailQueue;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IBlendFileGenerator _blendFileGenerator;
+    private readonly IBlendFileGenerationQueue _blendFileGenerationQueue;
     private readonly IUnitOfWork _unitOfWork;
 
     public SetMainVariantCommandHandler(
@@ -24,6 +25,7 @@ internal class SetMainVariantCommandHandler : ICommandHandler<SetMainVariantComm
         IThumbnailQueue thumbnailQueue,
         IDateTimeProvider dateTimeProvider,
         IBlendFileGenerator blendFileGenerator,
+        IBlendFileGenerationQueue blendFileGenerationQueue,
         IUnitOfWork unitOfWork)
     {
         _modelVersionRepository = modelVersionRepository;
@@ -31,6 +33,7 @@ internal class SetMainVariantCommandHandler : ICommandHandler<SetMainVariantComm
         _thumbnailQueue = thumbnailQueue;
         _dateTimeProvider = dateTimeProvider;
         _blendFileGenerator = blendFileGenerator;
+        _blendFileGenerationQueue = blendFileGenerationQueue;
         _unitOfWork = unitOfWork;
     }
 
@@ -74,8 +77,10 @@ internal class SetMainVariantCommandHandler : ICommandHandler<SetMainVariantComm
                     cancellationToken: cancellationToken);
             }
 
-            // Invalidate cached .blend so it regenerates with new variant's textures
+            // Invalidate cached .blend so it regenerates with new variant's textures, then
+            // schedule the regeneration in the background so it reappears without needing a client GET.
             _blendFileGenerator.InvalidateCache(modelVersion.ModelId, modelVersion.Id);
+            _blendFileGenerationQueue.Enqueue(modelVersion.ModelId, modelVersion.Id);
 
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 

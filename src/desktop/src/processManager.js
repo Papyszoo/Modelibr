@@ -193,6 +193,7 @@ export class ProcessManager {
       uploads: path.join(dataRoot, 'uploads'),
       thumbnails: path.join(dataRoot, 'thumbnails'),
       restore: path.join(dataRoot, 'restore'),
+      backups: path.join(dataRoot, 'backups'),
       postgresData: path.join(dataRoot, 'postgres'),
       blender: path.join(dataRoot, 'blender'),
       temp: path.join(userDataDir, 'temp'),
@@ -430,6 +431,7 @@ export class ProcessManager {
       ensureDirectory(this.paths.uploads),
       ensureDirectory(this.paths.thumbnails),
       ensureDirectory(this.paths.restore),
+      ensureDirectory(this.paths.backups),
       ensureDirectory(this.paths.postgresData),
       ensureDirectory(this.paths.blender),
       ensureDirectory(this.paths.temp),
@@ -700,8 +702,20 @@ export class ProcessManager {
         UPLOAD_STORAGE_PATH: this.paths.uploads,
         THUMBNAIL_STORAGE_PATH: this.paths.thumbnails,
         RESTORE_STORAGE_PATH: this.paths.restore,
+        BACKUP_STORAGE_PATH: this.paths.backups,
         BLENDER_INSTALL_PATH: this.paths.blender,
         ConnectionStrings__Default: `Host=127.0.0.1;Port=${this.runningConfig.postgresPort};Database=${POSTGRES_DATABASE};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};`,
+        // TODO(backup on desktop): BackupService shells out to `pg_dump`/`psql` by
+        // bare name (relies on PATH). The bundled Postgres runtime ships those
+        // binaries under runtimeDir/postgres/bin (see prepare-bundle.mjs), but
+        // nothing here adds that directory to PATH, unlike pg_ctl which this file
+        // always invokes by absolute path. Until that's wired up, the automatic
+        // pre-migration backup would fail here (as would the manual "Backup now"
+        // button in Settings) and, per its abort-on-failure policy, would prevent
+        // the app from starting after any future migration ships. Opting out here
+        // — rather than shipping a startup-blocking regression on desktop — until
+        // a follow-up resolves pg_dump/psql to an absolute path.
+        MODELIBR_SKIP_PREMIGRATION_BACKUP: 'true',
       },
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,

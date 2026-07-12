@@ -34,6 +34,8 @@ public/demo-assets
 
 # Visual regression test artifacts
 visual-tests/test-results/
+# Visual-regression baselines are machine-local (GPU/OS-dependent renders) — never commit
+visual-tests/__snapshots__/
 /test-results/
 /playwright-report/
 

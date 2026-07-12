@@ -15,6 +15,7 @@ internal class AssociateTextureSetWithModelVersionCommandHandler : ICommandHandl
     private readonly IThumbnailQueue _thumbnailQueue;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IBlendFileGenerator _blendFileGenerator;
+    private readonly IBlendFileGenerationQueue _blendFileGenerationQueue;
     private readonly IUnitOfWork _unitOfWork;
 
     public AssociateTextureSetWithModelVersionCommandHandler(
@@ -24,6 +25,7 @@ internal class AssociateTextureSetWithModelVersionCommandHandler : ICommandHandl
         IThumbnailQueue thumbnailQueue,
         IDateTimeProvider dateTimeProvider,
         IBlendFileGenerator blendFileGenerator,
+        IBlendFileGenerationQueue blendFileGenerationQueue,
         IUnitOfWork unitOfWork)
     {
         _textureSetRepository = textureSetRepository;
@@ -32,6 +34,7 @@ internal class AssociateTextureSetWithModelVersionCommandHandler : ICommandHandl
         _thumbnailQueue = thumbnailQueue;
         _dateTimeProvider = dateTimeProvider;
         _blendFileGenerator = blendFileGenerator;
+        _blendFileGenerationQueue = blendFileGenerationQueue;
         _unitOfWork = unitOfWork;
     }
 
@@ -81,8 +84,10 @@ internal class AssociateTextureSetWithModelVersionCommandHandler : ICommandHandl
             await _modelVersionRepository.AddTextureMappingAsync(
                 modelVersion.Id, command.TextureSetId, materialName, variantName, cancellationToken);
 
-            // Invalidate cached .blend so it regenerates with new textures
+            // Invalidate cached .blend so it regenerates with new textures, then schedule
+            // the regeneration in the background so it reappears without needing a client GET.
             _blendFileGenerator.InvalidateCache(modelVersion.ModelId, modelVersion.Id);
+            _blendFileGenerationQueue.Enqueue(modelVersion.ModelId, modelVersion.Id);
 
             // If the linked variant is the main variant and no default is set yet,
             // auto-set DefaultTextureSetId and regenerate thumbnail.

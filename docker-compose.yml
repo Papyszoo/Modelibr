@@ -40,6 +40,8 @@ services:
             - POSTGRES_USER=${POSTGRES_USER}
             - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
             - ConnectionStrings__Default=Host=postgres;Port=5432;Database=Modelibr;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};
+            - MODELIBR_SKIP_PREMIGRATION_BACKUP=${MODELIBR_SKIP_PREMIGRATION_BACKUP:-false}
+            - MODELIBR_PREMIGRATION_BACKUP_RETENTION=${MODELIBR_PREMIGRATION_BACKUP_RETENTION:-3}
             - DisableHttpsRedirection=true
             - HTTPS_PORT=${HTTPS_PORT:-8443}
             - EXPOSE_443_PORT=${EXPOSE_443_PORT:-true}
