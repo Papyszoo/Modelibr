@@ -684,148 +684,6 @@ Then("the model should be stored in shared state", async ({ page }) => {
 });
 
 /**
- * NOTE: Despite the step name, this verifies thumbnail generation via DB polling,
- * NOT via SignalR WebSocket interception. The step name is kept for backward
- * compatibility with existing feature files.
- * TODO: Add actual SignalR verification using SignalRHelper.
- */
-Then(
-    "the thumbnail should be generated via SignalR notification",
-    async ({ page }) => {
-        // Import DbHelper inline to avoid circular dependencies
-        const { DbHelper } = await import("../fixtures/db-helper");
-        const db = new DbHelper();
-
-        // Poll database for thumbnail status (max 55 seconds to stay within 60s test timeout)
-        let lastStatus: number | null = null;
-        let lastModelName = "";
-        let lastVersionId = 0;
-        const trackedModelName = getScenarioState(page).uploadTrackerModelName;
-        const trackedVersionId = getScenarioState(page).uploadTrackerVersionId;
-
-        // Determine query strategy: prefer version ID > model name > global most-recent
-        const hasVersionId = trackedVersionId > 0;
-        const hasModelName = trackedModelName !== null;
-
-        if (hasVersionId) {
-            console.log(
-                `[Thumbnail] Looking for version ID: ${getScenarioState(page).uploadTrackerVersionId} (model: "${getScenarioState(page).uploadTrackerModelName}")`,
-            );
-        } else if (hasModelName) {
-            console.log(
-                `[Thumbnail] Looking for model by name: "${getScenarioState(page).uploadTrackerModelName}" (no version ID)`,
-            );
-        } else {
-            console.log(
-                `[Thumbnail] Looking for any most recent model version`,
-            );
-        }
-
-        // Build the query once based on strategy
-        let query: string;
-        let params: any[];
-
-        if (hasVersionId) {
-            query = `SELECT t."Status", mv."Id" as "VersionId", m."Name" as "ModelName", m."Id" as "ModelId"
-                     FROM "ModelVersions" mv
-                     JOIN "Models" m ON m."Id" = mv."ModelId"
-                     LEFT JOIN "Thumbnails" t ON t."Id" = mv."ThumbnailId"
-                     WHERE mv."Id" = $1`;
-            params = [trackedVersionId];
-        } else if (hasModelName) {
-            query = `SELECT t."Status", mv."Id" as "VersionId", m."Name" as "ModelName", m."Id" as "ModelId"
-                     FROM "ModelVersions" mv
-                     JOIN "Models" m ON m."Id" = mv."ModelId"
-                     LEFT JOIN "Thumbnails" t ON t."Id" = mv."ThumbnailId"
-                     WHERE m."DeletedAt" IS NULL AND m."Name" = $1
-                     ORDER BY mv."CreatedAt" DESC
-                     LIMIT 1`;
-            params = [trackedModelName];
-        } else {
-            query = `SELECT t."Status", mv."Id" as "VersionId", m."Name" as "ModelName", m."Id" as "ModelId"
-                     FROM "ModelVersions" mv
-                     JOIN "Models" m ON m."Id" = mv."ModelId"
-                     LEFT JOIN "Thumbnails" t ON t."Id" = mv."ThumbnailId"
-                     WHERE m."DeletedAt" IS NULL
-                     ORDER BY mv."CreatedAt" DESC
-                     LIMIT 1`;
-            params = [];
-        }
-
-        // Use expect.poll for idiomatic Playwright polling instead of manual loop with waitForTimeout
-        await expect
-            .poll(
-                async () => {
-                    let result = await db.query(query, params);
-
-                    if (
-                        result.rows.length === 0 &&
-                        hasVersionId &&
-                        trackedModelName
-                    ) {
-                        result = await db.query(
-                            `SELECT t."Status", mv."Id" as "VersionId", m."Name" as "ModelName", m."Id" as "ModelId"
-                             FROM "ModelVersions" mv
-                             JOIN "Models" m ON m."Id" = mv."ModelId"
-                             LEFT JOIN "Thumbnails" t ON t."Id" = mv."ThumbnailId"
-                             WHERE m."DeletedAt" IS NULL AND m."Name" = $1
-                             ORDER BY mv."CreatedAt" DESC
-                             LIMIT 1`,
-                            [trackedModelName],
-                        );
-
-                        if (result.rows.length > 0) {
-                            console.warn(
-                                `[Thumbnail] Uploaded version ${trackedVersionId} was not found; falling back to latest version for model "${trackedModelName}"`,
-                            );
-                        }
-                    }
-
-                    if (result.rows.length > 0) {
-                        const row = result.rows[0];
-                        lastStatus = row.Status;
-                        lastModelName = row.ModelName;
-                        lastVersionId = row.VersionId;
-
-                        if (row.Status === 2) {
-                            console.log(
-                                `[Thumbnail] Ready for "${row.ModelName}" (model=${row.ModelId}) v${row.VersionId} (status=2)`,
-                            );
-                            return 2;
-                        } else if (row.Status === 3) {
-                            // Thumbnail generation failed - fail fast
-                            throw new Error(
-                                `Thumbnail generation FAILED for "${row.ModelName}" (model=${row.ModelId}) v${row.VersionId}. Check worker logs.`,
-                            );
-                        } else {
-                            console.log(
-                                `[Thumbnail] Waiting for "${row.ModelName}" (model=${row.ModelId}) v${row.VersionId} (status=${row.Status ?? "null"})...`,
-                            );
-                            return row.Status;
-                        }
-                    } else {
-                        console.log(
-                            `[Thumbnail] No model versions found, waiting...`,
-                        );
-                        return -1;
-                    }
-                },
-                {
-                    message: `Thumbnail generation timed out for model "${lastModelName}" v${lastVersionId}. Check if asset-processor-e2e container is healthy.`,
-                    timeout: 240000, // 4 min — cold-start thumbnail generation can be slow
-                    intervals: [3000],
-                },
-            )
-            .toBe(2);
-
-        // Clear the tracking variables after successful check
-        getScenarioState(page).uploadTrackerModelName = null;
-        getScenarioState(page).uploadTrackerVersionId = 0;
-        console.log("[Test] Thumbnail generation verified via database");
-    },
-);
-
-/**
  * Verifies that a model has the expected number of versions in shared state.
  */
 Then(
@@ -981,84 +839,60 @@ Then("I take a screenshot named {string}", async ({ page }, name: string) => {
 });
 
 /**
- * Verifies that the thumbnail is actually visible in the model list card UI.
- * This goes beyond DB verification to ensure the image actually loads in the browser.
- * Targets the specific model that was just uploaded (via uploadTracker) to avoid
- * false positives/negatives from stale models left over from previous runs.
+ * Verifies that a shared-state model's card shows a real, loaded thumbnail
+ * image. This blocks on an actual asset-processor render, so it only runs on
+ * the local GPU lane (@serial) — see 01-model-viewer/03-model-card-thumbnail.feature.
  */
-Then("the thumbnail should be visible in the model card", async ({ page }) => {
-    const modelListPage = new ModelListPage(page);
+Then(
+    "the model {string} should show a rendered thumbnail in its card",
+    async ({ page }, stateName: string) => {
+        const model = getScenarioState(page).getModel(stateName);
+        if (!model) {
+            throw new Error(`Model "${stateName}" not found in shared state`);
+        }
 
-    // Navigate to model list to see the card
-    await modelListPage.goto();
-    await page.waitForLoadState("domcontentloaded");
+        const modelListPage = new ModelListPage(page);
+        await modelListPage.goto();
+        await page.waitForLoadState("domcontentloaded");
 
-    // Target the specific model card that was just uploaded
-    const modelName = getScenarioState(page).uploadTrackerModelName;
-    let thumbnailImg;
-    if (modelName) {
-        // Find the card containing this model's name, then locate its thumbnail
+        // Reveal the card first: with the category sidebar open the grid is
+        // narrower, so a card past the first rows is virtualised out of the DOM
+        // until scrolled to — its thumbnail would never appear otherwise.
+        await modelListPage.expectModelVisible(model.name);
+
         const modelCard = page
             .locator(".model-grid .model-card, .model-card")
-            .filter({ hasText: modelName });
-        thumbnailImg = modelCard.locator(".thumbnail-image").first();
-        console.log(
-            `[UI] Looking for thumbnail in card for model "${modelName}"`,
-        );
-    } else {
-        // Fallback: use first thumbnail image if no model name tracked
-        thumbnailImg = page
-            .locator(
-                ".model-grid .thumbnail-image, .model-card .thumbnail-image",
+            .filter({ hasText: model.name });
+        const thumbnailImg = modelCard.locator(".thumbnail-image").first();
+
+        // 120s: the setup phase no longer waits for renders, so the render may
+        // still be in the asset-processor queue when the serial phase starts.
+        // The card swaps its placeholder for the image via SignalR when ready.
+        await expect(thumbnailImg).toBeVisible({ timeout: 120000 });
+
+        // Visible is not enough — verify the image bytes actually decoded.
+        await expect
+            .poll(
+                async () =>
+                    thumbnailImg.evaluate(
+                        (img: HTMLImageElement) =>
+                            img.complete && img.naturalWidth > 0,
+                    ),
+                {
+                    message: `Waiting for thumbnail image to load in card for "${model.name}"`,
+                    timeout: 30000,
+                },
             )
-            .first();
-        console.log("[UI] No model name tracked, using first thumbnail image");
-    }
+            .toBe(true);
 
-    // Wait for the thumbnail image to appear (not placeholder)
-    await expect
-        .poll(
-            async () => {
-                return (await thumbnailImg.count()) > 0;
-            },
-            {
-                message: `Waiting for thumbnail image to appear in model card${modelName ? ` for "${modelName}"` : ""}`,
-                timeout: 15000,
-            },
-        )
-        .toBe(true);
-
-    await expect(thumbnailImg).toBeVisible({ timeout: 15000 });
-
-    // Verify the image actually loaded (naturalWidth > 0)
-    await expect
-        .poll(
-            async () => {
-                return await thumbnailImg.evaluate((img: HTMLImageElement) => {
-                    return img.complete && img.naturalWidth > 0;
-                });
-            },
-            {
-                message: "Waiting for thumbnail image to load in model card",
-                timeout: 15000,
-            },
-        )
-        .toBe(true);
-
-    // Log details for debugging
-    const src = await thumbnailImg.getAttribute("src");
-    const dimensions = await thumbnailImg.evaluate((img: HTMLImageElement) => ({
-        naturalWidth: img.naturalWidth,
-        naturalHeight: img.naturalHeight,
-    }));
-    console.log(
-        `[UI] Model card thumbnail loaded: ${dimensions.naturalWidth}x${dimensions.naturalHeight}`,
-    );
-    console.log(`[UI] Thumbnail src: ${src?.substring(0, 80)}...`);
-
-    // Take screenshot to confirm thumbnail is visible
-    await page.screenshot({
-        path: "test-results/thumbnail-visible-in-card.png",
-    });
-    console.log("[Screenshot] Captured: thumbnail-visible-in-card.png ✓");
-});
+        const dimensions = await thumbnailImg.evaluate(
+            (img: HTMLImageElement) => ({
+                naturalWidth: img.naturalWidth,
+                naturalHeight: img.naturalHeight,
+            }),
+        );
+        console.log(
+            `[UI] Model card thumbnail loaded for "${model.name}": ${dimensions.naturalWidth}x${dimensions.naturalHeight}`,
+        );
+    },
+);

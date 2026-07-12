@@ -75,8 +75,4 @@ public interface IThumbnailJobRepository
     /// </summary>
     Task<IEnumerable<ThumbnailJob>> GetJobsWithExpiredLocksAsync(CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// Saves all changes to the repository.
-    /// </summary>
-    Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }

@@ -3,8 +3,7 @@ import { useRef } from 'react'
 import { createScriptWithFile } from '@/features/scripts/api/scriptApi'
 import { useUploadProgress } from '@/hooks/useUploadProgress'
 import { useDragAndDrop } from '@/shared/hooks/useFileUpload'
-
-const UNASSIGNED_CATEGORY_ID = -1
+import { isRealCategoryId } from '@/shared/types/categories'
 
 // Recognized source-code extensions, mirroring the backend FileType mapping.
 const SCRIPT_EXTENSION_RE =
@@ -51,10 +50,10 @@ export function useScriptUpload({
     }
 
     const batchId = uploadProgressContext?.createBatch() || undefined
-    const categoryIdToAssign =
-      activeCategoryId === UNASSIGNED_CATEGORY_ID
-        ? undefined
-        : (activeCategoryId ?? undefined)
+    // "All"/"Unassigned" are sentinel rows, not assignable categories.
+    const categoryIdToAssign = isRealCategoryId(activeCategoryId)
+      ? activeCategoryId
+      : undefined
 
     for (const file of scriptFiles) {
       let uploadId: string | null = null

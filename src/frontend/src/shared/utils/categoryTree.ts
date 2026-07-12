@@ -124,7 +124,9 @@ export function collectCategoryBranchIds<
 }
 
 export function getSelectedTreeId(
-  value: string | Record<string, boolean> | null | undefined
+  // Accepts every shape PrimeReact Tree selection events can carry (single
+  // mode = key string; multiple/checkbox modes = key-indexed records).
+  value: string | Record<string, unknown> | null | undefined
 ): number | null {
   if (!value) {
     return null

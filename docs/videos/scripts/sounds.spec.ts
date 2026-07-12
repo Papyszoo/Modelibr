@@ -142,28 +142,47 @@ test.describe("Sounds", () => {
         await shortPause(page);
 
         // Step 3: Create a category and organize the sound library.
-        const addCategoryBtn = page.getByRole("button", { name: "Add Category" });
-        await addCategoryBtn.hover();
+        // Category management lives in the sidebar's right-click context
+        // menu; the name is typed inline in the tree (no dialog).
+        const allBucket = page.getByTestId("category-tree-all");
+        await allBucket.hover();
         await viewerPause(page, 250);
-        await addCategoryBtn.click();
+        await allBucket.click({ button: "right" });
 
-        const categoryDialog = page.getByTestId("sound-category-dialog");
-        await categoryDialog.waitFor({ state: "visible", timeout: ciVideoTimeout });
-        await page.getByTestId("sound-category-name-input").click();
+        const addCategoryItem = page
+            .locator(".p-contextmenu .p-menuitem-text")
+            .filter({ hasText: "Add category" })
+            .first();
+        await addCategoryItem.waitFor({
+            state: "visible",
+            timeout: ciVideoTimeout,
+        });
+        await addCategoryItem.hover();
+        await viewerPause(page, 250);
+        await addCategoryItem.click();
+
+        const inlineCategoryInput = page.getByTestId(
+            "category-tree-inline-input",
+        );
+        await inlineCategoryInput.waitFor({
+            state: "visible",
+            timeout: ciVideoTimeout,
+        });
         await typeNaturally(categoryName);
         await viewerPause(page, 250);
-        await page.getByTestId("sound-category-dialog-save").click();
+        await inlineCategoryInput.press("Enter");
         await mediumPause(page);
 
+        // Categories live in the shared CategoryTreePanel sidebar (tree nodes
+        // plus the Unassigned bucket row) — sounds no longer uses tab chips.
         const categoryTab = page
-            .locator(".category-tab")
+            .locator(".sound-category-sidebar .p-treenode-content")
             .filter({ hasText: categoryName })
             .first();
         await categoryTab.waitFor({ state: "visible", timeout: ciVideoTimeout });
 
         const unassignedTab = page
-            .locator(".category-tab")
-            .filter({ hasText: "Unassigned" })
+            .locator(".sound-category-sidebar .category-tree-unassigned")
             .first();
         await unassignedTab.click();
         await expect(soundCard(renamedSound)).toBeVisible({

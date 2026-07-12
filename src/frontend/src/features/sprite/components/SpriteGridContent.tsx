@@ -3,6 +3,7 @@ import { Checkbox } from 'primereact/checkbox'
 import { type DragEvent, type MouseEvent, type RefObject } from 'react'
 
 import { getFilePreviewUrl } from '@/features/models/api/modelApi'
+import { EmptyState } from '@/shared/components/feedback'
 import { type SpriteDto } from '@/types'
 import { formatFileSize } from '@/utils/fileUtils'
 
@@ -77,15 +78,14 @@ export function SpriteGridContent({
   onLoadMore,
 }: SpriteGridContentProps) {
   if (filteredSprites.length === 0) {
+    // Legacy class kept as an e2e selector alias (prompt 46).
     return (
-      <div className="sprite-list-empty">
-        <i
-          className="pi pi-image"
-          style={{ fontSize: '3rem', marginBottom: '1rem' }}
-        />
-        <p>No sprites in this category</p>
-        <p className="hint">Drag and drop image files here to upload</p>
-      </div>
+      <EmptyState
+        className="sprite-list-empty"
+        icon="pi-image"
+        title="No sprites in this category"
+        message="Drag and drop image files here to upload"
+      />
     )
   }
 

@@ -19,11 +19,10 @@ internal sealed class ModelRepository : IModelRepository
         _dateTimeProvider = dateTimeProvider;
     }
 
-    public async Task<Model> AddAsync(Model model, CancellationToken cancellationToken = default)
+    public Task<Model> AddAsync(Model model, CancellationToken cancellationToken = default)
     {
         _context.Models.Add(model);
-        await _context.SaveChangesAsync(cancellationToken);
-        return model;
+        return Task.FromResult(model);
     }
 
     public async Task<IEnumerable<Model>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -126,6 +125,7 @@ internal sealed class ModelRepository : IModelRepository
         int? minTriangleCount = null,
         int? maxTriangleCount = null,
         bool? hasAnimations = null,
+        bool? uncategorized = null,
         CancellationToken cancellationToken = default)
     {
         var query = _context.Models.AsNoTracking().AsQueryable();
@@ -139,7 +139,9 @@ internal sealed class ModelRepository : IModelRepository
         if (textureSetId.HasValue)
             query = query.Where(m => m.TextureSets.Any(ts => ts.Id == textureSetId.Value));
 
-        if (categoryIds != null && categoryIds.Count > 0)
+        if (uncategorized == true)
+            query = query.Where(m => m.ModelCategoryId == null);
+        else if (categoryIds != null && categoryIds.Count > 0)
             query = query.Where(m => m.ModelCategoryId.HasValue && categoryIds.Contains(m.ModelCategoryId.Value));
 
         if (normalizedTagNames != null && normalizedTagNames.Count > 0)
@@ -251,6 +253,28 @@ internal sealed class ModelRepository : IModelRepository
         return (items, totalCount);
     }
 
+    public async Task<CategoryAssetCounts> GetCategoryAssetCountsAsync(CancellationToken cancellationToken = default)
+    {
+        // One grouped pass over the (soft-delete-filtered) set: direct count per
+        // category id plus the uncategorized bucket. Independent of any list
+        // filter so the sidebar badges show true library totals.
+        var grouped = await _context.Models
+            .AsNoTracking()
+            .GroupBy(m => m.ModelCategoryId)
+            .Select(g => new { CategoryId = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+
+        var perCategory = grouped
+            .Where(g => g.CategoryId.HasValue)
+            .ToDictionary(g => g.CategoryId!.Value, g => g.Count);
+        var uncategorized = grouped
+            .Where(g => !g.CategoryId.HasValue)
+            .Sum(g => g.Count);
+        var total = grouped.Sum(g => g.Count);
+
+        return new CategoryAssetCounts(perCategory, uncategorized, total);
+    }
+
     public async Task<Model?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         return await _context.Models
@@ -334,10 +358,10 @@ internal sealed class ModelRepository : IModelRepository
         return (result.ActiveVersionId, result.Thumbnail);
     }
 
-    public async Task UpdateAsync(Model model, CancellationToken cancellationToken = default)
+    public Task UpdateAsync(Model model, CancellationToken cancellationToken = default)
     {
-        _context.Models.Update(model);
-        await _context.SaveChangesAsync(cancellationToken);
+        _context.UpdateIfDetached(model);
+        return Task.CompletedTask;
     }
 
     public async Task<IEnumerable<Model>> GetAllDeletedAsync(CancellationToken cancellationToken = default)
@@ -439,9 +463,10 @@ internal sealed class ModelRepository : IModelRepository
             // Remove all versions
             _context.ModelVersions.RemoveRange(model.Versions);
             
-            // Remove the model (this will also remove the many-to-many join table entries)
+            // Remove the model (this will also remove the many-to-many join table entries).
+            // Staged only — the calling handler commits via IUnitOfWork. (The
+            // ExecuteUpdateAsync above remains immediate, as it always was.)
             _context.Models.Remove(model);
-            await _context.SaveChangesAsync(cancellationToken);
         }
     }
 }

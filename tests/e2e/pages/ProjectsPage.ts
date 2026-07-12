@@ -42,7 +42,7 @@ export class ProjectsPage {
 
                 // Wait for project data to render (cards or empty state).
                 await this.page
-                    .locator(".project-grid-card, .project-list-empty")
+                    .locator(".project-grid-card, .project-list .mod-empty-state")
                     .first()
                     .waitFor({ state: "visible", timeout: 30000 });
 
@@ -108,7 +108,7 @@ export class ProjectsPage {
 
         // Wait for page to load
         await this.page.waitForSelector(
-            ".project-list-header, .project-list-empty, .project-grid",
+            ".project-list .list-toolbar, .project-list .mod-empty-state, .project-grid",
             { timeout: 10000 },
         );
 

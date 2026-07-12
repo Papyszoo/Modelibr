@@ -19,7 +19,7 @@ Modelibr includes a built-in sound manager for organizing audio assets alongside
 
 Drag audio files directly onto the Sound Library panel to upload them.
 
-**Supported formats:** WAV, MP3, OGG, FLAC
+**Supported formats:** WAV, MP3, OGG, FLAC, AAC, M4A
 
 ### What Happens After Upload
 
@@ -60,11 +60,15 @@ Right-click a sound card and select **Rename** to change its display name.
 
 ### Organizing with Categories
 
-Use category tabs (above the grid) to organize sounds into groups:
+Use the category sidebar (left of the grid) to organize sounds into groups:
 
-- Click **+** to create a new category
-- Drag sounds between categories
-- Categories persist across sessions via URL state
+- Right-click anywhere in the sidebar and choose **Add category**, then type
+  the name directly in the tree
+- Right-click a category to **Add subcategory**, **Rename**, or **Delete** it
+  — deleting removes the whole branch, and its sounds become uncategorized
+- Drag sounds onto a category in the sidebar to move them
+- **All** shows every one of your sounds; **Unassigned** collects sounds
+  that aren't in any category
 
 ### Recycling
 

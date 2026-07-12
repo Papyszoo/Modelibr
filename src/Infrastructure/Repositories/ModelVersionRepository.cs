@@ -77,18 +77,16 @@ internal sealed class ModelVersionRepository : IModelVersionRepository
             .FirstOrDefaultAsync(v => v.Id == id, cancellationToken);
     }
 
-    public async Task<ModelVersion> AddAsync(ModelVersion version, CancellationToken cancellationToken = default)
+    public Task<ModelVersion> AddAsync(ModelVersion version, CancellationToken cancellationToken = default)
     {
         _context.ModelVersions.Add(version);
-        await _context.SaveChangesAsync(cancellationToken);
-        return version;
+        return Task.FromResult(version);
     }
 
-    public async Task<ModelVersion> UpdateAsync(ModelVersion version, CancellationToken cancellationToken = default)
+    public Task<ModelVersion> UpdateAsync(ModelVersion version, CancellationToken cancellationToken = default)
     {
-        _context.ModelVersions.Update(version);
-        await _context.SaveChangesAsync(cancellationToken);
-        return version;
+        _context.UpdateIfDetached(version);
+        return Task.FromResult(version);
     }
 
     public async Task SetThumbnailIdAsync(int modelVersionId, int thumbnailId, CancellationToken cancellationToken = default)
@@ -100,6 +98,14 @@ internal sealed class ModelVersionRepository : IModelVersionRepository
                 cancellationToken);
     }
 
+    // ─── ModelVersionTextureSet mapping methods ─────────────────────────
+    // These stay self-committing on purpose (unlike Add/Update/Delete above,
+    // which stage only and let the handler commit via IUnitOfWork): the
+    // variant-aware AddTextureMappingAsync is an idempotent-insert primitive —
+    // it must save immediately so it can catch the unique violation itself and
+    // recover by loading the existing row. The Remove* siblings keep the same
+    // immediate-commit boundary for symmetry. This is why the file remains in
+    // RepositoriesDontSelfCommitTests' allowlist.
     public async Task AddTextureMappingAsync(int modelVersionId, int textureSetId, string materialName, CancellationToken cancellationToken = default)
     {
         var mapping = ModelVersionTextureSet.Create(modelVersionId, textureSetId, materialName);
@@ -204,10 +210,10 @@ internal sealed class ModelVersionRepository : IModelVersionRepository
         }
     }
 
-    public async Task DeleteAsync(ModelVersion version, CancellationToken cancellationToken = default)
+    public Task DeleteAsync(ModelVersion version, CancellationToken cancellationToken = default)
     {
         _context.ModelVersions.Remove(version);
-        await _context.SaveChangesAsync(cancellationToken);
+        return Task.CompletedTask;
     }
 
     public async Task<int> GetLatestVersionNumberAsync(int modelId, CancellationToken cancellationToken = default)

@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
@@ -14,6 +15,8 @@ internal class AssociateTextureSetWithModelVersionCommandHandler : ICommandHandl
     private readonly IThumbnailQueue _thumbnailQueue;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IBlendFileGenerator _blendFileGenerator;
+    private readonly IBlendFileGenerationQueue _blendFileGenerationQueue;
+    private readonly IUnitOfWork _unitOfWork;
 
     public AssociateTextureSetWithModelVersionCommandHandler(
         ITextureSetRepository textureSetRepository,
@@ -21,7 +24,9 @@ internal class AssociateTextureSetWithModelVersionCommandHandler : ICommandHandl
         IThumbnailRepository thumbnailRepository,
         IThumbnailQueue thumbnailQueue,
         IDateTimeProvider dateTimeProvider,
-        IBlendFileGenerator blendFileGenerator)
+        IBlendFileGenerator blendFileGenerator,
+        IBlendFileGenerationQueue blendFileGenerationQueue,
+        IUnitOfWork unitOfWork)
     {
         _textureSetRepository = textureSetRepository;
         _modelVersionRepository = modelVersionRepository;
@@ -29,6 +34,8 @@ internal class AssociateTextureSetWithModelVersionCommandHandler : ICommandHandl
         _thumbnailQueue = thumbnailQueue;
         _dateTimeProvider = dateTimeProvider;
         _blendFileGenerator = blendFileGenerator;
+        _blendFileGenerationQueue = blendFileGenerationQueue;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(AssociateTextureSetWithModelVersionCommand command, CancellationToken cancellationToken)
@@ -77,8 +84,10 @@ internal class AssociateTextureSetWithModelVersionCommandHandler : ICommandHandl
             await _modelVersionRepository.AddTextureMappingAsync(
                 modelVersion.Id, command.TextureSetId, materialName, variantName, cancellationToken);
 
-            // Invalidate cached .blend so it regenerates with new textures
+            // Invalidate cached .blend so it regenerates with new textures, then schedule
+            // the regeneration in the background so it reappears without needing a client GET.
             _blendFileGenerator.InvalidateCache(modelVersion.ModelId, modelVersion.Id);
+            _blendFileGenerationQueue.Enqueue(modelVersion.ModelId, modelVersion.Id);
 
             // If the linked variant is the main variant and no default is set yet,
             // auto-set DefaultTextureSetId and regenerate thumbnail.
@@ -107,6 +116,8 @@ internal class AssociateTextureSetWithModelVersionCommandHandler : ICommandHandl
                         cancellationToken: cancellationToken);
                 }
             }
+
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             return Result.Success();
         }

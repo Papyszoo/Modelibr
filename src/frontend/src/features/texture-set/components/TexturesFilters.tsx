@@ -5,7 +5,6 @@ import { Dropdown } from 'primereact/dropdown'
 import { MultiSelect } from 'primereact/multiselect'
 import { type MouseEvent as ReactMouseEvent } from 'react'
 
-import { CategoryFilterPicker } from '@/shared/components/categories/CategoryFilterPicker'
 import {
   ListToolbar,
   ListToolbarActions,
@@ -19,13 +18,7 @@ import {
   ListToolbarSelectionSummary,
   OptionsButton,
 } from '@/shared/components/list-toolbar'
-import { type CategorySelectionKeys } from '@/shared/types/categories'
-import {
-  type PackDto,
-  type ProjectDto,
-  type TextureSetCategoryDto,
-  TextureType,
-} from '@/types'
+import { type PackDto, type ProjectDto, TextureType } from '@/types'
 
 // Texture types exposed in the filter. SplitChannel is an implementation
 // detail (a single source file fanned out across channels) — hiding it
@@ -65,18 +58,14 @@ interface TexturesFiltersProps {
   onSearchChange: (query: string) => void
   packs: PackDto[]
   projects: ProjectDto[]
-  categories: TextureSetCategoryDto[]
   selectedPackIds: number[]
   selectedProjectIds: number[]
-  selectedCategoryKeys: CategorySelectionKeys
   selectedTextureTypes: number[]
   minResolution: number | null
   availableTags: string[]
   selectedTagNames: string[]
   onPackFilterChange: (packIds: number[]) => void
   onProjectFilterChange: (projectIds: number[]) => void
-  onCategoryChange: (keys: CategorySelectionKeys) => void
-  onManageCategoriesClick: () => void
   onTextureTypesChange: (types: number[]) => void
   onMinResolutionChange: (value: number | null) => void
   onTagChange: (tags: string[]) => void
@@ -92,6 +81,9 @@ interface TexturesFiltersProps {
   onBulkActionsClick: (event: ReactMouseEvent<HTMLElement>) => void
   onSelectAllClick: () => void
   onDeselectAllClick: () => void
+  isCategoryPanelOpen: boolean
+  onCategoryPanelToggle: () => void
+  categoryFilterActive?: boolean
 }
 
 export function TexturesFilters({
@@ -103,18 +95,14 @@ export function TexturesFilters({
   onSearchChange,
   packs,
   projects,
-  categories,
   selectedPackIds,
   selectedProjectIds,
-  selectedCategoryKeys,
   selectedTextureTypes,
   minResolution,
   availableTags,
   selectedTagNames,
   onPackFilterChange,
   onProjectFilterChange,
-  onCategoryChange,
-  onManageCategoriesClick,
   onTextureTypesChange,
   onMinResolutionChange,
   onTagChange,
@@ -130,6 +118,9 @@ export function TexturesFilters({
   onBulkActionsClick,
   onSelectAllClick,
   onDeselectAllClick,
+  isCategoryPanelOpen,
+  onCategoryPanelToggle,
+  categoryFilterActive = false,
 }: TexturesFiltersProps) {
   const packOptions = packs.map(pack => ({
     label: pack.name,
@@ -141,14 +132,10 @@ export function TexturesFilters({
   }))
 
   const hasActiveSearch = searchQuery.trim().length > 0
-  const selectedCategoryCount = Object.values(selectedCategoryKeys).filter(
-    state => state?.checked
-  ).length
   const tagOptions = availableTags.map(tag => ({ label: tag, value: tag }))
   const hasActiveFilters =
     selectedPackIds.length > 0 ||
     selectedProjectIds.length > 0 ||
-    selectedCategoryCount > 0 ||
     selectedTextureTypes.length > 0 ||
     minResolution != null ||
     selectedTagNames.length > 0
@@ -156,7 +143,6 @@ export function TexturesFilters({
   const activeFilterCount = [
     selectedPackIds.length > 0,
     selectedProjectIds.length > 0,
-    selectedCategoryCount > 0,
     selectedTextureTypes.length > 0,
     minResolution != null,
     selectedTagNames.length > 0,
@@ -217,6 +203,16 @@ export function TexturesFilters({
             onClick={onRefreshClick}
             tooltip="Refresh list"
             ariaLabel="Refresh"
+          />
+          <ListToolbarButton
+            icon="pi pi-folder"
+            label="Categories"
+            active={isCategoryPanelOpen}
+            onClick={onCategoryPanelToggle}
+            tooltip="Toggle category panel"
+            ariaLabel="Toggle categories"
+            ariaExpanded={isCategoryPanelOpen}
+            badge={categoryFilterActive ? 1 : undefined}
           />
         </ListToolbarActions>
 
@@ -293,23 +289,6 @@ export function TexturesFilters({
               filterPlaceholder="Search projects..."
             />
           )}
-          {categories.length > 0 ? (
-            <CategoryFilterPicker
-              categories={categories}
-              selectedKeys={selectedCategoryKeys}
-              onChange={onCategoryChange}
-              onManageClick={onManageCategoriesClick}
-              label="Categories"
-              ariaLabel="Filter by texture-set categories"
-            />
-          ) : (
-            <Button
-              icon="pi pi-sitemap"
-              label="Manage categories"
-              className="p-button-text p-button-sm list-filters-control"
-              onClick={onManageCategoriesClick}
-            />
-          )}
           <MultiSelect
             value={selectedTextureTypes}
             options={TEXTURE_TYPE_FILTER_OPTIONS}
@@ -353,7 +332,6 @@ export function TexturesFilters({
               onClick={() => {
                 onPackFilterChange([])
                 onProjectFilterChange([])
-                onCategoryChange({})
                 onTextureTypesChange([])
                 onMinResolutionChange(null)
                 onTagChange([])
@@ -362,12 +340,10 @@ export function TexturesFilters({
           ) : null}
         </div>
 
-        {packs.length === 0 &&
-        projects.length === 0 &&
-        categories.length === 0 ? (
+        {packs.length === 0 && projects.length === 0 ? (
           <span className="list-filters-empty">
-            No pack, project, or category filters yet — texture-type filter is
-            always available.
+            No pack or project filters yet — texture-type filter is always
+            available.
           </span>
         ) : null}
       </ListToolbarPanel>

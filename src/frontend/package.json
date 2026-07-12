@@ -1,7 +1,7 @@
 {
   "name": "frontend",
   "private": true,
-  "version": "0.3.1",
+  "version": "0.4.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -17,6 +17,7 @@
     "test:coverage": "jest --coverage",
     "test:webgl": "npx playwright test --config playwright.webgl.config.ts",
     "storybook": "storybook dev -p 6006",
+    "design": "storybook dev -p 6006 --initial-path=/story/design-system-gallery--dark",
     "build-storybook": "storybook build",
     "test-storybook": "npx playwright test --config playwright.config.ts",
     "test-storybook:update": "npx playwright test --config playwright.config.ts --update-snapshots",

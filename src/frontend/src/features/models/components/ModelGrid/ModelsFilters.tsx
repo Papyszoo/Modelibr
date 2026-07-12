@@ -4,10 +4,8 @@ import { Button } from 'primereact/button'
 import { InputNumber } from 'primereact/inputnumber'
 import { InputSwitch } from 'primereact/inputswitch'
 import { MultiSelect } from 'primereact/multiselect'
-import { type MouseEvent as ReactMouseEvent, useState } from 'react'
+import { type MouseEvent as ReactMouseEvent } from 'react'
 
-import { ModelCategoryManagerDialog } from '@/features/models/components/ModelCategoryManagerDialog'
-import { ModelCategoryFilterPicker } from '@/features/models/components/ModelGrid/ModelCategoryFilterPicker'
 import {
   ListToolbar,
   ListToolbarActions,
@@ -21,13 +19,7 @@ import {
   ListToolbarSelectionSummary,
   OptionsButton,
 } from '@/shared/components/list-toolbar'
-import { type CategorySelectionKeys as ModelCategorySelectionKeys } from '@/shared/types/categories'
-import {
-  type ModelCategoryDto,
-  type ModelTagDto,
-  type PackDto,
-  type ProjectDto,
-} from '@/types'
+import { type ModelTagDto, type PackDto, type ProjectDto } from '@/types'
 
 interface ModelsFiltersProps {
   isSearchOpen: boolean
@@ -38,12 +30,9 @@ interface ModelsFiltersProps {
   onSearchChange: (query: string) => void
   packs: PackDto[]
   projects: ProjectDto[]
-  categories: ModelCategoryDto[]
   tags: ModelTagDto[]
   selectedPackIds: number[]
   selectedProjectIds: number[]
-  selectedCategoryKeys: ModelCategorySelectionKeys
-  selectedCategoryIds: number[]
   selectedTagNames: string[]
   hasConceptImages: boolean
   animatedOnly: boolean
@@ -51,7 +40,6 @@ interface ModelsFiltersProps {
   maxTriangleCount: number | null
   onPackFilterChange: (packIds: number[]) => void
   onProjectFilterChange: (projectIds: number[]) => void
-  onCategoryChange: (keys: ModelCategorySelectionKeys) => void
   onTagChange: (tags: string[]) => void
   onHasConceptImagesChange: (value: boolean) => void
   onAnimatedOnlyChange: (value: boolean) => void
@@ -69,6 +57,10 @@ interface ModelsFiltersProps {
   onSelectAllClick: () => void
   onDeselectAllClick: () => void
   visibleModelCount: number
+  isCategoryPanelOpen: boolean
+  onCategoryPanelToggle: () => void
+  showCategoryToggle?: boolean
+  categoryFilterActive?: boolean
 }
 
 export function ModelsFilters({
@@ -80,12 +72,9 @@ export function ModelsFilters({
   onSearchChange,
   packs,
   projects,
-  categories,
   tags,
   selectedPackIds,
   selectedProjectIds,
-  selectedCategoryKeys,
-  selectedCategoryIds,
   selectedTagNames,
   hasConceptImages,
   animatedOnly,
@@ -93,7 +82,6 @@ export function ModelsFilters({
   maxTriangleCount,
   onPackFilterChange,
   onProjectFilterChange,
-  onCategoryChange,
   onTagChange,
   onHasConceptImagesChange,
   onAnimatedOnlyChange,
@@ -111,9 +99,11 @@ export function ModelsFilters({
   onSelectAllClick,
   onDeselectAllClick,
   visibleModelCount,
+  isCategoryPanelOpen,
+  onCategoryPanelToggle,
+  showCategoryToggle = false,
+  categoryFilterActive = false,
 }: ModelsFiltersProps) {
-  const [showCategoryManager, setShowCategoryManager] = useState(false)
-
   const packOptions = packs.map(pack => ({
     label: pack.name,
     value: pack.id,
@@ -132,7 +122,6 @@ export function ModelsFilters({
   const hasActiveFilters =
     selectedPackIds.length > 0 ||
     selectedProjectIds.length > 0 ||
-    selectedCategoryIds.length > 0 ||
     selectedTagNames.length > 0 ||
     hasConceptImages ||
     animatedOnly ||
@@ -141,7 +130,6 @@ export function ModelsFilters({
   const activeFilterCount = [
     selectedPackIds.length > 0,
     selectedProjectIds.length > 0,
-    selectedCategoryIds.length > 0,
     selectedTagNames.length > 0,
     hasConceptImages,
     animatedOnly,
@@ -151,12 +139,6 @@ export function ModelsFilters({
 
   return (
     <ListToolbar>
-      <ModelCategoryManagerDialog
-        visible={showCategoryManager}
-        categories={categories}
-        onHide={() => setShowCategoryManager(false)}
-      />
-
       <ListToolbarRow>
         <ListToolbarActions>
           <ListToolbarButton
@@ -200,6 +182,18 @@ export function ModelsFilters({
             tooltip="Refresh models"
             ariaLabel="Refresh"
           />
+          {showCategoryToggle ? (
+            <ListToolbarButton
+              icon="pi pi-folder"
+              label="Categories"
+              active={isCategoryPanelOpen}
+              onClick={onCategoryPanelToggle}
+              tooltip="Toggle category panel"
+              ariaLabel="Toggle categories"
+              ariaExpanded={isCategoryPanelOpen}
+              badge={categoryFilterActive ? 1 : undefined}
+            />
+          ) : null}
         </ListToolbarActions>
 
         <ListToolbarCount count={modelCount} unitLabel="model" />
@@ -274,21 +268,6 @@ export function ModelsFilters({
               disabled={projectFilterDisabled}
             />
           )}
-          {categories.length > 0 ? (
-            <ModelCategoryFilterPicker
-              categories={categories}
-              selectedKeys={selectedCategoryKeys}
-              onChange={onCategoryChange}
-              onManageClick={() => setShowCategoryManager(true)}
-            />
-          ) : (
-            <Button
-              icon="pi pi-sitemap"
-              label="Manage categories"
-              className="p-button-text p-button-sm list-filters-control"
-              onClick={() => setShowCategoryManager(true)}
-            />
-          )}
           {tags.length > 0 && (
             <MultiSelect
               value={selectedTagNames}
@@ -350,7 +329,6 @@ export function ModelsFilters({
               onClick={() => {
                 onPackFilterChange([])
                 onProjectFilterChange([])
-                onCategoryChange({})
                 onTagChange([])
                 onHasConceptImagesChange(false)
                 onAnimatedOnlyChange(false)
@@ -361,12 +339,9 @@ export function ModelsFilters({
           ) : null}
         </div>
 
-        {packs.length === 0 &&
-        projects.length === 0 &&
-        categories.length === 0 &&
-        tags.length === 0 ? (
+        {packs.length === 0 && projects.length === 0 && tags.length === 0 ? (
           <span className="list-filters-empty">
-            No category, tag, pack, or project filters yet.
+            No tag, pack, or project filters yet.
           </span>
         ) : null}
       </ListToolbarPanel>

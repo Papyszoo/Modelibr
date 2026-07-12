@@ -98,6 +98,24 @@ export class RendererPool {
   }
 
   /**
+   * Force a specific renderer to reinitialize — used when the job holding
+   * it times out. Reuses the renderer's own crash-recovery machinery (the
+   * same path taken when a page detaches/crashes mid-render) so the pool
+   * gets back a USABLE renderer instead of one still stuck mid-render.
+   *
+   * This only repairs the renderer in place; it does not touch `available`
+   * or `_waiting`. The caller (the abandoned job's own processor, reacting
+   * to the same abort) is still responsible for eventually calling
+   * `release()` once its try/finally unwinds.
+   * @param {PuppeteerRenderer} renderer
+   */
+  async forceReinit(renderer) {
+    if (!renderer) return
+    logger.warn('Force-reinitializing renderer pool slot (job aborted)')
+    await renderer.reinitialize()
+  }
+
+  /**
    * Shut down all renderers and the shared browser.
    */
   async dispose() {

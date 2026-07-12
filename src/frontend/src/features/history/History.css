@@ -32,22 +32,6 @@
   color: var(--text-color-secondary);
 }
 
-.history-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
-  padding: 3rem;
-  color: var(--text-color-secondary);
-}
-
-.history-empty i {
-  font-size: 3rem;
-  color: var(--text-color-secondary);
-  opacity: 0.5;
-}
-
 .history-list {
   overflow-y: scroll;
   flex: 1;

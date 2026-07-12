@@ -34,9 +34,14 @@ public/demo-assets
 
 # Visual regression test artifacts
 visual-tests/test-results/
+# Visual-regression baselines are machine-local (GPU/OS-dependent renders) — never commit
+visual-tests/__snapshots__/
 /test-results/
 /playwright-report/
 
 # Environment files (may contain secrets)
 .env
 !.env.example
+# Visual-regression baselines are machine-local (design-system skill) —
+# regenerate with `npm run test-storybook:update`, never commit them.
+visual-tests/__snapshots__/

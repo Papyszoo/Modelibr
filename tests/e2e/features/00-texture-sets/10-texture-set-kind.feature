@@ -11,6 +11,11 @@ Feature: Texture Set Kind (Multi-Model vs Global Materials)
   - Context menu Regenerate Thumbnail visibility
   - Kind persistence, API filtering, and global texture files
 
+  # SKIPPED: the combined texture-sets view (and with it a "default kind")
+  # no longer exists — Global Materials and Multi-Model Textures are separate
+  # app tabs the user picks from the New Tab page. Un-skip only if a combined
+  # view ever returns (owner: prompt 13/18 page-unification work).
+  @skip
   Scenario: Default tab is Global Materials
     Given I am on the texture sets page
     Then the "Global Materials" kind tab should be active
@@ -46,6 +51,12 @@ Feature: Texture Set Kind (Multi-Model vs Global Materials)
     When I switch to the "Global Materials" kind tab
     Then I should not see texture set "kind_change_test" in the grid
 
+  # SKIPPED: drag-onto-kind-switcher shipped only on the removed combined
+  # view. Kind conversion is covered by the context-menu scenarios in
+  # 18-texture-set-kind-conversion.feature; a drag-based replacement (card →
+  # app tab) is prompt 49's unified-DnD capability matrix. Un-skip by
+  # rewriting to that interaction when 49 lands (owner: prompt 49).
+  @skip
   Scenario: Drag and drop between kind tabs
     Given I am on the texture sets page
     When I create a model-specific texture set "drag_to_global" via API
@@ -112,8 +123,10 @@ Feature: Texture Set Kind (Multi-Model vs Global Materials)
     When I create a model-specific texture set "persist_ms" via API
     And I create a universal texture set "persist_uni" via API
     And I reload the page
-    Then the "Global Materials" kind tab should be active
-    And I should see texture set "persist_uni" in the grid
+    # Kinds are separate app tabs now — the active tab persists across
+    # reload (the old in-page switcher reset to Global Materials instead).
+    Then the "Multi-Model" kind tab should be active
+    And I should see texture set "persist_ms" in the grid
     Then the API should return texture set "persist_ms" for kind ModelSpecific
     And the API should return texture set "persist_uni" for kind Universal
     And the API should not return texture set "persist_ms" for kind Universal

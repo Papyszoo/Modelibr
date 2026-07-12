@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Services;
@@ -9,13 +10,16 @@ internal class SoftDeleteSoundCommandHandler : ICommandHandler<SoftDeleteSoundCo
 {
     private readonly ISoundRepository _soundRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public SoftDeleteSoundCommandHandler(
         ISoundRepository soundRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _soundRepository = soundRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(SoftDeleteSoundCommand command, CancellationToken cancellationToken)
@@ -35,6 +39,7 @@ internal class SoftDeleteSoundCommandHandler : ICommandHandler<SoftDeleteSoundCo
 
         sound.SoftDelete(_dateTimeProvider.UtcNow);
         await _soundRepository.UpdateAsync(sound, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success();
     }

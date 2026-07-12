@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
 using Application.Models;
@@ -18,6 +19,8 @@ public class SetDefaultTextureSetCommandHandlerTests
     private readonly Mock<IThumbnailQueue> _mockThumbnailQueue;
     private readonly Mock<IDateTimeProvider> _mockDateTimeProvider;
     private readonly Mock<IBlendFileGenerator> _mockBlendFileGenerator;
+    private readonly Mock<IBlendFileGenerationQueue> _mockBlendFileGenerationQueue;
+    private readonly Mock<IUnitOfWork> _mockUnitOfWork = new();
     private readonly SetDefaultTextureSetCommandHandler _handler;
 
     public SetDefaultTextureSetCommandHandlerTests()
@@ -28,14 +31,17 @@ public class SetDefaultTextureSetCommandHandlerTests
         _mockThumbnailQueue = new Mock<IThumbnailQueue>();
         _mockDateTimeProvider = new Mock<IDateTimeProvider>();
         _mockBlendFileGenerator = new Mock<IBlendFileGenerator>();
-        
+        _mockBlendFileGenerationQueue = new Mock<IBlendFileGenerationQueue>();
+
         _handler = new SetDefaultTextureSetCommandHandler(
             _mockModelRepository.Object,
             _mockModelVersionRepository.Object,
             _mockThumbnailRepository.Object,
             _mockThumbnailQueue.Object,
             _mockDateTimeProvider.Object,
-            _mockBlendFileGenerator.Object);
+            _mockBlendFileGenerator.Object,
+            _mockBlendFileGenerationQueue.Object,
+            _mockUnitOfWork.Object);
     }
 
     [Fact]
@@ -101,8 +107,18 @@ public class SetDefaultTextureSetCommandHandlerTests
         
         // Verify model was NOT updated (only version gets updated)
         _mockModelRepository.Verify(
-            x => x.UpdateAsync(It.IsAny<Model>(), It.IsAny<CancellationToken>()), 
+            x => x.UpdateAsync(It.IsAny<Model>(), It.IsAny<CancellationToken>()),
             Times.Never);
+
+        // Verify the cached .blend was invalidated AND background regeneration was
+        // scheduled, so generated-{name}.blend picks up the new default texture set
+        // without needing a client GET to trigger generation synchronously.
+        _mockBlendFileGenerator.Verify(
+            g => g.InvalidateCache(1, model.ActiveVersion!.Id),
+            Times.Once);
+        _mockBlendFileGenerationQueue.Verify(
+            q => q.Enqueue(1, model.ActiveVersion!.Id),
+            Times.Once);
     }
 
     [Fact]

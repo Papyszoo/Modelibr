@@ -47,7 +47,9 @@ export class TextureSetsPage {
      * Navigate to the Texture Sets tab via UI interaction.
      */
     async goto(): Promise<void> {
-        await navigateToTab(this.page, "textureSets");
+        // The combined textureSets view no longer exists — texture-set CRUD
+        // flows run on the Multi-Model Textures page (the split default).
+        await navigateToTab(this.page, "modelTextures");
 
         // Wait for the page to load
         await this.page.waitForSelector(".texture-set-list", {
@@ -127,12 +129,16 @@ export class TextureSetsPage {
     async selectKindTab(
         label: "Multi-Model" | "Global Materials",
     ): Promise<void> {
-        await this.page.getByRole("button", { name: label }).click();
+        // Kinds are separate app tabs since the combined textureSets view
+        // was removed — "selecting a kind" = opening the matching tab.
+        const tabType =
+            label === "Global Materials" ? "globalMaterials" : "modelTextures";
+        await navigateToTab(this.page, tabType);
         await this.waitForLoad();
-        // Block until the new kind's data has actually resolved — the
-        // toolbar stays mounted across the loading cycle, so an immediate
-        // read of `getTextureSetNames()` would otherwise see whatever
-        // cards the grid happens to be displaying at that instant.
+        // Block until the tab's data has actually resolved — the toolbar
+        // stays mounted across the loading cycle, so an immediate read of
+        // `getTextureSetNames()` would otherwise see whatever cards the
+        // grid happens to be displaying at that instant.
         await waitForCountLabelStable(this.page);
     }
 
@@ -266,11 +272,6 @@ export class TextureSetsPage {
 
     // ── Categories ────────────────────────────────────────────────────
 
-    /** The shared "Manage Categories" dialog (CategoryManagerDialog). */
-    get categoryManagerDialog(): Locator {
-        return this.page.getByRole("dialog", { name: "Manage Categories" });
-    }
-
     /** The Filters toolbar panel (collapsed by default). */
     get filtersPanel(): Locator {
         return this.page.locator("#texture-set-grid-filters-panel");
@@ -292,32 +293,6 @@ export class TextureSetsPage {
         }
         await this.page.getByRole("button", { name: /^filters$/i }).click();
         await openPanel.waitFor({ state: "visible", timeout: 5000 });
-    }
-
-    /**
-     * Open the category manager. Works whether or not categories exist:
-     * with categories it opens the filter-picker popover and clicks the cog,
-     * otherwise it clicks the standalone "Manage categories" button.
-     */
-    async openCategoryManager(): Promise<void> {
-        await this.openFiltersPanel();
-        const trigger = this.filtersPanel.locator(
-            'button[aria-label="Filter by texture-set categories"]',
-        );
-        if (await trigger.count()) {
-            await trigger.scrollIntoViewIfNeeded();
-            await trigger.click();
-            const overlay = this.page.locator(".p-overlaypanel");
-            await overlay.waitFor({ state: "visible" });
-            await overlay
-                .locator('button[aria-label="Manage categories"]')
-                .click();
-        } else {
-            await this.filtersPanel
-                .getByRole("button", { name: "Manage categories" })
-                .click();
-        }
-        await this.categoryManagerDialog.waitFor({ state: "visible" });
     }
 
     /**
@@ -366,28 +341,6 @@ export class TextureSetsPage {
             .click();
         await panel.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
         await this.page.waitForLoadState("domcontentloaded");
-    }
-
-    /** Filter the grid by a category using the filter-picker popover. */
-    async filterByCategory(categoryName: string): Promise<void> {
-        await this.openFiltersPanel();
-        const trigger = this.filtersPanel.locator(
-            'button[aria-label="Filter by texture-set categories"]',
-        );
-        await trigger.scrollIntoViewIfNeeded();
-        await trigger.click();
-        const overlay = this.page.locator(".p-overlaypanel");
-        await overlay.waitFor({ state: "visible" });
-        await overlay
-            .locator(".category-tree .p-treenode-content", {
-                hasText: categoryName,
-            })
-            .first()
-            .locator(".p-checkbox")
-            .click();
-        // Close the overlay so it doesn't intercept later interactions.
-        await this.page.keyboard.press("Escape");
-        await overlay.waitFor({ state: "hidden" });
     }
 
     /**

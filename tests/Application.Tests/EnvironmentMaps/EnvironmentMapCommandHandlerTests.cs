@@ -1,4 +1,5 @@
 using Application.Abstractions.Files;
+using Application.Abstractions;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
 using Application.Tests;
@@ -20,6 +21,7 @@ public class EnvironmentMapCommandHandlerTests
     private readonly Mock<IBatchUploadRepository> _batchUploadRepository = new();
     private readonly Mock<IFileCreationService> _fileCreationService = new();
     private readonly Mock<IEnvironmentMapSizeLabelService> _sizeLabelService = new();
+    private readonly Mock<IUnitOfWork> _unitOfWork = new();
     private readonly Mock<ISettingRepository> _settingRepository = new();
     private readonly Mock<IThumbnailQueue> _thumbnailQueue = new();
     private readonly Mock<IDateTimeProvider> _dateTimeProvider = new();
@@ -53,7 +55,8 @@ public class EnvironmentMapCommandHandlerTests
             _sizeLabelService.Object,
             _settingRepository.Object,
             _thumbnailQueue.Object,
-            _dateTimeProvider.Object);
+            _dateTimeProvider.Object,
+            _unitOfWork.Object);
 
         var command = new CreateEnvironmentMapWithFileCommand(fileUpload, null, "Studio", "4K", "batch-1", 3, null);
 
@@ -111,7 +114,8 @@ public class EnvironmentMapCommandHandlerTests
             _fileCreationService.Object,
             _sizeLabelService.Object,
             _thumbnailQueue.Object,
-            _dateTimeProvider.Object);
+            _dateTimeProvider.Object,
+            _unitOfWork.Object);
 
         var command = new AddEnvironmentMapVariantWithFileCommand(environmentMap.Id, fileUpload, null, "8K");
 
@@ -162,7 +166,8 @@ public class EnvironmentMapCommandHandlerTests
             _fileCreationService.Object,
             _sizeLabelService.Object,
             _thumbnailQueue.Object,
-            _dateTimeProvider.Object);
+            _dateTimeProvider.Object,
+            _unitOfWork.Object);
 
         var result = await handler.Handle(
             new AddEnvironmentMapVariantWithFileCommand(environmentMap.Id, fileUpload, null, null),

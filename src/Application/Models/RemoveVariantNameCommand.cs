@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Services;
@@ -11,13 +12,16 @@ internal class RemoveVariantNameCommandHandler : ICommandHandler<RemoveVariantNa
 {
     private readonly IModelVersionRepository _modelVersionRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public RemoveVariantNameCommandHandler(
         IModelVersionRepository modelVersionRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _modelVersionRepository = modelVersionRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(RemoveVariantNameCommand command, CancellationToken cancellationToken)
@@ -39,6 +43,7 @@ internal class RemoveVariantNameCommandHandler : ICommandHandler<RemoveVariantNa
         var now = _dateTimeProvider.UtcNow;
         modelVersion.RemoveVariantName(variantName, now);
         await _modelVersionRepository.UpdateAsync(modelVersion, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success();
     }

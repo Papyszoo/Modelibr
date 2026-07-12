@@ -4,7 +4,7 @@ import type * as Preset from "@docusaurus/preset-classic";
 
 const config: Config = {
     title: "Modelibr",
-    tagline: "Self-hosted 3D Model Library",
+    tagline: "Self-hosted game asset library",
     favicon: "img/favicon.ico",
 
     future: {

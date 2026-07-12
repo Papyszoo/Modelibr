@@ -23,11 +23,16 @@ internal static partial class AssetNameService
         ISettingRepository settingRepository,
         CancellationToken cancellationToken)
     {
+        var policy = await GetPolicyAsync(settingRepository, cancellationToken);
+
+        // "Allow" is the default now that WebDAV disambiguates duplicate names by id —
+        // skip the existence check entirely, the name is accepted unchanged.
+        if (policy == "Allow")
+            return Result.Success(requestedName);
+
         var exists = await existsByNameAsync(requestedName, cancellationToken);
         if (!exists)
             return Result.Success(requestedName);
-
-        var policy = await GetPolicyAsync(settingRepository, cancellationToken);
 
         if (policy == "Reject")
         {
@@ -44,8 +49,10 @@ internal static partial class AssetNameService
     }
 
     /// <summary>
-    /// Gets the configured duplicate name policy. Defaults to "Reject" if not set.
-    /// Falls back to legacy "ModelDuplicateNamePolicy" key for backward compatibility.
+    /// Gets the configured duplicate name policy. Defaults to "Allow" if not set (WebDAV
+    /// disambiguates duplicate names by id, so names no longer need to be globally unique
+    /// by default). Falls back to legacy "ModelDuplicateNamePolicy" key for backward
+    /// compatibility.
     /// </summary>
     internal static async Task<string> GetPolicyAsync(
         ISettingRepository settingRepository,
@@ -53,7 +60,12 @@ internal static partial class AssetNameService
     {
         var setting = await settingRepository.GetByKeyAsync(SettingKeys.DuplicateNamePolicy, cancellationToken);
         setting ??= await settingRepository.GetByKeyAsync("ModelDuplicateNamePolicy", cancellationToken);
-        return setting?.Value is "AutoRename" ? "AutoRename" : "Reject";
+        return setting?.Value switch
+        {
+            "Reject" => "Reject",
+            "AutoRename" => "AutoRename",
+            _ => "Allow"
+        };
     }
 
     /// <summary>

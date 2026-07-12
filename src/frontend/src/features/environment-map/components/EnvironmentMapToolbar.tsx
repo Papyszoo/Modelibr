@@ -4,7 +4,6 @@ import { Button } from 'primereact/button'
 import { InputSwitch } from 'primereact/inputswitch'
 import { MultiSelect } from 'primereact/multiselect'
 
-import { CategoryFilterPicker } from '@/shared/components/categories/CategoryFilterPicker'
 import {
   ListToolbar,
   ListToolbarActions,
@@ -18,8 +17,6 @@ import {
   ListToolbarSelectionSummary,
   OptionsButton,
 } from '@/shared/components/list-toolbar'
-import { type CategorySelectionKeys } from '@/shared/types/categories'
-import { type EnvironmentMapCategoryDto } from '@/types'
 
 interface EnvironmentMapToolbarOption {
   label: string
@@ -36,17 +33,13 @@ interface EnvironmentMapToolbarProps {
   previewSizeOptions: EnvironmentMapToolbarOption[]
   packOptions: EnvironmentMapToolbarOption[]
   projectOptions: EnvironmentMapToolbarOption[]
-  categories: EnvironmentMapCategoryDto[]
   selectedPreviewSizes: string[]
   selectedPackIds: number[]
   selectedProjectIds: number[]
-  selectedCategoryKeys: CategorySelectionKeys
   onlyCustomThumbnail: boolean
   onPreviewSizesChange: (values: string[]) => void
   onPackIdsChange: (values: number[]) => void
   onProjectIdsChange: (values: number[]) => void
-  onCategoryChange: (keys: CategorySelectionKeys) => void
-  onManageCategoriesClick: () => void
   onOnlyCustomThumbnailChange: (value: boolean) => void
   cardWidth: number
   onCardWidthChange: (width: number) => void
@@ -58,6 +51,9 @@ interface EnvironmentMapToolbarProps {
   onBulkActionsClick: (event: React.MouseEvent<HTMLElement>) => void
   onSelectAllClick: () => void
   onDeselectAllClick: () => void
+  isCategoryPanelOpen: boolean
+  onCategoryPanelToggle: () => void
+  categoryFilterActive?: boolean
 }
 
 export function EnvironmentMapToolbar({
@@ -82,30 +78,27 @@ export function EnvironmentMapToolbar({
   previewSizeOptions,
   packOptions,
   projectOptions,
-  categories,
   selectedPreviewSizes,
   selectedPackIds,
   selectedProjectIds,
-  selectedCategoryKeys,
   onPreviewSizesChange,
   onPackIdsChange,
   onProjectIdsChange,
-  onCategoryChange,
-  onManageCategoriesClick,
+  isCategoryPanelOpen,
+  onCategoryPanelToggle,
+  categoryFilterActive = false,
 }: EnvironmentMapToolbarProps) {
   const hasActiveSearch = searchQuery.trim().length > 0
   const hasActiveFilters =
     selectedPreviewSizes.length > 0 ||
     selectedPackIds.length > 0 ||
     selectedProjectIds.length > 0 ||
-    Object.values(selectedCategoryKeys).some(state => state?.checked) ||
     onlyCustomThumbnail
 
   const activeFilterCount = [
     selectedPreviewSizes.length > 0,
     selectedPackIds.length > 0,
     selectedProjectIds.length > 0,
-    Object.values(selectedCategoryKeys).some(state => state?.checked),
     onlyCustomThumbnail,
   ].filter(Boolean).length
 
@@ -160,6 +153,16 @@ export function EnvironmentMapToolbar({
             onClick={onRefreshClick}
             tooltip="Refresh list"
             ariaLabel="Refresh"
+          />
+          <ListToolbarButton
+            icon="pi pi-folder"
+            label="Categories"
+            active={isCategoryPanelOpen}
+            onClick={onCategoryPanelToggle}
+            tooltip="Toggle category panel"
+            ariaLabel="Toggle categories"
+            ariaExpanded={isCategoryPanelOpen}
+            badge={categoryFilterActive ? 1 : undefined}
           />
         </ListToolbarActions>
 
@@ -246,22 +249,6 @@ export function EnvironmentMapToolbar({
               filterPlaceholder="Search projects..."
             />
           ) : null}
-          {categories.length > 0 ? (
-            <CategoryFilterPicker
-              categories={categories}
-              selectedKeys={selectedCategoryKeys}
-              onChange={onCategoryChange}
-              onManageClick={onManageCategoriesClick}
-              ariaLabel="Filter by environment map categories"
-            />
-          ) : (
-            <Button
-              icon="pi pi-sitemap"
-              label="Manage Categories"
-              className="p-button-text p-button-sm list-filters-control"
-              onClick={onManageCategoriesClick}
-            />
-          )}
           <div className="list-filters-switch">
             <InputSwitch
               checked={onlyCustomThumbnail}
@@ -281,7 +268,6 @@ export function EnvironmentMapToolbar({
                 onPreviewSizesChange([])
                 onPackIdsChange([])
                 onProjectIdsChange([])
-                onCategoryChange({})
                 onOnlyCustomThumbnailChange(false)
               }}
             />

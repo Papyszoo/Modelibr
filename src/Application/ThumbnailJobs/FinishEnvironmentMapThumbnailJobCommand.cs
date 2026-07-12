@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
@@ -28,6 +29,7 @@ public class FinishEnvironmentMapThumbnailJobCommandHandler
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IThumbnailNotificationService _thumbnailNotificationService;
     private readonly ILogger<FinishEnvironmentMapThumbnailJobCommandHandler> _logger;
+    private readonly IUnitOfWork _unitOfWork;
 
     public FinishEnvironmentMapThumbnailJobCommandHandler(
         IThumbnailJobRepository thumbnailJobRepository,
@@ -35,7 +37,8 @@ public class FinishEnvironmentMapThumbnailJobCommandHandler
         IThumbnailQueue thumbnailQueue,
         IDateTimeProvider dateTimeProvider,
         IThumbnailNotificationService thumbnailNotificationService,
-        ILogger<FinishEnvironmentMapThumbnailJobCommandHandler> logger)
+        ILogger<FinishEnvironmentMapThumbnailJobCommandHandler> logger,
+        IUnitOfWork unitOfWork)
     {
         _thumbnailJobRepository = thumbnailJobRepository;
         _environmentMapRepository = environmentMapRepository;
@@ -43,6 +46,7 @@ public class FinishEnvironmentMapThumbnailJobCommandHandler
         _dateTimeProvider = dateTimeProvider;
         _thumbnailNotificationService = thumbnailNotificationService;
         _logger = logger;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<FinishEnvironmentMapThumbnailJobResponse>> Handle(
@@ -88,6 +92,7 @@ public class FinishEnvironmentMapThumbnailJobCommandHandler
         {
             variant.SetThumbnailPath(command.ThumbnailPath, now);
             await _environmentMapRepository.UpdateAsync(environmentMap, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
             await _thumbnailQueue.MarkCompletedAsync(command.JobId, cancellationToken);
             await SendThumbnailNotificationAsync(environmentMap.Id, variant.Id, "Ready", now, null, cancellationToken);
             _logger.LogInformation("Environment map thumbnail job {JobId} completed for environment map {EnvironmentMapId} variant {VariantId}",
@@ -97,6 +102,7 @@ public class FinishEnvironmentMapThumbnailJobCommandHandler
         {
             variant.SetThumbnailPath(null, now);
             await _environmentMapRepository.UpdateAsync(environmentMap, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
             await _thumbnailQueue.MarkFailedAsync(command.JobId, command.ErrorMessage!, cancellationToken);
             await SendThumbnailNotificationAsync(environmentMap.Id, variant.Id, "Failed", now, command.ErrorMessage, cancellationToken);
             _logger.LogWarning("Environment map thumbnail job {JobId} failed for environment map {EnvironmentMapId} variant {VariantId}: {ErrorMessage}",

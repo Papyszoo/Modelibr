@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Services;
@@ -10,15 +11,18 @@ internal sealed class AddModelConceptImageCommandHandler : ICommandHandler<AddMo
     private readonly IModelRepository _modelRepository;
     private readonly IFileRepository _fileRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public AddModelConceptImageCommandHandler(
         IModelRepository modelRepository,
         IFileRepository fileRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _modelRepository = modelRepository;
         _fileRepository = fileRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(AddModelConceptImageCommand command, CancellationToken cancellationToken)
@@ -37,6 +41,7 @@ internal sealed class AddModelConceptImageCommandHandler : ICommandHandler<AddMo
 
         model.AddConceptImage(file, _dateTimeProvider.UtcNow);
         await _modelRepository.UpdateAsync(model, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }
 }
@@ -45,13 +50,16 @@ internal sealed class RemoveModelConceptImageCommandHandler : ICommandHandler<Re
 {
     private readonly IModelRepository _modelRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public RemoveModelConceptImageCommandHandler(
         IModelRepository modelRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _modelRepository = modelRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(RemoveModelConceptImageCommand command, CancellationToken cancellationToken)
@@ -64,6 +72,7 @@ internal sealed class RemoveModelConceptImageCommandHandler : ICommandHandler<Re
 
         model.RemoveConceptImage(command.FileId, _dateTimeProvider.UtcNow);
         await _modelRepository.UpdateAsync(model, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }
 }

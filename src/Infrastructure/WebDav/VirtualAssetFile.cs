@@ -1,4 +1,6 @@
 using Application.Abstractions.Storage;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using NWebDav.Server;
 using NWebDav.Server.Http;
 using NWebDav.Server.Locking;
@@ -13,17 +15,34 @@ namespace Infrastructure.WebDav;
 public sealed class VirtualAssetFile : IStoreItem, IVirtualFileMetadata
 {
     private readonly IUploadPathProvider _pathProvider;
+    private readonly string _relativePath;
+    private readonly ILogger _logger;
 
+    /// <param name="relativePath">
+    /// The <c>File.FilePath</c> value persisted by <c>HashBasedFileStorage</c> (e.g.
+    /// <c>"aa/bb/&lt;hash&gt;"</c>) — the single source of truth for where this asset's
+    /// bytes live on disk. Never re-derived from <paramref name="sha256Hash"/> here; see
+    /// item 4 of prompt 30.
+    /// </param>
+    /// <param name="logger">
+    /// Optional: only threaded through by callers that resolve a single named file
+    /// directly (the real GET/HEAD path, in <see cref="VirtualAssetStore"/>). Collection
+    /// listings that construct these purely for PROPFIND enumeration never call
+    /// <see cref="GetReadableStreamAsync"/>, so they pass no logger and this class falls
+    /// back to a no-op logger rather than forcing a logger through every listing call site.
+    /// </param>
     public VirtualAssetFile(
         VirtualItemPropertyManager propertyManager,
         ILockingManager lockingManager,
         string name,
         string sha256Hash,
+        string relativePath,
         long sizeBytes,
         string mimeType,
         DateTime createdAt,
         DateTime updatedAt,
-        IUploadPathProvider pathProvider)
+        IUploadPathProvider pathProvider,
+        ILogger? logger = null)
     {
         PropertyManager = propertyManager;
         LockingManager = lockingManager;
@@ -34,6 +53,8 @@ public sealed class VirtualAssetFile : IStoreItem, IVirtualFileMetadata
         CreatedAt = createdAt;
         UpdatedAt = updatedAt;
         _pathProvider = pathProvider;
+        _relativePath = relativePath;
+        _logger = logger ?? NullLogger.Instance;
     }
 
     public string Name { get; }
@@ -52,6 +73,19 @@ public sealed class VirtualAssetFile : IStoreItem, IVirtualFileMetadata
 
         if (!File.Exists(physicalPath))
         {
+            // A physical blob missing for a File row that's actually referenced by a
+            // model/texture/sprite/sound is a data-safety event, not a routine 404 — log
+            // it loudly. Returning Stream.Null (rather than an empty/zero-length stream
+            // written to the response) is what makes this a 404 instead of a bogus 0-byte
+            // download: CustomWebDavHandler.WriteFileAsync checks
+            // ReferenceEquals(stream, Stream.Null) and sets response.Status = 404 before
+            // ever touching the response body. NWebDav's own GET handler is never reached
+            // for this store — CustomWebDavHandler fully replaces it (see
+            // RequestHandlerFactory) — so this Stream.Null contract is the only mechanism
+            // that matters here.
+            _logger.LogError(
+                "Missing physical blob for asset {Name} (hash {Hash}): expected at {ExpectedPath}",
+                Name, Sha256Hash, physicalPath);
             return Task.FromResult(Stream.Null);
         }
 
@@ -70,12 +104,5 @@ public sealed class VirtualAssetFile : IStoreItem, IVirtualFileMetadata
         return Task.FromResult(new StoreItemResult(DavStatusCode.Forbidden));
     }
 
-    private string GetPhysicalPath()
-    {
-        // Hash-based storage: root/aa/bb/hash
-        var hash = Sha256Hash.ToLowerInvariant();
-        var a = hash[..2];
-        var b = hash[2..4];
-        return Path.Combine(_pathProvider.UploadRootPath, a, b, hash);
-    }
+    private string GetPhysicalPath() => Path.Combine(_pathProvider.UploadRootPath, _relativePath);
 }

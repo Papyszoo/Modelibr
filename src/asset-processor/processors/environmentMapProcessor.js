@@ -18,9 +18,16 @@ export class EnvironmentMapProcessor extends BaseProcessor {
     return 'environment-map'
   }
 
-  async process(job, jobLogger) {
+  /**
+   * @param {Object} job - The job to process.
+   * @param {Object} jobLogger - Logger with job context.
+   * @param {AbortSignal} [signal] - Set when the job times out; used to
+   *   force-reinitialize the held renderer instead of leaving it hung.
+   */
+  async process(job, jobLogger, signal) {
     let renderer = null
     let source = null
+    let disarmAbort = () => {}
 
     try {
       const environmentMapId = job.environmentMapId
@@ -47,6 +54,12 @@ export class EnvironmentMapProcessor extends BaseProcessor {
       }
 
       renderer = await this.rendererPool.acquire()
+      disarmAbort = this._armRendererAbort(
+        signal,
+        this.rendererPool,
+        renderer,
+        jobLogger
+      )
 
       await renderer.loadEnvironmentPreview(source, config.environmentMaps)
 
@@ -75,6 +88,7 @@ export class EnvironmentMapProcessor extends BaseProcessor {
 
       return storageResult
     } finally {
+      disarmAbort()
       if (renderer) {
         this.rendererPool.release(renderer)
       }

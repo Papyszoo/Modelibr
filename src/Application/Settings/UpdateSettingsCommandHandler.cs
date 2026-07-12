@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Models;
@@ -11,15 +12,18 @@ internal class UpdateSettingsCommandHandler : ICommandHandler<UpdateSettingsComm
     private readonly IApplicationSettingsRepository _settingsRepository;
     private readonly ISettingRepository _settingRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public UpdateSettingsCommandHandler(
         IApplicationSettingsRepository settingsRepository,
         ISettingRepository settingRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _settingsRepository = settingsRepository;
         _settingRepository = settingRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<UpdateSettingsResponse>> Handle(UpdateSettingsCommand command, CancellationToken cancellationToken)
@@ -63,6 +67,8 @@ internal class UpdateSettingsCommandHandler : ICommandHandler<UpdateSettingsComm
             await UpdateOrCreateSettingAsync(SettingKeys.GenerateThumbnailOnUpload, command.GenerateThumbnailOnUpload.ToString().ToLower(), now, cancellationToken);
             await UpdateOrCreateSettingAsync(SettingKeys.GenerateAnimatedThumbnail, command.GenerateAnimatedThumbnail.ToString().ToLower(), now, cancellationToken);
             await UpdateOrCreateSettingAsync(SettingKeys.TextureProxySize, command.TextureProxySize.ToString(), now, cancellationToken);
+
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             return Result.Success(new UpdateSettingsResponse(
                 updatedSettings.MaxFileSizeBytes,

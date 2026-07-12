@@ -1,5 +1,6 @@
 import { Page, expect, Locator } from "@playwright/test";
 import { navigateToAppClean } from "../helpers/navigation-helper";
+import { revealVirtualizedCard } from "../helpers/reveal-virtualized-card";
 
 export class ModelListPage {
     constructor(private page: Page) {}
@@ -57,44 +58,6 @@ export class ModelListPage {
         await input.fill(value === null ? "" : String(value));
         // Commit the value so PrimeReact's onValueChange fires.
         await input.press("Enter");
-    }
-
-    /**
-     * Open the model category manager. Mirrors the texture-set flow: the
-     * toolbar panel is `pointer-events: none` until it has `.is-open`, so we
-     * gate on that class before clicking the picker trigger / manage button.
-     */
-    async openCategoryManager(): Promise<void> {
-        const openPanel = this.page.locator(
-            "#model-grid-filters-panel.is-open",
-        );
-        if (!(await openPanel.count())) {
-            await this.page
-                .getByRole("button", { name: /^filters$/i })
-                .click();
-        }
-        await openPanel.waitFor({ state: "visible", timeout: 5000 });
-
-        const panel = this.page.locator("#model-grid-filters-panel");
-        const trigger = panel.locator(
-            'button[aria-label="Filter by model categories"]',
-        );
-        if (await trigger.count()) {
-            await trigger.scrollIntoViewIfNeeded();
-            await trigger.click();
-            const overlay = this.page.locator(".p-overlaypanel");
-            await overlay.waitFor({ state: "visible" });
-            await overlay
-                .locator('button[aria-label="Manage categories"]')
-                .click();
-        } else {
-            await panel
-                .getByRole("button", { name: "Manage categories" })
-                .click();
-        }
-        await this.page
-            .getByRole("dialog", { name: "Manage Model Categories" })
-            .waitFor({ state: "visible" });
     }
 
     async goto() {
@@ -249,6 +212,16 @@ export class ModelListPage {
         await expect(async () => {
             const visible = await modelCard.isVisible().catch(() => false);
             if (!visible) {
+                // The card may simply be virtualised out of the DOM: the
+                // category-sidebar rework narrows the grid (fewer columns), so
+                // cards past the first viewport rows aren't rendered until the
+                // scroll container (`.model-grid-main`) scrolls to them. Try a
+                // progressive scroll before falling back to a reload.
+                await this.scrollGridToFindCard(modelCard);
+                if (await modelCard.isVisible().catch(() => false)) {
+                    await expect(modelCard).toBeVisible({ timeout: 5000 });
+                    return;
+                }
                 await this.page.reload({ waitUntil: "domcontentloaded" });
                 await this.page.waitForSelector(
                     ".model-card, .model-grid, .no-results, .empty-state",
@@ -257,10 +230,21 @@ export class ModelListPage {
                         timeout: 15000,
                     },
                 );
+                await this.scrollGridToFindCard(modelCard);
             }
 
             await expect(modelCard).toBeVisible({ timeout: 5000 });
         }).toPass({ timeout: 60000, intervals: [1000, 2000, 5000] });
+    }
+
+    /**
+     * Progressively scroll the (virtualised) model grid so an off-viewport
+     * card is rendered into the DOM. The scrollable region is
+     * `.model-grid-main` (the category-sidebar rework moved the scroll there;
+     * `.model-grid-container` is now the non-scrolling outer shell).
+     */
+    private async scrollGridToFindCard(card: Locator): Promise<void> {
+        await revealVirtualizedCard(this.page, ".model-grid-main", card);
     }
 
     async openModel(modelName: string) {
@@ -276,6 +260,11 @@ export class ModelListPage {
             .locator('[class*="model-card"], [class*="model-list-item"]')
             .filter({ hasText: nameWithoutExt })
             .first();
+
+        // The card may be virtualised out of the DOM (the category sidebar
+        // narrows the grid, so cards past the first rows only render once
+        // scrolled to). Reveal it before probing for it.
+        await this.scrollGridToFindCard(modelCard);
 
         // If no specific card class, try finding clickable container with the text
         const fallbackCard = this.page
@@ -339,27 +328,6 @@ export class ModelListPage {
             .click();
         await dialog.getByRole("button", { name: "Move" }).click();
         await dialog.waitFor({ state: "hidden" });
-    }
-
-    /** Filter the model list by a category via the filter-picker popover. */
-    async filterByCategory(categoryName: string): Promise<void> {
-        await this.ensureFiltersOpen();
-        const trigger = this.page
-            .locator("#model-grid-filters-panel")
-            .locator('button[aria-label="Filter by model categories"]');
-        await trigger.scrollIntoViewIfNeeded();
-        await trigger.click();
-        const overlay = this.page.locator(".p-overlaypanel");
-        await overlay.waitFor({ state: "visible" });
-        await overlay
-            .locator(".category-tree .p-treenode-content", {
-                hasText: categoryName,
-            })
-            .first()
-            .locator(".p-checkbox")
-            .click();
-        await this.page.keyboard.press("Escape");
-        await overlay.waitFor({ state: "hidden" });
     }
 
     /**

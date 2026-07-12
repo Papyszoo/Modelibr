@@ -1,5 +1,5 @@
 import { client, UPLOAD_TIMEOUT } from '@/lib/apiBase'
-import { type SpriteDto } from '@/types'
+import { type SpriteCategoryDto, type SpriteDto } from '@/types'
 
 export async function getAllSprites(): Promise<{
   sprites: Array<{
@@ -135,13 +135,7 @@ export async function softDeleteSprite(spriteId: number): Promise<void> {
 // Sprite Category methods
 
 export async function getAllSpriteCategories(): Promise<{
-  categories: Array<{
-    id: number
-    name: string
-    description: string | null
-    createdAt: string
-    updatedAt: string
-  }>
+  categories: SpriteCategoryDto[]
 }> {
   const response = await client.get('/sprite-categories')
   return response.data
@@ -149,7 +143,8 @@ export async function getAllSpriteCategories(): Promise<{
 
 export async function createSpriteCategory(
   name: string,
-  description?: string
+  description?: string,
+  parentId?: number | null
 ): Promise<{
   id: number
   name: string
@@ -158,6 +153,7 @@ export async function createSpriteCategory(
   const response = await client.post('/sprite-categories', {
     name,
     description,
+    parentId: parentId ?? null,
   })
   return response.data
 }
@@ -165,7 +161,8 @@ export async function createSpriteCategory(
 export async function updateSpriteCategory(
   id: number,
   name: string,
-  description?: string
+  description?: string,
+  parentId?: number | null
 ): Promise<{
   id: number
   name: string
@@ -174,6 +171,7 @@ export async function updateSpriteCategory(
   const response = await client.put(`/sprite-categories/${id}`, {
     name,
     description,
+    parentId: parentId ?? null,
   })
   return response.data
 }

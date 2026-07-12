@@ -9,6 +9,8 @@
  */
 import { type DBSchema, type IDBPDatabase, openDB } from 'idb'
 
+import { buildBaseMeshSeed } from './baseMeshesSeed'
+
 // ─── Schema ─────────────────────────────────────────────────────────────
 
 export interface DemoFile {
@@ -635,6 +637,7 @@ export async function seedIfEmpty(): Promise<void> {
   if (modelCount > 0) return // already seeded
 
   const now = new Date().toISOString()
+  const baseMeshSeed = buildBaseMeshSeed(now)
 
   const seedModels: DemoModel[] = [
     {
@@ -1570,6 +1573,9 @@ public class Enemy : MonoBehaviour
   )
   for (const m of seedModels) await tx.objectStore('models').put(m)
   for (const v of seedVersions) await tx.objectStore('modelVersions').put(v)
+  for (const m of baseMeshSeed.models) await tx.objectStore('models').put(m)
+  for (const v of baseMeshSeed.versions)
+    await tx.objectStore('modelVersions').put(v)
   for (const ts of seedTextureSets) await tx.objectStore('textureSets').put(ts)
   for (const sp of seedSprites) await tx.objectStore('sprites').put(sp)
   for (const sn of seedSounds) await tx.objectStore('sounds').put(sn)
@@ -1577,6 +1583,7 @@ public class Enemy : MonoBehaviour
   for (const em of seedEnvironmentMaps)
     await tx.objectStore('environmentMaps').put(em)
   for (const pk of seedPacks) await tx.objectStore('packs').put(pk)
+  await tx.objectStore('packs').put(baseMeshSeed.pack)
   for (const pj of seedProjects) await tx.objectStore('projects').put(pj)
   for (const mc of seedModelCategories)
     await tx.objectStore('modelCategories').put(mc)

@@ -1,38 +1,26 @@
 import { JobApiClient } from './jobApiClient.js'
 import { SignalRQueueService } from './signalrQueueService.js'
 import { ModelFileService } from './modelFileService.js'
-import { SoundFileService } from './soundFileService.js'
-import { WaveformGeneratorService } from './waveformGeneratorService.js'
 import { ModelDataService } from './modelDataService.js'
-import { PuppeteerRenderer } from './puppeteerRenderer.js'
-import { FrameEncoderService } from './frameEncoderService.js'
-import { ThumbnailStorageService } from './thumbnailStorageService.js'
-import { JobEventService } from './jobEventService.js'
-import { ThumbnailApiService } from './thumbnailApiService.js'
 import { ProcessorRegistry } from './processors/processorRegistry.js'
 import {
   config,
   refreshBlenderConfigFromApi,
   refreshThumbnailRenderConfigFromApi,
 } from './config.js'
-import logger, { withJobContext } from './logger.js'
+import logger from './logger.js'
 
 /**
- * Job processor that handles thumbnail generation using SignalR real-time queue
+ * Job processor that handles thumbnail generation using SignalR real-time queue.
+ * Dispatch goes exclusively through ProcessorRegistry (see processors/) —
+ * this class owns queueing, concurrency, timeouts and lifecycle only.
  */
 export class JobProcessor {
   constructor() {
     this.jobService = new JobApiClient()
     this.signalrQueueService = new SignalRQueueService()
     this.modelFileService = new ModelFileService()
-    this.soundFileService = new SoundFileService()
-    this.waveformGenerator = new WaveformGeneratorService()
     this.modelDataService = new ModelDataService()
-    this.thumbnailStorage = new ThumbnailStorageService()
-    this.jobEventService = new JobEventService()
-    this.thumbnailApiService = new ThumbnailApiService()
-    this.puppeteerRenderer = null // Legacy — kept for backward compat, active rendering uses ProcessorRegistry
-    this.frameEncoder = null // Will be initialized when needed
     this.isShuttingDown = false
     this.activeJobs = new Map()
     this.jobQueue = [] // Local queue for sequential processing
@@ -293,27 +281,50 @@ export class JobProcessor {
           activeJobs: activePromises.size,
         })
 
+        this.activeJobs.set(job.id, job)
+
         const timeoutMs = config.jobTimeout || 300000
+        const abortController = new AbortController()
+        let timeoutHandle
+        let processorInvoked = false
+
         const jobPromise = (async () => {
           try {
             await refreshBlenderConfigFromApi(this.jobService)
             await refreshThumbnailRenderConfigFromApi(this.jobService)
-            const timeoutPromise = new Promise((_, reject) =>
-              setTimeout(
-                () =>
-                  reject(
-                    new Error(`Job processing timed out after ${timeoutMs}ms`)
-                  ),
-                timeoutMs
-              )
-            )
-            await Promise.race([processor(job), timeoutPromise])
+
+            const timeoutPromise = new Promise((_, reject) => {
+              timeoutHandle = setTimeout(() => {
+                reject(
+                  new Error(`Job processing timed out after ${timeoutMs}ms`)
+                )
+              }, timeoutMs)
+            })
+
+            // Pass an abort signal through to the processor so cancellable
+            // awaits (and, for renderer-backed processors, the RendererPool
+            // slot they're holding) can be torn down instead of hanging
+            // forever once the timeout below fires.
+            processorInvoked = true
+            await Promise.race([
+              processor(job, abortController.signal),
+              timeoutPromise,
+            ])
+            clearTimeout(timeoutHandle)
           } catch (error) {
+            clearTimeout(timeoutHandle)
+
             if (error.message.includes('timed out')) {
               logger.error(`Job ${job.id} timed out after ${timeoutMs}ms`, {
                 jobId: job.id,
                 timeoutMs,
               })
+              // Abort the abandoned work. Renderer-backed processors react
+              // to this by force-reinitializing the pool slot they hold —
+              // without it a hung Puppeteer page keeps that slot forever
+              // and every concurrent job eventually deadlocks the worker
+              // while /health keeps reporting healthy.
+              abortController.abort()
               try {
                 await this.jobService.markJobFailed(job.id, error.message)
               } catch (markFailedError) {
@@ -322,13 +333,45 @@ export class JobProcessor {
                   error: markFailedError.message,
                 })
               }
-              this.activeJobs.delete(job.id)
+            } else if (!processorInvoked) {
+              // Failed before the processor ever ran (e.g. a config
+              // refresh error) — nothing else has reported this job's
+              // outcome, so without this it would sit as "Processing"
+              // until the backend's lock timeout eventually expires.
+              logger.error('Job failed before processing started', {
+                jobId: job.id,
+                error: error.message,
+              })
+              try {
+                await this.jobService.markJobFailed(job.id, error.message)
+              } catch (markFailedError) {
+                logger.error('Failed to mark job as failed', {
+                  jobId: job.id,
+                  error: markFailedError.message,
+                })
+              }
+            } else {
+              // BaseProcessor.execute() already reported this job's
+              // outcome to the backend — or deliberately skipped doing so
+              // because it was aborted by the timeout branch above. The
+              // backend has no guard against a job being finished twice,
+              // so don't call markJobFailed again here: a duplicate call
+              // could clobber a job a different worker has since
+              // reclaimed.
+              logger.error('Job processing failed', {
+                jobId: job.id,
+                error: error.message,
+                aborted: abortController.signal.aborted,
+              })
             }
           }
         })()
 
         activePromises.add(jobPromise)
-        jobPromise.finally(() => activePromises.delete(jobPromise))
+        jobPromise.finally(() => {
+          activePromises.delete(jobPromise)
+          this.activeJobs.delete(job.id)
+        })
       }
 
       // Fill initial slots up to maxConcurrent
@@ -370,588 +413,6 @@ export class JobProcessor {
   }
 
   /**
-   * Process a model thumbnail job asynchronously
-   * @param {Object} job - The job to process
-   */
-  async processModelJobAsync(job) {
-    const jobLogger = withJobContext(job.id, job.modelId)
-    this.activeJobs.set(job.id, job)
-
-    try {
-      jobLogger.info('Starting thumbnail generation')
-
-      // Log job started event
-      await this.jobEventService.logJobStarted(
-        job.id,
-        job.modelId,
-        job.modelHash
-      )
-
-      // Process the model
-      const thumbnailMetadata = await this.processModel(job, jobLogger)
-
-      await this.jobService.markJobCompleted(job.id, thumbnailMetadata)
-
-      // Log job completed event
-      await this.jobEventService.logJobCompleted(job.id, thumbnailMetadata)
-
-      jobLogger.info('Thumbnail generation completed successfully')
-    } catch (error) {
-      jobLogger.error('Thumbnail generation failed', {
-        error: error.message,
-        stack: error.stack,
-      })
-
-      // Log job failed event
-      await this.jobEventService.logJobFailed(
-        job.id,
-        error.message,
-        error.stack
-      )
-
-      try {
-        await this.jobService.markJobFailed(job.id, error.message)
-      } catch (markFailedError) {
-        jobLogger.error('Failed to mark job as failed', {
-          markFailedError: markFailedError.message,
-        })
-      }
-    } finally {
-      this.activeJobs.delete(job.id)
-    }
-  }
-
-  /**
-   * Process a sound waveform job asynchronously
-   * @param {Object} job - The job to process
-   */
-  async processSoundJobAsync(job) {
-    const jobLogger = withJobContext(job.id, job.soundId)
-    this.activeJobs.set(job.id, job)
-
-    try {
-      jobLogger.info('Starting waveform generation')
-
-      // Log job started event
-      await this.jobEventService.logJobStarted(
-        job.id,
-        job.soundId,
-        job.soundHash
-      )
-
-      // Process the sound
-      const thumbnailMetadata = await this.processSound(job, jobLogger)
-
-      await this.jobService.finishSoundJob(job.id, true, thumbnailMetadata)
-
-      // Log job completed event
-      await this.jobEventService.logJobCompleted(job.id, thumbnailMetadata)
-
-      jobLogger.info(
-        'Waveform generation completed successfully',
-        thumbnailMetadata
-      )
-    } catch (error) {
-      jobLogger.error('Waveform generation failed', {
-        error: error.message,
-        stack: error.stack,
-      })
-
-      // Log job failed event
-      await this.jobEventService.logJobFailed(
-        job.id,
-        error.message,
-        error.stack
-      )
-
-      try {
-        await this.jobService.finishSoundJob(job.id, false, {}, error.message)
-      } catch (markFailedError) {
-        jobLogger.error('Failed to mark sound job as failed', {
-          markFailedError: markFailedError.message,
-        })
-      }
-    } finally {
-      this.activeJobs.delete(job.id)
-    }
-  }
-
-  /**
-   * Process a model for thumbnail generation
-   * @param {Object} job - The job being processed
-   * @param {Object} jobLogger - Logger with job context
-   */
-  async processModel(job, jobLogger) {
-    let tempFilePath = null
-    let texturePaths = null
-
-    try {
-      jobLogger.info('Starting model processing', {
-        modelId: job.modelId,
-        modelHash: job.modelHash,
-      })
-
-      // Step 1: Check if thumbnails already exist for this model hash
-      jobLogger.info('Checking for existing thumbnails', {
-        modelHash: job.modelHash,
-      })
-      const existingThumbnails =
-        await this.thumbnailStorage.checkThumbnailsExist(job.modelHash)
-
-      if (existingThumbnails.skipRendering) {
-        jobLogger.info('Thumbnails already exist, skipping rendering', {
-          modelHash: job.modelHash,
-          webpExists: existingThumbnails.webpExists,
-          posterExists: existingThumbnails.posterExists,
-          webpPath: existingThumbnails.paths?.webpPath,
-          posterPath: existingThumbnails.paths?.posterPath,
-        })
-
-        // Update thumbnail metadata if needed (thumbnails exist but job was still created)
-        // This can happen in edge cases where job was queued before thumbnails were stored
-        // For existing thumbnails, we need to provide default metadata since we can't complete without it
-        jobLogger.warn(
-          'Thumbnails already exist, providing default metadata for job completion'
-        )
-        return {
-          thumbnailPath: existingThumbnails.paths?.webpPath || '/default/path',
-          sizeBytes: 0,
-          width: 256,
-          height: 256,
-        }
-      }
-
-      // Step 2: Fetch the model file
-      jobLogger.info('Fetching model file from API')
-      await this.jobEventService.logModelDownloadStarted(job.id, job.modelId)
-
-      const fileInfo = await this.modelFileService.fetchModelFile(
-        job.modelId,
-        job.modelVersionId
-      )
-      tempFilePath = fileInfo.filePath
-
-      jobLogger.info('Model file fetched successfully', {
-        originalFileName: fileInfo.originalFileName,
-        fileType: fileInfo.fileType,
-        filePath: fileInfo.filePath,
-      })
-
-      await this.jobEventService.logModelDownloaded(
-        job.id,
-        job.modelId,
-        fileInfo.fileType,
-        fileInfo.filePath
-      )
-
-      // Step 3: Initialize Puppeteer renderer and load model
-      jobLogger.info('Initializing Puppeteer renderer and loading model')
-      await this.jobEventService.logModelLoadingStarted(
-        job.id,
-        fileInfo.fileType
-      )
-
-      // Initialize Puppeteer renderer if not already done
-      if (!this.puppeteerRenderer) {
-        this.puppeteerRenderer = new PuppeteerRenderer()
-        await this.puppeteerRenderer.initialize()
-      }
-
-      // Load model in browser
-      const polygonCount = await this.puppeteerRenderer.loadModel(
-        fileInfo.filePath,
-        fileInfo.fileType
-      )
-
-      jobLogger.info('Model loaded successfully in browser', {
-        polygonCount,
-        fileType: fileInfo.fileType,
-      })
-
-      await this.jobEventService.logModelLoaded(
-        job.id,
-        polygonCount,
-        fileInfo.fileType
-      )
-
-      // Step 3.5: Fetch and apply textures if default texture set is configured
-      try {
-        // Use defaultTextureSetId from job (version-specific)
-        if (job.defaultTextureSetId) {
-          jobLogger.info('Model version has default texture set configured', {
-            defaultTextureSetId: job.defaultTextureSetId,
-            modelVersionId: job.modelVersionId,
-          })
-
-          await this.jobEventService.logEvent(
-            job.id,
-            'TextureFetchStarted',
-            `Fetching texture set ${job.defaultTextureSetId} for version ${job.modelVersionId}`
-          )
-
-          const textureSet = await this.modelDataService.getTextureSet(
-            job.defaultTextureSetId
-          )
-
-          if (
-            textureSet &&
-            textureSet.textures &&
-            textureSet.textures.length > 0
-          ) {
-            jobLogger.info('Downloading texture files', {
-              textureSetId: textureSet.id,
-              textureSetName: textureSet.name,
-              textureCount: textureSet.textures.length,
-            })
-
-            texturePaths =
-              await this.modelDataService.downloadTextureSetFiles(textureSet)
-
-            if (Object.keys(texturePaths).length > 0) {
-              jobLogger.info('Applying textures to model', {
-                textureTypes: Object.keys(texturePaths),
-              })
-
-              const texturesApplied =
-                await this.puppeteerRenderer.applyTextures(
-                  texturePaths,
-                  fileInfo.fileType
-                )
-
-              if (texturesApplied) {
-                await this.jobEventService.logEvent(
-                  job.id,
-                  'TexturesApplied',
-                  `Applied ${Object.keys(texturePaths).length} textures to model`
-                )
-                jobLogger.info('Textures applied successfully')
-              } else {
-                jobLogger.warn(
-                  'Failed to apply textures, continuing without them'
-                )
-              }
-            } else {
-              jobLogger.warn('No texture files could be downloaded')
-            }
-          } else {
-            jobLogger.info(
-              'Texture set has no textures or could not be fetched'
-            )
-          }
-        } else {
-          jobLogger.debug('No default texture set configured for this model')
-        }
-      } catch (textureError) {
-        jobLogger.warn(
-          'Failed to fetch or apply textures, continuing without them',
-          {
-            error: textureError.message,
-          }
-        )
-        // Don't fail the job if textures can't be applied, continue with rendering
-      }
-
-      // Step 4: Generate orbit frames using Puppeteer renderer
-      if (config.orbit.enabled) {
-        jobLogger.info('Starting orbit frame rendering with Puppeteer')
-
-        // Calculate frame count for logging
-        const angleRange = config.orbit.endAngle - config.orbit.startAngle
-        const frameCount = Math.ceil(angleRange / config.orbit.angleStep)
-
-        await this.jobEventService.logFrameRenderingStarted(
-          job.id,
-          frameCount,
-          {
-            outputWidth: config.rendering.outputWidth,
-            outputHeight: config.rendering.outputHeight,
-            orbitAngleStep: config.orbit.angleStep,
-            orbitStartAngle: config.orbit.startAngle,
-            orbitEndAngle: config.orbit.endAngle,
-          }
-        )
-
-        // Render orbit frames
-        const renderStartTime = Date.now()
-        const frames = await this.puppeteerRenderer.renderOrbitFrames(jobLogger)
-
-        // Log memory statistics
-        const memoryStats = this.puppeteerRenderer.getMemoryStats(frames)
-        jobLogger.info('Orbit frame rendering completed successfully', {
-          polygonCount,
-          ...memoryStats,
-          processingConfig: {
-            outputWidth: config.rendering.outputWidth,
-            outputHeight: config.rendering.outputHeight,
-            outputFormat: config.rendering.outputFormat,
-            orbitAngleStep: config.orbit.angleStep,
-            orbitStartAngle: config.orbit.startAngle,
-            orbitEndAngle: config.orbit.endAngle,
-            cameraDistance: config.rendering.cameraDistance,
-            maxPolygonCount: config.modelProcessing.maxPolygonCount,
-            normalizedScale: config.modelProcessing.normalizedScale,
-          },
-        })
-
-        const renderTime = Date.now() - renderStartTime
-        await this.jobEventService.logFrameRenderingCompleted(
-          job.id,
-          frames.length,
-          renderTime
-        )
-
-        // Note: Frames are stored in memory for processing
-        jobLogger.info('Frames stored in memory for processing', {
-          frameCount: frames.length,
-          memoryUsageMB: memoryStats.totalSizeMB,
-        })
-
-        // Step 5: Encode frames into animated WebP and poster if enabled
-        if (config.encoding.enabled) {
-          jobLogger.info('Starting frame encoding')
-          await this.jobEventService.logEncodingStarted(job.id, frames.length)
-
-          // Initialize frame encoder if not already done
-          if (!this.frameEncoder) {
-            this.frameEncoder = new FrameEncoderService()
-          }
-
-          // Encode frames to WebP and poster
-          const encodingResult = await this.frameEncoder.encodeFrames(
-            frames,
-            jobLogger
-          )
-
-          jobLogger.info('Frame encoding completed successfully', {
-            webpPath: encodingResult.webpPath,
-            posterPath: encodingResult.posterPath,
-            encodeTimeMs: encodingResult.encodeTimeMs,
-            frameCount: encodingResult.frameCount,
-          })
-
-          await this.jobEventService.logEncodingCompleted(
-            job.id,
-            encodingResult.webpPath,
-            encodingResult.posterPath,
-            encodingResult.encodeTimeMs
-          )
-
-          // Step 6: Store thumbnails via API upload
-          if (this.thumbnailStorage.enabled) {
-            jobLogger.info('Uploading thumbnails to API')
-            await this.jobEventService.logThumbnailUploadStarted(
-              job.id,
-              job.modelHash
-            )
-
-            const storageResult = await this.thumbnailStorage.storeThumbnails(
-              job.modelHash,
-              encodingResult.webpPath,
-              encodingResult.posterPath,
-              encodingResult.pngPath,
-              job.modelId, // Pass model ID for API upload
-              job.modelVersionId // Pass model version ID for version-specific upload
-            )
-
-            jobLogger.info('Thumbnail API upload completed', {
-              stored: storageResult.stored,
-              webpStored: storageResult.webpStored,
-              posterStored: storageResult.posterStored,
-              pngStored: storageResult.pngStored,
-              uploadResults: storageResult.uploadResults?.length || 0,
-              allSuccessful: storageResult.apiResponse?.allSuccessful,
-            })
-
-            await this.jobEventService.logThumbnailUploadCompleted(
-              job.id,
-              storageResult.uploadResults
-            )
-
-            // Extract thumbnail metadata from successful upload for job completion
-            if (
-              storageResult.stored &&
-              storageResult.uploadResults?.length > 0
-            ) {
-              const successfulUpload = storageResult.uploadResults.find(
-                upload => upload.success && upload.data
-              )
-              if (successfulUpload && successfulUpload.data) {
-                const thumbnailData = successfulUpload.data
-                jobLogger.info(
-                  'Extracted thumbnail metadata for job completion',
-                  {
-                    thumbnailPath: thumbnailData.thumbnailPath,
-                    sizeBytes: thumbnailData.sizeBytes,
-                    width: thumbnailData.width,
-                    height: thumbnailData.height,
-                  }
-                )
-
-                return {
-                  thumbnailPath: thumbnailData.thumbnailPath,
-                  sizeBytes: thumbnailData.sizeBytes,
-                  width: thumbnailData.width,
-                  height: thumbnailData.height,
-                }
-              }
-            }
-
-            // If upload failed, throw error instead of returning default metadata
-            const errorMsg =
-              'Thumbnail upload failed - no valid thumbnail data available'
-            jobLogger.error(errorMsg)
-            await this.jobEventService.logError(
-              job.id,
-              'ThumbnailUploadFailed',
-              errorMsg,
-              new Error(errorMsg)
-            )
-            throw new Error(errorMsg)
-          } else {
-            const errorMsg =
-              'Persistent thumbnail storage is disabled - cannot complete job'
-            jobLogger.error(errorMsg)
-            await this.jobEventService.logError(
-              job.id,
-              'StorageDisabled',
-              errorMsg,
-              new Error(errorMsg)
-            )
-            throw new Error(errorMsg)
-          }
-        } else {
-          const errorMsg =
-            'Frame encoding is disabled - cannot generate thumbnails'
-          jobLogger.error(errorMsg)
-          await this.jobEventService.logError(
-            job.id,
-            'EncodingDisabled',
-            errorMsg,
-            new Error(errorMsg)
-          )
-          throw new Error(errorMsg)
-        }
-      } else {
-        const errorMsg =
-          'Orbit rendering is disabled - cannot generate thumbnails'
-        jobLogger.error(errorMsg)
-        await this.jobEventService.logError(
-          job.id,
-          'RenderingDisabled',
-          errorMsg,
-          new Error(errorMsg)
-        )
-        throw new Error(errorMsg)
-      }
-    } catch (error) {
-      jobLogger.error('Model processing failed', {
-        error: error.message,
-        modelId: job.modelId,
-      })
-      throw error
-    } finally {
-      // Clean up temporary file
-      if (tempFilePath) {
-        await this.modelFileService.cleanupFile(tempFilePath)
-      }
-
-      // Clean up temporary texture files
-      if (texturePaths) {
-        await this.modelDataService.cleanupTextureFiles(texturePaths)
-      }
-    }
-  }
-
-  /**
-   * Process a sound for waveform thumbnail generation
-   * @param {Object} job - The job being processed
-   * @param {Object} jobLogger - Logger with job context
-   */
-  async processSound(job, jobLogger) {
-    let tempFilePath = null
-
-    try {
-      jobLogger.info('Starting sound waveform processing', {
-        soundId: job.soundId,
-        soundHash: job.soundHash,
-      })
-
-      // Step 1: Fetch the sound file
-      jobLogger.info('Fetching sound file from API')
-
-      const fileInfo = await this.soundFileService.fetchSoundFile(job.soundId)
-      tempFilePath = fileInfo.filePath
-
-      jobLogger.info('Sound file fetched successfully', {
-        originalFileName: fileInfo.originalFileName,
-        fileType: fileInfo.fileType,
-        filePath: fileInfo.filePath,
-      })
-
-      // Step 2: Generate waveform PNG
-      jobLogger.info('Generating waveform thumbnail')
-
-      const tempOutputPath = `${tempFilePath}.waveform.png`
-      const { peaks, duration } = await this.waveformGenerator.generateWaveform(
-        tempFilePath,
-        tempOutputPath,
-        {
-          width: 800,
-          height: 150,
-          peakCount: 200,
-          color: '#3b82f6',
-        }
-      )
-
-      jobLogger.info('Waveform thumbnail generated', {
-        outputPath: tempOutputPath,
-        duration,
-        peakCount: peaks.length,
-      })
-
-      // Step 3: Upload waveform thumbnail to backend API
-      jobLogger.info('Uploading waveform thumbnail to backend')
-
-      const uploadResult = await this.thumbnailApiService.uploadSoundWaveform(
-        job.soundId,
-        tempOutputPath,
-        job.soundHash
-      )
-
-      if (!uploadResult.success) {
-        throw new Error(
-          `Failed to upload waveform thumbnail: ${uploadResult.error}`
-        )
-      }
-
-      jobLogger.info('Waveform thumbnail uploaded successfully', {
-        storagePath: uploadResult.storagePath,
-        sizeBytes: uploadResult.sizeBytes,
-      })
-
-      return {
-        waveformPath: uploadResult.storagePath,
-        sizeBytes: uploadResult.sizeBytes,
-      }
-    } catch (error) {
-      jobLogger.error('Sound waveform generation failed', {
-        error: error.message,
-        stack: error.stack,
-      })
-      throw error
-    } finally {
-      // Clean up temporary files
-      if (tempFilePath) {
-        this.soundFileService.cleanupFile(tempFilePath)
-
-        // Also cleanup the waveform output file
-        const tempOutputPath = `${tempFilePath}.waveform.png`
-        this.soundFileService.cleanupFile(tempOutputPath)
-      }
-    }
-  }
-
-  /**
    * Start periodic cleanup of temporary files
    */
   startPeriodicCleanup() {
@@ -964,11 +425,6 @@ export class JobProcessor {
 
             // Clean up old texture files
             await this.modelDataService.cleanupOldTextureFiles()
-
-            // Also cleanup old frame encoder files if encoder is initialized
-            if (this.frameEncoder) {
-              await this.frameEncoder.cleanupOldFiles()
-            }
           } catch (error) {
             logger.warn('Periodic cleanup failed', { error: error.message })
           }
@@ -1011,19 +467,8 @@ export class JobProcessor {
       this.jobQueue = [] // Clear the queue
     }
 
-    // Dispose of Puppeteer renderer resources
-    if (this.puppeteerRenderer) {
-      await this.puppeteerRenderer.dispose()
-      this.puppeteerRenderer = null
-    }
-
-    // Clean up frame encoder resources
-    if (this.frameEncoder) {
-      await this.frameEncoder.cleanupOldFiles(0) // Clean all files immediately
-      this.frameEncoder = null
-    }
-
-    // Clean up all registered processors
+    // Clean up all registered processors (each owns its own RendererPool /
+    // FrameEncoderService and releases them here)
     if (this.processorRegistry) {
       await this.processorRegistry.cleanupAll()
     }

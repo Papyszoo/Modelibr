@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using SharedKernel;
@@ -7,10 +8,14 @@ namespace Application.Packs;
 internal class DeletePackCommandHandler : ICommandHandler<DeletePackCommand>
 {
     private readonly IPackRepository _packRepository;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public DeletePackCommandHandler(IPackRepository packRepository)
+    public DeletePackCommandHandler(
+        IPackRepository packRepository,
+        IUnitOfWork unitOfWork)
     {
         _packRepository = packRepository;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(DeletePackCommand command, CancellationToken cancellationToken)
@@ -24,6 +29,7 @@ internal class DeletePackCommandHandler : ICommandHandler<DeletePackCommand>
 
         await _packRepository.DeleteAsync(pack, cancellationToken);
 
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }
 }

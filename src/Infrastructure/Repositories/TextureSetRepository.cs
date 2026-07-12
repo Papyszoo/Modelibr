@@ -21,7 +21,6 @@ internal sealed class TextureSetRepository : ITextureSetRepository
             throw new ArgumentNullException(nameof(textureSet));
 
         var entityEntry = await _context.TextureSets.AddAsync(textureSet, cancellationToken);
-        await _context.SaveChangesAsync(cancellationToken);
         
         return entityEntry.Entity;
     }
@@ -66,6 +65,7 @@ internal sealed class TextureSetRepository : ITextureSetRepository
         string? searchName = null,
         int? minResolution = null,
         IReadOnlyCollection<string>? normalizedTagNames = null,
+        bool? uncategorized = null,
         CancellationToken cancellationToken = default)
     {
         var query = _context.TextureSets.AsNoTracking().AsQueryable();
@@ -79,7 +79,9 @@ internal sealed class TextureSetRepository : ITextureSetRepository
         if (projectIds is { Count: > 0 })
             query = query.Where(ts => ts.Projects.Any(p => projectIds.Contains(p.Id)));
 
-        if (categoryIds is { Count: > 0 })
+        if (uncategorized == true)
+            query = query.Where(ts => ts.TextureSetCategoryId == null);
+        else if (categoryIds is { Count: > 0 })
             query = query.Where(ts =>
                 ts.TextureSetCategoryId.HasValue &&
                 categoryIds.Contains(ts.TextureSetCategoryId.Value));
@@ -127,6 +129,29 @@ internal sealed class TextureSetRepository : ITextureSetRepository
             .ToListAsync(cancellationToken);
 
         return (items, totalCount);
+    }
+
+    public async Task<CategoryAssetCounts> GetCategoryAssetCountsAsync(
+        TextureSetKind kind, CancellationToken cancellationToken = default)
+    {
+        // Counts are scoped to a single kind — categories are strictly per-kind
+        // (Universal vs ModelSpecific), never a shared vocabulary.
+        var grouped = await _context.TextureSets
+            .AsNoTracking()
+            .Where(ts => ts.Kind == kind)
+            .GroupBy(ts => ts.TextureSetCategoryId)
+            .Select(g => new { CategoryId = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+
+        var perCategory = grouped
+            .Where(g => g.CategoryId.HasValue)
+            .ToDictionary(g => g.CategoryId!.Value, g => g.Count);
+        var uncategorized = grouped
+            .Where(g => !g.CategoryId.HasValue)
+            .Sum(g => g.Count);
+        var total = grouped.Sum(g => g.Count);
+
+        return new CategoryAssetCounts(perCategory, uncategorized, total);
     }
 
     public async Task<IEnumerable<TextureSet>> GetAllDeletedAsync(CancellationToken cancellationToken = default)
@@ -230,15 +255,14 @@ internal sealed class TextureSetRepository : ITextureSetRepository
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<TextureSet> UpdateAsync(TextureSet textureSet, CancellationToken cancellationToken = default)
+    public Task<TextureSet> UpdateAsync(TextureSet textureSet, CancellationToken cancellationToken = default)
     {
         if (textureSet == null)
             throw new ArgumentNullException(nameof(textureSet));
 
-        _context.TextureSets.Update(textureSet);
-        await _context.SaveChangesAsync(cancellationToken);
-        
-        return textureSet;
+        _context.UpdateIfDetached(textureSet);
+
+        return Task.FromResult(textureSet);
     }
 
     public async Task DeleteAsync(int id, CancellationToken cancellationToken = default)
@@ -251,7 +275,6 @@ internal sealed class TextureSetRepository : ITextureSetRepository
         if (textureSet != null)
         {
             _context.TextureSets.Remove(textureSet);
-            await _context.SaveChangesAsync(cancellationToken);
         }
     }
 
@@ -269,7 +292,6 @@ internal sealed class TextureSetRepository : ITextureSetRepository
             _context.Textures.RemoveRange(textureSet.Textures);
             // Remove the texture set
             _context.TextureSets.Remove(textureSet);
-            await _context.SaveChangesAsync(cancellationToken);
         }
     }
 }

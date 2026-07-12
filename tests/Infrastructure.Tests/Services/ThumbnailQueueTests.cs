@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
 using Domain.Models;
@@ -14,6 +15,7 @@ public class ThumbnailQueueTests
     private readonly Mock<IThumbnailJobRepository> _mockRepository;
     private readonly Mock<IThumbnailJobQueueNotificationService> _mockQueueNotificationService;
     private readonly Mock<ILogger<ThumbnailQueue>> _mockLogger;
+    private readonly Mock<IUnitOfWork> _mockUnitOfWork = new();
     private readonly ThumbnailQueue _thumbnailQueue;
 
     public ThumbnailQueueTests()
@@ -21,7 +23,7 @@ public class ThumbnailQueueTests
         _mockRepository = new Mock<IThumbnailJobRepository>();
         _mockQueueNotificationService = new Mock<IThumbnailJobQueueNotificationService>();
         _mockLogger = new Mock<ILogger<ThumbnailQueue>>();
-        _thumbnailQueue = new ThumbnailQueue(_mockRepository.Object, _mockQueueNotificationService.Object, _mockLogger.Object);
+        _thumbnailQueue = new ThumbnailQueue(_mockRepository.Object, _mockQueueNotificationService.Object, _mockUnitOfWork.Object, _mockLogger.Object);
     }
 
     [Fact]

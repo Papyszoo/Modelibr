@@ -2,13 +2,12 @@ import { createBdd } from "playwright-bdd";
 import { expect } from "@playwright/test";
 import { ApiHelper } from "../helpers/api-helper";
 import {
-    categoryNode,
-    closeManager,
-    createCategory,
-    deleteCategory,
-    managerDialog,
-    renameCategory,
-} from "../helpers/category-manager-helper";
+    categoryTreeRow,
+    clickCategoryInTree,
+    createCategoryViaTree,
+    deleteCategoryViaTree,
+    renameCategoryViaTree,
+} from "../helpers/category-tree-helper";
 import {
     narrowVirtualisedList,
     waitForCountLabelStable,
@@ -19,8 +18,10 @@ const { Given, When, Then } = createBdd();
 
 const apiHelper = new ApiHelper();
 
-// Title of the shared CategoryManagerDialog on the texture-sets page.
-const TS_TITLE = "Manage Categories";
+// The Texture Sets tab's category tree lives in this sidebar. Its contents are
+// scoped to the active kind (Global Materials vs Multi-Model), so switching
+// the kind tab swaps the visible category pool.
+const SIDEBAR = ".texture-set-category-sidebar";
 
 // Tracks created category ids by base name (for API-level assertions).
 const categoryIds: Record<string, number> = {};
@@ -90,38 +91,52 @@ Given(
     },
 );
 
-// ── Category manager (shared CategoryManagerDialog) ───────────────────
+// ── Manage via the sidebar context menu (per active kind) ─────────────
 
-When("I open the category manager", async ({ page }) => {
-    await new TextureSetsPage(page).openCategoryManager();
-});
-
-When("I create the category {string}", async ({ page }, base: string) => {
-    await createCategory(page, TS_TITLE, unique(base));
-});
+When(
+    "I create a texture set category {string} via the context menu",
+    async ({ page }, base: string) => {
+        await createCategoryViaTree(page, SIDEBAR, unique(base));
+    },
+);
 
 Then(
-    "the category {string} is listed in the manager",
+    "the texture set category {string} is visible in the sidebar",
     async ({ page }, base: string) => {
-        await expect(categoryNode(page, TS_TITLE, resolve(base))).toBeVisible({
+        await expect(categoryTreeRow(page, SIDEBAR, resolve(base))).toBeVisible({
             timeout: 10000,
         });
     },
 );
 
 Then(
-    "the category {string} is not listed in the manager",
+    "the texture set category {string} is not visible in the sidebar",
     async ({ page }, base: string) => {
-        await expect(categoryNode(page, TS_TITLE, resolve(base))).toHaveCount(
+        await expect(categoryTreeRow(page, SIDEBAR, resolve(base))).toHaveCount(
             0,
             { timeout: 10000 },
         );
     },
 );
 
-When("I close the category manager", async ({ page }) => {
-    await closeManager(page, TS_TITLE);
-});
+When(
+    "I rename the texture set category {string} to {string} via the context menu",
+    async ({ page }, fromBase: string, toBase: string) => {
+        await renameCategoryViaTree(
+            page,
+            SIDEBAR,
+            resolve(fromBase),
+            unique(toBase),
+        );
+    },
+);
+
+When(
+    "I delete the texture set category {string} via the context menu",
+    async ({ page }, base: string) => {
+        await deleteCategoryViaTree(page, SIDEBAR, resolve(base));
+    },
+);
 
 // ── Assignment + filtering ────────────────────────────────────────────
 
@@ -146,7 +161,7 @@ When(
 When(
     "I filter texture sets by category {string}",
     async ({ page }, base: string) => {
-        await new TextureSetsPage(page).filterByCategory(resolve(base));
+        await clickCategoryInTree(page, SIDEBAR, resolve(base));
         await waitForCountLabelStable(page);
     },
 );
@@ -162,22 +177,6 @@ Then(
         await expect(textureSetsPage.getCardByName(setName)).toBeVisible({
             timeout: 10000,
         });
-    },
-);
-
-// ── Editing (rename / delete) ─────────────────────────────────────────
-
-When(
-    "I rename the category {string} to {string}",
-    async ({ page }, fromBase: string, toBase: string) => {
-        await renameCategory(page, TS_TITLE, resolve(fromBase), unique(toBase));
-    },
-);
-
-When(
-    "I delete the texture set category {string}",
-    async ({ page }, base: string) => {
-        await deleteCategory(page, TS_TITLE, resolve(base));
     },
 );
 
@@ -198,28 +197,26 @@ Then(
     },
 );
 
+// ── Same-kind duplicate rejection (UI: rename surfaces an error toast) ─
+
 Then(
-    "renaming the category {string} to {string} fails in the manager",
+    "renaming the texture set category {string} to {string} via the context menu surfaces an error",
     async ({ page }, fromBase: string, toBase: string) => {
-        const dialog = managerDialog(page, TS_TITLE);
-        await dialog
-            .getByRole("button", { name: `Edit ${resolve(fromBase)}` })
-            .click();
-        await dialog.locator("#category-name").fill(resolve(toBase));
-        await dialog.getByRole("button", { name: "Save Changes" }).click();
-        // Error toast surfaces the rejection; success toast must NOT appear.
-        await page
-            .locator(".p-toast-message", {
-                hasText: "Could not update category",
-            })
-            .first()
-            .waitFor({ state: "visible", timeout: 5000 });
+        await renameCategoryViaTree(
+            page,
+            SIDEBAR,
+            resolve(fromBase),
+            resolve(toBase),
+        );
+        // The rename mutation's onError raises a failure toast; the tree keeps
+        // showing the original name because the collision was rejected.
         await expect(
-            page.locator(".p-toast-message", {
-                hasText: "Category updated",
-            }),
-        ).toHaveCount(0);
-        // Form stays open; return to the list for subsequent assertions.
-        await dialog.getByRole("button", { name: "Cancel" }).click();
+            page
+                .locator(".p-toast-message", { hasText: "Failed to rename" })
+                .first(),
+        ).toBeVisible({ timeout: 5000 });
+        await expect(
+            categoryTreeRow(page, SIDEBAR, resolve(fromBase)),
+        ).toBeVisible({ timeout: 10000 });
     },
 );

@@ -1,5 +1,7 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Models;
 using Domain.Services;
 using SharedKernel;
 
@@ -9,16 +11,22 @@ internal class UpdateSoundCommandHandler : ICommandHandler<UpdateSoundCommand, U
 {
     private readonly ISoundRepository _soundRepository;
     private readonly ISoundCategoryRepository _soundCategoryRepository;
+    private readonly ISettingRepository _settingRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public UpdateSoundCommandHandler(
         ISoundRepository soundRepository,
         ISoundCategoryRepository soundCategoryRepository,
-        IDateTimeProvider dateTimeProvider)
+        ISettingRepository settingRepository,
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _soundRepository = soundRepository;
         _soundCategoryRepository = soundCategoryRepository;
+        _settingRepository = settingRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<UpdateSoundResponse>> Handle(UpdateSoundCommand command, CancellationToken cancellationToken)
@@ -34,14 +42,26 @@ internal class UpdateSoundCommandHandler : ICommandHandler<UpdateSoundCommand, U
 
             if (!string.IsNullOrWhiteSpace(command.Name) && command.Name != sound.Name)
             {
-                var existingSound = await _soundRepository.GetByNameAsync(command.Name, cancellationToken);
-                if (existingSound != null && existingSound.Id != sound.Id)
+                // Renames follow the same DuplicateNamePolicy as creation: Allow keeps the
+                // name as-is, Reject fails, AutoRename appends a numeric suffix. The
+                // existence check excludes this sound itself so it can keep or re-case
+                // its own name without tripping the Reject policy.
+                var nameResult = await AssetNameService.ResolveNameAsync(
+                    command.Name, "Sound",
+                    async (name, ct) =>
+                    {
+                        var other = await _soundRepository.GetByNameAsync(name, ct);
+                        return other != null && other.Id != sound.Id;
+                    },
+                    _soundRepository.GetNamesByPrefixAsync,
+                    _settingRepository, cancellationToken);
+                if (nameResult.IsFailure)
                 {
                     return Result.Failure<UpdateSoundResponse>(
                         new Error("SoundAlreadyExists", $"A sound with the name '{command.Name}' already exists."));
                 }
 
-                sound.UpdateName(command.Name, _dateTimeProvider.UtcNow);
+                sound.UpdateName(nameResult.Value, _dateTimeProvider.UtcNow);
             }
 
             if (command.CategoryId != sound.SoundCategoryId)
@@ -60,6 +80,7 @@ internal class UpdateSoundCommandHandler : ICommandHandler<UpdateSoundCommand, U
             }
 
             var savedSound = await _soundRepository.UpdateAsync(sound, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             return Result.Success(new UpdateSoundResponse(savedSound.Id, savedSound.Name));
         }

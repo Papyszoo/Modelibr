@@ -5,6 +5,7 @@ import { containerHandlers } from './dynamic-demo/containerHandlers'
 import {
   addRecycledItem,
   assetUrl,
+  buildCategoryCounts,
   buildCategoryPath,
   buildConceptImage,
   type DemoCategory,
@@ -46,6 +47,7 @@ import {
   removeThumbnail,
   seedAssetUrl,
   seedFileAssets,
+  seedRemoteThumbnails,
   serveFile,
   storeFileBlob,
   storeThumbnail,
@@ -387,23 +389,38 @@ async function deleteCategoryFromStore(
   categoryId: number,
   assetStoreName: DemoCategorizedAssetStoreName
 ) {
+  // Matches the backend's branch delete: the category and all of its
+  // descendants are removed, and assets assigned anywhere in the branch
+  // become uncategorized.
   const categories = await getAll(storeName)
-  if (categories.some(category => category.parentId === categoryId)) {
-    return HttpResponse.json(
-      {
-        error: 'CategoryHasChildren',
-        message:
-          'Delete or move child categories before removing this category.',
-      },
-      { status: 400 }
-    )
+  const branchIds = new Set<number>([categoryId])
+  let grew = true
+  while (grew) {
+    grew = false
+    for (const category of categories) {
+      if (
+        category.parentId !== null &&
+        category.parentId !== undefined &&
+        branchIds.has(category.parentId) &&
+        !branchIds.has(category.id)
+      ) {
+        branchIds.add(category.id)
+        grew = true
+      }
+    }
   }
 
-  await remove(storeName, categoryId)
+  for (const branchId of branchIds) {
+    await remove(storeName, branchId)
+  }
 
   const assets = await getAll(assetStoreName)
   for (const asset of assets) {
-    if (!('categoryId' in asset) || asset.categoryId !== categoryId) {
+    if (
+      !('categoryId' in asset) ||
+      asset.categoryId == null ||
+      !branchIds.has(asset.categoryId)
+    ) {
       continue
     }
 
@@ -592,6 +609,7 @@ export const dynamicDemoHandlers = [
       .getAll('categoryId')
       .map(value => Number(value))
       .filter(Number.isFinite)
+    const uncategorized = url.searchParams.get('uncategorized') === 'true'
     const tags = url.searchParams
       .getAll('tag')
       .map(tag => tag.trim().toLowerCase())
@@ -627,7 +645,9 @@ export const dynamicDemoHandlers = [
         m.textureSets?.some(ts => ts.id === Number(textureSetId))
       )
     }
-    if (categoryIds.length > 0) {
+    if (uncategorized) {
+      models = models.filter(model => model.categoryId == null)
+    } else if (categoryIds.length > 0) {
       models = models.filter(
         model => model.categoryId && categoryIds.includes(model.categoryId)
       )
@@ -785,6 +805,11 @@ export const dynamicDemoHandlers = [
       return new HttpResponse(thumb, {
         headers: { 'Content-Type': thumb.type || 'image/webp' },
       })
+    }
+    // Seed data with pre-rendered remote thumbnails (Base Meshes pack)
+    const remoteThumb = seedRemoteThumbnails[`model:${id}`]
+    if (remoteThumb) {
+      return fetchStaticAsset(remoteThumb, 'image/webp')
     }
     // Generate a real thumbnail for seed models on first request
     const model = await getById('models', id)
@@ -1023,6 +1048,11 @@ export const dynamicDemoHandlers = [
     return new HttpResponse(null, { status: 204 })
   }),
 
+  http.get('*/model-categories/counts', async () => {
+    const models = await getAll('models')
+    return HttpResponse.json(buildCategoryCounts(models))
+  }),
+
   http.get('*/model-categories', async () => {
     const categories = await getAll('modelCategories')
     return HttpResponse.json({
@@ -1139,29 +1169,17 @@ export const dynamicDemoHandlers = [
     return new HttpResponse(null, { status: 204 })
   }),
 
-  http.delete('*/model-categories/:id', async ({ params }) => {
-    const categoryId = Number(params.id)
-    const categories = await getAll('modelCategories')
-    if (categories.some(category => category.parentId === categoryId)) {
-      return HttpResponse.json(
-        {
-          error: 'CategoryHasChildren',
-          message:
-            'Delete or move child categories before removing this category.',
-        },
-        { status: 400 }
-      )
-    }
+  http.delete('*/model-categories/:id', async ({ params }) =>
+    deleteCategoryFromStore('modelCategories', Number(params.id), 'models')
+  ),
 
-    await remove('modelCategories', categoryId)
-    const models = await getAll('models')
-    for (const model of models) {
-      if (model.categoryId === categoryId) {
-        model.categoryId = null
-        await put('models', model)
-      }
-    }
-    return new HttpResponse(null, { status: 204 })
+  http.get('*/texture-set-categories/counts', async ({ request }) => {
+    const kindParam = new URL(request.url).searchParams.get('kind')
+    const kind = kindParam !== null ? Number(kindParam) : undefined
+    const sets = await getAll('textureSets')
+    const scoped =
+      kind !== undefined ? sets.filter(ts => ts.kind === kind) : sets
+    return HttpResponse.json(buildCategoryCounts(scoped))
   }),
 
   http.get('*/texture-set-categories', async ({ request }) => {
@@ -1206,6 +1224,11 @@ export const dynamicDemoHandlers = [
       'textureSets'
     )
   ),
+
+  http.get('*/environment-map-categories/counts', async () => {
+    const maps = await getAll('environmentMaps')
+    return HttpResponse.json(buildCategoryCounts(maps))
+  }),
 
   http.get('*/environment-map-categories', async () =>
     listCategoryStore('environmentMapCategories')
@@ -1446,6 +1469,11 @@ export const dynamicDemoHandlers = [
         headers: { 'Content-Type': thumb.type || 'image/webp' },
       })
     }
+    // Seed data with pre-rendered remote thumbnails (Base Meshes pack)
+    const remoteThumb = seedRemoteThumbnails[`version:${versionId}`]
+    if (remoteThumb) {
+      return fetchStaticAsset(remoteThumb, 'image/webp')
+    }
     // Generate a real thumbnail for seed versions on first request
     const allVersions = await getAll('modelVersions')
     const version = allVersions.find(v => v.id === versionId)
@@ -1668,6 +1696,7 @@ export const dynamicDemoHandlers = [
       .getAll('categoryIds')
       .map(value => Number(value))
       .filter(Number.isFinite)
+    const uncategorized = url.searchParams.get('uncategorized') === 'true'
     const textureTypes = url.searchParams
       .getAll('textureTypes')
       .map(value => Number(value))
@@ -1702,7 +1731,9 @@ export const dynamicDemoHandlers = [
     if (kind !== null && kind !== undefined) {
       sets = sets.filter(ts => ts.kind === Number(kind))
     }
-    if (categoryIds.length > 0) {
+    if (uncategorized) {
+      sets = sets.filter(ts => ts.categoryId == null)
+    } else if (categoryIds.length > 0) {
       sets = sets.filter(
         ts => ts.categoryId != null && categoryIds.includes(ts.categoryId)
       )
@@ -2335,6 +2366,11 @@ export const dynamicDemoHandlers = [
     ]
       .map(Number)
       .filter(Number.isFinite)
+    const categoryIds = url.searchParams
+      .getAll('categoryIds')
+      .map(value => Number(value))
+      .filter(Number.isFinite)
+    const uncategorized = url.searchParams.get('uncategorized') === 'true'
     const searchName = (url.searchParams.get('searchName') ?? '')
       .trim()
       .toLowerCase()
@@ -2352,6 +2388,14 @@ export const dynamicDemoHandlers = [
         (environmentMap.projects ?? []).some(project =>
           projectIds.includes(project.id)
         )
+      )
+    }
+
+    if (uncategorized) {
+      environmentMaps = environmentMaps.filter(em => em.categoryId == null)
+    } else if (categoryIds.length > 0) {
+      environmentMaps = environmentMaps.filter(
+        em => em.categoryId != null && categoryIds.includes(em.categoryId)
       )
     }
 

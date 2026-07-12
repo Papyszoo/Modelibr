@@ -1,20 +1,31 @@
+/* Default look = the quiet sidebar: transparent (sits on whatever surface the
+   page provides), tight rows, primary-tint selection. This is the app-wide
+   categories standard — don't re-add per-page backgrounds or frames. */
 .category-tree-panel {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  background: var(--surface-card);
-  border-bottom: 1px solid var(--surface-border);
+  gap: 0.25rem;
+  padding: 0.5rem;
+  background: transparent;
   flex-shrink: 0;
+  /* Rows are UI chrome, not prose — sm, and compact PrimeReact togglers. */
+  font-size: var(--mod-text-sm);
 }
 
+.category-tree-panel .p-tree-toggler {
+  width: 1.5rem;
+  height: 1.5rem;
+  margin-right: 0.25rem;
+}
+
+/* Framed variant for use inside dialogs/popovers where the tree needs its
+   own boundary. */
 .category-tree-panel.is-compact {
-  padding: 0.5rem;
   border: 1px solid var(--surface-border);
   border-radius: 8px;
 }
 
-.category-tree-unassigned,
+.category-tree-bucket,
 .category-tree-node-content {
   display: flex;
   align-items: center;
@@ -22,32 +33,35 @@
   width: 100%;
 }
 
-.category-tree-unassigned {
-  border: 1px solid var(--surface-border);
-  border-radius: 8px;
-  padding: 0.625rem 0.875rem;
-  background: var(--surface-ground);
+/* The "All" / "Unassigned" bucket rows read as part of the tree, not
+   buttons: transparent until hovered, selection = primary tint (matches
+   .p-highlight below). */
+.category-tree-bucket {
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 0.25rem 0.4rem;
+  background: transparent;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background 0.15s ease;
 }
 
-.category-tree-unassigned:hover {
+.category-tree-bucket:hover {
   background: var(--surface-hover);
 }
 
-.category-tree-unassigned.is-active {
-  background: var(--primary-color);
-  color: var(--primary-color-text);
-  border-color: var(--primary-color);
+.category-tree-bucket.is-active {
+  background: rgba(var(--primary-color-rgb), 0.12);
+  border-color: rgba(var(--primary-color-rgb), 0.24);
+  color: var(--text-color);
 }
 
-.category-tree-unassigned.is-drag-over,
+.category-tree-bucket.is-drag-over,
 .category-tree-node-content.is-drag-over {
   border-color: var(--primary-color);
   box-shadow: 0 0 0 1px rgba(var(--primary-color-rgb), 0.4);
 }
 
-.category-tree-unassigned-label,
+.category-tree-bucket-label,
 .category-tree-node-label {
   min-width: 0;
   flex: 1;
@@ -61,8 +75,17 @@
   color: var(--text-color-secondary);
 }
 
-.category-tree-unassigned.is-active .category-tree-count {
-  color: inherit;
+/* Inline name editor shown while creating or renaming a category via the
+   context menu — sized to sit inside a tree row without inflating it. */
+.category-tree-inline-input {
+  width: 100%;
+  min-width: 0;
+  padding: 0.15rem 0.4rem;
+  font-size: var(--mod-text-sm);
+}
+
+.category-tree-bucket.is-active .category-tree-count {
+  color: var(--text-color-secondary);
 }
 
 .category-tree {
@@ -72,8 +95,8 @@
 }
 
 .category-tree .p-treenode-content {
-  padding: 0.25rem 0.5rem;
-  border-radius: 8px;
+  padding: 0.15rem 0.4rem;
+  border-radius: 6px;
   border: 1px solid transparent;
   transition: background 0.2s ease;
 }

@@ -18,7 +18,7 @@ const API_BASE = process.env.API_BASE_URL || "http://localhost:8090";
 async function waitForSoundsUiReady(page: any): Promise<void> {
     await page
         .waitForSelector(
-            ".sound-list, .sound-grid, .sound-list-empty, .sound-list-loading, button:has-text('Add Category'), input[type='file']",
+            ".sound-list, .sound-grid, .sound-list-empty, .sound-list-loading, .sound-category-sidebar, input[type='file']",
             {
                 timeout: 15000,
             },
@@ -61,7 +61,11 @@ async function waitForSoundCategoryTab(page: any, categoryName: string) {
     for (let attempt = 0; attempt < 3; attempt += 1) {
         await waitForSoundsUiReady(page);
 
-        const categoryTabs = page.locator(".category-tab");
+        // Category rows in the shared CategoryTreePanel sidebar (unassigned
+        // bucket + tree nodes) — sounds no longer uses .category-tab tabs.
+        const categoryTabs = page.locator(
+            ".sound-category-sidebar .category-tree-unassigned, .sound-category-sidebar .category-tree .p-treenode-content",
+        );
         const tabCount = await categoryTabs.count();
 
         for (let index = 0; index < tabCount; index += 1) {
@@ -617,85 +621,142 @@ Then(
 );
 
 // ============= Category Management Steps =============
+// All category management happens inside the category tree sidebar via its
+// right-click context menu (the manager dialog was removed): "Add category"
+// on the panel buckets, "Add subcategory"/"Rename"/"Delete" on a node, and
+// an inline input in the tree for typing names.
 
-When("I open the sound category management dialog", async ({ page }) => {
-    await waitForSoundsUiReady(page);
+async function clickCategoryContextMenuItem(page: any, label: string) {
+    // PrimeReact ContextMenu portals to document.body (.p-* is the accepted
+    // exception for body-mounted overlays).
+    const item = page
+        .locator(".p-contextmenu .p-menuitem-text")
+        .filter({ hasText: label })
+        .first();
+    await expect(item).toBeVisible({ timeout: 5000 });
+    await item.click();
+}
 
-    // Click "Add Category" button
-    const addCategoryButton = page.locator("button:has-text('Add Category')");
-    await expect(addCategoryButton).toBeVisible({ timeout: 10000 });
-    await addCategoryButton.click();
-
-    await expect(page.locator(".p-dialog")).toBeVisible({ timeout: 5000 });
-    console.log("[Action] Opened sound category dialog");
-});
+async function commitInlineCategoryName(page: any, name: string) {
+    const input = page
+        .locator(
+            '.sound-category-sidebar [data-testid="category-tree-inline-input"]',
+        )
+        .first();
+    await expect(input).toBeVisible({ timeout: 5000 });
+    await input.fill(name);
+    await input.press("Enter");
+    await expect(input).toBeHidden({ timeout: 10000 });
+}
 
 When(
-    "I create a sound category named {string} with description {string}",
-    async ({ page }, name: string, description: string) => {
+    "I create a sound category named {string} via the context menu",
+    async ({ page }, name: string) => {
         await cleanupCategoryByName(page, name);
+        await waitForSoundsUiReady(page);
 
-        // Wait for dialog to be fully visible
-        const dialog = page.locator(".p-dialog");
-        await dialog.waitFor({ state: "visible", timeout: 5000 });
+        // Right-click a bucket row (not a category node) to get the
+        // background menu with the root-level "Add category" item.
+        await page
+            .locator('.sound-category-sidebar [data-testid="category-tree-all"]')
+            .click({ button: "right" });
+        await clickCategoryContextMenuItem(page, "Add category");
+        await commitInlineCategoryName(page, name);
 
-        // Wait for PrimeReact InputText - uses #categoryName id
-        const nameInput = dialog.locator("#categoryName");
-        await nameInput.waitFor({ state: "visible", timeout: 10000 });
-        await nameInput.fill(name);
-        console.log(`[Action] Filled category name: ${name}`);
-
-        // Fill in description (if textarea exists) - uses #categoryDescription id
-        const descInput = dialog.locator("#categoryDescription");
-        if (await descInput.isVisible()) {
-            await descInput.fill(description);
-            console.log(`[Action] Filled description: ${description}`);
-        }
-
-        // Click Save button
-        const saveButton = dialog.locator("button:has-text('Save')");
-        await saveButton.click();
-
-        await dialog
-            .waitFor({ state: "hidden", timeout: 10000 })
-            .catch(() => {});
         console.log(
-            `[Action] Created sound category "${name}" with description "${description}"`,
+            `[Action] Created sound category "${name}" via context menu`,
         );
     },
 );
 
 When(
-    "I create a sound category named {string}",
-    async ({ page }, name: string) => {
-        await cleanupCategoryByName(page, name);
+    "I rename the sound category {string} to {string} via the context menu",
+    async ({ page }, oldName: string, newName: string) => {
+        await cleanupCategoryByName(page, newName);
 
-        // Wait for dialog to be visible
-        const dialog = page.locator(".p-dialog");
-        await dialog.waitFor({ state: "visible", timeout: 5000 });
+        const categoryTab = await waitForSoundCategoryTab(page, oldName);
+        await categoryTab.click({ button: "right" });
+        await clickCategoryContextMenuItem(page, "Rename");
+        await commitInlineCategoryName(page, newName);
 
-        // Fill in category name using PrimeReact InputText ID
-        const nameInput = dialog.locator("#categoryName");
-        await nameInput.waitFor({ state: "visible", timeout: 10000 });
-        await nameInput.fill(name);
+        console.log(
+            `[Action] Renamed sound category "${oldName}" to "${newName}" via context menu`,
+        );
+    },
+);
 
-        // Click Save button
-        const saveButton = dialog.locator("button:has-text('Save')");
-        await saveButton.click();
+When(
+    "I add a subcategory named {string} under the sound category {string} via the context menu",
+    async ({ page }, childName: string, parentName: string) => {
+        await cleanupCategoryByName(page, childName);
 
-        await dialog
-            .waitFor({ state: "hidden", timeout: 10000 })
-            .catch(() => {});
-        console.log(`[Action] Created sound category "${name}"`);
+        const parentTab = await waitForSoundCategoryTab(page, parentName);
+        await parentTab.click({ button: "right" });
+        await clickCategoryContextMenuItem(page, "Add subcategory");
+        await commitInlineCategoryName(page, childName);
+
+        console.log(
+            `[Action] Added subcategory "${childName}" under "${parentName}" via context menu`,
+        );
+    },
+);
+
+async function deleteCategoryViaContextMenu(
+    page: any,
+    categoryName: string,
+    expectBranchWarning: boolean,
+) {
+    const categoryTab = await waitForSoundCategoryTab(page, categoryName);
+    await categoryTab.click({ button: "right" });
+    await clickCategoryContextMenuItem(page, "Delete");
+
+    const confirmDialog = page.locator(".p-confirm-dialog");
+    await expect(confirmDialog).toBeVisible({ timeout: 5000 });
+    if (expectBranchWarning) {
+        // The branch warning must spell out the consequences before the user
+        // commits to deleting subcategories and unassigning their sounds.
+        await expect(confirmDialog).toContainText("subcategor");
+        await expect(confirmDialog).toContainText("uncategorized");
+    }
+
+    await confirmDialog.locator("button.p-button-danger").click();
+    await expect(confirmDialog).toBeHidden({ timeout: 10000 });
+}
+
+When(
+    "I delete the sound category {string} via the context menu",
+    async ({ page }, categoryName: string) => {
+        await deleteCategoryViaContextMenu(page, categoryName, false);
+        console.log(
+            `[Action] Deleted sound category "${categoryName}" via context menu`,
+        );
+    },
+);
+
+When(
+    "I delete the sound category {string} via the context menu accepting the branch warning",
+    async ({ page }, categoryName: string) => {
+        await deleteCategoryViaContextMenu(page, categoryName, true);
+        console.log(
+            `[Action] Deleted sound category branch "${categoryName}" via context menu`,
+        );
     },
 );
 
 Then(
     "the sound category {string} should be visible in the category list",
     async ({ page }, categoryName: string) => {
-        await expect(async () => {
-            await waitForSoundCategoryTab(page, categoryName);
-        }).toPass({ timeout: 20000 });
+        // Create/rename update the tree reactively (query invalidation), so
+        // a web-first assertion suffices — the reload-scan helper is only
+        // needed to sync categories provisioned via API before the page
+        // loaded.
+        const categoryRow = page
+            .locator(
+                ".sound-category-sidebar .category-tree .p-treenode-content",
+            )
+            .filter({ has: page.getByText(categoryName, { exact: true }) })
+            .first();
+        await expect(categoryRow).toBeVisible({ timeout: 20000 });
         console.log(
             `[Verify] Sound category "${categoryName}" is visible in category list ✓`,
         );
@@ -796,119 +857,138 @@ Given(
     },
 );
 
-When(
-    "I edit the sound category {string}",
-    async ({ page }, categoryName: string) => {
-        const soundListPage = new SoundListPage(page);
-        await soundListPage.goto();
-        await waitForSoundsUiReady(page);
+Given(
+    "the sound category {string} exists as a subcategory of {string}",
+    async ({ page }, childName: string, parentName: string) => {
+        const parent = getScenarioState(page).getSoundCategory(parentName);
+        if (!parent) {
+            throw new Error(
+                `Parent sound category "${parentName}" must exist in shared state first`,
+            );
+        }
 
-        // Ensure no dialog is blocking
-        await page.keyboard.press("Escape");
-        await page
-            .locator(".p-dialog")
-            .waitFor({ state: "hidden", timeout: 5000 })
-            .catch(() => {});
-
-        const categoryTab = await waitForSoundCategoryTab(page, categoryName);
-        await categoryTab.click();
-
-        // Click the edit (pencil) button on the category tab
-        const editButton = categoryTab.locator("button:has(.pi-pencil)");
-        await editButton.waitFor({ state: "visible", timeout: 5000 });
-        await editButton.click();
-
-        // Wait for dialog using data-testid
-        const dialog = page.locator(
-            '[data-testid="category-dialog"], .p-dialog',
+        await cleanupCategoryByName(page, childName);
+        const createResponse = await page.request.post(
+            `${API_BASE}/sound-categories`,
+            {
+                data: {
+                    name: childName,
+                    description: "",
+                    parentId: parent.id,
+                },
+            },
         );
-        await dialog.waitFor({ state: "visible", timeout: 5000 });
+        if (!createResponse.ok()) {
+            throw new Error(
+                `Failed to provision subcategory "${childName}": ${createResponse.status()}`,
+            );
+        }
+        const created = await createResponse.json();
+        getScenarioState(page).saveSoundCategory(childName, {
+            id: created.id,
+            name: childName,
+            description: "",
+        });
         console.log(
-            `[Action] Opened edit dialog for sound category "${categoryName}"`,
+            `[Precondition] Subcategory "${childName}" (ID: ${created.id}) exists under "${parentName}" (ID: ${parent.id})`,
         );
     },
 );
 
-When(
-    "I change the sound category name to {string}",
-    async ({ page }, newName: string) => {
-        await cleanupCategoryByName(page, newName);
+Given(
+    "a sound named {string} assigned to the category {string} exists",
+    async ({ page }, soundName: string, categoryName: string) => {
+        const category = getScenarioState(page).getSoundCategory(categoryName);
+        if (!category) {
+            throw new Error(
+                `Sound category "${categoryName}" must exist in shared state first`,
+            );
+        }
 
-        // Use data-testid for the name input
-        const dialog = page
-            .locator('[data-testid="category-dialog"], .p-dialog')
-            .first();
-        const nameInput = dialog.locator(
-            '[data-testid="category-name-input"], #categoryName',
+        await cleanupSoundByName(page, soundName);
+        const uniqueFilePath =
+            await UniqueFileGenerator.generate("test-tone.wav");
+        const fs = await import("fs");
+        const fileBuffer = fs.readFileSync(uniqueFilePath);
+        const createResponse = await page.request.post(
+            `${API_BASE}/sounds/with-file`,
+            {
+                multipart: {
+                    file: {
+                        name: `${soundName}.wav`,
+                        mimeType: "audio/wav",
+                        buffer: fileBuffer,
+                    },
+                    name: soundName,
+                },
+            },
         );
-        await nameInput.waitFor({ state: "visible", timeout: 5000 });
-        await nameInput.clear();
-        await nameInput.fill(newName);
-        console.log(`[Action] Changed sound category name to "${newName}"`);
+        if (!createResponse.ok()) {
+            throw new Error(
+                `Failed to provision sound "${soundName}": ${createResponse.status()}`,
+            );
+        }
+        const created = await createResponse.json();
+        const soundId = created.soundId || created.id;
+
+        const assignResponse = await page.request.put(
+            `${API_BASE}/sounds/${soundId}`,
+            { data: { categoryId: category.id } },
+        );
+        if (!assignResponse.ok()) {
+            throw new Error(
+                `Failed to assign sound "${soundName}" to category "${categoryName}": ${assignResponse.status()}`,
+            );
+        }
+
+        getScenarioState(page).saveSound(soundName, {
+            id: soundId,
+            name: soundName,
+            fileId: created.fileId,
+            duration: created.duration,
+            categoryId: category.id,
+        });
+        console.log(
+            `[Precondition] Sound "${soundName}" (ID: ${soundId}) assigned to category "${categoryName}" (ID: ${category.id})`,
+        );
     },
 );
 
-When("I save the sound category changes", async ({ page }) => {
-    // Use data-testid for save button
-    const dialog = page
-        .locator('[data-testid="category-dialog"], .p-dialog')
-        .first();
-    const saveButton = dialog.locator(
-        '[data-testid="category-dialog-save"], button:has-text("Save")',
-    );
-    await saveButton.click();
+Then(
+    "the sound {string} should be uncategorized via API",
+    async ({ page }, soundName: string) => {
+        const sound = getScenarioState(page).getSound(soundName);
+        if (!sound) {
+            throw new Error(`Sound "${soundName}" not found in shared state`);
+        }
 
-    // Dialog may close asynchronously or remain visible briefly while data updates
-    await dialog.waitFor({ state: "hidden", timeout: 10000 }).catch(() => {});
-    console.log("[Action] Saved sound category changes");
-});
-
-When(
-    "I delete the sound category {string}",
-    async ({ page }, categoryName: string) => {
-        const soundListPage = new SoundListPage(page);
-        await soundListPage.goto();
-        await waitForSoundsUiReady(page);
-
-        // Ensure no dialog is blocking
-        await page.keyboard.press("Escape");
-        await page
-            .locator(".p-dialog")
-            .waitFor({ state: "hidden", timeout: 5000 })
-            .catch(() => {});
-
-        const categoryTab = await waitForSoundCategoryTab(page, categoryName);
-        await categoryTab.click();
-
-        // Click the delete (trash) button on the category tab
-        const deleteButton = categoryTab.locator("button:has(.pi-trash)");
-        await deleteButton.waitFor({ state: "visible", timeout: 5000 });
-        await deleteButton.click();
-
-        // Confirm deletion in dialog
-        const confirmDialog = page.locator(".p-confirm-dialog, .p-dialog");
-        await confirmDialog.waitFor({ state: "visible", timeout: 5000 });
-
-        const confirmButton = confirmDialog.locator(
-            "button.p-button-danger, button:has-text('Yes'), button:has-text('Delete')",
+        const response = await page.request.get(`${API_BASE}/sounds`);
+        const data = await response.json();
+        const found = (data.sounds || []).find((s: any) => s.id === sound.id);
+        if (!found) {
+            throw new Error(
+                `Sound "${soundName}" (ID: ${sound.id}) not found via API`,
+            );
+        }
+        expect(found.categoryId).toBeNull();
+        console.log(
+            `[Verify] Sound "${soundName}" is uncategorized after branch delete ✓`,
         );
-        await confirmButton.click();
-
-        // Wait for dialog to close reactively
-        await confirmDialog.waitFor({ state: "hidden", timeout: 10000 });
-        await page.waitForLoadState("domcontentloaded");
-
-        console.log(`[Action] Deleted sound category "${categoryName}"`);
     },
 );
 
 Then(
     "the sound category {string} should not be visible in the category list",
     async ({ page }, categoryName: string) => {
-        const categoryTab = page
-            .locator(".category-tab")
-            .filter({ hasText: categoryName });
-        await expect(categoryTab).not.toBeVisible({ timeout: 5000 });
+        // Category rows live in the shared CategoryTreePanel sidebar; the
+        // old .category-tab selector matched nothing and passed vacuously.
+        // Exact label match — hasText is substring and would over-match.
+        const categoryRow = page
+            .locator(
+                ".sound-category-sidebar .category-tree .p-treenode-content",
+            )
+            .filter({ has: page.getByText(categoryName, { exact: true }) });
+        await expect(categoryRow).toHaveCount(0, { timeout: 10000 });
         console.log(
             `[Verify] Sound category "${categoryName}" is not visible ✓`,
         );

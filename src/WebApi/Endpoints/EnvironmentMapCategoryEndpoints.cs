@@ -9,6 +9,7 @@ public static class EnvironmentMapCategoryEndpoints
     public static void MapEnvironmentMapCategoryEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapGet("/environment-map-categories", GetAllCategories).WithName("Get All Environment Map Categories").WithOpenApi();
+        app.MapGet("/environment-map-categories/counts", GetCategoryCounts).WithName("Get Environment Map Category Counts").WithOpenApi();
         app.MapPost("/environment-map-categories", CreateCategory).WithName("Create Environment Map Category").WithOpenApi();
         app.MapPut("/environment-map-categories/{id}", UpdateCategory).WithName("Update Environment Map Category").WithOpenApi();
         app.MapDelete("/environment-map-categories/{id}", DeleteCategory).WithName("Delete Environment Map Category").WithOpenApi();
@@ -19,6 +20,16 @@ public static class EnvironmentMapCategoryEndpoints
         CancellationToken cancellationToken)
     {
         var result = await queryHandler.Handle(new GetAllEnvironmentMapCategoriesQuery(), cancellationToken);
+        return result.IsSuccess
+            ? Results.Ok(result.Value)
+            : Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+    }
+
+    private static async Task<IResult> GetCategoryCounts(
+        IQueryHandler<GetEnvironmentMapCategoryCountsQuery, Application.Categories.CategoryCountsResponse> queryHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await queryHandler.Handle(new GetEnvironmentMapCategoryCountsQuery(), cancellationToken);
         return result.IsSuccess
             ? Results.Ok(result.Value)
             : Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });

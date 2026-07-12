@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Repositories;
 using Application.TextureSets;
 using Domain.Models;
@@ -13,13 +14,15 @@ public class UpdateTextureSetFileMetadataCommandHandlerTests
 {
     private readonly Mock<ITextureSetRepository> _mockTextureSetRepository = new();
     private readonly Mock<IDateTimeProvider> _mockDateTimeProvider = new();
+    private readonly Mock<IUnitOfWork> _unitOfWork = new();
     private readonly UpdateTextureSetFileMetadataCommandHandler _handler;
 
     public UpdateTextureSetFileMetadataCommandHandlerTests()
     {
         _handler = new UpdateTextureSetFileMetadataCommandHandler(
             _mockTextureSetRepository.Object,
-            _mockDateTimeProvider.Object);
+            _mockDateTimeProvider.Object,
+            _unitOfWork.Object);
     }
 
     [Fact]

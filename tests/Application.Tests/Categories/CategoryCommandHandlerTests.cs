@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Repositories;
 using Application.EnvironmentMapCategories;
 using Application.Tests;
@@ -17,6 +18,7 @@ public class CategoryCommandHandlerTests
 {
     private readonly Mock<IEnvironmentMapCategoryRepository> _repository = new();
     private readonly Mock<IDateTimeProvider> _dateTimeProvider = new();
+    private readonly Mock<IUnitOfWork> _unitOfWork = new();
     private readonly DateTime _now = new(2025, 1, 15, 12, 0, 0, DateTimeKind.Utc);
 
     public CategoryCommandHandlerTests()
@@ -40,7 +42,7 @@ public class CategoryCommandHandlerTests
             .ReturnsAsync((EnvironmentMapCategory cat, CancellationToken _) => cat.WithId(1));
 
         var handler = new CreateEnvironmentMapCategoryCommandHandler(
-            _repository.Object, _dateTimeProvider.Object);
+            _repository.Object, _dateTimeProvider.Object, _unitOfWork.Object);
 
         var command = new CreateEnvironmentMapCategoryCommand("Outdoor", "Outdoor environments", null);
 
@@ -63,7 +65,7 @@ public class CategoryCommandHandlerTests
             .ReturnsAsync(existing);
 
         var handler = new CreateEnvironmentMapCategoryCommandHandler(
-            _repository.Object, _dateTimeProvider.Object);
+            _repository.Object, _dateTimeProvider.Object, _unitOfWork.Object);
 
         var command = new CreateEnvironmentMapCategoryCommand("Outdoor", null, null);
 
@@ -92,7 +94,7 @@ public class CategoryCommandHandlerTests
             .ReturnsAsync(new List<EnvironmentMapCategory> { parent });
 
         var handler = new CreateEnvironmentMapCategoryCommandHandler(
-            _repository.Object, _dateTimeProvider.Object);
+            _repository.Object, _dateTimeProvider.Object, _unitOfWork.Object);
 
         var command = new CreateEnvironmentMapCategoryCommand("Sunset", null, 10);
 
@@ -126,7 +128,7 @@ public class CategoryCommandHandlerTests
             .Returns(Task.CompletedTask);
 
         var handler = new UpdateEnvironmentMapCategoryCommandHandler(
-            _repository.Object, _dateTimeProvider.Object);
+            _repository.Object, _dateTimeProvider.Object, _unitOfWork.Object);
 
         var command = new UpdateEnvironmentMapCategoryCommand(1, "Interior", "Interior scenes", null);
 
@@ -146,7 +148,7 @@ public class CategoryCommandHandlerTests
             .ReturnsAsync((EnvironmentMapCategory?)null);
 
         var handler = new UpdateEnvironmentMapCategoryCommandHandler(
-            _repository.Object, _dateTimeProvider.Object);
+            _repository.Object, _dateTimeProvider.Object, _unitOfWork.Object);
 
         var command = new UpdateEnvironmentMapCategoryCommand(999, "Ghost", null, null);
 
@@ -171,7 +173,7 @@ public class CategoryCommandHandlerTests
             .ReturnsAsync(sibling);
 
         var handler = new UpdateEnvironmentMapCategoryCommandHandler(
-            _repository.Object, _dateTimeProvider.Object);
+            _repository.Object, _dateTimeProvider.Object, _unitOfWork.Object);
 
         var command = new UpdateEnvironmentMapCategoryCommand(1, "Outdoor", null, null);
 
@@ -192,7 +194,7 @@ public class CategoryCommandHandlerTests
             .ReturnsAsync(category);
 
         var handler = new UpdateEnvironmentMapCategoryCommandHandler(
-            _repository.Object, _dateTimeProvider.Object);
+            _repository.Object, _dateTimeProvider.Object, _unitOfWork.Object);
 
         var command = new UpdateEnvironmentMapCategoryCommand(5, "Outdoor", null, 5);
 
@@ -223,7 +225,7 @@ public class CategoryCommandHandlerTests
             .ReturnsAsync(allCategories.AsReadOnly());
 
         var handler = new UpdateEnvironmentMapCategoryCommandHandler(
-            _repository.Object, _dateTimeProvider.Object);
+            _repository.Object, _dateTimeProvider.Object, _unitOfWork.Object);
 
         var command = new UpdateEnvironmentMapCategoryCommand(10, "Root", null, 30);
 
@@ -248,10 +250,14 @@ public class CategoryCommandHandlerTests
             .ReturnsAsync(category);
 
         _repository
+            .Setup(x => x.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<EnvironmentMapCategory> { category });
+
+        _repository
             .Setup(x => x.DeleteAsync(It.IsAny<EnvironmentMapCategory>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        var handler = new DeleteEnvironmentMapCategoryCommandHandler(_repository.Object);
+        var handler = new DeleteEnvironmentMapCategoryCommandHandler(_repository.Object, _unitOfWork.Object);
 
         var command = new DeleteEnvironmentMapCategoryCommand(1);
 
@@ -268,7 +274,7 @@ public class CategoryCommandHandlerTests
             .Setup(x => x.GetByIdAsync(999, It.IsAny<CancellationToken>()))
             .ReturnsAsync((EnvironmentMapCategory?)null);
 
-        var handler = new DeleteEnvironmentMapCategoryCommandHandler(_repository.Object);
+        var handler = new DeleteEnvironmentMapCategoryCommandHandler(_repository.Object, _unitOfWork.Object);
 
         var command = new DeleteEnvironmentMapCategoryCommand(999);
 
@@ -280,24 +286,39 @@ public class CategoryCommandHandlerTests
     }
 
     [Fact]
-    public async Task Delete_When_CategoryHasChildren_Returns_Failure_CategoryHasChildren()
+    public async Task Delete_When_CategoryHasDescendants_Deletes_WholeBranch_ChildrenFirst()
     {
+        // parent(1) -> child(2) -> grandchild(3); unrelated(4) must survive.
         var parent = EnvironmentMapCategory.Create("Outdoor", null, null, _now).WithId(1);
         var child = EnvironmentMapCategory.Create("Sunset", null, 1, _now).WithId(2);
-        parent.Children = new List<EnvironmentMapCategory> { child };
+        var grandchild = EnvironmentMapCategory.Create("Golden hour", null, 2, _now).WithId(3);
+        var unrelated = EnvironmentMapCategory.Create("Indoor", null, null, _now).WithId(4);
+        var all = new List<EnvironmentMapCategory> { parent, child, grandchild, unrelated };
+
+        foreach (var category in all)
+        {
+            var captured = category;
+            _repository
+                .Setup(x => x.GetByIdAsync(captured.Id, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(captured);
+        }
 
         _repository
-            .Setup(x => x.GetByIdAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(parent);
+            .Setup(x => x.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(all);
 
-        var handler = new DeleteEnvironmentMapCategoryCommandHandler(_repository.Object);
+        var deletedIds = new List<int>();
+        _repository
+            .Setup(x => x.DeleteAsync(It.IsAny<EnvironmentMapCategory>(), It.IsAny<CancellationToken>()))
+            .Callback((EnvironmentMapCategory category, CancellationToken _) => deletedIds.Add(category.Id))
+            .Returns(Task.CompletedTask);
 
-        var command = new DeleteEnvironmentMapCategoryCommand(1);
+        var handler = new DeleteEnvironmentMapCategoryCommandHandler(_repository.Object, _unitOfWork.Object);
 
-        var result = await handler.Handle(command, CancellationToken.None);
+        var result = await handler.Handle(new DeleteEnvironmentMapCategoryCommand(1), CancellationToken.None);
 
-        Assert.True(result.IsFailure);
-        Assert.Equal("CategoryHasChildren", result.Error.Code);
-        _repository.Verify(x => x.DeleteAsync(It.IsAny<EnvironmentMapCategory>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.True(result.IsSuccess);
+        // Children are deleted before their parent (Restrict FK on ParentId).
+        Assert.Equal(new[] { 3, 2, 1 }, deletedIds);
     }
 }

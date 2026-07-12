@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Services;
@@ -10,15 +11,18 @@ internal sealed class AddProjectConceptImageCommandHandler : ICommandHandler<Add
     private readonly IProjectRepository _projectRepository;
     private readonly IFileRepository _fileRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public AddProjectConceptImageCommandHandler(
         IProjectRepository projectRepository,
         IFileRepository fileRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _projectRepository = projectRepository;
         _fileRepository = fileRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(AddProjectConceptImageCommand command, CancellationToken cancellationToken)
@@ -37,6 +41,7 @@ internal sealed class AddProjectConceptImageCommandHandler : ICommandHandler<Add
 
         project.AddConceptImage(file, _dateTimeProvider.UtcNow);
         await _projectRepository.UpdateAsync(project, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }
 }
@@ -45,13 +50,16 @@ internal sealed class RemoveProjectConceptImageCommandHandler : ICommandHandler<
 {
     private readonly IProjectRepository _projectRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public RemoveProjectConceptImageCommandHandler(
         IProjectRepository projectRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _projectRepository = projectRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(RemoveProjectConceptImageCommand command, CancellationToken cancellationToken)
@@ -64,6 +72,7 @@ internal sealed class RemoveProjectConceptImageCommandHandler : ICommandHandler<
 
         project.RemoveConceptImage(command.FileId, _dateTimeProvider.UtcNow);
         await _projectRepository.UpdateAsync(project, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }
 }
@@ -73,15 +82,18 @@ internal sealed class SetProjectCustomThumbnailCommandHandler : ICommandHandler<
     private readonly IProjectRepository _projectRepository;
     private readonly IFileRepository _fileRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public SetProjectCustomThumbnailCommandHandler(
         IProjectRepository projectRepository,
         IFileRepository fileRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _projectRepository = projectRepository;
         _fileRepository = fileRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(SetProjectCustomThumbnailCommand command, CancellationToken cancellationToken)
@@ -104,6 +116,7 @@ internal sealed class SetProjectCustomThumbnailCommandHandler : ICommandHandler<
 
         project.SetCustomThumbnail(file, _dateTimeProvider.UtcNow);
         await _projectRepository.UpdateAsync(project, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }
 }

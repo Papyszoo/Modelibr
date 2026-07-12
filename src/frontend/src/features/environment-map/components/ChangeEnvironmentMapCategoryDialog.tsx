@@ -15,7 +15,6 @@ interface ChangeEnvironmentMapCategoryDialogProps {
   selectedCount: number
   initialCategoryId?: number | null
   onHide: () => void
-  onManageCategories?: () => void
   onConfirm: (categoryId: number) => Promise<void>
 }
 
@@ -25,7 +24,6 @@ export function ChangeEnvironmentMapCategoryDialog({
   selectedCount,
   initialCategoryId = null,
   onHide,
-  onManageCategories,
   onConfirm,
 }: ChangeEnvironmentMapCategoryDialogProps) {
   const [selectedId, setSelectedId] = useState<number | null>(initialCategoryId)
@@ -111,17 +109,6 @@ export function ChangeEnvironmentMapCategoryDialog({
         ) : (
           <div className="environment-map-category-empty-state">
             <span>No categories available yet.</span>
-            {onManageCategories ? (
-              <Button
-                label="Manage Categories"
-                icon="pi pi-sitemap"
-                text
-                onClick={() => {
-                  onHide()
-                  onManageCategories()
-                }}
-              />
-            ) : null}
           </div>
         )}
 

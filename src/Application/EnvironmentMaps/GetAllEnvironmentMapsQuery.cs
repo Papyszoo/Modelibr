@@ -27,6 +27,7 @@ internal sealed class GetAllEnvironmentMapsQueryHandler : IQueryHandler<GetAllEn
                 query.ProjectIds,
                 query.CategoryIds,
                 query.SearchName,
+                query.Uncategorized,
                 cancellationToken);
 
             environmentMaps = result.Items;
@@ -42,7 +43,9 @@ internal sealed class GetAllEnvironmentMapsQueryHandler : IQueryHandler<GetAllEn
             if (query.ProjectIds is { Count: > 0 })
                 environmentMaps = environmentMaps.Where(e => e.Projects.Any(p => query.ProjectIds.Contains(p.Id)));
 
-            if (query.CategoryIds is { Count: > 0 })
+            if (query.Uncategorized == true)
+                environmentMaps = environmentMaps.Where(e => !e.EnvironmentMapCategoryId.HasValue);
+            else if (query.CategoryIds is { Count: > 0 })
                 environmentMaps = environmentMaps.Where(e =>
                     e.EnvironmentMapCategoryId.HasValue &&
                     query.CategoryIds.Contains(e.EnvironmentMapCategoryId.Value));
@@ -73,7 +76,8 @@ public record GetAllEnvironmentMapsQuery(
     IReadOnlyCollection<int>? CategoryIds = null,
     string? SearchName = null,
     int? Page = null,
-    int? PageSize = null) : IQuery<GetAllEnvironmentMapsResponse>;
+    int? PageSize = null,
+    bool? Uncategorized = null) : IQuery<GetAllEnvironmentMapsResponse>;
 
 public record GetAllEnvironmentMapsResponse(
     IReadOnlyList<EnvironmentMapListDto> EnvironmentMaps,

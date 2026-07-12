@@ -157,7 +157,6 @@ export const TabProvider = ({
       tab =>
         tab.type === type &&
         (type === 'modelList' ||
-          type === 'textureSets' ||
           type === 'environmentMaps' ||
           type === 'packs' ||
           type === 'sprites' ||

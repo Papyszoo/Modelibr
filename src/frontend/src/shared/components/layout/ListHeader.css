@@ -1,15 +1,18 @@
+/* Compact by design — this is an application header row, not a website hero
+   band. Density budget: vertical padding ≤ --mod-space-sm (page variant:
+   --mod-space-md); don't re-pad. */
 .mod-list-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--mod-space-md);
-  padding: var(--mod-space-lg) var(--mod-space-xl);
+  padding: var(--mod-space-sm) var(--mod-space-md);
   background: var(--mod-color-surface);
   border-bottom: 1px solid var(--mod-color-border);
 }
 
 .mod-list-header--page {
-  padding: var(--mod-space-xl) var(--mod-space-2xl);
+  padding: var(--mod-space-md);
 }
 
 .mod-list-header__main {

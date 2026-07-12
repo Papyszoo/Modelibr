@@ -1,5 +1,7 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Categories;
 using Application.Models;
 using Domain.Models;
 using Domain.Services;
@@ -11,11 +13,16 @@ internal sealed class CreateModelCategoryCommandHandler : ICommandHandler<Create
 {
     private readonly IModelCategoryRepository _categoryRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public CreateModelCategoryCommandHandler(IModelCategoryRepository categoryRepository, IDateTimeProvider dateTimeProvider)
+    public CreateModelCategoryCommandHandler(
+        IModelCategoryRepository categoryRepository,
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _categoryRepository = categoryRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<ModelCategorySummaryDto>> Handle(CreateModelCategoryCommand command, CancellationToken cancellationToken)
@@ -28,6 +35,9 @@ internal sealed class CreateModelCategoryCommandHandler : ICommandHandler<Create
 
         var category = ModelCategory.Create(command.Name, command.Description, command.ParentId, _dateTimeProvider.UtcNow);
         await _categoryRepository.AddAsync(category, cancellationToken);
+        // Commit immediately: category.Id is database-assigned and is needed
+        // below for the response DTO.
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new ModelCategorySummaryDto
         {
@@ -44,11 +54,16 @@ internal sealed class UpdateModelCategoryCommandHandler : ICommandHandler<Update
 {
     private readonly IModelCategoryRepository _categoryRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public UpdateModelCategoryCommandHandler(IModelCategoryRepository categoryRepository, IDateTimeProvider dateTimeProvider)
+    public UpdateModelCategoryCommandHandler(
+        IModelCategoryRepository categoryRepository,
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _categoryRepository = categoryRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(UpdateModelCategoryCommand command, CancellationToken cancellationToken)
@@ -82,6 +97,7 @@ internal sealed class UpdateModelCategoryCommandHandler : ICommandHandler<Update
         category.Update(command.Name, command.Description, _dateTimeProvider.UtcNow);
         category.MoveTo(command.ParentId, _dateTimeProvider.UtcNow);
         await _categoryRepository.UpdateAsync(category, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }
 
@@ -107,28 +123,17 @@ internal sealed class UpdateModelCategoryCommandHandler : ICommandHandler<Update
 internal sealed class DeleteModelCategoryCommandHandler : ICommandHandler<DeleteModelCategoryCommand>
 {
     private readonly IModelCategoryRepository _categoryRepository;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public DeleteModelCategoryCommandHandler(IModelCategoryRepository categoryRepository)
+    public DeleteModelCategoryCommandHandler(IModelCategoryRepository categoryRepository, IUnitOfWork unitOfWork)
     {
         _categoryRepository = categoryRepository;
+        _unitOfWork = unitOfWork;
     }
 
-    public async Task<Result> Handle(DeleteModelCategoryCommand command, CancellationToken cancellationToken)
-    {
-        var category = await _categoryRepository.GetByIdAsync(command.Id, cancellationToken);
-        if (category == null)
-        {
-            return Result.Failure(new Error("CategoryNotFound", $"Model category with ID {command.Id} was not found."));
-        }
-
-        if (category.Children.Any())
-        {
-            return Result.Failure(new Error("CategoryHasChildren", "Delete or move child categories before removing this category."));
-        }
-
-        await _categoryRepository.DeleteAsync(category, cancellationToken);
-        return Result.Success();
-    }
+    public Task<Result> Handle(DeleteModelCategoryCommand command, CancellationToken cancellationToken)
+        => CategoryCommandHandlers.DeleteAsync(
+            _categoryRepository, command.Id, "Model category", _unitOfWork, cancellationToken);
 }
 
 public record CreateModelCategoryCommand(string Name, string? Description, int? ParentId) : ICommand<ModelCategorySummaryDto>;

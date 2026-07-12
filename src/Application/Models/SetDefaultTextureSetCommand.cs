@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
@@ -18,6 +19,8 @@ namespace Application.Models
         private readonly IThumbnailQueue _thumbnailQueue;
         private readonly IDateTimeProvider _dateTimeProvider;
         private readonly IBlendFileGenerator _blendFileGenerator;
+        private readonly IBlendFileGenerationQueue _blendFileGenerationQueue;
+        private readonly IUnitOfWork _unitOfWork;
 
         public SetDefaultTextureSetCommandHandler(
             IModelRepository modelRepository,
@@ -25,7 +28,9 @@ namespace Application.Models
             IThumbnailRepository thumbnailRepository,
             IThumbnailQueue thumbnailQueue,
             IDateTimeProvider dateTimeProvider,
-            IBlendFileGenerator blendFileGenerator)
+            IBlendFileGenerator blendFileGenerator,
+            IBlendFileGenerationQueue blendFileGenerationQueue,
+            IUnitOfWork unitOfWork)
         {
             _modelRepository = modelRepository;
             _modelVersionRepository = modelVersionRepository;
@@ -33,6 +38,8 @@ namespace Application.Models
             _thumbnailQueue = thumbnailQueue;
             _dateTimeProvider = dateTimeProvider;
             _blendFileGenerator = blendFileGenerator;
+            _blendFileGenerationQueue = blendFileGenerationQueue;
+            _unitOfWork = unitOfWork;
         }
 
         public async Task<Result<SetDefaultTextureSetResponse>> Handle(SetDefaultTextureSetCommand command, CancellationToken cancellationToken)
@@ -110,8 +117,12 @@ namespace Application.Models
                         cancellationToken: cancellationToken);
                 }
 
-                // Invalidate cached .blend so it regenerates with new textures
+                // Invalidate cached .blend so it regenerates with new textures, then
+                // schedule the regeneration in the background so it reappears without needing a client GET.
                 _blendFileGenerator.InvalidateCache(command.ModelId, targetVersion.Id);
+                _blendFileGenerationQueue.Enqueue(command.ModelId, targetVersion.Id);
+
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
 
                 return Result.Success(new SetDefaultTextureSetResponse(model.Id, targetVersion.Id, targetVersion.DefaultTextureSetId));
             }

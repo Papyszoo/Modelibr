@@ -13,6 +13,13 @@ services:
             - AllowedOrigins__0=http://localhost:3002
             - AllowedOrigins__1=http://localhost:3010
             - BLENDER_INSTALL_PATH=/var/lib/modelibr/blender
+            # This stack recreates its DB fresh every run, so first boot always has
+            # every migration pending. It has no backup configuration (no POSTGRES_*
+            # env / BACKUP_STORAGE_PATH), so the pre-migration backup cannot run here
+            # and would abort startup by design. The pre-migration path itself is
+            # covered by backup-restore-e2e spec 06 + the DatabaseExtensions
+            # integration tests.
+            - MODELIBR_SKIP_PREMIGRATION_BACKUP=true
         ports:
             - "8090:8080"
         healthcheck:

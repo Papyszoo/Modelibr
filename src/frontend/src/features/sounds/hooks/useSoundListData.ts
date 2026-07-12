@@ -4,8 +4,11 @@ import { useCallback, useState } from 'react'
 import { useSoundCategoriesQuery } from '@/features/sounds/api/queries'
 import { getSoundsPaginated } from '@/features/sounds/api/soundApi'
 import { useDebouncedValue } from '@/shared/hooks'
+import {
+  ALL_CATEGORIES_ID,
+  UNASSIGNED_CATEGORY_ID,
+} from '@/shared/types/categories'
 
-const UNASSIGNED_CATEGORY_ID = -1
 const PAGE_SIZE = 50
 
 interface ShowToast {
@@ -19,7 +22,7 @@ interface ShowToast {
 
 export function useSoundListData(_showToast: ShowToast) {
   const [activeCategoryId, setActiveCategoryId] = useState<number | null>(
-    UNASSIGNED_CATEGORY_ID
+    ALL_CATEGORIES_ID
   )
   const [searchQuery, setSearchQuery] = useState('')
   // Duration filter (seconds); null = unbounded on that end.
@@ -78,6 +81,9 @@ export function useSoundListData(_showToast: ShowToast) {
   }, [queryClient])
 
   const filteredSounds = sounds.filter(sound => {
+    if (activeCategoryId === ALL_CATEGORIES_ID) {
+      return true
+    }
     if (activeCategoryId === UNASSIGNED_CATEGORY_ID) {
       return sound.categoryId === null
     }

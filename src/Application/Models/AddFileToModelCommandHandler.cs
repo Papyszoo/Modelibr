@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Files;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
@@ -13,15 +14,18 @@ namespace Application.Models
         private readonly IModelRepository _modelRepository;
         private readonly IFileCreationService _fileCreationService;
         private readonly IDateTimeProvider _dateTimeProvider;
+        private readonly IUnitOfWork _unitOfWork;
 
         public AddFileToModelCommandHandler(
             IModelRepository modelRepository, 
             IFileCreationService fileCreationService,
-            IDateTimeProvider dateTimeProvider)
+            IDateTimeProvider dateTimeProvider,
+            IUnitOfWork unitOfWork)
         {
             _modelRepository = modelRepository;
             _fileCreationService = fileCreationService;
             _dateTimeProvider = dateTimeProvider;
+            _unitOfWork = unitOfWork;
         }
 
         public async Task<Result<AddFileToModelCommandResponse>> Handle(AddFileToModelCommand command, CancellationToken cancellationToken)
@@ -70,6 +74,7 @@ namespace Application.Models
                 model.ActiveVersion.AddFile(fileEntity);
                 
                 await _modelRepository.UpdateAsync(model, cancellationToken);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
                 return Result.Success(new AddFileToModelCommandResponse(fileEntity.Id, false));
             }
             catch (ArgumentException ex)
