@@ -19,11 +19,10 @@ internal sealed class ModelRepository : IModelRepository
         _dateTimeProvider = dateTimeProvider;
     }
 
-    public async Task<Model> AddAsync(Model model, CancellationToken cancellationToken = default)
+    public Task<Model> AddAsync(Model model, CancellationToken cancellationToken = default)
     {
         _context.Models.Add(model);
-        await _context.SaveChangesAsync(cancellationToken);
-        return model;
+        return Task.FromResult(model);
     }
 
     public async Task<IEnumerable<Model>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -359,10 +358,10 @@ internal sealed class ModelRepository : IModelRepository
         return (result.ActiveVersionId, result.Thumbnail);
     }
 
-    public async Task UpdateAsync(Model model, CancellationToken cancellationToken = default)
+    public Task UpdateAsync(Model model, CancellationToken cancellationToken = default)
     {
-        _context.Models.Update(model);
-        await _context.SaveChangesAsync(cancellationToken);
+        _context.UpdateIfDetached(model);
+        return Task.CompletedTask;
     }
 
     public async Task<IEnumerable<Model>> GetAllDeletedAsync(CancellationToken cancellationToken = default)
@@ -464,9 +463,10 @@ internal sealed class ModelRepository : IModelRepository
             // Remove all versions
             _context.ModelVersions.RemoveRange(model.Versions);
             
-            // Remove the model (this will also remove the many-to-many join table entries)
+            // Remove the model (this will also remove the many-to-many join table entries).
+            // Staged only — the calling handler commits via IUnitOfWork. (The
+            // ExecuteUpdateAsync above remains immediate, as it always was.)
             _context.Models.Remove(model);
-            await _context.SaveChangesAsync(cancellationToken);
         }
     }
 }

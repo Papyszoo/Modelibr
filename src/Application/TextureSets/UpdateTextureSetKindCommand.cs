@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
@@ -16,6 +17,7 @@ internal class UpdateTextureSetKindCommandHandler : ICommandHandler<UpdateTextur
     private readonly IBlendFileGenerator _blendFileGenerator;
     private readonly IBlendFileGenerationQueue _blendFileGenerationQueue;
     private readonly ILogger<UpdateTextureSetKindCommandHandler> _logger;
+    private readonly IUnitOfWork _unitOfWork;
 
     public UpdateTextureSetKindCommandHandler(
         ITextureSetRepository textureSetRepository,
@@ -23,7 +25,8 @@ internal class UpdateTextureSetKindCommandHandler : ICommandHandler<UpdateTextur
         IThumbnailQueue thumbnailQueue,
         IBlendFileGenerator blendFileGenerator,
         IBlendFileGenerationQueue blendFileGenerationQueue,
-        ILogger<UpdateTextureSetKindCommandHandler> logger)
+        ILogger<UpdateTextureSetKindCommandHandler> logger,
+        IUnitOfWork unitOfWork)
     {
         _textureSetRepository = textureSetRepository;
         _dateTimeProvider = dateTimeProvider;
@@ -31,6 +34,7 @@ internal class UpdateTextureSetKindCommandHandler : ICommandHandler<UpdateTextur
         _blendFileGenerator = blendFileGenerator;
         _blendFileGenerationQueue = blendFileGenerationQueue;
         _logger = logger;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<UpdateTextureSetKindResponse>> Handle(UpdateTextureSetKindCommand command, CancellationToken cancellationToken)
@@ -81,6 +85,7 @@ internal class UpdateTextureSetKindCommandHandler : ICommandHandler<UpdateTextur
             }
 
             var updated = await _textureSetRepository.UpdateAsync(textureSet, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             // Auto-enqueue thumbnail generation when kind changes to Universal
             if (command.Kind == TextureSetKind.Universal)

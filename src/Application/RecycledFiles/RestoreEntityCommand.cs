@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Services;
@@ -23,6 +24,7 @@ internal sealed class RestoreEntityCommandHandler : ICommandHandler<RestoreEntit
     private readonly IScriptRepository _scriptRepository;
     private readonly IEnvironmentMapRepository _environmentMapRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public RestoreEntityCommandHandler(
         IModelRepository modelRepository,
@@ -33,7 +35,8 @@ internal sealed class RestoreEntityCommandHandler : ICommandHandler<RestoreEntit
         ISoundRepository soundRepository,
         IScriptRepository scriptRepository,
         IEnvironmentMapRepository environmentMapRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _modelRepository = modelRepository;
         _modelVersionRepository = modelVersionRepository;
@@ -44,6 +47,7 @@ internal sealed class RestoreEntityCommandHandler : ICommandHandler<RestoreEntit
         _scriptRepository = scriptRepository;
         _environmentMapRepository = environmentMapRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<RestoreEntityResponse>> Handle(RestoreEntityCommand request, CancellationToken cancellationToken)
@@ -59,6 +63,7 @@ internal sealed class RestoreEntityCommandHandler : ICommandHandler<RestoreEntit
                 
                 model.Restore(now);
                 await _modelRepository.UpdateAsync(model, cancellationToken);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
                 return Result.Success(new RestoreEntityResponse(true, "Model restored successfully"));
 
             case "modelversion":
@@ -68,6 +73,7 @@ internal sealed class RestoreEntityCommandHandler : ICommandHandler<RestoreEntit
                 
                 version.Restore(now);
                 await _modelVersionRepository.UpdateAsync(version, cancellationToken);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
                 return Result.Success(new RestoreEntityResponse(true, "Model version restored successfully"));
 
             case "file":
@@ -77,6 +83,7 @@ internal sealed class RestoreEntityCommandHandler : ICommandHandler<RestoreEntit
                 
                 file.Restore(now);
                 await _fileRepository.UpdateAsync(file, cancellationToken);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
                 return Result.Success(new RestoreEntityResponse(true, "File restored successfully"));
 
             case "textureset":
@@ -86,6 +93,7 @@ internal sealed class RestoreEntityCommandHandler : ICommandHandler<RestoreEntit
                 
                 textureSet.Restore(now);
                 await _textureSetRepository.UpdateAsync(textureSet, cancellationToken);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
                 return Result.Success(new RestoreEntityResponse(true, "Texture set restored successfully"));
 
             case "sprite":
@@ -95,6 +103,7 @@ internal sealed class RestoreEntityCommandHandler : ICommandHandler<RestoreEntit
                 
                 sprite.Restore(now);
                 await _spriteRepository.UpdateAsync(sprite, cancellationToken);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
                 return Result.Success(new RestoreEntityResponse(true, "Sprite restored successfully"));
 
             case "sound":
@@ -104,6 +113,7 @@ internal sealed class RestoreEntityCommandHandler : ICommandHandler<RestoreEntit
                 
                 sound.Restore(now);
                 await _soundRepository.UpdateAsync(sound, cancellationToken);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
                 return Result.Success(new RestoreEntityResponse(true, "Sound restored successfully"));
 
             case "script":
@@ -113,6 +123,7 @@ internal sealed class RestoreEntityCommandHandler : ICommandHandler<RestoreEntit
 
                 script.Restore(now);
                 await _scriptRepository.UpdateAsync(script, cancellationToken);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
                 return Result.Success(new RestoreEntityResponse(true, "Script restored successfully"));
 
             case "environmentmap":
@@ -122,6 +133,7 @@ internal sealed class RestoreEntityCommandHandler : ICommandHandler<RestoreEntit
 
                 environmentMap.Restore(now);
                 await _environmentMapRepository.UpdateAsync(environmentMap, cancellationToken);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
                 return Result.Success(new RestoreEntityResponse(true, "Environment map restored successfully"));
 
             case "environmentmapvariant":
@@ -134,6 +146,7 @@ internal sealed class RestoreEntityCommandHandler : ICommandHandler<RestoreEntit
 
                 parent.RestoreVariant(request.EntityId, now);
                 await _environmentMapRepository.UpdateAsync(parent, cancellationToken);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
                 return Result.Success(new RestoreEntityResponse(true, "Environment map variant restored successfully"));
 
             default:

@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Repositories;
 using Domain.Models;
 using SharedKernel;
@@ -19,6 +20,7 @@ internal static class CategoryCommandHandlers
         string categoryTypeName,
         Func<string, string?, int?, DateTime, TCategory> factory,
         DateTime now,
+        IUnitOfWork unitOfWork,
         CancellationToken cancellationToken)
         where TCategory : class, IHierarchicalCategory<TCategory>
     {
@@ -33,6 +35,9 @@ internal static class CategoryCommandHandlers
         {
             var category = factory(name, description, parentId, now);
             await repository.AddAsync(category, cancellationToken);
+            // Commit immediately: category.Id is database-assigned and is needed
+            // below for the response DTO.
+            await unitOfWork.SaveChangesAsync(cancellationToken);
 
             var path = category.Name;
             if (parentId.HasValue)
@@ -66,6 +71,7 @@ internal static class CategoryCommandHandlers
         int? parentId,
         string categoryTypeName,
         DateTime now,
+        IUnitOfWork unitOfWork,
         CancellationToken cancellationToken)
         where TCategory : class, IHierarchicalCategory<TCategory>
     {
@@ -98,6 +104,7 @@ internal static class CategoryCommandHandlers
             category.Update(name, description, now);
             category.MoveTo(parentId, now);
             await repository.UpdateAsync(category, cancellationToken);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
             return Result.Success();
         }
         catch (ArgumentException ex)
@@ -110,6 +117,7 @@ internal static class CategoryCommandHandlers
         IHierarchicalCategoryRepository<TCategory> repository,
         int id,
         string categoryTypeName,
+        IUnitOfWork unitOfWork,
         CancellationToken cancellationToken)
         where TCategory : class, IHierarchicalCategory<TCategory>
     {
@@ -123,7 +131,10 @@ internal static class CategoryCommandHandlers
         // Deleting a category removes its whole branch. Descendants are
         // deleted children-first to satisfy the Restrict FK on ParentId;
         // assets assigned anywhere in the branch become uncategorized via
-        // the SetNull FK on the asset -> category relationship.
+        // the SetNull FK on the asset -> category relationship. All deletes
+        // land in one commit below, so a failure partway through (e.g. an
+        // unexpected FK violation) leaves the whole branch untouched instead
+        // of a partially-deleted tree.
         var allCategories = await repository.GetAllAsync(cancellationToken);
         foreach (var descendantId in CollectDescendantIdsChildrenFirst(allCategories, id))
         {
@@ -137,6 +148,7 @@ internal static class CategoryCommandHandlers
         }
 
         await repository.DeleteAsync(category, cancellationToken);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }
 

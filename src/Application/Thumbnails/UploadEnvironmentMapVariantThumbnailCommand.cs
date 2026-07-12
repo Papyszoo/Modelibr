@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Files;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
@@ -15,17 +16,20 @@ internal sealed class UploadEnvironmentMapVariantThumbnailCommandHandler
     private readonly IFileStorage _fileStorage;
     private readonly IUploadPathProvider _pathProvider;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public UploadEnvironmentMapVariantThumbnailCommandHandler(
         IEnvironmentMapRepository environmentMapRepository,
         IFileStorage fileStorage,
         IUploadPathProvider pathProvider,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _environmentMapRepository = environmentMapRepository;
         _fileStorage = fileStorage;
         _pathProvider = pathProvider;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<UploadEnvironmentMapVariantThumbnailCommandResponse>> Handle(
@@ -62,6 +66,7 @@ internal sealed class UploadEnvironmentMapVariantThumbnailCommandHandler
             environmentMap.Touch(now);
 
             await _environmentMapRepository.UpdateAsync(environmentMap, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             return Result.Success(new UploadEnvironmentMapVariantThumbnailCommandResponse(
                 command.EnvironmentMapId,

@@ -43,7 +43,6 @@ internal sealed class ApplicationSettingsRepository : IApplicationSettingsReposi
             _context.Entry(existing).CurrentValues.SetValues(settings);
         }
 
-        await _context.SaveChangesAsync(cancellationToken);
         return existing ?? settings;
     }
 }

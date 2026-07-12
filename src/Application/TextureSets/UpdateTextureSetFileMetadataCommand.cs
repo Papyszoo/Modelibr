@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Services;
@@ -20,13 +21,16 @@ internal sealed class UpdateTextureSetFileMetadataCommandHandler : ICommandHandl
 {
     private readonly ITextureSetRepository _textureSetRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public UpdateTextureSetFileMetadataCommandHandler(
         ITextureSetRepository textureSetRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _textureSetRepository = textureSetRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(UpdateTextureSetFileMetadataCommand command, CancellationToken cancellationToken)
@@ -53,6 +57,7 @@ internal sealed class UpdateTextureSetFileMetadataCommandHandler : ICommandHandl
         if (updated)
         {
             await _textureSetRepository.UpdateAsync(textureSet, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
         }
 
         return Result.Success();

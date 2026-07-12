@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Services;
@@ -13,13 +14,16 @@ internal sealed class SoftDeleteTextureSetCommandHandler : ICommandHandler<SoftD
 {
     private readonly ITextureSetRepository _textureSetRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public SoftDeleteTextureSetCommandHandler(
         ITextureSetRepository textureSetRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _textureSetRepository = textureSetRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<SoftDeleteTextureSetResponse>> Handle(SoftDeleteTextureSetCommand request, CancellationToken cancellationToken)
@@ -33,6 +37,7 @@ internal sealed class SoftDeleteTextureSetCommandHandler : ICommandHandler<SoftD
 
         textureSet.SoftDelete(_dateTimeProvider.UtcNow);
         await _textureSetRepository.UpdateAsync(textureSet, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new SoftDeleteTextureSetResponse(true, "Texture set soft deleted successfully"));
     }

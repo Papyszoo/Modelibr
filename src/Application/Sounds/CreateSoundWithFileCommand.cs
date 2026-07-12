@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Files;
@@ -22,6 +23,7 @@ internal class CreateSoundWithFileCommandHandler : ICommandHandler<CreateSoundWi
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IThumbnailQueue _thumbnailQueue;
     private readonly ILogger<CreateSoundWithFileCommandHandler> _logger;
+    private readonly IUnitOfWork _unitOfWork;
 
     public CreateSoundWithFileCommandHandler(
         ISoundRepository soundRepository,
@@ -31,7 +33,8 @@ internal class CreateSoundWithFileCommandHandler : ICommandHandler<CreateSoundWi
         ISettingRepository settingRepository,
         IDateTimeProvider dateTimeProvider,
         IThumbnailQueue thumbnailQueue,
-        ILogger<CreateSoundWithFileCommandHandler> logger)
+        ILogger<CreateSoundWithFileCommandHandler> logger,
+        IUnitOfWork unitOfWork)
     {
         _soundRepository = soundRepository;
         _soundCategoryRepository = soundCategoryRepository;
@@ -41,6 +44,7 @@ internal class CreateSoundWithFileCommandHandler : ICommandHandler<CreateSoundWi
         _dateTimeProvider = dateTimeProvider;
         _thumbnailQueue = thumbnailQueue;
         _logger = logger;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<CreateSoundWithFileResponse>> Handle(CreateSoundWithFileCommand command, CancellationToken cancellationToken)
@@ -87,6 +91,7 @@ internal class CreateSoundWithFileCommandHandler : ICommandHandler<CreateSoundWi
                         soundId: existingSound.Id);
 
                     await _batchUploadRepository.AddAsync(batchUpload, cancellationToken);
+                    await _unitOfWork.SaveChangesAsync(cancellationToken);
                 }
 
                 return Result.Success(new CreateSoundWithFileResponse(
@@ -126,6 +131,9 @@ internal class CreateSoundWithFileCommandHandler : ICommandHandler<CreateSoundWi
                 command.CategoryId);
 
             var createdSound = await _soundRepository.AddAsync(sound, cancellationToken);
+            // Commit now: the sound's real database-assigned id feeds the waveform-job
+            // enqueue and the BatchUpload raw scalar below.
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             // 5. Enqueue waveform thumbnail generation job
             try
@@ -166,6 +174,7 @@ internal class CreateSoundWithFileCommandHandler : ICommandHandler<CreateSoundWi
                     soundId: createdSound.Id);
 
                 await _batchUploadRepository.AddAsync(batchUpload, cancellationToken);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
             }
 
             return Result.Success(new CreateSoundWithFileResponse(

@@ -1,11 +1,50 @@
-﻿using Domain.Models;
+﻿using Application.Abstractions;
+using Domain.Models;
 using Domain.ValueObjects;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Infrastructure.Persistence
 {
-    public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : DbContext(options)
+    public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : DbContext(options), IUnitOfWork
     {
+        // Overridden (not just exposed via the explicit IUnitOfWork member below)
+        // so the known-benign-race handling applies no matter which caller
+        // reaches SaveChanges: Application-layer command handlers going through
+        // IUnitOfWork.SaveChangesAsync, AND repositories that haven't been
+        // migrated off self-committing yet (prompt 25 migrates them one bounded
+        // area at a time) and call this directly. Domain-event dispatch is wired
+        // separately via DomainEventsInterceptor (see
+        // Infrastructure/DependencyInjection.cs) and runs regardless of path too.
+        public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                return await base.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException ex) when (IsDuplicatePackModelAssociation(ex))
+            {
+                // Concurrent identical "add model to pack" requests can race on
+                // the PackModels join table's composite PK. Treat the duplicate
+                // insert as an idempotent no-op — moved here from
+                // PackRepository.UpdateAsync when repositories stopped
+                // self-committing (prompt 25); this is the one known-benign
+                // race the app deliberately swallows at the commit boundary.
+                ChangeTracker.Clear();
+                return 0;
+            }
+        }
+
+        Task IUnitOfWork.SaveChangesAsync(CancellationToken cancellationToken) =>
+            SaveChangesAsync(cancellationToken);
+
+        private static bool IsDuplicatePackModelAssociation(DbUpdateException ex)
+            => ex.InnerException is PostgresException
+            {
+                SqlState: PostgresErrorCodes.UniqueViolation,
+                ConstraintName: "PK_PackModels"
+            };
+
         public DbSet<Model> Models => Set<Model>();
         public DbSet<ModelVersion> ModelVersions => Set<ModelVersion>();
         public DbSet<Domain.Models.File> Files => Set<Domain.Models.File>();

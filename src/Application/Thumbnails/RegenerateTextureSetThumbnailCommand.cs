@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
@@ -9,13 +10,16 @@ internal class RegenerateTextureSetThumbnailCommandHandler : ICommandHandler<Reg
 {
     private readonly ITextureSetRepository _textureSetRepository;
     private readonly IThumbnailQueue _thumbnailQueue;
+    private readonly IUnitOfWork _unitOfWork;
 
     public RegenerateTextureSetThumbnailCommandHandler(
         ITextureSetRepository textureSetRepository,
-        IThumbnailQueue thumbnailQueue)
+        IThumbnailQueue thumbnailQueue,
+        IUnitOfWork unitOfWork)
     {
         _textureSetRepository = textureSetRepository;
         _thumbnailQueue = thumbnailQueue;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(RegenerateTextureSetThumbnailCommand command, CancellationToken cancellationToken)
@@ -32,6 +36,7 @@ internal class RegenerateTextureSetThumbnailCommandHandler : ICommandHandler<Reg
         {
             textureSet.UpdatePreviewSettings(command.UvScale, command.GeometryType, DateTime.UtcNow);
             await _textureSetRepository.UpdateAsync(textureSet, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
         }
 
         await _thumbnailQueue.EnqueueTextureSetThumbnailAsync(command.TextureSetId, command.ProxySize, forceRegenerate: true, cancellationToken: cancellationToken);

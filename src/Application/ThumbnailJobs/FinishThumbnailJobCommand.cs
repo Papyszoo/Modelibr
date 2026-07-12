@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
@@ -37,8 +38,8 @@ public class FinishThumbnailJobCommandHandler : ICommandHandler<FinishThumbnailJ
     private readonly IThumbnailRepository _thumbnailRepository;
     private readonly IThumbnailQueue _thumbnailQueue;
     private readonly IDateTimeProvider _dateTimeProvider;
-    private readonly IDomainEventDispatcher _domainEventDispatcher;
     private readonly ILogger<FinishThumbnailJobCommandHandler> _logger;
+    private readonly IUnitOfWork _unitOfWork;
 
     public FinishThumbnailJobCommandHandler(
         IThumbnailJobRepository thumbnailJobRepository,
@@ -46,16 +47,16 @@ public class FinishThumbnailJobCommandHandler : ICommandHandler<FinishThumbnailJ
         IThumbnailRepository thumbnailRepository,
         IThumbnailQueue thumbnailQueue,
         IDateTimeProvider dateTimeProvider,
-        IDomainEventDispatcher domainEventDispatcher,
-        ILogger<FinishThumbnailJobCommandHandler> logger)
+        ILogger<FinishThumbnailJobCommandHandler> logger,
+        IUnitOfWork unitOfWork)
     {
         _thumbnailJobRepository = thumbnailJobRepository ?? throw new ArgumentNullException(nameof(thumbnailJobRepository));
         _modelRepository = modelRepository ?? throw new ArgumentNullException(nameof(modelRepository));
         _thumbnailRepository = thumbnailRepository ?? throw new ArgumentNullException(nameof(thumbnailRepository));
         _thumbnailQueue = thumbnailQueue ?? throw new ArgumentNullException(nameof(thumbnailQueue));
         _dateTimeProvider = dateTimeProvider ?? throw new ArgumentNullException(nameof(dateTimeProvider));
-        _domainEventDispatcher = domainEventDispatcher ?? throw new ArgumentNullException(nameof(domainEventDispatcher));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<FinishThumbnailJobResponse>> Handle(FinishThumbnailJobCommand command, CancellationToken cancellationToken)
@@ -122,7 +123,10 @@ public class FinishThumbnailJobCommandHandler : ICommandHandler<FinishThumbnailJ
             {
                 thumbnail = Thumbnail.Create(job.ModelId.Value, job.ModelVersionId.Value, now);
                 thumbnail = await _thumbnailRepository.AddAsync(thumbnail, cancellationToken);
-                
+                // Commit so the thumbnail gets its real id — SetThumbnail below
+                // copies it into ModelVersion.ThumbnailId (a raw scalar FK).
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
+
                 // Set ThumbnailId on the ModelVersion
                 var targetVersion = model.Versions.FirstOrDefault(v => v.Id == job.ModelVersionId.Value);
                 if (targetVersion != null)
@@ -163,12 +167,11 @@ public class FinishThumbnailJobCommandHandler : ICommandHandler<FinishThumbnailJ
                     command.JobId, job.ModelId, job.ModelVersionId);
             }
 
-            // Save changes
+            // Save changes. ThumbnailStatusChangedEvent (raised by MarkAsReady/MarkAsFailed
+            // above) is dispatched from the save pipeline once this commits (see
+            // DomainEventsInterceptor); no manual publish here.
             await _thumbnailRepository.UpdateAsync(thumbnail, cancellationToken);
-
-            // Dispatch domain events (including ThumbnailStatusChangedEvent)
-            await _domainEventDispatcher.PublishAsync(thumbnail.DomainEvents, cancellationToken);
-            thumbnail.ClearDomainEvents();
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             return Result.Success(new FinishThumbnailJobResponse(job.ModelId.Value, job.ModelVersionId.Value, status));
         }

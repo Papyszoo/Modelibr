@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Categories;
@@ -12,11 +13,16 @@ internal sealed class CreateTextureSetCategoryCommandHandler : ICommandHandler<C
 {
     private readonly ITextureSetCategoryRepository _categoryRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public CreateTextureSetCategoryCommandHandler(ITextureSetCategoryRepository categoryRepository, IDateTimeProvider dateTimeProvider)
+    public CreateTextureSetCategoryCommandHandler(
+        ITextureSetCategoryRepository categoryRepository,
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _categoryRepository = categoryRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<TextureSetCategorySummaryDto>> Handle(CreateTextureSetCategoryCommand command, CancellationToken cancellationToken)
@@ -35,6 +41,9 @@ internal sealed class CreateTextureSetCategoryCommandHandler : ICommandHandler<C
             category = TextureSetCategory.Create(
                 command.Name, command.Description, command.ParentId, command.Kind, _dateTimeProvider.UtcNow);
             await _categoryRepository.AddAsync(category, cancellationToken);
+            // Commit immediately: category.Id is database-assigned and is needed
+            // below for the response DTO.
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
         }
         catch (ArgumentException ex)
         {
@@ -63,11 +72,16 @@ internal sealed class UpdateTextureSetCategoryCommandHandler : ICommandHandler<U
 {
     private readonly ITextureSetCategoryRepository _categoryRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public UpdateTextureSetCategoryCommandHandler(ITextureSetCategoryRepository categoryRepository, IDateTimeProvider dateTimeProvider)
+    public UpdateTextureSetCategoryCommandHandler(
+        ITextureSetCategoryRepository categoryRepository,
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _categoryRepository = categoryRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(UpdateTextureSetCategoryCommand command, CancellationToken cancellationToken)
@@ -106,6 +120,7 @@ internal sealed class UpdateTextureSetCategoryCommandHandler : ICommandHandler<U
             category.Update(command.Name, command.Description, _dateTimeProvider.UtcNow);
             category.MoveTo(command.ParentId, _dateTimeProvider.UtcNow);
             await _categoryRepository.UpdateAsync(category, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
             return Result.Success();
         }
         catch (ArgumentException ex)
@@ -118,15 +133,17 @@ internal sealed class UpdateTextureSetCategoryCommandHandler : ICommandHandler<U
 internal sealed class DeleteTextureSetCategoryCommandHandler : ICommandHandler<DeleteTextureSetCategoryCommand>
 {
     private readonly ITextureSetCategoryRepository _categoryRepository;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public DeleteTextureSetCategoryCommandHandler(ITextureSetCategoryRepository categoryRepository)
+    public DeleteTextureSetCategoryCommandHandler(ITextureSetCategoryRepository categoryRepository, IUnitOfWork unitOfWork)
     {
         _categoryRepository = categoryRepository;
+        _unitOfWork = unitOfWork;
     }
 
     public Task<Result> Handle(DeleteTextureSetCategoryCommand command, CancellationToken cancellationToken)
         => CategoryCommandHandlers.DeleteAsync(
-            _categoryRepository, command.Id, "Texture set category", cancellationToken);
+            _categoryRepository, command.Id, "Texture set category", _unitOfWork, cancellationToken);
 }
 
 public record CreateTextureSetCategoryCommand(string Name, string? Description, int? ParentId, TextureSetKind Kind) : ICommand<TextureSetCategorySummaryDto>;

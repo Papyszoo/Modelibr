@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Services;
@@ -9,13 +10,16 @@ internal sealed class RemoveEnvironmentMapVariantCommandHandler : ICommandHandle
 {
     private readonly IEnvironmentMapRepository _environmentMapRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public RemoveEnvironmentMapVariantCommandHandler(
         IEnvironmentMapRepository environmentMapRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _environmentMapRepository = environmentMapRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(RemoveEnvironmentMapVariantCommand command, CancellationToken cancellationToken)
@@ -30,6 +34,7 @@ internal sealed class RemoveEnvironmentMapVariantCommandHandler : ICommandHandle
 
             environmentMap.SoftDeleteVariant(command.VariantId, _dateTimeProvider.UtcNow);
             await _environmentMapRepository.UpdateAsync(environmentMap, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
             return Result.Success();
         }
         catch (InvalidOperationException ex)

@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Services;
@@ -9,13 +10,16 @@ internal sealed class SoftDeleteEnvironmentMapCommandHandler : ICommandHandler<S
 {
     private readonly IEnvironmentMapRepository _environmentMapRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public SoftDeleteEnvironmentMapCommandHandler(
         IEnvironmentMapRepository environmentMapRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _environmentMapRepository = environmentMapRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(SoftDeleteEnvironmentMapCommand command, CancellationToken cancellationToken)
@@ -33,6 +37,7 @@ internal sealed class SoftDeleteEnvironmentMapCommandHandler : ICommandHandler<S
 
         environmentMap.SoftDelete(_dateTimeProvider.UtcNow);
         await _environmentMapRepository.UpdateAsync(environmentMap, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }
 }

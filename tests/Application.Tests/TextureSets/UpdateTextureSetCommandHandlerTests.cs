@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Repositories;
 using Application.Settings;
 using Application.TextureSets;
@@ -19,6 +20,7 @@ public class UpdateTextureSetCommandHandlerTests
     private readonly Mock<ITextureSetCategoryRepository> _textureSetCategoryRepository = new();
     private readonly Mock<ISettingRepository> _settingRepository = new();
     private readonly Mock<IDateTimeProvider> _dateTimeProvider = new();
+    private readonly Mock<IUnitOfWork> _unitOfWork = new();
     private readonly UpdateTextureSetCommandHandler _handler;
 
     public UpdateTextureSetCommandHandlerTests()
@@ -31,7 +33,8 @@ public class UpdateTextureSetCommandHandlerTests
             _textureSetRepository.Object,
             _textureSetCategoryRepository.Object,
             _settingRepository.Object,
-            _dateTimeProvider.Object);
+            _dateTimeProvider.Object,
+            _unitOfWork.Object);
     }
 
     private static TextureSet CreateTextureSet(int id, string name)

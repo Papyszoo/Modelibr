@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Repositories;
 using Application.Settings;
 using Application.Sounds;
@@ -21,6 +22,7 @@ public class UpdateSoundCommandHandlerTests
     private readonly Mock<ISoundCategoryRepository> _soundCategoryRepository = new();
     private readonly Mock<ISettingRepository> _settingRepository = new();
     private readonly Mock<IDateTimeProvider> _dateTimeProvider = new();
+    private readonly Mock<IUnitOfWork> _unitOfWork = new();
     private readonly UpdateSoundCommandHandler _handler;
 
     public UpdateSoundCommandHandlerTests()
@@ -33,7 +35,8 @@ public class UpdateSoundCommandHandlerTests
             _soundRepository.Object,
             _soundCategoryRepository.Object,
             _settingRepository.Object,
-            _dateTimeProvider.Object);
+            _dateTimeProvider.Object,
+            _unitOfWork.Object);
     }
 
     private static Sound CreateSound(int id, string name)

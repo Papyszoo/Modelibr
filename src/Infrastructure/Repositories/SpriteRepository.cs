@@ -20,7 +20,6 @@ internal sealed class SpriteRepository : ISpriteRepository
             throw new ArgumentNullException(nameof(sprite));
 
         var entityEntry = await _context.Sprites.AddAsync(sprite, cancellationToken);
-        await _context.SaveChangesAsync(cancellationToken);
         
         return entityEntry.Entity;
     }
@@ -166,15 +165,14 @@ internal sealed class SpriteRepository : ISpriteRepository
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<Sprite> UpdateAsync(Sprite sprite, CancellationToken cancellationToken = default)
+    public Task<Sprite> UpdateAsync(Sprite sprite, CancellationToken cancellationToken = default)
     {
         if (sprite == null)
             throw new ArgumentNullException(nameof(sprite));
 
-        _context.Sprites.Update(sprite);
-        await _context.SaveChangesAsync(cancellationToken);
-        
-        return sprite;
+        _context.UpdateIfDetached(sprite);
+
+        return Task.FromResult(sprite);
     }
 
     public async Task DeleteAsync(int id, CancellationToken cancellationToken = default)
@@ -187,7 +185,6 @@ internal sealed class SpriteRepository : ISpriteRepository
         if (sprite != null)
         {
             _context.Sprites.Remove(sprite);
-            await _context.SaveChangesAsync(cancellationToken);
         }
     }
 }

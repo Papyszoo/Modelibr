@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Repositories;
 using Application.TextureSets;
 using Domain.Models;
@@ -13,6 +14,7 @@ public class ChangeTextureTypeCommandHandlerTests
 {
     private readonly Mock<ITextureSetRepository> _mockTextureSetRepository;
     private readonly Mock<IDateTimeProvider> _mockDateTimeProvider;
+    private readonly Mock<IUnitOfWork> _unitOfWork = new();
     private readonly ChangeTextureTypeCommandHandler _handler;
 
     public ChangeTextureTypeCommandHandlerTests()
@@ -22,7 +24,8 @@ public class ChangeTextureTypeCommandHandlerTests
         
         _handler = new ChangeTextureTypeCommandHandler(
             _mockTextureSetRepository.Object,
-            _mockDateTimeProvider.Object);
+            _mockDateTimeProvider.Object,
+            _unitOfWork.Object);
     }
 
     [Fact]

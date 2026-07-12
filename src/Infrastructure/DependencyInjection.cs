@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
 using Infrastructure.Persistence;
@@ -15,20 +16,27 @@ namespace Infrastructure
     {
         public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
         {
-            services.AddDbContext<ApplicationDbContext>(optionsBuilder =>
+            // Scoped, not Singleton: DomainEventsInterceptor keeps per-save
+            // recursion-guard state that must not leak across requests.
+            services.AddScoped<DomainEventsInterceptor>();
+
+            services.AddDbContext<ApplicationDbContext>((sp, optionsBuilder) =>
             {
                 var connectionString = configuration.GetConnectionString("Default");
                 if (string.IsNullOrEmpty(connectionString))
                 {
                     throw new InvalidOperationException("Database connection string 'Default' is not configured.");
                 }
-                
+
                 // Expand environment variables in connection string
                 connectionString = Environment.ExpandEnvironmentVariables(connectionString);
-                
+
                 optionsBuilder
-                    .UseNpgsql(connectionString);
+                    .UseNpgsql(connectionString)
+                    .AddInterceptors(sp.GetRequiredService<DomainEventsInterceptor>());
             });
+
+            services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<ApplicationDbContext>());
 
             services.AddScoped<IModelRepository, ModelRepository>();
             services.AddScoped<IModelVersionRepository, ModelVersionRepository>();

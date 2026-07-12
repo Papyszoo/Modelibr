@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Services;
@@ -10,15 +11,18 @@ internal class RemoveModelFromPackCommandHandler : ICommandHandler<RemoveModelFr
     private readonly IPackRepository _packRepository;
     private readonly IModelRepository _modelRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public RemoveModelFromPackCommandHandler(
         IPackRepository packRepository,
         IModelRepository modelRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _packRepository = packRepository;
         _modelRepository = modelRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(RemoveModelFromPackCommand command, CancellationToken cancellationToken)
@@ -41,6 +45,7 @@ internal class RemoveModelFromPackCommandHandler : ICommandHandler<RemoveModelFr
 
         await _packRepository.UpdateAsync(pack, cancellationToken);
 
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }
 }

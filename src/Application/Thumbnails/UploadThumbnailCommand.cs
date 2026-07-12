@@ -1,4 +1,5 @@
 using Application.Abstractions.Files;
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Storage;
@@ -16,19 +17,22 @@ internal class UploadThumbnailCommandHandler : ICommandHandler<UploadThumbnailCo
     private readonly IFileStorage _fileStorage;
     private readonly IUploadPathProvider _pathProvider;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public UploadThumbnailCommandHandler(
         IModelRepository modelRepository,
         IThumbnailRepository thumbnailRepository,
         IFileStorage fileStorage,
         IUploadPathProvider pathProvider,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _modelRepository = modelRepository;
         _thumbnailRepository = thumbnailRepository;
         _fileStorage = fileStorage;
         _pathProvider = pathProvider;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<UploadThumbnailCommandResponse>> Handle(UploadThumbnailCommand command, CancellationToken cancellationToken)
@@ -78,6 +82,9 @@ internal class UploadThumbnailCommandHandler : ICommandHandler<UploadThumbnailCo
                 // Create a new thumbnail for this version
                 var thumbnail = Thumbnail.Create(model.Id, targetVersion.Id, now);
                 thumbnailToUpdate = await _thumbnailRepository.AddAsync(thumbnail, cancellationToken);
+                // Commit so the thumbnail gets its real id — SetThumbnail copies it
+                // into ModelVersion.ThumbnailId (a raw scalar FK).
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
                 targetVersion.SetThumbnail(thumbnailToUpdate);
                 await _modelRepository.UpdateAsync(model, cancellationToken); // Save ThumbnailId to ModelVersion
             }
@@ -101,6 +108,7 @@ internal class UploadThumbnailCommandHandler : ICommandHandler<UploadThumbnailCo
                 now);
 
             await _thumbnailRepository.UpdateAsync(thumbnailToUpdate, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             return Result.Success(new UploadThumbnailCommandResponse(
                 model.Id,

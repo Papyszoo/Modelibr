@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
 using Domain.Models;
@@ -9,20 +10,29 @@ namespace Infrastructure.Services;
 /// <summary>
 /// Service implementation for thumbnail generation queue operations.
 /// Provides safe job claiming for concurrent workers and dead letter handling.
+///
+/// The queue commits its own writes via IUnitOfWork (unlike command handlers,
+/// which commit once at the end): enqueue/complete/fail/retry are durable-queue
+/// primitives — a job must be persisted before workers are notified over
+/// SignalR, and callers include the domain-event pipeline (ModelUploadedEventHandler)
+/// where no command handler exists to commit afterwards.
 /// </summary>
 public class ThumbnailQueue : IThumbnailQueue
 {
     private readonly IThumbnailJobRepository _thumbnailJobRepository;
     private readonly IThumbnailJobQueueNotificationService _queueNotificationService;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<ThumbnailQueue> _logger;
 
     public ThumbnailQueue(
         IThumbnailJobRepository thumbnailJobRepository,
         IThumbnailJobQueueNotificationService queueNotificationService,
+        IUnitOfWork unitOfWork,
         ILogger<ThumbnailQueue> logger)
     {
         _thumbnailJobRepository = thumbnailJobRepository ?? throw new ArgumentNullException(nameof(thumbnailJobRepository));
         _queueNotificationService = queueNotificationService ?? throw new ArgumentNullException(nameof(queueNotificationService));
+        _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -48,6 +58,7 @@ public class ThumbnailQueue : IThumbnailQueue
                 var currentTime = DateTime.UtcNow;
                 existingJob.Reset(currentTime);
                 await _thumbnailJobRepository.UpdateAsync(existingJob, cancellationToken);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
                 
                 _logger.LogInformation("Reset existing thumbnail job {JobId} (status: {Status}) for model {ModelId} version {ModelVersionId} for regeneration (forceRegenerate: {ForceRegenerate})", 
                     existingJob.Id, existingJob.Status, modelId, modelVersionId, forceRegenerate);
@@ -66,6 +77,7 @@ public class ThumbnailQueue : IThumbnailQueue
 
         var job = ThumbnailJob.Create(modelId, modelVersionId, modelHash, DateTime.UtcNow, maxAttempts, lockTimeoutMinutes);
         var createdJob = await _thumbnailJobRepository.AddAsync(job, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Enqueued thumbnail job {JobId} for model {ModelId} version {ModelVersionId} with hash {ModelHash}", 
             createdJob.Id, modelId, modelVersionId, modelHash);
@@ -94,6 +106,7 @@ public class ThumbnailQueue : IThumbnailQueue
                 var currentTime = DateTime.UtcNow;
                 existingJob.Reset(currentTime);
                 await _thumbnailJobRepository.UpdateAsync(existingJob, cancellationToken);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
 
                 _logger.LogInformation("Reset existing waveform job {JobId} (status: {Status}) for sound {SoundId} for regeneration (forceRegenerate: {ForceRegenerate})",
                     existingJob.Id, existingJob.Status, soundId, forceRegenerate);
@@ -111,6 +124,7 @@ public class ThumbnailQueue : IThumbnailQueue
 
         var job = ThumbnailJob.CreateForSound(soundId, soundHash, DateTime.UtcNow, maxAttempts, lockTimeoutMinutes);
         var createdJob = await _thumbnailJobRepository.AddAsync(job, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Enqueued waveform thumbnail job {JobId} for sound {SoundId} with hash {SoundHash}",
             createdJob.Id, soundId, soundHash);
@@ -139,6 +153,7 @@ public class ThumbnailQueue : IThumbnailQueue
                 var currentTime = DateTime.UtcNow;
                 existingJob.Reset(currentTime);
                 await _thumbnailJobRepository.UpdateAsync(existingJob, cancellationToken);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
 
                 _logger.LogInformation("Reset existing texture set thumbnail job {JobId} (status: {Status}) for texture set {TextureSetId} for regeneration (forceRegenerate: {ForceRegenerate})",
                     existingJob.Id, existingJob.Status, textureSetId, forceRegenerate);
@@ -156,6 +171,7 @@ public class ThumbnailQueue : IThumbnailQueue
 
         var job = ThumbnailJob.CreateForTextureSet(textureSetId, DateTime.UtcNow, maxAttempts, lockTimeoutMinutes, proxySize);
         var createdJob = await _thumbnailJobRepository.AddAsync(job, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Enqueued texture set thumbnail job {JobId} for texture set {TextureSetId}",
             createdJob.Id, textureSetId);
@@ -182,6 +198,7 @@ public class ThumbnailQueue : IThumbnailQueue
                 var currentTime = DateTime.UtcNow;
                 existingJob.Reset(currentTime);
                 await _thumbnailJobRepository.UpdateAsync(existingJob, cancellationToken);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
                 await _queueNotificationService.NotifyJobEnqueuedAsync(existingJob, cancellationToken);
             }
 
@@ -190,6 +207,7 @@ public class ThumbnailQueue : IThumbnailQueue
 
         var job = ThumbnailJob.CreateForEnvironmentMap(environmentMapId, environmentMapVariantId, DateTime.UtcNow, maxAttempts, lockTimeoutMinutes);
         var createdJob = await _thumbnailJobRepository.AddAsync(job, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
         await _queueNotificationService.NotifyJobEnqueuedAsync(createdJob, cancellationToken);
         return createdJob;
     }
@@ -239,6 +257,7 @@ public class ThumbnailQueue : IThumbnailQueue
 
         job.MarkAsCompleted(DateTime.UtcNow);
         await _thumbnailJobRepository.UpdateAsync(job, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Marked thumbnail job {JobId} as completed for model {ModelId} version {ModelVersionId}", 
             jobId, job.ModelId, job.ModelVersionId);
@@ -256,6 +275,7 @@ public class ThumbnailQueue : IThumbnailQueue
         var previousStatus = job.Status;
         job.MarkAsFailed(errorMessage, DateTime.UtcNow);
         await _thumbnailJobRepository.UpdateAsync(job, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         var sanitizedError = (errorMessage ?? string.Empty).ReplaceLineEndings(" ");
 
@@ -282,6 +302,7 @@ public class ThumbnailQueue : IThumbnailQueue
 
         job.Reset(DateTime.UtcNow);
         await _thumbnailJobRepository.UpdateAsync(job, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Reset thumbnail job {JobId} for manual retry for model {ModelId} version {ModelVersionId}", 
             jobId, job.ModelId, job.ModelVersionId);
@@ -312,6 +333,7 @@ public class ThumbnailQueue : IThumbnailQueue
             {
                 job.Cancel(currentTime);
                 await _thumbnailJobRepository.UpdateAsync(job, cancellationToken);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
                 cancelledCount++;
 
                 _logger.LogInformation("Cancelled thumbnail job {JobId} for model {ModelId} due to configuration change", 
@@ -345,6 +367,7 @@ public class ThumbnailQueue : IThumbnailQueue
             {
                 job.Reset(currentTime);
                 await _thumbnailJobRepository.UpdateAsync(job, cancellationToken);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
                 cleanedUpCount++;
 
                 _logger.LogInformation("Cleaned up expired lock for thumbnail job {JobId}, reset to pending status", job.Id);

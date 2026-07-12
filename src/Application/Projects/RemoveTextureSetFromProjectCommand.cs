@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Services;
@@ -10,15 +11,18 @@ internal class RemoveTextureSetFromProjectCommandHandler : ICommandHandler<Remov
     private readonly IProjectRepository _projectRepository;
     private readonly ITextureSetRepository _textureSetRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public RemoveTextureSetFromProjectCommandHandler(
         IProjectRepository projectRepository,
         ITextureSetRepository textureSetRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _projectRepository = projectRepository;
         _textureSetRepository = textureSetRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(RemoveTextureSetFromProjectCommand command, CancellationToken cancellationToken)
@@ -43,6 +47,7 @@ internal class RemoveTextureSetFromProjectCommandHandler : ICommandHandler<Remov
 
         await _projectRepository.UpdateAsync(project, cancellationToken);
 
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }
 }

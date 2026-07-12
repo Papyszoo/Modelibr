@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
@@ -19,6 +20,7 @@ namespace Application.Models
         private readonly IDateTimeProvider _dateTimeProvider;
         private readonly IBlendFileGenerator _blendFileGenerator;
         private readonly IBlendFileGenerationQueue _blendFileGenerationQueue;
+        private readonly IUnitOfWork _unitOfWork;
 
         public SetDefaultTextureSetCommandHandler(
             IModelRepository modelRepository,
@@ -27,7 +29,8 @@ namespace Application.Models
             IThumbnailQueue thumbnailQueue,
             IDateTimeProvider dateTimeProvider,
             IBlendFileGenerator blendFileGenerator,
-            IBlendFileGenerationQueue blendFileGenerationQueue)
+            IBlendFileGenerationQueue blendFileGenerationQueue,
+            IUnitOfWork unitOfWork)
         {
             _modelRepository = modelRepository;
             _modelVersionRepository = modelVersionRepository;
@@ -36,6 +39,7 @@ namespace Application.Models
             _dateTimeProvider = dateTimeProvider;
             _blendFileGenerator = blendFileGenerator;
             _blendFileGenerationQueue = blendFileGenerationQueue;
+            _unitOfWork = unitOfWork;
         }
 
         public async Task<Result<SetDefaultTextureSetResponse>> Handle(SetDefaultTextureSetCommand command, CancellationToken cancellationToken)
@@ -117,6 +121,8 @@ namespace Application.Models
                 // schedule the regeneration in the background so it reappears without needing a client GET.
                 _blendFileGenerator.InvalidateCache(command.ModelId, targetVersion.Id);
                 _blendFileGenerationQueue.Enqueue(command.ModelId, targetVersion.Id);
+
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
 
                 return Result.Success(new SetDefaultTextureSetResponse(model.Id, targetVersion.Id, targetVersion.DefaultTextureSetId));
             }

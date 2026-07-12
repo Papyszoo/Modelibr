@@ -37,8 +37,4 @@ public interface IThumbnailRepository
     /// </summary>
     Task<bool> ExistsByModelHashAsync(string modelHash, CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// Save changes to the database.
-    /// </summary>
-    Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }

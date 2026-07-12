@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Models;
@@ -22,15 +23,18 @@ internal sealed class UpdateTextureSetTagsCommandHandler
     private readonly ITextureSetRepository _textureSetRepository;
     private readonly IModelTagRepository _modelTagRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public UpdateTextureSetTagsCommandHandler(
         ITextureSetRepository textureSetRepository,
         IModelTagRepository modelTagRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _textureSetRepository = textureSetRepository;
         _modelTagRepository = modelTagRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<UpdateTextureSetTagsResponse>> Handle(
@@ -49,6 +53,7 @@ internal sealed class UpdateTextureSetTagsCommandHandler
 
         textureSet.SetTags(assignedTags, now);
         await _textureSetRepository.UpdateAsync(textureSet, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new UpdateTextureSetTagsResponse(
             textureSet.Id,
