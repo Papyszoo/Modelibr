@@ -16,7 +16,7 @@ Map what the user said to a suite id from `scripts/test-runner/suites.config.mjs
 | frontend / jest | `frontend` |
 | asset processor / thumbnails / vitest | `asset-processor` |
 | backup / restore | `backup-restore` |
-| desktop / tray | `desktop` (only on tray-host branches) |
+| desktop / tray | `desktop` |
 | performance / throughput | `e2e-performance` |
 
 If genuinely ambiguous, ask once; otherwise pick the obvious suite and proceed.
