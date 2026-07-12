@@ -3,6 +3,10 @@ import { HttpResponse } from 'msw'
 import { TextureSetKind } from '@/types'
 
 import {
+  baseMeshFileAssets,
+  baseMeshRemoteThumbnails,
+} from '../db/baseMeshesSeed'
+import {
   addRecycledItem,
   addUploadHistory,
   type DemoCategory,
@@ -94,8 +98,12 @@ const DEMO_BASE = import.meta.env.BASE_URL ?? '/Modelibr/demo/'
 export const assetUrl = (file: string) => `${DEMO_BASE}demo-assets/${file}`
 export const thumbnailUrl = (file: string) =>
   `${DEMO_BASE}demo-assets/thumbnails/${file}`
-export const seedAssetUrl = (file: string) =>
-  file.startsWith('hdri/') ? `${DEMO_BASE}${file}` : assetUrl(file)
+export const seedAssetUrl = (file: string) => {
+  // Remote seed assets (e.g. the Base Meshes pack served from GitHub raw)
+  // are stored as absolute URLs — pass them through untouched.
+  if (/^https?:\/\//i.test(file)) return file
+  return file.startsWith('hdri/') ? `${DEMO_BASE}${file}` : assetUrl(file)
+}
 
 /**
  * Infer a sensible MIME type for a File/Blob when `file.type` is missing.
@@ -141,8 +149,18 @@ export function inferMimeType(
   }
 }
 
-// Map seed file IDs to static asset paths (for pre-seeded data)
+/**
+ * entityKey ("model:{id}" / "version:{id}") → remote thumbnail URL for seed
+ * data that ships pre-rendered thumbnails (Base Meshes pack). Checked before
+ * falling back to in-browser thumbnail generation.
+ */
+export const seedRemoteThumbnails: Record<string, string> =
+  baseMeshRemoteThumbnails()
+
+// Map seed file IDs to static asset paths (for pre-seeded data).
+// Values may also be absolute URLs (remote seed assets) — see seedAssetUrl.
 export const seedFileAssets: Record<number, string> = {
+  ...baseMeshFileAssets(),
   101: 'test-cube.glb',
   102: 'test-cone.fbx',
   103: 'test-cylinder.fbx',
