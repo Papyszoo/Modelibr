@@ -57,7 +57,7 @@ internal class GetSettingsQueryHandler : IQueryHandler<GetSettingsQuery, GetSett
                     int.Parse(textureProxySizeSetting?.Value ?? "512"),
                     blenderPathSetting?.Value ?? "blender",
                     bool.Parse(blenderEnabledSetting?.Value ?? "false"),
-                    modelDuplicateNamePolicySetting?.Value ?? "Reject",
+                    modelDuplicateNamePolicySetting?.Value ?? "Allow",
                     maxFileSizeBytesSetting.CreatedAt,
                     maxFileSizeBytesSetting.UpdatedAt
                 );
@@ -86,7 +86,7 @@ internal class GetSettingsQueryHandler : IQueryHandler<GetSettingsQuery, GetSett
             settings.TextureProxySize,
             (await _settingRepository.GetByKeyAsync(SettingKeys.BlenderPath, cancellationToken))?.Value ?? "blender",
             bool.Parse((await _settingRepository.GetByKeyAsync(SettingKeys.BlenderEnabled, cancellationToken))?.Value ?? "false"),
-            (await _settingRepository.GetByKeyAsync(SettingKeys.DuplicateNamePolicy, cancellationToken))?.Value ?? "Reject",
+            (await _settingRepository.GetByKeyAsync(SettingKeys.DuplicateNamePolicy, cancellationToken))?.Value ?? "Allow",
             settings.CreatedAt,
             settings.UpdatedAt
         );

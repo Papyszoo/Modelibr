@@ -8,6 +8,7 @@ using Infrastructure.WebDav;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace Infrastructure
 {
@@ -79,6 +80,14 @@ namespace Infrastructure
             // Add Blender installation management service
             services.AddSingleton<IBlenderInstallationService, BlenderInstallationService>();
             services.AddSingleton<IBlendFileGenerator, BlendFileGenerator>();
+
+            // Background generation queue for generated-{name}.blend (see IBlendFileGenerationQueue).
+            // Registered once as a singleton and exposed through both the Application-facing
+            // producer interface and IHostedService so the enqueue side (request handlers)
+            // and the consumer (BackgroundService.ExecuteAsync) share the same channel.
+            services.AddSingleton<BlendFileGenerationQueue>();
+            services.AddSingleton<IBlendFileGenerationQueue>(sp => sp.GetRequiredService<BlendFileGenerationQueue>());
+            services.AddHostedService(sp => sp.GetRequiredService<BlendFileGenerationQueue>());
             services.AddHttpClient("BlenderDownload", client =>
             {
                 client.Timeout = TimeSpan.FromMinutes(30);

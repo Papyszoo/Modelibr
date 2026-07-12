@@ -25,7 +25,11 @@ export class SoundProcessor extends BaseProcessor {
    * @param {Object} jobLogger - Logger with job context.
    * @returns {Promise<Object>} Waveform metadata { waveformPath, sizeBytes }.
    */
-  async process(job, jobLogger) {
+  // No renderer/RendererPool is held here, so there's nothing for the abort
+  // signal to cancel — accept the standard (job, jobLogger, signal) shape
+  // for consistency but don't use it.
+  // eslint-disable-next-line no-unused-vars
+  async process(job, jobLogger, signal) {
     let tempFilePath = null
 
     try {

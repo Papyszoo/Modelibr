@@ -57,6 +57,15 @@ public class ModelibrWebFactory : WebApplicationFactory<Program>
         Environment.SetEnvironmentVariable("RESTORE_STORAGE_PATH", Path.Combine(_uploadPath, "restore"));
         Environment.SetEnvironmentVariable("THUMBNAIL_STORAGE_PATH", Path.Combine(_uploadPath, "thumbnails"));
 
+        // The freshly-created test database has every migration pending, which would
+        // trigger DatabaseExtensions' automatic pre-migration backup (and, on backup
+        // failure, abort startup) on every single test using this factory. That backup
+        // shells out to `pg_dump`, which isn't guaranteed to be on PATH on a dev machine
+        // or CI runner — so it's skipped by default here. Tests that specifically cover
+        // the pre-migration-backup gate build their own minimal host instead of this
+        // factory (see Infrastructure.Tests/Extensions/DatabaseExtensionsTests.cs).
+        Environment.SetEnvironmentVariable("MODELIBR_SKIP_PREMIGRATION_BACKUP", "true");
+
         EnsureTestDatabaseCreated();
     }
 
@@ -74,6 +83,7 @@ public class ModelibrWebFactory : WebApplicationFactory<Program>
                 // which isn't writable when the host boots on a dev machine.
                 ["RESTORE_STORAGE_PATH"] = Path.Combine(_uploadPath, "restore"),
                 ["THUMBNAIL_STORAGE_PATH"] = Path.Combine(_uploadPath, "thumbnails"),
+                ["BACKUP_STORAGE_PATH"] = Path.Combine(_uploadPath, "backups"),
                 ["HTTPS_PORT"] = "0",
                 ["EXPOSE_443_PORT"] = "false",
                 ["DisableHttpsRedirection"] = "true",

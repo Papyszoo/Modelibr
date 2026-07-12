@@ -126,6 +126,11 @@ public sealed class BlendFileGenerator : IBlendFileGenerator
         }
     }
 
+    // Known trade-off (not fixed here): the cache is keyed per version, so old versions'
+    // generated .blend files are never cleaned up once a model moves to a newer version —
+    // they just accumulate under generated-blend/. No sweeper exists for this yet (compare
+    // BlenderRetentionSweeper, which only covers webdav-blend-temp/orphans). Out of scope
+    // for the readiness-rule fix.
     private string GetCachePath(int modelId, int versionId)
     {
         var cacheDir = Path.Combine(_pathProvider.UploadRootPath, "generated-blend");
@@ -199,7 +204,7 @@ public sealed class BlendFileGenerator : IBlendFileGenerator
             return null;
         }
 
-        var renderablePath = GetPhysicalPath(renderableFile.Sha256Hash);
+        var renderablePath = GetPhysicalPath(renderableFile);
         if (!File.Exists(renderablePath))
         {
             _logger.LogWarning("Renderable file not found on disk: {Path}", renderablePath);
@@ -343,7 +348,7 @@ public sealed class BlendFileGenerator : IBlendFileGenerator
 
         foreach (var texture in textures)
         {
-            var physicalPath = GetPhysicalPath(texture.File.Sha256Hash);
+            var physicalPath = GetPhysicalPath(texture.File);
             if (!File.Exists(physicalPath))
                 continue;
 
@@ -379,13 +384,12 @@ public sealed class BlendFileGenerator : IBlendFileGenerator
         return tempPath;
     }
 
-    private string GetPhysicalPath(string sha256Hash)
-    {
-        var hash = sha256Hash.ToLowerInvariant();
-        var a = hash[..2];
-        var b = hash[2..4];
-        return Path.Combine(_pathProvider.UploadRootPath, a, b, hash);
-    }
+    // The persisted File.FilePath (written by HashBasedFileStorage) is the single source
+    // of truth for where a file's bytes live on disk — never re-derive the root/aa/bb/hash
+    // layout here. See VirtualAssetFile's identical rule (prompt 30, item 4), which this
+    // mirrors; this call site was missed when that cleanup landed in the WebDav folder.
+    private string GetPhysicalPath(Domain.Models.File file) =>
+        Path.Combine(_pathProvider.UploadRootPath, file.FilePath);
 
     private static string ResolveScriptPath()
     {
