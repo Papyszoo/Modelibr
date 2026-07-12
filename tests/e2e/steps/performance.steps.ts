@@ -12,7 +12,7 @@ const API_BASE_URL = process.env.API_BASE_URL || "http://localhost:8090";
 
 // ─── Shared state across steps within a scenario ───────────────────────────
 
-let bulkUploadedModelNames: string[] = [];
+let maxModelIdBeforeBulkUpload = 0;
 let apiUploadedModelIds: number[] = [];
 let networkRequestLog: { url: string; timestamp: number }[] = [];
 let tabSwitchRequestCount: number = 0;
@@ -25,7 +25,6 @@ let parallelProcessingStart: number = 0;
 When(
     "I bulk upload {int} models using unique files",
     async ({ page }, count: number) => {
-        bulkUploadedModelNames = [];
         const modelList = new ModelListPage(page);
 
         const filePaths: string[] = [];
@@ -35,13 +34,20 @@ When(
             const uniquePath =
                 await UniqueFileGenerator.generate("test-cube.glb");
             filePaths.push(uniquePath);
-
-            const basename = uniquePath.split("/").pop() || "";
-            const modelName = basename.replace(/\.[^/.]+$/, "");
-            bulkUploadedModelNames.push(modelName);
         }
 
-        console.log(`[Performance] Uploading ${count} models in batch`);
+        // Baseline for finding the models this step creates: names are
+        // unusable — every generated GLB keeps the base filename (only the
+        // content is made unique), so duplicate-name AutoRename turns them
+        // into "test-cube (N)". Newer id = created by this upload.
+        const baseline = await axios.get(
+            `${API_BASE_URL}/models?page=1&pageSize=1`,
+        );
+        maxModelIdBeforeBulkUpload = baseline.data?.items?.[0]?.id ?? 0;
+
+        console.log(
+            `[Performance] Uploading ${count} models in batch (baseline max model id: ${maxModelIdBeforeBulkUpload})`,
+        );
 
         await modelList.uploadMultipleModels(filePaths);
     },
@@ -228,24 +234,34 @@ When(
             }
         });
 
-        // Wait for all thumbnails to finish
+        // Wait for the uploaded models' thumbnails to finish. Check via API —
+        // the virtualized grid renders fewer DOM cards than `count` (the
+        // category sidebar narrows it to a single column), and the shared DB
+        // already holds thumbnails from earlier scenarios, so both DOM counts
+        // and unscoped totals are unusable. Models created by this scenario's
+        // bulk upload are the ones above the recorded id baseline. Polling
+        // axios from the test process doesn't show up in the page's request
+        // log.
         const timeoutMs = count * 60 * 1000;
         const startTime = Date.now();
 
         await expect(async () => {
-            if (Date.now() - startTime > 60000) {
-                await page.reload({ waitUntil: "domcontentloaded" });
-                await page.waitForSelector(
-                    ".model-card, .no-results, .empty-state",
-                    { state: "visible", timeout: 15000 },
-                );
-            }
-
-            const thumbnails = page.locator(
-                ".model-card .thumbnail-image, .model-card .thumbnail-image-container img",
+            const response = await axios.get(
+                `${API_BASE_URL}/models?page=1&pageSize=200`,
             );
-            const thumbnailCount = await thumbnails.count();
-            expect(thumbnailCount).toBeGreaterThanOrEqual(count);
+            const models = response.data?.items || [];
+            const uploadedWithThumbnails = models.filter(
+                (m: any) =>
+                    m.id > maxModelIdBeforeBulkUpload &&
+                    m.thumbnailUrl &&
+                    m.thumbnailUrl.length > 0,
+            );
+            console.log(
+                `[ST-2] Uploaded-model thumbnails (API): ${uploadedWithThumbnails.length}/${count} (${Math.round((Date.now() - startTime) / 1000)}s elapsed)`,
+            );
+            expect(uploadedWithThumbnails.length).toBeGreaterThanOrEqual(
+                count,
+            );
         }).toPass({
             timeout: timeoutMs,
             intervals: [5000, 10000, 15000],
@@ -322,11 +338,20 @@ Then(
 Given(
     "there are at least {int} models visible",
     async ({ page }, minCount: number) => {
+        // The virtualized grid keeps DOM cards below minCount when the
+        // category sidebar narrows it to a single column, so require
+        // minCount models via the API and at least one rendered card.
         await expect(async () => {
-            const cards = page.locator(".model-card");
-            const count = await cards.count();
-            expect(count).toBeGreaterThanOrEqual(minCount);
+            const response = await axios.get(
+                `${API_BASE_URL}/models?page=1&pageSize=1`,
+            );
+            const totalCount = response.data?.totalCount ?? 0;
+            expect(totalCount).toBeGreaterThanOrEqual(minCount);
         }).toPass({ timeout: 30000, intervals: [2000, 3000] });
+
+        await expect(page.locator(".model-card").first()).toBeVisible({
+            timeout: 15000,
+        });
     },
 );
 
