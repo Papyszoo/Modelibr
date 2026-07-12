@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Services;
@@ -11,17 +12,20 @@ internal class DisassociateTextureSetFromModelCommandHandler : ICommandHandler<D
     private readonly IModelRepository _modelRepository;
     private readonly IModelVersionRepository _modelVersionRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public DisassociateTextureSetFromModelCommandHandler(
         ITextureSetRepository textureSetRepository,
         IModelRepository modelRepository,
         IModelVersionRepository modelVersionRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _textureSetRepository = textureSetRepository;
         _modelRepository = modelRepository;
         _modelVersionRepository = modelVersionRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(DisassociateTextureSetFromModelCommand command, CancellationToken cancellationToken)
@@ -92,6 +96,7 @@ internal class DisassociateTextureSetFromModelCommandHandler : ICommandHandler<D
 
             // Update the texture set
             await _textureSetRepository.UpdateAsync(textureSet, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             return Result.Success();
         }

@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Services;
@@ -9,13 +10,16 @@ internal class UpdateMaterialNamesCommandHandler : ICommandHandler<UpdateMateria
 {
     private readonly IModelVersionRepository _modelVersionRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public UpdateMaterialNamesCommandHandler(
         IModelVersionRepository modelVersionRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _modelVersionRepository = modelVersionRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(UpdateMaterialNamesCommand command, CancellationToken cancellationToken)
@@ -32,6 +36,7 @@ internal class UpdateMaterialNamesCommandHandler : ICommandHandler<UpdateMateria
             modelVersion.SetMaterialNames(command.MaterialNames, _dateTimeProvider.UtcNow);
 
             await _modelVersionRepository.UpdateAsync(modelVersion, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             return Result.Success();
         }

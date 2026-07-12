@@ -1,7 +1,7 @@
+using Application.Abstractions;
 using Application.Abstractions.Files;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
-using Application.Abstractions.Services;
 using Application.Services;
 using Domain.Models;
 using Domain.Services;
@@ -16,26 +16,26 @@ namespace Application.Models
         private readonly IModelVersionRepository _versionRepository;
         private readonly IFileCreationService _fileCreationService;
         private readonly IDateTimeProvider _dateTimeProvider;
-        private readonly IDomainEventDispatcher _domainEventDispatcher;
         private readonly IBatchUploadRepository _batchUploadRepository;
         private readonly ISettingRepository _settingRepository;
+        private readonly IUnitOfWork _unitOfWork;
 
         public AddModelCommandHandler(
             IModelRepository modelRepository,
             IModelVersionRepository versionRepository,
             IFileCreationService fileCreationService,
             IDateTimeProvider dateTimeProvider,
-            IDomainEventDispatcher domainEventDispatcher,
             IBatchUploadRepository batchUploadRepository,
-            ISettingRepository settingRepository)
+            ISettingRepository settingRepository,
+            IUnitOfWork unitOfWork)
         {
             _modelRepository = modelRepository;
             _versionRepository = versionRepository;
             _fileCreationService = fileCreationService;
             _dateTimeProvider = dateTimeProvider;
-            _domainEventDispatcher = domainEventDispatcher;
             _batchUploadRepository = batchUploadRepository;
             _settingRepository = settingRepository;
+            _unitOfWork = unitOfWork;
         }
 
         public async Task<Result<AddModelCommandResponse>> Handle(AddModelCommand command, CancellationToken cancellationToken)
@@ -64,13 +64,11 @@ namespace Application.Models
             var existingModel = await _modelRepository.GetByFileHashAsync(fileEntity.Sha256Hash, cancellationToken);
             if (existingModel != null)
             {
-            // Raise domain event for existing model upload
+            // Raise domain event for existing model upload — dispatched from the
+                // save pipeline once this aggregate is persisted (see
+                // DomainEventsInterceptor); no manual publish here.
                 existingModel.RaiseModelUploadedEvent(existingModel.ActiveVersion!.Id, fileEntity.Sha256Hash, false);
-                
-                // Publish domain events
-                await _domainEventDispatcher.PublishAsync(existingModel.DomainEvents, cancellationToken);
-                existingModel.ClearDomainEvents();
-                
+
                 // Always track batch upload - generate batch ID if not provided
                 var batchId = command.BatchId ?? Guid.NewGuid().ToString();
                 var batchUpload = BatchUpload.Create(
@@ -81,7 +79,8 @@ namespace Application.Models
                     modelId: existingModel.Id);
                 
                 await _batchUploadRepository.AddAsync(batchUpload, cancellationToken);
-                
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
+
                 return Result.Success(new AddModelCommandResponse(existingModel.Id, true));
             }
 
@@ -103,26 +102,33 @@ namespace Application.Models
             try
             {
                 var model = Model.Create(modelName, _dateTimeProvider.UtcNow);
-                
-                // Save the model first to get an ID
+
+                // Save the model first — it must be committed BEFORE CreateVersion runs:
+                // the first version sets Model.ActiveVersion, and if model and version
+                // are both still Added in one save, EF hits the circular
+                // Model.ActiveVersionId <-> ModelVersion.ModelId FK dependency and throws.
                 var savedModel = await _modelRepository.AddAsync(model, cancellationToken);
-                
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
+
                 // Create version 1 automatically for new models
                 var version1 = savedModel.CreateVersion("Initial version", _dateTimeProvider.UtcNow);
                 version1.AddFile(fileEntity);
                 await _versionRepository.AddAsync(version1, cancellationToken);
-                
+
+                // Commit again so version1 gets its real database-assigned id —
+                // SetModelVersion below copies it into a raw scalar FK (see the
+                // backend-patterns skill's temporary-key trap).
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
+
                 // Link file to version
                 fileEntity.SetModelVersion(version1.Id);
                 await _modelRepository.UpdateAsync(savedModel, cancellationToken);
                 
-                // Raise domain event for new model upload after both model and file are persisted
+                // Raise domain event for new model upload after both model and file are
+                // persisted — dispatched from the save pipeline (see DomainEventsInterceptor);
+                // no manual publish here.
                 savedModel.RaiseModelUploadedEvent(version1.Id, fileEntity.Sha256Hash, true);
-                
-                // Publish domain events
-                await _domainEventDispatcher.PublishAsync(savedModel.DomainEvents, cancellationToken);
-                savedModel.ClearDomainEvents();
-                
+
                 // Always track batch upload - generate batch ID if not provided
                 var batchId = command.BatchId ?? Guid.NewGuid().ToString();
                 var batchUpload = BatchUpload.Create(
@@ -133,7 +139,8 @@ namespace Application.Models
                     modelId: savedModel.Id);
                 
                 await _batchUploadRepository.AddAsync(batchUpload, cancellationToken);
-                
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
+
                 return Result.Success(new AddModelCommandResponse(savedModel.Id, false));
             }
             catch (ArgumentException ex)

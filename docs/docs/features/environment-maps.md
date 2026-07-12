@@ -1,5 +1,5 @@
 ---
-sidebar_position: 10
+sidebar_position: 11
 ---
 
 # Environment Maps
@@ -23,6 +23,22 @@ The list page includes the same model-style toolbar behavior used elsewhere in t
 - **Refresh**
 
 Cards show the current preview image, source type, variant count, and last updated date. Click a card to open the full environment map viewer.
+
+## Organizing with Categories
+
+Use the category sidebar (left of the grid) to organize environment maps into
+groups:
+
+- Right-click anywhere in the sidebar and choose **Add category**, then type
+  the name directly in the tree
+- Right-click a category to **Add subcategory**, **Rename**, or **Delete** it
+  — deleting removes the whole branch, and its maps become uncategorized
+- Drag an environment map card onto a category in the sidebar to move it
+- **All** shows every one of your environment maps; **Unassigned** collects
+  maps that aren't in any category
+
+The **Categories** toolbar button hides or shows the sidebar; a badge on it
+reminds you that a category filter is active while the sidebar is hidden.
 
 ## Uploading Environment Maps
 

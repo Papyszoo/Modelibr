@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Services;
@@ -9,13 +10,16 @@ internal class SoftDeleteScriptCommandHandler : ICommandHandler<SoftDeleteScript
 {
     private readonly IScriptRepository _scriptRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public SoftDeleteScriptCommandHandler(
         IScriptRepository scriptRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _scriptRepository = scriptRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(SoftDeleteScriptCommand command, CancellationToken cancellationToken)
@@ -35,6 +39,7 @@ internal class SoftDeleteScriptCommandHandler : ICommandHandler<SoftDeleteScript
 
         script.SoftDelete(_dateTimeProvider.UtcNow);
         await _scriptRepository.UpdateAsync(script, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success();
     }

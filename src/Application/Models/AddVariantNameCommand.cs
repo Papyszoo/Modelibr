@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Services;
@@ -11,13 +12,16 @@ internal class AddVariantNameCommandHandler : ICommandHandler<AddVariantNameComm
 {
     private readonly IModelVersionRepository _modelVersionRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public AddVariantNameCommandHandler(
         IModelVersionRepository modelVersionRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _modelVersionRepository = modelVersionRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(AddVariantNameCommand command, CancellationToken cancellationToken)
@@ -39,6 +43,7 @@ internal class AddVariantNameCommandHandler : ICommandHandler<AddVariantNameComm
         var now = _dateTimeProvider.UtcNow;
         modelVersion.AddVariantName(variantName, now);
         await _modelVersionRepository.UpdateAsync(modelVersion, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success();
     }

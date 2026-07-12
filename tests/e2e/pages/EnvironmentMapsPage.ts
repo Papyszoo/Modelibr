@@ -5,6 +5,7 @@ import {
     type UploadFilePayload,
 } from "../helpers/file-payload-helper";
 import { navigateToAppClean } from "../helpers/navigation-helper";
+import { UploadProgressPage } from "./UploadProgressPage";
 
 interface EnvironmentMapDialogValues {
     name?: string;
@@ -175,36 +176,18 @@ export class EnvironmentMapsPage {
         await openPanel.waitFor({ state: "visible", timeout: 5000 });
     }
 
-    /** Open the (shared) Manage Environment Map Categories dialog. */
-    async openCategoryManager(): Promise<void> {
-        await this.openFiltersPanel();
-        const panel = this.page.locator("#environment-map-filters-panel");
-        const trigger = panel.locator(
-            'button[aria-label="Filter by environment map categories"]',
-        );
-        if (await trigger.count()) {
-            await trigger.scrollIntoViewIfNeeded();
-            await trigger.click();
-            const overlay = this.page.locator(".p-overlaypanel");
-            await overlay.waitFor({ state: "visible" });
-            await overlay
-                .locator('button[aria-label="Manage categories"]')
-                .click();
-        } else {
-            await panel
-                .getByRole("button", { name: "Manage Categories" })
-                .click();
-        }
-        await this.page
-            .getByRole("dialog", { name: "Manage Environment Map Categories" })
-            .waitFor({ state: "visible" });
-    }
-
     /** Assign an environment map to a category via the right-click menu. */
     async changeCategoryViaContextMenu(
         mapName: string,
         categoryName: string,
     ): Promise<void> {
+        // The floating "File Uploads" progress window overlays the (narrower,
+        // sidebar-open) grid and swallows pointer events, so a right-click on a
+        // card behind it hangs until the test times out. Dismiss it, then
+        // reveal the card — in the narrower grid it may be virtualised out of
+        // the DOM, and a right-click on a non-rendered card also hangs.
+        await new UploadProgressPage(this.page).closeWindowIfVisible();
+        await this.waitForEnvironmentMapByName(mapName, 15000);
         await this.getEnvironmentMapCardByName(mapName)
             .first()
             .click({ button: "right" });
@@ -227,29 +210,6 @@ export class EnvironmentMapsPage {
             .click();
         await dialog.getByRole("button", { name: "Move" }).click();
         await dialog.waitFor({ state: "hidden" });
-    }
-
-    /** Filter the list by a category via the filter-picker popover. */
-    async filterByCategory(categoryName: string): Promise<void> {
-        await this.openFiltersPanel();
-        const trigger = this.page
-            .locator("#environment-map-filters-panel")
-            .locator(
-                'button[aria-label="Filter by environment map categories"]',
-            );
-        await trigger.scrollIntoViewIfNeeded();
-        await trigger.click();
-        const overlay = this.page.locator(".p-overlaypanel");
-        await overlay.waitFor({ state: "visible" });
-        await overlay
-            .locator(".category-tree .p-treenode-content", {
-                hasText: categoryName,
-            })
-            .first()
-            .locator(".p-checkbox")
-            .click();
-        await this.page.keyboard.press("Escape");
-        await overlay.waitFor({ state: "hidden" });
     }
 
     async dragAndDropUpload(
@@ -376,8 +336,13 @@ export class EnvironmentMapsPage {
     ): Promise<void> {
         const findCard = async (): Promise<boolean> => {
             // VirtuosoGrid virtualises cards — scroll progressively to
-            // bring off-viewport items into the DOM.
-            const scrollContainer = this.page.locator(".environment-map-list");
+            // bring off-viewport items into the DOM. The scroll container is
+            // `.environment-map-list-main` (the category-sidebar rework moved
+            // the scrollable region there; `.environment-map-list` is now the
+            // non-scrolling flex shell around the toolbar + body).
+            const scrollContainer = this.page.locator(
+                ".environment-map-list-main",
+            );
             const card = this.getEnvironmentMapCardByName(name);
             if (await card.isVisible().catch(() => false)) return true;
 

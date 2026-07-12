@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Services;
@@ -10,15 +11,18 @@ internal sealed class SetEnvironmentMapCustomThumbnailCommandHandler : ICommandH
     private readonly IEnvironmentMapRepository _environmentMapRepository;
     private readonly IFileRepository _fileRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public SetEnvironmentMapCustomThumbnailCommandHandler(
         IEnvironmentMapRepository environmentMapRepository,
         IFileRepository fileRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _environmentMapRepository = environmentMapRepository;
         _fileRepository = fileRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(SetEnvironmentMapCustomThumbnailCommand command, CancellationToken cancellationToken)
@@ -41,6 +45,7 @@ internal sealed class SetEnvironmentMapCustomThumbnailCommandHandler : ICommandH
 
         environmentMap.SetCustomThumbnail(file, _dateTimeProvider.UtcNow);
         await _environmentMapRepository.UpdateAsync(environmentMap, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }
 }

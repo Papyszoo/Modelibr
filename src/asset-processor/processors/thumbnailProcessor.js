@@ -37,13 +37,16 @@ export class ThumbnailProcessor extends BaseProcessor {
    * Process a model thumbnail job.
    * @param {Object} job - The job to process.
    * @param {Object} jobLogger - Logger with job context.
+   * @param {AbortSignal} [signal] - Set when the job times out; used to
+   *   force-reinitialize the held renderer instead of leaving it hung.
    * @returns {Promise<Object>} Thumbnail metadata { thumbnailPath, sizeBytes, width, height }.
    */
-  async process(job, jobLogger) {
+  async process(job, jobLogger, signal) {
     let tempFilePath = null
     let glbConvertedPath = null
     let texturePaths = null
     let renderer = null
+    let disarmAbort = () => {}
 
     try {
       jobLogger.info('Starting model processing', {
@@ -192,6 +195,12 @@ export class ThumbnailProcessor extends BaseProcessor {
       }
 
       renderer = await this.rendererPool.acquire()
+      disarmAbort = this._armRendererAbort(
+        signal,
+        this.rendererPool,
+        renderer,
+        jobLogger
+      )
 
       // The "Embedded" variant (__embedded__) means "render the model's own
       // materials / vertex colors" — keep them instead of the neutral override.
@@ -294,6 +303,7 @@ export class ThumbnailProcessor extends BaseProcessor {
         'Thumbnail upload failed — no valid thumbnail data available'
       )
     } finally {
+      disarmAbort()
       if (renderer) {
         this.rendererPool.release(renderer)
       }

@@ -9,6 +9,7 @@ import {
     closeTabByType,
     isTabActive,
 } from "../helpers/navigation-helper";
+import { revealVirtualizedCard } from "../helpers/reveal-virtualized-card";
 
 const { Given, When, Then } = createBdd();
 
@@ -25,7 +26,22 @@ When(
             throw new Error(`Model "${modelName}" not found in shared state`);
         }
 
-        // Find and double-click on the model in the grid
+        // The card may be virtualised out of the DOM — the category sidebar
+        // narrows the grid, so cards past the first rows render only once the
+        // `.model-grid-main` scroll container reaches them.
+        const modelCardForReveal = page
+            .locator('[class*="model-card"], [class*="model-list-item"]')
+            .filter({ hasText: modelData.name })
+            .first();
+        await revealVirtualizedCard(page, ".model-grid-main", modelCardForReveal);
+
+        // Find and double-click on the model in the grid. `force: true` skips
+        // Playwright's actionability (stable + receives-events) wait: once a
+        // model viewer is open its `frameloop=always` canvas starves the main
+        // thread under software WebGL (prompt 48), so that wait can never
+        // resolve and a plain dblclick hangs to the test timeout. The event
+        // still dispatches; React opens the tab once the thread yields, and the
+        // viewer wait below covers that.
         const clickTarget = page.locator(`text="${modelData.name}"`).first();
         if (
             await clickTarget
@@ -33,7 +49,7 @@ When(
                 .then(() => true)
                 .catch(() => false)
         ) {
-            await clickTarget.dblclick();
+            await clickTarget.dblclick({ force: true });
         } else {
             // Fall back to model card locator
             const modelCard = page
@@ -41,7 +57,7 @@ When(
                     `.model-card, .model-grid-item, [data-model-name="${modelName}"]`,
                 )
                 .first();
-            await modelCard.dblclick();
+            await modelCard.dblclick({ force: true });
         }
 
         // Wait for model viewer to load
@@ -71,7 +87,7 @@ Then("the Texture Sets content should be visible", async ({ page }) => {
     // Texture Sets tab first to make sure it is the active left-panel tab.
     const textureSetsTab = page
         .locator(".dock-bar-left")
-        .locator(".draggable-tab:has(.pi-folder)")
+        .locator(".draggable-tab:has(.pi-images)")
         .first();
     if (
         await textureSetsTab
@@ -95,7 +111,7 @@ Then("the Texture Sets content should be visible", async ({ page }) => {
 Then(
     "a Texture Sets tab should be visible in the dock bar",
     async ({ page }) => {
-        const count = await countTabsByType(page, "textureSets");
+        const count = await countTabsByType(page, "modelTextures");
         expect(count).toBeGreaterThanOrEqual(1);
         console.log("[UI] Texture Sets tab visible in dock bar ✓");
     },
@@ -134,7 +150,7 @@ When("I open the Texture Sets tab in the left panel", async ({ page }) => {
     // Check if already open — just click it
     const existingTab = page
         .locator(".dock-bar-left")
-        .locator(".draggable-tab:has(.pi-folder)");
+        .locator(".draggable-tab:has(.pi-images)");
     if (
         await existingTab
             .waitFor({ state: "visible", timeout: 1000 })
@@ -148,7 +164,7 @@ When("I open the Texture Sets tab in the left panel", async ({ page }) => {
     }
 
     // Otherwise add it via menu
-    await openTabViaMenu(page, "textureSets", "left");
+    await openTabViaMenu(page, "modelTextures", "left");
     console.log("[UI] Opened Texture Sets tab ✓");
 });
 
@@ -167,11 +183,24 @@ When(
             throw new Error(`Model "${modelName}" not found in shared state`);
         }
 
+        const modelCardForReveal = page
+            .locator('[class*="model-card"], [class*="model-list-item"]')
+            .filter({ hasText: modelData.name })
+            .first();
+        await revealVirtualizedCard(page, ".model-grid-main", modelCardForReveal);
+
         const clickTarget = page.locator(`text="${modelData.name}"`).first();
-        await clickTarget.dblclick();
+        // force: true — the first viewer's frameloop=always canvas starves the
+        // main thread under software WebGL, so the actionability wait never
+        // resolves and a plain dblclick hangs (prompt 48). The event still
+        // dispatches; the viewer wait below covers the mount.
+        await clickTarget.dblclick({ force: true });
+        // 30s absorbs the model-viewer mount: three.js initializes on software
+        // WebGL on GPU-less CI runners and can block well past 10s (PR-lane
+        // timeouts on 2026-07-04). The app is converging, not broken.
         await page.waitForSelector(
             ".model-viewer, .viewer-canvas, .p-menubar",
-            { state: "visible", timeout: 10000 },
+            { state: "visible", timeout: 30000 },
         );
         console.log(`[UI] Clicked on model "${modelName}" again ✓`);
     },
@@ -180,11 +209,14 @@ When(
 Then(
     "there should be exactly {int} model viewer tab visible",
     async ({ page }, expectedCount: number) => {
-        // Wait for React state to settle after tab deduplication
+        // Wait for React state to settle after tab deduplication. 45s absorbs
+        // the model-viewer tab mount on GPU-less CI runners, where three.js
+        // initializes on software WebGL and can starve the main thread well
+        // past the old 10s budget (3× PR-lane timeouts on 2026-07-04).
         await expect(async () => {
             const count = await countTabsByType(page, "modelViewer");
             expect(count).toBe(expectedCount);
-        }).toPass({ timeout: 10000, intervals: [500, 1000, 2000] });
+        }).toPass({ timeout: 45000, intervals: [500, 1000, 2000] });
         console.log(
             `[UI] Found ${expectedCount} model viewer tab(s) ✓`,
         );
@@ -194,7 +226,7 @@ Then(
 Then(
     "there should be exactly {int} Texture Sets tab visible",
     async ({ page }, expectedCount: number) => {
-        const count = await countTabsByType(page, "textureSets");
+        const count = await countTabsByType(page, "modelTextures");
         expect(count).toBe(expectedCount);
         console.log(
             `[UI] Found ${count} Texture Sets tab(s) (expected ${expectedCount}) ✓`,
@@ -283,7 +315,7 @@ Then(
 Then(
     "the Texture Sets tab should be active in the left panel",
     async ({ page }) => {
-        const active = await isTabActive(page, "textureSets", "left");
+        const active = await isTabActive(page, "modelTextures", "left");
         expect(active).toBe(true);
         console.log("[UI] Texture Sets tab is active ✓");
     },

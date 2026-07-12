@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Services;
@@ -14,15 +15,18 @@ internal sealed class SoftDeleteModelVersionCommandHandler : ICommandHandler<Sof
     private readonly IModelRepository _modelRepository;
     private readonly IModelVersionRepository _modelVersionRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public SoftDeleteModelVersionCommandHandler(
         IModelRepository modelRepository,
         IModelVersionRepository modelVersionRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _modelRepository = modelRepository;
         _modelVersionRepository = modelVersionRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<SoftDeleteModelVersionResponse>> Handle(SoftDeleteModelVersionCommand request, CancellationToken cancellationToken)
@@ -69,6 +73,8 @@ internal sealed class SoftDeleteModelVersionCommandHandler : ICommandHandler<Sof
                 await _modelRepository.UpdateAsync(model, cancellationToken);
             }
         }
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new SoftDeleteModelVersionResponse(true, "Model version soft deleted successfully"));
     }

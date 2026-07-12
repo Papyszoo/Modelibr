@@ -114,6 +114,7 @@ namespace WebApi
             builder.Services.AddScoped<IThumbnailNotificationService, SignalRThumbnailNotificationService>();
             builder.Services.AddScoped<IThumbnailJobQueueNotificationService, SignalRThumbnailJobQueueNotificationService>();
             builder.Services.AddHostedService<UploadDirectoryInitializer>();
+            builder.Services.AddHostedService<BlenderRetentionSweepHostedService>();
 
             var app = builder.Build();
 

@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using SharedKernel;
@@ -7,10 +8,13 @@ namespace Application.Sprites;
 internal class DeleteSpriteCommandHandler : ICommandHandler<DeleteSpriteCommand>
 {
     private readonly ISpriteRepository _spriteRepository;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public DeleteSpriteCommandHandler(ISpriteRepository spriteRepository)
+    public DeleteSpriteCommandHandler(ISpriteRepository spriteRepository,
+        IUnitOfWork unitOfWork)
     {
         _spriteRepository = spriteRepository;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(DeleteSpriteCommand command, CancellationToken cancellationToken)
@@ -23,6 +27,7 @@ internal class DeleteSpriteCommandHandler : ICommandHandler<DeleteSpriteCommand>
         }
 
         await _spriteRepository.DeleteAsync(command.Id, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success();
     }

@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
@@ -18,6 +19,7 @@ internal class AddTextureToTextureSetCommandHandler : ICommandHandler<AddTexture
     private readonly IThumbnailQueue _thumbnailQueue;
     private readonly ITextureImageMetadataReader _textureImageMetadataReader;
     private readonly ILogger<AddTextureToTextureSetCommandHandler> _logger;
+    private readonly IUnitOfWork _unitOfWork;
 
     public AddTextureToTextureSetCommandHandler(
         ITextureSetRepository textureSetRepository,
@@ -26,7 +28,8 @@ internal class AddTextureToTextureSetCommandHandler : ICommandHandler<AddTexture
         IDateTimeProvider dateTimeProvider,
         IThumbnailQueue thumbnailQueue,
         ITextureImageMetadataReader textureImageMetadataReader,
-        ILogger<AddTextureToTextureSetCommandHandler> logger)
+        ILogger<AddTextureToTextureSetCommandHandler> logger,
+        IUnitOfWork unitOfWork)
     {
         _textureSetRepository = textureSetRepository;
         _fileRepository = fileRepository;
@@ -35,6 +38,7 @@ internal class AddTextureToTextureSetCommandHandler : ICommandHandler<AddTexture
         _thumbnailQueue = thumbnailQueue;
         _textureImageMetadataReader = textureImageMetadataReader;
         _logger = logger;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<AddTextureToTextureSetResponse>> Handle(AddTextureToTextureSetCommand command, CancellationToken cancellationToken)
@@ -91,13 +95,26 @@ internal class AddTextureToTextureSetCommandHandler : ICommandHandler<AddTexture
             // Update the texture set
             var updatedTextureSet = await _textureSetRepository.UpdateAsync(textureSet, cancellationToken);
 
-            // Update batch upload record to associate with texture set
+            // Update batch upload record to associate with texture set, if one
+            // exists for this file (uploads that go through the merge/split-
+            // channel flow reuse an existing FileId with no BatchUpload row at
+            // all — that's the normal case, not an error).
             var batchUpload = await _batchUploadRepository.GetByFileIdAsync(command.FileId, cancellationToken);
             if (batchUpload != null)
             {
                 batchUpload.TextureSetId = command.TextureSetId;
                 await _batchUploadRepository.UpdateAsync(batchUpload, cancellationToken);
             }
+
+            // Commit unconditionally: texture.Id is database-assigned and read
+            // in the response below, and the texture set/texture mutations
+            // above must persist regardless of whether a batch upload record
+            // existed to update. Previously this commit lived only inside the
+            // `if (batchUpload != null)` block above, so the merge/split-
+            // channel flow — which adds textures for a FileId with no
+            // BatchUpload row — silently never persisted anything (CI:
+            // "Merge ORM packed texture using Split Channels").
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             // Auto-enqueue thumbnail generation for Universal texture sets
             if (textureSet.Kind == TextureSetKind.Universal)

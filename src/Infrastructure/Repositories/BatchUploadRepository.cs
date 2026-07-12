@@ -74,13 +74,11 @@ internal sealed class BatchUploadRepository : IBatchUploadRepository
     public async Task AddAsync(BatchUpload batchUpload, CancellationToken cancellationToken = default)
     {
         await _context.BatchUploads.AddAsync(batchUpload, cancellationToken);
-        await _context.SaveChangesAsync(cancellationToken);
     }
 
     public async Task AddRangeAsync(IEnumerable<BatchUpload> batchUploads, CancellationToken cancellationToken = default)
     {
         await _context.BatchUploads.AddRangeAsync(batchUploads, cancellationToken);
-        await _context.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<BatchUpload?> GetByFileIdAsync(int fileId, CancellationToken cancellationToken = default)
@@ -123,6 +121,5 @@ internal sealed class BatchUploadRepository : IBatchUploadRepository
         {
             _context.BatchUploads.Add(batchUpload);
         }
-        await _context.SaveChangesAsync(cancellationToken);
     }
 }

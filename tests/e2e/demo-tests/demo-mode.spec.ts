@@ -152,7 +152,9 @@ test.describe("demo mode e2e", () => {
 
         await modelListPage.goto();
         await expect(page.getByText("Test Cube").first()).toBeVisible();
-        await expect(page.getByText("Test Torus").first()).toBeVisible();
+        // Test Torus sorts last; with the category sidebar open the grid is
+        // narrower, so it can be virtualised out until scrolled to.
+        await modelListPage.expectModelVisible("Test Torus");
         await page.getByRole("button", { name: /^filters$/i }).click();
         // Target the Concept-art switch by testid: the filter panel now also has
         // an Animated switch (added with model metadata), so a generic

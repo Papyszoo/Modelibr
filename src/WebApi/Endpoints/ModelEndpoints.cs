@@ -55,6 +55,7 @@ public static class ModelEndpoints
             int? minTriangleCount,
             int? maxTriangleCount,
             bool? hasAnimations,
+            bool? uncategorized,
             IQueryHandler<GetAllModelsQuery, GetAllModelsQueryResponse> queryHandler,
             CancellationToken cancellationToken) =>
         {
@@ -71,7 +72,8 @@ public static class ModelEndpoints
                     SearchName: string.IsNullOrWhiteSpace(searchName) ? null : searchName,
                     MinTriangleCount: minTriangleCount,
                     MaxTriangleCount: maxTriangleCount,
-                    HasAnimations: hasAnimations),
+                    HasAnimations: hasAnimations,
+                    Uncategorized: uncategorized),
                 cancellationToken);
             
             if (result.IsFailure)

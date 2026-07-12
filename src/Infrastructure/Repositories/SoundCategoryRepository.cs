@@ -14,11 +14,10 @@ internal sealed class SoundCategoryRepository : ISoundCategoryRepository
         _context = context ?? throw new ArgumentNullException(nameof(context));
     }
 
-    public async Task<SoundCategory> AddAsync(SoundCategory category, CancellationToken cancellationToken = default)
+    public Task<SoundCategory> AddAsync(SoundCategory category, CancellationToken cancellationToken = default)
     {
         _context.SoundCategories.Add(category);
-        await _context.SaveChangesAsync(cancellationToken);
-        return category;
+        return Task.FromResult(category);
     }
 
     public async Task<IReadOnlyList<SoundCategory>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -45,17 +44,16 @@ internal sealed class SoundCategoryRepository : ISoundCategoryRepository
             .FirstOrDefaultAsync(c => c.Name == name.Trim() && c.ParentId == parentId, cancellationToken);
     }
 
-    public async Task UpdateAsync(SoundCategory category, CancellationToken cancellationToken = default)
+    public Task UpdateAsync(SoundCategory category, CancellationToken cancellationToken = default)
     {
-        if (_context.Entry(category).State == EntityState.Detached)
-            _context.SoundCategories.Update(category);
+        _context.UpdateIfDetached(category);
 
-        await _context.SaveChangesAsync(cancellationToken);
+        return Task.CompletedTask;
     }
 
-    public async Task DeleteAsync(SoundCategory category, CancellationToken cancellationToken = default)
+    public Task DeleteAsync(SoundCategory category, CancellationToken cancellationToken = default)
     {
         _context.SoundCategories.Remove(category);
-        await _context.SaveChangesAsync(cancellationToken);
+        return Task.CompletedTask;
     }
 }

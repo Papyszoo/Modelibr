@@ -288,29 +288,61 @@ Given("I am on the sprites page for error test", async ({ page }) => {
     console.log("[Navigation] Navigated to sprites page for error test");
 });
 
-When(
-    "I open the category management dialog for error test",
-    async ({ page }) => {
-        const addCategoryButton = page.locator(
-            "button:has-text('Add Category')",
-        );
-        await addCategoryButton.click();
-        await expect(page.locator(".p-dialog")).toBeVisible({ timeout: 5000 });
-        console.log("[Action] Opened category dialog for error test");
-    },
-);
+// Categories are created inline in the category tree sidebar via its
+// right-click context menu (the manager dialog was removed).
+async function createSpriteCategoryViaContextMenu(page: any, name: string) {
+    await page
+        .locator('.sprite-category-sidebar [data-testid="category-tree-all"]')
+        .click({ button: "right" });
+
+    const addItem = page
+        .locator(".p-contextmenu .p-menuitem-text")
+        .filter({ hasText: "Add category" })
+        .first();
+    await expect(addItem).toBeVisible({ timeout: 5000 });
+    await addItem.click();
+
+    const input = page
+        .locator(
+            '.sprite-category-sidebar [data-testid="category-tree-inline-input"]',
+        )
+        .first();
+    await expect(input).toBeVisible({ timeout: 5000 });
+    await input.fill(name);
+    await input.press("Enter");
+    await expect(input).toBeHidden({ timeout: 10000 });
+}
 
 When(
     "I create a category named {string} for error test",
     async ({ page }, name: string) => {
-        const dialog = page.locator(".p-dialog");
-        const nameInput = dialog.locator("#categoryName");
-        await nameInput.waitFor({ state: "visible", timeout: 5000 });
-        await nameInput.fill(name);
+        // Clean up leftovers from prior runs so the first create succeeds.
+        const listResponse = await page.request.get(
+            `${API_BASE}/sprite-categories`,
+        );
+        if (listResponse.ok()) {
+            const data = await listResponse.json();
+            for (const cat of (data.categories || []).filter(
+                (c: any) => c.name === name,
+            )) {
+                await page.request
+                    .delete(`${API_BASE}/sprite-categories/${cat.id}`)
+                    .catch(() => {});
+            }
+        }
 
-        const saveButton = dialog.locator("button:has-text('Save')");
-        await saveButton.click();
-        await dialog.waitFor({ state: "hidden", timeout: 10000 });
+        await createSpriteCategoryViaContextMenu(page, name);
+
+        // Creation is confirmed by the category row appearing in the tree
+        // (exact label match — hasText is substring and could hit other rows).
+        await expect(
+            page
+                .locator(
+                    ".sprite-category-sidebar .category-tree .p-treenode-content",
+                )
+                .filter({ has: page.getByText(name, { exact: true }) })
+                .first(),
+        ).toBeVisible({ timeout: 10000 });
         console.log(`[Action] Created category "${name}" for error test`);
     },
 );
@@ -318,30 +350,7 @@ When(
 When(
     "I attempt to create a duplicate category named {string}",
     async ({ page }, name: string) => {
-        const dialog = page.locator(".p-dialog");
-        await dialog.waitFor({ state: "visible", timeout: 5000 });
-
-        const nameInput = dialog.locator("#categoryName");
-        await nameInput.waitFor({ state: "visible", timeout: 5000 });
-        await nameInput.fill(name);
-
-        const saveButton = dialog.locator("button:has-text('Save')");
-        await saveButton.click();
-
-        // Wait for error feedback or dialog to close
-        await Promise.race([
-            page
-                .locator(
-                    ".p-message-error, .p-toast-message-error, .p-dialog .p-error, .field-error, .p-inline-message-error",
-                )
-                .first()
-                .waitFor({ state: "visible", timeout: 10000 }),
-            page
-                .locator(".p-dialog")
-                .waitFor({ state: "hidden", timeout: 10000 }),
-        ]).catch(() => {
-            // Neither error appeared nor dialog closed within timeout
-        });
+        await createSpriteCategoryViaContextMenu(page, name);
         console.log(
             `[Action] Attempted to create duplicate category "${name}"`,
         );
@@ -349,56 +358,35 @@ When(
 );
 
 Then(
-    "a category error should be displayed or creation should be prevented",
+    "a category error should be displayed and no duplicate should be created",
     async ({ page }) => {
-        // Check for error indicators
-        const errorMessage = page.locator(
-            ".p-message-error, .p-toast-message-error, .p-dialog .p-error, .field-error, .p-inline-message-error",
+        // The duplicate create is rejected by the backend
+        // (CategoryAlreadyExists) and surfaced as an error toast.
+        await expect(
+            page.locator(".p-toast-message-error").first(),
+        ).toBeVisible({ timeout: 10000 });
+        console.log(
+            "[Verify] Error toast displayed for duplicate category ✓",
         );
-        const dialog = page.locator(".p-dialog");
 
-        const hasError = (await errorMessage.count()) > 0;
-        const dialogStillOpen = await dialog.isVisible();
-
-        if (hasError) {
-            await expect(errorMessage.first()).toBeVisible();
-            console.log(
-                "[Verify] Error message displayed for duplicate category ✓",
-            );
-        } else if (dialogStillOpen) {
-            await expect(dialog).toBeVisible();
-            console.log("[Verify] Dialog remained open (save was prevented) ✓");
-        } else {
-            // Neither error shown nor dialog kept open — the test must fail
-            expect(
-                hasError || dialogStillOpen,
-                "Expected an error message or the dialog to remain open for duplicate category, but neither occurred",
-            ).toBeTruthy();
-        }
-
-        // Clean up: close dialog if still open
-        if (dialogStillOpen) {
-            await page.keyboard.press("Escape");
-            await dialog
-                .waitFor({ state: "hidden", timeout: 5000 })
-                .catch(() => {});
-        }
-
-        // Clean up: delete the test categories via API
+        // And the duplicate must not exist server-side.
         const response = await page.request.get(
             `${API_BASE}/sprite-categories`,
         );
-        if (response.ok()) {
-            const data = await response.json();
-            const testCategories = (data.categories || []).filter(
-                (c: any) => c.name === "error-test-category",
+        expect(response.ok()).toBeTruthy();
+        const data = await response.json();
+        const testCategories = (data.categories || []).filter(
+            (c: any) => c.name === "error-test-category",
+        );
+        expect(testCategories.length).toBe(1);
+        console.log("[Verify] No duplicate category was created ✓");
+
+        // Clean up: delete the test category via API.
+        for (const cat of testCategories) {
+            await page.request.delete(
+                `${API_BASE}/sprite-categories/${cat.id}`,
             );
-            for (const cat of testCategories) {
-                await page.request.delete(
-                    `${API_BASE}/sprite-categories/${cat.id}`,
-                );
-                console.log(`[Cleanup] Deleted test category ID: ${cat.id}`);
-            }
+            console.log(`[Cleanup] Deleted test category ID: ${cat.id}`);
         }
     },
 );

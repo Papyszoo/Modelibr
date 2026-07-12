@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Repositories;
 using Application.Tests;
 using Application.ThumbnailJobs;
@@ -16,6 +17,7 @@ public class FinishSoundWaveformJobCommandHandlerTests
     private readonly Mock<IThumbnailJobRepository> _thumbnailJobRepository = new();
     private readonly Mock<ISoundRepository> _soundRepository = new();
     private readonly Mock<IDateTimeProvider> _dateTimeProvider = new();
+    private readonly Mock<IUnitOfWork> _unitOfWork = new();
     private readonly Mock<ILogger<FinishSoundWaveformJobCommandHandler>> _logger = new();
 
     [Fact]
@@ -35,7 +37,8 @@ public class FinishSoundWaveformJobCommandHandlerTests
             _thumbnailJobRepository.Object,
             _soundRepository.Object,
             _dateTimeProvider.Object,
-            _logger.Object);
+            _logger.Object,
+            _unitOfWork.Object);
 
         var result = await handler.Handle(
             new FinishSoundWaveformJobCommand(job.Id, true, "waveforms/soundhash/waveform.png", 1234, 9.5, 48000, 2, "wav", null),
@@ -63,7 +66,8 @@ public class FinishSoundWaveformJobCommandHandlerTests
             _thumbnailJobRepository.Object,
             _soundRepository.Object,
             _dateTimeProvider.Object,
-            _logger.Object);
+            _logger.Object,
+            _unitOfWork.Object);
 
         var result = await handler.Handle(
             new FinishSoundWaveformJobCommand(job.Id, true, "waveforms/soundhash/waveform.png", 1234, 9.5, 48000, 2, "wav", null),

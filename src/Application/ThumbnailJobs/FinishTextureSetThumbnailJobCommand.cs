@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Services;
@@ -26,15 +27,18 @@ public class FinishTextureSetThumbnailJobCommandHandler
     private readonly IThumbnailJobRepository _thumbnailJobRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly ILogger<FinishTextureSetThumbnailJobCommandHandler> _logger;
+    private readonly IUnitOfWork _unitOfWork;
 
     public FinishTextureSetThumbnailJobCommandHandler(
         IThumbnailJobRepository thumbnailJobRepository,
         IDateTimeProvider dateTimeProvider,
-        ILogger<FinishTextureSetThumbnailJobCommandHandler> logger)
+        ILogger<FinishTextureSetThumbnailJobCommandHandler> logger,
+        IUnitOfWork unitOfWork)
     {
         _thumbnailJobRepository = thumbnailJobRepository ?? throw new ArgumentNullException(nameof(thumbnailJobRepository));
         _dateTimeProvider = dateTimeProvider ?? throw new ArgumentNullException(nameof(dateTimeProvider));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<FinishTextureSetThumbnailJobResponse>> Handle(
@@ -70,6 +74,7 @@ public class FinishTextureSetThumbnailJobCommandHandler
         }
 
         await _thumbnailJobRepository.UpdateAsync(job, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new FinishTextureSetThumbnailJobResponse(
             command.JobId,

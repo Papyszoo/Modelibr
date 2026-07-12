@@ -2,7 +2,6 @@ using Application.Abstractions.Repositories;
 using Domain.Models;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
 
 namespace Infrastructure.Repositories;
 
@@ -15,11 +14,10 @@ internal sealed class PackRepository : IPackRepository
         _context = context;
     }
 
-    public async Task<Pack> AddAsync(Pack pack, CancellationToken cancellationToken = default)
+    public Task<Pack> AddAsync(Pack pack, CancellationToken cancellationToken = default)
     {
         _context.Packs.Add(pack);
-        await _context.SaveChangesAsync(cancellationToken);
-        return pack;
+        return Task.FromResult(pack);
     }
 
     public async Task<IEnumerable<Pack>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -67,34 +65,21 @@ internal sealed class PackRepository : IPackRepository
             .FirstOrDefaultAsync(p => p.Name == name, cancellationToken);
     }
 
-    public async Task UpdateAsync(Pack pack, CancellationToken cancellationToken = default)
+    public Task UpdateAsync(Pack pack, CancellationToken cancellationToken = default)
     {
-        // Only call Update for detached entities; tracked entities are saved automatically
-        if (_context.Entry(pack).State == Microsoft.EntityFrameworkCore.EntityState.Detached)
-            _context.Packs.Update(pack);
+        _context.UpdateIfDetached(pack);
 
-        try
-        {
-            await _context.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateException ex) when (IsDuplicatePackModelAssociation(ex))
-        {
-            // Concurrent identical add requests can race on the PackModels join table.
-            // Treat the duplicate insert as an idempotent no-op.
-            _context.ChangeTracker.Clear();
-        }
+        // Note: this used to catch a DbUpdateException for a duplicate
+        // PackModels PK here (concurrent "add model to pack" requests racing
+        // on the join table) and swallow it as an idempotent no-op. That
+        // handling now lives in ApplicationDbContext's IUnitOfWork.SaveChangesAsync,
+        // the single place SaveChanges is actually called from (prompt 25).
+        return Task.CompletedTask;
     }
 
-    public async Task DeleteAsync(Pack pack, CancellationToken cancellationToken = default)
+    public Task DeleteAsync(Pack pack, CancellationToken cancellationToken = default)
     {
         _context.Packs.Remove(pack);
-        await _context.SaveChangesAsync(cancellationToken);
+        return Task.CompletedTask;
     }
-
-    private static bool IsDuplicatePackModelAssociation(DbUpdateException ex)
-        => ex.InnerException is PostgresException
-        {
-            SqlState: PostgresErrorCodes.UniqueViolation,
-            ConstraintName: "PK_PackModels"
-        };
 }

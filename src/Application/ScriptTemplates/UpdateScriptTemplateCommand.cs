@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Services;
@@ -9,13 +10,16 @@ internal class UpdateScriptTemplateCommandHandler : ICommandHandler<UpdateScript
 {
     private readonly IScriptTemplateRepository _repository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public UpdateScriptTemplateCommandHandler(
         IScriptTemplateRepository repository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _repository = repository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<ScriptTemplateDto>> Handle(UpdateScriptTemplateCommand command, CancellationToken cancellationToken)
@@ -37,6 +41,7 @@ internal class UpdateScriptTemplateCommandHandler : ICommandHandler<UpdateScript
                 command.Description);
 
             var saved = await _repository.UpdateAsync(template, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
             return Result.Success(ScriptTemplateMappings.ToDto(saved));
         }
         catch (ArgumentException ex)

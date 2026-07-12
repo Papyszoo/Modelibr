@@ -1,11 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 
-import {
-  type ModelCategoryDto,
-  type ModelTagDto,
-  type PackDto,
-  type ProjectDto,
-} from '@/types'
+import { type ModelTagDto, type PackDto, type ProjectDto } from '@/types'
 
 import { ModelsFilters } from './ModelsFilters'
 
@@ -68,21 +63,6 @@ const mockProjects: ProjectDto[] = [
   },
 ]
 
-const mockCategories: ModelCategoryDto[] = [
-  {
-    id: 1,
-    name: 'Characters',
-    path: 'Characters',
-    parentId: null,
-  },
-  {
-    id: 2,
-    name: 'Humanoid',
-    path: 'Characters / Humanoid',
-    parentId: 1,
-  },
-]
-
 const mockTags: ModelTagDto[] = [
   { name: 'character' },
   { name: 'fantasy' },
@@ -99,12 +79,9 @@ const meta: Meta<typeof ModelsFilters> = {
     onSearchChange: noop,
     packs: mockPacks,
     projects: mockProjects,
-    categories: mockCategories,
     tags: mockTags,
     selectedPackIds: [],
     selectedProjectIds: [],
-    selectedCategoryKeys: {},
-    selectedCategoryIds: [],
     selectedTagNames: [],
     hasConceptImages: false,
     animatedOnly: false,
@@ -112,7 +89,6 @@ const meta: Meta<typeof ModelsFilters> = {
     maxTriangleCount: null,
     onPackFilterChange: noop,
     onProjectFilterChange: noop,
-    onCategoryChange: noop,
     onTagChange: noop,
     onHasConceptImagesChange: noop,
     onAnimatedOnlyChange: noop,
@@ -125,6 +101,9 @@ const meta: Meta<typeof ModelsFilters> = {
     onUploadClick: noop,
     onRefreshClick: noop,
     onBulkActionsClick: noop,
+    isCategoryPanelOpen: true,
+    onCategoryPanelToggle: noop,
+    showCategoryToggle: true,
   },
 }
 

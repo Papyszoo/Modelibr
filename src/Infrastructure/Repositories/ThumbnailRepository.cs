@@ -17,17 +17,16 @@ internal sealed class ThumbnailRepository : IThumbnailRepository
         _context = context ?? throw new ArgumentNullException(nameof(context));
     }
 
-    public async Task<Thumbnail> AddAsync(Thumbnail thumbnail, CancellationToken cancellationToken = default)
+    public Task<Thumbnail> AddAsync(Thumbnail thumbnail, CancellationToken cancellationToken = default)
     {
         _context.Thumbnails.Add(thumbnail);
-        await _context.SaveChangesAsync(cancellationToken);
-        return thumbnail;
+        return Task.FromResult(thumbnail);
     }
 
-    public async Task UpdateAsync(Thumbnail thumbnail, CancellationToken cancellationToken = default)
+    public Task UpdateAsync(Thumbnail thumbnail, CancellationToken cancellationToken = default)
     {
-        _context.Thumbnails.Update(thumbnail);
-        await _context.SaveChangesAsync(cancellationToken);
+        _context.UpdateIfDetached(thumbnail);
+        return Task.CompletedTask;
     }
 
     public async Task<Thumbnail?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
@@ -57,8 +56,4 @@ internal sealed class ThumbnailRepository : IThumbnailRepository
             .AnyAsync(t => t.ModelVersion.Files.Any(f => f.Sha256Hash == modelHash), cancellationToken);
     }
 
-    public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
-    {
-        await _context.SaveChangesAsync(cancellationToken);
-    }
 }

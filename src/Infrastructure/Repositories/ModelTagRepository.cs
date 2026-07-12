@@ -34,9 +34,9 @@ internal sealed class ModelTagRepository : IModelTagRepository
             .ToListAsync(cancellationToken);
     }
 
-    public async Task AddRangeAsync(IEnumerable<ModelTag> tags, CancellationToken cancellationToken = default)
+    public Task AddRangeAsync(IEnumerable<ModelTag> tags, CancellationToken cancellationToken = default)
     {
         _context.ModelTags.AddRange(tags);
-        await _context.SaveChangesAsync(cancellationToken);
+        return Task.CompletedTask;
     }
 }

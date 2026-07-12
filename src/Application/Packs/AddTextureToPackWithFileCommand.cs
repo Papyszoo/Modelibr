@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Files;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
@@ -28,6 +29,7 @@ internal sealed class AddTextureToPackWithFileCommandHandler
     private readonly IFileCreationService _fileCreationService;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly ITextureImageMetadataReader _textureImageMetadataReader;
+    private readonly IUnitOfWork _unitOfWork;
 
     public AddTextureToPackWithFileCommandHandler(
         IPackRepository packRepository,
@@ -35,8 +37,8 @@ internal sealed class AddTextureToPackWithFileCommandHandler
         IBatchUploadRepository batchUploadRepository,
         IFileCreationService fileCreationService,
         IDateTimeProvider dateTimeProvider,
-        ITextureImageMetadataReader textureImageMetadataReader
-    )
+        ITextureImageMetadataReader textureImageMetadataReader,
+        IUnitOfWork unitOfWork)
     {
         _packRepository = packRepository;
         _textureSetRepository = textureSetRepository;
@@ -44,6 +46,7 @@ internal sealed class AddTextureToPackWithFileCommandHandler
         _fileCreationService = fileCreationService;
         _dateTimeProvider = dateTimeProvider;
         _textureImageMetadataReader = textureImageMetadataReader;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<int>> Handle(
@@ -119,6 +122,13 @@ internal sealed class AddTextureToPackWithFileCommandHandler
 
         await _packRepository.UpdateAsync(pack, cancellationToken);
 
+        // Commit here (rather than only once at the end): when textureSet is
+        // newly created above, its Id is still an EF temporary placeholder
+        // until SaveChanges runs. BatchUpload.Create below takes textureSetId
+        // as a plain int, not a tracked navigation, so it needs the real,
+        // database-assigned value.
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
         // Create batch upload record
         var batchId = request.BatchId ?? Guid.NewGuid().ToString();
         var uploadType = request.UploadType ?? "pack";
@@ -133,6 +143,7 @@ internal sealed class AddTextureToPackWithFileCommandHandler
         );
 
         await _batchUploadRepository.AddAsync(batchUpload, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success(textureSet.Id);
     }

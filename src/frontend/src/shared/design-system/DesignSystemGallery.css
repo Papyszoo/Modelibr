@@ -1,0 +1,146 @@
+/* Gallery chrome only — everything it showcases must come from tokens or
+   the primitives themselves. The gallery practices the density it preaches. */
+.dsg {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-md);
+  padding: var(--mod-space-md);
+  background: var(--mod-color-bg);
+  color: var(--mod-color-text);
+  font-size: var(--mod-text-sm);
+}
+
+.dsg-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-xs);
+}
+
+.dsg-section-title {
+  margin: 0;
+  font-size: var(--mod-text-lg);
+  font-weight: var(--mod-font-weight-semibold);
+  border-bottom: 1px solid var(--mod-color-border);
+  padding-bottom: var(--mod-space-2xs);
+}
+
+.dsg-label {
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+}
+
+.dsg code {
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+}
+
+/* ── Colors ── */
+.dsg-color-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-xs);
+}
+
+.dsg-color-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-2xs);
+}
+
+.dsg-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--mod-space-xs);
+}
+
+.dsg-swatch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mod-space-2xs);
+}
+
+.dsg-swatch-chip {
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: var(--mod-radius-sm);
+  border: 1px solid var(--mod-color-border-strong);
+  flex-shrink: 0;
+}
+
+/* ── Typography ── */
+.dsg-type-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-2xs);
+}
+
+.dsg-type-row {
+  display: grid;
+  grid-template-columns: 10rem 1fr auto;
+  align-items: baseline;
+  gap: var(--mod-space-md);
+}
+
+/* ── Spacing ── */
+.dsg-space-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-2xs);
+}
+
+.dsg-space-row {
+  display: grid;
+  grid-template-columns: 10rem auto;
+  align-items: center;
+  gap: var(--mod-space-md);
+}
+
+.dsg-space-bar {
+  height: 0.75rem;
+  background: var(--mod-color-primary);
+  border-radius: var(--mod-radius-sm);
+}
+
+/* ── Radius & shadows ── */
+.dsg-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--mod-space-sm);
+}
+
+.dsg-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 6.5rem;
+  height: 3rem;
+  background: var(--mod-color-surface);
+  border: 1px solid var(--mod-color-border);
+}
+
+/* ── Category demo ── */
+.dsg-category-demo {
+  display: flex;
+  min-height: 10rem;
+}
+
+.dsg-category-demo .category-tree-panel {
+  width: 220px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--mod-color-border);
+}
+
+.dsg-category-demo-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+}
+
+/* ── Feedback ── */
+.dsg-feedback-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: var(--mod-space-sm);
+  align-items: start;
+}

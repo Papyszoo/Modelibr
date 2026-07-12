@@ -3,7 +3,6 @@ import '@/shared/components/FilterPanel.css'
 
 import { type ContextMenu } from 'primereact/contextmenu'
 import { Dropdown } from 'primereact/dropdown'
-import { ProgressSpinner } from 'primereact/progressspinner'
 import { Toast } from 'primereact/toast'
 import {
   type DragEvent,
@@ -21,6 +20,7 @@ import { useScriptMutations } from '@/features/scripts/hooks/useScriptMutations'
 import { useScriptUpload } from '@/features/scripts/hooks/useScriptUpload'
 import { useTabContext } from '@/hooks/useTabContext'
 import { CategoryTreePanel } from '@/shared/components/categories/CategoryTreePanel'
+import { LoadingState } from '@/shared/components/feedback'
 import {
   ListToolbar,
   ListToolbarActions,
@@ -34,6 +34,11 @@ import {
   ListToolbarSelectionSummary,
   OptionsButton,
 } from '@/shared/components/list-toolbar'
+import {
+  ALL_CATEGORIES_ID,
+  isRealCategoryId,
+  UNASSIGNED_CATEGORY_ID,
+} from '@/shared/types/categories'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
 import { type ScriptDto } from '@/types'
 import {
@@ -43,12 +48,9 @@ import {
 } from '@/utils/webdavUtils'
 
 import { getLanguageLabel } from '../utils/languages'
-import { ScriptCategoryManagerDialog } from './ScriptCategoryManagerDialog'
 import { ScriptContextMenu } from './ScriptContextMenu'
 import { ScriptCreateDialog } from './ScriptCreateDialog'
 import { ScriptGridContent } from './ScriptGridContent'
-
-const UNASSIGNED_CATEGORY_ID = -1
 
 export function ScriptList() {
   const toast = useRef<Toast>(null)
@@ -87,7 +89,6 @@ export function ScriptList() {
     loadCategories,
   } = useScriptListData(showToast)
 
-  const [showCategoryManager, setShowCategoryManager] = useState(false)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [isCreatingScript, setIsCreatingScript] = useState(false)
   const [dragOverCategoryId, setDragOverCategoryId] = useState<number | null>(
@@ -163,17 +164,22 @@ export function ScriptList() {
   const { settings, setCardWidth } = useCardWidthStore()
   const cardWidth = settings.scripts
 
-  const { moveScriptsToCategoryMutation, recycleScriptsMutation } =
-    useScriptMutations({
-      showToast,
-      loadScripts: invalidateScripts,
-      loadCategories,
-      activeCategoryId,
-      setActiveCategoryId,
-      categories,
-      setSelectedScriptIds,
-      setContextMenuTarget,
-    })
+  const {
+    createCategoryMutation,
+    renameCategoryMutation,
+    deleteCategoryMutation,
+    moveScriptsToCategoryMutation,
+    recycleScriptsMutation,
+  } = useScriptMutations({
+    showToast,
+    loadScripts: invalidateScripts,
+    loadCategories,
+    activeCategoryId,
+    setActiveCategoryId,
+    categories,
+    setSelectedScriptIds,
+    setContextMenuTarget,
+  })
 
   const {
     onDrop,
@@ -200,10 +206,10 @@ export function ScriptList() {
   }) => {
     setIsCreatingScript(true)
     try {
-      const categoryId =
-        activeCategoryId !== null && activeCategoryId !== UNASSIGNED_CATEGORY_ID
-          ? activeCategoryId
-          : undefined
+      // "All"/"Unassigned" are sentinel rows, not assignable categories.
+      const categoryId = isRealCategoryId(activeCategoryId)
+        ? activeCategoryId
+        : undefined
       const created = await createScript({
         name: values.name,
         language: values.language,
@@ -586,29 +592,34 @@ export function ScriptList() {
               dragOverCategoryId={dragOverCategoryId}
               categoryCounts={categoryCounts}
               unassignedCount={unassignedCount}
+              allCount={scripts.length}
+              allCategoryId={ALL_CATEGORIES_ID}
+              unassignedCategoryId={UNASSIGNED_CATEGORY_ID}
+              unassignedLabel="Uncategorized"
+              itemNoun="script"
               onCategoryChange={setActiveCategoryId}
               onCategoryDragOver={handleCategoryDragOver}
               onCategoryDragLeave={handleCategoryDragLeave}
               onCategoryDrop={handleCategoryDrop}
-              unassignedCategoryId={UNASSIGNED_CATEGORY_ID}
-              unassignedLabel="Uncategorized"
+              onCreateCategory={(name, parentId) =>
+                createCategoryMutation.mutate({ name, parentId })
+              }
+              onRenameCategory={(category, name) =>
+                renameCategoryMutation.mutate({ category, name })
+              }
+              onDeleteCategory={category =>
+                deleteCategoryMutation.mutate(category.id)
+              }
             />
-            <button
-              type="button"
-              className="script-category-manage-btn"
-              onClick={() => setShowCategoryManager(true)}
-            >
-              <i className="pi pi-cog" aria-hidden="true" />
-              <span>Manage categories</span>
-            </button>
           </div>
         )}
 
         <div className="script-list-main">
           {loading ? (
-            <div className="script-list-loading">
-              <ProgressSpinner />
-            </div>
+            <LoadingState
+              className="script-list-loading"
+              message="Loading scripts…"
+            />
           ) : (
             <ScriptGridContent
               filteredScripts={filteredScripts}
@@ -640,12 +651,6 @@ export function ScriptList() {
         <i className="pi pi-upload" />
         <span>Drop source-code files here</span>
       </div>
-
-      <ScriptCategoryManagerDialog
-        visible={showCategoryManager}
-        categories={categories}
-        onHide={() => setShowCategoryManager(false)}
-      />
 
       <ScriptCreateDialog
         visible={showCreateDialog}

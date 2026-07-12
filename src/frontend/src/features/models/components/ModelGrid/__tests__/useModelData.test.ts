@@ -14,7 +14,6 @@ const mockGet = client.get as jest.Mock
 const baseProps = {
   effectivePackIds: [],
   effectiveProjectIds: [],
-  selectedCategoryIds: [],
   selectedTagNames: [],
   hasConceptImages: false,
 }

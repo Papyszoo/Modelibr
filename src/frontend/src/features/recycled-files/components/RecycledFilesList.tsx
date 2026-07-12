@@ -17,6 +17,7 @@ import {
 } from '@/features/recycled-files/api/recycledApi'
 import { getLanguageLabel } from '@/features/scripts/utils/languages'
 import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
+import { EmptyState } from '@/shared/components/feedback'
 import { ThumbnailDisplay } from '@/shared/thumbnail'
 import { getVersionThumbnailUrl } from '@/shared/thumbnail/api/thumbnailApi'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
@@ -548,11 +549,12 @@ export function RecycledFilesList() {
       </div>
 
       {isEmpty ? (
-        <div className="recycled-files-empty">
-          <i className="pi pi-inbox" />
-          <h3>No Recycled Items</h3>
-          <p>Items you delete will appear here</p>
-        </div>
+        <EmptyState
+          className="recycled-files-empty"
+          icon="pi-inbox"
+          title="No Recycled Items"
+          message="Items you delete will appear here"
+        />
       ) : (
         <div className="recycled-files-content">
           {/* Models Section */}

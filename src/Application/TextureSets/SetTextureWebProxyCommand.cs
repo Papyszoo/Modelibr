@@ -1,4 +1,5 @@
 using Application.Abstractions.Files;
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Services;
@@ -31,19 +32,22 @@ internal class SetTextureWebProxyCommandHandler : ICommandHandler<SetTextureWebP
     private readonly IFileCreationService _fileCreationService;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly ILogger<SetTextureWebProxyCommandHandler> _logger;
+    private readonly IUnitOfWork _unitOfWork;
 
     public SetTextureWebProxyCommandHandler(
         ITextureSetRepository textureSetRepository,
         ITextureProxyRepository textureProxyRepository,
         IFileCreationService fileCreationService,
         IDateTimeProvider dateTimeProvider,
-        ILogger<SetTextureWebProxyCommandHandler> logger)
+        ILogger<SetTextureWebProxyCommandHandler> logger,
+        IUnitOfWork unitOfWork)
     {
         _textureSetRepository = textureSetRepository;
         _textureProxyRepository = textureProxyRepository;
         _fileCreationService = fileCreationService;
         _dateTimeProvider = dateTimeProvider;
         _logger = logger;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<SetTextureWebProxyResponse>> Handle(SetTextureWebProxyCommand command, CancellationToken cancellationToken)
@@ -115,6 +119,8 @@ internal class SetTextureWebProxyCommandHandler : ICommandHandler<SetTextureWebP
                 "Created texture proxy for Texture {TextureId} at size {Size}px with File {FileId}",
                 command.TextureId, command.Size, proxyFile.Id);
         }
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new SetTextureWebProxyResponse(
             proxy.Id,

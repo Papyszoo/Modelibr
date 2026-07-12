@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Repositories;
 using Application.Models;
 using Domain.Models;
@@ -11,6 +12,7 @@ public class UpdateTechnicalMetadataCommandHandlerTests
 {
     private readonly Mock<IModelVersionRepository> _mockModelVersionRepository;
     private readonly Mock<IDateTimeProvider> _mockDateTimeProvider;
+    private readonly Mock<IUnitOfWork> _mockUnitOfWork;
     private readonly UpdateTechnicalMetadataCommandHandler _handler;
 
     public UpdateTechnicalMetadataCommandHandlerTests()
@@ -18,10 +20,12 @@ public class UpdateTechnicalMetadataCommandHandlerTests
         _mockModelVersionRepository = new Mock<IModelVersionRepository>();
         _mockDateTimeProvider = new Mock<IDateTimeProvider>();
         _mockDateTimeProvider.Setup(x => x.UtcNow).Returns(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+        _mockUnitOfWork = new Mock<IUnitOfWork>();
 
         _handler = new UpdateTechnicalMetadataCommandHandler(
             _mockModelVersionRepository.Object,
-            _mockDateTimeProvider.Object);
+            _mockDateTimeProvider.Object,
+            _mockUnitOfWork.Object);
     }
 
     [Fact]

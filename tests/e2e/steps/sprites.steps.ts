@@ -14,6 +14,11 @@ const { Given, When, Then } = createBdd();
 
 const API_BASE = process.env.API_BASE_URL || "http://localhost:8090";
 
+// Category rows in the shared CategoryTreePanel sidebar (unassigned bucket +
+// tree nodes) — sprites no longer uses .category-tab chips.
+const CATEGORY_ROW_SELECTOR =
+    ".sprite-category-sidebar .category-tree-unassigned, .sprite-category-sidebar .category-tree .p-treenode-content";
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -774,10 +779,11 @@ When(
         await spriteListPage.goto();
         await page.waitForLoadState("domcontentloaded");
 
-        // Click the category tab to filter
+        // Click the category tab to filter (exact label match — hasText is
+        // substring and would also hit e.g. "Assign Test Category")
         const categoryTab = page
-            .locator(".category-tab")
-            .filter({ hasText: categoryName });
+            .locator(CATEGORY_ROW_SELECTOR)
+            .filter({ has: page.getByText(categoryName, { exact: true }) });
         await categoryTab.click();
         // Wait for filter to apply reactively
         await page.waitForLoadState("domcontentloaded");
@@ -802,293 +808,147 @@ Then(
 );
 
 // ============= Category Management Steps =============
+// Category management happens inside the category tree sidebar via its
+// right-click context menu (the manager dialog was removed): "Add category"
+// on the panel buckets, "Add subcategory"/"Rename"/"Delete" on a node, and
+// an inline input in the tree for typing names.
 
-When("I open the category management dialog", async ({ page }) => {
-    // Click "Add Category" button
-    const addCategoryButton = page.locator("button:has-text('Add Category')");
-    await addCategoryButton.click();
+async function cleanupSpriteCategoryByName(page: any, name: string) {
+    const listResponse = await page.request.get(
+        `${API_BASE}/sprite-categories`,
+    );
+    if (!listResponse.ok()) {
+        return;
+    }
+    const data = await listResponse.json();
+    const duplicates = (data.categories || []).filter(
+        (c: any) => c.name === name,
+    );
+    for (const dup of duplicates) {
+        const delResponse = await page.request
+            .delete(`${API_BASE}/sprite-categories/${dup.id}`)
+            .catch(() => null);
+        console.log(
+            `[Cleanup] Deleted existing category "${name}" (ID: ${dup.id}) — status: ${delResponse?.status() ?? "failed"}`,
+        );
+    }
 
-    await expect(page.locator(".p-dialog")).toBeVisible({ timeout: 5000 });
-    console.log("[Action] Opened category dialog");
-});
+    // If we deleted anything, verify the name is truly free before proceeding
+    if (duplicates.length > 0) {
+        await expect
+            .poll(
+                async () => {
+                    const checkResponse = await page.request.get(
+                        `${API_BASE}/sprite-categories`,
+                    );
+                    if (!checkResponse.ok()) return true; // assume clear
+                    const checkData = await checkResponse.json();
+                    return !(checkData.categories || []).some(
+                        (c: any) => c.name === name,
+                    );
+                },
+                {
+                    message: `Waiting for category "${name}" to be fully deleted`,
+                    timeout: 10000,
+                    intervals: [500, 1000],
+                },
+            )
+            .toBe(true);
+        console.log(`[Cleanup] Verified category "${name}" is fully deleted`);
+    }
+}
+
+async function clickSpriteCategoryMenuItem(page: any, label: string) {
+    // PrimeReact ContextMenu portals to document.body (.p-* is the accepted
+    // exception for body-mounted overlays).
+    const item = page
+        .locator(".p-contextmenu .p-menuitem-text")
+        .filter({ hasText: label })
+        .first();
+    await expect(item).toBeVisible({ timeout: 5000 });
+    await item.click();
+}
+
+async function commitSpriteInlineCategoryName(page: any, name: string) {
+    const input = page
+        .locator(
+            '.sprite-category-sidebar [data-testid="category-tree-inline-input"]',
+        )
+        .first();
+    await expect(input).toBeVisible({ timeout: 5000 });
+    await input.fill(name);
+    await input.press("Enter");
+    await expect(input).toBeHidden({ timeout: 10000 });
+}
+
+async function findSpriteCategoryRow(page: any, categoryName: string) {
+    // Exact label match — hasText is a substring match and would pick
+    // "Assign Test Category" when asked for "Test Category".
+    const row = page
+        .locator(".sprite-category-sidebar .category-tree .p-treenode-content")
+        .filter({ has: page.getByText(categoryName, { exact: true }) })
+        .first();
+    await expect(row).toBeVisible({ timeout: 15000 });
+    return row;
+}
 
 When(
-    "I create a category named {string} with description {string}",
-    async ({ page }, name: string, description: string) => {
-        // Clean up any existing categories with this name (from prior test runs)
-        const listResponse = await page.request.get(
-            `${API_BASE}/sprite-categories`,
-        );
-        if (listResponse.ok()) {
-            const data = await listResponse.json();
-            const duplicates = (data.categories || []).filter(
-                (c: any) => c.name === name,
-            );
-            for (const dup of duplicates) {
-                const delResponse = await page.request
-                    .delete(`${API_BASE}/sprite-categories/${dup.id}`)
-                    .catch(() => null);
-                console.log(
-                    `[Cleanup] Deleted existing category "${name}" (ID: ${dup.id}) — status: ${delResponse?.status() ?? "failed"}`,
-                );
-            }
+    "I create a category named {string} via the context menu",
+    async ({ page }, name: string) => {
+        await cleanupSpriteCategoryByName(page, name);
 
-            // If we deleted anything, verify the name is truly free before proceeding
-            if (duplicates.length > 0) {
-                await expect
-                    .poll(
-                        async () => {
-                            const checkResponse = await page.request.get(
-                                `${API_BASE}/sprite-categories`,
-                            );
-                            if (!checkResponse.ok()) return true; // assume clear
-                            const checkData = await checkResponse.json();
-                            return !(checkData.categories || []).some(
-                                (c: any) => c.name === name,
-                            );
-                        },
-                        {
-                            message: `Waiting for category "${name}" to be fully deleted`,
-                            timeout: 10000,
-                            intervals: [500, 1000],
-                        },
-                    )
-                    .toBe(true);
-                console.log(
-                    `[Cleanup] Verified category "${name}" is fully deleted`,
-                );
-            }
-        }
+        // Right-click a bucket row (not a category node) to get the
+        // background menu with the root-level "Add category" item.
+        await page
+            .locator('.sprite-category-sidebar [data-testid="category-tree-all"]')
+            .click({ button: "right" });
+        await clickSpriteCategoryMenuItem(page, "Add category");
+        await commitSpriteInlineCategoryName(page, name);
 
-        // The dialog should already be open from the previous step
-        const dialog = page.locator(".p-dialog");
-        await dialog.waitFor({ state: "visible", timeout: 5000 });
+        console.log(`[Action] Created category "${name}" via context menu`);
+    },
+);
 
-        // Wait for PrimeReact InputText to be visible and enabled
-        const nameInput = dialog.locator("#categoryName");
-        await nameInput.waitFor({ state: "visible", timeout: 10000 });
-        await expect(nameInput).toBeEnabled({ timeout: 5000 });
-        await nameInput.fill(name);
-        console.log(`[Action] Filled category name: ${name}`);
+When(
+    "I rename the category {string} to {string} via the context menu",
+    async ({ page }, oldName: string, newName: string) => {
+        await cleanupSpriteCategoryByName(page, newName);
 
-        // Fill in description (if textarea exists) - uses #categoryDescription id
-        const descInput = dialog.locator("#categoryDescription");
-        if (await descInput.isVisible()) {
-            await descInput.fill(description);
-            console.log(`[Action] Filled description: ${description}`);
-        }
-
-        // Click Save button and wait for the API response
-        const saveButton = dialog.locator("button:has-text('Save')");
-        const createResponsePromise = page.waitForResponse(
-            (resp) =>
-                resp.url().includes("/sprite-categories") &&
-                resp.request().method() === "POST",
-            { timeout: 15000 },
-        );
-        await saveButton.click();
-
-        let postSucceeded = false;
-        try {
-            const response = await createResponsePromise;
-            const status = response.status();
-            console.log(
-                `[API] Create category response: ${status} ${response.url()}`,
-            );
-            if (status >= 200 && status < 300) {
-                postSucceeded = true;
-            } else {
-                const body = await response.text().catch(() => "(unreadable)");
-                console.log(`[API] Create category error body: ${body}`);
-            }
-        } catch {
-            console.log(
-                "[API] No POST /sprite-categories response detected — create may have failed silently",
-            );
-        }
-
-        if (!postSucceeded) {
-            // POST failed — the dialog stays open on error. Close it and retry via API.
-            console.log(
-                "[Recovery] POST failed, closing dialog and creating via API instead",
-            );
-            const cancelButton = dialog.locator(
-                "button:has-text('Cancel'), .p-dialog-header-close",
-            );
-            if (
-                await cancelButton
-                    .first()
-                    .isVisible()
-                    .catch(() => false)
-            ) {
-                await cancelButton.first().click();
-            }
-            await dialog
-                .waitFor({ state: "hidden", timeout: 5000 })
-                .catch(() => {});
-
-            // Create via direct API call as fallback
-            const apiResponse = await page.request.post(
-                `${API_BASE}/sprite-categories`,
-                {
-                    data: { name, description },
-                },
-            );
-            console.log(
-                `[Recovery] API create response: ${apiResponse.status()}`,
-            );
-
-            // Reload to pick up the new category in the UI
-            await page.reload({ waitUntil: "domcontentloaded" });
-            await page.waitForSelector("button:has-text('Add Category')", {
-                state: "visible",
-                timeout: 15000,
-            });
-        } else {
-            // Wait for dialog to close on success
-            await dialog.waitFor({ state: "hidden", timeout: 10000 });
-        }
+        const categoryRow = await findSpriteCategoryRow(page, oldName);
+        await categoryRow.click({ button: "right" });
+        await clickSpriteCategoryMenuItem(page, "Rename");
+        await commitSpriteInlineCategoryName(page, newName);
 
         console.log(
-            `[Action] Created category "${name}" with description "${description}"`,
+            `[Action] Renamed category "${oldName}" to "${newName}" via context menu`,
         );
     },
 );
 
-When("I create a category named {string}", async ({ page }, name: string) => {
-    // Clean up any existing categories with this name (from prior test runs)
-    const listResponse = await page.request.get(
-        `${API_BASE}/sprite-categories`,
-    );
-    if (listResponse.ok()) {
-        const data = await listResponse.json();
-        const duplicates = (data.categories || []).filter(
-            (c: any) => c.name === name,
-        );
-        for (const dup of duplicates) {
-            const delResponse = await page.request
-                .delete(`${API_BASE}/sprite-categories/${dup.id}`)
-                .catch(() => null);
-            console.log(
-                `[Cleanup] Deleted existing category "${name}" (ID: ${dup.id}) — status: ${delResponse?.status() ?? "failed"}`,
-            );
-        }
+When(
+    "I delete the category {string} via the context menu",
+    async ({ page }, categoryName: string) => {
+        const categoryRow = await findSpriteCategoryRow(page, categoryName);
+        await categoryRow.click({ button: "right" });
+        await clickSpriteCategoryMenuItem(page, "Delete");
 
-        // If we deleted anything, verify the name is truly free before proceeding
-        if (duplicates.length > 0) {
-            await expect
-                .poll(
-                    async () => {
-                        const checkResponse = await page.request.get(
-                            `${API_BASE}/sprite-categories`,
-                        );
-                        if (!checkResponse.ok()) return true;
-                        const checkData = await checkResponse.json();
-                        return !(checkData.categories || []).some(
-                            (c: any) => c.name === name,
-                        );
-                    },
-                    {
-                        message: `Waiting for category "${name}" to be fully deleted`,
-                        timeout: 10000,
-                        intervals: [500, 1000],
-                    },
-                )
-                .toBe(true);
-            console.log(
-                `[Cleanup] Verified category "${name}" is fully deleted`,
-            );
-        }
-    }
+        const confirmDialog = page.locator(".p-confirm-dialog");
+        await expect(confirmDialog).toBeVisible({ timeout: 5000 });
+        await confirmDialog.locator("button.p-button-danger").click();
+        await expect(confirmDialog).toBeHidden({ timeout: 10000 });
 
-    // Wait for dialog to be visible
-    const dialog = page.locator(".p-dialog");
-    await dialog.waitFor({ state: "visible", timeout: 5000 });
-
-    // Fill in category name using PrimeReact InputText ID
-    const nameInput = dialog.locator("#categoryName");
-    await nameInput.waitFor({ state: "visible", timeout: 10000 });
-    await expect(nameInput).toBeEnabled({ timeout: 5000 });
-    await nameInput.fill(name);
-
-    // Click Save button and wait for the API response
-    const saveButton = dialog.locator("button:has-text('Save')");
-    const createResponsePromise = page.waitForResponse(
-        (resp) =>
-            resp.url().includes("/sprite-categories") &&
-            resp.request().method() === "POST",
-        { timeout: 15000 },
-    );
-    await saveButton.click();
-
-    let postSucceeded = false;
-    try {
-        const response = await createResponsePromise;
-        const status = response.status();
         console.log(
-            `[API] Create category response: ${status} ${response.url()}`,
+            `[Action] Deleted category "${categoryName}" via context menu`,
         );
-        if (status >= 200 && status < 300) {
-            postSucceeded = true;
-        } else {
-            const body = await response.text().catch(() => "(unreadable)");
-            console.log(`[API] Create category error body: ${body}`);
-        }
-    } catch {
-        console.log(
-            "[API] No POST /sprite-categories response detected — create may have failed silently",
-        );
-    }
-
-    if (!postSucceeded) {
-        // POST failed — the dialog stays open on error. Close it and retry via API.
-        console.log(
-            "[Recovery] POST failed, closing dialog and creating via API instead",
-        );
-        const cancelButton = dialog.locator(
-            "button:has-text('Cancel'), .p-dialog-header-close",
-        );
-        if (
-            await cancelButton
-                .first()
-                .isVisible()
-                .catch(() => false)
-        ) {
-            await cancelButton.first().click();
-        }
-        await dialog
-            .waitFor({ state: "hidden", timeout: 5000 })
-            .catch(() => {});
-
-        // Create via direct API call as fallback
-        const apiResponse = await page.request.post(
-            `${API_BASE}/sprite-categories`,
-            {
-                data: { name },
-            },
-        );
-        console.log(`[Recovery] API create response: ${apiResponse.status()}`);
-
-        // Reload to pick up the new category in the UI
-        await page.reload({ waitUntil: "domcontentloaded" });
-        await page.waitForSelector("button:has-text('Add Category')", {
-            state: "visible",
-            timeout: 15000,
-        });
-    } else {
-        // Wait for dialog to close on success
-        await dialog.waitFor({ state: "hidden", timeout: 10000 });
-    }
-
-    console.log(`[Action] Created category "${name}"`);
-});
+    },
+);
 
 Then(
     "the category {string} should be visible in the category list",
     async ({ page }, categoryName: string) => {
         const categoryTab = page
-            .locator(".category-tab")
-            .filter({ hasText: categoryName })
+            .locator(CATEGORY_ROW_SELECTOR)
+            .filter({ has: page.getByText(categoryName, { exact: true }) })
             .first();
         await expect(async () => {
             await expect(categoryTab).toBeVisible({ timeout: 5000 });
@@ -1210,223 +1070,6 @@ Given(
         console.log(
             `[Precondition] Category "${categoryName}" exists in shared state (ID: ${getScenarioState(page).getSpriteCategory(categoryName)?.id})`,
         );
-    },
-);
-
-// categoryEditState is tracked via getScenarioState(page).getCustom('categoryEditState')
-
-When("I edit the category {string}", async ({ page }, categoryName: string) => {
-    getScenarioState(page).setCustom("editingCategoryName", categoryName);
-    // Ensure no dialog is blocking — wait for any existing dialog to fully close
-    const existingDialog = page.locator(".p-dialog");
-    const dialogVisible = await existingDialog
-        .first()
-        .isVisible()
-        .catch(() => false);
-    if (dialogVisible) {
-        await page.keyboard.press("Escape");
-        await existingDialog
-            .first()
-            .waitFor({ state: "hidden", timeout: 10000 })
-            .catch(() => {});
-    }
-
-    // Wait for category tabs to be rendered
-    await page.waitForSelector(".category-tab", {
-        state: "visible",
-        timeout: 10000,
-    });
-
-    // Use polling to wait for the specific category tab to appear (may need re-render)
-    const findCategoryTabIndex = async () => {
-        const allTabs = page.locator(".category-tab");
-        const tabCount = await allTabs.count();
-        for (let i = 0; i < tabCount; i++) {
-            const tab = allTabs.nth(i);
-            const tabText = await tab.locator("span").first().textContent();
-            const rawName = tabText?.trim();
-            if (rawName === categoryName) {
-                return i;
-            }
-        }
-
-        return -1;
-    };
-
-    await expect
-        .poll(findCategoryTabIndex, {
-            message: `Waiting for category tab "${categoryName}" to appear`,
-            timeout: 15000,
-            intervals: [500, 1000, 2000],
-        })
-        .not.toBe(-1);
-
-    const targetTabIndex = await findCategoryTabIndex();
-    if (targetTabIndex < 0) {
-        throw new Error(
-            `Category tab "${categoryName}" not found (exact match)`,
-        );
-    }
-    const targetTab: any = page.locator(".category-tab").nth(targetTabIndex);
-    await targetTab.click();
-
-    // Click the edit (pencil) button on the category tab
-    const editButton = targetTab.locator("button:has(.pi-pencil)");
-    await editButton.waitFor({ state: "visible", timeout: 5000 });
-    await editButton.click();
-
-    // Wait for dialog using data-testid
-    const dialog = page.locator('[data-testid="category-dialog"], .p-dialog');
-    await dialog.waitFor({ state: "visible", timeout: 5000 });
-    console.log(`[Action] Opened edit dialog for category "${categoryName}"`);
-});
-
-When(
-    "I change the category name to {string}",
-    async ({ page }, newName: string) => {
-        getScenarioState(page).setCustom("newCategoryName", newName);
-        // Use data-testid for the name input
-        const dialog = page
-            .locator('[data-testid="category-dialog"], .p-dialog')
-            .first();
-        const nameInput = dialog.locator(
-            '[data-testid="category-name-input"], #categoryName',
-        );
-        await nameInput.waitFor({ state: "visible", timeout: 5000 });
-        await nameInput.clear();
-        await nameInput.fill(newName);
-        console.log(`[Action] Changed category name to "${newName}"`);
-    },
-);
-
-When("I save the category changes", async ({ page }) => {
-    // Use data-testid for save button
-    const dialog = page
-        .locator('[data-testid="category-dialog"], .p-dialog')
-        .first();
-    const saveButton = dialog.locator(
-        '[data-testid="category-dialog-save"], button:has-text("Save")',
-    );
-    await saveButton.click();
-
-    // Wait for dialog to close with fallback
-    const closed = await dialog
-        .waitFor({ state: "hidden", timeout: 15000 })
-        .then(() => true)
-        .catch(() => false);
-
-    if (!closed) {
-        console.log(
-            "[Action] Category dialog did not close, falling back to API rename",
-        );
-        // Close dialog manually
-        await page.keyboard.press("Escape");
-        await dialog
-            .waitFor({ state: "hidden", timeout: 5000 })
-            .catch(() => {});
-
-        // API fallback: rename the category directly
-        const editingName = getScenarioState(page).getCustom<string>(
-            "editingCategoryName",
-        );
-        const newCatName =
-            getScenarioState(page).getCustom<string>("newCategoryName");
-        if (editingName && newCatName) {
-            const oldName = editingName;
-            const newName = newCatName;
-
-            // Get current categories
-            const listResp = await page.request.get(
-                `${API_BASE}/sprite-categories`,
-            );
-            if (listResp.ok()) {
-                const data = await listResp.json();
-                const categories = data.categories || data || [];
-
-                // Delete any existing category with the target name (conflict)
-                const existing = categories.find(
-                    (c: any) => c.name === newName,
-                );
-                if (existing) {
-                    console.log(
-                        `[Cleanup] Deleting existing category "${newName}" (ID: ${existing.id})`,
-                    );
-                    await page.request
-                        .delete(`${API_BASE}/sprite-categories/${existing.id}`)
-                        .catch(() => {});
-                }
-
-                // Find the category to rename
-                const source = categories.find((c: any) => c.name === oldName);
-                if (source) {
-                    const putResp = await page.request.put(
-                        `${API_BASE}/sprite-categories/${source.id}`,
-                        {
-                            data: {
-                                name: newName,
-                                description: source.description || "",
-                            },
-                        },
-                    );
-                    if (putResp.ok()) {
-                        console.log(
-                            `[Action] Renamed category "${oldName}" → "${newName}" via API`,
-                        );
-                    } else {
-                        console.log(
-                            `[Warning] API rename failed: ${putResp.status()} ${await putResp.text()}`,
-                        );
-                    }
-                } else {
-                    console.log(
-                        `[Warning] Category "${oldName}" not found via API`,
-                    );
-                }
-            }
-        }
-
-        // Reload page to reflect API changes
-        await page.reload({ waitUntil: "domcontentloaded" });
-    }
-    console.log("[Action] Saved category changes");
-});
-
-When(
-    "I delete the category {string}",
-    async ({ page }, categoryName: string) => {
-        // Ensure no dialog is blocking
-        await page.keyboard.press("Escape");
-        await page
-            .locator(".p-dialog")
-            .waitFor({ state: "hidden", timeout: 5000 })
-            .catch(() => {});
-
-        // First select the category tab
-        const categoryTab = page
-            .locator(".category-tab")
-            .filter({ hasText: categoryName });
-        await categoryTab.waitFor({ state: "visible", timeout: 5000 });
-        await categoryTab.click();
-
-        // Click the delete (trash) button on the category tab
-        const deleteButton = categoryTab.locator("button:has(.pi-trash)");
-        await deleteButton.waitFor({ state: "visible", timeout: 5000 });
-        await deleteButton.click();
-
-        // Confirm deletion in dialog
-        const confirmDialog = page.locator(".p-confirm-dialog, .p-dialog");
-        await confirmDialog.waitFor({ state: "visible", timeout: 5000 });
-
-        const confirmButton = confirmDialog.locator(
-            "button.p-button-danger, button:has-text('Yes'), button:has-text('Delete')",
-        );
-        await confirmButton.click();
-
-        // Wait for dialog to close reactively
-        await confirmDialog.waitFor({ state: "hidden", timeout: 10000 });
-        await page.waitForLoadState("domcontentloaded");
-
-        console.log(`[Action] Deleted category "${categoryName}"`);
     },
 );
 

@@ -32,6 +32,74 @@ export interface ClosedWindowEntry {
   state: WindowState
 }
 
+// ─── Persisted-state migrations ──────────────────────────────────────
+
+/**
+ * v0 → v1: the 'textureSets' tab type was split into 'globalMaterials' and
+ * 'modelTextures'; the legacy type is gone from the TabType union, so any
+ * tab of that type still sitting in persisted navigation state (open tabs,
+ * recently closed tabs, archived windows) is rewritten to 'modelTextures' —
+ * the successor of the original texture-set list.
+ */
+function migrateLegacyTab(tab: Tab): Tab {
+  if ((tab.type as string) !== 'textureSets') return tab
+  return {
+    ...tab,
+    type: 'modelTextures',
+    // Singleton list tabs use id === type (openTab dedupe relies on it), so
+    // the id moves with the type.
+    id: tab.id === 'textureSets' ? 'modelTextures' : tab.id,
+    label: tab.label === 'Texture Sets' ? 'Multi-Model Textures' : tab.label,
+  }
+}
+
+function migrateWindowState(window: WindowState): WindowState {
+  // If a window somehow holds both the legacy tab and a real modelTextures
+  // tab, keep the legacy id to avoid a duplicate React key; it still renders.
+  const hasModelTextures = window.tabs.some(t => t.id === 'modelTextures')
+  const remapId = (id: string | null) =>
+    id === 'textureSets' && !hasModelTextures ? 'modelTextures' : id
+  const tabs = window.tabs.map(tab => {
+    const migrated = migrateLegacyTab(tab)
+    return hasModelTextures && tab.id === 'textureSets'
+      ? { ...migrated, id: tab.id }
+      : migrated
+  })
+  return {
+    ...window,
+    tabs,
+    activeTabId: remapId(window.activeTabId),
+    activeRightTabId: remapId(window.activeRightTabId),
+  }
+}
+
+/** Exported for tests. */
+export function migrateNavigationState(
+  persisted: unknown,
+  version: number
+): unknown {
+  if (version >= 1 || persisted == null) return persisted
+  const state = persisted as {
+    activeWindows?: Record<string, WindowState>
+    recentlyClosedTabs?: Tab[]
+    recentlyClosedWindows?: ClosedWindowEntry[]
+  }
+  return {
+    ...state,
+    activeWindows: Object.fromEntries(
+      Object.entries(state.activeWindows ?? {}).map(([id, win]) => [
+        id,
+        migrateWindowState(win),
+      ])
+    ),
+    recentlyClosedTabs: (state.recentlyClosedTabs ?? []).map(migrateLegacyTab),
+    recentlyClosedWindows: (state.recentlyClosedWindows ?? []).map(entry => ({
+      ...entry,
+      state: migrateWindowState(entry.state),
+    })),
+  }
+}
+
 /** Messages sent over BroadcastChannel */
 export type NavigationBroadcast =
   | { type: 'TAB_CLOSED'; windowId: string; tab: Tab }
@@ -153,8 +221,6 @@ export function getTabLabel(
     case 'modelViewer':
       if (modelName) return modelName
       return modelId ? `Model ${modelId}` : 'Model Viewer'
-    case 'textureSets':
-      return 'Texture Sets'
     case 'globalMaterials':
       return 'Global Materials'
     case 'modelTextures':
@@ -763,6 +829,8 @@ export const useNavigationStore = create<NavigationStore>()(
     {
       name: STORAGE_KEY,
       storage: createJSONStorage(() => localStorage),
+      version: 1,
+      migrate: migrateNavigationState,
       // Only persist what's needed; exclude transient function references
       partialize: state => ({
         activeWindows: state.activeWindows,

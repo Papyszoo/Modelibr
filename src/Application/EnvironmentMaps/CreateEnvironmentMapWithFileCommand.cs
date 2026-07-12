@@ -1,4 +1,5 @@
 using Application.Abstractions.Files;
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
@@ -19,6 +20,7 @@ internal sealed class CreateEnvironmentMapWithFileCommandHandler : ICommandHandl
     private readonly ISettingRepository _settingRepository;
     private readonly IThumbnailQueue _thumbnailQueue;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public CreateEnvironmentMapWithFileCommandHandler(
         IEnvironmentMapRepository environmentMapRepository,
@@ -27,7 +29,8 @@ internal sealed class CreateEnvironmentMapWithFileCommandHandler : ICommandHandl
         IEnvironmentMapSizeLabelService sizeLabelService,
         ISettingRepository settingRepository,
         IThumbnailQueue thumbnailQueue,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _environmentMapRepository = environmentMapRepository;
         _batchUploadRepository = batchUploadRepository;
@@ -36,6 +39,7 @@ internal sealed class CreateEnvironmentMapWithFileCommandHandler : ICommandHandl
         _settingRepository = settingRepository;
         _thumbnailQueue = thumbnailQueue;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<CreateEnvironmentMapWithFileResponse>> Handle(CreateEnvironmentMapWithFileCommand command, CancellationToken cancellationToken)
@@ -69,6 +73,7 @@ internal sealed class CreateEnvironmentMapWithFileCommandHandler : ICommandHandl
                             command.ProjectId,
                             existing.Id),
                         cancellationToken);
+                    await _unitOfWork.SaveChangesAsync(cancellationToken);
                 }
 
                 var existingVariant = existing.Variants.First(v =>
@@ -112,9 +117,13 @@ internal sealed class CreateEnvironmentMapWithFileCommandHandler : ICommandHandl
             environmentMap.AddVariant(variant, now);
 
             var created = await _environmentMapRepository.AddAsync(environmentMap, cancellationToken);
+            // Commit immediately: created.Id / variant.Id are database-assigned and
+            // are needed below by SetPreviewVariant and the thumbnail-job enqueue.
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             created.SetPreviewVariant(variant.Id, now);
             await _environmentMapRepository.UpdateAsync(created, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             await _thumbnailQueue.EnqueueEnvironmentMapThumbnailAsync(created.Id, variant.Id, cancellationToken: cancellationToken);
 
@@ -129,6 +138,7 @@ internal sealed class CreateEnvironmentMapWithFileCommandHandler : ICommandHandl
                         command.ProjectId,
                         created.Id),
                     cancellationToken);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
             }
 
             return Result.Success(new CreateEnvironmentMapWithFileResponse(

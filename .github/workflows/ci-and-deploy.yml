@@ -50,6 +50,25 @@ jobs:
                       worker:
                         - 'src/asset-processor/**'
 
+    docs-audit:
+        name: Docs Audit
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v5
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v5
+              with:
+                  node-version: "20"
+
+            # Zero-dependency script: no npm install needed. Fails when
+            # user-facing docs contradict code facts (formats, tab types,
+            # ports, video manifest). See scripts/docs-audit/index.mjs.
+            - name: Audit docs against code
+              run: npm run docs:audit
+
     backend-tests:
         name: Backend Unit Tests
         runs-on: ubuntu-latest

@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Services;
@@ -9,13 +10,16 @@ internal class SoftDeleteSpriteCommandHandler : ICommandHandler<SoftDeleteSprite
 {
     private readonly ISpriteRepository _spriteRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public SoftDeleteSpriteCommandHandler(
         ISpriteRepository spriteRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _spriteRepository = spriteRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(SoftDeleteSpriteCommand command, CancellationToken cancellationToken)
@@ -35,6 +39,7 @@ internal class SoftDeleteSpriteCommandHandler : ICommandHandler<SoftDeleteSprite
 
         sprite.SoftDelete(_dateTimeProvider.UtcNow);
         await _spriteRepository.UpdateAsync(sprite, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success();
     }

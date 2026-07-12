@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using SharedKernel;
@@ -15,10 +16,12 @@ public record HardDeleteTextureSetResponse(bool Success, string Message);
 internal sealed class HardDeleteTextureSetCommandHandler : ICommandHandler<HardDeleteTextureSetCommand, HardDeleteTextureSetResponse>
 {
     private readonly ITextureSetRepository _textureSetRepository;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public HardDeleteTextureSetCommandHandler(ITextureSetRepository textureSetRepository)
+    public HardDeleteTextureSetCommandHandler(ITextureSetRepository textureSetRepository, IUnitOfWork unitOfWork)
     {
         _textureSetRepository = textureSetRepository;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<HardDeleteTextureSetResponse>> Handle(HardDeleteTextureSetCommand request, CancellationToken cancellationToken)
@@ -34,6 +37,7 @@ internal sealed class HardDeleteTextureSetCommandHandler : ICommandHandler<HardD
         // Hard delete - removes the texture set and its textures from database
         // but does NOT delete the actual file from storage since it's being used elsewhere
         await _textureSetRepository.HardDeleteAsync(request.TextureSetId, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new HardDeleteTextureSetResponse(true, "Texture set deleted successfully"));
     }

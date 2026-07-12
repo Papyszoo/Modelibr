@@ -7,6 +7,7 @@ import { type QueryConfig } from '@/lib/react-query'
 import {
   getModelById,
   getModelCategories,
+  getModelCategoryCounts,
   getModelsPaginated,
   getModelTags,
 } from './modelApi'
@@ -124,6 +125,20 @@ export function getModelCategoriesQueryOptions() {
     queryKey: ['model-categories'] as const,
     queryFn: () => getModelCategories(),
   })
+}
+
+// True per-category counts for the sidebar badges. Keyed UNDER ['models'] so
+// any invalidateQueries(['models']) — upload, recycle, move, refresh — also
+// refreshes the counts; no extra invalidation wiring needed at mutation sites.
+export function getModelCategoryCountsQueryOptions() {
+  return queryOptions({
+    queryKey: ['models', 'category-counts'] as const,
+    queryFn: () => getModelCategoryCounts(),
+  })
+}
+
+export function useModelCategoryCountsQuery() {
+  return useQuery(getModelCategoryCountsQueryOptions())
 }
 
 type UseModelCategoriesQueryOptions = {

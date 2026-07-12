@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Services;
@@ -10,15 +11,18 @@ internal sealed class RemoveEnvironmentMapFromProjectCommandHandler : ICommandHa
     private readonly IProjectRepository _projectRepository;
     private readonly IEnvironmentMapRepository _environmentMapRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public RemoveEnvironmentMapFromProjectCommandHandler(
         IProjectRepository projectRepository,
         IEnvironmentMapRepository environmentMapRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _projectRepository = projectRepository;
         _environmentMapRepository = environmentMapRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(RemoveEnvironmentMapFromProjectCommand command, CancellationToken cancellationToken)
@@ -33,6 +37,7 @@ internal sealed class RemoveEnvironmentMapFromProjectCommandHandler : ICommandHa
 
         project.RemoveEnvironmentMap(environmentMap, _dateTimeProvider.UtcNow);
         await _projectRepository.UpdateAsync(project, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }
 }

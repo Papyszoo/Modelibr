@@ -1,6 +1,7 @@
 import { client } from '@/lib/apiBase'
 
 import {
+  getModelCategoryCounts,
   getModels,
   getModelsPaginated,
   setDefaultTextureSet,
@@ -76,6 +77,46 @@ describe('getModelsPaginated query serialization', () => {
     expect(url).toContain('searchName=car')
     expect(url).not.toContain('packIds')
     expect(url).not.toContain('minTriangleCount')
+  })
+
+  it('sends uncategorized=true and drops categoryId for the Unassigned bucket', async () => {
+    // The Unassigned sidebar bucket scopes server-side via `uncategorized`;
+    // a stray categoryId alongside it would let the backend ignore the flag.
+    await getModelsPaginated({
+      page: 1,
+      pageSize: 50,
+      uncategorized: true,
+      categoryIds: [5],
+    })
+    const url = lastGetUrl()
+    expect(url).toContain('uncategorized=true')
+    expect(url).not.toContain('categoryId=')
+  })
+
+  it('sends a single categoryId (real bucket) without the uncategorized flag', async () => {
+    await getModelsPaginated({ page: 1, pageSize: 50, categoryIds: [5] })
+    const url = lastGetUrl()
+    expect(url).toContain('categoryId=5')
+    expect(url).not.toContain('uncategorized')
+  })
+})
+
+describe('getModelCategoryCounts', () => {
+  it('reads the counts endpoint and unwraps the response body', async () => {
+    // Regression: the sidebar badges read true totals from this endpoint, not
+    // loaded-page scans — the URL and unwrapping must stay stable.
+    mockGet.mockResolvedValue({
+      data: {
+        categories: [{ categoryId: 5, count: 3 }],
+        uncategorizedCount: 2,
+        totalCount: 5,
+      },
+    })
+    const result = await getModelCategoryCounts()
+    expect(lastGetUrl()).toBe('/model-categories/counts')
+    expect(result.uncategorizedCount).toBe(2)
+    expect(result.totalCount).toBe(5)
+    expect(result.categories).toEqual([{ categoryId: 5, count: 3 }])
   })
 })
 

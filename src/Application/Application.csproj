@@ -9,6 +9,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Infrastructure.Tests" />
     <InternalsVisibleTo Include="Application.Tests" />
+    <InternalsVisibleTo Include="WebApi.Tests" />
   </ItemGroup>
 
   <ItemGroup>

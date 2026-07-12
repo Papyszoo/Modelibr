@@ -5,11 +5,7 @@ export {
   DEFAULT_ENV_MAP_LIST_VIEW_STATE,
   useEnvironmentMapListViewStore,
 } from './environmentMapListViewStore'
-export type {
-  ModelListViewState,
-  PersistedModelCategorySelectionKeys,
-  PersistedModelCategorySelectionState,
-} from './modelListViewStore'
+export type { ModelListViewState } from './modelListViewStore'
 export {
   DEFAULT_MODEL_LIST_VIEW_STATE,
   useModelListViewStore,

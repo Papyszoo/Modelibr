@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Models;
@@ -10,13 +11,16 @@ internal class CreateProjectCommandHandler : ICommandHandler<CreateProjectComman
 {
     private readonly IProjectRepository _projectRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public CreateProjectCommandHandler(
         IProjectRepository projectRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _projectRepository = projectRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<CreateProjectResponse>> Handle(CreateProjectCommand command, CancellationToken cancellationToken)
@@ -36,6 +40,7 @@ internal class CreateProjectCommandHandler : ICommandHandler<CreateProjectComman
 
             var savedProject = await _projectRepository.AddAsync(project, cancellationToken);
 
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
             return Result.Success(new CreateProjectResponse(savedProject.Id, savedProject.Name, savedProject.Description, savedProject.Notes));
         }
         catch (ArgumentException ex)

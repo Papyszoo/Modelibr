@@ -20,7 +20,6 @@ internal sealed class SoundRepository : ISoundRepository
             throw new ArgumentNullException(nameof(sound));
 
         var entityEntry = await _context.Sounds.AddAsync(sound, cancellationToken);
-        await _context.SaveChangesAsync(cancellationToken);
         
         return entityEntry.Entity;
     }
@@ -175,15 +174,14 @@ internal sealed class SoundRepository : ISoundRepository
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<Sound> UpdateAsync(Sound sound, CancellationToken cancellationToken = default)
+    public Task<Sound> UpdateAsync(Sound sound, CancellationToken cancellationToken = default)
     {
         if (sound == null)
             throw new ArgumentNullException(nameof(sound));
 
-        _context.Sounds.Update(sound);
-        await _context.SaveChangesAsync(cancellationToken);
-        
-        return sound;
+        _context.UpdateIfDetached(sound);
+
+        return Task.FromResult(sound);
     }
 
     public async Task DeleteAsync(int id, CancellationToken cancellationToken = default)
@@ -196,7 +194,6 @@ internal sealed class SoundRepository : ISoundRepository
         if (sound != null)
         {
             _context.Sounds.Remove(sound);
-            await _context.SaveChangesAsync(cancellationToken);
         }
     }
 }

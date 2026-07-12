@@ -94,7 +94,7 @@ GivenBdd(
 ThenBdd("I take a screenshot of the texture sets list", async ({ page }) => {
     // Navigate to texture sets via UI
     const { navigateToTab } = await import("../helpers/navigation-helper");
-    await navigateToTab(page, "textureSets");
+    await navigateToTab(page, "modelTextures");
     // Wait for texture sets page to fully load
     await page.waitForLoadState("domcontentloaded");
     await takeScreenshotToReport(
@@ -129,7 +129,7 @@ ThenBdd(
     async ({ page }) => {
         // Navigate to texture sets and verify not visible
         const { navigateToTab } = await import("../helpers/navigation-helper");
-        await navigateToTab(page, "textureSets");
+        await navigateToTab(page, "modelTextures");
         // Wait for texture sets page to fully load
         await page.waitForLoadState("domcontentloaded");
 
@@ -243,7 +243,7 @@ ThenBdd(
 
 WhenBdd("I navigate to the Texture Sets page", async ({ page }) => {
     const { navigateToTab } = await import("../helpers/navigation-helper");
-    await navigateToTab(page, "textureSets");
+    await navigateToTab(page, "modelTextures");
     // Wait for texture sets page to fully load
     await page.waitForLoadState("domcontentloaded");
     console.log("[Navigation] Navigated to Texture Sets page");
@@ -261,20 +261,8 @@ ThenBdd(
                 );
             });
 
-        // Switch to Multi-Model tab (default tab is now Global Materials)
-        const msTab = page
-            .locator(".kind-filter-select .p-button")
-            .filter({ hasText: "Multi-Model" });
-        await msTab.waitFor({ state: "visible", timeout: 10000 });
-        const isActive = await msTab.evaluate((el: Element) =>
-            el.classList.contains("p-highlight"),
-        );
-        if (!isActive) {
-            await msTab.click();
-            // Block until the new tab's data has resolved instead of
-            // sleeping 500ms and hoping the debounced fetch finished.
-            await waitForCountLabelStable(page);
-        }
+        // Navigation lands directly on the kind-locked Multi-Model
+        // Textures tab — the in-page kind switcher no longer exists.
 
         // The grid is virtualized — only cards in the visible viewport
         // are rendered. Narrow via the toolbar search so the card is

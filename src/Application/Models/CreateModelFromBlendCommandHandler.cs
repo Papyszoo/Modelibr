@@ -1,7 +1,7 @@
 using Application.Abstractions.Files;
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
-using Application.Abstractions.Services;
 using Application.Services;
 using Domain.Models;
 using Domain.Services;
@@ -16,23 +16,23 @@ internal class CreateModelFromBlendCommandHandler : ICommandHandler<CreateModelF
     private readonly IModelVersionRepository _versionRepository;
     private readonly IFileCreationService _fileCreationService;
     private readonly IDateTimeProvider _dateTimeProvider;
-    private readonly IDomainEventDispatcher _domainEventDispatcher;
     private readonly ISettingRepository _settingRepository;
+    private readonly IUnitOfWork _unitOfWork;
 
     public CreateModelFromBlendCommandHandler(
         IModelRepository modelRepository,
         IModelVersionRepository versionRepository,
         IFileCreationService fileCreationService,
         IDateTimeProvider dateTimeProvider,
-        IDomainEventDispatcher domainEventDispatcher,
-        ISettingRepository settingRepository)
+        ISettingRepository settingRepository,
+        IUnitOfWork unitOfWork)
     {
         _modelRepository = modelRepository;
         _versionRepository = versionRepository;
         _fileCreationService = fileCreationService;
         _dateTimeProvider = dateTimeProvider;
-        _domainEventDispatcher = domainEventDispatcher;
         _settingRepository = settingRepository;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<CreateModelFromBlendResponse>> Handle(
@@ -78,24 +78,31 @@ internal class CreateModelFromBlendCommandHandler : ICommandHandler<CreateModelF
         try
         {
             var model = Model.Create(modelName, _dateTimeProvider.UtcNow);
-            var savedModel = await _modelRepository.AddAsync(model, cancellationToken);
 
-            // Create version 1
+            // Commit the model BEFORE CreateVersion: the first version sets
+            // Model.ActiveVersion, and two still-Added entities hit the circular
+            // Model.ActiveVersionId <-> ModelVersion.ModelId FK dependency in one save.
+            var savedModel = await _modelRepository.AddAsync(model, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+            // Create version 1. Commit right away: version.Id is copied into a raw
+            // scalar FK (SetModelVersion) and into the ModelUploadedEvent below, and
+            // savedModel.Id goes into the response — both need real ids.
             var version = savedModel.CreateVersion("Initial version", _dateTimeProvider.UtcNow);
             version.AddFile(fileEntity);
             await _versionRepository.AddAsync(version, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             fileEntity.SetModelVersion(version.Id);
-            await _modelRepository.UpdateAsync(savedModel, cancellationToken);
 
-            // Always dispatch ModelUploadedEvent for .blend — asset-processor will convert
+            // Always raise ModelUploadedEvent for .blend — asset-processor will convert.
+            // Must happen before the SaveChanges below: the save pipeline dispatches
+            // whatever events are on the aggregate at that point (see
+            // DomainEventsInterceptor); no manual publish here.
             savedModel.RaiseModelUploadedEvent(version.Id, fileEntity.Sha256Hash, true);
 
-            if (savedModel.DomainEvents.Any())
-            {
-                await _domainEventDispatcher.PublishAsync(savedModel.DomainEvents, cancellationToken);
-                savedModel.ClearDomainEvents();
-            }
+            await _modelRepository.UpdateAsync(savedModel, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             return Result.Success(new CreateModelFromBlendResponse(savedModel.Id, false));
         }

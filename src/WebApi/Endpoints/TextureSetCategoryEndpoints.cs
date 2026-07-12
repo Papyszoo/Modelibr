@@ -10,6 +10,7 @@ public static class TextureSetCategoryEndpoints
     public static void MapTextureSetCategoryEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapGet("/texture-set-categories", GetAllCategories).WithName("Get All Texture Set Categories").WithOpenApi();
+        app.MapGet("/texture-set-categories/counts", GetCategoryCounts).WithName("Get Texture Set Category Counts").WithOpenApi();
         app.MapPost("/texture-set-categories", CreateCategory).WithName("Create Texture Set Category").WithOpenApi();
         app.MapPut("/texture-set-categories/{id}", UpdateCategory).WithName("Update Texture Set Category").WithOpenApi();
         app.MapDelete("/texture-set-categories/{id}", DeleteCategory).WithName("Delete Texture Set Category").WithOpenApi();
@@ -21,6 +22,17 @@ public static class TextureSetCategoryEndpoints
         CancellationToken cancellationToken)
     {
         var result = await queryHandler.Handle(new GetAllTextureSetCategoriesQuery(kind), cancellationToken);
+        return result.IsSuccess
+            ? Results.Ok(result.Value)
+            : Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+    }
+
+    private static async Task<IResult> GetCategoryCounts(
+        [FromQuery] TextureSetKind kind,
+        IQueryHandler<GetTextureSetCategoryCountsQuery, Application.Categories.CategoryCountsResponse> queryHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await queryHandler.Handle(new GetTextureSetCategoryCountsQuery(kind), cancellationToken);
         return result.IsSuccess
             ? Results.Ok(result.Value)
             : Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });

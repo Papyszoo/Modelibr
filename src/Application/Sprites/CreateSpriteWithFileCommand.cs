@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Files;
@@ -18,6 +19,7 @@ internal class CreateSpriteWithFileCommandHandler : ICommandHandler<CreateSprite
     private readonly IFileCreationService _fileCreationService;
     private readonly ISettingRepository _settingRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public CreateSpriteWithFileCommandHandler(
         ISpriteRepository spriteRepository,
@@ -25,7 +27,8 @@ internal class CreateSpriteWithFileCommandHandler : ICommandHandler<CreateSprite
         IBatchUploadRepository batchUploadRepository,
         IFileCreationService fileCreationService,
         ISettingRepository settingRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _spriteRepository = spriteRepository;
         _spriteCategoryRepository = spriteCategoryRepository;
@@ -33,6 +36,7 @@ internal class CreateSpriteWithFileCommandHandler : ICommandHandler<CreateSprite
         _fileCreationService = fileCreationService;
         _settingRepository = settingRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<CreateSpriteWithFileResponse>> Handle(CreateSpriteWithFileCommand command, CancellationToken cancellationToken)
@@ -78,6 +82,7 @@ internal class CreateSpriteWithFileCommandHandler : ICommandHandler<CreateSprite
                         spriteId: existingSprite.Id);
 
                     await _batchUploadRepository.AddAsync(batchUpload, cancellationToken);
+                    await _unitOfWork.SaveChangesAsync(cancellationToken);
                 }
 
                 return Result.Success(new CreateSpriteWithFileResponse(
@@ -116,6 +121,9 @@ internal class CreateSpriteWithFileCommandHandler : ICommandHandler<CreateSprite
                 command.CategoryId);
 
             var createdSprite = await _spriteRepository.AddAsync(sprite, cancellationToken);
+            // Commit now: the sprite's real database-assigned id feeds the BatchUpload
+            // raw scalar and the response below.
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             // 6. Track batch upload if batchId provided
             if (!string.IsNullOrWhiteSpace(command.BatchId))
@@ -132,6 +140,7 @@ internal class CreateSpriteWithFileCommandHandler : ICommandHandler<CreateSprite
                     spriteId: createdSprite.Id);
 
                 await _batchUploadRepository.AddAsync(batchUpload, cancellationToken);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
             }
 
             return Result.Success(new CreateSpriteWithFileResponse(

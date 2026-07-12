@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Services;
@@ -9,13 +10,16 @@ internal class UpdateProjectCommandHandler : ICommandHandler<UpdateProjectComman
 {
     private readonly IProjectRepository _projectRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public UpdateProjectCommandHandler(
         IProjectRepository projectRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _projectRepository = projectRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(UpdateProjectCommand command, CancellationToken cancellationToken)
@@ -43,6 +47,7 @@ internal class UpdateProjectCommandHandler : ICommandHandler<UpdateProjectComman
 
             await _projectRepository.UpdateAsync(project, cancellationToken);
 
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
             return Result.Success();
         }
         catch (ArgumentException ex)

@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Files;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
@@ -15,17 +16,20 @@ namespace Application.Files
         private readonly IFilePersistence _filePersistence;
         private readonly IBatchUploadRepository _batchUploadRepository;
         private readonly IDateTimeProvider _dateTimeProvider;
+        private readonly IUnitOfWork _unitOfWork;
 
         public UploadFileCommandHandler(
             IFileCreationService fileCreationService,
             IFilePersistence filePersistence,
             IBatchUploadRepository batchUploadRepository,
-            IDateTimeProvider dateTimeProvider)
+            IDateTimeProvider dateTimeProvider,
+            IUnitOfWork unitOfWork)
         {
             _fileCreationService = fileCreationService;
             _filePersistence = filePersistence;
             _batchUploadRepository = batchUploadRepository;
             _dateTimeProvider = dateTimeProvider;
+            _unitOfWork = unitOfWork;
         }
 
         public async Task<Result<UploadFileCommandResponse>> Handle(UploadFileCommand command, CancellationToken cancellationToken)
@@ -51,8 +55,11 @@ namespace Application.Files
             var fileEntity = fileResult.Value;
             bool alreadyExists = fileEntity.Id != 0;
 
-            // Persist the file to the database if it's new
+            // Persist the file to the database if it's new. Commit immediately:
+            // fileEntity.Id is database-assigned and is needed below for the
+            // BatchUpload FK and the response.
             await _filePersistence.PersistAsync(fileEntity, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             // Always track batch upload - generate batch ID if not provided
             var batchId = command.BatchId ?? Guid.NewGuid().ToString();
@@ -80,6 +87,7 @@ namespace Application.Files
                 textureSetId: command.TextureSetId);
             
             await _batchUploadRepository.AddAsync(batchUpload, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             return Result.Success(new UploadFileCommandResponse(fileEntity.Id, alreadyExists));
         }

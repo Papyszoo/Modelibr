@@ -6,7 +6,7 @@ import {
     narrowVirtualisedList,
     waitForCountLabelStable,
 } from "../helpers/list-toolbar-helper";
-import { navigateToTab } from "../helpers/navigation-helper";
+import { isTabActive, navigateToTab } from "../helpers/navigation-helper";
 import { TextureSetsPage } from "../pages/TextureSetsPage";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -36,54 +36,47 @@ When("I reload the page", async ({ page }) => {
     const textureSetsPage = new TextureSetsPage(page);
     await page.reload();
     await textureSetsPage.waitForList();
-    // Wait for kind filter tabs to initialize (nuqs URL state sync)
-    await page.waitForSelector(".kind-filter-select .p-button.p-highlight", {
-        timeout: 5000,
-    });
 });
 
 When("I navigate away and return to texture sets", async ({ page }) => {
     // Navigate to a different tab, then back
     await navigateToTab(page, "modelList");
     await page.waitForTimeout(500);
-    await navigateToTab(page, "textureSets");
+    await navigateToTab(page, "modelTextures");
     await new TextureSetsPage(page).waitForList();
 });
 
 // ── Kind Tab Interactions ─────────────────────────────────────────────
+// The in-page kind switcher shipped only on the combined textureSets view,
+// which was removed when the page split into Global Materials and
+// Multi-Model Textures. "Kind tabs" now map to the two real app tabs.
+
+const KIND_TAB_TYPES: Record<string, string> = {
+    "Global Materials": "globalMaterials",
+    "Multi-Model": "modelTextures",
+};
+
+function kindTabType(tabName: string): string {
+    const type = KIND_TAB_TYPES[tabName];
+    if (!type) throw new Error(`Unknown kind tab "${tabName}"`);
+    return type;
+}
 
 Then(
     "the {string} kind tab should be active",
     async ({ page }, tabName: string) => {
-        // The active kind tab button has the 'p-highlight' class
-        const tabButton = page
-            .locator(`.kind-filter-select .p-button`)
-            .filter({ hasText: tabName });
-
-        await expect(tabButton).toBeVisible({ timeout: 5000 });
-        await expect(tabButton).toHaveClass(/p-highlight/, { timeout: 5000 });
+        expect(await isTabActive(page, kindTabType(tabName), "left")).toBe(
+            true,
+        );
     },
 );
 
 When("I switch to the {string} kind tab", async ({ page }, tabName: string) => {
-    const tabButton = page
-        .locator(`.kind-filter-select .p-button`)
-        .filter({ hasText: tabName });
-
-    await expect(tabButton).toBeVisible({ timeout: 5000 });
-
-    // Only click if this tab is not already active
-    const isActive = await tabButton.evaluate((el: Element) =>
-        el.classList.contains("p-highlight"),
-    );
-    if (!isActive) {
-        await tabButton.click();
-        // Wait deterministically for the grid's data query to resolve.
-        // The toolbar stays mounted across the loading cycle, so an
-        // immediate `getCardByName` read would see whatever cards the
-        // grid happens to be showing right now.
-        await waitForCountLabelStable(page);
-    }
+    await navigateToTab(page, kindTabType(tabName));
+    await new TextureSetsPage(page).waitForList();
+    // Wait deterministically for the grid's data query to resolve before
+    // any card assertions read the grid.
+    await waitForCountLabelStable(page);
 });
 
 // ── Create Texture Sets via API ───────────────────────────────────────

@@ -31,18 +31,16 @@ public class TextureProxyRepository : ITextureProxyRepository
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<TextureProxy> AddAsync(TextureProxy proxy, CancellationToken cancellationToken = default)
+    public Task<TextureProxy> AddAsync(TextureProxy proxy, CancellationToken cancellationToken = default)
     {
         _context.TextureProxies.Add(proxy);
-        await _context.SaveChangesAsync(cancellationToken);
-        return proxy;
+        return Task.FromResult(proxy);
     }
 
-    public async Task<TextureProxy> UpdateAsync(TextureProxy proxy, CancellationToken cancellationToken = default)
+    public Task<TextureProxy> UpdateAsync(TextureProxy proxy, CancellationToken cancellationToken = default)
     {
-        _context.TextureProxies.Update(proxy);
-        await _context.SaveChangesAsync(cancellationToken);
-        return proxy;
+        _context.UpdateIfDetached(proxy);
+        return Task.FromResult(proxy);
     }
 
     public async Task DeleteByTextureIdAsync(int textureId, CancellationToken cancellationToken = default)
@@ -54,7 +52,6 @@ public class TextureProxyRepository : ITextureProxyRepository
         if (proxies.Count > 0)
         {
             _context.TextureProxies.RemoveRange(proxies);
-            await _context.SaveChangesAsync(cancellationToken);
         }
     }
 }

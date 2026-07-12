@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
 using Application.Thumbnails;
@@ -17,6 +18,7 @@ public class RegenerateThumbnailCommandHandlerTests
     private readonly Mock<IThumbnailRepository> _mockThumbnailRepository;
     private readonly Mock<IThumbnailQueue> _mockThumbnailQueue;
     private readonly Mock<IDateTimeProvider> _mockDateTimeProvider;
+    private readonly Mock<IUnitOfWork> _mockUnitOfWork = new();
     private readonly RegenerateThumbnailCommandHandler _handler;
 
     private const string ValidHash = "a1b2c3d4e5f6789012345678901234567890123456789012345678901234abcd";
@@ -32,7 +34,8 @@ public class RegenerateThumbnailCommandHandlerTests
             _mockModelRepository.Object,
             _mockThumbnailRepository.Object,
             _mockThumbnailQueue.Object,
-            _mockDateTimeProvider.Object);
+            _mockDateTimeProvider.Object,
+            _mockUnitOfWork.Object);
     }
 
     [Fact]

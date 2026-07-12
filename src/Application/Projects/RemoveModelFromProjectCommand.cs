@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Services;
@@ -10,15 +11,18 @@ internal class RemoveModelFromProjectCommandHandler : ICommandHandler<RemoveMode
     private readonly IProjectRepository _projectRepository;
     private readonly IModelRepository _modelRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public RemoveModelFromProjectCommandHandler(
         IProjectRepository projectRepository,
         IModelRepository modelRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _projectRepository = projectRepository;
         _modelRepository = modelRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(RemoveModelFromProjectCommand command, CancellationToken cancellationToken)
@@ -43,6 +47,7 @@ internal class RemoveModelFromProjectCommandHandler : ICommandHandler<RemoveMode
 
         await _projectRepository.UpdateAsync(project, cancellationToken);
 
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }
 }

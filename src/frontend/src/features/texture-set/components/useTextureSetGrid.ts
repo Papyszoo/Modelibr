@@ -13,12 +13,17 @@ import {
   createTextureSet,
   createTextureSetWithFile,
   getAllTextureSetCategories,
+  getTextureSetCategoryCounts,
   getTextureSetsPaginated,
 } from '@/features/texture-set/api/textureSetApi'
 import { useUploadProgress } from '@/hooks/useUploadProgress'
 import { useDebouncedValue } from '@/shared/hooks'
 import { useDragAndDrop } from '@/shared/hooks/useFileUpload'
-import { type CategorySelectionKeys } from '@/shared/types/categories'
+import {
+  isRealCategoryId,
+  toCategoryCountMap,
+  UNASSIGNED_CATEGORY_ID,
+} from '@/shared/types/categories'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
 import {
   DEFAULT_TEXTURE_SET_LIST_VIEW_STATE,
@@ -94,17 +99,13 @@ export function useTextureSetGrid({
     queryKey: ['textureSetCategories', categoriesKind],
     queryFn: () => getAllTextureSetCategories(categoriesKind),
   })
-
-  // --- Derived filter state ---
-
-  const selectedCategoryIds = useMemo(
-    () =>
-      Object.entries(viewState.selectedCategoryKeys)
-        .filter(([, state]) => state?.checked)
-        .map(([key]) => Number(key))
-        .filter(Number.isFinite),
-    [viewState.selectedCategoryKeys]
-  )
+  // Server-computed true totals for the sidebar badges. Keyed UNDER
+  // ['textureSets'] so any invalidateQueries(['textureSets']) also refreshes
+  // the counts (per kind).
+  const { data: categoryCountsData } = useQuery({
+    queryKey: ['textureSets', 'category-counts', categoriesKind],
+    queryFn: () => getTextureSetCategoryCounts(categoriesKind),
+  })
 
   // --- Data: texture sets ---
 
@@ -122,10 +123,6 @@ export function useTextureSetGrid({
     () => [...viewState.selectedTextureTypes].sort((a, b) => a - b),
     [viewState.selectedTextureTypes]
   )
-  const sortedCategoryIds = useMemo(
-    () => [...selectedCategoryIds].sort((a, b) => a - b),
-    [selectedCategoryIds]
-  )
   const sortedTagNames = useMemo(
     () => [...(viewState.selectedTagNames ?? [])].sort(),
     [viewState.selectedTagNames]
@@ -138,6 +135,15 @@ export function useTextureSetGrid({
     viewState.searchQuery.trim(),
     300
   )
+
+  // Category scoping is server-side so filtered views + totals are complete
+  // (not limited to loaded pages). Real id => single-element categoryIds; the
+  // Unassigned sentinel => uncategorized flag; All => neither.
+  const activeCategoryId = viewState.activeCategoryId
+  const categoryIds = isRealCategoryId(activeCategoryId)
+    ? [activeCategoryId]
+    : undefined
+  const uncategorized = activeCategoryId === UNASSIGNED_CATEGORY_ID
 
   const {
     data: paginatedData,
@@ -154,7 +160,8 @@ export function useTextureSetGrid({
         kind,
         packIds: sortedPackIds,
         projectIds: sortedProjectIds,
-        categoryIds: sortedCategoryIds,
+        categoryIds,
+        uncategorized,
         textureTypes: sortedTextureTypes,
         tags: sortedTagNames,
         searchName: debouncedSearchName || undefined,
@@ -168,8 +175,8 @@ export function useTextureSetGrid({
         kind,
         packIds: sortedPackIds.length > 0 ? sortedPackIds : undefined,
         projectIds: sortedProjectIds.length > 0 ? sortedProjectIds : undefined,
-        categoryIds:
-          sortedCategoryIds.length > 0 ? sortedCategoryIds : undefined,
+        categoryIds,
+        uncategorized: uncategorized || undefined,
         textureTypes:
           sortedTextureTypes.length > 0 ? sortedTextureTypes : undefined,
         tags: sortedTagNames.length > 0 ? sortedTagNames : undefined,
@@ -189,14 +196,24 @@ export function useTextureSetGrid({
   )
   const totalCount = paginatedData?.pages[0]?.totalCount ?? 0
 
-  // --- Client-side filtering: name search only. Pack/category/texture-type
-  // filtering runs server-side via the query params above. ---
+  // --- Client-side filtering: name search only. Category scoping and all
+  // other facets (pack/texture-type/tag/resolution) run server-side. ---
 
   const filteredTextureSets = useMemo(() => {
     const search = viewState.searchQuery.trim().toLowerCase()
-    if (!search) return textureSets
+    if (!search) {
+      return textureSets
+    }
     return textureSets.filter(set => set.name.toLowerCase().includes(search))
   }, [textureSets, viewState.searchQuery])
+
+  // Server-computed true totals for the sidebar badges.
+  const categoryCounts = useMemo(
+    () => toCategoryCountMap(categoryCountsData),
+    [categoryCountsData]
+  )
+  const unassignedCount = categoryCountsData?.uncategorizedCount ?? 0
+  const allCount = categoryCountsData?.totalCount ?? 0
 
   // --- Setters that route through view-state ---
 
@@ -220,8 +237,8 @@ export function useTextureSetGrid({
     (ids: number[]) => setView({ selectedProjectIds: ids }),
     [setView]
   )
-  const setSelectedCategoryKeys = useCallback(
-    (keys: CategorySelectionKeys) => setView({ selectedCategoryKeys: keys }),
+  const setActiveCategoryId = useCallback(
+    (id: number | null) => setView({ activeCategoryId: id }),
     [setView]
   )
   const setSelectedTextureTypes = useCallback(
@@ -387,6 +404,9 @@ export function useTextureSetGrid({
     // Data
     textureSets,
     filteredTextureSets,
+    categoryCounts,
+    unassignedCount,
+    allCount,
     totalCount,
     isLoading,
     error: queryError
@@ -412,9 +432,8 @@ export function useTextureSetGrid({
     setSelectedPackIds,
     selectedProjectIds: viewState.selectedProjectIds,
     setSelectedProjectIds,
-    selectedCategoryKeys: viewState.selectedCategoryKeys,
-    setSelectedCategoryKeys,
-    selectedCategoryIds,
+    activeCategoryId,
+    setActiveCategoryId,
     selectedTextureTypes: viewState.selectedTextureTypes as TextureType[],
     setSelectedTextureTypes,
     minResolution: viewState.minResolution,
