@@ -131,60 +131,61 @@ test.describe("Packs", () => {
         // Step 3: Add both models to the pack
         // ────────────────────────────────────────────────────────────
 
+        // Unconditional flow: the short isVisible guards this used to have
+        // silently skipped the whole add-models beat when a render took
+        // longer than the guard (loaded machine / no-GPU CI), and the video
+        // then failed downstream at "Models (2)" with 0. If a step here is
+        // genuinely broken the spec should fail AT that step.
         const addModelCard = page.locator(".model-card.model-card-add");
-        if (await addModelCard.isVisible({ timeout: 3000 }).catch(() => false)) {
-            const addBox = await addModelCard.boundingBox();
-            if (addBox) {
-                await page.mouse.move(
-                    addBox.x + addBox.width / 2,
-                    addBox.y + addBox.height / 2,
-                    { steps: 20 },
-                );
-                await viewerPause(page, 400);
-            }
-            await addModelCard.click();
-            await mediumPause(page);
-
-            const selectionDialog = page.locator(".p-dialog").filter({
-                has: page.getByText("Add Models to Pack"),
-            });
-            if (
-                await selectionDialog
-                    .isVisible({ timeout: 5000 })
-                    .catch(() => false)
-            ) {
-                const selectableItems = selectionDialog.locator(
-                    ".container-card[data-model-id]",
-                );
-                const itemCount = await selectableItems.count();
-                for (let i = 0; i < Math.min(itemCount, 2); i++) {
-                    const item = selectableItems.nth(i);
-                    const itemBox = await item.boundingBox();
-                    if (itemBox) {
-                        await page.mouse.move(
-                            itemBox.x + itemBox.width / 2,
-                            itemBox.y + itemBox.height / 2,
-                            { steps: 15 },
-                        );
-                        await viewerPause(page, 300);
-                    }
-                    await item.click();
-                    await shortPause(page);
-                }
-
-                const confirmBtn = selectionDialog
-                    .getByRole("button", { name: /Add Selected \([12]\)/ })
-                    .first();
-                if (
-                    await confirmBtn
-                        .isVisible({ timeout: 2000 })
-                        .catch(() => false)
-                ) {
-                    await confirmBtn.click();
-                    await mediumPause(page);
-                }
-            }
+        await addModelCard.waitFor({ state: "visible", timeout: ciVideoTimeout });
+        const addBox = await addModelCard.boundingBox();
+        if (addBox) {
+            await page.mouse.move(
+                addBox.x + addBox.width / 2,
+                addBox.y + addBox.height / 2,
+                { steps: 20 },
+            );
+            await viewerPause(page, 400);
         }
+        await addModelCard.click();
+        await mediumPause(page);
+
+        const selectionDialog = page.locator(".p-dialog").filter({
+            has: page.getByText("Add Models to Pack"),
+        });
+        await selectionDialog.waitFor({
+            state: "visible",
+            timeout: ciVideoTimeout,
+        });
+        const selectableItems = selectionDialog.locator(
+            ".container-card[data-model-id]",
+        );
+        await selectableItems
+            .first()
+            .waitFor({ state: "visible", timeout: ciVideoTimeout });
+        const itemCount = await selectableItems.count();
+        expect(itemCount).toBeGreaterThanOrEqual(2);
+        for (let i = 0; i < Math.min(itemCount, 2); i++) {
+            const item = selectableItems.nth(i);
+            const itemBox = await item.boundingBox();
+            if (itemBox) {
+                await page.mouse.move(
+                    itemBox.x + itemBox.width / 2,
+                    itemBox.y + itemBox.height / 2,
+                    { steps: 15 },
+                );
+                await viewerPause(page, 300);
+            }
+            await item.click();
+            await shortPause(page);
+        }
+
+        const confirmBtn = selectionDialog
+            .getByRole("button", { name: /Add Selected \(2\)/ })
+            .first();
+        await confirmBtn.waitFor({ state: "visible", timeout: ciVideoTimeout });
+        await confirmBtn.click();
+        await mediumPause(page);
 
         await expect(page.getByTestId("container-tab-models")).toHaveAttribute(
             "aria-label",
