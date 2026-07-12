@@ -15,16 +15,16 @@ name: Upgrade Test
 #                 unsigned (Squirrel.Mac requires code signing; planned for 1.0).
 #
 # Installers come straight from GitHub Releases — no build step. Defaults to
-# "v0.1.0 → latest published release".
+# "v0.3.1 → latest published release".
 on:
   workflow_dispatch:
     inputs:
       from_tag:
-        # NOTE: move this to v0.2.1 after a few releases so the self-update job
-        # exercises the opt-in updater rather than v0.1.0's old forced one.
+        # v0.3.1 = first release containing the Windows silent quitAndInstall
+        # fix (#550), so the self-update job exercises the fixed updater path.
         description: "Release tag to upgrade FROM"
         required: false
-        default: "v0.1.0"
+        default: "v0.3.1"
         type: string
       to_tag:
         description: "Release tag to upgrade TO (blank = latest published release)"
@@ -76,7 +76,7 @@ jobs:
           INPUT_TO: ${{ inputs.to_tag }}
         run: |
           set -euo pipefail
-          from="${INPUT_FROM:-v0.1.0}"
+          from="${INPUT_FROM:-v0.3.1}"
           to="${INPUT_TO:-}"
           if [ -z "$to" ]; then
             to=$(gh release list --exclude-drafts --exclude-pre-releases --limit 1 \
@@ -243,7 +243,7 @@ jobs:
           INPUT_TO: ${{ inputs.to_tag }}
         run: |
           set -euo pipefail
-          from="${INPUT_FROM:-v0.1.0}"
+          from="${INPUT_FROM:-v0.3.1}"
           to="${INPUT_TO:-}"
           if [ -z "$to" ]; then
             to=$(gh release list --exclude-drafts --exclude-pre-releases --limit 1 \
