@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
@@ -13,17 +14,20 @@ public class RegenerateThumbnailCommandHandler : ICommandHandler<RegenerateThumb
     private readonly IThumbnailRepository _thumbnailRepository;
     private readonly IThumbnailQueue _thumbnailQueue;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public RegenerateThumbnailCommandHandler(
         IModelRepository modelRepository,
         IThumbnailRepository thumbnailRepository,
         IThumbnailQueue thumbnailQueue,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _modelRepository = modelRepository;
         _thumbnailRepository = thumbnailRepository;
         _thumbnailQueue = thumbnailQueue;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<RegenerateThumbnailCommandResponse>> Handle(RegenerateThumbnailCommand command, CancellationToken cancellationToken)
@@ -77,14 +81,19 @@ public class RegenerateThumbnailCommandHandler : ICommandHandler<RegenerateThumb
         }
         else
         {
-            // Create new thumbnail record
+            // Create new thumbnail record. Commit before SetThumbnail — it copies
+            // the thumbnail's id into ModelVersion.ThumbnailId (a raw scalar FK),
+            // so the id must be real, not an EF temporary key.
             var newThumbnail = Thumbnail.Create(model.Id, targetVersion.Id, currentTime);
-            targetVersion.SetThumbnail(await _thumbnailRepository.AddAsync(newThumbnail, cancellationToken));
+            var savedThumbnail = await _thumbnailRepository.AddAsync(newThumbnail, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            targetVersion.SetThumbnail(savedThumbnail);
         }
 
         // Enqueue thumbnail job for this version
         // EnqueueAsync will check for existing jobs for this specific version and reuse them
         await _thumbnailQueue.EnqueueAsync(model.Id, targetVersion.Id, primaryFile.Sha256Hash, forceRegenerate: true, cancellationToken: cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new RegenerateThumbnailCommandResponse(model.Id, targetVersion.Id));
     }

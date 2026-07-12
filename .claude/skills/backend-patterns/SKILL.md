@@ -10,9 +10,11 @@ description: Modelibr backend conventions — Clean Architecture boundaries, Res
   SharedKernel stay free of EF Core attributes, HTTP concerns, and infrastructure refs.
 - One command/query handler per operation; business rules live on entities and value
   objects; repositories stay thin.
-- Known debt + planned refactors live in `.claude/prompts/` (15, 25–29). Before
-  reworking error mapping, transactions, event dispatch, or FileType, read the
-  matching prompt — don't half-implement it as a side effect.
+- Known debt + planned refactors live in `.claude/prompts/` (15, 26–29). Before
+  reworking error mapping or FileType, read the matching prompt — don't
+  half-implement it as a side effect. Transactions/event dispatch (prompt 25) are
+  covered below and DONE (every repository migrated except the two permanent,
+  individually-justified exceptions) — not a "read the prompt first" item.
 
 ## Result/Error
 - Handlers return `Task<Result>` / `Task<Result<T>>` (`SharedKernel/Result.cs`, `Error.cs`).
@@ -27,19 +29,64 @@ description: Modelibr backend conventions — Clean Architecture boundaries, Res
 
 ## Domain events
 - Extend `DomainEvent` (SharedKernel), defined in `Domain/Events/`; handlers implement
-  `IDomainEventHandler<TEvent>` in `Application/EventHandlers/`.
-- TRAP — dispatch is manual and easy to forget: after persisting, the command handler
-  itself must call `IDomainEventDispatcher.PublishAsync(aggregate.DomainEvents)` then
-  `aggregate.ClearDomainEvents()`. If you mutate an aggregate that raises events and
-  skip this, the events are silently dropped. (Prompt 25 moves this into the save
-  pipeline; until then, copy the pattern from `CreateModelVersionCommandHandler`.)
+  `IDomainEventHandler<TEvent>` in `Application/EventHandlers/` — assembly-scanned, no
+  registration needed. Raising the event via `RaiseDomainEvent(...)` on an
+  `AggregateRoot` is the entire contract.
+- Dispatch is NOT manual. `Infrastructure/Persistence/DomainEventsInterceptor.cs` (an EF
+  `SaveChangesInterceptor`) collects `DomainEvents` off every tracked `AggregateRoot`
+  after a successful commit, dispatches via `IDomainEventDispatcher`, then clears them —
+  for every `SaveChangesAsync` call, whoever makes it. **Never call
+  `IDomainEventDispatcher.PublishAsync` or `ClearDomainEvents` from a command handler** —
+  the interceptor already does it.
+- Dispatch is after-commit (side effects only fire for durable state), so raise the
+  event before the LAST mutation your handler will save, not after (see
+  `CreateModelVersionCommandHandler`). No outbox — the commit/dispatch crash window is
+  accepted by design for a local-first app. A handler that stages further writes while
+  reacting to an event (e.g. enqueuing a job) gets them flushed automatically — the
+  interceptor recurses one more SaveChanges round when changes remain after dispatch.
 
-## Transactions — there is NO unit of work
-- Every repository commits internally (`SaveChangesAsync` inside repo methods). A
-  handler calling two mutating repo methods = two independent commits; if the second
-  fails, the first is already durable. Until prompt 25: keep multi-entity writes
-  inside ONE repository method (single SaveChanges), and say so in the PR if you
-  can't. `ThumbnailJobRepository` shows the explicit-transaction escape hatch.
+## Transactions — unit of work
+- `IUnitOfWork` (`Application/Abstractions/IUnitOfWork.cs`, one `SaveChangesAsync`
+  method) is implemented by `ApplicationDbContext`. Repositories stage mutations
+  (`Add`/`Update`/`Remove` on the context) and do **not** call `SaveChangesAsync`
+  themselves; command handlers inject `IUnitOfWork` and call `SaveChangesAsync` exactly
+  once, after every repo call — that's what makes a multi-repo handler atomic.
+- TRAP — a freshly `Add`ed entity's `Id` is an EF temporary placeholder until
+  `SaveChangesAsync` runs. If your handler needs the real id for anything that isn't
+  just building the same EF change-tracked graph (a raw scalar FK on another entity, a
+  response DTO), call `SaveChangesAsync` right after that `Add`, not only at the end —
+  see `AddTextureToPackWithFileCommandHandler`.
+- TRAP (repository-level, caused a production 500 — PR #568) — a repository's
+  `UpdateAsync` must NOT call `_context.Set<T>().Update(entity)` unconditionally.
+  `AddAsync` → mutate → `UpdateAsync` on the SAME reference, before any
+  `SaveChangesAsync`, is a normal shape (e.g. add an aggregate, add a child to its
+  collection, then "update" it) — but the entity is already tracked as `Added` with a
+  temporary key, and forcing it to `Modified` throws "has a temporary value while
+  attempting to change the entity's state to 'Modified'". Every `UpdateAsync` instead
+  calls `_context.UpdateIfDetached(entity)` (`Infrastructure/Persistence/
+  DbContextTrackingExtensions.cs`): a no-op when the entity is already tracked (its
+  current state — Added or Modified — is what `SaveChangesAsync` will persist), and
+  only attaches + marks `Modified` when the entity is genuinely `Detached` (loaded/
+  rehydrated outside this context). Use this helper in every new repository's
+  `UpdateAsync` — don't reintroduce a bare `.Update(entity)` call.
+- Migration is done: every repository under `src/Infrastructure/Repositories` stages
+  mutations only. `tests/Infrastructure.Tests/Architecture/RepositoriesDontSelfCommitTests.cs`
+  is the live source of truth — its allowlist holds exactly two permanent exceptions
+  (`ModelVersionRepository.cs`, `ThumbnailJobRepository.cs`, both justified inline). A
+  new repository that self-commits, or a regression in an already-migrated one, fails
+  the build; don't add to the allowlist for a new repo — give it `IUnitOfWork` instead.
+- `ThumbnailJobRepository.GetNextPendingJobAsync`'s explicit `BeginTransactionAsync`
+  (claim semantics) is permanently outside the UoW. `ThumbnailQueue` (the service, not
+  the repo) deliberately commits its own writes via `IUnitOfWork` too — enqueue/complete/
+  fail/retry are durable-queue primitives that must persist before workers are notified,
+  and some callers (the domain-event pipeline) have no command handler to commit
+  afterwards. `ApplicationDbContext.SaveChangesAsync` also swallows one specific
+  known-benign race (concurrent "add model to pack" duplicating the `PackModels` join
+  PK) — name the exact constraint in the `when` clause if you add another.
+- A hierarchical delete (categories, and similar branch/tree deletes) that used to issue
+  one self-commit per row now lands in a single commit — a failure partway through
+  leaves the whole branch untouched instead of a partial delete. That's the atomicity
+  guarantee working as intended, not a bug to work around.
 
 ## Validation
 - No FluentValidation. Handler-level: validate early, return `Result.Failure(error)`.

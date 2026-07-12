@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
@@ -188,6 +189,7 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
     private readonly IEnvironmentMapRepository _environmentMapRepository;
     private readonly IFileStorage _fileStorage;
     private readonly IThumbnailQueue _thumbnailQueue;
+    private readonly IUnitOfWork _unitOfWork;
 
     public PermanentDeleteEntityCommandHandler(
         IModelRepository modelRepository,
@@ -199,7 +201,8 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
         IScriptRepository scriptRepository,
         IEnvironmentMapRepository environmentMapRepository,
         IFileStorage fileStorage,
-        IThumbnailQueue thumbnailQueue)
+        IThumbnailQueue thumbnailQueue,
+        IUnitOfWork unitOfWork)
     {
         _modelRepository = modelRepository;
         _modelVersionRepository = modelVersionRepository;
@@ -211,6 +214,7 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
         _environmentMapRepository = environmentMapRepository;
         _fileStorage = fileStorage;
         _thumbnailQueue = thumbnailQueue;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<PermanentDeleteEntityResponse>> Handle(PermanentDeleteEntityCommand request, CancellationToken cancellationToken)
@@ -245,6 +249,7 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
                 
                 // Delete model and related entities from database
                 await _modelRepository.DeleteAsync(request.EntityId, cancellationToken);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
                 return Result.Success(new PermanentDeleteEntityResponse(true, "Model permanently deleted", deletedFiles));
 
             case "modelversion":
@@ -265,6 +270,7 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
                 }
                 
                 await _modelVersionRepository.DeleteAsync(version2, cancellationToken);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
                 return Result.Success(new PermanentDeleteEntityResponse(true, "Model version permanently deleted", deletedFiles));
 
             case "file":
@@ -278,6 +284,7 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
                 
                 // Delete file from database
                 await _fileRepository.DeleteAsync(request.EntityId, cancellationToken);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
                 return Result.Success(new PermanentDeleteEntityResponse(true, "File permanently deleted", deletedFiles));
 
             case "textureset":
@@ -308,6 +315,7 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
                     }
                 }
                 
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
                 return Result.Success(new PermanentDeleteEntityResponse(true, "Texture set permanently deleted", deletedFiles));
 
             case "sprite":
@@ -333,6 +341,7 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
                     await _fileRepository.HardDeleteAsync(spriteFileId, cancellationToken);
                 }
                 
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
                 return Result.Success(new PermanentDeleteEntityResponse(true, "Sprite permanently deleted", deletedFiles));
 
             case "sound":
@@ -358,6 +367,7 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
                     await _fileRepository.HardDeleteAsync(soundFileId, cancellationToken);
                 }
                 
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
                 return Result.Success(new PermanentDeleteEntityResponse(true, "Sound permanently deleted", deletedFiles));
 
             case "script":
@@ -383,6 +393,7 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
                     await _fileRepository.HardDeleteAsync(scriptFileId, cancellationToken);
                 }
 
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
                 return Result.Success(new PermanentDeleteEntityResponse(true, "Script permanently deleted", deletedFiles));
 
             case "environmentmap":
@@ -407,6 +418,7 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
                     }
                 }
 
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
                 return Result.Success(new PermanentDeleteEntityResponse(true, "Environment map permanently deleted", deletedFiles));
 
             case "environmentmapvariant":
@@ -433,6 +445,7 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
                     }
                 }
 
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
                 return Result.Success(new PermanentDeleteEntityResponse(true, "Environment map variant permanently deleted", deletedFiles));
 
             default:

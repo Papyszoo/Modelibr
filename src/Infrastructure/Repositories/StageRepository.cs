@@ -31,13 +31,12 @@ internal sealed class StageRepository : IStageRepository
     public async Task AddAsync(Stage stage, CancellationToken cancellationToken = default)
     {
         await _context.Stages.AddAsync(stage, cancellationToken);
-        await _context.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task UpdateAsync(Stage stage, CancellationToken cancellationToken = default)
+    public Task UpdateAsync(Stage stage, CancellationToken cancellationToken = default)
     {
-        _context.Stages.Update(stage);
-        await _context.SaveChangesAsync(cancellationToken);
+        _context.UpdateIfDetached(stage);
+        return Task.CompletedTask;
     }
 
     public async Task DeleteAsync(int id, CancellationToken cancellationToken = default)
@@ -46,7 +45,6 @@ internal sealed class StageRepository : IStageRepository
         if (stage != null)
         {
             _context.Stages.Remove(stage);
-            await _context.SaveChangesAsync(cancellationToken);
         }
     }
 }

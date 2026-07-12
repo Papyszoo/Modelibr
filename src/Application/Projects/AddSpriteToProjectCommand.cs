@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Services;
@@ -10,15 +11,18 @@ internal class AddSpriteToProjectCommandHandler : ICommandHandler<AddSpriteToPro
     private readonly IProjectRepository _projectRepository;
     private readonly ISpriteRepository _spriteRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public AddSpriteToProjectCommandHandler(
         IProjectRepository projectRepository,
         ISpriteRepository spriteRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _projectRepository = projectRepository;
         _spriteRepository = spriteRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(AddSpriteToProjectCommand command, CancellationToken cancellationToken)
@@ -43,6 +47,7 @@ internal class AddSpriteToProjectCommandHandler : ICommandHandler<AddSpriteToPro
 
         await _projectRepository.UpdateAsync(project, cancellationToken);
 
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }
 }

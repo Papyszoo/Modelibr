@@ -3,8 +3,26 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
+using Xunit;
 
 namespace WebApi.Tests.Integration;
+
+/// <summary>
+/// Every test class that uses ModelibrWebFactory must carry
+/// [Collection(Name)] (keeping its own IClassFixture&lt;ModelibrWebFactory&gt;
+/// as usual — this is NOT a shared-instance collection fixture). Each factory
+/// instance drops and recreates the SAME shared "Modelibr_IntegrationTests"
+/// database in its constructor — xUnit runs different test classes in
+/// parallel by default, so two classes' factory constructors racing to
+/// drop/create that one database at the same time fail unpredictably. Putting
+/// them in one named collection makes xUnit run the classes sequentially
+/// instead (each still gets its own factory/database lifecycle).
+/// </summary>
+[CollectionDefinition(Name)]
+public class PostgresIntegrationCollection
+{
+    public const string Name = "Postgres Integration";
+}
 
 /// <summary>
 /// WebApplicationFactory that connects to localhost PostgreSQL using an isolated

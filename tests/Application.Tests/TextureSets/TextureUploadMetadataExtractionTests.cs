@@ -1,4 +1,5 @@
 using Application.Abstractions.Files;
+using Application.Abstractions;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
 using Application.Services;
@@ -28,6 +29,7 @@ public class TextureUploadMetadataExtractionTests
     private readonly Mock<IDateTimeProvider> _dateTimeProvider = new();
     private readonly Mock<IThumbnailQueue> _thumbnailQueue = new();
     private readonly Mock<ITextureImageMetadataReader> _metadataReader = new();
+    private readonly Mock<IUnitOfWork> _unitOfWork = new();
 
     public TextureUploadMetadataExtractionTests()
     {
@@ -41,7 +43,8 @@ public class TextureUploadMetadataExtractionTests
         _dateTimeProvider.Object,
         _thumbnailQueue.Object,
         _metadataReader.Object,
-        NullLogger<AddTextureToTextureSetCommandHandler>.Instance);
+        NullLogger<AddTextureToTextureSetCommandHandler>.Instance,
+        _unitOfWork.Object);
 
     [Fact]
     public async Task AddTexture_ToModelSpecificSet_ExtractsAndPersistsImageMetadata()
@@ -115,7 +118,8 @@ public class TextureUploadMetadataExtractionTests
             _dateTimeProvider.Object,
             _thumbnailQueue.Object,
             _metadataReader.Object,
-            NullLogger<CreateTextureSetWithFileCommandHandler>.Instance);
+            NullLogger<CreateTextureSetWithFileCommandHandler>.Instance,
+            _unitOfWork.Object);
 
         var result = await handler.Handle(
             new CreateTextureSetWithFileCommand(

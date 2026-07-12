@@ -17,7 +17,6 @@ internal sealed class ScriptTemplateRepository : IScriptTemplateRepository
     public async Task<ScriptTemplate> AddAsync(ScriptTemplate template, CancellationToken cancellationToken = default)
     {
         var entry = await _context.ScriptTemplates.AddAsync(template, cancellationToken);
-        await _context.SaveChangesAsync(cancellationToken);
         return entry.Entity;
     }
 
@@ -35,11 +34,10 @@ internal sealed class ScriptTemplateRepository : IScriptTemplateRepository
             .FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
     }
 
-    public async Task<ScriptTemplate> UpdateAsync(ScriptTemplate template, CancellationToken cancellationToken = default)
+    public Task<ScriptTemplate> UpdateAsync(ScriptTemplate template, CancellationToken cancellationToken = default)
     {
-        _context.ScriptTemplates.Update(template);
-        await _context.SaveChangesAsync(cancellationToken);
-        return template;
+        _context.UpdateIfDetached(template);
+        return Task.FromResult(template);
     }
 
     public async Task DeleteAsync(int id, CancellationToken cancellationToken = default)
@@ -50,7 +48,6 @@ internal sealed class ScriptTemplateRepository : IScriptTemplateRepository
         if (template != null)
         {
             _context.ScriptTemplates.Remove(template);
-            await _context.SaveChangesAsync(cancellationToken);
         }
     }
 }

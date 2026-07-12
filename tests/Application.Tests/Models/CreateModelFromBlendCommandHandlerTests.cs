@@ -1,6 +1,6 @@
 using Application.Abstractions.Files;
+using Application.Abstractions;
 using Application.Abstractions.Repositories;
-using Application.Abstractions.Services;
 using Application.Models;
 using Application.Services;
 using Application.Settings;
@@ -20,8 +20,8 @@ public class CreateModelFromBlendCommandHandlerTests
     private readonly Mock<IModelVersionRepository> _mockVersionRepository;
     private readonly Mock<IFileCreationService> _mockFileCreationService;
     private readonly Mock<IDateTimeProvider> _mockDateTimeProvider;
-    private readonly Mock<IDomainEventDispatcher> _mockEventDispatcher;
     private readonly Mock<ISettingRepository> _mockSettingRepository;
+    private readonly Mock<IUnitOfWork> _mockUnitOfWork = new();
     private readonly CreateModelFromBlendCommandHandler _handler;
 
     public CreateModelFromBlendCommandHandlerTests()
@@ -30,7 +30,6 @@ public class CreateModelFromBlendCommandHandlerTests
         _mockVersionRepository = new Mock<IModelVersionRepository>();
         _mockFileCreationService = new Mock<IFileCreationService>();
         _mockDateTimeProvider = new Mock<IDateTimeProvider>();
-        _mockEventDispatcher = new Mock<IDomainEventDispatcher>();
         _mockSettingRepository = new Mock<ISettingRepository>();
 
         _handler = new CreateModelFromBlendCommandHandler(
@@ -38,8 +37,8 @@ public class CreateModelFromBlendCommandHandlerTests
             _mockVersionRepository.Object,
             _mockFileCreationService.Object,
             _mockDateTimeProvider.Object,
-            _mockEventDispatcher.Object,
-            _mockSettingRepository.Object);
+            _mockSettingRepository.Object,
+            _mockUnitOfWork.Object);
     }
 
     private static IFileUpload CreateFakeBlendUpload(string fileName = "MyModel.blend")
@@ -95,13 +94,11 @@ public class CreateModelFromBlendCommandHandlerTests
                 return v;
             });
 
+        Model? capturedModel = null;
         _mockModelRepository
             .Setup(x => x.UpdateAsync(It.IsAny<Model>(), It.IsAny<CancellationToken>()))
+            .Callback<Model, CancellationToken>((m, _) => capturedModel = m)
             .Returns(Task.CompletedTask);
-
-        _mockEventDispatcher
-            .Setup(x => x.PublishAsync(It.IsAny<IEnumerable<IDomainEvent>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result.Success());
 
         // Act
         var result = await _handler.Handle(command, CancellationToken.None);
@@ -112,7 +109,12 @@ public class CreateModelFromBlendCommandHandlerTests
         Assert.False(result.Value.AlreadyExists);
         _mockModelRepository.Verify(x => x.AddAsync(It.IsAny<Model>(), It.IsAny<CancellationToken>()), Times.Once);
         _mockVersionRepository.Verify(x => x.AddAsync(It.IsAny<ModelVersion>(), It.IsAny<CancellationToken>()), Times.Once);
-        _mockEventDispatcher.Verify(x => x.PublishAsync(It.IsAny<IEnumerable<IDomainEvent>>(), It.IsAny<CancellationToken>()), Times.Once);
+
+        // The handler no longer dispatches events itself (see DomainEventsInterceptor) —
+        // it just has to leave the raised event on the aggregate it hands to UpdateAsync,
+        // for the save pipeline to pick up.
+        Assert.NotNull(capturedModel);
+        Assert.Contains(capturedModel!.DomainEvents, e => e is Domain.Events.ModelUploadedEvent);
     }
 
     [Fact]
@@ -150,7 +152,6 @@ public class CreateModelFromBlendCommandHandlerTests
         Assert.True(result.Value.AlreadyExists);
         _mockModelRepository.Verify(x => x.AddAsync(It.IsAny<Model>(), It.IsAny<CancellationToken>()), Times.Never);
         _mockVersionRepository.Verify(x => x.AddAsync(It.IsAny<ModelVersion>(), It.IsAny<CancellationToken>()), Times.Never);
-        _mockEventDispatcher.Verify(x => x.PublishAsync(It.IsAny<IEnumerable<IDomainEvent>>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -231,23 +232,21 @@ public class CreateModelFromBlendCommandHandlerTests
                 return v;
             });
 
+        Model? capturedModel = null;
         _mockModelRepository
             .Setup(x => x.UpdateAsync(It.IsAny<Model>(), It.IsAny<CancellationToken>()))
+            .Callback<Model, CancellationToken>((m, _) => capturedModel = m)
             .Returns(Task.CompletedTask);
-
-        IEnumerable<IDomainEvent>? publishedEvents = null;
-        _mockEventDispatcher
-            .Setup(x => x.PublishAsync(It.IsAny<IEnumerable<IDomainEvent>>(), It.IsAny<CancellationToken>()))
-            .Callback<IEnumerable<IDomainEvent>, CancellationToken>((events, _) => publishedEvents = events.ToList())
-            .ReturnsAsync(Result.Success());
 
         // Act
         var result = await _handler.Handle(command, CancellationToken.None);
 
-        // Assert
+        // Assert: the handler raises the event on the aggregate and hands it to
+        // UpdateAsync — dispatch itself is the save pipeline's job (DomainEventsInterceptor),
+        // not this handler's, so there's nothing to mock/verify here beyond that.
         Assert.True(result.IsSuccess);
-        Assert.NotNull(publishedEvents);
-        Assert.NotEmpty(publishedEvents);
+        Assert.NotNull(capturedModel);
+        Assert.Contains(capturedModel!.DomainEvents, e => e is Domain.Events.ModelUploadedEvent);
     }
 
     [Fact]
@@ -355,10 +354,6 @@ public class CreateModelFromBlendCommandHandlerTests
             .Setup(x => x.UpdateAsync(It.IsAny<Model>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        _mockEventDispatcher
-            .Setup(x => x.PublishAsync(It.IsAny<IEnumerable<IDomainEvent>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result.Success());
-
         // Act
         var result = await _handler.Handle(command, CancellationToken.None);
 
@@ -433,10 +428,6 @@ public class CreateModelFromBlendCommandHandlerTests
         _mockModelRepository
             .Setup(x => x.UpdateAsync(It.IsAny<Model>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
-
-        _mockEventDispatcher
-            .Setup(x => x.PublishAsync(It.IsAny<IEnumerable<IDomainEvent>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result.Success());
 
         // Act
         var result = await _handler.Handle(command, CancellationToken.None);

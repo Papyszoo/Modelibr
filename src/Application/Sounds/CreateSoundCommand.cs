@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Models;
@@ -14,19 +15,22 @@ internal class CreateSoundCommandHandler : ICommandHandler<CreateSoundCommand, C
     private readonly IFileRepository _fileRepository;
     private readonly ISettingRepository _settingRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public CreateSoundCommandHandler(
         ISoundRepository soundRepository,
         ISoundCategoryRepository soundCategoryRepository,
         IFileRepository fileRepository,
         ISettingRepository settingRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _soundRepository = soundRepository;
         _soundCategoryRepository = soundCategoryRepository;
         _fileRepository = fileRepository;
         _settingRepository = settingRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<CreateSoundResponse>> Handle(CreateSoundCommand command, CancellationToken cancellationToken)
@@ -72,6 +76,7 @@ internal class CreateSoundCommandHandler : ICommandHandler<CreateSoundCommand, C
                 command.CategoryId);
 
             var savedSound = await _soundRepository.AddAsync(sound, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             return Result.Success(new CreateSoundResponse(savedSound.Id, savedSound.Name));
         }

@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Services;
@@ -11,17 +12,20 @@ internal class AddModelToPackCommandHandler : ICommandHandler<AddModelToPackComm
     private readonly IModelRepository _modelRepository;
     private readonly IBatchUploadRepository _batchUploadRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public AddModelToPackCommandHandler(
         IPackRepository packRepository,
         IModelRepository modelRepository,
         IBatchUploadRepository batchUploadRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _packRepository = packRepository;
         _modelRepository = modelRepository;
         _batchUploadRepository = batchUploadRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(AddModelToPackCommand command, CancellationToken cancellationToken)
@@ -60,6 +64,8 @@ internal class AddModelToPackCommandHandler : ICommandHandler<AddModelToPackComm
             batchUpload.UpdateUploadType("pack");
             await _batchUploadRepository.UpdateAsync(batchUpload, cancellationToken);
         }
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success();
     }

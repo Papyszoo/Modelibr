@@ -17,11 +17,10 @@ internal sealed class ThumbnailJobEventRepository : IThumbnailJobEventRepository
         _context = context ?? throw new ArgumentNullException(nameof(context));
     }
 
-    public async Task<ThumbnailJobEvent> AddAsync(ThumbnailJobEvent jobEvent, CancellationToken cancellationToken = default)
+    public Task<ThumbnailJobEvent> AddAsync(ThumbnailJobEvent jobEvent, CancellationToken cancellationToken = default)
     {
         _context.ThumbnailJobEvents.Add(jobEvent);
-        await _context.SaveChangesAsync(cancellationToken);
-        return jobEvent;
+        return Task.FromResult(jobEvent);
     }
 
     public async Task<IEnumerable<ThumbnailJobEvent>> GetByJobIdAsync(int thumbnailJobId, CancellationToken cancellationToken = default)
@@ -33,8 +32,4 @@ internal sealed class ThumbnailJobEventRepository : IThumbnailJobEventRepository
             .ToListAsync(cancellationToken);
     }
 
-    public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
-    {
-        await _context.SaveChangesAsync(cancellationToken);
-    }
 }

@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Files;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
@@ -27,6 +28,7 @@ public class AddFileToVersionCommandHandlerTests
     private readonly Mock<IFileCreationService> _mockFileCreationService = new();
     private readonly Mock<IDateTimeProvider> _mockDateTimeProvider = new();
     private readonly Mock<IBlendFileGenerationQueue> _mockBlendFileGenerationQueue = new();
+    private readonly Mock<IUnitOfWork> _mockUnitOfWork = new();
     private readonly AddFileToVersionCommandHandler _handler;
 
     public AddFileToVersionCommandHandlerTests()
@@ -36,7 +38,8 @@ public class AddFileToVersionCommandHandlerTests
             _mockVersionRepository.Object,
             _mockFileCreationService.Object,
             _mockDateTimeProvider.Object,
-            _mockBlendFileGenerationQueue.Object);
+            _mockBlendFileGenerationQueue.Object,
+            _mockUnitOfWork.Object);
     }
 
     private void SetUpModelAndVersion(int modelId, int versionId)

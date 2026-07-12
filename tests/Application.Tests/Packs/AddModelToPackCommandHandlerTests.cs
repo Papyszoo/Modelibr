@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Repositories;
 using Application.Packs;
 using Application.Tests;
@@ -14,6 +15,7 @@ public class AddModelToPackCommandHandlerTests
     private readonly Mock<IModelRepository> _modelRepository = new();
     private readonly Mock<IBatchUploadRepository> _batchUploadRepository = new();
     private readonly Mock<IDateTimeProvider> _dateTimeProvider = new();
+    private readonly Mock<IUnitOfWork> _unitOfWork = new();
 
     [Fact]
     public async Task Handle_WhenModelAlreadyAssociatedAndBatchUploadAlreadyMatches_ReturnsSuccessWithoutPersisting()
@@ -35,7 +37,8 @@ public class AddModelToPackCommandHandlerTests
             _packRepository.Object,
             _modelRepository.Object,
             _batchUploadRepository.Object,
-            _dateTimeProvider.Object);
+            _dateTimeProvider.Object,
+            _unitOfWork.Object);
 
         var result = await handler.Handle(new AddModelToPackCommand(pack.Id, model.Id), CancellationToken.None);
 
@@ -64,7 +67,8 @@ public class AddModelToPackCommandHandlerTests
             _packRepository.Object,
             _modelRepository.Object,
             _batchUploadRepository.Object,
-            _dateTimeProvider.Object);
+            _dateTimeProvider.Object,
+            _unitOfWork.Object);
 
         var result = await handler.Handle(new AddModelToPackCommand(pack.Id, model.Id), CancellationToken.None);
 

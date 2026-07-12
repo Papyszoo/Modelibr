@@ -1,7 +1,7 @@
 using Application.Abstractions.Files;
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
-using Application.Abstractions.Services;
 using Application.Services;
 using Domain.Services;
 using Domain.ValueObjects;
@@ -15,20 +15,20 @@ internal class CreateModelVersionCommandHandler : ICommandHandler<CreateModelVer
     private readonly IModelVersionRepository _versionRepository;
     private readonly IFileCreationService _fileCreationService;
     private readonly IDateTimeProvider _dateTimeProvider;
-    private readonly IDomainEventDispatcher _domainEventDispatcher;
+    private readonly IUnitOfWork _unitOfWork;
 
     public CreateModelVersionCommandHandler(
         IModelRepository modelRepository,
         IModelVersionRepository versionRepository,
         IFileCreationService fileCreationService,
         IDateTimeProvider dateTimeProvider,
-        IDomainEventDispatcher domainEventDispatcher)
+        IUnitOfWork unitOfWork)
     {
         _modelRepository = modelRepository;
         _versionRepository = versionRepository;
         _fileCreationService = fileCreationService;
         _dateTimeProvider = dateTimeProvider;
-        _domainEventDispatcher = domainEventDispatcher;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<CreateModelVersionResponse>> Handle(
@@ -86,8 +86,12 @@ internal class CreateModelVersionCommandHandler : ICommandHandler<CreateModelVer
         var version = model.CreateVersion(nextVersionNumber, command.Description, _dateTimeProvider.UtcNow);
         version.AddFile(fileEntity);
 
-        // Save version
+        // Save version. Commit immediately: savedVersion.Id is copied into raw
+        // scalar FKs below (SetModelVersion, SetActiveVersion), carried in the
+        // ModelUploadedEvent, and returned in the response — all need the real
+        // database-assigned id, not EF's temporary key.
         var savedVersion = await _versionRepository.AddAsync(version, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         // Link file to version only if not already linked to another version
         // This prevents overwriting the ModelVersionId for deduplicated files
@@ -102,22 +106,20 @@ internal class CreateModelVersionCommandHandler : ICommandHandler<CreateModelVer
             model.SetActiveVersion(savedVersion.Id, _dateTimeProvider.UtcNow);
         }
 
-        await _modelRepository.UpdateAsync(model, cancellationToken);
-
-        // Raise domain event to trigger thumbnail generation for the new version
+        // Raise domain event to trigger thumbnail generation for the new version.
         // Trigger for renderable files (direct thumbnail) and project files like .blend
-        // (asset-processor converts .blend → .glb first, then generates thumbnail)
+        // (asset-processor converts .blend → .glb first, then generates thumbnail).
+        // Must happen before the SaveChanges below (includes ActiveVersionChangedEvent
+        // if SetAsActive was true) — the save pipeline dispatches whatever events are
+        // on the aggregate at that point (see DomainEventsInterceptor); no manual
+        // publish here.
         if (fileType.IsRenderable || fileType.Category == Domain.ValueObjects.FileTypeCategory.Project)
         {
             model.RaiseModelUploadedEvent(savedVersion.Id, fileEntity.Sha256Hash, true);
         }
-        
-        // Always publish domain events (includes ActiveVersionChangedEvent if SetAsActive was true)
-        if (model.DomainEvents.Any())
-        {
-            await _domainEventDispatcher.PublishAsync(model.DomainEvents, cancellationToken);
-            model.ClearDomainEvents();
-        }
+
+        await _modelRepository.UpdateAsync(model, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new CreateModelVersionResponse(
             savedVersion.Id,

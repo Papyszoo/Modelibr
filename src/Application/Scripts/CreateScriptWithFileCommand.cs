@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Files;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
@@ -17,19 +18,22 @@ internal class CreateScriptWithFileCommandHandler : ICommandHandler<CreateScript
     private readonly IFileCreationService _fileCreationService;
     private readonly ISettingRepository _settingRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public CreateScriptWithFileCommandHandler(
         IScriptRepository scriptRepository,
         IScriptCategoryRepository scriptCategoryRepository,
         IFileCreationService fileCreationService,
         ISettingRepository settingRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _scriptRepository = scriptRepository;
         _scriptCategoryRepository = scriptCategoryRepository;
         _fileCreationService = fileCreationService;
         _settingRepository = settingRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<CreateScriptWithFileResponse>> Handle(CreateScriptWithFileCommand command, CancellationToken cancellationToken)
@@ -107,6 +111,7 @@ internal class CreateScriptWithFileCommandHandler : ICommandHandler<CreateScript
                 command.CategoryId);
 
             var createdScript = await _scriptRepository.AddAsync(script, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             return Result.Success(new CreateScriptWithFileResponse(
                 createdScript.Id,

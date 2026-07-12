@@ -1,4 +1,5 @@
 using Application.Abstractions.Files;
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Storage;
@@ -14,17 +15,20 @@ internal class UploadTextureSetThumbnailCommandHandler : ICommandHandler<UploadT
     private readonly IFileStorage _fileStorage;
     private readonly IUploadPathProvider _pathProvider;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public UploadTextureSetThumbnailCommandHandler(
         ITextureSetRepository textureSetRepository,
         IFileStorage fileStorage,
         IUploadPathProvider pathProvider,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _textureSetRepository = textureSetRepository;
         _fileStorage = fileStorage;
         _pathProvider = pathProvider;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<UploadTextureSetThumbnailCommandResponse>> Handle(UploadTextureSetThumbnailCommand command, CancellationToken cancellationToken)
@@ -53,6 +57,7 @@ internal class UploadTextureSetThumbnailCommandHandler : ICommandHandler<UploadT
             }
 
             await _textureSetRepository.UpdateAsync(textureSet, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             return Result.Success(new UploadTextureSetThumbnailCommandResponse(
                 command.TextureSetId,

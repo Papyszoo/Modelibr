@@ -14,11 +14,10 @@ internal sealed class EnvironmentMapCategoryRepository : IEnvironmentMapCategory
         _context = context;
     }
 
-    public async Task<EnvironmentMapCategory> AddAsync(EnvironmentMapCategory category, CancellationToken cancellationToken = default)
+    public Task<EnvironmentMapCategory> AddAsync(EnvironmentMapCategory category, CancellationToken cancellationToken = default)
     {
         _context.EnvironmentMapCategories.Add(category);
-        await _context.SaveChangesAsync(cancellationToken);
-        return category;
+        return Task.FromResult(category);
     }
 
     public async Task<IReadOnlyList<EnvironmentMapCategory>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -42,17 +41,16 @@ internal sealed class EnvironmentMapCategoryRepository : IEnvironmentMapCategory
             .FirstOrDefaultAsync(c => c.Name == name && c.ParentId == parentId, cancellationToken);
     }
 
-    public async Task UpdateAsync(EnvironmentMapCategory category, CancellationToken cancellationToken = default)
+    public Task UpdateAsync(EnvironmentMapCategory category, CancellationToken cancellationToken = default)
     {
-        if (_context.Entry(category).State == EntityState.Detached)
-            _context.EnvironmentMapCategories.Update(category);
+        _context.UpdateIfDetached(category);
 
-        await _context.SaveChangesAsync(cancellationToken);
+        return Task.CompletedTask;
     }
 
-    public async Task DeleteAsync(EnvironmentMapCategory category, CancellationToken cancellationToken = default)
+    public Task DeleteAsync(EnvironmentMapCategory category, CancellationToken cancellationToken = default)
     {
         _context.EnvironmentMapCategories.Remove(category);
-        await _context.SaveChangesAsync(cancellationToken);
+        return Task.CompletedTask;
     }
 }

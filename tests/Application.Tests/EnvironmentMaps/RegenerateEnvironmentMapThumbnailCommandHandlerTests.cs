@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
 using Application.EnvironmentMaps;
@@ -17,6 +18,7 @@ public class RegenerateEnvironmentMapThumbnailCommandHandlerTests
     private readonly Mock<IEnvironmentMapRepository> _environmentMapRepository = new();
     private readonly Mock<IThumbnailQueue> _thumbnailQueue = new();
     private readonly Mock<IDateTimeProvider> _dateTimeProvider = new();
+    private readonly Mock<IUnitOfWork> _unitOfWork = new();
 
     [Fact]
     public async Task Handle_WhenEnvironmentMapExists_QueuesAllVariantThumbnailsAndTouchesEnvironmentMap()
@@ -47,7 +49,8 @@ public class RegenerateEnvironmentMapThumbnailCommandHandlerTests
         var handler = new RegenerateEnvironmentMapThumbnailCommandHandler(
             _environmentMapRepository.Object,
             _thumbnailQueue.Object,
-            _dateTimeProvider.Object);
+            _dateTimeProvider.Object,
+            _unitOfWork.Object);
 
         var result = await handler.Handle(new RegenerateEnvironmentMapThumbnailCommand(environmentMap.Id), CancellationToken.None);
 
@@ -71,7 +74,8 @@ public class RegenerateEnvironmentMapThumbnailCommandHandlerTests
         var handler = new RegenerateEnvironmentMapThumbnailCommandHandler(
             _environmentMapRepository.Object,
             _thumbnailQueue.Object,
-            _dateTimeProvider.Object);
+            _dateTimeProvider.Object,
+            _unitOfWork.Object);
 
         var result = await handler.Handle(new RegenerateEnvironmentMapThumbnailCommand(99), CancellationToken.None);
 

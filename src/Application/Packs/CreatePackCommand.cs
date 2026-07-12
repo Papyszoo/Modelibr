@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Models;
@@ -10,13 +11,16 @@ internal class CreatePackCommandHandler : ICommandHandler<CreatePackCommand, Cre
 {
     private readonly IPackRepository _packRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public CreatePackCommandHandler(
         IPackRepository packRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _packRepository = packRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<CreatePackResponse>> Handle(CreatePackCommand command, CancellationToken cancellationToken)
@@ -36,6 +40,7 @@ internal class CreatePackCommandHandler : ICommandHandler<CreatePackCommand, Cre
 
             var savedPack = await _packRepository.AddAsync(pack, cancellationToken);
 
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
             return Result.Success(new CreatePackResponse(savedPack.Id, savedPack.Name, savedPack.Description, savedPack.LicenseType, savedPack.Url));
         }
         catch (ArgumentException ex)

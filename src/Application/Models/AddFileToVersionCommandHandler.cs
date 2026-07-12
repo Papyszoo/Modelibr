@@ -1,4 +1,5 @@
 using Application.Abstractions.Files;
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
@@ -16,19 +17,22 @@ internal class AddFileToVersionCommandHandler : ICommandHandler<AddFileToVersion
     private readonly IFileCreationService _fileCreationService;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IBlendFileGenerationQueue _blendFileGenerationQueue;
+    private readonly IUnitOfWork _unitOfWork;
 
     public AddFileToVersionCommandHandler(
         IModelRepository modelRepository,
         IModelVersionRepository versionRepository,
         IFileCreationService fileCreationService,
         IDateTimeProvider dateTimeProvider,
-        IBlendFileGenerationQueue blendFileGenerationQueue)
+        IBlendFileGenerationQueue blendFileGenerationQueue,
+        IUnitOfWork unitOfWork)
     {
         _modelRepository = modelRepository;
         _versionRepository = versionRepository;
         _fileCreationService = fileCreationService;
         _dateTimeProvider = dateTimeProvider;
         _blendFileGenerationQueue = blendFileGenerationQueue;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<AddFileToVersionResponse>> Handle(
@@ -87,6 +91,7 @@ internal class AddFileToVersionCommandHandler : ICommandHandler<AddFileToVersion
         // Update
         await _versionRepository.UpdateAsync(version, cancellationToken);
         await _modelRepository.UpdateAsync(model, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         // This is the asset-processor worker's landing point for the .glb it extracts
         // from a Blender-saved version (the version is created with only a .blend —

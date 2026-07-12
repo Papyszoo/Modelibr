@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
 using Application.Thumbnails;
@@ -20,6 +21,7 @@ public class RegenerateAllThumbnailsCommandHandlerTests
     private readonly Mock<IThumbnailRepository> _mockThumbnailRepository = new();
     private readonly Mock<IThumbnailQueue> _mockThumbnailQueue = new();
     private readonly Mock<IDateTimeProvider> _mockDateTimeProvider = new();
+    private readonly Mock<IUnitOfWork> _mockUnitOfWork = new();
     private readonly RegenerateAllThumbnailsCommandHandler _handler;
 
     public RegenerateAllThumbnailsCommandHandlerTests()
@@ -29,7 +31,8 @@ public class RegenerateAllThumbnailsCommandHandlerTests
             _mockModelVersionRepository.Object,
             _mockThumbnailRepository.Object,
             _mockThumbnailQueue.Object,
-            _mockDateTimeProvider.Object);
+            _mockDateTimeProvider.Object,
+            _mockUnitOfWork.Object);
 
         _mockDateTimeProvider.Setup(x => x.UtcNow).Returns(DateTime.UtcNow);
     }

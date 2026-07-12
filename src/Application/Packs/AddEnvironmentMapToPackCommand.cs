@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Services;
@@ -10,15 +11,18 @@ internal sealed class AddEnvironmentMapToPackCommandHandler : ICommandHandler<Ad
     private readonly IPackRepository _packRepository;
     private readonly IEnvironmentMapRepository _environmentMapRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public AddEnvironmentMapToPackCommandHandler(
         IPackRepository packRepository,
         IEnvironmentMapRepository environmentMapRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _packRepository = packRepository;
         _environmentMapRepository = environmentMapRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(AddEnvironmentMapToPackCommand command, CancellationToken cancellationToken)
@@ -33,6 +37,7 @@ internal sealed class AddEnvironmentMapToPackCommandHandler : ICommandHandler<Ad
 
         pack.AddEnvironmentMap(environmentMap, _dateTimeProvider.UtcNow);
         await _packRepository.UpdateAsync(pack, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }
 }

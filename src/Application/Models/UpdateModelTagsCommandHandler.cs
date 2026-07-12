@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Models;
@@ -13,17 +14,20 @@ internal sealed class UpdateModelTagsCommandHandler
     private readonly IModelTagRepository _modelTagRepository;
     private readonly IModelCategoryRepository _modelCategoryRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public UpdateModelTagsCommandHandler(
         IModelRepository modelRepository,
         IModelTagRepository modelTagRepository,
         IModelCategoryRepository modelCategoryRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _modelRepository = modelRepository;
         _modelTagRepository = modelTagRepository;
         _modelCategoryRepository = modelCategoryRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<UpdateModelTagsResponse>> Handle(
@@ -82,6 +86,7 @@ internal sealed class UpdateModelTagsCommandHandler
         model.AssignCategory(command.CategoryId, now);
 
         await _modelRepository.UpdateAsync(model, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new UpdateModelTagsResponse(
             model.Id,
