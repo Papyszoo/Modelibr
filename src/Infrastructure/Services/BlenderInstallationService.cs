@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
+using Application.Abstractions;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
 using Application.Settings;
@@ -408,6 +409,11 @@ public sealed class BlenderInstallationService : IBlenderInstallationService
             {
                 await UpdateOrCreateSettingAsync(repo, SettingKeys.BlenderEnabled, "true", now);
             }
+
+            // Runs outside the command pipeline (background install task), so no
+            // decorator commits for us — repositories only stage changes.
+            var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+            await unitOfWork.SaveChangesAsync();
         }
         catch (Exception ex)
         {
