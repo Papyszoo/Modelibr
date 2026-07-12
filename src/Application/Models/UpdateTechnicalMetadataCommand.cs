@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Services;
@@ -9,13 +10,16 @@ internal sealed class UpdateTechnicalMetadataCommandHandler : ICommandHandler<Up
 {
     private readonly IModelVersionRepository _modelVersionRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public UpdateTechnicalMetadataCommandHandler(
         IModelVersionRepository modelVersionRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IUnitOfWork unitOfWork)
     {
         _modelVersionRepository = modelVersionRepository;
         _dateTimeProvider = dateTimeProvider;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(UpdateTechnicalMetadataCommand command, CancellationToken cancellationToken)
@@ -41,6 +45,7 @@ internal sealed class UpdateTechnicalMetadataCommandHandler : ICommandHandler<Up
             _dateTimeProvider.UtcNow);
 
         await _modelVersionRepository.UpdateAsync(version, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }
 }
