@@ -1,6 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace WebApi.Tests.Integration;
@@ -11,7 +14,7 @@ namespace WebApi.Tests.Integration;
 /// </summary>
 [Trait("Category", "Integration")]
 [Collection(PostgresIntegrationCollection.Name)]
-public class ConcurrencyTests : IClassFixture<ModelibrWebFactory>
+public class ConcurrencyTests : IClassFixture<ModelibrWebFactory>, IAsyncLifetime
 {
     private readonly ModelibrWebFactory _factory;
     private readonly HttpClient _client;
@@ -22,6 +25,30 @@ public class ConcurrencyTests : IClassFixture<ModelibrWebFactory>
         _factory = factory;
         _client = factory.CreateClient();
     }
+
+    // App startup applies migrations itself (Program.cs calls
+    // InitializeDatabaseAsync before app.Run), but it swallows failures to
+    // let the app start without DB connectivity. With four classes now
+    // sharing PostgresIntegrationCollection, each dropping/recreating the
+    // same "Modelibr_IntegrationTests" database in its ModelibrWebFactory
+    // constructor, that one-shot startup migration can land its
+    // GetAppliedMigrationsAsync query at the exact moment a sibling class's
+    // constructor issues pg_terminate_backend for a fresh drop/recreate —
+    // observed as Npgsql 57P01 "terminating connection due to administrator
+    // command", silently swallowed, leaving this app started with no schema
+    // (every request then 500s with "relation ... does not exist").
+    // UnitOfWorkRollbackTests and RepositoryUpdateTrackingTests already
+    // defend against this by re-migrating (idempotent) before they rely on
+    // the schema; IAsyncLifetime.InitializeAsync gives this class the same
+    // guarantee before any [Fact] runs.
+    public async Task InitializeAsync()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await context.Database.MigrateAsync();
+    }
+
+    public Task DisposeAsync() => Task.CompletedTask;
 
     // ─── Helpers ─────────────────────────────────────────────────────
 
