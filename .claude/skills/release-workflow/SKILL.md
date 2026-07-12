@@ -12,6 +12,10 @@ description: Modelibr git and release conventions — version-branch naming and 
 - Active development lands on a **version branch** named `version/<major>.<minor>`
   (e.g. `version/0.1`). Feature/fix branches PR **into the current version
   branch**, never directly into `main`.
+- **A version branch is done once its release ships.** Post-release fixes stage
+  on a new **patch branch** `version/<major>.<minor>.<patch>` (e.g.
+  `version/0.3.1`, `version/0.4.1`), created from the released tip — never
+  retarget more work at the already-released `version/X.Y` branch.
 - `main` only advances when cutting a release: merge the version branch → `main`,
   then publish a GitHub Release.
 
@@ -44,7 +48,7 @@ description: Modelibr git and release conventions — version-branch naming and 
   the testing rules in `CLAUDE.md` and the `test-triage` skill.
 
 ## Releases
-- Cutting a release = merge `version/X.Y` → `main`, then publish a GitHub
-  Release. electron-updater feeds (`latest*.yml` + `.blockmap`) are attached as
+- Cutting a release = merge the version branch (`version/X.Y` or patch branch
+  `version/X.Y.Z`) → `main`, then publish a GitHub Release. electron-updater feeds (`latest*.yml` + `.blockmap`) are attached as
   release assets; the desktop **client** publishes to its own `client` update
   channel so its feed never collides with the host's.
