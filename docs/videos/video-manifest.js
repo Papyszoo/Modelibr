@@ -9,7 +9,10 @@ export const videoManifest = [
         outputName: "model-management.webm",
         title: "Model Management",
         description: "Compare versions, inspect changes, and keep model history moving.",
-        maxDurationSeconds: 45,
+        // ~40s on a local GPU; CI's software rendering paces the recorded
+        // waits to ~61s (observed 3× on the v0.4.2 main push). 45 left no
+        // CI headroom and failed the deploy.
+        maxDurationSeconds: 75,
     },
     {
         slug: "texture-sets",
