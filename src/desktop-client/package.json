@@ -1,7 +1,7 @@
 {
   "name": "modelibr-client",
   "private": true,
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "Modelibr desktop client — an app window for a running Modelibr host",
   "homepage": "https://github.com/Papyszoo/Modelibr",
   "author": {
