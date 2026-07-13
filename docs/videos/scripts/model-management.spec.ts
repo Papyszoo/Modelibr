@@ -90,6 +90,18 @@ test.describe("Model Management", () => {
             waitForThumbnailReady(thirdModelId),
         ]);
 
+        // Off-camera prewarm: open the comparison model once so its file is
+        // in the browser cache and the viewer machinery is warm. The recorded
+        // beat re-opens it and must not spend seconds on a cold FBX load
+        // (this wait timed out under CI load when the open was cold).
+        await navigateTo(
+            page,
+            `/?leftTabs=modelList&rightTabs=model-${comparisonModelId}&activeRight=model-${comparisonModelId}`,
+        );
+        await expect(
+            page.locator(".p-splitter-panel").nth(1).locator("canvas").first(),
+        ).toBeVisible({ timeout: ciVideoTimeout });
+
         // Start on a polished split view: library on the left, hero model on the right.
         await navigateTo(
             page,
