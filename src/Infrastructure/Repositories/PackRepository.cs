@@ -65,6 +65,22 @@ internal sealed class PackRepository : IPackRepository
             .FirstOrDefaultAsync(p => p.Name == name, cancellationToken);
     }
 
+    public Task<Pack?> GetByStoreImportAsync(string storeUrl, string storeAssetId, CancellationToken cancellationToken = default)
+    {
+        return _context.Packs
+            .Include(p => p.Models)
+            .Include(p => p.TextureSets)
+            .Include(p => p.Sprites)
+            .Include(p => p.Sounds)
+            .Include(p => p.Scripts)
+            .Include(p => p.EnvironmentMaps)
+            .Include(p => p.CustomThumbnailFile)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(
+                p => p.StoreImportUrl == storeUrl && p.StoreImportAssetId == storeAssetId,
+                cancellationToken);
+    }
+
     public Task UpdateAsync(Pack pack, CancellationToken cancellationToken = default)
     {
         _context.UpdateIfDetached(pack);

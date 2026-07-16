@@ -17,6 +17,12 @@ namespace Application
             services.AddScoped<IDateTimeProvider, DateTimeProvider>();
             services.AddScoped<IFileCreationService, FileCreationService>();
             services.AddScoped<Application.Settings.ISettingsService, Application.Settings.SettingsService>();
+
+            // Store importer (v0.5 prompt 05): the orchestrator and its 1:1 handler adapter.
+            // The HTTP client, queue and progress notifier are infrastructure/host concerns
+            // and are registered in Infrastructure/WebApi.
+            services.AddScoped<Application.StoreImports.IStoreImportSink, Application.StoreImports.StoreImportSink>();
+            services.AddScoped<Application.StoreImports.IStoreImportProcessor, Application.StoreImports.StoreImportProcessor>();
             return services;
         }
 

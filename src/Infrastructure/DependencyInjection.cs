@@ -66,6 +66,7 @@ namespace Infrastructure
             services.AddScoped<IEnvironmentMapCategoryRepository, EnvironmentMapCategoryRepository>();
             services.AddScoped<ITextureSetCategoryRepository, TextureSetCategoryRepository>();
             services.AddScoped<ISearchRepository, SearchRepository>();
+            services.AddScoped<IStoreImportJobRepository, StoreImportJobRepository>();
             services.AddScoped<IEnvironmentMapSizeLabelService, EnvironmentMapSizeLabelService>();
             services.AddScoped<ITextureImageMetadataReader, TextureImageMetadataReader>();
             services.AddScoped<IThumbnailQueue, ThumbnailQueue>();
@@ -97,6 +98,25 @@ namespace Infrastructure
             {
                 client.Timeout = TimeSpan.FromSeconds(5);
             });
+
+            // Store importer (v0.5 prompt 05): SSRF-hardened client + in-process background queue.
+            // storeUrl is user-supplied, so redirects are followed manually (see StoreImportClient);
+            // auto-redirect is disabled at the handler level.
+            var storeImportTimeoutSeconds = configuration.GetValue<int?>("STORE_IMPORT_HTTP_TIMEOUT_SECONDS") ?? 120;
+            services.AddHttpClient(Infrastructure.Services.StoreImportClient.HttpClientName, client =>
+                {
+                    client.Timeout = TimeSpan.FromSeconds(storeImportTimeoutSeconds);
+                })
+                .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+
+            services.AddScoped<Application.Abstractions.Services.IStoreImportClient, StoreImportClient>();
+
+            // Registered once as a singleton, exposed through both the producer interface and
+            // IHostedService so enqueue (request handlers) and consume (background loop) share
+            // the same channel — mirrors the BlendFileGenerationQueue registration above.
+            services.AddSingleton<StoreImportQueue>();
+            services.AddSingleton<Application.Abstractions.Services.IStoreImportQueue>(sp => sp.GetRequiredService<StoreImportQueue>());
+            services.AddHostedService(sp => sp.GetRequiredService<StoreImportQueue>());
 
             // Add WebDAV virtual asset store services
             services.AddVirtualAssetStore();
