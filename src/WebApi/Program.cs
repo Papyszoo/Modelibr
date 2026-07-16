@@ -113,6 +113,7 @@ namespace WebApi
             builder.Services.AddSingleton<IFileThumbnailGenerator, FileThumbnailGenerator>();
             builder.Services.AddScoped<IThumbnailNotificationService, SignalRThumbnailNotificationService>();
             builder.Services.AddScoped<IThumbnailJobQueueNotificationService, SignalRThumbnailJobQueueNotificationService>();
+            builder.Services.AddScoped<IStoreImportProgressNotifier, SignalRStoreImportProgressNotifier>();
             builder.Services.AddHostedService<UploadDirectoryInitializer>();
             builder.Services.AddHostedService<BlenderRetentionSweepHostedService>();
 
@@ -173,10 +174,12 @@ namespace WebApi
             app.MapAudioSelectionEndpoints();
             app.MapBackupEndpoints();
             app.MapSearchEndpoints();
+            app.MapStoreImportEndpoints();
 
             // Map SignalR hubs
             app.MapHub<ThumbnailHub>("/thumbnailHub");
             app.MapHub<ThumbnailJobHub>("/jobProcessingHub");
+            app.MapHub<StoreImportHub>("/storeImportHub");
 
             app.MapHealthChecks("/health");
 

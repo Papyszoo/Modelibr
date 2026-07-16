@@ -77,6 +77,7 @@ namespace Infrastructure.Persistence
         public DbSet<EnvironmentMapVariantFaceFile> EnvironmentMapVariantFaceFiles => Set<EnvironmentMapVariantFaceFile>();
         public DbSet<TextureProxy> TextureProxies => Set<TextureProxy>();
         public DbSet<ModelVersionTextureSet> ModelVersionTextureSets => Set<ModelVersionTextureSet>();
+        public DbSet<StoreImportJob> StoreImportJobs => Set<StoreImportJob>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -560,9 +561,30 @@ namespace Infrastructure.Persistence
                     .HasForeignKey(p => p.CustomThumbnailFileId)
                     .OnDelete(DeleteBehavior.SetNull);
 
+                // Store-import provenance (v0.5 prompt 05). The (StoreImportUrl,
+                // StoreImportAssetId) pair is the idempotency key for re-imports.
+                entity.Property(p => p.StoreImportUrl).HasMaxLength(500);
+                entity.Property(p => p.StoreImportAssetId).HasMaxLength(200);
+                entity.HasIndex(p => new { p.StoreImportUrl, p.StoreImportAssetId });
+
                 // Create index for efficient querying by name
                 entity.HasIndex(p => p.Name);
                 entity.HasIndex(p => p.LicenseType);
+            });
+
+            // Configure StoreImportJob entity (v0.5 prompt 05). No import token is stored.
+            modelBuilder.Entity<StoreImportJob>(entity =>
+            {
+                entity.HasKey(j => j.Id);
+                entity.Property(j => j.StoreUrl).IsRequired().HasMaxLength(500);
+                entity.Property(j => j.StoreAssetId).IsRequired().HasMaxLength(200);
+                entity.Property(j => j.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
+                entity.Property(j => j.ErrorMessage).HasMaxLength(2000);
+                entity.Property(j => j.CreatedAt).IsRequired();
+                entity.Property(j => j.UpdatedAt).IsRequired();
+
+                entity.HasIndex(j => new { j.StoreUrl, j.StoreAssetId });
+                entity.HasIndex(j => j.Status);
             });
 
             // Configure Project entity
