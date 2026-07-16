@@ -34,7 +34,10 @@ internal class GetAllPacksQueryHandler : IQueryHandler<GetAllPacksQuery, GetAllP
             ScriptCount = p.ScriptCount,
             EnvironmentMapCount = p.EnvironmentMapCount,
             CustomThumbnailUrl = p.CustomThumbnailFileId.HasValue ? $"/files/{p.CustomThumbnailFileId.Value}/preview?channel=rgb" : null,
-            IsEmpty = p.IsEmpty
+            IsEmpty = p.IsEmpty,
+            StoreImportUrl = p.StoreImportUrl,
+            StoreImportAssetId = p.StoreImportAssetId,
+            StoreImportedAt = p.StoreImportedAt
         }).ToList();
 
         return Result.Success(new GetAllPacksResponse(packListDtos));
@@ -65,4 +68,10 @@ public record PackListDto
     public int EnvironmentMapCount { get; init; }
     public string? CustomThumbnailUrl { get; init; }
     public bool IsEmpty { get; init; }
+
+    // Store-import provenance — lets the Asset Store page mark library entries
+    // that were already imported (matched on store URL + store asset id).
+    public string? StoreImportUrl { get; init; }
+    public string? StoreImportAssetId { get; init; }
+    public DateTime? StoreImportedAt { get; init; }
 }

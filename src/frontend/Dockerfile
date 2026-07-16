@@ -6,6 +6,8 @@ FROM node:20-alpine AS build
 WORKDIR /app
 ARG VITE_API_BASE_URL
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+ARG VITE_STORE_URL
+ENV VITE_STORE_URL=${VITE_STORE_URL}
 COPY package*.json ./
 # Configure npm with longer timeouts and retries, and disable strict SSL for allowlist proxy
 # The allowlist proxy uses a self-signed certificate

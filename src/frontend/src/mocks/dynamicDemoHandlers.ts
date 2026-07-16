@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw'
 
 import { type StoreNames } from './db/demoDb'
+import { assetStoreHandlers } from './dynamic-demo/assetStoreHandlers'
 import { containerHandlers } from './dynamic-demo/containerHandlers'
 import {
   addRecycledItem,
@@ -4056,6 +4057,7 @@ export const dynamicDemoHandlers = [
     return new HttpResponse(null, { status: 204 })
   }),
 
+  ...assetStoreHandlers,
   ...containerHandlers,
   ...systemHandlers,
 ]

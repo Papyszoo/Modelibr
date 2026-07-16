@@ -30,6 +30,7 @@ The live demo stores its data in your browser, so what you add there is visible 
 | **WebDAV access** | Work with the library through a file-browser style workflow when that fits better than a browser-only flow. |
 | **Blender CLI at runtime** | Download Blender CLI from Settings when you need it instead of treating it as a fixed install requirement from day one. |
 | **Recycle bin and deduplication** | Restore deleted assets and avoid wasting storage on identical files. |
+| **Asset Store imports (optional)** | Connect a companion asset store via the Asset Store tab and import packs from your store library with one click — fully optional, the app stays local-first without it. |
 
 ---
 

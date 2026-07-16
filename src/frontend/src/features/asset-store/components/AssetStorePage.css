@@ -1,0 +1,83 @@
+/* Asset Store tab — dense, flat on the page surface (no card framing). */
+
+.asset-store-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: var(--mod-space-md);
+  gap: var(--mod-space-sm);
+  overflow: hidden;
+}
+
+.asset-store-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.asset-store-user {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mod-space-xs);
+  font-size: var(--mod-text-sm);
+  color: var(--text-color-secondary);
+}
+
+/* Sign-in form — quiet block, no card-in-card framing. */
+.asset-store-login {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-sm);
+  max-width: 20rem;
+  padding-top: var(--mod-space-sm);
+}
+
+.asset-store-login-hint {
+  margin: 0;
+  font-size: var(--mod-text-sm);
+  color: var(--text-color-secondary);
+}
+
+.asset-store-login-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-xs);
+  font-size: var(--mod-text-sm);
+}
+
+.asset-store-login-field .p-inputtext {
+  width: 100%;
+}
+
+.asset-store-login-error {
+  color: var(--mod-color-danger);
+  font-size: var(--mod-text-xs);
+}
+
+/* Per-tile corner action (rendered in the AssetTile corner slot). */
+.asset-store-action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mod-space-xs);
+}
+
+.asset-store-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mod-space-xs);
+  padding: 0.15rem 0.45rem;
+  border-radius: var(--mod-radius-sm);
+  background: var(--surface-overlay);
+  border: 1px solid var(--surface-border);
+  font-size: var(--mod-text-xs);
+  color: var(--text-color);
+  white-space: nowrap;
+}
+
+.asset-store-chip--imported {
+  color: var(--mod-color-success);
+}
+
+.asset-store-chip--error {
+  color: var(--mod-color-danger);
+}
