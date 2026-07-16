@@ -37,6 +37,7 @@ namespace Infrastructure
             });
 
             services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<ApplicationDbContext>());
+            services.AddScoped<IChangeTrackerReset>(sp => sp.GetRequiredService<ApplicationDbContext>());
 
             services.AddScoped<IModelRepository, ModelRepository>();
             services.AddScoped<IModelVersionRepository, ModelVersionRepository>();
@@ -107,7 +108,7 @@ namespace Infrastructure
                 {
                     client.Timeout = TimeSpan.FromSeconds(storeImportTimeoutSeconds);
                 })
-                .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+                .ConfigurePrimaryHttpMessageHandler(Infrastructure.Services.StoreImportClient.CreatePrimaryHandler);
 
             services.AddScoped<Application.Abstractions.Services.IStoreImportClient, StoreImportClient>();
 

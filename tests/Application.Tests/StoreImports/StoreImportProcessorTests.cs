@@ -103,6 +103,25 @@ public class StoreImportProcessorTests
     }
 
     [Fact]
+    public async Task Process_SoundItem_WithExtraFiles_ImportsAudioPrimaryAndReportsSurplus()
+    {
+        var h = new Harness();
+        // The audio file is deliberately NOT first: the primary must be picked by role.
+        var art = h.MakeFile("u/cover", RandomBytes(), "Image", "cover.png");
+        var audio = h.MakeFile("u/audio", RandomBytes(), "Audio", "boom.wav");
+        h.SetManifest(Item("Sound", "Boom", art, audio));
+        h.Sink.Setup(s => s.CreateSoundAsync(It.IsAny<IFileUpload>(), "Boom", It.IsAny<CancellationToken>())).ReturnsAsync(401);
+
+        await h.Run();
+
+        h.Sink.Verify(s => s.CreateSoundAsync(
+            It.Is<IFileUpload>(u => u.FileName == "boom.wav"), "Boom", It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Equal(1, h.Job.ItemsCreated);
+        // Sounds are single-file assets; the dropped surplus must be visible in the outcome.
+        Assert.Contains("additional file(s) not imported", h.Job.ResultJson);
+    }
+
+    [Fact]
     public async Task Process_EnvironmentMapItem_CreatesEnvMapAndAddsToPack()
     {
         var h = new Harness();
@@ -125,7 +144,7 @@ public class StoreImportProcessorTests
 
         await h.Run();
 
-        h.Client.Verify(c => c.DownloadFileAsync(It.IsAny<string>(), "u/other", It.IsAny<string>(), It.IsAny<long>(), It.IsAny<CancellationToken>()), Times.Never);
+        h.Client.Verify(c => c.DownloadFileAsync(It.IsAny<string>(), "u/other", It.IsAny<string>(), It.IsAny<long>(), It.IsAny<long?>(), It.IsAny<CancellationToken>()), Times.Never);
         Assert.Equal(0, h.Job.ItemsCreated);
         Assert.Equal(1, h.Job.ItemsSkipped);
         Assert.Contains("skipped-unsupported", h.Job.ResultJson);
@@ -140,16 +159,36 @@ public class StoreImportProcessorTests
         var mesh = h.MakeFile("u/mesh", RandomBytes(), "Mesh", "chair.glb");
         h.SetManifest(Item("Model", "Chair", mesh));
         h.ModelRepo.Setup(r => r.GetByFileHashAsync(mesh.Sha256, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Model.Create("Existing Chair", h.Now).WithId(55));
+            .ReturnsAsync(ExistingModel(55, mesh));
 
         await h.Run();
 
-        h.Client.Verify(c => c.DownloadFileAsync(It.IsAny<string>(), "u/mesh", It.IsAny<string>(), It.IsAny<long>(), It.IsAny<CancellationToken>()), Times.Never);
+        h.Client.Verify(c => c.DownloadFileAsync(It.IsAny<string>(), "u/mesh", It.IsAny<string>(), It.IsAny<long>(), It.IsAny<long?>(), It.IsAny<CancellationToken>()), Times.Never);
         h.Sink.Verify(s => s.CreateModelAsync(It.IsAny<IFileUpload>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
         h.Sink.Verify(s => s.AddModelToPackAsync(NewPackId, 55, It.IsAny<CancellationToken>()), Times.Once);
         Assert.Equal(1, h.Job.ItemsSkipped);
         Assert.Equal(0, h.Job.ItemsCreated);
         Assert.Contains("skipped-dedupe", h.Job.ResultJson);
+    }
+
+    [Fact]
+    public async Task Process_ModelItem_WhenDeduped_GapFillsFilesMissingFromExistingModel()
+    {
+        var h = new Harness();
+        var mesh = h.MakeFile("u/mesh", RandomBytes(), "Mesh", "chair.glb");
+        var extra = h.MakeFile("u/extra", RandomBytes(), "Image", "chair_albedo.png");
+        h.SetManifest(Item("Model", "Chair", mesh, extra));
+        // The existing model has the mesh but a previous partial run never attached the extra.
+        h.ModelRepo.Setup(r => r.GetByFileHashAsync(mesh.Sha256, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ExistingModel(55, mesh));
+
+        await h.Run();
+
+        h.Client.Verify(c => c.DownloadFileAsync(It.IsAny<string>(), "u/mesh", It.IsAny<string>(), It.IsAny<long>(), It.IsAny<long?>(), It.IsAny<CancellationToken>()), Times.Never);
+        h.Sink.Verify(s => s.AddFileToModelAsync(55, It.Is<IFileUpload>(u => u.FileName == "chair_albedo.png"), It.IsAny<CancellationToken>()), Times.Once);
+        h.Sink.Verify(s => s.AddModelToPackAsync(NewPackId, 55, It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Equal(1, h.Job.ItemsSkipped);
+        Assert.Contains("gap-filled 1 missing file(s)", h.Job.ResultJson);
     }
 
     // ---- re-run idempotency via provenance ----
@@ -167,7 +206,7 @@ public class StoreImportProcessorTests
             Item("Model", "Chair", mesh),
             Item("Sound", "Creak", newSound));
         h.ModelRepo.Setup(r => r.GetByFileHashAsync(mesh.Sha256, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Model.Create("Existing Chair", h.Now).WithId(55));
+            .ReturnsAsync(ExistingModel(55, mesh));
         h.Sink.Setup(s => s.CreateSoundAsync(It.IsAny<IFileUpload>(), "Creak", It.IsAny<CancellationToken>())).ReturnsAsync(401);
 
         await h.Run();
@@ -184,7 +223,7 @@ public class StoreImportProcessorTests
     // ---- hash mismatch fails one item, pack continues ----
 
     [Fact]
-    public async Task Process_WhenHashMismatch_ItemFails_PackContinues()
+    public async Task Process_WhenHashMismatch_ItemFails_PackContinues_AndTrackerIsReset()
     {
         var h = new Harness();
         var badMesh = h.MakeFile("u/mesh", RandomBytes(), "Mesh", "chair.glb", sha256: new string('0', 64));
@@ -202,6 +241,9 @@ public class StoreImportProcessorTests
         Assert.Equal(1, h.Job.ItemsCreated);
         Assert.Contains("SHA-256 mismatch", h.Job.ResultJson);
         Assert.Equal(Domain.ValueObjects.StoreImportJobStatus.CompletedWithErrors, h.Job.Status);
+        // A failed item may leave poisoned staged entities behind — the shared change
+        // tracker must be reset so subsequent items/saves don't cascade-fail.
+        h.TrackerReset.Verify(t => t.Clear(), Times.Once);
     }
 
     // ---- helpers ----
@@ -219,12 +261,23 @@ public class StoreImportProcessorTests
     private static string Sha256Hex(byte[] bytes)
         => Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
 
-    private static byte[] ReadAll(IFileUpload upload)
+    /// <summary>
+    /// A persisted-looking model whose active version carries files with the given manifest
+    /// hashes — the shape the gap-fill check inspects.
+    /// </summary>
+    private static Model ExistingModel(int id, params StoreManifestFile[] files)
     {
-        using var stream = upload.OpenRead();
-        using var ms = new MemoryStream();
-        stream.CopyTo(ms);
-        return ms.ToArray();
+        var now = DateTime.UtcNow;
+        var model = Model.Create("Existing Model", now).WithId(id);
+        var version = ModelVersion.Create(id, 1, null, now);
+        foreach (var file in files)
+        {
+            version.AddFile(Domain.Models.File.Create(
+                file.FileName, file.FileName, $"uploads/{file.FileName}", "application/octet-stream",
+                FileType.Unknown, file.FileSize, file.Sha256, now));
+        }
+        model.Versions.Add(version);
+        return model;
     }
 
     private sealed class Harness
@@ -238,9 +291,9 @@ public class StoreImportProcessorTests
         public readonly Mock<ISoundRepository> SoundRepo = new();
         public readonly Mock<ISpriteRepository> SpriteRepo = new();
         public readonly Mock<IEnvironmentMapRepository> EnvMapRepo = new();
-        public readonly Mock<IFileUtilityService> Hasher = new();
         public readonly Mock<IDateTimeProvider> Clock = new();
         public readonly Mock<IUnitOfWork> Uow = new();
+        public readonly Mock<IChangeTrackerReset> TrackerReset = new();
         public readonly Mock<IStoreImportProgressNotifier> Notifier = new();
 
         public readonly DateTime Now = new(2026, 7, 16, 0, 0, 0, DateTimeKind.Utc);
@@ -263,15 +316,17 @@ public class StoreImportProcessorTests
 
             Sink.Setup(s => s.CreatePackAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>())).ReturnsAsync(NewPackId);
 
-            // Fake hasher computes the real SHA-256 of the uploaded bytes so a manifest hash
-            // set to the same value matches, and a wrong one triggers a mismatch.
-            Hasher.Setup(h => h.CalculateFileHashAsync(It.IsAny<IFileUpload>(), It.IsAny<CancellationToken>()))
-                .Returns<IFileUpload, CancellationToken>((f, _) => Task.FromResult(Sha256Hex(ReadAll(f))));
-
-            // Fake client returns the bytes registered for a download URL.
-            Client.Setup(c => c.DownloadFileAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<long>(), It.IsAny<CancellationToken>()))
-                .Returns<string, string, string, long, CancellationToken>((_, url, _, _, _) =>
-                    Task.FromResult(_downloads.TryGetValue(url, out var bytes) ? bytes : Array.Empty<byte>()));
+            // Fake client parks the bytes registered for a URL in a real temp file and
+            // hashes them like the real client does, so manifest-hash equality decides
+            // match vs mismatch exactly as in production.
+            Client.Setup(c => c.DownloadFileAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<long>(), It.IsAny<long?>(), It.IsAny<CancellationToken>()))
+                .Returns<string, string, string, long, long?, CancellationToken>((_, url, _, _, _, _) =>
+                {
+                    var bytes = _downloads.TryGetValue(url, out var b) ? b : Array.Empty<byte>();
+                    var path = Path.Combine(Path.GetTempPath(), "modelibr-test-" + Guid.NewGuid().ToString("N") + ".tmp");
+                    System.IO.File.WriteAllBytes(path, bytes);
+                    return Task.FromResult(new StoreDownloadedFile(path, Sha256Hex(bytes), bytes.Length));
+                });
 
             Notifier.Setup(n => n.NotifyAsync(It.IsAny<StoreImportProgress>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         }
@@ -299,7 +354,7 @@ public class StoreImportProcessorTests
             var processor = new StoreImportProcessor(
                 Client.Object, Sink.Object, JobRepo.Object, PackRepo.Object, ModelRepo.Object,
                 TextureSetRepo.Object, SoundRepo.Object, SpriteRepo.Object, EnvMapRepo.Object,
-                Hasher.Object, Clock.Object, Uow.Object, Notifier.Object,
+                Clock.Object, Uow.Object, TrackerReset.Object, Notifier.Object,
                 NullLogger<StoreImportProcessor>.Instance);
 
             return processor.ProcessAsync(new StoreImportWorkItem(JobId, StoreUrl, AssetId, Token), CancellationToken.None);

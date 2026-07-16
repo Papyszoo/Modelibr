@@ -30,4 +30,10 @@ internal sealed class StoreImportJobRepository : IStoreImportJobRepository
         _context.UpdateIfDetached(job);
         return Task.CompletedTask;
     }
+
+    public async Task<IReadOnlyList<StoreImportJob>> GetUnfinishedAsync(CancellationToken cancellationToken = default)
+        => await _context.StoreImportJobs
+            .Where(j => j.Status == Domain.ValueObjects.StoreImportJobStatus.Pending
+                || j.Status == Domain.ValueObjects.StoreImportJobStatus.Running)
+            .ToListAsync(cancellationToken);
 }

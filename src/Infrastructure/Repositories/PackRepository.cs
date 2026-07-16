@@ -67,15 +67,9 @@ internal sealed class PackRepository : IPackRepository
 
     public Task<Pack?> GetByStoreImportAsync(string storeUrl, string storeAssetId, CancellationToken cancellationToken = default)
     {
+        // Idempotency probe only — the importer just needs the pack's identity, so no
+        // collection navigations are loaded (a big imported pack would drag hundreds of rows).
         return _context.Packs
-            .Include(p => p.Models)
-            .Include(p => p.TextureSets)
-            .Include(p => p.Sprites)
-            .Include(p => p.Sounds)
-            .Include(p => p.Scripts)
-            .Include(p => p.EnvironmentMaps)
-            .Include(p => p.CustomThumbnailFile)
-            .AsSplitQuery()
             .FirstOrDefaultAsync(
                 p => p.StoreImportUrl == storeUrl && p.StoreImportAssetId == storeAssetId,
                 cancellationToken);
