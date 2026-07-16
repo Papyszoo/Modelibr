@@ -1,6 +1,9 @@
 using System.Threading.Channels;
+using Application.Abstractions;
+using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
 using Application.StoreImports;
+using Domain.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -46,6 +49,8 @@ public sealed class StoreImportQueue : BackgroundService, IStoreImportQueue
     {
         try
         {
+            await FailOrphanedJobsAsync(stoppingToken);
+
             await foreach (var work in _channel.Reader.ReadAllAsync(stoppingToken))
             {
                 try
@@ -68,6 +73,45 @@ public sealed class StoreImportQueue : BackgroundService, IStoreImportQueue
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
             // Normal shutdown.
+        }
+    }
+
+    /// <summary>
+    /// The queue is in-memory, so any job still Pending/Running in the database at startup
+    /// was interrupted by a restart/crash and no worker will ever resume it. Fail those rows
+    /// so a polling UI gets a terminal state instead of an eternal spinner; a fresh import
+    /// gap-fills via provenance + SHA dedupe.
+    /// </summary>
+    private async Task FailOrphanedJobsAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var jobs = scope.ServiceProvider.GetRequiredService<IStoreImportJobRepository>();
+            var clock = scope.ServiceProvider.GetRequiredService<IDateTimeProvider>();
+            var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+
+            var orphaned = await jobs.GetUnfinishedAsync(cancellationToken);
+            if (orphaned.Count == 0)
+                return;
+
+            foreach (var job in orphaned)
+            {
+                job.Fail("Interrupted by an application restart. Start the import again — already-imported items are skipped/gap-filled.", clock.UtcNow);
+                await jobs.UpdateAsync(job, cancellationToken);
+            }
+
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+            _logger.LogWarning("Store import: failed {Count} job(s) orphaned by a previous shutdown", orphaned.Count);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            // The sweep must never prevent the consumer loop from starting.
+            _logger.LogError(ex, "Store import: failed to sweep orphaned jobs at startup");
         }
     }
 }

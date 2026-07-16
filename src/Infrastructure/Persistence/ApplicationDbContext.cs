@@ -6,8 +6,10 @@ using Npgsql;
 
 namespace Infrastructure.Persistence
 {
-    public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : DbContext(options), IUnitOfWork
+    public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : DbContext(options), IUnitOfWork, IChangeTrackerReset
     {
+        void IChangeTrackerReset.Clear() => ChangeTracker.Clear();
+
         // Overridden (not just exposed via the explicit IUnitOfWork member below)
         // so the known-benign-race handling applies no matter which caller
         // reaches SaveChanges: Application-layer command handlers going through

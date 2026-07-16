@@ -2,7 +2,6 @@ using System.Text.Json;
 using Application.Abstractions;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
-using Application.Files;
 using Domain.Models;
 using Domain.Services;
 using Microsoft.Extensions.Logging;
@@ -22,6 +21,10 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
     private const string OutcomeSkippedUnsupported = "skipped-unsupported";
     private const string OutcomeFailed = "failed";
 
+    // Previews carry no manifest size, so they get a fixed modest cap instead of the
+    // multi-GB absolute file cap.
+    private const long PreviewMaxBytes = 33_554_432; // 32 MiB
+
     private readonly IStoreImportClient _client;
     private readonly IStoreImportSink _sink;
     private readonly IStoreImportJobRepository _jobRepository;
@@ -31,9 +34,9 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
     private readonly ISoundRepository _soundRepository;
     private readonly ISpriteRepository _spriteRepository;
     private readonly IEnvironmentMapRepository _environmentMapRepository;
-    private readonly IFileUtilityService _fileUtilityService;
     private readonly IDateTimeProvider _clock;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IChangeTrackerReset _trackerReset;
     private readonly IStoreImportProgressNotifier _notifier;
     private readonly ILogger<StoreImportProcessor> _logger;
 
@@ -47,9 +50,9 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         ISoundRepository soundRepository,
         ISpriteRepository spriteRepository,
         IEnvironmentMapRepository environmentMapRepository,
-        IFileUtilityService fileUtilityService,
         IDateTimeProvider clock,
         IUnitOfWork unitOfWork,
+        IChangeTrackerReset trackerReset,
         IStoreImportProgressNotifier notifier,
         ILogger<StoreImportProcessor> logger)
     {
@@ -62,9 +65,9 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         _soundRepository = soundRepository;
         _spriteRepository = spriteRepository;
         _environmentMapRepository = environmentMapRepository;
-        _fileUtilityService = fileUtilityService;
         _clock = clock;
         _unitOfWork = unitOfWork;
+        _trackerReset = trackerReset;
         _notifier = notifier;
         _logger = logger;
     }
@@ -120,11 +123,16 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
                 }
                 catch (StoreImportException ex)
                 {
+                    // An exception thrown between a handler's staging and its SaveChanges
+                    // leaves poisoned entities in the shared change tracker that would make
+                    // every later save in this scope re-fail — reset before the next item.
+                    _trackerReset.Clear();
                     outcome = new StoreImportItemResult(item.ItemType, item.Name, OutcomeFailed, ex.Message);
                 }
                 catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "Store import: item '{Item}' ({ItemType}) failed", item.Name, item.ItemType);
+                    _trackerReset.Clear();
                     outcome = new StoreImportItemResult(item.ItemType, item.Name, OutcomeFailed, ex.Message);
                 }
 
@@ -144,8 +152,9 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         }
         catch (OperationCanceledException)
         {
-            // Host shutdown / cancellation: leave the job as-is. It is re-runnable and will
-            // gap-fill via provenance + SHA dedupe on the next run.
+            // Host shutdown / cancellation: leave the job as-is here — the queue's startup
+            // sweep marks interrupted jobs Failed on the next boot, and a new import
+            // gap-fills via provenance + SHA dedupe.
             _logger.LogInformation("Store import job {JobId} was cancelled", work.JobId);
         }
         catch (Exception ex)
@@ -153,6 +162,9 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
             _logger.LogError(ex, "Store import job {JobId} aborted", work.JobId);
             try
             {
+                // The abort may have left poisoned entities behind; reset so the failure
+                // state itself can still be persisted (UpdateIfDetached re-attaches the job).
+                _trackerReset.Clear();
                 job.Fail(ex.Message, _clock.UtcNow);
                 await SaveJobAsync(job, CancellationToken.None);
                 await NotifyAsync(job, 0, null, $"Import failed: {ex.Message}", CancellationToken.None);
@@ -195,7 +207,7 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
             {
                 return await _sink.CreatePackAsync(name, description, license, url, ct);
             }
-            catch (StoreImportException ex) when (ex.Message.Contains("PackAlreadyExists", StringComparison.Ordinal))
+            catch (StoreImportException ex) when (ex.ErrorCode == "PackAlreadyExists")
             {
                 // try the next suffix
             }
@@ -212,10 +224,9 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
 
         try
         {
-            // Previews carry no manifest size; 0 lets the client apply its absolute cap.
-            var bytes = await _client.DownloadFileAsync(work.StoreUrl, preview.Url, work.ImportToken, 0, ct);
-            var upload = new InMemoryFileUpload(preview.FileName, bytes, preview.ContentType);
-            await _sink.SetPackThumbnailFromFileAsync(packId, upload, ct);
+            using var download = await _client.DownloadFileAsync(
+                work.StoreUrl, preview.Url, work.ImportToken, expectedSizeBytes: 0, maxBytes: PreviewMaxBytes, ct);
+            await _sink.SetPackThumbnailFromFileAsync(packId, download.ToUpload(preview.FileName, preview.ContentType), ct);
         }
         catch (OperationCanceledException)
         {
@@ -224,6 +235,7 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         catch (Exception ex)
         {
             // Best-effort: a missing/failed pack thumbnail must not fail the import.
+            _trackerReset.Clear();
             _logger.LogWarning(ex, "Store import: failed to attach pack thumbnail for pack {PackId}", packId);
         }
     }
@@ -246,9 +258,9 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         {
             StoreManifestMapping.ImportTarget.Model => await ImportModelAsync(work, packId, item, files, tags, ct),
             StoreManifestMapping.ImportTarget.TextureSet => await ImportTextureSetAsync(work, packId, item, files, tags, ct),
-            StoreManifestMapping.ImportTarget.Sound => await ImportSoundAsync(work, packId, item, files[0], ct),
-            StoreManifestMapping.ImportTarget.Sprite => await ImportSpriteAsync(work, packId, item, files[0], ct),
-            StoreManifestMapping.ImportTarget.EnvironmentMap => await ImportEnvironmentMapAsync(work, packId, item, files[0], ct),
+            StoreManifestMapping.ImportTarget.Sound => await ImportSoundAsync(work, packId, item, files, ct),
+            StoreManifestMapping.ImportTarget.Sprite => await ImportSpriteAsync(work, packId, item, files, ct),
+            StoreManifestMapping.ImportTarget.EnvironmentMap => await ImportEnvironmentMapAsync(work, packId, item, files, ct),
             _ => Skipped(item, OutcomeSkippedUnsupported, $"Unsupported item type '{item.ItemType}'.")
         };
     }
@@ -256,34 +268,53 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
     private async Task<StoreImportItemResult> ImportModelAsync(
         StoreImportWorkItem work, int packId, StoreManifestItem item, IReadOnlyList<StoreManifestFile> files, string[] tags, CancellationToken ct)
     {
-        var meshes = files.Where(f => StoreManifestMapping.ParseRole(f.Role).Kind == StoreManifestMapping.RoleKind.Mesh).ToList();
-        var primary = meshes.FirstOrDefault() ?? files[0];
+        var primary = PickPrimary(files, StoreManifestMapping.RoleKind.Mesh);
 
-        // SHA dedupe: if a model already exists for the primary file hash, link it — no download.
+        // SHA dedupe: if a model already exists for the primary file hash, link it — and
+        // gap-fill any manifest files a previous partial run failed to attach, so re-running
+        // the import repairs the item instead of freezing its gaps forever.
         var existing = await _modelRepository.GetByFileHashAsync(primary.Sha256, ct);
         if (existing != null)
         {
+            var have = existing.Versions
+                .SelectMany(v => v.Files)
+                .Select(f => f.Sha256Hash)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var missing = files.Where(f => f.Sha256 is null || !have.Contains(f.Sha256)).ToList();
+
+            foreach (var file in missing)
+            {
+                using var download = await DownloadAndVerifyAsync(work, file, ct);
+                await _sink.AddFileToModelAsync(existing.Id, download.ToUpload(file.FileName), ct);
+            }
+
             await _sink.AddModelToPackAsync(packId, existing.Id, ct);
-            return Skipped(item, OutcomeSkippedDedupe, "Model already present (deduplicated by SHA-256).");
+            var reason = missing.Count > 0
+                ? $"Model already present (deduplicated by SHA-256); gap-filled {missing.Count} missing file(s)."
+                : "Model already present (deduplicated by SHA-256).";
+            return Skipped(item, OutcomeSkippedDedupe, reason);
         }
 
-        var primaryBytes = await DownloadAndVerifyAsync(work, primary, ct);
-        var modelId = await _sink.CreateModelAsync(new InMemoryFileUpload(primary.FileName, primaryBytes), item.Name, ct);
-
-        foreach (var file in files)
+        using (var primaryDownload = await DownloadAndVerifyAsync(work, primary, ct))
         {
-            if (ReferenceEquals(file, primary))
-                continue;
-            var bytes = await DownloadAndVerifyAsync(work, file, ct);
-            await _sink.AddFileToModelAsync(modelId, new InMemoryFileUpload(file.FileName, bytes), ct);
+            var modelId = await _sink.CreateModelAsync(primaryDownload.ToUpload(primary.FileName), item.Name, ct);
+
+            foreach (var file in files)
+            {
+                if (ReferenceEquals(file, primary))
+                    continue;
+                using var download = await DownloadAndVerifyAsync(work, file, ct);
+                await _sink.AddFileToModelAsync(modelId, download.ToUpload(file.FileName), ct);
+            }
+
+            // Tags (+ item name reused as description) mirror the CLI: applied only when the
+            // manifest carries tags. Models/texture sets are the only per-type tag vocabularies.
+            if (tags.Length > 0)
+                await _sink.SetModelTagsAsync(modelId, tags, item.Name, ct);
+
+            await _sink.AddModelToPackAsync(packId, modelId, ct);
         }
 
-        // Tags (+ item name reused as description) mirror the CLI: applied only when the
-        // manifest carries tags. Models/texture sets are the only per-type tag vocabularies.
-        if (tags.Length > 0)
-            await _sink.SetModelTagsAsync(modelId, tags, item.Name, ct);
-
-        await _sink.AddModelToPackAsync(packId, modelId, ct);
         return Created(item);
     }
 
@@ -296,21 +327,42 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         var existing = await _textureSetRepository.GetByFileHashAsync(first.Sha256, ct);
         if (existing != null)
         {
+            // Same gap-fill contract as models: attach manifest textures missing from the set.
+            var have = existing.Textures
+                .Where(t => t.File is not null)
+                .Select(t => t.File!.Sha256Hash)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var missing = files.Where(f => f.Sha256 is null || !have.Contains(f.Sha256)).ToList();
+
+            foreach (var file in missing)
+            {
+                var role = StoreManifestMapping.ParseRole(file.Role);
+                using var download = await DownloadAndVerifyAsync(work, file, ct);
+                var fileId = await _sink.UploadTextureFileAsync(existing.Id, download.ToUpload(file.FileName), ct);
+                await _sink.AddTextureAsync(existing.Id, fileId, role.TextureType, role.SourceChannel, ct);
+            }
+
             await _sink.AddTextureSetToPackAsync(packId, existing.Id, ct);
-            return Skipped(item, OutcomeSkippedDedupe, "Texture set already present (deduplicated by SHA-256).");
+            var reason = missing.Count > 0
+                ? $"Texture set already present (deduplicated by SHA-256); gap-filled {missing.Count} missing texture(s)."
+                : "Texture set already present (deduplicated by SHA-256).";
+            return Skipped(item, OutcomeSkippedDedupe, reason);
         }
 
         if (firstRole.TextureTypeUnmapped)
             _logger.LogWarning("Store import: texture role '{Role}' not mapped; importing '{File}' as Albedo", first.Role, first.FileName);
 
-        var firstBytes = await DownloadAndVerifyAsync(work, first, ct);
-        var setId = await _sink.CreateTextureSetAsync(new InMemoryFileUpload(first.FileName, firstBytes), item.Name, firstRole.TextureType, ct);
+        int setId;
+        using (var firstDownload = await DownloadAndVerifyAsync(work, first, ct))
+        {
+            setId = await _sink.CreateTextureSetAsync(firstDownload.ToUpload(first.FileName), item.Name, firstRole.TextureType, ct);
+        }
 
         foreach (var file in files.Skip(1))
         {
             var role = StoreManifestMapping.ParseRole(file.Role);
-            var bytes = await DownloadAndVerifyAsync(work, file, ct);
-            var fileId = await _sink.UploadTextureFileAsync(setId, new InMemoryFileUpload(file.FileName, bytes), ct);
+            using var download = await DownloadAndVerifyAsync(work, file, ct);
+            var fileId = await _sink.UploadTextureFileAsync(setId, download.ToUpload(file.FileName), ct);
             await _sink.AddTextureAsync(setId, fileId, role.TextureType, role.SourceChannel, ct);
         }
 
@@ -322,65 +374,75 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
     }
 
     private async Task<StoreImportItemResult> ImportSoundAsync(
-        StoreImportWorkItem work, int packId, StoreManifestItem item, StoreManifestFile file, CancellationToken ct)
+        StoreImportWorkItem work, int packId, StoreManifestItem item, IReadOnlyList<StoreManifestFile> files, CancellationToken ct)
     {
-        var existing = await _soundRepository.GetByFileHashAsync(file.Sha256, ct);
+        var primary = PickPrimary(files, StoreManifestMapping.RoleKind.Audio);
+        var extraNote = ExtraFilesNote(files, "sounds");
+
+        var existing = await _soundRepository.GetByFileHashAsync(primary.Sha256, ct);
         if (existing != null)
         {
             await _sink.AddSoundToPackAsync(packId, existing.Id, ct);
-            return Skipped(item, OutcomeSkippedDedupe, "Sound already present (deduplicated by SHA-256).");
+            return Skipped(item, OutcomeSkippedDedupe, Append("Sound already present (deduplicated by SHA-256).", extraNote));
         }
 
-        var bytes = await DownloadAndVerifyAsync(work, file, ct);
-        var soundId = await _sink.CreateSoundAsync(new InMemoryFileUpload(file.FileName, bytes), item.Name, ct);
+        using var download = await DownloadAndVerifyAsync(work, primary, ct);
+        var soundId = await _sink.CreateSoundAsync(download.ToUpload(primary.FileName), item.Name, ct);
         await _sink.AddSoundToPackAsync(packId, soundId, ct);
-        return Created(item);
+        return Created(item, extraNote);
     }
 
     private async Task<StoreImportItemResult> ImportSpriteAsync(
-        StoreImportWorkItem work, int packId, StoreManifestItem item, StoreManifestFile file, CancellationToken ct)
+        StoreImportWorkItem work, int packId, StoreManifestItem item, IReadOnlyList<StoreManifestFile> files, CancellationToken ct)
     {
-        var existing = await _spriteRepository.GetByFileHashAsync(file.Sha256, ct);
+        var primary = PickPrimary(files, StoreManifestMapping.RoleKind.Image);
+        var extraNote = ExtraFilesNote(files, "sprites");
+
+        var existing = await _spriteRepository.GetByFileHashAsync(primary.Sha256, ct);
         if (existing != null)
         {
             await _sink.AddSpriteToPackAsync(packId, existing.Id, ct);
-            return Skipped(item, OutcomeSkippedDedupe, "Sprite already present (deduplicated by SHA-256).");
+            return Skipped(item, OutcomeSkippedDedupe, Append("Sprite already present (deduplicated by SHA-256).", extraNote));
         }
 
-        var bytes = await DownloadAndVerifyAsync(work, file, ct);
-        var spriteId = await _sink.CreateSpriteAsync(new InMemoryFileUpload(file.FileName, bytes), item.Name, ct);
+        using var download = await DownloadAndVerifyAsync(work, primary, ct);
+        var spriteId = await _sink.CreateSpriteAsync(download.ToUpload(primary.FileName), item.Name, ct);
         await _sink.AddSpriteToPackAsync(packId, spriteId, ct);
-        return Created(item);
+        return Created(item, extraNote);
     }
 
     private async Task<StoreImportItemResult> ImportEnvironmentMapAsync(
-        StoreImportWorkItem work, int packId, StoreManifestItem item, StoreManifestFile file, CancellationToken ct)
+        StoreImportWorkItem work, int packId, StoreManifestItem item, IReadOnlyList<StoreManifestFile> files, CancellationToken ct)
     {
-        var existing = await _environmentMapRepository.GetByFileHashAsync(file.Sha256, ct);
+        var primary = PickPrimary(files, StoreManifestMapping.RoleKind.Panorama);
+        var extraNote = ExtraFilesNote(files, "environment maps");
+
+        var existing = await _environmentMapRepository.GetByFileHashAsync(primary.Sha256, ct);
         if (existing != null)
         {
             await _sink.AddEnvironmentMapToPackAsync(packId, existing.Id, ct);
-            return Skipped(item, OutcomeSkippedDedupe, "Environment map already present (deduplicated by SHA-256).");
+            return Skipped(item, OutcomeSkippedDedupe, Append("Environment map already present (deduplicated by SHA-256).", extraNote));
         }
 
-        var bytes = await DownloadAndVerifyAsync(work, file, ct);
-        var envMapId = await _sink.CreateEnvironmentMapAsync(new InMemoryFileUpload(file.FileName, bytes), item.Name, ct);
+        using var download = await DownloadAndVerifyAsync(work, primary, ct);
+        var envMapId = await _sink.CreateEnvironmentMapAsync(download.ToUpload(primary.FileName), item.Name, ct);
         await _sink.AddEnvironmentMapToPackAsync(packId, envMapId, ct);
-        return Created(item);
+        return Created(item, extraNote);
     }
 
-    private async Task<byte[]> DownloadAndVerifyAsync(StoreImportWorkItem work, StoreManifestFile file, CancellationToken ct)
+    private async Task<StoreDownloadedFile> DownloadAndVerifyAsync(StoreImportWorkItem work, StoreManifestFile file, CancellationToken ct)
     {
-        var bytes = await _client.DownloadFileAsync(work.StoreUrl, file.DownloadUrl, work.ImportToken, file.FileSize, ct);
+        var download = await _client.DownloadFileAsync(work.StoreUrl, file.DownloadUrl, work.ImportToken, file.FileSize, maxBytes: null, ct);
 
-        var actual = await _fileUtilityService.CalculateFileHashAsync(new InMemoryFileUpload(file.FileName, bytes), ct);
-        if (!string.Equals(actual, file.Sha256, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(download.Sha256, file.Sha256, StringComparison.OrdinalIgnoreCase))
         {
+            var actual = download.Sha256;
+            download.Dispose();
             throw new StoreImportException(
                 $"SHA-256 mismatch for '{file.FileName}': manifest '{file.Sha256}', downloaded '{actual}'.");
         }
 
-        return bytes;
+        return download;
     }
 
     private async Task SaveJobAsync(StoreImportJob job, CancellationToken ct)
@@ -408,8 +470,25 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         return _notifier.NotifyAsync(progress, ct);
     }
 
-    private static StoreImportItemResult Created(StoreManifestItem item)
-        => new(item.ItemType, item.Name, OutcomeCreated, null);
+    /// <summary>The file whose role matches the item's expected primary kind, or the first file.</summary>
+    private static StoreManifestFile PickPrimary(IReadOnlyList<StoreManifestFile> files, StoreManifestMapping.RoleKind preferred)
+        => files.FirstOrDefault(f => StoreManifestMapping.ParseRole(f.Role).Kind == preferred) ?? files[0];
+
+    /// <summary>
+    /// Sounds/sprites/environment maps are single-file assets in Modelibr; when the manifest
+    /// item carries more files, the surplus is surfaced in the outcome reason instead of
+    /// being dropped silently.
+    /// </summary>
+    private static string? ExtraFilesNote(IReadOnlyList<StoreManifestFile> files, string assetTypeName)
+        => files.Count > 1
+            ? $"{files.Count - 1} additional file(s) not imported — {assetTypeName} are single-file assets in Modelibr."
+            : null;
+
+    private static string? Append(string reason, string? note)
+        => note is null ? reason : $"{reason} {note}";
+
+    private static StoreImportItemResult Created(StoreManifestItem item, string? reason = null)
+        => new(item.ItemType, item.Name, OutcomeCreated, reason);
 
     private static StoreImportItemResult Skipped(StoreManifestItem item, string outcome, string reason)
         => new(item.ItemType, item.Name, outcome, reason);

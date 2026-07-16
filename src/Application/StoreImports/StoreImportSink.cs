@@ -144,7 +144,7 @@ internal sealed class StoreImportSink : IStoreImportSink
     private static T Unwrap<T>(Result<T> result)
     {
         if (result.IsFailure)
-            throw new StoreImportException($"{result.Error.Code}: {result.Error.Message}");
+            throw StoreImportException.FromError(result.Error.Code, result.Error.Message);
         return result.Value;
     }
 
@@ -152,7 +152,7 @@ internal sealed class StoreImportSink : IStoreImportSink
     {
         var result = await resultTask;
         if (result.IsFailure)
-            throw new StoreImportException($"{result.Error.Code}: {result.Error.Message}");
+            throw StoreImportException.FromError(result.Error.Code, result.Error.Message);
     }
 
     private static async Task RunAsync<T>(Task<Result<T>> resultTask)
