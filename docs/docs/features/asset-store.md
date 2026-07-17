@@ -14,15 +14,16 @@ single quiet status and nothing else in the app is affected.
 
 ## Configuring
 
-Point your instance at a store by setting `VITE_STORE_URL` in your `.env`
-before building/starting the frontend:
+Your instance defaults to the hosted store at `https://store.modelibr.com`. To
+point it elsewhere — a store you self-host, or a local dev store — set
+`VITE_STORE_URL` in your `.env` before building/starting the frontend:
 
 ```bash
 VITE_STORE_URL=https://your-store.example
 ```
 
 `https` is required for remote stores; plain `http` is accepted only for a
-store running on `localhost`.
+store running on `localhost`. Set it empty to disable the store surface.
 
 ## Signing in
 
