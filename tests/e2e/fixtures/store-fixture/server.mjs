@@ -27,12 +27,55 @@ const IMPORT_TOKEN = "e2e-import-token";
 const ASSET_ID = "e2e-props-pack";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
+
+// The shared test-cube.glb is uploaded RAW by other e2e scenarios (e.g.
+// upload-window, model-categories), so serving it byte-identical makes the
+// importer SHA-256-dedupe onto that pre-existing model (named "test-cube")
+// instead of creating "E2E Test Cube" — failing the provenance scenario in
+// full-suite runs. Re-tag the GLB's JSON chunk (spec-compliant asset.extras
+// edit, same technique as fixtures/unique-file-generator.ts) so the store's
+// bytes are unique to the fixture while staying a valid GLB. Deterministic on
+// purpose: retries and re-imports must still dedupe against the FIRST import
+// of this fixture within a run.
+function retagGlb(buffer, marker) {
+    if (buffer.readUInt32LE(0) !== 0x46546c67) {
+        throw new Error("store-fixture: asset is not a GLB");
+    }
+    const jsonLen = buffer.readUInt32LE(12);
+    if (buffer.readUInt32LE(16) !== 0x4e4f534a) {
+        throw new Error("store-fixture: first GLB chunk is not JSON");
+    }
+    const gltf = JSON.parse(
+        buffer
+            .subarray(20, 20 + jsonLen)
+            .toString("utf8")
+            .trim(),
+    );
+    gltf.asset = gltf.asset || { version: "2.0" };
+    gltf.asset.extras = { ...gltf.asset.extras, _storeFixture: marker };
+    let json = JSON.stringify(gltf);
+    json += " ".repeat((4 - (json.length % 4)) % 4);
+    const jsonBuf = Buffer.from(json, "utf8");
+    const bin = buffer.subarray(20 + jsonLen);
+    const out = Buffer.alloc(12 + 8 + jsonBuf.length + bin.length);
+    buffer.copy(out, 0, 0, 12);
+    out.writeUInt32LE(out.length, 8);
+    out.writeUInt32LE(jsonBuf.length, 12);
+    out.writeUInt32LE(0x4e4f534a, 16); // 'JSON'
+    jsonBuf.copy(out, 20);
+    bin.copy(out, 20 + jsonBuf.length);
+    return out;
+}
+
 const files = {
     // fileId → { name, contentType, bytes }
     1: {
         name: "test-cube.glb",
         contentType: "model/gltf-binary",
-        bytes: readFileSync(path.join(here, "assets/test-cube.glb")),
+        bytes: retagGlb(
+            readFileSync(path.join(here, "assets/test-cube.glb")),
+            "e2e-store-fixture",
+        ),
     },
     2: {
         name: "preview.png",

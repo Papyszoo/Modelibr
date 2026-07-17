@@ -15,6 +15,7 @@ import {
   handleStoreResponseError,
   loginToStore,
   mintImportToken,
+  refreshStoreTokensOnce,
   storeClient,
 } from '../storeApi'
 
@@ -162,5 +163,46 @@ describe('handleStoreResponseError (401 refresh flow)', () => {
     expect(state.status).toBe('loggedOut')
     expect(state.accessToken).toBeNull()
     expect(state.error).toMatch(/session expired/i)
+  })
+
+  // Regression: two requests 401ing at the same moment each ran their own
+  // refresh — against a store that rotates refresh tokens on use, the second
+  // refresh (with the now-consumed token) 401ed and logged the user out
+  // right after a successful refresh.
+  it('shares one refresh between concurrent 401s', async () => {
+    loggedInState()
+    postMock.mockResolvedValue({
+      data: { accessToken: 'access-2', refreshToken: 'refresh-2' },
+    })
+    requestMock.mockResolvedValue({ data: 'ok' })
+
+    await Promise.all([
+      handleStoreResponseError(make401('/api/library')),
+      handleStoreResponseError(make401('/api/library?page=2')),
+    ])
+
+    expect(postMock).toHaveBeenCalledTimes(1)
+    expect(useAssetStoreAuthStore.getState().accessToken).toBe('access-2')
+  })
+})
+
+describe('refreshStoreTokensOnce', () => {
+  it('joins an in-flight refresh and starts a new one after it settles', async () => {
+    let resolvePost: (value: unknown) => void = () => {}
+    postMock.mockReturnValueOnce(new Promise(r => (resolvePost = r)))
+
+    const first = refreshStoreTokensOnce('refresh-1')
+    const second = refreshStoreTokensOnce('refresh-1')
+    expect(postMock).toHaveBeenCalledTimes(1)
+
+    resolvePost({ data: { accessToken: 'a2', refreshToken: 'r2' } })
+    const [a, b] = await Promise.all([first, second])
+    expect(a).toBe(b)
+
+    postMock.mockResolvedValue({
+      data: { accessToken: 'a3', refreshToken: 'r3' },
+    })
+    await refreshStoreTokensOnce('r2')
+    expect(postMock).toHaveBeenCalledTimes(2)
   })
 })

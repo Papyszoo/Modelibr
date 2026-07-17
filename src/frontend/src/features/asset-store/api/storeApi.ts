@@ -61,7 +61,7 @@ export async function handleStoreResponseError(
     !isAuthEndpoint
   ) {
     try {
-      const refreshed = await refreshStoreTokens(auth.refreshToken)
+      const refreshed = await refreshStoreTokensOnce(auth.refreshToken)
       useAssetStoreAuthStore.getState().setTokens({
         accessToken: refreshed.accessToken,
         refreshToken: refreshed.refreshToken,
@@ -103,6 +103,27 @@ export async function refreshStoreTokens(
     { refreshToken }
   )
   return response.data
+}
+
+let refreshInFlight: Promise<StoreAuthResponse> | null = null
+
+/**
+ * Single-flight refresh: concurrent 401 retries (or the proactive session
+ * loop racing the interceptor) share ONE refresh call. A store that rotates
+ * refresh tokens on use must never see the same token twice — the loser of
+ * that race would 401 and clear a session that just refreshed successfully.
+ * Callers joining an in-flight refresh get its result regardless of the
+ * token they passed (both callers necessarily hold the same, pre-rotation one).
+ */
+export function refreshStoreTokensOnce(
+  refreshToken: string
+): Promise<StoreAuthResponse> {
+  if (!refreshInFlight) {
+    refreshInFlight = refreshStoreTokens(refreshToken).finally(() => {
+      refreshInFlight = null
+    })
+  }
+  return refreshInFlight
 }
 
 export async function getStoreLibrary(

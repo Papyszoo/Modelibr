@@ -165,4 +165,29 @@ describe('startImport', () => {
 
     expect(entry()).toMatchObject({ phase: 'completed', packId: 7 })
   })
+
+  // Regression: the polled snapshot dropped job.errorMessage, so every
+  // failed import showed a generic "Import failed" with no diagnostic.
+  it('surfaces the backend errorMessage when the job fails', async () => {
+    storeApi.mintImportToken.mockResolvedValue({ token: 'tok-1' })
+    importApi.startStoreImport.mockResolvedValue({ jobId: 9 })
+    importApi.getStoreImportJob.mockResolvedValue(
+      jobDto({
+        status: 'Failed',
+        itemsFailed: 1,
+        errorMessage: 'manifest hash mismatch',
+      })
+    )
+    jest.spyOn(queryClient, 'invalidateQueries').mockResolvedValue()
+
+    const run = startImport(ITEM)
+    await jest.advanceTimersByTimeAsync(0)
+    await jest.advanceTimersByTimeAsync(2500)
+    await run
+
+    expect(entry()).toMatchObject({
+      phase: 'failed',
+      error: 'manifest hash mismatch',
+    })
+  })
 })

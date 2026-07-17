@@ -102,6 +102,25 @@ describe('assetStoreImportStore', () => {
     })
   })
 
+  // Regression: the backend's errorMessage was dropped on the way into the
+  // store, leaving only a generic "Import failed" on the Failed chip.
+  it('carries the backend errorMessage into a failed entry', () => {
+    startedImport('a1', 7)
+    store().applyProgress({
+      jobId: 7,
+      status: 'Failed',
+      packId: null,
+      itemsTotal: 5,
+      itemsProcessed: 3,
+      itemsFailed: 1,
+      errorMessage: 'download failed: 502',
+    })
+    expect(store().imports['a1']).toMatchObject({
+      phase: 'failed',
+      error: 'download failed: 502',
+    })
+  })
+
   // Regression: a re-import starts with beginImport — if the old terminal
   // entry survived, the sticky-terminal rule above would block all progress
   // of the new run.
