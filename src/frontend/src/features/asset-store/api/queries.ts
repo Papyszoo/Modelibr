@@ -31,6 +31,8 @@ export function useStoreLibraryQuery({
   return useQuery({
     ...getStoreLibraryQueryOptions(page),
     enabled: isLoggedIn,
+    // Keep the previous page's tiles on screen while the next page loads.
+    placeholderData: previousData => previousData,
     ...queryConfig,
   })
 }

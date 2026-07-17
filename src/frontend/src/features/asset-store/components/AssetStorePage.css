@@ -81,3 +81,13 @@
 .asset-store-chip--error {
   color: var(--mod-color-danger);
 }
+
+/* Quiet pager row pinned under the scrolling grid. */
+.asset-store-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--mod-space-sm);
+  font-size: var(--mod-text-sm);
+  color: var(--text-color-secondary);
+}

@@ -4,19 +4,20 @@
  * breaks, the page silently degrades to 401s mid-session.
  */
 import { ApiClientError } from '@/lib/apiBase'
+import { queryClient } from '@/lib/react-query'
 import { useAssetStoreAuthStore } from '@/stores/assetStoreAuthStore'
 
 import { loginToStoreSession, logoutOfStoreSession } from '../session'
 
 jest.mock('../../api/storeApi', () => ({
   loginToStore: jest.fn(),
-  refreshStoreTokens: jest.fn(),
+  refreshStoreTokensOnce: jest.fn(),
 }))
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const storeApi = require('../../api/storeApi') as {
   loginToStore: jest.Mock
-  refreshStoreTokens: jest.Mock
+  refreshStoreTokensOnce: jest.Mock
 }
 
 const authState = () => useAssetStoreAuthStore.getState()
@@ -94,22 +95,22 @@ describe('refresh loop', () => {
   // 8-minute proactive refresh the session 401s mid-browse.
   it('refreshes tokens before the access token expires and keeps looping', async () => {
     storeApi.loginToStore.mockResolvedValue(session(1))
-    storeApi.refreshStoreTokens.mockResolvedValue(session(2))
+    storeApi.refreshStoreTokensOnce.mockResolvedValue(session(2))
     await loginToStoreSession('me@example.com', 'pw')
 
     await jest.advanceTimersByTimeAsync(8 * 60 * 1000)
 
-    expect(storeApi.refreshStoreTokens).toHaveBeenCalledWith('refresh-1')
+    expect(storeApi.refreshStoreTokensOnce).toHaveBeenCalledWith('refresh-1')
     expect(authState().accessToken).toBe('access-2')
 
-    storeApi.refreshStoreTokens.mockResolvedValue(session(3))
+    storeApi.refreshStoreTokensOnce.mockResolvedValue(session(3))
     await jest.advanceTimersByTimeAsync(8 * 60 * 1000)
     expect(authState().accessToken).toBe('access-3')
   })
 
   it('logs out when the refresh token is rejected', async () => {
     storeApi.loginToStore.mockResolvedValue(session(1))
-    storeApi.refreshStoreTokens.mockRejectedValue(
+    storeApi.refreshStoreTokensOnce.mockRejectedValue(
       new ApiClientError('invalid refresh token', {
         status: 401,
         isNetworkError: false,
@@ -129,7 +130,7 @@ describe('refresh loop', () => {
   // loop retries sooner instead.
   it('keeps the session and retries after a network failure', async () => {
     storeApi.loginToStore.mockResolvedValue(session(1))
-    storeApi.refreshStoreTokens.mockRejectedValueOnce(
+    storeApi.refreshStoreTokensOnce.mockRejectedValueOnce(
       new ApiClientError('offline', {
         isNetworkError: true,
         isTimeout: false,
@@ -141,7 +142,7 @@ describe('refresh loop', () => {
     await jest.advanceTimersByTimeAsync(8 * 60 * 1000)
     expect(authState().status).toBe('loggedIn')
 
-    storeApi.refreshStoreTokens.mockResolvedValue(session(2))
+    storeApi.refreshStoreTokensOnce.mockResolvedValue(session(2))
     await jest.advanceTimersByTimeAsync(60 * 1000)
     expect(authState().accessToken).toBe('access-2')
   })
@@ -150,13 +151,49 @@ describe('refresh loop', () => {
   // fresh tokens minted for a user who explicitly signed out.
   it('logout cancels the refresh loop', async () => {
     storeApi.loginToStore.mockResolvedValue(session(1))
-    storeApi.refreshStoreTokens.mockResolvedValue(session(2))
+    storeApi.refreshStoreTokensOnce.mockResolvedValue(session(2))
     await loginToStoreSession('me@example.com', 'pw')
 
     logoutOfStoreSession()
     await jest.advanceTimersByTimeAsync(30 * 60 * 1000)
 
-    expect(storeApi.refreshStoreTokens).not.toHaveBeenCalled()
+    expect(storeApi.refreshStoreTokensOnce).not.toHaveBeenCalled()
     expect(authState().status).toBe('loggedOut')
+  })
+
+  // Regression: a logout racing an IN-FLIGHT refresh used to re-arm the
+  // 8-minute timer for a session that no longer existed.
+  it('does not re-arm the loop when logout raced an in-flight refresh', async () => {
+    storeApi.loginToStore.mockResolvedValue(session(1))
+    let resolveRefresh: (value: unknown) => void = () => {}
+    storeApi.refreshStoreTokensOnce.mockReturnValue(
+      new Promise(resolve => (resolveRefresh = resolve))
+    )
+    await loginToStoreSession('me@example.com', 'pw')
+
+    await jest.advanceTimersByTimeAsync(8 * 60 * 1000) // refresh in flight
+    logoutOfStoreSession()
+    resolveRefresh(session(2))
+    await jest.advanceTimersByTimeAsync(0)
+
+    expect(authState().status).toBe('loggedOut')
+    expect(authState().accessToken).toBeNull()
+    expect(jest.getTimerCount()).toBe(0)
+  })
+})
+
+describe('logout cache hygiene', () => {
+  // Regression: the cached library survived logout — with the app's 5-minute
+  // staleTime, a different account logging in could be shown the previous
+  // account's library.
+  it('drops the cached store library on logout', async () => {
+    const removeSpy = jest.spyOn(queryClient, 'removeQueries')
+    storeApi.loginToStore.mockResolvedValue(session(1))
+    await loginToStoreSession('me@example.com', 'pw')
+
+    logoutOfStoreSession()
+
+    expect(removeSpy).toHaveBeenCalledWith({ queryKey: ['store-library'] })
+    removeSpy.mockRestore()
   })
 })

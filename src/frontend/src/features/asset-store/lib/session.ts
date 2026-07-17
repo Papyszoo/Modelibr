@@ -1,7 +1,7 @@
 import { ApiClientError } from '@/lib/apiBase'
 import { useAssetStoreAuthStore } from '@/stores/assetStoreAuthStore'
 
-import { loginToStore, refreshStoreTokens } from '../api/storeApi'
+import { loginToStore, refreshStoreTokensOnce } from '../api/storeApi'
 
 /**
  * Store session lifecycle: login/logout plus the proactive access-token
@@ -35,18 +35,26 @@ async function refreshSession(): Promise<void> {
   }
 
   try {
-    const refreshed = await refreshStoreTokens(auth.refreshToken)
+    // Single-flight (shared with the 401-retry interceptor): a store that
+    // rotates refresh tokens must never receive the same token twice.
+    const refreshed = await refreshStoreTokensOnce(auth.refreshToken)
     useAssetStoreAuthStore.getState().setTokens({
       accessToken: refreshed.accessToken,
       refreshToken: refreshed.refreshToken,
     })
-    scheduleRefresh()
+    // A logout that raced the in-flight refresh wins — don't re-arm a timer
+    // for a session that no longer exists.
+    if (useAssetStoreAuthStore.getState().status === 'loggedIn') {
+      scheduleRefresh()
+    }
   } catch (error) {
     // A rejected refresh token means the session is gone; transient network
     // trouble just retries sooner and leaves the session up (the 401-retry
     // interceptor still guards individual calls).
     if (error instanceof ApiClientError && error.isNetworkError) {
-      refreshTimer = setTimeout(() => void refreshSession(), 60 * 1000)
+      if (useAssetStoreAuthStore.getState().status === 'loggedIn') {
+        refreshTimer = setTimeout(() => void refreshSession(), 60 * 1000)
+      }
       return
     }
     cancelRefreshLoop()

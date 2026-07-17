@@ -36,6 +36,8 @@ interface AssetStoreImportState {
     itemsTotal: number
     itemsProcessed: number
     itemsFailed: number
+    /** Backend failure reason (job errorMessage / hub message) — shown on the Failed chip. */
+    errorMessage?: string | null
   }) => void
   markFailed: (assetId: string, error: string) => void
   clearImport: (assetId: string) => void
@@ -122,7 +124,10 @@ export const useAssetStoreImportStore = create<AssetStoreImportState>(
             itemsProcessed: progress.itemsProcessed,
             itemsFailed: progress.itemsFailed,
             packId: progress.packId ?? entry.packId,
-            error: phase === 'failed' ? (entry.error ?? 'Import failed') : null,
+            error:
+              phase === 'failed'
+                ? (progress.errorMessage ?? entry.error ?? 'Import failed')
+                : null,
           },
         },
       }))

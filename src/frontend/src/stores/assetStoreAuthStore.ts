@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 
+import { queryClient } from '@/lib/react-query'
+
 /**
  * Asset Store session state. Tokens live in MEMORY ONLY — never localStorage,
  * never cookies (store CORS is credential-less by design; a persisted token
@@ -59,5 +61,14 @@ export const useAssetStoreAuthStore = create<AssetStoreAuthState>(set => ({
   setLoginError: message =>
     set({ ...initialState, status: 'loggedOut', error: message }),
 
-  clearSession: error => set({ ...initialState, error: error ?? null }),
+  clearSession: error => {
+    // Every logout path (sign-out, refresh failure) funnels through here —
+    // drop the cached library so a next login (possibly a different account)
+    // can't be served the previous account's data from the 5-min staleTime.
+    // Key literal matches getStoreLibraryQueryOptions in
+    // features/asset-store/api/queries.ts (importing it here would cycle
+    // through storeApi back into this store).
+    queryClient.removeQueries({ queryKey: ['store-library'] })
+    set({ ...initialState, error: error ?? null })
+  },
 }))

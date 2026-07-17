@@ -1,6 +1,7 @@
 import './AssetStorePage.css'
 
 import { Button } from 'primereact/button'
+import { useEffect, useState } from 'react'
 
 import {
   EmptyState,
@@ -12,7 +13,10 @@ import { useAssetStoreAuthStore } from '@/stores/assetStoreAuthStore'
 
 import { useStoreLibraryQuery } from '../api/queries'
 import { logoutOfStoreSession } from '../lib/session'
-import { getConfiguredStoreUrl } from '../lib/storeConfig'
+import {
+  getConfiguredStoreUrl,
+  getStoreUrlConfigError,
+} from '../lib/storeConfig'
 import { StoreLibraryGrid } from './StoreLibraryGrid'
 import { StoreLoginForm } from './StoreLoginForm'
 
@@ -29,7 +33,14 @@ export function AssetStorePage() {
   const username = useAssetStoreAuthStore(state => state.username)
   const isLoggedIn = status === 'loggedIn'
 
-  const library = useStoreLibraryQuery()
+  const [page, setPage] = useState(1)
+  const library = useStoreLibraryQuery({ page })
+
+  // A new session (possibly a different account) starts from page 1 — a
+  // stale page index could point past the new library's last page.
+  useEffect(() => {
+    if (!isLoggedIn) setPage(1)
+  }, [isLoggedIn])
 
   const headerActions = isLoggedIn ? (
     <>
@@ -49,6 +60,16 @@ export function AssetStorePage() {
 
   const renderContent = () => {
     if (!storeUrl) {
+      const configError = getStoreUrlConfigError()
+      if (configError) {
+        return (
+          <EmptyState
+            icon="pi-shopping-bag"
+            title="Store URL rejected"
+            message={`${configError} The configured value is ignored until it is fixed.`}
+          />
+        )
+      }
       return (
         <EmptyState
           icon="pi-shopping-bag"
@@ -76,8 +97,8 @@ export function AssetStorePage() {
       )
     }
 
-    const page = library.data
-    if (!page || page.items.length === 0) {
+    const data = library.data
+    if (!data || data.items.length === 0) {
       return (
         <EmptyState
           icon="pi-shopping-bag"
@@ -95,8 +116,11 @@ export function AssetStorePage() {
       )
     }
 
-    return <StoreLibraryGrid items={page.items} />
+    return <StoreLibraryGrid items={data.items} />
   }
+
+  const totalPages = library.data?.totalPages ?? 0
+  const showPager = isLoggedIn && (totalPages > 1 || page > 1)
 
   return (
     <div className="asset-store-page" data-testid="asset-store-page">
@@ -112,6 +136,31 @@ export function AssetStorePage() {
         actions={headerActions}
       />
       <div className="asset-store-content">{renderContent()}</div>
+      {showPager && (
+        <div className="asset-store-pager" data-testid="asset-store-pager">
+          <Button
+            icon="pi pi-chevron-left"
+            size="small"
+            text
+            disabled={page <= 1 || library.isFetching}
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            aria-label="Previous page"
+            data-testid="asset-store-prev-page"
+          />
+          <span>
+            Page {page} of {Math.max(totalPages, page)}
+          </span>
+          <Button
+            icon="pi pi-chevron-right"
+            size="small"
+            text
+            disabled={page >= totalPages || library.isFetching}
+            onClick={() => setPage(p => p + 1)}
+            aria-label="Next page"
+            data-testid="asset-store-next-page"
+          />
+        </div>
+      )}
     </div>
   )
 }

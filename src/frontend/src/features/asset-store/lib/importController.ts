@@ -25,7 +25,11 @@ function ensureProgressSubscription(): void {
   if (progressSubscribed) return
   progressSubscribed = true
   storeImportSignalRService.onImportProgress(progress => {
-    useAssetStoreImportStore.getState().applyProgress(progress)
+    useAssetStoreImportStore.getState().applyProgress({
+      ...progress,
+      // On failure the hub's message carries the reason ("Import failed: …").
+      errorMessage: progress.status === 'Failed' ? progress.message : null,
+    })
     if (TERMINAL_STATUSES.has(progress.status)) {
       onImportFinished()
     }
@@ -45,6 +49,7 @@ function applyJobSnapshot(job: StoreImportJobDto): void {
     itemsTotal: job.itemsTotal,
     itemsProcessed: job.itemsCreated + job.itemsSkipped + job.itemsFailed,
     itemsFailed: job.itemsFailed,
+    errorMessage: job.errorMessage,
   })
 }
 
@@ -103,13 +108,16 @@ export async function startImport(item: StoreLibraryItem): Promise<void> {
     return
   }
 
-  // Live progress is best-effort; polling below is the guarantee.
+  // Live progress is best-effort; polling is the guarantee. Start polling
+  // BEFORE awaiting the hub join — a slow or failing SignalR connect (demo
+  // mode, hub down) must never delay the progress the poll loop provides.
   ensureProgressSubscription()
+  const polling = pollUntilDone(item.assetId, jobId)
   try {
     await storeImportSignalRService.joinJobGroup(jobId)
   } catch {
     // Hub unavailable (e.g. demo mode) — polling carries the job.
   }
 
-  await pollUntilDone(item.assetId, jobId)
+  await polling
 }

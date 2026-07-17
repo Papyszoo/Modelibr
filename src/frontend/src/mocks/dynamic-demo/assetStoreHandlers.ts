@@ -340,37 +340,18 @@ export const assetStoreHandlers = [
   }),
 
   // ════════════════════════════════════════════════════════════════════════
-  //  SIGNALR (storeImportHub) — no-op stubs; the page falls back to polling
+  //  SIGNALR (storeImportHub) — REJECT the negotiate so connect() fails
+  //  immediately and polling drives progress. (An earlier stub negotiated a
+  //  LongPolling transport whose poll GET hung, which stalled the SignalR
+  //  handshake for its full timeout before the import controller's poll loop
+  //  showed any progress.)
   // ════════════════════════════════════════════════════════════════════════
 
   http.post('*/storeImportHub/negotiate', async () => {
-    return HttpResponse.json(
-      {
-        negotiateVersion: 1,
-        connectionId: 'demo-store-import-connection',
-        connectionToken: 'demo-store-import-token',
-        availableTransports: [
-          { transport: 'LongPolling', transferFormats: ['Text'] },
-        ],
-      },
-      { status: 200 }
-    )
+    return new HttpResponse(null, { status: 503 })
   }),
 
   http.options('*/storeImportHub/negotiate', async () => {
     return new HttpResponse(null, { status: 204 })
-  }),
-
-  http.get('*/storeImportHub', async () => {
-    await new Promise(resolve => setTimeout(resolve, 30000))
-    return new HttpResponse(null, { status: 200 })
-  }),
-
-  http.post('*/storeImportHub', async () => {
-    return new HttpResponse(null, { status: 200 })
-  }),
-
-  http.delete('*/storeImportHub', async () => {
-    return new HttpResponse(null, { status: 202 })
   }),
 ]
