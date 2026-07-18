@@ -374,6 +374,9 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
             }
 
             await _sink.AddModelToPackAsync(packId, existing.Id, ct);
+            if (existing.ModelCategoryId is null
+                && await ResolveCategoryAsync(StoreManifestMapping.ImportTarget.Model, item, ct) is int gapFillCategoryId)
+                await _sink.SetModelCategoryAsync(existing.Id, gapFillCategoryId, ct);
             var reason = missing.Count > 0
                 ? $"Model already present (deduplicated by SHA-256); gap-filled {missing.Count} missing file(s)."
                 : "Model already present (deduplicated by SHA-256).";
@@ -450,6 +453,9 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
             }
 
             await _sink.AddTextureSetToPackAsync(packId, existing.Id, ct);
+            if (existing.TextureSetCategoryId is null
+                && await ResolveCategoryAsync(StoreManifestMapping.ImportTarget.TextureSet, item, ct) is int gapFillCategoryId)
+                await _sink.SetTextureSetCategoryAsync(existing.Id, existing.Name, gapFillCategoryId, ct);
             var reason = missing.Count > 0
                 ? $"Texture set already present (deduplicated by SHA-256); gap-filled {missing.Count} missing texture(s)."
                 : "Texture set already present (deduplicated by SHA-256).";
@@ -492,6 +498,9 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         if (existing != null)
         {
             await _sink.AddSoundToPackAsync(packId, existing.Id, ct);
+            if (existing.SoundCategoryId is null
+                && await ResolveCategoryAsync(StoreManifestMapping.ImportTarget.Sound, item, ct) is int gapFillCategoryId)
+                await _sink.SetSoundCategoryAsync(existing.Id, gapFillCategoryId, ct);
             return Skipped(item, OutcomeSkippedDedupe, Append("Sound already present (deduplicated by SHA-256).", extraNote));
         }
 
@@ -513,6 +522,9 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         if (existing != null)
         {
             await _sink.AddSpriteToPackAsync(packId, existing.Id, ct);
+            if (existing.SpriteCategoryId is null
+                && await ResolveCategoryAsync(StoreManifestMapping.ImportTarget.Sprite, item, ct) is int gapFillCategoryId)
+                await _sink.SetSpriteCategoryAsync(existing.Id, gapFillCategoryId, ct);
             return Skipped(item, OutcomeSkippedDedupe, Append("Sprite already present (deduplicated by SHA-256).", extraNote));
         }
 
@@ -534,6 +546,9 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         if (existing != null)
         {
             await _sink.AddEnvironmentMapToPackAsync(packId, existing.Id, ct);
+            if (existing.EnvironmentMapCategoryId is null
+                && await ResolveCategoryAsync(StoreManifestMapping.ImportTarget.EnvironmentMap, item, ct) is int gapFillCategoryId)
+                await _sink.SetEnvironmentMapCategoryAsync(existing.Id, gapFillCategoryId, ct);
             return Skipped(item, OutcomeSkippedDedupe, Append("Environment map already present (deduplicated by SHA-256).", extraNote));
         }
 
@@ -547,9 +562,11 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         return Created(item, extraNote);
     }
 
-    // Category policy: only newly created assets receive the manifest category — dedupe hits
-    // keep whatever the user (or an earlier import) already assigned. Resolution is
-    // best-effort (see IStoreImportCategoryResolver) and never fails an item.
+    // Category policy: newly created assets receive the manifest category; dedupe hits are
+    // gap-filled ONLY when currently uncategorized — a category the user (or an earlier
+    // import) already assigned is never overwritten, so re-running an import categorizes
+    // assets that predate category support without clobbering manual organization.
+    // Resolution is best-effort (see IStoreImportCategoryResolver) and never fails an item.
     private Task<int?> ResolveCategoryAsync(StoreManifestMapping.ImportTarget target, StoreManifestItem item, CancellationToken ct)
         => _categoryResolver.ResolveAsync(target, StoreManifestMapping.GetItemCategory(item.MetadataJson), ct);
 

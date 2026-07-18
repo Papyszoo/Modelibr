@@ -43,6 +43,17 @@ public interface IStoreImportSink
     Task<int> CreateSpriteAsync(IFileUpload file, string name, string? batchId, int? categoryId, CancellationToken ct);
     Task AddSpriteToPackAsync(int packId, int spriteId, CancellationToken ct);
     Task<int> CreateEnvironmentMapAsync(IFileUpload file, string name, string? batchId, CancellationToken ct);
-    Task SetEnvironmentMapCategoryAsync(int environmentMapId, int categoryId, CancellationToken ct);
     Task AddEnvironmentMapToPackAsync(int packId, int environmentMapId, CancellationToken ct);
+
+    // Category assignment on EXISTING assets — used by the dedupe gap-fill (re-running an
+    // import categorizes assets that predate category support) and by env-map creation
+    // (whose create command has no category parameter). Each implementation preserves the
+    // asset's other user-editable metadata: models/env maps re-send their current tags and
+    // description through the combined update commands; sounds/sprites/texture sets use
+    // updates whose omitted fields mean "unchanged".
+    Task SetModelCategoryAsync(int modelId, int categoryId, CancellationToken ct);
+    Task SetTextureSetCategoryAsync(int textureSetId, string currentName, int categoryId, CancellationToken ct);
+    Task SetSoundCategoryAsync(int soundId, int categoryId, CancellationToken ct);
+    Task SetSpriteCategoryAsync(int spriteId, int categoryId, CancellationToken ct);
+    Task SetEnvironmentMapCategoryAsync(int environmentMapId, int categoryId, CancellationToken ct);
 }

@@ -42,6 +42,10 @@ internal sealed class StoreImportSink : IStoreImportSink
     private readonly ICommandHandler<CreateEnvironmentMapWithFileCommand, CreateEnvironmentMapWithFileResponse> _createEnvironmentMap;
     private readonly ICommandHandler<UpdateEnvironmentMapMetadataCommand, UpdateEnvironmentMapMetadataResponse> _updateEnvironmentMapMetadata;
     private readonly ICommandHandler<AddEnvironmentMapToPackCommand> _addEnvironmentMapToPack;
+    private readonly ICommandHandler<UpdateSoundCommand, UpdateSoundResponse> _updateSound;
+    private readonly ICommandHandler<UpdateSpriteCommand, UpdateSpriteResponse> _updateSprite;
+    private readonly ICommandHandler<UpdateTextureSetCommand, UpdateTextureSetResponse> _updateTextureSet;
+    private readonly IQueryHandler<GetEnvironmentMapByIdQuery, GetEnvironmentMapByIdResponse> _getEnvironmentMap;
 
     public StoreImportSink(
         ICommandHandler<CreatePackCommand, CreatePackResponse> createPack,
@@ -64,7 +68,11 @@ internal sealed class StoreImportSink : IStoreImportSink
         ICommandHandler<AddSpriteToPackCommand> addSpriteToPack,
         ICommandHandler<CreateEnvironmentMapWithFileCommand, CreateEnvironmentMapWithFileResponse> createEnvironmentMap,
         ICommandHandler<UpdateEnvironmentMapMetadataCommand, UpdateEnvironmentMapMetadataResponse> updateEnvironmentMapMetadata,
-        ICommandHandler<AddEnvironmentMapToPackCommand> addEnvironmentMapToPack)
+        ICommandHandler<AddEnvironmentMapToPackCommand> addEnvironmentMapToPack,
+        ICommandHandler<UpdateSoundCommand, UpdateSoundResponse> updateSound,
+        ICommandHandler<UpdateSpriteCommand, UpdateSpriteResponse> updateSprite,
+        ICommandHandler<UpdateTextureSetCommand, UpdateTextureSetResponse> updateTextureSet,
+        IQueryHandler<GetEnvironmentMapByIdQuery, GetEnvironmentMapByIdResponse> getEnvironmentMap)
     {
         _createPack = createPack;
         _setProvenance = setProvenance;
@@ -87,6 +95,10 @@ internal sealed class StoreImportSink : IStoreImportSink
         _createEnvironmentMap = createEnvironmentMap;
         _updateEnvironmentMapMetadata = updateEnvironmentMapMetadata;
         _addEnvironmentMapToPack = addEnvironmentMapToPack;
+        _updateSound = updateSound;
+        _updateSprite = updateSprite;
+        _updateTextureSet = updateTextureSet;
+        _getEnvironmentMap = getEnvironmentMap;
     }
 
     public async Task<int> CreatePackAsync(string name, string? description, string? licenseType, string? url, CancellationToken ct)
@@ -160,13 +172,39 @@ internal sealed class StoreImportSink : IStoreImportSink
         => Unwrap(await _createEnvironmentMap.Handle(
             new CreateEnvironmentMapWithFileCommand(file, CubeFaces: null, Name: name, SizeLabel: null, BatchId: batchId, PackId: null, ProjectId: null), ct)).EnvironmentMapId;
 
-    // Tags: null = leave unchanged; store imports never set environment-map tags anyway.
-    public Task SetEnvironmentMapCategoryAsync(int environmentMapId, int categoryId, CancellationToken ct)
-        => RunAsync<UpdateEnvironmentMapMetadataResponse>(_updateEnvironmentMapMetadata.Handle(
-            new UpdateEnvironmentMapMetadataCommand(environmentMapId, Tags: null, CategoryId: categoryId), ct));
-
     public Task AddEnvironmentMapToPackAsync(int packId, int environmentMapId, CancellationToken ct)
         => RunAsync(_addEnvironmentMapToPack.Handle(new AddEnvironmentMapToPackCommand(packId, environmentMapId), ct));
+
+    // UpdateModelTags is the one command that assigns model categories, but it replaces
+    // tags/description wholesale — so re-send the model's current ones to leave them intact.
+    public async Task SetModelCategoryAsync(int modelId, int categoryId, CancellationToken ct)
+    {
+        var model = Unwrap(await _getModel.Handle(new GetModelByIdQuery(modelId), ct)).Model;
+        await RunAsync<UpdateModelTagsResponse>(_updateModelTags.Handle(
+            new UpdateModelTagsCommand(modelId, model.Tags, model.Description, categoryId), ct));
+    }
+
+    // UpdateTextureSet requires a name; passing the current one is a no-op rename.
+    public Task SetTextureSetCategoryAsync(int textureSetId, string currentName, int categoryId, CancellationToken ct)
+        => RunAsync<UpdateTextureSetResponse>(_updateTextureSet.Handle(
+            new UpdateTextureSetCommand(textureSetId, currentName, categoryId), ct));
+
+    public Task SetSoundCategoryAsync(int soundId, int categoryId, CancellationToken ct)
+        => RunAsync<UpdateSoundResponse>(_updateSound.Handle(
+            new UpdateSoundCommand(soundId, Name: null, CategoryId: categoryId), ct));
+
+    public Task SetSpriteCategoryAsync(int spriteId, int categoryId, CancellationToken ct)
+        => RunAsync<UpdateSpriteResponse>(_updateSprite.Handle(
+            new UpdateSpriteCommand(spriteId, Name: null, SpriteType: null, CategoryId: categoryId), ct));
+
+    // Like UpdateModelTags, the env-map metadata command replaces tags wholesale —
+    // re-send the current ones so only the category changes.
+    public async Task SetEnvironmentMapCategoryAsync(int environmentMapId, int categoryId, CancellationToken ct)
+    {
+        var envMap = Unwrap(await _getEnvironmentMap.Handle(new GetEnvironmentMapByIdQuery(environmentMapId), ct)).EnvironmentMap;
+        await RunAsync<UpdateEnvironmentMapMetadataResponse>(_updateEnvironmentMapMetadata.Handle(
+            new UpdateEnvironmentMapMetadataCommand(environmentMapId, envMap.Tags.ToList(), categoryId), ct));
+    }
 
     private static T Unwrap<T>(Result<T> result)
     {

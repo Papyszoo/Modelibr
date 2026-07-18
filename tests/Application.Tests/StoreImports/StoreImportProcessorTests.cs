@@ -378,19 +378,40 @@ public class StoreImportProcessorTests
     }
 
     [Fact]
-    public async Task Process_DedupedSoundItem_DoesNotResolveOrAssignCategory()
+    public async Task Process_DedupedUncategorizedSound_GapFillsTheManifestCategory()
     {
         var h = new Harness();
         var file = h.MakeFile("u/sound", RandomBytes(), "Audio", "click.ogg");
         h.SetManifest(new StoreManifestItem("Sound", "Click", new[] { file }, null, "item-1", """{"category": "UI"}"""));
         h.SoundRepo.Setup(r => r.GetByFileHashAsync(file.Sha256, It.IsAny<CancellationToken>()))
             .ReturnsAsync(ExistingSound(44));
+        h.CategoryResolver
+            .Setup(r => r.ResolveAsync(StoreManifestMapping.ImportTarget.Sound, "UI", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(77);
 
         await h.Run();
 
-        // Dedupe hits keep the user's existing categorization — the manifest category is
-        // only for newly created assets, so no find-or-create side effects either.
+        // Re-running an import categorizes assets that predate category support —
+        // the same repair contract as the file gap-fill.
+        h.Sink.Verify(s => s.SetSoundCategoryAsync(44, 77, It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Equal(1, h.Job.ItemsSkipped);
+    }
+
+    [Fact]
+    public async Task Process_DedupedAlreadyCategorizedSound_KeepsItsCategory()
+    {
+        var h = new Harness();
+        var file = h.MakeFile("u/sound", RandomBytes(), "Audio", "click.ogg");
+        h.SetManifest(new StoreManifestItem("Sound", "Click", new[] { file }, null, "item-1", """{"category": "UI"}"""));
+        h.SoundRepo.Setup(r => r.GetByFileHashAsync(file.Sha256, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ExistingSound(44, categoryId: 5));
+
+        await h.Run();
+
+        // An existing categorization — the user's or an earlier import's — is never
+        // overwritten, and no find-or-create side effects happen either.
         h.CategoryResolver.Verify(r => r.ResolveAsync(It.IsAny<StoreManifestMapping.ImportTarget>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+        h.Sink.Verify(s => s.SetSoundCategoryAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
         Assert.Equal(1, h.Job.ItemsSkipped);
     }
 
@@ -409,13 +430,13 @@ public class StoreImportProcessorTests
     private static string Sha256Hex(byte[] bytes)
         => Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
 
-    private static Sound ExistingSound(int id)
+    private static Sound ExistingSound(int id, int? categoryId = null)
     {
         var now = DateTime.UtcNow;
         var file = Domain.Models.File.Create(
             "existing.ogg", "existing.ogg", "uploads/existing.ogg", "audio/ogg",
             FileType.Unknown, 10, new string('a', 64), now).WithId(1);
-        return Sound.Create("Existing Sound", file, 0, null, now).WithId(id);
+        return Sound.Create("Existing Sound", file, 0, null, now, categoryId).WithId(id);
     }
 
     /// <summary>
