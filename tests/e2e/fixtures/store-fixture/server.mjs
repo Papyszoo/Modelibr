@@ -94,8 +94,12 @@ const manifest = {
     tags: ["e2e", "props"],
     items: [
         {
+            id: "11111111-1111-1111-1111-111111111111",
             itemType: "Model",
             name: "E2E Test Cube",
+            // Taxonomy v1 category — the importer must find-or-create the
+            // "Props" model category and file the imported model under it.
+            metadataJson: JSON.stringify({ category: "Props" }),
             files: [
                 {
                     fileName: files[1].name,
@@ -116,6 +120,35 @@ const manifest = {
             url: `${PUBLIC_BASE}/api/files/2/download`,
         },
     ],
+};
+
+// Catalog detail (GET /api/assets/{id}) — what the Asset Store tab's pack
+// detail view lists for per-item import selection. Item ids match the
+// manifest's so selectedItemIds round-trip to the importer.
+const assetDetail = {
+    id: ASSET_ID,
+    title: "E2E Props Pack",
+    author: "E2E Fixture",
+    isPack: true,
+    files: [
+        {
+            id: "f1",
+            fileName: files[1].name,
+            relativePath: files[1].name,
+            fileSize: files[1].bytes.length,
+        },
+    ],
+    items: [
+        {
+            id: "11111111-1111-1111-1111-111111111111",
+            itemType: "Model",
+            name: "E2E Test Cube",
+            isPreviewable: true,
+            fileIds: ["f1"],
+            category: "Props",
+        },
+    ],
+    previews: [],
 };
 
 const libraryItem = {
@@ -223,6 +256,11 @@ const server = http.createServer(async (req, res) => {
             scheme: "ImportToken",
             expiresAt: new Date(Date.now() + 600000).toISOString(),
         });
+    }
+
+    if (route === `GET /api/assets/${ASSET_ID}`) {
+        if (!hasBearer(req)) return json(res, 401, { message: "Unauthorized" });
+        return json(res, 200, assetDetail);
     }
 
     if (route === `GET /api/assets/${ASSET_ID}/manifest`) {

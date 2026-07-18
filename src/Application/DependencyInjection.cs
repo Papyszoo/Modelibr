@@ -22,6 +22,7 @@ namespace Application
             // The HTTP client, queue and progress notifier are infrastructure/host concerns
             // and are registered in Infrastructure/WebApi.
             services.AddScoped<Application.StoreImports.IStoreImportSink, Application.StoreImports.StoreImportSink>();
+            services.AddScoped<Application.StoreImports.IStoreImportCategoryResolver, Application.StoreImports.StoreImportCategoryResolver>();
             services.AddScoped<Application.StoreImports.IStoreImportProcessor, Application.StoreImports.StoreImportProcessor>();
             return services;
         }

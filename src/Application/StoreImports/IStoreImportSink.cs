@@ -23,23 +23,26 @@ public interface IStoreImportSink
     // generateThumbnail=false when the caller will attach the store's rendered thumbnail instead.
     Task<int> CreateModelAsync(IFileUpload primaryFile, string name, string? batchId, bool generateThumbnail, CancellationToken ct);
     Task AddFileToModelAsync(int modelId, IFileUpload file, CancellationToken ct);
-    Task SetModelTagsAsync(int modelId, IReadOnlyCollection<string> tags, string description, CancellationToken ct);
+    Task SetModelTagsAsync(int modelId, IReadOnlyCollection<string> tags, string description, int? categoryId, CancellationToken ct);
     Task AddModelToPackAsync(int packId, int modelId, CancellationToken ct);
     /// <summary>Attaches a store-provided thumbnail image to the model's active version (reuses UploadThumbnailCommand).</summary>
     Task SetModelThumbnailFromFileAsync(int modelId, IFileUpload thumbnailFile, CancellationToken ct);
 
     // TextureSet → CreateTextureSetWithFile (first) / UploadFile + AddTextureToSet (rest) / tags / AddTextureSetToPack.
-    Task<int> CreateTextureSetAsync(IFileUpload firstFile, string name, TextureType textureType, string? batchId, CancellationToken ct);
+    // categoryId (here and below) comes from IStoreImportCategoryResolver; null = uncategorized.
+    Task<int> CreateTextureSetAsync(IFileUpload firstFile, string name, TextureType textureType, string? batchId, int? categoryId, CancellationToken ct);
     Task<int> UploadTextureFileAsync(int textureSetId, IFileUpload file, CancellationToken ct);
     Task AddTextureAsync(int textureSetId, int fileId, TextureType textureType, TextureChannel? sourceChannel, CancellationToken ct);
     Task SetTextureSetTagsAsync(int textureSetId, IReadOnlyCollection<string> tags, CancellationToken ct);
     Task AddTextureSetToPackAsync(int packId, int textureSetId, CancellationToken ct);
 
-    // Sound / Sprite / EnvironmentMap → *WithFile create + add-to-pack.
-    Task<int> CreateSoundAsync(IFileUpload file, string name, string? batchId, CancellationToken ct);
+    // Sound / Sprite / EnvironmentMap → *WithFile create + add-to-pack. Sounds and sprites
+    // take the category at creation; environment maps only support it via metadata update.
+    Task<int> CreateSoundAsync(IFileUpload file, string name, string? batchId, int? categoryId, CancellationToken ct);
     Task AddSoundToPackAsync(int packId, int soundId, CancellationToken ct);
-    Task<int> CreateSpriteAsync(IFileUpload file, string name, string? batchId, CancellationToken ct);
+    Task<int> CreateSpriteAsync(IFileUpload file, string name, string? batchId, int? categoryId, CancellationToken ct);
     Task AddSpriteToPackAsync(int packId, int spriteId, CancellationToken ct);
     Task<int> CreateEnvironmentMapAsync(IFileUpload file, string name, string? batchId, CancellationToken ct);
+    Task SetEnvironmentMapCategoryAsync(int environmentMapId, int categoryId, CancellationToken ct);
     Task AddEnvironmentMapToPackAsync(int packId, int environmentMapId, CancellationToken ct);
 }

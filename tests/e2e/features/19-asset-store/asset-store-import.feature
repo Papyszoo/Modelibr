@@ -13,3 +13,4 @@ Feature: Asset Store import
     Then the store import completes with an option to open the pack
     And opening the imported pack shows the pack viewer for "E2E Props Pack"
     And the imported pack "E2E Props Pack" contains the model "E2E Test Cube" with store provenance
+    And the imported model "E2E Test Cube" is filed under the "Props" model category

@@ -50,4 +50,6 @@ an **Imported ✓** badge with a **Re-import** action.
 
 The imported pack records its provenance (store and asset id), keeps the
 store's preview as its thumbnail, and maps store tags onto your per-asset-type
-tag vocabularies.
+tag vocabularies. Items that carry a store taxonomy category arrive already
+organized: the import finds — or creates — a category with that name in the
+matching asset type's category tree and files the item under it.

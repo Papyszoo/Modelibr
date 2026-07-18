@@ -27,6 +27,7 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
 
     private readonly IStoreImportClient _client;
     private readonly IStoreImportSink _sink;
+    private readonly IStoreImportCategoryResolver _categoryResolver;
     private readonly IStoreImportJobRepository _jobRepository;
     private readonly IPackRepository _packRepository;
     private readonly IModelRepository _modelRepository;
@@ -43,6 +44,7 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
     public StoreImportProcessor(
         IStoreImportClient client,
         IStoreImportSink sink,
+        IStoreImportCategoryResolver categoryResolver,
         IStoreImportJobRepository jobRepository,
         IPackRepository packRepository,
         IModelRepository modelRepository,
@@ -58,6 +60,7 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
     {
         _client = client;
         _sink = sink;
+        _categoryResolver = categoryResolver;
         _jobRepository = jobRepository;
         _packRepository = packRepository;
         _modelRepository = modelRepository;
@@ -387,6 +390,8 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
 
         try
         {
+            var categoryId = await ResolveCategoryAsync(StoreManifestMapping.ImportTarget.Model, item, ct);
+
             using var primaryDownload = await DownloadAndVerifyAsync(work, primary, ct);
             var modelId = await _sink.CreateModelAsync(
                 primaryDownload.ToUpload(primary.FileName), item.Name, batchId,
@@ -402,8 +407,10 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
 
             // Tags (+ item name reused as description) mirror the CLI: applied only when the
             // manifest carries tags. Models/texture sets are the only per-type tag vocabularies.
-            if (tags.Length > 0)
-                await _sink.SetModelTagsAsync(modelId, tags, item.Name, ct);
+            // The item category rides the same command (it's UpdateModelTags that assigns
+            // model categories throughout the app).
+            if (tags.Length > 0 || categoryId.HasValue)
+                await _sink.SetModelTagsAsync(modelId, tags, item.Name, categoryId, ct);
 
             await _sink.AddModelToPackAsync(packId, modelId, ct);
 
@@ -452,10 +459,12 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         if (firstRole.TextureTypeUnmapped)
             _logger.LogWarning("Store import: texture role '{Role}' not mapped; importing '{File}' as Albedo", first.Role, first.FileName);
 
+        var categoryId = await ResolveCategoryAsync(StoreManifestMapping.ImportTarget.TextureSet, item, ct);
+
         int setId;
         using (var firstDownload = await DownloadAndVerifyAsync(work, first, ct))
         {
-            setId = await _sink.CreateTextureSetAsync(firstDownload.ToUpload(first.FileName), item.Name, firstRole.TextureType, batchId, ct);
+            setId = await _sink.CreateTextureSetAsync(firstDownload.ToUpload(first.FileName), item.Name, firstRole.TextureType, batchId, categoryId, ct);
         }
 
         foreach (var file in files.Skip(1))
@@ -486,8 +495,10 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
             return Skipped(item, OutcomeSkippedDedupe, Append("Sound already present (deduplicated by SHA-256).", extraNote));
         }
 
+        var categoryId = await ResolveCategoryAsync(StoreManifestMapping.ImportTarget.Sound, item, ct);
+
         using var download = await DownloadAndVerifyAsync(work, primary, ct);
-        var soundId = await _sink.CreateSoundAsync(download.ToUpload(primary.FileName), item.Name, batchId, ct);
+        var soundId = await _sink.CreateSoundAsync(download.ToUpload(primary.FileName), item.Name, batchId, categoryId, ct);
         await _sink.AddSoundToPackAsync(packId, soundId, ct);
         return Created(item, extraNote);
     }
@@ -505,8 +516,10 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
             return Skipped(item, OutcomeSkippedDedupe, Append("Sprite already present (deduplicated by SHA-256).", extraNote));
         }
 
+        var categoryId = await ResolveCategoryAsync(StoreManifestMapping.ImportTarget.Sprite, item, ct);
+
         using var download = await DownloadAndVerifyAsync(work, primary, ct);
-        var spriteId = await _sink.CreateSpriteAsync(download.ToUpload(primary.FileName), item.Name, batchId, ct);
+        var spriteId = await _sink.CreateSpriteAsync(download.ToUpload(primary.FileName), item.Name, batchId, categoryId, ct);
         await _sink.AddSpriteToPackAsync(packId, spriteId, ct);
         return Created(item, extraNote);
     }
@@ -524,11 +537,21 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
             return Skipped(item, OutcomeSkippedDedupe, Append("Environment map already present (deduplicated by SHA-256).", extraNote));
         }
 
+        var categoryId = await ResolveCategoryAsync(StoreManifestMapping.ImportTarget.EnvironmentMap, item, ct);
+
         using var download = await DownloadAndVerifyAsync(work, primary, ct);
         var envMapId = await _sink.CreateEnvironmentMapAsync(download.ToUpload(primary.FileName), item.Name, batchId, ct);
+        if (categoryId.HasValue)
+            await _sink.SetEnvironmentMapCategoryAsync(envMapId, categoryId.Value, ct);
         await _sink.AddEnvironmentMapToPackAsync(packId, envMapId, ct);
         return Created(item, extraNote);
     }
+
+    // Category policy: only newly created assets receive the manifest category — dedupe hits
+    // keep whatever the user (or an earlier import) already assigned. Resolution is
+    // best-effort (see IStoreImportCategoryResolver) and never fails an item.
+    private Task<int?> ResolveCategoryAsync(StoreManifestMapping.ImportTarget target, StoreManifestItem item, CancellationToken ct)
+        => _categoryResolver.ResolveAsync(target, StoreManifestMapping.GetItemCategory(item.MetadataJson), ct);
 
     private async Task<StoreDownloadedFile> DownloadAndVerifyAsync(StoreImportWorkItem work, StoreManifestFile file, CancellationToken ct)
     {

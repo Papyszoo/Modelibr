@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Domain.ValueObjects;
 
 namespace Application.StoreImports;
@@ -137,4 +138,34 @@ public static class StoreManifestMapping
         // GAP (docs/VISION.md): PackItemType.Other has no Modelibr home; skipped and reported.
         _ => ImportTarget.Unsupported
     };
+
+    /// <summary>
+    /// Reads the optional "category" name from an item's metadataJson — the read side of the
+    /// store's CategoryTaxonomy.ValidateItemCategory (taxonomy v1: categories travel as
+    /// <c>{"category": "Name"}</c>). Tolerant by design: missing, blank, non-object or
+    /// malformed metadata yields null; metadata must never fail an import.
+    /// </summary>
+    public static string? GetItemCategory(string? metadataJson)
+    {
+        if (string.IsNullOrWhiteSpace(metadataJson))
+            return null;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(metadataJson);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object
+                || !doc.RootElement.TryGetProperty("category", out var element)
+                || element.ValueKind != JsonValueKind.String)
+            {
+                return null;
+            }
+
+            var name = element.GetString();
+            return string.IsNullOrWhiteSpace(name) ? null : name.Trim();
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
 }

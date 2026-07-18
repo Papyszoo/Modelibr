@@ -52,16 +52,27 @@ export class AssetStorePage {
         return this.page.locator(`[data-store-asset-id="${assetId}"]`);
     }
 
-    importButton(assetId: string): Locator {
-        return this.page.getByTestId(`asset-store-import-${assetId}`);
+    // Import moved into the per-pack detail view (per-item selection): the
+    // grid tile only opens the detail; the detail hosts the import + open
+    // actions.
+    packDetail(): Locator {
+        return this.page.getByTestId("asset-store-detail");
     }
 
-    openInLibraryButton(assetId: string): Locator {
-        return this.page.getByTestId(`asset-store-open-${assetId}`);
+    importSelectedButton(): Locator {
+        return this.page.getByTestId("asset-store-detail-import");
+    }
+
+    openInLibraryButton(): Locator {
+        return this.page.getByTestId("asset-store-detail-open");
     }
 
     async importAsset(assetId: string): Promise<void> {
-        await this.importButton(assetId).click();
-        console.log(`[Action] Started import of ${assetId}`);
+        await this.libraryTile(assetId).click();
+        await expect(this.packDetail()).toBeVisible({ timeout: 15000 });
+        // All items are selected by default — "Import selected (N)" imports
+        // the whole pack.
+        await this.importSelectedButton().click();
+        console.log(`[Action] Started import of ${assetId} from pack detail`);
     }
 }
