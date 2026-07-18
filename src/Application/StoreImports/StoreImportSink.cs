@@ -40,6 +40,7 @@ internal sealed class StoreImportSink : IStoreImportSink
     private readonly ICommandHandler<CreateSpriteWithFileCommand, CreateSpriteWithFileResponse> _createSprite;
     private readonly ICommandHandler<AddSpriteToPackCommand> _addSpriteToPack;
     private readonly ICommandHandler<CreateEnvironmentMapWithFileCommand, CreateEnvironmentMapWithFileResponse> _createEnvironmentMap;
+    private readonly ICommandHandler<UpdateEnvironmentMapMetadataCommand, UpdateEnvironmentMapMetadataResponse> _updateEnvironmentMapMetadata;
     private readonly ICommandHandler<AddEnvironmentMapToPackCommand> _addEnvironmentMapToPack;
 
     public StoreImportSink(
@@ -62,6 +63,7 @@ internal sealed class StoreImportSink : IStoreImportSink
         ICommandHandler<CreateSpriteWithFileCommand, CreateSpriteWithFileResponse> createSprite,
         ICommandHandler<AddSpriteToPackCommand> addSpriteToPack,
         ICommandHandler<CreateEnvironmentMapWithFileCommand, CreateEnvironmentMapWithFileResponse> createEnvironmentMap,
+        ICommandHandler<UpdateEnvironmentMapMetadataCommand, UpdateEnvironmentMapMetadataResponse> updateEnvironmentMapMetadata,
         ICommandHandler<AddEnvironmentMapToPackCommand> addEnvironmentMapToPack)
     {
         _createPack = createPack;
@@ -83,6 +85,7 @@ internal sealed class StoreImportSink : IStoreImportSink
         _createSprite = createSprite;
         _addSpriteToPack = addSpriteToPack;
         _createEnvironmentMap = createEnvironmentMap;
+        _updateEnvironmentMapMetadata = updateEnvironmentMapMetadata;
         _addEnvironmentMapToPack = addEnvironmentMapToPack;
     }
 
@@ -116,15 +119,15 @@ internal sealed class StoreImportSink : IStoreImportSink
             _uploadThumbnail.Handle(new UploadThumbnailCommand(modelId, versionId, thumbnailFile), ct));
     }
 
-    public Task SetModelTagsAsync(int modelId, IReadOnlyCollection<string> tags, string description, CancellationToken ct)
-        => RunAsync<UpdateModelTagsResponse>(_updateModelTags.Handle(new UpdateModelTagsCommand(modelId, tags, description, null), ct));
+    public Task SetModelTagsAsync(int modelId, IReadOnlyCollection<string> tags, string description, int? categoryId, CancellationToken ct)
+        => RunAsync<UpdateModelTagsResponse>(_updateModelTags.Handle(new UpdateModelTagsCommand(modelId, tags, description, categoryId), ct));
 
     public Task AddModelToPackAsync(int packId, int modelId, CancellationToken ct)
         => RunAsync(_addModelToPack.Handle(new AddModelToPackCommand(packId, modelId), ct));
 
-    public async Task<int> CreateTextureSetAsync(IFileUpload firstFile, string name, TextureType textureType, string? batchId, CancellationToken ct)
+    public async Task<int> CreateTextureSetAsync(IFileUpload firstFile, string name, TextureType textureType, string? batchId, int? categoryId, CancellationToken ct)
         => Unwrap(await _createTextureSet.Handle(
-            new CreateTextureSetWithFileCommand(firstFile, name, textureType, BatchId: batchId, Kind: TextureSetKind.ModelSpecific), ct)).TextureSetId;
+            new CreateTextureSetWithFileCommand(firstFile, name, textureType, BatchId: batchId, Kind: TextureSetKind.ModelSpecific, CategoryId: categoryId), ct)).TextureSetId;
 
     public async Task<int> UploadTextureFileAsync(int textureSetId, IFileUpload file, CancellationToken ct)
         => Unwrap(await _uploadFile.Handle(new UploadFileCommand(file, UploadType: "texture", TextureSetId: textureSetId), ct)).FileId;
@@ -139,16 +142,16 @@ internal sealed class StoreImportSink : IStoreImportSink
     public Task AddTextureSetToPackAsync(int packId, int textureSetId, CancellationToken ct)
         => RunAsync(_addTextureSetToPack.Handle(new AddTextureSetToPackCommand(packId, textureSetId), ct));
 
-    public async Task<int> CreateSoundAsync(IFileUpload file, string name, string? batchId, CancellationToken ct)
+    public async Task<int> CreateSoundAsync(IFileUpload file, string name, string? batchId, int? categoryId, CancellationToken ct)
         => Unwrap(await _createSound.Handle(
-            new CreateSoundWithFileCommand(file, name, Duration: 0, Peaks: null, CategoryId: null, BatchId: batchId, PackId: null, ProjectId: null), ct)).SoundId;
+            new CreateSoundWithFileCommand(file, name, Duration: 0, Peaks: null, CategoryId: categoryId, BatchId: batchId, PackId: null, ProjectId: null), ct)).SoundId;
 
     public Task AddSoundToPackAsync(int packId, int soundId, CancellationToken ct)
         => RunAsync(_addSoundToPack.Handle(new AddSoundToPackCommand(packId, soundId), ct));
 
-    public async Task<int> CreateSpriteAsync(IFileUpload file, string name, string? batchId, CancellationToken ct)
+    public async Task<int> CreateSpriteAsync(IFileUpload file, string name, string? batchId, int? categoryId, CancellationToken ct)
         => Unwrap(await _createSprite.Handle(
-            new CreateSpriteWithFileCommand(file, name, SpriteType.Static, CategoryId: null, BatchId: batchId, PackId: null, ProjectId: null), ct)).SpriteId;
+            new CreateSpriteWithFileCommand(file, name, SpriteType.Static, CategoryId: categoryId, BatchId: batchId, PackId: null, ProjectId: null), ct)).SpriteId;
 
     public Task AddSpriteToPackAsync(int packId, int spriteId, CancellationToken ct)
         => RunAsync(_addSpriteToPack.Handle(new AddSpriteToPackCommand(packId, spriteId), ct));
@@ -156,6 +159,11 @@ internal sealed class StoreImportSink : IStoreImportSink
     public async Task<int> CreateEnvironmentMapAsync(IFileUpload file, string name, string? batchId, CancellationToken ct)
         => Unwrap(await _createEnvironmentMap.Handle(
             new CreateEnvironmentMapWithFileCommand(file, CubeFaces: null, Name: name, SizeLabel: null, BatchId: batchId, PackId: null, ProjectId: null), ct)).EnvironmentMapId;
+
+    // Tags: null = leave unchanged; store imports never set environment-map tags anyway.
+    public Task SetEnvironmentMapCategoryAsync(int environmentMapId, int categoryId, CancellationToken ct)
+        => RunAsync<UpdateEnvironmentMapMetadataResponse>(_updateEnvironmentMapMetadata.Handle(
+            new UpdateEnvironmentMapMetadataCommand(environmentMapId, Tags: null, CategoryId: categoryId), ct));
 
     public Task AddEnvironmentMapToPackAsync(int packId, int environmentMapId, CancellationToken ct)
         => RunAsync(_addEnvironmentMapToPack.Handle(new AddEnvironmentMapToPackCommand(packId, environmentMapId), ct));

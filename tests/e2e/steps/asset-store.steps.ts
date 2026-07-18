@@ -44,9 +44,9 @@ Then(
         // The backend job downloads the manifest + files from the fixture and
         // replays them through the upload handlers; generous timeout absorbs a
         // cold thumbnail-queue/db moment, not a render (nothing waits on GPU).
-        await expect(
-            storePage.openInLibraryButton(STORE_ASSET_ID),
-        ).toBeVisible({ timeout: 60000 });
+        await expect(storePage.openInLibraryButton()).toBeVisible({
+            timeout: 60000,
+        });
         console.log("[Assert] Import completed — open-in-library offered");
     },
 );
@@ -55,7 +55,7 @@ Then(
     "opening the imported pack shows the pack viewer for {string}",
     async ({ page }, packName: string) => {
         const storePage = new AssetStorePage(page);
-        await storePage.openInLibraryButton(STORE_ASSET_ID).click();
+        await storePage.openInLibraryButton().click();
         // PackViewer (ContainerViewer) header shows the pack name.
         await expect(
             page.locator(`.container-viewer :text("${packName}")`).first(),
@@ -93,6 +93,40 @@ Then(
         getScenarioState(page).setCustom("importedPackId", pack.id);
         console.log(
             `[Assert] Pack ${pack.id} has provenance + model "${modelName}"`,
+        );
+    },
+);
+
+Then(
+    "the imported model {string} is filed under the {string} model category",
+    async ({ page }, modelName: string, categoryName: string) => {
+        // The fixture manifest carries metadataJson {"category": "Props"} on the
+        // item; the importer must find-or-create that model category and assign
+        // the created model to it (taxonomy v1 integration contract).
+        const categoriesResponse = await page.request.get(
+            `${API_BASE}/model-categories`,
+        );
+        expect(categoriesResponse.ok()).toBe(true);
+        const { categories } = await categoriesResponse.json();
+        const category = (categories || []).find(
+            (c: { name: string }) => c.name === categoryName,
+        );
+        expect(
+            category,
+            `model category "${categoryName}" should exist after import`,
+        ).toBeTruthy();
+
+        const modelsResponse = await page.request.get(`${API_BASE}/models`);
+        expect(modelsResponse.ok()).toBe(true);
+        // Unpaginated /models returns a flat array (backward-compat shape).
+        const models = await modelsResponse.json();
+        const model = (models || []).find(
+            (m: { name: string }) => m.name === modelName,
+        );
+        expect(model, `model "${modelName}" should exist`).toBeTruthy();
+        expect(model.categoryId).toBe(category.id);
+        console.log(
+            `[Assert] Model "${modelName}" is in category "${categoryName}" (id ${category.id})`,
         );
     },
 );

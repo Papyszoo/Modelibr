@@ -36,7 +36,7 @@ public class StoreImportProcessorTests
 
         h.Sink.Verify(s => s.CreateModelAsync(It.IsAny<IFileUpload>(), "Chair", It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Once);
         h.Sink.Verify(s => s.AddFileToModelAsync(101, It.IsAny<IFileUpload>(), It.IsAny<CancellationToken>()), Times.Once);
-        h.Sink.Verify(s => s.SetModelTagsAsync(101, It.Is<IReadOnlyCollection<string>>(t => t.Contains("furniture")), "Chair", It.IsAny<CancellationToken>()), Times.Once);
+        h.Sink.Verify(s => s.SetModelTagsAsync(101, It.Is<IReadOnlyCollection<string>>(t => t.Contains("furniture")), "Chair", It.IsAny<int?>(), It.IsAny<CancellationToken>()), Times.Once);
         h.Sink.Verify(s => s.AddModelToPackAsync(NewPackId, 101, It.IsAny<CancellationToken>()), Times.Once);
         Assert.Equal(1, h.Job.ItemsCreated);
         Assert.Equal(0, h.Job.ItemsFailed);
@@ -49,12 +49,12 @@ public class StoreImportProcessorTests
         var albedo = h.MakeFile("u/albedo", RandomBytes(), "Texture:Albedo", "brick_albedo.png");
         var rough = h.MakeFile("u/rough", RandomBytes(), "Texture:Roughness:G", "brick_orm.png");
         h.SetManifest(Item("TextureSet", "Bricks", albedo, rough));
-        h.Sink.Setup(s => s.CreateTextureSetAsync(It.IsAny<IFileUpload>(), "Bricks", TextureType.Albedo, It.IsAny<string?>(), It.IsAny<CancellationToken>())).ReturnsAsync(201);
+        h.Sink.Setup(s => s.CreateTextureSetAsync(It.IsAny<IFileUpload>(), "Bricks", TextureType.Albedo, It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>())).ReturnsAsync(201);
         h.Sink.Setup(s => s.UploadTextureFileAsync(201, It.IsAny<IFileUpload>(), It.IsAny<CancellationToken>())).ReturnsAsync(301);
 
         await h.Run();
 
-        h.Sink.Verify(s => s.CreateTextureSetAsync(It.IsAny<IFileUpload>(), "Bricks", TextureType.Albedo, It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
+        h.Sink.Verify(s => s.CreateTextureSetAsync(It.IsAny<IFileUpload>(), "Bricks", TextureType.Albedo, It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()), Times.Once);
         h.Sink.Verify(s => s.AddTextureAsync(201, 301, TextureType.Roughness, TextureChannel.G, It.IsAny<CancellationToken>()), Times.Once);
         h.Sink.Verify(s => s.AddTextureSetToPackAsync(NewPackId, 201, It.IsAny<CancellationToken>()), Times.Once);
         Assert.Equal(1, h.Job.ItemsCreated);
@@ -66,11 +66,11 @@ public class StoreImportProcessorTests
         var h = new Harness();
         var opacity = h.MakeFile("u/op", RandomBytes(), "Texture:Opacity", "glass_opacity.png");
         h.SetManifest(Item("TextureSet", "Glass", opacity));
-        h.Sink.Setup(s => s.CreateTextureSetAsync(It.IsAny<IFileUpload>(), "Glass", TextureType.Alpha, It.IsAny<string?>(), It.IsAny<CancellationToken>())).ReturnsAsync(202);
+        h.Sink.Setup(s => s.CreateTextureSetAsync(It.IsAny<IFileUpload>(), "Glass", TextureType.Alpha, It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>())).ReturnsAsync(202);
 
         await h.Run();
 
-        h.Sink.Verify(s => s.CreateTextureSetAsync(It.IsAny<IFileUpload>(), "Glass", TextureType.Alpha, It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
+        h.Sink.Verify(s => s.CreateTextureSetAsync(It.IsAny<IFileUpload>(), "Glass", TextureType.Alpha, It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -79,11 +79,11 @@ public class StoreImportProcessorTests
         var h = new Harness();
         var file = h.MakeFile("u/sprite", RandomBytes(), "Image", "hero.png");
         h.SetManifest(Item("Sprite", "Hero", file));
-        h.Sink.Setup(s => s.CreateSpriteAsync(It.IsAny<IFileUpload>(), "Hero", It.IsAny<string?>(), It.IsAny<CancellationToken>())).ReturnsAsync(501);
+        h.Sink.Setup(s => s.CreateSpriteAsync(It.IsAny<IFileUpload>(), "Hero", It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>())).ReturnsAsync(501);
 
         await h.Run();
 
-        h.Sink.Verify(s => s.CreateSpriteAsync(It.IsAny<IFileUpload>(), "Hero", It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
+        h.Sink.Verify(s => s.CreateSpriteAsync(It.IsAny<IFileUpload>(), "Hero", It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()), Times.Once);
         h.Sink.Verify(s => s.AddSpriteToPackAsync(NewPackId, 501, It.IsAny<CancellationToken>()), Times.Once);
         Assert.Equal(1, h.Job.ItemsCreated);
     }
@@ -94,11 +94,11 @@ public class StoreImportProcessorTests
         var h = new Harness();
         var file = h.MakeFile("u/sound", RandomBytes(), "Audio", "boom.wav");
         h.SetManifest(Item("Sound", "Boom", file));
-        h.Sink.Setup(s => s.CreateSoundAsync(It.IsAny<IFileUpload>(), "Boom", It.IsAny<string?>(), It.IsAny<CancellationToken>())).ReturnsAsync(401);
+        h.Sink.Setup(s => s.CreateSoundAsync(It.IsAny<IFileUpload>(), "Boom", It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>())).ReturnsAsync(401);
 
         await h.Run();
 
-        h.Sink.Verify(s => s.CreateSoundAsync(It.IsAny<IFileUpload>(), "Boom", It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
+        h.Sink.Verify(s => s.CreateSoundAsync(It.IsAny<IFileUpload>(), "Boom", It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()), Times.Once);
         h.Sink.Verify(s => s.AddSoundToPackAsync(NewPackId, 401, It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -110,12 +110,12 @@ public class StoreImportProcessorTests
         var art = h.MakeFile("u/cover", RandomBytes(), "Image", "cover.png");
         var audio = h.MakeFile("u/audio", RandomBytes(), "Audio", "boom.wav");
         h.SetManifest(Item("Sound", "Boom", art, audio));
-        h.Sink.Setup(s => s.CreateSoundAsync(It.IsAny<IFileUpload>(), "Boom", It.IsAny<string?>(), It.IsAny<CancellationToken>())).ReturnsAsync(401);
+        h.Sink.Setup(s => s.CreateSoundAsync(It.IsAny<IFileUpload>(), "Boom", It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>())).ReturnsAsync(401);
 
         await h.Run();
 
         h.Sink.Verify(s => s.CreateSoundAsync(
-            It.Is<IFileUpload>(u => u.FileName == "boom.wav"), "Boom", It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
+            It.Is<IFileUpload>(u => u.FileName == "boom.wav"), "Boom", It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()), Times.Once);
         Assert.Equal(1, h.Job.ItemsCreated);
         // Sounds are single-file assets; the dropped surplus must be visible in the outcome.
         Assert.Contains("additional file(s) not imported", h.Job.ResultJson);
@@ -207,7 +207,7 @@ public class StoreImportProcessorTests
             Item("Sound", "Creak", newSound));
         h.ModelRepo.Setup(r => r.GetByFileHashAsync(mesh.Sha256, It.IsAny<CancellationToken>()))
             .ReturnsAsync(ExistingModel(55, mesh));
-        h.Sink.Setup(s => s.CreateSoundAsync(It.IsAny<IFileUpload>(), "Creak", It.IsAny<string?>(), It.IsAny<CancellationToken>())).ReturnsAsync(401);
+        h.Sink.Setup(s => s.CreateSoundAsync(It.IsAny<IFileUpload>(), "Creak", It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>())).ReturnsAsync(401);
 
         await h.Run();
 
@@ -231,7 +231,7 @@ public class StoreImportProcessorTests
         h.SetManifest(
             Item("Model", "Chair", badMesh),
             Item("Sound", "Boom", goodSound));
-        h.Sink.Setup(s => s.CreateSoundAsync(It.IsAny<IFileUpload>(), "Boom", It.IsAny<string?>(), It.IsAny<CancellationToken>())).ReturnsAsync(401);
+        h.Sink.Setup(s => s.CreateSoundAsync(It.IsAny<IFileUpload>(), "Boom", It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>())).ReturnsAsync(401);
 
         await h.Run();
 
@@ -256,14 +256,14 @@ public class StoreImportProcessorTests
         var audio = h.MakeFile("u/audio", RandomBytes(), "Audio", "boom.wav");
         h.SetManifest(new[] { Item("Model", "Chair", mesh), Item("Sound", "Boom", audio) });
         h.Sink.Setup(s => s.CreateModelAsync(It.IsAny<IFileUpload>(), "Chair", It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync(101);
-        h.Sink.Setup(s => s.CreateSoundAsync(It.IsAny<IFileUpload>(), "Boom", It.IsAny<string?>(), It.IsAny<CancellationToken>())).ReturnsAsync(401);
+        h.Sink.Setup(s => s.CreateSoundAsync(It.IsAny<IFileUpload>(), "Boom", It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>())).ReturnsAsync(401);
 
         await h.Run();
 
         // Every created asset shares the job's batch id so History renders one batch, not N rows.
         var batch = $"store-import-{JobId}";
         h.Sink.Verify(s => s.CreateModelAsync(It.IsAny<IFileUpload>(), "Chair", batch, It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Once);
-        h.Sink.Verify(s => s.CreateSoundAsync(It.IsAny<IFileUpload>(), "Boom", batch, It.IsAny<CancellationToken>()), Times.Once);
+        h.Sink.Verify(s => s.CreateSoundAsync(It.IsAny<IFileUpload>(), "Boom", batch, It.IsAny<int?>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     // ---- reuse store thumbnails instead of regenerating ----
@@ -324,6 +324,76 @@ public class StoreImportProcessorTests
         Assert.Equal(1, h.Job.ItemsCreated);
     }
 
+    // ---- item categories (store taxonomy → Modelibr categories) ----
+
+    [Fact]
+    public async Task Process_SoundItem_WithCategoryMetadata_CreatesSoundInResolvedCategory()
+    {
+        var h = new Harness();
+        var file = h.MakeFile("u/sound", RandomBytes(), "Audio", "click.ogg");
+        h.SetManifest(new StoreManifestItem("Sound", "Click", new[] { file }, null, "item-1", """{"category": "UI"}"""));
+        h.CategoryResolver
+            .Setup(r => r.ResolveAsync(StoreManifestMapping.ImportTarget.Sound, "UI", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(77);
+        h.Sink.Setup(s => s.CreateSoundAsync(It.IsAny<IFileUpload>(), "Click", It.IsAny<string?>(), 77, It.IsAny<CancellationToken>())).ReturnsAsync(401);
+
+        await h.Run();
+
+        h.Sink.Verify(s => s.CreateSoundAsync(It.IsAny<IFileUpload>(), "Click", It.IsAny<string?>(), 77, It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Equal(1, h.Job.ItemsCreated);
+    }
+
+    [Fact]
+    public async Task Process_ModelItem_WithCategoryButNoTags_StillAppliesCategoryViaTagsCommand()
+    {
+        var h = new Harness();
+        var mesh = h.MakeFile("u/mesh", RandomBytes(), "Mesh", "chair.glb");
+        h.SetManifest(new StoreManifestItem("Model", "Chair", new[] { mesh }, null, "item-1", """{"category": "Furniture"}"""));
+        h.CategoryResolver
+            .Setup(r => r.ResolveAsync(StoreManifestMapping.ImportTarget.Model, "Furniture", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(88);
+        h.Sink.Setup(s => s.CreateModelAsync(It.IsAny<IFileUpload>(), "Chair", It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync(101);
+
+        await h.Run();
+
+        // No manifest tags, but the category still needs the UpdateModelTags path — that is
+        // the one command that assigns model categories.
+        h.Sink.Verify(s => s.SetModelTagsAsync(101, It.Is<IReadOnlyCollection<string>>(t => t.Count == 0), "Chair", 88, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Process_EnvironmentMapItem_WithCategory_AppliesItAfterCreation()
+    {
+        var h = new Harness();
+        var file = h.MakeFile("u/env", RandomBytes(), "Panorama", "sky.hdr");
+        h.SetManifest(new StoreManifestItem("EnvironmentMap", "Sky", new[] { file }, null, "item-1", """{"category": "Sky"}"""));
+        h.CategoryResolver
+            .Setup(r => r.ResolveAsync(StoreManifestMapping.ImportTarget.EnvironmentMap, "Sky", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(99);
+        h.Sink.Setup(s => s.CreateEnvironmentMapAsync(It.IsAny<IFileUpload>(), "Sky", It.IsAny<string?>(), It.IsAny<CancellationToken>())).ReturnsAsync(601);
+
+        await h.Run();
+
+        h.Sink.Verify(s => s.SetEnvironmentMapCategoryAsync(601, 99, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Process_DedupedSoundItem_DoesNotResolveOrAssignCategory()
+    {
+        var h = new Harness();
+        var file = h.MakeFile("u/sound", RandomBytes(), "Audio", "click.ogg");
+        h.SetManifest(new StoreManifestItem("Sound", "Click", new[] { file }, null, "item-1", """{"category": "UI"}"""));
+        h.SoundRepo.Setup(r => r.GetByFileHashAsync(file.Sha256, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ExistingSound(44));
+
+        await h.Run();
+
+        // Dedupe hits keep the user's existing categorization — the manifest category is
+        // only for newly created assets, so no find-or-create side effects either.
+        h.CategoryResolver.Verify(r => r.ResolveAsync(It.IsAny<StoreManifestMapping.ImportTarget>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Equal(1, h.Job.ItemsSkipped);
+    }
+
     // ---- helpers ----
 
     private static StoreManifestItem Item(string type, string name, params StoreManifestFile[] files)
@@ -338,6 +408,15 @@ public class StoreImportProcessorTests
 
     private static string Sha256Hex(byte[] bytes)
         => Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+
+    private static Sound ExistingSound(int id)
+    {
+        var now = DateTime.UtcNow;
+        var file = Domain.Models.File.Create(
+            "existing.ogg", "existing.ogg", "uploads/existing.ogg", "audio/ogg",
+            FileType.Unknown, 10, new string('a', 64), now).WithId(1);
+        return Sound.Create("Existing Sound", file, 0, null, now).WithId(id);
+    }
 
     /// <summary>
     /// A persisted-looking model whose active version carries files with the given manifest
@@ -362,6 +441,7 @@ public class StoreImportProcessorTests
     {
         public readonly Mock<IStoreImportClient> Client = new();
         public readonly Mock<IStoreImportSink> Sink = new();
+        public readonly Mock<IStoreImportCategoryResolver> CategoryResolver = new();
         public readonly Mock<IStoreImportJobRepository> JobRepo = new();
         public readonly Mock<IPackRepository> PackRepo = new();
         public readonly Mock<IModelRepository> ModelRepo = new();
@@ -393,6 +473,11 @@ public class StoreImportProcessorTests
             EnvMapRepo.Setup(r => r.GetByFileHashAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync((EnvironmentMap?)null);
 
             Sink.Setup(s => s.CreatePackAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>())).ReturnsAsync(NewPackId);
+
+            // Default: items resolve to no category (the common uncategorized-manifest case).
+            CategoryResolver
+                .Setup(r => r.ResolveAsync(It.IsAny<StoreManifestMapping.ImportTarget>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((int?)null);
 
             // Fake client parks the bytes registered for a URL in a real temp file and
             // hashes them like the real client does, so manifest-hash equality decides
@@ -437,7 +522,7 @@ public class StoreImportProcessorTests
         public Task Run(IReadOnlyList<string>? selectedItemIds = null)
         {
             var processor = new StoreImportProcessor(
-                Client.Object, Sink.Object, JobRepo.Object, PackRepo.Object, ModelRepo.Object,
+                Client.Object, Sink.Object, CategoryResolver.Object, JobRepo.Object, PackRepo.Object, ModelRepo.Object,
                 TextureSetRepo.Object, SoundRepo.Object, SpriteRepo.Object, EnvMapRepo.Object,
                 Clock.Object, Uow.Object, TrackerReset.Object, Notifier.Object,
                 NullLogger<StoreImportProcessor>.Instance);

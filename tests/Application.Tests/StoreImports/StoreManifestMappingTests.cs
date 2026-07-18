@@ -113,4 +113,29 @@ public class StoreManifestMappingTests
     {
         Assert.Equal(expected, StoreManifestMapping.PlanForItem(itemType));
     }
+
+    [Theory]
+    [InlineData("""{"category": "Impacts & Hits"}""", "Impacts & Hits")]
+    [InlineData("""{"category": "  UI  "}""", "UI")]
+    [InlineData("""{"category": "Music", "other": 1}""", "Music")]
+    public void GetItemCategory_ReadsCategoryFromMetadata(string metadataJson, string expected)
+    {
+        Assert.Equal(expected, StoreManifestMapping.GetItemCategory(metadataJson));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("{}")]
+    [InlineData("""{"category": null}""")]
+    [InlineData("""{"category": ""}""")]
+    [InlineData("""{"category": 42}""")]
+    [InlineData("""["category"]""")]
+    [InlineData("not json at all")]
+    public void GetItemCategory_ToleratesMissingOrMalformedMetadata(string? metadataJson)
+    {
+        // Metadata is enrichment — anything unreadable must yield null, never throw.
+        Assert.Null(StoreManifestMapping.GetItemCategory(metadataJson));
+    }
 }
