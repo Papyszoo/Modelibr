@@ -191,14 +191,15 @@ namespace Domain.Models
         /// <param name="modelVersionId">The ID of the model version the file was added to</param>
         /// <param name="modelHash">The SHA256 hash of the uploaded model file</param>
         /// <param name="isNewModel">Whether this is a new model or an existing one</param>
-        public void RaiseModelUploadedEvent(int modelVersionId, string modelHash, bool isNewModel)
+        /// <param name="generateThumbnail">Whether the pipeline should render a thumbnail; false when the caller attaches its own (e.g. a store import).</param>
+        public void RaiseModelUploadedEvent(int modelVersionId, string modelHash, bool isNewModel, bool generateThumbnail = true)
         {
             if (modelVersionId <= 0)
                 throw new ArgumentException("Model version ID must be greater than 0.", nameof(modelVersionId));
             if (string.IsNullOrWhiteSpace(modelHash))
                 throw new ArgumentException("Model hash cannot be null or empty.", nameof(modelHash));
 
-            RaiseDomainEvent(new ModelUploadedEvent(Id, modelVersionId, modelHash, isNewModel));
+            RaiseDomainEvent(new ModelUploadedEvent(Id, modelVersionId, modelHash, isNewModel, generateThumbnail));
         }
 
         /// <summary>

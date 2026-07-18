@@ -7,6 +7,7 @@ using Application.Packs;
 using Application.Sounds;
 using Application.Sprites;
 using Application.TextureSets;
+using Application.Thumbnails;
 using Domain.ValueObjects;
 using SharedKernel;
 
@@ -27,6 +28,8 @@ internal sealed class StoreImportSink : IStoreImportSink
     private readonly ICommandHandler<AddFileToModelCommand, AddFileToModelCommandResponse> _addFileToModel;
     private readonly ICommandHandler<UpdateModelTagsCommand, UpdateModelTagsResponse> _updateModelTags;
     private readonly ICommandHandler<AddModelToPackCommand> _addModelToPack;
+    private readonly ICommandHandler<UploadThumbnailCommand, UploadThumbnailCommandResponse> _uploadThumbnail;
+    private readonly IQueryHandler<GetModelByIdQuery, GetModelByIdQueryResponse> _getModel;
     private readonly ICommandHandler<CreateTextureSetWithFileCommand, CreateTextureSetWithFileResponse> _createTextureSet;
     private readonly ICommandHandler<UploadFileCommand, UploadFileCommandResponse> _uploadFile;
     private readonly ICommandHandler<AddTextureToTextureSetCommand, AddTextureToTextureSetResponse> _addTexture;
@@ -47,6 +50,8 @@ internal sealed class StoreImportSink : IStoreImportSink
         ICommandHandler<AddFileToModelCommand, AddFileToModelCommandResponse> addFileToModel,
         ICommandHandler<UpdateModelTagsCommand, UpdateModelTagsResponse> updateModelTags,
         ICommandHandler<AddModelToPackCommand> addModelToPack,
+        ICommandHandler<UploadThumbnailCommand, UploadThumbnailCommandResponse> uploadThumbnail,
+        IQueryHandler<GetModelByIdQuery, GetModelByIdQueryResponse> getModel,
         ICommandHandler<CreateTextureSetWithFileCommand, CreateTextureSetWithFileResponse> createTextureSet,
         ICommandHandler<UploadFileCommand, UploadFileCommandResponse> uploadFile,
         ICommandHandler<AddTextureToTextureSetCommand, AddTextureToTextureSetResponse> addTexture,
@@ -66,6 +71,8 @@ internal sealed class StoreImportSink : IStoreImportSink
         _addFileToModel = addFileToModel;
         _updateModelTags = updateModelTags;
         _addModelToPack = addModelToPack;
+        _uploadThumbnail = uploadThumbnail;
+        _getModel = getModel;
         _createTextureSet = createTextureSet;
         _uploadFile = uploadFile;
         _addTexture = addTexture;
@@ -91,11 +98,23 @@ internal sealed class StoreImportSink : IStoreImportSink
         await RunAsync(_setPackThumbnail.Handle(new SetPackCustomThumbnailCommand(packId, fileId), ct));
     }
 
-    public async Task<int> CreateModelAsync(IFileUpload primaryFile, string name, CancellationToken ct)
-        => Unwrap(await _addModel.Handle(new AddModelCommand(primaryFile, name), ct)).Id;
+    public async Task<int> CreateModelAsync(IFileUpload primaryFile, string name, string? batchId, bool generateThumbnail, CancellationToken ct)
+        => Unwrap(await _addModel.Handle(new AddModelCommand(primaryFile, name, batchId, generateThumbnail), ct)).Id;
 
     public Task AddFileToModelAsync(int modelId, IFileUpload file, CancellationToken ct)
         => RunAsync<AddFileToModelCommandResponse>(_addFileToModel.Handle(new AddFileToModelCommand(modelId, file), ct));
+
+    public async Task SetModelThumbnailFromFileAsync(int modelId, IFileUpload thumbnailFile, CancellationToken ct)
+    {
+        // Resolve the active version the same way ThumbnailEndpoints does — a freshly imported
+        // model has exactly one (active) version to carry the thumbnail.
+        var model = Unwrap(await _getModel.Handle(new GetModelByIdQuery(modelId), ct)).Model;
+        if (model.ActiveVersionId is not int versionId)
+            throw new StoreImportException($"Model {modelId} has no active version to attach a thumbnail to.");
+
+        await RunAsync<UploadThumbnailCommandResponse>(
+            _uploadThumbnail.Handle(new UploadThumbnailCommand(modelId, versionId, thumbnailFile), ct));
+    }
 
     public Task SetModelTagsAsync(int modelId, IReadOnlyCollection<string> tags, string description, CancellationToken ct)
         => RunAsync<UpdateModelTagsResponse>(_updateModelTags.Handle(new UpdateModelTagsCommand(modelId, tags, description, null), ct));
@@ -103,9 +122,9 @@ internal sealed class StoreImportSink : IStoreImportSink
     public Task AddModelToPackAsync(int packId, int modelId, CancellationToken ct)
         => RunAsync(_addModelToPack.Handle(new AddModelToPackCommand(packId, modelId), ct));
 
-    public async Task<int> CreateTextureSetAsync(IFileUpload firstFile, string name, TextureType textureType, CancellationToken ct)
+    public async Task<int> CreateTextureSetAsync(IFileUpload firstFile, string name, TextureType textureType, string? batchId, CancellationToken ct)
         => Unwrap(await _createTextureSet.Handle(
-            new CreateTextureSetWithFileCommand(firstFile, name, textureType, BatchId: null, Kind: TextureSetKind.ModelSpecific), ct)).TextureSetId;
+            new CreateTextureSetWithFileCommand(firstFile, name, textureType, BatchId: batchId, Kind: TextureSetKind.ModelSpecific), ct)).TextureSetId;
 
     public async Task<int> UploadTextureFileAsync(int textureSetId, IFileUpload file, CancellationToken ct)
         => Unwrap(await _uploadFile.Handle(new UploadFileCommand(file, UploadType: "texture", TextureSetId: textureSetId), ct)).FileId;
@@ -120,23 +139,23 @@ internal sealed class StoreImportSink : IStoreImportSink
     public Task AddTextureSetToPackAsync(int packId, int textureSetId, CancellationToken ct)
         => RunAsync(_addTextureSetToPack.Handle(new AddTextureSetToPackCommand(packId, textureSetId), ct));
 
-    public async Task<int> CreateSoundAsync(IFileUpload file, string name, CancellationToken ct)
+    public async Task<int> CreateSoundAsync(IFileUpload file, string name, string? batchId, CancellationToken ct)
         => Unwrap(await _createSound.Handle(
-            new CreateSoundWithFileCommand(file, name, Duration: 0, Peaks: null, CategoryId: null, BatchId: null, PackId: null, ProjectId: null), ct)).SoundId;
+            new CreateSoundWithFileCommand(file, name, Duration: 0, Peaks: null, CategoryId: null, BatchId: batchId, PackId: null, ProjectId: null), ct)).SoundId;
 
     public Task AddSoundToPackAsync(int packId, int soundId, CancellationToken ct)
         => RunAsync(_addSoundToPack.Handle(new AddSoundToPackCommand(packId, soundId), ct));
 
-    public async Task<int> CreateSpriteAsync(IFileUpload file, string name, CancellationToken ct)
+    public async Task<int> CreateSpriteAsync(IFileUpload file, string name, string? batchId, CancellationToken ct)
         => Unwrap(await _createSprite.Handle(
-            new CreateSpriteWithFileCommand(file, name, SpriteType.Static, CategoryId: null, BatchId: null, PackId: null, ProjectId: null), ct)).SpriteId;
+            new CreateSpriteWithFileCommand(file, name, SpriteType.Static, CategoryId: null, BatchId: batchId, PackId: null, ProjectId: null), ct)).SpriteId;
 
     public Task AddSpriteToPackAsync(int packId, int spriteId, CancellationToken ct)
         => RunAsync(_addSpriteToPack.Handle(new AddSpriteToPackCommand(packId, spriteId), ct));
 
-    public async Task<int> CreateEnvironmentMapAsync(IFileUpload file, string name, CancellationToken ct)
+    public async Task<int> CreateEnvironmentMapAsync(IFileUpload file, string name, string? batchId, CancellationToken ct)
         => Unwrap(await _createEnvironmentMap.Handle(
-            new CreateEnvironmentMapWithFileCommand(file, CubeFaces: null, Name: name, SizeLabel: null, BatchId: null, PackId: null, ProjectId: null), ct)).EnvironmentMapId;
+            new CreateEnvironmentMapWithFileCommand(file, CubeFaces: null, Name: name, SizeLabel: null, BatchId: batchId, PackId: null, ProjectId: null), ct)).EnvironmentMapId;
 
     public Task AddEnvironmentMapToPackAsync(int packId, int environmentMapId, CancellationToken ct)
         => RunAsync(_addEnvironmentMapToPack.Handle(new AddEnvironmentMapToPackCommand(packId, environmentMapId), ct));

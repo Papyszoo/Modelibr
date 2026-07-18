@@ -90,6 +90,15 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
             var manifest = await _client.FetchManifestAsync(work.StoreUrl, work.AssetId, work.ImportToken, cancellationToken);
             var items = manifest.Items ?? Array.Empty<StoreManifestItem>();
 
+            // Partial import: when a selection is present, keep only those manifest items (by store
+            // item id). An empty/absent selection imports the whole pack. Items lacking an id can't
+            // be matched, so they're excluded while a selection is active.
+            if (work.SelectedItemIds is { Count: > 0 })
+            {
+                var wanted = new HashSet<string>(work.SelectedItemIds, StringComparer.OrdinalIgnoreCase);
+                items = items.Where(i => i.Id is not null && wanted.Contains(i.Id)).ToArray();
+            }
+
             job.SetManifestVersion(manifest.SchemaVersion, _clock.UtcNow);
             job.SetItemTotal(items.Count, _clock.UtcNow);
             await SaveJobAsync(job, cancellationToken);
@@ -104,6 +113,10 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
                 .Where(t => !string.IsNullOrWhiteSpace(t))
                 .ToArray();
 
+            // One batch id for the whole import so every created asset groups into a single
+            // upload-history batch (otherwise each Create* handler mints its own id per item).
+            var batchId = $"store-import-{job.Id}";
+
             var results = new List<StoreImportItemResult>(items.Count);
             int created = 0, skipped = 0, failed = 0, processed = 0;
 
@@ -115,7 +128,7 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
                 StoreImportItemResult outcome;
                 try
                 {
-                    outcome = await ImportItemAsync(work, packId, item, tags, cancellationToken);
+                    outcome = await ImportItemAsync(work, packId, item, tags, batchId, cancellationToken);
                 }
                 catch (OperationCanceledException)
                 {
@@ -240,8 +253,77 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         }
     }
 
+    // Content types UploadThumbnailCommand accepts — the store turntable is an animated WebP.
+    private static readonly HashSet<string> ReusableThumbnailContentTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "image/png", "image/jpeg", "image/jpg", "image/webp"
+    };
+
+    /// <summary>
+    /// The store preview to reuse as this model's thumbnail, or null. Prefers the animated
+    /// turntable, then a static thumbnail; requires a browser-renderable image content type
+    /// (Modelibr shows model thumbnails as &lt;img&gt;, and UploadThumbnailCommand rejects others).
+    /// </summary>
+    private static StoreManifestPreview? PickReusableThumbnail(IReadOnlyList<StoreManifestPreview>? previews)
+    {
+        if (previews is null || previews.Count == 0)
+            return null;
+
+        static bool Usable(StoreManifestPreview p)
+            => !string.IsNullOrWhiteSpace(p.Url)
+               && p.ContentType is not null
+               && ReusableThumbnailContentTypes.Contains(p.ContentType);
+
+        return previews.FirstOrDefault(p => IsPreviewType(p, "Turntable") && Usable(p))
+            ?? previews.FirstOrDefault(p => IsPreviewType(p, "Thumbnail") && Usable(p));
+    }
+
+    private static bool IsPreviewType(StoreManifestPreview preview, string type)
+        => string.Equals(preview.Type, type, StringComparison.OrdinalIgnoreCase);
+
+    private async Task<StoreDownloadedFile?> TryDownloadThumbnailAsync(
+        StoreImportWorkItem work, StoreManifestPreview preview, string itemName, CancellationToken ct)
+    {
+        try
+        {
+            return await _client.DownloadFileAsync(
+                work.StoreUrl, preview.Url, work.ImportToken, expectedSizeBytes: 0, maxBytes: PreviewMaxBytes, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            // Falling back to local generation is fine — log and move on.
+            _logger.LogWarning(ex, "Store import: could not fetch the store thumbnail for '{Item}'; will generate one instead", itemName);
+            return null;
+        }
+    }
+
+    private async Task AttachStoreThumbnailBestEffortAsync(
+        int modelId, StoreManifestPreview preview, StoreDownloadedFile download, CancellationToken ct)
+    {
+        try
+        {
+            await _sink.SetModelThumbnailFromFileAsync(modelId, download.ToUpload(preview.FileName, preview.ContentType), ct);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            // The model exists (generation was suppressed) — a failed attach leaves it without a
+            // thumbnail, recoverable via manual regenerate. Reset so a poisoned tracker doesn't
+            // cascade into later items.
+            _trackerReset.Clear();
+            _logger.LogWarning(ex, "Store import: failed to attach the store thumbnail to model {ModelId}", modelId);
+        }
+    }
+
     private async Task<StoreImportItemResult> ImportItemAsync(
-        StoreImportWorkItem work, int packId, StoreManifestItem item, string[] tags, CancellationToken ct)
+        StoreImportWorkItem work, int packId, StoreManifestItem item, string[] tags, string? batchId, CancellationToken ct)
     {
         var target = StoreManifestMapping.PlanForItem(item.ItemType);
         if (target == StoreManifestMapping.ImportTarget.Unsupported)
@@ -256,17 +338,17 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
 
         return target switch
         {
-            StoreManifestMapping.ImportTarget.Model => await ImportModelAsync(work, packId, item, files, tags, ct),
-            StoreManifestMapping.ImportTarget.TextureSet => await ImportTextureSetAsync(work, packId, item, files, tags, ct),
-            StoreManifestMapping.ImportTarget.Sound => await ImportSoundAsync(work, packId, item, files, ct),
-            StoreManifestMapping.ImportTarget.Sprite => await ImportSpriteAsync(work, packId, item, files, ct),
-            StoreManifestMapping.ImportTarget.EnvironmentMap => await ImportEnvironmentMapAsync(work, packId, item, files, ct),
+            StoreManifestMapping.ImportTarget.Model => await ImportModelAsync(work, packId, item, files, tags, batchId, ct),
+            StoreManifestMapping.ImportTarget.TextureSet => await ImportTextureSetAsync(work, packId, item, files, tags, batchId, ct),
+            StoreManifestMapping.ImportTarget.Sound => await ImportSoundAsync(work, packId, item, files, batchId, ct),
+            StoreManifestMapping.ImportTarget.Sprite => await ImportSpriteAsync(work, packId, item, files, batchId, ct),
+            StoreManifestMapping.ImportTarget.EnvironmentMap => await ImportEnvironmentMapAsync(work, packId, item, files, batchId, ct),
             _ => Skipped(item, OutcomeSkippedUnsupported, $"Unsupported item type '{item.ItemType}'.")
         };
     }
 
     private async Task<StoreImportItemResult> ImportModelAsync(
-        StoreImportWorkItem work, int packId, StoreManifestItem item, IReadOnlyList<StoreManifestFile> files, string[] tags, CancellationToken ct)
+        StoreImportWorkItem work, int packId, StoreManifestItem item, IReadOnlyList<StoreManifestFile> files, string[] tags, string? batchId, CancellationToken ct)
     {
         var primary = PickPrimary(files, StoreManifestMapping.RoleKind.Mesh);
 
@@ -295,9 +377,20 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
             return Skipped(item, OutcomeSkippedDedupe, reason);
         }
 
-        using (var primaryDownload = await DownloadAndVerifyAsync(work, primary, ct))
+        // Reuse the store's already-rendered thumbnail (turntable preferred, else static)
+        // instead of re-rendering it locally. Download it FIRST: a failed fetch simply falls
+        // back to normal generation, so the model never ends up with no thumbnail at all.
+        var reusablePreview = PickReusableThumbnail(item.Previews);
+        var thumbnailDownload = reusablePreview is null
+            ? null
+            : await TryDownloadThumbnailAsync(work, reusablePreview, item.Name, ct);
+
+        try
         {
-            var modelId = await _sink.CreateModelAsync(primaryDownload.ToUpload(primary.FileName), item.Name, ct);
+            using var primaryDownload = await DownloadAndVerifyAsync(work, primary, ct);
+            var modelId = await _sink.CreateModelAsync(
+                primaryDownload.ToUpload(primary.FileName), item.Name, batchId,
+                generateThumbnail: thumbnailDownload is null, ct);
 
             foreach (var file in files)
             {
@@ -313,13 +406,20 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
                 await _sink.SetModelTagsAsync(modelId, tags, item.Name, ct);
 
             await _sink.AddModelToPackAsync(packId, modelId, ct);
+
+            if (thumbnailDownload is not null && reusablePreview is not null)
+                await AttachStoreThumbnailBestEffortAsync(modelId, reusablePreview, thumbnailDownload, ct);
+        }
+        finally
+        {
+            thumbnailDownload?.Dispose();
         }
 
         return Created(item);
     }
 
     private async Task<StoreImportItemResult> ImportTextureSetAsync(
-        StoreImportWorkItem work, int packId, StoreManifestItem item, IReadOnlyList<StoreManifestFile> files, string[] tags, CancellationToken ct)
+        StoreImportWorkItem work, int packId, StoreManifestItem item, IReadOnlyList<StoreManifestFile> files, string[] tags, string? batchId, CancellationToken ct)
     {
         var first = files[0];
         var firstRole = StoreManifestMapping.ParseRole(first.Role);
@@ -355,7 +455,7 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         int setId;
         using (var firstDownload = await DownloadAndVerifyAsync(work, first, ct))
         {
-            setId = await _sink.CreateTextureSetAsync(firstDownload.ToUpload(first.FileName), item.Name, firstRole.TextureType, ct);
+            setId = await _sink.CreateTextureSetAsync(firstDownload.ToUpload(first.FileName), item.Name, firstRole.TextureType, batchId, ct);
         }
 
         foreach (var file in files.Skip(1))
@@ -374,7 +474,7 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
     }
 
     private async Task<StoreImportItemResult> ImportSoundAsync(
-        StoreImportWorkItem work, int packId, StoreManifestItem item, IReadOnlyList<StoreManifestFile> files, CancellationToken ct)
+        StoreImportWorkItem work, int packId, StoreManifestItem item, IReadOnlyList<StoreManifestFile> files, string? batchId, CancellationToken ct)
     {
         var primary = PickPrimary(files, StoreManifestMapping.RoleKind.Audio);
         var extraNote = ExtraFilesNote(files, "sounds");
@@ -387,13 +487,13 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         }
 
         using var download = await DownloadAndVerifyAsync(work, primary, ct);
-        var soundId = await _sink.CreateSoundAsync(download.ToUpload(primary.FileName), item.Name, ct);
+        var soundId = await _sink.CreateSoundAsync(download.ToUpload(primary.FileName), item.Name, batchId, ct);
         await _sink.AddSoundToPackAsync(packId, soundId, ct);
         return Created(item, extraNote);
     }
 
     private async Task<StoreImportItemResult> ImportSpriteAsync(
-        StoreImportWorkItem work, int packId, StoreManifestItem item, IReadOnlyList<StoreManifestFile> files, CancellationToken ct)
+        StoreImportWorkItem work, int packId, StoreManifestItem item, IReadOnlyList<StoreManifestFile> files, string? batchId, CancellationToken ct)
     {
         var primary = PickPrimary(files, StoreManifestMapping.RoleKind.Image);
         var extraNote = ExtraFilesNote(files, "sprites");
@@ -406,13 +506,13 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         }
 
         using var download = await DownloadAndVerifyAsync(work, primary, ct);
-        var spriteId = await _sink.CreateSpriteAsync(download.ToUpload(primary.FileName), item.Name, ct);
+        var spriteId = await _sink.CreateSpriteAsync(download.ToUpload(primary.FileName), item.Name, batchId, ct);
         await _sink.AddSpriteToPackAsync(packId, spriteId, ct);
         return Created(item, extraNote);
     }
 
     private async Task<StoreImportItemResult> ImportEnvironmentMapAsync(
-        StoreImportWorkItem work, int packId, StoreManifestItem item, IReadOnlyList<StoreManifestFile> files, CancellationToken ct)
+        StoreImportWorkItem work, int packId, StoreManifestItem item, IReadOnlyList<StoreManifestFile> files, string? batchId, CancellationToken ct)
     {
         var primary = PickPrimary(files, StoreManifestMapping.RoleKind.Panorama);
         var extraNote = ExtraFilesNote(files, "environment maps");
@@ -425,7 +525,7 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         }
 
         using var download = await DownloadAndVerifyAsync(work, primary, ct);
-        var envMapId = await _sink.CreateEnvironmentMapAsync(download.ToUpload(primary.FileName), item.Name, ct);
+        var envMapId = await _sink.CreateEnvironmentMapAsync(download.ToUpload(primary.FileName), item.Name, batchId, ct);
         await _sink.AddEnvironmentMapToPackAsync(packId, envMapId, ct);
         return Created(item, extraNote);
     }

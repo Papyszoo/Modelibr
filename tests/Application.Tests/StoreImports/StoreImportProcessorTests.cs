@@ -30,11 +30,11 @@ public class StoreImportProcessorTests
         var mesh = h.MakeFile("u/mesh", RandomBytes(), "Mesh", "chair.glb");
         var extra = h.MakeFile("u/extra", RandomBytes(), "Image", "chair_albedo.png");
         h.SetManifest(Item("Model", "Chair", mesh, extra), tags: new[] { "furniture" });
-        h.Sink.Setup(s => s.CreateModelAsync(It.IsAny<IFileUpload>(), "Chair", It.IsAny<CancellationToken>())).ReturnsAsync(101);
+        h.Sink.Setup(s => s.CreateModelAsync(It.IsAny<IFileUpload>(), "Chair", It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync(101);
 
         await h.Run();
 
-        h.Sink.Verify(s => s.CreateModelAsync(It.IsAny<IFileUpload>(), "Chair", It.IsAny<CancellationToken>()), Times.Once);
+        h.Sink.Verify(s => s.CreateModelAsync(It.IsAny<IFileUpload>(), "Chair", It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Once);
         h.Sink.Verify(s => s.AddFileToModelAsync(101, It.IsAny<IFileUpload>(), It.IsAny<CancellationToken>()), Times.Once);
         h.Sink.Verify(s => s.SetModelTagsAsync(101, It.Is<IReadOnlyCollection<string>>(t => t.Contains("furniture")), "Chair", It.IsAny<CancellationToken>()), Times.Once);
         h.Sink.Verify(s => s.AddModelToPackAsync(NewPackId, 101, It.IsAny<CancellationToken>()), Times.Once);
@@ -49,12 +49,12 @@ public class StoreImportProcessorTests
         var albedo = h.MakeFile("u/albedo", RandomBytes(), "Texture:Albedo", "brick_albedo.png");
         var rough = h.MakeFile("u/rough", RandomBytes(), "Texture:Roughness:G", "brick_orm.png");
         h.SetManifest(Item("TextureSet", "Bricks", albedo, rough));
-        h.Sink.Setup(s => s.CreateTextureSetAsync(It.IsAny<IFileUpload>(), "Bricks", TextureType.Albedo, It.IsAny<CancellationToken>())).ReturnsAsync(201);
+        h.Sink.Setup(s => s.CreateTextureSetAsync(It.IsAny<IFileUpload>(), "Bricks", TextureType.Albedo, It.IsAny<string?>(), It.IsAny<CancellationToken>())).ReturnsAsync(201);
         h.Sink.Setup(s => s.UploadTextureFileAsync(201, It.IsAny<IFileUpload>(), It.IsAny<CancellationToken>())).ReturnsAsync(301);
 
         await h.Run();
 
-        h.Sink.Verify(s => s.CreateTextureSetAsync(It.IsAny<IFileUpload>(), "Bricks", TextureType.Albedo, It.IsAny<CancellationToken>()), Times.Once);
+        h.Sink.Verify(s => s.CreateTextureSetAsync(It.IsAny<IFileUpload>(), "Bricks", TextureType.Albedo, It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
         h.Sink.Verify(s => s.AddTextureAsync(201, 301, TextureType.Roughness, TextureChannel.G, It.IsAny<CancellationToken>()), Times.Once);
         h.Sink.Verify(s => s.AddTextureSetToPackAsync(NewPackId, 201, It.IsAny<CancellationToken>()), Times.Once);
         Assert.Equal(1, h.Job.ItemsCreated);
@@ -66,11 +66,11 @@ public class StoreImportProcessorTests
         var h = new Harness();
         var opacity = h.MakeFile("u/op", RandomBytes(), "Texture:Opacity", "glass_opacity.png");
         h.SetManifest(Item("TextureSet", "Glass", opacity));
-        h.Sink.Setup(s => s.CreateTextureSetAsync(It.IsAny<IFileUpload>(), "Glass", TextureType.Alpha, It.IsAny<CancellationToken>())).ReturnsAsync(202);
+        h.Sink.Setup(s => s.CreateTextureSetAsync(It.IsAny<IFileUpload>(), "Glass", TextureType.Alpha, It.IsAny<string?>(), It.IsAny<CancellationToken>())).ReturnsAsync(202);
 
         await h.Run();
 
-        h.Sink.Verify(s => s.CreateTextureSetAsync(It.IsAny<IFileUpload>(), "Glass", TextureType.Alpha, It.IsAny<CancellationToken>()), Times.Once);
+        h.Sink.Verify(s => s.CreateTextureSetAsync(It.IsAny<IFileUpload>(), "Glass", TextureType.Alpha, It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -79,11 +79,11 @@ public class StoreImportProcessorTests
         var h = new Harness();
         var file = h.MakeFile("u/sprite", RandomBytes(), "Image", "hero.png");
         h.SetManifest(Item("Sprite", "Hero", file));
-        h.Sink.Setup(s => s.CreateSpriteAsync(It.IsAny<IFileUpload>(), "Hero", It.IsAny<CancellationToken>())).ReturnsAsync(501);
+        h.Sink.Setup(s => s.CreateSpriteAsync(It.IsAny<IFileUpload>(), "Hero", It.IsAny<string?>(), It.IsAny<CancellationToken>())).ReturnsAsync(501);
 
         await h.Run();
 
-        h.Sink.Verify(s => s.CreateSpriteAsync(It.IsAny<IFileUpload>(), "Hero", It.IsAny<CancellationToken>()), Times.Once);
+        h.Sink.Verify(s => s.CreateSpriteAsync(It.IsAny<IFileUpload>(), "Hero", It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
         h.Sink.Verify(s => s.AddSpriteToPackAsync(NewPackId, 501, It.IsAny<CancellationToken>()), Times.Once);
         Assert.Equal(1, h.Job.ItemsCreated);
     }
@@ -94,11 +94,11 @@ public class StoreImportProcessorTests
         var h = new Harness();
         var file = h.MakeFile("u/sound", RandomBytes(), "Audio", "boom.wav");
         h.SetManifest(Item("Sound", "Boom", file));
-        h.Sink.Setup(s => s.CreateSoundAsync(It.IsAny<IFileUpload>(), "Boom", It.IsAny<CancellationToken>())).ReturnsAsync(401);
+        h.Sink.Setup(s => s.CreateSoundAsync(It.IsAny<IFileUpload>(), "Boom", It.IsAny<string?>(), It.IsAny<CancellationToken>())).ReturnsAsync(401);
 
         await h.Run();
 
-        h.Sink.Verify(s => s.CreateSoundAsync(It.IsAny<IFileUpload>(), "Boom", It.IsAny<CancellationToken>()), Times.Once);
+        h.Sink.Verify(s => s.CreateSoundAsync(It.IsAny<IFileUpload>(), "Boom", It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
         h.Sink.Verify(s => s.AddSoundToPackAsync(NewPackId, 401, It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -110,12 +110,12 @@ public class StoreImportProcessorTests
         var art = h.MakeFile("u/cover", RandomBytes(), "Image", "cover.png");
         var audio = h.MakeFile("u/audio", RandomBytes(), "Audio", "boom.wav");
         h.SetManifest(Item("Sound", "Boom", art, audio));
-        h.Sink.Setup(s => s.CreateSoundAsync(It.IsAny<IFileUpload>(), "Boom", It.IsAny<CancellationToken>())).ReturnsAsync(401);
+        h.Sink.Setup(s => s.CreateSoundAsync(It.IsAny<IFileUpload>(), "Boom", It.IsAny<string?>(), It.IsAny<CancellationToken>())).ReturnsAsync(401);
 
         await h.Run();
 
         h.Sink.Verify(s => s.CreateSoundAsync(
-            It.Is<IFileUpload>(u => u.FileName == "boom.wav"), "Boom", It.IsAny<CancellationToken>()), Times.Once);
+            It.Is<IFileUpload>(u => u.FileName == "boom.wav"), "Boom", It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
         Assert.Equal(1, h.Job.ItemsCreated);
         // Sounds are single-file assets; the dropped surplus must be visible in the outcome.
         Assert.Contains("additional file(s) not imported", h.Job.ResultJson);
@@ -127,11 +127,11 @@ public class StoreImportProcessorTests
         var h = new Harness();
         var file = h.MakeFile("u/env", RandomBytes(), "Panorama", "sky.hdr");
         h.SetManifest(Item("EnvironmentMap", "Sky", file));
-        h.Sink.Setup(s => s.CreateEnvironmentMapAsync(It.IsAny<IFileUpload>(), "Sky", It.IsAny<CancellationToken>())).ReturnsAsync(601);
+        h.Sink.Setup(s => s.CreateEnvironmentMapAsync(It.IsAny<IFileUpload>(), "Sky", It.IsAny<string?>(), It.IsAny<CancellationToken>())).ReturnsAsync(601);
 
         await h.Run();
 
-        h.Sink.Verify(s => s.CreateEnvironmentMapAsync(It.IsAny<IFileUpload>(), "Sky", It.IsAny<CancellationToken>()), Times.Once);
+        h.Sink.Verify(s => s.CreateEnvironmentMapAsync(It.IsAny<IFileUpload>(), "Sky", It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
         h.Sink.Verify(s => s.AddEnvironmentMapToPackAsync(NewPackId, 601, It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -164,7 +164,7 @@ public class StoreImportProcessorTests
         await h.Run();
 
         h.Client.Verify(c => c.DownloadFileAsync(It.IsAny<string>(), "u/mesh", It.IsAny<string>(), It.IsAny<long>(), It.IsAny<long?>(), It.IsAny<CancellationToken>()), Times.Never);
-        h.Sink.Verify(s => s.CreateModelAsync(It.IsAny<IFileUpload>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        h.Sink.Verify(s => s.CreateModelAsync(It.IsAny<IFileUpload>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
         h.Sink.Verify(s => s.AddModelToPackAsync(NewPackId, 55, It.IsAny<CancellationToken>()), Times.Once);
         Assert.Equal(1, h.Job.ItemsSkipped);
         Assert.Equal(0, h.Job.ItemsCreated);
@@ -207,7 +207,7 @@ public class StoreImportProcessorTests
             Item("Sound", "Creak", newSound));
         h.ModelRepo.Setup(r => r.GetByFileHashAsync(mesh.Sha256, It.IsAny<CancellationToken>()))
             .ReturnsAsync(ExistingModel(55, mesh));
-        h.Sink.Setup(s => s.CreateSoundAsync(It.IsAny<IFileUpload>(), "Creak", It.IsAny<CancellationToken>())).ReturnsAsync(401);
+        h.Sink.Setup(s => s.CreateSoundAsync(It.IsAny<IFileUpload>(), "Creak", It.IsAny<string?>(), It.IsAny<CancellationToken>())).ReturnsAsync(401);
 
         await h.Run();
 
@@ -231,11 +231,11 @@ public class StoreImportProcessorTests
         h.SetManifest(
             Item("Model", "Chair", badMesh),
             Item("Sound", "Boom", goodSound));
-        h.Sink.Setup(s => s.CreateSoundAsync(It.IsAny<IFileUpload>(), "Boom", It.IsAny<CancellationToken>())).ReturnsAsync(401);
+        h.Sink.Setup(s => s.CreateSoundAsync(It.IsAny<IFileUpload>(), "Boom", It.IsAny<string?>(), It.IsAny<CancellationToken>())).ReturnsAsync(401);
 
         await h.Run();
 
-        h.Sink.Verify(s => s.CreateModelAsync(It.IsAny<IFileUpload>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        h.Sink.Verify(s => s.CreateModelAsync(It.IsAny<IFileUpload>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
         h.Sink.Verify(s => s.AddSoundToPackAsync(NewPackId, 401, It.IsAny<CancellationToken>()), Times.Once);
         Assert.Equal(1, h.Job.ItemsFailed);
         Assert.Equal(1, h.Job.ItemsCreated);
@@ -244,6 +244,84 @@ public class StoreImportProcessorTests
         // A failed item may leave poisoned staged entities behind — the shared change
         // tracker must be reset so subsequent items/saves don't cascade-fail.
         h.TrackerReset.Verify(t => t.Clear(), Times.Once);
+    }
+
+    // ---- one shared batch id per import (upload-history grouping) ----
+
+    [Fact]
+    public async Task Process_StampsOneSharedBatchIdAcrossAllItems()
+    {
+        var h = new Harness();
+        var mesh = h.MakeFile("u/mesh", RandomBytes(), "Mesh", "chair.glb");
+        var audio = h.MakeFile("u/audio", RandomBytes(), "Audio", "boom.wav");
+        h.SetManifest(new[] { Item("Model", "Chair", mesh), Item("Sound", "Boom", audio) });
+        h.Sink.Setup(s => s.CreateModelAsync(It.IsAny<IFileUpload>(), "Chair", It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync(101);
+        h.Sink.Setup(s => s.CreateSoundAsync(It.IsAny<IFileUpload>(), "Boom", It.IsAny<string?>(), It.IsAny<CancellationToken>())).ReturnsAsync(401);
+
+        await h.Run();
+
+        // Every created asset shares the job's batch id so History renders one batch, not N rows.
+        var batch = $"store-import-{JobId}";
+        h.Sink.Verify(s => s.CreateModelAsync(It.IsAny<IFileUpload>(), "Chair", batch, It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Once);
+        h.Sink.Verify(s => s.CreateSoundAsync(It.IsAny<IFileUpload>(), "Boom", batch, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    // ---- reuse store thumbnails instead of regenerating ----
+
+    [Fact]
+    public async Task Process_ModelItem_WithStoreTurntable_ReusesItAndSuppressesGeneration()
+    {
+        var h = new Harness();
+        var mesh = h.MakeFile("u/mesh", RandomBytes(), "Mesh", "chair.glb");
+        var turntable = h.MakePreview("u/turntable", "Turntable", "image/webp", "chair.webp");
+        h.SetManifest(new StoreManifestItem("Model", "Chair", new[] { mesh }, new[] { turntable }, "item-1"));
+        h.Sink.Setup(s => s.CreateModelAsync(It.IsAny<IFileUpload>(), "Chair", It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync(101);
+
+        await h.Run();
+
+        // generateThumbnail:false AND the store thumbnail attached to the new model.
+        h.Sink.Verify(s => s.CreateModelAsync(It.IsAny<IFileUpload>(), "Chair", It.IsAny<string?>(), false, It.IsAny<CancellationToken>()), Times.Once);
+        h.Sink.Verify(s => s.SetModelThumbnailFromFileAsync(101, It.IsAny<IFileUpload>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Process_ModelItem_WithoutReusableThumbnail_GeneratesLocally()
+    {
+        var h = new Harness();
+        var mesh = h.MakeFile("u/mesh", RandomBytes(), "Mesh", "chair.glb");
+        // A 3D preview model is not a reusable <img> thumbnail — must fall back to generation.
+        var model3d = h.MakePreview("u/model", "PreviewModel", "model/gltf-binary", "chair.glb");
+        h.SetManifest(new StoreManifestItem("Model", "Chair", new[] { mesh }, new[] { model3d }, "item-1"));
+        h.Sink.Setup(s => s.CreateModelAsync(It.IsAny<IFileUpload>(), "Chair", It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync(101);
+
+        await h.Run();
+
+        h.Sink.Verify(s => s.CreateModelAsync(It.IsAny<IFileUpload>(), "Chair", It.IsAny<string?>(), true, It.IsAny<CancellationToken>()), Times.Once);
+        h.Sink.Verify(s => s.SetModelThumbnailFromFileAsync(It.IsAny<int>(), It.IsAny<IFileUpload>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    // ---- partial import: only selected manifest items ----
+
+    [Fact]
+    public async Task Process_WithSelectedItemIds_ImportsOnlySelectedItems()
+    {
+        var h = new Harness();
+        var meshA = h.MakeFile("u/a", RandomBytes(), "Mesh", "a.glb");
+        var meshB = h.MakeFile("u/b", RandomBytes(), "Mesh", "b.glb");
+        h.SetManifest(new[]
+        {
+            new StoreManifestItem("Model", "A", new[] { meshA }, null, "item-a"),
+            new StoreManifestItem("Model", "B", new[] { meshB }, null, "item-b"),
+        });
+        h.Sink.Setup(s => s.CreateModelAsync(It.IsAny<IFileUpload>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync(101);
+
+        await h.Run(selectedItemIds: new[] { "item-b" });
+
+        h.Sink.Verify(s => s.CreateModelAsync(It.IsAny<IFileUpload>(), "B", It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Once);
+        h.Sink.Verify(s => s.CreateModelAsync(It.IsAny<IFileUpload>(), "A", It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
+        // The unselected item is never even downloaded.
+        h.Client.Verify(c => c.DownloadFileAsync(It.IsAny<string>(), "u/a", It.IsAny<string>(), It.IsAny<long>(), It.IsAny<long?>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Equal(1, h.Job.ItemsCreated);
     }
 
     // ---- helpers ----
@@ -337,6 +415,13 @@ public class StoreImportProcessorTests
             return new StoreManifestFile(fileName, bytes.Length, sha256 ?? Sha256Hex(bytes), role, url);
         }
 
+        /// <summary>An item preview whose bytes are downloadable via the fake client (previews carry no SHA).</summary>
+        public StoreManifestPreview MakePreview(string url, string type, string contentType, string fileName)
+        {
+            _downloads[url] = RandomBytes();
+            return new StoreManifestPreview(type, fileName, contentType, url);
+        }
+
         public void SetManifest(StoreManifestItem item, IReadOnlyList<string>? tags = null)
             => SetManifest(new[] { item }, tags);
 
@@ -349,7 +434,7 @@ public class StoreImportProcessorTests
             Client.Setup(c => c.FetchManifestAsync(StoreUrl, AssetId, Token, It.IsAny<CancellationToken>())).ReturnsAsync(manifest);
         }
 
-        public Task Run()
+        public Task Run(IReadOnlyList<string>? selectedItemIds = null)
         {
             var processor = new StoreImportProcessor(
                 Client.Object, Sink.Object, JobRepo.Object, PackRepo.Object, ModelRepo.Object,
@@ -357,7 +442,8 @@ public class StoreImportProcessorTests
                 Clock.Object, Uow.Object, TrackerReset.Object, Notifier.Object,
                 NullLogger<StoreImportProcessor>.Instance);
 
-            return processor.ProcessAsync(new StoreImportWorkItem(JobId, StoreUrl, AssetId, Token), CancellationToken.None);
+            return processor.ProcessAsync(
+                new StoreImportWorkItem(JobId, StoreUrl, AssetId, Token, selectedItemIds), CancellationToken.None);
         }
     }
 }
