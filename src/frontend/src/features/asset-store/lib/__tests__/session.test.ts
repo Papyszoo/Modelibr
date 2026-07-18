@@ -7,7 +7,11 @@ import { ApiClientError } from '@/lib/apiBase'
 import { queryClient } from '@/lib/react-query'
 import { useAssetStoreAuthStore } from '@/stores/assetStoreAuthStore'
 
-import { loginToStoreSession, logoutOfStoreSession } from '../session'
+import {
+  loginToStoreSession,
+  logoutOfStoreSession,
+  resumeStoreSession,
+} from '../session'
 
 jest.mock('../../api/storeApi', () => ({
   loginToStore: jest.fn(),
@@ -179,6 +183,40 @@ describe('refresh loop', () => {
     expect(authState().status).toBe('loggedOut')
     expect(authState().accessToken).toBeNull()
     expect(jest.getTimerCount()).toBe(0)
+  })
+})
+
+describe('resumeStoreSession', () => {
+  // Regression: after a reload the in-memory refresh loop is gone and the
+  // persisted access token is stale — resume must refresh once and re-arm it,
+  // or the session degrades to 401-retries (and "logs out too quickly").
+  it('refreshes the stale token and re-arms the loop for a persisted session', async () => {
+    storeApi.refreshStoreTokensOnce.mockResolvedValue(session(2))
+    // Simulate a rehydrated logged-in session (no refresh loop armed yet).
+    useAssetStoreAuthStore.getState().setSession({
+      accessToken: 'access-1',
+      refreshToken: 'refresh-1',
+      username: 'artist',
+    })
+
+    resumeStoreSession()
+    await jest.advanceTimersByTimeAsync(0)
+
+    expect(storeApi.refreshStoreTokensOnce).toHaveBeenCalledWith('refresh-1')
+    expect(authState().accessToken).toBe('access-2')
+
+    // The proactive loop keeps running past resume.
+    storeApi.refreshStoreTokensOnce.mockResolvedValue(session(3))
+    await jest.advanceTimersByTimeAsync(8 * 60 * 1000)
+    expect(authState().accessToken).toBe('access-3')
+  })
+
+  it('is a no-op when there is no persisted session', async () => {
+    resumeStoreSession()
+    await jest.advanceTimersByTimeAsync(0)
+
+    expect(storeApi.refreshStoreTokensOnce).not.toHaveBeenCalled()
+    expect(authState().status).toBe('loggedOut')
   })
 })
 

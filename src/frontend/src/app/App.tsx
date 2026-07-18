@@ -6,6 +6,7 @@ import { type JSX, useEffect } from 'react'
 
 import { DemoBanner } from '@/components/DemoBanner'
 import { AppShell } from '@/components/layout/AppShell'
+import { resumeStoreSession } from '@/features/asset-store/lib/session'
 import { getWebDavUrls } from '@/features/settings/api/settingsApi'
 import { useGlobalDragPrevention } from '@/hooks/useGlobalDragPrevention'
 import { useTheme } from '@/hooks/useTheme'
@@ -36,6 +37,12 @@ function App(): JSX.Element {
       .then(({ urls }) => initWebDavFromUrls(urls))
       .catch(() => {}) // non-critical
   }, [initWebDavFromUrls])
+
+  // Resume a persisted Asset Store session (refresh the stale token + re-arm the
+  // proactive refresh loop) once at startup.
+  useEffect(() => {
+    resumeStoreSession()
+  }, [])
 
   // Connect to SignalR at the app level so all components receive thumbnail events
   useThumbnailSignalR([])

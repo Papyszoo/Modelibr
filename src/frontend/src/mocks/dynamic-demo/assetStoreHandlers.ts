@@ -87,11 +87,48 @@ function toLibraryItem(def: StorePackDefinition) {
   }
 }
 
+// Stable manifest item id for a mesh — the value the backend filters on for a
+// partial import, and what the detail view's checkboxes select.
+const packItemId = (assetId: string, meshName: string) =>
+  `${assetId}::${meshName}`
+
+/** Asset detail (GET /api/assets/{id}) — items/files/previews the pick-list needs. */
+function toAssetDetail(def: StorePackDefinition) {
+  return {
+    id: def.assetId,
+    title: def.title,
+    author: 'The Base Mesh',
+    isPack: true,
+    items: def.meshes.map(mesh => ({
+      id: packItemId(def.assetId, mesh.name),
+      itemType: 'Model',
+      name: displayName(mesh.name),
+      isPreviewable: true,
+      fileIds: [`${def.assetId}::${mesh.name}::glb`],
+    })),
+    files: def.meshes.map(mesh => ({
+      id: `${def.assetId}::${mesh.name}::glb`,
+      fileName: `${mesh.name}.glb`,
+      relativePath: `${mesh.name}/${mesh.name}.glb`,
+      fileSize: mesh.sizeBytes,
+    })),
+    previews: def.meshes.map(mesh => ({
+      id: `${def.assetId}::${mesh.name}::thumb`,
+      type: 'Turntable',
+      url: webpUrl(mesh.name),
+      fileName: `${mesh.name}.webp`,
+      packItemId: packItemId(def.assetId, mesh.name),
+    })),
+  }
+}
+
 // In-memory job table — demo imports are transient; each GET advances the
 // job so the page's polling shows live progress without SignalR.
 interface DemoImportJob {
   id: number
   assetId: string
+  /** The mesh subset this job imports (respects a partial selection). */
+  meshes: { name: string; sizeBytes: number }[]
   itemsTotal: number
   itemsProcessed: number
   packId: number | null
@@ -108,7 +145,10 @@ async function findImportedPack(assetId: string): Promise<DemoPack | null> {
 }
 
 /** Creates the demo pack + models for a finished import (idempotent). */
-async function materializeImport(def: StorePackDefinition): Promise<number> {
+async function materializeImport(
+  def: StorePackDefinition,
+  meshes: { name: string; sizeBytes: number }[]
+): Promise<number> {
   const existing = await findImportedPack(def.assetId)
   if (existing) return existing.id
 
@@ -116,7 +156,7 @@ async function materializeImport(def: StorePackDefinition): Promise<number> {
   const packId = await nextId('packs')
   const modelRefs: { id: number; name: string }[] = []
 
-  for (const mesh of def.meshes) {
+  for (const mesh of meshes) {
     const modelId = await nextId('models')
     const versionId = await nextId('modelVersions')
     const fileId = await nextId('files')
@@ -280,6 +320,12 @@ export const assetStoreHandlers = [
     })
   }),
 
+  http.get(storeEndpoint('/api/assets/:assetId'), async ({ params }) => {
+    const def = STORE_PACKS.find(p => p.assetId === (params.assetId as string))
+    if (!def) return new HttpResponse(null, { status: 404 })
+    return HttpResponse.json(toAssetDetail(def))
+  }),
+
   http.post(
     storeEndpoint('/api/library/:assetId/import-token'),
     async ({ request, params }) => {
@@ -302,6 +348,7 @@ export const assetStoreHandlers = [
     const body = (await request.json()) as {
       assetId?: string
       importToken?: string
+      selectedItemIds?: string[]
     }
     const def = STORE_PACKS.find(p => p.assetId === body.assetId)
     if (!def || body.importToken !== `demo-import-${def.assetId}`) {
@@ -310,10 +357,18 @@ export const assetStoreHandlers = [
         { status: 400 }
       )
     }
+    // Partial import: keep only the selected meshes (by item id); empty = whole pack.
+    const selection = body.selectedItemIds?.length
+      ? new Set(body.selectedItemIds)
+      : null
+    const meshes = selection
+      ? def.meshes.filter(m => selection.has(packItemId(def.assetId, m.name)))
+      : def.meshes
     const job: DemoImportJob = {
       id: nextJobId++,
       assetId: def.assetId,
-      itemsTotal: def.meshes.length,
+      meshes,
+      itemsTotal: meshes.length,
       itemsProcessed: 0,
       packId: null,
       status: 'Running',
@@ -332,7 +387,7 @@ export const assetStoreHandlers = [
       job.itemsProcessed = Math.min(job.itemsProcessed + 2, job.itemsTotal)
       if (job.itemsProcessed >= job.itemsTotal) {
         const def = STORE_PACKS.find(p => p.assetId === job.assetId)!
-        job.packId = await materializeImport(def)
+        job.packId = await materializeImport(def, job.meshes)
         job.status = 'Completed'
       }
     }

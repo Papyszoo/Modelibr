@@ -3,7 +3,7 @@ import { queryOptions, useQuery } from '@tanstack/react-query'
 import { type QueryConfig } from '@/lib/react-query'
 import { useAssetStoreAuthStore } from '@/stores/assetStoreAuthStore'
 
-import { getStoreLibrary } from './storeApi'
+import { getStoreAsset, getStoreLibrary } from './storeApi'
 
 // --- Store library (server state on the STORE origin) ---
 
@@ -34,5 +34,24 @@ export function useStoreLibraryQuery({
     // Keep the previous page's tiles on screen while the next page loads.
     placeholderData: previousData => previousData,
     ...queryConfig,
+  })
+}
+
+// --- Store asset detail (items to pick from before importing) ---
+
+export function getStoreAssetQueryOptions(assetId: string) {
+  return queryOptions({
+    queryKey: ['store-asset', assetId] as const,
+    queryFn: () => getStoreAsset(assetId),
+  })
+}
+
+export function useStoreAssetQuery(assetId: string | null) {
+  const isLoggedIn = useAssetStoreAuthStore(
+    state => state.status === 'loggedIn'
+  )
+  return useQuery({
+    ...getStoreAssetQueryOptions(assetId ?? ''),
+    enabled: isLoggedIn && !!assetId,
   })
 }

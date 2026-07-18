@@ -31,6 +31,43 @@ export interface StoreLibraryPage {
   totalPages: number
 }
 
+// Store asset detail (GET {storeUrl}/api/assets/{id}) — public, CORS-allowed for
+// the Modelibr import page. Used to list a pack's items so the user can pick which
+// ones to import. Item `id` matches the manifest item id the backend filters on.
+
+export interface StoreAssetFile {
+  id: string
+  fileName: string
+  relativePath: string
+  fileSize: number
+}
+
+export interface StoreAssetItem {
+  id: string
+  itemType: string
+  name: string
+  isPreviewable: boolean
+  fileIds: string[]
+}
+
+export interface StoreAssetPreview {
+  id: string
+  type: string
+  url: string
+  fileName: string
+  packItemId: string | null
+}
+
+export interface StoreAssetDetail {
+  id: string
+  title: string
+  author: string
+  isPack: boolean
+  files?: StoreAssetFile[]
+  items?: StoreAssetItem[]
+  previews?: StoreAssetPreview[]
+}
+
 export interface MintImportTokenResponse {
   token: string
   scheme: string

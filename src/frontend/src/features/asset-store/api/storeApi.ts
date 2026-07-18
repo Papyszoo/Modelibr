@@ -6,6 +6,7 @@ import { useAssetStoreAuthStore } from '@/stores/assetStoreAuthStore'
 import { getConfiguredStoreUrl } from '../lib/storeConfig'
 import type {
   MintImportTokenResponse,
+  StoreAssetDetail,
   StoreAuthResponse,
   StoreLibraryPage,
 } from '../types'
@@ -133,6 +134,20 @@ export async function getStoreLibrary(
   const response = await storeClient.get<StoreLibraryPage>('/api/library', {
     params: { page, pageSize },
   })
+  return response.data
+}
+
+/**
+ * Fetches a store asset's detail (items + files + previews) so the user can pick
+ * which pack items to import. Public store endpoint; the access token is attached
+ * when present but not required.
+ */
+export async function getStoreAsset(
+  assetId: string
+): Promise<StoreAssetDetail> {
+  const response = await storeClient.get<StoreAssetDetail>(
+    `/api/assets/${assetId}`
+  )
   return response.data
 }
 

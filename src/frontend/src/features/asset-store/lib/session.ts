@@ -93,3 +93,16 @@ export function logoutOfStoreSession(): void {
   cancelRefreshLoop()
   useAssetStoreAuthStore.getState().clearSession()
 }
+
+/**
+ * Resumes a persisted session on app startup: the stored access token is likely
+ * expired after a reload/restart, so refresh once now and re-arm the proactive
+ * refresh loop (which is otherwise only started on an interactive login). A
+ * rejected refresh token clears the session; a network error keeps it and retries.
+ */
+export function resumeStoreSession(): void {
+  const auth = useAssetStoreAuthStore.getState()
+  if (auth.status !== 'loggedIn' || !auth.refreshToken) return
+  scheduleRefresh()
+  void refreshSession()
+}
