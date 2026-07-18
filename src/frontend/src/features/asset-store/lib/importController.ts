@@ -76,10 +76,14 @@ async function pollUntilDone(assetId: string, jobId: number): Promise<void> {
 }
 
 /**
- * Starts (or re-runs) the import of a store library item. Errors surface in
- * the import store, not as a rejection.
+ * Starts (or re-runs) the import of a store library item. Pass `selectedItemIds`
+ * to import only specific pack items; omit to import the whole pack. Errors
+ * surface in the import store, not as a rejection.
  */
-export async function startImport(item: StoreLibraryItem): Promise<void> {
+export async function startImport(
+  item: StoreLibraryItem,
+  selectedItemIds?: string[]
+): Promise<void> {
   const storeUrl = getConfiguredStoreUrl()
   const importStore = useAssetStoreImportStore.getState()
 
@@ -98,6 +102,7 @@ export async function startImport(item: StoreLibraryItem): Promise<void> {
       storeUrl,
       assetId: item.assetId,
       importToken: minted.token,
+      selectedItemIds,
     })
     jobId = started.jobId
     useAssetStoreImportStore.getState().markStarted(item.assetId, jobId)

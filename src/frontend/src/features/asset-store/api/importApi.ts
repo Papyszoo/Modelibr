@@ -9,6 +9,8 @@ export async function startStoreImport(request: {
   storeUrl: string
   assetId: string
   importToken: string
+  /** When set, only these manifest item ids are imported (partial pack import). */
+  selectedItemIds?: string[]
 }): Promise<StartStoreImportResponse> {
   const response = await client.post<StartStoreImportResponse>(
     '/store-imports',

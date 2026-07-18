@@ -17,8 +17,10 @@ import {
   getConfiguredStoreUrl,
   getStoreUrlConfigError,
 } from '../lib/storeConfig'
+import type { StoreLibraryItem } from '../types'
 import { StoreLibraryGrid } from './StoreLibraryGrid'
 import { StoreLoginForm } from './StoreLoginForm'
+import { StorePackDetail } from './StorePackDetail'
 
 /**
  * Asset Store tab — the user signs into the companion store, sees their
@@ -34,12 +36,17 @@ export function AssetStorePage() {
   const isLoggedIn = status === 'loggedIn'
 
   const [page, setPage] = useState(1)
+  const [openPack, setOpenPack] = useState<StoreLibraryItem | null>(null)
   const library = useStoreLibraryQuery({ page })
 
   // A new session (possibly a different account) starts from page 1 — a
-  // stale page index could point past the new library's last page.
+  // stale page index could point past the new library's last page. Signing out
+  // also closes any open pack detail.
   useEffect(() => {
-    if (!isLoggedIn) setPage(1)
+    if (!isLoggedIn) {
+      setPage(1)
+      setOpenPack(null)
+    }
   }, [isLoggedIn])
 
   const headerActions = isLoggedIn ? (
@@ -80,7 +87,17 @@ export function AssetStorePage() {
     }
 
     if (!isLoggedIn) {
-      return <StoreLoginForm />
+      return (
+        <div className="asset-store-login-center">
+          <StoreLoginForm />
+        </div>
+      )
+    }
+
+    if (openPack) {
+      return (
+        <StorePackDetail item={openPack} onBack={() => setOpenPack(null)} />
+      )
     }
 
     if (library.isPending) {
@@ -116,11 +133,12 @@ export function AssetStorePage() {
       )
     }
 
-    return <StoreLibraryGrid items={data.items} />
+    return <StoreLibraryGrid items={data.items} onOpenPack={setOpenPack} />
   }
 
   const totalPages = library.data?.totalPages ?? 0
-  const showPager = isLoggedIn && (totalPages > 1 || page > 1)
+  // The pager belongs to the library grid, not the pack detail.
+  const showPager = isLoggedIn && !openPack && (totalPages > 1 || page > 1)
 
   return (
     <div className="asset-store-page" data-testid="asset-store-page">
