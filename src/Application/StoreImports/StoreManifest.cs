@@ -19,7 +19,10 @@ public sealed record StoreManifestItem(
     string ItemType,
     string Name,
     IReadOnlyList<StoreManifestFile>? Files,
-    IReadOnlyList<StoreManifestPreview>? Previews);
+    IReadOnlyList<StoreManifestPreview>? Previews,
+    // Store pack-item id (Guid string). Used to scope a partial import to selected items;
+    // null on manifests that predate item ids (whole pack imports unaffected).
+    string? Id = null);
 
 public sealed record StoreManifestFile(
     string FileName,

@@ -67,7 +67,7 @@ namespace Application.Models
             // Raise domain event for existing model upload — dispatched from the
                 // save pipeline once this aggregate is persisted (see
                 // DomainEventsInterceptor); no manual publish here.
-                existingModel.RaiseModelUploadedEvent(existingModel.ActiveVersion!.Id, fileEntity.Sha256Hash, false);
+                existingModel.RaiseModelUploadedEvent(existingModel.ActiveVersion!.Id, fileEntity.Sha256Hash, false, command.GenerateThumbnail);
 
                 // Always track batch upload - generate batch ID if not provided
                 var batchId = command.BatchId ?? Guid.NewGuid().ToString();
@@ -127,7 +127,7 @@ namespace Application.Models
                 // Raise domain event for new model upload after both model and file are
                 // persisted — dispatched from the save pipeline (see DomainEventsInterceptor);
                 // no manual publish here.
-                savedModel.RaiseModelUploadedEvent(version1.Id, fileEntity.Sha256Hash, true);
+                savedModel.RaiseModelUploadedEvent(version1.Id, fileEntity.Sha256Hash, true, command.GenerateThumbnail);
 
                 // Always track batch upload - generate batch ID if not provided
                 var batchId = command.BatchId ?? Guid.NewGuid().ToString();
@@ -150,6 +150,6 @@ namespace Application.Models
         }
     }
 
-    public record AddModelCommand(IFileUpload File, string? ModelName = null, string? BatchId = null) : ICommand<AddModelCommandResponse>;
+    public record AddModelCommand(IFileUpload File, string? ModelName = null, string? BatchId = null, bool GenerateThumbnail = true) : ICommand<AddModelCommandResponse>;
     public record AddModelCommandResponse(int Id, bool AlreadyExists = false);
 }

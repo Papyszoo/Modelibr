@@ -13,7 +13,8 @@ namespace Application.StoreImports;
 /// persists a <see cref="StoreImportJob"/> WITHOUT the token, then hands the token to the
 /// in-memory queue only. Returns the job id immediately; progress surfaces over SignalR.
 /// </summary>
-public record CreateStoreImportCommand(string StoreUrl, string AssetId, string ImportToken)
+public record CreateStoreImportCommand(
+    string StoreUrl, string AssetId, string ImportToken, IReadOnlyList<string>? SelectedItemIds = null)
     : ICommand<CreateStoreImportResponse>;
 
 public record CreateStoreImportResponse(int JobId);
@@ -66,8 +67,17 @@ internal sealed class CreateStoreImportCommandHandler : ICommandHandler<CreateSt
         // Commit now so the row is durable before the background processor loads it by id.
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
+        // Normalize the selection: trim, drop blanks, dedupe. An empty selection means "whole pack".
+        var selectedItemIds = command.SelectedItemIds?
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Select(id => id.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (selectedItemIds is { Length: 0 })
+            selectedItemIds = null;
+
         // The token lives ONLY in this in-memory work item — never persisted, never logged.
-        var enqueued = _queue.Enqueue(new StoreImportWorkItem(job.Id, storeUrl, assetId, command.ImportToken.Trim()));
+        var enqueued = _queue.Enqueue(new StoreImportWorkItem(job.Id, storeUrl, assetId, command.ImportToken.Trim(), selectedItemIds));
         if (!enqueued)
         {
             job.Fail("Import queue is saturated; try again shortly.", _dateTimeProvider.UtcNow);
