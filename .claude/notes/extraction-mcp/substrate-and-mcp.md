@@ -110,7 +110,25 @@ library must be visible *inside* the container. colima only mounts `$HOME`, not
 
 **The remote branch is unaudited.** `import_model` without `path` hands back an HTTP
 endpoint and steps out — those uploads get no `AgentOperationLog` entry and no
-idempotency, the two guarantees the co-located path advertises.
+idempotency, the two guarantees the co-located path advertises. It also returns only
+endpoint *paths*, not field names: the real `/models/multifile` contract is `primary` +
+`files[]` + `paths[]` (each aux file's URI relative to the primary), which no agent will
+guess from the description.
+
+**Pipeline health over ~6,100 jobs: 26 failures (0.4%).**
+
+- 24 sound jobs failed `Unsupported sound file type:` with an *empty* type, on formats
+  that imported fine in bulk — looks like a job-payload/extension-propagation gap, not a
+  format gap. Worth a proper look before it is dismissed as noise.
+- 1 `THREE.GLTFLoader: No DRACOLoader instance provided` and 1
+  `setKTX2Loader must be called before loading KTX2 textures`. **DRACO and KTX2 are
+  mainstream in modern glTF pipelines** — the worker's loader registers neither, so those
+  assets can never get a thumbnail or extraction.
+
+Multi-file glTF import (prompt 28) verified live: BoomBox `.gltf` + `.bin` + 4 PNGs →
+5 auxiliary files linked, worker resolved the external refs offline, 6,036 tris /
+1 material / `HasUvs=true` indexed. `compute_on_demand` returns `{"status":"pending"}`
+for every metric, as documented — the cache and endpoints exist, the metric math does not.
 
 ## v0.6 direction — full agent surface (writes)
 
