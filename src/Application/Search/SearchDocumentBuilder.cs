@@ -33,12 +33,15 @@ public static class SearchDocumentBuilder
         var assetDisplay = string.IsNullOrWhiteSpace(assetName) ? $"Model {modelId}" : assetName.Trim();
         var hasAnimations = rollups.AnimationCount is > 0;
 
-        // Semantic bridge (prompt 29): fold the assigned category name + deterministic
-        // concept labels (weapon/animal/building) derived from the tokens into the
-        // indexed tokens, so conceptual free-text queries hit even without an explicit
-        // category filter. Suggestion improves recall; it never mutates assignment.
-        var suggestedLabels = CategorySuggester.Suggest(derived.Tokens);
-        var assetTokens = derived.Tokens
+        // Semantic bridge: widen the authored tokens (abbreviations, adjacent-token
+        // compounds, synonyms) and fold in the assigned category name plus deterministic
+        // concept labels, so conceptual free-text queries hit even without an explicit
+        // category filter. Widening is what makes Synty's `SM_Bld_Apartment_01` — which
+        // tokenises to `bld, apartment` — reachable by the word "building".
+        // Suggestion improves recall; it never mutates the user's category assignment.
+        var widenedTokens = SearchVocabulary.ExpandForIndex(derived.Tokens);
+        var suggestedLabels = CategorySuggester.Suggest(widenedTokens);
+        var assetTokens = widenedTokens
             .Concat(suggestedLabels)
             .Concat(CategoryNameTokens(categoryName))
             .Where(t => !string.IsNullOrWhiteSpace(t))
@@ -90,7 +93,7 @@ public static class SearchDocumentBuilder
                 isCurrentVersion: isCurrentVersion,
                 prominence: part.Prominence,
                 displayName: part.PartPath.Split('/', '\\')[^1],
-                tokens: string.Join(' ', part.Tokens),
+                tokens: string.Join(' ', SearchVocabulary.ExpandForIndex(part.Tokens)),
                 browseSummary: part.BrowseSummary,
                 updatedAt: now,
                 triangleCount: trianglesByPath.GetValueOrDefault(part.PartPath),
