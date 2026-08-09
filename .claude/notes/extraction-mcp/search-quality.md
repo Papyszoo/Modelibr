@@ -1,5 +1,13 @@
 # MCP search quality — the verdict and what to do about it
 
+> **Resolved 2026-08-09 (PR #579).** Measured on the same 1,717-model library, fully
+> re-derived: **P@5 69.2% → 89.7%, MRR 75.8% → 87.8%, nDCG 76.0% → 91.2%**, cases
+> containing a forbidden near-miss **8 → 0**, plural-parity failures **3 → 0**,
+> structural failures **2 → 0**. `building` 0% → 100%, `streetlight` 0% → 100%,
+> "a rundown city street at night" 0% → 80%, `furniture` 40% → 100%.
+> The regression suite is `SearchRelevanceGoldenTests` (seeded documents, runs in CI).
+> The history below is kept because it explains *why* each fix exists.
+
 Measured 2026-08-08 with a throwaway retrieval harness against a real
 1,357-model instance (probes: `flint_tool`, `Fox`, `OfficeRound`).
 
