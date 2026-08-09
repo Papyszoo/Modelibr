@@ -78,8 +78,12 @@ characters are all correct. Three data-quality problems then dominate:
   OBJ. Asset-level world bounds stay correct on both, so only part-level size filtering
   is poisoned — but that is exactly what an agent uses.
 
-`trigger_rederive` is a good escape hatch: re-deriving 147 models via MCP indexed them
-in ~2 min, versus hours behind the thumbnail queue.
+**Correction:** an earlier note here claimed `trigger_rederive` re-indexed 147 models in
+~2 minutes. It did not — those documents were written by the thumbnail queue draining at
+the same time. A model re-derive queued **without an explicit versionId was a silent
+no-op**: the worker extracted the file, 400'd on both save calls, and still reported the
+job completed. Fixed by resolving the current version in the enqueue handler; before that
+fix, re-deriving all 1,717 models reported success and changed nothing.
 
 ### Mechanism — why multi-word queries behave the way they do
 
