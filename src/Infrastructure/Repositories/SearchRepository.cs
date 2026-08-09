@@ -15,6 +15,9 @@ internal sealed class SearchRepository : ISearchRepository
     private const double TrigramThreshold = 0.45;
     private const int MinFuzzyLength = 4;
 
+    // Shortest query word allowed to match as an unanchored substring of a display name.
+    private const int MinSubstringLength = 4;
+
     // Degenerate nodes (empty exporter leftovers) are real documents but never a real
     // answer: "car under 10k tris" used to return an 8-triangle, 0x0x0 m "car-01" first,
     // and "vehicle" ranked it above every actual vehicle. Zero measured volume is the
@@ -165,10 +168,19 @@ internal sealed class SearchRepository : ISearchRepository
             if (variant >= variants.Count) return NeverMatches;
             return "% " + variants[variant] + " %";
         }
+        // Unanchored substring match on the display name — a fallback for names the
+        // tokenizer split differently ("Mailbox" for "box"). Two rules keep it from
+        // becoming noise:
+        //   * minimum length, because a short word matches inside unrelated names —
+        //     "low" in "low poly car" pulled "SM_Env_Flower_01" to rank 2;
+        //   * the singular form, so "boxes" reaches "Mailbox" the same way "box" does
+        //     (matching the literal plural found 63 assets where the singular found 88).
         string Substring(int i)
         {
             if (i >= parsed.Terms.Count) return NeverMatches;
-            return "%" + parsed.Terms[i].Word + "%";
+            var variants = parsed.Terms[i].Variants;
+            var shortest = variants[^1];
+            return shortest.Length >= MinSubstringLength ? "%" + shortest + "%" : NeverMatches;
         }
 
         string b00 = Boundary(0, 0), b01 = Boundary(0, 1), s0 = Substring(0);
