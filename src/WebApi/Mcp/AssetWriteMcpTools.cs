@@ -17,9 +17,13 @@ namespace WebApi.Mcp;
 /// pass-through over the same command handlers the frontend uses (one source of truth).
 ///
 /// Registered ONLY when <c>MCP_WRITE_ENABLED=true</c> (default off), so a stock server
-/// stays read-only and enabling writes is a deliberate, operator-scoped opt-in. Every
-/// write requires a caller-supplied <c>idempotencyKey</c> and is recorded in
-/// <see cref="Domain.Models.AgentOperationLog"/>; a repeat with the same key is a no-op.
+/// stays read-only and enabling writes is a deliberate, operator-scoped opt-in.
+///
+/// Every write <b>claims</b> its caller-supplied <c>idempotencyKey</c> in
+/// <see cref="Domain.Models.AgentOperationLog"/> before applying anything, completes the
+/// entry on success, and releases it if the write failed. Claiming first (rather than
+/// looking the key up and then writing) is what makes a concurrent batch import safe:
+/// with a lookup, two in-flight calls sharing a key both pass the check and both apply.
 /// </summary>
 [McpServerToolType]
 public sealed class AssetWriteMcpTools
@@ -36,7 +40,8 @@ public sealed class AssetWriteMcpTools
         [Description("Optional description; omit to leave unchanged.")] string? description = null,
         CancellationToken cancellationToken = default)
     {
-        var prior = await audit.FindAsync(idempotencyKey, cancellationToken);
+        var prior = await audit.TryBeginAsync(
+            new AgentWrite(idempotencyKey, "set-tags", "Model", modelId), cancellationToken);
         if (prior is not null)
         {
             return AlreadyApplied(prior);
@@ -46,6 +51,7 @@ public sealed class AssetWriteMcpTools
         var current = await getHandler.Handle(new GetModelByIdQuery(modelId), cancellationToken);
         if (current.IsFailure)
         {
+            await audit.AbandonAsync(idempotencyKey, cancellationToken);
             return Error(current.Error);
         }
         var categoryId = current.Value.Model.Category?.Id;
@@ -55,11 +61,11 @@ public sealed class AssetWriteMcpTools
             new UpdateModelTagsCommand(modelId, tags, effectiveDescription, categoryId), cancellationToken);
         if (result.IsFailure)
         {
+            await audit.AbandonAsync(idempotencyKey, cancellationToken);
             return Error(result.Error);
         }
 
-        await audit.RecordAsync(new AgentWrite(
-            idempotencyKey, "set-tags", "Model", modelId, PayloadAfter: Json(result.Value)), cancellationToken);
+        await audit.CompleteAsync(idempotencyKey, "Model", modelId, Json(result.Value), cancellationToken);
         return new { status = "ok", model = result.Value };
     }
 
@@ -73,7 +79,8 @@ public sealed class AssetWriteMcpTools
         [Description("Category id to assign, or null to clear.")] int? categoryId = null,
         CancellationToken cancellationToken = default)
     {
-        var prior = await audit.FindAsync(idempotencyKey, cancellationToken);
+        var prior = await audit.TryBeginAsync(
+            new AgentWrite(idempotencyKey, "set-category", "Model", modelId), cancellationToken);
         if (prior is not null)
         {
             return AlreadyApplied(prior);
@@ -82,11 +89,11 @@ public sealed class AssetWriteMcpTools
         var result = await handler.Handle(new SetModelCategoryCommand(modelId, categoryId), cancellationToken);
         if (result.IsFailure)
         {
+            await audit.AbandonAsync(idempotencyKey, cancellationToken);
             return Error(result.Error);
         }
 
-        await audit.RecordAsync(new AgentWrite(
-            idempotencyKey, "set-category", "Model", modelId, PayloadAfter: Json(result.Value)), cancellationToken);
+        await audit.CompleteAsync(idempotencyKey, "Model", modelId, Json(result.Value), cancellationToken);
         return new { status = "ok", model = result.Value };
     }
 
@@ -100,7 +107,8 @@ public sealed class AssetWriteMcpTools
         [Description("Optional description.")] string? description = null,
         CancellationToken cancellationToken = default)
     {
-        var prior = await audit.FindAsync(idempotencyKey, cancellationToken);
+        var prior = await audit.TryBeginAsync(
+            new AgentWrite(idempotencyKey, "create-pack", "Pack"), cancellationToken);
         if (prior is not null)
         {
             return AlreadyApplied(prior);
@@ -109,11 +117,11 @@ public sealed class AssetWriteMcpTools
         var result = await handler.Handle(new CreatePackCommand(name, description, null, null), cancellationToken);
         if (result.IsFailure)
         {
+            await audit.AbandonAsync(idempotencyKey, cancellationToken);
             return Error(result.Error);
         }
 
-        await audit.RecordAsync(new AgentWrite(
-            idempotencyKey, "create-pack", "Pack", result.Value.Id, PayloadAfter: Json(result.Value)), cancellationToken);
+        await audit.CompleteAsync(idempotencyKey, "Pack", result.Value.Id, Json(result.Value), cancellationToken);
         return new { status = "ok", pack = result.Value };
     }
 
@@ -127,7 +135,8 @@ public sealed class AssetWriteMcpTools
         [Description("Unique key so a retried call does not re-add.")] string idempotencyKey,
         CancellationToken cancellationToken = default)
     {
-        var prior = await audit.FindAsync(idempotencyKey, cancellationToken);
+        var prior = await audit.TryBeginAsync(
+            new AgentWrite(idempotencyKey, "add-to-pack", "Model", modelId), cancellationToken);
         if (prior is not null)
         {
             return AlreadyApplied(prior);
@@ -136,12 +145,12 @@ public sealed class AssetWriteMcpTools
         var result = await handler.Handle(new AddModelToPackCommand(packId, modelId), cancellationToken);
         if (result.IsFailure)
         {
+            await audit.AbandonAsync(idempotencyKey, cancellationToken);
             return Error(result.Error);
         }
 
-        await audit.RecordAsync(new AgentWrite(
-            idempotencyKey, "add-to-pack", "Model", modelId,
-            PayloadAfter: Json(new { packId, modelId })), cancellationToken);
+        await audit.CompleteAsync(
+            idempotencyKey, "Model", modelId, Json(new { packId, modelId }), cancellationToken);
         return new { status = "ok", packId, modelId };
     }
 
@@ -156,7 +165,8 @@ public sealed class AssetWriteMcpTools
         [Description("Version id (models); omit for non-versioned families.")] int? versionId = null,
         CancellationToken cancellationToken = default)
     {
-        var prior = await audit.FindAsync(idempotencyKey, cancellationToken);
+        var prior = await audit.TryBeginAsync(
+            new AgentWrite(idempotencyKey, "trigger-rederive", assetType, assetId), cancellationToken);
         if (prior is not null)
         {
             return AlreadyApplied(prior);
@@ -166,12 +176,12 @@ public sealed class AssetWriteMcpTools
             new EnqueueExtractionJobCommand(assetType, assetId, versionId), cancellationToken);
         if (result.IsFailure)
         {
+            await audit.AbandonAsync(idempotencyKey, cancellationToken);
             return Error(result.Error);
         }
 
-        await audit.RecordAsync(new AgentWrite(
-            idempotencyKey, "trigger-rederive", assetType, assetId,
-            PayloadAfter: Json(result.Value)), cancellationToken);
+        await audit.CompleteAsync(
+            idempotencyKey, assetType, assetId, Json(result.Value), cancellationToken);
         return new { status = "ok", jobId = result.Value.JobId, alreadyQueued = result.Value.AlreadyQueued };
     }
 
@@ -186,6 +196,7 @@ public sealed class AssetWriteMcpTools
         CancellationToken cancellationToken = default)
     {
         // Remote case: bytes must travel over HTTP; point the agent's host at the endpoints.
+        // No claim is taken — nothing has been written, so a repeat is free.
         if (string.IsNullOrWhiteSpace(path))
         {
             return new
@@ -198,7 +209,8 @@ public sealed class AssetWriteMcpTools
             };
         }
 
-        var prior = await audit.FindAsync(idempotencyKey, cancellationToken);
+        var prior = await audit.TryBeginAsync(
+            new AgentWrite(idempotencyKey, "import-model", "Model"), cancellationToken);
         if (prior is not null)
         {
             return AlreadyApplied(prior);
@@ -206,6 +218,7 @@ public sealed class AssetWriteMcpTools
 
         if (!File.Exists(path))
         {
+            await audit.AbandonAsync(idempotencyKey, cancellationToken);
             return new { error = "PathNotFound", message = $"No file readable by the server at '{path}'." };
         }
 
@@ -216,6 +229,7 @@ public sealed class AssetWriteMcpTools
         }
         catch (Exception ex)
         {
+            await audit.AbandonAsync(idempotencyKey, cancellationToken);
             return new { error = "PathUnreadable", message = ex.Message };
         }
 
@@ -223,12 +237,12 @@ public sealed class AssetWriteMcpTools
         var result = await handler.Handle(new AddModelCommand(upload, name), cancellationToken);
         if (result.IsFailure)
         {
+            await audit.AbandonAsync(idempotencyKey, cancellationToken);
             return Error(result.Error);
         }
 
-        await audit.RecordAsync(new AgentWrite(
-            idempotencyKey, "import-model", "Model", result.Value.Id,
-            PayloadAfter: Json(result.Value)), cancellationToken);
+        await audit.CompleteAsync(
+            idempotencyKey, "Model", result.Value.Id, Json(result.Value), cancellationToken);
         return new { status = "ok", modelId = result.Value.Id, alreadyExists = result.Value.AlreadyExists };
     }
 
