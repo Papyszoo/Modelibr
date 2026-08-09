@@ -119,7 +119,10 @@ public class McpWriteRoundTripIntegrationTests : IClassFixture<ModelibrWebFactor
 
         // Every caller gets a well-formed answer — exactly one applied, the rest stood down.
         Assert.Equal(1, responses.Count(r => r.Contains("\"ok\"")));
-        Assert.Equal(3, responses.Count(r => r.Contains("already-applied")));
+        // A loser sees "already-applied" if the winner had already completed its claim, and
+        // "in-progress" if the claim was still live. Which of the two is a timing detail;
+        // standing down without re-applying is the contract.
+        Assert.Equal(3, responses.Count(r => r.Contains("already-applied") || r.Contains("in-progress")));
 
         using (var scope = _factory.Services.CreateScope())
         {
