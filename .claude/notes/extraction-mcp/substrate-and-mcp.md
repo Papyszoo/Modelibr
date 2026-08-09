@@ -17,10 +17,17 @@ Moving `./data/` aside instead of deleting it makes the old instance restorable:
 - MCP endpoint serves at `https://localhost:8443/mcp` (SSE) with `MCP_ENABLED`.
 - Postgres credentials come from root `.env`.
 
-## Today's MCP server is READ-ONLY
+## The MCP surface today
 
-Five tools: `search_assets`, `get_asset`, `get_part`, `compute_on_demand`,
-`list_facets`. All return real data.
+**11 tools + 1 prompt.** Read (always on): `search_assets`, `get_asset`, `get_part`,
+`compute_on_demand`, `list_facets`. Write (only with `MCP_WRITE_ENABLED=true`):
+`set_tags`, `set_category`, `create_pack`, `add_to_pack`, `trigger_rederive`,
+`import_model`, plus the `import_library` prompt. All return real data.
+
+**Every write tool is Model-only.** There is no agent-reachable path for sounds,
+textures, texture sets, sprites or env maps — importing the CC0 sound corpus had to
+bypass MCP and POST to `/sounds/with-file`. Nor can an agent bind a texture set,
+create a category, delete, or undo. "Everything a user can do" is about one sixth true.
 
 ## Real-data validation
 
@@ -72,6 +79,38 @@ normal/metallic need the pre-upload-fileId flow.
 materials; the user must pick the "Embedded" variant to see colors. Frontend
 model-viewer default, `__embedded__` logic near
 `src/frontend/src/mocks/dynamic-demo/shared.ts:825`.
+
+## Second validation run — 2026-08-09, imported *through* MCP
+
+Fresh stack (data wiped, images rebuilt), `MCP_WRITE_ENABLED=true`, driven over the
+real `/mcp` transport. **1,717 models imported by the MCP write tools themselves**
+(base-meshes 900 `.glb`, glTF Sample Assets 120 `.glb`, POLYGON City 697 FBX/OBJ),
+0 import failures, 3,438 audit rows. Plus 4,375 CC0 sounds via HTTP (MCP cannot carry
+them). This is the run that found the two bugs below.
+
+**Two bugs found and fixed on PR #579:**
+
+1. **MCP flags never reached the container.** `MCP_ENABLED` / `MCP_WRITE_ENABLED` were
+   read from configuration but absent from both `docker-compose.yml` and
+   `.env.example` — so on the Docker stack (how Modelibr actually runs) writes could
+   not be turned on at all and `MCP_ENABLED=false` did not turn the endpoint off.
+2. **Idempotency was a check-then-act race.** Each tool looked the key up, wrote, then
+   inserted the audit row. Two concurrent calls with one key both passed the lookup and
+   both applied; the loser tripped the unique index *after* mutating. Reproduced with two
+   concurrent `create_pack` calls: **two `Packs` rows, one audit row**, and an opaque
+   "An error occurred invoking 'create_pack'" instead of `already-applied`. Fixed by
+   claiming the key first (`TryClaimAsync` → handler → `CompleteClaimAsync`, or
+   `ReleaseClaimAsync` on failure). Verified live: 5 concurrent same-key calls → 1 pack,
+   1 audit row, 4 `already-applied`. Regression test is a **concurrency** integration
+   test — the sequential retry test could never have caught it.
+
+**Co-located import needs a mount.** `import_model(path)` reads server-side, so the
+library must be visible *inside* the container. colima only mounts `$HOME`, not
+`/Volumes`, so an external-disk corpus has to be staged under `$HOME` and bind-mounted.
+
+**The remote branch is unaudited.** `import_model` without `path` hands back an HTTP
+endpoint and steps out — those uploads get no `AgentOperationLog` entry and no
+idempotency, the two guarantees the co-located path advertises.
 
 ## v0.6 direction — full agent surface (writes)
 

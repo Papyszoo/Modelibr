@@ -37,4 +37,32 @@ offline** to respect the local-first invariant.
   ILIKE, but fuzzy trigram only fires on *part* tokens — the prompt-23
   "asset-name Include" follow-up would fix this.
 
+## Re-measured 2026-08-09 — the verdict holds, with detail
+
+Second run against a fresh 1,717-model library (base-meshes + glTF samples + POLYGON
+City), probed over the MCP transport. **Prompt 29 did not close the semantic gap**: the
+schema has `Tokens`, `Symbols` and `CategoryName`, and nothing writes concept labels
+into any of them — `CategorySuggester` output only surfaces on
+`get_asset.suggestedCategories`. So the "conceptual queries hit via deterministic
+concept labels" claim is not backed by the index.
+
+Still excellent: exact/partial names, trigram typos, and **every structural filter**
+(`chair` + `minTriangles=5000` → exactly the 3 hero-detail chairs).
+
+Newly pinned failures:
+
+- `vehicle` → `credit_card`; `character` → `roman_pottery_01`; `building` → six
+  `door_0N`; `medieval weapon` → `medieval_bookcase`, `bowl_01`.
+- **Trigram noise outranks substring matches**: `street` → `strap`, `straw`.
+- **Longer queries collapse**: `a city street at night` → 0 hits;
+  `streetlight for a city street` → 1 junk hit. Adding words can *reduce* results to none.
+- **Empty query returns 0**, so no filter-only browse — `list_facets` advertises filters
+  that need a text query to work. "Every rigged asset" is unanswerable.
+- **Duplicate + inconsistent counts**: asset-level and part-level docs both return, so
+  `chair` = 46 docs but `chair` + any attribute filter = 17, because attributes live only
+  on asset-level docs.
+
+Fix plan is the v0.6 retrieval-bridge prompt: concept labels as an indexed column
+(weighted below tokens), filter-only browse, group-by-asset, and a trigram floor.
+
 Related: [[substrate-and-mcp.md]]
