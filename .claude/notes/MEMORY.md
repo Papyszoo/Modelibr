@@ -5,6 +5,7 @@ One line per note. Conventions and the public/private boundary: [README.md](READ
 - [Store integration](store/integration.md) — import tokens, manifest v1, the Modelibr importer, new-tab-type checklist, e2e fixture tricks
 - [Store incidents](store/incidents.md) — EF cartesian explosion on large packs, SPA deep-link 404, and why e2e couldn't catch either
 - [Extraction substrate & MCP](extraction-mcp/substrate-and-mcp.md) — validation approach, three fixed bugs, texture binding, v0.6 write-tools direction
+- [Substrate invariants](extraction-mcp/substrate-invariants.md) — the cross-layer rules PR #579 broke while fully green: re-derive destroying its own raw data, normalized dimensions, projection lifecycle, claim-vs-completion, glTF identity and offline egress
 - [MCP search quality](extraction-mcp/search-quality.md) — lexically excellent, semantically blind; auto-categorization is the chosen bridge
 - [Release process](release/process.md) — the one manual step, pre-release video check, patch-branch rule
 - [Release history](release/history.md) — 0.3.x and 0.4.x cuts and what each taught

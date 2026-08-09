@@ -47,9 +47,13 @@ of truth for what a change means:
 
 Two rules make these safe to retry:
 
-- **Every write takes an `idempotencyKey`.** Repeating a call with a key that was
-  already used is a no-op that returns `already-applied` — a crashed import run can
-  simply be restarted.
+- **Every write takes an `idempotencyKey`.** The key is claimed before anything is
+  applied, and the claim records whether the write actually landed. Repeating a call
+  therefore gets one of three honest answers: `already-applied` (it completed — here is
+  the recorded result), `in-progress` (another call holds the key right now; nothing has
+  been applied yet, retry), or the write simply runs, because the previous attempt
+  failed or its caller died. A crashed import run can be restarted without either
+  double-applying a write or losing one to a key that was burned by a failure.
 - **Every write is audited.** Modelibr records the operation, target and payload in
   its agent operation log, so "what did the agent change?" stays answerable.
 
