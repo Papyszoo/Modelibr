@@ -33,7 +33,13 @@ export function useModelUpload({
     [packId, projectId]
   )
 
-  const { uploading, uploadProgress, uploadMultipleFiles } = useFileUpload({
+  const {
+    uploading,
+    uploadProgress,
+    uploadMultipleFiles,
+    uploadFolder,
+    uploadZip,
+  } = useFileUpload({
     requireThreeJSRenderable: true,
     toast,
     onSuccess: async (
@@ -75,6 +81,10 @@ export function useModelUpload({
     uploading,
     uploadProgress,
     uploadMultipleFiles: filteredUploadMultipleFiles,
+    // Multi-file glTF import (folder / .zip). Passed straight through — grouping and
+    // the blender filter live in the folder/zip paths themselves.
+    uploadFolder,
+    uploadZip,
     onDrop,
     onDragOver,
     onDragEnter,

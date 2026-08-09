@@ -31,6 +31,10 @@ public static class ModelVersionEndpoints
         app.MapGet("/models/{modelId}/versions/{versionId}/files/{fileId}", GetVersionFile)
             .WithName("Get Version File");
 
+        app.MapGet("/models/{modelId}/versions/{versionId}/auxiliary-files", GetVersionAuxiliaryFiles)
+            .WithName("Get Version Auxiliary Files")
+            .WithSummary("Lists external glTF resources (.bin/textures) linked to a version, with relative paths");
+
         app.MapPut("/model-versions/{versionId}/material-names", UpdateMaterialNames)
             .WithName("Update Material Names")
             .WithSummary("Updates the material names extracted from the 3D model")
@@ -40,6 +44,12 @@ public static class ModelVersionEndpoints
         app.MapPut("/model-versions/{versionId}/technical-metadata", UpdateTechnicalMetadata)
             .WithName("Update Technical Metadata")
             .WithSummary("Updates material names and technical stats extracted from the newest renderable file")
+            .AddEndpointFilter<WorkerApiKeyFilter>()
+            .WithOpenApi();
+
+        app.MapPut("/model-versions/{versionId}/scene-graph", ImportSceneGraph)
+            .WithName("Import Model Scene Graph")
+            .WithSummary("Persists the full scene-graph extraction (per-part rows + rollups + raw payload)")
             .AddEndpointFilter<WorkerApiKeyFilter>()
             .WithOpenApi();
 
@@ -183,6 +193,19 @@ public static class ModelVersionEndpoints
         return Results.File(fileStream, result.Value.MimeType, result.Value.OriginalFileName, enableRangeProcessing: true);
     }
 
+    private static async Task<IResult> GetVersionAuxiliaryFiles(
+        int modelId,
+        int versionId,
+        IQueryHandler<GetVersionAuxiliaryFilesQuery, GetVersionAuxiliaryFilesResponse> queryHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await queryHandler.Handle(new GetVersionAuxiliaryFilesQuery(versionId), cancellationToken);
+
+        return result.IsFailure
+            ? Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message })
+            : Results.Ok(result.Value);
+    }
+
     private static async Task<IResult> UpdateMaterialNames(
         int versionId,
         [FromBody] UpdateMaterialNamesRequest request,
@@ -284,7 +307,44 @@ public static class ModelVersionEndpoints
 
         return Results.NoContent();
     }
+
+    private static async Task<IResult> ImportSceneGraph(
+        int versionId,
+        [FromBody] ImportSceneGraphRequest request,
+        ICommandHandler<ImportModelSceneGraphCommand> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var command = new ImportModelSceneGraphCommand(
+            versionId,
+            request.FileSha256 ?? string.Empty,
+            request.ExtractorVersion,
+            request.GeometryHashVersion,
+            request.SchemaVersion <= 0 ? 1 : request.SchemaVersion,
+            // Store the request verbatim as the raw extraction payload.
+            System.Text.Json.JsonSerializer.Serialize(request),
+            request.Rollups ?? new SceneGraphRollupsDto(null, null, null, null, null, null, null, null, null),
+            request.Parts ?? new List<SceneGraphPartDto>(),
+            request.Warnings ?? new List<string>());
+
+        var result = await commandHandler.Handle(command, cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+        }
+
+        return Results.NoContent();
+    }
 }
+
+public record ImportSceneGraphRequest(
+    string? FileSha256,
+    int ExtractorVersion,
+    int? GeometryHashVersion,
+    int SchemaVersion,
+    SceneGraphRollupsDto? Rollups,
+    List<SceneGraphPartDto>? Parts,
+    List<string>? Warnings);
 
 public record UpdateMaterialNamesRequest(List<string> MaterialNames);
 public record UpdateTechnicalMetadataRequest(

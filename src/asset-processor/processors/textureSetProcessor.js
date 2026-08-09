@@ -7,6 +7,10 @@ import {
   extractTextureDimensions,
   generateTextureProxies,
 } from '../textureProxyGenerator.js'
+import {
+  computeTextureSetExtraction,
+  TEXTURE_SET_EXTRACTOR_VERSION,
+} from '../textureSetExtractor.js'
 
 /**
  * Processor for generating texture set preview thumbnails.
@@ -99,6 +103,30 @@ export class TextureSetProcessor extends BaseProcessor {
       } catch (metadataError) {
         jobLogger.warn('Texture metadata extraction failed (non-blocking)', {
           error: metadataError.message,
+        })
+      }
+
+      // Step 2c: Extract deterministic material pixel stats (tileability, detail
+      // frequency, channel stats) into the extraction substrate. Best-effort —
+      // a stats failure must never fail the thumbnail job.
+      try {
+        const extraction = await computeTextureSetExtraction(texturePaths)
+        if (extraction) {
+          await this.modelDataService.saveExtraction(
+            'TextureSet',
+            textureSetId,
+            {
+              fileSha256: extraction.fileSha256,
+              payload: extraction.payload,
+              warnings: extraction.warnings,
+              extractorVersion: TEXTURE_SET_EXTRACTOR_VERSION,
+              schemaVersion: 1,
+            }
+          )
+        }
+      } catch (statsError) {
+        jobLogger.warn('Material stat extraction failed (non-blocking)', {
+          error: statsError.message,
         })
       }
 

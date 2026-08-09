@@ -260,6 +260,27 @@ export class ApiHelper {
     }
 
     /**
+     * Get the auxiliary files (external .bin/textures) persisted against a model
+     * version by a multi-file glTF import. Each descriptor carries the relativePath
+     * the primary .gltf references it by.
+     */
+    async getVersionAuxiliaryFiles(
+        modelId: number,
+        versionId: number,
+    ): Promise<any[]> {
+        const response = await this.client.get(
+            `/models/${modelId}/versions/${versionId}/auxiliary-files`,
+        );
+        if (response.status !== 200) {
+            throw new Error(
+                `Failed to get auxiliary files: ${response.status}`,
+            );
+        }
+        const body = response.data?.value ?? response.data;
+        return body?.auxiliaries ?? [];
+    }
+
+    /**
      * Find a model by name (searches in the list)
      */
     async findModelByName(modelName: string): Promise<any | null> {

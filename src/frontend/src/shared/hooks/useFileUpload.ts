@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { uploadModel } from '@/features/models/api/modelApi'
+import {
+  uploadModel,
+  uploadModelGroup,
+  uploadModelZip,
+} from '@/features/models/api/modelApi'
 import { useUploadProgress } from '@/hooks/useUploadProgress'
+import { groupFilesForImport } from '@/shared/utils/multiFileImport'
 
 import {
   isSupportedModelFormat,
@@ -245,12 +250,152 @@ export function useFileUpload(options = {}) {
     }
   }
 
+  /**
+   * Upload a picked folder as one or more model groups. Each supported primary
+   * model file is grouped with its sibling auxiliary files (.bin/textures) by
+   * directory and posted as a multi-file import; a group with no auxiliaries
+   * falls back to the plain single-file upload. Solves bulk multi-file glTF import
+   * (glTF-Sample-Assets / Synty layouts).
+   * @param {FileList|File[]} files - Files from a webkitdirectory picker
+   * @returns {Promise<Object>} Upload results summary
+   */
+  const uploadFolder = async files => {
+    const groups = groupFilesForImport(files)
+    const results = { succeeded: [], failed: [], total: groups.length }
+
+    if (groups.length === 0) {
+      if (toast?.current) {
+        toast.current.show({
+          severity: 'warn',
+          summary: 'No models found',
+          detail:
+            'The selected folder has no supported model files (.gltf, .glb, .obj, .fbx, .stl, .3mf).',
+        })
+      }
+      return results
+    }
+
+    setUploading(true)
+    setUploadProgress(0)
+
+    const batchId =
+      useGlobalProgress && uploadProgressContext && groups.length > 1
+        ? uploadProgressContext.createBatch()
+        : undefined
+
+    try {
+      for (let i = 0; i < groups.length; i++) {
+        const group = groups[i]
+        const uploadId =
+          useGlobalProgress && uploadProgressContext
+            ? uploadProgressContext.addUpload(group.primary, fileType, batchId)
+            : null
+
+        try {
+          if (useGlobalProgress && uploadId && uploadProgressContext) {
+            uploadProgressContext.updateUploadProgress(uploadId, 50)
+          }
+
+          const result =
+            group.auxiliaries.length > 0
+              ? await uploadModelGroup(group.primary, group.auxiliaries, {
+                  batchId,
+                })
+              : await uploadModel(group.primary, { batchId })
+
+          if (useGlobalProgress && uploadId && uploadProgressContext) {
+            uploadProgressContext.updateUploadProgress(uploadId, 100)
+            uploadProgressContext.completeUpload(uploadId, result)
+          }
+          results.succeeded.push({ file: group.primary, result })
+        } catch (error) {
+          if (useGlobalProgress && uploadId && uploadProgressContext) {
+            uploadProgressContext.failUpload(uploadId, error)
+          }
+          results.failed.push({ file: group.primary, error })
+          if (toast?.current) {
+            toast.current.show({
+              severity: 'error',
+              summary: 'Import Failed',
+              detail: `${group.primary.name}: ${error.message}`,
+            })
+          }
+          if (onError) onError(group.primary, error)
+        }
+
+        setUploadProgress(
+          Math.round(((i + 1) / groups.length) * 100 * 100) / 100
+        )
+      }
+
+      if (onSuccess && results.succeeded.length > 0) {
+        onSuccess(null, results)
+      }
+      return results
+    } finally {
+      setUploading(false)
+      setUploadProgress(0)
+    }
+  }
+
+  /**
+   * Upload a .zip archive; the backend unzips, groups by directory, and imports
+   * every model group (multi-file glTF resolved server-side).
+   * @param {File} file - The .zip file
+   * @returns {Promise<Object>} Import result
+   */
+  const uploadZip = async file => {
+    setUploading(true)
+    setUploadProgress(0)
+
+    const uploadId =
+      useGlobalProgress && uploadProgressContext
+        ? uploadProgressContext.addUpload(file, fileType)
+        : null
+
+    try {
+      if (useGlobalProgress && uploadId && uploadProgressContext) {
+        uploadProgressContext.updateUploadProgress(uploadId, 50)
+      }
+      setUploadProgress(50)
+
+      const result = await uploadModelZip(file)
+
+      if (useGlobalProgress && uploadId && uploadProgressContext) {
+        uploadProgressContext.updateUploadProgress(uploadId, 100)
+        uploadProgressContext.completeUpload(uploadId, result)
+      }
+      setUploadProgress(100)
+
+      if (onSuccess) onSuccess(file, result)
+      return result
+    } catch (error) {
+      if (useGlobalProgress && uploadId && uploadProgressContext) {
+        uploadProgressContext.failUpload(uploadId, error)
+      }
+      if (toast?.current) {
+        toast.current.show({
+          severity: 'error',
+          summary: 'Import Failed',
+          detail: `${file.name}: ${error.message}`,
+        })
+      }
+      if (onError) onError(file, error)
+      throw error
+    } finally {
+      setUploading(false)
+      setUploadProgress(0)
+    }
+  }
+
   return {
     uploading,
     uploadProgress,
     uploadFile,
     uploadMultipleFiles,
     uploadSingleFile,
+    uploadFolder,
+    uploadZip,
   }
 }
 

@@ -183,6 +183,72 @@ export class ModelListPage {
         );
     }
 
+    /**
+     * Import a loose multi-file glTF group (a `.gltf` plus its external `.bin`/
+     * textures) via the "Import folder" toolbar button. The hidden input is
+     * `webkitdirectory`, so Playwright requires a single DIRECTORY path (not a file
+     * list); its files arrive with `webkitRelativePath` set, which the frontend groups
+     * by directory and posts to `POST /models/multifile`. Waits for the shared
+     * upload-progress window to report a completed import.
+     */
+    async importFolder(directoryPath: string) {
+        await this.page.waitForLoadState("load", { timeout: 15000 });
+        const fileChooserPromise = this.page.waitForEvent("filechooser");
+        const folderButton = this.page.getByLabel("Import folder");
+        await expect(folderButton).toBeVisible({ timeout: 10000 });
+        await folderButton.click();
+        const fileChooser = await fileChooserPromise;
+        await fileChooser.setFiles(directoryPath);
+        await this.waitForUploadCompleted();
+    }
+
+    /**
+     * Import a `.zip` archive of model groups via the "Import zip" toolbar button. The
+     * backend unzips, groups by directory, and imports each group (multi-file glTF
+     * resolved server-side). Waits for the shared upload-progress window.
+     */
+    async importZip(zipPath: string) {
+        await this.page.waitForLoadState("load", { timeout: 15000 });
+        const fileChooserPromise = this.page.waitForEvent("filechooser");
+        const zipButton = this.page.getByLabel("Import zip");
+        await expect(zipButton).toBeVisible({ timeout: 10000 });
+        await zipButton.click();
+        const fileChooser = await fileChooserPromise;
+        await fileChooser.setFiles(zipPath);
+        await this.waitForUploadCompleted();
+    }
+
+    /** Wait for the global upload-progress window to report at least one completion. */
+    private async waitForUploadCompleted() {
+        await expect(
+            this.page
+                .locator(".upload-summary-text")
+                .getByText(/\d+ completed/i),
+        ).toBeVisible({ timeout: 60000 });
+
+        await expect(async () => {
+            const text = await this.page
+                .locator(".upload-summary-text")
+                .textContent();
+            const count = parseInt(text?.match(/(\d+) completed/i)?.[1] ?? "0", 10);
+            expect(count).toBeGreaterThan(0);
+        }).toPass({ timeout: 60000 });
+
+        const closeButton = this.page
+            .locator(
+                '#upload-progress-window button[aria-label="Close"], #upload-progress-window .pi-times',
+            )
+            .first();
+        if (
+            await closeButton
+                .waitFor({ state: "visible", timeout: 1000 })
+                .then(() => true)
+                .catch(() => false)
+        ) {
+            await closeButton.click();
+        }
+    }
+
     async expectModelStatus(modelName: string, status: string) {
         const nameWithoutExt = modelName.split(".").slice(0, -1).join(".");
         // Try multiple possible selectors for the model item

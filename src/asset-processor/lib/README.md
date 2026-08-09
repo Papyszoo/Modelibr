@@ -47,6 +47,13 @@ not in two places.
   ambient/directional/environment controls land on one rig instead of being
   swamped by a second one. Demo mode (browserAssetProcessor) also builds its rig
   from this (plus a neutral RoomEnvironment IBL) so its thumbnails match.
+- **`gltfResources.js`** — multi-file glTF external-resource resolution. No THREE
+  import. `buildResourceResolver({ relativePath: url })` returns the
+  `LoadingManager.setURLModifier` callback that maps a loose `.gltf`'s external
+  URIs (`.bin`/textures) to already-uploaded siblings; unresolved refs pass through
+  untouched (resolve locally, never network) to preserve the offline invariant. The
+  worker render template installs it for `.gltf` loads; the in-app viewer can reuse
+  it when multi-file viewing lands.
 - **`textureMaterial.js`** — texture-set → material pipeline slices shared by the
   viewer and the worker `applyTextures`. No THREE import.
   - `resolveTextureMaterialConfig(presentMaps)` — the metalness/roughness/

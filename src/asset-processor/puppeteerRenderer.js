@@ -354,6 +354,12 @@ export class PuppeteerRenderer {
    */
   async loadModel(filePath, fileType, options = {}) {
     const preserveMaterials = options.preserveMaterials === true
+    // Multi-file glTF external resources: { relativePath: dataUrl }. Resolved in
+    // the page by a LoadingManager URLModifier (see render-template.html).
+    const gltfResources =
+      options.gltfResources && Object.keys(options.gltfResources).length > 0
+        ? options.gltfResources
+        : null
     // Check if page exists, is not closed, AND the frame is still usable
     if (!this.page || this.page.isClosed() || !(await this._isPageUsable())) {
       logger.warn(
@@ -404,12 +410,13 @@ export class PuppeteerRenderer {
 
       // Load model in the browser
       const result = await this.page.evaluate(
-        async (modelData, type, preserve) => {
+        async (modelData, type, preserve, resources) => {
           try {
             const model = await window.loadModelFromData(
               modelData,
               type,
-              preserve
+              preserve,
+              resources
             )
 
             // Normalize and add to scene
@@ -445,7 +452,8 @@ export class PuppeteerRenderer {
         },
         dataUrl,
         fileType,
-        preserveMaterials
+        preserveMaterials,
+        gltfResources
       )
 
       if (!result.success) {
@@ -1668,6 +1676,52 @@ export class PuppeteerRenderer {
       logger.warn('Error extracting technical metadata', {
         error: error.message,
       })
+      return null
+    }
+  }
+
+  /**
+   * Extract the full scene graph (per-part rows + whole-asset rollups) from the
+   * loaded model by running the shared sceneGraph lib in the page context
+   * (exposed as window.modelibrExtractSceneGraph in render-template.html). The
+   * geometry hash it produces is order-invariant and matches a future bpy pass.
+   *
+   * @param {string} sourceFormat - The loaded file's type/extension (informs unit confidence).
+   * @returns {Promise<Object|null>} The scene-graph payload, or null if unavailable.
+   */
+  async extractSceneGraph(sourceFormat) {
+    if (!this.page || this.page.isClosed()) {
+      logger.warn('Cannot extract scene graph — page not available')
+      return null
+    }
+
+    try {
+      const result = await this.page.evaluate(fmt => {
+        const model = window.modelRenderer?.model
+        if (!model) return { success: false, error: 'No model loaded' }
+        if (typeof window.modelibrExtractSceneGraph !== 'function') {
+          return { success: false, error: 'Scene-graph extractor not exposed' }
+        }
+        const payload = window.modelibrExtractSceneGraph(model, {
+          sourceFormat: fmt,
+        })
+        return { success: true, payload }
+      }, sourceFormat)
+
+      if (!result.success) {
+        logger.warn('Failed to extract scene graph', { error: result.error })
+        return null
+      }
+
+      logger.info('Extracted scene graph from model', {
+        partCount: result.payload.parts.length,
+        meshCount: result.payload.rollups.meshCount,
+        totalTriangles: result.payload.rollups.totalTriangles,
+        warnings: result.payload.warnings.length,
+      })
+      return result.payload
+    } catch (error) {
+      logger.warn('Error extracting scene graph', { error: error.message })
       return null
     }
   }
