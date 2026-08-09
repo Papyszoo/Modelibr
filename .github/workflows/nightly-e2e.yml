@@ -138,7 +138,7 @@ jobs:
             # first boot — then tears the stack down). This is the ONLY place the
             # full create→backup→wipe→restore→verify trust loop actually gates
             # anything; it was non-gating before and had silently rotted (see
-            # CLAUDE.md rule 10).
+            # AGENTS.md rule 10).
             - name: Run backup/restore trust drill
               id: backup-restore
               continue-on-error: true

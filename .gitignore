@@ -508,11 +508,15 @@ tests/e2e/.shared-state.json
 
 .playwright-mcp
 E2E_REPORT.md
-# Ignore Claude Code local state (worktrees, local settings) but version the
-# project skills and agents so they're shared with the repo.
+# Ignore Claude Code local state (worktrees, local settings, the prompt queue)
+# but version the agent-facing docs so they're shared with the repo: skills
+# (conventions), agents (subagent definitions) and notes (engineering context).
+# Anything machine-specific, production, or business-sensitive stays OUT of
+# notes/ — this repo is public. See .claude/notes/README.md.
 .claude/*
 !.claude/skills/
 !.claude/agents/
+!.claude/notes/
 
 # Local test mega-runner output (scripts/test-runner) — repo-root only, so it
 # does not also match the source dirs under scripts/.
