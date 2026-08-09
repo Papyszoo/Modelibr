@@ -411,6 +411,10 @@ export class PuppeteerRenderer {
       // Load model in the browser
       const result = await this.page.evaluate(
         async (modelData, type, preserve, resources) => {
+          // Drop any capture from a previous load first: a failed load must never
+          // leave the last model's scene graph readable as if it were this one's.
+          window.modelRenderer.rawSceneGraph = null
+          window.modelRenderer.blockedResourceUrls = []
           try {
             const model = await window.loadModelFromData(
               modelData,
@@ -418,6 +422,23 @@ export class PuppeteerRenderer {
               preserve,
               resources
             )
+
+            // Walk the scene graph BEFORE normalizeModel touches the transforms.
+            // normalizeModel multiplies the root scale to fit a 2-unit view box, so
+            // world bounds read afterwards describe the thumbnail framing, not the
+            // asset: a 10x4x2 m model would be indexed as ~2x0.8x0.4 and every size
+            // fact and search filter derived from it would be wrong.
+            try {
+              window.modelRenderer.rawSceneGraph =
+                typeof window.modelibrExtractSceneGraph === 'function'
+                  ? window.modelibrExtractSceneGraph(model, {
+                      sourceFormat: type,
+                    })
+                  : null
+            } catch (sceneGraphError) {
+              console.error('Scene-graph extraction error:', sceneGraphError)
+              window.modelRenderer.rawSceneGraph = null
+            }
 
             // Normalize and add to scene
             const normInfo = window.normalizeModel(model, 2.0)
@@ -441,6 +462,8 @@ export class PuppeteerRenderer {
               modelSize: normInfo.size,
               maxDimension: normInfo.maxDimension,
               boundingSphereRadius: normInfo.boundingSphereRadius,
+              blockedResourceUrls:
+                window.modelRenderer.blockedResourceUrls || [],
             }
           } catch (error) {
             console.error('Model loading error:', error)
@@ -458,6 +481,15 @@ export class PuppeteerRenderer {
 
       if (!result.success) {
         throw new Error(result.error || 'Failed to load model')
+      }
+
+      if (result.blockedResourceUrls?.length) {
+        // Not fatal on its own — the model may still render without the reference —
+        // but it means the file asked us to leave the machine, which we refused.
+        logger.warn('Blocked external glTF resource references', {
+          count: result.blockedResourceUrls.length,
+          urls: result.blockedResourceUrls,
+        })
       }
 
       logger.info('Model loaded successfully in browser', {
@@ -542,6 +574,9 @@ export class PuppeteerRenderer {
         const model = new THREE.Group()
         model.add(mesh)
 
+        // Preview primitives are not library assets — make sure no stale
+        // pre-normalization capture from a real model survives behind them.
+        window.modelRenderer.rawSceneGraph = null
         const normInfo = window.normalizeModel(model, 2.0)
         window.modelRenderer.model = model
         window.modelRenderer.scene.add(window.modelRenderer.modelContainer)
@@ -659,6 +694,9 @@ export class PuppeteerRenderer {
         const model = new THREE.Group()
         model.add(mesh)
 
+        // Preview primitives are not library assets — make sure no stale
+        // pre-normalization capture from a real model survives behind them.
+        window.modelRenderer.rawSceneGraph = null
         const normInfo = window.normalizeModel(model, 2.0)
         window.modelRenderer.model = model
         window.modelRenderer.scene.add(window.modelRenderer.modelContainer)
@@ -1686,27 +1724,35 @@ export class PuppeteerRenderer {
    * (exposed as window.modelibrExtractSceneGraph in render-template.html). The
    * geometry hash it produces is order-invariant and matches a future bpy pass.
    *
-   * @param {string} sourceFormat - The loaded file's type/extension (informs unit confidence).
+   * Returns the payload captured at load time, BEFORE normalizeModel scaled the
+   * model to fit the thumbnail view box — measuring afterwards would report the
+   * framing size (max dimension 2) instead of the asset's real dimensions.
+   *
+   * Takes no source format: the format is recorded into the payload at load time,
+   * where it is known, rather than re-supplied here.
+   *
    * @returns {Promise<Object|null>} The scene-graph payload, or null if unavailable.
    */
-  async extractSceneGraph(sourceFormat) {
+  async extractSceneGraph() {
     if (!this.page || this.page.isClosed()) {
       logger.warn('Cannot extract scene graph — page not available')
       return null
     }
 
     try {
-      const result = await this.page.evaluate(fmt => {
+      const result = await this.page.evaluate(() => {
         const model = window.modelRenderer?.model
         if (!model) return { success: false, error: 'No model loaded' }
-        if (typeof window.modelibrExtractSceneGraph !== 'function') {
-          return { success: false, error: 'Scene-graph extractor not exposed' }
+        const captured = window.modelRenderer?.rawSceneGraph
+        if (captured) return { success: true, payload: captured }
+        // No pre-normalization capture (e.g. a model injected by another path):
+        // refuse rather than return dimensions distorted by the view-box scale.
+        return {
+          success: false,
+          error:
+            'No pre-normalization scene graph was captured for the loaded model',
         }
-        const payload = window.modelibrExtractSceneGraph(model, {
-          sourceFormat: fmt,
-        })
-        return { success: true, payload }
-      }, sourceFormat)
+      })
 
       if (!result.success) {
         logger.warn('Failed to extract scene graph', { error: result.error })

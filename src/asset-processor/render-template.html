@@ -98,6 +98,11 @@
         isReady: false,
         error: null,
         useWebGPU: false,
+        // Scene graph captured at load time, before normalizeModel rescales the
+        // model to fit the view box (see puppeteerRenderer.extractSceneGraph).
+        rawSceneGraph: null,
+        // External glTF references the resolver refused (offline invariant).
+        blockedResourceUrls: [],
       }
 
       // Bound scene-graph extractor for the classic-script page.evaluate context.
@@ -482,13 +487,27 @@
             // Multi-file glTF: install a LoadingManager whose URLModifier maps the
             // glTF's external URIs (.bin/textures) to the already-uploaded siblings
             // passed in `resources`. No network fetch — see lib/gltfResources.js.
-            if (resources && Object.keys(resources).length > 0) {
-              const manager = new THREE.LoadingManager()
-              manager.setURLModifier(buildResourceResolver(resources))
-              loader = new GLTFLoader(manager)
-            } else {
-              loader = new GLTFLoader()
-            }
+            //
+            // Installed unconditionally, including for an empty map: without a
+            // resolver the loader would fetch whatever URI the glTF names, so a
+            // file with an absolute http:// buffer or texture reference turned this
+            // renderer into an outbound HTTP client against arbitrary hosts.
+            const manager = new THREE.LoadingManager()
+            manager.setURLModifier(
+              buildResourceResolver(resources, {
+                onBlocked: url => {
+                  window.modelRenderer.blockedResourceUrls =
+                    window.modelRenderer.blockedResourceUrls || []
+                  if (
+                    window.modelRenderer.blockedResourceUrls.length < 20 &&
+                    !window.modelRenderer.blockedResourceUrls.includes(url)
+                  ) {
+                    window.modelRenderer.blockedResourceUrls.push(url)
+                  }
+                },
+              })
+            )
+            loader = new GLTFLoader(manager)
             // Draco-compressed geometry and KTX2/Basis textures are mainstream in
             // modern glTF pipelines, and without these the loader throws
             // ("No DRACOLoader instance provided" / "setKTX2Loader must be called

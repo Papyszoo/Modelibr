@@ -314,18 +314,23 @@ export class JobApiClient {
   /**
    * Report the outcome of a claimed extraction job.
    * @param {number} jobId
+   * @param {string} workerId - The worker holding the claim (lease check).
    * @param {boolean} success
    * @param {string|null} errorMessage
    * @param {string|null} warningDetail
    */
   async finishExtractionJob(
     jobId,
+    workerId,
     success,
     errorMessage = null,
     warningDetail = null
   ) {
     try {
+      // workerId proves we still hold the claim; the API rejects a result from a
+      // worker whose lease expired and whose job another worker has taken over.
       await this.apiClient.post(`/extraction-jobs/${jobId}/finish`, {
+        workerId,
         success,
         errorMessage,
         warningDetail,
@@ -333,6 +338,7 @@ export class JobApiClient {
     } catch (error) {
       logger.error('Failed to finish extraction job', {
         jobId,
+        workerId,
         success,
         error: error.message,
       })
