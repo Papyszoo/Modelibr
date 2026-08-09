@@ -110,7 +110,11 @@ When(
         // Upload a model to trigger thumbnail generation
         const filePath = await UniqueFileGenerator.generate("test-cube.glb");
 
-        const fileInput = page.locator("input[type='file']");
+        // Scope to the model-upload input specifically: the Models page (ModelGrid)
+        // also renders a webkitdirectory folder picker and a .zip import input, so a
+        // bare input[type='file'] trips Playwright strict mode. The model upload is
+        // the only one with a 3D-format accept list.
+        const fileInput = page.locator("input[type='file'][accept*='.glb']");
         const uploadResponsePromise = page.waitForResponse(
             (resp) =>
                 resp.url().includes("/models") &&

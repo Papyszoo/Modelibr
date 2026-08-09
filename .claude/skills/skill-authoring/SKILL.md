@@ -1,6 +1,6 @@
 ---
 name: skill-authoring
-description: How to write and maintain Modelibr agent skills — compactness budget, structure template, staleness rules, what belongs in a skill vs the code vs CLAUDE.md. Use when creating or editing anything under .claude/skills/.
+description: How to write and maintain Modelibr agent skills — compactness budget, structure template, staleness rules, what belongs in a skill vs the code vs AGENTS.md. Use when creating or editing anything under .claude/skills/.
 ---
 
 # Skill authoring (keep skills compact and specific)
@@ -30,7 +30,7 @@ do something wrong without this?"** If no — delete it.
 ## Maintenance rules
 
 - **Code wins.** If a skill claim contradicts the code, fix the skill in the
-  same session (CLAUDE.md rule). Don't soften with "may have changed".
+  same session (AGENTS.md rule). Don't soften with "may have changed".
 - **Prefer replace/delete over append.** A feature that changes behavior
   rewrites the stale line; it doesn't add a second paragraph beside it.
 - Temporary state ("until prompt N lands") is allowed ONLY with the trigger
@@ -39,7 +39,7 @@ do something wrong without this?"** If no — delete it.
   agent may need, never as attribution.
 - `description:` frontmatter = trigger conditions, concrete paths ("Use when
   creating or editing anything under src/X") — that's what decides loading.
-- Don't duplicate CLAUDE.md or another skill; name the other skill instead.
+- Don't duplicate AGENTS.md or another skill; name the other skill instead.
 - One domain per skill. If a section serves a different audience/task,
   it's a different skill (or belongs in none).
 

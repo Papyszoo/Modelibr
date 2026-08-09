@@ -80,8 +80,11 @@ When(
             setTimeout(() => observer.disconnect(), 30000);
         });
 
-        // Set the file input — the UI/server should reject non-3D files
-        const fileInput = page.locator("input[type='file']");
+        // Set the file input — the UI/server should reject non-3D files.
+        // Scope to the model-upload input (accept list of 3D formats): ModelGrid also
+        // renders a folder picker and a .zip import input, and a bare selector would
+        // trip strict mode and get swallowed by the catch below, masking the test.
+        const fileInput = page.locator("input[type='file'][accept*='.glb']");
 
         // Listen for any error responses
         const errorResponsePromise = page
