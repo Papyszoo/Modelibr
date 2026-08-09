@@ -62,7 +62,27 @@ Newly pinned failures:
   `chair` = 46 docs but `chair` + any attribute filter = 17, because attributes live only
   on asset-level docs.
 
+### After the POLYGON City pack finished indexing
+
+Lexical retrieval improves a lot with real game-library content: `apartment`, `SM_Bld`,
+`bench`, `traffic`, `vehicle` (`SM_Veh_Car_Van_01` #1) and `hasRig` → 15 rigged Synty
+characters are all correct. Three data-quality problems then dominate:
+
+- **Degenerate nodes rank first.** `car` + `maxTriangles=10000` → `car-01 — 8 tris,
+  0×0×0 m` at #1. Known noise source, now actively winning scene queries.
+- **`building` still returns doors** with 334 `SM_Bld_*` indexed — the tokenizer never
+  expands `Bld`. Synty-style abbreviations (`Bld`/`Veh`/`Env`, `SM_`/`SK_`) need an
+  expansion layer; this naming is ubiquitous in game asset packs.
+- **FBX and OBJ imports of the same mesh disagree on part scale by ~100×.**
+  `SM_Bld_Apartment_01` (456 tris) → `1.92×1.15×2 m` from FBX, `0.02×0.01×0.02 m` from
+  OBJ. Asset-level world bounds stay correct on both, so only part-level size filtering
+  is poisoned — but that is exactly what an agent uses.
+
+`trigger_rederive` is a good escape hatch: re-deriving 147 models via MCP indexed them
+in ~2 min, versus hours behind the thumbnail queue.
+
 Fix plan is the v0.6 retrieval-bridge prompt: concept labels as an indexed column
-(weighted below tokens), filter-only browse, group-by-asset, and a trigram floor.
+(weighted below tokens), abbreviation expansion, filter-only browse, group-by-asset,
+a trigram floor, and dropping degenerate nodes.
 
 Related: [[substrate-and-mcp.md]]
