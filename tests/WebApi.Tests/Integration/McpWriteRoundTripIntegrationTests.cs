@@ -92,6 +92,44 @@ public class McpWriteRoundTripIntegrationTests : IClassFixture<ModelibrWebFactor
     }
 
     [Fact]
+    public async Task CreatePack_Concurrent_Calls_With_One_Key_Create_Exactly_One_Pack()
+    {
+        // Regression (found driving a real 1,700-model MCP import): idempotency used to be
+        // a lookup followed by a write. Two in-flight calls sharing a key BOTH passed the
+        // lookup, BOTH created a pack, and the loser then tripped the audit log's unique
+        // index — leaving a duplicate pack with no audit row and an opaque tool error.
+        // The sequential retry test above cannot see this; only concurrency can.
+        await MigrateAsync();
+        const string key = "mcp-write-create-pack-concurrent-1";
+        const string packName = "Concurrently Created Pack";
+
+        async Task<string> InvokeAsync()
+        {
+            using var scope = _factory.Services.CreateScope();
+            var sp = scope.ServiceProvider;
+            var result = await AssetWriteMcpTools.CreatePack(
+                sp.GetRequiredService<ICommandHandler<CreatePackCommand, CreatePackResponse>>(),
+                sp.GetRequiredService<IAgentAudit>(),
+                packName,
+                key);
+            return System.Text.Json.JsonSerializer.Serialize(result);
+        }
+
+        var responses = await Task.WhenAll(InvokeAsync(), InvokeAsync(), InvokeAsync(), InvokeAsync());
+
+        // Every caller gets a well-formed answer — exactly one applied, the rest stood down.
+        Assert.Equal(1, responses.Count(r => r.Contains("\"ok\"")));
+        Assert.Equal(3, responses.Count(r => r.Contains("already-applied")));
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            Assert.Equal(1, await context.Packs.CountAsync(p => p.Name == packName));
+            Assert.Equal(1, await context.AgentOperationLogs.CountAsync(l => l.IdempotencyKey == key));
+        }
+    }
+
+    [Fact]
     public async Task TriggerRederive_Enqueues_Job_Records_Audit_And_Retry_Reuses_The_Job()
     {
         await MigrateAsync();

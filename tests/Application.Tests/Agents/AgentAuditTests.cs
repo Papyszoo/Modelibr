@@ -1,4 +1,3 @@
-using Application.Abstractions;
 using Application.Abstractions.Repositories;
 using Application.Agents;
 using Domain.Models;
@@ -13,44 +12,63 @@ public class AgentAuditTests
     private static readonly DateTime Now = new(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
     private readonly Mock<IAgentOperationLogRepository> _repo = new();
-    private readonly Mock<IUnitOfWork> _uow = new();
     private readonly AgentAudit _audit;
 
     public AgentAuditTests()
     {
         var clock = new Mock<IDateTimeProvider>();
         clock.Setup(c => c.UtcNow).Returns(Now);
-        _audit = new AgentAudit(_repo.Object, clock.Object, _uow.Object);
+        _audit = new AgentAudit(_repo.Object, clock.Object);
     }
 
     [Fact]
-    public async Task FindAsync_Returns_Prior_Entry_For_Key()
+    public async Task TryBeginAsync_Claims_The_Key_Before_The_Write_Runs()
     {
-        var prior = AgentOperationLog.Create("key-1", "set-category", Now, assetType: "Model", assetId: 3);
-        _repo.Setup(r => r.GetByIdempotencyKeyAsync("key-1", It.IsAny<CancellationToken>())).ReturnsAsync(prior);
+        AgentOperationLog? claimed = null;
+        _repo.Setup(r => r.TryClaimAsync(It.IsAny<AgentOperationLog>(), It.IsAny<CancellationToken>()))
+            .Callback<AgentOperationLog, CancellationToken>((log, _) => claimed = log)
+            .ReturnsAsync((AgentOperationLog?)null);
 
-        var found = await _audit.FindAsync("key-1");
+        var prior = await _audit.TryBeginAsync(new AgentWrite("key-2", "set-tags", "Model", 7));
 
-        Assert.Same(prior, found);
+        Assert.Null(prior);
+        Assert.NotNull(claimed);
+        Assert.Equal("key-2", claimed!.IdempotencyKey);
+        Assert.Equal("set-tags", claimed.Operation);
+        Assert.Equal("Model", claimed.AssetType);
+        Assert.Equal(7, claimed.AssetId);
+        Assert.Equal(Now, claimed.PerformedAt);
     }
 
     [Fact]
-    public async Task RecordAsync_Adds_Log_And_Commits()
+    public async Task TryBeginAsync_Returns_The_Winning_Entry_When_The_Key_Is_Already_Claimed()
     {
-        AgentOperationLog? captured = null;
-        _repo.Setup(r => r.AddAsync(It.IsAny<AgentOperationLog>(), It.IsAny<CancellationToken>()))
-            .Callback<AgentOperationLog, CancellationToken>((log, _) => captured = log)
-            .Returns(Task.CompletedTask);
+        // The claim insert losing to a concurrent caller is the whole point of the
+        // primitive: the loser must be told to stand down, not apply its write.
+        var winner = AgentOperationLog.Create("key-1", "set-category", Now, assetType: "Model", assetId: 3);
+        _repo.Setup(r => r.TryClaimAsync(It.IsAny<AgentOperationLog>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(winner);
 
-        await _audit.RecordAsync(new AgentWrite(
-            "key-2", "set-tags", "Model", 7, PayloadAfter: "{\"tags\":[\"pbr\"]}"));
+        var prior = await _audit.TryBeginAsync(new AgentWrite("key-1", "set-category", "Model", 3));
 
-        Assert.NotNull(captured);
-        Assert.Equal("key-2", captured!.IdempotencyKey);
-        Assert.Equal("set-tags", captured.Operation);
-        Assert.Equal("Model", captured.AssetType);
-        Assert.Equal(7, captured.AssetId);
-        Assert.Equal(Now, captured.PerformedAt);
-        _uow.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Same(winner, prior);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_Records_The_Outcome_On_The_Claim()
+    {
+        await _audit.CompleteAsync("key-3", "Model", 9, "{\"tags\":[\"pbr\"]}");
+
+        _repo.Verify(
+            r => r.CompleteClaimAsync("key-3", "Model", 9, "{\"tags\":[\"pbr\"]}", It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task AbandonAsync_Releases_The_Claim_So_A_Failed_Write_Can_Be_Retried()
+    {
+        await _audit.AbandonAsync("key-4");
+
+        _repo.Verify(r => r.ReleaseClaimAsync("key-4", It.IsAny<CancellationToken>()), Times.Once);
     }
 }

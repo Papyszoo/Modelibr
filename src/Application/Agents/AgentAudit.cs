@@ -1,4 +1,3 @@
-using Application.Abstractions;
 using Application.Abstractions.Repositories;
 using Domain.Models;
 using Domain.Services;
@@ -8,16 +7,37 @@ namespace Application.Agents;
 /// <summary>
 /// Records agent-initiated writes (MCP write tools) into the append-only
 /// <see cref="AgentOperationLog"/> and enforces idempotency: a repeated write carrying
-/// the same key is detected up-front so it is not re-applied. This is the audit + replay
-/// safety the write surface requires (prompt 30 / [[project_mcp_full_agent_surface_v06]]).
+/// the same key must not be re-applied. This is the audit + replay safety the write
+/// surface requires (prompt 30 / the v0.6 full-agent-surface direction).
+///
+/// The key is <b>claimed before</b> the write runs, not merely looked up. A
+/// lookup-then-write check is a check-then-act race: two concurrent calls with one key
+/// both pass the lookup, both apply the write, and the second then trips the unique
+/// index while its mutation has already landed — which is exactly how a batch import
+/// with a retried key produced a duplicate pack.
 /// </summary>
 public interface IAgentAudit
 {
-    /// <summary>The prior log entry for this key, or null if the operation has not run.</summary>
-    Task<AgentOperationLog?> FindAsync(string idempotencyKey, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Claims <paramref name="write"/>'s idempotency key. Returns <c>null</c> when the
+    /// caller owns the claim and must go on to apply the write; returns the prior entry
+    /// when the operation already ran (or is running) and must not be re-applied.
+    /// </summary>
+    Task<AgentOperationLog?> TryBeginAsync(AgentWrite write, CancellationToken cancellationToken = default);
 
-    /// <summary>Appends an audit entry and commits it (separate from the write's own commit).</summary>
-    Task RecordAsync(AgentWrite write, CancellationToken cancellationToken = default);
+    /// <summary>Records the outcome of a write that succeeded, on a claim this caller owns.</summary>
+    Task CompleteAsync(
+        string idempotencyKey,
+        string? assetType = null,
+        int? assetId = null,
+        string? payloadAfter = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Releases a claim whose write failed, so retrying it is not turned away as
+    /// "already applied" for an operation that never happened.
+    /// </summary>
+    Task AbandonAsync(string idempotencyKey, CancellationToken cancellationToken = default);
 }
 
 /// <summary>Describes one agent write for the audit log.</summary>
@@ -34,24 +54,18 @@ internal sealed class AgentAudit : IAgentAudit
 {
     private readonly IAgentOperationLogRepository _repository;
     private readonly IDateTimeProvider _dateTimeProvider;
-    private readonly IUnitOfWork _unitOfWork;
 
     public AgentAudit(
         IAgentOperationLogRepository repository,
-        IDateTimeProvider dateTimeProvider,
-        IUnitOfWork unitOfWork)
+        IDateTimeProvider dateTimeProvider)
     {
         _repository = repository;
         _dateTimeProvider = dateTimeProvider;
-        _unitOfWork = unitOfWork;
     }
 
-    public Task<AgentOperationLog?> FindAsync(string idempotencyKey, CancellationToken cancellationToken = default) =>
-        _repository.GetByIdempotencyKeyAsync(idempotencyKey, cancellationToken);
-
-    public async Task RecordAsync(AgentWrite write, CancellationToken cancellationToken = default)
+    public Task<AgentOperationLog?> TryBeginAsync(AgentWrite write, CancellationToken cancellationToken = default)
     {
-        var log = AgentOperationLog.Create(
+        var claim = AgentOperationLog.Create(
             write.IdempotencyKey,
             write.Operation,
             _dateTimeProvider.UtcNow,
@@ -61,7 +75,17 @@ internal sealed class AgentAudit : IAgentAudit
             payloadBefore: write.PayloadBefore,
             payloadAfter: write.PayloadAfter);
 
-        await _repository.AddAsync(log, cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        return _repository.TryClaimAsync(claim, cancellationToken);
     }
+
+    public Task CompleteAsync(
+        string idempotencyKey,
+        string? assetType = null,
+        int? assetId = null,
+        string? payloadAfter = null,
+        CancellationToken cancellationToken = default) =>
+        _repository.CompleteClaimAsync(idempotencyKey, assetType, assetId, payloadAfter, cancellationToken);
+
+    public Task AbandonAsync(string idempotencyKey, CancellationToken cancellationToken = default) =>
+        _repository.ReleaseClaimAsync(idempotencyKey, cancellationToken);
 }
