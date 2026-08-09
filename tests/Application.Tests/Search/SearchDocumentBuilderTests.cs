@@ -41,21 +41,31 @@ public class SearchDocumentBuilderTests
         docs.Single(d => d.PartPath == null);
 
     [Fact]
-    public void BuildForModel_Folds_SuggestedLabel_And_CategoryName_Into_Tokens()
+    public void BuildForModel_Separates_Inferred_Concepts_From_Authored_Tokens()
     {
         // The semantic bridge: a "sword" asset in a "Weapons" category must be findable
-        // by the conceptual query "weapon" — so both the derived concept label and the
-        // category words are folded into the indexed tokens.
+        // by the conceptual query "weapon".
+        //
+        // The concept label used to be folded into Tokens alongside the authored name.
+        // That made an inferred match indistinguishable from a named one, so on a real
+        // library "vehicle" ranked boat_ornament and tram_rail — vehicles only by
+        // inference — level with SM_Veh_Car_Van_01, and alphabetical tie-breaking then
+        // decided the result page. Concepts now have their own field and are ranked
+        // below authored names.
         var docs = SearchDocumentBuilder.BuildForModel(
             modelId: 1, versionId: 1, isCurrentVersion: true,
             assetName: "Sword", derived: DerivedWith("sword", "blade"),
             rollups: Rollups(), rawParts: new[] { Part() }, now: DateTime.UtcNow,
             categoryId: 7, categoryName: "Sci-Fi Weapons");
 
-        var tokens = AssetDoc(docs).Tokens.Split(' ');
-        Assert.Contains("weapon", tokens);   // folded concept label (suggested from "sword")
-        Assert.Contains("Weapons", tokens);  // folded category word
-        Assert.Contains("sword", tokens);    // original authored token preserved
+        var doc = AssetDoc(docs);
+        var tokens = doc.Tokens.Split(' ');
+        var concepts = doc.ConceptLabels.Split(' ');
+
+        Assert.Contains("sword", tokens);      // authored token preserved
+        Assert.Contains("Weapons", tokens);    // the user's own category words are authored too
+        Assert.Contains("weapon", concepts);   // inferred concept, kept separate
+        Assert.DoesNotContain("weapon", tokens);
     }
 
     [Fact]

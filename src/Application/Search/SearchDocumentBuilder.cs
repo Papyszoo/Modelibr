@@ -42,8 +42,12 @@ public static class SearchDocumentBuilder
         var widenedTokens = SearchVocabulary.ExpandForIndex(derived.Tokens);
         var suggestedLabels = CategorySuggester.Suggest(widenedTokens);
         var assetTokens = widenedTokens
-            .Concat(suggestedLabels)
             .Concat(CategoryNameTokens(categoryName))
+            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+        // Concept labels go in their own field so a "vehicle" that is only a vehicle by
+        // inference cannot rank level with one whose author named it that.
+        var conceptLabels = suggestedLabels
             .Where(t => !string.IsNullOrWhiteSpace(t))
             .Distinct(StringComparer.OrdinalIgnoreCase);
 
@@ -62,6 +66,7 @@ public static class SearchDocumentBuilder
             prominence: Prominence.Full,
             displayName: assetDisplay,
             tokens: string.Join(' ', assetTokens),
+            conceptLabels: string.Join(' ', conceptLabels),
             browseSummary: derived.BrowseSummary,
             updatedAt: now,
             triangleCount: rollups.TotalTriangles,

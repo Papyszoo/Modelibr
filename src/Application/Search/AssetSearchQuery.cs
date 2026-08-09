@@ -45,7 +45,30 @@ public record AssetSearchHit(
     string DisplayName,
     string BrowseSummary,
     string Prominence,
-    string MatchedOn);
+    string MatchedOn,
+    AssetSearchFacts? Facts = null);
+
+/// <summary>
+/// The structural facts a caller needs to <i>choose between</i> hits, returned inline.
+///
+/// Without these, picking one of ten candidates costs ten extra <c>get_asset</c> calls —
+/// the dominant cost in an agent assembling a scene, where every filter it wants to apply
+/// (triangle budget, physical size, is it rigged, does it have UVs) is already sitting in
+/// the search document that produced the hit.
+/// </summary>
+public record AssetSearchFacts(
+    int? TriangleCount,
+    int? VertexCount,
+    int? PartCount,
+    int? MaterialCount,
+    double? MaxDimension,
+    bool? HasUvs,
+    bool HasRig,
+    int? BoneCount,
+    bool? HasAnimations,
+    int? AnimationCount,
+    string? ShapeClass,
+    string? CategoryName);
 
 /// <summary>Filters passed to the repository (mirrors the query's structural facets).</summary>
 public record AssetSearchRequest(
