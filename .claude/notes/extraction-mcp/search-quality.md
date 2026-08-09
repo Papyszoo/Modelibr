@@ -81,8 +81,31 @@ characters are all correct. Three data-quality problems then dominate:
 `trigger_rederive` is a good escape hatch: re-deriving 147 models via MCP indexed them
 in ~2 min, versus hours behind the thumbnail queue.
 
-Fix plan is the v0.6 retrieval-bridge prompt: concept labels as an indexed column
-(weighted below tokens), abbreviation expansion, filter-only browse, group-by-asset,
-a trigram floor, and dropping degenerate nodes.
+### Mechanism — why multi-word queries behave the way they do
+
+`AssetSearchQueryHandler` passes the **raw, unsplit term** to `SearchRepository`, which
+ORs four clauses: whole-phrase adjacency ILIKE on `Tokens`/`Symbols`, whole-phrase
+substring on `DisplayName`, `trigram(entire token blob, entire term) > 0.2`, and
+`to_tsvector('simple', BrowseSummary) @@ plainto_tsquery('simple', term)`.
+
+The first two need the whole phrase contiguous and the fourth ANDs its lexemes against a
+*summary*, so **multi-word queries are decided almost entirely by whole-blob trigram
+similarity** — noise that sometimes lands (`traffic light` → `SM_Prop_TrafficLight_01`
+#1) and sometimes does not (`streetlight for a city street` → `b_RightForeArm_07`). It is
+also why adding words *raises* the result count: `apartment` 103 → `apartment building`
+243, with `SM_Bld_Apartment_Door_01` outranking `SM_Bld_Apartment_01`.
+
+`'simple'` means no stemming and no stopwords, so plurals silently lose most results:
+`chair` 57 → `chairs` 33, `box` 98 → `boxes` 30, `building` 200 → `buildings` 174. And
+the 0.2 trigram floor is self-described as a guess — `stree` works, `strt` returns
+`strap`/`straw`.
+
+Fix plan is the v0.6 retrieval-bridge prompt: **split the query and score per word**
+(the cheapest large win), `english` config for prose with a `setweight`ed tsvector +
+GIN index, concept labels and abbreviation expansion at index time, folder/pack path as
+free tokens, filter-only browse, group-by-asset, a calibrated trigram floor, and dropping
+degenerate nodes. A local ONNX embedding model stays a live option — the invariant bans
+*hosted* inference, and Blender's download-on-demand is the precedent for shipping an
+optional local model.
 
 Related: [[substrate-and-mcp.md]]
