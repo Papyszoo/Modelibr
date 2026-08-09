@@ -44,14 +44,16 @@ of these instead:
 - **Import folder** (folder toolbar button) — pick the folder that holds the
   models. Each `.gltf` is grouped with the `.bin`/textures in its directory and
   imported together; a whole library of subfolders imports in one action.
-- **Import `.zip`** (archive toolbar button) — upload a `.zip` and the app unzips
-  it, groups every model by directory, and imports each one.
+- **Import `.zip`** (archive toolbar button) — pick a `.zip` and the app expands it
+  and imports it exactly like a picked folder: same grouping, same format checks,
+  one progress entry per model. The archive is expanded on your machine, not
+  uploaded whole.
 
 The external files are stored with the model and resolved when its thumbnail and
-scene graph are extracted, so a multi-file `.gltf` looks and behaves like its
-packed `.glb` twin. Nothing is ever fetched from the network — only the files you
-uploaded are used, and an unresolved reference is skipped with a warning rather
-than failing the import.
+scene graph are extracted, and when you open it in the viewer — so a multi-file
+`.gltf` looks and behaves like its packed `.glb` twin. Nothing is ever fetched from
+the network: only the files you uploaded are used, and a reference that points
+anywhere else is refused rather than requested.
 
 ## Organizing with Categories
 
