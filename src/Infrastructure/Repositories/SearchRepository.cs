@@ -18,6 +18,11 @@ internal sealed class SearchRepository : ISearchRepository
     // Shortest query word allowed to match as an unanchored substring of a display name.
     private const int MinSubstringLength = 4;
 
+    // How many ranked documents to pull per requested hit before collapsing them to one
+    // row per asset. An asset contributes one document plus one per part, so a small
+    // multiple is enough to fill the page without a second round trip.
+    private const int AssetGroupingOverfetch = 4;
+
     // Degenerate nodes (empty exporter leftovers) are real documents but never a real
     // answer: "car under 10k tris" used to return an 8-triangle, 0x0x0 m "car-01" first,
     // and "vehicle" ranked it above every actual vehicle. Zero measured volume is the
@@ -139,15 +144,22 @@ internal sealed class SearchRepository : ISearchRepository
         // used to return nothing, which made every facet in list_facets unusable alone.
         if (parsed.IsEmpty)
         {
-            var browseTotal = await query.CountAsync(cancellationToken);
-            var browseHits = await query
+            var browseLimit = Math.Clamp(request.Limit, 1, 100);
+            var browseTotal = await query
+                .Select(d => new { d.AssetType, d.AssetId })
+                .Distinct()
+                .CountAsync(cancellationToken);
+            var browseDocs = await query
                 .OrderByDescending(d => d.PartPath == null) // whole assets before parts
                 .ThenBy(d => d.DisplayName)
-                .Take(Math.Clamp(request.Limit, 1, 100))
-                .Select(d => new AssetSearchHit(
-                    d.AssetType, d.AssetId, d.VersionId, d.PartPath,
-                    d.DisplayName, d.BrowseSummary, d.Prominence, "browse"))
+                .Take(browseLimit * AssetGroupingOverfetch)
                 .ToListAsync(cancellationToken);
+            var browseHits = browseDocs
+                .GroupBy(d => (d.AssetType, d.AssetId))
+                .Select(g => g.First())
+                .Take(browseLimit)
+                .Select(d => ToHit(d))
+                .ToList();
             return new AssetSearchResponse(browseHits, browseTotal);
         }
 
@@ -221,6 +233,14 @@ internal sealed class SearchRepository : ISearchRepository
             P3 = EF.Functions.ILike(d.BrowseSummary, s3),
             P4 = EF.Functions.ILike(d.BrowseSummary, s4),
             P5 = EF.Functions.ILike(d.BrowseSummary, s5),
+            // Inferred concept labels: recall for intent queries, but ranked below an
+            // authored name so "vehicle" puts SM_Veh_Car_Van_01 above boat_ornament.
+            C0 = EF.Functions.ILike(" " + d.ConceptLabels + " ", b00),
+            C1 = EF.Functions.ILike(" " + d.ConceptLabels + " ", b10),
+            C2 = EF.Functions.ILike(" " + d.ConceptLabels + " ", b20),
+            C3 = EF.Functions.ILike(" " + d.ConceptLabels + " ", b30),
+            C4 = EF.Functions.ILike(" " + d.ConceptLabels + " ", b40),
+            C5 = EF.Functions.ILike(" " + d.ConceptLabels + " ", b50),
             // Whole-name match on the original phrase: "park bench" should still beat a
             // document that merely carries both words separately. Multi-word queries only
             // — for a single word this just repeats the name match below, and promoting it
@@ -242,6 +262,8 @@ internal sealed class SearchRepository : ISearchRepository
                               + (x.T3 ? 1 : 0) + (x.T4 ? 1 : 0) + (x.T5 ? 1 : 0),
             ProseCoverage = (x.P0 ? 1 : 0) + (x.P1 ? 1 : 0) + (x.P2 ? 1 : 0)
                             + (x.P3 ? 1 : 0) + (x.P4 ? 1 : 0) + (x.P5 ? 1 : 0),
+            ConceptCoverage = (x.C0 ? 1 : 0) + (x.C1 ? 1 : 0) + (x.C2 ? 1 : 0)
+                              + (x.C3 ? 1 : 0) + (x.C4 ? 1 : 0) + (x.C5 ? 1 : 0),
         })
         .Select(x => new
         {
@@ -250,39 +272,84 @@ internal sealed class SearchRepository : ISearchRepository
             x.Similarity,
             x.LiteralCoverage,
             x.ProseCoverage,
+            x.ConceptCoverage,
             // A confident fuzzy match counts as covering the (single) query word, so a
             // near-miss on the real name competes with an incidental substring hit:
             // "aple" must reach "apple", not stop at "staple".
             Coverage = x.LiteralCoverage + (x.Similarity > TrigramThreshold ? 1 : 0),
         })
-        .Where(x => x.Coverage > 0 || x.ProseCoverage > 0);
+        .Where(x => x.Coverage > 0 || x.ConceptCoverage > 0 || x.ProseCoverage > 0);
 
-        var total = await scored.CountAsync(cancellationToken);
+        // Count assets, not documents. An asset is indexed once for itself and once per
+        // part, so the old document count reported "46 chairs" for 17 chairs — and the
+        // number changed meaning as soon as a filter was applied, since attributes only
+        // live on the asset-level document.
+        var total = await scored
+            .Select(x => new { x.Doc.AssetType, x.Doc.AssetId })
+            .Distinct()
+            .CountAsync(cancellationToken);
 
-        var hits = await scored
+        var limit = Math.Clamp(request.Limit, 1, 100);
+
+        // Over-fetch, then keep the best-ranked document per asset. The same asset used
+        // to occupy several of the caller's top-k slots with itself and its parts, which
+        // is wasted context for an agent choosing between candidates.
+        var ranked = await scored
             .OrderByDescending(x => x.PhraseHit)   // the whole phrase in the name wins
-            .ThenByDescending(x => x.Coverage)     // then: how many query words matched
+            .ThenByDescending(x => x.Coverage)     // then: how many query words the NAME matched
+            .ThenByDescending(x => x.ConceptCoverage) // then inferred concepts
             .ThenByDescending(x => x.Doc.PartPath == null) // whole assets before their parts
-            .ThenByDescending(x => x.ProseCoverage) // summary text is the weakest signal
-            .ThenByDescending(x => x.Similarity)   // fuzzy only breaks remaining ties
+            .ThenByDescending(x => x.Similarity)   // a close name match beats an incidental one
+            .ThenByDescending(x => x.ProseCoverage) // generated summary text is the weakest signal
             .ThenBy(x => x.Doc.DisplayName)
-            .Take(Math.Clamp(request.Limit, 1, 100))
-            .Select(x => new AssetSearchHit(
-                x.Doc.AssetType,
-                x.Doc.AssetId,
-                x.Doc.VersionId,
-                x.Doc.PartPath,
-                x.Doc.DisplayName,
-                x.Doc.BrowseSummary,
-                x.Doc.Prominence,
-                x.PhraseHit ? "phrase"
+            .Take(limit * AssetGroupingOverfetch)
+            .Select(x => new
+            {
+                x.Doc,
+                MatchedOn = x.PhraseHit ? "phrase"
                     : x.LiteralCoverage > 0 ? "token"
                     : x.Coverage > x.LiteralCoverage ? "fuzzy"
-                    : "summary"))
+                    : x.ConceptCoverage > 0 ? "concept"
+                    : "summary",
+            })
             .ToListAsync(cancellationToken);
+
+        var hits = ranked
+            .GroupBy(x => (x.Doc.AssetType, x.Doc.AssetId))
+            .Select(g => g.First())
+            .Take(limit)
+            .Select(x => ToHit(x.Doc, x.MatchedOn))
+            .ToList();
 
         return new AssetSearchResponse(hits, total);
     }
+
+    /// <summary>
+    /// Projects a search document into a hit, carrying the structural facts inline so a
+    /// caller can choose between candidates without a follow-up call per hit.
+    /// </summary>
+    private static AssetSearchHit ToHit(Domain.Models.AssetSearchDocument doc, string matchedOn = "browse") =>
+        new(doc.AssetType,
+            doc.AssetId,
+            doc.VersionId,
+            doc.PartPath,
+            doc.DisplayName,
+            doc.BrowseSummary,
+            doc.Prominence,
+            matchedOn,
+            new AssetSearchFacts(
+                doc.TriangleCount,
+                doc.VertexCount,
+                doc.PartCount,
+                doc.MaterialCount,
+                doc.MaxDimension,
+                doc.HasUvs,
+                doc.BoneCount is > 0,
+                doc.BoneCount,
+                doc.HasAnimations,
+                doc.AnimationCount,
+                doc.ShapeClass,
+                doc.CategoryName));
 
     public async Task<IReadOnlyList<SearchResultGroup>> SearchAsync(
         string term,

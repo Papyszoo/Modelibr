@@ -39,6 +39,18 @@ public class AssetSearchDocument
     /// <summary>Space-joined declared script symbols (mesh-name weight), trigram-indexed.</summary>
     public string Symbols { get; private set; } = string.Empty;
 
+    /// <summary>
+    /// Space-joined deterministic concept labels (weapon / vehicle / building …) inferred
+    /// from the authored tokens.
+    ///
+    /// Kept OUT of <see cref="Tokens"/> deliberately. When both lived in one field a
+    /// concept match was indistinguishable from a name match, so a query for "vehicle"
+    /// ranked <c>boat_ornament</c> and <c>tram_rail</c> — labelled vehicles — level with
+    /// <c>SM_Veh_Car_Van_01</c>, and alphabetical tie-breaking then decided the page.
+    /// Scored separately, concepts add recall without displacing an authored name.
+    /// </summary>
+    public string ConceptLabels { get; private set; } = string.Empty;
+
     /// <summary>Human-readable prose line for the full-text vector.</summary>
     public string BrowseSummary { get; private set; } = string.Empty;
 
@@ -81,6 +93,7 @@ public class AssetSearchDocument
         string browseSummary,
         DateTime updatedAt,
         string symbols = "",
+        string conceptLabels = "",
         int? triangleCount = null,
         bool? hasAnimations = null,
         int? boneCount = null,
@@ -117,6 +130,7 @@ public class AssetSearchDocument
             DisplayName = displayName ?? string.Empty,
             Tokens = tokens ?? string.Empty,
             Symbols = symbols ?? string.Empty,
+            ConceptLabels = conceptLabels ?? string.Empty,
             BrowseSummary = browseSummary ?? string.Empty,
             TriangleCount = triangleCount,
             HasAnimations = hasAnimations,

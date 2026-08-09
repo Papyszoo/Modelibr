@@ -50,6 +50,8 @@
     <script type="module">
       import * as THREE from 'three'
       import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
+      import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'
+      import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js'
       import { OBJLoader } from 'three/addons/loaders/OBJLoader.js'
       import { FBXLoader } from 'three/addons/loaders/FBXLoader.js'
       import { STLLoader } from 'three/addons/loaders/STLLoader.js'
@@ -487,6 +489,27 @@
             } else {
               loader = new GLTFLoader()
             }
+            // Draco-compressed geometry and KTX2/Basis textures are mainstream in
+            // modern glTF pipelines, and without these the loader throws
+            // ("No DRACOLoader instance provided" / "setKTX2Loader must be called
+            // before loading KTX2 textures") — so those assets could never get a
+            // thumbnail or an extraction, and stayed invisible to search forever.
+            // Both decoders ship inside the three package, so this stays offline.
+            loader.setDRACOLoader(
+              new DRACOLoader().setDecoderPath(
+                './node_modules/three/examples/jsm/libs/draco/'
+              )
+            )
+            const ktx2 = new KTX2Loader().setTranscoderPath(
+              './node_modules/three/examples/jsm/libs/basis/'
+            )
+            if (window.modelRenderer.renderer) {
+              // detectSupport needs the live renderer to pick a transcode target;
+              // without one the loader still constructs and simply transcodes to a
+              // safe default rather than throwing.
+              ktx2.detectSupport(window.modelRenderer.renderer)
+            }
+            loader.setKTX2Loader(ktx2)
           } else if (fileType === 'obj') {
             loader = new OBJLoader()
           } else if (fileType === 'fbx') {

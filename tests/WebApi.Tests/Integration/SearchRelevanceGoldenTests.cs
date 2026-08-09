@@ -68,6 +68,9 @@ public class SearchRelevanceGoldenTests : IClassFixture<ModelibrWebFactory>
         // Vehicles + the distractors that substring matching used to promote.
         new("SM_Veh_Car_Van_01", 5681), new("SM_Veh_Car_Police_01", 6100),
         new("SM_Veh_Car_Ambo_01", 6449), new("SM_Veh_Truck_01", 7200),
+        // Vehicles only by inference — their names say boat/tram, not "vehicle". They
+        // must be reachable by an intent query but must not outrank a named vehicle.
+        new("boat_ornament", 900), new("tram_rail", 400), new("ship_wheel", 700),
         new("credit_card", 92), new("cartwheel", 672), new("car_tire_01", 2176),
         // Degenerate exporter leftover — a few triangles, zero volume. Must never answer.
         new("car-01", 8, MaxDimension: 0),
@@ -118,7 +121,10 @@ public class SearchRelevanceGoldenTests : IClassFixture<ModelibrWebFactory>
             MinRelevantInTopK: 3),
         new("intent-vehicle", "vehicle",
             Relevant: new[] { "SM_Veh_Car_Van_01", "SM_Veh_Car_Police_01", "SM_Veh_Car_Ambo_01", "SM_Veh_Truck_01" },
-            Forbidden: new[] { "credit_card", "cartwheel", "SK_Character_Male_Police" },
+            // boat/tram/ship are genuinely vehicles by concept, but an asset whose author
+            // named it a vehicle must come first — this is what the separate concept field
+            // buys, and without it alphabetical order decided the page.
+            Forbidden: new[] { "credit_card", "cartwheel", "SK_Character_Male_Police", "boat_ornament", "tram_rail", "ship_wheel" },
             MinRelevantInTopK: 3),
         new("intent-character", "character",
             Relevant: new[] { "SK_Character_Female_Coat", "SK_Character_Male_Hoodie", "SK_Character_Male_Police" },
@@ -206,7 +212,8 @@ public class SearchRelevanceGoldenTests : IClassFixture<ModelibrWebFactory>
                 isCurrentVersion: true,
                 prominence: "full",
                 displayName: fixture.Name,
-                tokens: string.Join(' ', widened.Concat(labels).Distinct(StringComparer.OrdinalIgnoreCase)),
+                tokens: string.Join(' ', widened),
+                conceptLabels: string.Join(' ', labels),
                 browseSummary: $"{fixture.Name} — mesh, {fixture.Triangles} tris",
                 updatedAt: now,
                 triangleCount: fixture.Triangles,

@@ -1315,6 +1315,7 @@ namespace Infrastructure.Persistence
                 entity.Property(e => e.DisplayName).IsRequired().HasMaxLength(512);
                 entity.Property(e => e.Tokens).IsRequired();
                 entity.Property(e => e.Symbols).IsRequired();
+                entity.Property(e => e.ConceptLabels).IsRequired().HasDefaultValue(string.Empty);
                 entity.Property(e => e.BrowseSummary).IsRequired();
                 entity.Property(e => e.TriangleCount).IsRequired(false);
                 entity.Property(e => e.HasAnimations).IsRequired(false);
