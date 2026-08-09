@@ -10,7 +10,10 @@ import { STLLoader } from 'three/examples/jsm/loaders/STLLoader'
 
 import { LoadingPlaceholder } from '@/components/LoadingPlaceholder'
 import { useModelObject } from '@/features/model-viewer/hooks/useModelObject'
-import { safeLoadingManager } from '@/shared/three/safeLoadingManager'
+import {
+  createGltfResourceManager,
+  safeLoadingManager,
+} from '@/shared/three/safeLoadingManager'
 import { THREEJS_SUPPORTED_FORMATS } from '@/utils/fileUtils'
 
 import { buildStlModel } from '../../../../../asset-processor/lib/stlMesh.js'
@@ -130,13 +133,21 @@ function GLTFModel({
   modelUrl,
   rotationSpeed,
   preserveMaterials = false,
+  gltfResources,
 }: {
   modelUrl: string
   rotationSpeed: number
   preserveMaterials?: boolean
+  gltfResources?: Record<string, string>
 }) {
+  // A loose .gltf references its buffers/textures relatively; those must be mapped to
+  // the version's uploaded auxiliary files or the model loads with no geometry at all.
+  const manager = useMemo(
+    () => createGltfResourceManager(gltfResources),
+    [gltfResources]
+  )
   const gltf = useLoader(GLTFLoader, modelUrl, loader => {
-    loader.manager = safeLoadingManager
+    loader.manager = manager
   })
   const meshRef = useRenderedModel(
     gltf?.scene,
@@ -235,11 +246,14 @@ export function Model({
   fileExtension,
   rotationSpeed = 0.002,
   preserveMaterials = false,
+  gltfResources,
 }: {
   modelUrl: string
   fileExtension: string
   rotationSpeed?: number
   preserveMaterials?: boolean
+  /** Relative-path -> URL map for a multi-file glTF's external resources. */
+  gltfResources?: Record<string, string>
 }) {
   return (
     <Suspense fallback={<LoadingPlaceholder />}>
@@ -262,6 +276,7 @@ export function Model({
           modelUrl={modelUrl}
           rotationSpeed={rotationSpeed}
           preserveMaterials={preserveMaterials}
+          gltfResources={gltfResources}
         />
       )}
       {fileExtension === 'stl' && (

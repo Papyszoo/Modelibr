@@ -7,7 +7,6 @@ import {
   setDefaultTextureSet,
   updateModelTags,
   uploadModelGroup,
-  uploadModelZip,
 } from '../modelApi'
 
 const mockGet = client.get as jest.Mock
@@ -202,16 +201,5 @@ describe('multi-file / zip import request construction', () => {
       batchId: 'batch-7',
     })
     expect(lastPostArgs()[0]).toBe('/models/multifile?batchId=batch-7')
-  })
-
-  it('uploadModelZip posts the archive under `file` to /models/zip', async () => {
-    // Regression: the zip endpoint binds an IFormFile named `file`; a wrong field
-    // name makes every zip import 400.
-    const zip = new File(['z'], 'assets.zip', { type: 'application/zip' })
-    await uploadModelZip(zip)
-
-    const [url, form] = lastPostArgs()
-    expect(url).toBe('/models/zip')
-    expect((form.get('file') as File).name).toBe('assets.zip')
   })
 })

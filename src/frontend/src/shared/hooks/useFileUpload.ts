@@ -1,12 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import {
-  uploadModel,
-  uploadModelGroup,
-  uploadModelZip,
-} from '@/features/models/api/modelApi'
+import { uploadModel, uploadModelGroup } from '@/features/models/api/modelApi'
 import { useUploadProgress } from '@/hooks/useUploadProgress'
 import { groupFilesForImport } from '@/shared/utils/multiFileImport'
+import { extractZipEntries } from '@/shared/utils/zipImport'
 
 import {
   isSupportedModelFormat,
@@ -192,9 +189,11 @@ export function useFileUpload(options = {}) {
         setUploadProgress(progress)
       }
 
-      // Call onSuccess once after all uploads complete (if any succeeded)
+      // Call onSuccess once after all uploads complete (if any succeeded).
+      // Awaited: the callback associates models with a pack/project, and an unawaited
+      // rejection would silently skip that work while the UI reported success.
       if (onSuccess && results.succeeded.length > 0) {
-        onSuccess(null, results)
+        await onSuccess(null, results)
       }
 
       return results
@@ -257,10 +256,16 @@ export function useFileUpload(options = {}) {
    * falls back to the plain single-file upload. Solves bulk multi-file glTF import
    * (glTF-Sample-Assets / Synty layouts).
    * @param {FileList|File[]} files - Files from a webkitdirectory picker
+   * @param {Object} groupingOptions - { allowBlend } — renderability follows the hook's
+   *   own `requireThreeJSRenderable`, so a folder import cannot smuggle past the gates
+   *   the single-file picker applies.
    * @returns {Promise<Object>} Upload results summary
    */
-  const uploadFolder = async files => {
-    const groups = groupFilesForImport(files)
+  const uploadFolder = async (files, groupingOptions = {}) => {
+    const groups = groupFilesForImport(files, {
+      requireThreeJSRenderable,
+      allowBlend: groupingOptions.allowBlend === true,
+    })
     const results = { succeeded: [], failed: [], total: groups.length }
 
     if (groups.length === 0) {
@@ -329,7 +334,7 @@ export function useFileUpload(options = {}) {
       }
 
       if (onSuccess && results.succeeded.length > 0) {
-        onSuccess(null, results)
+        await onSuccess(null, results)
       }
       return results
     } finally {
@@ -339,53 +344,38 @@ export function useFileUpload(options = {}) {
   }
 
   /**
-   * Upload a .zip archive; the backend unzips, groups by directory, and imports
-   * every model group (multi-file glTF resolved server-side).
+   * Import a `.zip` archive of models. The archive is expanded in the browser and the
+   * resulting files go through the SAME path as a picked folder — same grouping, same
+   * renderability/.blend gates, same per-model progress entries, same result shape, and
+   * the same pack/project association.
+   *
+   * It used to POST the archive to a server-side unzip endpoint, which answered a
+   * different shape ({batchId, imported[]}) than every other upload path. Consumers read
+   * `results.succeeded`, so the success callback threw: nothing was associated with the
+   * pack/project the import came from and the grid never refreshed — all after the
+   * progress window had already reported the import complete.
+   *
    * @param {File} file - The .zip file
-   * @returns {Promise<Object>} Import result
+   * @param {Object} groupingOptions - Same options as uploadFolder ({ allowBlend }).
+   * @returns {Promise<Object>} Upload results summary
    */
-  const uploadZip = async file => {
-    setUploading(true)
-    setUploadProgress(0)
-
-    const uploadId =
-      useGlobalProgress && uploadProgressContext
-        ? uploadProgressContext.addUpload(file, fileType)
-        : null
-
+  const uploadZip = async (file, groupingOptions = {}) => {
+    let entries
     try {
-      if (useGlobalProgress && uploadId && uploadProgressContext) {
-        uploadProgressContext.updateUploadProgress(uploadId, 50)
-      }
-      setUploadProgress(50)
-
-      const result = await uploadModelZip(file)
-
-      if (useGlobalProgress && uploadId && uploadProgressContext) {
-        uploadProgressContext.updateUploadProgress(uploadId, 100)
-        uploadProgressContext.completeUpload(uploadId, result)
-      }
-      setUploadProgress(100)
-
-      if (onSuccess) onSuccess(file, result)
-      return result
+      entries = await extractZipEntries(file)
     } catch (error) {
-      if (useGlobalProgress && uploadId && uploadProgressContext) {
-        uploadProgressContext.failUpload(uploadId, error)
-      }
       if (toast?.current) {
         toast.current.show({
           severity: 'error',
           summary: 'Import Failed',
-          detail: `${file.name}: ${error.message}`,
+          detail: error.message,
         })
       }
       if (onError) onError(file, error)
       throw error
-    } finally {
-      setUploading(false)
-      setUploadProgress(0)
     }
+
+    return uploadFolder(entries, groupingOptions)
   }
 
   return {
