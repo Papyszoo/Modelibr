@@ -81,6 +81,7 @@ export class ExtractionJobProcessor {
     if (job.assetType !== 'Model') {
       await this.jobApi.finishExtractionJob(
         job.id,
+        config.workerId,
         true,
         null,
         `No extraction runner for asset type ${job.assetType}; skipped.`
@@ -102,6 +103,7 @@ export class ExtractionJobProcessor {
         // owns that); skip here rather than fail the queue.
         await this.jobApi.finishExtractionJob(
           job.id,
+          config.workerId,
           true,
           null,
           'Re-extraction of .blend via the extraction queue is not supported yet.'
@@ -130,25 +132,46 @@ export class ExtractionJobProcessor {
       const fileSha256 = job.fileSha256 || this.hashFile(fileInfo.filePath)
 
       // Rebuild the scene-graph projection (parts + derivation + search docs).
-      const sceneGraph = await renderer.extractSceneGraph(fileInfo.fileType)
+      //
+      // This is the SINGLE authoritative write for a re-extraction. The backend's
+      // scene-graph import also refreshes the flat technical-metadata columns and
+      // upserts the verbatim raw payload into the same AssetExtraction row, so a
+      // follow-up saveTechnicalMetadata() would overwrite the raw v2 payload with
+      // the flat v1 shape and destroy exactly what re-derivation needs. The flat
+      // path is a FALLBACK, used only when no scene graph could be produced.
+      const sceneGraph = await renderer.extractSceneGraph()
       if (sceneGraph) {
-        await this.modelDataService.saveSceneGraph(
+        const saved = await this.modelDataService.saveSceneGraph(
           job.versionId,
           fileSha256,
           sceneGraph
         )
-      }
-
-      // Keep the flat technical metadata consistent with the re-extraction.
-      const technicalMetadata = await renderer.extractTechnicalMetadata()
-      if (technicalMetadata) {
-        await this.modelDataService.saveTechnicalMetadata(
+        // saveSceneGraph swallows API errors into `false`; a transient 400/500/timeout
+        // must retry the job, not silently complete it having rebuilt nothing.
+        if (!saved) {
+          throw new Error(
+            `Persisting the scene graph for version ${job.versionId} failed.`
+          )
+        }
+      } else {
+        const technicalMetadata = await renderer.extractTechnicalMetadata()
+        if (!technicalMetadata) {
+          throw new Error(
+            `Neither a scene graph nor technical metadata could be extracted for version ${job.versionId}.`
+          )
+        }
+        const saved = await this.modelDataService.saveTechnicalMetadata(
           job.versionId,
           technicalMetadata
         )
+        if (!saved) {
+          throw new Error(
+            `Persisting technical metadata for version ${job.versionId} failed.`
+          )
+        }
       }
 
-      await this.jobApi.finishExtractionJob(job.id, true)
+      await this.jobApi.finishExtractionJob(job.id, config.workerId, true)
       jobLogger.info('Extraction job completed', {
         jobId: job.id,
         modelId: job.assetId,
@@ -161,7 +184,12 @@ export class ExtractionJobProcessor {
       })
       // Best-effort finish; the backend handles retry/dead-letter by attempt count.
       try {
-        await this.jobApi.finishExtractionJob(job.id, false, error.message)
+        await this.jobApi.finishExtractionJob(
+          job.id,
+          config.workerId,
+          false,
+          error.message
+        )
       } catch (finishError) {
         jobLogger.error('Failed to report extraction-job failure', {
           jobId: job.id,

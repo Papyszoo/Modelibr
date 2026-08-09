@@ -258,7 +258,7 @@ export class ThumbnailProcessor extends BaseProcessor {
       // fail the thumbnail. Supersedes the flat technical-metadata write above
       // for the raw substrate; both keep the flat projection consistent.
       try {
-        const sceneGraph = await renderer.extractSceneGraph(fileInfo.fileType)
+        const sceneGraph = await renderer.extractSceneGraph()
         if (sceneGraph && job.modelHash) {
           await this.modelDataService.saveSceneGraph(
             job.modelVersionId,

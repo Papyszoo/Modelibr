@@ -8,10 +8,10 @@
 // already-uploaded sibling, provided as a { relativePath: url } map.
 //
 // Offline invariant: the resolver only ever returns a caller-supplied URL
-// (typically a data: URL) or the original request untouched. It never fabricates
-// an external host, so a missing reference resolves against the local page origin
-// and fails locally — it is never fetched from the network. A genuine embedded
-// data URI matches no key and is returned unchanged for the loader to decode.
+// (typically a data: URL), a scheme that carries its own bytes (data:/blob:), a
+// URL the caller explicitly allowed, or a blocked placeholder. Anything else —
+// including a reference that matched no key — is refused, so a glTF can never
+// make the renderer fetch an arbitrary host or local-network address.
 //
 // Pure and dependency-light on purpose (no THREE): runs in the Vite frontend
 // bundle, this worker's classic-script render page, and Vitest alike.
@@ -50,13 +50,36 @@ export function normalizeResourceKey(key) {
 }
 
 /**
+ * Substituted for any reference we could not resolve locally. An empty
+ * `application/octet-stream` payload decodes without a request, so the loader
+ * fails on the missing resource (which is honest and surfaces as a job error)
+ * instead of reaching out to whatever host the glTF named.
+ */
+export const BLOCKED_RESOURCE_URL = 'data:application/octet-stream;base64,'
+
+/**
  * Build a three.js `LoadingManager.setURLModifier` callback that resolves a
  * glTF's external URIs against the supplied resource map.
+ *
+ * Offline invariant: a reference that resolves to nothing in the map is replaced
+ * with {@link BLOCKED_RESOURCE_URL}, never passed through. Returning it untouched
+ * let a crafted glTF drive the renderer's Chromium to fetch an arbitrary HTTP or
+ * local-network URL, which breaks the local-first guarantee — the loader must
+ * only ever read bytes the caller supplied.
+ *
  * @param {Record<string, string>|Map<string, string>|null|undefined} resources
  *   Map of relative path (as the glTF references it) -> resolvable URL (data URL).
- * @returns {(url: string) => string} A URL modifier: mapped URL, or the input untouched.
+ * @param {{ onBlocked?: (url: string) => void, allow?: (url: string) => boolean }} [options]
+ *   `onBlocked` is called with each reference that was refused, for warning detail.
+ *   `allow` opts specific unmapped URLs back in — the in-app viewer uses it to keep
+ *   loading the primary model from its own `/files/<id>` route.
+ * @returns {(url: string) => string} A URL modifier: mapped URL, a safe passthrough,
+ *   or {@link BLOCKED_RESOURCE_URL}.
  */
-export function buildResourceResolver(resources) {
+export function buildResourceResolver(resources, options = {}) {
+  const onBlocked =
+    typeof options.onBlocked === 'function' ? options.onBlocked : null
+  const allow = typeof options.allow === 'function' ? options.allow : null
   const map = new Map()
 
   const entries =
@@ -106,7 +129,21 @@ export function buildResourceResolver(resources) {
       if (basename(key) === base) return map.get(key)
     }
 
-    // Unresolved — return untouched (resolves locally, never network; see header).
-    return url
+    // Unresolved from here on. Two shapes are still safe to hand back verbatim:
+    //
+    //  * a genuine embedded data URI — pure base64, so its basename carries no
+    //    '.ext' and could never have matched a key above (the main .gltf itself
+    //    arrives this way, and GLTFLoader re-resolves it through this modifier);
+    //  * a blob: URL, which the caller minted from bytes it already holds.
+    //
+    // Anything else — an http(s) host, a protocol-relative "//host/x", a
+    // file:/// path, or a bare relative name with no matching sibling — would be
+    // fetched by the renderer. Refuse it.
+    if (url.startsWith('blob:')) return url
+    if (url.startsWith('data:') && !base.includes('.')) return url
+    if (allow && allow(url)) return url
+
+    if (onBlocked) onBlocked(url)
+    return BLOCKED_RESOURCE_URL
   }
 }

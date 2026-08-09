@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 
 import {
+  BLOCKED_RESOURCE_URL,
   buildResourceResolver,
   normalizeResourceKey,
 } from '../lib/gltfResources.js'
@@ -66,18 +67,48 @@ describe('buildResourceResolver', () => {
     expect(resolve(embedded)).toBe(embedded)
   })
 
-  it('returns an unresolved reference untouched (offline: never fabricates a host)', () => {
+  it('blocks an unresolved reference instead of letting it be fetched', () => {
     const resolve = buildResourceResolver(resources)
     const missing = 'textures/missing-normal.png'
-    // Unchanged input — it resolves against the local page origin and fails
-    // locally, it is never rewritten to an external URL.
-    expect(resolve(missing)).toBe(missing)
+    // Regression: returning the input untouched let the loader issue a real
+    // request for it. Nothing unmapped may reach the network.
+    expect(resolve(missing)).toBe(BLOCKED_RESOURCE_URL)
   })
 
-  it('handles empty/absent resource maps without throwing', () => {
-    expect(buildResourceResolver(null)('scene.bin')).toBe('scene.bin')
-    expect(buildResourceResolver({})('scene.bin')).toBe('scene.bin')
-    expect(buildResourceResolver(undefined)('scene.bin')).toBe('scene.bin')
+  it('blocks absolute and protocol-relative URLs a glTF names (offline invariant)', () => {
+    const blocked = []
+    const resolve = buildResourceResolver(resources, {
+      onBlocked: url => blocked.push(url),
+    })
+
+    expect(resolve('http://evil.example/x.bin')).toBe(BLOCKED_RESOURCE_URL)
+    expect(resolve('https://evil.example/x.png')).toBe(BLOCKED_RESOURCE_URL)
+    expect(resolve('//192.168.1.10/share/x.bin')).toBe(BLOCKED_RESOURCE_URL)
+    expect(resolve('file:///etc/passwd')).toBe(BLOCKED_RESOURCE_URL)
+    expect(blocked).toHaveLength(4)
+  })
+
+  it('lets the caller allow-list its own URLs (in-app viewer file route)', () => {
+    const resolve = buildResourceResolver(resources, {
+      allow: url => /\/files\/\d+$/.test(url),
+    })
+    expect(resolve('/api/files/42')).toBe('/api/files/42')
+    expect(resolve('http://evil.example/files/42x')).toBe(BLOCKED_RESOURCE_URL)
+  })
+
+  it('passes blob: URLs through (bytes the caller already holds)', () => {
+    const resolve = buildResourceResolver(resources)
+    expect(resolve('blob:http://localhost/abc-123')).toBe(
+      'blob:http://localhost/abc-123'
+    )
+  })
+
+  it('handles empty/absent resource maps without throwing, and still blocks', () => {
+    expect(buildResourceResolver(null)('scene.bin')).toBe(BLOCKED_RESOURCE_URL)
+    expect(buildResourceResolver({})('scene.bin')).toBe(BLOCKED_RESOURCE_URL)
+    expect(buildResourceResolver(undefined)('scene.bin')).toBe(
+      BLOCKED_RESOURCE_URL
+    )
   })
 
   it('accepts a Map as well as a plain object', () => {

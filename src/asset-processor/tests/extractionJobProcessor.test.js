@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
+import { config } from '../config.js'
 import { ExtractionJobProcessor } from '../extractionJobProcessor.js'
 
 vi.mock('../logger.js', () => ({
@@ -45,9 +46,11 @@ describe('ExtractionJobProcessor.process', () => {
       fetchAuxiliaryResourceMap: vi.fn().mockResolvedValue(null),
       cleanupFile: vi.fn().mockResolvedValue(undefined),
     }
+    // Both save methods report success/failure as a boolean and never throw —
+    // mocking them as `undefined` is what let a failed persist read as success.
     processor.modelDataService = {
-      saveSceneGraph: vi.fn().mockResolvedValue(undefined),
-      saveTechnicalMetadata: vi.fn().mockResolvedValue(undefined),
+      saveSceneGraph: vi.fn().mockResolvedValue(true),
+      saveTechnicalMetadata: vi.fn().mockResolvedValue(true),
     }
     processor.jobApi = {
       finishExtractionJob: vi.fn().mockResolvedValue(undefined),
@@ -70,10 +73,20 @@ describe('ExtractionJobProcessor.process', () => {
       'a'.repeat(64),
       { nodes: [] }
     )
+    // Regression: the scene-graph import IS the technical-metadata write (it
+    // refreshes the flat columns itself). Following it with saveTechnicalMetadata
+    // overwrote the verbatim v2 extraction payload with the flat v1 shape, so every
+    // successful re-derive destroyed the raw data the next derivation needs.
     expect(
       processor.modelDataService.saveTechnicalMetadata
-    ).toHaveBeenCalledWith(7, { triangleCount: 10 })
-    expect(processor.jobApi.finishExtractionJob).toHaveBeenCalledWith(5, true)
+    ).not.toHaveBeenCalled()
+    // The worker id proves we still hold the lease; the API refuses a result from a
+    // worker whose claim has since been taken over.
+    expect(processor.jobApi.finishExtractionJob).toHaveBeenCalledWith(
+      5,
+      config.workerId,
+      true
+    )
     expect(processor.rendererPool.release).toHaveBeenCalledWith(renderer)
     expect(processor.modelFileService.cleanupFile).toHaveBeenCalledWith(
       '/tmp/model.glb'
@@ -121,12 +134,77 @@ describe('ExtractionJobProcessor.process', () => {
 
     expect(processor.jobApi.finishExtractionJob).toHaveBeenCalledWith(
       7,
+      config.workerId,
       false,
       'load boom'
     )
     // Still cleans up the temp file and releases the renderer on failure.
     expect(processor.rendererPool.release).toHaveBeenCalledWith(renderer)
     expect(processor.modelFileService.cleanupFile).toHaveBeenCalled()
+  })
+
+  it('fails the job when persisting the scene graph fails', async () => {
+    // Regression: saveSceneGraph converts an API error (400/500/timeout) into
+    // `false`. Ignoring it completed the job having rebuilt nothing, permanently —
+    // the queue would never retry, and trigger_rederive silently did nothing.
+    processor.modelDataService.saveSceneGraph.mockResolvedValue(false)
+
+    await processor.process({
+      id: 9,
+      assetType: 'Model',
+      assetId: 46,
+      versionId: 10,
+      fileSha256: 'd'.repeat(64),
+    })
+
+    expect(processor.jobApi.finishExtractionJob).toHaveBeenCalledWith(
+      9,
+      config.workerId,
+      false,
+      expect.stringContaining('scene graph')
+    )
+  })
+
+  it('falls back to technical metadata only when no scene graph could be extracted', async () => {
+    renderer.extractSceneGraph.mockResolvedValue(null)
+
+    await processor.process({
+      id: 10,
+      assetType: 'Model',
+      assetId: 47,
+      versionId: 11,
+      fileSha256: 'e'.repeat(64),
+    })
+
+    expect(processor.modelDataService.saveSceneGraph).not.toHaveBeenCalled()
+    expect(
+      processor.modelDataService.saveTechnicalMetadata
+    ).toHaveBeenCalledWith(11, { triangleCount: 10 })
+    expect(processor.jobApi.finishExtractionJob).toHaveBeenCalledWith(
+      10,
+      config.workerId,
+      true
+    )
+  })
+
+  it('fails the job when neither a scene graph nor technical metadata is available', async () => {
+    renderer.extractSceneGraph.mockResolvedValue(null)
+    renderer.extractTechnicalMetadata.mockResolvedValue(null)
+
+    await processor.process({
+      id: 11,
+      assetType: 'Model',
+      assetId: 48,
+      versionId: 12,
+      fileSha256: 'f'.repeat(64),
+    })
+
+    expect(processor.jobApi.finishExtractionJob).toHaveBeenCalledWith(
+      11,
+      config.workerId,
+      false,
+      expect.stringContaining('Neither')
+    )
   })
 
   it('acks a non-Model job as done without running a renderer', async () => {
@@ -140,6 +218,7 @@ describe('ExtractionJobProcessor.process', () => {
     expect(processor.rendererPool.acquire).not.toHaveBeenCalled()
     expect(processor.jobApi.finishExtractionJob).toHaveBeenCalledWith(
       8,
+      config.workerId,
       true,
       null,
       expect.stringContaining('Sound')
