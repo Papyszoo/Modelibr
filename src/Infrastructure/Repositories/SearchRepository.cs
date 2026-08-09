@@ -212,17 +212,17 @@ internal sealed class SearchRepository : ISearchRepository
         {
             Doc = d,
             T0 = EF.Functions.ILike(" " + d.Tokens + " ", b00) || EF.Functions.ILike(" " + d.Tokens + " ", b01)
-                 || EF.Functions.ILike(" " + d.Symbols + " ", b00) || EF.Functions.ILike(d.DisplayName, s0),
+                 || EF.Functions.ILike(" " + d.Symbols + " ", b00) || EF.Functions.ILike(" " + d.Symbols + " ", b01) || EF.Functions.ILike(d.DisplayName, s0),
             T1 = EF.Functions.ILike(" " + d.Tokens + " ", b10) || EF.Functions.ILike(" " + d.Tokens + " ", b11)
-                 || EF.Functions.ILike(" " + d.Symbols + " ", b10) || EF.Functions.ILike(d.DisplayName, s1),
+                 || EF.Functions.ILike(" " + d.Symbols + " ", b10) || EF.Functions.ILike(" " + d.Symbols + " ", b11) || EF.Functions.ILike(d.DisplayName, s1),
             T2 = EF.Functions.ILike(" " + d.Tokens + " ", b20) || EF.Functions.ILike(" " + d.Tokens + " ", b21)
-                 || EF.Functions.ILike(" " + d.Symbols + " ", b20) || EF.Functions.ILike(d.DisplayName, s2),
+                 || EF.Functions.ILike(" " + d.Symbols + " ", b20) || EF.Functions.ILike(" " + d.Symbols + " ", b21) || EF.Functions.ILike(d.DisplayName, s2),
             T3 = EF.Functions.ILike(" " + d.Tokens + " ", b30) || EF.Functions.ILike(" " + d.Tokens + " ", b31)
-                 || EF.Functions.ILike(" " + d.Symbols + " ", b30) || EF.Functions.ILike(d.DisplayName, s3),
+                 || EF.Functions.ILike(" " + d.Symbols + " ", b30) || EF.Functions.ILike(" " + d.Symbols + " ", b31) || EF.Functions.ILike(d.DisplayName, s3),
             T4 = EF.Functions.ILike(" " + d.Tokens + " ", b40) || EF.Functions.ILike(" " + d.Tokens + " ", b41)
-                 || EF.Functions.ILike(" " + d.Symbols + " ", b40) || EF.Functions.ILike(d.DisplayName, s4),
+                 || EF.Functions.ILike(" " + d.Symbols + " ", b40) || EF.Functions.ILike(" " + d.Symbols + " ", b41) || EF.Functions.ILike(d.DisplayName, s4),
             T5 = EF.Functions.ILike(" " + d.Tokens + " ", b50) || EF.Functions.ILike(" " + d.Tokens + " ", b51)
-                 || EF.Functions.ILike(" " + d.Symbols + " ", b50) || EF.Functions.ILike(d.DisplayName, s5),
+                 || EF.Functions.ILike(" " + d.Symbols + " ", b50) || EF.Functions.ILike(" " + d.Symbols + " ", b51) || EF.Functions.ILike(d.DisplayName, s5),
             // The browse summary is a weaker signal than an authored name, so it is
             // scored separately and only ever breaks ties — but it must still admit a
             // document whose text mentions the term, which is recall an agent relies on
@@ -235,12 +235,18 @@ internal sealed class SearchRepository : ISearchRepository
             P5 = EF.Functions.ILike(d.BrowseSummary, s5),
             // Inferred concept labels: recall for intent queries, but ranked below an
             // authored name so "vehicle" puts SM_Veh_Car_Van_01 above boat_ornament.
-            C0 = EF.Functions.ILike(" " + d.ConceptLabels + " ", b00),
-            C1 = EF.Functions.ILike(" " + d.ConceptLabels + " ", b10),
-            C2 = EF.Functions.ILike(" " + d.ConceptLabels + " ", b20),
-            C3 = EF.Functions.ILike(" " + d.ConceptLabels + " ", b30),
-            C4 = EF.Functions.ILike(" " + d.ConceptLabels + " ", b40),
-            C5 = EF.Functions.ILike(" " + d.ConceptLabels + " ", b50),
+            C0 = EF.Functions.ILike(" " + d.ConceptLabels + " ", b00)
+                 || EF.Functions.ILike(" " + d.ConceptLabels + " ", b01),
+            C1 = EF.Functions.ILike(" " + d.ConceptLabels + " ", b10)
+                 || EF.Functions.ILike(" " + d.ConceptLabels + " ", b11),
+            C2 = EF.Functions.ILike(" " + d.ConceptLabels + " ", b20)
+                 || EF.Functions.ILike(" " + d.ConceptLabels + " ", b21),
+            C3 = EF.Functions.ILike(" " + d.ConceptLabels + " ", b30)
+                 || EF.Functions.ILike(" " + d.ConceptLabels + " ", b31),
+            C4 = EF.Functions.ILike(" " + d.ConceptLabels + " ", b40)
+                 || EF.Functions.ILike(" " + d.ConceptLabels + " ", b41),
+            C5 = EF.Functions.ILike(" " + d.ConceptLabels + " ", b50)
+                 || EF.Functions.ILike(" " + d.ConceptLabels + " ", b51),
             // Whole-name match on the original phrase: "park bench" should still beat a
             // document that merely carries both words separately. Multi-word queries only
             // — for a single word this just repeats the name match below, and promoting it

@@ -223,13 +223,13 @@ public class SearchRelevanceGoldenTests : IClassFixture<ModelibrWebFactory>
         await context.SaveChangesAsync();
     }
 
-    private async Task<IReadOnlyList<string>> SearchAsync(string query, Action<AssetSearchQuery>? _ = null)
+    private async Task<IReadOnlyList<string>> SearchAsync(string query, int limit = K)
     {
         using var scope = _factory.Services.CreateScope();
         var handler = scope.ServiceProvider
             .GetRequiredService<IQueryHandler<AssetSearchQuery, AssetSearchResponse>>();
         var result = await handler.Handle(
-            new AssetSearchQuery(query, K, false, null, null, null, null, null, Marker,
+            new AssetSearchQuery(query, limit, false, null, null, null, null, null, Marker,
                 null, null, null, null, null, null, null, null, null, null, null, null, null),
             CancellationToken.None);
         Assert.False(result.IsFailure, result.IsFailure ? result.Error.Message : string.Empty);
@@ -306,6 +306,28 @@ public class SearchRelevanceGoldenTests : IClassFixture<ModelibrWebFactory>
                 pluralHits.Count >= singularHits.Count,
                 $"\"{plural}\" returned {pluralHits.Count} but \"{singular}\" returned {singularHits.Count}");
         }
+    }
+
+    [Fact]
+    public async Task Plural_Queries_Also_Reach_Assets_Matched_Only_By_Concept()
+    {
+        // Regression: the singular variant of a query word was checked against the
+        // authored tokens but NOT against the concept labels or symbols, so an asset
+        // reachable only by inference answered "vehicle" and vanished for "vehicles".
+        // On the real library that cost 55 of 226 buildings — and the count-parity check
+        // above misses it, because assets whose NAME carries the word still matched.
+        await SeedAsync();
+
+        // boat/tram/ship are vehicles only via their concept label, never by name. This
+        // is about recall, not the top-5 page, so read past the ranking window.
+        var singular = await SearchAsync("vehicle", limit: 25);
+        var plural = await SearchAsync("vehicles", limit: 25);
+
+        Assert.Contains(singular, n => n.Equals("boat_ornament", StringComparison.OrdinalIgnoreCase));
+        Assert.True(
+            plural.Count >= singular.Count,
+            $"\"vehicles\" returned {plural.Count} but \"vehicle\" returned {singular.Count}");
+        Assert.Contains(plural, n => n.Equals("boat_ornament", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
