@@ -59,6 +59,7 @@
       import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js'
       import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
       import { buildStlModel } from './lib/stlMesh.js'
+      import { buildResourceResolver } from './lib/gltfResources.js'
       import {
         DEFAULT_LIGHTING,
         ENVIRONMENT_PREVIEW_LIGHTING,
@@ -72,6 +73,10 @@
       import './lib/textureMaterial.js'
       import './lib/displacementNormal.js'
       import './lib/textureChannels.js'
+      // Scene-graph extraction runs the shared lib in this module scope (it needs
+      // THREE injected) and exposes a bound fn for the classic-script
+      // page.evaluate in puppeteerRenderer, mirroring the texture helpers above.
+      import { extractSceneGraph } from './lib/sceneGraph.js'
 
       // Global state for external control
       window.modelRenderer = {
@@ -92,6 +97,10 @@
         error: null,
         useWebGPU: false,
       }
+
+      // Bound scene-graph extractor for the classic-script page.evaluate context.
+      window.modelibrExtractSceneGraph = (root, options) =>
+        extractSceneGraph(root, THREE, options)
 
       // Initialize scene with WebGPU or WebGL
       async function initScene(width, height, backgroundColor) {
@@ -458,12 +467,26 @@
       // preserveMaterials=true (the "Embedded" variant) keeps the model's own
       // materials and vertex colors instead of the neutral override — lets
       // users choose between the real surface and a clean default thumbnail.
-      async function loadModel(modelData, fileType, preserveMaterials = false) {
+      async function loadModel(
+        modelData,
+        fileType,
+        preserveMaterials = false,
+        resources = null
+      ) {
         return new Promise((resolve, reject) => {
           let loader
 
           if (fileType === 'gltf' || fileType === 'glb') {
-            loader = new GLTFLoader()
+            // Multi-file glTF: install a LoadingManager whose URLModifier maps the
+            // glTF's external URIs (.bin/textures) to the already-uploaded siblings
+            // passed in `resources`. No network fetch — see lib/gltfResources.js.
+            if (resources && Object.keys(resources).length > 0) {
+              const manager = new THREE.LoadingManager()
+              manager.setURLModifier(buildResourceResolver(resources))
+              loader = new GLTFLoader(manager)
+            } else {
+              loader = new GLTFLoader()
+            }
           } else if (fileType === 'obj') {
             loader = new OBJLoader()
           } else if (fileType === 'fbx') {

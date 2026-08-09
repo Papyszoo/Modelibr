@@ -285,6 +285,86 @@ export class JobApiClient {
   }
 
   /**
+   * Claim the next runnable extraction job in a family (prompt 20 executor).
+   * @param {string} workerId
+   * @param {string} extractorFamily - e.g. "Geometry"
+   * @returns {Promise<Object|null>} The claimed job, or null when the queue is empty.
+   */
+  async dequeueExtractionJob(workerId, extractorFamily) {
+    try {
+      const response = await this.apiClient.post('/extraction-jobs/dequeue', {
+        workerId,
+        extractorFamily,
+      })
+      // 204 No Content => empty queue.
+      if (response.status === 204 || !response.data) {
+        return null
+      }
+      return response.data
+    } catch (error) {
+      logger.error('Failed to dequeue extraction job', {
+        workerId,
+        extractorFamily,
+        error: error.message,
+      })
+      throw error
+    }
+  }
+
+  /**
+   * Report the outcome of a claimed extraction job.
+   * @param {number} jobId
+   * @param {boolean} success
+   * @param {string|null} errorMessage
+   * @param {string|null} warningDetail
+   */
+  async finishExtractionJob(
+    jobId,
+    success,
+    errorMessage = null,
+    warningDetail = null
+  ) {
+    try {
+      await this.apiClient.post(`/extraction-jobs/${jobId}/finish`, {
+        success,
+        errorMessage,
+        warningDetail,
+      })
+    } catch (error) {
+      logger.error('Failed to finish extraction job', {
+        jobId,
+        success,
+        error: error.message,
+      })
+      throw error
+    }
+  }
+
+  /**
+   * List the auxiliary (external) files linked to a model version — the .bin
+   * buffers and textures a loose .gltf references, each with the relative path
+   * the primary references it by. Used to resolve multi-file glTF imports.
+   * @param {number} modelId - The model ID
+   * @param {number} modelVersionId - The model version ID
+   * @returns {Promise<{modelVersionId: number, auxiliaries: Array<{fileId: number, relativePath: string, originalFileName: string, sha256Hash: string, sizeBytes: number}>}>}
+   */
+  async getVersionAuxiliaryFiles(modelId, modelVersionId) {
+    try {
+      const response = await this.apiClient.get(
+        `/models/${modelId}/versions/${modelVersionId}/auxiliary-files`
+      )
+      return response.data
+    } catch (error) {
+      logger.error('Failed to get version auxiliary files', {
+        modelId,
+        modelVersionId,
+        error: error.message,
+      })
+      throw error
+    }
+  }
+
+  /**
    * Get sound file for processing
    * @param {number} soundId - The sound ID
    * @returns {Promise<Object>} Sound file response with stream

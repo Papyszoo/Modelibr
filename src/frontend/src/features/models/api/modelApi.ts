@@ -46,6 +46,89 @@ export async function uploadModel(
   return response.data
 }
 
+/** One auxiliary (external) file plus the path the primary glTF references it by. */
+export interface ModelGroupAuxiliary {
+  file: File
+  /** URI relative to the primary, e.g. "scene.bin", "textures/wood.png". */
+  relativePath: string
+}
+
+export interface ImportMultiFileResponse {
+  id: number
+  alreadyExists: boolean
+  auxiliaryFilesLinked: number
+  auxiliaryFilesSkipped: number
+}
+
+/**
+ * Import a loose primary model file (a `.gltf`) together with its external
+ * auxiliary files (`.bin` + textures), so it renders/extracts like a packed `.glb`.
+ */
+export async function uploadModelGroup(
+  primary: File,
+  auxiliaries: ModelGroupAuxiliary[],
+  options: { batchId?: string } = {}
+): Promise<ImportMultiFileResponse> {
+  const formData = new FormData()
+  formData.append('primary', primary)
+  for (const aux of auxiliaries) {
+    formData.append('files', aux.file)
+    formData.append('paths', aux.relativePath)
+  }
+
+  let url = '/models/multifile'
+  const params = new URLSearchParams()
+  if (options.batchId) {
+    params.append('batchId', options.batchId)
+  }
+  if (params.toString()) {
+    url += `?${params.toString()}`
+  }
+
+  const response: AxiosResponse<ImportMultiFileResponse> = await client.post(
+    url,
+    formData,
+    {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: UPLOAD_TIMEOUT,
+    }
+  )
+  return response.data
+}
+
+export interface ImportZipResponse {
+  batchId: string
+  imported: ImportMultiFileResponse[]
+}
+
+/** Import every model group found in a `.zip` (multi-file glTF resolved by directory). */
+export async function uploadModelZip(
+  zip: File,
+  options: { batchId?: string } = {}
+): Promise<ImportZipResponse> {
+  const formData = new FormData()
+  formData.append('file', zip)
+
+  let url = '/models/zip'
+  const params = new URLSearchParams()
+  if (options.batchId) {
+    params.append('batchId', options.batchId)
+  }
+  if (params.toString()) {
+    url += `?${params.toString()}`
+  }
+
+  const response: AxiosResponse<ImportZipResponse> = await client.post(
+    url,
+    formData,
+    {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: UPLOAD_TIMEOUT,
+    }
+  )
+  return response.data
+}
+
 export async function uploadFile(
   file: File,
   options: {

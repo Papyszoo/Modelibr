@@ -19,11 +19,15 @@ jest.mock('@/features/project/api/projectApi', () => ({
 
 // Mock useFileUpload
 const mockUploadMultipleFiles = jest.fn()
+const mockUploadFolder = jest.fn()
+const mockUploadZip = jest.fn()
 jest.mock('@/shared/hooks/useFileUpload', () => ({
   useFileUpload: () => ({
     uploading: false,
     uploadProgress: 0,
     uploadMultipleFiles: mockUploadMultipleFiles,
+    uploadFolder: mockUploadFolder,
+    uploadZip: mockUploadZip,
   }),
   useDragAndDrop: (callback: (files: File[]) => void) => ({
     onDrop: (e: {
@@ -63,6 +67,21 @@ describe('useModelUpload', () => {
         onUploadComplete: mockOnUploadComplete,
       })
     )
+
+  // Regression: useModelUpload must re-expose the multi-file glTF entry points from
+  // useFileUpload. They were originally omitted from the destructure/return, so the
+  // folder/zip toolbar buttons called `undefined` and crashed the grid at runtime
+  // ("uploadFolder is not a function"). The buttons are wired to exactly these.
+  describe('multi-file glTF import passthrough', () => {
+    it('exposes uploadFolder and uploadZip from useFileUpload', () => {
+      const { result } = renderUploadHook()
+
+      expect(typeof result.current.uploadFolder).toBe('function')
+      expect(typeof result.current.uploadZip).toBe('function')
+      expect(result.current.uploadFolder).toBe(mockUploadFolder)
+      expect(result.current.uploadZip).toBe(mockUploadZip)
+    })
+  })
 
   describe('.blend filtering based on blenderEnabled', () => {
     it('should filter out .blend files when blenderEnabled is false', () => {

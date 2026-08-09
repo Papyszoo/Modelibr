@@ -77,6 +77,16 @@ namespace Infrastructure.Persistence
         public DbSet<EnvironmentMapVariantFaceFile> EnvironmentMapVariantFaceFiles => Set<EnvironmentMapVariantFaceFile>();
         public DbSet<TextureProxy> TextureProxies => Set<TextureProxy>();
         public DbSet<ModelVersionTextureSet> ModelVersionTextureSets => Set<ModelVersionTextureSet>();
+        public DbSet<AssetExtraction> AssetExtractions => Set<AssetExtraction>();
+        public DbSet<AssetPart> AssetParts => Set<AssetPart>();
+        public DbSet<ExtractionJob> ExtractionJobs => Set<ExtractionJob>();
+        public DbSet<AssetDerivation> AssetDerivations => Set<AssetDerivation>();
+        public DbSet<AssetSearchDocument> AssetSearchDocuments => Set<AssetSearchDocument>();
+        public DbSet<SearchLog> SearchLogs => Set<SearchLog>();
+        public DbSet<ComputeCacheEntry> ComputeCacheEntries => Set<ComputeCacheEntry>();
+        public DbSet<AssetDerivationLineage> AssetDerivationLineages => Set<AssetDerivationLineage>();
+        public DbSet<AgentOperationLog> AgentOperationLogs => Set<AgentOperationLog>();
+        public DbSet<ModelVersionAuxiliaryFile> ModelVersionAuxiliaryFiles => Set<ModelVersionAuxiliaryFile>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -1144,6 +1154,276 @@ namespace Infrastructure.Persistence
                     .WithMany()
                     .HasForeignKey(faceFile => faceFile.FileId)
                     .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // Configure AssetExtraction — raw, versioned extractor output.
+            modelBuilder.Entity<AssetExtraction>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.AssetType).IsRequired().HasMaxLength(30);
+                entity.Property(e => e.AssetId).IsRequired();
+                entity.Property(e => e.VersionId).IsRequired(false);
+                entity.Property(e => e.FileSha256).IsRequired().HasMaxLength(64);
+                entity.Property(e => e.RawPayload).IsRequired().HasColumnType("jsonb");
+                entity.Property(e => e.ExtractorVersion).IsRequired();
+                entity.Property(e => e.GeometryHashVersion).IsRequired(false);
+                entity.Property(e => e.SchemaVersion).IsRequired();
+                entity.Property(e => e.Outcome).IsRequired();
+                entity.Property(e => e.Warnings)
+                    .HasColumnType("text[]")
+                    .HasDefaultValueSql("'{}'::text[]");
+                entity.Property(e => e.ExtractedAt).IsRequired();
+                entity.Property(e => e.UpdatedAt).IsRequired();
+
+                // One row per (asset, version, file) — the idempotent upsert key.
+                // NULLS NOT DISTINCT so non-versioned assets (VersionId = null) still
+                // dedup on (AssetType, AssetId, FileSha256); Postgres would otherwise
+                // treat every null VersionId as distinct and allow duplicate rows.
+                entity.HasIndex(e => new { e.AssetType, e.AssetId, e.VersionId, e.FileSha256 })
+                    .IsUnique()
+                    .AreNullsDistinct(false);
+
+                // Invalidation ("which rows are stale?") scans by extractor version.
+                entity.HasIndex(e => new { e.AssetType, e.ExtractorVersion });
+            });
+
+            // Configure AssetPart — per-object scene-graph rows (sub-part findability).
+            modelBuilder.Entity<AssetPart>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.AssetType).IsRequired().HasMaxLength(30);
+                entity.Property(e => e.AssetId).IsRequired();
+                entity.Property(e => e.VersionId).IsRequired(false);
+                entity.Property(e => e.PartPath).IsRequired().HasMaxLength(1024);
+                entity.Property(e => e.Name).IsRequired().HasMaxLength(512);
+                entity.Property(e => e.ParentPath).HasMaxLength(1024);
+                entity.Property(e => e.Depth).IsRequired();
+                entity.Property(e => e.ObjectType).IsRequired().HasMaxLength(30);
+                entity.Property(e => e.TriangleCount).IsRequired(false);
+                entity.Property(e => e.VertexCount).IsRequired(false);
+                entity.Property(e => e.GeometryHash).IsRequired(false).HasMaxLength(64);
+                entity.Property(e => e.GeometryHashVersion).IsRequired(false);
+                entity.Property(e => e.HasUvs).IsRequired(false);
+                entity.Property(e => e.Detail).HasColumnType("jsonb");
+                entity.Property(e => e.CreatedAt).IsRequired();
+
+                // One row per (asset, version, part path). NULLS NOT DISTINCT so
+                // non-versioned assets (null VersionId) still dedup on the part path.
+                entity.HasIndex(e => new { e.AssetType, e.AssetId, e.VersionId, e.PartPath })
+                    .IsUnique()
+                    .AreNullsDistinct(false);
+
+                // Fetch-by-asset (rebuild/read a whole scene graph).
+                entity.HasIndex(e => new { e.AssetType, e.AssetId, e.VersionId });
+
+                // Instance grouping + expensive-compute cache keyed on geometry hash.
+                entity.HasIndex(e => e.GeometryHash);
+            });
+
+            // Configure ModelVersionAuxiliaryFile — external glTF resources (.bin/textures)
+            // linked to a version with the relative path the primary .gltf references.
+            modelBuilder.Entity<ModelVersionAuxiliaryFile>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.ModelVersionId).IsRequired();
+                entity.Property(e => e.FileId).IsRequired();
+                entity.Property(e => e.RelativePath).IsRequired().HasMaxLength(500);
+                entity.Property(e => e.CreatedAt).IsRequired();
+
+                // One row per (version, relative path) — a URI is cited once per group.
+                entity.HasIndex(e => new { e.ModelVersionId, e.RelativePath }).IsUnique();
+
+                // Removing a version drops its aux links; the shared File row survives
+                // (its own cleanup runs when no entity references the hash — see IFileRepository).
+                entity.HasOne(e => e.ModelVersion)
+                    .WithMany()
+                    .HasForeignKey(e => e.ModelVersionId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(e => e.File)
+                    .WithMany()
+                    .HasForeignKey(e => e.FileId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // Configure ExtractionJob — decoupled extraction queue (mirrors ThumbnailJob).
+            modelBuilder.Entity<ExtractionJob>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.AssetType).IsRequired().HasMaxLength(30);
+                entity.Property(e => e.AssetId).IsRequired();
+                entity.Property(e => e.VersionId).IsRequired(false);
+                entity.Property(e => e.FileSha256).IsRequired(false).HasMaxLength(64);
+                entity.Property(e => e.ExtractorFamily).IsRequired().HasMaxLength(30);
+                entity.Property(e => e.Status).IsRequired();
+                entity.Property(e => e.AttemptCount).IsRequired();
+                entity.Property(e => e.MaxAttempts).IsRequired();
+                entity.Property(e => e.ErrorMessage).HasMaxLength(2000);
+                entity.Property(e => e.WarningDetail).HasMaxLength(2000);
+                entity.Property(e => e.LockedBy).HasMaxLength(100);
+                entity.Property(e => e.LockTimeoutMinutes).IsRequired();
+                entity.Property(e => e.CreatedAt).IsRequired();
+                entity.Property(e => e.UpdatedAt).IsRequired();
+                entity.Property(e => e.CompletedAt).IsRequired(false);
+
+                // Dedup: at most one live job per (asset, version, family). Filtered so
+                // completed/dead rows don't block re-queuing (Pending=0, Processing=1).
+                entity.HasIndex(e => new { e.AssetType, e.AssetId, e.VersionId, e.ExtractorFamily })
+                    .IsUnique()
+                    .HasFilter("\"Status\" IN (0, 1)");
+
+                // Claim scan: pull the oldest pending job within a family.
+                entity.HasIndex(e => new { e.ExtractorFamily, e.Status, e.CreatedAt });
+            });
+
+            // Configure AssetDerivation — derived-signal layer (own DeriveVersion).
+            modelBuilder.Entity<AssetDerivation>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.AssetType).IsRequired().HasMaxLength(30);
+                entity.Property(e => e.AssetId).IsRequired();
+                entity.Property(e => e.VersionId).IsRequired(false);
+                entity.Property(e => e.DeriveVersion).IsRequired();
+                entity.Property(e => e.Payload).IsRequired().HasColumnType("jsonb");
+                entity.Property(e => e.DerivedAt).IsRequired();
+                entity.Property(e => e.UpdatedAt).IsRequired();
+
+                // One derived row per (asset, version). NULLS NOT DISTINCT so
+                // non-versioned assets (null VersionId) still dedup.
+                entity.HasIndex(e => new { e.AssetType, e.AssetId, e.VersionId })
+                    .IsUnique()
+                    .AreNullsDistinct(false);
+
+                // Invalidation ("which derivations are stale?") scans by derive version.
+                entity.HasIndex(e => new { e.AssetType, e.DeriveVersion });
+            });
+
+            // pg_trgm powers the literal/fuzzy identifier matching in the search
+            // projection (multilingual, no stemming).
+            modelBuilder.HasPostgresExtension("pg_trgm");
+
+            // Configure AssetSearchDocument — the derived-layer search projection.
+            modelBuilder.Entity<AssetSearchDocument>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.AssetType).IsRequired().HasMaxLength(30);
+                entity.Property(e => e.AssetId).IsRequired();
+                entity.Property(e => e.VersionId).IsRequired(false);
+                entity.Property(e => e.PartPath).IsRequired(false).HasMaxLength(1024);
+                entity.Property(e => e.IsCurrentVersion).IsRequired();
+                entity.Property(e => e.Prominence).IsRequired().HasMaxLength(16);
+                entity.Property(e => e.DisplayName).IsRequired().HasMaxLength(512);
+                entity.Property(e => e.Tokens).IsRequired();
+                entity.Property(e => e.Symbols).IsRequired();
+                entity.Property(e => e.BrowseSummary).IsRequired();
+                entity.Property(e => e.TriangleCount).IsRequired(false);
+                entity.Property(e => e.HasAnimations).IsRequired(false);
+                entity.Property(e => e.BoneCount).IsRequired(false);
+                entity.Property(e => e.ShapeClass).IsRequired(false).HasMaxLength(16);
+                entity.Property(e => e.Tileability).IsRequired(false);
+                entity.Property(e => e.DurationClass).IsRequired(false).HasMaxLength(16);
+                entity.Property(e => e.Engine).IsRequired(false).HasMaxLength(32);
+                entity.Property(e => e.GridSize).IsRequired(false);
+                entity.Property(e => e.QualityFlags)
+                    .HasColumnType("text[]")
+                    .HasDefaultValueSql("'{}'::text[]");
+                // prompt-29 attribute filters + category bridge
+                entity.Property(e => e.VertexCount).IsRequired(false);
+                entity.Property(e => e.MaterialCount).IsRequired(false);
+                entity.Property(e => e.HasUvs).IsRequired(false);
+                entity.Property(e => e.PartCount).IsRequired(false);
+                entity.Property(e => e.AnimationCount).IsRequired(false);
+                entity.Property(e => e.MaxDimension).IsRequired(false);
+                entity.Property(e => e.CategoryId).IsRequired(false);
+                entity.Property(e => e.CategoryName).IsRequired(false).HasMaxLength(200);
+                entity.Property(e => e.UpdatedAt).IsRequired();
+
+                // One document per (asset, version, part). NULLS NOT DISTINCT so the
+                // asset-level doc (null PartPath) and non-versioned assets still dedup.
+                entity.HasIndex(e => new { e.AssetType, e.AssetId, e.VersionId, e.PartPath })
+                    .IsUnique()
+                    .AreNullsDistinct(false);
+
+                // Default result gate: current version + prominence.
+                entity.HasIndex(e => new { e.AssetType, e.IsCurrentVersion, e.Prominence });
+
+                // Trigram GIN over authored identifiers — literal, multilingual, fuzzy.
+                entity.HasIndex(e => e.Tokens).HasMethod("gin").HasOperators("gin_trgm_ops");
+                entity.HasIndex(e => e.DisplayName).HasMethod("gin").HasOperators("gin_trgm_ops");
+                entity.HasIndex(e => e.Symbols).HasMethod("gin").HasOperators("gin_trgm_ops");
+
+                // Structural-filter btree indexes an agent composes on.
+                entity.HasIndex(e => e.TriangleCount);
+                entity.HasIndex(e => e.ShapeClass);
+                entity.HasIndex(e => e.Engine);
+                entity.HasIndex(e => e.MaxDimension);
+                entity.HasIndex(e => e.CategoryId);
+            });
+
+            // Configure SearchLog — one row per deliberate search (from day one).
+            modelBuilder.Entity<SearchLog>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Query).IsRequired().HasMaxLength(500);
+                entity.Property(e => e.FiltersJson).HasColumnType("jsonb");
+                entity.Property(e => e.ResultsJson).IsRequired().HasColumnType("jsonb");
+                entity.Property(e => e.ResultCount).IsRequired();
+                entity.Property(e => e.CreatedAt).IsRequired();
+                entity.Property(e => e.OpenedAssetType).HasMaxLength(30);
+                entity.Property(e => e.OpenedAssetId).IsRequired(false);
+                entity.Property(e => e.OpenedAt).IsRequired(false);
+
+                entity.HasIndex(e => e.CreatedAt);
+            });
+
+            // Configure ComputeCacheEntry — hash-keyed expensive-compute cache.
+            modelBuilder.Entity<ComputeCacheEntry>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.GeometryHash).IsRequired().HasMaxLength(64);
+                entity.Property(e => e.GeometryHashVersion).IsRequired();
+                entity.Property(e => e.Metric).IsRequired().HasMaxLength(40);
+                entity.Property(e => e.Result).IsRequired().HasColumnType("jsonb");
+                entity.Property(e => e.ComputedAt).IsRequired();
+                entity.Property(e => e.UpdatedAt).IsRequired();
+
+                // One result per (hash, hash version, metric) — the cross-asset cache key.
+                entity.HasIndex(e => new { e.GeometryHash, e.GeometryHashVersion, e.Metric }).IsUnique();
+            });
+
+            // Configure AssetDerivationLineage — schema hook, not yet written to.
+            modelBuilder.Entity<AssetDerivationLineage>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.AssetType).IsRequired().HasMaxLength(30);
+                entity.Property(e => e.AssetId).IsRequired();
+                entity.Property(e => e.SourceAssetType).IsRequired().HasMaxLength(30);
+                entity.Property(e => e.SourceAssetId).IsRequired();
+                entity.Property(e => e.SourceVersionId).IsRequired(false);
+                entity.Property(e => e.SourcePartPath).HasMaxLength(1024);
+                entity.Property(e => e.CreatedAt).IsRequired();
+
+                entity.HasIndex(e => new { e.AssetType, e.AssetId });
+                entity.HasIndex(e => new { e.SourceAssetType, e.SourceAssetId });
+            });
+
+            // Configure AgentOperationLog — append-only audit / reversal hook.
+            modelBuilder.Entity<AgentOperationLog>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.IdempotencyKey).IsRequired().HasMaxLength(200);
+                entity.Property(e => e.BatchId).HasMaxLength(200);
+                entity.Property(e => e.Operation).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.AssetType).HasMaxLength(30);
+                entity.Property(e => e.AssetId).IsRequired(false);
+                entity.Property(e => e.PayloadBefore).HasColumnType("jsonb");
+                entity.Property(e => e.PayloadAfter).HasColumnType("jsonb");
+                entity.Property(e => e.PerformedAt).IsRequired();
+                entity.Property(e => e.ReversedAt).IsRequired(false);
+
+                // A retried write with the same key must be a no-op — enforced here.
+                entity.HasIndex(e => e.IdempotencyKey).IsUnique();
+                entity.HasIndex(e => e.BatchId);
             });
 
             base.OnModelCreating(modelBuilder);

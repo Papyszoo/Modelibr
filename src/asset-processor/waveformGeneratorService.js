@@ -273,6 +273,91 @@ export class WaveformGeneratorService {
   }
 
   /**
+   * Decode PCM and compute deterministic audio content/quality statistics for the
+   * extraction substrate (peak/rms/DC/clipping, head/tail silence, single-channel-
+   * in-stereo, null BPM on non-musical content). The maths lives in the pure
+   * `audioStats.js`; this method only does the ffmpeg decode.
+   *
+   * Preserves the SOURCE channel layout (no remix) so a real mono file is not
+   * mistaken for "two identical channels". Analysis is bounded to the first
+   * `maxSeconds` to cap memory on long files.
+   *
+   * @param {string} audioFilePath
+   * @param {{channels?: number|null, maxSeconds?: number}} [options]
+   * @returns {Promise<Object|null>} audioStats payload, or null if decode failed.
+   */
+  async extractAudioStats(audioFilePath, options = {}) {
+    const analysisRate = 22050
+    const maxSeconds = options.maxSeconds ?? 120
+    // Fall back to a probe when the caller didn't pass channel count.
+    let channels = options.channels
+    if (!channels || channels < 1) {
+      try {
+        channels = (await this.getAudioMetadata(audioFilePath)).channels
+      } catch {
+        channels = null
+      }
+    }
+    const ch = channels && channels > 0 ? channels : 1
+
+    const args = [
+      '-v',
+      'error',
+      '-t',
+      String(maxSeconds),
+      '-i',
+      audioFilePath,
+      '-f',
+      'f32le',
+      '-acodec',
+      'pcm_f32le',
+      '-ac',
+      String(ch), // == source channels, so no up/down-mix
+      '-ar',
+      String(analysisRate),
+      'pipe:1',
+    ]
+
+    let pcm
+    try {
+      const { stdout } = await execFileAsync('ffmpeg', args, {
+        encoding: 'buffer',
+        maxBuffer: 256 * 1024 * 1024,
+      })
+      pcm = stdout
+    } catch (error) {
+      logger.warn('Audio PCM decode failed for stats', { error: error.message })
+      return null
+    }
+
+    if (!pcm || pcm.length < 4) return null
+
+    const { computeAudioStats } = await import('./audioStats.js')
+    const f32 = new Float32Array(
+      pcm.buffer,
+      pcm.byteOffset,
+      Math.floor(pcm.length / 4)
+    )
+    const frames = Math.floor(f32.length / ch)
+    const channelBuffers = Array.from(
+      { length: ch },
+      () => new Float32Array(frames)
+    )
+    for (let i = 0; i < frames; i++) {
+      for (let c = 0; c < ch; c++) channelBuffers[c][i] = f32[i * ch + c]
+    }
+
+    const stats = computeAudioStats({
+      channels: channelBuffers,
+      sampleRate: analysisRate,
+    })
+    if (stats && maxSeconds && frames >= maxSeconds * analysisRate) {
+      stats.truncatedToSeconds = maxSeconds
+    }
+    return stats
+  }
+
+  /**
    * Check if ffmpeg is available
    * @returns {Promise<boolean>}
    */

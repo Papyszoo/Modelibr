@@ -65,6 +65,7 @@ export default [
   {
     files: [
       'jobProcessor.js',
+      'extractionJobProcessor.js',
       'jobApiClient.js',
       'modelFileService.js',
       'environmentMapFileService.js',
