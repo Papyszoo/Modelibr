@@ -20,6 +20,22 @@ public class ExtractionJobCommandsTests
         return clock;
     }
 
+    /// <summary>Model 42 has one version, id 1 — the version an omitted VersionId resolves to.</summary>
+    private static Mock<IModelVersionRepository> Versions()
+    {
+        var versions = new Mock<IModelVersionRepository>();
+        versions.Setup(v => v.GetByModelIdAsync(42, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { ModelVersionFake(1, 1) });
+        return versions;
+    }
+
+    private static ModelVersion ModelVersionFake(int id, int versionNumber)
+    {
+        var version = ModelVersion.Create(42, versionNumber, null, Now);
+        typeof(ModelVersion).GetProperty(nameof(ModelVersion.Id))!.SetValue(version, id);
+        return version;
+    }
+
     // ---- Enqueue ----------------------------------------------------------------
 
     [Fact]
@@ -30,7 +46,7 @@ public class ExtractionJobCommandsTests
             .ReturnsAsync((ExtractionJob?)null);
         var uow = new Mock<IUnitOfWork>();
 
-        var handler = new EnqueueExtractionJobCommandHandler(repo.Object, Clock().Object, uow.Object);
+        var handler = new EnqueueExtractionJobCommandHandler(repo.Object, Versions().Object, Clock().Object, uow.Object);
         var result = await handler.Handle(
             new EnqueueExtractionJobCommand("Model", 42, VersionId: 1), CancellationToken.None);
 
@@ -49,7 +65,7 @@ public class ExtractionJobCommandsTests
             .ReturnsAsync(existing);
         var uow = new Mock<IUnitOfWork>();
 
-        var handler = new EnqueueExtractionJobCommandHandler(repo.Object, Clock().Object, uow.Object);
+        var handler = new EnqueueExtractionJobCommandHandler(repo.Object, Versions().Object, Clock().Object, uow.Object);
         var result = await handler.Handle(
             new EnqueueExtractionJobCommand("Model", 42, VersionId: 1), CancellationToken.None);
 
@@ -57,6 +73,47 @@ public class ExtractionJobCommandsTests
         Assert.True(result.Value.AlreadyQueued);
         repo.Verify(r => r.AddAsync(It.IsAny<ExtractionJob>(), It.IsAny<CancellationToken>()), Times.Never);
         uow.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Enqueue_Model_Without_VersionId_Resolves_The_Current_Version()
+    {
+        // Regression: trigger_rederive omits versionId for a model, and the job used to
+        // be queued with a null one. The worker then downloaded the file, extracted it,
+        // failed BOTH save calls with a 400 ("modelVersionId": null) and still reported
+        // the job completed — so re-deriving 1,717 models reported success while not one
+        // search document changed.
+        var repo = new Mock<IExtractionJobRepository>();
+        repo.Setup(r => r.GetLiveJobAsync("Model", 42, 1, ExtractorFamilies.Geometry, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ExtractionJob?)null);
+        var uow = new Mock<IUnitOfWork>();
+
+        var handler = new EnqueueExtractionJobCommandHandler(repo.Object, Versions().Object, Clock().Object, uow.Object);
+        var result = await handler.Handle(
+            new EnqueueExtractionJobCommand("Model", 42), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        repo.Verify(
+            r => r.AddAsync(It.Is<ExtractionJob>(j => j.VersionId == 1), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task Enqueue_Model_With_No_Versions_Fails_Instead_Of_Queueing_A_Useless_Job()
+    {
+        var repo = new Mock<IExtractionJobRepository>();
+        var uow = new Mock<IUnitOfWork>();
+        var versions = new Mock<IModelVersionRepository>();
+        versions.Setup(v => v.GetByModelIdAsync(99, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<ModelVersion>());
+
+        var handler = new EnqueueExtractionJobCommandHandler(repo.Object, versions.Object, Clock().Object, uow.Object);
+        var result = await handler.Handle(
+            new EnqueueExtractionJobCommand("Model", 99), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("ModelVersionNotFound", result.Error.Code);
+        repo.Verify(r => r.AddAsync(It.IsAny<ExtractionJob>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     // ---- Dequeue ----------------------------------------------------------------
