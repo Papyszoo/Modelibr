@@ -96,36 +96,31 @@ export async function uploadModelGroup(
   return response.data
 }
 
-export interface ImportZipResponse {
-  batchId: string
-  imported: ImportMultiFileResponse[]
+/** One external resource a loose `.gltf` references, as the version stores it. */
+export interface AuxiliaryFileDescriptor {
+  fileId: number
+  relativePath: string
+  originalFileName: string
+  sha256Hash: string
+  sizeBytes: number
 }
 
-/** Import every model group found in a `.zip` (multi-file glTF resolved by directory). */
-export async function uploadModelZip(
-  zip: File,
-  options: { batchId?: string } = {}
-): Promise<ImportZipResponse> {
-  const formData = new FormData()
-  formData.append('file', zip)
+export interface VersionAuxiliaryFilesResponse {
+  modelVersionId: number
+  auxiliaries: AuxiliaryFileDescriptor[]
+}
 
-  let url = '/models/zip'
-  const params = new URLSearchParams()
-  if (options.batchId) {
-    params.append('batchId', options.batchId)
-  }
-  if (params.toString()) {
-    url += `?${params.toString()}`
-  }
-
-  const response: AxiosResponse<ImportZipResponse> = await client.post(
-    url,
-    formData,
-    {
-      headers: { 'Content-Type': 'multipart/form-data' },
-      timeout: UPLOAD_TIMEOUT,
-    }
-  )
+/**
+ * The external `.bin`/texture resources linked to a model version. The viewer needs
+ * these to resolve a loose `.gltf`'s relative URIs — without them GLTFLoader asks for
+ * `scene.bin` against the page origin and the model cannot load in the browser at all.
+ */
+export async function getVersionAuxiliaryFiles(
+  modelId: number | string,
+  versionId: number | string
+): Promise<VersionAuxiliaryFilesResponse> {
+  const response: AxiosResponse<VersionAuxiliaryFilesResponse> =
+    await client.get(`/models/${modelId}/versions/${versionId}/auxiliary-files`)
   return response.data
 }
 

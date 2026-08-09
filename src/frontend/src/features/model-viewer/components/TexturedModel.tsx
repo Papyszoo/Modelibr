@@ -13,7 +13,10 @@ import {
 } from '@/features/model-viewer/hooks/useChannelExtractedTextures'
 import { useModelObject } from '@/features/model-viewer/hooks/useModelObject'
 import { getFileUrl } from '@/features/models/api/modelApi'
-import { safeLoadingManager } from '@/shared/three/safeLoadingManager'
+import {
+  createGltfResourceManager,
+  safeLoadingManager,
+} from '@/shared/three/safeLoadingManager'
 import { TextureChannel, TextureType } from '@/types'
 
 import { buildStlModel } from '../../../../../asset-processor/lib/stlMesh.js'
@@ -34,6 +37,8 @@ interface TexturedModelProps {
   fileExtension: string
   rotationSpeed: number
   materialTextureSets: MaterialTextureSets
+  /** Relative-path -> URL map for a multi-file glTF's external resources. */
+  gltfResources?: Record<string, string>
 }
 
 // Texture types in apply order, each with its fallback when the primary is
@@ -105,6 +110,7 @@ interface FormatComponentProps {
   modelUrl: string
   rotationSpeed: number
   materialTextureSets: MaterialTextureSets
+  gltfResources?: Record<string, string>
 }
 
 /** Shared hook: build combined configs, load textures, return ready state */
@@ -253,6 +259,7 @@ function GLTFModelWithTextures({
   modelUrl,
   rotationSpeed,
   materialTextureSets,
+  gltfResources,
 }: FormatComponentProps) {
   const meshRef = useRef<THREE.Group>(null)
   const { setModelObject } = useModelObject()
@@ -265,8 +272,14 @@ function GLTFModelWithTextures({
     }
   })
 
+  // See Model.tsx: a loose .gltf's relative buffer/texture URIs must resolve to the
+  // version's auxiliary files, otherwise it loads as an empty scene.
+  const manager = useMemo(
+    () => createGltfResourceManager(gltfResources),
+    [gltfResources]
+  )
   const gltf = useLoader(GLTFLoader, modelUrl, loader => {
-    loader.manager = safeLoadingManager
+    loader.manager = manager
   })
   const model = gltf?.scene
   const { loadedTextures, texturesReady } = usePerMaterialTextures(
@@ -454,6 +467,7 @@ export function TexturedModel({
   fileExtension,
   rotationSpeed,
   materialTextureSets,
+  gltfResources,
 }: TexturedModelProps) {
   if (fileExtension === 'obj') {
     return (
@@ -479,6 +493,7 @@ export function TexturedModel({
         modelUrl={modelUrl}
         rotationSpeed={rotationSpeed}
         materialTextureSets={materialTextureSets}
+        gltfResources={gltfResources}
       />
     )
   }

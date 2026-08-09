@@ -42,6 +42,7 @@ export function useModelUpload({
   } = useFileUpload({
     requireThreeJSRenderable: true,
     toast,
+    // Every multi-model path (multi-file, folder, zip) reports this shape.
     onSuccess: async (
       _file: unknown,
       results: { succeeded: { result: { id: number } }[] }
@@ -59,6 +60,22 @@ export function useModelUpload({
       onUploadComplete()
     },
   })
+
+  // Folder and zip imports run through the same gates as the file picker:
+  // renderable-only (the hook's requireThreeJSRenderable) plus the .blend allowance
+  // below. Without this they were side doors for .blend/.dae/.3ds files the grid
+  // otherwise refuses — a zip especially, since it used to be unzipped server-side
+  // where no client gate applied at all.
+  const gatedUploadFolder = useCallback(
+    (files: File[] | FileList) =>
+      uploadFolder(files, { allowBlend: blenderEnabled }),
+    [blenderEnabled, uploadFolder]
+  )
+
+  const gatedUploadZip = useCallback(
+    (file: File) => uploadZip(file, { allowBlend: blenderEnabled }),
+    [blenderEnabled, uploadZip]
+  )
 
   // Wrap uploadMultipleFiles to filter out .blend when blenderEnabled is false
   const filteredUploadMultipleFiles = useCallback(
@@ -81,10 +98,10 @@ export function useModelUpload({
     uploading,
     uploadProgress,
     uploadMultipleFiles: filteredUploadMultipleFiles,
-    // Multi-file glTF import (folder / .zip). Passed straight through — grouping and
-    // the blender filter live in the folder/zip paths themselves.
-    uploadFolder,
-    uploadZip,
+    // Multi-file glTF import (folder / .zip) — a zip is expanded in the browser and
+    // then follows the folder path exactly.
+    uploadFolder: gatedUploadFolder,
+    uploadZip: gatedUploadZip,
     onDrop,
     onDragOver,
     onDragEnter,

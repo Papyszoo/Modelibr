@@ -79,6 +79,11 @@ function SceneLights({
 
 interface SceneProps {
   model: ModelType
+  /**
+   * Relative-path -> URL map for a multi-file `.gltf`'s external resources. Resolved by
+   * the caller (outside <Canvas>, where React Query lives) and passed in as plain data.
+   */
+  gltfResources?: Record<string, string>
   settings?: ViewerSettingsType
   materialTextureSets?: MaterialTextureSets
   defaultFileId?: number | null
@@ -100,6 +105,7 @@ interface OrbitControlsHandle {
 
 export function Scene({
   model,
+  gltfResources,
   settings,
   materialTextureSets,
   defaultFileId,
@@ -227,6 +233,7 @@ export function Scene({
               fileExtension={fileExtension}
               rotationSpeed={modelRotationSpeed}
               materialTextureSets={materialTextureSets}
+              gltfResources={gltfResources}
             />
           ) : (
             <Model
@@ -235,6 +242,7 @@ export function Scene({
               fileExtension={fileExtension}
               rotationSpeed={modelRotationSpeed}
               preserveMaterials={preserveMaterials}
+              gltfResources={gltfResources}
             />
           )}
         </Suspense>

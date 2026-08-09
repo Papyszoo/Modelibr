@@ -67,4 +67,56 @@ describe('groupFilesForImport', () => {
     ])
     expect(groups).toEqual([])
   })
+
+  // Regression: a folder import used every ALL_SUPPORTED_FORMATS extension as a
+  // primary and applied no Blender gate, so a picked folder was a side door for
+  // formats the grid's own file picker refuses.
+  describe('primary gating', () => {
+    it('rejects non-renderable formats when renderability is required', () => {
+      const files = [
+        fileAt('kit/statue.dae'),
+        fileAt('kit/crate.3ds'),
+        fileAt('kit/barrel.glb'),
+      ]
+
+      const groups = groupFilesForImport(files, {
+        requireThreeJSRenderable: true,
+      })
+
+      expect(groups.map(g => g.primary.name)).toEqual(['barrel.glb'])
+    })
+
+    it('rejects .blend primaries unless Blender is enabled', () => {
+      const files = [fileAt('kit/scene.blend')]
+
+      expect(
+        groupFilesForImport(files, { requireThreeJSRenderable: true })
+      ).toEqual([])
+      expect(
+        groupFilesForImport(files, {
+          requireThreeJSRenderable: true,
+          allowBlend: true,
+        }).map(g => g.primary.name)
+      ).toEqual(['scene.blend'])
+    })
+
+    it('never demotes a rejected model file into an auxiliary resource', () => {
+      // A .dae next to a .gltf is another model, not one of its resources —
+      // uploading it as an auxiliary would smuggle it in through the back door.
+      const files = [
+        fileAt('kit/scene.gltf'),
+        fileAt('kit/scene.bin'),
+        fileAt('kit/legacy.dae'),
+      ]
+
+      const groups = groupFilesForImport(files, {
+        requireThreeJSRenderable: true,
+      })
+
+      expect(groups).toHaveLength(1)
+      expect(groups[0].auxiliaries.map(a => a.relativePath)).toEqual([
+        'scene.bin',
+      ])
+    })
+  })
 })

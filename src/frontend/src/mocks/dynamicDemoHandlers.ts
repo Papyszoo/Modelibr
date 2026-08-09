@@ -1029,13 +1029,6 @@ export const dynamicDemoHandlers = [
 
   // Zip import. The demo bundle can't unzip, so report an empty import rather
   // than a 405/network error when the button is used in the showcase.
-  http.post('*/models/zip', async () => {
-    return HttpResponse.json(
-      { batchId: `batch-${Date.now()}`, imported: [] },
-      { status: 200 }
-    )
-  }),
-
   // Update model (tags/description)
   http.post('*/models/:id/tags', async ({ params, request }) => {
     const model = await getById('models', Number(params.id))
@@ -1568,6 +1561,19 @@ export const dynamicDemoHandlers = [
     '*/models/:modelId/versions/:versionId/files/:fileId',
     async ({ params }) => {
       return serveFile(Number(params.fileId))
+    }
+  ),
+
+  // External glTF resources linked to a version. The demo library ships packed
+  // .glb seeds, so this is always empty — but it must answer, not 404: the viewer
+  // asks for it whenever a version carries a loose .gltf.
+  http.get(
+    '*/models/:modelId/versions/:versionId/auxiliary-files',
+    async ({ params }) => {
+      return HttpResponse.json({
+        modelVersionId: Number(params.versionId),
+        auxiliaries: [],
+      })
     }
   ),
 

@@ -78,8 +78,46 @@ describe('useModelUpload', () => {
 
       expect(typeof result.current.uploadFolder).toBe('function')
       expect(typeof result.current.uploadZip).toBe('function')
-      expect(result.current.uploadFolder).toBe(mockUploadFolder)
-      expect(result.current.uploadZip).toBe(mockUploadZip)
+
+      // Both are wrapped to carry the Blender gate (below), so assert delegation
+      // rather than identity.
+      result.current.uploadFolder([])
+      expect(mockUploadFolder).toHaveBeenCalled()
+      result.current.uploadZip(new File(['z'], 'kit.zip'))
+      expect(mockUploadZip).toHaveBeenCalled()
+    })
+
+    // Regression: uploadFolder was passed straight through, so a picked folder
+    // bypassed the renderability/.blend gates the file picker applies — .blend files
+    // reached the backend with Blender disabled, and .dae/.3ds always did.
+    it('refuses .blend primaries in a folder import when Blender is disabled', () => {
+      mockBlenderEnabled = false
+      const { result } = renderUploadHook()
+
+      result.current.uploadFolder([])
+
+      expect(mockUploadFolder).toHaveBeenCalledWith([], { allowBlend: false })
+    })
+
+    it('allows .blend primaries in a folder import when Blender is enabled', () => {
+      mockBlenderEnabled = true
+      const { result } = renderUploadHook()
+
+      result.current.uploadFolder([])
+
+      expect(mockUploadFolder).toHaveBeenCalledWith([], { allowBlend: true })
+    })
+
+    // A zip is expanded client-side and imported like a folder, so it must carry the
+    // same gate. The old server-side unzip route applied no client gate at all.
+    it('carries the Blender gate into a zip import', () => {
+      mockBlenderEnabled = false
+      const { result } = renderUploadHook()
+      const zip = new File(['z'], 'kit.zip')
+
+      result.current.uploadZip(zip)
+
+      expect(mockUploadZip).toHaveBeenCalledWith(zip, { allowBlend: false })
     })
   })
 
