@@ -56,6 +56,13 @@ internal class ImportModelWithAuxiliaryFilesCommandHandler
         if (primaryTypeResult.IsFailure)
             return Result.Failure<ImportModelWithAuxiliaryFilesResponse>(primaryTypeResult.Error);
 
+        // Resolve the auxiliaries FIRST. Files are content-addressed, so creating them is
+        // idempotent and cheap, and it is the only way to know what this import actually
+        // references before deciding whether it is the same asset as an existing one.
+        var (resolved, skipped) = await ResolveAuxiliariesAsync(command.Auxiliaries, cancellationToken);
+
+        var now = _dateTimeProvider.UtcNow;
+
         // Reuse the model-creation path (dedup, batch tracking, domain events, save
         // ordering) for the primary; it commits before we read the version id below.
         var modelResult = await _addModelHandler.Handle(
@@ -72,12 +79,72 @@ internal class ImportModelWithAuxiliaryFilesCommandHandler
         }
 
         var versionId = model.ActiveVersion.Id;
-        var now = _dateTimeProvider.UtcNow;
-        var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var alreadyExists = modelResult.Value.AlreadyExists;
+
+        // A loose .gltf's identity is its JSON *plus* the resources it references. If the
+        // primary hash matched an existing model but that model's auxiliaries differ, the
+        // two imports are different assets: merging them would keep one asset's geometry
+        // and silently discard the other's. Re-import as a distinct model instead.
+        if (alreadyExists && await ReferencedResourcesDifferAsync(versionId, resolved, cancellationToken))
+        {
+            _logger.LogInformation(
+                "Model {ModelId} shares the primary file hash of this import but references different " +
+                "external resources; importing as a separate model rather than merging.",
+                model.Id);
+
+            var distinctResult = await _addModelHandler.Handle(
+                new AddModelCommand(command.Primary, BatchId: command.BatchId, SkipDeduplication: true),
+                cancellationToken);
+            if (distinctResult.IsFailure)
+                return Result.Failure<ImportModelWithAuxiliaryFilesResponse>(distinctResult.Error);
+
+            model = await _modelRepository.GetByIdAsync(distinctResult.Value.Id, cancellationToken);
+            if (model?.ActiveVersion is null)
+            {
+                return Result.Failure<ImportModelWithAuxiliaryFilesResponse>(
+                    new Error("NoActiveVersion", $"Imported model {distinctResult.Value.Id} has no active version."));
+            }
+
+            versionId = model.ActiveVersion.Id;
+            alreadyExists = false;
+        }
+
         var linked = 0;
+        foreach (var (relativePath, file) in resolved)
+        {
+            // Already linked from a prior import of this exact version — nothing to do.
+            if (await _auxiliaryRepository.ExistsAsync(versionId, relativePath, cancellationToken))
+            {
+                skipped++;
+                continue;
+            }
+
+            var join = ModelVersionAuxiliaryFile.Create(versionId, file, relativePath, now);
+            await _auxiliaryRepository.AddAsync(join, cancellationToken);
+            linked++;
+        }
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return Result.Success(new ImportModelWithAuxiliaryFilesResponse(
+            model.Id, alreadyExists, linked, skipped));
+    }
+
+    /// <summary>
+    /// Normalises, validates and materialises each auxiliary into a stored
+    /// <see cref="Domain.Models.File"/>, dropping duplicates and anything unsupported.
+    /// Returns the surviving (relativePath, file) pairs plus a count of what was dropped.
+    /// </summary>
+    private async Task<(List<(string RelativePath, Domain.Models.File File)> Resolved, int Skipped)>
+        ResolveAuxiliariesAsync(
+            IReadOnlyList<AuxiliaryUpload> auxiliaries,
+            CancellationToken cancellationToken)
+    {
+        var resolved = new List<(string, Domain.Models.File)>();
+        var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var skipped = 0;
 
-        foreach (var auxiliary in command.Auxiliaries)
+        foreach (var auxiliary in auxiliaries)
         {
             string relativePath;
             try
@@ -91,16 +158,7 @@ internal class ImportModelWithAuxiliaryFilesCommandHandler
                 continue;
             }
 
-            if (string.IsNullOrWhiteSpace(relativePath))
-            {
-                skipped++;
-                continue;
-            }
-
-            // Dedup within this batch (the unique index also enforces it in the DB) and
-            // against already-linked paths from a prior import of the same version.
-            if (!seenPaths.Add(relativePath) ||
-                await _auxiliaryRepository.ExistsAsync(versionId, relativePath, cancellationToken))
+            if (string.IsNullOrWhiteSpace(relativePath) || !seenPaths.Add(relativePath))
             {
                 skipped++;
                 continue;
@@ -110,8 +168,8 @@ internal class ImportModelWithAuxiliaryFilesCommandHandler
             if (auxTypeResult.IsFailure)
             {
                 _logger.LogWarning(
-                    "Skipping unsupported auxiliary file {RelativePath} for version {VersionId}: {Error}",
-                    relativePath, versionId, auxTypeResult.Error.Message);
+                    "Skipping unsupported auxiliary file {RelativePath}: {Error}",
+                    relativePath, auxTypeResult.Error.Message);
                 skipped++;
                 continue;
             }
@@ -121,21 +179,48 @@ internal class ImportModelWithAuxiliaryFilesCommandHandler
             if (fileResult.IsFailure)
             {
                 _logger.LogWarning(
-                    "Skipping auxiliary file {RelativePath} for version {VersionId}: {Error}",
-                    relativePath, versionId, fileResult.Error.Message);
+                    "Skipping auxiliary file {RelativePath}: {Error}",
+                    relativePath, fileResult.Error.Message);
                 skipped++;
                 continue;
             }
 
-            var join = ModelVersionAuxiliaryFile.Create(versionId, fileResult.Value, relativePath, now);
-            await _auxiliaryRepository.AddAsync(join, cancellationToken);
-            linked++;
+            resolved.Add((relativePath, fileResult.Value));
         }
 
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        return (resolved, skipped);
+    }
 
-        return Result.Success(new ImportModelWithAuxiliaryFilesResponse(
-            modelResult.Value.Id, modelResult.Value.AlreadyExists, linked, skipped));
+    /// <summary>
+    /// True when the version already links a different file at any of the relative paths
+    /// this import brings — i.e. the two imports reference different resources and cannot
+    /// be the same asset. Paths the version does not have yet are additive, not a conflict.
+    /// </summary>
+    private async Task<bool> ReferencedResourcesDifferAsync(
+        int versionId,
+        IReadOnlyList<(string RelativePath, Domain.Models.File File)> resolved,
+        CancellationToken cancellationToken)
+    {
+        if (resolved.Count == 0)
+        {
+            return false;
+        }
+
+        var existing = await _auxiliaryRepository.GetForVersionAsync(versionId, cancellationToken);
+        if (existing.Count == 0)
+        {
+            return false;
+        }
+
+        // Compare by content hash, not file id: a resource whose bytes the library has
+        // never seen comes back as an unsaved entity with id 0, and hashes are the
+        // identity that actually matters here.
+        var existingByPath = existing.ToDictionary(
+            a => a.RelativePath, a => a.File.Sha256Hash, StringComparer.OrdinalIgnoreCase);
+
+        return resolved.Any(r =>
+            existingByPath.TryGetValue(r.RelativePath, out var existingHash) &&
+            !string.Equals(existingHash, r.File.Sha256Hash, StringComparison.OrdinalIgnoreCase));
     }
 }
 

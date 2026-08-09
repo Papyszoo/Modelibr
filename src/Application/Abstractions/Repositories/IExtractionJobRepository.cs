@@ -39,12 +39,23 @@ public interface IExtractionJobRepository
 
     /// <summary>
     /// Atomically claims a job by id if it is still Pending or its lock has
-    /// expired. Returns true when this caller won the row. A single UPDATE, so no
-    /// SaveChangesAsync / transaction is needed (keeps the repo non-self-committing).
+    /// expired, and it still has attempts left. Returns true when this caller won the
+    /// row. A single UPDATE, so no SaveChangesAsync / transaction is needed (keeps the
+    /// repo non-self-committing).
     /// </summary>
     Task<bool> TryClaimJobAsync(
         int jobId,
         string workerId,
         DateTime claimedAtUtc,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Dead-letters jobs stuck in Processing with an expired lock and no attempts left —
+    /// their worker died and nothing else will ever claim or finish them. Returns the
+    /// number of jobs retired. A single UPDATE (no self-commit).
+    /// </summary>
+    Task<int> DeadLetterExhaustedJobsAsync(
+        string extractorFamily,
+        DateTime nowUtc,
         CancellationToken cancellationToken = default);
 }

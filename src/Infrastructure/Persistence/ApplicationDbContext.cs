@@ -1311,6 +1311,7 @@ namespace Infrastructure.Persistence
                 entity.Property(e => e.VersionId).IsRequired(false);
                 entity.Property(e => e.PartPath).IsRequired(false).HasMaxLength(1024);
                 entity.Property(e => e.IsCurrentVersion).IsRequired();
+                entity.Property(e => e.IsActive).IsRequired().HasDefaultValue(true);
                 entity.Property(e => e.Prominence).IsRequired().HasMaxLength(16);
                 entity.Property(e => e.DisplayName).IsRequired().HasMaxLength(512);
                 entity.Property(e => e.Tokens).IsRequired();
@@ -1345,8 +1346,8 @@ namespace Infrastructure.Persistence
                     .IsUnique()
                     .AreNullsDistinct(false);
 
-                // Default result gate: current version + prominence.
-                entity.HasIndex(e => new { e.AssetType, e.IsCurrentVersion, e.Prominence });
+                // Default result gate: active + current version + prominence.
+                entity.HasIndex(e => new { e.AssetType, e.IsActive, e.IsCurrentVersion, e.Prominence });
 
                 // Trigram GIN over authored identifiers — literal, multilingual, fuzzy.
                 entity.HasIndex(e => e.Tokens).HasMethod("gin").HasOperators("gin_trgm_ops");
@@ -1421,10 +1422,21 @@ namespace Infrastructure.Persistence
                 entity.Property(e => e.PayloadAfter).HasColumnType("jsonb");
                 entity.Property(e => e.PerformedAt).IsRequired();
                 entity.Property(e => e.ReversedAt).IsRequired(false);
+                // Claim state: a row exists from the moment the key is reserved, so only
+                // Completed means the guarded mutation actually landed.
+                entity.Property(e => e.Status)
+                    .IsRequired()
+                    .HasMaxLength(16)
+                    .HasDefaultValue(Domain.Models.AgentOperationStatus.Completed);
+                entity.Property(e => e.ClaimedBy).IsRequired(false).HasMaxLength(200);
+                entity.Property(e => e.ClaimedAt).IsRequired();
+                entity.Property(e => e.CompletedAt).IsRequired(false);
 
                 // A retried write with the same key must be a no-op — enforced here.
                 entity.HasIndex(e => e.IdempotencyKey).IsUnique();
                 entity.HasIndex(e => e.BatchId);
+                // Sweeping abandoned Pending claims.
+                entity.HasIndex(e => new { e.Status, e.ClaimedAt });
             });
 
             base.OnModelCreating(modelBuilder);

@@ -21,7 +21,8 @@ public static class SearchDocumentBuilder
         IReadOnlyList<SceneGraphPartDto> rawParts,
         DateTime now,
         int? categoryId = null,
-        string? categoryName = null)
+        string? categoryName = null,
+        bool isActive = true)
     {
         var rawByPath = rawParts
             .GroupBy(p => p.PartPath)
@@ -63,6 +64,7 @@ public static class SearchDocumentBuilder
             versionId: versionId,
             partPath: null,
             isCurrentVersion: isCurrentVersion,
+            isActive: isActive,
             prominence: Prominence.Full,
             displayName: assetDisplay,
             tokens: string.Join(' ', assetTokens),
@@ -96,6 +98,7 @@ public static class SearchDocumentBuilder
                 versionId: versionId,
                 partPath: part.PartPath,
                 isCurrentVersion: isCurrentVersion,
+                isActive: isActive,
                 prominence: part.Prominence,
                 displayName: part.PartPath.Split('/', '\\')[^1],
                 tokens: string.Join(' ', SearchVocabulary.ExpandForIndex(part.Tokens)),

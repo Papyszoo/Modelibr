@@ -14,6 +14,7 @@ public class SetModelCategoryCommandHandlerTests
 
     private readonly Mock<IModelRepository> _models = new();
     private readonly Mock<IModelCategoryRepository> _categories = new();
+    private readonly Mock<IAssetSearchDocumentRepository> _searchDocuments = new();
     private readonly Mock<IUnitOfWork> _uow = new();
     private readonly SetModelCategoryCommandHandler _handler;
 
@@ -21,13 +22,14 @@ public class SetModelCategoryCommandHandlerTests
     {
         var clock = new Mock<IDateTimeProvider>();
         clock.Setup(c => c.UtcNow).Returns(Now);
-        _handler = new SetModelCategoryCommandHandler(_models.Object, _categories.Object, clock.Object, _uow.Object);
+        _handler = new SetModelCategoryCommandHandler(
+            _models.Object, _categories.Object, _searchDocuments.Object, clock.Object, _uow.Object);
     }
 
     [Fact]
     public async Task Handle_Assigns_Category_And_Saves()
     {
-        var model = Model.Create("Sword", Now);
+        var model = Model.Create("Sword", Now).WithId(1);
         _models.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(model);
         _categories.Setup(r => r.GetByIdAsync(5, It.IsAny<CancellationToken>()))
             .ReturnsAsync(ModelCategory.Create("Weapons", null, null, Now));
@@ -38,12 +40,19 @@ public class SetModelCategoryCommandHandlerTests
         Assert.Equal(5, result.Value.CategoryId);
         Assert.Equal(5, model.ModelCategoryId);
         _uow.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+
+        // Regression: category is denormalised into the search projection during
+        // extraction. Without this write, `set_category` followed by a category-filtered
+        // search could not see its own write until something re-derived the asset.
+        _searchDocuments.Verify(
+            r => r.SetCategoryForAssetAsync("Model", 1, 5, "Weapons", It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     [Fact]
     public async Task Handle_Clears_Category_When_Null_Without_Category_Lookup()
     {
-        var model = Model.Create("Sword", Now);
+        var model = Model.Create("Sword", Now).WithId(1);
         model.AssignCategory(9, Now);
         _models.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(model);
 
@@ -52,6 +61,9 @@ public class SetModelCategoryCommandHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Null(result.Value.CategoryId);
         _categories.Verify(r => r.GetByIdAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        _searchDocuments.Verify(
+            r => r.SetCategoryForAssetAsync("Model", 1, null, null, It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     [Fact]

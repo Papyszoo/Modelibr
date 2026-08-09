@@ -46,6 +46,18 @@ internal sealed class DequeueExtractionJobCommandHandler
             : command.ExtractorFamily.Trim();
         var workerId = command.WorkerId.Trim();
 
+        // Retire jobs whose worker died on its last permitted attempt. Nothing will
+        // re-claim them (claiming requires attempts left) and nothing will report their
+        // failure, so without this they sit in Processing forever.
+        var retired = await _repository.DeadLetterExhaustedJobsAsync(
+            family, _dateTimeProvider.UtcNow, cancellationToken);
+        if (retired > 0)
+        {
+            _logger.LogWarning(
+                "Dead-lettered {Count} extraction job(s) in family {Family} whose lease expired with no attempts left",
+                retired, family);
+        }
+
         for (var attempt = 0; attempt < MaxClaimAttempts; attempt++)
         {
             var now = _dateTimeProvider.UtcNow;

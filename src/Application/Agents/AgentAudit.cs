@@ -5,6 +5,27 @@ using Domain.Services;
 namespace Application.Agents;
 
 /// <summary>
+/// What a claim attempt resolved to.
+/// </summary>
+public enum AgentClaimOutcome
+{
+    /// <summary>The caller owns the claim and must apply its write.</summary>
+    Owned,
+
+    /// <summary>The operation already completed; replay its recorded result, do not re-apply.</summary>
+    AlreadyApplied,
+
+    /// <summary>Another caller holds a live claim for this key; the write may still be running.</summary>
+    InProgress
+}
+
+/// <summary>Outcome of <see cref="IAgentAudit.TryBeginAsync"/>, with the entry when there is one.</summary>
+public sealed record AgentClaim(AgentClaimOutcome Outcome, AgentOperationLog? Entry)
+{
+    public bool IsOwned => Outcome == AgentClaimOutcome.Owned;
+}
+
+/// <summary>
 /// Records agent-initiated writes (MCP write tools) into the append-only
 /// <see cref="AgentOperationLog"/> and enforces idempotency: a repeated write carrying
 /// the same key must not be re-applied. This is the audit + replay safety the write
@@ -15,15 +36,16 @@ namespace Application.Agents;
 /// both pass the lookup, both apply the write, and the second then trips the unique
 /// index while its mutation has already landed — which is exactly how a batch import
 /// with a retried key produced a duplicate pack.
+///
+/// Because the claim precedes the mutation, a claim row is not proof the mutation
+/// happened. Only a <b>Completed</b> entry may be replayed as "already applied"; a live
+/// Pending claim is reported as in-progress (retryable), and a claim whose owner died is
+/// reclaimed after its lease so a crash cannot permanently burn an idempotency key.
 /// </summary>
 public interface IAgentAudit
 {
-    /// <summary>
-    /// Claims <paramref name="write"/>'s idempotency key. Returns <c>null</c> when the
-    /// caller owns the claim and must go on to apply the write; returns the prior entry
-    /// when the operation already ran (or is running) and must not be re-applied.
-    /// </summary>
-    Task<AgentOperationLog?> TryBeginAsync(AgentWrite write, CancellationToken cancellationToken = default);
+    /// <summary>Claims <paramref name="write"/>'s key, reporting who owns it and in what state.</summary>
+    Task<AgentClaim> TryBeginAsync(AgentWrite write, CancellationToken cancellationToken = default);
 
     /// <summary>Records the outcome of a write that succeeded, on a claim this caller owns.</summary>
     Task CompleteAsync(
@@ -34,7 +56,7 @@ public interface IAgentAudit
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Releases a claim whose write failed, so retrying it is not turned away as
+    /// Marks an owned claim as failed, so retrying it is not turned away as
     /// "already applied" for an operation that never happened.
     /// </summary>
     Task AbandonAsync(string idempotencyKey, CancellationToken cancellationToken = default);
@@ -52,6 +74,13 @@ public sealed record AgentWrite(
 
 internal sealed class AgentAudit : IAgentAudit
 {
+    /// <summary>
+    /// How long a Pending claim is honoured before it counts as abandoned. Long enough to
+    /// cover the slowest write tool (a co-located import reads and hashes a file), short
+    /// enough that a crashed caller doesn't block a retry for a working session.
+    /// </summary>
+    private const int ClaimLeaseMinutes = 15;
+
     private readonly IAgentOperationLogRepository _repository;
     private readonly IDateTimeProvider _dateTimeProvider;
 
@@ -63,19 +92,29 @@ internal sealed class AgentAudit : IAgentAudit
         _dateTimeProvider = dateTimeProvider;
     }
 
-    public Task<AgentOperationLog?> TryBeginAsync(AgentWrite write, CancellationToken cancellationToken = default)
+    public async Task<AgentClaim> TryBeginAsync(AgentWrite write, CancellationToken cancellationToken = default)
     {
+        var now = _dateTimeProvider.UtcNow;
         var claim = AgentOperationLog.Create(
             write.IdempotencyKey,
             write.Operation,
-            _dateTimeProvider.UtcNow,
+            now,
             batchId: write.BatchId,
             assetType: write.AssetType,
             assetId: write.AssetId,
             payloadBefore: write.PayloadBefore,
-            payloadAfter: write.PayloadAfter);
+            payloadAfter: write.PayloadAfter,
+            claimedBy: Environment.MachineName);
 
-        return _repository.TryClaimAsync(claim, cancellationToken);
+        var existing = await _repository.TryClaimAsync(claim, ClaimLeaseMinutes, now, cancellationToken);
+        if (existing is null)
+        {
+            return new AgentClaim(AgentClaimOutcome.Owned, null);
+        }
+
+        return existing.Status == AgentOperationStatus.Completed
+            ? new AgentClaim(AgentClaimOutcome.AlreadyApplied, existing)
+            : new AgentClaim(AgentClaimOutcome.InProgress, existing);
     }
 
     public Task CompleteAsync(
@@ -84,8 +123,9 @@ internal sealed class AgentAudit : IAgentAudit
         int? assetId = null,
         string? payloadAfter = null,
         CancellationToken cancellationToken = default) =>
-        _repository.CompleteClaimAsync(idempotencyKey, assetType, assetId, payloadAfter, cancellationToken);
+        _repository.CompleteClaimAsync(
+            idempotencyKey, assetType, assetId, payloadAfter, _dateTimeProvider.UtcNow, cancellationToken);
 
     public Task AbandonAsync(string idempotencyKey, CancellationToken cancellationToken = default) =>
-        _repository.ReleaseClaimAsync(idempotencyKey, cancellationToken);
+        _repository.FailClaimAsync(idempotencyKey, _dateTimeProvider.UtcNow, cancellationToken);
 }

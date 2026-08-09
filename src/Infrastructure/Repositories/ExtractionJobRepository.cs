@@ -64,6 +64,10 @@ internal sealed class ExtractionJobRepository : IExtractionJobRepository
         return await _context.ExtractionJobs
             .AsNoTracking()
             .Where(e => e.ExtractorFamily == extractorFamily &&
+                        // An expired lock must not become an unlimited retry budget:
+                        // a job that reliably hangs the worker would otherwise be
+                        // re-claimed forever, never dead-lettered, forever burning a slot.
+                        e.AttemptCount < e.MaxAttempts &&
                         (e.Status == ExtractionJobStatus.Pending ||
                          (e.Status == ExtractionJobStatus.Processing &&
                           e.LockedAt.HasValue &&
@@ -85,6 +89,7 @@ internal sealed class ExtractionJobRepository : IExtractionJobRepository
         // the self-commit fitness gate.
         var rowsAffected = await _context.ExtractionJobs
             .Where(e => e.Id == jobId &&
+                        e.AttemptCount < e.MaxAttempts &&
                         (e.Status == ExtractionJobStatus.Pending ||
                          (e.Status == ExtractionJobStatus.Processing &&
                           e.LockedAt.HasValue &&
@@ -98,5 +103,30 @@ internal sealed class ExtractionJobRepository : IExtractionJobRepository
                 cancellationToken);
 
         return rowsAffected == 1;
+    }
+
+    public Task<int> DeadLetterExhaustedJobsAsync(
+        string extractorFamily,
+        DateTime nowUtc,
+        CancellationToken cancellationToken = default)
+    {
+        // A job whose lock expired after its last permitted attempt is never coming back:
+        // nothing will re-claim it (the claim predicates now require attempts left), and
+        // no worker will ever report its failure. Dead-letter it so it leaves the queue
+        // and shows up as failed instead of sitting in Processing forever.
+        return _context.ExtractionJobs
+            .Where(e => e.ExtractorFamily == extractorFamily &&
+                        e.Status == ExtractionJobStatus.Processing &&
+                        e.AttemptCount >= e.MaxAttempts &&
+                        e.LockedAt.HasValue &&
+                        e.LockedAt.Value.AddMinutes(e.LockTimeoutMinutes) <= nowUtc)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(e => e.Status, ExtractionJobStatus.Dead)
+                .SetProperty(e => e.ErrorMessage, "The worker holding this job never reported an outcome and no attempts remain.")
+                .SetProperty(e => e.LockedBy, (string?)null)
+                .SetProperty(e => e.LockedAt, (DateTime?)null)
+                .SetProperty(e => e.CompletedAt, nowUtc)
+                .SetProperty(e => e.UpdatedAt, nowUtc),
+                cancellationToken);
     }
 }

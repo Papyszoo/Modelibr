@@ -28,6 +28,14 @@ public class AssetSearchDocument
 
     public bool IsCurrentVersion { get; private set; }
 
+    /// <summary>
+    /// False while the underlying asset is in the recycle bin. Soft delete must hide an
+    /// asset from search immediately, and restoring it must bring the asset back without
+    /// waiting for a re-extraction — so deletion state is carried on the projection
+    /// rather than left for the next derive to notice.
+    /// </summary>
+    public bool IsActive { get; private set; } = true;
+
     /// <summary>full / secondary / hidden (see the derived prominence layer).</summary>
     public string Prominence { get; private set; } = "full";
 
@@ -110,7 +118,8 @@ public class AssetSearchDocument
         int? animationCount = null,
         double? maxDimension = null,
         int? categoryId = null,
-        string? categoryName = null)
+        string? categoryName = null,
+        bool isActive = true)
     {
         if (string.IsNullOrWhiteSpace(assetType))
             throw new ArgumentException("Asset type cannot be null or whitespace.", nameof(assetType));
@@ -126,6 +135,7 @@ public class AssetSearchDocument
             VersionId = versionId,
             PartPath = string.IsNullOrWhiteSpace(partPath) ? null : partPath.Trim(),
             IsCurrentVersion = isCurrentVersion,
+            IsActive = isActive,
             Prominence = string.IsNullOrWhiteSpace(prominence) ? "full" : prominence.Trim(),
             DisplayName = displayName ?? string.Empty,
             Tokens = tokens ?? string.Empty,
@@ -155,4 +165,18 @@ public class AssetSearchDocument
 
     /// <summary>Flips the current-version marker (used when a newer version becomes active).</summary>
     public void SetCurrentVersion(bool isCurrent) => IsCurrentVersion = isCurrent;
+
+    /// <summary>Hides (or unhides) the document when the asset is recycled or restored.</summary>
+    public void SetActive(bool isActive) => IsActive = isActive;
+
+    /// <summary>
+    /// Re-points the denormalised category fields after a category-only mutation, so an
+    /// agent that calls <c>set_category</c> can immediately confirm the write with a
+    /// category-filtered search instead of waiting for the next re-derive.
+    /// </summary>
+    public void SetCategory(int? categoryId, string? categoryName)
+    {
+        CategoryId = categoryId;
+        CategoryName = string.IsNullOrWhiteSpace(categoryName) ? null : categoryName.Trim();
+    }
 }
