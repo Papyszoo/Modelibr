@@ -7,8 +7,20 @@ namespace Infrastructure.Repositories;
 
 internal sealed class SearchRepository : ISearchRepository
 {
-    // Trigram similarity above which a fuzzy identifier match counts (pre-calibration guess).
-    private const double TrigramThreshold = 0.2;
+    // Trigram similarity above which a fuzzy identifier match counts. Calibrated on a
+    // 1,700-model library: at the old 0.2 the query "strt" confidently returned "strap"
+    // and "straw". Fuzzy is a typo-recovery mechanism, so it is also gated on a
+    // single-word query of at least MinFuzzyLength characters — a multi-word brief must
+    // never be answered by whole-string similarity noise.
+    private const double TrigramThreshold = 0.45;
+    private const int MinFuzzyLength = 4;
+
+    // Degenerate nodes (empty exporter leftovers) are real documents but never a real
+    // answer: "car under 10k tris" used to return an 8-triangle, 0x0x0 m "car-01" first,
+    // and "vehicle" ranked it above every actual vehicle. Zero measured volume is the
+    // reliable signal — a triangle floor alone is not, since such nodes routinely carry a
+    // handful of triangles while a legitimate flat asset (a decal, a plane) carries two.
+    private const int MinMeaningfulTriangles = 2;
 
     private readonly ApplicationDbContext _context;
 
@@ -22,14 +34,13 @@ internal sealed class SearchRepository : ISearchRepository
         CancellationToken cancellationToken = default)
     {
         var term = request.Term?.Trim() ?? string.Empty;
-        if (term.Length == 0)
-        {
-            return new AssetSearchResponse(Array.Empty<AssetSearchHit>(), 0);
-        }
+        var parsed = SearchQueryParser.Parse(term);
 
         var query = _context.AssetSearchDocuments
             .AsNoTracking()
-            .Where(d => d.IsCurrentVersion); // version-scoping, enforced here in one place
+            .Where(d => d.IsCurrentVersion) // version-scoping, enforced here in one place
+            .Where(d => d.TriangleCount == null || d.TriangleCount >= MinMeaningfulTriangles)
+            .Where(d => d.MaxDimension == null || d.MaxDimension > 0);
 
         // Prominence gate: full only by default; secondary reachable when targeted; never hidden.
         query = request.IncludeSecondary
@@ -120,30 +131,128 @@ internal sealed class SearchRepository : ISearchRepository
             query = query.Where(d => d.CategoryName != null && EF.Functions.ILike(d.CategoryName, categoryPattern));
         }
 
-        // Word-boundary token/symbol match (literal, multilingual — no stemming);
-        // trigram carries the fuzzy match; the tsvector covers prose summaries.
-        var boundary = "% " + term + " %";
-        var substring = "%" + term + "%";
+        // Filter-only browse: a blank query means "everything that passes the filters",
+        // so an agent can ask for "every rigged asset" without inventing a word. This
+        // used to return nothing, which made every facet in list_facets unusable alone.
+        if (parsed.IsEmpty)
+        {
+            var browseTotal = await query.CountAsync(cancellationToken);
+            var browseHits = await query
+                .OrderByDescending(d => d.PartPath == null) // whole assets before parts
+                .ThenBy(d => d.DisplayName)
+                .Take(Math.Clamp(request.Limit, 1, 100))
+                .Select(d => new AssetSearchHit(
+                    d.AssetType, d.AssetId, d.VersionId, d.PartPath,
+                    d.DisplayName, d.BrowseSummary, d.Prominence, "browse"))
+                .ToListAsync(cancellationToken);
+            return new AssetSearchResponse(browseHits, browseTotal);
+        }
+
+        // Per-word matching with coverage ranking. Each query word is scored on its own
+        // (against the indexed tokens, their singular form, and the display name) and a
+        // document matching MORE words ranks higher. The previous implementation matched
+        // the whole phrase contiguously or not at all, which left multi-word queries to
+        // be decided by whole-blob trigram similarity — noise that sometimes landed and
+        // sometimes returned an arm bone for "streetlight for a city street".
+        //
+        // Unrolled to a fixed six slots because EF Core must translate a static shape;
+        // unused slots get a pattern that cannot match.
+        const string NeverMatches = "__no_match__";
+        string Boundary(int i, int variant)
+        {
+            if (i >= parsed.Terms.Count) return NeverMatches;
+            var variants = parsed.Terms[i].Variants;
+            if (variant >= variants.Count) return NeverMatches;
+            return "% " + variants[variant] + " %";
+        }
+        string Substring(int i)
+        {
+            if (i >= parsed.Terms.Count) return NeverMatches;
+            return "%" + parsed.Terms[i].Word + "%";
+        }
+
+        string b00 = Boundary(0, 0), b01 = Boundary(0, 1), s0 = Substring(0);
+        string b10 = Boundary(1, 0), b11 = Boundary(1, 1), s1 = Substring(1);
+        string b20 = Boundary(2, 0), b21 = Boundary(2, 1), s2 = Substring(2);
+        string b30 = Boundary(3, 0), b31 = Boundary(3, 1), s3 = Substring(3);
+        string b40 = Boundary(4, 0), b41 = Boundary(4, 1), s4 = Substring(4);
+        string b50 = Boundary(5, 0), b51 = Boundary(5, 1), s5 = Substring(5);
+
+        // Fuzzy is typo recovery only: one word, long enough to be meaningful, and well
+        // above the similarity floor. It can introduce results; it can never outrank a
+        // literal match.
+        var fuzzyAllowed = parsed.IsSingleTerm && parsed.Terms[0].Word.Length >= MinFuzzyLength;
+        var fuzzyTerm = fuzzyAllowed ? parsed.Terms[0].Word : NeverMatches;
 
         var scored = query.Select(d => new
         {
             Doc = d,
-            TokenHit = EF.Functions.ILike(" " + d.Tokens + " ", boundary)
-                       || EF.Functions.ILike(" " + d.Symbols + " ", boundary),
-            NameHit = EF.Functions.ILike(d.DisplayName, substring),
-            Similarity = EF.Functions.TrigramsSimilarity(d.Tokens, term),
-            ProseHit = EF.Functions.ToTsVector("simple", d.BrowseSummary)
-                .Matches(EF.Functions.PlainToTsQuery("simple", term)),
+            T0 = EF.Functions.ILike(" " + d.Tokens + " ", b00) || EF.Functions.ILike(" " + d.Tokens + " ", b01)
+                 || EF.Functions.ILike(" " + d.Symbols + " ", b00) || EF.Functions.ILike(d.DisplayName, s0),
+            T1 = EF.Functions.ILike(" " + d.Tokens + " ", b10) || EF.Functions.ILike(" " + d.Tokens + " ", b11)
+                 || EF.Functions.ILike(" " + d.Symbols + " ", b10) || EF.Functions.ILike(d.DisplayName, s1),
+            T2 = EF.Functions.ILike(" " + d.Tokens + " ", b20) || EF.Functions.ILike(" " + d.Tokens + " ", b21)
+                 || EF.Functions.ILike(" " + d.Symbols + " ", b20) || EF.Functions.ILike(d.DisplayName, s2),
+            T3 = EF.Functions.ILike(" " + d.Tokens + " ", b30) || EF.Functions.ILike(" " + d.Tokens + " ", b31)
+                 || EF.Functions.ILike(" " + d.Symbols + " ", b30) || EF.Functions.ILike(d.DisplayName, s3),
+            T4 = EF.Functions.ILike(" " + d.Tokens + " ", b40) || EF.Functions.ILike(" " + d.Tokens + " ", b41)
+                 || EF.Functions.ILike(" " + d.Symbols + " ", b40) || EF.Functions.ILike(d.DisplayName, s4),
+            T5 = EF.Functions.ILike(" " + d.Tokens + " ", b50) || EF.Functions.ILike(" " + d.Tokens + " ", b51)
+                 || EF.Functions.ILike(" " + d.Symbols + " ", b50) || EF.Functions.ILike(d.DisplayName, s5),
+            // The browse summary is a weaker signal than an authored name, so it is
+            // scored separately and only ever breaks ties — but it must still admit a
+            // document whose text mentions the term, which is recall an agent relies on
+            // once assets carry descriptions.
+            P0 = EF.Functions.ILike(d.BrowseSummary, s0),
+            P1 = EF.Functions.ILike(d.BrowseSummary, s1),
+            P2 = EF.Functions.ILike(d.BrowseSummary, s2),
+            P3 = EF.Functions.ILike(d.BrowseSummary, s3),
+            P4 = EF.Functions.ILike(d.BrowseSummary, s4),
+            P5 = EF.Functions.ILike(d.BrowseSummary, s5),
+            // Whole-name match on the original phrase: "park bench" should still beat a
+            // document that merely carries both words separately. Multi-word queries only
+            // — for a single word this just repeats the name match below, and promoting it
+            // would rank an incidental substring ("staple" for "aple") above a much better
+            // fuzzy match on the real name ("apple").
+            PhraseHit = !parsed.IsSingleTerm && EF.Functions.ILike(d.DisplayName, "%" + parsed.Original + "%"),
+            // Compare against the display name as well as the token blob: a typo is a
+            // misspelling of the NAME ("aple"), and similarity against a long
+            // concatenated token list is too diluted to recover it.
+            TokenSimilarity = EF.Functions.TrigramsSimilarity(d.Tokens, fuzzyTerm),
+            NameSimilarity = EF.Functions.TrigramsSimilarity(d.DisplayName, fuzzyTerm),
         })
-        .Where(x => x.TokenHit || x.NameHit || x.ProseHit || x.Similarity > TrigramThreshold);
+        .Select(x => new
+        {
+            x.Doc,
+            x.PhraseHit,
+            Similarity = x.TokenSimilarity > x.NameSimilarity ? x.TokenSimilarity : x.NameSimilarity,
+            LiteralCoverage = (x.T0 ? 1 : 0) + (x.T1 ? 1 : 0) + (x.T2 ? 1 : 0)
+                              + (x.T3 ? 1 : 0) + (x.T4 ? 1 : 0) + (x.T5 ? 1 : 0),
+            ProseCoverage = (x.P0 ? 1 : 0) + (x.P1 ? 1 : 0) + (x.P2 ? 1 : 0)
+                            + (x.P3 ? 1 : 0) + (x.P4 ? 1 : 0) + (x.P5 ? 1 : 0),
+        })
+        .Select(x => new
+        {
+            x.Doc,
+            x.PhraseHit,
+            x.Similarity,
+            x.LiteralCoverage,
+            x.ProseCoverage,
+            // A confident fuzzy match counts as covering the (single) query word, so a
+            // near-miss on the real name competes with an incidental substring hit:
+            // "aple" must reach "apple", not stop at "staple".
+            Coverage = x.LiteralCoverage + (x.Similarity > TrigramThreshold ? 1 : 0),
+        })
+        .Where(x => x.Coverage > 0 || x.ProseCoverage > 0);
 
         var total = await scored.CountAsync(cancellationToken);
 
         var hits = await scored
-            .OrderByDescending(x => x.TokenHit)   // tokenised names outrank everything
-            .ThenByDescending(x => x.NameHit)
-            .ThenByDescending(x => x.Similarity)
-            .ThenByDescending(x => x.ProseHit)     // substring/prose ranks last
+            .OrderByDescending(x => x.PhraseHit)   // the whole phrase in the name wins
+            .ThenByDescending(x => x.Coverage)     // then: how many query words matched
+            .ThenByDescending(x => x.Doc.PartPath == null) // whole assets before their parts
+            .ThenByDescending(x => x.ProseCoverage) // summary text is the weakest signal
+            .ThenByDescending(x => x.Similarity)   // fuzzy only breaks remaining ties
             .ThenBy(x => x.Doc.DisplayName)
             .Take(Math.Clamp(request.Limit, 1, 100))
             .Select(x => new AssetSearchHit(
@@ -154,7 +263,10 @@ internal sealed class SearchRepository : ISearchRepository
                 x.Doc.DisplayName,
                 x.Doc.BrowseSummary,
                 x.Doc.Prominence,
-                x.TokenHit ? "token" : x.NameHit ? "name" : x.Similarity > TrigramThreshold ? "fuzzy" : "summary"))
+                x.PhraseHit ? "phrase"
+                    : x.LiteralCoverage > 0 ? "token"
+                    : x.Coverage > x.LiteralCoverage ? "fuzzy"
+                    : "summary"))
             .ToListAsync(cancellationToken);
 
         return new AssetSearchResponse(hits, total);

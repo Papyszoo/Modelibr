@@ -10,6 +10,7 @@ One line per note. Conventions and the public/private boundary: [README.md](READ
 - [Release history](release/history.md) — 0.3.x and 0.4.x cuts and what each taught
 - [Desktop self-update](release/updater.md) — Windows fixed, Linux fine, macOS fallback-only until signing at 1.0
 - [Test strategy](testing/strategy.md) — suite inventory, CI vs local-GPU split, what actually gates
+- [Asset corpora](testing/asset-corpora.md) — the CC0/licensed test libraries, what each proves, and which to add next
 - [Test runner & Studio](testing/runner-and-studio.md) — `npm run test:all` / `test:site`, manifest as source of truth, CI lanes
 - [E2E flakiness](testing/flakiness.md) — it's environment, not app bugs; known flake classes; run the full suite before claiming green
 - [Categories feature](features/categories.md) — the sidebar standard and the five traps it taught

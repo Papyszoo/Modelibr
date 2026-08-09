@@ -34,11 +34,10 @@ internal sealed class AssetSearchQueryHandler
         AssetSearchQuery query,
         CancellationToken cancellationToken)
     {
+        // A blank term is a legitimate query: it means "everything matching the filters".
+        // Returning empty here made every structural facet unusable on its own, so an
+        // agent could not ask for "all rigged assets" without inventing a word.
         var term = query.Term?.Trim() ?? string.Empty;
-        if (term.Length == 0)
-        {
-            return Result.Success(new AssetSearchResponse(Array.Empty<AssetSearchHit>(), 0));
-        }
 
         var request = new AssetSearchRequest(
             term,
