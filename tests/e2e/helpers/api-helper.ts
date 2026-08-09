@@ -7,1347 +7,1346 @@ import fs from "fs";
  * Provides direct API access for test setup/teardown operations
  */
 export class ApiHelper {
-    private client: AxiosInstance;
+  private client: AxiosInstance;
 
-    constructor(
-        baseURL: string = process.env.API_BASE_URL || "http://localhost:8090",
+  constructor(
+    baseURL: string = process.env.API_BASE_URL || "http://localhost:8090",
+  ) {
+    this.client = axios.create({
+      baseURL,
+      timeout: 30000,
+      validateStatus: () => true, // Don't throw on any status
+    });
+  }
+
+  /**
+   * Create a texture set
+   */
+  async createTextureSet(name: string): Promise<{ id: number; name: string }> {
+    const response = await this.client.post("/texture-sets", { name });
+    if (response.status !== 200 && response.status !== 201) {
+      console.error(
+        "Create texture set failed:",
+        response.status,
+        response.statusText,
+        response.data,
+      );
+      throw new Error(
+        `Failed to create texture set: ${response.status} ${response.statusText}`,
+      );
+    }
+    return response.data;
+  }
+
+  /**
+   * Create a texture set with a file in one operation
+   * Uses /texture-sets/with-file endpoint
+   */
+  async createTextureSetWithFile(
+    name: string,
+    filePath: string,
+    textureType: number = 1, // 1 = Albedo
+  ): Promise<{ textureSetId: number; name: string; fileId: number }> {
+    const formData = new FormData();
+    formData.append("file", fs.createReadStream(filePath));
+
+    const response = await this.client.post(
+      `/texture-sets/with-file?name=${encodeURIComponent(name)}&textureType=${textureType}`,
+      formData,
+      {
+        headers: formData.getHeaders(),
+      },
+    );
+
+    if (response.status !== 200 && response.status !== 201) {
+      console.error(
+        "Create texture set with file failed:",
+        response.status,
+        response.statusText,
+        response.data,
+      );
+      throw new Error(
+        `Failed to create texture set with file: ${response.status} ${response.statusText}`,
+      );
+    }
+    return response.data;
+  }
+
+  /**
+   * Map texture type names to their numeric values
+   */
+  private mapTextureType(textureType: string | number): number {
+    if (typeof textureType === "number") {
+      return textureType;
+    }
+    const mapping: Record<string, number> = {
+      Albedo: 1,
+      Normal: 2,
+      Height: 3,
+      AO: 4,
+      Roughness: 5,
+      Metallic: 6,
+      Emissive: 9,
+      Bump: 10,
+      Alpha: 11,
+      Displacement: 12,
+    };
+    return mapping[textureType] ?? 1; // Default to Albedo
+  }
+
+  /**
+   * Upload a texture file to a texture set
+   * Two-step process: 1) Upload file via /files endpoint, 2) Add texture to set
+   */
+  async uploadTextureToSet(
+    textureSetId: number,
+    filePath: string,
+    textureType: string | number = 1, // 1 = Albedo, or string name like 'Albedo'
+  ): Promise<void> {
+    const textureTypeNum = this.mapTextureType(textureType);
+
+    // Step 1: Upload the file with textureSetId parameter
+    const formData = new FormData();
+    formData.append("file", fs.createReadStream(filePath));
+
+    const uploadResponse = await this.client.post(
+      `/files?textureSetId=${textureSetId}`,
+      formData,
+      {
+        headers: formData.getHeaders(),
+      },
+    );
+
+    if (uploadResponse.status !== 200) {
+      console.error(
+        "File upload failed:",
+        uploadResponse.status,
+        uploadResponse.statusText,
+        uploadResponse.data,
+      );
+      throw new Error(
+        `Failed to upload file: ${uploadResponse.status} ${uploadResponse.statusText}`,
+      );
+    }
+
+    const fileId = uploadResponse.data.id || uploadResponse.data.fileId;
+    if (!fileId) {
+      throw new Error("File upload succeeded but no file ID returned");
+    }
+
+    // Step 2: Add the texture to the set with the specified type
+    const addTextureResponse = await this.client.post(
+      `/texture-sets/${textureSetId}/textures`,
+      {
+        FileId: fileId,
+        TextureType: textureTypeNum,
+      },
+    );
+
+    if (addTextureResponse.status !== 200) {
+      console.error(
+        "Add texture to set failed:",
+        addTextureResponse.status,
+        addTextureResponse.statusText,
+        addTextureResponse.data,
+      );
+      throw new Error(
+        `Failed to add texture to set: ${addTextureResponse.status} ${addTextureResponse.statusText}`,
+      );
+    }
+  }
+
+  /**
+   * Associate a texture set with a model version
+   */
+  async linkTextureSetToModel(
+    textureSetId: number,
+    modelId: number,
+    modelVersionId: number,
+  ): Promise<void> {
+    const response = await this.client.post(
+      `/texture-sets/${textureSetId}/model-versions/${modelVersionId}`,
+    );
+
+    // Accept 200, 201, 204 as success, and 400 with AssociationAlreadyExists as "already done"
+    if (
+      response.status !== 200 &&
+      response.status !== 201 &&
+      response.status !== 204
     ) {
-        this.client = axios.create({
-            baseURL,
-            timeout: 30000,
-            validateStatus: () => true, // Don't throw on any status
-        });
+      // Check if it's "already associated" error - treat as success
+      if (
+        response.status === 400 &&
+        response.data?.error === "AssociationAlreadyExists"
+      ) {
+        // Silently succeed - texture set is already linked
+        return;
+      }
+      console.error(
+        "Link texture set failed:",
+        response.status,
+        response.statusText,
+        response.data,
+      );
+      throw new Error(
+        `Failed to link texture set: ${response.status} ${response.statusText}`,
+      );
+    }
+  }
+
+  /**
+   * Set default texture set for a model version
+   */
+  async setDefaultTextureSet(
+    modelId: number,
+    modelVersionId: number,
+    textureSetId: number | null,
+  ): Promise<void> {
+    const response = await this.client.put(
+      `/models/${modelId}/default-texture-set`,
+      {
+        TextureSetId: textureSetId,
+        ModelVersionId: modelVersionId,
+      },
+    );
+
+    if (response.status !== 200) {
+      console.error(
+        "Set default texture set failed:",
+        response.status,
+        response.statusText,
+        response.data,
+      );
+      throw new Error(
+        `Failed to set default texture set: ${response.status} ${response.statusText}`,
+      );
+    }
+  }
+
+  /**
+   * Get all models
+   */
+  async getModels(): Promise<any[]> {
+    const response = await this.client.get("/models");
+    if (response.status !== 200) {
+      throw new Error(`Failed to get models: ${response.status}`);
+    }
+    return response.data;
+  }
+
+  /**
+   * Get a specific model by ID
+   */
+  async getModel(modelId: number): Promise<any> {
+    const response = await this.client.get(`/models/${modelId}`);
+    if (response.status !== 200) {
+      throw new Error(`Failed to get model: ${response.status}`);
+    }
+    return response.data;
+  }
+
+  /**
+   * Get all versions for a model
+   */
+  async getModelVersions(modelId: number): Promise<any[]> {
+    const response = await this.client.get(`/models/${modelId}/versions`);
+    if (response.status !== 200) {
+      throw new Error(`Failed to get model versions: ${response.status}`);
+    }
+    // Response has a 'value' array
+    return response.data.value || response.data || [];
+  }
+
+  /**
+   * Get the auxiliary files (external .bin/textures) persisted against a model
+   * version by a multi-file glTF import. Each descriptor carries the relativePath
+   * the primary .gltf references it by.
+   */
+  async getVersionAuxiliaryFiles(
+    modelId: number,
+    versionId: number,
+  ): Promise<any[]> {
+    const response = await this.client.get(
+      `/models/${modelId}/versions/${versionId}/auxiliary-files`,
+    );
+    if (response.status !== 200) {
+      throw new Error(`Failed to get auxiliary files: ${response.status}`);
+    }
+    const body = response.data?.value ?? response.data;
+    return body?.auxiliaries ?? [];
+  }
+
+  /**
+   * Find a model by name (searches in the list)
+   */
+  async findModelByName(modelName: string): Promise<any | null> {
+    const models = await this.getModels();
+    const nameWithoutExt = modelName.split(".").slice(0, -1).join(".");
+    return (
+      models.find((m) => m.name === modelName || m.name === nameWithoutExt) ||
+      null
+    );
+  }
+
+  /**
+   * Get all texture sets
+   */
+  async getAllTextureSets(): Promise<any[]> {
+    const response = await this.client.get("/texture-sets");
+    if (response.status !== 200) {
+      throw new Error(`Failed to get texture sets: ${response.status}`);
+    }
+    return response.data.textureSets || [];
+  }
+
+  /**
+   * Get a texture set by name
+   */
+  async getTextureSetByName(
+    name: string,
+    options?: { requireTextures?: boolean },
+  ): Promise<any> {
+    const sets = (await this.getAllTextureSets())
+      .filter((s) => s.name === name)
+      .sort((a, b) => Number(b.id ?? 0) - Number(a.id ?? 0));
+
+    if (sets.length === 0) {
+      throw new Error(`Texture set "${name}" not found`);
     }
 
-    /**
-     * Create a texture set
-     */
-    async createTextureSet(
-        name: string,
-    ): Promise<{ id: number; name: string }> {
-        const response = await this.client.post("/texture-sets", { name });
-        if (response.status !== 200 && response.status !== 201) {
-            console.error(
-                "Create texture set failed:",
-                response.status,
-                response.statusText,
-                response.data,
-            );
-            throw new Error(
-                `Failed to create texture set: ${response.status} ${response.statusText}`,
-            );
+    let fallback = sets[0];
+
+    for (const candidate of sets) {
+      if (!candidate?.id) {
+        continue;
+      }
+
+      try {
+        const details = await this.getTextureSetById(candidate.id);
+        const textureCount = Array.isArray(details?.textures)
+          ? details.textures.length
+          : 0;
+
+        fallback = { ...candidate, ...details };
+
+        if (textureCount > 0) {
+          return fallback;
         }
-        return response.data;
+      } catch {
+        // Ignore hydration failures and continue checking newer candidates.
+      }
     }
 
-    /**
-     * Create a texture set with a file in one operation
-     * Uses /texture-sets/with-file endpoint
-     */
-    async createTextureSetWithFile(
-        name: string,
-        filePath: string,
-        textureType: number = 1, // 1 = Albedo
-    ): Promise<{ textureSetId: number; name: string; fileId: number }> {
-        const formData = new FormData();
-        formData.append("file", fs.createReadStream(filePath));
+    if (options?.requireTextures) {
+      throw new Error(`Texture set "${name}" exists but has no textures`);
+    }
 
-        const response = await this.client.post(
-            `/texture-sets/with-file?name=${encodeURIComponent(name)}&textureType=${textureType}`,
-            formData,
-            {
-                headers: formData.getHeaders(),
-            },
+    return fallback;
+  }
+
+  /**
+   * Get a specific texture set by ID
+   */
+  async getTextureSetById(id: number): Promise<any> {
+    const response = await this.client.get(`/texture-sets/${id}`);
+    if (response.status !== 200) {
+      throw new Error(`Failed to get texture set ${id}: ${response.status}`);
+    }
+    return response.data;
+  }
+
+  /**
+   * Upload a model file and return the created model data
+   */
+  async uploadModel(
+    filePath: string,
+  ): Promise<{ id: number; name: string; versionId?: number }> {
+    const formData = new FormData();
+    formData.append("file", fs.createReadStream(filePath));
+
+    const response = await this.client.post("/models", formData, {
+      headers: formData.getHeaders(),
+    });
+
+    if (response.status !== 200 && response.status !== 201) {
+      throw new Error(
+        `Failed to upload model: ${response.status} ${response.statusText}`,
+      );
+    }
+    return response.data;
+  }
+
+  /**
+   * Upload a model via REST API, returning the raw response status and data.
+   * Does not throw on non-200 status — useful for testing error responses (e.g., 409 Conflict).
+   */
+  async uploadModelRaw(
+    filePath: string,
+  ): Promise<{ status: number; data: any }> {
+    const formData = new FormData();
+    formData.append("file", fs.createReadStream(filePath));
+
+    const response = await this.client.post("/models", formData, {
+      headers: formData.getHeaders(),
+    });
+
+    return { status: response.status, data: response.data };
+  }
+
+  /**
+   * Create a pack
+   */
+  async createPack(
+    name: string,
+    description?: string,
+  ): Promise<{ id: number; name: string }> {
+    const response = await this.client.post("/packs", {
+      name,
+      description: description || "",
+    });
+    if (response.status !== 200 && response.status !== 201) {
+      throw new Error(
+        `Failed to create pack: ${response.status} ${response.statusText}`,
+      );
+    }
+    return response.data;
+  }
+
+  /** Models currently belonging to a pack. */
+  async getModelsByPack(packId: number): Promise<any[]> {
+    const response = await this.client.get(`/models?packIds=${packId}`);
+    if (response.status !== 200) {
+      throw new Error(
+        `Failed to list models for pack ${packId}: ${response.status} ${response.statusText}`,
+      );
+    }
+    return response.data;
+  }
+
+  async setPackCustomThumbnail(
+    packId: number,
+    fileId: number | null,
+  ): Promise<void> {
+    const response = await this.client.put(`/packs/${packId}/thumbnail`, {
+      fileId,
+    });
+    if (response.status !== 200 && response.status !== 204) {
+      throw new Error(
+        `Failed to set pack thumbnail: ${response.status} ${response.statusText}`,
+      );
+    }
+  }
+
+  /**
+   * Create a project
+   */
+  async createProject(
+    name: string,
+    description?: string,
+  ): Promise<{ id: number; name: string }> {
+    const response = await this.client.post("/projects", {
+      name,
+      description: description || "",
+    });
+    if (response.status !== 200 && response.status !== 201) {
+      throw new Error(
+        `Failed to create project: ${response.status} ${response.statusText}`,
+      );
+    }
+    return response.data;
+  }
+
+  async setProjectCustomThumbnail(
+    projectId: number,
+    fileId: number | null,
+  ): Promise<void> {
+    const response = await this.client.put(`/projects/${projectId}/thumbnail`, {
+      fileId,
+    });
+    if (response.status !== 200 && response.status !== 204) {
+      throw new Error(
+        `Failed to set project thumbnail: ${response.status} ${response.statusText}`,
+      );
+    }
+  }
+
+  /**
+   * Soft-delete a model by ID (sends it to the recycle bin).
+   */
+  async softDeleteModel(modelId: number): Promise<void> {
+    const response = await this.client.delete(`/models/${modelId}`);
+    if (response.status !== 200 && response.status !== 204) {
+      throw new Error(
+        `Failed to soft-delete model ${modelId}: ${response.status} ${response.statusText}`,
+      );
+    }
+  }
+
+  /**
+   * Delete every non-deleted model whose name matches modelName.
+   * Useful for blend tests that re-use model names across runs.
+   */
+  async softDeleteModelsByName(modelName: string): Promise<void> {
+    const models = await this.getModels();
+    const nameWithoutExt = modelName.split(".").slice(0, -1).join(".");
+    const matches = models.filter(
+      (m) => m.name === modelName || m.name === nameWithoutExt,
+    );
+    for (const m of matches) {
+      await this.softDeleteModel(m.id);
+      console.log(
+        `[Blend Cleanup] Soft-deleted existing model "${m.name}" (id=${m.id})`,
+      );
+    }
+  }
+
+  /**
+   * Delete a sound by ID
+   */
+  async deleteSound(soundId: number): Promise<void> {
+    const response = await this.client.delete(`/sounds/${soundId}`);
+    if (response.status !== 200 && response.status !== 204) {
+      throw new Error(
+        `Failed to delete sound: ${response.status} ${response.statusText}`,
+      );
+    }
+  }
+
+  /**
+   * Get all sprites
+   */
+  async getAllSprites(): Promise<any[]> {
+    const response = await this.client.get("/sprites");
+    if (response.status !== 200) {
+      throw new Error(`Failed to get sprites: ${response.status}`);
+    }
+    return response.data.sprites || [];
+  }
+
+  /**
+   * Get all sounds
+   */
+  async getAllSounds(): Promise<any[]> {
+    const response = await this.client.get("/sounds");
+    if (response.status !== 200) {
+      throw new Error(`Failed to get sounds: ${response.status}`);
+    }
+    return response.data.sounds || [];
+  }
+
+  /**
+   * Create a texture set with a file and specific kind
+   */
+  async createTextureSetWithFileAndKind(
+    name: string,
+    filePath: string,
+    textureType: number = 1,
+    kind: number = 0, // 0 = ModelSpecific, 1 = Universal
+  ): Promise<{ textureSetId: number; name: string; fileId: number }> {
+    const formData = new FormData();
+    formData.append("file", fs.createReadStream(filePath));
+
+    const response = await this.client.post(
+      `/texture-sets/with-file?name=${encodeURIComponent(name)}&textureType=${textureType}&kind=${kind}`,
+      formData,
+      {
+        headers: formData.getHeaders(),
+      },
+    );
+
+    if (response.status !== 200 && response.status !== 201) {
+      throw new Error(
+        `Failed to create texture set with file and kind: ${response.status} ${response.statusText}`,
+      );
+    }
+    return response.data;
+  }
+
+  /**
+   * Create a texture set with a specific kind (no file).
+   */
+  async createTextureSetWithKind(
+    name: string,
+    kind: number, // 0 = ModelSpecific, 1 = Universal
+  ): Promise<{ id: number; name: string }> {
+    const response = await this.client.post("/texture-sets", {
+      name,
+      kind,
+    });
+    if (response.status !== 200 && response.status !== 201) {
+      throw new Error(
+        `Failed to create texture set with kind: ${response.status} ${response.statusText} ${JSON.stringify(response.data)}`,
+      );
+    }
+    return response.data;
+  }
+
+  /**
+   * Create a texture set category scoped to a kind.
+   */
+  async createTextureSetCategory(
+    name: string,
+    kind: number, // 0 = ModelSpecific, 1 = Universal
+    parentId: number | null = null,
+  ): Promise<{ id: number; name: string; parentId: number | null }> {
+    const response = await this.client.post("/texture-set-categories", {
+      name,
+      description: null,
+      parentId,
+      kind,
+    });
+    if (response.status !== 200 && response.status !== 201) {
+      throw new Error(
+        `Failed to create texture set category: ${response.status} ${response.statusText} ${JSON.stringify(response.data)}`,
+      );
+    }
+    return response.data;
+  }
+
+  /** Create a model category. */
+  async createModelCategory(
+    name: string,
+    parentId: number | null = null,
+  ): Promise<{ id: number; name: string }> {
+    const response = await this.client.post("/model-categories", {
+      name,
+      description: null,
+      parentId,
+    });
+    if (response.status !== 200 && response.status !== 201) {
+      throw new Error(
+        `Failed to create model category: ${response.status} ${JSON.stringify(response.data)}`,
+      );
+    }
+    return response.data;
+  }
+
+  /** Create an environment map category. */
+  async createEnvironmentMapCategory(
+    name: string,
+    parentId: number | null = null,
+  ): Promise<{ id: number; name: string }> {
+    const response = await this.client.post("/environment-map-categories", {
+      name,
+      description: null,
+      parentId,
+    });
+    if (response.status !== 200 && response.status !== 201) {
+      throw new Error(
+        `Failed to create environment map category: ${response.status} ${JSON.stringify(response.data)}`,
+      );
+    }
+    return response.data;
+  }
+
+  /**
+   * Attempt to rename a texture set category, returning the HTTP status
+   * without throwing (used to assert rejection cases).
+   */
+  async updateTextureSetCategoryStatus(
+    id: number,
+    name: string,
+    parentId: number | null = null,
+  ): Promise<number> {
+    const response = await this.client.put(`/texture-set-categories/${id}`, {
+      name,
+      description: null,
+      parentId,
+    });
+    return response.status;
+  }
+
+  /**
+   * List texture set categories for a kind.
+   */
+  async getTextureSetCategories(kind: number): Promise<any[]> {
+    const response = await this.client.get(
+      `/texture-set-categories?kind=${kind}`,
+    );
+    if (response.status !== 200) {
+      throw new Error(
+        `Failed to get texture set categories: ${response.status}`,
+      );
+    }
+    return response.data.categories || [];
+  }
+
+  /**
+   * Delete a texture set category by id.
+   */
+  async deleteTextureSetCategory(id: number): Promise<void> {
+    await this.client.delete(`/texture-set-categories/${id}`);
+  }
+
+  /**
+   * Update the kind of a texture set
+   */
+  async updateTextureSetKind(
+    textureSetId: number,
+    kind: number, // 0 = ModelSpecific, 1 = Universal
+  ): Promise<void> {
+    const response = await this.client.put(
+      `/texture-sets/${textureSetId}/kind`,
+      { kind },
+    );
+
+    if (response.status !== 200) {
+      throw new Error(
+        `Failed to update texture set kind: ${response.status} ${response.statusText}`,
+      );
+    }
+  }
+
+  /**
+   * Replace a texture set's tags (shared tag vocabulary).
+   */
+  async updateTextureSetTags(
+    textureSetId: number,
+    tags: string[],
+  ): Promise<void> {
+    const response = await this.client.put(
+      `/texture-sets/${textureSetId}/tags`,
+      { tags },
+    );
+
+    if (response.status !== 200) {
+      throw new Error(
+        `Failed to update texture set tags: ${response.status} ${response.statusText}`,
+      );
+    }
+  }
+
+  /**
+   * Get texture sets filtered by kind
+   */
+  async getTextureSetsByKind(kind: number): Promise<any[]> {
+    const response = await this.client.get(`/texture-sets?kind=${kind}`);
+    if (response.status !== 200) {
+      throw new Error(`Failed to get texture sets by kind: ${response.status}`);
+    }
+    return response.data.textureSets || [];
+  }
+
+  /**
+   * Regenerate thumbnail for a texture set (Universal/Global Materials only)
+   */
+  async regenerateTextureSetThumbnail(textureSetId: number): Promise<void> {
+    const response = await this.client.post(
+      `/texture-sets/${textureSetId}/thumbnail/regenerate`,
+    );
+    if (response.status !== 200 && response.status !== 202) {
+      throw new Error(
+        `Failed to regenerate thumbnail: ${response.status} ${response.statusText}`,
+      );
+    }
+  }
+
+  /**
+   * Upload a file via the /files endpoint and return the file ID.
+   */
+  async uploadFile(
+    filePath: string,
+    textureSetId?: number,
+  ): Promise<{ fileId: number; alreadyExists: boolean }> {
+    const formData = new FormData();
+    formData.append("file", fs.createReadStream(filePath));
+
+    let url = "/files";
+    if (textureSetId !== undefined) {
+      url += `?textureSetId=${textureSetId}`;
+    }
+
+    const response = await this.client.post(url, formData, {
+      headers: formData.getHeaders(),
+    });
+
+    if (response.status !== 200) {
+      throw new Error(
+        `Failed to upload file: ${response.status} ${response.statusText}`,
+      );
+    }
+
+    const fileId = response.data.id || response.data.fileId;
+    return { fileId, alreadyExists: response.data.alreadyExists || false };
+  }
+
+  /**
+   * Get a file preview. Returns the HTTP status code.
+   */
+  async getFilePreview(
+    fileId: number,
+    channel?: string,
+  ): Promise<{ status: number; contentType?: string }> {
+    let url = `/files/${fileId}/preview`;
+    if (channel) {
+      url += `?channel=${channel}`;
+    }
+    const response = await this.client.get(url, {
+      responseType: "arraybuffer",
+    });
+    return {
+      status: response.status,
+      contentType: response.headers["content-type"],
+    };
+  }
+
+  /**
+   * Create a sprite from a file
+   */
+  async createSprite(
+    filePath: string,
+    name: string,
+  ): Promise<{ id: number; name: string; fileId: number }> {
+    const formData = new FormData();
+    formData.append("file", fs.createReadStream(filePath));
+
+    const response = await this.client.post(
+      `/sprites/with-file?name=${encodeURIComponent(name)}`,
+      formData,
+      {
+        headers: formData.getHeaders(),
+      },
+    );
+
+    if (response.status !== 200 && response.status !== 201) {
+      throw new Error(
+        `Failed to create sprite: ${response.status} ${response.statusText}`,
+      );
+    }
+    return {
+      id: response.data.spriteId,
+      name: response.data.name,
+      fileId: response.data.fileId,
+    };
+  }
+
+  // ── Blend / WebDAV helpers ───────────────────────────────────────────
+
+  /**
+   * Create a new model by uploading a .blend file via the WebDAV PUT endpoint.
+   * Simulates: PUT /modelibr/Models/{modelName}.blend
+   */
+  async createModelViaWebDavBlend(
+    filePath: string,
+    modelName: string,
+  ): Promise<{ status: number }> {
+    const fileBuffer = fs.readFileSync(filePath);
+    const response = await this.client.put(
+      `/modelibr/Models/${encodeURIComponent(modelName)}.blend`,
+      fileBuffer,
+      {
+        headers: {
+          "Content-Type": "application/octet-stream",
+        },
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity,
+      },
+    );
+    return { status: response.status };
+  }
+
+  /**
+   * Simulate Blender Safe Save (PUT temp + MOVE) to create a new model version
+   * via WebDAV. This is the pattern Blender uses when saving to an existing file:
+   *   1. PUT /modelibr/Models/{modelName}/uploaded-{modelName}.blend@  (temp upload)
+   *   2. MOVE the temp file → uploaded-{modelName}.blend (triggers version creation)
+   */
+  async createVersionViaWebDavBlendSave(
+    filePath: string,
+    modelName: string,
+  ): Promise<{ putStatus: number; moveStatus: number }> {
+    const fileBuffer = fs.readFileSync(filePath);
+    const baseUrl = process.env.API_BASE_URL || "http://localhost:8090";
+    const encodedName = encodeURIComponent(modelName);
+    const uploadedFileName = `uploaded-${modelName}`;
+
+    // Step 1: PUT the temp file (uploaded-{modelName}.blend@)
+    const putResponse = await this.client.put(
+      `/modelibr/Models/${encodedName}/${encodeURIComponent(uploadedFileName)}.blend@`,
+      fileBuffer,
+      {
+        headers: {
+          "Content-Type": "application/octet-stream",
+        },
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity,
+      },
+    );
+
+    // Step 2: MOVE temp → uploaded-{modelName}.blend
+    const moveResponse = await this.client.request({
+      method: "MOVE",
+      url: `/modelibr/Models/${encodedName}/${encodeURIComponent(uploadedFileName)}.blend@`,
+      headers: {
+        Destination: `${baseUrl}/modelibr/Models/${encodedName}/${encodeURIComponent(uploadedFileName)}.blend`,
+        Overwrite: "T",
+      },
+    });
+
+    return {
+      putStatus: putResponse.status,
+      moveStatus: moveResponse.status,
+    };
+  }
+
+  /**
+   * Same Blender Safe Save dance as {@link createVersionViaWebDavBlendSave}, but
+   * targets an explicit WebDAV folder segment instead of the bare model name.
+   * Needed once duplicate model names are allowed: two models can share a name,
+   * so the folder segment must be the disambiguated "{modelName} [{id}]" form to
+   * address one specific model (see WebDavUtilities id-suffix contract). The
+   * inner filename still uses the PLAIN model name — the folder segment already
+   * disambiguates, per the shared convention.
+   */
+  async createVersionViaWebDavBlendSaveAtFolder(
+    filePath: string,
+    folderSegment: string,
+    modelName: string,
+  ): Promise<{ putStatus: number; moveStatus: number }> {
+    const fileBuffer = fs.readFileSync(filePath);
+    const baseUrl = process.env.API_BASE_URL || "http://localhost:8090";
+    const encodedFolder = encodeURIComponent(folderSegment);
+    const uploadedFileName = `uploaded-${modelName}`;
+    const encodedFileName = encodeURIComponent(uploadedFileName);
+
+    // Step 1: PUT the temp file (uploaded-{modelName}.blend@) into the id-suffixed folder
+    const putResponse = await this.client.put(
+      `/modelibr/Models/${encodedFolder}/${encodedFileName}.blend@`,
+      fileBuffer,
+      {
+        headers: {
+          "Content-Type": "application/octet-stream",
+        },
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity,
+      },
+    );
+
+    // Step 2: MOVE temp → uploaded-{modelName}.blend, still inside the id-suffixed folder
+    const moveResponse = await this.client.request({
+      method: "MOVE",
+      url: `/modelibr/Models/${encodedFolder}/${encodedFileName}.blend@`,
+      headers: {
+        Destination: `${baseUrl}/modelibr/Models/${encodedFolder}/${encodedFileName}.blend`,
+        Overwrite: "T",
+      },
+    });
+
+    return {
+      putStatus: putResponse.status,
+      moveStatus: moveResponse.status,
+    };
+  }
+
+  /**
+   * Create a new model version by uploading a file via POST /models/{modelId}/versions.
+   * This is the HTTP API path the frontend uses (drag-drop onto model viewer).
+   */
+  async createModelVersion(
+    modelId: number,
+    filePath: string,
+    description?: string,
+    setAsActive: boolean = true,
+  ): Promise<{
+    versionId: number;
+    versionNumber: number;
+    fileId: number;
+  }> {
+    const formData = new FormData();
+    formData.append("file", fs.createReadStream(filePath));
+
+    let url = `/models/${modelId}/versions?setAsActive=${setAsActive}`;
+    if (description) {
+      url += `&description=${encodeURIComponent(description)}`;
+    }
+
+    const response = await this.client.post(url, formData, {
+      headers: formData.getHeaders(),
+    });
+
+    if (response.status !== 200 && response.status !== 201) {
+      throw new Error(
+        `Failed to create model version: ${response.status} ${response.statusText} - ${JSON.stringify(response.data)}`,
+      );
+    }
+    return response.data;
+  }
+
+  /**
+   * Get the thumbnail for a model. Returns status and content-type.
+   */
+  async getModelThumbnail(
+    modelId: number,
+  ): Promise<{ status: number; contentType?: string; size?: number }> {
+    const response = await this.client.get(`/models/${modelId}/thumbnail`, {
+      responseType: "arraybuffer",
+    });
+    return {
+      status: response.status,
+      contentType: response.headers["content-type"],
+      size: response.data?.byteLength,
+    };
+  }
+
+  /**
+   * Get the blender-enabled setting from the backend.
+   */
+  async getBlenderEnabled(): Promise<boolean> {
+    const response = await this.client.get("/settings/blender-enabled");
+    if (response.status !== 200) {
+      throw new Error(`Failed to get blender-enabled: ${response.status}`);
+    }
+    return response.data.enableBlender;
+  }
+
+  /**
+   * Get blender installation status.
+   */
+  async getBlenderInstallStatus(): Promise<{
+    state: string;
+    installedVersion: string | null;
+    installedPath: string | null;
+    progress: number;
+    error: string | null;
+  }> {
+    const response = await this.client.get("/settings/blender/status");
+    if (response.status !== 200) {
+      throw new Error(`Failed to get blender status: ${response.status}`);
+    }
+    return response.data;
+  }
+
+  /**
+   * Start Blender installation (fire-and-forget). Poll getBlenderInstallStatus() for progress.
+   */
+  async installBlender(version: string): Promise<void> {
+    const response = await this.client.post("/settings/blender/install", {
+      version,
+    });
+    if (response.status !== 200) {
+      throw new Error(`Failed to start blender install: ${response.status}`);
+    }
+  }
+
+  /**
+   * Install Blender and wait until installation completes.
+   * Polls status every 2 seconds. Throws if installation fails.
+   */
+  async ensureBlenderInstalled(
+    version: string,
+    timeoutMs: number = 600000,
+  ): Promise<void> {
+    const status = await this.getBlenderInstallStatus();
+    if (status.state === "installed" && status.installedVersion === version) {
+      console.log(
+        `[Blender] Already installed: ${version} at ${status.installedPath}`,
+      );
+      return;
+    }
+
+    console.log(`[Blender] Installing Blender ${version}...`);
+    await this.installBlender(version);
+
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 2000));
+      const s = await this.getBlenderInstallStatus();
+      if (s.state === "installed") {
+        console.log(
+          `[Blender] Installation complete: ${s.installedVersion} at ${s.installedPath}`,
         );
-
-        if (response.status !== 200 && response.status !== 201) {
-            console.error(
-                "Create texture set with file failed:",
-                response.status,
-                response.statusText,
-                response.data,
-            );
-            throw new Error(
-                `Failed to create texture set with file: ${response.status} ${response.statusText}`,
-            );
-        }
-        return response.data;
-    }
-
-    /**
-     * Map texture type names to their numeric values
-     */
-    private mapTextureType(textureType: string | number): number {
-        if (typeof textureType === "number") {
-            return textureType;
-        }
-        const mapping: Record<string, number> = {
-            Albedo: 1,
-            Normal: 2,
-            Height: 3,
-            AO: 4,
-            Roughness: 5,
-            Metallic: 6,
-            Emissive: 9,
-            Bump: 10,
-            Alpha: 11,
-            Displacement: 12,
-        };
-        return mapping[textureType] ?? 1; // Default to Albedo
-    }
-
-    /**
-     * Upload a texture file to a texture set
-     * Two-step process: 1) Upload file via /files endpoint, 2) Add texture to set
-     */
-    async uploadTextureToSet(
-        textureSetId: number,
-        filePath: string,
-        textureType: string | number = 1, // 1 = Albedo, or string name like 'Albedo'
-    ): Promise<void> {
-        const textureTypeNum = this.mapTextureType(textureType);
-
-        // Step 1: Upload the file with textureSetId parameter
-        const formData = new FormData();
-        formData.append("file", fs.createReadStream(filePath));
-
-        const uploadResponse = await this.client.post(
-            `/files?textureSetId=${textureSetId}`,
-            formData,
-            {
-                headers: formData.getHeaders(),
-            },
+        return;
+      }
+      if (s.state === "error" || s.state === "failed") {
+        throw new Error(
+          `Blender installation failed: ${s.error || "unknown error"}`,
         );
-
-        if (uploadResponse.status !== 200) {
-            console.error(
-                "File upload failed:",
-                uploadResponse.status,
-                uploadResponse.statusText,
-                uploadResponse.data,
-            );
-            throw new Error(
-                `Failed to upload file: ${uploadResponse.status} ${uploadResponse.statusText}`,
-            );
-        }
-
-        const fileId = uploadResponse.data.id || uploadResponse.data.fileId;
-        if (!fileId) {
-            throw new Error("File upload succeeded but no file ID returned");
-        }
-
-        // Step 2: Add the texture to the set with the specified type
-        const addTextureResponse = await this.client.post(
-            `/texture-sets/${textureSetId}/textures`,
-            {
-                FileId: fileId,
-                TextureType: textureTypeNum,
-            },
-        );
-
-        if (addTextureResponse.status !== 200) {
-            console.error(
-                "Add texture to set failed:",
-                addTextureResponse.status,
-                addTextureResponse.statusText,
-                addTextureResponse.data,
-            );
-            throw new Error(
-                `Failed to add texture to set: ${addTextureResponse.status} ${addTextureResponse.statusText}`,
-            );
-        }
+      }
+      console.log(`[Blender] Status: ${s.state} (${s.progress}%)`);
     }
+    throw new Error(`Blender installation timed out after ${timeoutMs}ms`);
+  }
 
-    /**
-     * Associate a texture set with a model version
-     */
-    async linkTextureSetToModel(
-        textureSetId: number,
-        modelId: number,
-        modelVersionId: number,
-    ): Promise<void> {
-        const response = await this.client.post(
-            `/texture-sets/${textureSetId}/model-versions/${modelVersionId}`,
-        );
-
-        // Accept 200, 201, 204 as success, and 400 with AssociationAlreadyExists as "already done"
-        if (
-            response.status !== 200 &&
-            response.status !== 201 &&
-            response.status !== 204
-        ) {
-            // Check if it's "already associated" error - treat as success
-            if (
-                response.status === 400 &&
-                response.data?.error === "AssociationAlreadyExists"
-            ) {
-                // Silently succeed - texture set is already linked
-                return;
-            }
-            console.error(
-                "Link texture set failed:",
-                response.status,
-                response.statusText,
-                response.data,
-            );
-            throw new Error(
-                `Failed to link texture set: ${response.status} ${response.statusText}`,
-            );
-        }
+  /**
+   * Get version files for a specific model version.
+   */
+  async getModelVersionFiles(
+    modelId: number,
+    versionId: number,
+  ): Promise<any[]> {
+    const response = await this.client.get(
+      `/models/${modelId}/versions/${versionId}`,
+    );
+    if (response.status !== 200) {
+      throw new Error(`Failed to get model version: ${response.status}`);
     }
+    return response.data.files || [];
+  }
 
-    /**
-     * Set default texture set for a model version
-     */
-    async setDefaultTextureSet(
-        modelId: number,
-        modelVersionId: number,
-        textureSetId: number | null,
-    ): Promise<void> {
-        const response = await this.client.put(
-            `/models/${modelId}/default-texture-set`,
-            {
-                TextureSetId: textureSetId,
-                ModelVersionId: modelVersionId,
-            },
-        );
+  // ── Setting helpers ────────────────────────────────────────────────
 
-        if (response.status !== 200) {
-            console.error(
-                "Set default texture set failed:",
-                response.status,
-                response.statusText,
-                response.data,
-            );
-            throw new Error(
-                `Failed to set default texture set: ${response.status} ${response.statusText}`,
-            );
-        }
+  /**
+   * Update a single setting by key via PUT /settings/{key}.
+   */
+  async updateSetting(
+    key: string,
+    value: string,
+  ): Promise<{ status: number; data: any }> {
+    const response = await this.client.put(
+      `/settings/${encodeURIComponent(key)}`,
+      {
+        value,
+      },
+    );
+    return { status: response.status, data: response.data };
+  }
+
+  /**
+   * Get all settings via GET /settings.
+   */
+  async getSettings(): Promise<any> {
+    const response = await this.client.get("/settings");
+    if (response.status !== 200) {
+      throw new Error(`Failed to get settings: ${response.status}`);
     }
-
-    /**
-     * Get all models
-     */
-    async getModels(): Promise<any[]> {
-        const response = await this.client.get("/models");
-        if (response.status !== 200) {
-            throw new Error(`Failed to get models: ${response.status}`);
-        }
-        return response.data;
-    }
-
-    /**
-     * Get a specific model by ID
-     */
-    async getModel(modelId: number): Promise<any> {
-        const response = await this.client.get(`/models/${modelId}`);
-        if (response.status !== 200) {
-            throw new Error(`Failed to get model: ${response.status}`);
-        }
-        return response.data;
-    }
-
-    /**
-     * Get all versions for a model
-     */
-    async getModelVersions(modelId: number): Promise<any[]> {
-        const response = await this.client.get(`/models/${modelId}/versions`);
-        if (response.status !== 200) {
-            throw new Error(`Failed to get model versions: ${response.status}`);
-        }
-        // Response has a 'value' array
-        return response.data.value || response.data || [];
-    }
-
-    /**
-     * Get the auxiliary files (external .bin/textures) persisted against a model
-     * version by a multi-file glTF import. Each descriptor carries the relativePath
-     * the primary .gltf references it by.
-     */
-    async getVersionAuxiliaryFiles(
-        modelId: number,
-        versionId: number,
-    ): Promise<any[]> {
-        const response = await this.client.get(
-            `/models/${modelId}/versions/${versionId}/auxiliary-files`,
-        );
-        if (response.status !== 200) {
-            throw new Error(
-                `Failed to get auxiliary files: ${response.status}`,
-            );
-        }
-        const body = response.data?.value ?? response.data;
-        return body?.auxiliaries ?? [];
-    }
-
-    /**
-     * Find a model by name (searches in the list)
-     */
-    async findModelByName(modelName: string): Promise<any | null> {
-        const models = await this.getModels();
-        const nameWithoutExt = modelName.split(".").slice(0, -1).join(".");
-        return (
-            models.find(
-                (m) => m.name === modelName || m.name === nameWithoutExt,
-            ) || null
-        );
-    }
-
-    /**
-     * Get all texture sets
-     */
-    async getAllTextureSets(): Promise<any[]> {
-        const response = await this.client.get("/texture-sets");
-        if (response.status !== 200) {
-            throw new Error(`Failed to get texture sets: ${response.status}`);
-        }
-        return response.data.textureSets || [];
-    }
-
-    /**
-     * Get a texture set by name
-     */
-    async getTextureSetByName(
-        name: string,
-        options?: { requireTextures?: boolean },
-    ): Promise<any> {
-        const sets = (await this.getAllTextureSets())
-            .filter((s) => s.name === name)
-            .sort((a, b) => Number(b.id ?? 0) - Number(a.id ?? 0));
-
-        if (sets.length === 0) {
-            throw new Error(`Texture set "${name}" not found`);
-        }
-
-        let fallback = sets[0];
-
-        for (const candidate of sets) {
-            if (!candidate?.id) {
-                continue;
-            }
-
-            try {
-                const details = await this.getTextureSetById(candidate.id);
-                const textureCount = Array.isArray(details?.textures)
-                    ? details.textures.length
-                    : 0;
-
-                fallback = { ...candidate, ...details };
-
-                if (textureCount > 0) {
-                    return fallback;
-                }
-            } catch {
-                // Ignore hydration failures and continue checking newer candidates.
-            }
-        }
-
-        if (options?.requireTextures) {
-            throw new Error(`Texture set "${name}" exists but has no textures`);
-        }
-
-        return fallback;
-    }
-
-    /**
-     * Get a specific texture set by ID
-     */
-    async getTextureSetById(id: number): Promise<any> {
-        const response = await this.client.get(`/texture-sets/${id}`);
-        if (response.status !== 200) {
-            throw new Error(
-                `Failed to get texture set ${id}: ${response.status}`,
-            );
-        }
-        return response.data;
-    }
-
-    /**
-     * Upload a model file and return the created model data
-     */
-    async uploadModel(
-        filePath: string,
-    ): Promise<{ id: number; name: string; versionId?: number }> {
-        const formData = new FormData();
-        formData.append("file", fs.createReadStream(filePath));
-
-        const response = await this.client.post("/models", formData, {
-            headers: formData.getHeaders(),
-        });
-
-        if (response.status !== 200 && response.status !== 201) {
-            throw new Error(
-                `Failed to upload model: ${response.status} ${response.statusText}`,
-            );
-        }
-        return response.data;
-    }
-
-    /**
-     * Upload a model via REST API, returning the raw response status and data.
-     * Does not throw on non-200 status — useful for testing error responses (e.g., 409 Conflict).
-     */
-    async uploadModelRaw(
-        filePath: string,
-    ): Promise<{ status: number; data: any }> {
-        const formData = new FormData();
-        formData.append("file", fs.createReadStream(filePath));
-
-        const response = await this.client.post("/models", formData, {
-            headers: formData.getHeaders(),
-        });
-
-        return { status: response.status, data: response.data };
-    }
-
-    /**
-     * Create a pack
-     */
-    async createPack(
-        name: string,
-        description?: string,
-    ): Promise<{ id: number; name: string }> {
-        const response = await this.client.post("/packs", {
-            name,
-            description: description || "",
-        });
-        if (response.status !== 200 && response.status !== 201) {
-            throw new Error(
-                `Failed to create pack: ${response.status} ${response.statusText}`,
-            );
-        }
-        return response.data;
-    }
-
-    async setPackCustomThumbnail(
-        packId: number,
-        fileId: number | null,
-    ): Promise<void> {
-        const response = await this.client.put(`/packs/${packId}/thumbnail`, {
-            fileId,
-        });
-        if (response.status !== 200 && response.status !== 204) {
-            throw new Error(
-                `Failed to set pack thumbnail: ${response.status} ${response.statusText}`,
-            );
-        }
-    }
-
-    /**
-     * Create a project
-     */
-    async createProject(
-        name: string,
-        description?: string,
-    ): Promise<{ id: number; name: string }> {
-        const response = await this.client.post("/projects", {
-            name,
-            description: description || "",
-        });
-        if (response.status !== 200 && response.status !== 201) {
-            throw new Error(
-                `Failed to create project: ${response.status} ${response.statusText}`,
-            );
-        }
-        return response.data;
-    }
-
-    async setProjectCustomThumbnail(
-        projectId: number,
-        fileId: number | null,
-    ): Promise<void> {
-        const response = await this.client.put(
-            `/projects/${projectId}/thumbnail`,
-            { fileId },
-        );
-        if (response.status !== 200 && response.status !== 204) {
-            throw new Error(
-                `Failed to set project thumbnail: ${response.status} ${response.statusText}`,
-            );
-        }
-    }
-
-    /**
-     * Soft-delete a model by ID (sends it to the recycle bin).
-     */
-    async softDeleteModel(modelId: number): Promise<void> {
-        const response = await this.client.delete(`/models/${modelId}`);
-        if (response.status !== 200 && response.status !== 204) {
-            throw new Error(
-                `Failed to soft-delete model ${modelId}: ${response.status} ${response.statusText}`,
-            );
-        }
-    }
-
-    /**
-     * Delete every non-deleted model whose name matches modelName.
-     * Useful for blend tests that re-use model names across runs.
-     */
-    async softDeleteModelsByName(modelName: string): Promise<void> {
-        const models = await this.getModels();
-        const nameWithoutExt = modelName.split(".").slice(0, -1).join(".");
-        const matches = models.filter(
-            (m) => m.name === modelName || m.name === nameWithoutExt,
-        );
-        for (const m of matches) {
-            await this.softDeleteModel(m.id);
-            console.log(
-                `[Blend Cleanup] Soft-deleted existing model "${m.name}" (id=${m.id})`,
-            );
-        }
-    }
-
-    /**
-     * Delete a sound by ID
-     */
-    async deleteSound(soundId: number): Promise<void> {
-        const response = await this.client.delete(`/sounds/${soundId}`);
-        if (response.status !== 200 && response.status !== 204) {
-            throw new Error(
-                `Failed to delete sound: ${response.status} ${response.statusText}`,
-            );
-        }
-    }
-
-    /**
-     * Get all sprites
-     */
-    async getAllSprites(): Promise<any[]> {
-        const response = await this.client.get("/sprites");
-        if (response.status !== 200) {
-            throw new Error(`Failed to get sprites: ${response.status}`);
-        }
-        return response.data.sprites || [];
-    }
-
-    /**
-     * Get all sounds
-     */
-    async getAllSounds(): Promise<any[]> {
-        const response = await this.client.get("/sounds");
-        if (response.status !== 200) {
-            throw new Error(`Failed to get sounds: ${response.status}`);
-        }
-        return response.data.sounds || [];
-    }
-
-    /**
-     * Create a texture set with a file and specific kind
-     */
-    async createTextureSetWithFileAndKind(
-        name: string,
-        filePath: string,
-        textureType: number = 1,
-        kind: number = 0, // 0 = ModelSpecific, 1 = Universal
-    ): Promise<{ textureSetId: number; name: string; fileId: number }> {
-        const formData = new FormData();
-        formData.append("file", fs.createReadStream(filePath));
-
-        const response = await this.client.post(
-            `/texture-sets/with-file?name=${encodeURIComponent(name)}&textureType=${textureType}&kind=${kind}`,
-            formData,
-            {
-                headers: formData.getHeaders(),
-            },
-        );
-
-        if (response.status !== 200 && response.status !== 201) {
-            throw new Error(
-                `Failed to create texture set with file and kind: ${response.status} ${response.statusText}`,
-            );
-        }
-        return response.data;
-    }
-
-    /**
-     * Create a texture set with a specific kind (no file).
-     */
-    async createTextureSetWithKind(
-        name: string,
-        kind: number, // 0 = ModelSpecific, 1 = Universal
-    ): Promise<{ id: number; name: string }> {
-        const response = await this.client.post("/texture-sets", {
-            name,
-            kind,
-        });
-        if (response.status !== 200 && response.status !== 201) {
-            throw new Error(
-                `Failed to create texture set with kind: ${response.status} ${response.statusText} ${JSON.stringify(response.data)}`,
-            );
-        }
-        return response.data;
-    }
-
-    /**
-     * Create a texture set category scoped to a kind.
-     */
-    async createTextureSetCategory(
-        name: string,
-        kind: number, // 0 = ModelSpecific, 1 = Universal
-        parentId: number | null = null,
-    ): Promise<{ id: number; name: string; parentId: number | null }> {
-        const response = await this.client.post("/texture-set-categories", {
-            name,
-            description: null,
-            parentId,
-            kind,
-        });
-        if (response.status !== 200 && response.status !== 201) {
-            throw new Error(
-                `Failed to create texture set category: ${response.status} ${response.statusText} ${JSON.stringify(response.data)}`,
-            );
-        }
-        return response.data;
-    }
-
-    /** Create a model category. */
-    async createModelCategory(
-        name: string,
-        parentId: number | null = null,
-    ): Promise<{ id: number; name: string }> {
-        const response = await this.client.post("/model-categories", {
-            name,
-            description: null,
-            parentId,
-        });
-        if (response.status !== 200 && response.status !== 201) {
-            throw new Error(
-                `Failed to create model category: ${response.status} ${JSON.stringify(response.data)}`,
-            );
-        }
-        return response.data;
-    }
-
-    /** Create an environment map category. */
-    async createEnvironmentMapCategory(
-        name: string,
-        parentId: number | null = null,
-    ): Promise<{ id: number; name: string }> {
-        const response = await this.client.post(
-            "/environment-map-categories",
-            { name, description: null, parentId },
-        );
-        if (response.status !== 200 && response.status !== 201) {
-            throw new Error(
-                `Failed to create environment map category: ${response.status} ${JSON.stringify(response.data)}`,
-            );
-        }
-        return response.data;
-    }
-
-    /**
-     * Attempt to rename a texture set category, returning the HTTP status
-     * without throwing (used to assert rejection cases).
-     */
-    async updateTextureSetCategoryStatus(
-        id: number,
-        name: string,
-        parentId: number | null = null,
-    ): Promise<number> {
-        const response = await this.client.put(
-            `/texture-set-categories/${id}`,
-            { name, description: null, parentId },
-        );
-        return response.status;
-    }
-
-    /**
-     * List texture set categories for a kind.
-     */
-    async getTextureSetCategories(kind: number): Promise<any[]> {
-        const response = await this.client.get(
-            `/texture-set-categories?kind=${kind}`,
-        );
-        if (response.status !== 200) {
-            throw new Error(
-                `Failed to get texture set categories: ${response.status}`,
-            );
-        }
-        return response.data.categories || [];
-    }
-
-    /**
-     * Delete a texture set category by id.
-     */
-    async deleteTextureSetCategory(id: number): Promise<void> {
-        await this.client.delete(`/texture-set-categories/${id}`);
-    }
-
-    /**
-     * Update the kind of a texture set
-     */
-    async updateTextureSetKind(
-        textureSetId: number,
-        kind: number, // 0 = ModelSpecific, 1 = Universal
-    ): Promise<void> {
-        const response = await this.client.put(
-            `/texture-sets/${textureSetId}/kind`,
-            { kind },
-        );
-
-        if (response.status !== 200) {
-            throw new Error(
-                `Failed to update texture set kind: ${response.status} ${response.statusText}`,
-            );
-        }
-    }
-
-    /**
-     * Replace a texture set's tags (shared tag vocabulary).
-     */
-    async updateTextureSetTags(
-        textureSetId: number,
-        tags: string[],
-    ): Promise<void> {
-        const response = await this.client.put(
-            `/texture-sets/${textureSetId}/tags`,
-            { tags },
-        );
-
-        if (response.status !== 200) {
-            throw new Error(
-                `Failed to update texture set tags: ${response.status} ${response.statusText}`,
-            );
-        }
-    }
-
-    /**
-     * Get texture sets filtered by kind
-     */
-    async getTextureSetsByKind(kind: number): Promise<any[]> {
-        const response = await this.client.get(`/texture-sets?kind=${kind}`);
-        if (response.status !== 200) {
-            throw new Error(
-                `Failed to get texture sets by kind: ${response.status}`,
-            );
-        }
-        return response.data.textureSets || [];
-    }
-
-    /**
-     * Regenerate thumbnail for a texture set (Universal/Global Materials only)
-     */
-    async regenerateTextureSetThumbnail(textureSetId: number): Promise<void> {
-        const response = await this.client.post(
-            `/texture-sets/${textureSetId}/thumbnail/regenerate`,
-        );
-        if (response.status !== 200 && response.status !== 202) {
-            throw new Error(
-                `Failed to regenerate thumbnail: ${response.status} ${response.statusText}`,
-            );
-        }
-    }
-
-    /**
-     * Upload a file via the /files endpoint and return the file ID.
-     */
-    async uploadFile(
-        filePath: string,
-        textureSetId?: number,
-    ): Promise<{ fileId: number; alreadyExists: boolean }> {
-        const formData = new FormData();
-        formData.append("file", fs.createReadStream(filePath));
-
-        let url = "/files";
-        if (textureSetId !== undefined) {
-            url += `?textureSetId=${textureSetId}`;
-        }
-
-        const response = await this.client.post(url, formData, {
-            headers: formData.getHeaders(),
-        });
-
-        if (response.status !== 200) {
-            throw new Error(
-                `Failed to upload file: ${response.status} ${response.statusText}`,
-            );
-        }
-
-        const fileId = response.data.id || response.data.fileId;
-        return { fileId, alreadyExists: response.data.alreadyExists || false };
-    }
-
-    /**
-     * Get a file preview. Returns the HTTP status code.
-     */
-    async getFilePreview(
-        fileId: number,
-        channel?: string,
-    ): Promise<{ status: number; contentType?: string }> {
-        let url = `/files/${fileId}/preview`;
-        if (channel) {
-            url += `?channel=${channel}`;
-        }
-        const response = await this.client.get(url, {
-            responseType: "arraybuffer",
-        });
-        return {
-            status: response.status,
-            contentType: response.headers["content-type"],
-        };
-    }
-
-    /**
-     * Create a sprite from a file
-     */
-    async createSprite(
-        filePath: string,
-        name: string,
-    ): Promise<{ id: number; name: string; fileId: number }> {
-        const formData = new FormData();
-        formData.append("file", fs.createReadStream(filePath));
-
-        const response = await this.client.post(
-            `/sprites/with-file?name=${encodeURIComponent(name)}`,
-            formData,
-            {
-                headers: formData.getHeaders(),
-            },
-        );
-
-        if (response.status !== 200 && response.status !== 201) {
-            throw new Error(
-                `Failed to create sprite: ${response.status} ${response.statusText}`,
-            );
-        }
-        return {
-            id: response.data.spriteId,
-            name: response.data.name,
-            fileId: response.data.fileId,
-        };
-    }
-
-    // ── Blend / WebDAV helpers ───────────────────────────────────────────
-
-    /**
-     * Create a new model by uploading a .blend file via the WebDAV PUT endpoint.
-     * Simulates: PUT /modelibr/Models/{modelName}.blend
-     */
-    async createModelViaWebDavBlend(
-        filePath: string,
-        modelName: string,
-    ): Promise<{ status: number }> {
-        const fileBuffer = fs.readFileSync(filePath);
-        const response = await this.client.put(
-            `/modelibr/Models/${encodeURIComponent(modelName)}.blend`,
-            fileBuffer,
-            {
-                headers: {
-                    "Content-Type": "application/octet-stream",
-                },
-                maxContentLength: Infinity,
-                maxBodyLength: Infinity,
-            },
-        );
-        return { status: response.status };
-    }
-
-    /**
-     * Simulate Blender Safe Save (PUT temp + MOVE) to create a new model version
-     * via WebDAV. This is the pattern Blender uses when saving to an existing file:
-     *   1. PUT /modelibr/Models/{modelName}/uploaded-{modelName}.blend@  (temp upload)
-     *   2. MOVE the temp file → uploaded-{modelName}.blend (triggers version creation)
-     */
-    async createVersionViaWebDavBlendSave(
-        filePath: string,
-        modelName: string,
-    ): Promise<{ putStatus: number; moveStatus: number }> {
-        const fileBuffer = fs.readFileSync(filePath);
-        const baseUrl = process.env.API_BASE_URL || "http://localhost:8090";
-        const encodedName = encodeURIComponent(modelName);
-        const uploadedFileName = `uploaded-${modelName}`;
-
-        // Step 1: PUT the temp file (uploaded-{modelName}.blend@)
-        const putResponse = await this.client.put(
-            `/modelibr/Models/${encodedName}/${encodeURIComponent(uploadedFileName)}.blend@`,
-            fileBuffer,
-            {
-                headers: {
-                    "Content-Type": "application/octet-stream",
-                },
-                maxContentLength: Infinity,
-                maxBodyLength: Infinity,
-            },
-        );
-
-        // Step 2: MOVE temp → uploaded-{modelName}.blend
-        const moveResponse = await this.client.request({
-            method: "MOVE",
-            url: `/modelibr/Models/${encodedName}/${encodeURIComponent(uploadedFileName)}.blend@`,
-            headers: {
-                Destination: `${baseUrl}/modelibr/Models/${encodedName}/${encodeURIComponent(uploadedFileName)}.blend`,
-                Overwrite: "T",
-            },
-        });
-
-        return {
-            putStatus: putResponse.status,
-            moveStatus: moveResponse.status,
-        };
-    }
-
-    /**
-     * Same Blender Safe Save dance as {@link createVersionViaWebDavBlendSave}, but
-     * targets an explicit WebDAV folder segment instead of the bare model name.
-     * Needed once duplicate model names are allowed: two models can share a name,
-     * so the folder segment must be the disambiguated "{modelName} [{id}]" form to
-     * address one specific model (see WebDavUtilities id-suffix contract). The
-     * inner filename still uses the PLAIN model name — the folder segment already
-     * disambiguates, per the shared convention.
-     */
-    async createVersionViaWebDavBlendSaveAtFolder(
-        filePath: string,
-        folderSegment: string,
-        modelName: string,
-    ): Promise<{ putStatus: number; moveStatus: number }> {
-        const fileBuffer = fs.readFileSync(filePath);
-        const baseUrl = process.env.API_BASE_URL || "http://localhost:8090";
-        const encodedFolder = encodeURIComponent(folderSegment);
-        const uploadedFileName = `uploaded-${modelName}`;
-        const encodedFileName = encodeURIComponent(uploadedFileName);
-
-        // Step 1: PUT the temp file (uploaded-{modelName}.blend@) into the id-suffixed folder
-        const putResponse = await this.client.put(
-            `/modelibr/Models/${encodedFolder}/${encodedFileName}.blend@`,
-            fileBuffer,
-            {
-                headers: {
-                    "Content-Type": "application/octet-stream",
-                },
-                maxContentLength: Infinity,
-                maxBodyLength: Infinity,
-            },
-        );
-
-        // Step 2: MOVE temp → uploaded-{modelName}.blend, still inside the id-suffixed folder
-        const moveResponse = await this.client.request({
-            method: "MOVE",
-            url: `/modelibr/Models/${encodedFolder}/${encodedFileName}.blend@`,
-            headers: {
-                Destination: `${baseUrl}/modelibr/Models/${encodedFolder}/${encodedFileName}.blend`,
-                Overwrite: "T",
-            },
-        });
-
-        return {
-            putStatus: putResponse.status,
-            moveStatus: moveResponse.status,
-        };
-    }
-
-    /**
-     * Create a new model version by uploading a file via POST /models/{modelId}/versions.
-     * This is the HTTP API path the frontend uses (drag-drop onto model viewer).
-     */
-    async createModelVersion(
-        modelId: number,
-        filePath: string,
-        description?: string,
-        setAsActive: boolean = true,
-    ): Promise<{
-        versionId: number;
-        versionNumber: number;
-        fileId: number;
-    }> {
-        const formData = new FormData();
-        formData.append("file", fs.createReadStream(filePath));
-
-        let url = `/models/${modelId}/versions?setAsActive=${setAsActive}`;
-        if (description) {
-            url += `&description=${encodeURIComponent(description)}`;
-        }
-
-        const response = await this.client.post(url, formData, {
-            headers: formData.getHeaders(),
-        });
-
-        if (response.status !== 200 && response.status !== 201) {
-            throw new Error(
-                `Failed to create model version: ${response.status} ${response.statusText} - ${JSON.stringify(response.data)}`,
-            );
-        }
-        return response.data;
-    }
-
-    /**
-     * Get the thumbnail for a model. Returns status and content-type.
-     */
-    async getModelThumbnail(
-        modelId: number,
-    ): Promise<{ status: number; contentType?: string; size?: number }> {
-        const response = await this.client.get(`/models/${modelId}/thumbnail`, {
-            responseType: "arraybuffer",
-        });
-        return {
-            status: response.status,
-            contentType: response.headers["content-type"],
-            size: response.data?.byteLength,
-        };
-    }
-
-    /**
-     * Get the blender-enabled setting from the backend.
-     */
-    async getBlenderEnabled(): Promise<boolean> {
-        const response = await this.client.get("/settings/blender-enabled");
-        if (response.status !== 200) {
-            throw new Error(
-                `Failed to get blender-enabled: ${response.status}`,
-            );
-        }
-        return response.data.enableBlender;
-    }
-
-    /**
-     * Get blender installation status.
-     */
-    async getBlenderInstallStatus(): Promise<{
-        state: string;
-        installedVersion: string | null;
-        installedPath: string | null;
-        progress: number;
-        error: string | null;
-    }> {
-        const response = await this.client.get("/settings/blender/status");
-        if (response.status !== 200) {
-            throw new Error(`Failed to get blender status: ${response.status}`);
-        }
-        return response.data;
-    }
-
-    /**
-     * Start Blender installation (fire-and-forget). Poll getBlenderInstallStatus() for progress.
-     */
-    async installBlender(version: string): Promise<void> {
-        const response = await this.client.post("/settings/blender/install", {
-            version,
-        });
-        if (response.status !== 200) {
-            throw new Error(
-                `Failed to start blender install: ${response.status}`,
-            );
-        }
-    }
-
-    /**
-     * Install Blender and wait until installation completes.
-     * Polls status every 2 seconds. Throws if installation fails.
-     */
-    async ensureBlenderInstalled(
-        version: string,
-        timeoutMs: number = 600000,
-    ): Promise<void> {
-        const status = await this.getBlenderInstallStatus();
-        if (
-            status.state === "installed" &&
-            status.installedVersion === version
-        ) {
-            console.log(
-                `[Blender] Already installed: ${version} at ${status.installedPath}`,
-            );
-            return;
-        }
-
-        console.log(`[Blender] Installing Blender ${version}...`);
-        await this.installBlender(version);
-
-        const deadline = Date.now() + timeoutMs;
-        while (Date.now() < deadline) {
-            await new Promise((r) => setTimeout(r, 2000));
-            const s = await this.getBlenderInstallStatus();
-            if (s.state === "installed") {
-                console.log(
-                    `[Blender] Installation complete: ${s.installedVersion} at ${s.installedPath}`,
-                );
-                return;
-            }
-            if (s.state === "error" || s.state === "failed") {
-                throw new Error(
-                    `Blender installation failed: ${s.error || "unknown error"}`,
-                );
-            }
-            console.log(`[Blender] Status: ${s.state} (${s.progress}%)`);
-        }
-        throw new Error(`Blender installation timed out after ${timeoutMs}ms`);
-    }
-
-    /**
-     * Get version files for a specific model version.
-     */
-    async getModelVersionFiles(
-        modelId: number,
-        versionId: number,
-    ): Promise<any[]> {
-        const response = await this.client.get(
-            `/models/${modelId}/versions/${versionId}`,
-        );
-        if (response.status !== 200) {
-            throw new Error(`Failed to get model version: ${response.status}`);
-        }
-        return response.data.files || [];
-    }
-
-    // ── Setting helpers ────────────────────────────────────────────────
-
-    /**
-     * Update a single setting by key via PUT /settings/{key}.
-     */
-    async updateSetting(
-        key: string,
-        value: string,
-    ): Promise<{ status: number; data: any }> {
-        const response = await this.client.put(`/settings/${encodeURIComponent(key)}`, {
-            value,
-        });
-        return { status: response.status, data: response.data };
-    }
-
-    /**
-     * Get all settings via GET /settings.
-     */
-    async getSettings(): Promise<any> {
-        const response = await this.client.get("/settings");
-        if (response.status !== 200) {
-            throw new Error(`Failed to get settings: ${response.status}`);
-        }
-        return response.data;
-    }
-
-    // ── WebDAV verb helpers ──────────────────────────────────────────────
-
-    /**
-     * Send a raw WebDAV PUT with arbitrary content (or empty buffer for zero-byte tests).
-     */
-    async webdavPut(
-        path: string,
-        content: Buffer,
-    ): Promise<{ status: number; data: any }> {
-        const response = await this.client.put(path, content, {
-            headers: { "Content-Type": "application/octet-stream" },
-            maxContentLength: Infinity,
-            maxBodyLength: Infinity,
-        });
-        return { status: response.status, data: response.data };
-    }
-
-    /**
-     * Send a WebDAV LOCK request.
-     */
-    async webdavLock(
-        path: string,
-    ): Promise<{ status: number; data: any; headers: any }> {
-        const lockBody = `<?xml version="1.0" encoding="utf-8"?>
+    return response.data;
+  }
+
+  // ── WebDAV verb helpers ──────────────────────────────────────────────
+
+  /**
+   * Send a raw WebDAV PUT with arbitrary content (or empty buffer for zero-byte tests).
+   */
+  async webdavPut(
+    path: string,
+    content: Buffer,
+  ): Promise<{ status: number; data: any }> {
+    const response = await this.client.put(path, content, {
+      headers: { "Content-Type": "application/octet-stream" },
+      maxContentLength: Infinity,
+      maxBodyLength: Infinity,
+    });
+    return { status: response.status, data: response.data };
+  }
+
+  /**
+   * Send a WebDAV LOCK request.
+   */
+  async webdavLock(
+    path: string,
+  ): Promise<{ status: number; data: any; headers: any }> {
+    const lockBody = `<?xml version="1.0" encoding="utf-8"?>
 <D:lockinfo xmlns:D="DAV:">
   <D:lockscope><D:exclusive/></D:lockscope>
   <D:locktype><D:write/></D:locktype>
   <D:owner><D:href>e2e-test</D:href></D:owner>
 </D:lockinfo>`;
-        const response = await this.client.request({
-            method: "LOCK",
-            url: path,
-            data: lockBody,
-            headers: { "Content-Type": "application/xml" },
-        });
-        return {
-            status: response.status,
-            data: response.data,
-            headers: response.headers,
-        };
+    const response = await this.client.request({
+      method: "LOCK",
+      url: path,
+      data: lockBody,
+      headers: { "Content-Type": "application/xml" },
+    });
+    return {
+      status: response.status,
+      data: response.data,
+      headers: response.headers,
+    };
+  }
+
+  /**
+   * Send a WebDAV UNLOCK request.
+   */
+  async webdavUnlock(
+    path: string,
+    lockToken?: string,
+  ): Promise<{ status: number }> {
+    const response = await this.client.request({
+      method: "UNLOCK",
+      url: path,
+      headers: {
+        "Lock-Token": lockToken || "<opaquelocktoken:e2e-test>",
+      },
+    });
+    return { status: response.status };
+  }
+
+  /**
+   * Send a WebDAV HEAD request.
+   */
+  async webdavHead(path: string): Promise<{ status: number; headers: any }> {
+    const response = await this.client.head(path);
+    return { status: response.status, headers: response.headers };
+  }
+
+  /**
+   * Send a WebDAV PROPFIND request. Depth defaults to "0" (the resource itself);
+   * pass "1" to list a collection's immediate children.
+   */
+  async webdavPropfind(
+    path: string,
+    depth: "0" | "1" = "0",
+  ): Promise<{ status: number; data: any }> {
+    const response = await this.client.request({
+      method: "PROPFIND",
+      url: path,
+      headers: { Depth: depth, "Content-Type": "application/xml" },
+    });
+    return { status: response.status, data: response.data };
+  }
+
+  /**
+   * Send a WebDAV DELETE request.
+   */
+  async webdavDelete(path: string): Promise<{ status: number }> {
+    const response = await this.client.delete(path);
+    return { status: response.status };
+  }
+
+  /**
+   * Send a WebDAV MOVE request.
+   */
+  async webdavMove(
+    sourcePath: string,
+    destinationPath: string,
+  ): Promise<{ status: number }> {
+    const baseUrl = process.env.API_BASE_URL || "http://localhost:8090";
+    const response = await this.client.request({
+      method: "MOVE",
+      url: sourcePath,
+      headers: {
+        Destination: `${baseUrl}${destinationPath}`,
+        Overwrite: "T",
+      },
+    });
+    return { status: response.status };
+  }
+
+  /**
+   * Send a WebDAV GET request (for temp file existence checks).
+   */
+  async webdavGet(path: string): Promise<{ status: number; data: any }> {
+    const response = await this.client.get(path, {
+      responseType: "arraybuffer",
+    });
+    return { status: response.status, data: response.data };
+  }
+
+  /**
+   * Associate a texture set with a model version for a specific material and variant (preset)
+   */
+  async linkTextureSetToModelWithVariant(
+    textureSetId: number,
+    modelVersionId: number,
+    materialName: string,
+    variantName: string,
+  ): Promise<void> {
+    const params = new URLSearchParams();
+    if (materialName) params.append("materialName", materialName);
+    if (variantName) params.append("variantName", variantName);
+
+    const url = `/texture-sets/${textureSetId}/model-versions/${modelVersionId}${params.toString() ? `?${params.toString()}` : ""}`;
+    const response = await this.client.post(url);
+
+    if (
+      response.status !== 200 &&
+      response.status !== 201 &&
+      response.status !== 204
+    ) {
+      if (
+        response.status === 400 &&
+        response.data?.error === "AssociationAlreadyExists"
+      ) {
+        return;
+      }
+      throw new Error(
+        `Failed to link texture set with variant: ${response.status} ${response.statusText}`,
+      );
     }
+  }
 
-    /**
-     * Send a WebDAV UNLOCK request.
-     */
-    async webdavUnlock(
-        path: string,
-        lockToken?: string,
-    ): Promise<{ status: number }> {
-        const response = await this.client.request({
-            method: "UNLOCK",
-            url: path,
-            headers: {
-                "Lock-Token": lockToken || "<opaquelocktoken:e2e-test>",
-            },
-        });
-        return { status: response.status };
+  /**
+   * Set the main variant (preset) for a model version
+   */
+  async setMainVariant(
+    modelVersionId: number,
+    variantName: string,
+  ): Promise<void> {
+    const response = await this.client.put(
+      `/model-versions/${modelVersionId}/main-variant`,
+      { variantName },
+    );
+
+    if (response.status !== 200 && response.status !== 204) {
+      throw new Error(
+        `Failed to set main variant: ${response.status} ${response.statusText}`,
+      );
     }
+  }
 
-    /**
-     * Send a WebDAV HEAD request.
-     */
-    async webdavHead(path: string): Promise<{ status: number; headers: any }> {
-        const response = await this.client.head(path);
-        return { status: response.status, headers: response.headers };
+  /**
+   * Regenerate thumbnail for a model
+   */
+  async regenerateThumbnail(
+    modelId: number,
+    modelVersionId: number,
+  ): Promise<void> {
+    const response = await this.client.post(
+      `/models/${modelId}/thumbnail/regenerate?versionId=${modelVersionId}`,
+    );
+
+    if (response.status !== 200 && response.status !== 202) {
+      throw new Error(
+        `Failed to regenerate thumbnail: ${response.status} ${response.statusText}`,
+      );
     }
+  }
 
-    /**
-     * Send a WebDAV PROPFIND request. Depth defaults to "0" (the resource itself);
-     * pass "1" to list a collection's immediate children.
-     */
-    async webdavPropfind(
-        path: string,
-        depth: "0" | "1" = "0",
-    ): Promise<{ status: number; data: any }> {
-        const response = await this.client.request({
-            method: "PROPFIND",
-            url: path,
-            headers: { Depth: depth, "Content-Type": "application/xml" },
-        });
-        return { status: response.status, data: response.data };
+  /**
+   * Add a variant (preset) name to a model version
+   */
+  async addVariantName(
+    modelVersionId: number,
+    variantName: string,
+  ): Promise<void> {
+    const response = await this.client.post(
+      `/model-versions/${modelVersionId}/variants`,
+      { variantName },
+    );
+
+    if (response.status !== 204 && response.status !== 200) {
+      throw new Error(
+        `Failed to add variant name: ${response.status} ${response.statusText}`,
+      );
     }
+  }
 
-    /**
-     * Send a WebDAV DELETE request.
-     */
-    async webdavDelete(path: string): Promise<{ status: number }> {
-        const response = await this.client.delete(path);
-        return { status: response.status };
+  /**
+   * Remove a variant (preset) name from a model version
+   */
+  async removeVariantName(
+    modelVersionId: number,
+    variantName: string,
+  ): Promise<void> {
+    const response = await this.client.delete(
+      `/model-versions/${modelVersionId}/variants/${encodeURIComponent(variantName)}`,
+    );
+
+    if (response.status !== 204 && response.status !== 200) {
+      throw new Error(
+        `Failed to remove variant name: ${response.status} ${response.statusText}`,
+      );
     }
+  }
 
-    /**
-     * Send a WebDAV MOVE request.
-     */
-    async webdavMove(
-        sourcePath: string,
-        destinationPath: string,
-    ): Promise<{ status: number }> {
-        const baseUrl = process.env.API_BASE_URL || "http://localhost:8090";
-        const response = await this.client.request({
-            method: "MOVE",
-            url: sourcePath,
-            headers: {
-                Destination: `${baseUrl}${destinationPath}`,
-                Overwrite: "T",
-            },
-        });
-        return { status: response.status };
-    }
-
-    /**
-     * Send a WebDAV GET request (for temp file existence checks).
-     */
-    async webdavGet(path: string): Promise<{ status: number; data: any }> {
-        const response = await this.client.get(path, {
-            responseType: "arraybuffer",
-        });
-        return { status: response.status, data: response.data };
-    }
-
-    /**
-     * Associate a texture set with a model version for a specific material and variant (preset)
-     */
-    async linkTextureSetToModelWithVariant(
-        textureSetId: number,
-        modelVersionId: number,
-        materialName: string,
-        variantName: string,
-    ): Promise<void> {
-        const params = new URLSearchParams();
-        if (materialName) params.append("materialName", materialName);
-        if (variantName) params.append("variantName", variantName);
-
-        const url = `/texture-sets/${textureSetId}/model-versions/${modelVersionId}${params.toString() ? `?${params.toString()}` : ""}`;
-        const response = await this.client.post(url);
-
-        if (
-            response.status !== 200 &&
-            response.status !== 201 &&
-            response.status !== 204
-        ) {
-            if (
-                response.status === 400 &&
-                response.data?.error === "AssociationAlreadyExists"
-            ) {
-                return;
-            }
-            throw new Error(
-                `Failed to link texture set with variant: ${response.status} ${response.statusText}`,
-            );
-        }
-    }
-
-    /**
-     * Set the main variant (preset) for a model version
-     */
-    async setMainVariant(
-        modelVersionId: number,
-        variantName: string,
-    ): Promise<void> {
-        const response = await this.client.put(
-            `/model-versions/${modelVersionId}/main-variant`,
-            { variantName },
-        );
-
-        if (response.status !== 200 && response.status !== 204) {
-            throw new Error(
-                `Failed to set main variant: ${response.status} ${response.statusText}`,
-            );
-        }
-    }
-
-    /**
-     * Regenerate thumbnail for a model
-     */
-    async regenerateThumbnail(
-        modelId: number,
-        modelVersionId: number,
-    ): Promise<void> {
-        const response = await this.client.post(
-            `/models/${modelId}/thumbnail/regenerate?versionId=${modelVersionId}`,
-        );
-
-        if (response.status !== 200 && response.status !== 202) {
-            throw new Error(
-                `Failed to regenerate thumbnail: ${response.status} ${response.statusText}`,
-            );
-        }
-    }
-
-    /**
-     * Add a variant (preset) name to a model version
-     */
-    async addVariantName(
-        modelVersionId: number,
-        variantName: string,
-    ): Promise<void> {
-        const response = await this.client.post(
-            `/model-versions/${modelVersionId}/variants`,
-            { variantName },
-        );
-
-        if (response.status !== 204 && response.status !== 200) {
-            throw new Error(
-                `Failed to add variant name: ${response.status} ${response.statusText}`,
-            );
-        }
-    }
-
-    /**
-     * Remove a variant (preset) name from a model version
-     */
-    async removeVariantName(
-        modelVersionId: number,
-        variantName: string,
-    ): Promise<void> {
-        const response = await this.client.delete(
-            `/model-versions/${modelVersionId}/variants/${encodeURIComponent(variantName)}`,
-        );
-
-        if (response.status !== 204 && response.status !== 200) {
-            throw new Error(
-                `Failed to remove variant name: ${response.status} ${response.statusText}`,
-            );
-        }
-    }
-
-    /**
-     * Get a single model version's details (including variantNames, mainVariantName, textureMappings)
-     */
-    async getModelVersionDetail(
-        modelId: number,
-        modelVersionId: number,
-    ): Promise<any> {
-        const versions = await this.getModelVersions(modelId);
-        return versions.find((v: any) => v.id === modelVersionId) ?? null;
-    }
+  /**
+   * Get a single model version's details (including variantNames, mainVariantName, textureMappings)
+   */
+  async getModelVersionDetail(
+    modelId: number,
+    modelVersionId: number,
+  ): Promise<any> {
+    const versions = await this.getModelVersions(modelId);
+    return versions.find((v: any) => v.id === modelVersionId) ?? null;
+  }
 }
