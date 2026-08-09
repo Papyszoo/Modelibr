@@ -20,17 +20,23 @@ namespace WebApi.Mcp;
 /// stays read-only and enabling writes is a deliberate, operator-scoped opt-in.
 ///
 /// Every write <b>claims</b> its caller-supplied <c>idempotencyKey</c> in
-/// <see cref="Domain.Models.AgentOperationLog"/> before applying anything, completes the
-/// entry on success, and releases it if the write failed. Claiming first (rather than
-/// looking the key up and then writing) is what makes a concurrent batch import safe:
-/// with a lookup, two in-flight calls sharing a key both pass the check and both apply.
+/// <see cref="Domain.Models.AgentOperationLog"/> before applying anything. Claiming first
+/// (rather than looking the key up and then writing) is what makes a concurrent batch
+/// import safe: with a lookup, two in-flight calls sharing a key both pass the check and
+/// both apply.
+///
+/// Claiming first also means a claim row is <b>not</b> evidence the write happened, so
+/// every tool body runs through <see cref="Guarded{T}"/>: only a Completed entry replays
+/// as <c>already-applied</c>, a live claim answers <c>in-progress</c> (retryable), and any
+/// exit path — returned failure, thrown exception, cancellation — releases the claim
+/// rather than leaving the key permanently burned on an operation that never ran.
 /// </summary>
 [McpServerToolType]
 public sealed class AssetWriteMcpTools
 {
     [McpServerTool(Name = "set_tags")]
     [Description("Set a model's tags (and optional description), preserving its assigned category. Idempotent per idempotencyKey.")]
-    public static async Task<object> SetTags(
+    public static Task<object> SetTags(
         IQueryHandler<GetModelByIdQuery, GetModelByIdQueryResponse> getHandler,
         ICommandHandler<UpdateModelTagsCommand, UpdateModelTagsResponse> updateHandler,
         IAgentAudit audit,
@@ -40,38 +46,37 @@ public sealed class AssetWriteMcpTools
         [Description("Optional description; omit to leave unchanged.")] string? description = null,
         CancellationToken cancellationToken = default)
     {
-        var prior = await audit.TryBeginAsync(
-            new AgentWrite(idempotencyKey, "set-tags", "Model", modelId), cancellationToken);
-        if (prior is not null)
-        {
-            return AlreadyApplied(prior);
-        }
+        return Guarded(
+            audit,
+            new AgentWrite(idempotencyKey, "set-tags", "Model", modelId),
+            async ct =>
+            {
+                // Preserve the current category (UpdateModelTags rewrites all metadata together).
+                var current = await getHandler.Handle(new GetModelByIdQuery(modelId), ct);
+                if (current.IsFailure)
+                {
+                    return Failed(current.Error);
+                }
+                var categoryId = current.Value.Model.Category?.Id;
+                var effectiveDescription = description ?? current.Value.Model.Description;
 
-        // Preserve the current category (UpdateModelTags rewrites all metadata together).
-        var current = await getHandler.Handle(new GetModelByIdQuery(modelId), cancellationToken);
-        if (current.IsFailure)
-        {
-            await audit.AbandonAsync(idempotencyKey, cancellationToken);
-            return Error(current.Error);
-        }
-        var categoryId = current.Value.Model.Category?.Id;
-        var effectiveDescription = description ?? current.Value.Model.Description;
+                var result = await updateHandler.Handle(
+                    new UpdateModelTagsCommand(modelId, tags, effectiveDescription, categoryId), ct);
+                if (result.IsFailure)
+                {
+                    return Failed(result.Error);
+                }
 
-        var result = await updateHandler.Handle(
-            new UpdateModelTagsCommand(modelId, tags, effectiveDescription, categoryId), cancellationToken);
-        if (result.IsFailure)
-        {
-            await audit.AbandonAsync(idempotencyKey, cancellationToken);
-            return Error(result.Error);
-        }
-
-        await audit.CompleteAsync(idempotencyKey, "Model", modelId, Json(result.Value), cancellationToken);
-        return new { status = "ok", model = result.Value };
+                return Applied(
+                    new { status = "ok", model = result.Value },
+                    "Model", modelId, result.Value);
+            },
+            cancellationToken);
     }
 
     [McpServerTool(Name = "set_category")]
     [Description("Assign (or clear, with categoryId=null) a model's category without touching tags. Idempotent per idempotencyKey.")]
-    public static async Task<object> SetCategory(
+    public static Task<object> SetCategory(
         ICommandHandler<SetModelCategoryCommand, SetModelCategoryResponse> handler,
         IAgentAudit audit,
         [Description("Target model id.")] int modelId,
@@ -79,27 +84,22 @@ public sealed class AssetWriteMcpTools
         [Description("Category id to assign, or null to clear.")] int? categoryId = null,
         CancellationToken cancellationToken = default)
     {
-        var prior = await audit.TryBeginAsync(
-            new AgentWrite(idempotencyKey, "set-category", "Model", modelId), cancellationToken);
-        if (prior is not null)
-        {
-            return AlreadyApplied(prior);
-        }
-
-        var result = await handler.Handle(new SetModelCategoryCommand(modelId, categoryId), cancellationToken);
-        if (result.IsFailure)
-        {
-            await audit.AbandonAsync(idempotencyKey, cancellationToken);
-            return Error(result.Error);
-        }
-
-        await audit.CompleteAsync(idempotencyKey, "Model", modelId, Json(result.Value), cancellationToken);
-        return new { status = "ok", model = result.Value };
+        return Guarded(
+            audit,
+            new AgentWrite(idempotencyKey, "set-category", "Model", modelId),
+            async ct =>
+            {
+                var result = await handler.Handle(new SetModelCategoryCommand(modelId, categoryId), ct);
+                return result.IsFailure
+                    ? Failed(result.Error)
+                    : Applied(new { status = "ok", model = result.Value }, "Model", modelId, result.Value);
+            },
+            cancellationToken);
     }
 
     [McpServerTool(Name = "create_pack")]
     [Description("Create a new pack (a curated collection). Idempotent per idempotencyKey.")]
-    public static async Task<object> CreatePack(
+    public static Task<object> CreatePack(
         ICommandHandler<CreatePackCommand, CreatePackResponse> handler,
         IAgentAudit audit,
         [Description("Pack name.")] string name,
@@ -107,27 +107,22 @@ public sealed class AssetWriteMcpTools
         [Description("Optional description.")] string? description = null,
         CancellationToken cancellationToken = default)
     {
-        var prior = await audit.TryBeginAsync(
-            new AgentWrite(idempotencyKey, "create-pack", "Pack"), cancellationToken);
-        if (prior is not null)
-        {
-            return AlreadyApplied(prior);
-        }
-
-        var result = await handler.Handle(new CreatePackCommand(name, description, null, null), cancellationToken);
-        if (result.IsFailure)
-        {
-            await audit.AbandonAsync(idempotencyKey, cancellationToken);
-            return Error(result.Error);
-        }
-
-        await audit.CompleteAsync(idempotencyKey, "Pack", result.Value.Id, Json(result.Value), cancellationToken);
-        return new { status = "ok", pack = result.Value };
+        return Guarded(
+            audit,
+            new AgentWrite(idempotencyKey, "create-pack", "Pack"),
+            async ct =>
+            {
+                var result = await handler.Handle(new CreatePackCommand(name, description, null, null), ct);
+                return result.IsFailure
+                    ? Failed(result.Error)
+                    : Applied(new { status = "ok", pack = result.Value }, "Pack", result.Value.Id, result.Value);
+            },
+            cancellationToken);
     }
 
     [McpServerTool(Name = "add_to_pack")]
     [Description("Add a model to a pack. Idempotent per idempotencyKey.")]
-    public static async Task<object> AddToPack(
+    public static Task<object> AddToPack(
         ICommandHandler<AddModelToPackCommand> handler,
         IAgentAudit audit,
         [Description("Target pack id.")] int packId,
@@ -135,28 +130,22 @@ public sealed class AssetWriteMcpTools
         [Description("Unique key so a retried call does not re-add.")] string idempotencyKey,
         CancellationToken cancellationToken = default)
     {
-        var prior = await audit.TryBeginAsync(
-            new AgentWrite(idempotencyKey, "add-to-pack", "Model", modelId), cancellationToken);
-        if (prior is not null)
-        {
-            return AlreadyApplied(prior);
-        }
-
-        var result = await handler.Handle(new AddModelToPackCommand(packId, modelId), cancellationToken);
-        if (result.IsFailure)
-        {
-            await audit.AbandonAsync(idempotencyKey, cancellationToken);
-            return Error(result.Error);
-        }
-
-        await audit.CompleteAsync(
-            idempotencyKey, "Model", modelId, Json(new { packId, modelId }), cancellationToken);
-        return new { status = "ok", packId, modelId };
+        return Guarded(
+            audit,
+            new AgentWrite(idempotencyKey, "add-to-pack", "Model", modelId),
+            async ct =>
+            {
+                var result = await handler.Handle(new AddModelToPackCommand(packId, modelId), ct);
+                return result.IsFailure
+                    ? Failed(result.Error)
+                    : Applied(new { status = "ok", packId, modelId }, "Model", modelId, new { packId, modelId });
+            },
+            cancellationToken);
     }
 
     [McpServerTool(Name = "trigger_rederive")]
     [Description("Queue a re-extraction of an asset so its parts, derived signals, and search index (incl. semantic labels) are rebuilt. Idempotent — a live job is reused.")]
-    public static async Task<object> TriggerRederive(
+    public static Task<object> TriggerRederive(
         ICommandHandler<EnqueueExtractionJobCommand, EnqueueExtractionJobResponse> handler,
         IAgentAudit audit,
         [Description("Asset family, e.g. Model.")] string assetType,
@@ -165,29 +154,25 @@ public sealed class AssetWriteMcpTools
         [Description("Version id (models); omit for non-versioned families.")] int? versionId = null,
         CancellationToken cancellationToken = default)
     {
-        var prior = await audit.TryBeginAsync(
-            new AgentWrite(idempotencyKey, "trigger-rederive", assetType, assetId), cancellationToken);
-        if (prior is not null)
-        {
-            return AlreadyApplied(prior);
-        }
-
-        var result = await handler.Handle(
-            new EnqueueExtractionJobCommand(assetType, assetId, versionId), cancellationToken);
-        if (result.IsFailure)
-        {
-            await audit.AbandonAsync(idempotencyKey, cancellationToken);
-            return Error(result.Error);
-        }
-
-        await audit.CompleteAsync(
-            idempotencyKey, assetType, assetId, Json(result.Value), cancellationToken);
-        return new { status = "ok", jobId = result.Value.JobId, alreadyQueued = result.Value.AlreadyQueued };
+        return Guarded(
+            audit,
+            new AgentWrite(idempotencyKey, "trigger-rederive", assetType, assetId),
+            async ct =>
+            {
+                var result = await handler.Handle(
+                    new EnqueueExtractionJobCommand(assetType, assetId, versionId), ct);
+                return result.IsFailure
+                    ? Failed(result.Error)
+                    : Applied(
+                        new { status = "ok", jobId = result.Value.JobId, alreadyQueued = result.Value.AlreadyQueued },
+                        assetType, assetId, result.Value);
+            },
+            cancellationToken);
     }
 
     [McpServerTool(Name = "import_model")]
     [Description("Import a model. Co-located: pass a server-readable file `path` and it is imported. Remote (client != server): omit `path` to get the HTTP upload endpoints to stream bytes to (control plane here, data plane over HTTP).")]
-    public static async Task<object> ImportModel(
+    public static Task<object> ImportModel(
         ICommandHandler<AddModelCommand, AddModelCommandResponse> handler,
         IAgentAudit audit,
         [Description("Unique key so a retried call does not re-import.")] string idempotencyKey,
@@ -199,51 +184,113 @@ public sealed class AssetWriteMcpTools
         // No claim is taken — nothing has been written, so a repeat is free.
         if (string.IsNullOrWhiteSpace(path))
         {
-            return new
+            return Task.FromResult<object>(new
             {
                 status = "upload-required",
                 message = "The MCP server can't read a client-side path. Stream the file to the HTTP data plane, then finalise with set_category / add_to_pack.",
                 uploadEndpoint = "POST /models (multipart form field 'file')",
                 multiFileEndpoint = "POST /models/multifile (loose .gltf + external .bin/textures)",
                 zipEndpoint = "POST /models/zip",
-            };
+            });
         }
 
-        var prior = await audit.TryBeginAsync(
-            new AgentWrite(idempotencyKey, "import-model", "Model"), cancellationToken);
-        if (prior is not null)
+        return Guarded(
+            audit,
+            new AgentWrite(idempotencyKey, "import-model", "Model"),
+            async ct =>
+            {
+                if (!File.Exists(path))
+                {
+                    return Failed(new { error = "PathNotFound", message = $"No file readable by the server at '{path}'." });
+                }
+
+                byte[] bytes;
+                try
+                {
+                    bytes = await File.ReadAllBytesAsync(path, ct);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    return Failed(new { error = "PathUnreadable", message = ex.Message });
+                }
+
+                var upload = new InMemoryFileUpload(Path.GetFileName(path), bytes);
+                var result = await handler.Handle(new AddModelCommand(upload, name), ct);
+                if (result.IsFailure)
+                {
+                    return Failed(result.Error);
+                }
+
+                return Applied(
+                    new { status = "ok", modelId = result.Value.Id, alreadyExists = result.Value.AlreadyExists },
+                    "Model", result.Value.Id, result.Value);
+            },
+            cancellationToken);
+    }
+
+    // ---- claim plumbing -------------------------------------------------------------
+
+    /// <summary>What a guarded tool body produced, and what the audit entry should record.</summary>
+    private sealed record ToolOutcome(
+        object Response,
+        bool Succeeded,
+        string? AssetType = null,
+        int? AssetId = null,
+        object? Payload = null);
+
+    private static ToolOutcome Applied(object response, string? assetType, int? assetId, object payload) =>
+        new(response, Succeeded: true, assetType, assetId, payload);
+
+    private static ToolOutcome Failed(SharedKernel.Error error) =>
+        new(new { error = error.Code, message = error.Message }, Succeeded: false);
+
+    private static ToolOutcome Failed(object response) => new(response, Succeeded: false);
+
+    /// <summary>
+    /// Claims the key, runs <paramref name="body"/>, and settles the claim on every exit
+    /// path. A thrown exception or a cancellation releases the claim before propagating —
+    /// otherwise a crashed call would leave the key Pending and a later retry would be
+    /// told the operation was already applied when nothing had been.
+    /// </summary>
+    private static async Task<object> Guarded(
+        IAgentAudit audit,
+        AgentWrite write,
+        Func<CancellationToken, Task<ToolOutcome>> body,
+        CancellationToken cancellationToken)
+    {
+        var claim = await audit.TryBeginAsync(write, cancellationToken);
+        switch (claim.Outcome)
         {
-            return AlreadyApplied(prior);
+            case AgentClaimOutcome.AlreadyApplied:
+                return AlreadyApplied(claim.Entry!);
+            case AgentClaimOutcome.InProgress:
+                return InProgress(claim.Entry!);
         }
 
-        if (!File.Exists(path))
-        {
-            await audit.AbandonAsync(idempotencyKey, cancellationToken);
-            return new { error = "PathNotFound", message = $"No file readable by the server at '{path}'." };
-        }
-
-        byte[] bytes;
         try
         {
-            bytes = await File.ReadAllBytesAsync(path, cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            await audit.AbandonAsync(idempotencyKey, cancellationToken);
-            return new { error = "PathUnreadable", message = ex.Message };
-        }
+            var outcome = await body(cancellationToken);
+            if (!outcome.Succeeded)
+            {
+                await audit.AbandonAsync(write.IdempotencyKey, CancellationToken.None);
+                return outcome.Response;
+            }
 
-        var upload = new InMemoryFileUpload(Path.GetFileName(path), bytes);
-        var result = await handler.Handle(new AddModelCommand(upload, name), cancellationToken);
-        if (result.IsFailure)
-        {
-            await audit.AbandonAsync(idempotencyKey, cancellationToken);
-            return Error(result.Error);
+            await audit.CompleteAsync(
+                write.IdempotencyKey,
+                outcome.AssetType,
+                outcome.AssetId,
+                outcome.Payload is null ? null : Json(outcome.Payload),
+                CancellationToken.None);
+            return outcome.Response;
         }
-
-        await audit.CompleteAsync(
-            idempotencyKey, "Model", result.Value.Id, Json(result.Value), cancellationToken);
-        return new { status = "ok", modelId = result.Value.Id, alreadyExists = result.Value.AlreadyExists };
+        catch
+        {
+            // CancellationToken.None on purpose: the caller's token may already be
+            // cancelled, and releasing the claim is exactly what must still happen.
+            await audit.AbandonAsync(write.IdempotencyKey, CancellationToken.None);
+            throw;
+        }
     }
 
     private static object AlreadyApplied(Domain.Models.AgentOperationLog prior) => new
@@ -251,10 +298,17 @@ public sealed class AssetWriteMcpTools
         status = "already-applied",
         operation = prior.Operation,
         performedAt = prior.PerformedAt,
+        completedAt = prior.CompletedAt,
         assetId = prior.AssetId,
     };
 
-    private static object Error(SharedKernel.Error error) => new { error = error.Code, message = error.Message };
+    private static object InProgress(Domain.Models.AgentOperationLog prior) => new
+    {
+        status = "in-progress",
+        operation = prior.Operation,
+        claimedAt = prior.ClaimedAt,
+        message = "Another call is applying this idempotency key. It has NOT been applied yet — retry, and it will either complete or be retried for you once the claim lapses.",
+    };
 
     private static string Json(object value) => JsonSerializer.Serialize(value);
 }

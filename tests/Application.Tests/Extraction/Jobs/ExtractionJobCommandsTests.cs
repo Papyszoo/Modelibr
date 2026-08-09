@@ -185,11 +185,53 @@ public class ExtractionJobCommandsTests
         var uow = new Mock<IUnitOfWork>();
 
         var handler = new FinishExtractionJobCommandHandler(repo.Object, Clock().Object, uow.Object);
-        var result = await handler.Handle(new FinishExtractionJobCommand(job.Id, Success: true), CancellationToken.None);
+        var result = await handler.Handle(
+            new FinishExtractionJobCommand(job.Id, "w1", Success: true), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(Domain.ValueObjects.ExtractionJobStatus.Done, job.Status);
         uow.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Finish_From_A_Worker_That_No_Longer_Holds_The_Claim_Is_Rejected()
+    {
+        // Regression: an expired lease let another worker re-claim the job. Without an
+        // ownership check the original worker could come back and overwrite the newer
+        // run's outcome — marking Done a job the current owner never finished.
+        var job = ExtractionJob.Create("Model", 42, ExtractorFamilies.Geometry, Now);
+        job.TryClaim("w1", Now);
+        job.MarkAsFailed("lease expired", Now);   // released back to the queue
+        job.TryClaim("w2", Now);                  // re-claimed by a different worker
+        var repo = new Mock<IExtractionJobRepository>();
+        repo.Setup(r => r.GetByIdAsync(job.Id, It.IsAny<CancellationToken>())).ReturnsAsync(job);
+        var uow = new Mock<IUnitOfWork>();
+
+        var handler = new FinishExtractionJobCommandHandler(repo.Object, Clock().Object, uow.Object);
+        var result = await handler.Handle(
+            new FinishExtractionJobCommand(job.Id, "w1", Success: true), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("ExtractionJobLeaseLost", result.Error.Code);
+        Assert.Equal(Domain.ValueObjects.ExtractionJobStatus.Processing, job.Status);
+        uow.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Finish_On_An_Unclaimed_Job_Is_Rejected()
+    {
+        var job = ExtractionJob.Create("Model", 42, ExtractorFamilies.Geometry, Now);
+        var repo = new Mock<IExtractionJobRepository>();
+        repo.Setup(r => r.GetByIdAsync(job.Id, It.IsAny<CancellationToken>())).ReturnsAsync(job);
+        var uow = new Mock<IUnitOfWork>();
+
+        var handler = new FinishExtractionJobCommandHandler(repo.Object, Clock().Object, uow.Object);
+        var result = await handler.Handle(
+            new FinishExtractionJobCommand(job.Id, "w1", Success: true), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("ExtractionJobNotClaimed", result.Error.Code);
+        uow.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -199,7 +241,8 @@ public class ExtractionJobCommandsTests
         repo.Setup(r => r.GetByIdAsync(99, It.IsAny<CancellationToken>())).ReturnsAsync((ExtractionJob?)null);
 
         var handler = new FinishExtractionJobCommandHandler(repo.Object, Clock().Object, new Mock<IUnitOfWork>().Object);
-        var result = await handler.Handle(new FinishExtractionJobCommand(99, Success: true), CancellationToken.None);
+        var result = await handler.Handle(
+            new FinishExtractionJobCommand(99, "w1", Success: true), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("ExtractionJobNotFound", result.Error.Code);

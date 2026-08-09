@@ -7,30 +7,47 @@ namespace Application.Abstractions.Repositories;
 /// enforced by <b>claiming</b> the caller-supplied key before a write is applied — a
 /// lookup-then-write check is not enough, because two concurrent calls carrying the
 /// same key both pass the lookup and both apply the write.
+///
+/// Because the claim precedes the mutation, the claim row itself carries a status: a
+/// row's mere existence proves only that someone started, never that anything landed.
 /// </summary>
 public interface IAgentOperationLogRepository
 {
     /// <summary>
-    /// Reserves <paramref name="claim"/>'s idempotency key by inserting it immediately.
-    /// Returns <c>null</c> when the key was free (the caller owns the claim and may apply
-    /// its write), or the entry that already holds the key (the caller must not re-apply).
+    /// Reserves <paramref name="claim"/>'s idempotency key. Returns <c>null</c> when the
+    /// caller now owns the claim and must apply its write; otherwise the entry that holds
+    /// the key, whose <see cref="AgentOperationLog.Status"/> tells the caller whether the
+    /// operation already completed or is still in flight.
+    ///
+    /// A claim left <c>Pending</c> for longer than <paramref name="leaseMinutes"/> is
+    /// treated as abandoned (its owner crashed between claiming and mutating) and is
+    /// taken over atomically, so one dead caller cannot wedge a key forever.
     /// </summary>
-    Task<AgentOperationLog?> TryClaimAsync(AgentOperationLog claim, CancellationToken cancellationToken = default);
+    Task<AgentOperationLog?> TryClaimAsync(
+        AgentOperationLog claim,
+        int leaseMinutes,
+        DateTime now,
+        CancellationToken cancellationToken = default);
 
-    /// <summary>Fills in the outcome of a write that succeeded, on an owned claim.</summary>
+    /// <summary>Marks an owned claim Completed — the only state a retry may replay as applied.</summary>
     Task CompleteClaimAsync(
         string idempotencyKey,
         string? assetType,
         int? assetId,
         string? payloadAfter,
+        DateTime completedAt,
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Releases an owned claim whose write failed, so a genuine retry is not turned away
-    /// as "already applied" for an operation that never happened.
+    /// Marks an owned claim Failed, so a genuine retry is not turned away as
+    /// "already applied" for an operation that never happened. The row is kept rather
+    /// than deleted: the audit log should record the attempt.
     /// </summary>
-    Task ReleaseClaimAsync(string idempotencyKey, CancellationToken cancellationToken = default);
+    Task FailClaimAsync(
+        string idempotencyKey,
+        DateTime failedAt,
+        CancellationToken cancellationToken = default);
 
-    /// <summary>The entry for an idempotency key, if the operation already ran.</summary>
+    /// <summary>The entry for an idempotency key, if one exists.</summary>
     Task<AgentOperationLog?> GetByIdempotencyKeyAsync(string idempotencyKey, CancellationToken cancellationToken = default);
 }

@@ -89,7 +89,8 @@ public static class ExtractionEndpoints
         CancellationToken cancellationToken)
     {
         var result = await commandHandler.Handle(
-            new FinishExtractionJobCommand(id, request.Success, request.ErrorMessage, request.WarningDetail),
+            new FinishExtractionJobCommand(
+                id, request.WorkerId ?? string.Empty, request.Success, request.ErrorMessage, request.WarningDetail),
             cancellationToken);
 
         if (result.IsFailure)
@@ -224,4 +225,5 @@ public record StoreComputeResultRequest(
 
 public record DequeueExtractionJobRequest(string? WorkerId, string? ExtractorFamily);
 
-public record FinishExtractionJobRequest(bool Success, string? ErrorMessage, string? WarningDetail);
+/// <summary><c>WorkerId</c> must be the worker that holds the claim — a lapsed lease may not report an outcome.</summary>
+public record FinishExtractionJobRequest(string? WorkerId, bool Success, string? ErrorMessage, string? WarningDetail);

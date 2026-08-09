@@ -28,7 +28,18 @@ public class AssetWriteMcpToolsTests
     {
         var audit = new Mock<IAgentAudit>();
         audit.Setup(a => a.TryBeginAsync(It.IsAny<AgentWrite>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((AgentOperationLog?)null);
+            .ReturnsAsync(new AgentClaim(AgentClaimOutcome.Owned, null));
+        return audit;
+    }
+
+    /// <summary>An audit reporting the key already ran to completion.</summary>
+    private static Mock<IAgentAudit> ClaimCompleted(string key, string operation, string? assetType, int? assetId)
+    {
+        var entry = AgentOperationLog.Create(key, operation, Now, assetType: assetType, assetId: assetId);
+        entry.MarkCompleted(Now, assetType, assetId, "{}");
+        var audit = new Mock<IAgentAudit>();
+        audit.Setup(a => a.TryBeginAsync(It.IsAny<AgentWrite>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AgentClaim(AgentClaimOutcome.AlreadyApplied, entry));
         return audit;
     }
 
@@ -54,9 +65,7 @@ public class AssetWriteMcpToolsTests
     public async Task SetCategory_Is_Idempotent_And_Skips_The_Write()
     {
         var handler = new Mock<ICommandHandler<SetModelCategoryCommand, SetModelCategoryResponse>>();
-        var audit = new Mock<IAgentAudit>();
-        audit.Setup(a => a.TryBeginAsync(It.IsAny<AgentWrite>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(AgentOperationLog.Create("key-1", "set-category", Now, assetType: "Model", assetId: 1));
+        var audit = ClaimCompleted("key-1", "set-category", "Model", 1);
 
         var result = await AssetWriteMcpTools.SetCategory(handler.Object, audit.Object, 1, "key-1", 5);
 
@@ -94,14 +103,70 @@ public class AssetWriteMcpToolsTests
         // created the pack anyway — two concurrent calls with one key produced TWO Packs
         // rows and a unique-violation 500. Losing the claim must skip the handler.
         var handler = new Mock<ICommandHandler<CreatePackCommand, CreatePackResponse>>();
-        var audit = new Mock<IAgentAudit>();
-        audit.Setup(a => a.TryBeginAsync(It.IsAny<AgentWrite>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(AgentOperationLog.Create("key-1", "create-pack", Now, assetType: "Pack", assetId: 4));
+        var audit = ClaimCompleted("key-1", "create-pack", "Pack", 4);
 
         var result = await AssetWriteMcpTools.CreatePack(handler.Object, audit.Object, "Race Probe", "key-1");
 
         Assert.Contains("already-applied", Json(result));
         handler.Verify(h => h.Handle(It.IsAny<CreatePackCommand>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task A_Live_Claim_Reports_In_Progress_Rather_Than_Already_Applied()
+    {
+        // Regression: the claim row is written BEFORE the mutation, so "a row exists"
+        // never proved the write landed. Answering already-applied for a Pending claim
+        // told a retrying agent its mutation had been applied when the original caller
+        // may have crashed before touching anything.
+        var pending = AgentOperationLog.Create("key-7", "create-pack", Now, assetType: "Pack");
+        var handler = new Mock<ICommandHandler<CreatePackCommand, CreatePackResponse>>();
+        var audit = new Mock<IAgentAudit>();
+        audit.Setup(a => a.TryBeginAsync(It.IsAny<AgentWrite>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AgentClaim(AgentClaimOutcome.InProgress, pending));
+
+        var result = await AssetWriteMcpTools.CreatePack(handler.Object, audit.Object, "Race Probe", "key-7");
+
+        var json = Json(result);
+        Assert.Contains("in-progress", json);
+        Assert.DoesNotContain("already-applied", json);
+        handler.Verify(h => h.Handle(It.IsAny<CreatePackCommand>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task A_Thrown_Handler_Releases_The_Claim_Before_Propagating()
+    {
+        // Regression: only RETURNED failures released the claim. An exception (or a
+        // cancellation) left the key Pending forever, so every later retry of that key
+        // was refused as already-applied for a mutation that never ran.
+        var handler = new Mock<ICommandHandler<SetModelCategoryCommand, SetModelCategoryResponse>>();
+        handler.Setup(h => h.Handle(It.IsAny<SetModelCategoryCommand>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("connection reset"));
+        var audit = ClaimGranted();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => AssetWriteMcpTools.SetCategory(handler.Object, audit.Object, 1, "key-8", 5));
+
+        audit.Verify(a => a.AbandonAsync("key-8", It.IsAny<CancellationToken>()), Times.Once);
+        audit.Verify(a => a.CompleteAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task A_Cancelled_Write_Releases_The_Claim()
+    {
+        var handler = new Mock<ICommandHandler<SetModelCategoryCommand, SetModelCategoryResponse>>();
+        handler.Setup(h => h.Handle(It.IsAny<SetModelCategoryCommand>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new OperationCanceledException());
+        var audit = ClaimGranted();
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            () => AssetWriteMcpTools.SetCategory(handler.Object, audit.Object, 1, "key-10", 5, cts.Token));
+
+        // Released with an uncancelled token — the caller's token is already dead.
+        audit.Verify(a => a.AbandonAsync("key-10", CancellationToken.None), Times.Once);
     }
 
     [Fact]

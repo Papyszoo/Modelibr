@@ -188,28 +188,43 @@ internal sealed class ImportModelSceneGraphCommandHandler : ICommandHandler<Impo
             await _assetDerivationRepository.UpdateAsync(existingDerivation, cancellationToken);
         }
 
-        // 5. Rebuild the search projection for this version (asset + non-hidden parts),
-        //    and make this the current version — clearing the flag on older versions so
-        //    a re-versioned model doesn't return near-duplicate hits.
+        // 5. Rebuild the search projection for this version (asset + non-hidden parts).
+        //
+        //    "Current" is the model's ACTIVE version, not whichever extraction finished
+        //    last. Marking this version current unconditionally meant a delayed job for
+        //    an old version, an upload of a non-active version, or a re-derive could all
+        //    silently swap what search returns for the asset.
+        var isCurrentVersion = version.Model is null
+            // No model loaded (defensive): fall back to owning the flag rather than
+            // leaving the asset with no searchable current version at all.
+            ? true
+            : version.Model.ActiveVersionId == version.Id;
+
         await _searchDocumentRepository.RemoveForAssetAsync(
             ExtractionAssetTypes.Model, version.ModelId, version.Id, cancellationToken);
 
         var searchDocs = SearchDocumentBuilder.BuildForModel(
-            version.ModelId, version.Id, isCurrentVersion: true,
+            version.ModelId, version.Id, isCurrentVersion,
             version.Model?.Name, derived, rollups, command.Parts, now,
             categoryId: version.Model?.ModelCategoryId,
-            categoryName: version.Model?.ModelCategory?.Name);
+            categoryName: version.Model?.ModelCategory?.Name,
+            // A recycled model must stay out of search after a re-extraction too.
+            isActive: version.Model?.IsDeleted != true && !version.IsDeleted);
         foreach (var doc in searchDocs)
         {
             await _searchDocumentRepository.AddAsync(doc, cancellationToken);
         }
 
-        var otherVersionDocs = await _searchDocumentRepository.GetForOtherVersionsAsync(
-            ExtractionAssetTypes.Model, version.ModelId, version.Id, cancellationToken);
-        foreach (var doc in otherVersionDocs)
+        // Only the active version may clear the flag on its siblings.
+        if (isCurrentVersion)
         {
-            doc.SetCurrentVersion(false);
-            await _searchDocumentRepository.UpdateAsync(doc, cancellationToken);
+            var otherVersionDocs = await _searchDocumentRepository.GetForOtherVersionsAsync(
+                ExtractionAssetTypes.Model, version.ModelId, version.Id, cancellationToken);
+            foreach (var doc in otherVersionDocs)
+            {
+                doc.SetCurrentVersion(false);
+                await _searchDocumentRepository.UpdateAsync(doc, cancellationToken);
+            }
         }
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);

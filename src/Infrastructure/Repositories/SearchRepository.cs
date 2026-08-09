@@ -47,10 +47,12 @@ internal sealed class SearchRepository : ISearchRepository
         var query = _context.AssetSearchDocuments
             .AsNoTracking()
             .Where(d => d.IsCurrentVersion) // version-scoping, enforced here in one place
+            .Where(d => d.IsActive)         // recycled assets/versions are never a result
             .Where(d => d.TriangleCount == null || d.TriangleCount >= MinMeaningfulTriangles)
             .Where(d => d.MaxDimension == null || d.MaxDimension > 0);
 
         // Prominence gate: full only by default; secondary reachable when targeted; never hidden.
+        // Per-document by design — it is a property of the part, not the asset.
         query = request.IncludeSecondary
             ? query.Where(d => d.Prominence != "hidden")
             : query.Where(d => d.Prominence == "full");
@@ -59,84 +61,115 @@ internal sealed class SearchRepository : ISearchRepository
         {
             query = query.Where(d => d.AssetType == request.AssetType);
         }
+
+        // Structural filters describe the WHOLE ASSET, so they are evaluated against the
+        // asset-level document and then used to admit or reject all of that asset's rows.
+        //
+        // Applying them per-document was wrong in both directions. A part document only
+        // carries triangles/vertices/UVs — everything else is null — so "under 10k tris"
+        // passed a 4-million-triangle asset on the strength of one small part, and
+        // hasRig=false passed a rigged model because its parts have a null BoneCount.
+        // Conversely, category is only stamped on the asset document, so a category
+        // filter silently dropped every part hit.
+        var assetLevel = _context.AssetSearchDocuments
+            .AsNoTracking()
+            .Where(d => d.PartPath == null && d.IsCurrentVersion && d.IsActive);
+        var hasStructuralFilter = false;
+
+        void Restrict(Func<IQueryable<Domain.Models.AssetSearchDocument>, IQueryable<Domain.Models.AssetSearchDocument>> apply)
+        {
+            assetLevel = apply(assetLevel);
+            hasStructuralFilter = true;
+        }
+
         if (request.MinTriangles is int min)
         {
-            query = query.Where(d => d.TriangleCount >= min);
+            Restrict(q => q.Where(d => d.TriangleCount >= min));
         }
         if (request.MaxTriangles is int max)
         {
-            query = query.Where(d => d.TriangleCount <= max);
+            Restrict(q => q.Where(d => d.TriangleCount <= max));
         }
         if (request.HasAnimations is bool anim)
         {
-            query = query.Where(d => d.HasAnimations == anim);
+            Restrict(q => q.Where(d => d.HasAnimations == anim));
         }
         if (!string.IsNullOrWhiteSpace(request.ShapeClass))
         {
-            query = query.Where(d => d.ShapeClass == request.ShapeClass);
+            Restrict(q => q.Where(d => d.ShapeClass == request.ShapeClass));
         }
         if (!string.IsNullOrWhiteSpace(request.Engine))
         {
-            query = query.Where(d => d.Engine == request.Engine);
+            Restrict(q => q.Where(d => d.Engine == request.Engine));
         }
 
         // prompt-29 attribute filters ------------------------------------------------
         if (request.MinSize is double minSize)
         {
-            query = query.Where(d => d.MaxDimension >= minSize);
+            Restrict(q => q.Where(d => d.MaxDimension >= minSize));
         }
         if (request.MaxSize is double maxSize)
         {
-            query = query.Where(d => d.MaxDimension <= maxSize);
+            Restrict(q => q.Where(d => d.MaxDimension <= maxSize));
         }
         if (request.HasRig is bool hasRig)
         {
-            query = hasRig
-                ? query.Where(d => d.BoneCount > 0)
-                : query.Where(d => d.BoneCount == null || d.BoneCount == 0);
+            Restrict(q => hasRig
+                ? q.Where(d => d.BoneCount > 0)
+                : q.Where(d => d.BoneCount == null || d.BoneCount == 0));
         }
         if (request.MinBones is int minBones)
         {
-            query = query.Where(d => d.BoneCount >= minBones);
+            Restrict(q => q.Where(d => d.BoneCount >= minBones));
         }
         if (request.MaxBones is int maxBones)
         {
-            query = query.Where(d => d.BoneCount <= maxBones);
+            Restrict(q => q.Where(d => d.BoneCount <= maxBones));
         }
         if (request.MinMaterials is int minMat)
         {
-            query = query.Where(d => d.MaterialCount >= minMat);
+            Restrict(q => q.Where(d => d.MaterialCount >= minMat));
         }
         if (request.MaxMaterials is int maxMat)
         {
-            query = query.Where(d => d.MaterialCount <= maxMat);
+            Restrict(q => q.Where(d => d.MaterialCount <= maxMat));
         }
         if (request.HasUvs is bool hasUvs)
         {
-            query = query.Where(d => d.HasUvs == hasUvs);
+            Restrict(q => q.Where(d => d.HasUvs == hasUvs));
         }
         if (request.MinParts is int minParts)
         {
-            query = query.Where(d => d.PartCount >= minParts);
+            Restrict(q => q.Where(d => d.PartCount >= minParts));
         }
         if (request.MaxParts is int maxParts)
         {
-            query = query.Where(d => d.PartCount <= maxParts);
+            Restrict(q => q.Where(d => d.PartCount <= maxParts));
         }
         if (request.MinVertices is int minVerts)
         {
-            query = query.Where(d => d.VertexCount >= minVerts);
+            Restrict(q => q.Where(d => d.VertexCount >= minVerts));
         }
         if (request.MaxVertices is int maxVerts)
         {
-            query = query.Where(d => d.VertexCount <= maxVerts);
+            Restrict(q => q.Where(d => d.VertexCount <= maxVerts));
         }
         if (!string.IsNullOrWhiteSpace(request.Category))
         {
             // Match the assigned category by name (case-insensitive, partial), so an
             // agent can filter by "weapon" and hit a "Sci-Fi Weapons" category too.
             var categoryPattern = "%" + request.Category.Trim() + "%";
-            query = query.Where(d => d.CategoryName != null && EF.Functions.ILike(d.CategoryName, categoryPattern));
+            Restrict(q => q.Where(d => d.CategoryName != null && EF.Functions.ILike(d.CategoryName, categoryPattern)));
+        }
+
+        if (hasStructuralFilter)
+        {
+            // Snapshot before the closure so the EXISTS subquery is the fully-built one.
+            var qualifyingAssets = assetLevel;
+            query = query.Where(d => qualifyingAssets.Any(a =>
+                a.AssetType == d.AssetType &&
+                a.AssetId == d.AssetId &&
+                a.VersionId == d.VersionId));
         }
 
         // Filter-only browse: a blank query means "everything that passes the filters",

@@ -171,4 +171,73 @@ public class ImportModelSceneGraphCommandHandlerTests
             It.IsAny<CancellationToken>()), Times.Once);
         _searchDocs.Verify(x => x.AddAsync(It.IsAny<AssetSearchDocument>(), It.IsAny<CancellationToken>()), Times.Exactly(3));
     }
+
+    /// <summary>A version whose parent model exists, with the given active version.</summary>
+    private ModelVersion SetupVersionWithModel(int versionId, int activeVersionId)
+    {
+        var model = Model.Create("Chair", DateTime.UtcNow).WithId(1);
+        // Set the FK directly: SetActiveVersion validates against the loaded Versions
+        // collection, which a repository read for this handler does not populate.
+        typeof(Model)
+            .GetProperty(nameof(Model.ActiveVersionId))!
+            .SetValue(model, activeVersionId);
+
+        var version = ModelVersion.Create(1, 1, "v1", DateTime.UtcNow).WithId(versionId);
+        version.Model = model;
+        _versions.Setup(x => x.GetByIdAsync(versionId, It.IsAny<CancellationToken>())).ReturnsAsync(version);
+        _versions.Setup(x => x.UpdateAsync(It.IsAny<ModelVersion>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ModelVersion mv, CancellationToken _) => mv);
+        return version;
+    }
+
+    [Fact]
+    public async Task Handle_MarksTheVersionCurrentOnlyWhenItIsTheModelsActiveVersion()
+    {
+        // Regression: every extraction claimed the current-version marker, so whichever
+        // job finished LAST decided what search returned. A delayed job for an old
+        // version, an upload against a non-active version, or a re-derive could all
+        // silently swap the asset's searchable version.
+        SetupVersionWithModel(versionId: 1, activeVersionId: 2);
+
+        var result = await _handler.Handle(Command(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        _searchDocs.Verify(
+            x => x.AddAsync(It.Is<AssetSearchDocument>(d => d.IsCurrentVersion), It.IsAny<CancellationToken>()),
+            Times.Never);
+        // Nor may a non-active version clear the marker on the version that IS active.
+        _searchDocs.Verify(
+            x => x.GetForOtherVersionsAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_MarksTheActiveVersionCurrentAndClearsTheOthers()
+    {
+        SetupVersionWithModel(versionId: 1, activeVersionId: 1);
+
+        var result = await _handler.Handle(Command(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        _searchDocs.Verify(
+            x => x.AddAsync(It.Is<AssetSearchDocument>(d => d.PartPath == null && d.IsCurrentVersion), It.IsAny<CancellationToken>()),
+            Times.Once);
+        _searchDocs.Verify(
+            x => x.GetForOtherVersionsAsync("Model", 1, 1, It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_KeepsARecycledModelOutOfSearchAfterReExtraction()
+    {
+        var version = SetupVersionWithModel(versionId: 1, activeVersionId: 1);
+        version.Model.SoftDelete(DateTime.UtcNow);
+
+        var result = await _handler.Handle(Command(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        _searchDocs.Verify(
+            x => x.AddAsync(It.Is<AssetSearchDocument>(d => d.IsActive), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
 }
