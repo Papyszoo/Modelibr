@@ -33,6 +33,31 @@ export class DockerHelper {
     }
 
     /**
+     * One-line container lifecycle state — what distinguishes "the worker is
+     * busy" from "the worker is gone". `docker logs --tail` cannot tell them
+     * apart: a dead container keeps returning the same frozen tail forever, which
+     * is what made the 2026-08-10 e2e-full failure take a dig through the colima
+     * VM's kernel log to explain.
+     *
+     * Reading the result: ExitCode 134 = abort (e.g. V8 "JavaScript heap out of
+     * memory"), 139 = segfault, 137 = SIGKILL, OOMKilled=true = hit a cgroup
+     * memory limit, restarts > 0 = it already crashed and came back under the
+     * compose restart policy.
+     */
+    async getContainerState(containerName: string): Promise<string> {
+        const format =
+            "{{.State.Status}} exit={{.State.ExitCode}} oomKilled={{.State.OOMKilled}} restarts={{.RestartCount}} startedAt={{.State.StartedAt}} finishedAt={{.State.FinishedAt}}";
+        try {
+            const { stdout } = await execAsync(
+                `docker inspect --format '${format}' ${containerName}`,
+            );
+            return stdout.trim();
+        } catch (error: any) {
+            return `unavailable (${error.message.split("\n")[0]})`;
+        }
+    }
+
+    /**
      * List filenames directly inside a directory in a running container.
      *
      * The e2e stack (docker-compose.e2e.yml) keeps uploads on a NAMED docker

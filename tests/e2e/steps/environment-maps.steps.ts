@@ -14,6 +14,7 @@ import {
     createUniqueUploadFilePayload,
 } from "../helpers/file-payload-helper";
 import { clickTab } from "../helpers/navigation-helper";
+import { runWithWorkerWatchdog } from "../helpers/worker-health";
 import { EnvironmentMapsPage } from "../pages/EnvironmentMapsPage";
 import { RecycledFilesPage } from "../pages/RecycledFilesPage";
 import { UploadProgressPage } from "../pages/UploadProgressPage";
@@ -620,24 +621,36 @@ Then(
         const environmentMap = getStoredEnvironmentMap(page, alias);
         const environmentMapsPage = new EnvironmentMapsPage(page);
 
-        await expect
-            .poll(
-                async () => {
-                    const response = await page.request.get(
-                        `${API_BASE}/environment-maps/${environmentMap.id}/preview`,
-                    );
-                    return {
-                        ok: response.ok(),
-                        contentType: response.headers()["content-type"] ?? "",
-                    };
-                },
-                { timeout: 180000, intervals: [1000, 2000, 5000, 10000] },
-            )
-            .toEqual({
-                ok: true,
-                contentType: expect.stringContaining("image/png"),
-            });
-        await environmentMapsPage.waitForCardThumbnailLoaded(environmentMap.name, 180000);
+        await runWithWorkerWatchdog(
+            `a generated thumbnail for environment map "${environmentMap.name}"`,
+            async () => {
+                await expect
+                    .poll(
+                        async () => {
+                            const response = await page.request.get(
+                                `${API_BASE}/environment-maps/${environmentMap.id}/preview`,
+                            );
+                            return {
+                                ok: response.ok(),
+                                contentType:
+                                    response.headers()["content-type"] ?? "",
+                            };
+                        },
+                        {
+                            timeout: 180000,
+                            intervals: [1000, 2000, 5000, 10000],
+                        },
+                    )
+                    .toEqual({
+                        ok: true,
+                        contentType: expect.stringContaining("image/png"),
+                    });
+                await environmentMapsPage.waitForCardThumbnailLoaded(
+                    environmentMap.name,
+                    180000,
+                );
+            },
+        );
     },
 );
 
@@ -702,10 +715,13 @@ Then(
     "I should receive an environment map thumbnail ready notification via WebSocket for {string}",
     async ({ page }, alias: string) => {
         const environmentMap = getStoredEnvironmentMap(page, alias);
-        const notification =
-            await getEnvironmentMapThumbnailSignalRRuntime(
-                page,
-            ).waitForMatchingNotification();
+        const notification = await runWithWorkerWatchdog(
+            `an ${ENVIRONMENT_MAP_THUMBNAIL_SIGNALR_TARGET} notification for "${environmentMap.name}"`,
+            () =>
+                getEnvironmentMapThumbnailSignalRRuntime(
+                    page,
+                ).waitForMatchingNotification(),
+        );
 
         getScenarioState(page).setCustom(
             "environmentMapThumbnailNotification",

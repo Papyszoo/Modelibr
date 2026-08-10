@@ -33,6 +33,28 @@ The easiest way to upload models is to drag and drop files directly onto the Mod
 You can drag multiple files at once. Each file becomes a separate model.
 :::
 
+### Multi-file glTF (external `.bin` + textures)
+
+A packed **GLB** is self-contained and always the recommended path. Some models,
+though, ship only as a loose **`.gltf`** that references external files — a
+`.bin` buffer and image textures alongside it (the Khronos glTF-Sample-Assets and
+many kit layouts). A single-file upload can't resolve those references, so use one
+of these instead:
+
+- **Import folder** (folder toolbar button) — pick the folder that holds the
+  models. Each `.gltf` is grouped with the `.bin`/textures in its directory and
+  imported together; a whole library of subfolders imports in one action.
+- **Import `.zip`** (archive toolbar button) — pick a `.zip` and the app expands it
+  and imports it exactly like a picked folder: same grouping, same format checks,
+  one progress entry per model. The archive is expanded on your machine, not
+  uploaded whole.
+
+The external files are stored with the model and resolved when its thumbnail and
+scene graph are extracted, and when you open it in the viewer — so a multi-file
+`.gltf` looks and behaves like its packed `.glb` twin. Nothing is ever fetched from
+the network: only the files you uploaded are used, and a reference that points
+anywhere else is refused rather than requested.
+
 ## Organizing with Categories
 
 Use the category sidebar (left of the grid) to organize models into groups:

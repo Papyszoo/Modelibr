@@ -3,6 +3,7 @@ using Application.Abstractions.Repositories;
 using Application.Models;
 using Domain.Models;
 using Domain.Services;
+using Domain.ValueObjects;
 using Moq;
 using Xunit;
 
@@ -11,6 +12,7 @@ namespace Application.Tests.Models;
 public class UpdateTechnicalMetadataCommandHandlerTests
 {
     private readonly Mock<IModelVersionRepository> _mockModelVersionRepository;
+    private readonly Mock<IAssetExtractionRepository> _mockAssetExtractionRepository;
     private readonly Mock<IDateTimeProvider> _mockDateTimeProvider;
     private readonly Mock<IUnitOfWork> _mockUnitOfWork;
     private readonly UpdateTechnicalMetadataCommandHandler _handler;
@@ -18,12 +20,14 @@ public class UpdateTechnicalMetadataCommandHandlerTests
     public UpdateTechnicalMetadataCommandHandlerTests()
     {
         _mockModelVersionRepository = new Mock<IModelVersionRepository>();
+        _mockAssetExtractionRepository = new Mock<IAssetExtractionRepository>();
         _mockDateTimeProvider = new Mock<IDateTimeProvider>();
         _mockDateTimeProvider.Setup(x => x.UtcNow).Returns(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
         _mockUnitOfWork = new Mock<IUnitOfWork>();
 
         _handler = new UpdateTechnicalMetadataCommandHandler(
             _mockModelVersionRepository.Object,
+            _mockAssetExtractionRepository.Object,
             _mockDateTimeProvider.Object,
             _mockUnitOfWork.Object);
     }
@@ -95,6 +99,88 @@ public class UpdateTechnicalMetadataCommandHandlerTests
                 v.AnimationNames.Count == 2 &&
                 v.BoneCount == 18),
             It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    private const string ModelHash = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
+
+    private static ModelVersion VersionWithModelFile()
+    {
+        var version = ModelVersion.Create(1, 1, "v1", DateTime.UtcNow);
+        version.WithId(1);
+        var file = Domain.Models.File.Create(
+            "chair.glb", "stored.glb", "/data/stored.glb", "model/gltf-binary",
+            FileType.Glb, 1024, ModelHash, DateTime.UtcNow);
+        version.AddFile(file);
+        return version;
+    }
+
+    [Fact]
+    public async Task Handle_WhenVersionHasModelFile_UpsertsRawExtractionRow()
+    {
+        var version = VersionWithModelFile();
+        _mockModelVersionRepository.Setup(x => x.GetByIdAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(version);
+        _mockModelVersionRepository.Setup(x => x.UpdateAsync(It.IsAny<ModelVersion>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ModelVersion mv, CancellationToken _) => mv);
+        // GetByKeyAsync returns null → the new-row (Add) path.
+
+        var command = new UpdateTechnicalMetadataCommand(1, new List<string> { "Metal" }, 1200, 600, 5, 1);
+
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        _mockAssetExtractionRepository.Verify(
+            x => x.AddAsync(It.Is<AssetExtraction>(e =>
+                e.AssetType == "Model" &&
+                e.AssetId == 1 &&
+                e.VersionId == 1 &&
+                e.FileSha256 == ModelHash &&
+                e.ExtractorVersion >= 1),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_WhenRawExtractionExists_UpdatesInPlaceInsteadOfAdding()
+    {
+        var version = VersionWithModelFile();
+        _mockModelVersionRepository.Setup(x => x.GetByIdAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(version);
+        _mockModelVersionRepository.Setup(x => x.UpdateAsync(It.IsAny<ModelVersion>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ModelVersion mv, CancellationToken _) => mv);
+
+        var existing = AssetExtraction.Create("Model", 1, 1, ModelHash, "{}", 1, 1, DateTime.UtcNow);
+        _mockAssetExtractionRepository
+            .Setup(x => x.GetByKeyAsync("Model", 1, 1, ModelHash, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existing);
+
+        var command = new UpdateTechnicalMetadataCommand(1, new List<string> { "Metal" }, 1200, 600, 5, 1);
+
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        _mockAssetExtractionRepository.Verify(
+            x => x.UpdateAsync(existing, It.IsAny<CancellationToken>()), Times.Once);
+        _mockAssetExtractionRepository.Verify(
+            x => x.AddAsync(It.IsAny<AssetExtraction>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_WhenVersionHasNoFile_SkipsRawExtractionButStillSucceeds()
+    {
+        var version = ModelVersion.Create(1, 1, "v1", DateTime.UtcNow);
+        version.WithId(1);
+        _mockModelVersionRepository.Setup(x => x.GetByIdAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(version);
+        _mockModelVersionRepository.Setup(x => x.UpdateAsync(It.IsAny<ModelVersion>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ModelVersion mv, CancellationToken _) => mv);
+
+        var command = new UpdateTechnicalMetadataCommand(1, new List<string> { "Metal" }, 1200, 600, 5, 1);
+
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        _mockAssetExtractionRepository.Verify(
+            x => x.AddAsync(It.IsAny<AssetExtraction>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

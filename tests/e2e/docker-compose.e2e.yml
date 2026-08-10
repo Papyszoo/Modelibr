@@ -75,6 +75,14 @@ services:
             context: ../../src/asset-processor
             dockerfile: Dockerfile
         container_name: asset-processor-e2e
+        # A dead worker used to poison the whole run: nothing restarted it and no
+        # scenario noticed, so every later thumbnail wait burned its full timeout
+        # (2026-08-10: the worker died 14 min in, e2e-full took 102 min instead of
+        # 18 and lost 3 scenarios). on-failure — not unless-stopped — so a clean
+        # `compose down` still stops it and an interrupted run leaves nothing to
+        # resurrect on the next daemon start. A restart is never silent: hooks.ts
+        # attaches RestartCount to every failing test.
+        restart: on-failure:5
         environment:
             - WORKER_ID=worker-e2e
             - WORKER_PORT=3001

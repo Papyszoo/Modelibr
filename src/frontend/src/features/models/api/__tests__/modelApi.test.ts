@@ -6,6 +6,7 @@ import {
   getModelsPaginated,
   setDefaultTextureSet,
   updateModelTags,
+  uploadModelGroup,
 } from '../modelApi'
 
 const mockGet = client.get as jest.Mock
@@ -163,5 +164,42 @@ describe('write payload contracts', () => {
       TextureSetId: null,
       ModelVersionId: undefined,
     })
+  })
+})
+
+describe('multi-file / zip import request construction', () => {
+  const lastPostArgs = () => mockPost.mock.calls.at(-1) as [string, FormData]
+
+  it('uploadModelGroup posts primary + parallel files[]/paths[] the backend binds by name', async () => {
+    // Regression: the backend reads `primary`, `files`, and a parallel `paths`
+    // array; renaming any field (or desyncing files↔paths order) silently drops
+    // every auxiliary so a multi-file glTF loses its .bin/textures.
+    const primary = new File(['g'], 'FlightHelmet.gltf')
+    const bin = new File(['b'], 'FlightHelmet.bin')
+    const tex = new File(['t'], 'wood.png')
+
+    await uploadModelGroup(primary, [
+      { file: bin, relativePath: 'FlightHelmet.bin' },
+      { file: tex, relativePath: 'textures/wood.png' },
+    ])
+
+    const [url, form] = lastPostArgs()
+    expect(url).toBe('/models/multifile')
+    expect((form.get('primary') as File).name).toBe('FlightHelmet.gltf')
+    expect(form.getAll('files').map(f => (f as File).name)).toEqual([
+      'FlightHelmet.bin',
+      'wood.png',
+    ])
+    expect(form.getAll('paths')).toEqual([
+      'FlightHelmet.bin',
+      'textures/wood.png',
+    ])
+  })
+
+  it('uploadModelGroup appends batchId as a query param', async () => {
+    await uploadModelGroup(new File(['g'], 'a.gltf'), [], {
+      batchId: 'batch-7',
+    })
+    expect(lastPostArgs()[0]).toBe('/models/multifile?batchId=batch-7')
   })
 })

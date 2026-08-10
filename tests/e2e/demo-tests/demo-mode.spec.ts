@@ -138,7 +138,7 @@ async function addModelToOpenPack(page, modelName, modelId) {
 // in playwright.demo.config.ts). Such scenarios are tagged `@serial` so they run
 // on the local GPU lane only and are excluded from the GPU-less CI fast lane
 // (run-e2e-fast.js passes --grep-invert=@serial to the demo phase). The tagged
-// three below all flaked on the v0.3.0 main push. See CLAUDE.md testing rule 3.
+// three below all flaked on the v0.3.0 main push. See AGENTS.md testing rule 3.
 test.describe("demo mode e2e", () => {
     // @serial: demo SPA boot times out under software WebGL at the CI tail.
     test("shows seeded demo libraries across tabs", { tag: "@serial" }, async ({

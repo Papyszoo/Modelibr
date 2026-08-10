@@ -19,7 +19,7 @@ Feature: Model 3D Viewer Rendering
   # On GitHub's GPU-less runners the SwiftShader software render times out at
   # the drained-runner tail (this scenario flaked on the v0.3.0 main push);
   # it passes on a real GPU, so it runs on the local GPU lane only. See
-  # CLAUDE.md testing rule 3.
+  # AGENTS.md testing rule 3.
   @ui @controls @serial
   Scenario: Menubar controls are accessible
     Given I am on the model viewer page for "multi-version-model"

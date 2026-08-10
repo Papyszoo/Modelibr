@@ -12,4 +12,13 @@ public interface ISearchRepository
         string term,
         int perTypeLimit,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Structured search over the derived-layer projection: trigram + full-text
+    /// ranking (tokenised names outrank substring hits), composable structural
+    /// filters, current-version-only, prominence-gated.
+    /// </summary>
+    Task<AssetSearchResponse> SearchAssetsAsync(
+        AssetSearchRequest request,
+        CancellationToken cancellationToken = default);
 }

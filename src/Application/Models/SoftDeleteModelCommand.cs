@@ -2,6 +2,7 @@ using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
+using Application.Extraction;
 using Domain.Services;
 using Microsoft.Extensions.Logging;
 using SharedKernel;
@@ -15,6 +16,7 @@ public record SoftDeleteModelResponse(bool Success, string Message);
 internal sealed class SoftDeleteModelCommandHandler : ICommandHandler<SoftDeleteModelCommand, SoftDeleteModelResponse>
 {
     private readonly IModelRepository _modelRepository;
+    private readonly IAssetSearchDocumentRepository _searchDocumentRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IThumbnailQueue _thumbnailQueue;
     private readonly ILogger<SoftDeleteModelCommandHandler> _logger;
@@ -22,12 +24,14 @@ internal sealed class SoftDeleteModelCommandHandler : ICommandHandler<SoftDelete
 
     public SoftDeleteModelCommandHandler(
         IModelRepository modelRepository,
+        IAssetSearchDocumentRepository searchDocumentRepository,
         IDateTimeProvider dateTimeProvider,
         IThumbnailQueue thumbnailQueue,
         ILogger<SoftDeleteModelCommandHandler> logger,
         IUnitOfWork unitOfWork)
     {
         _modelRepository = modelRepository;
+        _searchDocumentRepository = searchDocumentRepository;
         _dateTimeProvider = dateTimeProvider;
         _thumbnailQueue = thumbnailQueue;
         _logger = logger;
@@ -54,6 +58,12 @@ internal sealed class SoftDeleteModelCommandHandler : ICommandHandler<SoftDelete
 
         model.SoftDelete(_dateTimeProvider.UtcNow);
         await _modelRepository.UpdateAsync(model, cancellationToken);
+
+        // Search reads the projection, not the Models table — a recycled model that
+        // keeps its documents stays fully searchable and returnable to an agent.
+        await _searchDocumentRepository.SetActiveForAssetAsync(
+            ExtractionAssetTypes.Model, model.Id, isActive: false, cancellationToken);
+
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new SoftDeleteModelResponse(true, "Model soft deleted successfully"));

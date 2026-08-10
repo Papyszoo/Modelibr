@@ -60,8 +60,18 @@ namespace Application.Models
 
             var fileEntity = fileResult.Value;
 
-            // Check if a model already exists with this file hash
-            var existingModel = await _modelRepository.GetByFileHashAsync(fileEntity.Sha256Hash, cancellationToken);
+            // Check if a model already exists with this file hash.
+            //
+            // The primary file's hash is the whole identity ONLY for a self-contained
+            // model. A loose .gltf is identity-incomplete: two different assets can share
+            // byte-identical JSON while referencing different .bin buffers, and merging
+            // them silently keeps one asset's geometry and discards the other's. The
+            // multi-file import path therefore re-runs this command with
+            // SkipDeduplication once it has resolved the auxiliaries and found the
+            // referenced resources differ.
+            var existingModel = command.SkipDeduplication
+                ? null
+                : await _modelRepository.GetByFileHashAsync(fileEntity.Sha256Hash, cancellationToken);
             if (existingModel != null)
             {
             // Raise domain event for existing model upload — dispatched from the
@@ -150,6 +160,20 @@ namespace Application.Models
         }
     }
 
-    public record AddModelCommand(IFileUpload File, string? ModelName = null, string? BatchId = null, bool GenerateThumbnail = true) : ICommand<AddModelCommandResponse>;
+    /// <param name="GenerateThumbnail">
+    /// Whether the upload event should ask the worker for a thumbnail. Store imports set
+    /// this false when the manifest already ships a rendered thumbnail for the item.
+    /// </param>
+    /// <param name="SkipDeduplication">
+    /// Forces a distinct model even when the primary file's hash already exists. Set only
+    /// by callers that own a broader identity than the primary file — today the multi-file
+    /// glTF import, whose referenced .bin/textures are part of what the asset IS.
+    /// </param>
+    public record AddModelCommand(
+        IFileUpload File,
+        string? ModelName = null,
+        string? BatchId = null,
+        bool GenerateThumbnail = true,
+        bool SkipDeduplication = false) : ICommand<AddModelCommandResponse>;
     public record AddModelCommandResponse(int Id, bool AlreadyExists = false);
 }

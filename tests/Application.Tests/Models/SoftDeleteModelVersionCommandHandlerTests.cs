@@ -15,6 +15,7 @@ public class SoftDeleteModelVersionCommandHandlerTests
     private readonly Mock<IModelRepository> _mockModelRepository;
     private readonly Mock<IModelVersionRepository> _mockModelVersionRepository;
     private readonly Mock<IDateTimeProvider> _mockDateTimeProvider;
+    private readonly Mock<IAssetSearchDocumentRepository> _mockSearchDocuments = new();
     private readonly Mock<IUnitOfWork> _mockUnitOfWork = new();
     private readonly SoftDeleteModelVersionCommandHandler _handler;
 
@@ -27,6 +28,7 @@ public class SoftDeleteModelVersionCommandHandlerTests
         _handler = new SoftDeleteModelVersionCommandHandler(
             _mockModelRepository.Object,
             _mockModelVersionRepository.Object,
+            _mockSearchDocuments.Object,
             _mockDateTimeProvider.Object,
             _mockUnitOfWork.Object);
     }

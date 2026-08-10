@@ -39,16 +39,38 @@ description: Modelibr git and release conventions — version-branch naming and 
 ## Commits
 - **Conventional commits**: `feat(scope): …`, `fix(e2e): …`, `ci(security): …`,
   `docs(agents): …`.
-- **Never add an AI co-author trailer.** No `Co-Authored-By:` line for
-  Claude/the assistant on any commit. This is a hard rule.
+- **Never add AI attribution.** No `Co-Authored-By:` line for Claude/the
+  assistant on any commit, and no "Generated with Claude Code" (or similar)
+  footer on a PR body. This is a hard rule — the user wants history and PRs to
+  read as his own work.
 
 ## PRs
 - Target the current version branch, not `main`.
+- **Nothing goes directly to `main` — including CI-only files.** Workflows and
+  `tests/` tooling route through the version branch like everything else, even
+  when a workflow needs to be on the default branch to be dispatchable. Accept
+  that it goes live at the next release.
+- **Batch into feature-sized PRs.** The user dislikes small stacked PRs — he
+  wants to test a complete, user-visible feature in one branch. Fold prerequisite
+  fixes into the feature branch unless they're urgent alone, and ship a change
+  checklist with the PR so he can test it.
 - Features ship with tests (xUnit / Jest / Vitest / Gherkin scenario) following
-  the testing rules in `CLAUDE.md` and the `test-triage` skill.
+  the testing rules in `AGENTS.md` and the `test-triage` skill.
 
 ## Releases
 - Cutting a release = merge the version branch (`version/X.Y` or patch branch
-  `version/X.Y.Z`) → `main`, then publish a GitHub Release. electron-updater feeds (`latest*.yml` + `.blockmap`) are attached as
+  `version/X.Y.Z`) → `main`, then publish a GitHub Release.
+- **`gh release create vX.Y.Z --target main` is the one manual step.** Everything
+  downstream runs off it: installers + updater feeds attach, Docker images
+  publish, docs deploy.
+- **Before tagging, run `npm run videos:generate` locally.** Docs video specs are
+  exercised only at main-push, and a red docs CI **silently blocks Docker
+  Publish** — `docker-publish.yml` fires only on "CI and Deploy Docs" success on
+  main and has **no manual trigger**. This cost 0.4.0–0.4.2 their Docker images.
+  Duration caps regress only at CI pace (CI paces recorded waits ~1.5× local), so
+  a spec at ~90% of its cap locally will fail CI.
+- **After each release, bump `upgrade-test.yml`'s `from_tag`.** That job runs the
+  FROM version's updater code, so an updater fix is validated live only once two
+  post-fix releases exist; until then it is red by design. electron-updater feeds (`latest*.yml` + `.blockmap`) are attached as
   release assets; the desktop **client** publishes to its own `client` update
   channel so its feed never collides with the host's.
