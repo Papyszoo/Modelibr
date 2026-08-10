@@ -19,6 +19,16 @@ public static class ModelEndpoints
         .WithName("Add File to Model")
         .DisableAntiforgery();
 
+        app.MapPost("/models/multifile", ImportMultiFileModel)
+        .WithName("Import Multi-File Model")
+        .WithSummary("Imports a loose primary model (.gltf) plus its external .bin/textures")
+        .DisableAntiforgery();
+
+        app.MapPost("/models/zip", ImportModelZip)
+        .WithName("Import Model Zip")
+        .WithSummary("Imports every model group in a .zip (multi-file glTF resolved by directory)")
+        .DisableAntiforgery();
+
         app.MapPost("/models/{modelId}/tags", UpdateModelTags)
         .WithName("Update Model Tags")
         .WithTags("Models");
@@ -235,6 +245,98 @@ public static class ModelEndpoints
         }
 
         var result = await commandHandler.Handle(new AddFileToModelCommand(modelId, new FormFileUpload(file)), cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+        }
+
+        return Results.Ok(result.Value);
+    }
+
+    private static async Task<IResult> ImportMultiFileModel(
+        HttpRequest request,
+        [FromQuery] string? batchId,
+        ICommandHandler<ImportModelWithAuxiliaryFilesCommand, ImportModelWithAuxiliaryFilesResponse> commandHandler,
+        Application.Settings.ISettingsService settingsService,
+        CancellationToken cancellationToken)
+    {
+        if (!request.HasFormContentType)
+        {
+            return Results.BadRequest(new { error = "InvalidRequest", message = "Expected a multipart/form-data upload." });
+        }
+
+        var form = await request.ReadFormAsync(cancellationToken);
+        var settings = await settingsService.GetSettingsAsync(cancellationToken);
+
+        // Contract: `primary` = the loose model file (.gltf); `files` = its external
+        // siblings; `paths[i]` = the URI `files[i]` is referenced by, relative to the
+        // primary (e.g. "scene.bin", "textures/wood.png").
+        var primary = form.Files.GetFile("primary");
+        if (primary is null)
+        {
+            return Results.BadRequest(new { error = "MissingPrimary", message = "A 'primary' model file is required." });
+        }
+
+        var primaryValidation = ValidateFile(primary, settings.MaxFileSizeBytes);
+        if (primaryValidation.IsFailure)
+        {
+            return Results.BadRequest(new { error = primaryValidation.Error.Code, message = primaryValidation.Error.Message });
+        }
+
+        var auxFiles = form.Files.GetFiles("files");
+        var paths = form["paths"].ToArray();
+        if (auxFiles.Count != paths.Length)
+        {
+            return Results.BadRequest(new { error = "PathCountMismatch", message = "Each auxiliary file must have exactly one matching relative path." });
+        }
+
+        var auxiliaries = new List<AuxiliaryUpload>(auxFiles.Count);
+        for (var i = 0; i < auxFiles.Count; i++)
+        {
+            var auxValidation = ValidateFile(auxFiles[i], settings.MaxFileSizeBytes);
+            if (auxValidation.IsFailure)
+            {
+                return Results.BadRequest(new { error = auxValidation.Error.Code, message = auxValidation.Error.Message });
+            }
+
+            auxiliaries.Add(new AuxiliaryUpload(paths[i] ?? string.Empty, new FormFileUpload(auxFiles[i])));
+        }
+
+        var result = await commandHandler.Handle(
+            new ImportModelWithAuxiliaryFilesCommand(new FormFileUpload(primary), auxiliaries, batchId),
+            cancellationToken);
+
+        if (result.IsFailure)
+        {
+            if (result.Error.Code == "ModelNameAlreadyExists")
+            {
+                return Results.Conflict(new { error = result.Error.Code, message = result.Error.Message });
+            }
+
+            return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+        }
+
+        return Results.Ok(result.Value);
+    }
+
+    private static async Task<IResult> ImportModelZip(
+        IFormFile file,
+        [FromQuery] string? batchId,
+        ICommandHandler<ImportModelZipCommand, ImportModelZipResponse> commandHandler,
+        Application.Settings.ISettingsService settingsService,
+        CancellationToken cancellationToken)
+    {
+        var settings = await settingsService.GetSettingsAsync(cancellationToken);
+        var validation = ValidateFile(file, settings.MaxFileSizeBytes);
+        if (validation.IsFailure)
+        {
+            return Results.BadRequest(new { error = validation.Error.Code, message = validation.Error.Message });
+        }
+
+        var result = await commandHandler.Handle(
+            new ImportModelZipCommand(new FormFileUpload(file), batchId),
+            cancellationToken);
 
         if (result.IsFailure)
         {

@@ -622,19 +622,20 @@ public class TextureSetDomainTests
     {
         // Arrange
         var textureSet = TextureSet.Create("Test Texture Set", DateTime.UtcNow);
-        // var model1 = Model.Create("Model 1", DateTime.UtcNow);
-        // var model2 = Model.Create("Model 2", DateTime.UtcNow);
-        // textureSet.AddModel(model1, DateTime.UtcNow.AddMinutes(1));
-        // textureSet.AddModel(model2, DateTime.UtcNow.AddMinutes(2));
+        // Distinct ids are required: AddModel dedupes on Id, so two freshly created
+        // (id 0) models would collapse into one and hide what this test checks.
+        var model1 = Model.Create("Model 1", DateTime.UtcNow).WithId(1);
+        var model2 = Model.Create("Model 2", DateTime.UtcNow).WithId(2);
+        textureSet.AddModel(model1, DateTime.UtcNow.AddMinutes(1));
+        textureSet.AddModel(model2, DateTime.UtcNow.AddMinutes(2));
 
         // Act
         var models = textureSet.GetModels();
 
         // Assert
-        Assert.Equal(0, models.Count);
-        // Assert.Equal(2, models.Count);
-        // Assert.Contains(model1, models);
-        // Assert.Contains(model2, models);
+        Assert.Equal(2, models.Count);
+        Assert.Contains(model1, models);
+        Assert.Contains(model2, models);
         Assert.IsAssignableFrom<IReadOnlyList<Model>>(models);
     }
 

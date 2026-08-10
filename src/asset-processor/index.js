@@ -3,6 +3,7 @@ import { config, validateConfig } from './config.js'
 import logger from './logger.js'
 // eslint-disable-next-line no-restricted-imports
 import { JobProcessor } from './jobProcessor.js'
+import { ExtractionJobProcessor } from './extractionJobProcessor.js'
 import { HealthServer } from './healthServer.js'
 
 // Load environment variables
@@ -15,6 +16,7 @@ dotenv.config()
 class AssetProcessorApp {
   constructor() {
     this.jobProcessor = null
+    this.extractionJobProcessor = null
     this.healthServer = null
     this.isShuttingDown = false
   }
@@ -57,6 +59,10 @@ class AssetProcessorApp {
       // Start job processor
       await this.jobProcessor.start()
 
+      // Start the decoupled extraction-queue poller (prompt 20 executor).
+      this.extractionJobProcessor = new ExtractionJobProcessor()
+      this.extractionJobProcessor.start()
+
       logger.info('Asset processor service started successfully')
     } catch (error) {
       logger.error('Failed to start asset processor service', {
@@ -83,6 +89,10 @@ class AssetProcessorApp {
       // Stop accepting new jobs first
       if (this.jobProcessor) {
         await this.jobProcessor.shutdown()
+      }
+
+      if (this.extractionJobProcessor) {
+        await this.extractionJobProcessor.shutdown()
       }
 
       // Stop health server

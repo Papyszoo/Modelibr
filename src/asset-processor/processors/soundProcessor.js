@@ -2,6 +2,8 @@ import { BaseProcessor } from './baseProcessor.js'
 import { SoundFileService } from '../soundFileService.js'
 import { WaveformGeneratorService } from '../waveformGeneratorService.js'
 import { ThumbnailApiService } from '../thumbnailApiService.js'
+import { ModelDataService } from '../modelDataService.js'
+import { AUDIO_STATS_VERSION } from '../audioStats.js'
 
 /**
  * Processor for generating sound waveform thumbnails.
@@ -13,6 +15,7 @@ export class SoundProcessor extends BaseProcessor {
     this.soundFileService = new SoundFileService()
     this.waveformGenerator = new WaveformGeneratorService()
     this.thumbnailApiService = new ThumbnailApiService()
+    this.modelDataService = new ModelDataService()
   }
 
   get processorType() {
@@ -70,6 +73,35 @@ export class SoundProcessor extends BaseProcessor {
         format,
         peakCount: peaks.length,
       })
+
+      // Step 2b: Extract deterministic audio content/quality stats into the
+      // extraction substrate. Best-effort — a stats failure must never fail the
+      // waveform job.
+      try {
+        if (job.soundHash) {
+          const audioStats = await this.waveformGenerator.extractAudioStats(
+            tempFilePath,
+            { channels }
+          )
+          if (audioStats) {
+            await this.modelDataService.saveExtraction('Sound', job.soundId, {
+              fileSha256: job.soundHash,
+              payload: audioStats,
+              warnings: [],
+              extractorVersion: AUDIO_STATS_VERSION,
+              schemaVersion: 1,
+            })
+          }
+        } else {
+          jobLogger.warn(
+            'Skipping audio stat extraction — job has no sound hash'
+          )
+        }
+      } catch (statsError) {
+        jobLogger.warn('Audio stat extraction failed (non-blocking)', {
+          error: statsError.message,
+        })
+      }
 
       // Step 3: Upload waveform thumbnail
       jobLogger.info('Uploading waveform thumbnail')

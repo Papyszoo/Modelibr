@@ -19,11 +19,15 @@ jest.mock('@/features/project/api/projectApi', () => ({
 
 // Mock useFileUpload
 const mockUploadMultipleFiles = jest.fn()
+const mockUploadFolder = jest.fn()
+const mockUploadZip = jest.fn()
 jest.mock('@/shared/hooks/useFileUpload', () => ({
   useFileUpload: () => ({
     uploading: false,
     uploadProgress: 0,
     uploadMultipleFiles: mockUploadMultipleFiles,
+    uploadFolder: mockUploadFolder,
+    uploadZip: mockUploadZip,
   }),
   useDragAndDrop: (callback: (files: File[]) => void) => ({
     onDrop: (e: {
@@ -63,6 +67,59 @@ describe('useModelUpload', () => {
         onUploadComplete: mockOnUploadComplete,
       })
     )
+
+  // Regression: useModelUpload must re-expose the multi-file glTF entry points from
+  // useFileUpload. They were originally omitted from the destructure/return, so the
+  // folder/zip toolbar buttons called `undefined` and crashed the grid at runtime
+  // ("uploadFolder is not a function"). The buttons are wired to exactly these.
+  describe('multi-file glTF import passthrough', () => {
+    it('exposes uploadFolder and uploadZip from useFileUpload', () => {
+      const { result } = renderUploadHook()
+
+      expect(typeof result.current.uploadFolder).toBe('function')
+      expect(typeof result.current.uploadZip).toBe('function')
+
+      // Both are wrapped to carry the Blender gate (below), so assert delegation
+      // rather than identity.
+      result.current.uploadFolder([])
+      expect(mockUploadFolder).toHaveBeenCalled()
+      result.current.uploadZip(new File(['z'], 'kit.zip'))
+      expect(mockUploadZip).toHaveBeenCalled()
+    })
+
+    // Regression: uploadFolder was passed straight through, so a picked folder
+    // bypassed the renderability/.blend gates the file picker applies — .blend files
+    // reached the backend with Blender disabled, and .dae/.3ds always did.
+    it('refuses .blend primaries in a folder import when Blender is disabled', () => {
+      mockBlenderEnabled = false
+      const { result } = renderUploadHook()
+
+      result.current.uploadFolder([])
+
+      expect(mockUploadFolder).toHaveBeenCalledWith([], { allowBlend: false })
+    })
+
+    it('allows .blend primaries in a folder import when Blender is enabled', () => {
+      mockBlenderEnabled = true
+      const { result } = renderUploadHook()
+
+      result.current.uploadFolder([])
+
+      expect(mockUploadFolder).toHaveBeenCalledWith([], { allowBlend: true })
+    })
+
+    // A zip is expanded client-side and imported like a folder, so it must carry the
+    // same gate. The old server-side unzip route applied no client gate at all.
+    it('carries the Blender gate into a zip import', () => {
+      mockBlenderEnabled = false
+      const { result } = renderUploadHook()
+      const zip = new File(['z'], 'kit.zip')
+
+      result.current.uploadZip(zip)
+
+      expect(mockUploadZip).toHaveBeenCalledWith(zip, { allowBlend: false })
+    })
+  })
 
   describe('.blend filtering based on blenderEnabled', () => {
     it('should filter out .blend files when blenderEnabled is false', () => {

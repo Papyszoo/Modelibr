@@ -87,6 +87,8 @@ export function ModelGrid({
   const [scrollParent, setScrollParent] = useState<HTMLDivElement | null>(null)
   const contextMenuRef = useRef<ModelContextMenuHandle>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const folderInputRef = useRef<HTMLInputElement>(null)
+  const zipInputRef = useRef<HTMLInputElement>(null)
   const selectionSurfaceRef = useRef<HTMLDivElement | null>(null)
   const { openModelDetailsTab } = useTabContext()
   const [showAddModelDialog, setShowAddModelDialog] = useState(false)
@@ -181,6 +183,8 @@ export function ModelGrid({
     uploading,
     uploadProgress,
     uploadMultipleFiles,
+    uploadFolder,
+    uploadZip,
     onDrop,
     onDragOver,
     onDragEnter,
@@ -525,6 +529,26 @@ export function ModelGrid({
     [uploadMultipleFiles]
   )
 
+  const handleFolderInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files && e.target.files.length > 0) {
+        uploadFolder(e.target.files)
+        e.target.value = ''
+      }
+    },
+    [uploadFolder]
+  )
+
+  const handleZipInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files && e.target.files.length > 0) {
+        uploadZip(e.target.files[0])
+        e.target.value = ''
+      }
+    },
+    [uploadZip]
+  )
+
   if (loading) {
     return (
       <div className="model-grid-container">
@@ -575,6 +599,30 @@ export function ModelGrid({
         onChange={handleFileInputChange}
       />
 
+      {/* Folder picker for multi-file glTF (external .bin + textures). webkitdirectory
+          is a non-standard attribute, set imperatively so the ref stays typed. */}
+      <input
+        type="file"
+        ref={el => {
+          folderInputRef.current = el
+          if (el) {
+            el.setAttribute('webkitdirectory', '')
+            el.setAttribute('directory', '')
+          }
+        }}
+        style={{ display: 'none' }}
+        multiple
+        onChange={handleFolderInputChange}
+      />
+
+      <input
+        type="file"
+        ref={zipInputRef}
+        style={{ display: 'none' }}
+        accept=".zip"
+        onChange={handleZipInputChange}
+      />
+
       <ModelContextMenu
         ref={contextMenuRef}
         hideAddToPack={!!packId}
@@ -618,6 +666,8 @@ export function ModelGrid({
         modelCount={pagination.totalCount}
         selectedModelCount={selectedModels.length}
         onUploadClick={() => fileInputRef.current?.click()}
+        onUploadFolderClick={() => folderInputRef.current?.click()}
+        onUploadZipClick={() => zipInputRef.current?.click()}
         onRefreshClick={handleRefresh}
         onBulkActionsClick={handleBulkActionsClick}
         onSelectAllClick={handleSelectAll}

@@ -1,6 +1,7 @@
 using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Extraction;
 using Domain.Services;
 using SharedKernel;
 
@@ -23,6 +24,7 @@ internal sealed class RestoreEntityCommandHandler : ICommandHandler<RestoreEntit
     private readonly ISoundRepository _soundRepository;
     private readonly IScriptRepository _scriptRepository;
     private readonly IEnvironmentMapRepository _environmentMapRepository;
+    private readonly IAssetSearchDocumentRepository _searchDocumentRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IUnitOfWork _unitOfWork;
 
@@ -35,6 +37,7 @@ internal sealed class RestoreEntityCommandHandler : ICommandHandler<RestoreEntit
         ISoundRepository soundRepository,
         IScriptRepository scriptRepository,
         IEnvironmentMapRepository environmentMapRepository,
+        IAssetSearchDocumentRepository searchDocumentRepository,
         IDateTimeProvider dateTimeProvider,
         IUnitOfWork unitOfWork)
     {
@@ -46,6 +49,7 @@ internal sealed class RestoreEntityCommandHandler : ICommandHandler<RestoreEntit
         _soundRepository = soundRepository;
         _scriptRepository = scriptRepository;
         _environmentMapRepository = environmentMapRepository;
+        _searchDocumentRepository = searchDocumentRepository;
         _dateTimeProvider = dateTimeProvider;
         _unitOfWork = unitOfWork;
     }
@@ -63,6 +67,10 @@ internal sealed class RestoreEntityCommandHandler : ICommandHandler<RestoreEntit
                 
                 model.Restore(now);
                 await _modelRepository.UpdateAsync(model, cancellationToken);
+                // Bring the asset back into search now, rather than when something
+                // eventually re-derives it.
+                await _searchDocumentRepository.SetActiveForAssetAsync(
+                    ExtractionAssetTypes.Model, model.Id, isActive: true, cancellationToken);
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
                 return Result.Success(new RestoreEntityResponse(true, "Model restored successfully"));
 
@@ -73,6 +81,8 @@ internal sealed class RestoreEntityCommandHandler : ICommandHandler<RestoreEntit
                 
                 version.Restore(now);
                 await _modelVersionRepository.UpdateAsync(version, cancellationToken);
+                await _searchDocumentRepository.SetActiveForVersionAsync(
+                    ExtractionAssetTypes.Model, version.ModelId, version.Id, isActive: true, cancellationToken);
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
                 return Result.Success(new RestoreEntityResponse(true, "Model version restored successfully"));
 

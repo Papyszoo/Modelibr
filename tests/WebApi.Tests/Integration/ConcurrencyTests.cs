@@ -119,9 +119,11 @@ public class ConcurrencyTests : IClassFixture<ModelibrWebFactory>, IAsyncLifetim
         Assert.True(successful.Length >= 1,
             $"At least one upload should succeed. Errors: {string.Join("; ", errorBodies)}");
 
-        // BUG: Under heavy concurrency, some uploads may 500 due to DB race conditions.
-        // Once fixed, uncomment:
-        // Assert.Equal(parallelism, successful.Length);
+        // Every upload must succeed: sharing one file hash deduplicates the stored file but
+        // still creates a model each. This used to 500 under the concurrent insert and the
+        // assertion was parked as a comment; the dedup path handles the race now, so it is
+        // asserted for real — a regression that reintroduces the 500 has to fail here.
+        Assert.Equal(parallelism, successful.Length);
 
         // All successful models should have distinct IDs
         var modelIds = new List<int>();
@@ -216,13 +218,20 @@ public class ConcurrencyTests : IClassFixture<ModelibrWebFactory>, IAsyncLifetim
 
         var claimedResponses = responses.Where(r => r.StatusCode == HttpStatusCode.OK).ToArray();
 
-        // BUG: Without SELECT ... FOR UPDATE, multiple workers can claim the same job.
-        // The correct behavior is at most 1 claim. Once fixed, replace the assertion below:
-        // Assert.True(claimedResponses.Length <= 1,
-        //     $"Expected at most 1 worker to claim the job, but {claimedResponses.Length} workers claimed it");
-
-        // Current behavior: multiple workers may claim (documenting the bug)
         Assert.True(claimedResponses.Length >= 1, "At least one worker should claim the job");
+
+        // The real invariant: no job is handed to two workers. ThumbnailQueue.DequeueAsync
+        // claims via a conditional UPDATE (WHERE Status = Pending), so losers of the race
+        // update zero rows and get 204. Sibling tests leave their own pending jobs in the
+        // shared database, so several workers may legitimately claim — just never the same job.
+        var claimedJobIds = new List<int>();
+        foreach (var resp in claimedResponses)
+        {
+            var json = await resp.Content.ReadFromJsonAsync<JsonElement>(JsonOpts);
+            claimedJobIds.Add(json.GetProperty("id").GetInt32());
+        }
+
+        Assert.Equal(claimedJobIds.Count, claimedJobIds.Distinct().Count());
     }
 
     // ─── Test 5: Parallel pack creation with same name ──────────────

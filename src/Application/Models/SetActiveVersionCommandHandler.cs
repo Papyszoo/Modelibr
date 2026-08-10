@@ -1,6 +1,7 @@
 using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Extraction;
 using Domain.Services;
 using SharedKernel;
 
@@ -10,17 +11,20 @@ internal class SetActiveVersionCommandHandler : ICommandHandler<SetActiveVersion
 {
     private readonly IModelRepository _modelRepository;
     private readonly IModelVersionRepository _versionRepository;
+    private readonly IAssetSearchDocumentRepository _searchDocumentRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IUnitOfWork _unitOfWork;
 
     public SetActiveVersionCommandHandler(
         IModelRepository modelRepository,
         IModelVersionRepository versionRepository,
+        IAssetSearchDocumentRepository searchDocumentRepository,
         IDateTimeProvider dateTimeProvider,
         IUnitOfWork unitOfWork)
     {
         _modelRepository = modelRepository;
         _versionRepository = versionRepository;
+        _searchDocumentRepository = searchDocumentRepository;
         _dateTimeProvider = dateTimeProvider;
         _unitOfWork = unitOfWork;
     }
@@ -52,6 +56,13 @@ internal class SetActiveVersionCommandHandler : ICommandHandler<SetActiveVersion
             // this UpdateAsync's SaveChanges commits (see DomainEventsInterceptor);
             // no manual publish here.
             await _modelRepository.UpdateAsync(model, cancellationToken);
+
+            // Search reads projection state only, so the current-version marker has to
+            // move with the active version. Without this, switching versions left search
+            // answering from whichever version was extracted last.
+            await _searchDocumentRepository.SetCurrentVersionAsync(
+                ExtractionAssetTypes.Model, model.Id, version.Id, cancellationToken);
+
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             return Result.Success();
