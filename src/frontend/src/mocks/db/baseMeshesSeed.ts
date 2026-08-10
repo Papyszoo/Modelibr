@@ -5,9 +5,12 @@
  * Credits: meshes by The Base Mesh (https://www.thebasemesh.com/, CC0 1.0),
  * glTF conversion by https://github.com/M3-org/base-meshes, thumbnails
  * rendered with Modelibr's own asset-processor pipeline in the fork
- * https://github.com/Papyszoo/base-meshes.
+ * https://github.com/Papyszoo/CC0-Public-Domain-Models.
  *
  * URLs are pinned to a commit SHA so upstream pushes can never break the demo.
+ * That commit predates the repo's packs/<slug>/ reorganisation, so the path
+ * below is still `models/…` — a pinned URL always describes the tree as it was
+ * at that commit, and GitHub keeps serving it under the current repo name.
  * Each model folder provides `{name}.glb` plus pipeline-identical thumbnails
  * (`{name}.webp` animated turntable, `{name}.png` static fallback).
  */
@@ -15,7 +18,7 @@ import type { DemoModel, DemoModelVersion, DemoPack } from './demoDb'
 
 export const BASE_MESHES_COMMIT = '792e14d4f80d6345c2382d13c17dd9f862fb3a75'
 
-const RAW_BASE = `https://raw.githubusercontent.com/Papyszoo/base-meshes/${BASE_MESHES_COMMIT}/models`
+const RAW_BASE = `https://raw.githubusercontent.com/Papyszoo/CC0-Public-Domain-Models/${BASE_MESHES_COMMIT}/models`
 
 export const BASE_MESHES_PACK_ID = 3
 
