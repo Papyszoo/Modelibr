@@ -21,7 +21,78 @@ namespace Infrastructure.Migrations
                 .HasAnnotation("ProductVersion", "9.0.8")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
+            NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "pg_trgm");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+
+            modelBuilder.Entity("Domain.Models.AgentOperationLog", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("AssetId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("AssetType")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("BatchId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("ClaimedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ClaimedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Operation")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("PayloadAfter")
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("PayloadBefore")
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTime>("PerformedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ReversedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("Completed");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BatchId");
+
+                    b.HasIndex("IdempotencyKey")
+                        .IsUnique();
+
+                    b.HasIndex("Status", "ClaimedAt");
+
+                    b.ToTable("AgentOperationLogs");
+                });
 
             modelBuilder.Entity("Domain.Models.ApplicationSettings", b =>
                 {
@@ -66,6 +137,391 @@ namespace Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("ApplicationSettings");
+                });
+
+            modelBuilder.Entity("Domain.Models.AssetDerivation", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AssetId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("AssetType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<int>("DeriveVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("DerivedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("VersionId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssetType", "DeriveVersion");
+
+                    b.HasIndex("AssetType", "AssetId", "VersionId")
+                        .IsUnique();
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("AssetType", "AssetId", "VersionId"), false);
+
+                    b.ToTable("AssetDerivations");
+                });
+
+            modelBuilder.Entity("Domain.Models.AssetDerivationLineage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AssetId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("AssetType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("SourceAssetId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("SourceAssetType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("SourcePartPath")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
+                    b.Property<int?>("SourceVersionId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssetType", "AssetId");
+
+                    b.HasIndex("SourceAssetType", "SourceAssetId");
+
+                    b.ToTable("AssetDerivationLineages");
+                });
+
+            modelBuilder.Entity("Domain.Models.AssetExtraction", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AssetId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("AssetType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTime>("ExtractedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("ExtractorVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("FileSha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int?>("GeometryHashVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Outcome")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("RawPayload")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<int>("SchemaVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("VersionId")
+                        .HasColumnType("integer");
+
+                    b.PrimitiveCollection<List<string>>("Warnings")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text[]")
+                        .HasDefaultValueSql("'{}'::text[]");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssetType", "ExtractorVersion");
+
+                    b.HasIndex("AssetType", "AssetId", "VersionId", "FileSha256")
+                        .IsUnique();
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("AssetType", "AssetId", "VersionId", "FileSha256"), false);
+
+                    b.ToTable("AssetExtractions");
+                });
+
+            modelBuilder.Entity("Domain.Models.AssetPart", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AssetId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("AssetType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Depth")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Detail")
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("GeometryHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int?>("GeometryHashVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<bool?>("HasUvs")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<string>("ObjectType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("ParentPath")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
+                    b.Property<string>("PartPath")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
+                    b.Property<int?>("TriangleCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("VersionId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("VertexCount")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GeometryHash");
+
+                    b.HasIndex("AssetType", "AssetId", "VersionId");
+
+                    b.HasIndex("AssetType", "AssetId", "VersionId", "PartPath")
+                        .IsUnique();
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("AssetType", "AssetId", "VersionId", "PartPath"), false);
+
+                    b.ToTable("AssetParts");
+                });
+
+            modelBuilder.Entity("Domain.Models.AssetSearchDocument", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("AnimationCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("AssetId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("AssetType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<int?>("BoneCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("BrowseSummary")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int?>("CategoryId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("CategoryName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("ConceptLabels")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<string>("DurationClass")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("Engine")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<double?>("GridSize")
+                        .HasColumnType("double precision");
+
+                    b.Property<bool?>("HasAnimations")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool?>("HasUvs")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("IsCurrentVersion")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("MaterialCount")
+                        .HasColumnType("integer");
+
+                    b.Property<double?>("MaxDimension")
+                        .HasColumnType("double precision");
+
+                    b.Property<int?>("PartCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("PartPath")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
+                    b.Property<string>("Prominence")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.PrimitiveCollection<List<string>>("QualityFlags")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text[]")
+                        .HasDefaultValueSql("'{}'::text[]");
+
+                    b.Property<string>("ShapeClass")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("Symbols")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<double?>("Tileability")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("Tokens")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int?>("TriangleCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("VersionId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("VertexCount")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CategoryId");
+
+                    b.HasIndex("DisplayName");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("DisplayName"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("DisplayName"), new[] { "gin_trgm_ops" });
+
+                    b.HasIndex("Engine");
+
+                    b.HasIndex("MaxDimension");
+
+                    b.HasIndex("ShapeClass");
+
+                    b.HasIndex("Symbols");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("Symbols"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("Symbols"), new[] { "gin_trgm_ops" });
+
+                    b.HasIndex("Tokens");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("Tokens"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("Tokens"), new[] { "gin_trgm_ops" });
+
+                    b.HasIndex("TriangleCount");
+
+                    b.HasIndex("AssetType", "AssetId", "VersionId", "PartPath")
+                        .IsUnique();
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("AssetType", "AssetId", "VersionId", "PartPath"), false);
+
+                    b.HasIndex("AssetType", "IsActive", "IsCurrentVersion", "Prominence");
+
+                    b.ToTable("AssetSearchDocuments");
                 });
 
             modelBuilder.Entity("Domain.Models.BatchUpload", b =>
@@ -138,6 +594,45 @@ namespace Infrastructure.Migrations
                     b.HasIndex("UploadedAt");
 
                     b.ToTable("BatchUploads");
+                });
+
+            modelBuilder.Entity("Domain.Models.ComputeCacheEntry", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("ComputedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("GeometryHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("GeometryHashVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Metric")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("Result")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GeometryHash", "GeometryHashVersion", "Metric")
+                        .IsUnique();
+
+                    b.ToTable("ComputeCacheEntries");
                 });
 
             modelBuilder.Entity("Domain.Models.EnvironmentMap", b =>
@@ -288,6 +783,81 @@ namespace Infrastructure.Migrations
                     b.HasIndex("FileId");
 
                     b.ToTable("EnvironmentMapVariantFaceFiles");
+                });
+
+            modelBuilder.Entity("Domain.Models.ExtractionJob", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AssetId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("AssetType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("ExtractorFamily")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("FileSha256")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("LockTimeoutMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("LockedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LockedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("MaxAttempts")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("VersionId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("WarningDetail")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExtractorFamily", "Status", "CreatedAt");
+
+                    b.HasIndex("AssetType", "AssetId", "VersionId", "ExtractorFamily")
+                        .IsUnique()
+                        .HasFilter("\"Status\" IN (0, 1)");
+
+                    b.ToTable("ExtractionJobs");
                 });
 
             modelBuilder.Entity("Domain.Models.File", b =>
@@ -606,6 +1176,38 @@ namespace Infrastructure.Migrations
                     b.ToTable("ModelVersions");
                 });
 
+            modelBuilder.Entity("Domain.Models.ModelVersionAuxiliaryFile", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("FileId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ModelVersionId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("RelativePath")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FileId");
+
+                    b.HasIndex("ModelVersionId", "RelativePath")
+                        .IsUnique();
+
+                    b.ToTable("ModelVersionAuxiliaryFiles");
+                });
+
             modelBuilder.Entity("Domain.Models.ModelVersionTextureSet", b =>
                 {
                     b.Property<int>("ModelVersionId")
@@ -895,6 +1497,49 @@ namespace Infrastructure.Migrations
                     b.HasIndex("Name");
 
                     b.ToTable("ScriptTemplates");
+                });
+
+            modelBuilder.Entity("Domain.Models.SearchLog", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FiltersJson")
+                        .HasColumnType("jsonb");
+
+                    b.Property<int?>("OpenedAssetId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("OpenedAssetType")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTime?>("OpenedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Query")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("ResultCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ResultsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.ToTable("SearchLogs");
                 });
 
             modelBuilder.Entity("Domain.Models.Setting", b =>
@@ -2060,6 +2705,25 @@ namespace Infrastructure.Migrations
                     b.Navigation("Model");
 
                     b.Navigation("Thumbnail");
+                });
+
+            modelBuilder.Entity("Domain.Models.ModelVersionAuxiliaryFile", b =>
+                {
+                    b.HasOne("Domain.Models.File", "File")
+                        .WithMany()
+                        .HasForeignKey("FileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Models.ModelVersion", "ModelVersion")
+                        .WithMany()
+                        .HasForeignKey("ModelVersionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("File");
+
+                    b.Navigation("ModelVersion");
                 });
 
             modelBuilder.Entity("Domain.Models.ModelVersionTextureSet", b =>

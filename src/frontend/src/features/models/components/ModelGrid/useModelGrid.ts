@@ -101,6 +101,8 @@ export function useModelGrid({
     uploading: upload.uploading,
     uploadProgress: upload.uploadProgress,
     uploadMultipleFiles: upload.uploadMultipleFiles,
+    uploadFolder: upload.uploadFolder,
+    uploadZip: upload.uploadZip,
 
     // Drag and drop
     onDrop: upload.onDrop,

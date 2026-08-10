@@ -1,6 +1,7 @@
 using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Extraction;
 using Domain.Services;
 using SharedKernel;
 
@@ -14,17 +15,20 @@ internal sealed class SoftDeleteModelVersionCommandHandler : ICommandHandler<Sof
 {
     private readonly IModelRepository _modelRepository;
     private readonly IModelVersionRepository _modelVersionRepository;
+    private readonly IAssetSearchDocumentRepository _searchDocumentRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IUnitOfWork _unitOfWork;
 
     public SoftDeleteModelVersionCommandHandler(
         IModelRepository modelRepository,
         IModelVersionRepository modelVersionRepository,
+        IAssetSearchDocumentRepository searchDocumentRepository,
         IDateTimeProvider dateTimeProvider,
         IUnitOfWork unitOfWork)
     {
         _modelRepository = modelRepository;
         _modelVersionRepository = modelVersionRepository;
+        _searchDocumentRepository = searchDocumentRepository;
         _dateTimeProvider = dateTimeProvider;
         _unitOfWork = unitOfWork;
     }
@@ -61,6 +65,11 @@ internal sealed class SoftDeleteModelVersionCommandHandler : ICommandHandler<Sof
         version.SoftDelete(now);
         await _modelVersionRepository.UpdateAsync(version, cancellationToken);
 
+        // Keep the search projection in step: the recycled version stops being
+        // searchable, and the current-version marker follows the new active version.
+        await _searchDocumentRepository.SetActiveForVersionAsync(
+            ExtractionAssetTypes.Model, request.ModelId, request.VersionId, isActive: false, cancellationToken);
+
         // If this was the active version, set active to the latest non-deleted version (excluding the one just deleted)
         if (model.ActiveVersionId == request.VersionId)
         {
@@ -71,6 +80,8 @@ internal sealed class SoftDeleteModelVersionCommandHandler : ICommandHandler<Sof
             {
                 model.SetActiveVersion(latestVersion.Id, now);
                 await _modelRepository.UpdateAsync(model, cancellationToken);
+                await _searchDocumentRepository.SetCurrentVersionAsync(
+                    ExtractionAssetTypes.Model, request.ModelId, latestVersion.Id, cancellationToken);
             }
         }
 

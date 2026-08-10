@@ -26,10 +26,17 @@ public class RepositoriesDontSelfCommitTests
     // Files still calling _context.SaveChangesAsync() internally. Every other
     // area (settings, packs, projects, models, thumbnails, texture sets,
     // sounds, sprites, scripts, env maps, categories, files, stages) has
-    // migrated — regressing one of those must fail this test. Only two
+    // migrated — regressing one of those must fail this test. Only three
     // permanent, individually-justified exceptions remain:
     private static readonly HashSet<string> StillSelfCommitting = new(StringComparer.OrdinalIgnoreCase)
     {
+        // AgentOperationLogRepository.TryClaimAsync is the same kind of
+        // idempotent-insert primitive: the MCP write tools' idempotency claim
+        // must hit the database BEFORE the write it guards, so it can catch its
+        // own unique violation and report the winning entry. Deferring it to the
+        // handler's commit would reopen the check-then-act race it exists to
+        // close. Stays permanently.
+        "AgentOperationLogRepository.cs",
         // ModelVersionRepository's ModelVersionTextureSet mapping methods stay
         // self-committing on purpose: the variant-aware AddTextureMappingAsync
         // is an idempotent-insert primitive that must save immediately to catch

@@ -46,6 +46,23 @@ namespace Infrastructure
             services.AddScoped<IThumbnailRepository, ThumbnailRepository>();
             services.AddScoped<IThumbnailJobRepository, ThumbnailJobRepository>();
             services.AddScoped<IThumbnailJobEventRepository, ThumbnailJobEventRepository>();
+            services.AddScoped<IAssetExtractionRepository, AssetExtractionRepository>();
+            services.AddScoped<IExtractionJobRepository, ExtractionJobRepository>();
+            services.AddScoped<IAssetPartRepository, AssetPartRepository>();
+            services.AddScoped<IModelVersionAuxiliaryFileRepository, ModelVersionAuxiliaryFileRepository>();
+            services.AddScoped<IAgentOperationLogRepository, AgentOperationLogRepository>();
+            services.AddScoped<IAssetDerivationRepository, AssetDerivationRepository>();
+            services.AddScoped<IAssetSearchDocumentRepository, AssetSearchDocumentRepository>();
+            services.AddScoped<ISearchLogRepository, SearchLogRepository>();
+            services.AddScoped<IComputeCacheRepository, ComputeCacheRepository>();
+            services.AddScoped<Application.Extraction.Compute.ComputeCacheService>();
+
+            // Derived-layer thresholds — config-driven guesses until prompt 26
+            // calibrates them (bind the "Derivation" section, fall back to defaults).
+            var derivationOptions =
+                configuration.GetSection("Derivation").Get<Application.Extraction.Derivation.DerivationOptions>()
+                ?? new Application.Extraction.Derivation.DerivationOptions();
+            services.AddSingleton(derivationOptions);
             services.AddScoped<ITextureSetRepository, TextureSetRepository>();
             services.AddScoped<ITextureProxyRepository, TextureProxyRepository>();
             services.AddScoped<IPackRepository, PackRepository>();

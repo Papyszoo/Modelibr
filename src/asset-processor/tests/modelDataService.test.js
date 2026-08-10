@@ -70,3 +70,87 @@ describe('ModelDataService.saveTechnicalMetadata', () => {
     expect(body.animationNames).toEqual([])
   })
 })
+
+describe('ModelDataService.saveSceneGraph', () => {
+  let service
+  let putSpy
+
+  beforeEach(() => {
+    service = new ModelDataService()
+    putSpy = vi.fn().mockResolvedValue({ status: 204 })
+    service.apiClient = { put: putSpy }
+  })
+
+  const sceneGraph = {
+    extractorVersion: 1,
+    geometryHashVersion: 1,
+    partPathVersion: 1,
+    parts: [
+      {
+        partPath: '/Chair/Leg[0]',
+        name: 'Leg',
+        parentPath: '/Chair',
+        depth: 2,
+        objectType: 'mesh',
+        source: 'threejs',
+        transform: {
+          position: [0, 0, 0],
+          quaternion: [0, 0, 0, 1],
+          scale: [1, 1, 1],
+        },
+        boundingBox: { min: [0, 0, 0], max: [1, 1, 1] },
+        triangleCount: 12,
+        vertexCount: 8,
+        geometryHash: 'aaaa000000000000',
+        hasUvs: true,
+        uvBounds: null,
+        materialSlots: ['Wood'],
+        shapeKeys: [],
+        vertexGroups: null,
+        modifiers: null,
+        quadCount: null,
+        ngonCount: null,
+      },
+    ],
+    rollups: {
+      objectCounts: { mesh: 1 },
+      meshCount: 1,
+      totalTriangles: 12,
+      totalVertices: 8,
+      materialCount: 1,
+      materialNames: ['Wood'],
+      boneCount: 0,
+      worldBounds: { min: [0, 0, 0], max: [1, 1, 1], dimensions: [1, 1, 1] },
+      unitConfidence: 'medium',
+      animationCount: 0,
+      animationNames: [],
+      animations: [],
+      referencedImages: { resolvedCount: 0, unresolved: [] },
+    },
+    warnings: [],
+  }
+
+  it('PUTs to the version scene-graph endpoint with the mapped contract', async () => {
+    const ok = await service.saveSceneGraph(42, 'a'.repeat(64), sceneGraph)
+
+    expect(ok).toBe(true)
+    expect(putSpy).toHaveBeenCalledTimes(1)
+    const [url, body] = putSpy.mock.calls[0]
+    expect(url).toBe('/model-versions/42/scene-graph')
+    expect(body.fileSha256).toBe('a'.repeat(64))
+    expect(body.extractorVersion).toBe(1)
+    expect(body.rollups.worldBounds.dimensions).toEqual([1, 1, 1])
+    expect(body.parts).toHaveLength(1)
+    // Promoted columns at the top level, everything else nested under detail.
+    expect(body.parts[0].partPath).toBe('/Chair/Leg[0]')
+    expect(body.parts[0].geometryHash).toBe('aaaa000000000000')
+    expect(body.parts[0].detail.materialSlots).toEqual(['Wood'])
+    expect(body.parts[0].detail.vertexGroups).toBeNull()
+  })
+
+  it('returns false when the request fails, without throwing', async () => {
+    putSpy.mockRejectedValueOnce(new Error('boom'))
+    const ok = await service.saveSceneGraph(1, 'a'.repeat(64), sceneGraph)
+    expect(ok).toBe(false)
+  })
+})

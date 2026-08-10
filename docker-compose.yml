@@ -51,6 +51,10 @@ services:
             - ASPNETCORE_LOGGING__LOGLEVEL__DEFAULT=Warning
             - ASPNETCORE_LOGGING__LOGLEVEL__Microsoft=Warning
             - BLENDER_INSTALL_PATH=${BLENDER_INSTALL_PATH:-/var/lib/modelibr/blender}
+            # Local MCP agent server. Reads are on by default; writes are a
+            # deliberate opt-in because the endpoint shares the Web API's exposure.
+            - MCP_ENABLED=${MCP_ENABLED:-true}
+            - MCP_WRITE_ENABLED=${MCP_WRITE_ENABLED:-false}
         ports:
             - "${HTTPS_PORT:-8443}:${HTTPS_PORT:-8443}"
         volumes:

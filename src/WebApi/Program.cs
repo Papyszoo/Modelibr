@@ -115,6 +115,29 @@ namespace WebApi
             builder.Services.AddScoped<IThumbnailJobQueueNotificationService, SignalRThumbnailJobQueueNotificationService>();
             builder.Services.AddScoped<IStoreImportProgressNotifier, SignalRStoreImportProgressNotifier>();
             builder.Services.AddHostedService<UploadDirectoryInitializer>();
+
+            // Local MCP server (prompt 27) — a thin, read-only pass-through over the
+            // asset-search / metadata / compute query handlers, hosted in-process over
+            // HTTP (SSE) so there's one process and one auth posture. Enabled by default;
+            // set MCP_ENABLED=false to turn it off.
+            var mcpEnabled = builder.Configuration["MCP_ENABLED"] != "false";
+            if (mcpEnabled)
+            {
+                var mcpServer = builder.Services.AddMcpServer()
+                    .WithHttpTransport()
+                    .WithTools<WebApi.Mcp.AssetSearchMcpTools>();
+
+                // Write tools (prompt 30) are opt-in: OFF by default keeps a stock server
+                // read-only so enabling agent writes on a LAN-reachable endpoint is a
+                // deliberate operator choice. Every write is idempotency-keyed + audited.
+                var mcpWriteEnabled = builder.Configuration["MCP_WRITE_ENABLED"] == "true";
+                if (mcpWriteEnabled)
+                {
+                    mcpServer
+                        .WithTools<WebApi.Mcp.AssetWriteMcpTools>()
+                        .WithPrompts<WebApi.Mcp.ImportLibraryPrompts>();
+                }
+            }
             builder.Services.AddHostedService<BlenderRetentionSweepHostedService>();
 
             var app = builder.Build();
@@ -149,6 +172,7 @@ namespace WebApi
             // Map endpoints
             app.MapModelEndpoints();
             app.MapModelVersionEndpoints();
+            app.MapExtractionEndpoints();
             app.MapFilesEndpoints();
             app.MapThumbnailEndpoints();
             app.MapThumbnailJobEndpoints();
@@ -175,6 +199,11 @@ namespace WebApi
             app.MapBackupEndpoints();
             app.MapSearchEndpoints();
             app.MapStoreImportEndpoints();
+            if (mcpEnabled)
+            {
+                // Exposes the MCP endpoint (SSE) at /mcp for a local agent to connect to.
+                app.MapMcp("/mcp");
+            }
 
             // Map SignalR hubs
             app.MapHub<ThumbnailHub>("/thumbnailHub");

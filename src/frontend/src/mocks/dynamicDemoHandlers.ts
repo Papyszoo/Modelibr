@@ -579,6 +579,109 @@ async function buildEnvironmentMapPreviewResponse(fileId: number | null) {
 
 // ─── Handlers ───────────────────────────────────────────────────────────
 
+/**
+ * Create a demo model (+ version + file blob) from a primary uploaded file and
+ * return its id. Shared by the plain `/models` upload and the multi-file glTF
+ * import so the demo store stays consistent. The demo has no worker, so external
+ * glTF auxiliaries are recorded but not resolved.
+ */
+async function createDemoModelFromPrimary(
+  file: File
+): Promise<{ modelId: number }> {
+  const modelId = await nextId('models')
+  const fileId = await nextId('files')
+  const versionId = await nextId('modelVersions')
+  const ext = file.name.split('.').pop() ?? ''
+  const isRenderable = ['glb', 'gltf', 'fbx', 'obj'].includes(ext.toLowerCase())
+  const ts = now()
+
+  const demoFile = {
+    id: fileId,
+    originalFileName: file.name,
+    storedFileName: file.name,
+    filePath: file.name,
+    mimeType: file.type || 'application/octet-stream',
+    sizeBytes: file.size,
+    sha256Hash: `demo-${fileId}`,
+    fileType: ext.toLowerCase(),
+    isRenderable,
+    createdAt: ts,
+    updatedAt: ts,
+  }
+
+  const model: DemoModel = {
+    id: modelId,
+    name: file.name.replace(/\.[^.]+$/, ''),
+    description: '',
+    tags: [],
+    files: [demoFile],
+    createdAt: ts,
+    updatedAt: ts,
+    activeVersionId: versionId,
+    defaultTextureSetId: null,
+    categoryId: null,
+    conceptImages: [],
+    textureSets: [],
+    packs: [],
+    projects: [],
+  }
+
+  const version: DemoModelVersion = {
+    id: versionId,
+    modelId,
+    versionNumber: 1,
+    description: 'Initial version',
+    createdAt: ts,
+    defaultTextureSetId: null,
+    thumbnailUrl: null,
+    pngThumbnailUrl: null,
+    files: [
+      {
+        id: fileId,
+        originalFileName: file.name,
+        mimeType: demoFile.mimeType,
+        fileType: demoFile.fileType,
+        sizeBytes: file.size,
+        isRenderable,
+      },
+    ],
+    materialNames: ['Material'],
+    mainVariantName: '',
+    variantNames: [],
+    textureMappings: [],
+    textureSetIds: [],
+  }
+
+  await storeFileBlob(fileId, file, file.name, demoFile.mimeType)
+  await put('models', model)
+  await put('modelVersions', version)
+
+  const batchId = `batch-${Date.now()}`
+  trackUpload({
+    batchId,
+    uploadType: 'Model',
+    fileId,
+    fileName: file.name,
+    packId: null,
+    packName: null,
+    projectId: null,
+    projectName: null,
+    modelId,
+    modelName: model.name,
+    textureSetId: null,
+    textureSetName: null,
+    spriteId: null,
+    spriteName: null,
+  })
+
+  if (isRenderable && ['glb', 'fbx'].includes(ext.toLowerCase())) {
+    generateModelThumbnailAsync(modelId, file, file.name)
+    generateVersionThumbnailAsync(versionId, file, file.name)
+  }
+
+  return { modelId }
+}
+
 export const dynamicDemoHandlers = [
   // ════════════════════════════════════════════════════════════════════════
   //  MODELS
@@ -893,108 +996,40 @@ export const dynamicDemoHandlers = [
     if (!file)
       return HttpResponse.json({ error: 'No file provided' }, { status: 400 })
 
-    const modelId = await nextId('models')
-    const fileId = await nextId('files')
-    const versionId = await nextId('modelVersions')
-    const ext = file.name.split('.').pop() ?? ''
-    const isRenderable = ['glb', 'gltf', 'fbx', 'obj'].includes(
-      ext.toLowerCase()
-    )
-    const ts = now()
-
-    const demoFile = {
-      id: fileId,
-      originalFileName: file.name,
-      storedFileName: file.name,
-      filePath: file.name,
-      mimeType: file.type || 'application/octet-stream',
-      sizeBytes: file.size,
-      sha256Hash: `demo-${fileId}`,
-      fileType: ext.toLowerCase(),
-      isRenderable,
-      createdAt: ts,
-      updatedAt: ts,
-    }
-
-    const model: DemoModel = {
-      id: modelId,
-      name: file.name.replace(/\.[^.]+$/, ''),
-      description: '',
-      tags: [],
-      files: [demoFile],
-      createdAt: ts,
-      updatedAt: ts,
-      activeVersionId: versionId,
-      defaultTextureSetId: null,
-      categoryId: null,
-      conceptImages: [],
-      textureSets: [],
-      packs: [],
-      projects: [],
-    }
-
-    const version: DemoModelVersion = {
-      id: versionId,
-      modelId,
-      versionNumber: 1,
-      description: 'Initial version',
-      createdAt: ts,
-      defaultTextureSetId: null,
-      thumbnailUrl: null,
-      pngThumbnailUrl: null,
-      files: [
-        {
-          id: fileId,
-          originalFileName: file.name,
-          mimeType: demoFile.mimeType,
-          fileType: demoFile.fileType,
-          sizeBytes: file.size,
-          isRenderable,
-        },
-      ],
-      materialNames: ['Material'],
-      mainVariantName: '',
-      variantNames: [],
-      textureMappings: [],
-      textureSetIds: [],
-    }
-
-    // Store file blob, model, and version
-    await storeFileBlob(fileId, file, file.name, demoFile.mimeType)
-    await put('models', model)
-    await put('modelVersions', version)
-
-    // Track upload
-    const batchId = `batch-${Date.now()}`
-    trackUpload({
-      batchId,
-      uploadType: 'Model',
-      fileId,
-      fileName: file.name,
-      packId: null,
-      packName: null,
-      projectId: null,
-      projectName: null,
-      modelId,
-      modelName: model.name,
-      textureSetId: null,
-      textureSetName: null,
-      spriteId: null,
-      spriteName: null,
-    })
-
-    // Generate thumbnail in background
-    if (isRenderable && ['glb', 'fbx'].includes(ext.toLowerCase())) {
-      generateModelThumbnailAsync(modelId, file, file.name)
-      generateVersionThumbnailAsync(versionId, file, file.name)
-    }
-
+    const { modelId } = await createDemoModelFromPrimary(file)
     return HttpResponse.json(
       { id: modelId, alreadyExists: false },
       { status: 201 }
     )
   }),
 
+  // Multi-file glTF import (primary + external .bin/textures). The demo has no
+  // worker to resolve auxiliaries, so we create the model from the primary and
+  // report the auxiliary count for UI honesty.
+  http.post('*/models/multifile', async ({ request }) => {
+    const formData = await request.formData()
+    const primary = formData.get('primary') as File | null
+    if (!primary)
+      return HttpResponse.json(
+        { error: 'No primary file provided' },
+        { status: 400 }
+      )
+
+    const auxiliaryFilesLinked = formData.getAll('files').length
+    const { modelId } = await createDemoModelFromPrimary(primary)
+    return HttpResponse.json(
+      {
+        id: modelId,
+        alreadyExists: false,
+        auxiliaryFilesLinked,
+        auxiliaryFilesSkipped: 0,
+      },
+      { status: 201 }
+    )
+  }),
+
+  // Zip import. The demo bundle can't unzip, so report an empty import rather
+  // than a 405/network error when the button is used in the showcase.
   // Update model (tags/description)
   http.post('*/models/:id/tags', async ({ params, request }) => {
     const model = await getById('models', Number(params.id))
@@ -1527,6 +1562,19 @@ export const dynamicDemoHandlers = [
     '*/models/:modelId/versions/:versionId/files/:fileId',
     async ({ params }) => {
       return serveFile(Number(params.fileId))
+    }
+  ),
+
+  // External glTF resources linked to a version. The demo library ships packed
+  // .glb seeds, so this is always empty — but it must answer, not 404: the viewer
+  // asks for it whenever a version carries a loose .gltf.
+  http.get(
+    '*/models/:modelId/versions/:versionId/auxiliary-files',
+    async ({ params }) => {
+      return HttpResponse.json({
+        modelVersionId: Number(params.versionId),
+        auxiliaries: [],
+      })
     }
   ),
 

@@ -13,6 +13,9 @@ Forbidden: static text/placeholder assertions with no logic behind them,
 passed, mocking PrimeReact (or any component library) and asserting on the
 stub. If the only thing that can fail it is a label rename, delete it.
 
+Validate non-vacuousness with a **mutation check**: break the source, watch the
+test go red, revert. A test that stays green through that is not a test.
+
 ## Convention: name the regression
 Each test (or its describe block) carries a comment saying what real bug it
 catches — see `ScriptList.flow.test.tsx` ("the language options were derived

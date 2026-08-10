@@ -37,5 +37,77 @@ function rewriteTextureUrl(url: string): string {
 export const safeLoadingManager = new THREE.LoadingManager()
 safeLoadingManager.setURLModifier(rewriteTextureUrl)
 
+/**
+ * A LoadingManager for a **multi-file glTF**: resolves the relative URIs the file
+ * references (`scene.bin`, `textures/wood.png`) to the `/files/<id>` URLs its
+ * auxiliary resources are served from, then falls back to the same safe rewrite as
+ * {@link safeLoadingManager} for anything unmapped.
+ *
+ * Without this the viewer could not open an imported loose `.gltf` at all: the
+ * relative URIs resolve against the file route, 404, and the shared manager replaces
+ * them with a transparent pixel — which for the `.bin` buffer means the model has no
+ * geometry. The worker's thumbnail renderer already resolves them (via the shared
+ * `lib/gltfResources` helper); this is the browser half of the same idea.
+ *
+ * Build one per resource map and hand it to a loader as `loader.manager = …`. Returns
+ * the shared safe manager when there is nothing to resolve, so packed `.glb` and
+ * single-file formats keep exactly their current behaviour.
+ */
+export function createGltfResourceManager(
+  resources: Record<string, string> | null | undefined
+): THREE.LoadingManager {
+  const entries = Object.entries(resources ?? {}).filter(
+    ([key, value]) =>
+      Boolean(key) && typeof value === 'string' && value.length > 0
+  )
+  if (entries.length === 0) return safeLoadingManager
+
+  // Normalise the way the loader asks for them: forward slashes, no leading "./".
+  const byPath = new Map<string, string>()
+  for (const [key, value] of entries) {
+    byPath.set(normalizeKey(key), value)
+  }
+  // Longest key first so "textures/wood.png" wins over a bare "wood.png".
+  const keys = [...byPath.keys()].sort((a, b) => b.length - a.length)
+
+  const manager = new THREE.LoadingManager()
+  manager.setURLModifier(url => {
+    if (typeof url !== 'string' || url.length === 0) return url
+    // The primary file itself and any data:/blob: the loader synthesises.
+    if (OUR_FILE_ENDPOINT_RE.test(url)) return url
+    if (url.startsWith('data:') || url.startsWith('blob:')) return url
+
+    const normalized = normalizeKey(url)
+    const direct = byPath.get(normalized)
+    if (direct) return direct
+
+    for (const key of keys) {
+      if (normalized.endsWith('/' + key)) return byPath.get(key)!
+    }
+
+    const base = normalized.slice(normalized.lastIndexOf('/') + 1)
+    const byBase = byPath.get(base)
+    if (byBase) return byBase
+    for (const key of keys) {
+      if (key.slice(key.lastIndexOf('/') + 1) === base) return byPath.get(key)!
+    }
+
+    // Unmapped: same safety net as the shared manager — never a live request.
+    return TRANSPARENT_PIXEL
+  })
+  return manager
+}
+
+function normalizeKey(value: string): string {
+  let out = value.split('#')[0].split('?')[0].replace(/\\/g, '/')
+  try {
+    out = decodeURIComponent(out)
+  } catch {
+    // Leave a malformed escape sequence alone rather than throwing mid-load.
+  }
+  while (out.startsWith('./')) out = out.slice(2)
+  return out.replace(/^\/+/, '')
+}
+
 /** Test-only export. */
 export const __test = { rewriteTextureUrl }
