@@ -6,379 +6,387 @@ import { navigateToTab } from "../helpers/navigation-helper";
 const API_BASE = process.env.API_BASE_URL || "http://localhost:8090";
 
 export interface PackInfo {
-    id: number;
-    name: string;
-    description?: string;
-    licenseType?: string;
-    url?: string;
+  id: number;
+  name: string;
+  description?: string;
+  licenseType?: string;
+  url?: string;
 }
 
 export class PacksPage {
-    readonly page: Page;
-    readonly packListTab: Locator;
-    readonly createPackButton: Locator;
-    readonly packNameInput: Locator;
-    readonly packDescriptionInput: Locator;
-    readonly createButton: Locator;
-    readonly cancelButton: Locator;
-    readonly packGrid: Locator;
+  readonly page: Page;
+  readonly packListTab: Locator;
+  readonly createPackButton: Locator;
+  readonly packNameInput: Locator;
+  readonly packDescriptionInput: Locator;
+  readonly createButton: Locator;
+  readonly cancelButton: Locator;
+  readonly packGrid: Locator;
 
-    constructor(page: Page) {
-        this.page = page;
-        this.packListTab = page.locator('[data-tab-id="packList"]');
-        this.createPackButton = page.locator('button:has-text("Create Pack")');
-        this.packNameInput = page.locator("#pack-name");
-        this.packDescriptionInput = page.locator("#pack-description");
-        this.createButton = page.locator(
-            'button:has-text("Create"):not(:has-text("Pack"))',
-        );
-        this.cancelButton = page.locator('button:has-text("Cancel")');
-        this.packGrid = page.locator(".pack-grid");
-    }
+  constructor(page: Page) {
+    this.page = page;
+    this.packListTab = page.locator('[data-tab-id="packList"]');
+    this.createPackButton = page.locator('button:has-text("Create Pack")');
+    this.packNameInput = page.locator("#pack-name");
+    this.packDescriptionInput = page.locator("#pack-description");
+    this.createButton = page.locator(
+      'button:has-text("Create"):not(:has-text("Pack"))',
+    );
+    this.cancelButton = page.locator('button:has-text("Cancel")');
+    this.packGrid = page.locator(".pack-grid");
+  }
 
-    async navigateToPackList(): Promise<void> {
-        await navigateToTab(this.page, "packs");
-        await this.page.waitForSelector(
-            ".pack-list .list-toolbar, .pack-list .mod-empty-state, .pack-grid",
-            {
-                state: "visible",
-                timeout: 15000,
-            },
-        );
-        console.log("[Navigation] Navigated to Pack List");
-    }
+  async navigateToPackList(): Promise<void> {
+    await navigateToTab(this.page, "packs");
+    await this.page.waitForSelector(
+      ".pack-list .list-toolbar, .pack-list .mod-empty-state, .pack-grid",
+      {
+        state: "visible",
+        timeout: 15000,
+      },
+    );
+    console.log("[Navigation] Navigated to Pack List");
+  }
 
-    async createPack(
-        name: string,
-        description?: string,
-        metadata?: { licenseType?: string; url?: string },
-    ): Promise<PackInfo> {
-        // Remove stale packs with the same name so metadata tests always
-        // validate the values created by the current scenario.
-        const checkResponse = await this.page.request.get(`${API_BASE}/packs`);
-        if (checkResponse.ok()) {
-            const checkData = await checkResponse.json();
-            const existing = (checkData.packs || []).filter(
-                (p: any) => p.name === name,
-            );
-            for (const stalePack of existing) {
-                await this.page.request.delete(
-                    `${API_BASE}/packs/${stalePack.id}`,
-                );
-                console.log(
-                    `[Pack] Deleted stale pack "${name}" (ID: ${stalePack.id})`,
-                );
-            }
-        }
-
-        // Wait for the page to be fully loaded
-        await this.page.waitForSelector(".pack-list .list-toolbar, .pack-list .mod-empty-state", {
-            timeout: 10000,
-        });
-
-        // Click create button - could be in header or in empty state
-        const createButton = this.page
-            .locator('button:has-text("Create Pack")')
-            .first();
-        await createButton.waitFor({ state: "visible", timeout: 10000 });
-        await createButton.click();
-        console.log("[Action] Clicked Create Pack button");
-
-        // Wait for dialog to appear
-        await this.page.waitForSelector(
-            '.p-dialog:has-text("Create New Pack")',
-            { state: "visible", timeout: 5000 },
-        );
-        console.log("[Action] Create Pack dialog opened");
-
-        // Fill in pack details using correct input IDs from PackList.tsx
-        const nameInput = this.page.locator("#pack-name");
-        await nameInput.waitFor({ state: "visible", timeout: 5000 });
-        await nameInput.fill(name);
-        console.log(`[Action] Filled pack name: ${name}`);
-
-        if (description) {
-            const descInput = this.page.locator("#pack-description");
-            await descInput.fill(description);
-            console.log(`[Action] Filled pack description: ${description}`);
-        }
-
-        if (metadata?.licenseType) {
-            const licenseDropdown = this.page.locator("#pack-license");
-            await licenseDropdown.waitFor({ state: "visible", timeout: 10000 });
-            await licenseDropdown.locator(".p-dropdown-trigger").click();
-
-            const licenseOption = this.page.locator(
-                `[role="option"][aria-label="${metadata.licenseType}"]`,
-            );
-            await licenseOption.first().waitFor({
-                state: "visible",
-                timeout: 5000,
-            });
-            await licenseOption.first().click();
-            console.log(
-                `[Action] Filled pack license type: ${metadata.licenseType}`,
-            );
-        }
-
-        if (metadata?.url) {
-            const urlInput = this.page.locator("#pack-url");
-            await urlInput.fill(metadata.url);
-            console.log(`[Action] Filled pack URL: ${metadata.url}`);
-        }
-
-        // Click Create button in dialog footer
-        const dialogCreateBtn = this.page.locator(
-            '.p-dialog-footer button:has-text("Create")',
-        );
-        await dialogCreateBtn.click();
-        console.log("[Action] Clicked Create button in dialog");
-
-        // Wait for dialog to close
-        await this.page.waitForSelector(
-            '.p-dialog:has-text("Create New Pack")',
-            { state: "hidden", timeout: 30000 },
-        );
-        console.log("[Action] Dialog closed");
-
-        // Get the pack ID from the API
-        const response = await this.page.request.get(`${API_BASE}/packs`);
-        const packs = await response.json();
-        const pack = packs.packs.find((p: any) => p.name === name);
-
-        // Wait for the pack card to appear in the grid using data-pack-id
-        if (pack?.id) {
-            await this.page.waitForSelector(
-                `.pack-grid-card[data-pack-id="${pack.id}"]`,
-                {
-                    state: "visible",
-                    timeout: 10000,
-                },
-            );
-        } else {
-            await this.page.waitForSelector(
-                `.pack-grid-card:has-text("${name}")`,
-                {
-                    state: "visible",
-                    timeout: 10000,
-                },
-            );
-        }
-        console.log(`[Action] Pack card "${name}" visible in grid`);
-
-        console.log(`[Pack] Created pack "${name}" with ID: ${pack?.id}`);
-        return {
-            id: pack?.id,
-            name,
-            description,
-            licenseType: metadata?.licenseType,
-            url: metadata?.url,
-        };
-    }
-
-    async openPack(packName: string, packId?: number): Promise<void> {
-        const packCard = packId
-            ? this.page.locator(`.pack-grid-card[data-pack-id="${packId}"]`)
-            : this.page.locator(`.pack-grid-card:has-text("${packName}")`);
-        await packCard.click();
-        await this.page.waitForLoadState("domcontentloaded");
+  async createPack(
+    name: string,
+    description?: string,
+    metadata?: { licenseType?: string; url?: string },
+  ): Promise<PackInfo> {
+    // Remove stale packs with the same name so metadata tests always
+    // validate the values created by the current scenario.
+    const checkResponse = await this.page.request.get(`${API_BASE}/packs`);
+    if (checkResponse.ok()) {
+      const checkData = await checkResponse.json();
+      const existing = (checkData.packs || []).filter(
+        (p: any) => p.name === name,
+      );
+      for (const stalePack of existing) {
+        await this.page.request.delete(`${API_BASE}/packs/${stalePack.id}`);
         console.log(
-            `[Navigation] Opened pack: ${packName}${packId ? ` (id=${packId})` : ""}`,
+          `[Pack] Deleted stale pack "${name}" (ID: ${stalePack.id})`,
         );
+      }
     }
 
-    async deletePack(packName: string, packId?: number): Promise<void> {
-        const packCard = packId
-            ? this.page.locator(`.pack-grid-card[data-pack-id="${packId}"]`)
-            : this.page.locator(`.pack-grid-card:has-text("${packName}")`);
-        const deleteButton = packCard.locator(
-            'button[aria-label="Delete Pack"], button.p-button-danger',
-        );
-        await deleteButton.click();
-        await packCard.waitFor({ state: "hidden", timeout: 10000 });
-        console.log(`[Action] Deleted pack: ${packName}`);
+    // Wait for the page to be fully loaded
+    await this.page.waitForSelector(
+      ".pack-list .list-toolbar, .pack-list .mod-empty-state",
+      {
+        timeout: 10000,
+      },
+    );
+
+    // Click create button - could be in header or in empty state
+    const createButton = this.page
+      .locator('button:has-text("Create Pack")')
+      .first();
+    await createButton.waitFor({ state: "visible", timeout: 10000 });
+    await createButton.click();
+    console.log("[Action] Clicked Create Pack button");
+
+    // Wait for dialog to appear
+    await this.page.waitForSelector('.p-dialog:has-text("Create New Pack")', {
+      state: "visible",
+      timeout: 5000,
+    });
+    console.log("[Action] Create Pack dialog opened");
+
+    // Fill in pack details using correct input IDs from PackList.tsx
+    const nameInput = this.page.locator("#pack-name");
+    await nameInput.waitFor({ state: "visible", timeout: 5000 });
+    await nameInput.fill(name);
+    console.log(`[Action] Filled pack name: ${name}`);
+
+    if (description) {
+      const descInput = this.page.locator("#pack-description");
+      await descInput.fill(description);
+      console.log(`[Action] Filled pack description: ${description}`);
     }
 
-    getPackCard(packName: string, packId?: number): Locator {
-        if (packId) {
-            return this.page.locator(
-                `.pack-grid-card[data-pack-id="${packId}"]`,
-            );
-        }
-        return this.page.locator(`.pack-grid-card:has-text("${packName}")`);
+    if (metadata?.licenseType) {
+      const licenseDropdown = this.page.locator("#pack-license");
+      await licenseDropdown.waitFor({ state: "visible", timeout: 10000 });
+      await licenseDropdown.locator(".p-dropdown-trigger").click();
+
+      const licenseOption = this.page.locator(
+        `[role="option"][aria-label="${metadata.licenseType}"]`,
+      );
+      await licenseOption.first().waitFor({
+        state: "visible",
+        timeout: 5000,
+      });
+      await licenseOption.first().click();
+      console.log(`[Action] Filled pack license type: ${metadata.licenseType}`);
     }
 
-    async isPackVisible(packName: string, packId?: number): Promise<boolean> {
-        const packCard = packId
-            ? this.page.locator(`.pack-grid-card[data-pack-id="${packId}"]`)
-            : this.page.locator(`.pack-grid-card:has-text("${packName}")`);
-        try {
-            await packCard.waitFor({ state: "visible", timeout: 15000 });
-            return true;
-        } catch {
-            return false;
-        }
+    if (metadata?.url) {
+      const urlInput = this.page.locator("#pack-url");
+      await urlInput.fill(metadata.url);
+      console.log(`[Action] Filled pack URL: ${metadata.url}`);
     }
 
-    private async assertDecodedImage(
-        image: Locator,
-        context: string,
-        expectedFileId?: number,
-    ): Promise<void> {
-        await expect(image).toBeVisible({ timeout: 15000 });
-        await expect
-            .poll(
-                async () => {
-                    return await image.evaluate((img: HTMLImageElement) => {
-                        return img.complete && img.naturalWidth > 0;
-                    });
-                },
-                {
-                    message: `Waiting for ${context} image to decode`,
-                    timeout: 15000,
-                    intervals: [500, 1000, 2000],
-                },
-            )
-            .toBe(true);
+    // Click Create button in dialog footer
+    const dialogCreateBtn = this.page.locator(
+      '.p-dialog-footer button:has-text("Create")',
+    );
+    await dialogCreateBtn.click();
+    console.log("[Action] Clicked Create button in dialog");
 
-        const details = await image.evaluate((img: HTMLImageElement) => ({
-            src: img.getAttribute("src"),
-            currentSrc: img.currentSrc,
-            naturalWidth: img.naturalWidth,
-            naturalHeight: img.naturalHeight,
-        }));
+    // Wait for dialog to close
+    await this.page.waitForSelector('.p-dialog:has-text("Create New Pack")', {
+      state: "hidden",
+      timeout: 30000,
+    });
+    console.log("[Action] Dialog closed");
 
-        if (expectedFileId !== undefined) {
-            expect(details.currentSrc || details.src).toContain(
-                `/files/${expectedFileId}`,
-            );
-        }
+    // Get the pack ID from the API
+    const response = await this.page.request.get(`${API_BASE}/packs`);
+    const packs = await response.json();
+    const pack = packs.packs.find((p: any) => p.name === name);
 
-        console.log(
-            `[UI] ${context} image loaded: ${details.naturalWidth}x${details.naturalHeight} (${details.currentSrc || details.src})`,
-        );
+    // Wait for the pack card to appear in the grid using data-pack-id
+    if (pack?.id) {
+      await this.page.waitForSelector(
+        `.pack-grid-card[data-pack-id="${pack.id}"]`,
+        {
+          state: "visible",
+          timeout: 10000,
+        },
+      );
+    } else {
+      await this.page.waitForSelector(`.pack-grid-card:has-text("${name}")`, {
+        state: "visible",
+        timeout: 10000,
+      });
+    }
+    console.log(`[Action] Pack card "${name}" visible in grid`);
+
+    console.log(`[Pack] Created pack "${name}" with ID: ${pack?.id}`);
+    return {
+      id: pack?.id,
+      name,
+      description,
+      licenseType: metadata?.licenseType,
+      url: metadata?.url,
+    };
+  }
+
+  async openPack(packName: string, packId?: number): Promise<void> {
+    const packCard = packId
+      ? this.page.locator(`.pack-grid-card[data-pack-id="${packId}"]`)
+      : this.page.locator(`.pack-grid-card:has-text("${packName}")`);
+    await packCard.click();
+    await this.page.waitForLoadState("domcontentloaded");
+    console.log(
+      `[Navigation] Opened pack: ${packName}${packId ? ` (id=${packId})` : ""}`,
+    );
+  }
+
+  /**
+   * Switch the open container to one of its asset tabs. The trigger carries a
+   * stable `data-testid` from ContainerViewer's shared tab header renderer, so
+   * this works for packs and projects alike.
+   */
+  async openContainerTab(
+    slug:
+      | "details"
+      | "models"
+      | "global-materials"
+      | "multi-model-textures"
+      | "sprites"
+      | "sounds"
+      | "scripts"
+      | "environment-maps",
+  ): Promise<void> {
+    const trigger = this.page.locator(`[data-testid="container-tab-${slug}"]`);
+    await expect(trigger).toBeVisible({ timeout: 15000 });
+    await trigger.click();
+    console.log(`[Navigation] Opened container tab: ${slug}`);
+  }
+
+  async deletePack(packName: string, packId?: number): Promise<void> {
+    const packCard = packId
+      ? this.page.locator(`.pack-grid-card[data-pack-id="${packId}"]`)
+      : this.page.locator(`.pack-grid-card:has-text("${packName}")`);
+    const deleteButton = packCard.locator(
+      'button[aria-label="Delete Pack"], button.p-button-danger',
+    );
+    await deleteButton.click();
+    await packCard.waitFor({ state: "hidden", timeout: 10000 });
+    console.log(`[Action] Deleted pack: ${packName}`);
+  }
+
+  getPackCard(packName: string, packId?: number): Locator {
+    if (packId) {
+      return this.page.locator(`.pack-grid-card[data-pack-id="${packId}"]`);
+    }
+    return this.page.locator(`.pack-grid-card:has-text("${packName}")`);
+  }
+
+  async isPackVisible(packName: string, packId?: number): Promise<boolean> {
+    const packCard = packId
+      ? this.page.locator(`.pack-grid-card[data-pack-id="${packId}"]`)
+      : this.page.locator(`.pack-grid-card:has-text("${packName}")`);
+    try {
+      await packCard.waitFor({ state: "visible", timeout: 15000 });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private async assertDecodedImage(
+    image: Locator,
+    context: string,
+    expectedFileId?: number,
+  ): Promise<void> {
+    await expect(image).toBeVisible({ timeout: 15000 });
+    await expect
+      .poll(
+        async () => {
+          return await image.evaluate((img: HTMLImageElement) => {
+            return img.complete && img.naturalWidth > 0;
+          });
+        },
+        {
+          message: `Waiting for ${context} image to decode`,
+          timeout: 15000,
+          intervals: [500, 1000, 2000],
+        },
+      )
+      .toBe(true);
+
+    const details = await image.evaluate((img: HTMLImageElement) => ({
+      src: img.getAttribute("src"),
+      currentSrc: img.currentSrc,
+      naturalWidth: img.naturalWidth,
+      naturalHeight: img.naturalHeight,
+    }));
+
+    if (expectedFileId !== undefined) {
+      expect(details.currentSrc || details.src).toContain(
+        `/files/${expectedFileId}`,
+      );
     }
 
-    async assertPackCardCustomThumbnailLoaded(
-        packName: string,
-        expectedFileId: number,
-        packId?: number,
-    ): Promise<void> {
-        const card = this.getPackCard(packName, packId);
-        await expect(card).toBeVisible({ timeout: 15000 });
-        await this.assertDecodedImage(
-            card.locator("img").first(),
-            `pack card for \"${packName}\"`,
-            expectedFileId,
-        );
-    }
+    console.log(
+      `[UI] ${context} image loaded: ${details.naturalWidth}x${details.naturalHeight} (${details.currentSrc || details.src})`,
+    );
+  }
 
-    async assertPackDetailCustomThumbnailLoaded(
-        packName: string,
-        expectedFileId: number,
-    ): Promise<void> {
-        const viewer = this.page.locator(".container-viewer").first();
-        await expect(viewer).toBeVisible({ timeout: 15000 });
-        await this.assertDecodedImage(
-            viewer.locator(`img[alt="${packName}"]`).first(),
-            `pack detail for \"${packName}\"`,
-            expectedFileId,
-        );
-    }
+  async assertPackCardCustomThumbnailLoaded(
+    packName: string,
+    expectedFileId: number,
+    packId?: number,
+  ): Promise<void> {
+    const card = this.getPackCard(packName, packId);
+    await expect(card).toBeVisible({ timeout: 15000 });
+    await this.assertDecodedImage(
+      card.locator("img").first(),
+      `pack card for \"${packName}\"`,
+      expectedFileId,
+    );
+  }
 
-    // PackViewer methods (ContainerViewer with tabs)
-    async addModelToPack(): Promise<void> {
-        // Click Models tab first, then find the Add Model card
-        await this.page
-            .locator('[data-testid="container-tab-models"]')
-            .click();
-        const addCard = this.page.locator(".model-card-add").first();
-        await addCard.waitFor({ state: "visible", timeout: 10000 });
-        await addCard.click();
-        await this.page
-            .locator(".p-dialog")
-            .waitFor({ state: "visible", timeout: 10000 });
-        console.log("[Action] Opened Add Model dialog");
-    }
+  async assertPackDetailCustomThumbnailLoaded(
+    packName: string,
+    expectedFileId: number,
+  ): Promise<void> {
+    const viewer = this.page.locator(".container-viewer").first();
+    await expect(viewer).toBeVisible({ timeout: 15000 });
+    await this.assertDecodedImage(
+      viewer.locator(`img[alt="${packName}"]`).first(),
+      `pack detail for \"${packName}\"`,
+      expectedFileId,
+    );
+  }
 
-    async selectModelInDialog(modelName: string): Promise<void> {
-        const modelItem = this.page.locator(
-            `.p-dialog .add-item-card:has-text("${modelName}"), .p-dialog .model-item:has-text("${modelName}")`,
-        );
-        await modelItem.click();
-        console.log(`[Action] Selected model: ${modelName}`);
-    }
+  // PackViewer methods (ContainerViewer with tabs)
+  async addModelToPack(): Promise<void> {
+    // Click Models tab first, then find the Add Model card
+    await this.page.locator('[data-testid="container-tab-models"]').click();
+    const addCard = this.page.locator(".model-card-add").first();
+    await addCard.waitFor({ state: "visible", timeout: 10000 });
+    await addCard.click();
+    await this.page
+      .locator(".p-dialog")
+      .waitFor({ state: "visible", timeout: 10000 });
+    console.log("[Action] Opened Add Model dialog");
+  }
 
-    async confirmAddSelection(): Promise<void> {
-        const addButton = this.page.locator(
-            '.p-dialog-footer button:has-text("Add")',
-        );
-        await addButton.click();
-        await this.page
-            .locator(".p-dialog")
-            .waitFor({ state: "hidden", timeout: 10000 });
-        console.log("[Action] Confirmed adding items to pack");
-    }
+  async selectModelInDialog(modelName: string): Promise<void> {
+    const modelItem = this.page.locator(
+      `.p-dialog .add-item-card:has-text("${modelName}"), .p-dialog .model-item:has-text("${modelName}")`,
+    );
+    await modelItem.click();
+    console.log(`[Action] Selected model: ${modelName}`);
+  }
 
-    async removeModelFromPack(
-        modelName: string,
-        modelId?: number,
-    ): Promise<void> {
-        // Click Models tab first
-        await this.page
-            .locator('[data-testid="container-tab-models"]')
-            .click();
-        const modelCard = modelId
-            ? this.page.locator(`.model-card[data-model-id="${modelId}"]`)
-            : this.page.locator(`.model-card:has-text("${modelName}")`).first();
-        await modelCard.waitFor({ state: "visible", timeout: 10000 });
-        await modelCard.click({ button: "right" });
-        await this.page
-            .locator(".p-contextmenu")
-            .waitFor({ state: "visible", timeout: 5000 });
-        const removeOption = this.page
-            .locator(
-                '.p-contextmenu .p-menuitem:has-text("Remove from pack"), .p-contextmenu .p-menuitem:has-text("Remove")',
-            )
-            .first();
-        await removeOption.click();
-        await modelCard.waitFor({ state: "hidden", timeout: 10000 });
-        console.log(`[Action] Removed model "${modelName}" from pack`);
-    }
+  async confirmAddSelection(): Promise<void> {
+    const addButton = this.page.locator(
+      '.p-dialog-footer button:has-text("Add")',
+    );
+    await addButton.click();
+    await this.page
+      .locator(".p-dialog")
+      .waitFor({ state: "hidden", timeout: 10000 });
+    console.log("[Action] Confirmed adding items to pack");
+  }
 
-    async getModelCount(): Promise<number> {
-        const stat = this.page.locator(
-            ".pack-grid-card-stats span:has(.pi-box)",
-        );
-        const text = await stat.textContent();
-        return parseInt(text?.trim() || "0", 10);
-    }
+  async removeModelFromPack(
+    modelName: string,
+    modelId?: number,
+  ): Promise<void> {
+    // Click Models tab first
+    await this.page.locator('[data-testid="container-tab-models"]').click();
+    const modelCard = modelId
+      ? this.page.locator(`.model-card[data-model-id="${modelId}"]`)
+      : this.page.locator(`.model-card:has-text("${modelName}")`).first();
+    await modelCard.waitFor({ state: "visible", timeout: 10000 });
+    await modelCard.click({ button: "right" });
+    await this.page
+      .locator(".p-contextmenu")
+      .waitFor({ state: "visible", timeout: 5000 });
+    const removeOption = this.page
+      .locator(
+        '.p-contextmenu .p-menuitem:has-text("Remove from pack"), .p-contextmenu .p-menuitem:has-text("Remove")',
+      )
+      .first();
+    await removeOption.click();
+    await modelCard.waitFor({ state: "hidden", timeout: 10000 });
+    console.log(`[Action] Removed model "${modelName}" from pack`);
+  }
 
-    // Stats badges are identified by their PrimeIcon classes (mirrors what
-    // PackList.tsx renders). Keep these selectors in sync if the icons
-    // change: `pi-palette` → Global Materials, `pi-th-large` → Multi-Model
-    // Textures. A missing/swapped icon would silently make these return 0.
-    async getGlobalMaterialCount(): Promise<number> {
-        const stat = this.page.locator(
-            ".pack-grid-card-stats span:has(.pi-palette)",
-        );
-        const text = await stat.textContent();
-        return parseInt(text?.trim() || "0", 10);
-    }
+  async getModelCount(): Promise<number> {
+    const stat = this.page.locator(".pack-grid-card-stats span:has(.pi-box)");
+    const text = await stat.textContent();
+    return parseInt(text?.trim() || "0", 10);
+  }
 
-    async getMultiModelTextureCount(): Promise<number> {
-        const stat = this.page.locator(
-            ".pack-grid-card-stats span:has(.pi-th-large)",
-        );
-        const text = await stat.textContent();
-        return parseInt(text?.trim() || "0", 10);
-    }
+  // Stats badges are identified by their PrimeIcon classes (mirrors what
+  // PackList.tsx renders). Keep these selectors in sync if the icons
+  // change: `pi-palette` → Global Materials, `pi-th-large` → Multi-Model
+  // Textures. A missing/swapped icon would silently make these return 0.
+  async getGlobalMaterialCount(): Promise<number> {
+    const stat = this.page.locator(
+      ".pack-grid-card-stats span:has(.pi-palette)",
+    );
+    const text = await stat.textContent();
+    return parseInt(text?.trim() || "0", 10);
+  }
 
-    async getSpriteCount(): Promise<number> {
-        const stat = this.page.locator(
-            ".pack-grid-card-stats span:has(.pi-image)",
-        );
-        const text = await stat.textContent();
-        return parseInt(text?.trim() || "0", 10);
-    }
+  async getMultiModelTextureCount(): Promise<number> {
+    const stat = this.page.locator(
+      ".pack-grid-card-stats span:has(.pi-th-large)",
+    );
+    const text = await stat.textContent();
+    return parseInt(text?.trim() || "0", 10);
+  }
+
+  async getSpriteCount(): Promise<number> {
+    const stat = this.page.locator(".pack-grid-card-stats span:has(.pi-image)");
+    const text = await stat.textContent();
+    return parseInt(text?.trim() || "0", 10);
+  }
 }

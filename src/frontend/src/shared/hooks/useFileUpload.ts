@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { uploadModel } from '@/features/models/api/modelApi'
+import { uploadModel, uploadModelGroup } from '@/features/models/api/modelApi'
 import { useUploadProgress } from '@/hooks/useUploadProgress'
+import { groupFilesForImport } from '@/shared/utils/multiFileImport'
+import { extractZipEntries } from '@/shared/utils/zipImport'
 
 import {
   isSupportedModelFormat,
@@ -187,9 +189,11 @@ export function useFileUpload(options = {}) {
         setUploadProgress(progress)
       }
 
-      // Call onSuccess once after all uploads complete (if any succeeded)
+      // Call onSuccess once after all uploads complete (if any succeeded).
+      // Awaited: the callback associates models with a pack/project, and an unawaited
+      // rejection would silently skip that work while the UI reported success.
       if (onSuccess && results.succeeded.length > 0) {
-        onSuccess(null, results)
+        await onSuccess(null, results)
       }
 
       return results
@@ -245,12 +249,143 @@ export function useFileUpload(options = {}) {
     }
   }
 
+  /**
+   * Upload a picked folder as one or more model groups. Each supported primary
+   * model file is grouped with its sibling auxiliary files (.bin/textures) by
+   * directory and posted as a multi-file import; a group with no auxiliaries
+   * falls back to the plain single-file upload. Solves bulk multi-file glTF import
+   * (glTF-Sample-Assets / Synty layouts).
+   * @param {FileList|File[]} files - Files from a webkitdirectory picker
+   * @param {Object} groupingOptions - { allowBlend } — renderability follows the hook's
+   *   own `requireThreeJSRenderable`, so a folder import cannot smuggle past the gates
+   *   the single-file picker applies.
+   * @returns {Promise<Object>} Upload results summary
+   */
+  const uploadFolder = async (files, groupingOptions = {}) => {
+    const groups = groupFilesForImport(files, {
+      requireThreeJSRenderable,
+      allowBlend: groupingOptions.allowBlend === true,
+    })
+    const results = { succeeded: [], failed: [], total: groups.length }
+
+    if (groups.length === 0) {
+      if (toast?.current) {
+        toast.current.show({
+          severity: 'warn',
+          summary: 'No models found',
+          detail:
+            'The selected folder has no supported model files (.gltf, .glb, .obj, .fbx, .stl, .3mf).',
+        })
+      }
+      return results
+    }
+
+    setUploading(true)
+    setUploadProgress(0)
+
+    const batchId =
+      useGlobalProgress && uploadProgressContext && groups.length > 1
+        ? uploadProgressContext.createBatch()
+        : undefined
+
+    try {
+      for (let i = 0; i < groups.length; i++) {
+        const group = groups[i]
+        const uploadId =
+          useGlobalProgress && uploadProgressContext
+            ? uploadProgressContext.addUpload(group.primary, fileType, batchId)
+            : null
+
+        try {
+          if (useGlobalProgress && uploadId && uploadProgressContext) {
+            uploadProgressContext.updateUploadProgress(uploadId, 50)
+          }
+
+          const result =
+            group.auxiliaries.length > 0
+              ? await uploadModelGroup(group.primary, group.auxiliaries, {
+                  batchId,
+                })
+              : await uploadModel(group.primary, { batchId })
+
+          if (useGlobalProgress && uploadId && uploadProgressContext) {
+            uploadProgressContext.updateUploadProgress(uploadId, 100)
+            uploadProgressContext.completeUpload(uploadId, result)
+          }
+          results.succeeded.push({ file: group.primary, result })
+        } catch (error) {
+          if (useGlobalProgress && uploadId && uploadProgressContext) {
+            uploadProgressContext.failUpload(uploadId, error)
+          }
+          results.failed.push({ file: group.primary, error })
+          if (toast?.current) {
+            toast.current.show({
+              severity: 'error',
+              summary: 'Import Failed',
+              detail: `${group.primary.name}: ${error.message}`,
+            })
+          }
+          if (onError) onError(group.primary, error)
+        }
+
+        setUploadProgress(
+          Math.round(((i + 1) / groups.length) * 100 * 100) / 100
+        )
+      }
+
+      if (onSuccess && results.succeeded.length > 0) {
+        await onSuccess(null, results)
+      }
+      return results
+    } finally {
+      setUploading(false)
+      setUploadProgress(0)
+    }
+  }
+
+  /**
+   * Import a `.zip` archive of models. The archive is expanded in the browser and the
+   * resulting files go through the SAME path as a picked folder — same grouping, same
+   * renderability/.blend gates, same per-model progress entries, same result shape, and
+   * the same pack/project association.
+   *
+   * It used to POST the archive to a server-side unzip endpoint, which answered a
+   * different shape ({batchId, imported[]}) than every other upload path. Consumers read
+   * `results.succeeded`, so the success callback threw: nothing was associated with the
+   * pack/project the import came from and the grid never refreshed — all after the
+   * progress window had already reported the import complete.
+   *
+   * @param {File} file - The .zip file
+   * @param {Object} groupingOptions - Same options as uploadFolder ({ allowBlend }).
+   * @returns {Promise<Object>} Upload results summary
+   */
+  const uploadZip = async (file, groupingOptions = {}) => {
+    let entries
+    try {
+      entries = await extractZipEntries(file)
+    } catch (error) {
+      if (toast?.current) {
+        toast.current.show({
+          severity: 'error',
+          summary: 'Import Failed',
+          detail: error.message,
+        })
+      }
+      if (onError) onError(file, error)
+      throw error
+    }
+
+    return uploadFolder(entries, groupingOptions)
+  }
+
   return {
     uploading,
     uploadProgress,
     uploadFile,
     uploadMultipleFiles,
     uploadSingleFile,
+    uploadFolder,
+    uploadZip,
   }
 }
 

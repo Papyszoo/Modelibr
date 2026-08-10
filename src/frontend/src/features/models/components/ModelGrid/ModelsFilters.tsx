@@ -52,6 +52,8 @@ interface ModelsFiltersProps {
   modelCount: number
   selectedModelCount: number
   onUploadClick: () => void
+  onUploadFolderClick?: () => void
+  onUploadZipClick?: () => void
   onRefreshClick: () => void
   onBulkActionsClick: (event: ReactMouseEvent<HTMLElement>) => void
   onSelectAllClick: () => void
@@ -94,6 +96,8 @@ export function ModelsFilters({
   modelCount,
   selectedModelCount,
   onUploadClick,
+  onUploadFolderClick,
+  onUploadZipClick,
   onRefreshClick,
   onBulkActionsClick,
   onSelectAllClick,
@@ -175,6 +179,22 @@ export function ModelsFilters({
             // via `getByLabel("Upload models")`.
             ariaLabel="Upload models"
           />
+          {onUploadFolderClick ? (
+            <ListToolbarButton
+              icon="pi pi-folder-open"
+              onClick={onUploadFolderClick}
+              tooltip="Import folder (multi-file glTF: .gltf + .bin + textures)"
+              ariaLabel="Import folder"
+            />
+          ) : null}
+          {onUploadZipClick ? (
+            <ListToolbarButton
+              icon="pi pi-download"
+              onClick={onUploadZipClick}
+              tooltip="Import .zip archive of models"
+              ariaLabel="Import zip"
+            />
+          ) : null}
           <ListToolbarButton
             icon="pi pi-refresh"
             label="Refresh"

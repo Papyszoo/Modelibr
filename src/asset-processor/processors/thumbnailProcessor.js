@@ -207,10 +207,21 @@ export class ThumbnailProcessor extends BaseProcessor {
       // Same signal that makes _applyTextures skip texture application below.
       const preserveMaterials = (job.mainVariantName || '') === '__embedded__'
 
+      // Multi-file glTF: resolve external buffers/textures against the
+      // already-uploaded siblings. Only .gltf carries external references
+      // (.glb — including a .blend converted to .glb above — is self-contained).
+      let gltfResources = null
+      if (fileInfo.fileType === 'gltf') {
+        gltfResources = await this.modelFileService.fetchAuxiliaryResourceMap(
+          job.modelId,
+          job.modelVersionId
+        )
+      }
+
       const polygonCount = await renderer.loadModel(
         fileInfo.filePath,
         fileInfo.fileType,
-        { preserveMaterials }
+        { preserveMaterials, gltfResources }
       )
 
       jobLogger.info('Model loaded in browser', { polygonCount })
@@ -240,6 +251,27 @@ export class ThumbnailProcessor extends BaseProcessor {
             error: matError.message,
           }
         )
+      }
+
+      // Step 3.3: Extract and save the full scene graph (per-part rows + rollups
+      // + verbatim raw payload). Best-effort — a scene-graph failure must never
+      // fail the thumbnail. Supersedes the flat technical-metadata write above
+      // for the raw substrate; both keep the flat projection consistent.
+      try {
+        const sceneGraph = await renderer.extractSceneGraph()
+        if (sceneGraph && job.modelHash) {
+          await this.modelDataService.saveSceneGraph(
+            job.modelVersionId,
+            job.modelHash,
+            sceneGraph
+          )
+        } else if (!job.modelHash) {
+          jobLogger.warn('Skipping scene-graph save — job has no model hash')
+        }
+      } catch (sgError) {
+        jobLogger.warn('Failed to extract/save scene graph, continuing', {
+          error: sgError.message,
+        })
       }
 
       // Step 3.5: Apply textures if configured

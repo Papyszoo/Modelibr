@@ -18,6 +18,8 @@ internal sealed class ModelVersionRepository : IModelVersionRepository
     public async Task<ModelVersion?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         return await _context.ModelVersions
+            .Include(v => v.Model)
+                .ThenInclude(m => m.ModelCategory)
             .Include(v => v.Files)
             .Include(v => v.Thumbnail)
             .Include(v => v.TextureMappings)

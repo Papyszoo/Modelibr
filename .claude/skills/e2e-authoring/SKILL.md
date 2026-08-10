@@ -46,6 +46,14 @@ comment naming what they absorb (see dock-system.steps.ts).
 - Phase worker counts are set by `run-e2e.js` (chromium currently 3 local AND
   CI — 4 caused asset-processor contention); trust run-e2e.js over the stale
   comment in `playwright.config.ts`.
+- **`--no-deps` single-scenario runs are for iterating, never for signing off.**
+  The full parallel suite produces failures isolation cannot: accumulated items
+  from earlier scenarios, the upload-progress panel overlaying cards, viewer
+  canvas starvation under software WebGL, and duplicate names across workers.
+  **Run `run-e2e.js` before claiming e2e green** — four consecutive "verified"
+  rounds of the category-sidebar work each missed a failure the next wider run
+  found. Exit code 1 with an EADDRINUSE in the demo phase is usually a stale
+  local `vite preview` on :3004, not a test failure.
 
 ## Results & traces (read your own run output)
 A machine-readable **JSON report** (`status`, `error.message`, `attachments[]`)
@@ -109,7 +117,7 @@ For deeper triage (history, regression-vs-long-broken, infra signatures) use the
   expect(locator).toBeVisible()/toHaveText()/toHaveCount()` — they retry.
   `waitForSelector` is the legacy pattern (prompt 47 migrates it); don't
   write new ones.
-- **No `waitForTimeout`** (CLAUDE.md rule 4). A "let React settle" sleep
+- **No `waitForTimeout`** (AGENTS.md rule 4). A "let React settle" sleep
   means the NEXT assertion should be a retrying web-first one — write that
   instead. Fixed intervals inside an explicit bounded poll loop are the one
   exception; any surviving sleep needs a comment naming the race it absorbs.
