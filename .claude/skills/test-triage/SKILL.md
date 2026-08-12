@@ -1,12 +1,12 @@
 ---
 name: test-triage
-description: Diagnose a failing test suite ("visual regression failed", "e2e is red", "backend tests broke") by locating the right logs and artifacts — test-report/logs, Playwright reports/traces, visual diff PNGs, TRX files — and analyzing the failure. Use whenever the user reports a test failure and wants to know what/why, or asks where test logs live.
+description: Diagnose a failing test suite ("visual regression failed", "e2e is red", "backend tests broke") by locating the right logs and artifacts - test-report/logs, Playwright reports/traces, visual diff PNGs, TRX files - and analyzing the failure. Use whenever the user reports a test failure and wants to know what/why, or asks where test logs live.
 ---
 
 # Test triage
 
 Map what the user said to a suite id from `scripts/test-runner/suites.config.mjs`
-(the manifest — single source of truth for all suites):
+(the manifest - single source of truth for all suites):
 
 | User says | Suite id |
 |---|---|
@@ -24,17 +24,17 @@ If genuinely ambiguous, ask once; otherwise pick the obvious suite and proceed.
 ## Where artifacts live
 
 Every suite run via the local runner (`npm run test:all*`) or Test Studio
-(`npm run test:site`) writes — **last run only, overwritten each run**:
+(`npm run test:site`) writes - **last run only, overwritten each run**:
 
-- `test-report/logs/<suite-id>.log` — full stdout/stderr
-- `test-report/summary.json` — normalized pass/fail counts (runner runs)
-- `test-report/history.jsonl` — per-run status/duration history (appended, survives)
+- `test-report/logs/<suite-id>.log` - full stdout/stderr
+- `test-report/summary.json` - normalized pass/fail counts (runner runs)
+- `test-report/history.jsonl` - per-run status/duration history (appended, survives)
 
 Kind-specific artifacts on top of that:
 
 | Suite | Failure artifacts |
 |---|---|
-| `backend`, `backend-integration` | TRX: `test-report/.work/<suite-id>/trx/*.trx` — failed tests are `<UnitTestResult outcome="Failed">` with `<Message>`/`<StackTrace>` |
+| `backend`, `backend-integration` | TRX: `test-report/.work/<suite-id>/trx/*.trx` - failed tests are `<UnitTestResult outcome="Failed">` with `<Message>`/`<StackTrace>` |
 | `frontend` | `test-report/.work/frontend/jest.json` (`testResults[].message` for failures) |
 | `asset-processor` | `test-report/.work/asset-processor/vitest.json` |
 | `e2e-fast` / `e2e-full` / `e2e-performance` | `tests/e2e/playwright-report/index.html` (merged HTML report); `tests/e2e/test-results/<test-dir>/` per failure: screenshots, video `.webm`, `trace.zip`, `error-context.md` |
@@ -42,7 +42,7 @@ Kind-specific artifacts on top of that:
 | `storybook-visual` | `src/frontend/visual-tests/test-results/<test-dir>/` per failure: `error-context.md`, and for pixel diffs `*-expected.png` / `*-actual.png` / `*-diff.png`; baselines in `src/frontend/visual-tests/__snapshots__/` (only exists after a first baseline run) |
 
 If `test-report/logs/<id>.log` is missing, the suite wasn't run through the
-runner/Studio — check the suite's own dirs above, or offer to run it
+runner/Studio - check the suite's own dirs above, or offer to run it
 (`npm run test:all -- --only=<id> --yes --no-open`).
 
 ## Procedure
@@ -51,9 +51,9 @@ runner/Studio — check the suite's own dirs above, or offer to run it
    test names and error messages. Check `test-report/history.jsonl` to see if
    the suite was passing before (regression vs long-broken).
 2. Pull the kind-specific evidence:
-   - **Visual regression** — two distinct failure modes:
+   - **Visual regression** - two distinct failure modes:
      (a) *render gate*: a story never becomes visible (`#storybook-root` hidden
-     timeout) — the failing story name is in the error line; that's a component
+     timeout) - the failing story name is in the error line; that's a component
      bug or a story needing setup, NOT a pixel diff.
      (b) *pixel diff*: Read the `-expected`/`-actual`/`-diff` PNGs with the Read
      tool (it renders images) and describe the visual difference. Intentional UI
@@ -75,13 +75,13 @@ runner/Studio — check the suite's own dirs above, or offer to run it
 
 When the user asks whether everything is green / quality has fallen:
 
-1. `test-report/summary.json` — per-suite status + counts of the **last** runner
+1. `test-report/summary.json` - per-suite status + counts of the **last** runner
    run (incl. Studio's "Run everything", which shells out to the runner). A suite
-   with `"status": "skipped"` or `"not-present"` did NOT run — say so explicitly,
+   with `"status": "skipped"` or `"not-present"` did NOT run - say so explicitly,
    don't count it as passing.
-2. `test-report/history.jsonl` — one line per run; compare the latest entries to
+2. `test-report/history.jsonl` - one line per run; compare the latest entries to
    see whether a suite regressed (was passing, now failing) or got slower.
-3. `test-report/everything.log` — the combined console log of a Studio
+3. `test-report/everything.log` - the combined console log of a Studio
    "Run everything"; per-suite logs are still in `test-report/logs/<id>.log`.
 
 To produce fresh results: `npm run test:all:full` (CLI) or the **Run everything**
@@ -102,5 +102,5 @@ starting (built into the suite commands), so stale containers can't skew results
   "Cannot connect to the Docker daemon" → the colima VM OOM-crashed (needs
   ≥ 6 CPU / 8 GiB for the parallel e2e image builds: `colima start --cpu 6 --memory 8`).
 - The WebApi reads `RESTORE_STORAGE_PATH`/`THUMBNAIL_STORAGE_PATH` in Program.Main
-  **before** host config is applied — for in-process tests these must be set as
+  **before** host config is applied - for in-process tests these must be set as
   environment variables (see ModelibrWebFactory), not just host configuration.

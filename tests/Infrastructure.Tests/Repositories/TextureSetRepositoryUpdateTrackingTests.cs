@@ -11,12 +11,12 @@ namespace Infrastructure.Tests.Repositories;
 /// Focused repository-level coverage for the UpdateAsync tracking guard
 /// (<see cref="DbContextTrackingExtensions.UpdateIfDetached{TEntity}"/>),
 /// added to fix PR #568's regression: once repositories stopped
-/// self-committing (see the backend-patterns skill, "Transactions — unit of
+/// self-committing (see the backend-patterns skill, "Transactions - unit of
 /// work"), TextureSetRepository.UpdateAsync called
 /// <c>_context.TextureSets.Update(textureSet)</c> unconditionally. Calling
 /// that on an entity still tracked as Added with a temporary (not yet
-/// DB-assigned) key — exactly what CreateTextureSetWithFileCommandHandler
-/// does (AddAsync -> AddTexture -> UpdateAsync -> one SaveChanges) — throws
+/// DB-assigned) key - exactly what CreateTextureSetWithFileCommandHandler
+/// does (AddAsync -> AddTexture -> UpdateAsync -> one SaveChanges) - throws
 /// "The property 'TextureSet.Id' has a temporary value while attempting to
 /// change the entity's state to 'Modified'." Uses EF Core's InMemory
 /// provider because this is purely change-tracker/temporary-key behavior,
@@ -67,7 +67,7 @@ public class TextureSetRepositoryUpdateTrackingTests
     {
         // The reverse hazard: a genuinely Detached entity (loaded/rehydrated
         // outside the current context) must still be attached and marked
-        // Modified — the guard must not turn UpdateAsync into a no-op for the
+        // Modified - the guard must not turn UpdateAsync into a no-op for the
         // exact case it exists to handle.
         var databaseName = Guid.NewGuid().ToString();
 

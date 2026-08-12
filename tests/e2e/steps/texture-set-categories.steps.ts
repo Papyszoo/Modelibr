@@ -31,7 +31,7 @@ const categoryIds: Record<string, number> = {};
 const runId = Date.now().toString(36).slice(-4);
 
 // Maps a human-friendly base name from the feature to the unique name we
-// actually create. Shared by categories and texture sets — bases are
+// actually create. Shared by categories and texture sets - bases are
 // distinct across scenarios.
 const uniqueNames: Record<string, string> = {};
 

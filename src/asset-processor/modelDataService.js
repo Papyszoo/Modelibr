@@ -297,7 +297,7 @@ export class ModelDataService {
   async cleanupTextureFiles(texturePaths) {
     if (!texturePaths) return
 
-    // Deduplicate file paths — multiple texture types may share the same file (e.g., ARM channels)
+    // Deduplicate file paths - multiple texture types may share the same file (e.g., ARM channels)
     const uniquePaths = new Set()
     for (const textureInfo of Object.values(texturePaths)) {
       // Handle both new {filePath, sourceChannel} objects and legacy plain strings
@@ -403,6 +403,139 @@ export class ModelDataService {
     } catch (error) {
       logger.warn('Failed to save technical metadata', {
         modelVersionId,
+        error: error.message,
+        status: error.response?.status,
+      })
+      return false
+    }
+  }
+
+  /**
+   * Persist a full scene-graph extraction for a model version.
+   * Calls PUT /model-versions/{versionId}/scene-graph (worker-authenticated).
+   * @param {number} modelVersionId - The model version ID
+   * @param {string} fileSha256 - SHA-256 of the extracted model file
+   * @param {Object} sceneGraph - Payload from puppeteerRenderer.extractSceneGraph()
+   * @returns {Promise<boolean>} True if saved successfully
+   */
+  async saveSceneGraph(modelVersionId, fileSha256, sceneGraph) {
+    try {
+      const body = {
+        fileSha256,
+        extractorVersion: sceneGraph.extractorVersion,
+        geometryHashVersion: sceneGraph.geometryHashVersion ?? null,
+        schemaVersion: 1,
+        rollups: {
+          meshCount: sceneGraph.rollups.meshCount ?? null,
+          totalTriangles: sceneGraph.rollups.totalTriangles ?? null,
+          totalVertices: sceneGraph.rollups.totalVertices ?? null,
+          materialCount: sceneGraph.rollups.materialCount ?? null,
+          materialNames: sceneGraph.rollups.materialNames ?? [],
+          boneCount: sceneGraph.rollups.boneCount ?? null,
+          worldBounds: sceneGraph.rollups.worldBounds
+            ? { dimensions: sceneGraph.rollups.worldBounds.dimensions }
+            : null,
+          animationCount: sceneGraph.rollups.animationCount ?? null,
+          animationNames: sceneGraph.rollups.animationNames ?? [],
+        },
+        parts: sceneGraph.parts.map(p => ({
+          partPath: p.partPath,
+          name: p.name,
+          parentPath: p.parentPath ?? null,
+          depth: p.depth,
+          objectType: p.objectType,
+          triangleCount: p.triangleCount ?? null,
+          vertexCount: p.vertexCount ?? null,
+          geometryHash: p.geometryHash ?? null,
+          hasUvs: p.hasUvs ?? null,
+          // Everything not promoted to a column travels as jsonb detail.
+          detail: {
+            source: p.source,
+            transform: p.transform,
+            boundingBox: p.boundingBox ?? null,
+            worldBoundingBox: p.worldBoundingBox ?? null,
+            uvBounds: p.uvBounds ?? null,
+            materialSlots: p.materialSlots ?? [],
+            shapeKeys: p.shapeKeys ?? [],
+            vertexGroups: p.vertexGroups ?? null,
+            modifiers: p.modifiers ?? null,
+            quadCount: p.quadCount ?? null,
+            ngonCount: p.ngonCount ?? null,
+          },
+        })),
+        warnings: sceneGraph.warnings ?? [],
+      }
+
+      await this.apiClient.put(
+        `/model-versions/${modelVersionId}/scene-graph`,
+        body,
+        {
+          headers: {
+            ...(config.workerApiKey
+              ? { 'X-Api-Key': config.workerApiKey }
+              : {}),
+          },
+        }
+      )
+
+      logger.info('Scene graph saved successfully', {
+        modelVersionId,
+        partCount: body.parts.length,
+      })
+      return true
+    } catch (error) {
+      logger.warn('Failed to save scene graph', {
+        modelVersionId,
+        error: error.message,
+        status: error.response?.status,
+      })
+      return false
+    }
+  }
+
+  /**
+   * Persist a raw extraction for a non-mesh asset family (TextureSet, Sound,
+   * Script, Sprite, EnvironmentMap). Calls PUT /assets/{assetType}/{assetId}/extraction
+   * (worker-authenticated). Models use saveSceneGraph instead.
+   * @param {string} assetType - "TextureSet" | "Sound" | "Script" | "Sprite" | "EnvironmentMap"
+   * @param {number} assetId - Id within the family
+   * @param {Object} extraction - { fileSha256, payload, warnings?, extractorVersion, schemaVersion?, versionId?, outcome? }
+   * @returns {Promise<boolean>} True if saved successfully
+   */
+  async saveExtraction(assetType, assetId, extraction) {
+    try {
+      const body = {
+        versionId: extraction.versionId ?? null,
+        fileSha256: extraction.fileSha256,
+        extractorVersion: extraction.extractorVersion,
+        schemaVersion: extraction.schemaVersion ?? 1,
+        outcome: extraction.outcome ?? null,
+        payload: extraction.payload ?? {},
+        warnings: extraction.warnings ?? [],
+      }
+
+      await this.apiClient.put(
+        `/assets/${encodeURIComponent(assetType)}/${assetId}/extraction`,
+        body,
+        {
+          headers: {
+            ...(config.workerApiKey
+              ? { 'X-Api-Key': config.workerApiKey }
+              : {}),
+          },
+        }
+      )
+
+      logger.info('Extraction saved successfully', {
+        assetType,
+        assetId,
+        warningCount: body.warnings.length,
+      })
+      return true
+    } catch (error) {
+      logger.warn('Failed to save extraction', {
+        assetType,
+        assetId,
         error: error.message,
         status: error.response?.status,
       })

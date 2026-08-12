@@ -10,7 +10,7 @@ public class SoundDomainTests
     [Fact]
     public void UpdateAudioMetadata_WithValidValues_StoresFieldsAndAuthoritativeDuration()
     {
-        // Arrange — sounds are frequently created with duration 0 before the
+        // Arrange - sounds are frequently created with duration 0 before the
         // worker has analyzed the file.
         var sound = Sound.Create("clip", CreateAudioFile(), duration: 0, peaks: null, DateTime.UtcNow);
         var updatedAt = DateTime.UtcNow.AddMinutes(1);
@@ -32,7 +32,7 @@ public class SoundDomainTests
         // Arrange
         var sound = Sound.Create("clip", CreateAudioFile(), duration: 3.0, peaks: null, DateTime.UtcNow);
 
-        // Act — a failed/absent worker duration must not zero out a known value.
+        // Act - a failed/absent worker duration must not zero out a known value.
         sound.UpdateAudioMetadata(44100, 1, "mp3", durationFromWorker: 0, DateTime.UtcNow);
 
         // Assert

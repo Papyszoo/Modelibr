@@ -27,7 +27,7 @@ beforeEach(() => {
   mockPost.mockResolvedValue({ data: {} })
 })
 
-describe('RecycledFilesList — scripts in the bin', () => {
+describe('RecycledFilesList - scripts in the bin', () => {
   // Regression: recycled scripts were returned by the API but the bin UI had no
   // Scripts section, so they were invisible and unrecoverable. This drives the
   // real component against the recycled endpoint and the restore endpoint.

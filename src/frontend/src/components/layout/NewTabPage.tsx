@@ -30,7 +30,7 @@ import { type Tab, type TabType } from '@/types'
 //
 type TileGroup = 'assets' | 'organize' | 'system'
 
-/** Non-tab tile actions — open an overlay instead of converting the host tab. */
+/** Non-tab tile actions - open an overlay instead of converting the host tab. */
 type TileAction = 'global-search'
 
 interface Tile {
@@ -107,7 +107,7 @@ const TILES: Tile[] = [
     group: 'assets',
     icon: 'pi-volume-up',
     label: 'Sounds',
-    description: 'WAV, OGG, and MP3 — SFX, dialogue, ambient loops.',
+    description: 'WAV, OGG, and MP3 - SFX, dialogue, ambient loops.',
     targetType: 'sounds',
     targetLabel: 'Sounds',
   },
@@ -116,7 +116,7 @@ const TILES: Tile[] = [
     group: 'assets',
     icon: 'pi-code',
     label: 'Scripts',
-    description: 'Source code — Lua, C#, Python, shaders, and more.',
+    description: 'Source code - Lua, C#, Python, shaders, and more.',
     targetType: 'scripts',
     targetLabel: 'Scripts',
   },
@@ -125,7 +125,7 @@ const TILES: Tile[] = [
     group: 'assets',
     icon: 'pi-th-large',
     label: 'Stages',
-    description: 'Scene compositions — under rework.',
+    description: 'Scene compositions - under rework.',
     targetType: 'stageList',
     targetLabel: 'Stages',
     disabled: true,
@@ -149,6 +149,15 @@ const TILES: Tile[] = [
     description: 'Curated bundles you can publish or hand off.',
     targetType: 'packs',
     targetLabel: 'Packs',
+  },
+  {
+    key: 'asset-store',
+    group: 'organize',
+    icon: 'pi-shopping-bag',
+    label: 'Asset Store',
+    description: 'Import packs from your store library into this instance.',
+    targetType: 'assetStore',
+    targetLabel: 'Asset Store',
   },
   {
     key: 'history',
@@ -219,6 +228,7 @@ const RECENT_TAB_ICON: Partial<Record<TabType, string>> = {
   sounds: 'pi-volume-up',
   stageList: 'pi-th-large',
   stageEditor: 'pi-th-large',
+  assetStore: 'pi-shopping-bag',
   settings: 'pi-cog',
   history: 'pi-history',
   recycledFiles: 'pi-trash',
@@ -229,7 +239,7 @@ function iconForTab(type: TabType): string {
 }
 
 interface NewTabPageProps {
-  /** The id of the host `newTab` tab — used so we can replace ourselves */
+  /** The id of the host `newTab` tab - used so we can replace ourselves */
   tabId: string
 }
 
@@ -318,7 +328,7 @@ export function NewTabPage({ tabId }: NewTabPageProps): JSX.Element {
       return
     }
 
-    // Convert in place — preserve panel marker so right-panel tabs stay right.
+    // Convert in place - preserve panel marker so right-panel tabs stay right.
     const created: Tab = createTab(
       tile.targetType,
       undefined,
@@ -370,7 +380,7 @@ export function NewTabPage({ tabId }: NewTabPageProps): JSX.Element {
     // merge each session tab into the current window. `openTab` dedups by
     // id and routes panel='right' tabs to the right active list, so the
     // merge respects both sides. The original session's `activeTabId` /
-    // `activeRightTabId` are intentionally NOT reapplied — the last tab
+    // `activeRightTabId` are intentionally NOT reapplied - the last tab
     // inserted on each side ends up active, which matches how merging
     // tabs from another browser window works in most editors.
     const remaining = tabs.filter(t => t.id !== tabId)
@@ -490,7 +500,7 @@ function NewTabGrid({ tiles, onPick }: NewTabGridProps): JSX.Element {
           onClick={() => onPick(tile)}
           disabled={tile.disabled}
           aria-disabled={tile.disabled || undefined}
-          title={tile.disabled ? `${tile.label} — reworking` : tile.label}
+          title={tile.disabled ? `${tile.label} - reworking` : tile.label}
         >
           <div className="newtab-tile-head">
             <span className="newtab-tile-icon" aria-hidden="true">
@@ -547,7 +557,7 @@ function useHorizontalScrollStrip(
 
     const onWheel = (e: WheelEvent) => {
       if (e.deltaY === 0) return
-      // Trackpad horizontal gestures (deltaX dominant) — let native handle.
+      // Trackpad horizontal gestures (deltaX dominant) - let native handle.
       if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return
       const right =
         e.deltaY > 0 && el.scrollLeft + el.clientWidth < el.scrollWidth
@@ -705,7 +715,7 @@ function splitTabsByPanel(tabs: Tab[]): { left: Tab[]; right: Tab[] } {
 }
 
 function tabTitlesPreview(tabs: Tab[]): string {
-  if (tabs.length === 0) return '—'
+  if (tabs.length === 0) return '-'
   return tabs.map(t => t.label ?? t.type).join(', ')
 }
 
@@ -730,7 +740,7 @@ function SessionTooltipColumn({ side, tabs }: SessionColumnProps): JSX.Element {
         <span className="newtab-session-tooltip-count">{tabs.length}</span>
       </div>
       {tabs.length === 0 ? (
-        <p className="newtab-session-tooltip-empty">—</p>
+        <p className="newtab-session-tooltip-empty">-</p>
       ) : (
         <ul className="newtab-session-tooltip-list">
           {tabs.map(t => (
@@ -755,7 +765,7 @@ function SessionsGrid({
   // Each session needs a unique DOM target the PrimeReact tooltip can bind
   // to. The tooltip renders in a portal so it isn't clipped by the strip's
   // overflow:auto. `useId` returns a stable, collision-free id per
-  // component instance — important when several NewTabPage panels render
+  // component instance - important when several NewTabPage panels render
   // simultaneously.
   const tooltipIdBase = useId()
   // CSS.escape the colons React injects into useId() output so the
@@ -797,7 +807,7 @@ function SessionsGrid({
               type="button"
               className="newtab-recent-row newtab-session-row"
               onClick={() => onRestore(entry)}
-              aria-label={`Restore session — ${ariaSummary}`}
+              aria-label={`Restore session - ${ariaSummary}`}
             >
               <span
                 className="newtab-session-side newtab-session-side--left"

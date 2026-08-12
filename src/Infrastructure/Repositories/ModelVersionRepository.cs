@@ -18,6 +18,8 @@ internal sealed class ModelVersionRepository : IModelVersionRepository
     public async Task<ModelVersion?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         return await _context.ModelVersions
+            .Include(v => v.Model)
+                .ThenInclude(m => m.ModelCategory)
             .Include(v => v.Files)
             .Include(v => v.Thumbnail)
             .Include(v => v.TextureMappings)
@@ -101,7 +103,7 @@ internal sealed class ModelVersionRepository : IModelVersionRepository
     // ─── ModelVersionTextureSet mapping methods ─────────────────────────
     // These stay self-committing on purpose (unlike Add/Update/Delete above,
     // which stage only and let the handler commit via IUnitOfWork): the
-    // variant-aware AddTextureMappingAsync is an idempotent-insert primitive —
+    // variant-aware AddTextureMappingAsync is an idempotent-insert primitive -
     // it must save immediately so it can catch the unique violation itself and
     // recover by loading the existing row. The Remove* siblings keep the same
     // immediate-commit boundary for symmetry. This is why the file remains in
@@ -124,7 +126,7 @@ internal sealed class ModelVersionRepository : IModelVersionRepository
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
         {
             _context.Entry(mapping).State = EntityState.Detached;
-            // Mapping already exists — load it so EF Core relationship fixup keeps the entity graph consistent
+            // Mapping already exists - load it so EF Core relationship fixup keeps the entity graph consistent
             await _context.Set<ModelVersionTextureSet>()
                 .FirstOrDefaultAsync(m => m.ModelVersionId == modelVersionId
                     && m.TextureSetId == textureSetId

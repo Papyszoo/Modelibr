@@ -56,7 +56,7 @@ function renderFilters(overrides = {}) {
   return props
 }
 
-describe('ModelsFilters — technical-metadata filters', () => {
+describe('ModelsFilters - technical-metadata filters', () => {
   it('renders the Animated toggle and Triangles range inputs', () => {
     renderFilters()
     expect(screen.getByText('Animated')).toBeInTheDocument()
@@ -84,11 +84,11 @@ describe('ModelsFilters — technical-metadata filters', () => {
   })
 })
 
-describe('ModelsFilters — Categories toggle badge', () => {
+describe('ModelsFilters - Categories toggle badge', () => {
   // Regression: the "1" badge tells the user a category filter is narrowing
   // the grid while the sidebar is hidden. A flipped condition
   // (`badge={active ? undefined : 1}`) or a badge rendered unconditionally
-  // would light it up with no filter — or hide it when one is active.
+  // would light it up with no filter - or hide it when one is active.
   it('shows the "1" badge on the Categories toggle when a category filter is active', () => {
     renderFilters({ categoryFilterActive: true })
     const toggle = screen.getByRole('button', { name: 'Toggle categories' })

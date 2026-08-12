@@ -10,9 +10,9 @@ namespace WebApi.Tests.Integration;
 /// <summary>
 /// Every test class that uses ModelibrWebFactory must carry
 /// [Collection(Name)] (keeping its own IClassFixture&lt;ModelibrWebFactory&gt;
-/// as usual — this is NOT a shared-instance collection fixture). Each factory
+/// as usual - this is NOT a shared-instance collection fixture). Each factory
 /// instance drops and recreates the SAME shared "Modelibr_IntegrationTests"
-/// database in its constructor — xUnit runs different test classes in
+/// database in its constructor - xUnit runs different test classes in
 /// parallel by default, so two classes' factory constructors racing to
 /// drop/create that one database at the same time fail unpredictably. Putting
 /// them in one named collection makes xUnit run the classes sequentially
@@ -50,8 +50,8 @@ public class ModelibrWebFactory : WebApplicationFactory<Program>
         _uploadPath = Path.Combine(Path.GetTempPath(), "modelibr_concurrency_tests", Path.GetRandomFileName());
         Directory.CreateDirectory(_uploadPath);
 
-        // RestoreOnBootProcessor runs in Program.Main right after CreateBuilder —
-        // BEFORE the factory's deferred ConfigureAppConfiguration is applied — so
+        // RestoreOnBootProcessor runs in Program.Main right after CreateBuilder -
+        // BEFORE the factory's deferred ConfigureAppConfiguration is applied - so
         // at that point it can only see environment variables. Without these it
         // falls back to /var/lib/modelibr/* and dies on a dev machine.
         Environment.SetEnvironmentVariable("RESTORE_STORAGE_PATH", Path.Combine(_uploadPath, "restore"));
@@ -61,7 +61,7 @@ public class ModelibrWebFactory : WebApplicationFactory<Program>
         // trigger DatabaseExtensions' automatic pre-migration backup (and, on backup
         // failure, abort startup) on every single test using this factory. That backup
         // shells out to `pg_dump`, which isn't guaranteed to be on PATH on a dev machine
-        // or CI runner — so it's skipped by default here. Tests that specifically cover
+        // or CI runner - so it's skipped by default here. Tests that specifically cover
         // the pre-migration-backup gate build their own minimal host instead of this
         // factory (see Infrastructure.Tests/Extensions/DatabaseExtensionsTests.cs).
         Environment.SetEnvironmentVariable("MODELIBR_SKIP_PREMIGRATION_BACKUP", "true");
@@ -92,7 +92,7 @@ public class ModelibrWebFactory : WebApplicationFactory<Program>
 
         builder.ConfigureServices(services =>
         {
-            // Remove Kestrel HTTPS configuration — TestServer doesn't use Kestrel
+            // Remove Kestrel HTTPS configuration - TestServer doesn't use Kestrel
             services.Configure<Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerOptions>(opts => { });
         });
     }
@@ -141,7 +141,7 @@ public class ModelibrWebFactory : WebApplicationFactory<Program>
         }
         catch
         {
-            // Best-effort cleanup — CI or dev machine may not have PostgreSQL running
+            // Best-effort cleanup - CI or dev machine may not have PostgreSQL running
         }
     }
 

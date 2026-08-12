@@ -40,7 +40,7 @@ interface TexturePreviewPanelProps {
 
 /**
  * Procedural studio IBL for the preview (RoomEnvironment → PMREM). Replaces
- * drei's `<Stage environment="city">`, which fetches an HDR from a CDN — a
+ * drei's `<Stage environment="city">`, which fetches an HDR from a CDN - a
  * local-first violation that also breaks on offline / air-gapped installs.
  * RoomEnvironment is generated in-process, so material previews keep real
  * reflections with zero network dependency.
@@ -148,7 +148,7 @@ export function TexturePreviewPanel({
     },
   })
 
-  // Generate proxies at a specific size — handled by TextureSetViewer now
+  // Generate proxies at a specific size - handled by TextureSetViewer now
 
   // Toggle texture visibility in preview
   const handleToggleTexture = useCallback((textureType: string) => {
@@ -187,7 +187,7 @@ export function TexturePreviewPanel({
       ? Math.round((textureLoading.loaded / textureLoading.total) * 100)
       : 0
 
-  // Combine settings for geometry params — memoised to avoid unnecessary re-renders
+  // Combine settings for geometry params - memoised to avoid unnecessary re-renders
   const geometryParams = useMemo(
     () => ({
       type: previewSettings.type,
@@ -273,7 +273,7 @@ export function TexturePreviewPanel({
           }}
           dpr={Math.min(window.devicePixelRatio, 2)}
         >
-          {/* Procedural local IBL (no CDN HDR — local-first). */}
+          {/* Procedural local IBL (no CDN HDR - local-first). */}
           <PreviewEnvironment />
           {/* Stage provides automatic lighting, shadows, and camera positioning */}
           <Stage intensity={0.5} environment={null} adjustCamera={false}>

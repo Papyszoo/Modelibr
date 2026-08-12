@@ -5,7 +5,7 @@ namespace WebApi.Infrastructure;
 
 /// <summary>
 /// Outcome of a single <see cref="BlenderRetentionSweeper.SweepAsync"/> pass. Counts, not
-/// items — the per-file detail is in the log lines emitted during the sweep.
+/// items - the per-file detail is in the log lines emitted during the sweep.
 /// </summary>
 internal sealed record BlenderRetentionSweepResult(
     int TempQuarantined,
@@ -19,25 +19,25 @@ internal sealed record BlenderRetentionSweepResult(
 /// behind under <c>{uploads}/</c>:
 ///
 /// <list type="bullet">
-/// <item><c>webdav-blend-temp/</c> — in-flight Safe-Save uploads, keyed by a hash of the
+/// <item><c>webdav-blend-temp/</c> - in-flight Safe-Save uploads, keyed by a hash of the
 /// request path (<c>WebDavMiddleware.GetTempFileKey</c>). A file lingers here only if
 /// Blender (or the connection) crashed mid-save before the MOVE that would either
 /// process it or quarantine it.</item>
-/// <item><c>webdav-blend-orphans/</c> — <see cref="BlenderTempFileQuarantine"/>'s landing
+/// <item><c>webdav-blend-orphans/</c> - <see cref="BlenderTempFileQuarantine"/>'s landing
 /// zone for saves that could not be resolved to a model. Each entry is a
 /// <c>.blend</c> + <c>.json</c> sidecar pair.</item>
 /// </list>
 ///
-/// Data-safety rule (prompt 30, item 5): unprocessed user bytes are never deleted — only
+/// Data-safety rule (prompt 30, item 5): unprocessed user bytes are never deleted - only
 /// quarantined. So aged-out temp files are moved into the orphans dir (via the same
 /// <see cref="BlenderTempFileQuarantine"/> used by the live Safe-Save failure paths),
 /// never deleted directly. This is a deliberate deviation from a naive ">24h ⇒ delete"
 /// policy: it guarantees there is exactly one place bytes disappear from disk
 /// (<see cref="SweepOrphansAsync"/>'s 30-day-old deletion), and that place only ever
-/// touches files that already went through quarantine — i.e. the artist's original save
+/// touches files that already went through quarantine - i.e. the artist's original save
 /// was already unresolvable, not merely slow to be picked up.
 ///
-/// This class does the sweep logic only — no timer, no DI lifetime — so it can be unit
+/// This class does the sweep logic only - no timer, no DI lifetime - so it can be unit
 /// tested by constructing it directly and calling <see cref="SweepAsync"/> with an
 /// explicit "now". <see cref="BlenderRetentionSweepHostedService"/> owns the schedule.
 /// </summary>
@@ -45,7 +45,7 @@ internal sealed class BlenderRetentionSweeper
 {
     /// <summary>
     /// Temp files older than this are presumed abandoned by a crashed Safe-Save and get
-    /// quarantined (not deleted — see class remarks).
+    /// quarantined (not deleted - see class remarks).
     /// </summary>
     internal static readonly TimeSpan TempFileMaxAge = TimeSpan.FromHours(24);
 
@@ -75,7 +75,7 @@ internal sealed class BlenderRetentionSweeper
     }
 
     /// <summary>
-    /// Runs one sweep pass. Never throws — every per-file operation is individually
+    /// Runs one sweep pass. Never throws - every per-file operation is individually
     /// guarded, and any unexpected top-level failure is caught and logged so a bad sweep
     /// can never take down the hosted service (and therefore the app).
     /// </summary>
@@ -141,7 +141,7 @@ internal sealed class BlenderRetentionSweeper
                 var tempKey = Path.GetFileName(path);
                 await _quarantine.QuarantineAsync(
                     path,
-                    requestPath: $"(unknown — {TempAgedOutReason}; temp key {tempKey})",
+                    requestPath: $"(unknown - {TempAgedOutReason}; temp key {tempKey})",
                     reason: TempAgedOutReason,
                     candidateModelIds: null);
                 quarantined++;
@@ -166,7 +166,7 @@ internal sealed class BlenderRetentionSweeper
 
         // Orphans are always written as a {baseName}.blend + {baseName}.json pair by
         // BlenderTempFileQuarantine. Group by base name so both halves of a pair age out
-        // (and get deleted) together, keyed off the .blend file's timestamp — but also
+        // (and get deleted) together, keyed off the .blend file's timestamp - but also
         // clean up a stray sidecar left behind by a previous partial failure.
         var byBaseName = Directory.EnumerateFiles(orphanDir)
             .GroupBy(Path.GetFileNameWithoutExtension);

@@ -16,7 +16,7 @@ let modelCleanupDone = false;
  *
  * @param protectedIds - Model IDs that must NOT be deleted (e.g. setup-created models)
  *
- * Safe to call multiple times per run — only executes once.
+ * Safe to call multiple times per run - only executes once.
  */
 export async function cleanupStaleModels(
     protectedIds: Set<number> = new Set(),
@@ -180,7 +180,7 @@ export async function cleanupStaleTextureSets(
 
 /**
  * Remove ALL sprites accumulated from previous test runs.
- * 73+ sprites causes "Load More" pagination — freshly uploaded sprites
+ * 73+ sprites causes "Load More" pagination - freshly uploaded sprites
  * land alphabetically in the middle, invisible without scrolling.
  */
 export async function cleanupStaleSprites(): Promise<void> {

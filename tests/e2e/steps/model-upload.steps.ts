@@ -4,6 +4,7 @@ import { ModelListPage } from "../pages/ModelListPage";
 import { SignalRHelper } from "../fixtures/signalr-helper";
 import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
 import { getScenarioState } from "../fixtures/shared-state";
+import { runWithWorkerWatchdog } from "../helpers/worker-health";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -49,7 +50,7 @@ Then(
         const db = new DbHelper();
         try {
             // The renderable file the viewer/thumbnail pipeline picks up. Asserts
-            // the backend mapped the extension to its renderable FileType — before
+            // the backend mapped the extension to its renderable FileType - before
             // the feature, .stl mapped to a non-renderable type and the upload was
             // rejected outright, so no row would exist here at all.
             const result = await db.query(
@@ -106,40 +107,45 @@ Then(
 
             let trackedModelId: number | null = null;
 
-            await expect
-                .poll(
-                    async () => {
-                        const result = await db.query(query, [
-                            trackedModelName,
-                        ]);
-                        if (result.rows.length === 0) {
-                            console.log(
-                                `[Status] Waiting for uploaded model \"${trackedModelName}\" to appear in database...`,
-                            );
-                            return -1;
-                        }
+            await runWithWorkerWatchdog(
+                `model "${trackedModelName}" to reach thumbnail Ready state`,
+                async () => {
+                    await expect
+                        .poll(
+                            async () => {
+                                const result = await db.query(query, [
+                                    trackedModelName,
+                                ]);
+                                if (result.rows.length === 0) {
+                                    console.log(
+                                        `[Status] Waiting for uploaded model \"${trackedModelName}\" to appear in database...`,
+                                    );
+                                    return -1;
+                                }
 
-                        const row = result.rows[0];
-                        trackedModelId = row.ModelId;
+                                const row = result.rows[0];
+                                trackedModelId = row.ModelId;
 
-                        if (row.Status === 3) {
-                            throw new Error(
-                                `Thumbnail generation failed for \"${row.ModelName}\" (model=${row.ModelId}, version=${row.VersionId})`,
-                            );
-                        }
+                                if (row.Status === 3) {
+                                    throw new Error(
+                                        `Thumbnail generation failed for \"${row.ModelName}\" (model=${row.ModelId}, version=${row.VersionId})`,
+                                    );
+                                }
 
-                        console.log(
-                            `[Status] Model \"${row.ModelName}\" thumbnail status=${row.Status ?? "null"} (model=${row.ModelId}, version=${row.VersionId})`,
-                        );
-                        return row.Status ?? -1;
-                    },
-                    {
-                        message: `Waiting for model \"${trackedModelName}\" to reach thumbnail Ready state`,
-                        timeout: 240000,
-                        intervals: [3000],
-                    },
-                )
-                .toBe(2);
+                                console.log(
+                                    `[Status] Model \"${row.ModelName}\" thumbnail status=${row.Status ?? "null"} (model=${row.ModelId}, version=${row.VersionId})`,
+                                );
+                                return row.Status ?? -1;
+                            },
+                            {
+                                message: `Waiting for model \"${trackedModelName}\" to reach thumbnail Ready state`,
+                                timeout: 240000,
+                                intervals: [3000],
+                            },
+                        )
+                        .toBe(2);
+                },
+            );
 
             await page.reload({ waitUntil: "domcontentloaded" });
             await page.waitForSelector(

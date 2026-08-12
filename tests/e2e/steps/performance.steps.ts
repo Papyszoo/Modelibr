@@ -28,7 +28,7 @@ When(
         const modelList = new ModelListPage(page);
 
         const filePaths: string[] = [];
-        // Use only GLB — UniqueFileGenerator injects unique JSON into GLB,
+        // Use only GLB - UniqueFileGenerator injects unique JSON into GLB,
         // guaranteeing unique SHA256 hashes. FBX thumbnails fail in THREE.FBXLoader.
         for (let i = 0; i < count; i++) {
             const uniquePath =
@@ -37,7 +37,7 @@ When(
         }
 
         // Baseline for finding the models this step creates: names are
-        // unusable — every generated GLB keeps the base filename (only the
+        // unusable - every generated GLB keeps the base filename (only the
         // content is made unique), so duplicate-name AutoRename turns them
         // into "test-cube (N)". Newer id = created by this upload.
         const baseline = await axios.get(
@@ -92,7 +92,7 @@ Then("I close the upload window", async ({ page }) => {
 Then(
     "all {int} models should be visible in the grid",
     async ({ page }, count: number) => {
-        // Grid is virtualized — DOM cards < total. Check total from API.
+        // Grid is virtualized - DOM cards < total. Check total from API.
         await expect(async () => {
             const response = await axios.get(
                 `${API_BASE_URL}/models?page=1&pageSize=1`,
@@ -113,7 +113,7 @@ Then(
         const timeoutMs = minutes * 60 * 1000;
         const startTime = Date.now();
 
-        // Use API to check thumbnail count — DOM is virtualized and shows fewer cards
+        // Use API to check thumbnail count - DOM is virtualized and shows fewer cards
         await expect(async () => {
             const response = await axios.get(
                 `${API_BASE_URL}/models?page=1&pageSize=200`,
@@ -160,7 +160,7 @@ Then("every thumbnail image should be unique", async ({ page }) => {
 Then(
     "no thumbnail should show multiple overlapping models",
     async ({ page }) => {
-        // Use API to check — DOM is virtualized
+        // Use API to check - DOM is virtualized
         const response = await axios.get(
             `${API_BASE_URL}/models?page=1&pageSize=200`,
         );
@@ -215,7 +215,7 @@ Then(
     },
 );
 
-// ─── ST-2: SignalR event storm — controlled API calls ──────────────────────
+// ─── ST-2: SignalR event storm - controlled API calls ──────────────────────
 
 When(
     "I monitor network requests while thumbnails generate for {int} models",
@@ -234,7 +234,7 @@ When(
             }
         });
 
-        // Wait for the uploaded models' thumbnails to finish. Check via API —
+        // Wait for the uploaded models' thumbnails to finish. Check via API -
         // the virtualized grid renders fewer DOM cards than `count` (the
         // category sidebar narrows it to a single column), and the shared DB
         // already holds thumbnails from earlier scenarios, so both DOM counts
@@ -289,7 +289,7 @@ Then(
 Given(
     "there are at least {int} models in the grid",
     async ({ page }, minCount: number) => {
-        // Grid is virtualized — DOM card count < total models.
+        // Grid is virtualized - DOM card count < total models.
         // Check total from API instead of DOM cards.
         await expect(async () => {
             const response = await axios.get(
@@ -430,7 +430,7 @@ Given(
 
         console.log(`[ST-6] Creating ${needed} additional models via API...`);
 
-        // Use only GLB — UniqueFileGenerator injects unique JSON into GLB,
+        // Use only GLB - UniqueFileGenerator injects unique JSON into GLB,
         // guaranteeing unique SHA256 hashes. FBX thumbnails fail in THREE.FBXLoader.
 
         // Upload in batches of 5 to avoid overwhelming the server
@@ -629,7 +629,7 @@ When(
         requestTimings = [];
         parallelProcessingStart = Date.now();
 
-        // Use only GLB — UniqueFileGenerator injects unique JSON into GLB,
+        // Use only GLB - UniqueFileGenerator injects unique JSON into GLB,
         // guaranteeing unique SHA256 hashes. FBX thumbnails fail in THREE.FBXLoader.
 
         // Generate all unique files first
@@ -797,7 +797,7 @@ When(
         apiUploadedModelIds = [];
         requestTimings = [];
 
-        // Use only GLB — UniqueFileGenerator injects unique JSON into GLB,
+        // Use only GLB - UniqueFileGenerator injects unique JSON into GLB,
         // guaranteeing unique SHA256 hashes. FBX thumbnails fail in THREE.FBXLoader.
 
         console.log(`[ST-11] Uploading ${count} models sequentially...`);
@@ -871,7 +871,7 @@ Then(
                 );
             }
         } catch (e) {
-            // Docker stats may not be available — log and pass
+            // Docker stats may not be available - log and pass
             console.log(`[ST-12] Docker stats unavailable, skipping: ${e}`);
         }
     },
@@ -1036,6 +1036,6 @@ Then("no request should fail with a connection error", async ({}) => {
     const durations = requestTimings.map((r) => r.duration);
     const avg = durations.reduce((a, b) => a + b, 0) / durations.length;
     console.log(
-        `[ST-15] Timing — avg: ${Math.round(avg)}ms, min: ${Math.min(...durations)}ms, max: ${Math.max(...durations)}ms`,
+        `[ST-15] Timing - avg: ${Math.round(avg)}ms, min: ${Math.min(...durations)}ms, max: ${Math.max(...durations)}ms`,
     );
 });

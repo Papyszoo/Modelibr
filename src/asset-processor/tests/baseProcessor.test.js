@@ -158,7 +158,7 @@ describe('BaseProcessor', () => {
       await expect(processor.execute(mockJob)).rejects.toThrow(
         'Processing failed'
       )
-      // Should not throw the markFailed error — it's caught internally
+      // Should not throw the markFailed error - it's caught internally
     })
   })
 
@@ -196,7 +196,7 @@ describe('BaseProcessor', () => {
         processor.execute(mockJob, controller.signal)
       ).rejects.toThrow('boom')
 
-      // The job queue's timeout handler already reported this job failed —
+      // The job queue's timeout handler already reported this job failed -
       // the backend has no double-finish guard, so a second markFailed call
       // here could clobber a job a different worker has since reclaimed.
       expect(mockMarkJobFailed).not.toHaveBeenCalled()

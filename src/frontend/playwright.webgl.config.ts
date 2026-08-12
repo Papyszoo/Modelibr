@@ -4,7 +4,7 @@ import { defineConfig, devices } from '@playwright/test'
  * Isolated WebGL2 harness for the shared channel-extraction shaders.
  *
  * Unlike playwright.config.ts (Storybook visual regression), this config boots
- * NO web server and loads NO app — each test renders the actual shared GLSL in a
+ * NO web server and loads NO app - each test renders the actual shared GLSL in a
  * real WebGL2 context via page.evaluate and reads pixels back. Software GL
  * (SwiftShader) is forced so the result is identical on a GPU dev box and a
  * GPU-less CI runner, and the run is fast and Docker-free.

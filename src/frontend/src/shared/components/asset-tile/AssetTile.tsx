@@ -3,14 +3,14 @@ import './AssetTile.css'
 import { type ReactNode } from 'react'
 
 /**
- * AssetTile — dumb, presentational card used by every asset tab.
+ * AssetTile - dumb, presentational card used by every asset tab.
  *
  * Knows nothing about asset types. Callers pass a `media` node (an <img> or
  * a placeholder), the item `name`, and optional extras. The tile mirrors the
  * `.model-card` look from ModelGrid.
  */
 export interface AssetTileProps {
-  /** The thumbnail area — an <img> element or a placeholder node. */
+  /** The thumbnail area - an <img> element or a placeholder node. */
   media: ReactNode
   /** Primary label shown in the bottom overlay. */
   name: string
@@ -21,14 +21,14 @@ export interface AssetTileProps {
   meta?: ReactNode
   /**
    * Shape variant:
-   * - 'square' (default) — aspect-ratio 1:1, image covers the area.
-   * - 'wide' — aspect-ratio 2:1 with object-fit: contain (env maps).
+   * - 'square' (default) - aspect-ratio 1:1, image covers the area.
+   * - 'wide' - aspect-ratio 2:1 with object-fit: contain (env maps).
    */
   variant?: 'square' | 'wide'
   /** Highlights the tile with a primary-colour ring. */
   selected?: boolean
   /**
-   * Optional node rendered in the top-right corner — typically a
+   * Optional node rendered in the top-right corner - typically a
    * PrimeReact <Checkbox> used inside add-dialogs.
    */
   checkbox?: ReactNode
@@ -36,7 +36,7 @@ export interface AssetTileProps {
   onContextMenu?: (e: React.MouseEvent) => void
   className?: string
   /**
-   * Extra `data-*` attributes spread on the root element — stable hooks for
+   * Extra `data-*` attributes spread on the root element - stable hooks for
    * tests/automation to target a specific item, e.g.
    * `{ 'data-texture-set-id': id }`.
    */
@@ -64,11 +64,34 @@ export function AssetTile({
     .filter(Boolean)
     .join(' ')
 
+  // A clickable tile is a button: without this it is reachable by mouse only, and
+  // every asset grid in the app (models, textures, sounds, sprites, env maps, store
+  // packs) becomes unusable from the keyboard. Tiles with no onClick stay inert -
+  // making them focusable would just add empty tab stops.
+  //
+  // Nesting is safe here: the `checkbox` slot is a readOnly PrimeReact Checkbox or a
+  // status chip - a rendering of the tile's own state, never a separate control.
+  const interactive = onClick !== undefined
+
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (!onClick) return
+    // Ignore keys bubbling from anything focusable the caller put inside.
+    if (event.target !== event.currentTarget) return
+    if (event.key !== 'Enter' && event.key !== ' ') return
+
+    // Space scrolls the page on a non-button element unless prevented.
+    event.preventDefault()
+    onClick(event as unknown as React.MouseEvent)
+  }
+
   return (
     <div
       className={tileClass}
       onClick={onClick}
       onContextMenu={onContextMenu}
+      role={interactive ? 'button' : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      onKeyDown={interactive ? handleKeyDown : undefined}
       {...dataAttributes}
     >
       {checkbox ? <div className="asset-tile-checkbox">{checkbox}</div> : null}

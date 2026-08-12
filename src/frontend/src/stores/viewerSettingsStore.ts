@@ -67,7 +67,7 @@ export const useViewerSettingsStore = create<ViewerSettingsStore>()(
       // v1: the ambient/environment defaults changed to match the shared
       // thumbnail rig (asset-processor/lib/sceneLighting.js). Existing users
       // have the old values cached for keys they may never have touched, and
-      // the merge below keeps persisted values over defaults — so without a
+      // the merge below keeps persisted values over defaults - so without a
       // migration an upgraded viewer would never pick up the new lighting.
       // Reset just those two keys for pre-v1 state so "unconfigured viewer
       // matches the render" actually holds on upgrade.

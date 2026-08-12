@@ -52,7 +52,7 @@ Feature: Preset Lifecycle, Texture Association, and Main Variant Thumbnails
     Then the texture set "blue_color" should be linked in materials
 
   @presets @texture-association @timeout:720000 @serial
-  Scenario: Unlink last texture set from a preset — preset still visible (Bug #1)
+  Scenario: Unlink last texture set from a preset - preset still visible (Bug #1)
     Given I am on the model viewer page for "single-version-model"
     When I add a new preset "AlmostEmpty"
     And I link texture set "red_color" to the current preset via UI
@@ -101,7 +101,7 @@ Feature: Preset Lifecycle, Texture Association, and Main Variant Thumbnails
     Then the preset "Primary" should be selected
     When I set the current preset as main
     Then the current preset should show the "Main" badge
-    # Switch away and back — badge should persist
+    # Switch away and back - badge should persist
     When I select preset "Default"
     And I select preset "Primary"
     Then the current preset should show the "Main" badge

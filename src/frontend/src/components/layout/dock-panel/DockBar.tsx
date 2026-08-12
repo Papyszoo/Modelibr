@@ -105,7 +105,7 @@ export function DockBar({
   const handleBarMouseDown = (e: React.MouseEvent): void => {
     // Middle-click on empty bar space opens a New Tab. Middle-click on a tab
     // closes that tab (handled in DraggableTab with stopPropagation), so this
-    // only fires when the click lands on the bar background or the + button —
+    // only fires when the click lands on the bar background or the + button -
     // both of which should yield a New Tab.
     if (e.button === 1) {
       e.preventDefault() // Suppress autoscroll cursor.
@@ -139,7 +139,7 @@ export function DockBar({
         ))}
       </div>
 
-      {/* Add tab button — opens the New Tab page. Right-click on the bar
+      {/* Add tab button - opens the New Tab page. Right-click on the bar
           shows the same shortcut as a context menu entry. */}
       <div className="dock-add">
         <Button

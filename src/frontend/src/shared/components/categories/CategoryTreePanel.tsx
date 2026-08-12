@@ -190,7 +190,7 @@ export function CategoryTreePanel<TCategory extends HierarchicalCategory>({
 
   // Expansion is fully controlled (expandedKeys + onToggle). TRAP: without
   // onToggle, PrimeReact Tree seeds internal state from the prop ONCE and
-  // ignores later updates — so a childless node that gains its first child
+  // ignores later updates - so a childless node that gains its first child
   // (the create-subcategory placeholder) would stay collapsed and hide the
   // inline editor. Parents start expanded when they first appear; user
   // toggles persist otherwise.
@@ -219,14 +219,14 @@ export function CategoryTreePanel<TCategory extends HierarchicalCategory>({
   const startCreate = (parentId: number | null) => {
     setEditState({ mode: 'create', parentId })
     if (parentId !== null) {
-      // The placeholder lives under this parent — it must be expanded for
+      // The placeholder lives under this parent - it must be expanded for
       // the inline editor to render.
       setExpandedKeys(prev => ({ ...prev, [String(parentId)]: true }))
     }
   }
 
   // PrimeReact Tree in `selectionMode="single"` expects selectionKeys to be
-  // the selected key as a string — the `{ key: true }` map form is only for
+  // the selected key as a string - the `{ key: true }` map form is only for
   // multiple/checkbox modes and silently never highlights in single mode.
   const selectedTreeKeys =
     activeCategoryId !== null &&

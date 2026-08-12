@@ -223,7 +223,7 @@ export function SpriteList() {
     if (spriteGridRef.current) {
       // NOTE: spriteGridRef IS the scroll container (.sprite-grid-container has
       // overflow: auto), so its bounding rect stays fixed while the content
-      // scrolls — the scrollLeft/scrollTop term below is REQUIRED to map the
+      // scrolls - the scrollLeft/scrollTop term below is REQUIRED to map the
       // cursor into the scrolled content. This differs from the model /
       // texture-set / environment-map grids, where the rect comes from a
       // non-scrolling selection-surface child and adding scroll would

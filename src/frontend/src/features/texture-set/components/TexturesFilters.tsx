@@ -21,7 +21,7 @@ import {
 import { type PackDto, type ProjectDto, TextureType } from '@/types'
 
 // Texture types exposed in the filter. SplitChannel is an implementation
-// detail (a single source file fanned out across channels) — hiding it
+// detail (a single source file fanned out across channels) - hiding it
 // keeps the picker focused on user-meaningful map types.
 // Minimum-resolution buckets keyed off a texture's largest side. "1K" means
 // "at least 1024px on the longest side", matching how artists shop for maps.
@@ -342,7 +342,7 @@ export function TexturesFilters({
 
         {packs.length === 0 && projects.length === 0 ? (
           <span className="list-filters-empty">
-            No pack or project filters yet — texture-type filter is always
+            No pack or project filters yet - texture-type filter is always
             available.
           </span>
         ) : null}

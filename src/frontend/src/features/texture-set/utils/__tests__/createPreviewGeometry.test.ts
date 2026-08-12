@@ -13,7 +13,7 @@ describe('createCylinderGeometry', () => {
     const disp = geom.getAttribute('aDispNormal')
     expect(disp).toBeDefined()
 
-    // Find aDispNormal values for any vertex at the top rim — strictly
+    // Find aDispNormal values for any vertex at the top rim - strictly
     // y = 1 and x² + z² ≈ 1.
     const radialCount = { radial: 0, vertical: 0, fortyFive: 0 }
     for (let i = 0; i < pos.count; i++) {

@@ -130,15 +130,15 @@ jobs:
               run: npm ci
 
             # Needs no GPU (unlike the main e2e/storybook-visual suites, which is
-            # why they stay local-only) — this is a plain Docker + Playwright drill,
+            # why they stay local-only) - this is a plain Docker + Playwright drill,
             # so a GitHub-hosted runner can run it. Self-contained: same command as
             # `npm run test:all -- --only=backup-restore` locally (builds its own
-            # stack, runs every spec — create/list/download, restore round-trip,
+            # stack, runs every spec - create/list/download, restore round-trip,
             # concurrent conflict, bad-archive rejection, pre-migration snapshot on
-            # first boot — then tears the stack down). This is the ONLY place the
+            # first boot - then tears the stack down). This is the ONLY place the
             # full create→backup→wipe→restore→verify trust loop actually gates
             # anything; it was non-gating before and had silently rotted (see
-            # CLAUDE.md rule 10).
+            # AGENTS.md rule 10).
             - name: Run backup/restore trust drill
               id: backup-restore
               continue-on-error: true

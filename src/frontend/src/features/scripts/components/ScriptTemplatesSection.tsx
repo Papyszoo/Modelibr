@@ -131,7 +131,7 @@ export function ScriptTemplatesSection() {
       <ConfirmDialog />
       <p className="script-templates-intro">
         Templates give new scripts a head start. Built-in templates ship with
-        the app; create your own below — they appear in the “New Script” dialog.
+        the app; create your own below - they appear in the “New Script” dialog.
       </p>
 
       <div className="script-templates-toolbar">

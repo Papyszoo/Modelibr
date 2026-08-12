@@ -134,7 +134,7 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
 
     it('maps the legacy textureSets URL id to modelTextures', () => {
       // Regression guard: the 'textureSets' tab type was split into
-      // globalMaterials/modelTextures and removed from the TabType union —
+      // globalMaterials/modelTextures and removed from the TabType union -
       // bookmarks from before the split must still restore a working tab.
       const result = parseCompactTabFormat('textureSets')
       expect(result).toHaveLength(1)

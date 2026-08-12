@@ -48,7 +48,7 @@ const meta = {
     layout: 'fullscreen',
   },
   tags: ['autodocs'],
-  // The panel reads settings via React Query — without a provider the story
+  // The panel reads settings via React Query - without a provider the story
   // throws "No QueryClient set" and (until the visual suite's error gate)
   // silently broke every alphabetically-later story's snapshot.
   decorators: [

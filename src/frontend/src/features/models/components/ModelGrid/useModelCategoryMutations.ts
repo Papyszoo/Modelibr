@@ -66,7 +66,7 @@ export function useModelCategoryMutations({
       }),
     deleteCategory: deleteModelCategory,
     // The metadata endpoint replaces the full tag set + description, so both
-    // are passed through unchanged — omitting them would wipe an asset's tags
+    // are passed through unchanged - omitting them would wipe an asset's tags
     // or description on a category move.
     moveToCategory: async vars => {
       await Promise.all(

@@ -34,7 +34,7 @@ export async function startEdgeServer({ runtimeDir, configPath, runtimeManager, 
     // Worker settings apply live; ports and the data folder need a restart.
     // ProcessManager.hasPendingRestart() is the single source of truth for
     // "needs restart" (used identically by the tray IPC handler), so changing
-    // the backend/database port here behaves the same as from the tray — not
+    // the backend/database port here behaves the same as from the tray - not
     // just appPort.
     const workerSettingsChanged =
       nextConfig.workerProcessCount !== previousConfig.workerProcessCount ||
@@ -87,7 +87,7 @@ export async function startEdgeServer({ runtimeDir, configPath, runtimeManager, 
 
   // Rate-limit the static frontend file serving. The /api and WebDAV proxies
   // above short-circuit before reaching here, so this only guards the local
-  // file-system reads — generous enough to never affect normal local use.
+  // file-system reads - generous enough to never affect normal local use.
   const staticLimiter = rateLimit({
     windowMs: 60 * 1000,
     max: 10000,
@@ -115,7 +115,7 @@ export async function startEdgeServer({ runtimeDir, configPath, runtimeManager, 
   })
 
   // The app port was already resolved to a free one at start (runningConfig),
-  // so a clash here is rare — surface a clear message if it somehow still hits.
+  // so a clash here is rare - surface a clear message if it somehow still hits.
   const appPort = runtimeManager.runningConfig.appPort
   // Loopback by default (this machine only). Bind all interfaces when the user
   // opts into network access, so a desktop client on another LAN machine can

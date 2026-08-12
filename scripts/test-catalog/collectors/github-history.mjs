@@ -52,7 +52,7 @@ export function collectGithubHistory({ force = false, cacheOnly = false } = {}) 
     if (!force && fs.existsSync(GH_CACHE_FILE)) {
         try {
             const cached = JSON.parse(fs.readFileSync(GH_CACHE_FILE, "utf8"));
-            // cacheOnly: serve whatever we have regardless of age — used by the
+            // cacheOnly: serve whatever we have regardless of age - used by the
             // server's lazy rebuilds so a page load never blocks ~30s on a gh
             // refetch. Explicit refreshes (↻ button, CLI build) respect the TTL.
             if (cacheOnly || Date.now() - new Date(cached.fetchedAt).getTime() < CACHE_TTL_MS)
@@ -62,7 +62,7 @@ export function collectGithubHistory({ force = false, cacheOnly = false } = {}) 
         }
     }
     if (cacheOnly) {
-        return { fetchedAt: null, available: false, note: "no cached GitHub data — use ↻ to fetch", jobs: {} };
+        return { fetchedAt: null, available: false, note: "no cached GitHub data - use ↻ to fetch", jobs: {} };
     }
 
     const byJob = {};
@@ -73,7 +73,7 @@ export function collectGithubHistory({ force = false, cacheOnly = false } = {}) 
         gh(["auth", "status"]);
     } catch {
         available = false;
-        note = "gh not authenticated — GitHub history unavailable";
+        note = "gh not authenticated - GitHub history unavailable";
     }
 
     if (available) {

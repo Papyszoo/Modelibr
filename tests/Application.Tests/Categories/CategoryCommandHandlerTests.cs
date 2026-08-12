@@ -209,7 +209,7 @@ public class CategoryCommandHandlerTests
     public async Task Update_When_MoveUnderDescendant_Returns_Failure_InvalidCategoryParent()
     {
         // Tree: Root (10) -> Child (20) -> Grandchild (30)
-        // Attempt: move Root (10) under Grandchild (30) — should fail
+        // Attempt: move Root (10) under Grandchild (30) - should fail
         var root = EnvironmentMapCategory.Create("Root", null, null, _now).WithId(10);
         var child = EnvironmentMapCategory.Create("Child", null, 10, _now).WithId(20);
         var grandchild = EnvironmentMapCategory.Create("Grandchild", null, 20, _now).WithId(30);

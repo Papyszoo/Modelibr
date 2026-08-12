@@ -1,11 +1,11 @@
 /**
  * Shared scene-lighting rig, used by every runtime that renders a model preview
  * so they all light it identically:
- *   - the frontend viewer (Vite bundle, React-Three-Fiber) — maps the resolved
+ *   - the frontend viewer (Vite bundle, React-Three-Fiber) - maps the resolved
  *     descriptor to declarative <ambientLight>/<directionalLight>/... primitives,
- *   - the worker Puppeteer thumbnail render (`render-template.html`) — builds
+ *   - the worker Puppeteer thumbnail render (`render-template.html`) - builds
  *     real THREE light instances via buildSceneLights,
- *   - demo mode (browserAssetProcessor) — same builder.
+ *   - demo mode (browserAssetProcessor) - same builder.
  *
  * Before this module the rig was hand-copied into all three with different
  * numbers, so the in-app viewer (drei <Stage> + a second manual rig) was wildly
@@ -19,7 +19,7 @@
  */
 
 /**
- * The canonical balanced rig — these are the worker thumbnail's numbers, which
+ * The canonical balanced rig - these are the worker thumbnail's numbers, which
  * are the reference "correct" look. Direct lights are deliberately low so PBR
  * materials aren't overexposed; the image-based lighting (environmentIntensity)
  * carries soft fill.
@@ -62,10 +62,10 @@ export const ENVIRONMENT_PREVIEW_LIGHTING = {
  * Resolve a rig descriptor for a given set of user-facing viewer settings.
  *
  * Semantics (matching the historical viewer sliders):
- *   - ambientIntensity     — absolute ambient light intensity (default = base).
- *   - directionalIntensity — multiplier on the whole directional triplet
+ *   - ambientIntensity     - absolute ambient light intensity (default = base).
+ *   - directionalIntensity - multiplier on the whole directional triplet
  *     (directional/point/spot), default 1 → exactly the base rig.
- *   - environmentIntensity — absolute scene.environmentIntensity (default = base).
+ *   - environmentIntensity - absolute scene.environmentIntensity (default = base).
  *
  * With no settings (or all undefined) this returns the base rig unchanged, so
  * the viewer's default matches the thumbnail.

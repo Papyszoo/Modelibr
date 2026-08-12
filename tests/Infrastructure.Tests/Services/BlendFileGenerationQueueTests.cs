@@ -7,7 +7,7 @@ using Xunit;
 namespace Infrastructure.Tests.Services;
 
 /// <summary>
-/// Covers BlendFileGenerationQueue — the bounded Channel + BackgroundService that
+/// Covers BlendFileGenerationQueue - the bounded Channel + BackgroundService that
 /// (re)generates generated-{name}.blend in the background after a renderable file is
 /// attached to a version, or the cache is invalidated. See IBlendFileGenerationQueue.
 /// </summary>
@@ -60,7 +60,7 @@ public class BlendFileGenerationQueueTests
             // Must not throw, must not block the caller.
             queue.Enqueue(1, 2);
 
-            // Give the (empty) channel a moment — there's nothing to observe finishing,
+            // Give the (empty) channel a moment - there's nothing to observe finishing,
             // so this just proves Enqueue returned immediately without queuing anything.
             await Task.Delay(TimeSpan.FromMilliseconds(200));
         }
@@ -75,7 +75,7 @@ public class BlendFileGenerationQueueTests
     [Fact]
     public void Enqueue_NeverThrowsEvenWithoutTheBackgroundServiceRunning()
     {
-        // Enqueue must never block or fail the caller (a request handler) — even if the
+        // Enqueue must never block or fail the caller (a request handler) - even if the
         // BackgroundService hasn't been started yet (e.g. host startup ordering).
         var mockGenerator = new Mock<IBlendFileGenerator>();
         mockGenerator.Setup(g => g.IsAvailable).Returns(true);

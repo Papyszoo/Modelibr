@@ -7,7 +7,7 @@ import {
 
 /**
  * Frontend wrapper over the shared cross-runtime displacement-normal helpers
- * (`asset-processor/lib/displacementNormal.js`) — the same source the worker
+ * (`asset-processor/lib/displacementNormal.js`) - the same source the worker
  * thumbnail uses, so hard-edged displaced meshes shade identically in both.
  *
  * The shared module injects THREE; this wrapper passes the bundler's instance so

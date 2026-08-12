@@ -1,4 +1,4 @@
-/* Shared list-toolbar — minimalist pill toolbar used by list pages
+/* Shared list-toolbar - minimalist pill toolbar used by list pages
    (Models, Texture Sets, Environment Maps, …).
 
    Visual parity with the original model-grid-* toolbar. Class names here
@@ -154,7 +154,7 @@
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
-/* Tablet & smaller — toolbar collapses to icon-only buttons and the
+/* Tablet & smaller - toolbar collapses to icon-only buttons and the
    count chip hides. Mirrors the responsive behavior the model grid had
    before extraction. */
 @media (max-width: 768px) {
@@ -171,7 +171,7 @@
     gap: 0.25rem;
   }
 
-  /* Icon-only — but only for the main toolbar actions row. The selection
+  /* Icon-only - but only for the main toolbar actions row. The selection
      bar contains label-only buttons (Select All / Deselect All) that
      would become invisible if their labels were hidden. */
   .list-toolbar-actions .list-toolbar-button .p-button-label,
@@ -187,11 +187,11 @@
     padding: 0;
     justify-content: center;
     /* PrimeReact's icon-with-label spacing leaves a gap to the right of
-       the icon — kill it so the icon truly centers in the square button. */
+       the icon - kill it so the icon truly centers in the square button. */
     gap: 0;
   }
 
-  /* Hide the "{N} items" chip — it eats horizontal real estate that the
+  /* Hide the "{N} items" chip - it eats horizontal real estate that the
      icon row needs. */
   .list-toolbar-count {
     display: none;
@@ -200,7 +200,7 @@
 
 /* ── ListToolbarSearchInput chrome ──────────────────────────────────────
    Moved here from FilterPanel.css: these classes are emitted by
-   ListToolbarSearchInput, so its own stylesheet must style them — the
+   ListToolbarSearchInput, so its own stylesheet must style them - the
    design-system gallery renders primitives in isolation and exposes any
    styles leaking in from other components' CSS files. */
 .list-filters-search {

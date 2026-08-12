@@ -11,7 +11,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 let updateHandlersWired = false
 
 // Opt-in auto-update: we check on launch, but a new build is only downloaded and
-// installed when the user agrees — first "Download", then "Restart & Install". A
+// installed when the user agrees - first "Download", then "Restart & Install". A
 // user may have reasons to stay on a stable build, so nothing happens behind
 // their back. Handlers are wired once; checkForUpdates() can be called repeatedly
 // (launch + the "Check for Updates…" menu item).

@@ -64,7 +64,7 @@ function CreateBackupModal({
           <label className="settings-checkbox-label">
             <input type="checkbox" checked disabled />
             <span>
-              Database <em>(always — required)</em>
+              Database <em>(always - required)</em>
               {estimate && (
                 <span className="backups-modal-size">
                   ~{formatBytes(estimate.databaseBytes)}
@@ -76,7 +76,7 @@ function CreateBackupModal({
           <label className="settings-checkbox-label">
             <input type="checkbox" checked disabled />
             <span>
-              Uploaded files <em>(always — required)</em>
+              Uploaded files <em>(always - required)</em>
               {estimate && (
                 <span className="backups-modal-size">
                   ~{formatBytes(estimate.uploadsBytes)}
@@ -103,7 +103,7 @@ function CreateBackupModal({
           </label>
           <span className="settings-help backups-modal-help">
             Auto-generated thumbnails can be regenerated, but custom-uploaded
-            thumbnails cannot — include this if you've uploaded custom ones.
+            thumbnails cannot - include this if you've uploaded custom ones.
           </span>
 
           {projected != null && (
@@ -265,7 +265,7 @@ export function BackupsSection(): JSX.Element {
         </button>
         {storage && (
           <span className="settings-help backups-storage-line">
-            <code>{storage.hostPath}</code> on host —{' '}
+            <code>{storage.hostPath}</code> on host -{' '}
             <strong>{formatBytes(storage.totalUsedBytes)}</strong> used by{' '}
             {backups.length} archive{backups.length === 1 ? '' : 's'}
           </span>
@@ -303,7 +303,7 @@ export function BackupsSection(): JSX.Element {
                 </td>
                 <td>{formatDate(b.createdAtUtc)}</td>
                 <td>
-                  {b.status === 'in_progress' ? '—' : formatBytes(b.sizeBytes)}
+                  {b.status === 'in_progress' ? '-' : formatBytes(b.sizeBytes)}
                 </td>
                 <td>
                   DB + uploads

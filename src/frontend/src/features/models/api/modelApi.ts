@@ -46,6 +46,84 @@ export async function uploadModel(
   return response.data
 }
 
+/** One auxiliary (external) file plus the path the primary glTF references it by. */
+export interface ModelGroupAuxiliary {
+  file: File
+  /** URI relative to the primary, e.g. "scene.bin", "textures/wood.png". */
+  relativePath: string
+}
+
+export interface ImportMultiFileResponse {
+  id: number
+  alreadyExists: boolean
+  auxiliaryFilesLinked: number
+  auxiliaryFilesSkipped: number
+}
+
+/**
+ * Import a loose primary model file (a `.gltf`) together with its external
+ * auxiliary files (`.bin` + textures), so it renders/extracts like a packed `.glb`.
+ */
+export async function uploadModelGroup(
+  primary: File,
+  auxiliaries: ModelGroupAuxiliary[],
+  options: { batchId?: string } = {}
+): Promise<ImportMultiFileResponse> {
+  const formData = new FormData()
+  formData.append('primary', primary)
+  for (const aux of auxiliaries) {
+    formData.append('files', aux.file)
+    formData.append('paths', aux.relativePath)
+  }
+
+  let url = '/models/multifile'
+  const params = new URLSearchParams()
+  if (options.batchId) {
+    params.append('batchId', options.batchId)
+  }
+  if (params.toString()) {
+    url += `?${params.toString()}`
+  }
+
+  const response: AxiosResponse<ImportMultiFileResponse> = await client.post(
+    url,
+    formData,
+    {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: UPLOAD_TIMEOUT,
+    }
+  )
+  return response.data
+}
+
+/** One external resource a loose `.gltf` references, as the version stores it. */
+export interface AuxiliaryFileDescriptor {
+  fileId: number
+  relativePath: string
+  originalFileName: string
+  sha256Hash: string
+  sizeBytes: number
+}
+
+export interface VersionAuxiliaryFilesResponse {
+  modelVersionId: number
+  auxiliaries: AuxiliaryFileDescriptor[]
+}
+
+/**
+ * The external `.bin`/texture resources linked to a model version. The viewer needs
+ * these to resolve a loose `.gltf`'s relative URIs - without them GLTFLoader asks for
+ * `scene.bin` against the page origin and the model cannot load in the browser at all.
+ */
+export async function getVersionAuxiliaryFiles(
+  modelId: number | string,
+  versionId: number | string
+): Promise<VersionAuxiliaryFilesResponse> {
+  const response: AxiosResponse<VersionAuxiliaryFilesResponse> =
+    await client.get(`/models/${modelId}/versions/${versionId}/auxiliary-files`)
+  return response.data
+}
+
 export async function uploadFile(
   file: File,
   options: {

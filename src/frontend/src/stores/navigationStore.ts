@@ -20,7 +20,7 @@ export interface WindowState {
   activeRightTabId: string | null
   /** Splitter percentage for the left panel */
   splitterSize: number
-  /** Timestamp of last activity — used for stale-window GC */
+  /** Timestamp of last activity - used for stale-window GC */
   lastActiveAt: string
 }
 
@@ -38,7 +38,7 @@ export interface ClosedWindowEntry {
  * v0 → v1: the 'textureSets' tab type was split into 'globalMaterials' and
  * 'modelTextures'; the legacy type is gone from the TabType union, so any
  * tab of that type still sitting in persisted navigation state (open tabs,
- * recently closed tabs, archived windows) is rewritten to 'modelTextures' —
+ * recently closed tabs, archived windows) is rewritten to 'modelTextures' -
  * the successor of the original texture-set list.
  */
 function migrateLegacyTab(tab: Tab): Tab {
@@ -259,6 +259,8 @@ export function getTabLabel(
     case 'stageEditor':
       if (stageName) return stageName
       return stageId ? `Stage ${stageId}` : 'Stage Editor'
+    case 'assetStore':
+      return 'Asset Store'
     case 'history':
       return 'History'
     case 'settings':
@@ -373,7 +375,7 @@ export const useNavigationStore = create<NavigationStore>()(
       initWindow: (windowId: string) => {
         set(state => {
           if (state.activeWindows[windowId]) {
-            // Window already exists — just touch it
+            // Window already exists - just touch it
             return {
               activeWindows: {
                 ...state.activeWindows,
@@ -397,7 +399,7 @@ export const useNavigationStore = create<NavigationStore>()(
       removeWindow: (windowId: string) => {
         // Early-out BEFORE `set` runs. Zustand `persist` writes on every
         // `set` call regardless of whether the state actually changed, so
-        // a no-op archive (the windowId isn't in our in-memory state —
+        // a no-op archive (the windowId isn't in our in-memory state -
         // which happens when a peer browser tab closes and we never saw
         // its `initWindow` write) would otherwise clobber peer-written
         // localStorage entries (e.g. a manually archived session). See

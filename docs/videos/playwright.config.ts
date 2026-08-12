@@ -21,10 +21,10 @@ export default defineConfig({
     use: {
         // Use localhost (not 127.0.0.1) so browser origin matches CORS allowed origins
         baseURL: process.env.FRONTEND_URL || "http://localhost:3002",
-        // No blue Playwright border — use a plain viewport, no highlights
+        // No blue Playwright border - use a plain viewport, no highlights
         screenshot: "off",
         trace: "off",
-        // Viewport matches video size exactly — no blue border
+        // Viewport matches video size exactly - no blue border
         viewport: { width: 1280, height: 720 },
         // Disable action highlights (blue borders)
         actionTimeout: 15_000,

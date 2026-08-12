@@ -73,7 +73,7 @@ export function useTextureSetViewerData(textureSetId: number) {
     return sizes
   }, [textureSet])
 
-  // Build quality dropdown options — show actual resolution, filter duplicates
+  // Build quality dropdown options - show actual resolution, filter duplicates
   const qualityOptions = useMemo<QualityOption[]>(() => {
     const origLabel = originalResolution
       ? `${originalResolution} px`

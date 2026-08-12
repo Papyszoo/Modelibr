@@ -2,7 +2,7 @@
 // (push / pull_request / schedule / workflow_dispatch / workflow_run / release,
 // with path filters and cron), and the list of jobs + their display names.
 //
-// A tiny indentation-aware reader (not a full YAML parser) is enough — these
+// A tiny indentation-aware reader (not a full YAML parser) is enough - these
 // workflow files are machine-generated and consistently indented (2 or 4 spaces).
 
 import fs from "node:fs";
@@ -104,7 +104,7 @@ function parseWorkflow(absPath) {
             const id = keyOf(jobRow);
             if (!id) continue;
             const sub = blockRange(rows, rows.indexOf(jobRow));
-            // Only the job's own keys — not a step's `- name:` deeper in the block.
+            // Only the job's own keys - not a step's `- name:` deeper in the block.
             const nameR = directChildren(sub).find((r) => keyOf(r) === "name");
             jobs.push({
                 id,

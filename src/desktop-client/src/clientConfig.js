@@ -1,7 +1,7 @@
 import fs from 'fs/promises'
 import path from 'path'
 
-// The client ships no runtime of its own — it points at a Modelibr host. The
+// The client ships no runtime of its own - it points at a Modelibr host. The
 // default targets a host running locally on its standard public port.
 export const DEFAULT_HOST_URL = 'http://127.0.0.1:3010'
 

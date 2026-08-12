@@ -22,7 +22,7 @@ export class ScriptListPage {
 
     /**
      * Return to the already-open Scripts list tab (e.g. after editing a script
-     * in its own tab) by clicking it in the dock — no app reset.
+     * in its own tab) by clicking it in the dock - no app reset.
      */
     async returnToList(): Promise<void> {
         await clickTab(this.page, "scripts");

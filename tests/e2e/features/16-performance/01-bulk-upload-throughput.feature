@@ -4,9 +4,9 @@ Feature: Performance - Full Pipeline & Thumbnail Integrity (ST-5, ST-13)
   Validates full upload-to-thumbnail pipeline and concurrent thumbnail updates.
   Ensures renderer pool fix works (each concurrent job gets own WebGL context).
 
-  Excluded from CI — run only with: npm run test:performance
+  Excluded from CI - run only with: npm run test:performance
 
-  # ST-13: Full pipeline — upload models, wait for all thumbnails
+  # ST-13: Full pipeline - upload models, wait for all thumbnails
   @timeout:600000
   Scenario: ST-13 Full pipeline - upload 10 models and verify all thumbnails appear
     Given I am on the model list page
@@ -17,7 +17,7 @@ Feature: Performance - Full Pipeline & Thumbnail Integrity (ST-5, ST-13)
     And all 10 thumbnails should be generated within 5 minutes
     And every thumbnail image should be unique
 
-  # ST-5: Concurrent thumbnail updates — grid updates smoothly
+  # ST-5: Concurrent thumbnail updates - grid updates smoothly
   @timeout:600000
   Scenario: ST-5 Concurrent thumbnail updates - no duplicate API calls
     Given I am on the model list page

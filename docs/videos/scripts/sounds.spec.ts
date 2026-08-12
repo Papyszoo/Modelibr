@@ -174,7 +174,7 @@ test.describe("Sounds", () => {
         await mediumPause(page);
 
         // Categories live in the shared CategoryTreePanel sidebar (tree nodes
-        // plus the Unassigned bucket row) — sounds no longer uses tab chips.
+        // plus the Unassigned bucket row) - sounds no longer uses tab chips.
         const categoryTab = page
             .locator(".sound-category-sidebar .p-treenode-content")
             .filter({ hasText: categoryName })

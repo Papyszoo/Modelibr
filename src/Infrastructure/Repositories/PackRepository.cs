@@ -31,7 +31,7 @@ internal sealed class PackRepository : IPackRepository
             .Include(p => p.Scripts)
             .Include(p => p.EnvironmentMaps)
             .Include(p => p.CustomThumbnailFile)
-            // Six collection includes — split to avoid a cartesian explosion
+            // Six collection includes - split to avoid a cartesian explosion
             // (and the latency that widens reactive-count races in the UI).
             .AsSplitQuery()
             .ToListAsync(cancellationToken);
@@ -63,6 +63,16 @@ internal sealed class PackRepository : IPackRepository
             .Include(p => p.CustomThumbnailFile)
             .AsSplitQuery()
             .FirstOrDefaultAsync(p => p.Name == name, cancellationToken);
+    }
+
+    public Task<Pack?> GetByStoreImportAsync(string storeUrl, string storeAssetId, CancellationToken cancellationToken = default)
+    {
+        // Idempotency probe only - the importer just needs the pack's identity, so no
+        // collection navigations are loaded (a big imported pack would drag hundreds of rows).
+        return _context.Packs
+            .FirstOrDefaultAsync(
+                p => p.StoreImportUrl == storeUrl && p.StoreImportAssetId == storeAssetId,
+                cancellationToken);
     }
 
     public Task UpdateAsync(Pack pack, CancellationToken cancellationToken = default)

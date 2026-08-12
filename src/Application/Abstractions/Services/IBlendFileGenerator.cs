@@ -18,7 +18,7 @@ public interface IBlendFileGenerator
 
     /// <summary>
     /// Returns the cached .blend file size in bytes if it exists, null otherwise.
-    /// Lightweight — only checks the file system, does not trigger generation.
+    /// Lightweight - only checks the file system, does not trigger generation.
     /// </summary>
     long? GetCachedSizeBytes(int modelId, int versionId);
 

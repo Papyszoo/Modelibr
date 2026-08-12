@@ -5,9 +5,9 @@ namespace Infrastructure.WebDav;
 /// answered without opening (and thereby generating/processing) the content stream.
 ///
 /// macOS WebDAV clients (webdavfs) issue a HEAD on every file while listing a folder.
-/// If that HEAD blocks on on-demand content production — e.g. the Blender CLI render
+/// If that HEAD blocks on on-demand content production - e.g. the Blender CLI render
 /// behind <see cref="VirtualGeneratedBlendFile"/>, or the image channel extraction
-/// behind <see cref="VirtualExtractedTextureFile"/> — the client times out and drops
+/// behind <see cref="VirtualExtractedTextureFile"/> - the client times out and drops
 /// the file from Finder ("shows up for a second and disappears").
 /// </summary>
 public interface IVirtualFileMetadata

@@ -51,7 +51,7 @@
   align-items: center;
 }
 
-/* Body: category tree sidebar + sounds grid, flat on the page background —
+/* Body: category tree sidebar + sounds grid, flat on the page background -
    the quiet CategoryTreePanel default is the app-wide categories standard. */
 .sound-list-body {
   display: flex;
@@ -95,7 +95,7 @@
   gap: 1rem;
 }
 
-/* Card identity — keep in sync with AssetTile.css (design-system skill). */
+/* Card identity - keep in sync with AssetTile.css (design-system skill). */
 .sound-card {
   position: relative;
   display: flex;
@@ -293,7 +293,7 @@
   }
 
   .sound-select-checkbox {
-    /* Visible by default on touch — no hover. */
+    /* Visible by default on touch - no hover. */
     background: rgba(0, 0, 0, 0.6);
   }
 }

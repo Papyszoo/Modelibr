@@ -7,7 +7,7 @@ namespace WebApi.Infrastructure;
 /// <summary>
 /// Quarantines Blender Safe-Save temp files that could not be turned into a model
 /// version, instead of deleting them. The whole point of Safe Save is that the bytes
-/// the artist just saved must never disappear — if the WebDAV middleware can't resolve
+/// the artist just saved must never disappear - if the WebDAV middleware can't resolve
 /// or process a save, it moves the temp file (plus a JSON sidecar describing why) into
 /// "{uploads}/webdav-blend-orphans/" so it can be recovered manually instead of quietly
 /// vanishing. See webdav-patterns skill / prompt 30 for the data-safety rule this
@@ -30,7 +30,7 @@ internal sealed class BlenderTempFileQuarantine
     /// Moves the temp file at <paramref name="tempFilePath"/> into the orphan directory
     /// and writes a JSON sidecar with the original request path, timestamp, reason, and
     /// candidate model ids (when the failure was an ambiguous name match). No-ops (with
-    /// a warning) if the temp file no longer exists — there are no bytes to protect.
+    /// a warning) if the temp file no longer exists - there are no bytes to protect.
     /// Deliberately takes no CancellationToken: quarantine is a data-safety operation,
     /// and a client that disconnects mid-failure (aborting the request) must not be
     /// able to cancel the move or the sidecar write.

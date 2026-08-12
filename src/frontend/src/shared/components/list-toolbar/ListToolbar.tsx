@@ -79,7 +79,7 @@ export function ListToolbarButton({
   )
 }
 
-/** Right-aligned count chip — e.g. "12 models". */
+/** Right-aligned count chip - e.g. "12 models". */
 export function ListToolbarCount({
   icon = 'pi pi-box',
   count,
@@ -124,7 +124,7 @@ export function ListToolbarSelectionActions({
 }
 
 /**
- * Collapsible panel below the toolbar — used to host Search input or the
+ * Collapsible panel below the toolbar - used to host Search input or the
  * filters row. Animates open/close via grid-template-rows.
  */
 export function ListToolbarPanel({
@@ -148,7 +148,7 @@ interface ListToolbarSearchInputProps {
   onChange: (value: string) => void
   placeholder?: string
   /**
-   * Focus the input when this flips to true — used to put the caret straight
+   * Focus the input when this flips to true - used to put the caret straight
    * into the field when the collapsible search panel is opened. The input
    * stays mounted (panel only animates height), so an effect, not the native
    * `autoFocus` attribute, is what actually moves focus on each open.
@@ -156,7 +156,7 @@ interface ListToolbarSearchInputProps {
   autoFocus?: boolean
 }
 
-/** Search input chrome — magnifier icon + bare input on a card surface. */
+/** Search input chrome - magnifier icon + bare input on a card surface. */
 export function ListToolbarSearchInput({
   value,
   onChange,

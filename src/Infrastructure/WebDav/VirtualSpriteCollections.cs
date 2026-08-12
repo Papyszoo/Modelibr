@@ -41,7 +41,7 @@ public sealed class VirtualSpriteCategoriesCollection : VirtualCollectionBase
 
         // Category names are enforced unique per-parent at the DB level (case-sensitively),
         // so a case-only collision is possible for WebDAV clients that treat paths
-        // case-insensitively (Windows/macOS) — never guess among duplicates.
+        // case-insensitively (Windows/macOS) - never guess among duplicates.
         var category = WebDavUtilities.ResolveSegment(name, _categories, c => c.Id, c => c.Name);
         if (category == null)
             return Task.FromResult<IStoreItem?>(null);

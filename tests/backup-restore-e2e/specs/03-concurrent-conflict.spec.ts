@@ -31,7 +31,7 @@ test.describe("Backup API edge cases", () => {
     });
 
     test("Delete with an invalid filename is rejected", async () => {
-        // Path-traversal style — must be rejected by the server-side validator.
+        // Path-traversal style - must be rejected by the server-side validator.
         const status = await api.deleteBackup("../etc/passwd");
         expect(status).toBe(400);
     });

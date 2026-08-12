@@ -18,7 +18,7 @@ namespace WebApi.Tests.Integration;
 /// lives inside a conditional branch that a valid request can legitimately
 /// skip, and (2) a handler that forgets to commit at all. Both are covered by
 /// CommandHandlerUnitOfWorkDecorator (see its doc comment in
-/// Application.Abstractions.Messaging) — this file proves the fix end to end
+/// Application.Abstractions.Messaging) - this file proves the fix end to end
 /// against real PostgreSQL.
 /// </summary>
 [Trait("Category", "Integration")]
@@ -40,12 +40,12 @@ public class CommitOnSuccessRegressionTests : IClassFixture<ModelibrWebFactory>
         // Arrange: exactly the merge/split-channel flow's precondition. Before
         // the fix, AddTextureToTextureSetCommandHandler's ONLY
         // IUnitOfWork.SaveChangesAsync call lived inside
-        // `if (batchUpload != null)` — a file added via the merge dialog
+        // `if (batchUpload != null)` - a file added via the merge dialog
         // (POST /texture-sets/{id}/textures, e.g. splitting an ORM map's R/G/B
         // channels into AO/Roughness/Metallic textures) legitimately has no
         // BatchUpload row for its FileId, so that branch is never taken and
         // the staged texture never persisted. This is the exact CI failure:
-        // "Merge ORM packed texture using Split Channels" — "ORM Target
+        // "Merge ORM packed texture using Split Channels" - "ORM Target
         // should have AO, Roughness, and Metallic textures" but the set
         // stayed empty.
         using var scope = _factory.Services.CreateScope();
@@ -69,7 +69,7 @@ public class CommitOnSuccessRegressionTests : IClassFixture<ModelibrWebFactory>
             DateTime.UtcNow);
         context.Files.Add(file);
 
-        // One seed commit for both — no BatchUpload row is ever created for
+        // One seed commit for both - no BatchUpload row is ever created for
         // `file`, matching the "no batchId" precondition.
         await unitOfWork.SaveChangesAsync();
 
@@ -103,11 +103,11 @@ public class CommitOnSuccessRegressionTests : IClassFixture<ModelibrWebFactory>
     {
         // Arrange: a handler shaped exactly like the pre-fix
         // HardDeleteTextureSetCommandHandler (one of the six handlers this PR
-        // fixed for having no commit at all) — it stages the delete via the
+        // fixed for having no commit at all) - it stages the delete via the
         // repository but never calls IUnitOfWork itself. Constructed directly
         // and wrapped by CommandHandlerUnitOfWorkDecorator by hand (the
-        // decorator path, bypassing DI resolution) to prove the wrapper —
-        // not the handler — is what makes the delete durable.
+        // decorator path, bypassing DI resolution) to prove the wrapper -
+        // not the handler - is what makes the delete durable.
         using var scope = _factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         await context.Database.MigrateAsync();
@@ -163,7 +163,7 @@ public class CommitOnSuccessRegressionTests : IClassFixture<ModelibrWebFactory>
 
             await _textureSetRepository.HardDeleteAsync(request.TextureSetId, cancellationToken);
 
-            // No unitOfWork.SaveChangesAsync() call — that's the point.
+            // No unitOfWork.SaveChangesAsync() call - that's the point.
             return Result.Success(new HardDeleteTextureSetResponse(true, "Texture set deleted successfully"));
         }
     }

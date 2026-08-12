@@ -25,7 +25,7 @@ Feature: Upload History Page
     And the item should display an "Uploaded to" location
 
   @history-open-model @slow
-  # @slow: UI-timing flake on `locator.waitFor` for the model viewer tab — the open-model
+  # @slow: UI-timing flake on `locator.waitFor` for the model viewer tab - the open-model
   # action lands but the tab doesn't reliably appear within 25s on shared CI runners.
   Scenario: History navigation opens model in viewer
     When I navigate to the Upload History page

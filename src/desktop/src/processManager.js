@@ -161,12 +161,12 @@ export class ProcessManager {
     this.runtimeDir = runtimeDir
     this.userDataDir = userDataDir
     // Three views of the config:
-    //   config        — the desired/saved values, shown in Settings.
-    //   startedConfig — what was desired at the last successful boot; drives
+    //   config        - the desired/saved values, shown in Settings.
+    //   startedConfig - what was desired at the last successful boot; drives
     //                   "needs restart" (did the user change a restart setting
     //                   since start?), so an auto-resolved port isn't mistaken
     //                   for a pending change.
-    //   activeConfig  — the ports actually bound (config, but with any port that
+    //   activeConfig  - the ports actually bound (config, but with any port that
     //                   was taken swapped for a free one). Snapshot URLs and
     //                   health probes read this, so the "Open" button always
     //                   points at a port that's really listening.
@@ -233,7 +233,7 @@ export class ProcessManager {
   }
 
   // True when the user has changed a restart-only setting (ports / data folder)
-  // SINCE the last start — i.e. a relaunch would apply it. Compared against
+  // SINCE the last start - i.e. a relaunch would apply it. Compared against
   // startedConfig (not activeConfig) so an auto-resolved port, where active
   // already differs from desired through no user action, isn't read as pending.
   hasPendingRestart() {
@@ -243,7 +243,7 @@ export class ProcessManager {
     // The data folder compares *resolved* roots, so choosing the path the
     // default already resolves to isn't a false positive. The remaining
     // restart-only keys (the ports) compare directly via the shared definition
-    // — dataDirectory is zeroed on both sides so it doesn't double-count here.
+    // - dataDirectory is zeroed on both sides so it doesn't double-count here.
     if (this.dataRootFor(this.config) !== this.dataRootFor(this.startedConfig)) {
       return true
     }
@@ -273,7 +273,7 @@ export class ProcessManager {
   // its own row rather than collapsing the whole app into "not running".
   async probeStatus() {
     // Probe and report the ports the services are actually bound to (active),
-    // not the latest-saved ones — otherwise a pending port change would make
+    // not the latest-saved ones - otherwise a pending port change would make
     // every service read as "down" against a port nothing is listening on yet.
     const active = this.runningConfig
     const internalApiPort = active.internalApiPort
@@ -313,7 +313,7 @@ export class ProcessManager {
   }
 
   // True when a configured port was taken at start and we bound a free one
-  // instead — lets the UI explain why the address differs from the saved port.
+  // instead - lets the UI explain why the address differs from the saved port.
   portsAutoAdjusted() {
     if (!this.startedConfig || !this.activeConfig) {
       return false
@@ -415,7 +415,7 @@ export class ProcessManager {
     await this.stopWorkers()
     await this.startWorkers()
     // Worker settings are applied live by this recycle, so they're now part of
-    // what's actually running — fold them into activeConfig (ports/data folder
+    // what's actually running - fold them into activeConfig (ports/data folder
     // are untouched; those still require a full restart).
     if (this.activeConfig) {
       this.activeConfig.workerProcessCount = this.config.workerProcessCount
@@ -481,7 +481,7 @@ export class ProcessManager {
 
     // The bundled PostgreSQL ships its own shared libraries (e.g. ICU) in lib/.
     // The dynamic loader resolves them via LD_LIBRARY_PATH (Linux) / DYLD_*
-    // (macOS) — PATH alone doesn't cover shared-library lookup.
+    // (macOS) - PATH alone doesn't cover shared-library lookup.
     const prependLib = existing =>
       [libDir, existing].filter(Boolean).join(path.delimiter)
 
@@ -535,7 +535,7 @@ export class ProcessManager {
     }
   }
 
-  // True if `pid` names a live process. Signal 0 only checks existence — it
+  // True if `pid` names a live process. Signal 0 only checks existence - it
   // never actually signals the process. EPERM means it exists but isn't ours.
   isPidAlive(pid) {
     try {
@@ -556,7 +556,7 @@ export class ProcessManager {
     }
   }
 
-  // True if `pid` belongs to a process whose image looks like PostgreSQL — so we
+  // True if `pid` belongs to a process whose image looks like PostgreSQL - so we
   // can tell a real orphaned server (stop it) from a stale lock whose PID was
   // reused by something unrelated (remove the file, never signal it).
   async isPostgresProcess(pid) {
@@ -582,7 +582,7 @@ export class ProcessManager {
   // left a postmaster.pid behind, which otherwise makes pg_ctl start fail with
   // "lock file already exists". Safe by construction: it only sends a signal
   // (via stopPostgres) to a PID it has VERIFIED is PostgreSQL, and otherwise
-  // just deletes the stale lock file — never a live server's, never an
+  // just deletes the stale lock file - never a live server's, never an
   // unrelated process's.
   async clearStalePostgresLock() {
     const pidFile = path.join(this.paths.postgresData, 'postmaster.pid')
@@ -713,7 +713,7 @@ export class ProcessManager {
         // pre-migration backup would fail here (as would the manual "Backup now"
         // button in Settings) and, per its abort-on-failure policy, would prevent
         // the app from starting after any future migration ships. Opting out here
-        // — rather than shipping a startup-blocking regression on desktop — until
+        // - rather than shipping a startup-blocking regression on desktop - until
         // a follow-up resolves pg_dump/psql to an absolute path.
         MODELIBR_SKIP_PREMIGRATION_BACKUP: 'true',
       },
@@ -769,7 +769,7 @@ export class ProcessManager {
         WORKER_ID: `worker-${index + 1}`,
         WORKER_PORT: String(healthPort),
         // Target the WebApi the workers can actually reach right now (active
-        // port), not a just-saved one that won't be bound until a restart — so
+        // port), not a just-saved one that won't be bound until a restart - so
         // recycling workers is safe even while a port change is pending. The
         // worker-pool settings below still come from the latest saved config.
         API_BASE_URL: `http://127.0.0.1:${this.runningConfig.internalApiPort}`,
@@ -801,7 +801,7 @@ export class ProcessManager {
       }
 
       if (!this.stoppingWorkers) {
-        logWithPrefix(this.log, `worker:${index + 1}`, 'Unexpected exit — respawning in 3 s')
+        logWithPrefix(this.log, `worker:${index + 1}`, 'Unexpected exit - respawning in 3 s')
         setTimeout(() => {
           this.spawnWorker(index).catch(error => {
             logWithPrefix(this.log, `worker:${index + 1}`, 'Respawn failed', {

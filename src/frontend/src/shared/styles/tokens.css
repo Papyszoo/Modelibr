@@ -43,16 +43,16 @@
   /* Modelibr is a dense desktop application, not a website. The workhorses
      are 2xs–md (the app's real distribution: gap 0.5rem ≫ 0.75 ≫ 1rem;
      padding 1rem ≥ 0.5 ≥ 0.75rem). lg and up are reserved for empty states,
-     dialogs, and centered placeholders — never for headers, toolbars, or
+     dialogs, and centered placeholders - never for headers, toolbars, or
      anything that repeats down the page. */
-  --mod-space-2xs: 0.25rem; /*  4px — inline icon/label gaps */
-  --mod-space-xs: 0.5rem; /*  8px — default gap between controls */
-  --mod-space-sm: 0.75rem; /* 12px — panel/toolbar padding */
-  --mod-space-md: 1rem; /* 16px — page/section padding ceiling */
-  --mod-space-lg: 1.5rem; /* 24px — dialog padding */
-  --mod-space-xl: 2rem; /* 32px — empty states only */
-  --mod-space-2xl: 3rem; /* 48px — empty states only */
-  --mod-space-3xl: 4rem; /* 64px — empty states only */
+  --mod-space-2xs: 0.25rem; /*  4px - inline icon/label gaps */
+  --mod-space-xs: 0.5rem; /*  8px - default gap between controls */
+  --mod-space-sm: 0.75rem; /* 12px - panel/toolbar padding */
+  --mod-space-md: 1rem; /* 16px - page/section padding ceiling */
+  --mod-space-lg: 1.5rem; /* 24px - dialog padding */
+  --mod-space-xl: 2rem; /* 32px - empty states only */
+  --mod-space-2xl: 3rem; /* 48px - empty states only */
+  --mod-space-3xl: 4rem; /* 64px - empty states only */
 
   /* ── Radius ───────────────────────────────────────────────────── */
   --mod-radius-sm: 4px;
@@ -64,7 +64,7 @@
   /* ── Typography ───────────────────────────────────────────────── */
   /* sm (0.875rem) is the app's default UI text size by a wide margin; xs is
      for counts/captions/badges. 2xl (1.5rem) is the largest text in the app
-     — the Models page title — and the hard ceiling: there is deliberately
+     - the Models page title - and the hard ceiling: there is deliberately
      no 3xl. If a heading feels like it needs more, the layout is drifting
      toward "website"; don't. */
   --mod-text-xs: 0.75rem; /* counts, captions, badges */
@@ -111,7 +111,7 @@
   --asset-card-hover-lift: -4px;
 
   /*
-   * Breakpoints — kept in sync with `shared/styles/breakpoints.ts`.
+   * Breakpoints - kept in sync with `shared/styles/breakpoints.ts`.
    * Note: CSS `var()` cannot be used inside @media queries, so these
    * are documentation only. Use the TS constants for runtime checks
    * and write hardcoded media queries that match these values.

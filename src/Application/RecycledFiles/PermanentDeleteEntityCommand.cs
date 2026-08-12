@@ -3,6 +3,7 @@ using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
 using Application.Abstractions.Storage;
+using Application.Extraction;
 using SharedKernel;
 
 namespace Application.RecycledFiles;
@@ -189,6 +190,7 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
     private readonly IEnvironmentMapRepository _environmentMapRepository;
     private readonly IFileStorage _fileStorage;
     private readonly IThumbnailQueue _thumbnailQueue;
+    private readonly IAssetSearchDocumentRepository _searchDocumentRepository;
     private readonly IUnitOfWork _unitOfWork;
 
     public PermanentDeleteEntityCommandHandler(
@@ -202,6 +204,7 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
         IEnvironmentMapRepository environmentMapRepository,
         IFileStorage fileStorage,
         IThumbnailQueue thumbnailQueue,
+        IAssetSearchDocumentRepository searchDocumentRepository,
         IUnitOfWork unitOfWork)
     {
         _modelRepository = modelRepository;
@@ -214,6 +217,7 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
         _environmentMapRepository = environmentMapRepository;
         _fileStorage = fileStorage;
         _thumbnailQueue = thumbnailQueue;
+        _searchDocumentRepository = searchDocumentRepository;
         _unitOfWork = unitOfWork;
     }
 
@@ -247,6 +251,12 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
                     }
                 }
                 
+                // The search projection is denormalised and carries no FK to Models,
+                // so nothing cascades - drop its documents explicitly or the asset
+                // stays searchable after the row it describes is gone.
+                await _searchDocumentRepository.RemoveAllForAssetAsync(
+                    ExtractionAssetTypes.Model, request.EntityId, cancellationToken);
+
                 // Delete model and related entities from database
                 await _modelRepository.DeleteAsync(request.EntityId, cancellationToken);
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
@@ -269,6 +279,9 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
                     // If shared, file stays on disk but DB record for this version's file will be removed
                 }
                 
+                await _searchDocumentRepository.RemoveForAssetAsync(
+                    ExtractionAssetTypes.Model, version2.ModelId, version2.Id, cancellationToken);
+
                 await _modelVersionRepository.DeleteAsync(version2, cancellationToken);
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
                 return Result.Success(new PermanentDeleteEntityResponse(true, "Model version permanently deleted", deletedFiles));

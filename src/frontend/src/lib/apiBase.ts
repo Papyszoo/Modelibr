@@ -28,7 +28,7 @@ export function resolveApiAssetUrl(url?: string | null): string | null {
   try {
     return new URL(url, baseURL).toString()
   } catch {
-    // baseURL is relative (e.g. "/api") — prepend it to the path
+    // baseURL is relative (e.g. "/api") - prepend it to the path
     if (baseURL.startsWith('/') && url.startsWith('/')) {
       return `${baseURL}${url}`
     }
@@ -52,6 +52,8 @@ export interface NormalizedApiError {
   isNetworkError: boolean
   isTimeout: boolean
   isOffline: boolean
+  /** Original axios request config - lets callers retry the request. */
+  requestConfig?: InternalAxiosRequestConfig
 }
 
 export class ApiClientError extends Error implements NormalizedApiError {
@@ -62,6 +64,7 @@ export class ApiClientError extends Error implements NormalizedApiError {
   isNetworkError: boolean
   isTimeout: boolean
   isOffline: boolean
+  requestConfig?: InternalAxiosRequestConfig
 
   constructor(message: string, normalized: NormalizedApiError) {
     super(message)
@@ -73,6 +76,7 @@ export class ApiClientError extends Error implements NormalizedApiError {
     this.isNetworkError = normalized.isNetworkError
     this.isTimeout = normalized.isTimeout
     this.isOffline = normalized.isOffline
+    this.requestConfig = normalized.requestConfig
   }
 }
 
@@ -139,6 +143,7 @@ const normalizeAxiosError = (error: AxiosError): ApiClientError => {
     isNetworkError,
     isTimeout,
     isOffline,
+    requestConfig: error.config,
   })
 }
 
@@ -155,23 +160,38 @@ const attachDefaultRequestHeaders = (
   return config
 }
 
-export const client = axios.create({
-  baseURL,
-  timeout: 30000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-})
+/**
+ * Creates an axios instance with the app's shared conventions: JSON headers,
+ * a default Accept header, and rejection with a normalized ApiClientError.
+ * Feature modules that talk to a different origin (e.g. the Asset Store)
+ * build their client through this factory instead of forking the setup.
+ */
+export function createApiClient(
+  clientBaseURL: string,
+  options: { timeout?: number } = {}
+) {
+  const instance = axios.create({
+    baseURL: clientBaseURL,
+    timeout: options.timeout ?? 30000,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  })
 
-client.interceptors.request.use(attachDefaultRequestHeaders)
+  instance.interceptors.request.use(attachDefaultRequestHeaders)
 
-client.interceptors.response.use(
-  response => response,
-  error => {
-    if (!axios.isAxiosError(error)) {
-      return Promise.reject(error)
+  instance.interceptors.response.use(
+    response => response,
+    error => {
+      if (!axios.isAxiosError(error)) {
+        return Promise.reject(error)
+      }
+
+      return Promise.reject(normalizeAxiosError(error))
     }
+  )
 
-    return Promise.reject(normalizeAxiosError(error))
-  }
-)
+  return instance
+}
+
+export const client = createApiClient(baseURL)

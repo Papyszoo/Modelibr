@@ -14,6 +14,9 @@ export const config = {
   // Job processing settings
   maxConcurrentJobs: parseInt(process.env.MAX_CONCURRENT_JOBS || '3', 10),
   jobTimeout: parseInt(process.env.JOB_TIMEOUT_MS) || 300000, // 5 minutes default
+  // Poll interval for the decoupled extraction queue (prompt 20 executor).
+  extractionPollIntervalMs:
+    parseInt(process.env.EXTRACTION_POLL_INTERVAL_MS, 10) || 5000,
 
   // Logging
   logLevel: process.env.LOG_LEVEL || 'info',
@@ -28,6 +31,10 @@ export const config = {
     cameraDistance: parseFloat(process.env.CAMERA_DISTANCE) || 5,
     enableAntialiasing: process.env.ENABLE_ANTIALIASING !== 'false',
     useHardwareAcceleration: process.env.ENABLE_GPU_RENDERING === 'true',
+    // Turntable rig version - the render rig (framing/camera/lighting/background)
+    // is frozen so the same stills can later serve as vision-model input. Bump
+    // ONLY on a deliberate rig change; a bump invalidates cached stills library-wide.
+    rigVersion: parseInt(process.env.RENDER_RIG_VERSION, 10) || 1,
   },
 
   // Orbit animation settings
@@ -60,6 +67,17 @@ export const config = {
     maxPolygonCount: parseInt(process.env.MAX_POLYGON_COUNT) || 1000000, // 1M polygons by default
     enableNormalization: process.env.ENABLE_NORMALIZATION !== 'false',
     normalizedScale: parseFloat(process.env.NORMALIZED_SCALE) || 2.0, // Scale to fit in a 2x2x2 cube
+  },
+
+  // Metadata extraction (prompt 20–22 substrate). Determinism over resolution:
+  // pixel stats run on a fixed working size so the same material yields the same
+  // numbers regardless of source dimensions. Script parsing is bounded so a
+  // pathological upload can never hang or OOM the worker.
+  extraction: {
+    materialSampleSize: parseInt(process.env.MATERIAL_SAMPLE_SIZE, 10) || 256, // resize each texture to this square before pixel stats
+    scriptMaxBytes:
+      parseInt(process.env.SCRIPT_MAX_BYTES, 10) || 2 * 1024 * 1024, // skip parse above this size
+    scriptTimeoutMs: parseInt(process.env.SCRIPT_TIMEOUT_MS, 10) || 5000, // per-file parse budget
   },
 
   // Frame encoding settings
@@ -258,7 +276,7 @@ const ALLOWED_THUMBNAIL_SIZES = new Set([64, 128, 256, 512, 1024, 2048])
  * to existing in-memory config on failure.
  *
  * When isAnimated=false, frameCount collapses to 1 (single frame at start angle)
- * — the renderer still produces a webp, just a 1-frame one. This keeps the
+ * - the renderer still produces a webp, just a 1-frame one. This keeps the
  * pipeline uniform without a separate static-thumbnail code path.
  *
  * @param {import('./jobApiClient.js').JobApiClient} apiClient

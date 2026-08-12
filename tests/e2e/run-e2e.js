@@ -121,7 +121,7 @@ function preserveBlobs(phase) {
 /**
  * Run the sibling backup-restore E2E suite. It lives in its own package with a
  * separate Docker stack (ports 3102/8190) and restarts the webapi mid-test, so
- * it cannot share the main run — its `test:full` script self-provisions
+ * it cannot share the main run - its `test:full` script self-provisions
  * setup → specs → teardown. Returns the suite's exit code.
  */
 function runBackupRestore() {
@@ -175,8 +175,8 @@ async function main() {
   fs.rmSync(blobAllDir, { recursive: true, force: true });
 
   // Two-phase execution:
-  //   Phase 1: Setup tests with 1 worker (sequential — avoids asset-processor overload)
-  //   Phase 2: Chromium tests with multiple workers (parallel — uses auto-provisioning)
+  //   Phase 1: Setup tests with 1 worker (sequential - avoids asset-processor overload)
+  //   Phase 2: Chromium tests with multiple workers (parallel - uses auto-provisioning)
   //
   // Worker count rationale:
   //   Two test files are inherently slow (thumbnail generation, SignalR):
@@ -185,7 +185,7 @@ async function main() {
   //   With workers=3 locally both slow tests each occupy a dedicated worker
   //   while the third worker handles the 150+ fast tests, bounding total time
   //   to the slowest thumbnail (~10.5min) instead of ~13min with workers=2.
-  //   CI uses 3 workers (same as local) — 4 workers caused asset-processor
+  //   CI uses 3 workers (same as local) - 4 workers caused asset-processor
   //   contention on slower CI hardware, leading to thumbnail generation timeouts.
   // `--with-backup-restore` runs the sibling backup-restore E2E suite after the
   // main run (see Phase 6). Strip it from the args forwarded to Playwright.

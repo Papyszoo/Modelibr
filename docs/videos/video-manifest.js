@@ -1,6 +1,6 @@
 // `maxDurationSeconds` is a QA ceiling, not a target or a trim point:
 // recordings are NEVER cut to the cap (only frozen tails are trimmed).
-// analyze-videos.js fails the pipeline when a recording exceeds its cap —
+// analyze-videos.js fails the pipeline when a recording exceeds its cap -
 // that means the spec choreography must be tightened, or the cap raised
 // here deliberately. Caps include headroom for slower CI rendering.
 export const videoManifest = [
@@ -50,14 +50,21 @@ export const videoManifest = [
         outputName: "sounds.webm",
         title: "Sounds",
         description: "Browse, preview, and inspect sound assets.",
-        maxDurationSeconds: 40,
+        // Records ~26s locally. CI software rendering paces recorded waits
+        // ~1.5x local (measured on model-management at v0.4.2), which puts this
+        // at ~39s against the old 40s cap - inside the noise. Raised for CI
+        // headroom, not because the choreography grew.
+        maxDurationSeconds: 50,
     },
     {
         slug: "projects",
         outputName: "projects.webm",
         title: "Projects",
         description: "Browse, search, and inspect production-ready project boards.",
-        maxDurationSeconds: 45,
+        // Records ~28s locally, which the ~1.5x CI pacing puts at ~43s against
+        // the old 45s cap. Same reasoning as sounds above: too thin a margin to
+        // survive a slow runner, and an overrun blocks the docs deploy.
+        maxDurationSeconds: 55,
     },
     {
         slug: "packs",

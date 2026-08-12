@@ -1,7 +1,7 @@
 // Static extraction of Jest / Vitest test cases. There's no reliable "list tests
 // without running" for these, so we parse describe/it/test names from the source.
 // Dynamically generated tests (loops, test.each with computed names) may be
-// missed — this is for browsing, not execution.
+// missed - this is for browsing, not execution.
 
 import path from "node:path";
 import { REPO_ROOT, rel, readText, findFiles } from "../util.mjs";

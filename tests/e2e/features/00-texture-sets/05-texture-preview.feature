@@ -13,7 +13,7 @@ Feature: Preview Texture Sets
       | red_color   |
 
   @three-js @preview @slow
-  # @slow: Three.js/WebGL page crash on shared CI runners — fails with
+  # @slow: Three.js/WebGL page crash on shared CI runners - fails with
   # "Target page, context or browser has been closed" mid-test. Moved off the
   # PR-gating fast lane until the renderer-context-loss root cause is fixed.
   Scenario: Switching between texture sets updates the 3D model

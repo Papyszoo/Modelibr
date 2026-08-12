@@ -137,7 +137,7 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
   const [contextMode, setContextMode] = useState<'single' | 'bulk'>('single')
 
   // Area-drag (lasso) selection state. Card-drag-to-merge uses HTML5 native
-  // drag (a separate event stream) so the two don't conflict — we only
+  // drag (a separate event stream) so the two don't conflict - we only
   // start the lasso when the mousedown originates *outside* a card.
   const [isAreaSelecting, setIsAreaSelecting] = useState(false)
   const [selectionBox, setSelectionBox] = useState<{
@@ -319,7 +319,7 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
       if (event.button !== 0) return
 
       // Coordinates are relative to the selection surface's live bounding
-      // rect, which already shifts with the scroll position — so no
+      // rect, which already shifts with the scroll position - so no
       // scrollTop/scrollLeft offset is added here (doing so double-counts the
       // scroll and the box would start away from the cursor). The selection
       // box is absolutely positioned inside the surface, so these surface-
@@ -599,7 +599,7 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
         console.error('Failed to regenerate thumbnail:', error)
       }
     }
-    // Single-item: keep the original message text — the e2e tests assert on it.
+    // Single-item: keep the original message text - the e2e tests assert on it.
     const detail =
       sets.length === 1
         ? okCount === 1
@@ -702,7 +702,7 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
     const eligible = allSets.filter(s => s.kind !== TextureSetKind.ModelOwned)
     const skipped = allSets.length - eligible.length
 
-    // Issue updates in parallel — they're independent.
+    // Issue updates in parallel - they're independent.
     const results = await Promise.allSettled(
       eligible.map(set =>
         updateTextureSet(set.id, { name: set.name, categoryId })
@@ -732,7 +732,7 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
             ? 'error'
             : 'warn',
       summary: 'Category changed',
-      detail: detailParts.join(' — '),
+      detail: detailParts.join(' - '),
       life: 3000,
     })
     invalidateTextureSets()
@@ -755,7 +755,7 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
         console.error('Failed to recycle texture set:', error)
       }
     }
-    // Single-item: preserve the original message text — e2e tests assert on it.
+    // Single-item: preserve the original message text - e2e tests assert on it.
     const detail =
       sets.length === 1
         ? okCount === 1
@@ -853,7 +853,7 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
       },
     ]
     // Handlers are component-local closures that read the same state
-    // captured below — including them would trigger a new menu identity on
+    // captured below - including them would trigger a new menu identity on
     // every render and drop the open menu.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contextMode, activeContextSet, selectedTextureSets, unitLabel])
@@ -1052,7 +1052,7 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
                 className="texture-set-grid-empty"
                 icon="pi-images"
                 title="No Texture Sets"
-                message="Drag and drop texture files here to create new sets — each file becomes a set with an albedo texture"
+                message="Drag and drop texture files here to create new sets - each file becomes a set with an albedo texture"
               />
             )
           ) : filteredTextureSets.length === 0 ? (

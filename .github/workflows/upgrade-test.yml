@@ -2,29 +2,28 @@ name: Upgrade Test
 
 # Proves a real version-to-version upgrade keeps user data. Two complementary jobs:
 #
-#   reinstall   — installs the FROM release, seeds one of every asset type, then
+#   reinstall   - installs the FROM release, seeds one of every asset type, then
 #                 installs the TO release *over* it (data folder lives in the user
 #                 profile, so it persists) and verifies everything survived. Covers
 #                 all 3 OS and is the only coverage for the Linux .deb and the
 #                 macOS data path.
 #
-#   self-update — exercises the real in-app electron-updater: installs FROM, seeds,
+#   self-update - exercises the real in-app electron-updater: installs FROM, seeds,
 #                 then drives the app's own "download + install" over CDP and
 #                 confirms the relaunched build is the new version with data intact.
-#                 Windows + Linux only — macOS can't self-update while the app is
+#                 Windows + Linux only - macOS can't self-update while the app is
 #                 unsigned (Squirrel.Mac requires code signing; planned for 1.0).
 #
-# Installers come straight from GitHub Releases — no build step. Defaults to
-# "v0.3.1 → latest published release".
+# Installers come straight from GitHub Releases - no build step. Both tags are
+# resolved from the Releases API by the resolve-tags job below, so nothing here
+# needs bumping at release time: the default is always "second-newest release ->
+# newest release".
 on:
   workflow_dispatch:
     inputs:
       from_tag:
-        # v0.3.1 = first release containing the Windows silent quitAndInstall
-        # fix (#550), so the self-update job exercises the fixed updater path.
-        description: "Release tag to upgrade FROM"
+        description: "Release tag to upgrade FROM (blank = the release before TO)"
         required: false
-        default: "v0.3.1"
         type: string
       to_tag:
         description: "Release tag to upgrade TO (blank = latest published release)"
@@ -42,8 +41,54 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Single source of truth for both jobs below. Resolved once, from the Releases
+  # API, so a release cut never needs a tag edited in this file - the previous
+  # hardcoded default went stale for two releases in a row.
+  resolve-tags:
+    name: Resolve FROM / TO release tags
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      from: ${{ steps.tags.outputs.from }}
+      to: ${{ steps.tags.outputs.to }}
+    steps:
+      - name: Resolve tags
+        id: tags
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          INPUT_FROM: ${{ inputs.from_tag }}
+          INPUT_TO: ${{ inputs.to_tag }}
+        run: |
+          set -euo pipefail
+
+          # Newest first. 30 is plenty of history to find the entry before TO.
+          releases=$(gh release list --exclude-drafts --exclude-pre-releases \
+            --limit 30 --json tagName --jq '[.[].tagName]')
+
+          to="${INPUT_TO:-$(jq -r '.[0] // empty' <<<"$releases")}"
+          [ -n "$to" ] || { echo "Could not resolve a TO release tag"; exit 1; }
+
+          # FROM defaults to the release immediately before TO, so an explicit
+          # to_tag still upgrades from its real predecessor rather than from the
+          # newest release overall. If TO isn't in the list (a tag with no
+          # release), fall back to the second-newest.
+          from="${INPUT_FROM:-$(jq -r --arg to "$to" \
+            '(index($to) // 0) as $i | (.[$i + 1] // empty)' <<<"$releases")}"
+          [ -n "$from" ] || { echo "Could not resolve a FROM release tag - is there more than one release?"; exit 1; }
+
+          if [ "$from" = "$to" ]; then
+            echo "FROM ($from) equals TO ($to) - nothing to upgrade."; exit 1
+          fi
+
+          echo "Upgrading: $from  ->  $to"
+          echo "from=$from" >> "$GITHUB_OUTPUT"
+          echo "to=$to" >> "$GITHUB_OUTPUT"
+
   reinstall:
     name: Reinstall ${{ matrix.name }}
+    needs: resolve-tags
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     strategy:
@@ -67,29 +112,6 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Resolve FROM / TO release tags
-        id: tags
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          INPUT_FROM: ${{ inputs.from_tag }}
-          INPUT_TO: ${{ inputs.to_tag }}
-        run: |
-          set -euo pipefail
-          from="${INPUT_FROM:-v0.3.1}"
-          to="${INPUT_TO:-}"
-          if [ -z "$to" ]; then
-            to=$(gh release list --exclude-drafts --exclude-pre-releases --limit 1 \
-              --json tagName --jq '.[0].tagName // empty')
-          fi
-          [ -n "$to" ] || { echo "Could not resolve a TO release tag"; exit 1; }
-          if [ "$from" = "$to" ]; then
-            echo "FROM ($from) equals TO ($to) — nothing to upgrade."; exit 1
-          fi
-          echo "Upgrading: $from  ->  $to"
-          echo "from=$from" >> "$GITHUB_OUTPUT"
-          echo "to=$to" >> "$GITHUB_OUTPUT"
-
       - name: Download FROM and TO installers
         shell: bash
         env:
@@ -102,8 +124,8 @@ jobs:
             Windows) pat='*windows-x64.exe' ;;
           esac
           mkdir -p old-installer new-installer
-          gh release download "${{ steps.tags.outputs.from }}" --dir old-installer --pattern "$pat"
-          gh release download "${{ steps.tags.outputs.to }}"   --dir new-installer --pattern "$pat"
+          gh release download "${{ needs.resolve-tags.outputs.from }}" --dir old-installer --pattern "$pat"
+          gh release download "${{ needs.resolve-tags.outputs.to }}"   --dir new-installer --pattern "$pat"
           echo "── FROM ──"; ls -la old-installer
           echo "── TO ──";   ls -la new-installer
 
@@ -210,6 +232,7 @@ jobs:
 
   self-update:
     name: Self-update ${{ matrix.name }}
+    needs: resolve-tags
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     strategy:
@@ -234,28 +257,6 @@ jobs:
       - name: Install CDP driver dependency
         run: npm install --no-save playwright-core
 
-      - name: Resolve FROM tag (and confirm a newer release exists)
-        id: tags
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          INPUT_FROM: ${{ inputs.from_tag }}
-          INPUT_TO: ${{ inputs.to_tag }}
-        run: |
-          set -euo pipefail
-          from="${INPUT_FROM:-v0.3.1}"
-          to="${INPUT_TO:-}"
-          if [ -z "$to" ]; then
-            to=$(gh release list --exclude-drafts --exclude-pre-releases --limit 1 \
-              --json tagName --jq '.[0].tagName // empty')
-          fi
-          [ -n "$to" ] || { echo "Could not resolve a newer release"; exit 1; }
-          if [ "$from" = "$to" ]; then
-            echo "FROM ($from) equals latest ($to) — nothing to self-update to."; exit 1
-          fi
-          echo "Self-update: $from  ->  $to (updater picks latest from the feed)"
-          echo "from=$from" >> "$GITHUB_OUTPUT"
-
       - name: Download FROM installer
         shell: bash
         env:
@@ -269,7 +270,7 @@ jobs:
             Windows) pat='*windows-x64.exe' ;;
           esac
           mkdir -p old-installer
-          gh release download "${{ steps.tags.outputs.from }}" --dir old-installer --pattern "$pat"
+          gh release download "${{ needs.resolve-tags.outputs.from }}" --dir old-installer --pattern "$pat"
           ls -la old-installer
 
       - name: Self-update scenario (Linux)
@@ -278,7 +279,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          # libfuse2 lets the AppImage run normally so it sets $APPIMAGE — which
+          # libfuse2 lets the AppImage run normally so it sets $APPIMAGE - which
           # electron-updater needs to know which file to replace on self-update.
           sudo apt-get install -y xvfb libfuse2 >/dev/null
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
@@ -310,7 +311,7 @@ jobs:
           echo "::group::Verify the relaunched build is the NEW version, data intact"
           sleep 15  # quitAndInstall relaunches; give it a moment
           if ! wait_ready; then
-            echo "did not auto-relaunch — launching the (updated) AppImage"
+            echo "did not auto-relaunch - launching the (updated) AppImage"
             start_app; wait_ready || { echo "not ready after update"; tail -n 80 /tmp/modelibr.log || true; exit 1; }
           fi
           code=$(http_code http://127.0.0.1:3010/api/scripts)
@@ -377,7 +378,7 @@ jobs:
           Start-Sleep 25
           Dump-Diag 'after-update'
           if (-not (Wait-Ready)) {
-            Write-Host "did not auto-relaunch — starting the (updated) app"
+            Write-Host "did not auto-relaunch - starting the (updated) app"
             Start-App
             if (-not (Wait-Ready)) { throw "app not ready after update" }
           }

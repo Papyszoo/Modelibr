@@ -400,7 +400,7 @@ export function EnvironmentMapList() {
       }
 
       // Coordinates are relative to the selection surface's live bounding
-      // rect, which already shifts with the scroll position — so no
+      // rect, which already shifts with the scroll position - so no
       // scrollTop/scrollLeft offset is added here (doing so double-counts the
       // scroll and the box would start away from the cursor). The selection
       // box is absolutely positioned inside the surface, so these surface-
@@ -515,7 +515,7 @@ export function EnvironmentMapList() {
       event: React.DragEvent<HTMLElement>,
       environmentMap: EnvironmentMapDto
     ) => {
-      // Deliberately do NOT mutate selection here — a mid-drag layout shift
+      // Deliberately do NOT mutate selection here - a mid-drag layout shift
       // (e.g. a new selection bar row) can make Chromium cancel the drag before
       // drop fires. See SoundList.handleSoundDragStart for the full story.
       setDraggedId(environmentMap.id)

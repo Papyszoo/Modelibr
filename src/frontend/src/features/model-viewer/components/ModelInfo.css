@@ -10,7 +10,7 @@
   gap: 0.75rem;
 }
 
-/* Sticky action bar — pins Save to the bottom of the surrounding scroll
+/* Sticky action bar - pins Save to the bottom of the surrounding scroll
    container (FloatingWindow desktop, mobile sheet). Negative margins bleed
    it edge-to-edge inside the container's 0.75rem padding. */
 .model-info-actions {
@@ -368,7 +368,7 @@
   }
 
   /* Category row: stack the dropdown and its action button so the dropdown
-     gets the full width — desktop's flex-wrap leaves a cramped half-row. */
+     gets the full width - desktop's flex-wrap leaves a cramped half-row. */
   .model-info-category-row,
   .model-info-header-row {
     flex-direction: column;

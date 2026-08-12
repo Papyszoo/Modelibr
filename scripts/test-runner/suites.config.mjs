@@ -48,7 +48,7 @@ export const suites = [
         kind: "playwright",
         cwd: "src/frontend",
         // Renders the shared channel-extraction GLSL in a forced-SwiftShader
-        // WebGL2 context and reads pixels back — no app, backend, or Docker.
+        // WebGL2 context and reads pixels back - no app, backend, or Docker.
         // Fast + deterministic, unlike the full-app extraction E2E.
         command: "npm run test:webgl",
         tier: "fast",
@@ -79,7 +79,7 @@ export const suites = [
     },
     {
         id: "e2e-fast",
-        name: "E2E — fast tiers (Playwright + BDD, Docker)",
+        name: "E2E - fast tiers (Playwright + BDD, Docker)",
         kind: "playwright",
         cwd: "tests/e2e",
         // test:ci assumes the stack is already up, so wrap it in setup/teardown.
@@ -99,22 +99,22 @@ export const suites = [
         kind: "dotnet",
         cwd: ".",
         // --wait blocks until the healthcheck passes, so the tests never race a
-        // cold Postgres start. The container is left running afterwards — it is
+        // cold Postgres start. The container is left running afterwards - it is
         // the dev database (tests use an isolated Modelibr_IntegrationTests db).
         command:
             'docker compose up -d --wait postgres && dotnet test Modelibr.sln --filter "Category=Integration"',
         tier: "slow",
         requiresDocker: true,
         detectPath: "Modelibr.sln",
-        note: "Starts the dev Postgres container automatically (left running — it's the dev database).",
+        note: "Starts the dev Postgres container automatically (left running - it's the dev database).",
     },
     {
         id: "e2e-full",
-        name: "E2E — all tiers incl. @slow Blender (Docker)",
+        name: "E2E - all tiers incl. @slow Blender (Docker)",
         kind: "playwright",
         cwd: "tests/e2e",
         // `node run-e2e.js` (not `npm test`) so the mega-runner runs the main
-        // E2E only — backup-restore is tracked as its own suite below, so it
+        // E2E only - backup-restore is tracked as its own suite below, so it
         // must not be double-run via the package's --with-backup-restore flag.
         command: "node run-e2e.js",
         tier: "slow",
@@ -133,7 +133,7 @@ export const suites = [
         requiresDocker: true,
         detectPath: "tests/backup-restore-e2e/package.json",
         reportPath: "tests/backup-restore-e2e/playwright-report",
-        note: "Gating nightly on GitHub (.github/workflows/nightly-e2e.yml, job backup-restore-drill) — needs no GPU, unlike storybook-visual/e2e-full which stay local-only.",
+        note: "Gating nightly on GitHub (.github/workflows/nightly-e2e.yml, job backup-restore-drill) - needs no GPU, unlike storybook-visual/e2e-full which stay local-only.",
     },
     {
         id: "storybook-visual",
@@ -149,7 +149,7 @@ export const suites = [
     },
     {
         id: "e2e-performance",
-        name: "E2E — performance / throughput (Docker)",
+        name: "E2E - performance / throughput (Docker)",
         kind: "playwright",
         cwd: "tests/e2e",
         command:

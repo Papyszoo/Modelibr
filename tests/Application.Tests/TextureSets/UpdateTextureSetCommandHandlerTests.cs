@@ -109,7 +109,7 @@ public class UpdateTextureSetCommandHandlerTests
     [Fact]
     public async Task Handle_NameUnchanged_SkipsPolicyLookupEntirely()
     {
-        // Category-only updates keep the same name — they must not consult the policy
+        // Category-only updates keep the same name - they must not consult the policy
         // or the by-name lookup at all (an asset can always keep its own name).
         var textureSet = CreateTextureSet(1, "Wood");
         _textureSetRepository.Setup(x => x.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(textureSet);

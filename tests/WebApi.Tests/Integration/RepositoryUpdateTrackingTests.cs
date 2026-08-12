@@ -12,7 +12,7 @@ namespace WebApi.Tests.Integration;
 
 /// <summary>
 /// Covers the regression from PR #568 (feat/unit-of-work): once repositories
-/// stopped self-committing (see the backend-patterns skill, "Transactions —
+/// stopped self-committing (see the backend-patterns skill, "Transactions -
 /// unit of work"), a handler that calls AddAsync and then, in the same
 /// request, mutates and UpdateAsync's the SAME aggregate before the first
 /// SaveChanges hands back an entity still tracked as Added with a temporary
@@ -23,7 +23,7 @@ namespace WebApi.Tests.Integration;
 /// to change the entity's state to 'Modified'." CreateTextureSetWithFileCommand
 /// hit this in production (uploading a texture set via the UI 500'd). The fix
 /// is repository-level: <see cref="Infrastructure.Persistence.DbContextTrackingExtensions.UpdateIfDetached{TEntity}"/>
-/// only calls Update() when the entity is genuinely Detached — an
+/// only calls Update() when the entity is genuinely Detached - an
 /// already-tracked entity (Added or otherwise) is persisted in its current
 /// state by the next SaveChangesAsync with no extra call needed.
 /// </summary>
@@ -33,7 +33,7 @@ public class RepositoryUpdateTrackingTests : IClassFixture<ModelibrWebFactory>
 {
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNameCaseInsensitive = true };
 
-    // Minimal valid 1x1 transparent PNG — real bytes so the handler's
+    // Minimal valid 1x1 transparent PNG - real bytes so the handler's
     // best-effort image-metadata read (ImageDimensionReader) has something
     // decodable to work with, though it degrades gracefully either way.
     private static readonly byte[] MinimalPngBytes = Convert.FromBase64String(
@@ -79,7 +79,7 @@ public class RepositoryUpdateTrackingTests : IClassFixture<ModelibrWebFactory>
         Assert.True(textureSetId > 0, "TextureSetId should be a real, database-assigned id.");
         Assert.True(textureId > 0, "TextureId should be a real, database-assigned id.");
 
-        // Assert: it's actually durable — read it back through a plain GET.
+        // Assert: it's actually durable - read it back through a plain GET.
         var getResponse = await _client.GetAsync($"/texture-sets/{textureSetId}");
         getResponse.EnsureSuccessStatusCode();
         var getJson = await getResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOpts);
@@ -100,7 +100,7 @@ public class RepositoryUpdateTrackingTests : IClassFixture<ModelibrWebFactory>
         // handler happens to chain Model's Add and Update quite this tightly
         // today (CreateModelVersionCommandHandler/AddModelCommandHandler
         // interleave a SaveChanges in between, which sidesteps the temporary
-        // key), but the repository bug — and the fix — applied to every
+        // key), but the repository bug - and the fix - applied to every
         // repository under src/Infrastructure/Repositories equally.
         using var scope = _factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -115,8 +115,8 @@ public class RepositoryUpdateTrackingTests : IClassFixture<ModelibrWebFactory>
         var added = await modelRepository.AddAsync(Model.Create(originalName, DateTime.UtcNow));
         added.UpdateName(renamedName, DateTime.UtcNow);
 
-        // Before the fix, this UpdateAsync call — on the same still-Added,
-        // temporary-keyed entity — would have forced EF to try to move it to
+        // Before the fix, this UpdateAsync call - on the same still-Added,
+        // temporary-keyed entity - would have forced EF to try to move it to
         // Modified and throw. It must not throw now.
         await modelRepository.UpdateAsync(added);
         await unitOfWork.SaveChangesAsync();
@@ -139,8 +139,8 @@ public class RepositoryUpdateTrackingTests : IClassFixture<ModelibrWebFactory>
     {
         // The repo-level guard (UpdateIfDetached) only skips the explicit
         // Update() call when the CURRENT context already tracks the entity.
-        // A genuinely detached instance — loaded via AsNoTracking, or
-        // reconstructed in a different scope/request — must still be
+        // A genuinely detached instance - loaded via AsNoTracking, or
+        // reconstructed in a different scope/request - must still be
         // attached and marked Modified so SaveChanges persists it. This is
         // "what Update() is for"; the fix must not turn it into a no-op.
         using var seedScope = _factory.Services.CreateScope();

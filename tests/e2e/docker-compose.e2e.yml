@@ -22,6 +22,9 @@ services:
             - MODELIBR_SKIP_PREMIGRATION_BACKUP=true
         ports:
             - "8090:8080"
+            # Published for store-fixture-e2e, which shares this container's
+            # network namespace (see that service for why).
+            - "9280:9280"
         healthcheck:
             test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
             interval: 5s
@@ -35,6 +38,21 @@ services:
                 condition: service_healthy
         networks:
             - modelibr-e2e
+    # Stand-in for the companion Asset Store (fixtures/store-fixture). It
+    # shares webapi-e2e's network namespace so the ONE configured store URL,
+    # http://localhost:9280, resolves to it from both the browser (via the
+    # host port published on webapi-e2e) and the backend importer (loopback -
+    # the importer allows http only for localhost, and manifest download URLs
+    # must be same-ORIGIN - scheme included - to carry the import token).
+    store-fixture-e2e:
+        build:
+            context: .
+            dockerfile: fixtures/store-fixture/Dockerfile
+        container_name: store-fixture-e2e
+        network_mode: "service:webapi-e2e"
+        depends_on:
+            webapi-e2e:
+                condition: service_started
     frontend-e2e:
         build:
             context: ../../src/frontend
@@ -46,6 +64,7 @@ services:
                 asset-processor: ../../src/asset-processor
             args:
                 VITE_API_BASE_URL: http://localhost:8090
+                VITE_STORE_URL: http://localhost:9280
         container_name: frontend-e2e
         ports:
             - "3002:80"
@@ -56,6 +75,14 @@ services:
             context: ../../src/asset-processor
             dockerfile: Dockerfile
         container_name: asset-processor-e2e
+        # A dead worker used to poison the whole run: nothing restarted it and no
+        # scenario noticed, so every later thumbnail wait burned its full timeout
+        # (2026-08-10: the worker died 14 min in, e2e-full took 102 min instead of
+        # 18 and lost 3 scenarios). on-failure - not unless-stopped - so a clean
+        # `compose down` still stops it and an interrupted run leaves nothing to
+        # resurrect on the next daemon start. A restart is never silent: hooks.ts
+        # attaches RestartCount to every failing test.
+        restart: on-failure:5
         environment:
             - WORKER_ID=worker-e2e
             - WORKER_PORT=3001

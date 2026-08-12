@@ -50,6 +50,8 @@
     <script type="module">
       import * as THREE from 'three'
       import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
+      import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'
+      import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js'
       import { OBJLoader } from 'three/addons/loaders/OBJLoader.js'
       import { FBXLoader } from 'three/addons/loaders/FBXLoader.js'
       import { STLLoader } from 'three/addons/loaders/STLLoader.js'
@@ -59,6 +61,7 @@
       import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js'
       import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
       import { buildStlModel } from './lib/stlMesh.js'
+      import { buildResourceResolver } from './lib/gltfResources.js'
       import {
         DEFAULT_LIGHTING,
         ENVIRONMENT_PREVIEW_LIGHTING,
@@ -72,6 +75,10 @@
       import './lib/textureMaterial.js'
       import './lib/displacementNormal.js'
       import './lib/textureChannels.js'
+      // Scene-graph extraction runs the shared lib in this module scope (it needs
+      // THREE injected) and exposes a bound fn for the classic-script
+      // page.evaluate in puppeteerRenderer, mirroring the texture helpers above.
+      import { extractSceneGraph } from './lib/sceneGraph.js'
 
       // Global state for external control
       window.modelRenderer = {
@@ -91,7 +98,16 @@
         isReady: false,
         error: null,
         useWebGPU: false,
+        // Scene graph captured at load time, before normalizeModel rescales the
+        // model to fit the view box (see puppeteerRenderer.extractSceneGraph).
+        rawSceneGraph: null,
+        // External glTF references the resolver refused (offline invariant).
+        blockedResourceUrls: [],
       }
+
+      // Bound scene-graph extractor for the classic-script page.evaluate context.
+      window.modelibrExtractSceneGraph = (root, options) =>
+        extractSceneGraph(root, THREE, options)
 
       // Initialize scene with WebGPU or WebGL
       async function initScene(width, height, backgroundColor) {
@@ -456,14 +472,63 @@
 
       // Load model from data URL or URL.
       // preserveMaterials=true (the "Embedded" variant) keeps the model's own
-      // materials and vertex colors instead of the neutral override — lets
+      // materials and vertex colors instead of the neutral override - lets
       // users choose between the real surface and a clean default thumbnail.
-      async function loadModel(modelData, fileType, preserveMaterials = false) {
+      async function loadModel(
+        modelData,
+        fileType,
+        preserveMaterials = false,
+        resources = null
+      ) {
         return new Promise((resolve, reject) => {
           let loader
 
           if (fileType === 'gltf' || fileType === 'glb') {
-            loader = new GLTFLoader()
+            // Multi-file glTF: install a LoadingManager whose URLModifier maps the
+            // glTF's external URIs (.bin/textures) to the already-uploaded siblings
+            // passed in `resources`. No network fetch - see lib/gltfResources.js.
+            //
+            // Installed unconditionally, including for an empty map: without a
+            // resolver the loader would fetch whatever URI the glTF names, so a
+            // file with an absolute http:// buffer or texture reference turned this
+            // renderer into an outbound HTTP client against arbitrary hosts.
+            const manager = new THREE.LoadingManager()
+            manager.setURLModifier(
+              buildResourceResolver(resources, {
+                onBlocked: url => {
+                  window.modelRenderer.blockedResourceUrls =
+                    window.modelRenderer.blockedResourceUrls || []
+                  if (
+                    window.modelRenderer.blockedResourceUrls.length < 20 &&
+                    !window.modelRenderer.blockedResourceUrls.includes(url)
+                  ) {
+                    window.modelRenderer.blockedResourceUrls.push(url)
+                  }
+                },
+              })
+            )
+            loader = new GLTFLoader(manager)
+            // Draco-compressed geometry and KTX2/Basis textures are mainstream in
+            // modern glTF pipelines, and without these the loader throws
+            // ("No DRACOLoader instance provided" / "setKTX2Loader must be called
+            // before loading KTX2 textures") - so those assets could never get a
+            // thumbnail or an extraction, and stayed invisible to search forever.
+            // Both decoders ship inside the three package, so this stays offline.
+            loader.setDRACOLoader(
+              new DRACOLoader().setDecoderPath(
+                './node_modules/three/examples/jsm/libs/draco/'
+              )
+            )
+            const ktx2 = new KTX2Loader().setTranscoderPath(
+              './node_modules/three/examples/jsm/libs/basis/'
+            )
+            if (window.modelRenderer.renderer) {
+              // detectSupport needs the live renderer to pick a transcode target;
+              // without one the loader still constructs and simply transcodes to a
+              // safe default rather than throwing.
+              ktx2.detectSupport(window.modelRenderer.renderer)
+            }
+            loader.setKTX2Loader(ktx2)
           } else if (fileType === 'obj') {
             loader = new OBJLoader()
           } else if (fileType === 'fbx') {
@@ -483,11 +548,11 @@
               let model
               if (fileType === 'gltf' || fileType === 'glb') {
                 model = result.scene
-                // GLTFLoader keeps clips on the result, not the scene —
+                // GLTFLoader keeps clips on the result, not the scene -
                 // carry them over so metadata extraction can see them.
                 model.animations = result.animations || []
               } else if (fileType === 'stl') {
-                // STLLoader resolves to a raw BufferGeometry — wrap it (and
+                // STLLoader resolves to a raw BufferGeometry - wrap it (and
                 // surface any binary-STL vertex colors) via the shared builder
                 // so the viewer and this thumbnail render shade STL identically.
                 // In the default (override) path the material is replaced below.
@@ -497,14 +562,14 @@
               }
 
               // glTF/GLB carry embedded PBR materials (BaseColor, MR, normal,
-              // emissive, …) that map 1:1 from Blender's Principled BSDF —
+              // emissive, …) that map 1:1 from Blender's Principled BSDF -
               // preserve them so embedded-material thumbnails show the real
               // material instead of a flat gray placeholder. If a texture set
               // is configured for this model, applyTextures() replaces these
               // materials wholesale, so preservation is safe.
               //
               // OBJ/FBX embedded materials are inconsistent across DCC tools,
-              // so keep the neutral-PBR baseline override for those — unless the
+              // so keep the neutral-PBR baseline override for those - unless the
               // user explicitly picked the "Embedded" variant (preserveMaterials),
               // which forces the original materials/vertex colors for any format.
               const preserveEmbeddedMaterials =

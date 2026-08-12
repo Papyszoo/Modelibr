@@ -15,7 +15,7 @@ const MAX_RECENTLY_CLOSED_WINDOWS = 5
  * Read the persisted navigation state directly from localStorage and
  * push it into the in-memory Zustand store. Used by both the storage
  * event listener (peer tab wrote something) and the WINDOW_CLOSED
- * broadcast listener (peer tab just pagehid'd) — they're redundant
+ * broadcast listener (peer tab just pagehid'd) - they're redundant
  * triggers, and we want either one to wake the in-memory state up
  * even if the other got dropped by the browser.
  */
@@ -41,7 +41,7 @@ function syncFromLocalStorage(): void {
         []) as State['recentlyClosedWindows'],
     })
   } catch {
-    /* malformed payload — ignore */
+    /* malformed payload - ignore */
   }
 }
 
@@ -50,7 +50,7 @@ function syncFromLocalStorage(): void {
  * bypassing the Zustand persist middleware. We do this on `pagehide`
  * for two reasons:
  *
- *   1. localStorage is the freshest source of truth — a peer tab (or
+ *   1. localStorage is the freshest source of truth - a peer tab (or
  *      an e2e test fixture) may have written to it after our in-memory
  *      Zustand snapshot was last refreshed. Archiving from the
  *      in-memory snapshot would clobber those writes.
@@ -94,7 +94,7 @@ function archiveSelfDirectly(windowId: string): void {
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed))
   } catch {
-    /* malformed payload — ignore */
+    /* malformed payload - ignore */
   }
 }
 
@@ -163,7 +163,7 @@ export function useWindowInit(): string {
           // The closing tab self-archives via localStorage during its
           // pagehide handler. The `storage` event listener below
           // usually picks that change up, but cross-tab `storage`
-          // delivery can be unreliable during browser unload — Chrome
+          // delivery can be unreliable during browser unload - Chrome
           // in particular has been observed to occasionally not fire
           // it for writes from a closing tab. Treat the broadcast as a
           // second, redundant trigger to re-read localStorage.
@@ -173,7 +173,7 @@ export function useWindowInit(): string {
           break
 
         case 'STATE_SYNC':
-          // Another window requests a fresh read — store already synced via
+          // Another window requests a fresh read - store already synced via
           // localStorage events; nothing else needed.
           break
       }
@@ -186,7 +186,7 @@ export function useWindowInit(): string {
   // ── 2b. Cross-tab localStorage sync ─────────────────────────────────
   //
   // Zustand `persist` writes to localStorage on every action but never
-  // reads back peer browser tabs' writes — each tab's in-memory store
+  // reads back peer browser tabs' writes - each tab's in-memory store
   // stays at its mount-time snapshot otherwise, and a peer tab's
   // pagehide-archive into recentlyClosedWindows would never reach this
   // tab. The `storage` event fires only when *another* tab modifies
@@ -205,7 +205,7 @@ export function useWindowInit(): string {
   //
   // `pagehide` fires on both refresh and close (with `event.persisted`
   // false for "truly discarded", true for bfcache). We archive ourselves
-  // unconditionally on non-persisted unloads — that's the only way the
+  // unconditionally on non-persisted unloads - that's the only way the
   // "last open window closes" case can survive, because there's no peer
   // tab to do the archive for us.
   //
@@ -220,7 +220,7 @@ export function useWindowInit(): string {
 
     const handlePageHide = (event: PageTransitionEvent) => {
       if (event.persisted) return
-      // 1. Self-archive directly via localStorage — reading the freshest
+      // 1. Self-archive directly via localStorage - reading the freshest
       //    persisted value (which may have been touched by a peer tab or
       //    a test fixture out-of-band) and writing back synchronously
       //    before the browser kills us.

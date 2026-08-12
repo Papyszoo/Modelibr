@@ -23,7 +23,7 @@ export function decodeTiff(buffer, options) {
     (typeof globalThis !== 'undefined' && globalThis.UTIF)
   if (!UTIF) {
     throw new Error(
-      'UTIF (utif2) is not available — pass it via options.UTIF or load utif2 globally'
+      'UTIF (utif2) is not available - pass it via options.UTIF or load utif2 globally'
     )
   }
   const ifds = UTIF.decode(buffer)

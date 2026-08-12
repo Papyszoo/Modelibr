@@ -45,7 +45,7 @@ function renderFilters(overrides = {}) {
   return props
 }
 
-describe('TexturesFilters — resolution filter', () => {
+describe('TexturesFilters - resolution filter', () => {
   it('renders the min-resolution dropdown', () => {
     renderFilters()
     expect(screen.getByTestId('texture-resolution-filter')).toBeInTheDocument()
@@ -67,7 +67,7 @@ describe('TexturesFilters — resolution filter', () => {
   })
 })
 
-describe('TexturesFilters — Categories toggle badge', () => {
+describe('TexturesFilters - Categories toggle badge', () => {
   // Regression: the "1" badge signals an active category filter while the
   // sidebar is collapsed. An inverted condition or an always-on badge would
   // mislead the user about whether the grid is being narrowed.

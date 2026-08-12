@@ -6,6 +6,8 @@ FROM node:20-alpine AS build
 WORKDIR /app
 ARG VITE_API_BASE_URL
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+ARG VITE_STORE_URL
+ENV VITE_STORE_URL=${VITE_STORE_URL}
 COPY package*.json ./
 # Configure npm with longer timeouts and retries, and disable strict SSL for allowlist proxy
 # The allowlist proxy uses a self-signed certificate
@@ -19,7 +21,7 @@ RUN npm config set strict-ssl false && \
 COPY . .
 # Bring in the shared TIFF decoder from the asset-processor workspace.
 # tiffTextureLoader.ts imports it as `../../../asset-processor/lib/tiffDecode.js`,
-# which from /app/src/utils resolves to /asset-processor/lib/ — so we drop
+# which from /app/src/utils resolves to /asset-processor/lib/ - so we drop
 # the lib at that path (sibling of /app/) to match the relative resolution.
 # The named context `asset-processor` is wired up in docker-compose.
 COPY --from=asset-processor lib /asset-processor/lib

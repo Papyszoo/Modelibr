@@ -34,7 +34,7 @@ export function buildMaterialFromTextures(
   const get = (slot: string) =>
     loadedTextures[`${materialPrefix}${KEY_SEP}${slot}`] ?? null
 
-  // Shared gating rule (asset-processor/lib/textureMaterial.js — the same rule
+  // Shared gating rule (asset-processor/lib/textureMaterial.js - the same rule
   // the worker thumbnail uses). Gating metalness/roughness on their OWN maps,
   // not on the base-color map, is what stops a textured-but-not-metal surface
   // from rendering as a black mirror in the viewer.
@@ -76,7 +76,7 @@ export function buildMaterialFromTextures(
     material.displacementScale = 0.02
     material.displacementBias = -0.01
     // Sample displacement direction from an averaged-by-position normal
-    // attribute rather than the face-aligned objectNormal — so hard-edged
+    // attribute rather than the face-aligned objectNormal - so hard-edged
     // meshes (game-asset cubes etc.) stay watertight under displacement
     // while keeping their original per-face UVs intact for color sampling.
     applyDispNormalDisplacement(material)
@@ -153,7 +153,7 @@ export function applyMaterialTextures(
 
     // AO maps sample the second UV set. Without uv2 the AO term collapses to
     // ~0 and kills ALL indirect light (ambient + environment IBL) while direct
-    // lights still work — which made the ambient/environment controls look
+    // lights still work - which made the ambient/environment controls look
     // inert. Copy uv -> uv2 like the worker thumbnail does.
     if (appliedMaterial?.aoMap) {
       ensureAoMapUv2(mesh.geometry)

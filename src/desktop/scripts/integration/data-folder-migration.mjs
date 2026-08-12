@@ -1,7 +1,7 @@
 // Host-level integration test (no Electron). Boots the real bundled WebApi +
 // embedded PostgreSQL from a built runtime, uploads a model, moves the data
 // folder with the same migration the app uses, boots again on the new folder,
-// and verifies the model is still listed AND its bytes are intact — i.e. that
+// and verifies the model is still listed AND its bytes are intact - i.e. that
 // changing the data folder doesn't lose data.
 //
 // Needs a built runtime (run `npm run dist`, or set MODELIBR_RUNTIME_DIR). It
@@ -184,7 +184,7 @@ async function main() {
   try {
     log('Booting host on folder A…')
     pm = await bootHost(runtimeDir, userDataDir, folderA)
-    log('Host up on A — uploading a model…')
+    log('Host up on A - uploading a model…')
     await uploadModel(pm, 'integration-cube.obj', OBJ)
 
     let models = await listModels(pm)
@@ -209,13 +209,13 @@ async function main() {
     const idB = models[0].id ?? models[0].Id
     const fileB = await getModelFile(pm, idB)
     assert(fileB.status === 200, `GET file on B returned ${fileB.status}`)
-    assert(fileB.buffer.equals(OBJ), 'file bytes differ on B — uploads were not migrated')
+    assert(fileB.buffer.equals(OBJ), 'file bytes differ on B - uploads were not migrated')
 
     await stopHost(pm)
     pm = null
 
     // Simulate an unclean exit (crash / force-quit) that left a postmaster.pid
-    // behind, then boot again — the host must recover instead of failing with
+    // behind, then boot again - the host must recover instead of failing with
     // "lock file already exists".
     log('Writing a stale postmaster.pid and rebooting to test recovery…')
     const pgData = path.join(folderB, 'postgres')
@@ -227,7 +227,7 @@ async function main() {
     pm = null
     log('Recovered from a stale postmaster.pid with data intact.')
 
-    log('✅ PASS — model survived the data-folder change AND a stale-lock recovery.')
+    log('✅ PASS - model survived the data-folder change AND a stale-lock recovery.')
   } finally {
     if (pm) await stopHost(pm)
     await fs.rm(base, { recursive: true, force: true }).catch(() => {})

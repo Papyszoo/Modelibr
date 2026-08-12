@@ -59,7 +59,7 @@ public class VirtualAssetFileTests : IDisposable
         var stream = await file.GetReadableStreamAsync(_httpContext.Object);
 
         // CustomWebDavHandler.WriteFileAsync checks ReferenceEquals(stream, Stream.Null)
-        // to decide whether to answer 404 — a merely-empty MemoryStream would NOT trigger
+        // to decide whether to answer 404 - a merely-empty MemoryStream would NOT trigger
         // that check and would instead produce a bogus 200 with a zero-length body. The
         // reference-equality is the actual contract; assert it explicitly.
         Assert.True(ReferenceEquals(stream, Stream.Null));
@@ -93,7 +93,7 @@ public class VirtualAssetFileTests : IDisposable
     public async Task GetReadableStreamAsync_ResolvesFromPersistedRelativePath_NotFromHashLayout()
     {
         // Deliberately mismatched: the hash's own root/aa/bb/hash layout location is left
-        // empty, and the bytes instead live at the (unrelated) persisted RelativePath —
+        // empty, and the bytes instead live at the (unrelated) persisted RelativePath -
         // proving physical resolution comes from RelativePath, not re-derived hash math.
         const string hash = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
         var relativePath = Path.Combine("custom-bucket", "nested", "renamed-blob.bin");

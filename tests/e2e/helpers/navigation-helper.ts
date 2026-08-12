@@ -3,7 +3,7 @@ import { Page, expect } from "@playwright/test";
 /**
  * Navigation Helper for E2E tests
  *
- * Provides UI-based tab navigation — all actions simulate real user input.
+ * Provides UI-based tab navigation - all actions simulate real user input.
  * The app uses a Zustand store persisted to localStorage for tab state,
  * so there are no URL query params for tab management.
  *
@@ -20,9 +20,9 @@ import { Page, expect } from "@playwright/test";
  * Tile titles in the New Tab page. Used to locate the tile button when
  * opening a tab via UI.
  *
- * Tab types not in this map (`stageList`) have no tile — `stageList` is
+ * Tab types not in this map (`stageList`) have no tile - `stageList` is
  * disabled while the feature is incomplete. Tests that need it inject the
- * tab via localStorage state — see `injectAndActivateTab`. (The legacy
+ * tab via localStorage state - see `injectAndActivateTab`. (The legacy
  * `textureSets` type was removed from the app entirely; a persisted-state
  * migration rewrites it to `modelTextures`.)
  */
@@ -36,6 +36,7 @@ const TILE_LABELS: Record<string, string> = {
     scripts: "Scripts",
     packs: "Packs",
     projects: "Projects",
+    assetStore: "Asset Store",
     history: "History",
     recycledFiles: "Recycled Files",
     settings: "Settings",
@@ -58,6 +59,7 @@ const TAB_ICONS: Record<string, string> = {
     packViewer: "pi-folder-open",
     projects: "pi-briefcase",
     projectViewer: "pi-briefcase",
+    assetStore: "pi-shopping-bag",
     settings: "pi-cog",
     history: "pi-history",
     recycledFiles: "pi-trash",
@@ -110,7 +112,7 @@ export async function navigateToApp(page: Page): Promise<void> {
  * matching tile → placeholder converts in place to the target type.
  *
  * For tab types that have no tile (`textureSets`, `stageList`), this falls
- * back to a localStorage state injection + reload — same pattern used by
+ * back to a localStorage state injection + reload - same pattern used by
  * `openModelViewer`. Those entries are deliberately not surfaced in the New
  * Tab page (combined texture-sets view is replaced by Global Materials /
  * Model Textures; stages is disabled while incomplete) but the underlying
@@ -132,7 +134,7 @@ export async function openTabViaMenu(
     const tileLabel = TILE_LABELS[tabType];
     if (!tileLabel) {
         throw new Error(
-            `Unknown tab type "${tabType}" — no tile in New Tab page and not state-injectable`,
+            `Unknown tab type "${tabType}" - no tile in New Tab page and not state-injectable`,
         );
     }
 
@@ -460,7 +462,7 @@ export async function navigateToTab(
 ): Promise<void> {
     await navigateToAppClean(page);
 
-    // Default state already has modelList — skip if that's the target
+    // Default state already has modelList - skip if that's the target
     if (tabType === "modelList") {
         return;
     }

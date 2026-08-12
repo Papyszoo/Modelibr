@@ -17,6 +17,7 @@ export type TabType =
   | 'scriptViewer'
   | 'stageList'
   | 'stageEditor'
+  | 'assetStore'
   | 'settings'
   | 'history'
   | 'recycledFiles'
@@ -25,7 +26,7 @@ export interface Tab {
   id: string
   type: TabType
   label?: string
-  /** Minimal identifiers — React Query fetches entity data at render time */
+  /** Minimal identifiers - React Query fetches entity data at render time */
   params: Record<string, string>
   /** UI-only state persisted per-tab (active sub-tab, scroll position, etc.) */
   internalUiState: Record<string, unknown>

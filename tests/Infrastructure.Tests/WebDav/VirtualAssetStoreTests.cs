@@ -203,7 +203,7 @@ public class VirtualAssetStoreTests : IDisposable
     [Fact]
     public async Task GetCollectionAsync_TwoModelsWithSameName_PlainNameResolution_ReturnsNull()
     {
-        // Arrange — two non-deleted models sharing a name is now legal under the
+        // Arrange - two non-deleted models sharing a name is now legal under the
         // "Allow" duplicate-name policy. WebDAV must never guess which one a plain,
         // undisambiguated name refers to.
         var now = DateTime.UtcNow;
@@ -267,7 +267,7 @@ public class VirtualAssetStoreTests : IDisposable
     [Fact]
     public async Task GetItemAsync_ModelVersionFile_StreamsFromPersistedFilePath_NotFromHashLayout()
     {
-        // Arrange — a real upload root on disk, since this test exercises the resolved
+        // Arrange - a real upload root on disk, since this test exercises the resolved
         // VirtualAssetFile's actual stream, not just its type.
         var uploadRoot = Path.Combine(Path.GetTempPath(), "modelibr-store-tests-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(uploadRoot);

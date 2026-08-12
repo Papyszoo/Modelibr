@@ -67,7 +67,7 @@ export class SettingsPage {
     // Form
     private readonly form = ".settings-form";
 
-    // Animated thumbnail uses the toggle markup — locate via the input id, but
+    // Animated thumbnail uses the toggle markup - locate via the input id, but
     // clicks need to land on the visible toggle pill (the input is sr-only).
     private readonly animatedThumbToggleLabel =
         'label.toggle-field:has(input#generateAnimatedThumbnail)';
@@ -349,7 +349,7 @@ export class SettingsPage {
 
     async setTheme(value: "light" | "dark"): Promise<void> {
         await this.ensureFieldVisible("#colorTheme");
-        // Visible theme picker buttons drive the same state — click those so
+        // Visible theme picker buttons drive the same state - click those so
         // we exercise the real UI, not the sr-only fallback select.
         const card =
             value === "dark"

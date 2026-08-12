@@ -225,7 +225,7 @@ ThenBdd(
     "the sprite should not be visible in the sprite list",
     async ({ page }) => {
         // Wait for the recycled sprite card to disappear from the UI
-        // (no reload needed — frontend invalidates sprite queries after recycling)
+        // (no reload needed - frontend invalidates sprite queries after recycling)
         const _lastRecycledSpriteName =
             getScenarioState(page).getCustom<string>(
                 "lastRecycledSpriteName",

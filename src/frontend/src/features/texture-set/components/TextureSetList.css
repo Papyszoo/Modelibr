@@ -1,4 +1,4 @@
-/* Texture-set list page shell. Mirrors model-list — the toolbar provides
+/* Texture-set list page shell. Mirrors model-list - the toolbar provides
    page identity (count chip), so there's no header band or h1 here. */
 
 .texture-set-list {
@@ -17,7 +17,7 @@
    Texture Sets tab look "different" from the rest of the app, so we
    inherit the same surface here. */
 
-/* Kind switcher — only rendered on the generic textureSets tab. The
+/* Kind switcher - only rendered on the generic textureSets tab. The
    dedicated Global Materials / Multi-Model Textures tabs lock the kind
    via prop and hide this row. */
 .kind-filter-bar {

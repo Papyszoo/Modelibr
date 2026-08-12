@@ -179,7 +179,7 @@ async function generateSrgbProxy(
 
 /**
  * Generates a proxy for linear data maps (Roughness, Metallic, AO, Height, etc.).
- * Uses lossless WebP to preserve exact data values — lossy compression shifts
+ * Uses lossless WebP to preserve exact data values - lossy compression shifts
  * pixel values (e.g. pure white 255 → 250) which is visible on data maps.
  * For split-channel textures (sourceChannel > 0), extracts the specific channel
  * instead of converting to grayscale, which would incorrectly blend all channels.
@@ -221,7 +221,7 @@ async function generateLinearProxy(
  *   2. Extract raw RGB pixel buffer
  *   3. Re-normalize all normal vectors to unit length
  *   4. Write back from raw buffer
- *   5. Save as PNG (lossless — lossy compression introduces block artifacts
+ *   5. Save as PNG (lossless - lossy compression introduces block artifacts
  *      in normal vectors causing visible shading errors)
  */
 async function generateNormalMapProxy(
@@ -360,7 +360,7 @@ export async function generateTextureProxies(
       }
 
       try {
-        // Check if this is an EXR file — skip proxy generation for HDR formats
+        // Check if this is an EXR file - skip proxy generation for HDR formats
         const ext = path.extname(filePath).toLowerCase()
         if (ext === '.exr' || ext === '.hdr') {
           jobLogger.info('Skipping proxy for HDR format', {
@@ -391,7 +391,7 @@ export async function generateTextureProxies(
           category: getTextureCategory(numericType),
         })
 
-        // Generate the proxy — pass sourceChannel for split-channel extraction
+        // Generate the proxy - pass sourceChannel for split-channel extraction
         const { outputPath, fileName } = await generateProxy(
           filePath,
           numericType,

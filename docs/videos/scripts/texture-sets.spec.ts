@@ -169,7 +169,7 @@ test.describe("Texture Sets", () => {
 
         const leftPanel = page.locator(".p-splitter-panel").nth(0);
         // The dedicated `<h1>Texture Sets</h1>` header band was removed
-        // when the page adopted the shared list-toolbar — page identity
+        // when the page adopted the shared list-toolbar - page identity
         // is now carried by the toolbar's count chip + the "Create Set"
         // button. Confirm we're on the right page by waiting on those.
         await expect(leftPanel.locator(".list-toolbar")).toBeVisible({
@@ -266,7 +266,7 @@ test.describe("Texture Sets", () => {
         });
         await viewerPause(page, 900);
 
-        // Final beat: switch the preview geometry via Preview Settings — a
+        // Final beat: switch the preview geometry via Preview Settings - a
         // visible 3D payoff. Deliberately NOT an orbit drag, and deliberately
         // plain clicks instead of humanClick: this canvas renders with
         // frameloop="always", and under software WebGL (headless recording,

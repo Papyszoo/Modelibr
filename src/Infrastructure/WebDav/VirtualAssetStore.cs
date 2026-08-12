@@ -128,7 +128,7 @@ public sealed class VirtualAssetStore : IStore
     /// Resolves a WebDAV path segment to a project id using the shared disambiguation
     /// contract (id-suffix first, else an unambiguous case-insensitive name match).
     /// Projects have their own creation-time uniqueness check and are never rendered
-    /// with an id suffix — but WebDAV clients on Windows/macOS treat paths
+    /// with an id suffix - but WebDAV clients on Windows/macOS treat paths
     /// case-insensitively, so a case-only collision must never be guessed at.
     /// </summary>
     private static async Task<int?> ResolveProjectIdAsync(ApplicationDbContext dbContext, string segment)
@@ -557,7 +557,7 @@ public sealed class VirtualAssetStore : IStore
 
         // Category names are enforced unique per-parent at the DB level (case-sensitively),
         // so a case-only collision is possible for WebDAV clients that treat paths
-        // case-insensitively (Windows/macOS) — never guess among duplicates.
+        // case-insensitively (Windows/macOS) - never guess among duplicates.
         var allCategories = await categoryRepo.GetAllAsync();
         var category = WebDavUtilities.ResolveSegment(categorySegment, allCategories.ToList(), c => c.Id, c => c.Name);
         if (category == null)
@@ -659,7 +659,7 @@ public sealed class VirtualAssetStore : IStore
     /// Resolves a WebDAV path segment to a pack id using the shared disambiguation
     /// contract (id-suffix first, else an unambiguous case-insensitive name match).
     /// Packs have their own creation-time uniqueness check and are never rendered
-    /// with an id suffix — but WebDAV clients on Windows/macOS treat paths
+    /// with an id suffix - but WebDAV clients on Windows/macOS treat paths
     /// case-insensitively, so a case-only collision must never be guessed at.
     /// </summary>
     private static async Task<int?> ResolvePackIdAsync(ApplicationDbContext dbContext, string segment)
@@ -735,7 +735,7 @@ public sealed class VirtualAssetStore : IStore
     /// WebDAV-specific query that loads a single model with full version information.
     /// Uses AsNoTracking for read-only access and AsSplitQuery to avoid cartesian explosion.
     /// Resolves the segment via the shared disambiguation contract (id-suffix first,
-    /// else an unambiguous case-insensitive name match — never guesses among duplicates).
+    /// else an unambiguous case-insensitive name match - never guesses among duplicates).
     /// </summary>
     private static async Task<Domain.Models.Model?> GetModelForWebDavAsync(IServiceProvider sp, string segment)
     {
@@ -779,7 +779,7 @@ public sealed class VirtualAssetStore : IStore
     /// <summary>
     /// Computes a globally-resolved model's WebDAV display name, appending the "[id]"
     /// suffix only if another non-deleted model shares its name case-insensitively.
-    /// A lightweight existence check — avoids loading every model just to render one.
+    /// A lightweight existence check - avoids loading every model just to render one.
     /// </summary>
     private static async Task<string> ComputeGlobalModelDisplayNameAsync(ApplicationDbContext dbContext, Domain.Models.Model model)
     {
@@ -1108,7 +1108,7 @@ public sealed class VirtualAssetStore : IStore
         var textureSetRepo = sp.GetRequiredService<ITextureSetRepository>();
 
         // Both listing and single-item resolution need the full sibling set to compute
-        // disambiguated names — GetAllAsync already loads the includes callers need, so
+        // disambiguated names - GetAllAsync already loads the includes callers need, so
         // reuse it instead of a separate (case-sensitive) GetByNameAsync lookup.
         var allTextureSets = (await textureSetRepo.GetAllAsync()).Where(ts => !ts.IsDeleted).ToList();
 
@@ -1159,7 +1159,7 @@ public sealed class VirtualAssetStore : IStore
         var environmentMapRepository = sp.GetRequiredService<IEnvironmentMapRepository>();
 
         // Both listing and single-item resolution need the full sibling set to compute
-        // disambiguated names — GetAllAsync already loads the includes callers need, so
+        // disambiguated names - GetAllAsync already loads the includes callers need, so
         // reuse it instead of a separate (case-sensitive) GetByNameAsync lookup.
         var allEnvironmentMaps = (await environmentMapRepository.GetAllAsync()).Where(e => !e.IsDeleted).ToList();
 
@@ -1315,7 +1315,7 @@ public sealed class VirtualAssetStore : IStore
 
         // Category names are enforced unique per-parent at the DB level (case-sensitively),
         // so a case-only collision is possible for WebDAV clients that treat paths
-        // case-insensitively (Windows/macOS) — never guess among duplicates.
+        // case-insensitively (Windows/macOS) - never guess among duplicates.
         var allCategories = await categoryRepo.GetAllAsync();
         var category = WebDavUtilities.ResolveSegment(categorySegment, allCategories.ToList(), c => c.Id, c => c.Name);
         if (category == null)

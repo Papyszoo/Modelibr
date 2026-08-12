@@ -33,12 +33,12 @@ import {
 } from '@/shared/types/categories'
 
 /**
- * One page showing the whole design system — token vocabulary plus every
+ * One page showing the whole design system - token vocabulary plus every
  * shared primitive in its standard state. A primitive that stops matching
  * its siblings is visible at a glance, and the storybook-visual suite
  * snapshots the family in one image (light + dark stories).
  *
- * Extend this gallery whenever a token or shared primitive is added — see
+ * Extend this gallery whenever a token or shared primitive is added - see
  * the `design-system` skill.
  */
 
@@ -153,7 +153,7 @@ export function DesignSystemGallery() {
             <div key={token} className="dsg-type-row">
               <code className="dsg-type-token">{token}</code>
               <span style={{ fontSize: `var(${token})` }}>
-                Clean, useful app — no fireworks
+                Clean, useful app - no fireworks
               </span>
               <span className="dsg-label">{usage}</span>
             </div>
@@ -198,7 +198,7 @@ export function DesignSystemGallery() {
         </div>
       </Section>
 
-      <Section title="ListHeader — compact application header">
+      <Section title="ListHeader - compact application header">
         <ListHeader
           variant="tab"
           title="Models"
@@ -231,7 +231,7 @@ export function DesignSystemGallery() {
         </ListToolbar>
       </Section>
 
-      <Section title="Asset tiles — the card identity">
+      <Section title="Asset tiles - the card identity">
         <AssetGrid cardWidth={140}>
           <AssetTile
             name="rock_large.glb"
@@ -252,7 +252,7 @@ export function DesignSystemGallery() {
         </AssetGrid>
       </Section>
 
-      <Section title="Category sidebar — the categories standard">
+      <Section title="Category sidebar - the categories standard">
         <div className="dsg-category-demo">
           <CategoryTreePanel
             categories={SAMPLE_CATEGORIES}
@@ -273,7 +273,7 @@ export function DesignSystemGallery() {
             onDeleteCategory={noop}
           />
           <div className="dsg-category-demo-content dsg-label">
-            content area — sidebar sits flat on the page surface, no frame; add
+            content area - sidebar sits flat on the page surface, no frame; add
             / rename / delete live in the tree&apos;s right-click menu
           </div>
         </div>

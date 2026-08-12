@@ -61,7 +61,7 @@ export function useModelData({
   const sortedProjectIds = [...effectiveProjectIds].sort((a, b) => a - b)
   const sortedTagNames = [...selectedTagNames].sort()
 
-  // Debounce typing — server fetch waits 300ms past the last keystroke.
+  // Debounce typing - server fetch waits 300ms past the last keystroke.
   // Client-side filtering in useModelFilters keeps the visual snappy.
   const debouncedSearchName = useDebouncedValue(searchQuery.trim(), 300)
 

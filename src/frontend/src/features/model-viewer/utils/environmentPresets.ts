@@ -58,7 +58,7 @@ export async function getCachedPresets(): Promise<Set<string>> {
       }
     }
   } catch {
-    // Cache API not available — only bundled preset is available
+    // Cache API not available - only bundled preset is available
   }
   return cached
 }
@@ -88,7 +88,7 @@ export async function resolveHdrUrl(preset: string): Promise<string> {
       return URL.createObjectURL(blob)
     }
 
-    // Not cached — try to fetch
+    // Not cached - try to fetch
     if (!navigator.onLine) return BUNDLED_HDR_PATH
 
     const response = await fetch(cdnUrl)

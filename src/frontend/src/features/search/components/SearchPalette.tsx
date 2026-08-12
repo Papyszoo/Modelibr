@@ -69,7 +69,7 @@ export function SearchPalette({
   }, [flatItems.length])
 
   // Keep the highlighted result visible as the user arrows through the list.
-  // (Guarded — jsdom and a few browsers don't implement scrollIntoView.)
+  // (Guarded - jsdom and a few browsers don't implement scrollIntoView.)
   useEffect(() => {
     activeItemRef.current?.scrollIntoView?.({ block: 'nearest' })
   }, [activeIndex])

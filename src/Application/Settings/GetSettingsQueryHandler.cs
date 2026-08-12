@@ -66,7 +66,7 @@ internal class GetSettingsQueryHandler : IQueryHandler<GetSettingsQuery, GetSett
 
             // If no settings exist in either table, create default settings.
             // This is a query that writes (pre-existing design: get-or-create
-            // defaults) — SaveAsync only stages the new row now that
+            // defaults) - SaveAsync only stages the new row now that
             // repositories don't self-commit, so it must be followed by an
             // explicit commit or the defaults vanish at the end of the
             // request and every subsequent GetSettings call recreates them

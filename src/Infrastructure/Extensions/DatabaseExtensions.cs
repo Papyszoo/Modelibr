@@ -10,7 +10,7 @@ namespace Infrastructure.Extensions;
 
 /// <summary>
 /// Thrown when the automatic pre-migration backup fails. Left uncaught by
-/// <see cref="DatabaseExtensions.InitializeDatabaseAsync(WebApplication)"/> on purpose —
+/// <see cref="DatabaseExtensions.InitializeDatabaseAsync(WebApplication)"/> on purpose -
 /// it propagates out of <c>Program.Main</c> and aborts startup, because applying a
 /// pending migration with no safety net is worse than not starting at all.
 /// </summary>
@@ -38,7 +38,7 @@ public static class DatabaseExtensions
     /// <summary>
     /// Core implementation, decoupled from <see cref="WebApplication"/> so it can be
     /// exercised against a bare <see cref="IServiceProvider"/> in tests without spinning
-    /// up Kestrel/hosting — see Infrastructure.Tests/Extensions/DatabaseExtensionsTests.cs.
+    /// up Kestrel/hosting - see Infrastructure.Tests/Extensions/DatabaseExtensionsTests.cs.
     /// </summary>
     internal static async Task InitializeDatabaseAsync(IServiceProvider rootServices)
     {
@@ -73,7 +73,7 @@ public static class DatabaseExtensions
                 pendingMigrations.Count,
                 string.Join(", ", pendingMigrations));
 
-            // Intentionally NOT inside the try/catch below — a failure here must
+            // Intentionally NOT inside the try/catch below - a failure here must
             // propagate out of InitializeDatabaseAsync and abort startup (unless the
             // operator explicitly opted out), never be swallowed like a connectivity
             // failure.
@@ -101,7 +101,7 @@ public static class DatabaseExtensions
         if (configuration.GetValue<bool>(SkipEnvVar))
         {
             logger.LogWarning(
-                "{EnvVar}=true — skipping the automatic pre-migration backup. If the " +
+                "{EnvVar}=true - skipping the automatic pre-migration backup. If the " +
                 "upcoming migration fails or is destructive there is no automatic rollback " +
                 "point. This is not recommended outside throwaway environments.",
                 SkipEnvVar);
@@ -112,13 +112,13 @@ public static class DatabaseExtensions
 
         try
         {
-            // Logged upfront so a large library doesn't look like a hang — this backup
+            // Logged upfront so a large library doesn't look like a hang - this backup
             // runs before the app serves any traffic.
             var estimate = await backupService.EstimateSizeAsync(CancellationToken.None);
             logger.LogInformation(
                 "Taking automatic pre-migration backup before applying migrations " +
                 "(estimated database ~{DbMb:N1} MB, uploads ~{UploadsMb:N1} MB; thumbnails " +
-                "excluded — they regenerate). The app has not started serving traffic yet; " +
+                "excluded - they regenerate). The app has not started serving traffic yet; " +
                 "this may take a while for a large library.",
                 estimate.DatabaseBytes / 1024d / 1024d,
                 estimate.UploadsBytes / 1024d / 1024d);
@@ -140,7 +140,7 @@ public static class DatabaseExtensions
         {
             logger.LogCritical(
                 ex,
-                "Pre-migration backup failed — aborting startup before applying pending " +
+                "Pre-migration backup failed - aborting startup before applying pending " +
                 "migrations so a schema change is never made without a safety net. Set " +
                 "{EnvVar}=true to bypass this check (not recommended).",
                 SkipEnvVar);

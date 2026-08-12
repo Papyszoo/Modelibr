@@ -28,7 +28,7 @@ interface SurfaceCardProps {
 
 /**
  * Special card for Roughness/Glossiness texture types.
- * They describe the same surface property (microsurface), inverted —
+ * They describe the same surface property (microsurface), inverted -
  * only ONE can be assigned at a time. Glossiness is inverted at load time
  * and fed into Three's roughnessMap slot.
  */

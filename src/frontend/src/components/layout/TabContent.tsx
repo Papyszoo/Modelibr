@@ -89,6 +89,11 @@ const RecycledFilesList = lazy(() =>
     default: module.RecycledFilesList,
   }))
 )
+const AssetStorePage = lazy(() =>
+  import('@/features/asset-store').then(module => ({
+    default: module.AssetStorePage,
+  }))
+)
 
 interface TabContentProps {
   tab: Tab
@@ -218,6 +223,9 @@ export function TabContent({ tab }: TabContentProps): JSX.Element {
 
       case 'stageEditor':
         return <StageEditor stageId={tab.stageId} />
+
+      case 'assetStore':
+        return <AssetStorePage />
 
       case 'settings':
         return <Settings tabId={tab.id} />

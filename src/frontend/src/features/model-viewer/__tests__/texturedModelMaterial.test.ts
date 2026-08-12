@@ -10,7 +10,7 @@ import {
 /**
  * Integration tests for the viewer's REAL texture → material apply path
  * (`applyMaterialTextures` → `buildMaterialFromTextures` → the shared
- * resolveTextureMaterialConfig / ensureAoMapUv2). Uses real THREE objects — the
+ * resolveTextureMaterialConfig / ensureAoMapUv2). Uses real THREE objects - the
  * material/geometry construction is GPU-free, so this runs in jsdom without a
  * WebGL context.
  *

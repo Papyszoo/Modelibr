@@ -12,7 +12,7 @@ Feature: Texture Set Kind (Multi-Model vs Global Materials)
   - Kind persistence, API filtering, and global texture files
 
   # SKIPPED: the combined texture-sets view (and with it a "default kind")
-  # no longer exists — Global Materials and Multi-Model Textures are separate
+  # no longer exists - Global Materials and Multi-Model Textures are separate
   # app tabs the user picks from the New Tab page. Un-skip only if a combined
   # view ever returns (owner: prompt 13/18 page-unification work).
   @skip
@@ -106,7 +106,7 @@ Feature: Texture Set Kind (Multi-Model vs Global Materials)
     # Regression trap: when the texture-set list query used
     # `placeholderData: previousData => previousData`, switching tabs
     # would leave the prior tab's cards on screen until the new query
-    # resolved — and tests that immediately read the grid saw the wrong
+    # resolved - and tests that immediately read the grid saw the wrong
     # data. The current `selectKindTab` waits for the count chip to
     # stabilise; this scenario asserts the user-visible outcome.
     Given I am on the texture sets page
@@ -123,7 +123,7 @@ Feature: Texture Set Kind (Multi-Model vs Global Materials)
     When I create a model-specific texture set "persist_ms" via API
     And I create a universal texture set "persist_uni" via API
     And I reload the page
-    # Kinds are separate app tabs now — the active tab persists across
+    # Kinds are separate app tabs now - the active tab persists across
     # reload (the old in-page switcher reset to Global Materials instead).
     Then the "Multi-Model" kind tab should be active
     And I should see texture set "persist_ms" in the grid

@@ -30,7 +30,7 @@ const UPLOAD_ROOT = "/var/lib/modelibr/uploads";
 const ORPHAN_DIR = `${UPLOAD_ROOT}/webdav-blend-orphans`;
 
 // Per-process unique suffix so scenario data (model names, orphan request
-// paths) doesn't collide with leftovers from a previous run — required for
+// paths) doesn't collide with leftovers from a previous run - required for
 // the orphan scenario, whose sidecar-based cleanup identifies "its" orphan
 // files by exact original request path (see e2e-authoring skill's
 // unique-data rule).
@@ -48,7 +48,7 @@ After(
 );
 
 // Remove only the orphan files THIS scenario quarantined (never a wholesale
-// directory wipe — other scenarios' orphans may coexist in the same folder).
+// directory wipe - other scenarios' orphans may coexist in the same folder).
 After("@blend-orphan-quarantine", async ({ page }) => {
     const ctx = getBlendContext(page);
     if (ctx.orphanJsonFileName) {
@@ -168,7 +168,7 @@ Given(
     },
 );
 
-// Raw file steps for dedup tests — use the ACTUAL file from assets (no UniqueFileGenerator)
+// Raw file steps for dedup tests - use the ACTUAL file from assets (no UniqueFileGenerator)
 // so that the hash is deterministic and matches across invocations.
 
 Given(
@@ -266,7 +266,7 @@ When(
 When(
     "I save {string} to model {string} via WebDAV Safe Save",
     async ({}, blendFile: string, modelName: string) => {
-        // Use UniqueFileGenerator — the new version must have a unique hash
+        // Use UniqueFileGenerator - the new version must have a unique hash
         const filePath = await UniqueFileGenerator.generate(blendFile);
         const result = await api.createVersionViaWebDavBlendSave(
             filePath,
@@ -286,7 +286,7 @@ When(
         const model = await api.findModelByName(modelName);
         expect(model).not.toBeNull();
 
-        // Use UniqueFileGenerator — the new version must have a unique hash
+        // Use UniqueFileGenerator - the new version must have a unique hash
         const filePath = await UniqueFileGenerator.generate(blendFile);
         const versionResult = await api.createModelVersion(model.id, filePath);
         console.log(
@@ -306,7 +306,7 @@ When(
             filePath,
             modelName,
         );
-        // The MOVE should succeed (204) even if the content is unchanged —
+        // The MOVE should succeed (204) even if the content is unchanged -
         // the middleware detects identical hashes and skips version creation
         console.log(
             `[Blend] WebDAV Safe Save (same content) for "${modelName}": PUT=${result.putStatus}, MOVE=${result.moveStatus}`,
@@ -493,7 +493,7 @@ Then(
         // BlendDedupB lookup should find the SAME model as BlendDedupA
         // because CreateModelFromBlendCommand returns the existing model on hash match
         expect(modelA).not.toBeNull();
-        // modelB might be null (name "BlendDedupB" was never created — the handler returned BlendDedupA's id)
+        // modelB might be null (name "BlendDedupB" was never created - the handler returned BlendDedupA's id)
         // OR modelB might exist if the endpoint returns 201 with the existing model's id
         // The important thing: no duplicate file storage
         console.log(
@@ -677,7 +677,7 @@ When("I send a DELETE request for {string}", async ({}, path: string) => {
 });
 
 Then("the DELETE response should be successful", async () => {
-    // Should return 204 (No Content) or 200 — the middleware silences .blend1 operations
+    // Should return 204 (No Content) or 200 - the middleware silences .blend1 operations
     expect(blend1State.deleteStatus).toBeGreaterThanOrEqual(200);
     expect(blend1State.deleteStatus).toBeLessThan(300);
     console.log(
@@ -773,7 +773,7 @@ Given(
 When(
     "I upload {string} as a new model {string} via WebDAV PUT expecting duplicate",
     async ({ page }, blendFile: string, modelName: string) => {
-        // Do NOT delete the existing model — we want to test duplicate behavior
+        // Do NOT delete the existing model - we want to test duplicate behavior
         const filePath = await UniqueFileGenerator.generate(blendFile);
         const result = await api.createModelViaWebDavBlend(filePath, modelName);
         updateBlendContext(page, {
@@ -800,7 +800,7 @@ Then(
 When(
     "I upload {string} as a new model named {string} via REST API",
     async ({ page }, blendFile: string, modelName: string) => {
-        // Do NOT delete — we want to test duplicate name rejection via REST.
+        // Do NOT delete - we want to test duplicate name rejection via REST.
         // REST upload uses the filename as the model name when no explicit name is provided,
         // so we name the file to match the desired model name.
         const filePath = await UniqueFileGenerator.generate(blendFile);
@@ -872,7 +872,7 @@ Given(
 
         // Both models now share the same name (DuplicateNamePolicy=Allow does not
         // rename). Fetch all matches and pick the one that isn't modelA to get
-        // the second duplicate's id — never assume creation order survives the API.
+        // the second duplicate's id - never assume creation order survives the API.
         const allModels = await api.getModels();
         const duplicates = allModels.filter((m: any) => m.name === actualName);
         expect(duplicates.length).toBe(2);
@@ -970,7 +970,7 @@ Then(
 /**
  * Scans webdav-blend-orphans/ for the sidecar whose `originalRequestPath`
  * matches the given WebDAV request path. This is the server-side inspection
- * mechanism for orphan files — the sibling of how @blend-temp-lifecycle
+ * mechanism for orphan files - the sibling of how @blend-temp-lifecycle
  * inspects webdav-blend-temp/, extended (via DockerHelper) to reach a
  * directory that has no WebDAV-routable address of its own.
  */
@@ -1000,7 +1000,7 @@ async function findOrphanSidecarByRequestPath(requestPath: string): Promise<{
                 };
             }
         } catch {
-            // Not ours (unreadable/malformed) — keep scanning.
+            // Not ours (unreadable/malformed) - keep scanning.
         }
     }
     return null;

@@ -1,7 +1,7 @@
 @depends-on:setup
 Feature: File Deletion Real-Time Updates in Split Panel
   Ensures that deleting a file via the FilesTab updates the open Recycled Files
-  panel in real time — no navigation or manual refresh required.
+  panel in real time - no navigation or manual refresh required.
 
   Background:
     Given I am on the model list page

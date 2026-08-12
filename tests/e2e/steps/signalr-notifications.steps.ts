@@ -27,7 +27,7 @@ const signalRState = {
 When(
     "I upload a model and listen for SignalR thumbnail notification",
     async ({ page }) => {
-        // Collect ALL ThumbnailStatusChanged notifications — we'll filter by
+        // Collect ALL ThumbnailStatusChanged notifications - we'll filter by
         // version ID after the upload completes, to avoid race conditions
         // where notifications from prior tests arrive first.
         const collectedNotifications: any[] = [];
@@ -110,7 +110,11 @@ When(
         // Upload a model to trigger thumbnail generation
         const filePath = await UniqueFileGenerator.generate("test-cube.glb");
 
-        const fileInput = page.locator("input[type='file']");
+        // Scope to the model-upload input specifically: the Models page (ModelGrid)
+        // also renders a webkitdirectory folder picker and a .zip import input, so a
+        // bare input[type='file'] trips Playwright strict mode. The model upload is
+        // the only one with a 3D-format accept list.
+        const fileInput = page.locator("input[type='file'][accept*='.glb']");
         const uploadResponsePromise = page.waitForResponse(
             (resp) =>
                 resp.url().includes("/models") &&
@@ -212,15 +216,15 @@ Given("I navigate to the application", async ({ page }) => {
 });
 
 When("the model list page loads", async ({ page }) => {
-    // Model list is the default page after navigateToAppClean — just verify it loaded
+    // Model list is the default page after navigateToAppClean - just verify it loaded
     await page
         .waitForSelector('[data-testid="model-card"], .model-card, .p-card', {
             timeout: 15000,
         })
         .catch(() => {
-            // Page might be empty (no models) — that's OK, we just need the page loaded
+            // Page might be empty (no models) - that's OK, we just need the page loaded
             console.log(
-                "[SignalR S2] No model cards found — page may be empty",
+                "[SignalR S2] No model cards found - page may be empty",
             );
         });
 });

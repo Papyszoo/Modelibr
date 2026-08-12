@@ -44,7 +44,7 @@ test('multiple config changes persist and only go live after a relaunch', async 
     assert.equal(result.restartRequired, true)
     assert.equal(pm.buildRuntimeSnapshot().publicAppUrl, originalAppUrl)
 
-    // Change #2: database port — still pending, still serving the original port.
+    // Change #2: database port - still pending, still serving the original port.
     result = await saveConfig(pm, configPath, { postgresPort: 45432 })
     assert.equal(result.restartRequired, true)
     assert.equal(pm.buildRuntimeSnapshot().publicAppUrl, originalAppUrl)
@@ -55,7 +55,7 @@ test('multiple config changes persist and only go live after a relaunch', async 
     assert.equal(onDisk.postgresPort, 45432)
 
     // Relaunch: a fresh process loads the persisted config and binds the new
-    // ports — this is what Electron's app.relaunch() effectively does.
+    // ports - this is what Electron's app.relaunch() effectively does.
     const reloaded = await loadRuntimeConfig(userData)
     pm = makePM(userData, reloaded.config)
     pm.markRunning()

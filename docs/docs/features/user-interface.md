@@ -29,7 +29,7 @@ The interface is split into **two panels** (left and right), each containing mul
 | **Multi-Model Textures** | Texture sets created for specific models                           |
 | **Environment Maps**     | HDR panoramas and six-face cube maps used for lighting             |
 | **Sprites**              | 2D sprite sheets, atlases, and UI iconography                      |
-| **Sounds**               | Audio assets — SFX, dialogue, ambient loops                        |
+| **Sounds**               | Audio assets - SFX, dialogue, ambient loops                        |
 | **Scripts**              | Source code and shaders with live previews                         |
 
 **Organize and system:**
@@ -38,6 +38,7 @@ The interface is split into **two panels** (left and right), each containing mul
 | ------------------ | ------------------------------------------------------ |
 | **Packs**          | Reusable asset bundles                                 |
 | **Projects**       | Project workspaces                                     |
+| **Asset Store**    | Import packs from your store library (optional)        |
 | **History**        | Recent uploads, renames, and version bumps             |
 | **Recycled Files** | Recover deleted items                                  |
 | **Settings**       | Storage, appearance, WebDAV, and Blender CLI           |
@@ -46,11 +47,11 @@ The interface is split into **two panels** (left and right), each containing mul
 
 ### The New Tab Page
 
-Opening a new tab shows the **New Tab page** — a launcher for the whole app:
+Opening a new tab shows the **New Tab page** - a launcher for the whole app:
 
 - **Tiles** for every tab type, grouped into Asset Types, Organize, and System
-- **Recently Closed** — reopen tabs you closed, with their exact content restored
-- **Sessions** — restore recently closed windows and their full tab layout
+- **Recently Closed** - reopen tabs you closed, with their exact content restored
+- **Sessions** - restore recently closed windows and their full tab layout
 - A **search box** (autofocused) to filter tiles quickly
 
 ### Global Search

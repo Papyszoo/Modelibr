@@ -165,7 +165,7 @@ export function isSurfaceRelatedType(textureType: TextureType): boolean {
 
 /**
  * Get all texture types that are rendered as standalone cards (i.e. not grouped
- * behind a mode dropdown — Height/Bump/Displacement and Roughness/Glossiness
+ * behind a mode dropdown - Height/Bump/Displacement and Roughness/Glossiness
  * are excluded because they live in HeightCard and SurfaceCard respectively).
  */
 export function getRegularTypes(): TextureType[] {

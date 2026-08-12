@@ -80,7 +80,7 @@ internal sealed class ModelRepository : IModelRepository
                 ? query.Where(m => m.ConceptImages.Any())
                 : query.Where(m => !m.ConceptImages.Any());
 
-        // EF.Functions.ILike — case-insensitive Contains on Postgres.
+        // EF.Functions.ILike - case-insensitive Contains on Postgres.
         if (!string.IsNullOrWhiteSpace(searchName))
         {
             var pattern = $"%{searchName.Trim()}%";
@@ -152,7 +152,7 @@ internal sealed class ModelRepository : IModelRepository
                 ? query.Where(m => m.ConceptImages.Any())
                 : query.Where(m => !m.ConceptImages.Any());
 
-        // EF.Functions.ILike — case-insensitive Contains on Postgres.
+        // EF.Functions.ILike - case-insensitive Contains on Postgres.
         if (!string.IsNullOrWhiteSpace(searchName))
         {
             var pattern = $"%{searchName.Trim()}%";
@@ -464,7 +464,7 @@ internal sealed class ModelRepository : IModelRepository
             _context.ModelVersions.RemoveRange(model.Versions);
             
             // Remove the model (this will also remove the many-to-many join table entries).
-            // Staged only — the calling handler commits via IUnitOfWork. (The
+            // Staged only - the calling handler commits via IUnitOfWork. (The
             // ExecuteUpdateAsync above remains immediate, as it always was.)
             _context.Models.Remove(model);
         }

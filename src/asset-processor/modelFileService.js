@@ -34,7 +34,7 @@ export class ModelFileService {
     logger.debug('Fetching model file', { modelId, modelVersionId })
 
     // Retry logic for transient errors (network issues, server overload)
-    // 404 errors are NOT retried — they indicate the model/version is deleted
+    // 404 errors are NOT retried - they indicate the model/version is deleted
     const maxRetries = 3
     const retryDelay = 1000 // 1 second
 
@@ -60,7 +60,7 @@ export class ModelFileService {
           error: error.message,
         })
 
-        // If it's a 404/not-found error, fail immediately — model is likely deleted
+        // If it's a 404/not-found error, fail immediately - model is likely deleted
         if (this.isFileNotFoundError(error)) {
           throw error
         }
@@ -171,6 +171,103 @@ export class ModelFileService {
         error: error.message,
       })
     }
+  }
+
+  /**
+   * Fetch the auxiliary (external) glTF resources for a model version and return
+   * them as a { relativePath: dataUrl } map for the page's LoadingManager to
+   * resolve. Downloads each already-uploaded sibling (.bin/textures) and inlines
+   * it as a data URL - offline by construction, no external network. Best-effort:
+   * a failed list or download leaves the reference unresolved rather than failing
+   * the whole render (matches the "Unresolved reference" warning path).
+   * @param {number} modelId
+   * @param {number} modelVersionId
+   * @returns {Promise<Record<string, string>|null>} Resource map, or null if none.
+   */
+  async fetchAuxiliaryResourceMap(modelId, modelVersionId) {
+    if (!modelVersionId) return null
+
+    let list
+    try {
+      list = await this.jobService.getVersionAuxiliaryFiles(
+        modelId,
+        modelVersionId
+      )
+    } catch (error) {
+      logger.warn(
+        'Failed to fetch auxiliary file list; rendering without external glTF resources',
+        { modelId, modelVersionId, error: error.message }
+      )
+      return null
+    }
+
+    const auxiliaries = list?.auxiliaries || []
+    if (auxiliaries.length === 0) return null
+
+    const resources = {}
+    for (const aux of auxiliaries) {
+      try {
+        const response = await this.jobService.getFile(aux.fileId)
+        const buffer = await this.streamToBuffer(response.data)
+        const mime = this.mimeFromFileName(aux.originalFileName)
+        resources[aux.relativePath] =
+          `data:${mime};base64,${buffer.toString('base64')}`
+      } catch (error) {
+        logger.warn(
+          'Failed to download auxiliary file; leaving reference unresolved',
+          {
+            fileId: aux.fileId,
+            relativePath: aux.relativePath,
+            error: error.message,
+          }
+        )
+      }
+    }
+
+    const resolvedCount = Object.keys(resources).length
+    logger.info('Fetched auxiliary glTF resources', {
+      modelId,
+      modelVersionId,
+      requested: auxiliaries.length,
+      resolved: resolvedCount,
+    })
+
+    return resolvedCount > 0 ? resources : null
+  }
+
+  /**
+   * Collect a readable stream into a Buffer.
+   * @param {ReadableStream} stream
+   * @returns {Promise<Buffer>}
+   */
+  async streamToBuffer(stream) {
+    const chunks = []
+    for await (const chunk of stream) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+    }
+    return Buffer.concat(chunks)
+  }
+
+  /**
+   * Map an auxiliary file name to a MIME type so an inlined data URL decodes
+   * correctly in the browser (image textures) or streams as bytes (.bin).
+   * @param {string} fileName
+   * @returns {string}
+   */
+  mimeFromFileName(fileName) {
+    const ext = path.extname(fileName || '').toLowerCase()
+    const mimes = {
+      '.png': 'image/png',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.webp': 'image/webp',
+      '.gif': 'image/gif',
+      '.bmp': 'image/bmp',
+      '.ktx2': 'image/ktx2',
+      '.basis': 'application/octet-stream',
+      '.bin': 'application/octet-stream',
+    }
+    return mimes[ext] || 'application/octet-stream'
   }
 
   /**

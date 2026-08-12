@@ -3,9 +3,9 @@ import { createJSONStorage, persist } from 'zustand/middleware'
 
 /**
  * Where the dock bar lives on a mobile-sized viewport.
- *  - `left`   — vertical bar on the left (default; mirrors desktop layout)
- *  - `bottom` — horizontal bar at the bottom (native-app style)
- *  - `top`    — horizontal bar at the top
+ *  - `left`   - vertical bar on the left (default; mirrors desktop layout)
+ *  - `bottom` - horizontal bar at the bottom (native-app style)
+ *  - `top`    - horizontal bar at the top
  */
 export type MobileBarPosition = 'top' | 'bottom' | 'left'
 

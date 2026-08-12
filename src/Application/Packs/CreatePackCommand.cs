@@ -38,6 +38,16 @@ internal class CreatePackCommandHandler : ICommandHandler<CreatePackCommand, Cre
             // Create new pack using domain factory method
             var pack = Pack.Create(command.Name, command.Description, command.LicenseType, command.Url, _dateTimeProvider.UtcNow);
 
+            // Store provenance is stamped BEFORE the save, not by a follow-up command: the pack
+            // row and its (StoreImportUrl, StoreImportAssetId) idempotency key must become
+            // visible in the same transaction. Two commits left a window where a crash - or a
+            // concurrent import of the same asset - produced a second, unstamped pack.
+            if (command.StoreProvenance is { } provenance)
+            {
+                pack.RecordStoreImport(
+                    provenance.StoreUrl, provenance.StoreAssetId, provenance.ManifestVersion, _dateTimeProvider.UtcNow);
+            }
+
             var savedPack = await _packRepository.AddAsync(pack, cancellationToken);
 
             await _unitOfWork.SaveChangesAsync(cancellationToken);
@@ -51,5 +61,17 @@ internal class CreatePackCommandHandler : ICommandHandler<CreatePackCommand, Cre
     }
 }
 
-public record CreatePackCommand(string Name, string? Description, string? LicenseType, string? Url) : ICommand<CreatePackResponse>;
+public record CreatePackCommand(
+    string Name,
+    string? Description,
+    string? LicenseType,
+    string? Url,
+    PackStoreProvenance? StoreProvenance = null) : ICommand<CreatePackResponse>;
+
+/// <summary>
+/// Store-import stamp applied at pack creation time. Optional - only the store importer
+/// supplies it; every other caller creates an unstamped pack.
+/// </summary>
+public record PackStoreProvenance(string StoreUrl, string StoreAssetId, int ManifestVersion);
+
 public record CreatePackResponse(int Id, string Name, string? Description, string? LicenseType, string? Url);

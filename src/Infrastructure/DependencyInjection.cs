@@ -37,6 +37,7 @@ namespace Infrastructure
             });
 
             services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<ApplicationDbContext>());
+            services.AddScoped<IChangeTrackerReset>(sp => sp.GetRequiredService<ApplicationDbContext>());
 
             services.AddScoped<IModelRepository, ModelRepository>();
             services.AddScoped<IModelVersionRepository, ModelVersionRepository>();
@@ -45,6 +46,23 @@ namespace Infrastructure
             services.AddScoped<IThumbnailRepository, ThumbnailRepository>();
             services.AddScoped<IThumbnailJobRepository, ThumbnailJobRepository>();
             services.AddScoped<IThumbnailJobEventRepository, ThumbnailJobEventRepository>();
+            services.AddScoped<IAssetExtractionRepository, AssetExtractionRepository>();
+            services.AddScoped<IExtractionJobRepository, ExtractionJobRepository>();
+            services.AddScoped<IAssetPartRepository, AssetPartRepository>();
+            services.AddScoped<IModelVersionAuxiliaryFileRepository, ModelVersionAuxiliaryFileRepository>();
+            services.AddScoped<IAgentOperationLogRepository, AgentOperationLogRepository>();
+            services.AddScoped<IAssetDerivationRepository, AssetDerivationRepository>();
+            services.AddScoped<IAssetSearchDocumentRepository, AssetSearchDocumentRepository>();
+            services.AddScoped<ISearchLogRepository, SearchLogRepository>();
+            services.AddScoped<IComputeCacheRepository, ComputeCacheRepository>();
+            services.AddScoped<Application.Extraction.Compute.ComputeCacheService>();
+
+            // Derived-layer thresholds - config-driven guesses until prompt 26
+            // calibrates them (bind the "Derivation" section, fall back to defaults).
+            var derivationOptions =
+                configuration.GetSection("Derivation").Get<Application.Extraction.Derivation.DerivationOptions>()
+                ?? new Application.Extraction.Derivation.DerivationOptions();
+            services.AddSingleton(derivationOptions);
             services.AddScoped<ITextureSetRepository, TextureSetRepository>();
             services.AddScoped<ITextureProxyRepository, TextureProxyRepository>();
             services.AddScoped<IPackRepository, PackRepository>();
@@ -66,6 +84,7 @@ namespace Infrastructure
             services.AddScoped<IEnvironmentMapCategoryRepository, EnvironmentMapCategoryRepository>();
             services.AddScoped<ITextureSetCategoryRepository, TextureSetCategoryRepository>();
             services.AddScoped<ISearchRepository, SearchRepository>();
+            services.AddScoped<IStoreImportJobRepository, StoreImportJobRepository>();
             services.AddScoped<IEnvironmentMapSizeLabelService, EnvironmentMapSizeLabelService>();
             services.AddScoped<ITextureImageMetadataReader, TextureImageMetadataReader>();
             services.AddScoped<IThumbnailQueue, ThumbnailQueue>();
@@ -97,6 +116,25 @@ namespace Infrastructure
             {
                 client.Timeout = TimeSpan.FromSeconds(5);
             });
+
+            // Store importer (v0.5 prompt 05): SSRF-hardened client + in-process background queue.
+            // storeUrl is user-supplied, so redirects are followed manually (see StoreImportClient);
+            // auto-redirect is disabled at the handler level.
+            var storeImportTimeoutSeconds = configuration.GetValue<int?>("STORE_IMPORT_HTTP_TIMEOUT_SECONDS") ?? 120;
+            services.AddHttpClient(Infrastructure.Services.StoreImportClient.HttpClientName, client =>
+                {
+                    client.Timeout = TimeSpan.FromSeconds(storeImportTimeoutSeconds);
+                })
+                .ConfigurePrimaryHttpMessageHandler(Infrastructure.Services.StoreImportClient.CreatePrimaryHandler);
+
+            services.AddScoped<Application.Abstractions.Services.IStoreImportClient, StoreImportClient>();
+
+            // Registered once as a singleton, exposed through both the producer interface and
+            // IHostedService so enqueue (request handlers) and consume (background loop) share
+            // the same channel - mirrors the BlendFileGenerationQueue registration above.
+            services.AddSingleton<StoreImportQueue>();
+            services.AddSingleton<Application.Abstractions.Services.IStoreImportQueue>(sp => sp.GetRequiredService<StoreImportQueue>());
+            services.AddHostedService(sp => sp.GetRequiredService<StoreImportQueue>());
 
             // Add WebDAV virtual asset store services
             services.AddVirtualAssetStore();

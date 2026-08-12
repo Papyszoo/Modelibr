@@ -134,11 +134,11 @@ async function addModelToOpenPack(page, modelName, modelId) {
 
 // Some demo scenarios open 3D canvases / render-heavy views. On GitHub's
 // GPU-less runners these fall back to SwiftShader software WebGL and time out at
-// the drained-runner tail (they pass 15/15 locally on a real GPU — see the note
+// the drained-runner tail (they pass 15/15 locally on a real GPU - see the note
 // in playwright.demo.config.ts). Such scenarios are tagged `@serial` so they run
 // on the local GPU lane only and are excluded from the GPU-less CI fast lane
 // (run-e2e-fast.js passes --grep-invert=@serial to the demo phase). The tagged
-// three below all flaked on the v0.3.0 main push. See CLAUDE.md testing rule 3.
+// three below all flaked on the v0.3.0 main push. See AGENTS.md testing rule 3.
 test.describe("demo mode e2e", () => {
     // @serial: demo SPA boot times out under software WebGL at the CI tail.
     test("shows seeded demo libraries across tabs", { tag: "@serial" }, async ({
@@ -243,7 +243,7 @@ test.describe("demo mode e2e", () => {
         ).toContainText("Basic Texture Set");
     });
 
-    // @serial: asserts the model-viewer <canvas> is visible — GPU render flake.
+    // @serial: asserts the model-viewer <canvas> is visible - GPU render flake.
     test("uploads a model and records it in upload history", { tag: "@serial" }, async ({
         page,
     }) => {
@@ -455,7 +455,7 @@ test.describe("demo mode e2e", () => {
             await expect(card).toContainText("Disabled in demo mode");
         }
 
-        // Clicking a locked card must not navigate into the detail view —
+        // Clicking a locked card must not navigate into the detail view -
         // the grid stays visible.
         await page
             .locator(".setting-card.locked", { hasText: "Blender" })

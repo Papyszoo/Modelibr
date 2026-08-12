@@ -1,9 +1,11 @@
 import { act, renderHook } from '@testing-library/react'
+import { zipSync } from 'fflate'
 
 import { useDragAndDrop, useFileUpload } from '@/shared/hooks/useFileUpload'
 
 jest.mock('@/features/models/api/modelApi', () => ({
   uploadModel: jest.fn(),
+  uploadModelGroup: jest.fn(),
 }))
 
 // Mock fileUtils
@@ -31,7 +33,7 @@ jest.mock('../../../stores/uploadProgressStore', () => ({
   }),
 }))
 
-import { uploadModel } from '@/features/models/api/modelApi'
+import { uploadModel, uploadModelGroup } from '@/features/models/api/modelApi'
 
 import {
   isSupportedModelFormat,
@@ -39,6 +41,9 @@ import {
 } from '../../../utils/fileUtils'
 
 const mockUploadModel = uploadModel as jest.MockedFunction<typeof uploadModel>
+const mockUploadModelGroup = uploadModelGroup as jest.MockedFunction<
+  typeof uploadModelGroup
+>
 const mockIsSupportedModelFormat =
   isSupportedModelFormat as jest.MockedFunction<typeof isSupportedModelFormat>
 const mockIsThreeJSRenderable = isThreeJSRenderable as jest.MockedFunction<
@@ -123,7 +128,7 @@ describe('useFileUpload', () => {
         return result.current.uploadMultipleFiles([mockFile])
       })
 
-      // .blend should NOT be rejected — it bypasses the renderable check
+      // .blend should NOT be rejected - it bypasses the renderable check
       expect(uploadResult.failed).toHaveLength(0)
       expect(uploadResult.succeeded).toHaveLength(1)
       expect(mockUploadModel).toHaveBeenCalledWith(mockFile, expect.anything())
@@ -197,6 +202,142 @@ describe('useFileUpload', () => {
           total: 2,
         })
       )
+    })
+  })
+  describe('uploadZip', () => {
+    // A zip is expanded in the browser and then imported through exactly the same
+    // path as a picked folder. Regression: it used to POST the archive to a
+    // server-side unzip endpoint whose response shape ({batchId, imported[]})
+    // differed from every other upload path, so the success callback threw -
+    // nothing was associated with the pack/project the import came from and the
+    // grid never refreshed, after the progress UI had already reported success.
+    const makeZip = (entries: Record<string, string>): File => {
+      const zipped = zipSync(
+        Object.fromEntries(
+          Object.entries(entries).map(([path, content]) => [
+            path,
+            Uint8Array.from(content, c => c.charCodeAt(0)),
+          ])
+        )
+      )
+      return new File([zipped], 'kit.zip', { type: 'application/zip' })
+    }
+
+    beforeEach(() => {
+      mockIsSupportedModelFormat.mockImplementation(ext =>
+        ['.gltf', '.glb', '.obj'].includes(ext)
+      )
+      mockIsThreeJSRenderable.mockImplementation(ext =>
+        ['.gltf', '.glb', '.obj'].includes(ext)
+      )
+    })
+
+    it('imports each model group in the archive with its sibling resources', async () => {
+      mockUploadModelGroup.mockResolvedValue({
+        id: 11,
+        alreadyExists: false,
+        auxiliaryFilesLinked: 1,
+        auxiliaryFilesSkipped: 0,
+      } as never)
+      const onSuccess = jest.fn()
+      const { result } = renderHook(() => useFileUpload({ onSuccess }))
+
+      const zip = makeZip({
+        'Quad/Quad.gltf': '{"asset":{"version":"2.0"}}',
+        'Quad/Quad.bin': 'binary-buffer',
+      })
+
+      await act(async () => {
+        await result.current.uploadZip(zip)
+      })
+
+      expect(mockUploadModelGroup).toHaveBeenCalledTimes(1)
+      const [primary, auxiliaries] = mockUploadModelGroup.mock.calls[0]
+      expect(primary.name).toBe('Quad.gltf')
+      expect(auxiliaries.map(a => a.relativePath)).toEqual(['Quad.bin'])
+    })
+
+    it('reports results in the shared {succeeded} shape every other path uses', async () => {
+      mockUploadModelGroup.mockResolvedValue({
+        id: 12,
+        alreadyExists: false,
+        auxiliaryFilesLinked: 0,
+        auxiliaryFilesSkipped: 0,
+      } as never)
+      const onSuccess = jest.fn()
+      const { result } = renderHook(() => useFileUpload({ onSuccess }))
+
+      await act(async () => {
+        await result.current.uploadZip(
+          makeZip({
+            'A/A.gltf': '{}',
+            'A/A.bin': 'buf',
+          })
+        )
+      })
+
+      expect(onSuccess).toHaveBeenCalledTimes(1)
+      const results = onSuccess.mock.calls[0][1]
+      expect(
+        results.succeeded.map((s: { result: { id: number } }) => s.result.id)
+      ).toEqual([12])
+      expect(results.failed).toEqual([])
+      expect(results.total).toBe(1)
+    })
+
+    it('skips archive metadata entries so they never become auxiliaries', async () => {
+      mockUploadModelGroup.mockResolvedValue({
+        id: 13,
+        alreadyExists: false,
+        auxiliaryFilesLinked: 1,
+        auxiliaryFilesSkipped: 0,
+      } as never)
+      const { result } = renderHook(() => useFileUpload())
+
+      await act(async () => {
+        await result.current.uploadZip(
+          makeZip({
+            'Quad/Quad.gltf': '{}',
+            'Quad/Quad.bin': 'buf',
+            'Quad/.DS_Store': 'junk',
+            '__MACOSX/Quad/._Quad.gltf': 'junk',
+          })
+        )
+      })
+
+      const [, auxiliaries] = mockUploadModelGroup.mock.calls[0]
+      expect(auxiliaries.map(a => a.relativePath)).toEqual(['Quad.bin'])
+    })
+
+    it('applies the renderability gate a zip used to bypass entirely', async () => {
+      // The server-side unzip route ran none of the client gates, so an archive was
+      // a side door for formats the file picker refuses.
+      const onSuccess = jest.fn()
+      const { result } = renderHook(() =>
+        useFileUpload({ requireThreeJSRenderable: true, onSuccess })
+      )
+
+      await act(async () => {
+        await result.current.uploadZip(makeZip({ 'legacy/statue.dae': 'x' }))
+      })
+
+      expect(mockUploadModelGroup).not.toHaveBeenCalled()
+      expect(onSuccess).not.toHaveBeenCalled()
+    })
+
+    it('surfaces a corrupt archive as an import failure', async () => {
+      const onError = jest.fn()
+      const { result } = renderHook(() => useFileUpload({ onError }))
+      const notAZip = new File(['definitely not a zip'], 'broken.zip', {
+        type: 'application/zip',
+      })
+
+      await act(async () => {
+        await expect(result.current.uploadZip(notAZip)).rejects.toThrow(/zip/i)
+      })
+
+      expect(onError).toHaveBeenCalled()
+      expect(mockUploadModelGroup).not.toHaveBeenCalled()
     })
   })
 })

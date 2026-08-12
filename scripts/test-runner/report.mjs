@@ -14,7 +14,7 @@ const STATUS = {
     "not-present": { label: "NOT PRESENT", color: "#57606a", bg: "#eaeef2" },
 };
 
-// Full HTML entity-escape — covers element AND attribute context (quotes), so
+// Full HTML entity-escape - covers element AND attribute context (quotes), so
 // esc() is safe to interpolate into "..." attributes (href, style), not just text.
 function esc(s) {
     return String(s)
@@ -48,7 +48,7 @@ export function writeReport(results, meta) {
                 ? `${r.counts.passed}/${r.counts.total}` +
                   (r.counts.failed ? ` · ${r.counts.failed} failed` : "") +
                   (r.counts.skipped ? ` · ${r.counts.skipped} skipped` : "")
-                : "—";
+                : "-";
             const links = [];
             if (r.logFile)
                 links.push(
@@ -63,8 +63,8 @@ export function writeReport(results, meta) {
         <td class="name">${esc(r.name)}${r.note ? `<div class="note">${esc(r.note)}</div>` : ""}</td>
         <td class="tier">${esc(r.tier)}</td>
         <td class="counts">${cells}</td>
-        <td class="dur">${r.durationMs != null ? fmtDuration(r.durationMs) : "—"}</td>
-        <td class="links">${links.join(" · ") || "—"}</td>
+        <td class="dur">${r.durationMs != null ? fmtDuration(r.durationMs) : "-"}</td>
+        <td class="links">${links.join(" · ") || "-"}</td>
       </tr>`;
         })
         .join("\n");
@@ -73,7 +73,7 @@ export function writeReport(results, meta) {
     const html = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Modelibr — Local Test Report</title>
+<title>Modelibr - Local Test Report</title>
 <style>
   :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
   body { margin: 0; background: #f6f8fa; color: #1f2328; }
@@ -98,7 +98,7 @@ export function writeReport(results, meta) {
   footer { color:#8c959f; font-size:12px; margin-top:20px; }
 </style></head>
 <body><div class="wrap">
-  <h1>Modelibr — Local Test Report</h1>
+  <h1>Modelibr - Local Test Report</h1>
   <div class="sub">${esc(meta.host)} · ${esc(meta.platform)} · node ${esc(meta.node)} · branch ${esc(meta.branch)} · ${esc(meta.finishedAt)}</div>
   <div class="hero">
     ${ost.label}

@@ -2,7 +2,7 @@
 Feature: Sessions section restores closed windows
 
   The New Tab page surfaces a "Sessions" section that lists every archived
-  (closed) browser window — distinct from the per-tab "Recently Closed"
+  (closed) browser window - distinct from the per-tab "Recently Closed"
   list. Each entry shows the tab count per panel, restores all tabs into
   the current window on click, and persists across reloads.
 

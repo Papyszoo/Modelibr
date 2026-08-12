@@ -69,7 +69,7 @@ export function useEnvironmentMapCategoryMutations({
       }),
     deleteCategory: deleteEnvironmentMapCategory,
     // The metadata endpoint replaces the full tag set, so tags are passed
-    // through unchanged — omitting them would wipe an asset's tags on a move.
+    // through unchanged - omitting them would wipe an asset's tags on a move.
     moveToCategory: async vars => {
       await Promise.all(
         vars.environmentMaps.map(environmentMap =>

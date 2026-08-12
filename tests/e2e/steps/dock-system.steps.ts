@@ -26,7 +26,7 @@ When(
             throw new Error(`Model "${modelName}" not found in shared state`);
         }
 
-        // The card may be virtualised out of the DOM — the category sidebar
+        // The card may be virtualised out of the DOM - the category sidebar
         // narrows the grid, so cards past the first rows render only once the
         // `.model-grid-main` scroll container reaches them.
         const modelCardForReveal = page
@@ -147,7 +147,7 @@ When("I open Settings in the right panel", async ({ page }) => {
 });
 
 When("I open the Texture Sets tab in the left panel", async ({ page }) => {
-    // Check if already open — just click it
+    // Check if already open - just click it
     const existingTab = page
         .locator(".dock-bar-left")
         .locator(".draggable-tab:has(.pi-images)");
@@ -190,7 +190,7 @@ When(
         await revealVirtualizedCard(page, ".model-grid-main", modelCardForReveal);
 
         const clickTarget = page.locator(`text="${modelData.name}"`).first();
-        // force: true — the first viewer's frameloop=always canvas starves the
+        // force: true - the first viewer's frameloop=always canvas starves the
         // main thread under software WebGL, so the actionability wait never
         // resolves and a plain dblclick hangs (prompt 48). The event still
         // dispatches; the viewer wait below covers the mount.

@@ -6,7 +6,7 @@ import { type ReactElement, type ReactNode } from 'react'
  * Shared test harness for component-flow tests. Wraps the UI in a fresh React
  * Query client (retries off, no caching between tests) so a test can drive a
  * real component against the globally-mocked `@/lib/apiBase` and assert on the
- * rendered result + the requests it fired — i.e. real scenarios, not snapshots.
+ * rendered result + the requests it fired - i.e. real scenarios, not snapshots.
  *
  * Add more providers here (theme, tab context, …) as flow tests need them, so
  * individual tests stay focused on behaviour rather than scaffolding.
@@ -21,7 +21,7 @@ export function createTestQueryClient(): QueryClient {
 }
 
 /**
- * Wrapper component for `renderHook` — gives a hook a real React Query client so
+ * Wrapper component for `renderHook` - gives a hook a real React Query client so
  * its query/mutation behaviour (pagination, cache keys, refetch) can be driven
  * and asserted. Create the client once per test (in beforeEach) so cache state
  * doesn't leak between cases.

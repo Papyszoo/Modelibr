@@ -2,7 +2,7 @@
 /**
  * Design-review page snapshots.
  *
- * Screenshots every main app page in the DEMO build (MSW + IndexedDB — no
+ * Screenshots every main app page in the DEMO build (MSW + IndexedDB - no
  * backend needed) in both themes, into test-report/design-review/<label>/.
  * Used to eyeball before/after when migrating pages onto the design system:
  *
@@ -12,7 +12,7 @@
  *   npm run design:compare -- before-sounds after-sounds
  *
  * Options:
- *   --label <name>     required — output folder name
+ *   --label <name>     required - output folder name
  *   --pages a,b,c      subset of page ids (default: all)
  *   --no-build         reuse the existing demo build in src/frontend/dist
  */
@@ -32,7 +32,7 @@ const frontendDir = path.join(repoRoot, 'src/frontend')
 const frontendRequire = createRequire(path.join(frontendDir, 'package.json'))
 const { chromium } = frontendRequire('@playwright/test')
 
-// The main design surfaces — keep in sync with the New Tab page's tiles
+// The main design surfaces - keep in sync with the New Tab page's tiles
 // (components/layout/NewTabPage.tsx), NOT the TabType union: the union
 // carries legacy tab types users can no longer open (e.g. 'textureSets',
 // which was split into Global Materials + Multi-Model Textures).
@@ -108,7 +108,7 @@ function serveDemo(distDir) {
 
 /**
  * Seed the app's persisted navigation store with a single open tab, so the
- * page under review renders directly — same mechanism the docs-videos
+ * page under review renders directly - same mechanism the docs-videos
  * helper uses (localStorage 'modelibr_navigation' + session windowId).
  */
 function navigationSeed(tab, theme) {
@@ -145,7 +145,7 @@ async function main() {
 
   const distDir = path.join(frontendDir, 'dist')
   if (!fs.existsSync(path.join(distDir, 'index.html'))) {
-    throw new Error(`No demo build found at ${distDir} — run without --no-build`)
+    throw new Error(`No demo build found at ${distDir} - run without --no-build`)
   }
 
   const pages = args.pages

@@ -13,19 +13,19 @@
  *
  * The duplication had already drifted: the two channel-extraction shaders used
  * different channel numbering (frontend 0-based `uChannel`, worker 1-based
- * `channel`), and the worker's slot map had no Glossiness entry at all — so a
+ * `channel`), and the worker's slot map had no Glossiness entry at all - so a
  * Glossiness map (inverted roughness) was silently dropped in the thumbnail
  * while the viewer applied it as an inverted roughnessMap. Both are fixed by
  * sharing the map + shaders here.
  *
- * No THREE import — the maps are plain data, the shaders are strings, and the
+ * No THREE import - the maps are plain data, the shaders are strings, and the
  * channel index is arithmetic. Each runtime keeps its own render-to-target
  * orchestration (render-target size, camera, clone/dispose, color-space
  * assignment); only the data and the GLSL live here.
  */
 
 /**
- * TextureType enum — mirrors `Domain/ValueObjects/TextureType.cs` (the API
+ * TextureType enum - mirrors `Domain/ValueObjects/TextureType.cs` (the API
  * serializes the enum as its numeric value). Kept here so all three runtimes
  * name the same numbers instead of sprinkling magic literals.
  * @type {Readonly<Record<string, number>>}
@@ -47,7 +47,7 @@ export const TEXTURE_TYPE = Object.freeze({
 })
 
 /**
- * TextureChannel enum — mirrors `Domain/ValueObjects/TextureChannel.cs`. RGB
+ * TextureChannel enum - mirrors `Domain/ValueObjects/TextureChannel.cs`. RGB
  * means "use the whole texture, no channel extraction".
  * @type {Readonly<Record<string, number>>}
  */
@@ -167,7 +167,7 @@ export function channelNeedsExtraction(channel) {
 /**
  * Fullscreen-quad passthrough vertex shader for the channel-extraction passes.
  * Writes clip-space directly from the unit-quad position (a `PlaneGeometry(2, 2)`
- * whose vertices sit at ±1), so the camera setup is irrelevant — but the source
+ * whose vertices sit at ±1), so the camera setup is irrelevant - but the source
  * geometry MUST be that 2×2 quad. The runtimes' ortho cameras differ; this shader
  * intentionally ignores them.
  * @type {string}

@@ -273,6 +273,10 @@ export interface DemoPack {
   isEmpty: boolean
   customThumbnailFileId?: number | null
   customThumbnailUrl?: string | null
+  // Store-import provenance (set by the demo Asset Store import)
+  storeImportUrl?: string | null
+  storeImportAssetId?: string | null
+  storeImportedAt?: string | null
   models: { id: number; name: string }[]
   textureSets: { id: number; name: string }[]
   sprites: { id: number; name: string }[]

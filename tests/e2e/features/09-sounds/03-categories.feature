@@ -9,7 +9,7 @@ Feature: Sound Categories CRUD Operations
     Then the sound category "Test Sound Category" should be visible in the category list
     And I store the sound category "Test Sound Category" in shared state
 
-  # Uses its own category (not the create scenario's) — scenarios in this
+  # Uses its own category (not the create scenario's) - scenarios in this
   # file run fully parallel, and the create scenario's name cleanup would
   # race a rename of the same category.
   @update

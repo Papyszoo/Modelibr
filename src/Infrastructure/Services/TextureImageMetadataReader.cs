@@ -40,7 +40,7 @@ internal sealed class TextureImageMetadataReader : ITextureImageMetadataReader
         catch (Exception ex)
         {
             // Best-effort: a format we can't decode, or a transient read error, must
-            // never fail the upload — the texture's resolution simply stays null.
+            // never fail the upload - the texture's resolution simply stays null.
             _logger.LogWarning(ex, "Could not read texture image metadata for file {FileId} at {Path}", file.Id, fullPath);
             return null;
         }

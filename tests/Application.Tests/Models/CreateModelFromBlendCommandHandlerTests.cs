@@ -110,7 +110,7 @@ public class CreateModelFromBlendCommandHandlerTests
         _mockModelRepository.Verify(x => x.AddAsync(It.IsAny<Model>(), It.IsAny<CancellationToken>()), Times.Once);
         _mockVersionRepository.Verify(x => x.AddAsync(It.IsAny<ModelVersion>(), It.IsAny<CancellationToken>()), Times.Once);
 
-        // The handler no longer dispatches events itself (see DomainEventsInterceptor) —
+        // The handler no longer dispatches events itself (see DomainEventsInterceptor) -
         // it just has to leave the raised event on the aggregate it hands to UpdateAsync,
         // for the save pipeline to pick up.
         Assert.NotNull(capturedModel);
@@ -242,7 +242,7 @@ public class CreateModelFromBlendCommandHandlerTests
         var result = await _handler.Handle(command, CancellationToken.None);
 
         // Assert: the handler raises the event on the aggregate and hands it to
-        // UpdateAsync — dispatch itself is the save pipeline's job (DomainEventsInterceptor),
+        // UpdateAsync - dispatch itself is the save pipeline's job (DomainEventsInterceptor),
         // not this handler's, so there's nothing to mock/verify here beyond that.
         Assert.True(result.IsSuccess);
         Assert.NotNull(capturedModel);
@@ -286,7 +286,7 @@ public class CreateModelFromBlendCommandHandlerTests
             .Setup(x => x.ExistsByNameAsync("Chair", It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
-        // Policy is explicitly Reject (no longer the default — "Allow" is; see
+        // Policy is explicitly Reject (no longer the default - "Allow" is; see
         // Handle_WithDuplicateName_WhenPolicyIsUnset_DefaultsToAllow_CreatesModelWithSameName)
         var policySetting = Setting.Create(SettingKeys.DuplicateNamePolicy, "Reject", now);
         _mockSettingRepository
@@ -305,7 +305,7 @@ public class CreateModelFromBlendCommandHandlerTests
     [Fact]
     public async Task Handle_WithDuplicateName_WhenPolicyIsUnset_DefaultsToAllow_CreatesModelWithSameName()
     {
-        // Arrange — "Allow" is the default duplicate-name policy now that WebDAV
+        // Arrange - "Allow" is the default duplicate-name policy now that WebDAV
         // disambiguates colliding names by id; an unset policy must not reject or rename.
         var now = DateTime.UtcNow;
         _mockDateTimeProvider.Setup(x => x.UtcNow).Returns(now);
@@ -363,7 +363,7 @@ public class CreateModelFromBlendCommandHandlerTests
         Assert.False(result.Value.AlreadyExists);
         Assert.NotNull(capturedModel);
         Assert.Equal("Chair", capturedModel!.Name);
-        // Allow skips the existence check entirely — it must never be consulted.
+        // Allow skips the existence check entirely - it must never be consulted.
         _mockModelRepository.Verify(x => x.ExistsByNameAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 

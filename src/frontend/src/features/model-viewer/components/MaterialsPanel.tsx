@@ -190,7 +190,7 @@ export function MaterialsPanel({
     if (!modelVersionId || !modelId) return
     try {
       setSettingMainVariant(true)
-      // '__embedded__' is a frontend sentinel — register it in the backend if not yet stored
+      // '__embedded__' is a frontend sentinel - register it in the backend if not yet stored
       if (
         selectedVariant === '__embedded__' &&
         !variantNames.includes('__embedded__')
@@ -374,7 +374,7 @@ export function MaterialsPanel({
         setConvertingId(ts.id)
         await updateTextureSetKind(ts.id, kind, ownerModelId)
         // Converting to Single Model unlinks the set from other models, so
-        // refresh texture-set, model and version queries — any open model
+        // refresh texture-set, model and version queries - any open model
         // viewer must drop the now-stale mapping from its 3D preview.
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: ['textureSets'] }),
@@ -403,7 +403,7 @@ export function MaterialsPanel({
     async (ts: TextureSetDto) => {
       const currentModelId = Number(modelId)
 
-      // The cached texture set may be stale — e.g. it was linked to another
+      // The cached texture set may be stale - e.g. it was linked to another
       // model from a different panel since this list was loaded. Re-fetch so
       // the unlink warning reflects the set's actual associations.
       let associatedModels = ts.associatedModels
@@ -489,7 +489,7 @@ export function MaterialsPanel({
 
   return (
     <div className="materials-panel" data-testid="materials-panel">
-      {/* Preset selector — always visible */}
+      {/* Preset selector - always visible */}
       <div className="materials-variant-section">
         <label className="materials-variant-label">Preset</label>
         <div className="materials-variant-controls">
@@ -726,7 +726,7 @@ export function MaterialsPanel({
         lockedKind={TextureSetKind.ModelOwned}
         header={
           creatingForMaterial
-            ? `New Texture Set — ${creatingForMaterial}`
+            ? `New Texture Set - ${creatingForMaterial}`
             : 'New Texture Set'
         }
       />

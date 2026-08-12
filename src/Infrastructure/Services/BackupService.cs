@@ -211,7 +211,7 @@ public sealed class BackupService : IBackupService
             }
 
             var target = Path.Combine(_paths.RestoreRoot, fileName);
-            // Copy into a .tmp sibling first, fsync, then atomic rename — guarantees
+            // Copy into a .tmp sibling first, fsync, then atomic rename - guarantees
             // the boot processor never sees a half-copied archive.
             var tmpTarget = target + ".staging";
             File.Copy(source, tmpTarget, overwrite: true);
@@ -279,7 +279,7 @@ public sealed class BackupService : IBackupService
         if (!Directory.Exists(_paths.BackupRoot)) return;
 
         // The filename embeds the creation timestamp (yyyy-MM-dd-HHmmss), so an
-        // ordinal sort of the name is already chronological — no need to hit the
+        // ordinal sort of the name is already chronological - no need to hit the
         // filesystem for LastWriteTimeUtc.
         var candidates = Directory.EnumerateFiles(_paths.BackupRoot, $"{fileNamePrefix}*.tar")
             .OrderByDescending(path => Path.GetFileName(path), StringComparer.Ordinal)
@@ -331,10 +331,10 @@ public sealed class BackupService : IBackupService
                 {
                     // Skip uploads/tmp/ (HashBasedFileStorage's staging dir for in-flight
                     // uploads) and uploads/webdav-blend-temp/ (in-flight Blender Safe-Save
-                    // uploads — unprocessed, ages out via BlenderRetentionSweeper, and
+                    // uploads - unprocessed, ages out via BlenderRetentionSweeper, and
                     // restoring it would just replay half-finished saves). Deliberately
                     // NOT skipping uploads/webdav-blend-orphans/: those are quarantined
-                    // user bytes that survived a failed save — real user data that a
+                    // user bytes that survived a failed save - real user data that a
                     // restore must bring back (prompt 30, item 5).
                     (uploadsCount, uploadsBytes) = await WriteDirectoryEntriesAsync(
                         tar, _paths.UploadRoot, UploadsPrefix, skipDirNames: UploadSkipDirNames);
@@ -477,7 +477,7 @@ public sealed class BackupService : IBackupService
             var entryName = entryPrefix + relative;
             var entry = new PaxTarEntry(TarEntryType.RegularFile, entryName);
             await using var fs = File.OpenRead(path);
-            // fs.Length is valid here regardless of stream position — it returns the
+            // fs.Length is valid here regardless of stream position - it returns the
             // file's size, not bytes-read-since-open.
             var size = fs.Length;
             entry.DataStream = fs;
@@ -534,7 +534,7 @@ public sealed class BackupService : IBackupService
         {
             // Best-effort. On filesystems that don't support fsync (rare in our
             // bind-mounted Linux setup) the rest of the pipeline still produces
-            // a valid archive — the manifest read on restore catches truncation.
+            // a valid archive - the manifest read on restore catches truncation.
         }
     }
 

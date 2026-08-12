@@ -6,7 +6,7 @@ const { Given, When, Then } = createBdd();
 
 const STORAGE_KEY = "modelibr_navigation";
 
-// Predefined tab payload used by the "demo" archived session — kept in one
+// Predefined tab payload used by the "demo" archived session - kept in one
 // place so the assertions downstream can rely on the same labels.
 const DEMO_TABS = {
     left: [
@@ -123,7 +123,7 @@ Given(
 // The peer page is shared between two steps (`Given` opens it, the
 // later `When` drives + closes it). We carry it on the `page` object's
 // owning context so a failure between the two steps doesn't leak a
-// browser tab into the next scenario — `context.close()` (fired by the
+// browser tab into the next scenario - `context.close()` (fired by the
 // Playwright fixture teardown) reaps any still-open peer.
 function attachPeer(page: Page, peer: Page): void {
     (page as unknown as { __peer__: Page | null }).__peer__ = peer;
@@ -148,7 +148,7 @@ Given("a second browser page is opened", async ({ context, page }) => {
 When("the second browser page is closed", async ({ page }) => {
     const peer = takePeer(page);
     if (!peer) {
-        throw new Error("No peer page attached — did the prior step run?");
+        throw new Error("No peer page attached - did the prior step run?");
     }
     if (!peer.isClosed()) {
         await peer.close();
@@ -247,7 +247,7 @@ Then(
     },
 );
 
-// Accepts both the "1 session card" and "N session cards" wordings —
+// Accepts both the "1 session card" and "N session cards" wordings -
 // playwright-bdd parses `{int}` and uses a single matcher with a regex
 // suffix is awkward, so the simplest portable solution is one impl
 // hooked to both phrasings.

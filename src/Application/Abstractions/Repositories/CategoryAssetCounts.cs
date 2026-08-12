@@ -7,7 +7,7 @@ namespace Application.Abstractions.Repositories;
 /// rather than whatever a paginated list happened to load.
 /// </summary>
 /// <param name="PerCategory">Direct asset count keyed by category id (assets
-/// whose category is exactly that id — not its descendants).</param>
+/// whose category is exactly that id - not its descendants).</param>
 /// <param name="UncategorizedCount">Assets with no category.</param>
 /// <param name="TotalCount">All assets (categorized + uncategorized).</param>
 public sealed record CategoryAssetCounts(

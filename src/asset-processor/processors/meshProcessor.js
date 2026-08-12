@@ -9,7 +9,7 @@ const execFileAsync = promisify(execFile)
 /**
  * Processor for extracting mesh data from 3D files (especially .blend).
  *
- * PLACEHOLDER — This processor defines the interface for mesh analysis.
+ * PLACEHOLDER - This processor defines the interface for mesh analysis.
  * The actual implementation will spawn Blender in headless mode with a
  * Python extraction script to retrieve:
  *   - VertexCount
@@ -98,7 +98,7 @@ export class MeshAnalysisProcessor extends BaseProcessor {
 
     throw new Error(
       'MeshAnalysisProcessor is not yet fully implemented. ' +
-        'Blender is available — awaiting extraction script and API endpoint.'
+        'Blender is available - awaiting extraction script and API endpoint.'
     )
 
     // --- Future implementation outline ---
@@ -136,7 +136,7 @@ export class MeshAnalysisProcessor extends BaseProcessor {
    */
   // eslint-disable-next-line no-unused-vars
   async extractMeshData(filePath) {
-    // Placeholder — will use child_process.execFile to run:
+    // Placeholder - will use child_process.execFile to run:
     //   blender --background --python scripts/extract_mesh_data.py -- <filePath>
     //
     // The Python script outputs JSON to stdout which is parsed here.
@@ -164,7 +164,7 @@ export class MeshAnalysisProcessor extends BaseProcessor {
    */
   // eslint-disable-next-line no-unused-vars
   async reportResults(job, meshData) {
-    // Placeholder — will POST to a new API endpoint
+    // Placeholder - will POST to a new API endpoint
     logger.warn('MeshAnalysisProcessor.reportResults() is a placeholder')
   }
 }

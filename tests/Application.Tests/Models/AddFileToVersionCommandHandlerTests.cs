@@ -18,7 +18,7 @@ namespace Application.Tests.Models;
 /// extracts from a Blender-saved version (see jobApiClient.uploadRenderableFile →
 /// POST /models/{modelId}/versions/{versionId}/files). A version created by a Blender
 /// save starts with only a .blend (non-renderable), so this is the moment
-/// generated-{name}.blend first becomes generatable — these tests cover that it schedules
+/// generated-{name}.blend first becomes generatable - these tests cover that it schedules
 /// background generation exactly when a renderable file lands, and not otherwise.
 /// </summary>
 public class AddFileToVersionCommandHandlerTests
@@ -74,7 +74,7 @@ public class AddFileToVersionCommandHandlerTests
     [Fact]
     public async Task Handle_RenderableFileAttached_EnqueuesBackgroundBlendGenerationExactlyOnce()
     {
-        // Arrange — mirrors the worker attaching its extracted .glb to the version.
+        // Arrange - mirrors the worker attaching its extracted .glb to the version.
         const int modelId = 1;
         const int versionId = 10;
         SetUpModelAndVersion(modelId, versionId);
@@ -100,7 +100,7 @@ public class AddFileToVersionCommandHandlerTests
     [Fact]
     public async Task Handle_NonRenderableFileAttached_DoesNotEnqueueBlendGeneration()
     {
-        // Arrange — attaching a .blend (or any non-renderable project file) shouldn't
+        // Arrange - attaching a .blend (or any non-renderable project file) shouldn't
         // schedule generation: GetOrGenerateAsync needs a renderable file to work from,
         // and a .blend attach doesn't provide one.
         const int modelId = 1;

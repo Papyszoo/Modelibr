@@ -41,7 +41,7 @@ Then("the playback controls should be visible", async ({ page }) => {
     console.log("[Verify] Playback controls are visible ✓");
 });
 
-// Note: "I click the play button" is defined in sounds.steps.ts — avoid duplication
+// Note: "I click the play button" is defined in sounds.steps.ts - avoid duplication
 
 When("I click the pause button", async ({ page }) => {
     const pauseButton = page

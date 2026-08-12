@@ -147,7 +147,7 @@
     transform: none;
   }
 
-  /* Touch — no hover, so actions need to be visible by default. */
+  /* Touch - no hover, so actions need to be visible by default. */
   .pack-grid-card-actions {
     opacity: 1;
   }

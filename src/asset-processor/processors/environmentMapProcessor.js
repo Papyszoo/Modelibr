@@ -65,7 +65,7 @@ export class EnvironmentMapProcessor extends BaseProcessor {
 
       if (!config.orbit.enabled) {
         throw new Error(
-          'Orbit rendering is disabled — cannot generate environment map thumbnails'
+          'Orbit rendering is disabled - cannot generate environment map thumbnails'
         )
       }
 
@@ -73,7 +73,7 @@ export class EnvironmentMapProcessor extends BaseProcessor {
 
       if (!config.encoding.enabled) {
         throw new Error(
-          'Frame encoding is disabled — cannot generate environment map thumbnails'
+          'Frame encoding is disabled - cannot generate environment map thumbnails'
         )
       }
 
@@ -193,7 +193,7 @@ export class EnvironmentMapProcessor extends BaseProcessor {
 
     if (!uploadResult.allSuccessful || uploadResult.uploads.length === 0) {
       throw new Error(
-        'Environment map thumbnail upload failed — no valid thumbnail data available'
+        'Environment map thumbnail upload failed - no valid thumbnail data available'
       )
     }
 

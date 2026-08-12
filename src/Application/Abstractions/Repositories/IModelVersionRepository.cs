@@ -15,7 +15,7 @@ public interface IModelVersionRepository
     Task<int> GetLatestVersionNumberAsync(int modelId, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Direct DB update of ModelVersion.ThumbnailId — avoids the EF graph attach
+    /// Direct DB update of ModelVersion.ThumbnailId - avoids the EF graph attach
     /// that <see cref="UpdateAsync"/> triggers when called repeatedly in a loop
     /// over models with shared related entities (Packs, Projects, etc.).
     /// </summary>

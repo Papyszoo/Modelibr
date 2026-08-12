@@ -1,4 +1,4 @@
-/* Texture-set grid — visual parity with the model grid. The toolbar
+/* Texture-set grid - visual parity with the model grid. The toolbar
    chrome lives in @/shared/components/list-toolbar; this file owns the
    container, grid layout, and card. */
 
@@ -47,7 +47,7 @@
   background: rgba(49, 130, 206, 0.1);
 }
 
-/* Body: category tree sidebar + sets grid, flat on the page background —
+/* Body: category tree sidebar + sets grid, flat on the page background -
    the quiet CategoryTreePanel default is the app-wide categories standard. */
 .texture-set-list-body {
   display: flex;
@@ -82,7 +82,7 @@
   gap: 1rem;
 }
 
-/* Texture Set Grid — column min-width comes from --texture-set-card-width
+/* Texture Set Grid - column min-width comes from --texture-set-card-width
    (set inline from the slider). Falls back to 200px when the variable is
    missing. */
 .texture-set-grid {
@@ -96,7 +96,7 @@
 }
 
 /* Texture Set Card */
-/* Card identity — keep in sync with AssetTile.css (design-system skill). */
+/* Card identity - keep in sync with AssetTile.css (design-system skill). */
 .texture-set-card {
   background: var(--surface-card);
   border: 2px solid transparent;
@@ -284,15 +284,15 @@
   opacity: 0.9;
 }
 
-/* Area-drag (lasso) selection — mirrors .model-grid-selection-* */
+/* Area-drag (lasso) selection - mirrors .model-grid-selection-* */
 .texture-set-grid-selection-surface {
   position: relative;
   flex: 1 1 auto;
-  /* Fill the leftover space below the toolbar via flex-grow — NOT
+  /* Fill the leftover space below the toolbar via flex-grow - NOT
      min-height: 100%. Against the height-bounded .texture-set-grid-container
      (a bounded flex column), `min-height: 100%` resolves to the *full*
      container height, so stacked under the toolbar it forced the container to
-     overflow by ~the toolbar height — a phantom scrollbar even with only a few
+     overflow by ~the toolbar height - a phantom scrollbar even with only a few
      cards that fit. flex:1 already stretches the surface to fill the leftover
      space (drop / rubber-band area). */
   min-height: 0;
@@ -393,7 +393,7 @@
     font-size: 0.75rem;
   }
 
-  /* Touch — overlays + checkbox always visible. */
+  /* Touch - overlays + checkbox always visible. */
   .texture-set-card-overlay,
   .texture-set-card .texture-set-select-checkbox {
     opacity: 1;

@@ -43,8 +43,8 @@ public static partial class WebDavUtilities
     /// shared "{name} [{id}]" convention. For flat files the suffix sits directly before
     /// the file extension (e.g. "Footstep [17].wav"); for folders there is no extension
     /// (e.g. "Chair [42]"). <paramref name="baseName"/> is the segment with just the
-    /// " [id]" marker removed — i.e. the plain, non-disambiguated form of the segment
-    /// (extension, if any, stays attached) — so callers can compare it against a
+    /// " [id]" marker removed - i.e. the plain, non-disambiguated form of the segment
+    /// (extension, if any, stays attached) - so callers can compare it against a
     /// candidate's ordinary (pre-disambiguation) display name.
     /// </summary>
     public static bool TryParseIdSuffix(string segment, out string baseName, out int id)
@@ -67,13 +67,13 @@ public static partial class WebDavUtilities
     private static partial Regex IdSuffixRegex();
 
     /// <summary>
-    /// Computes each candidate's WebDAV display NAME (asset name only — no file
+    /// Computes each candidate's WebDAV display NAME (asset name only - no file
     /// extension) for a listing, appending the shared "[id]" suffix to every entry
     /// whose name collides case-insensitively with another candidate in the same
     /// listing. For flat files, wrap the result with <see cref="GetVirtualFileName"/>
     /// to attach the extension AFTER disambiguating, so the id suffix lands before the
     /// extension per the shared convention. Collision scope is exactly the candidates
-    /// passed in — callers must pre-scope siblings to a single listing/asset-type
+    /// passed in - callers must pre-scope siblings to a single listing/asset-type
     /// (e.g. one project's models, not all models globally).
     /// </summary>
     public static IReadOnlyDictionary<int, string> ComputeDisplayNames<T>(
@@ -112,10 +112,10 @@ public static partial class WebDavUtilities
     ///     {base} case-insensitively, resolve to it.
     ///  2. Otherwise, treat the whole segment as a plain name matched
     ///     case-insensitively against candidates' plain display names. Exactly one
-    ///     match resolves; zero or multiple matches return null — never guess among
+    ///     match resolves; zero or multiple matches return null - never guess among
     ///     duplicates (the client gets a 404).
     /// <paramref name="nameSelector"/> must return each candidate's plain
-    /// (non-disambiguated) display name — i.e. the name/virtual-filename it would have
+    /// (non-disambiguated) display name - i.e. the name/virtual-filename it would have
     /// if it were the only sibling in the listing (matching what
     /// <see cref="ComputeDisplayNames{T}"/> would show for a non-colliding entry).
     /// </summary>

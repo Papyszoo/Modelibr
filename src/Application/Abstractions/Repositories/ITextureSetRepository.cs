@@ -16,7 +16,7 @@ public interface ITextureSetRepository
     Task<IReadOnlyList<string>> GetNamesByPrefixAsync(string prefix, CancellationToken cancellationToken = default);
     /// <summary>
     /// Distinct tag names currently assigned to (non-deleted) texture sets.
-    /// This is the texture-set tag vocabulary — kept separate from the model tag
+    /// This is the texture-set tag vocabulary - kept separate from the model tag
     /// pool so tag suggestions stay strictly per-asset-type.
     /// </summary>
     Task<IReadOnlyList<string>> GetAssignedTagNamesAsync(CancellationToken cancellationToken = default);
@@ -34,7 +34,7 @@ public interface ITextureSetRepository
         CancellationToken cancellationToken = default);
     /// <summary>
     /// True per-category texture-set counts for one kind (Universal or
-    /// ModelSpecific) — drives the category sidebar's count badges.
+    /// ModelSpecific) - drives the category sidebar's count badges.
     /// </summary>
     Task<CategoryAssetCounts> GetCategoryAssetCountsAsync(
         TextureSetKind kind, CancellationToken cancellationToken = default);
