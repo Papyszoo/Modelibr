@@ -14,7 +14,12 @@ export interface StoreLibraryItem {
   assetId: string
   title: string
   author: string
-  categoryName: string
+  /**
+   * Distinct item types contained in the entry ("Model", "Sound", …). Replaced
+   * the store's removed `categoryName` — item types are the taxonomy now. The
+   * grid doesn't surface it yet; it is kept so the type matches the wire.
+   */
+  itemTypes: string[]
   license: string
   isPack: boolean
   fileCount: number

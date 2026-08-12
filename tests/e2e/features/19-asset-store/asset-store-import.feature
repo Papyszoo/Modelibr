@@ -9,6 +9,8 @@ Feature: Asset Store import
     Given I am on the Asset Store tab
     When I sign in to the asset store
     Then my store library shows "E2E Props Pack"
+    When I open "e2e-props-pack" from the store library
+    Then clicking an item's checkbox deselects and reselects that item
     When I import "e2e-props-pack" from the store library
     Then the store import completes with an option to open the pack
     And opening the imported pack shows the pack viewer for "E2E Props Pack"

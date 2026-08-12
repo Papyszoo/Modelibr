@@ -25,6 +25,13 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
     // multi-GB absolute file cap.
     private const long PreviewMaxBytes = 33_554_432; // 32 MiB
 
+    /// <summary>
+    /// Highest manifest schema this importer understands (see StoreManifest). A newer store may
+    /// reshape or re-mean fields, so an unknown version is refused loudly rather than imported
+    /// on v1 assumptions. Version 0 means "absent" and is treated as v1 for older manifests.
+    /// </summary>
+    private const int MaxSupportedManifestSchemaVersion = 1;
+
     private readonly IStoreImportClient _client;
     private readonly IStoreImportSink _sink;
     private readonly IStoreImportCategoryResolver _categoryResolver;
@@ -91,6 +98,12 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
             await NotifyAsync(job, 0, null, "Fetching manifest", cancellationToken);
 
             var manifest = await _client.FetchManifestAsync(work.StoreUrl, work.AssetId, work.ImportToken, cancellationToken);
+
+            if (manifest.SchemaVersion > MaxSupportedManifestSchemaVersion)
+                throw new StoreImportException(
+                    $"Manifest schema version {manifest.SchemaVersion} is newer than this Modelibr supports " +
+                    $"(up to v{MaxSupportedManifestSchemaVersion}). Update Modelibr to import from this store.");
+
             var items = manifest.Items ?? Array.Empty<StoreManifestItem>();
 
             // Partial import: when a selection is present, keep only those manifest items (by store
@@ -133,7 +146,10 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
                 {
                     outcome = await ImportItemAsync(work, packId, item, tags, batchId, cancellationToken);
                 }
-                catch (OperationCanceledException)
+                // Only a real host-shutdown cancellation aborts the run. HttpClient.Timeout also
+                // surfaces as (Task)OperationCanceledException, and treating that as shutdown
+                // used to abandon the whole job — a network timeout must fail just this item.
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
                     throw;
                 }
@@ -166,11 +182,14 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
             await SaveJobAsync(job, cancellationToken);
             await NotifyAsync(job, processed, null, "Import complete", cancellationToken, created, skipped, failed);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             // Host shutdown / cancellation: leave the job as-is here — the queue's startup
             // sweep marks interrupted jobs Failed on the next boot, and a new import
-            // gap-fills via provenance + SHA dedupe.
+            // gap-fills via provenance + SHA dedupe. The `when` guard matters: an HTTP
+            // timeout throws the same exception type, and swallowing it here left the job
+            // Running forever with the UI polling it indefinitely. Those fall through to the
+            // generic handler below and are persisted as Failed.
             _logger.LogInformation("Store import job {JobId} was cancelled", work.JobId);
         }
         catch (Exception ex)
@@ -207,21 +226,42 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         var baseName = string.IsNullOrWhiteSpace(manifest.Title) ? $"Imported pack {work.AssetId}" : manifest.Title!.Trim();
         var license = StoreManifestMapping.MapLicense(manifest.License);
 
-        var packId = await CreatePackWithUniqueNameAsync(baseName, manifest.Description, license, listingUrl, ct);
-        await _sink.RecordPackProvenanceAsync(packId, work.StoreUrl, work.AssetId, manifest.SchemaVersion, ct);
-        return packId;
+        try
+        {
+            // Creation stamps provenance in the same transaction (see IStoreImportSink), so the
+            // pack is never visible without its idempotency key.
+            return await CreatePackWithUniqueNameAsync(
+                baseName, manifest.Description, license, listingUrl, work, manifest.SchemaVersion, ct);
+        }
+        catch (Exception) when (!ct.IsCancellationRequested)
+        {
+            // A concurrent import of the SAME store asset passed the lookup above too and won the
+            // race — the unique provenance index rejects this one. Adopt the winner's pack instead
+            // of failing the job; anything else is a real error and rethrows.
+            _trackerReset.Clear();
+            var winner = await _packRepository.GetByStoreImportAsync(work.StoreUrl, work.AssetId, ct);
+            if (winner is null)
+                throw;
+
+            _logger.LogInformation(
+                "Store import: pack for {AssetId} was created concurrently; adopting pack {PackId}", work.AssetId, winner.Id);
+            return winner.Id;
+        }
     }
 
     // A pack name collision with an UNRELATED existing pack must not dead-end the import
     // (provenance already prevents re-import collisions). Disambiguate with a bounded suffix.
-    private async Task<int> CreatePackWithUniqueNameAsync(string baseName, string? description, string? license, string url, CancellationToken ct)
+    private async Task<int> CreatePackWithUniqueNameAsync(
+        string baseName, string? description, string? license, string url,
+        StoreImportWorkItem work, int manifestVersion, CancellationToken ct)
     {
         for (var attempt = 0; attempt < 25; attempt++)
         {
             var name = attempt == 0 ? baseName : $"{baseName} ({attempt + 1})";
             try
             {
-                return await _sink.CreatePackAsync(name, description, license, url, ct);
+                return await _sink.CreatePackAsync(
+                    name, description, license, url, work.StoreUrl, work.AssetId, manifestVersion, ct);
             }
             catch (StoreImportException ex) when (ex.ErrorCode == "PackAlreadyExists")
             {
@@ -244,7 +284,7 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
                 work.StoreUrl, preview.Url, work.ImportToken, expectedSizeBytes: 0, maxBytes: PreviewMaxBytes, ct);
             await _sink.SetPackThumbnailFromFileAsync(packId, download.ToUpload(preview.FileName, preview.ContentType), ct);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             throw;
         }
@@ -292,7 +332,7 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
             return await _client.DownloadFileAsync(
                 work.StoreUrl, preview.Url, work.ImportToken, expectedSizeBytes: 0, maxBytes: PreviewMaxBytes, ct);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             throw;
         }
@@ -311,7 +351,7 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         {
             await _sink.SetModelThumbnailFromFileAsync(modelId, download.ToUpload(preview.FileName, preview.ContentType), ct);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             throw;
         }
@@ -633,8 +673,10 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
     private static StoreImportItemResult Skipped(StoreManifestItem item, string outcome, string reason)
         => new(item.ItemType, item.Name, outcome, reason);
 
+    // Must match the storefront's asset detail route (`/assets/:id` in the store frontend's
+    // App.tsx) — this URL is shown as the pack's source link and has to actually open.
     private static string BuildListingUrl(string storeUrl, string assetId)
-        => $"{storeUrl.TrimEnd('/')}/asset/{assetId}";
+        => $"{storeUrl.TrimEnd('/')}/assets/{assetId}";
 
     private static string Serialize(IReadOnlyList<StoreImportItemResult> results)
         => JsonSerializer.Serialize(results);

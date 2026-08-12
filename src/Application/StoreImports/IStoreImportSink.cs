@@ -14,7 +14,15 @@ namespace Application.StoreImports;
 public interface IStoreImportSink
 {
     // Pack.
-    Task<int> CreatePackAsync(string name, string? description, string? licenseType, string? url, CancellationToken ct);
+    /// <summary>
+    /// Creates the pack AND stamps its store provenance in one transaction — the
+    /// (storeUrl, storeAssetId) pair is the re-import idempotency key, so a pack must never be
+    /// visible without it. <see cref="RecordPackProvenanceAsync"/> only re-stamps packs that
+    /// already exist.
+    /// </summary>
+    Task<int> CreatePackAsync(
+        string name, string? description, string? licenseType, string? url,
+        string storeUrl, string storeAssetId, int manifestVersion, CancellationToken ct);
     Task RecordPackProvenanceAsync(int packId, string storeUrl, string storeAssetId, int manifestVersion, CancellationToken ct);
     Task SetPackThumbnailFromFileAsync(int packId, IFileUpload file, CancellationToken ct);
 

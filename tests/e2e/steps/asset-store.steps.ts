@@ -30,6 +30,37 @@ Then("my store library shows {string}", async ({ page }, title: string) => {
 });
 
 When(
+    "I open {string} from the store library",
+    async ({ page }, assetId: string) => {
+        const storePage = new AssetStorePage(page);
+        await storePage.openPackDetail(assetId);
+    },
+);
+
+// Regression: the row and its checkbox both toggled selection, so a click on
+// the checkbox toggled twice (bubbling to the row) and the checkbox looked
+// dead. The previous suite only imported the default all-selected set, so it
+// never clicked one.
+Then(
+    "clicking an item's checkbox deselects and reselects that item",
+    async ({ page }) => {
+        const storePage = new AssetStorePage(page);
+        const checkbox = storePage.itemCheckbox(0);
+        await expect(checkbox).toBeChecked();
+
+        await checkbox.click();
+        await expect(checkbox).not.toBeChecked();
+        // Nothing selected — importing is not offered.
+        await expect(storePage.importSelectedButton()).toBeDisabled();
+
+        await checkbox.click();
+        await expect(checkbox).toBeChecked();
+        await expect(storePage.importSelectedButton()).toBeEnabled();
+        console.log("[Assert] Item checkbox toggles selection exactly once");
+    },
+);
+
+When(
     "I import {string} from the store library",
     async ({ page }, assetId: string) => {
         const storePage = new AssetStorePage(page);

@@ -77,7 +77,8 @@ function toLibraryItem(def: StorePackDefinition) {
     assetId: def.assetId,
     title: def.title,
     author: 'The Base Mesh',
-    categoryName: 'Base Meshes',
+    // Mirrors the store's LibraryEntryResponse.ItemTypes (its CategoryName is gone).
+    itemTypes: ['Model'],
     license: 'CC0',
     isPack: true,
     fileCount: def.meshes.length,

@@ -9,6 +9,7 @@ import type { InternalAxiosRequestConfig } from 'axios'
 import { ApiClientError } from '@/lib/apiBase'
 import { useAssetStoreAuthStore } from '@/stores/assetStoreAuthStore'
 
+import * as storeConfig from '../../lib/storeConfig'
 import {
   attachStoreAuthHeader,
   getStoreLibrary,
@@ -151,9 +152,16 @@ describe('handleStoreResponseError (401 refresh flow)', () => {
     expect(postMock).not.toHaveBeenCalled()
   })
 
-  it('clears the session when the refresh itself fails', async () => {
+  it('clears the session when the store REJECTS the refresh token', async () => {
     loggedInState()
-    postMock.mockRejectedValue(new Error('refresh token revoked'))
+    postMock.mockRejectedValue(
+      new ApiClientError('invalid refresh token', {
+        status: 401,
+        isNetworkError: false,
+        isTimeout: false,
+        isOffline: false,
+      })
+    )
 
     await expect(
       handleStoreResponseError(make401('/api/library'))
@@ -163,6 +171,54 @@ describe('handleStoreResponseError (401 refresh flow)', () => {
     expect(state.status).toBe('loggedOut')
     expect(state.accessToken).toBeNull()
     expect(state.error).toMatch(/session expired/i)
+  })
+
+  // Regression: this used to clear the session for ANY refresh failure, so a
+  // rate-limited (429) or restarting (5xx) store signed the user out of a
+  // session whose refresh token was still perfectly good.
+  it('keeps the session when the refresh fails for a transient reason', async () => {
+    loggedInState()
+    postMock.mockRejectedValue(
+      new ApiClientError('Too many requests', {
+        status: 429,
+        isNetworkError: false,
+        isTimeout: false,
+        isOffline: false,
+      })
+    )
+
+    await expect(
+      handleStoreResponseError(make401('/api/library'))
+    ).rejects.toBeInstanceOf(ApiClientError)
+
+    const state = useAssetStoreAuthStore.getState()
+    expect(state.status).toBe('loggedIn')
+    expect(state.refreshToken).toBe('refresh-1')
+    expect(requestMock).not.toHaveBeenCalled()
+  })
+
+  // Regression: a refresh that resolved AFTER the user signed in as someone else
+  // was dropped by setTokens (good) but the request was retried and cached
+  // anyway — serving account A's response to account B.
+  it('does not retry the request when the session changed mid-refresh', async () => {
+    loggedInState()
+    postMock.mockImplementation(async () => {
+      // Someone signs in as another account while the refresh is open.
+      useAssetStoreAuthStore.getState().setSession({
+        accessToken: 'access-B',
+        refreshToken: 'refresh-B',
+        username: 'other-artist',
+      })
+      return { data: { accessToken: 'access-2', refreshToken: 'refresh-2' } }
+    })
+
+    const error = make401('/api/library')
+    await expect(handleStoreResponseError(error)).rejects.toBe(error)
+
+    expect(requestMock).not.toHaveBeenCalled()
+    const state = useAssetStoreAuthStore.getState()
+    expect(state.accessToken).toBe('access-B')
+    expect(state.refreshToken).toBe('refresh-B')
   })
 
   // Regression: two requests 401ing at the same moment each ran their own
@@ -204,5 +260,83 @@ describe('refreshStoreTokensOnce', () => {
     })
     await refreshStoreTokensOnce('r2')
     expect(postMock).toHaveBeenCalledTimes(2)
+  })
+
+  // Regression: the single flight was a bare module-level promise, not keyed by
+  // session. Account A's refresh, still open while the user logged out and signed
+  // in as B, resolved into B's session and replaced B's tokens with A's.
+  it('does not share a flight across sessions, and drops a late result for a session that is gone', async () => {
+    useAssetStoreAuthStore.getState().setSession({
+      accessToken: 'a-access',
+      refreshToken: 'a-refresh',
+      username: 'account-a',
+    })
+
+    let resolveA: (value: unknown) => void = () => {}
+    postMock.mockReturnValueOnce(new Promise(r => (resolveA = r)))
+    const aFlight = refreshStoreTokensOnce('a-refresh')
+
+    // The user logs out and signs in as B while A's refresh is still open.
+    useAssetStoreAuthStore.getState().clearSession()
+    useAssetStoreAuthStore.getState().setSession({
+      accessToken: 'b-access',
+      refreshToken: 'b-refresh',
+      username: 'account-b',
+    })
+
+    // B's own refresh is a separate call — it must not be handed A's promise.
+    postMock.mockResolvedValueOnce({
+      data: { accessToken: 'b-access-2', refreshToken: 'b-refresh-2' },
+    })
+    const bResult = await refreshStoreTokensOnce('b-refresh')
+    expect(postMock).toHaveBeenCalledTimes(2)
+    expect(bResult.accessToken).toBe('b-access-2')
+
+    // A's late response is discarded rather than applied over B's session.
+    resolveA({
+      data: { accessToken: 'a-access-2', refreshToken: 'a-refresh-2' },
+    })
+    const aResult = await aFlight
+    useAssetStoreAuthStore.getState().setTokens({
+      accessToken: aResult.accessToken,
+      refreshToken: aResult.refreshToken,
+      previousRefreshToken: 'a-refresh',
+    })
+
+    const state = useAssetStoreAuthStore.getState()
+    expect(state.username).toBe('account-b')
+    expect(state.accessToken).toBe('b-access')
+  })
+})
+
+describe('store-origin binding', () => {
+  // Regression: the client was built with `createApiClient(storeUrl ?? '')`. With
+  // VITE_STORE_URL unset that is an EMPTY base URL, so '/api/library' resolved
+  // against Modelibr's own origin and the store bearer token was sent to the
+  // local backend. Nothing credentialed may leave without a configured store.
+  it('refuses to send a store request when the store URL is not configured', () => {
+    loggedInState()
+    jest.spyOn(storeConfig, 'getConfiguredStoreUrl').mockReturnValue(null)
+
+    expect(() =>
+      attachStoreAuthHeader({
+        url: '/api/library',
+        headers: {},
+      } as unknown as InternalAxiosRequestConfig)
+    ).toThrow(/not configured/i)
+  })
+
+  it('refuses to send a store request aimed at a different origin', () => {
+    loggedInState()
+    jest
+      .spyOn(storeConfig, 'getConfiguredStoreUrl')
+      .mockReturnValue('https://store.test')
+
+    expect(() =>
+      attachStoreAuthHeader({
+        url: 'https://evil.example/api/library',
+        headers: {},
+      } as unknown as InternalAxiosRequestConfig)
+    ).toThrow(/Refusing to send a store request/i)
   })
 })

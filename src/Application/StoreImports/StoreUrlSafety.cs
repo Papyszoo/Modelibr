@@ -50,18 +50,26 @@ public static class StoreUrlSafety
         return IPAddress.TryParse(uri.Host, out var ip) && IPAddress.IsLoopback(ip);
     }
 
-    /// <summary>True when two URLs address the same host and port (case-insensitive host).</summary>
-    public static bool IsSameHost(Uri a, Uri b)
-        => string.Equals(a.Host, b.Host, StringComparison.OrdinalIgnoreCase) && a.Port == b.Port;
+    /// <summary>
+    /// True when two URLs share a full origin — scheme, host (case-insensitive) and port.
+    /// Trust is deliberately origin-based, not host-based: <c>http://store:443</c> is NOT the
+    /// same principal as <c>https://store:443</c>, so an https store that redirects to plain
+    /// http on its own host must not be handed the import token in cleartext.
+    /// </summary>
+    public static bool IsSameOrigin(Uri a, Uri b)
+        => string.Equals(a.Scheme, b.Scheme, StringComparison.OrdinalIgnoreCase)
+           && string.Equals(a.Host, b.Host, StringComparison.OrdinalIgnoreCase)
+           && a.Port == b.Port;
 
     /// <summary>
     /// Validates a download / redirect-hop target against the store it belongs to. The scheme
-    /// must stay http(s) (blocks downgrades to file://, gopher://, etc.). The store's OWN host
-    /// is trusted (a self-hosted store may legitimately live on a LAN/loopback address that the
-    /// user chose), so same-host targets always pass. Any OTHER host must not be a private/
-    /// link-local address — and not loopback either, unless the store itself is loopback (dev).
-    /// When the target host is an IP literal it is classified here; hostnames pass this check
-    /// and the client additionally resolves + re-validates them via <see cref="IsBlockedAddress"/>.
+    /// must stay http(s) (blocks downgrades to file://, gopher://, etc.) and an https store may
+    /// never be downgraded to http on any hop. The store's OWN origin is trusted (a self-hosted
+    /// store may legitimately live on a LAN/loopback address that the user chose), so
+    /// same-origin targets always pass. Any OTHER origin must not be a private/link-local
+    /// address — and not loopback either, unless the store itself is loopback (dev). When the
+    /// target host is an IP literal it is classified here; hostnames pass this check and the
+    /// client additionally resolves + re-validates them via <see cref="IsBlockedAddress"/>.
     /// </summary>
     public static Result ValidateDownloadTarget(Uri target, Uri storeUri)
     {
@@ -70,8 +78,15 @@ public static class StoreUrlSafety
                 "StoreImport.InsecureDownloadUrl",
                 $"Refusing to download from a non-http(s) URL ({target.Scheme})."));
 
-        // The store's own host is trusted (it is the URL the user entered).
-        if (IsSameHost(target, storeUri))
+        // A transport downgrade is refused before anything else — otherwise an https store
+        // could redirect to http on its own host/port and read the import token off the wire.
+        if (storeUri.Scheme == Uri.UriSchemeHttps && target.Scheme == Uri.UriSchemeHttp)
+            return Result.Failure(new Error(
+                "StoreImport.InsecureDownloadUrl",
+                $"Refusing to downgrade to http for '{target.Host}' — the store is https."));
+
+        // The store's own origin is trusted (it is the URL the user entered).
+        if (IsSameOrigin(target, storeUri))
             return Result.Success();
 
         var allowLoopback = IsLoopbackHost(storeUri);

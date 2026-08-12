@@ -58,10 +58,16 @@ function newEntry(assetId: string): AssetStoreImportEntry {
   }
 }
 
-/** Maps a backend job status (SignalR/DTO) onto the UI phase. */
+/**
+ * Maps a backend job status (SignalR/DTO) onto the UI phase. 'CompletedWithErrors'
+ * is terminal too — the job finished, some items failed. Omitting it here left the
+ * import stuck on 'importing' forever (permanent spinner, endless polling); the
+ * partial failure is reported through `itemsFailed`.
+ */
 function phaseForStatus(status: string): AssetStoreImportPhase {
   switch (status) {
     case 'Completed':
+    case 'CompletedWithErrors':
       return 'completed'
     case 'Failed':
       return 'failed'

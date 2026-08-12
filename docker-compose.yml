@@ -83,7 +83,11 @@ services:
                 asset-processor: ./src/asset-processor
             args:
                 VITE_API_BASE_URL: ${VITE_API_BASE_URL}
-                VITE_STORE_URL: ${VITE_STORE_URL:-https://store.modelibr.com}
+                # `-` and not `:-`: an explicitly EMPTY VITE_STORE_URL means "no
+                # store", and the Asset Store tab renders its unconfigured state.
+                # With `:-` the empty value fell through to the hosted default,
+                # so opting out of the online surface silently opted back in.
+                VITE_STORE_URL: ${VITE_STORE_URL-https://store.modelibr.com}
         container_name: frontend
         networks:
             - modelibr

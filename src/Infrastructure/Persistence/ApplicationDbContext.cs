@@ -577,7 +577,14 @@ namespace Infrastructure.Persistence
                 // StoreImportAssetId) pair is the idempotency key for re-imports.
                 entity.Property(p => p.StoreImportUrl).HasMaxLength(500);
                 entity.Property(p => p.StoreImportAssetId).HasMaxLength(200);
-                entity.HasIndex(p => new { p.StoreImportUrl, p.StoreImportAssetId });
+                // UNIQUE so the idempotency key is enforced by the database, not just by the
+                // importer's read-then-write lookup: two concurrent imports of the same store
+                // asset both pass that lookup, and only the index stops the second from creating
+                // a duplicate pack. Filtered because the columns are null for every pack not
+                // created by the importer.
+                entity.HasIndex(p => new { p.StoreImportUrl, p.StoreImportAssetId })
+                    .IsUnique()
+                    .HasFilter("\"StoreImportUrl\" IS NOT NULL");
 
                 // Create index for efficient querying by name
                 entity.HasIndex(p => p.Name);

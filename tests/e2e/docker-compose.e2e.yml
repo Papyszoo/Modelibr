@@ -43,7 +43,7 @@ services:
     # http://localhost:9280, resolves to it from both the browser (via the
     # host port published on webapi-e2e) and the backend importer (loopback —
     # the importer allows http only for localhost, and manifest download URLs
-    # must be same-host to carry the import token).
+    # must be same-ORIGIN — scheme included — to carry the import token).
     store-fixture-e2e:
         build:
             context: .

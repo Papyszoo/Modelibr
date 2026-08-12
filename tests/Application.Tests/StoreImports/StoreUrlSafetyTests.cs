@@ -49,16 +49,30 @@ public class StoreUrlSafetyTests
     }
 
     [Theory]
-    [InlineData("http://10.0.0.5/f")]
-    [InlineData("http://172.16.4.4/f")]
-    [InlineData("http://192.168.1.10/f")]
-    [InlineData("http://169.254.1.1/f")]     // link-local
-    [InlineData("https://192.168.0.99/f")]   // private even over https
+    [InlineData("https://10.0.0.5/f")]
+    [InlineData("https://172.16.4.4/f")]
+    [InlineData("https://192.168.1.10/f")]
+    [InlineData("https://169.254.1.1/f")]     // link-local
+    [InlineData("https://192.168.0.99/f")]    // private even over https
     public void ValidateDownloadTarget_Blocks_PrivateAndLinkLocalRedirects(string url)
     {
         var result = StoreUrlSafety.ValidateDownloadTarget(new Uri(url), PublicStore);
         Assert.True(result.IsFailure);
         Assert.Equal("StoreImport.BlockedDownloadUrl", result.Error.Code);
+    }
+
+    // The same targets over plain http are refused one step earlier, as transport downgrades
+    // (an https store must never be followed onto http). Both paths block; the codes differ.
+    [Theory]
+    [InlineData("http://10.0.0.5/f")]
+    [InlineData("http://172.16.4.4/f")]
+    [InlineData("http://192.168.1.10/f")]
+    [InlineData("http://169.254.1.1/f")]
+    public void ValidateDownloadTarget_Blocks_HttpRedirects_FromAnHttpsStore(string url)
+    {
+        var result = StoreUrlSafety.ValidateDownloadTarget(new Uri(url), PublicStore);
+        Assert.True(result.IsFailure);
+        Assert.Equal("StoreImport.InsecureDownloadUrl", result.Error.Code);
     }
 
     [Fact]
@@ -74,6 +88,31 @@ public class StoreUrlSafetyTests
     {
         var result = StoreUrlSafety.ValidateDownloadTarget(new Uri("http://10.0.0.5/f"), LoopbackStore);
         Assert.True(result.IsFailure);
+    }
+
+    // Regression: trust used to be host+port only, ignoring the scheme. An https store could
+    // redirect a download to http on its own host/port, be treated as "same host", and receive
+    // the import token in cleartext (and skip address classification entirely).
+    [Fact]
+    public void ValidateDownloadTarget_Blocks_HttpsToHttpDowngrade_EvenOnTheStoresOwnHost()
+    {
+        var result = StoreUrlSafety.ValidateDownloadTarget(
+            new Uri("http://store.example.com:443/api/files/1/download"), PublicStore);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("StoreImport.InsecureDownloadUrl", result.Error.Code);
+    }
+
+    [Fact]
+    public void IsSameOrigin_RequiresSchemeHostAndPort()
+    {
+        Assert.True(StoreUrlSafety.IsSameOrigin(
+            new Uri("https://store.example.com/a"), new Uri("https://STORE.example.com/b")));
+        // Same host and port, different scheme — a different principal, so no token.
+        Assert.False(StoreUrlSafety.IsSameOrigin(
+            new Uri("http://store.example.com:443/a"), new Uri("https://store.example.com/b")));
+        Assert.False(StoreUrlSafety.IsSameOrigin(
+            new Uri("https://store.example.com:8443/a"), new Uri("https://store.example.com/b")));
     }
 
     [Theory]
