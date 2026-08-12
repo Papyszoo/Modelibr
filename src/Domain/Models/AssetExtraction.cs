@@ -12,7 +12,7 @@ namespace Domain.Models;
 /// same input bytes yield the same content. Versioned: <see cref="ExtractorVersion"/>
 /// (and, for 3D, <see cref="GeometryHashVersion"/>) combined with the file hash
 /// answers "which assets need re-extraction?" as a set difference. Re-extraction
-/// is idempotent — the same key upserts in place via <see cref="UpdatePayload"/>.
+/// is idempotent - the same key upserts in place via <see cref="UpdatePayload"/>.
 /// </summary>
 public class AssetExtraction
 {
@@ -27,7 +27,7 @@ public class AssetExtraction
     /// <summary>Version id where the family is versioned (models); null otherwise.</summary>
     public int? VersionId { get; private set; }
 
-    /// <summary>SHA-256 of the extracted file — the invalidation key alongside the extractor version.</summary>
+    /// <summary>SHA-256 of the extracted file - the invalidation key alongside the extractor version.</summary>
     public string FileSha256 { get; private set; } = string.Empty;
 
     /// <summary>Verbatim extractor output as JSON (stored as jsonb). Never trimmed or reinterpreted here.</summary>
@@ -47,7 +47,7 @@ public class AssetExtraction
 
     /// <summary>
     /// Human-readable warnings from a partial run (skipped fields, unresolved
-    /// references, importer complaints) — surfaced in the UI so users see why a
+    /// references, importer complaints) - surfaced in the UI so users see why a
     /// malformed upload indexed incompletely. Empty on a clean run.
     /// </summary>
     public List<string> Warnings { get; private set; } = new();

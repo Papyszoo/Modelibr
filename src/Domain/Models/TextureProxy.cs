@@ -3,7 +3,7 @@ namespace Domain.Models;
 /// <summary>
 /// Represents a resized proxy version of a Texture, generated for efficient WebGL rendering.
 /// Links the original Texture to a downscaled File at a specific square resolution.
-/// The proxy is strictly for 3D rendering — not for UI thumbnails or previews.
+/// The proxy is strictly for 3D rendering - not for UI thumbnails or previews.
 /// </summary>
 public class TextureProxy
 {

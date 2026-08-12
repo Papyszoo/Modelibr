@@ -162,7 +162,7 @@
       .link-btn:hover { background: none; text-decoration: underline; }
       .folder-actions { display: flex; gap: 14px; }
 
-      /* Advanced settings — tucked away so the common fields stay uncluttered. */
+      /* Advanced settings - tucked away so the common fields stay uncluttered. */
       details.advanced { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 4px; }
       details.advanced > summary {
         list-style: none; cursor: pointer; font-size: 11.5px; color: var(--muted); padding: 6px 0;
@@ -219,24 +219,24 @@
         <div class="service">
           <span class="dot pending" id="dot-backend"></span>
           <span class="name">Modelibr service</span>
-          <span class="detail" id="detail-backend">—</span>
+          <span class="detail" id="detail-backend">-</span>
         </div>
         <div class="service">
           <span class="dot pending" id="dot-database"></span>
           <span class="name">Storage</span>
-          <span class="detail" id="detail-database">—</span>
+          <span class="detail" id="detail-database">-</span>
         </div>
         <div class="service">
           <span class="dot pending" id="dot-asset"></span>
           <span class="name">Preview generator</span>
-          <span class="detail" id="detail-asset">—</span>
+          <span class="detail" id="detail-asset">-</span>
         </div>
       </div>
     </details>
 
     <button class="hero" id="open-frontend" disabled>Open Modelibr</button>
     <div class="address-line">
-      <code id="frontend-url">—</code>
+      <code id="frontend-url">-</code>
       <button class="icon" id="copy-url" title="Copy address">Copy</button>
     </div>
     <div class="address-note" id="address-note" style="display:none">
@@ -245,14 +245,14 @@
 
     <div class="install">
       <div class="text">
-        <b>Desktop client</b> — <span id="install-text">open Modelibr in its own app window instead of a browser tab.</span>
+        <b>Desktop client</b> - <span id="install-text">open Modelibr in its own app window instead of a browser tab.</span>
       </div>
       <button id="install-client">Install</button>
     </div>
 
     <div class="leftover" id="leftover-note" style="display:none">
       <div class="leftover-text">
-        Your previous data folder is still on disk as a backup —
+        Your previous data folder is still on disk as a backup -
         <code id="leftover-path"></code>. Safe to delete once you've confirmed everything moved over.
       </div>
       <div class="leftover-actions">
@@ -387,7 +387,7 @@
         } else if (allUp) {
           setOverall('up', 'Modelibr is ready', '')
         } else {
-          setOverall('pending', 'Partly running', "Some parts aren't responding yet — open Show details to see which.")
+          setOverall('pending', 'Partly running', "Some parts aren't responding yet - open Show details to see which.")
         }
 
         setOpenEnabled(status.phase === 'ready')
@@ -438,7 +438,7 @@
 
         if (u.status === 'downloaded') {
           banner.classList.add('available')
-          text.textContent = `Update ready — v${u.latestVersion}`
+          text.textContent = `Update ready - v${u.latestVersion}`
           action.textContent = 'Restart & Install'
           action.style.display = ''
         } else if (u.status === 'downloading') {
@@ -447,7 +447,7 @@
           action.style.display = 'none'
         } else if (u.status === 'available') {
           banner.classList.add('available')
-          text.textContent = `Update available — v${u.latestVersion}`
+          text.textContent = `Update available - v${u.latestVersion}`
           action.textContent = 'Update'
           action.style.display = ''
         } else if (u.status === 'checking') {
@@ -509,7 +509,7 @@
         const btn = $('install-client')
         if (clientInstalled) {
           btn.textContent = 'Open'
-          $('install-text').textContent = 'installed — open Modelibr in its own app window.'
+          $('install-text').textContent = 'installed - open Modelibr in its own app window.'
         } else {
           btn.textContent = 'Install'
           $('install-text').textContent = installDefaultText
@@ -589,7 +589,7 @@
             loadedConfig = result.config
             applyConfigToInputs(loadedConfig)
             $('cfg-note').textContent = result.restartRequired
-              ? 'Saved — restart to apply (ports / data folder).'
+              ? 'Saved - restart to apply (ports / data folder).'
               : 'Saved.'
             toast('Settings saved')
           }
@@ -642,7 +642,7 @@
           const result = await api.openClient()
           if (!result?.ok) {
             // The default-location guess was wrong (custom install dir, or it
-            // was removed) — fall back to the install flow next time.
+            // was removed) - fall back to the install flow next time.
             await refreshClientStatus()
           }
           return
@@ -657,7 +657,7 @@
         try {
           const result = await api.installClient()
           if (result?.ok) {
-            $('install-text').textContent = 'Installer opened — follow its prompts.'
+            $('install-text').textContent = 'Installer opened - follow its prompts.'
           } else if (result?.reason !== 'error') {
             $('install-text').textContent = installDefaultText
           }

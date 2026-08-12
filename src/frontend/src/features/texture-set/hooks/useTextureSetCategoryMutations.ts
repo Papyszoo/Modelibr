@@ -24,7 +24,7 @@ interface ShowToast {
 
 interface UseTextureSetCategoryMutationsOptions {
   showToast: ShowToast
-  /** Kind the visible categories belong to — categories are scoped per kind. */
+  /** Kind the visible categories belong to - categories are scoped per kind. */
   categoriesKind: TextureSetKind
   activeCategoryId: number | null
   setActiveCategoryId: (id: number | null) => void
@@ -62,7 +62,7 @@ export function useTextureSetCategoryMutations({
       await Promise.all([invalidateCategories(), invalidateTextureSets()])
     },
     onAssetsChanged: invalidateTextureSets,
-    // Categories are scoped per kind — stamp the visible kind onto create/rename.
+    // Categories are scoped per kind - stamp the visible kind onto create/rename.
     createCategory: vars =>
       createTextureSetCategory({
         name: vars.name,

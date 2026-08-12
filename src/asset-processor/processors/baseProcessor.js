@@ -59,10 +59,10 @@ export class BaseProcessor {
       if (signal?.aborted) {
         // The job queue already timed this job out and reported it failed
         // while we were still running. Discard this late result instead of
-        // double-finishing the job — a different worker may have already
+        // double-finishing the job - a different worker may have already
         // reclaimed it for retry.
         jobLogger.warn(
-          `${this.processorType} processing finished after the job had already timed out — discarding stale result`
+          `${this.processorType} processing finished after the job had already timed out - discarding stale result`
         )
         return
       }
@@ -86,7 +86,7 @@ export class BaseProcessor {
 
       if (signal?.aborted) {
         jobLogger.warn(
-          'Skipping markFailed — job was already finished by the timeout handler'
+          'Skipping markFailed - job was already finished by the timeout handler'
         )
       } else {
         try {
@@ -122,12 +122,12 @@ export class BaseProcessor {
    * the job holding it times out. Puppeteer's in-flight page.evaluate()
    * calls reject once the page is torn down, which unwinds the processor's
    * own try/finally and returns the slot via the normal `rendererPool
-   * .release()` path — but with a fresh, usable page instead of a hung one.
+   * .release()` path - but with a fresh, usable page instead of a hung one.
    * @param {AbortSignal|undefined} signal
    * @param {import('../rendererPool.js').RendererPool} rendererPool
    * @param {*} renderer - The renderer this job currently holds.
    * @param {Object} jobLogger
-   * @returns {() => void} Disarm function — call it once the renderer has
+   * @returns {() => void} Disarm function - call it once the renderer has
    *   been released normally so a later abort (there shouldn't be one) is
    *   a no-op.
    */
@@ -137,7 +137,7 @@ export class BaseProcessor {
     }
 
     const onAbort = () => {
-      jobLogger.warn('Job aborted — force-reinitializing renderer pool slot')
+      jobLogger.warn('Job aborted - force-reinitializing renderer pool slot')
       rendererPool.forceReinit(renderer).catch(reinitError => {
         jobLogger.error('Failed to force-reinitialize renderer after abort', {
           error: reinitError.message,

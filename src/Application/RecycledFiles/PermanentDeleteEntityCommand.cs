@@ -252,7 +252,7 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
                 }
                 
                 // The search projection is denormalised and carries no FK to Models,
-                // so nothing cascades — drop its documents explicitly or the asset
+                // so nothing cascades - drop its documents explicitly or the asset
                 // stays searchable after the row it describes is gone.
                 await _searchDocumentRepository.RemoveAllForAssetAsync(
                     ExtractionAssetTypes.Model, request.EntityId, cancellationToken);

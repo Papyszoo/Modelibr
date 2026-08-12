@@ -17,8 +17,8 @@ namespace Application.Tests.TextureSets;
 
 /// <summary>
 /// Covers the backend texture-image metadata extraction added so non-Universal
-/// (Multi-Model / Single-Model) texture sets — which never get a worker thumbnail
-/// pass — still capture their source-image resolution at upload time. Universal
+/// (Multi-Model / Single-Model) texture sets - which never get a worker thumbnail
+/// pass - still capture their source-image resolution at upload time. Universal
 /// sets must NOT extract here; they get their metadata from the worker job.
 /// </summary>
 public class TextureUploadMetadataExtractionTests

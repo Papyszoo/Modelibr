@@ -4,7 +4,7 @@ const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3102";
 
 export default defineConfig({
     testDir: "./specs",
-    timeout: 180000, // 3 min — restore round-trip restarts the webapi container
+    timeout: 180000, // 3 min - restore round-trip restarts the webapi container
     fullyParallel: false, // Stack is shared; tests must run sequentially.
     workers: 1,
     retries: 0,

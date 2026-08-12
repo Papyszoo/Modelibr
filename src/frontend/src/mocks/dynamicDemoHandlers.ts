@@ -163,7 +163,7 @@ public class NewBehaviour : MonoBehaviour
     language: 'glsl',
     description:
       'ShaderToy-compatible fragment shader; renders live in the preview pane.',
-    content: `// Fragment shader — animated gradient.
+    content: `// Fragment shader - animated gradient.
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     vec2 uv = fragCoord / iResolution.xy;
     vec3 col = 0.5 + 0.5 * cos(iTime + uv.xyx + vec3(0.0, 2.0, 4.0));
@@ -177,7 +177,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     name: 'three.js Vertex Shader (GLSL)',
     language: 'glsl',
     description: 'A pass-through vertex shader using three.js built-ins.',
-    content: `// Vertex shader — passes UVs through to the fragment stage.
+    content: `// Vertex shader - passes UVs through to the fragment stage.
 varying vec2 vUv;
 
 void main() {
@@ -325,8 +325,8 @@ async function updateCategoryInStore(
   }
 
   const all = await getAll(storeName)
-  // Texture-set categories are kind-scoped — same name is allowed across
-  // kinds — so the duplicate-name and descendant checks must only see
+  // Texture-set categories are kind-scoped - same name is allowed across
+  // kinds - so the duplicate-name and descendant checks must only see
   // siblings of the same kind. Other category types omit `kind`, in which
   // case this is a no-op.
   const categories =
@@ -806,7 +806,7 @@ export const dynamicDemoHandlers = [
   }),
 
   http.get('*/model-tags', async () => {
-    // Model tag vocabulary only — texture sets have their own pool at
+    // Model tag vocabulary only - texture sets have their own pool at
     // "/texture-sets/tags". Tags are strictly per-asset-type, never shared.
     const models = await getAll('models')
     const tags = [...new Set(models.flatMap(model => model.tags ?? []))]
@@ -1566,7 +1566,7 @@ export const dynamicDemoHandlers = [
   ),
 
   // External glTF resources linked to a version. The demo library ships packed
-  // .glb seeds, so this is always empty — but it must answer, not 404: the viewer
+  // .glb seeds, so this is always empty - but it must answer, not 404: the viewer
   // asks for it whenever a version carries a loose .gltf.
   http.get(
     '*/models/:modelId/versions/:versionId/auxiliary-files',
@@ -3558,7 +3558,7 @@ export const dynamicDemoHandlers = [
       sound.waveformUrl = `/sounds/${soundId}/waveform`
       await storeThumbnail(`waveform:${soundId}`, result.thumbnail)
     } catch {
-      // Waveform generation failed — leave waveformUrl as null
+      // Waveform generation failed - leave waveformUrl as null
     }
 
     await put('sounds', sound)

@@ -90,7 +90,7 @@ public static class BackupEndpoints
             try
             {
                 backupService.StageRestore(fileName);
-                // 202 Accepted — the actual restore happens on the next webapi boot
+                // 202 Accepted - the actual restore happens on the next webapi boot
                 // via RestoreOnBootProcessor, not synchronously here.
                 return Results.Accepted(value: new
                 {

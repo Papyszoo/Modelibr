@@ -1,4 +1,4 @@
-# Backup trust hardening — and the open desktop gap
+# Backup trust hardening - and the open desktop gap
 
 Prompt 17 implemented 2026-07-11, **PR #566** (`feat/backup-trust-hardening` →
 `version/0.4`).
@@ -13,7 +13,7 @@ Prompt 17 implemented 2026-07-11, **PR #566** (`feat/backup-trust-hardening` →
 - Restore drill = a nightly GitHub Actions job (`backup-restore-drill` in
   `nightly-e2e.yml`).
 
-## CRITICAL open follow-up — desktop backups don't work
+## CRITICAL open follow-up - desktop backups don't work
 
 Discovered during the same work: **desktop tray-host backups are nonfunctional.**
 
@@ -22,14 +22,14 @@ Discovered during the same work: **desktop tray-host backups are nonfunctional.*
   Postgres `bin/` is not on the desktop PATH.
 
 Because a startup-blocking regression would be worse, desktop currently sets
-`MODELIBR_SKIP_PREMIGRATION_BACKUP=true` — i.e. **desktop has opted out of
+`MODELIBR_SKIP_PREMIGRATION_BACKUP=true` - i.e. **desktop has opted out of
 pre-migration backup entirely.**
 
 **Real fix:** absolute-path resolution for the pg tools in `BackupService`. Tracked
 as `TODO(backup on desktop)` in `src/desktop/src/processManager.js` and noted in
 `docs/docs/features/backups.md`.
 
-**This deserves its own prompt before 1.0** — desktop is the auto-update channel,
+**This deserves its own prompt before 1.0** - desktop is the auto-update channel,
 which is exactly where a pre-migration backup matters most.
 
 Related: [[desktop-installer.md]]

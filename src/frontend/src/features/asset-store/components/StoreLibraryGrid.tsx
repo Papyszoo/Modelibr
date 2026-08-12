@@ -21,7 +21,7 @@ interface StoreLibraryGridProps {
 
 /**
  * Read-only status chip for a library tile: Importing… / Imported ✓ / Failed.
- * The actual import (whole pack or selected items) happens in the pack detail —
+ * The actual import (whole pack or selected items) happens in the pack detail -
  * tiles just open it.
  */
 function StatusChip({
@@ -91,7 +91,7 @@ export function StoreLibraryGrid({ items, onOpenPack }: StoreLibraryGridProps) {
   return (
     <AssetGrid className="asset-store-grid">
       {items.map(item => {
-        // The store serves relative preview urls unless it has a PublicBaseUrl —
+        // The store serves relative preview urls unless it has a PublicBaseUrl -
         // resolve them against the store, not against Modelibr's own origin.
         const previewUrl = resolveStorePreviewUrl(item.previewThumbnailUrl)
         return (

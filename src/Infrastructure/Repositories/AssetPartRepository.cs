@@ -28,7 +28,7 @@ internal sealed class AssetPartRepository : IAssetPartRepository
     {
         // Load tracked and stage RemoveRange (rather than ExecuteDelete) so the
         // delete + the following re-insert commit together in the handler's single
-        // SaveChanges — a failed re-extraction never leaves an asset part-less.
+        // SaveChanges - a failed re-extraction never leaves an asset part-less.
         var existing = await _context.AssetParts
             .Where(p => p.AssetType == assetType && p.AssetId == assetId && p.VersionId == versionId)
             .ToListAsync(cancellationToken);

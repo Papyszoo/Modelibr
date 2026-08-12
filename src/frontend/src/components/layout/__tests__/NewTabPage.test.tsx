@@ -131,7 +131,7 @@ describe('NewTabPage', () => {
     window.removeEventListener(OPEN_SEARCH_EVENT, onOpenSearch)
 
     expect(onOpenSearch).toHaveBeenCalledTimes(1)
-    // Action tiles open an overlay — the host New Tab page is not converted.
+    // Action tiles open an overlay - the host New Tab page is not converted.
     expect(setTabs).not.toHaveBeenCalled()
   })
 
@@ -408,7 +408,7 @@ describe('NewTabPage', () => {
       expect(screen.getByText('Sessions')).toBeInTheDocument()
 
       const restoreBtn = screen.getByRole('button', {
-        name: /Restore session — Left \(2\): Models, Sounds \| Right \(1\): Sprites/,
+        name: /Restore session - Left \(2\): Models, Sounds \| Right \(1\): Sprites/,
       })
       expect(restoreBtn).toBeInTheDocument()
     })
@@ -426,7 +426,7 @@ describe('NewTabPage', () => {
       renderWithContext(<NewTabPage tabId="newTab" />, ctx)
 
       fireEvent.click(
-        screen.getByRole('button', { name: /^Restore session — Left/ })
+        screen.getByRole('button', { name: /^Restore session - Left/ })
       )
 
       // Placeholder newTab removed from the panel.

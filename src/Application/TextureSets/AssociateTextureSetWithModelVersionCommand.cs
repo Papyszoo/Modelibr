@@ -91,7 +91,7 @@ internal class AssociateTextureSetWithModelVersionCommandHandler : ICommandHandl
 
             // If the linked variant is the main variant and no default is set yet,
             // auto-set DefaultTextureSetId and regenerate thumbnail.
-            // Only auto-set when null — explicit SetDefaultTextureSetCommand should be used to change it.
+            // Only auto-set when null - explicit SetDefaultTextureSetCommand should be used to change it.
             var mainVariant = modelVersion.MainVariantName ?? string.Empty;
             if (variantName == mainVariant && modelVersion.DefaultTextureSetId == null)
             {

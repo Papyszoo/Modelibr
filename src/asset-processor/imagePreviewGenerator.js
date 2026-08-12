@@ -44,8 +44,8 @@ export function isExrFile(filePath) {
 /**
  * Check whether Sharp can decode the file directly (PNG/JPEG/WebP/BMP/GIF/TGA/TIFF).
  *
- * Note: not all of these formats are decodable by a browser natively — TIFF in
- * particular is not — but Sharp handles them all server-side, which is what
+ * Note: not all of these formats are decodable by a browser natively - TIFF in
+ * particular is not - but Sharp handles them all server-side, which is what
  * the preview pipeline depends on. Keep this name accurate when adding formats:
  * anything Sharp can decode → here; anything that needs a custom decoder
  * (e.g. EXR) → handled in its own branch in `generateFilePreview`.

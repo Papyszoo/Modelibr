@@ -72,7 +72,7 @@ describe('useMediaQuery', () => {
     expect(result.current).toBe(false)
 
     // The hook calls matchMedia once for the initial state and once inside
-    // the effect — only the effect's MQL has a listener attached.
+    // the effect - only the effect's MQL has a listener attached.
     const subscribed = created.find(mql => mql.listeners.size > 0)
     expect(subscribed).toBeDefined()
 

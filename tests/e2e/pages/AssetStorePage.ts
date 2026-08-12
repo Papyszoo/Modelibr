@@ -76,13 +76,13 @@ export class AssetStorePage {
         return this.itemList().locator("li").nth(index);
     }
 
-    /** The row's own selection checkbox — the control, not the row-click affordance. */
+    /** The row's own selection checkbox - the control, not the row-click affordance. */
     itemCheckbox(index = 0): Locator {
         return this.itemRow(index).locator("input[type=checkbox]");
     }
 
     /**
-     * Opens the pack detail, or no-ops when it is already open — the detail view
+     * Opens the pack detail, or no-ops when it is already open - the detail view
      * REPLACES the library grid, so a second click on the (now absent) tile would
      * just time out.
      */
@@ -98,14 +98,14 @@ export class AssetStorePage {
 
     async importAsset(assetId: string): Promise<void> {
         await this.openPackDetail(assetId);
-        // The button stays disabled until the pack CONTENTS have loaded — a pack
+        // The button stays disabled until the pack CONTENTS have loaded - a pack
         // whose detail request failed reports zero items, and importing then
         // would silently pull the whole pack. Wait for it explicitly so that
         // case fails here with a clear message instead of inside the click.
         await expect(this.importSelectedButton()).toBeEnabled({
             timeout: 15000,
         });
-        // All items are selected by default — "Import selected (N)" imports
+        // All items are selected by default - "Import selected (N)" imports
         // the whole pack.
         await this.importSelectedButton().click();
         console.log(`[Action] Started import of ${assetId} from pack detail`);

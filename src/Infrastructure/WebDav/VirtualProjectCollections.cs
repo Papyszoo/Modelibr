@@ -27,7 +27,7 @@ public sealed class VirtualProjectsCollection : VirtualCollectionBase
     public override Task<IStoreItem?> GetItemAsync(string name, IHttpContext httpContext)
     {
         // Projects have their own (case-sensitive, DB-enforced-at-creation-time) uniqueness
-        // check and are not disambiguated with an id suffix — but WebDAV clients on
+        // check and are not disambiguated with an id suffix - but WebDAV clients on
         // Windows/macOS address paths case-insensitively, so a case-only collision must
         // never be guessed at: resolve unambiguously or 404.
         var project = WebDavUtilities.ResolveSegment(name, _projects, p => p.Id, p => p.Name);
@@ -181,7 +181,7 @@ public sealed class VirtualModelCollection : VirtualCollectionBase
     private readonly IBlendFileGenerator? _blendFileGenerator;
     private readonly ILogger? _logger;
 
-    // Inner filenames always use the model's plain name — the folder segment (Name,
+    // Inner filenames always use the model's plain name - the folder segment (Name,
     // possibly "{model.Name} [{id}]") already disambiguates the model itself.
     private string GeneratedBlendFileName => $"generated-{_model.Name}.blend";
     private string UploadedBlendFileName => $"uploaded-{_model.Name}.blend";
@@ -328,7 +328,7 @@ public sealed class VirtualModelCollection : VirtualCollectionBase
 
     /// <summary>
     /// Creates a VirtualGeneratedBlendFile if Blender CLI is available, the newest version
-    /// has a renderable file, AND the generated .blend is already cached — see
+    /// has a renderable file, AND the generated .blend is already cached - see
     /// <see cref="VirtualGeneratedBlendFile.TryCreate"/> for why the cache check is required.
     /// </summary>
     private IStoreItem? TryCreateGeneratedBlendItem()

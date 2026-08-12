@@ -10,7 +10,7 @@ const services = [
     { url: "http://localhost:3102", label: "Frontend" },
 ];
 
-const TIMEOUT_MS = 180000; // 3 min — first build pulls postgresql-client-16
+const TIMEOUT_MS = 180000; // 3 min - first build pulls postgresql-client-16
 const POLL_MS = 2000;
 
 function httpGet(url) {

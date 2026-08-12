@@ -199,7 +199,7 @@ public class RegenerateAllThumbnailsCommandHandlerTests
     public async Task Handle_NeverCallsModelRepositoryUpdateAsync_ToAvoidGraphTrackingConflicts()
     {
         // Guards against the EF tracking exception caused by calling
-        // _modelRepository.UpdateAsync(model) in a loop — shared related
+        // _modelRepository.UpdateAsync(model) in a loop - shared related
         // entities across iterations cause IdentityMap conflicts. The fix
         // uses the targeted IModelVersionRepository.SetThumbnailIdAsync.
         var modelA = BuildModelWithActiveVersionAndFile(1, 10, ValidHash);

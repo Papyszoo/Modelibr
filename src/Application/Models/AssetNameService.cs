@@ -25,7 +25,7 @@ internal static partial class AssetNameService
     {
         var policy = await GetPolicyAsync(settingRepository, cancellationToken);
 
-        // "Allow" is the default now that WebDAV disambiguates duplicate names by id —
+        // "Allow" is the default now that WebDAV disambiguates duplicate names by id -
         // skip the existence check entirely, the name is accepted unchanged.
         if (policy == "Allow")
             return Result.Success(requestedName);

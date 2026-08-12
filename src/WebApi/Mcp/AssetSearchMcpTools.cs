@@ -9,7 +9,7 @@ namespace WebApi.Mcp;
 
 /// <summary>
 /// Local MCP tools exposing the asset library to an agent. A <b>thin pass-through</b>
-/// over the ordinary query handlers (prompts 23–25) — no extraction or search logic
+/// over the ordinary query handlers (prompts 23–25) - no extraction or search logic
 /// lives here. Read-only: agent writes are deliberately out of scope. Search logging
 /// (prompt 24) covers these queries too, since they route through the same handler.
 /// </summary>

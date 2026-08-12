@@ -18,7 +18,7 @@ import { type MaterialTextureSets, TexturedModel } from './TexturedModel'
 import { type ViewerSettingsType } from './ViewerSettings'
 
 /**
- * The shared cross-runtime light rig (lib/sceneLighting.js — also used by the
+ * The shared cross-runtime light rig (lib/sceneLighting.js - also used by the
  * worker thumbnail render) mapped to React-Three-Fiber primitives. This is the
  * ONLY lighting in the scene: drei's <Stage> runs at intensity 0 so its own
  * lights don't stack on top and swamp these (the bug that made the ambient /
@@ -209,7 +209,7 @@ export function Scene({
   return (
     <>
       {/* Stage centres the model and casts the contact shadow. Its own lights
-          are disabled (intensity 0) — the shared SceneLights rig below is the
+          are disabled (intensity 0) - the shared SceneLights rig below is the
           single light source, so the viewer matches the thumbnail render and
           the ambient/environment controls aren't swamped. */}
       <Stage
@@ -260,7 +260,7 @@ export function Scene({
         />
       )}
 
-      {/* Shared cross-runtime light rig — the single source of illumination. */}
+      {/* Shared cross-runtime light rig - the single source of illumination. */}
       <SceneLights descriptor={lighting} showHelpers={showLightHelpers} />
 
       {/* Mesh highlighting from hierarchy panel */}

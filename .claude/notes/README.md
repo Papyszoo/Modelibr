@@ -1,21 +1,21 @@
-# .claude/notes — shared engineering knowledge
+# .claude/notes - shared engineering knowledge
 
 Durable context that the code can't explain on its own: why a decision went the
 way it did, what a subsystem's failure modes are, what an incident taught us, and
 what's already been ruled out.
 
-**Committed and tool-neutral.** Any agent working in this repo reads these —
-Claude Code, Codex, Antigravity — and so can a human. `AGENTS.md` points here.
+**Committed and tool-neutral.** Any agent working in this repo reads these -
+Claude Code, Codex, Antigravity - and so can a human. `AGENTS.md` points here.
 
 Complements `.claude/skills/` (enforceable conventions, also committed).
 
-## What belongs here — and what doesn't
+## What belongs here - and what doesn't
 
 **Here:** architecture and design rationale, gotchas and failure contracts,
 incident write-ups, testing strategy, feature state and the traps a feature
 taught.
 
-**NOT here — this repository is public.** Keep out of these files:
+**NOT here - this repository is public.** Keep out of these files:
 
 - machine-specific setup (local Docker/VM config, personal scripts, host paths)
 - production infrastructure: server addresses, credentials, deploy specifics
@@ -23,17 +23,17 @@ taught.
 - anything referencing gitignored paths, since a reader can't follow the pointer
 
 That material belongs in the maintainer's private agent memory, not in the repo.
-If you're unsure, leave it out — a note is easy to add later and impossible to
+If you're unsure, leave it out - a note is easy to add later and impossible to
 un-publish.
 
 ## Convention
 
-- **`MEMORY.md` is the index** — one line per note. Keep it to one line each;
+- **`MEMORY.md` is the index** - one line per note. Keep it to one line each;
   never put content there.
 - **One topic per file.** Bullets and pointers over prose; long files drain
   context for every agent that reads them.
 - **Categorized in subfolders.** Cross-link with `[[relative/path.md]]`.
-- **Facts go stale — date them.** Verify against the code before asserting.
+- **Facts go stale - date them.** Verify against the code before asserting.
 - Enforceable, always-applicable rules belong in `AGENTS.md` or a skill, **not
   here.** Notes are context; rules are instructions.
 

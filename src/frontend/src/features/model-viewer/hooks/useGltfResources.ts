@@ -14,7 +14,7 @@ export type GltfResourceMap = Record<string, string>
  *
  * A multi-file glTF stores its buffers and images as relative URIs. The viewer serves
  * the primary file from `/files/<id>`, so those URIs resolve against the API route and
- * 404 — and the shared safe loading manager then substitutes a transparent pixel for
+ * 404 - and the shared safe loading manager then substitutes a transparent pixel for
  * every one of them, which for `scene.bin` means no geometry at all. Feeding the loader
  * this map is what makes an imported multi-file glTF actually open in the browser.
  *

@@ -113,7 +113,7 @@ def center_objects():
         -(min_z + max_z) / 2,
     ))
 
-    # Only move root objects (no parent) — children follow automatically
+    # Only move root objects (no parent) - children follow automatically
     root_objects = [obj for obj in bpy.context.scene.objects if obj.parent is None]
     for obj in root_objects:
         obj.location += offset
@@ -206,7 +206,7 @@ def create_pbr_material(mat, textures):
         y_offset -= 300
         print(f"  Applied metallic: {textures['metallic']}")
 
-    # Ambient Occlusion — multiply with Base Color if both exist
+    # Ambient Occlusion - multiply with Base Color if both exist
     if 'ao' in textures and os.path.isfile(textures['ao']):
         tex_node = nodes.new(type='ShaderNodeTexImage')
         tex_node.location = (x_pos, y_offset)

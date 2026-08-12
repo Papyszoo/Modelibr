@@ -6,7 +6,7 @@ namespace Infrastructure.Tests.Fakes;
 /// Minimal IBlendFileGenerator test double that mirrors BlendFileGenerator's real on-disk
 /// cache contract (a file at {cacheDir}/{modelId}-v{versionId}.blend) without needing a
 /// real Blender install. Tests control readiness purely by writing/deleting files under
-/// CacheDir — exactly the signal VirtualGeneratedBlendFile.TryCreate reads through
+/// CacheDir - exactly the signal VirtualGeneratedBlendFile.TryCreate reads through
 /// GetCachedSizeBytes.
 /// </summary>
 internal sealed class FakeBlendFileGenerator : IBlendFileGenerator

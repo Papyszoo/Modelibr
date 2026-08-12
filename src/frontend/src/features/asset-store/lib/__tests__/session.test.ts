@@ -1,6 +1,6 @@
 /**
  * Session lifecycle tests: the proactive refresh loop is what keeps a store
- * session alive past the 10-minute access-token expiry — if scheduling
+ * session alive past the 10-minute access-token expiry - if scheduling
  * breaks, the page silently degrades to 401s mid-session.
  */
 import { ApiClientError } from '@/lib/apiBase'
@@ -95,7 +95,7 @@ describe('loginToStoreSession', () => {
 })
 
 describe('refresh loop', () => {
-  // Regression: the store's access token dies at 10 minutes — without the
+  // Regression: the store's access token dies at 10 minutes - without the
   // 8-minute proactive refresh the session 401s mid-browse.
   it('refreshes tokens before the access token expires and keeps looping', async () => {
     storeApi.loginToStore.mockResolvedValue(session(1))
@@ -130,7 +130,7 @@ describe('refresh loop', () => {
     expect(authState().error).toMatch(/session expired/i)
   })
 
-  // Regression: a transient network blip must NOT log the user out — the
+  // Regression: a transient network blip must NOT log the user out - the
   // loop retries sooner instead.
   it('keeps the session and retries after a network failure', async () => {
     storeApi.loginToStore.mockResolvedValue(session(1))
@@ -254,7 +254,7 @@ describe('refresh loop', () => {
 
 describe('resumeStoreSession', () => {
   // Regression: after a reload the in-memory refresh loop is gone and the
-  // persisted access token is stale — resume must refresh once and re-arm it,
+  // persisted access token is stale - resume must refresh once and re-arm it,
   // or the session degrades to 401-retries (and "logs out too quickly").
   it('refreshes the stale token and re-arms the loop for a persisted session', async () => {
     storeApi.refreshStoreTokensOnce.mockResolvedValue(session(2))
@@ -287,7 +287,7 @@ describe('resumeStoreSession', () => {
 })
 
 describe('logout cache hygiene', () => {
-  // Regression: the cached library survived logout — with the app's 5-minute
+  // Regression: the cached library survived logout - with the app's 5-minute
   // staleTime, a different account logging in could be shown the previous
   // account's library.
   it('drops the cached store library on logout', async () => {

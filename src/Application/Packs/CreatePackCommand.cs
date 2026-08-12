@@ -40,8 +40,8 @@ internal class CreatePackCommandHandler : ICommandHandler<CreatePackCommand, Cre
 
             // Store provenance is stamped BEFORE the save, not by a follow-up command: the pack
             // row and its (StoreImportUrl, StoreImportAssetId) idempotency key must become
-            // visible in the same transaction. Two commits left a window where a crash — or a
-            // concurrent import of the same asset — produced a second, unstamped pack.
+            // visible in the same transaction. Two commits left a window where a crash - or a
+            // concurrent import of the same asset - produced a second, unstamped pack.
             if (command.StoreProvenance is { } provenance)
             {
                 pack.RecordStoreImport(
@@ -69,7 +69,7 @@ public record CreatePackCommand(
     PackStoreProvenance? StoreProvenance = null) : ICommand<CreatePackResponse>;
 
 /// <summary>
-/// Store-import stamp applied at pack creation time. Optional — only the store importer
+/// Store-import stamp applied at pack creation time. Optional - only the store importer
 /// supplies it; every other caller creates an unstamped pack.
 /// </summary>
 public record PackStoreProvenance(string StoreUrl, string StoreAssetId, int ManifestVersion);

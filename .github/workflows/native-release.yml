@@ -123,7 +123,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           # EnterpriseDB (used by Chocolatey's postgresql package) returns 403 to
           # GitHub's datacenter IPs, so pull portable PostgreSQL 16 binaries from
-          # Maven Central (Zonky) instead — reliable from CI and self-contained.
+          # Maven Central (Zonky) instead - reliable from CI and self-contained.
           $ver = '16.4.0'
           $jarUrl = "https://repo1.maven.org/maven2/io/zonky/test/postgres/embedded-postgres-binaries-windows-amd64/$ver/embedded-postgres-binaries-windows-amd64-$ver.jar"
           $work = Join-Path $env:RUNNER_TEMP 'pg'
@@ -139,7 +139,7 @@ jobs:
           if (-not (Test-Path (Join-Path $pgDir 'bin/pg_ctl.exe'))) { throw 'pg_ctl.exe not found after extraction' }
           "MODELIBR_POSTGRES_RUNTIME_DIR=$pgDir" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
-      # Self-contained PostgreSQL 16 from Maven Central (Zonky) — relocatable
+      # Self-contained PostgreSQL 16 from Maven Central (Zonky) - relocatable
       # binaries that bundle their own libs, so they run on clean user machines
       # and on the test runners (Homebrew/apt builds linked against libs that
       # aren't present at runtime).
@@ -187,7 +187,7 @@ jobs:
       # upload a model, move the data folder, and confirm it survived. Runs on
       # every OS that built a runtime, so data-folder migration is verified
       # cross-platform before anything ships.
-      - name: Integration test — data survives a data-folder change
+      - name: Integration test - data survives a data-folder change
         working-directory: src/desktop
         shell: bash
         env:
@@ -211,8 +211,8 @@ jobs:
     needs: build-installers
     runs-on: ${{ matrix.os }}
     # Smoke + the full Playwright suite against the installed app (incl. the
-    # slow Blender tier) can run long — the Windows runner in particular is much
-    # slower under the parallel UI tests — so keep a generous ceiling.
+    # slow Blender tier) can run long - the Windows runner in particular is much
+    # slower under the parallel UI tests - so keep a generous ceiling.
     timeout-minutes: 180
     strategy:
       fail-fast: false
@@ -252,7 +252,7 @@ jobs:
           hdiutil attach "$DMG" -mountpoint /Volumes/Modelibr -nobrowse -quiet
           cp -R "/Volumes/Modelibr/Modelibr.app" /Applications/
           hdiutil detach /Volumes/Modelibr -quiet
-          # Strip quarantine attribute — installer isn't notarized in CI
+          # Strip quarantine attribute - installer isn't notarized in CI
           # Bundled Puppeteer Chrome + node_modules/.bin contain dangling
           # symlinks that make recursive xattr exit non-zero; that's harmless.
           sudo xattr -dr com.apple.quarantine /Applications/Modelibr.app 2>/dev/null || true
@@ -322,11 +322,11 @@ jobs:
           exit 1
 
       # ───── Smoke tests ─────
-      - name: Smoke — frontend served
+      - name: Smoke - frontend served
         shell: bash
         run: curl -sf http://127.0.0.1:3010 -o /dev/null
 
-      - name: Smoke — native runtime API
+      - name: Smoke - native runtime API
         shell: bash
         run: |
           response=$(curl -sf http://127.0.0.1:3010/api/native/runtime)
@@ -335,13 +335,13 @@ jobs:
           echo "$response" | grep -q workerHealthUrls
           echo "$response" | grep -q dataDirectory
 
-      - name: Smoke — WebApi health (proxied)
+      - name: Smoke - WebApi health (proxied)
         shell: bash
         run: |
           # /api/* is rewritten to /* by the edge server, so this hits WebApi /health
           curl -sf http://127.0.0.1:3010/api/health -o /dev/null
 
-      - name: Smoke — DB-backed endpoint (catches missing migrations)
+      - name: Smoke - DB-backed endpoint (catches missing migrations)
         shell: bash
         run: |
           # /api/models queries the database, so it returns 200 only when the
@@ -355,7 +355,7 @@ jobs:
       # Runs the real test suite (not just smoke checks) against the running
       # native install on every OS (Windows, macOS, Linux). Skipped on a `main`
       # push, which only smoke-tests the install (the smoke steps above always
-      # run) — release / nightly schedule / manual dispatch run the full suite.
+      # run) - release / nightly schedule / manual dispatch run the full suite.
       - name: Checkout repo (for E2E suite)
         if: github.event_name != 'push'
         uses: actions/checkout@v5
@@ -390,7 +390,7 @@ jobs:
           WEBAPI_HEALTH_URL: http://127.0.0.1:3010/api/health
           ASSET_HEALTH_URL: ""
           # The demo phase tests a standalone demo build in Playwright's own
-          # browser, not the installed app — skip it here (covered by Docker CI).
+          # browser, not the installed app - skip it here (covered by Docker CI).
           SKIP_DEMO_PHASE: "1"
           # The hosted runners (Windows especially) are CPU-contended running the
           # native stack alongside parallel browsers, which thrashed and made UI
@@ -580,7 +580,7 @@ jobs:
         with:
           node-version: 20
 
-      # The client bundles no runtime — it's just an Electron shell that loads a
+      # The client bundles no runtime - it's just an Electron shell that loads a
       # running host, so the build needs nothing but its own dependencies.
       - name: Install client dependencies
         working-directory: src/desktop-client
@@ -594,7 +594,7 @@ jobs:
       # the same GitHub release as the host without overwriting the host's
       # latest*.yml. The client sets autoUpdater.channel = 'client', so it
       # fetches these. The .yml contents (installer name, sha, blockmap) are
-      # unchanged — only the filename differs.
+      # unchanged - only the filename differs.
       - name: Rename client update feed to its own channel
         working-directory: src/desktop-client/dist
         shell: bash
@@ -617,14 +617,14 @@ jobs:
           files: ${{ matrix.artifactGlob }}
 
   # On manual (workflow_dispatch) runs there's no GitHub Release to attach
-  # assets to, so the build jobs only leave Actions artifacts — and GitHub
+  # assets to, so the build jobs only leave Actions artifacts - and GitHub
   # always serves those as a single .zip. This job instead collects every built
   # installer into one *draft* GitHub Release, where each file is a separate,
   # directly-downloadable asset (bare .exe / .dmg / .AppImage / .deb) with no
   # zip wrapper. It's a draft, so it stays private until you click Publish.
   # Production releases (the `release: published` trigger) keep using the
   # per-job "Upload release assets" steps above and are unaffected. Gated on the
-  # build jobs only — not the long test-installers suite — so a try-it build is
+  # build jobs only - not the long test-installers suite - so a try-it build is
   # downloadable as soon as it finishes building (see the warning in the release
   # body: these binaries are NOT gated on the tests passing).
   publish-draft-release:
@@ -646,17 +646,17 @@ jobs:
           # don't pile up as a new draft per run. (Same-named assets are
           # overwritten; the constant version keeps names stable.)
           tag_name: draft-build
-          name: 🚧 Draft build — ${{ github.ref_name }} (run ${{ github.run_number }})
+          name: 🚧 Draft build - ${{ github.ref_name }} (run ${{ github.run_number }})
           draft: true
           prerelease: true
           body: |
             Automated draft from a manual workflow run of `${{ github.ref_name }}`.
 
-            ⚠️ **Not verified** — this is published as soon as the installers
+            ⚠️ **Not verified** - this is published as soon as the installers
             *build*; the installer test suite may still be running or may have
             failed. These binaries are for quick local trials only, and are
             replaced on every manual run.
-          # Only the user-facing installers — not the electron-updater feed
+          # Only the user-facing installers - not the electron-updater feed
           # files (latest*.yml) or delta maps (*.blockmap). Those are machine
           # -only, and their fixed names (e.g. latest.yml) would collide between
           # the host and client apps. Each installer name is already unique, so

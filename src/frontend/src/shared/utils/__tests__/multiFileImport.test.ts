@@ -32,7 +32,7 @@ describe('groupFilesForImport', () => {
   })
 
   // Regression: two models in one folder tree must not share/steal each other's
-  // buffers — each aux belongs only to the primary under whose directory it sits.
+  // buffers - each aux belongs only to the primary under whose directory it sits.
   it('separates two models into two groups without cross-contamination', () => {
     const files = [
       fileAt('Models/A/glTF/A.gltf'),
@@ -101,7 +101,7 @@ describe('groupFilesForImport', () => {
     })
 
     it('never demotes a rejected model file into an auxiliary resource', () => {
-      // A .dae next to a .gltf is another model, not one of its resources —
+      // A .dae next to a .gltf is another model, not one of its resources -
       // uploading it as an auxiliary would smuggle it in through the back door.
       const files = [
         fileAt('kit/scene.gltf'),

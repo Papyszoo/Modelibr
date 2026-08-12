@@ -78,7 +78,7 @@ button:not(.p-button):not(.p-component):not(.p-link):focus-visible {
  * pointer-events block on `body.dragging-file:has(.drag-over)` so the
  * block only applies when there is also an *active* drop target in
  * the DOM. If the body class leaks past the drag, no `.drag-over`
- * exists and pointer events stay enabled — the UI self-recovers.
+ * exists and pointer events stay enabled - the UI self-recovers.
  */
 .dragging-file {
   cursor: copy !important;

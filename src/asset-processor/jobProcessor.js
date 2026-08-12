@@ -12,7 +12,7 @@ import logger from './logger.js'
 
 /**
  * Job processor that handles thumbnail generation using SignalR real-time queue.
- * Dispatch goes exclusively through ProcessorRegistry (see processors/) —
+ * Dispatch goes exclusively through ProcessorRegistry (see processors/) -
  * this class owns queueing, concurrency, timeouts and lifecycle only.
  */
 export class JobProcessor {
@@ -269,7 +269,7 @@ export class JobProcessor {
     try {
       const activePromises = new Set()
 
-      // MUST be synchronous — shift from queue and add to activePromises immediately
+      // MUST be synchronous - shift from queue and add to activePromises immediately
       // so the while-loop conditions update on each iteration without yielding.
       const startNextJob = () => {
         if (this.jobQueue.length === 0 || this.isShuttingDown) return
@@ -320,7 +320,7 @@ export class JobProcessor {
                 timeoutMs,
               })
               // Abort the abandoned work. Renderer-backed processors react
-              // to this by force-reinitializing the pool slot they hold —
+              // to this by force-reinitializing the pool slot they hold -
               // without it a hung Puppeteer page keeps that slot forever
               // and every concurrent job eventually deadlocks the worker
               // while /health keeps reporting healthy.
@@ -335,7 +335,7 @@ export class JobProcessor {
               }
             } else if (!processorInvoked) {
               // Failed before the processor ever ran (e.g. a config
-              // refresh error) — nothing else has reported this job's
+              // refresh error) - nothing else has reported this job's
               // outcome, so without this it would sit as "Processing"
               // until the backend's lock timeout eventually expires.
               logger.error('Job failed before processing started', {
@@ -352,7 +352,7 @@ export class JobProcessor {
               }
             } else {
               // BaseProcessor.execute() already reported this job's
-              // outcome to the backend — or deliberately skipped doing so
+              // outcome to the backend - or deliberately skipped doing so
               // because it was aborted by the timeout branch above. The
               // backend has no guard against a job being finished twice,
               // so don't call markJobFailed again here: a duplicate call

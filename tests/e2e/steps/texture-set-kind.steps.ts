@@ -173,7 +173,7 @@ Then(
         // Narrow the (virtualised) grid by name so pagination + virtual
         // scrolling can't hide the card. `narrowVirtualisedList` opens
         // the search panel, fills the name, and waits for the count
-        // chip to stabilise — no fixed sleep needed.
+        // chip to stabilise - no fixed sleep needed.
         const searchInput = await narrowVirtualisedList(page, set.name);
 
         const card = textureSetsPage.getCardByName(set.name);
@@ -264,7 +264,7 @@ Then(
                 );
                 break;
             }
-            // Wait 1s between attempts (max ~300 seconds total — texture set
+            // Wait 1s between attempts (max ~300 seconds total - texture set
             // thumbnail jobs are processed sequentially and each takes ~25s)
             await new Promise((resolve) => setTimeout(resolve, 1000));
         }

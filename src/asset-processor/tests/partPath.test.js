@@ -58,7 +58,7 @@ describe('resolveSiblingSegments', () => {
 
   it('keeps reserved-char names unambiguous (a literal % is itself encoded)', () => {
     // "a/b" → "a%2Fb"; "a%2Fb" → "a%252Fb" (its % becomes %25), so they do NOT
-    // collide — the encoding is reversible, which is the whole point.
+    // collide - the encoding is reversible, which is the whole point.
     expect(resolveSiblingSegments(['a/b', 'a%2Fb'])).toEqual([
       'a%2Fb',
       'a%252Fb',

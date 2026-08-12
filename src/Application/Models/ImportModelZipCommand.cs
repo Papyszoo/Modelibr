@@ -12,7 +12,7 @@ namespace Application.Models;
 /// in-memory, grouped by directory (<see cref="MultiFileImportGrouping"/>), and each
 /// group imported via <see cref="ImportModelWithAuxiliaryFilesCommand"/> so a multi-file
 /// glTF resolves its external buffers/textures. Robust where a browser folder walk is
-/// quirky — the frontend just posts the archive.
+/// quirky - the frontend just posts the archive.
 /// </summary>
 internal class ImportModelZipCommandHandler
     : ICommandHandler<ImportModelZipCommand, ImportModelZipResponse>
@@ -73,7 +73,7 @@ internal class ImportModelZipCommandHandler
 
             if (result.IsFailure)
             {
-                // One bad group shouldn't abort the whole archive — log and keep going.
+                // One bad group shouldn't abort the whole archive - log and keep going.
                 _logger.LogWarning(
                     "Skipping a group in zip import ({Primary}): {Error}",
                     group.Primary.FileName, result.Error.Message);

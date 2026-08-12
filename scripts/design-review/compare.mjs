@@ -40,7 +40,7 @@ const rows = shots
     const afterExists = fs.existsSync(path.join(reviewDir, after, f))
     return `
 <section>
-  <h2>${f.replace('.png', '').replace('--', ' — ')}</h2>
+  <h2>${f.replace('.png', '').replace('--', ' - ')}</h2>
   <div class="pair">
     <figure>
       <figcaption>before · ${before}</figcaption>

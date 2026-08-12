@@ -78,7 +78,7 @@ afterEach(() => {
 })
 
 describe('startImport', () => {
-  // Regression: the whole point of the token flow — the LOCAL backend gets
+  // Regression: the whole point of the token flow - the LOCAL backend gets
   // the minted import token and the configured store URL, never the JWT.
   it('mints a token, starts the job, and polls it to completion', async () => {
     storeApi.mintImportToken.mockResolvedValue({
@@ -115,9 +115,9 @@ describe('startImport', () => {
 
     expect(entry()).toMatchObject({ phase: 'completed', packId: 42 })
     // Regression: without invalidation the imported pack only appears
-    // after a manual reload — the "packs" list must refetch.
+    // after a manual reload - the "packs" list must refetch.
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['packs'] })
-    // Regression: an import creates assets of five types, not just the pack —
+    // Regression: an import creates assets of five types, not just the pack -
     // invalidating only ['packs'] left the new models/sounds/etc. invisible.
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['models'] })
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['sounds'] })

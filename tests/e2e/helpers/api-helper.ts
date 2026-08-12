@@ -378,7 +378,7 @@ export class ApiHelper {
 
   /**
    * Upload a model via REST API, returning the raw response status and data.
-   * Does not throw on non-200 status — useful for testing error responses (e.g., 409 Conflict).
+   * Does not throw on non-200 status - useful for testing error responses (e.g., 409 Conflict).
    */
   async uploadModelRaw(
     filePath: string,
@@ -895,7 +895,7 @@ export class ApiHelper {
    * Needed once duplicate model names are allowed: two models can share a name,
    * so the folder segment must be the disambiguated "{modelName} [{id}]" form to
    * address one specific model (see WebDavUtilities id-suffix contract). The
-   * inner filename still uses the PLAIN model name — the folder segment already
+   * inner filename still uses the PLAIN model name - the folder segment already
    * disambiguates, per the shared convention.
    */
   async createVersionViaWebDavBlendSaveAtFolder(

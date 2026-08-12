@@ -22,7 +22,7 @@ describe('normalizeStoreUrl', () => {
   it('maps null/undefined to an empty string (no accidental matches)', () => {
     expect(normalizeStoreUrl(null)).toBe('')
     expect(normalizeStoreUrl(undefined)).toBe('')
-    // An unconfigured store must not equal a pack with an empty URL — both
+    // An unconfigured store must not equal a pack with an empty URL - both
     // sides guard, but the normalized forms must at least be comparable.
     expect(normalizeStoreUrl('')).toBe('')
   })
@@ -53,7 +53,7 @@ describe('store URL scheme enforcement', () => {
   }
 
   // Regression: the docs promised "https required for remote stores", but
-  // only the backend importer enforced it — the login form would happily
+  // only the backend importer enforced it - the login form would happily
   // POST store credentials over cleartext http to a remote host.
   it('rejects plain http for remote hosts (mirrors backend StoreUrlSafety)', () => {
     withEnv('http://store.example.com', () => {
@@ -105,7 +105,7 @@ describe('resolveStorePreviewUrl', () => {
 
   // Regression: the store emits RELATIVE preview urls whenever its own
   // PublicBaseUrl is unset, and a relative <img src> resolves against MODELIBR's
-  // origin — every store thumbnail 404'd against the local app.
+  // origin - every store thumbnail 404'd against the local app.
   it('resolves a relative preview url against the configured store', () => {
     withStore('https://store.example.com', () => {
       expect(resolveStorePreviewUrl('/api/files/42/preview')).toBe(
@@ -130,7 +130,7 @@ describe('resolveStorePreviewUrl', () => {
     })
   })
 
-  // A relative url with no store configured has no base to resolve against —
+  // A relative url with no store configured has no base to resolve against -
   // null (placeholder) beats pointing the <img> at the local backend.
   it('returns null for a relative url when the store is unconfigured', () => {
     withStore(undefined, () => {

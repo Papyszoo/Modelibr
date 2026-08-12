@@ -163,7 +163,7 @@ async function main() {
   }
 
   // The demo phase builds a standalone "demo mode" frontend and tests it in
-  // Playwright's own browser — it does not exercise the deployment under test,
+  // Playwright's own browser - it does not exercise the deployment under test,
   // so it's skippable when running against an installed native build (it's
   // still covered by the Docker e2e CI).
   let demoResult = 0;
@@ -195,7 +195,7 @@ async function main() {
   // The highly-parallel Chromium UI phase is the slowest and flakiest on
   // resource-constrained runners (notably the hosted Windows runner, which is
   // far slower for the 3D-heavy views). When CHROMIUM_PHASE_NONBLOCKING=1 it
-  // still runs and is reported, but its failures don't fail the run — the
+  // still runs and is reported, but its failures don't fail the run - the
   // install-critical phases (setup/serial/slow) stay strict, and Linux/macOS
   // keep gating the full UI sweep.
   const chromiumNonBlocking = process.env.CHROMIUM_PHASE_NONBLOCKING === "1";

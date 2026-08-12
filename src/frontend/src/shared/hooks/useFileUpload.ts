@@ -67,7 +67,7 @@ export function useFileUpload(options = {}) {
     }
 
     // Check Three.js renderability if required
-    // .blend files bypass this check when blenderEnabled is true — they're handled by the asset-processor
+    // .blend files bypass this check when blenderEnabled is true - they're handled by the asset-processor
     const isBlendFile = fileExtension === '.blend'
     if (
       requireThreeJSRenderable &&
@@ -256,7 +256,7 @@ export function useFileUpload(options = {}) {
    * falls back to the plain single-file upload. Solves bulk multi-file glTF import
    * (glTF-Sample-Assets / Synty layouts).
    * @param {FileList|File[]} files - Files from a webkitdirectory picker
-   * @param {Object} groupingOptions - { allowBlend } — renderability follows the hook's
+   * @param {Object} groupingOptions - { allowBlend } - renderability follows the hook's
    *   own `requireThreeJSRenderable`, so a folder import cannot smuggle past the gates
    *   the single-file picker applies.
    * @returns {Promise<Object>} Upload results summary
@@ -345,14 +345,14 @@ export function useFileUpload(options = {}) {
 
   /**
    * Import a `.zip` archive of models. The archive is expanded in the browser and the
-   * resulting files go through the SAME path as a picked folder — same grouping, same
+   * resulting files go through the SAME path as a picked folder - same grouping, same
    * renderability/.blend gates, same per-model progress entries, same result shape, and
    * the same pack/project association.
    *
    * It used to POST the archive to a server-side unzip endpoint, which answered a
    * different shape ({batchId, imported[]}) than every other upload path. Consumers read
    * `results.succeeded`, so the success callback threw: nothing was associated with the
-   * pack/project the import came from and the grid never refreshed — all after the
+   * pack/project the import came from and the grid never refreshed - all after the
    * progress window had already reported the import complete.
    *
    * @param {File} file - The .zip file
@@ -428,7 +428,7 @@ export function useDragAndDrop(onFilesDropped) {
     // racy (multiple components share the document, a drag can end
     // outside our handlers, browser focus changes), and a stale
     // `.dragging-file` class on <body> globally disables pointer
-    // events on native buttons — locking the UI. This cleanup runs
+    // events on native buttons - locking the UI. This cleanup runs
     // cheaply on every mouseup; the only cost when no drag was active
     // is a single classList check.
     const handlePointerSafety = () => {

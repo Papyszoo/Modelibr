@@ -47,7 +47,7 @@ export class TextureSetsPage {
      * Navigate to the Texture Sets tab via UI interaction.
      */
     async goto(): Promise<void> {
-        // The combined textureSets view no longer exists — texture-set CRUD
+        // The combined textureSets view no longer exists - texture-set CRUD
         // flows run on the Multi-Model Textures page (the split default).
         await navigateToTab(this.page, "modelTextures");
 
@@ -130,12 +130,12 @@ export class TextureSetsPage {
         label: "Multi-Model" | "Global Materials",
     ): Promise<void> {
         // Kinds are separate app tabs since the combined textureSets view
-        // was removed — "selecting a kind" = opening the matching tab.
+        // was removed - "selecting a kind" = opening the matching tab.
         const tabType =
             label === "Global Materials" ? "globalMaterials" : "modelTextures";
         await navigateToTab(this.page, tabType);
         await this.waitForLoad();
-        // Block until the tab's data has actually resolved — the toolbar
+        // Block until the tab's data has actually resolved - the toolbar
         // stays mounted across the loading cycle, so an immediate read of
         // `getTextureSetNames()` would otherwise see whatever cards the
         // grid happens to be displaying at that instant.

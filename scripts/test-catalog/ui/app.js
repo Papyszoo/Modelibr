@@ -1,13 +1,13 @@
 "use strict";
 
-// Test Studio UI — organized, filterable lists with honest CI-lane info.
+// Test Studio UI - organized, filterable lists with honest CI-lane info.
 // Routes:
 //   #/                      home: areas + suites (lists)
-//   #/e2e                   all scenarios — filter by area / runs-on, sortable
+//   #/e2e                   all scenarios - filter by area / runs-on, sortable
 //   #/e2e/<folder>          same list pre-filtered to one area
 //   #/scenario/<file>/<i>   scenario detail + run builder
-//   #/backend               all .NET tests — filter by project / type
-//   #/frontend  #/asset-processor   unit cases — filter by file
+//   #/backend               all .NET tests - filter by project / type
+//   #/frontend  #/asset-processor   unit cases - filter by file
 //   #/suite/<id>            suite detail
 //   #/unit/<suiteId>/<source>/<name>  single unit test + filtered run
 // Typing 2+ chars in the top search overlays a global search page.
@@ -15,7 +15,7 @@
 const state = { catalog: null, history: null, summary: null, interactive: false, q: "" };
 
 const $ = (sel) => document.querySelector(sel);
-// Full HTML entity-escape — covers element AND attribute context (quotes), so
+// Full HTML entity-escape - covers element AND attribute context (quotes), so
 // esc() is safe to interpolate into "..."/'...' attributes, not just text.
 const esc = (s) =>
     String(s ?? "")
@@ -28,12 +28,12 @@ const esc = (s) =>
 const stripAnsi = (s) => s.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "");
 
 function fmtSec(s) {
-    if (s == null) return "—";
+    if (s == null) return "-";
     if (s < 90) return `${s}s`;
     return `${Math.floor(s / 60)}m ${s % 60}s`;
 }
 function fmtMs(ms) {
-    if (ms == null) return "—";
+    if (ms == null) return "-";
     return fmtSec(Math.round(ms / 1000));
 }
 
@@ -63,19 +63,19 @@ const localAvg = (suiteId) => {
 // tags and how the runners slice the projects:
 //   PR job (test:ci --fast-only) = setup + untagged "chromium" scenarios
 //   nightly workflow             = @slow only
-//   @serial                      = local full runs only — never on GitHub
+//   @serial                      = local full runs only - never on GitHub
 //   @performance                 = opt-in only
 const LANES = {
     pr:      { label: "every PR",   cls: "green",
                desc: "Runs in the <b>E2E Tests</b> job on every GitHub PR, and locally in the fast tier." },
     nightly: { label: "nightly",    cls: "accent",
-               desc: "Tagged <b>@slow</b> — runs in the nightly GitHub workflow (3:00 UTC) and locally in <b>e2e-full</b>." },
+               desc: "Tagged <b>@slow</b> - runs in the nightly GitHub workflow (3:00 UTC) and locally in <b>e2e-full</b>." },
     local:   { label: "local only", cls: "amber",
-               desc: "Tagged <b>@serial</b> — runs only in local full runs (<b>e2e-full</b> / <b>test:all</b>). It is NOT part of any GitHub job." },
+               desc: "Tagged <b>@serial</b> - runs only in local full runs (<b>e2e-full</b> / <b>test:all</b>). It is NOT part of any GitHub job." },
     manual:  { label: "manual",     cls: "gray",
-               desc: "Tagged <b>@performance</b> — opt-in only (<b>test:performance</b>); not in CI and excluded from normal local runs." },
+               desc: "Tagged <b>@performance</b> - opt-in only (<b>test:performance</b>); not in CI and excluded from normal local runs." },
     setup:   { label: "setup",      cls: "gray",
-               desc: "Seed scenario — runs first in every E2E flow (CI and local) to create shared test data." },
+               desc: "Seed scenario - runs first in every E2E flow (CI and local) to create shared test data." },
 };
 const LANE_ORDER = ["pr", "nightly", "local", "manual", "setup"];
 
@@ -228,7 +228,7 @@ function homePage() {
       <div class="card runall">
         <div class="scol">
           <span class="sname"><b>Run everything</b></span>
-          <span class="dim">All ${t.suites} suites through the local runner — Docker suites bring their stack up and tear it down (leftovers from interrupted runs are cleaned first); unavailable suites are skipped honestly. Full report + per-suite logs at the end.</span>
+          <span class="dim">All ${t.suites} suites through the local runner - Docker suites bring their stack up and tear it down (leftovers from interrupted runs are cleaned first); unavailable suites are skipped honestly. Full report + per-suite logs at the end.</span>
         </div>
         ${runBtn("everything", "Run everything")}
       </div>` : ""}
@@ -237,7 +237,7 @@ function homePage() {
       <div class="card lrows" id="areas">
         ${areaRow("#/e2e", "🎭", "E2E scenarios", t.e2eScenarios,
             `<b>${lc.pr}</b> on every PR · <b>${lc.nightly}</b> nightly · <b class="warn">${lc.local} local-only</b> · ${lc.manual} manual · ${lc.setup} setup`,
-            e2eGh != null ? `<span class="badge green" title="The PR E2E job runs the ${lc.pr + lc.setup} fast-tier scenarios — not all ${t.e2eScenarios}">PR job ≈ ${fmtSec(e2eGh)} (runs ${lc.pr + lc.setup} of ${t.e2eScenarios})</span>` : "",
+            e2eGh != null ? `<span class="badge green" title="The PR E2E job runs the ${lc.pr + lc.setup} fast-tier scenarios - not all ${t.e2eScenarios}">PR job ≈ ${fmtSec(e2eGh)} (runs ${lc.pr + lc.setup} of ${t.e2eScenarios})</span>` : "",
             `${runBtn("e2e-fast", "Fast tier")} ${runBtn("e2e-full", "All E2E")}`)}
         ${areaRow("#/backend", "⚙️", "Backend", t.backendCases,
             `${state.catalog.unit.dotnet.projects.length} .NET projects · all run on every PR${localAvg("backend") != null ? ` · ${fmtMs(localAvg("backend"))} here` : ""}`,
@@ -253,7 +253,7 @@ function homePage() {
             runBtn("asset-processor", "Run"))}
       </div>
 
-      <h2>Suites <span class="dim normal">— the runnable units (local runner + CI)</span></h2>
+      <h2>Suites <span class="dim normal">- the runnable units (local runner + CI)</span></h2>
       <div class="card lrows">
         ${ordered.map((s) => `
           <div class="lrow tall clickable" data-nav="#/suite/${esc(s.id)}">
@@ -277,7 +277,7 @@ const STATUS_BADGE = {
     skipped: "amber", "not-present": "gray", stopped: "gray",
 };
 
-// Last local runner run — turns the home page into "is everything green?".
+// Last local runner run - turns the home page into "is everything green?".
 function latestResultsHtml() {
     const s = state.summary?.meta ? state.summary : state.catalog.latestRun;
     if (!s?.meta) return "";
@@ -285,7 +285,7 @@ function latestResultsHtml() {
     const notRun = s.results.filter((r) => r.status === "skipped" || r.status === "not-present").length;
     const passed = s.results.filter((r) => r.status === "passed").length;
     return `
-      <h2>Latest local run <span class="dim normal">— ${esc(s.meta.finishedAt)} · branch ${esc(s.meta.branch)} · ${fmtMs(s.meta.durationMs)}${failed ? ` · <b class="warn">${failed} failing</b>` : " · all green"}${notRun ? ` · ${notRun} not run` : ""}</span></h2>
+      <h2>Latest local run <span class="dim normal">- ${esc(s.meta.finishedAt)} · branch ${esc(s.meta.branch)} · ${fmtMs(s.meta.durationMs)}${failed ? ` · <b class="warn">${failed} failing</b>` : " · all green"}${notRun ? ` · ${notRun} not run` : ""}</span></h2>
       <div class="card lrows">
         ${s.results.map((r) => `
           <div class="lrow clickable" data-nav="#/suite/${esc(r.id)}">
@@ -297,14 +297,14 @@ function latestResultsHtml() {
       </div>`;
 }
 
-// Native installer pipeline status — GitHub data, branch-independent (the
+// Native installer pipeline status - GitHub data, branch-independent (the
 // workflow lives on feat/tray-host; the runs are visible from anywhere).
 function nativeInstallersHtml() {
     const jobs = state.catalog.native || [];
     if (!jobs.length) return "";
     const at = jobs[0].recent?.[0]?.at;
     return `
-      <h2>Native installers <span class="dim normal">— GitHub pipeline (feat/tray-host)${at ? ` · last run ${new Date(at).toLocaleDateString()}` : ""}</span></h2>
+      <h2>Native installers <span class="dim normal">- GitHub pipeline (feat/tray-host)${at ? ` · last run ${new Date(at).toLocaleDateString()}` : ""}</span></h2>
       <div class="card lrows">
         ${jobs.map((j) => {
             const last = j.recent?.[0];
@@ -320,7 +320,7 @@ function nativeInstallersHtml() {
           </div>`;
         }).join("")}
       </div>
-      <div class="dim" style="margin-top:6px;font-size:12px">Runs on release / manual dispatch — builds installers for Windows, macOS and Linux, then installs, smoke-tests, runs the full E2E suite against the installed app, and verifies uninstall. The local <b>desktop</b> suite activates automatically once feat/tray-host merges.</div>`;
+      <div class="dim" style="margin-top:6px;font-size:12px">Runs on release / manual dispatch - builds installers for Windows, macOS and Linux, then installs, smoke-tests, runs the full E2E suite against the installed app, and verifies uninstall. The local <b>desktop</b> suite activates automatically once feat/tray-host merges.</div>`;
 }
 
 function statLine(suiteId) {
@@ -582,7 +582,7 @@ function searchPage(q) {
             <div class="scol"><span class="sname">${esc(r.title)}</span><span class="dim">${esc(r.sub)}</span></div>
             ${r.lane ? `<span class="stags">${laneBadge(r.lane)}</span>` : ""}
           </div>`).join("")}
-        ${items.length > 30 ? `<div class="lrow dim">…and ${items.length - 30} more — refine the search</div>` : ""}
+        ${items.length > 30 ? `<div class="lrow dim">…and ${items.length - 30} more - refine the search</div>` : ""}
       </div>`).join("");
 
     return sections || `<div class="empty">No tests match “${esc(q)}”.</div>`;
@@ -597,7 +597,7 @@ function tagHtml(t) {
 function tierBadge(t) { return `<span class="badge accent">${esc(t)}</span>`; }
 
 function triggersHtml(tr) {
-    if (!tr) return "—";
+    if (!tr) return "-";
     const out = [];
     if (tr.push) out.push("push" + (tr.push.paths ? " (path-filtered)" : ""));
     if (tr.pull_request) out.push("PR" + (tr.pull_request.paths ? " (path-filtered)" : ""));
@@ -802,7 +802,7 @@ function wireGlobalEvents() {
             const id = run.dataset.run;
             // "everything" is a virtual suite (the mega-runner), not in the catalog.
             const suite = suiteById(id) ||
-                (id === "everything" ? { id, name: "Everything — all suites" } : null);
+                (id === "everything" ? { id, name: "Everything - all suites" } : null);
             const spec = { suiteId: id, params: {} };
             if (run.dataset.grep) spec.grep = run.dataset.grep;
             if (suite) runSpec(spec, suite);

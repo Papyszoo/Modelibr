@@ -13,7 +13,7 @@ namespace Infrastructure.Services;
 ///
 /// The queue commits its own writes via IUnitOfWork (unlike command handlers,
 /// which commit once at the end): enqueue/complete/fail/retry are durable-queue
-/// primitives — a job must be persisted before workers are notified over
+/// primitives - a job must be persisted before workers are notified over
 /// SignalR, and callers include the domain-event pipeline (ModelUploadedEventHandler)
 /// where no command handler exists to commit afterwards.
 /// </summary>

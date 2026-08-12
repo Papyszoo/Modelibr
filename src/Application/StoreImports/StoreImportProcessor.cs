@@ -148,7 +148,7 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
                 }
                 // Only a real host-shutdown cancellation aborts the run. HttpClient.Timeout also
                 // surfaces as (Task)OperationCanceledException, and treating that as shutdown
-                // used to abandon the whole job — a network timeout must fail just this item.
+                // used to abandon the whole job - a network timeout must fail just this item.
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
                     throw;
@@ -157,7 +157,7 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
                 {
                     // An exception thrown between a handler's staging and its SaveChanges
                     // leaves poisoned entities in the shared change tracker that would make
-                    // every later save in this scope re-fail — reset before the next item.
+                    // every later save in this scope re-fail - reset before the next item.
                     _trackerReset.Clear();
                     outcome = new StoreImportItemResult(item.ItemType, item.Name, OutcomeFailed, ex.Message);
                 }
@@ -184,7 +184,7 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            // Host shutdown / cancellation: leave the job as-is here — the queue's startup
+            // Host shutdown / cancellation: leave the job as-is here - the queue's startup
             // sweep marks interrupted jobs Failed on the next boot, and a new import
             // gap-fills via provenance + SHA dedupe. The `when` guard matters: an HTTP
             // timeout throws the same exception type, and swallowing it here left the job
@@ -236,7 +236,7 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         catch (Exception) when (!ct.IsCancellationRequested)
         {
             // A concurrent import of the SAME store asset passed the lookup above too and won the
-            // race — the unique provenance index rejects this one. Adopt the winner's pack instead
+            // race - the unique provenance index rejects this one. Adopt the winner's pack instead
             // of failing the job; anything else is a real error and rethrows.
             _trackerReset.Clear();
             var winner = await _packRepository.GetByStoreImportAsync(work.StoreUrl, work.AssetId, ct);
@@ -296,7 +296,7 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         }
     }
 
-    // Content types UploadThumbnailCommand accepts — the store turntable is an animated WebP.
+    // Content types UploadThumbnailCommand accepts - the store turntable is an animated WebP.
     private static readonly HashSet<string> ReusableThumbnailContentTypes = new(StringComparer.OrdinalIgnoreCase)
     {
         "image/png", "image/jpeg", "image/jpg", "image/webp"
@@ -338,7 +338,7 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         }
         catch (Exception ex)
         {
-            // Falling back to local generation is fine — log and move on.
+            // Falling back to local generation is fine - log and move on.
             _logger.LogWarning(ex, "Store import: could not fetch the store thumbnail for '{Item}'; will generate one instead", itemName);
             return null;
         }
@@ -357,7 +357,7 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         }
         catch (Exception ex)
         {
-            // The model exists (generation was suppressed) — a failed attach leaves it without a
+            // The model exists (generation was suppressed) - a failed attach leaves it without a
             // thumbnail, recoverable via manual regenerate. Reset so a poisoned tracker doesn't
             // cascade into later items.
             _trackerReset.Clear();
@@ -371,8 +371,8 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         var target = StoreManifestMapping.PlanForItem(item.ItemType);
         if (target == StoreManifestMapping.ImportTarget.Unsupported)
         {
-            // GAP (docs/VISION.md): PackItemType.Other has no Modelibr home — skip + report.
-            return Skipped(item, OutcomeSkippedUnsupported, $"Unsupported item type '{item.ItemType}' — no Modelibr mapping.");
+            // GAP (docs/VISION.md): PackItemType.Other has no Modelibr home - skip + report.
+            return Skipped(item, OutcomeSkippedUnsupported, $"Unsupported item type '{item.ItemType}' - no Modelibr mapping.");
         }
 
         var files = item.Files ?? Array.Empty<StoreManifestFile>();
@@ -395,7 +395,7 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
     {
         var primary = PickPrimary(files, StoreManifestMapping.RoleKind.Mesh);
 
-        // SHA dedupe: if a model already exists for the primary file hash, link it — and
+        // SHA dedupe: if a model already exists for the primary file hash, link it - and
         // gap-fill any manifest files a previous partial run failed to attach, so re-running
         // the import repairs the item instead of freezing its gaps forever.
         var existing = await _modelRepository.GetByFileHashAsync(primary.Sha256, ct);
@@ -603,7 +603,7 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
     }
 
     // Category policy: newly created assets receive the manifest category; dedupe hits are
-    // gap-filled ONLY when currently uncategorized — a category the user (or an earlier
+    // gap-filled ONLY when currently uncategorized - a category the user (or an earlier
     // import) already assigned is never overwritten, so re-running an import categorizes
     // assets that predate category support without clobbering manual organization.
     // Resolution is best-effort (see IStoreImportCategoryResolver) and never fails an item.
@@ -661,7 +661,7 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
     /// </summary>
     private static string? ExtraFilesNote(IReadOnlyList<StoreManifestFile> files, string assetTypeName)
         => files.Count > 1
-            ? $"{files.Count - 1} additional file(s) not imported — {assetTypeName} are single-file assets in Modelibr."
+            ? $"{files.Count - 1} additional file(s) not imported - {assetTypeName} are single-file assets in Modelibr."
             : null;
 
     private static string? Append(string reason, string? note)
@@ -674,7 +674,7 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         => new(item.ItemType, item.Name, outcome, reason);
 
     // Must match the storefront's asset detail route (`/assets/:id` in the store frontend's
-    // App.tsx) — this URL is shown as the pack's source link and has to actually open.
+    // App.tsx) - this URL is shown as the pack's source link and has to actually open.
     private static string BuildListingUrl(string storeUrl, string assetId)
         => $"{storeUrl.TrimEnd('/')}/assets/{assetId}";
 

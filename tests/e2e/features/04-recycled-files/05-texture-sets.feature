@@ -7,7 +7,7 @@ Feature: Recycled Texture Sets
 
   @recycle-texture-set @slow
   # @slow: `page.waitForSelector` 10s timeout on `.model-card, .no-results, .empty-state`
-  # in ModelListPage on shared CI runners — the model list hydration is slower
+  # in ModelListPage on shared CI runners - the model list hydration is slower
   # than the 10s budget. Moved off the PR-gating fast lane.
   Scenario: Recycling a texture set removes it from the texture sets list
     Given I create a texture set "recycle-test-texture" with a color texture

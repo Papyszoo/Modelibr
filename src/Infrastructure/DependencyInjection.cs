@@ -57,7 +57,7 @@ namespace Infrastructure
             services.AddScoped<IComputeCacheRepository, ComputeCacheRepository>();
             services.AddScoped<Application.Extraction.Compute.ComputeCacheService>();
 
-            // Derived-layer thresholds — config-driven guesses until prompt 26
+            // Derived-layer thresholds - config-driven guesses until prompt 26
             // calibrates them (bind the "Derivation" section, fall back to defaults).
             var derivationOptions =
                 configuration.GetSection("Derivation").Get<Application.Extraction.Derivation.DerivationOptions>()
@@ -131,7 +131,7 @@ namespace Infrastructure
 
             // Registered once as a singleton, exposed through both the producer interface and
             // IHostedService so enqueue (request handlers) and consume (background loop) share
-            // the same channel — mirrors the BlendFileGenerationQueue registration above.
+            // the same channel - mirrors the BlendFileGenerationQueue registration above.
             services.AddSingleton<StoreImportQueue>();
             services.AddSingleton<Application.Abstractions.Services.IStoreImportQueue>(sp => sp.GetRequiredService<StoreImportQueue>());
             services.AddHostedService(sp => sp.GetRequiredService<StoreImportQueue>());

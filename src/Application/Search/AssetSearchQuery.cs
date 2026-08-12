@@ -3,7 +3,7 @@ using Application.Abstractions.Messaging;
 namespace Application.Search;
 
 /// <summary>
-/// Structured search over the derived-layer projection — the payoff the MCP server
+/// Structured search over the derived-layer projection - the payoff the MCP server
 /// (prompt 27) wraps. Lexical ranking (tokenised names beat substring hits) plus
 /// composable structural filters, scoped to the current version, honouring
 /// prominence. Distinct from <see cref="GlobalSearchQuery"/> (the incremental
@@ -51,7 +51,7 @@ public record AssetSearchHit(
 /// <summary>
 /// The structural facts a caller needs to <i>choose between</i> hits, returned inline.
 ///
-/// Without these, picking one of ten candidates costs ten extra <c>get_asset</c> calls —
+/// Without these, picking one of ten candidates costs ten extra <c>get_asset</c> calls -
 /// the dominant cost in an agent assembling a scene, where every filter it wants to apply
 /// (triangle budget, physical size, is it rigged, does it have UVs) is already sitting in
 /// the search document that produced the hit.

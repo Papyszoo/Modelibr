@@ -128,12 +128,12 @@ async function runSuite(suite) {
     };
 
     if (!exists(suite.detectPath)) {
-        console.log(c.gray(`\n— ${suite.name}: not present on this branch, skipping`));
+        console.log(c.gray(`\n- ${suite.name}: not present on this branch, skipping`));
         return { ...base, status: "not-present" };
     }
     if (suite.requiresDocker && !dockerUp()) {
         console.log(
-            c.yellow(`\n— ${suite.name}: Docker not running, skipping`),
+            c.yellow(`\n- ${suite.name}: Docker not running, skipping`),
         );
         return { ...base, status: "skipped", note: "Docker unavailable" };
     }
@@ -184,12 +184,12 @@ async function main() {
     if (opts.help) return printHelp();
     if (opts.list) return listSuites();
 
-    // Drift audit banner — surfaces suites added elsewhere but not tracked.
+    // Drift audit banner - surfaces suites added elsewhere but not tracked.
     const { untracked } = audit();
     if (untracked.length) {
         console.log(
             c.yellow(
-                `\n⚠ ${untracked.length} untracked test signal(s) — run "npm run test:audit" to see them.`,
+                `\n⚠ ${untracked.length} untracked test signal(s) - run "npm run test:audit" to see them.`,
             ),
         );
     }
@@ -204,7 +204,7 @@ async function main() {
         return;
     }
 
-    // Fresh report tree each run (suite reports live elsewhere, untouched) — but
+    // Fresh report tree each run (suite reports live elsewhere, untouched) - but
     // preserve history.jsonl, which accumulates timing across runs.
     for (const sub of ["logs", ".work", "index.html", "summary.json"]) {
         fs.rmSync(path.join(REPORT_DIR, sub), { recursive: true, force: true });

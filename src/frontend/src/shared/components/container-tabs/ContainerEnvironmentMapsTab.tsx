@@ -165,7 +165,7 @@ export function ContainerEnvironmentMapsTab({
         className="container-grid-wrapper"
       >
         <div className="container-section">
-          {/* variant='wide' — env maps are panoramic so 2:1 aspect with object-fit: contain */}
+          {/* variant='wide' - env maps are panoramic so 2:1 aspect with object-fit: contain */}
           <AssetGrid cardWidth={cardWidth}>
             {filteredEnvironmentMaps.map(environmentMap => {
               const previewUrl =
@@ -201,7 +201,7 @@ export function ContainerEnvironmentMapsTab({
               )
             })}
 
-            {/* AddTile is always square — not affected by variant='wide' on peers */}
+            {/* AddTile is always square - not affected by variant='wide' on peers */}
             <AddTile label="Add Environment Map" onClick={env.openAddDialog} />
           </AssetGrid>
 

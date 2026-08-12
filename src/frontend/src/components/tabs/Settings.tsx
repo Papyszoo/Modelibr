@@ -65,7 +65,7 @@ interface SectionMeta {
   label: string
   icon: string
   desc: string
-  /** Field labels searched by the live filter — empty for action-only sections. */
+  /** Field labels searched by the live filter - empty for action-only sections. */
   fields: string[]
   /** True when the section persists via the shared Save footer. */
   hasFormSave: boolean
@@ -187,7 +187,7 @@ function highlight(text: string, query: string): ReactNode {
 }
 
 interface SettingsProps {
-  /** Owning tab id — used to persist activeSection across tab switches. */
+  /** Owning tab id - used to persist activeSection across tab switches. */
   tabId?: string
 }
 
@@ -297,7 +297,7 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
     null
   )
   // Ref shadow of formDraft so the dirty-detect effect can read the latest
-  // draft without listing formDraft as a dep — listing it would cause an
+  // draft without listing formDraft as a dep - listing it would cause an
   // extra effect run every time we setFormDraft from inside the effect.
   const formDraftRef = useRef(formDraft)
   useEffect(() => {
@@ -513,7 +513,7 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
     // First hydration after mount: prefer the persisted draft (typed but
     // not yet saved) over the server snapshot so a tab switch doesn't wipe
     // the user's edits. Subsequent settings refetches do NOT reset the form
-    // — refetches can race with the user typing.
+    // - refetches can race with the user typing.
     if (!formInitialisedRef.current) {
       reset(formDraft ?? original)
       formInitialisedRef.current = true
@@ -579,7 +579,7 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
 
   // If we boot in demo mode but the persisted activeSection points at a
   // demo-locked section (Blender, SSL, WebDAV, Backup), bounce back to the
-  // grid — otherwise the detail view renders with disabled actions and no
+  // grid - otherwise the detail view renders with disabled actions and no
   // clear path out.
   useEffect(() => {
     if (!isDemo || !activeSection) return
@@ -714,7 +714,7 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
           const { enqueuedCount, skippedCount } =
             await regenerateAllThumbnails()
           const skipNote =
-            skippedCount > 0 ? ` (${skippedCount} skipped — no files)` : ''
+            skippedCount > 0 ? ` (${skippedCount} skipped - no files)` : ''
           showSuccess(
             `Queued ${enqueuedCount} thumbnail regeneration${enqueuedCount === 1 ? '' : 's'}${skipNote}.`,
             5000
@@ -1090,7 +1090,7 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
                   <span className="settings-help">
                     Controls what happens when uploading an asset with a name
                     that already exists. Applies to all asset types.{' '}
-                    <strong>Allow</strong> keeps the name as-is — WebDAV
+                    <strong>Allow</strong> keeps the name as-is - WebDAV
                     disambiguates colliding names with an ID suffix.{' '}
                     <strong>Reject</strong> blocks the upload.{' '}
                     <strong>Auto-rename</strong> appends a numeric suffix.
@@ -1336,7 +1336,7 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
 
                       {blenderVersionsOffline && (
                         <span className="blender-status-none">
-                          No internet connection — version list unavailable.
+                          No internet connection - version list unavailable.
                           {blenderStatus.state === 'installed'
                             ? ' Currently installed version can still be used.'
                             : ' Connect to the internet to download Blender.'}
@@ -1353,7 +1353,7 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
                       {blenderStatus.state === 'none' &&
                         !blenderVersionsOffline && (
                           <span className="blender-status-none">
-                            Not installed — select a version and click Install.
+                            Not installed - select a version and click Install.
                           </span>
                         )}
 

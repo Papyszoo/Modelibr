@@ -29,7 +29,7 @@ function normalizeIcon(icon: string): string {
 /**
  * Standard header used at the top of a list/grid view.
  *
- * Replaces the per-feature `*ListHeader` components — pass title, optional
+ * Replaces the per-feature `*ListHeader` components - pass title, optional
  * subtitle, inline stats, and an actions slot. Layout, spacing, and
  * responsive collapse are handled here.
  */

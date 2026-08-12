@@ -202,7 +202,7 @@ export function SoundList() {
     if (soundGridRef.current) {
       // NOTE: soundGridRef IS the scroll container (.sound-grid-container has
       // overflow: auto), so its bounding rect stays fixed while the content
-      // scrolls — the scrollLeft/scrollTop term below is REQUIRED to map the
+      // scrolls - the scrollLeft/scrollTop term below is REQUIRED to map the
       // cursor into the scrolled content. This differs from the model /
       // texture-set / environment-map grids, where the rect comes from a
       // non-scrolling selection-surface child and adding scroll would
@@ -290,7 +290,7 @@ export function SoundList() {
     // `ListToolbarSelectionBar` mount adds a new row to the toolbar
     // column, pushing the category-tabs / grid down. Chromium treats
     // that mid-drag layout shift as a cancellation and fires `dragend`
-    // before `drop` — so `draggedSoundId` is null when
+    // before `drop` - so `draggedSoundId` is null when
     // `handleCategoryDrop` runs and the move never happens. (Verified
     // by reproducing the docs/videos `Sounds Video` failure locally.)
     setDraggedSoundId(sound.id)

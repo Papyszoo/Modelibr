@@ -6,7 +6,7 @@ repo.** Confirmed direction 2026-07-02.
 ## Why not committed
 
 A committed-videos approach was tried and **rejected by the user**: PR #548
-originally committed ~11 MB of `.webm`. His call — *"too much space the user would
+originally committed ~11 MB of `.webm`. His call - *"too much space the user would
 have to download"*. #548's branch history was rewritten to remove the blobs, and
 the PR now contains only the E2E `@serial` work.
 
@@ -25,7 +25,7 @@ generate` up to 3× to absorb the SwiftShader flake, with step/job timeouts bump
 for headroom.
 
 **Videos are a documentation artifact, NOT a test.** Handled by
-autogeneration + retry — never by the `@serial` local-only test lane. The user
+autogeneration + retry - never by the `@serial` local-only test lane. The user
 emphasized this distinction.
 
 ## Current behavior
@@ -35,18 +35,18 @@ emphasized this distinction.
 hard-fails on a genuine `failure` (skipped on PRs is fine); `deploy-docs` is
 guarded to `main`.
 
-## The 0.4 fallout — why this blocks releases
+## The 0.4 fallout - why this blocks releases
 
 The 0.4 UI changes broke video specs at docs-deploy time. **Nothing gates them on
-PRs**, and a red docs CI **skips Docker Publish** — 0.4.x images didn't ship until
+PRs**, and a red docs CI **skips Docker Publish** - 0.4.x images didn't ship until
 0.4.3.
 
 Fixed across PRs #572 / #574: projects (`ListToolbar` search panel), sprites ("All"
 default bucket), recycled-files + shared helpers (raw mouse events don't
-auto-scroll — call `scrollIntoViewIfNeeded` before `boundingBox`), packs (a
+auto-scroll - call `scrollIntoViewIfNeeded` before `boundingBox`), packs (a
 conditional add-flow silently skipping), model-management (cold on-camera FBX open
 → off-camera prewarm), and **prompt 48**: `TexturePreviewPanel` Canvas →
-`frameloop="demand"` (a static scene; `always` starved input under software GL —
+`frameloop="demand"` (a static scene; `always` starved input under software GL -
 the deterministic texture-sets CI kill).
 
 ## Duration caps

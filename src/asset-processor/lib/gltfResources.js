@@ -1,4 +1,4 @@
-// Multi-file glTF external-resource resolution — shared cross-runtime helper.
+// Multi-file glTF external-resource resolution - shared cross-runtime helper.
 //
 // A loose .gltf references its buffers (.bin) and textures by relative URI
 // (e.g. "scene.bin", "textures/wood.png"). When such a glTF is loaded from a
@@ -9,8 +9,8 @@
 //
 // Offline invariant: the resolver only ever returns a caller-supplied URL
 // (typically a data: URL), a scheme that carries its own bytes (data:/blob:), a
-// URL the caller explicitly allowed, or a blocked placeholder. Anything else —
-// including a reference that matched no key — is refused, so a glTF can never
+// URL the caller explicitly allowed, or a blocked placeholder. Anything else -
+// including a reference that matched no key - is refused, so a glTF can never
 // make the renderer fetch an arbitrary host or local-network address.
 //
 // Pure and dependency-light on purpose (no THREE): runs in the Vite frontend
@@ -64,14 +64,14 @@ export const BLOCKED_RESOURCE_URL = 'data:application/octet-stream;base64,'
  * Offline invariant: a reference that resolves to nothing in the map is replaced
  * with {@link BLOCKED_RESOURCE_URL}, never passed through. Returning it untouched
  * let a crafted glTF drive the renderer's Chromium to fetch an arbitrary HTTP or
- * local-network URL, which breaks the local-first guarantee — the loader must
+ * local-network URL, which breaks the local-first guarantee - the loader must
  * only ever read bytes the caller supplied.
  *
  * @param {Record<string, string>|Map<string, string>|null|undefined} resources
  *   Map of relative path (as the glTF references it) -> resolvable URL (data URL).
  * @param {{ onBlocked?: (url: string) => void, allow?: (url: string) => boolean }} [options]
  *   `onBlocked` is called with each reference that was refused, for warning detail.
- *   `allow` opts specific unmapped URLs back in — the in-app viewer uses it to keep
+ *   `allow` opts specific unmapped URLs back in - the in-app viewer uses it to keep
  *   loading the primary model from its own `/files/<id>` route.
  * @returns {(url: string) => string} A URL modifier: mapped URL, a safe passthrough,
  *   or {@link BLOCKED_RESOURCE_URL}.
@@ -104,7 +104,7 @@ export function buildResourceResolver(resources, options = {}) {
 
     // NB: no early `data:` passthrough. When the main .gltf is itself loaded from
     // a data URL, GLTFLoader resolves an external ref against the base64 base path,
-    // producing a mangled "data:...<base64>/scene.bin" — which we DO want to
+    // producing a mangled "data:...<base64>/scene.bin" - which we DO want to
     // resolve. A genuine embedded data URI is pure base64 (no '.'), so it can never
     // suffix-match a real filename key (which carries a '.ext') and falls through
     // to the untouched return below.
@@ -131,13 +131,13 @@ export function buildResourceResolver(resources, options = {}) {
 
     // Unresolved from here on. Two shapes are still safe to hand back verbatim:
     //
-    //  * a genuine embedded data URI — pure base64, so its basename carries no
+    //  * a genuine embedded data URI - pure base64, so its basename carries no
     //    '.ext' and could never have matched a key above (the main .gltf itself
     //    arrives this way, and GLTFLoader re-resolves it through this modifier);
     //  * a blob: URL, which the caller minted from bytes it already holds.
     //
-    // Anything else — an http(s) host, a protocol-relative "//host/x", a
-    // file:/// path, or a bare relative name with no matching sibling — would be
+    // Anything else - an http(s) host, a protocol-relative "//host/x", a
+    // file:/// path, or a bare relative name with no matching sibling - would be
     // fetched by the renderer. Refuse it.
     if (url.startsWith('blob:')) return url
     if (url.startsWith('data:') && !base.includes('.')) return url

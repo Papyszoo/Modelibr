@@ -47,11 +47,11 @@ public sealed class VirtualGeneratedBlendFile : IStoreItem, IVirtualFileMetadata
     /// Readiness gate: generated-{name}.blend is only ever exposed to a WebDAV client
     /// (listing or single-item resolution) once the background generator has actually
     /// produced a cached file for this exact (modelId, versionId). Before that, PROPFIND/
-    /// HEAD would have to report SOME size — and the only one available (the source
+    /// HEAD would have to report SOME size - and the only one available (the source
     /// renderable file's) is a lie the GET response can't back up. Clients that trust
     /// PROPFIND size for bounded reads (e.g. macOS WebDAVFS) then truncate the real .blend
     /// mid-copy, corrupting it. Returns null (never expose) when Blender is unavailable,
-    /// there's no renderable file yet, or the cache is simply cold — GetOrGenerateAsync in
+    /// there's no renderable file yet, or the cache is simply cold - GetOrGenerateAsync in
     /// GetReadableStreamAsync still covers a direct GET-by-URL for the cold-cache case.
     /// </summary>
     public static VirtualGeneratedBlendFile? TryCreate(
@@ -86,7 +86,7 @@ public sealed class VirtualGeneratedBlendFile : IStoreItem, IVirtualFileMetadata
     public string UniqueKey => $"generated-blend:{_modelId}:v{_versionId}";
 
     // Now that TryCreate only ever hands out an instance once the cache is confirmed
-    // present, this is always the truthful on-disk size — never the source file's
+    // present, this is always the truthful on-disk size - never the source file's
     // approximate size (that lie is exactly what corrupted the file on WebDAV clients
     // that truncate reads to the PROPFIND-reported length). The 0 fallback only matters
     // for the pathological race where the cache file is invalidated between TryCreate and
@@ -112,7 +112,7 @@ public sealed class VirtualGeneratedBlendFile : IStoreItem, IVirtualFileMetadata
             if (!File.Exists(result.FilePath))
             {
                 // Unlike a normal generation failure (Blender unavailable, bad source
-                // file — logged as a warning above), the generator reported success but
+                // file - logged as a warning above), the generator reported success but
                 // the output vanished before we could read it. That's the same class of
                 // anomaly as a missing persisted blob (VirtualAssetFile), so it gets the
                 // same Error level. Stream.Null still drives CustomWebDavHandler to 404,

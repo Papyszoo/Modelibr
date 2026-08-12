@@ -255,7 +255,7 @@
 
 /* Wrapper around the Recently Closed and Sessions sections. Sits at the
  * visual bottom of the page; both sections act as single horizontal
- * strips — when there are more entries than fit, the rows scroll sideways
+ * strips - when there are more entries than fit, the rows scroll sideways
  * rather than wrapping into a tall block that pushes the asset tiles up. */
 .newtab-bottom {
   margin-top: auto;

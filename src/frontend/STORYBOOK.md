@@ -164,7 +164,7 @@ Storybook._
   `ListHeader`, `CardWidthSlider`).
 - **Reusable feature components** that take all data via props and have no
   side effects (e.g. `ModelListHeader`, `TextureCard`, `SoundCard`).
-- **Visual variants of a component** — one story per meaningful state
+- **Visual variants of a component** - one story per meaningful state
   (default, empty, loading, error, hover, disabled, mobile breakpoint).
 
 ### What should NOT have a story
@@ -181,11 +181,11 @@ Storybook._
 
 ### Mocking
 
-- API calls go through **MSW** — handlers in
+- API calls go through **MSW** - handlers in
   [`src/mocks/handlers.ts`](src/mocks/handlers.ts) are registered globally
   in `.storybook/preview.ts`. Per-story overrides go in
   `parameters.msw.handlers`.
-- Do NOT mock the `apiClient` directly inside a story — use MSW instead so
+- Do NOT mock the `apiClient` directly inside a story - use MSW instead so
   the story exercises the same network path as the app.
 
 ### Story file template

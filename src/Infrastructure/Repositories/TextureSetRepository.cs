@@ -102,7 +102,7 @@ internal sealed class TextureSetRepository : ITextureSetRepository
             query = query.Where(ts =>
                 ts.Textures.Any(t => t.Width >= minResolution.Value || t.Height >= minResolution.Value));
 
-        // EF.Functions.ILike — case-insensitive Contains on Postgres.
+        // EF.Functions.ILike - case-insensitive Contains on Postgres.
         if (!string.IsNullOrWhiteSpace(searchName))
         {
             var pattern = $"%{searchName.Trim()}%";
@@ -134,7 +134,7 @@ internal sealed class TextureSetRepository : ITextureSetRepository
     public async Task<CategoryAssetCounts> GetCategoryAssetCountsAsync(
         TextureSetKind kind, CancellationToken cancellationToken = default)
     {
-        // Counts are scoped to a single kind — categories are strictly per-kind
+        // Counts are scoped to a single kind - categories are strictly per-kind
         // (Universal vs ModelSpecific), never a shared vocabulary.
         var grouped = await _context.TextureSets
             .AsNoTracking()

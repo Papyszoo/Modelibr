@@ -25,7 +25,7 @@ function model(files: ReturnType<typeof file>[]): Model {
 describe('resolveModelPreview', () => {
   it('prefers the renderable file over the first file', () => {
     // Regression: source file (.blend) is first, the loadable .glb is flagged
-    // renderable — picking files[0] is what made model selection a no-op.
+    // renderable - picking files[0] is what made model selection a no-op.
     const result = resolveModelPreview(
       model([file('1', 'source.blend', false), file('2', 'mesh.glb', true)])
     )

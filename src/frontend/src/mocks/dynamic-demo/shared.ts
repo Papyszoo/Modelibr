@@ -100,7 +100,7 @@ export const thumbnailUrl = (file: string) =>
   `${DEMO_BASE}demo-assets/thumbnails/${file}`
 export const seedAssetUrl = (file: string) => {
   // Remote seed assets (e.g. the Base Meshes pack served from GitHub raw)
-  // are stored as absolute URLs — pass them through untouched.
+  // are stored as absolute URLs - pass them through untouched.
   if (/^https?:\/\//i.test(file)) return file
   return file.startsWith('hdri/') ? `${DEMO_BASE}${file}` : assetUrl(file)
 }
@@ -158,7 +158,7 @@ export const seedRemoteThumbnails: Record<string, string> =
   baseMeshRemoteThumbnails()
 
 // Map seed file IDs to static asset paths (for pre-seeded data).
-// Values may also be absolute URLs (remote seed assets) — see seedAssetUrl.
+// Values may also be absolute URLs (remote seed assets) - see seedAssetUrl.
 export const seedFileAssets: Record<number, string> = {
   ...baseMeshFileAssets(),
   101: 'test-cube.glb',
@@ -227,7 +227,7 @@ export async function fetchStaticAsset(
 }
 
 /**
- * Serve a file by ID — check IndexedDB first (user uploads), fall back to
+ * Serve a file by ID - check IndexedDB first (user uploads), fall back to
  * seed static assets.
  */
 export async function serveFile(fileId: number): Promise<Response> {
@@ -308,7 +308,7 @@ export async function trackUpload(
  * the kind of each linked texture set in the textureSets store. Texture sets
  * with kind=Universal contribute to `globalMaterialCount`, kind=ModelSpecific
  * to `multiModelTextureCount`; ModelOwned (or unknown kinds) are excluded
- * from both — matching the backend domain split.
+ * from both - matching the backend domain split.
  */
 async function splitTextureSetCounts(
   refs: { id: number; name: string }[]
@@ -739,7 +739,7 @@ export function buildConceptImage(
   }
 }
 
-// Background thumbnail generation — fire and forget
+// Background thumbnail generation - fire and forget
 export function generateModelThumbnailAsync(
   modelId: number,
   fileBlob: Blob,
@@ -759,7 +759,7 @@ export function generateModelThumbnailAsync(
   gen
     .then(thumb => storeThumbnail(`model:${modelId}`, thumb))
     .catch(() => {
-      // Silently ignore — thumbnail will just be missing
+      // Silently ignore - thumbnail will just be missing
     })
 }
 
@@ -822,7 +822,7 @@ export async function getVersionTextureMaps(
   version: DemoModelVersion
 ): Promise<TextureMapData[]> {
   const mainVariant = version.mainVariantName ?? ''
-  // "__embedded__" means use the model's original materials — skip texture maps
+  // "__embedded__" means use the model's original materials - skip texture maps
   if (mainVariant === '__embedded__') return []
   // Get mappings for the main variant (or empty variant name)
   const mappings = version.textureMappings.filter(
@@ -1301,7 +1301,7 @@ export async function prewarmSeedThumbnails(): Promise<void> {
       await storeThumbnail(modelKey, thumbnail)
       await storeThumbnail(`version:${versionId}`, thumbnail)
     } catch {
-      // Silently ignore — thumbnail requests will still generate on demand.
+      // Silently ignore - thumbnail requests will still generate on demand.
     }
   }
 }
@@ -1358,7 +1358,7 @@ export async function prewarmSeedEnvironmentMapThumbnails(): Promise<void> {
         await storeThumbnail(mapKey, preview)
       }
     } catch {
-      // Silently ignore — preview requests will still generate on demand.
+      // Silently ignore - preview requests will still generate on demand.
     }
   }
 }
@@ -1398,7 +1398,7 @@ export async function prewarmSeedSoundWaveforms(): Promise<void> {
         await put('sounds', sound)
       }
     } catch {
-      // Silently ignore — waveform will show placeholder.
+      // Silently ignore - waveform will show placeholder.
     }
   }
 }

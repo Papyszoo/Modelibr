@@ -155,7 +155,7 @@ export class RecycledFilesPage {
                     state: "visible",
                     timeout: 10000,
                 });
-                return; // Dialog appeared — success
+                return; // Dialog appeared - success
             } catch {
                 console.log(
                     `[Retry] Delete dialog did not appear on attempt ${attempt + 1}, retrying...`,
@@ -502,7 +502,7 @@ export class RecycledFilesPage {
         let response = await responsePromise;
 
         if (!response) {
-            // Playwright click didn't trigger the React handler — retry with native DOM click
+            // Playwright click didn't trigger the React handler - retry with native DOM click
             console.log(
                 "[Delete] API not called by Playwright click, retrying with JS click...",
             );

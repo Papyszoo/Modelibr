@@ -1,20 +1,20 @@
 ---
 name: release-workflow
-description: Modelibr git and release conventions — version-branch naming and protection, PR targeting, conventional commits (never an AI co-author trailer), and the version-branch→main release cadence. Use when branching, committing, opening PRs, cutting a release, or configuring branch protection.
+description: Modelibr git and release conventions - version-branch naming and protection, PR targeting, conventional commits (never an AI co-author trailer), and the version-branch→main release cadence. Use when branching, committing, opening PRs, cutting a release, or configuring branch protection.
 ---
 
 # Release & git workflow
 
 ## Branches
 - `main` represents **released versions only**. Installed desktop apps auto-update
-  via electron-updater from GitHub Releases, so keep the release cadence low —
+  via electron-updater from GitHub Releases, so keep the release cadence low -
   users shouldn't be prompted to update every few days.
 - Active development lands on a **version branch** named `version/<major>.<minor>`
   (e.g. `version/0.1`). Feature/fix branches PR **into the current version
   branch**, never directly into `main`.
 - **A version branch is done once its release ships.** Post-release fixes stage
   on a new **patch branch** `version/<major>.<minor>.<patch>` (e.g.
-  `version/0.3.1`, `version/0.4.1`), created from the released tip — never
+  `version/0.3.1`, `version/0.4.1`), created from the released tip - never
   retarget more work at the already-released `version/X.Y` branch.
 - `main` only advances when cutting a release: merge the version branch → `main`,
   then publish a GitHub Release.
@@ -24,7 +24,7 @@ description: Modelibr git and release conventions — version-branch naming and 
   current and future version branch is protected automatically (no per-branch
   setup).
 - The rule: require a PR before merging (0 approvals), block force-pushes and
-  branch deletion, and require these CI checks — `Backend Unit Tests`,
+  branch deletion, and require these CI checks - `Backend Unit Tests`,
   `Frontend Unit Tests`, `Asset Processor Tests`. They run on **every** PR via
   `ci-and-deploy.yml` (no path filter, no job-level skip), so requiring them
   never deadlocks a PR.
@@ -41,16 +41,16 @@ description: Modelibr git and release conventions — version-branch naming and 
   `docs(agents): …`.
 - **Never add AI attribution.** No `Co-Authored-By:` line for Claude/the
   assistant on any commit, and no "Generated with Claude Code" (or similar)
-  footer on a PR body. This is a hard rule — the user wants history and PRs to
+  footer on a PR body. This is a hard rule - the user wants history and PRs to
   read as his own work.
 
 ## PRs
 - Target the current version branch, not `main`.
-- **Nothing goes directly to `main` — including CI-only files.** Workflows and
+- **Nothing goes directly to `main` - including CI-only files.** Workflows and
   `tests/` tooling route through the version branch like everything else, even
   when a workflow needs to be on the default branch to be dispatchable. Accept
   that it goes live at the next release.
-- **Batch into feature-sized PRs.** The user dislikes small stacked PRs — he
+- **Batch into feature-sized PRs.** The user dislikes small stacked PRs - he
   wants to test a complete, user-visible feature in one branch. Fold prerequisite
   fixes into the feature branch unless they're urgent alone, and ship a change
   checklist with the PR so he can test it.
@@ -65,7 +65,7 @@ description: Modelibr git and release conventions — version-branch naming and 
   publish, docs deploy.
 - **Before tagging, run `npm run videos:generate` locally.** Docs video specs are
   exercised only at main-push, and a red docs CI **silently blocks Docker
-  Publish** — `docker-publish.yml` fires only on "CI and Deploy Docs" success on
+  Publish** - `docker-publish.yml` fires only on "CI and Deploy Docs" success on
   main and has **no manual trigger**. This cost 0.4.0–0.4.2 their Docker images.
   Duration caps regress only at CI pace (CI paces recorded waits ~1.5× local), so
   a spec at ~90% of its cap locally will fail CI.

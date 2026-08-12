@@ -2,7 +2,7 @@ import { isSupportedModelFormat, isThreeJSRenderable } from '@/utils/fileUtils'
 
 /**
  * One importable model group: a primary model file plus the auxiliary (external)
- * files that live under its directory — the `.bin` buffers and textures a loose
+ * files that live under its directory - the `.bin` buffers and textures a loose
  * `.gltf` references. Mirrors the backend grouping so a folder upload posts the
  * same shape a `.zip` upload produces server-side.
  */
@@ -41,7 +41,7 @@ function relativeTo(path: string, dir: string): string {
 export interface ImportGroupingOptions {
   /**
    * Restrict primaries to formats the in-app viewer can load. Mirrors the single-file
-   * upload path's `requireThreeJSRenderable` gate — without it a folder import was a
+   * upload path's `requireThreeJSRenderable` gate - without it a folder import was a
    * side door for `.dae`/`.3ds`, which the grid's own file picker rejects.
    */
   requireThreeJSRenderable?: boolean
@@ -77,7 +77,7 @@ export function groupFilesForImport(
 ): ModelImportGroup[] {
   const entries = Array.from(files).map(file => ({ file, path: pathOf(file) }))
   // A rejected primary (a .blend with Blender off, a .dae) must not become an
-  // *auxiliary* of a neighbouring model either — it is a model, not a resource.
+  // *auxiliary* of a neighbouring model either - it is a model, not a resource.
   const isModelFile = (path: string): boolean =>
     isSupportedModelFormat(extensionOf(path))
   const isPrimary = (path: string): boolean => isPrimaryCandidate(path, options)

@@ -157,7 +157,7 @@ export async function installClient({ onProgress, openPath, openExternal, log = 
   const asset = pickClientAsset(release)
 
   if (!asset) {
-    // No matching installer (e.g. no release yet) — fall back to the page.
+    // No matching installer (e.g. no release yet) - fall back to the page.
     log('[ModelibrDesktop][client-install] No matching asset; opening releases page')
     await openExternal?.(RELEASES_PAGE_URL)
     return { ok: false, reason: 'no-asset' }

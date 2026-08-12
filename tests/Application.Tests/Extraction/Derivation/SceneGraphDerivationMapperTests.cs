@@ -43,7 +43,7 @@ public class SceneGraphDerivationMapperTests
     [Fact]
     public void PartDimensions_FallBackToLocalBox_WhenWorldBoxAbsent()
     {
-        // Extractor-v1 / bpy payloads have no worldBoundingBox — the local box is used.
+        // Extractor-v1 / bpy payloads have no worldBoundingBox - the local box is used.
         var detail = """
         { "boundingBox": { "min": [-1.25,-1.25,-0.25], "max": [1.25,1.25,0.25] } }
         """;

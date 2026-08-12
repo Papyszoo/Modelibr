@@ -121,7 +121,7 @@
   animation: slideIn 0.2s ease-out;
 }
 
-/* Mobile sheet — full-viewport, drag disabled, header non-movable.
+/* Mobile sheet - full-viewport, drag disabled, header non-movable.
    The browser URL bar (and any --demo-banner-height) is excluded via dvh
    so Save buttons in scrollable content stay reachable. */
 .floating-window--mobile {
@@ -149,7 +149,7 @@
 .floating-window--mobile .floating-window-header {
   cursor: default;
   padding: 0.75rem 1rem;
-  /* Larger touch targets — header buttons grow on mobile via cascade. */
+  /* Larger touch targets - header buttons grow on mobile via cascade. */
 }
 
 .floating-window--mobile .floating-window-header button.floating-window-btn {

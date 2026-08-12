@@ -76,7 +76,7 @@ public sealed class VirtualAudioSelectionFile : IStoreItem
         var file = await fileRepository.GetByIdAsync(selection.FileId);
         if (file == null)
         {
-            // The selection points at a FileId that no longer resolves — an orphaned
+            // The selection points at a FileId that no longer resolves - an orphaned
             // reference, not routine "nothing selected" (that's the selection == null
             // branch above). Worth an Error: it means selection state and the Files
             // table have drifted apart.

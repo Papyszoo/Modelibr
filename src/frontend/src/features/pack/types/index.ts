@@ -36,7 +36,7 @@ export interface PackDto {
   isEmpty: boolean
   customThumbnailUrl?: string | null
   // Store-import provenance (set when the pack was imported from the
-  // companion Asset Store) — the Asset Store page matches these to show
+  // companion Asset Store) - the Asset Store page matches these to show
   // "Imported ✓" on library entries.
   storeImportUrl?: string | null
   storeImportAssetId?: string | null

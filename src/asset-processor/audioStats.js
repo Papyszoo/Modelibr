@@ -1,5 +1,5 @@
 /**
- * Audio content/quality statistics — deterministic analysis over decoded PCM,
+ * Audio content/quality statistics - deterministic analysis over decoded PCM,
  * as pure functions so they run in the worker and are fully unit-testable without
  * shelling out to ffmpeg. The ffmpeg decode (and true LUFS / true-peak, which
  * need ITU-R BS.1770 K-weighting) live in the worker wrapper; everything here is
@@ -140,7 +140,7 @@ export function analyzeStereo(
 
 /**
  * Very rough tempo estimate from onset regularity. Returns null on non-musical
- * content (too few onsets, or irregular spacing) — the prompt explicitly prefers
+ * content (too few onsets, or irregular spacing) - the prompt explicitly prefers
  * null over a confident wrong number on a door creak or noise.
  */
 export function estimateBpm(
@@ -214,7 +214,7 @@ export function computeAudioStats(decoded) {
 
   const perChannel = channels.map(channelLevels)
 
-  // Downmix to mono for content analysis (silence/bpm) — a simple average.
+  // Downmix to mono for content analysis (silence/bpm) - a simple average.
   const length = channels[0].length
   const mono = new Float32Array(length)
   for (let i = 0; i < length; i++) {

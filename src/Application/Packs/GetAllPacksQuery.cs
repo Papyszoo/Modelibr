@@ -69,7 +69,7 @@ public record PackListDto
     public string? CustomThumbnailUrl { get; init; }
     public bool IsEmpty { get; init; }
 
-    // Store-import provenance — lets the Asset Store page mark library entries
+    // Store-import provenance - lets the Asset Store page mark library entries
     // that were already imported (matched on store URL + store asset id).
     public string? StoreImportUrl { get; init; }
     public string? StoreImportAssetId { get; init; }

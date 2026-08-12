@@ -38,7 +38,7 @@ export class UniqueFileGenerator {
         // Ensure temp directory exists
         await fs.mkdir(tempDir, { recursive: true });
 
-        // Keep original filename — the unique subdirectory prevents collisions,
+        // Keep original filename - the unique subdirectory prevents collisions,
         // and the modified content produces a unique SHA256 hash.
         // NOT renaming is critical: the server derives entity names (texture sets,
         // models) from the uploaded filename, so renaming breaks test assertions.
@@ -69,7 +69,7 @@ export class UniqueFileGenerator {
         if (ext === ".glb") {
             newBuffer = this.modifyGLBJson(originalBuffer, uniqueId);
         } else if (ext === ".png") {
-            // Validate actual PNG signature before modifying — some .png files
+            // Validate actual PNG signature before modifying - some .png files
             // may actually be JPEG or other formats with wrong extension.
             const pngSig = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
             if (
@@ -78,7 +78,7 @@ export class UniqueFileGenerator {
             ) {
                 newBuffer = this.modifyPNG(originalBuffer, uniqueId);
             } else {
-                // Not a real PNG — append unique bytes to avoid dedup
+                // Not a real PNG - append unique bytes to avoid dedup
                 const marker = Buffer.from(`\n/* UniqueId: ${uniqueId} */`);
                 newBuffer = Buffer.concat([originalBuffer, marker]);
                 console.log(
@@ -102,7 +102,7 @@ export class UniqueFileGenerator {
             // Binary STL: mutate the 80-byte header in place (see modifySTL).
             newBuffer = this.modifySTL(originalBuffer, uniqueId);
         } else {
-            // FBX, OBJ, etc — copy without modification.
+            // FBX, OBJ, etc - copy without modification.
             // Appending bytes breaks binary formats like FBX (THREE.FBXLoader fails).
             // These files will produce identical SHA256 hashes on re-upload.
             // For tests needing unique uploads, use GLB (which supports safe JSON editing).
@@ -338,7 +338,7 @@ export class UniqueFileGenerator {
             }
         }
 
-        // ASCII or malformed STL — append a trailing comment to vary the hash.
+        // ASCII or malformed STL - append a trailing comment to vary the hash.
         console.log(
             "[UniqueFileGenerator] .stl is not binary; appended unique marker",
         );

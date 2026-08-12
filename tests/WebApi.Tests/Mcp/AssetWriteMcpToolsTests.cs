@@ -12,8 +12,8 @@ using Xunit;
 namespace WebApi.Tests.Mcp;
 
 /// <summary>
-/// Unit tests for the MCP write tools' cross-cutting behaviour — idempotency
-/// claim/complete/release, error mapping, and the remote-upload branch — using mocked
+/// Unit tests for the MCP write tools' cross-cutting behaviour - idempotency
+/// claim/complete/release, error mapping, and the remote-upload branch - using mocked
 /// handlers. The tools are thin pass-throughs, so this is where their own logic (not the
 /// wrapped commands) is verified.
 /// </summary>
@@ -79,7 +79,7 @@ public class AssetWriteMcpToolsTests
     [Fact]
     public async Task SetCategory_Failure_Releases_The_Claim_So_A_Retry_Can_Run()
     {
-        // Regression: with claim-before-write, a failed write must give the key back —
+        // Regression: with claim-before-write, a failed write must give the key back -
         // otherwise retrying the same key answers "already-applied" for an operation
         // that never happened.
         var handler = new Mock<ICommandHandler<SetModelCategoryCommand, SetModelCategoryResponse>>();
@@ -100,7 +100,7 @@ public class AssetWriteMcpToolsTests
     public async Task CreatePack_Losing_A_Concurrent_Claim_Does_Not_Create_A_Second_Pack()
     {
         // Regression: the check-then-act version looked the key up, found nothing, and
-        // created the pack anyway — two concurrent calls with one key produced TWO Packs
+        // created the pack anyway - two concurrent calls with one key produced TWO Packs
         // rows and a unique-violation 500. Losing the claim must skip the handler.
         var handler = new Mock<ICommandHandler<CreatePackCommand, CreatePackResponse>>();
         var audit = ClaimCompleted("key-1", "create-pack", "Pack", 4);
@@ -165,7 +165,7 @@ public class AssetWriteMcpToolsTests
         await Assert.ThrowsAsync<OperationCanceledException>(
             () => AssetWriteMcpTools.SetCategory(handler.Object, audit.Object, 1, "key-10", 5, cts.Token));
 
-        // Released with an uncancelled token — the caller's token is already dead.
+        // Released with an uncancelled token - the caller's token is already dead.
         audit.Verify(a => a.AbandonAsync("key-10", CancellationToken.None), Times.Once);
     }
 

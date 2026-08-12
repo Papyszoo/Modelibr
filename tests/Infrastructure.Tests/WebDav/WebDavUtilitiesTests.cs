@@ -7,7 +7,7 @@ public class WebDavUtilitiesTests
 {
     private sealed record Candidate(int Id, string Name);
 
-    // ── GetExtension / GetVirtualFileName (pre-existing behavior — regression guard) ──
+    // ── GetExtension / GetVirtualFileName (pre-existing behavior - regression guard) ──
 
     [Fact]
     public void GetExtension_WithExtension_ReturnsExtensionWithoutDot()
@@ -52,7 +52,7 @@ public class WebDavUtilitiesTests
     [Fact]
     public void TryParseIdSuffix_NameContainingDots_TreatsLastDotGroupAsExtensionOnly()
     {
-        // "v1.2 Kick.wav" — the suffix insertion point is right before the real
+        // "v1.2 Kick.wav" - the suffix insertion point is right before the real
         // extension; dots earlier in the name must not be mistaken for it.
         var success = WebDavUtilities.TryParseIdSuffix("v1.2 Kick [9].wav", out var baseName, out var id);
 
@@ -64,7 +64,7 @@ public class WebDavUtilitiesTests
     [Fact]
     public void TryParseIdSuffix_FolderNameContainingDot_KeepsDotAsPartOfName()
     {
-        // No extension for folders — a dot in the name is just part of the name.
+        // No extension for folders - a dot in the name is just part of the name.
         var success = WebDavUtilities.TryParseIdSuffix("Chair.old [42]", out var baseName, out var id);
 
         Assert.True(success);
@@ -148,7 +148,7 @@ public class WebDavUtilitiesTests
     {
         // Two "Chair" among the passed-in siblings collide; a third "Chair" outside
         // the passed set (simulating a different listing scope, e.g. another project)
-        // is irrelevant — collision detection must not reach beyond the given candidates.
+        // is irrelevant - collision detection must not reach beyond the given candidates.
         var candidates = new[] { new Candidate(1, "Chair"), new Candidate(2, "Table") };
 
         var result = WebDavUtilities.ComputeDisplayNames(candidates, c => c.Id, c => c.Name);
@@ -184,7 +184,7 @@ public class WebDavUtilitiesTests
     [Fact]
     public void ResolveSegment_PlainSegment_AmbiguousDuplicates_ReturnsNull()
     {
-        // Two "Chair" siblings and the client asks for the bare, undisambiguated name —
+        // Two "Chair" siblings and the client asks for the bare, undisambiguated name -
         // must never guess which one to serve.
         var candidates = new[] { new Candidate(42, "Chair"), new Candidate(57, "Chair") };
 
@@ -218,7 +218,7 @@ public class WebDavUtilitiesTests
     public void ResolveSegment_IdSuffixSegment_IdExistsButNameMismatch_FallsBackToPlainNameAmbiguityGuard()
     {
         // "Chair [57]" as a literal plain name doesn't exist among the candidates and
-        // id 57's actual name is "Table" (stale/bogus suffix) — must not resolve.
+        // id 57's actual name is "Table" (stale/bogus suffix) - must not resolve.
         var candidates = new[] { new Candidate(57, "Table") };
 
         var result = WebDavUtilities.ResolveSegment("Chair [57]", candidates, c => c.Id, c => c.Name);

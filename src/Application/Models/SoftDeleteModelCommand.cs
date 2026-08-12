@@ -59,7 +59,7 @@ internal sealed class SoftDeleteModelCommandHandler : ICommandHandler<SoftDelete
         model.SoftDelete(_dateTimeProvider.UtcNow);
         await _modelRepository.UpdateAsync(model, cancellationToken);
 
-        // Search reads the projection, not the Models table — a recycled model that
+        // Search reads the projection, not the Models table - a recycled model that
         // keeps its documents stays fully searchable and returnable to an agent.
         await _searchDocumentRepository.SetActiveForAssetAsync(
             ExtractionAssetTypes.Model, model.Id, isActive: false, cancellationToken);

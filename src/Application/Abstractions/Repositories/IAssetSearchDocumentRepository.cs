@@ -7,8 +7,8 @@ namespace Application.Abstractions.Repositories;
 /// (AssetType, AssetId, VersionId) on re-derive; the current-version marker is
 /// maintained here in one place so search never returns stale versions.
 ///
-/// The projection is denormalised, so every state transition that search reads —
-/// active version, category, soft delete, restore, permanent delete — has to be
+/// The projection is denormalised, so every state transition that search reads -
+/// active version, category, soft delete, restore, permanent delete - has to be
 /// mirrored here. Search reads projection state only, so anything not mirrored is
 /// simply wrong until the next extraction happens to run.
 /// </summary>
@@ -31,7 +31,7 @@ public interface IAssetSearchDocumentRepository
 
     /// <summary>
     /// Clears the current-version flag on every document of an asset EXCEPT the
-    /// given version — so exactly one version is searchable by default.
+    /// given version - so exactly one version is searchable by default.
     /// </summary>
     Task<IReadOnlyList<AssetSearchDocument>> GetForOtherVersionsAsync(
         string assetType,

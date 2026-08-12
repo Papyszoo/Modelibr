@@ -1,5 +1,5 @@
 // List .NET (xUnit) tests without running them via `dotnet test --list-tests`.
-// Theory cases share a method name with a "(params)" suffix — we group those and
+// Theory cases share a method name with a "(params)" suffix - we group those and
 // count cases. Uses --no-build by default (fast); pass build=true to force a build
 // if the test assemblies aren't compiled yet.
 
@@ -31,7 +31,7 @@ function listProject(csprojRel, build) {
             project: csprojRel,
             error: build
                 ? "dotnet test --list-tests failed"
-                : "not built — run the backend suite once, or rebuild",
+                : "not built - run the backend suite once, or rebuild",
             classes: [],
             methodCount: 0,
             caseCount: 0,

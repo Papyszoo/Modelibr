@@ -1,13 +1,13 @@
 /**
- * Scene-graph extraction — shared cross-runtime code. Walks a loaded THREE scene
+ * Scene-graph extraction - shared cross-runtime code. Walks a loaded THREE scene
  * (the three.js path; a bpy pass produces the same shape natively with the extra
  * fields filled) and produces the raw per-part rows + whole-asset rollups that
  * feed the extraction substrate.
  *
  * THREE is injected so this runs in the Puppeteer page AND in Vitest under Node
  * (see the other lib/ modules). The three.js path triangulates, so fields that
- * only exist in the authoring tool — quad/n-gon ratios, vertex groups, applied
- * modifiers — are emitted as null here, never guessed. The geometry hash is
+ * only exist in the authoring tool - quad/n-gon ratios, vertex groups, applied
+ * modifiers - are emitted as null here, never guessed. The geometry hash is
  * computed on the triangulated geometry available in BOTH paths (see
  * geometryHash.js) so bpy and three.js agree.
  */
@@ -253,7 +253,7 @@ export function extractSceneGraph(root, THREE, options = {}) {
     })
   }
 
-  // Ensure world matrices are current before walking — per-part world bounds
+  // Ensure world matrices are current before walking - per-part world bounds
   // (worldBoundingBoxOf) and the whole-asset world bounds both depend on them.
   try {
     root.updateMatrixWorld(true)

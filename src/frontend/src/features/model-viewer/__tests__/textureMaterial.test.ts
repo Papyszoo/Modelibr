@@ -25,7 +25,7 @@ function fakeGeometry(initial: Record<string, { clone: () => unknown }> = {}) {
  *
  * The regression this guards against: the viewer once gated metalness on the
  * base-color map, so a textured surface with no metalness map became fully
- * metallic — a black mirror lit only by the environment, while the worker
+ * metallic - a black mirror lit only by the environment, while the worker
  * thumbnail rendered it correctly as a dielectric. The first test below is the
  * direct guard.
  */
@@ -34,7 +34,7 @@ describe('resolveTextureMaterialConfig', () => {
     const cfg = resolveTextureMaterialConfig({ baseColorMap: {} })
 
     expect(cfg.hasBaseColorMap).toBe(true)
-    // Dielectric — responds to ambient/direct/IBL like the thumbnail does.
+    // Dielectric - responds to ambient/direct/IBL like the thumbnail does.
     expect(cfg.metalness).toBe(0)
     expect(cfg.roughness).toBe(0.8)
   })
@@ -99,7 +99,7 @@ describe('ensureAoMapUv2', () => {
     expect(geometry.attrs.uv2).toBe(cloned)
   })
 
-  it('is idempotent — does not overwrite an existing uv2', () => {
+  it('is idempotent - does not overwrite an existing uv2', () => {
     const geometry = fakeGeometry({
       uv: { clone: () => ({}) },
       uv2: { clone: () => ({}) },

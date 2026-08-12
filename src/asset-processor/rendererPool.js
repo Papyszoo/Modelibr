@@ -77,7 +77,7 @@ export class RendererPool {
       return this.available.shift()
     }
 
-    // All renderers busy — wait for one to be released
+    // All renderers busy - wait for one to be released
     return new Promise(resolve => {
       this._waiting.push(resolve)
     })
@@ -98,7 +98,7 @@ export class RendererPool {
   }
 
   /**
-   * Force a specific renderer to reinitialize — used when the job holding
+   * Force a specific renderer to reinitialize - used when the job holding
    * it times out. Reuses the renderer's own crash-recovery machinery (the
    * same path taken when a page detaches/crashes mid-render) so the pool
    * gets back a USABLE renderer instead of one still stuck mid-render.

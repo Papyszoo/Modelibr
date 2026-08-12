@@ -2,7 +2,7 @@ namespace Domain.ValueObjects;
 
 /// <summary>
 /// Status of an asset metadata extraction job in the queue.
-/// Mirrors <see cref="ThumbnailJobStatus"/> — extraction is a separate,
+/// Mirrors <see cref="ThumbnailJobStatus"/> - extraction is a separate,
 /// decoupled job family from thumbnail rendering.
 /// </summary>
 public enum ExtractionJobStatus

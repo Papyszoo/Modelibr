@@ -6,7 +6,7 @@ import { decodeTiff } from '../../../asset-processor/lib/tiffDecode.js'
 /**
  * Decode a TIFF ArrayBuffer to an ImageBitmap.
  *
- * By default the bitmap is in the TIFF's natural top-down orientation —
+ * By default the bitmap is in the TIFF's natural top-down orientation -
  * Three.js' `texture.flipY` then controls how the bitmap is uploaded.
  *
  * Pass `{ flipY: true }` to bake a vertical flip into the bitmap itself,
@@ -16,7 +16,7 @@ import { decodeTiff } from '../../../asset-processor/lib/tiffDecode.js'
  *
  * Hook callers that drive `texture.flipY` themselves (e.g. the model viewer's
  * `useChannelExtractedTextures`) should leave `flipY: false` so the
- * format-aware flip in Three.js works correctly — otherwise GLTF models
+ * format-aware flip in Three.js works correctly - otherwise GLTF models
  * (which use `flipY = false`) render TIFFs upside-down.
  */
 export async function decodeTiffBufferToBitmap(
@@ -40,7 +40,7 @@ export async function decodeTiffBlobToBitmap(
 
 /**
  * Fetch a TIFF URL and return a Three.js Texture in natural orientation.
- * The caller owns `texture.flipY` — leave it as the per-model-format default
+ * The caller owns `texture.flipY` - leave it as the per-model-format default
  * (Three.js default is `true`, GLTFLoader sets `false`).
  */
 export async function loadTiffTextureFromUrl(

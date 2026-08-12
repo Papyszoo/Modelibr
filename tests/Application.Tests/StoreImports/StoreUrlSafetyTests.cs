@@ -108,7 +108,7 @@ public class StoreUrlSafetyTests
     {
         Assert.True(StoreUrlSafety.IsSameOrigin(
             new Uri("https://store.example.com/a"), new Uri("https://STORE.example.com/b")));
-        // Same host and port, different scheme — a different principal, so no token.
+        // Same host and port, different scheme - a different principal, so no token.
         Assert.False(StoreUrlSafety.IsSameOrigin(
             new Uri("http://store.example.com:443/a"), new Uri("https://store.example.com/b")));
         Assert.False(StoreUrlSafety.IsSameOrigin(

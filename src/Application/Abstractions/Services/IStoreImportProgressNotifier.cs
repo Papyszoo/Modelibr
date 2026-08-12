@@ -15,7 +15,7 @@ public sealed record StoreImportProgress(
 
 /// <summary>
 /// Pushes store-import progress to subscribed UI clients (SignalR in WebApi). Implementations
-/// must never throw into the caller — a notification failure must not break the import.
+/// must never throw into the caller - a notification failure must not break the import.
 /// </summary>
 public interface IStoreImportProgressNotifier
 {

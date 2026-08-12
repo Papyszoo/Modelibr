@@ -10,7 +10,7 @@
  * renderer wrap and shade STL meshes identically.
  */
 
-// Hex form of new Color(0.7, 0.7, 0.9) — the app's neutral default surface.
+// Hex form of new Color(0.7, 0.7, 0.9) - the app's neutral default surface.
 const NEUTRAL_COLOR = 0xb3b3e6
 
 /**

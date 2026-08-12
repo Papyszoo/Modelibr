@@ -19,8 +19,8 @@ interface ShowToast {
  * Per-asset-type configuration for the shared category-mutations factory.
  * Every asset type's category sidebar drives the same four operations
  * (create / rename / delete / move); this hook owns the identical
- * orchestration — toasts, `setActiveCategoryId` on create, the delete-branch
- * fallback to "All", `clearSelection` on move — and the callers inject the
+ * orchestration - toasts, `setActiveCategoryId` on create, the delete-branch
+ * fallback to "All", `clearSelection` on move - and the callers inject the
  * asset-type-specific API calls, invalidation, and toast noun. The hook stays
  * dumb: no asset-type awareness lives here.
  */
@@ -79,7 +79,7 @@ export function useCategoryMutations<
   deleteCategory,
   moveToCategory,
 }: UseCategoryMutationsConfig<TCategory, TCreated, TMoveVars>) {
-  // Each injected function is called with exactly its declared argument —
+  // Each injected function is called with exactly its declared argument -
   // React Query v5 forwards a second mutation-context object to `mutationFn`,
   // which would otherwise leak into a directly-passed API function.
   const createCategoryMutation = useMutation({
@@ -108,7 +108,7 @@ export function useCategoryMutations<
 
   const renameCategoryMutation = useMutation({
     // The caller's `renameCategory` passes the existing parentId (and any
-    // per-type extras like texture `kind`) through unchanged — the update
+    // per-type extras like texture `kind`) through unchanged - the update
     // endpoints treat a null parentId as "move to root", so dropping the
     // current parent would silently re-root the category.
     mutationFn: (vars: { category: TCategory; name: string }) =>

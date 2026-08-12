@@ -18,7 +18,7 @@ namespace Application.Tests.Models;
 
 /// <summary>
 /// The multi-file import's own logic: what counts as the same asset. A loose
-/// <c>.gltf</c> is identity-incomplete — the primary file's hash does not describe the
+/// <c>.gltf</c> is identity-incomplete - the primary file's hash does not describe the
 /// geometry, the referenced <c>.bin</c> does.
 /// </summary>
 public class ImportModelWithAuxiliaryFilesCommandHandlerTests
@@ -116,7 +116,7 @@ public class ImportModelWithAuxiliaryFilesCommandHandlerTests
     [Fact]
     public async Task Reuses_The_Existing_Model_When_The_Referenced_Resources_Match()
     {
-        // Same .gltf, same .bin — genuinely the same asset. Must not fork a duplicate.
+        // Same .gltf, same .bin - genuinely the same asset. Must not fork a duplicate.
         var binHash = "b" + new string('0', 63);
         SetupAddModel(modelId: 7, versionId: 70, alreadyExists: true);
         SetupAuxiliaryFile("scene.bin", fileId: 100, hash: binHash);

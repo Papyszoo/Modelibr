@@ -297,7 +297,7 @@ export class ModelDataService {
   async cleanupTextureFiles(texturePaths) {
     if (!texturePaths) return
 
-    // Deduplicate file paths — multiple texture types may share the same file (e.g., ARM channels)
+    // Deduplicate file paths - multiple texture types may share the same file (e.g., ARM channels)
     const uniquePaths = new Set()
     for (const textureInfo of Object.values(texturePaths)) {
       // Handle both new {filePath, sourceChannel} objects and legacy plain strings

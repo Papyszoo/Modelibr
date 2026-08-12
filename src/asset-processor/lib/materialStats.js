@@ -1,10 +1,10 @@
 /**
- * Material pixel statistics — deterministic image analysis for reusable material
+ * Material pixel statistics - deterministic image analysis for reusable material
  * sets (NOT model-bound textures). Pure functions over raw pixel buffers (as
  * produced by `sharp(...).raw().toBuffer({ resolveWithObject: true })`), so they
  * run in the worker and are fully unit-testable without decoding a file.
  *
- * These stats are the searchable signal an agent needs to place a material —
+ * These stats are the searchable signal an agent needs to place a material -
  * above all tileability ("does this wrap?") and detail frequency ("how big is
  * one tile?"). Channel-assignment validation (prompt 22) is advisory and lives
  * elsewhere; this module only measures.
@@ -94,7 +94,7 @@ export function tileability(image) {
 /**
  * Detail frequency: mean absolute difference between horizontally/vertically
  * adjacent pixels, normalised 0..1. The best deterministic proxy for tiling
- * scale — fine noise (high) tiles convincingly small, large features (low) need
+ * scale - fine noise (high) tiles convincingly small, large features (low) need
  * a bigger tile. Nothing else in the system answers "how big is one tile".
  */
 export function detailFrequency(image) {

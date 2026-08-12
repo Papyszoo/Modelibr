@@ -488,7 +488,7 @@ jobs:
         # Video capture drives the same GPU-dependent WebGL render as the E2E
         # suite and flakes on GPU-less runners. It is only needed to refresh the
         # docs-site videos on main, so restrict it to main pushes + manual
-        # dispatch — it no longer runs (or flakes) on PRs.
+        # dispatch - it no longer runs (or flakes) on PRs.
         if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
         # A single attempt completes in ~12 minutes; the generate step retries up
         # to 3x to absorb the software-WebGL flake, so allow headroom (setup +
@@ -539,7 +539,7 @@ jobs:
               working-directory: docs/videos
               timeout-minutes: 40
               # Capture uses SwiftShader software WebGL on the GPU-less runner,
-              # which occasionally flakes mid-render — and a single failed clip
+              # which occasionally flakes mid-render - and a single failed clip
               # fails the whole run, which then blocks the main docs deploy (the
               # v0.3.0 push flaked once and passed on a plain re-run). Retry a
               # couple of times to absorb that transient flake instead of

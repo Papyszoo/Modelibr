@@ -33,11 +33,11 @@ namespace Application
             Assembly assembly = Assembly.GetExecutingAssembly();
 
             // Query handlers and domain-event handlers are registered by direct
-            // type mapping — a plain constructor call, nothing wraps them.
+            // type mapping - a plain constructor call, nothing wraps them.
             services.RegisterHandlersForInterfaceTypes(assembly, [typeof(IQueryHandler<,>), typeof(IDomainEventHandler<>)]);
 
             // Command handlers go through the commit-on-success decorator
-            // instead (see CommandHandlerUnitOfWorkDecorator) — this is the
+            // instead (see CommandHandlerUnitOfWorkDecorator) - this is the
             // structural guarantee that a successful command always commits,
             // even if the handler forgot to call IUnitOfWork itself.
             services.RegisterCommandHandlersWithUnitOfWorkDecorator(assembly);
@@ -63,7 +63,7 @@ namespace Application
         /// Registers every ICommandHandler&lt;TCommand&gt; / ICommandHandler&lt;TCommand,TResponse&gt;
         /// implementation found via assembly scan, wrapped in
         /// CommandHandlerUnitOfWorkDecorator&lt;...&gt;. The concrete handler type
-        /// is also registered under itself — that's what the decorator's
+        /// is also registered under itself - that's what the decorator's
         /// factory below resolves as "the real handler"; asking the container
         /// to inject the handler's own service interface from inside its own
         /// factory would just recurse into the decorator again.

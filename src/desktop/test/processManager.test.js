@@ -33,7 +33,7 @@ test('saving a new port does NOT change the live URL until a restart', () => {
   pm.updateConfig(sanitizeRuntimeConfig({ ...pm.config, appPort: 4010 }))
 
   const snap = pm.buildRuntimeSnapshot()
-  // The live URL/health still point at the bound port — this is the exact bug
+  // The live URL/health still point at the bound port - this is the exact bug
   // that made "Open" jump to a port nothing was serving yet.
   assert.equal(snap.publicAppUrl, 'http://127.0.0.1:3010')
   assert.equal(snap.pendingRestart, true)
@@ -92,7 +92,7 @@ test('setting the data folder to the default-resolved path is not a pending rest
   })
   pm.markRunning()
 
-  // The literal path the default resolves to — selecting it should be a no-op,
+  // The literal path the default resolves to - selecting it should be a no-op,
   // not a spurious "restart required" (raw '' vs the absolute path differ).
   const resolvedDefault = path.join(userDataDir, 'data')
   pm.updateConfig(sanitizeRuntimeConfig({ ...pm.config, dataDirectory: resolvedDefault }))

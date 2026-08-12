@@ -34,7 +34,7 @@ export function ThumbnailDisplay({
 
   // Re-decode whenever the source or mode requires it. We use an off-DOM
   // `Image` rather than `fetch`+`ImageDecoder` so this works across every
-  // browser that already loads the thumbnail in the first place — no CORS
+  // browser that already loads the thumbnail in the first place - no CORS
   // headache, no spec quirks, no Firefox carve-out.
   useEffect(() => {
     if (!needsStill || !imgSrc) {
@@ -51,7 +51,7 @@ export function ThumbnailDisplay({
     setStillReady(false)
 
     const loader = new Image()
-    // Intentionally do NOT set crossOrigin — that would force a CORS
+    // Intentionally do NOT set crossOrigin - that would force a CORS
     // request the visible <img> never makes, which fails silently on
     // backends without ACAO headers and drops us back to the animated
     // <img>. We only draw to the canvas (no readback), so taint is fine.
@@ -66,7 +66,7 @@ export function ThumbnailDisplay({
       const ctx = canvas.getContext('2d')
       if (!ctx) return
       // Snap the canvas onto whatever frame the <img> is currently showing
-      // — for a freshly-loaded animated WebP that is frame 0.
+      // - for a freshly-loaded animated WebP that is frame 0.
       ctx.drawImage(loader, 0, 0, width, height)
       setStillReady(true)
     }
@@ -88,7 +88,7 @@ export function ThumbnailDisplay({
     }
   }, [imgSrc, needsStill])
 
-  // Drop any stale hover state when the user switches modes — otherwise
+  // Drop any stale hover state when the user switches modes - otherwise
   // a cursor sitting over a card during the switch would keep `isHovered`
   // out of sync with what the new mode expects.
   useEffect(() => {
@@ -107,8 +107,8 @@ export function ThumbnailDisplay({
   }
 
   // Canvas takes over when the user has explicitly opted out of motion:
-  //   - mode === 'static'                       — always
-  //   - mode === 'onHover' && !isHovered        — only while idle
+  //   - mode === 'static'                       - always
+  //   - mode === 'onHover' && !isHovered        - only while idle
   const stillCovers =
     needsStill &&
     stillReady &&

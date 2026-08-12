@@ -128,7 +128,7 @@ internal sealed class StoreImportSink : IStoreImportSink
 
     public async Task SetModelThumbnailFromFileAsync(int modelId, IFileUpload thumbnailFile, CancellationToken ct)
     {
-        // Resolve the active version the same way ThumbnailEndpoints does — a freshly imported
+        // Resolve the active version the same way ThumbnailEndpoints does - a freshly imported
         // model has exactly one (active) version to carry the thumbnail.
         var model = Unwrap(await _getModel.Handle(new GetModelByIdQuery(modelId), ct)).Model;
         if (model.ActiveVersionId is not int versionId)
@@ -183,7 +183,7 @@ internal sealed class StoreImportSink : IStoreImportSink
         => RunAsync(_addEnvironmentMapToPack.Handle(new AddEnvironmentMapToPackCommand(packId, environmentMapId), ct));
 
     // UpdateModelTags is the one command that assigns model categories, but it replaces
-    // tags/description wholesale — so re-send the model's current ones to leave them intact.
+    // tags/description wholesale - so re-send the model's current ones to leave them intact.
     public async Task SetModelCategoryAsync(int modelId, int categoryId, CancellationToken ct)
     {
         var model = Unwrap(await _getModel.Handle(new GetModelByIdQuery(modelId), ct)).Model;
@@ -204,7 +204,7 @@ internal sealed class StoreImportSink : IStoreImportSink
         => RunAsync<UpdateSpriteResponse>(_updateSprite.Handle(
             new UpdateSpriteCommand(spriteId, Name: null, SpriteType: null, CategoryId: categoryId), ct));
 
-    // Like UpdateModelTags, the env-map metadata command replaces tags wholesale —
+    // Like UpdateModelTags, the env-map metadata command replaces tags wholesale -
     // re-send the current ones so only the category changes.
     public async Task SetEnvironmentMapCategoryAsync(int environmentMapId, int categoryId, CancellationToken ct)
     {

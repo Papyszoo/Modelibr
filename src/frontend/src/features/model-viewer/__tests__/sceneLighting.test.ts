@@ -19,7 +19,7 @@ import {
  * We assert on intensities rather than rendered pixels because THREE's lighting
  * is monotonic in these values: every term is a non-negative additive light
  * contribution, so a strictly larger total is a strictly brighter (lighter)
- * result for any material — without needing a GPU/WebGL in jsdom.
+ * result for any material - without needing a GPU/WebGL in jsdom.
  */
 
 /**
@@ -99,7 +99,7 @@ describe('resolveSceneLighting', () => {
 })
 
 describe('buildSceneLights', () => {
-  it('builds exactly the four canonical lights — no extras (guards against re-stacking a second rig)', () => {
+  it('builds exactly the four canonical lights - no extras (guards against re-stacking a second rig)', () => {
     const rig = buildSceneLights(THREE, DEFAULT_LIGHTING)
 
     expect(rig.lights).toHaveLength(4)

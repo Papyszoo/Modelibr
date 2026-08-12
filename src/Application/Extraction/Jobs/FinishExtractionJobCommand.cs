@@ -10,11 +10,11 @@ namespace Application.Extraction.Jobs;
 /// <summary>
 /// Reports the outcome of a claimed extraction job. Success marks it Done (with optional
 /// partial-run warning detail); failure records the error and either re-queues (attempts
-/// left) or dead-letters — the retry/dead-letter transition lives on the entity.
+/// left) or dead-letters - the retry/dead-letter transition lives on the entity.
 ///
 /// The reporting worker must still hold the claim. Without that check a worker whose
-/// lease had expired — and whose job another worker had since re-claimed and possibly
-/// already finished — could come back and overwrite the newer outcome with its own stale
+/// lease had expired - and whose job another worker had since re-claimed and possibly
+/// already finished - could come back and overwrite the newer outcome with its own stale
 /// one, marking a job Done that the current run never completed.
 /// </summary>
 internal sealed class FinishExtractionJobCommandHandler
@@ -52,7 +52,7 @@ internal sealed class FinishExtractionJobCommandHandler
         {
             return Result.Failure(new Error(
                 "ExtractionJobNotClaimed",
-                $"Extraction job {command.JobId} is {job.Status}, not Processing — there is no claim to report against."));
+                $"Extraction job {command.JobId} is {job.Status}, not Processing - there is no claim to report against."));
         }
 
         if (!string.Equals(job.LockedBy, command.WorkerId.Trim(), StringComparison.Ordinal))

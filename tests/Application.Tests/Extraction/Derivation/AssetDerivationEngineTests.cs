@@ -166,19 +166,19 @@ public class AssetDerivationEngineTests
         var result = Derive("Chair", new[] { 0.6, 1.2, 0.6 },
             Part("/seat", "Seat", tris: 1240, dims: new[] { 0.6, 0.1, 0.6 }));
 
-        Assert.Equal("Seat — mesh, 1,240 tris, 0.6×0.1×0.6 m", Find(result, "/seat").BrowseSummary);
-        Assert.StartsWith("Chair — 1 part, 1,240 tris, 0.6×1.2×0.6 m", result.BrowseSummary);
+        Assert.Equal("Seat - mesh, 1,240 tris, 0.6×0.1×0.6 m", Find(result, "/seat").BrowseSummary);
+        Assert.StartsWith("Chair - 1 part, 1,240 tris, 0.6×1.2×0.6 m", result.BrowseSummary);
     }
 
     [Fact]
     public void PartBrowseSummary_GenericName_DoesNotRepeatObjectType()
     {
         // "Torus"/"Cube" are generic exporter names → the display name falls back to
-        // the object type; the summary must not read "mesh — mesh, …" (regression).
+        // the object type; the summary must not read "mesh - mesh, …" (regression).
         var result = Derive("Asset", new[] { 2.0, 0.4, 2.0 },
             Part("/Torus", "Torus", tris: 384, dims: new[] { 2.0, 0.4, 2.0 }));
 
-        Assert.Equal("mesh — 384 tris, 2×0.4×2 m", Find(result, "/Torus").BrowseSummary);
+        Assert.Equal("mesh - 384 tris, 2×0.4×2 m", Find(result, "/Torus").BrowseSummary);
     }
 
     [Fact]

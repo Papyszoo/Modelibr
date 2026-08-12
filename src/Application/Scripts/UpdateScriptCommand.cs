@@ -80,7 +80,7 @@ internal class UpdateScriptCommandHandler : ICommandHandler<UpdateScriptCommand,
             }
 
             // Only touch the description when the request actually carried the
-            // field — this keeps category-only updates (e.g. drag-to-categorize)
+            // field - this keeps category-only updates (e.g. drag-to-categorize)
             // from clearing an existing description.
             if (command.UpdateDescription)
             {

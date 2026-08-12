@@ -11,13 +11,13 @@ using Xunit;
 namespace Infrastructure.Tests.Services;
 
 /// <summary>
-/// Covers StoreImportClient — the SSRF-hardened server-to-server client that pulls a
+/// Covers StoreImportClient - the SSRF-hardened server-to-server client that pulls a
 /// store manifest and its files. StoreUrlSafety unit-tests the POLICY; these tests cover
 /// the client that APPLIES it: which hops carry the import token, redirect handling and
 /// the hop cap, size caps, and relative download-URL resolution.
 ///
 /// The connection pinning (SocketsHttpHandler.ConnectCallback) is deliberately NOT covered
-/// here — it needs real sockets. It is exercised by the e2e store-fixture import instead.
+/// here - it needs real sockets. It is exercised by the e2e store-fixture import instead.
 /// </summary>
 public class StoreImportClientTests
 {
@@ -172,7 +172,7 @@ public class StoreImportClientTests
     [Fact]
     public async Task Download_StopsAfterTheRedirectHopCap()
     {
-        // Always redirects within the store's own origin — only the cap ends this.
+        // Always redirects within the store's own origin - only the cap ends this.
         var (client, handler) = Build(_ => RedirectTo($"{StoreUrl}/api/files/next"));
 
         var ex = await Assert.ThrowsAsync<StoreImportException>(() => client.DownloadFileAsync(
@@ -210,7 +210,7 @@ public class StoreImportClientTests
     }
 
     // An absolute non-http(s) URL must be refused rather than resolved against the store
-    // base — otherwise relative-URL support would become a file:// read primitive.
+    // base - otherwise relative-URL support would become a file:// read primitive.
     [Theory]
     [InlineData("file:///etc/passwd")]
     [InlineData("ftp://store.example.com/f")]
@@ -262,7 +262,7 @@ public class StoreImportClientTests
         Assert.Contains("404", ex.Message);
     }
 
-    // The store's own origin is trusted, so it is never block-listed — but it IS resolved once
+    // The store's own origin is trusted, so it is never block-listed - but it IS resolved once
     // and pinned, so the manifest fetch and every token-bearing download in one import land on
     // the same host. Re-resolving per request would let a 0-TTL record move them apart.
     [Fact]

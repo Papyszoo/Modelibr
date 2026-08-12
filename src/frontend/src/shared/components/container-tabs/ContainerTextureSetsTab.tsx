@@ -46,7 +46,7 @@ interface ContainerTextureSetsTabProps {
   onTotalCountChange?: (count: number) => void
   /**
    * Optional kind scope. When provided, the tab only lists/adds texture sets
-   * of that kind — used to split the single "Texture Sets" tab into separate
+   * of that kind - used to split the single "Texture Sets" tab into separate
    * "Global Materials" and "Multi-Model Textures" tabs.
    */
   kind?: TextureSetKind

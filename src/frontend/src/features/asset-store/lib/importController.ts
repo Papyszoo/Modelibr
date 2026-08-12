@@ -10,7 +10,7 @@ import { getConfiguredStoreUrl } from './storeConfig'
 /**
  * Orchestrates one pack import: mint an import token on the store (browser →
  * store, JWT), hand it to the local backend (POST /store-imports), then track
- * the job — SignalR push for liveness plus polling as the reliable fallback
+ * the job - SignalR push for liveness plus polling as the reliable fallback
  * (demo mode and dropped hub connections still finish). All observable state
  * lands in useAssetStoreImportStore.
  */
@@ -25,7 +25,7 @@ const TERMINAL_STATUSES = new Set([
   'Failed',
 ])
 
-// Every collection an import can add to — a finished import must refresh all of
+// Every collection an import can add to - a finished import must refresh all of
 // them, not just the pack list, or the new assets stay invisible until a manual
 // refetch. Keys mirror the feature api/queries modules.
 const IMPORT_TOUCHED_QUERY_KEYS = [
@@ -62,7 +62,7 @@ function ensureProgressSubscription(): void {
 }
 
 function onImportFinished(): void {
-  // The import created/updated a pack and any of five asset types — refetch all
+  // The import created/updated a pack and any of five asset types - refetch all
   // of them (a partial success still creates assets, so this runs for
   // CompletedWithErrors too).
   for (const queryKey of IMPORT_TOUCHED_QUERY_KEYS) {
@@ -99,7 +99,7 @@ async function pollUntilDone(assetId: string, jobId: number): Promise<void> {
         return
       }
     } catch {
-      // Transient poll failure — keep trying; SignalR may still deliver.
+      // Transient poll failure - keep trying; SignalR may still deliver.
     }
   }
 }
@@ -143,14 +143,14 @@ export async function startImport(
   }
 
   // Live progress is best-effort; polling is the guarantee. Start polling
-  // BEFORE awaiting the hub join — a slow or failing SignalR connect (demo
+  // BEFORE awaiting the hub join - a slow or failing SignalR connect (demo
   // mode, hub down) must never delay the progress the poll loop provides.
   ensureProgressSubscription()
   const polling = pollUntilDone(item.assetId, jobId)
   try {
     await storeImportSignalRService.joinJobGroup(jobId)
   } catch {
-    // Hub unavailable (e.g. demo mode) — polling carries the job.
+    // Hub unavailable (e.g. demo mode) - polling carries the job.
   }
 
   await polling

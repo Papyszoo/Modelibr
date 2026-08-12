@@ -16,10 +16,10 @@ import {
  * feeds a 1×1 texture with distinct per-channel values, and reads the rendered
  * pixel back.
  *
- * Unlike the full-app E2E — which only asserts that *some* map object landed on
- * the material — this asserts the extraction produced the RIGHT channel with the
+ * Unlike the full-app E2E - which only asserts that *some* map object landed on
+ * the material - this asserts the extraction produced the RIGHT channel with the
  * RIGHT value (and that invert flips it). It catches: a wrong channel index, a
- * broken invert, TEXTURE_CHANNEL→uChannel drift, or GLSL that stops compiling —
+ * broken invert, TEXTURE_CHANNEL→uChannel drift, or GLSL that stops compiling -
  * none of which the "a map exists" E2E check can see. No app, backend, or
  * thumbnail render is involved, so it does not ride the flaky GPU-less render at
  * the tail of a drained Docker run.

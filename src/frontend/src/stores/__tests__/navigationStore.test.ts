@@ -54,7 +54,7 @@ describe('openTab', () => {
     expect(win().activeTabId).toBe('scripts')
   })
 
-  it('does not duplicate an already-open tab — it just re-activates it', () => {
+  it('does not duplicate an already-open tab - it just re-activates it', () => {
     store().openTab('w1', 'left', createTab('scripts'))
     store().setActiveTab('w1', 'modelList')
     store().openTab('w1', 'left', createTab('scripts'))

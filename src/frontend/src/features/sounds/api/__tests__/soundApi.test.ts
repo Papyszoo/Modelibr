@@ -41,7 +41,7 @@ describe('getSoundsPaginated query serialization', () => {
   })
 
   it('keeps a 0 duration bound (null-check, not truthiness)', async () => {
-    // minDuration is guarded with `!= null`, so a legitimate 0 must survive —
+    // minDuration is guarded with `!= null`, so a legitimate 0 must survive -
     // a truthy check here would drop "from 0 seconds".
     await getSoundsPaginated({ page: 1, pageSize: 50, minDuration: 0 })
     expect(lastGetUrl()).toContain('minDuration=0')
@@ -79,7 +79,7 @@ describe('updateSound payload contract', () => {
 
 describe('sound category payload contract', () => {
   // The backend treats a missing/null parentId as "root" on create and as
-  // "move to root" on update — so create must serialize the chosen parent,
+  // "move to root" on update - so create must serialize the chosen parent,
   // and update must echo the current parent or a rename would silently
   // re-root a subcategory (shipped-bug class caught on scripts first).
   it('creates a category with an explicit parent', async () => {

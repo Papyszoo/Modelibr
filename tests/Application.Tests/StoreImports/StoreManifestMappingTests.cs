@@ -135,7 +135,7 @@ public class StoreManifestMappingTests
     [InlineData("not json at all")]
     public void GetItemCategory_ToleratesMissingOrMalformedMetadata(string? metadataJson)
     {
-        // Metadata is enrichment — anything unreadable must yield null, never throw.
+        // Metadata is enrichment - anything unreadable must yield null, never throw.
         Assert.Null(StoreManifestMapping.GetItemCategory(metadataJson));
     }
 }

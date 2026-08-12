@@ -14,7 +14,7 @@ import {
 } from './shared'
 
 /**
- * Demo Asset Store — fakes the companion store's Modelibr-integration
+ * Demo Asset Store - fakes the companion store's Modelibr-integration
  * endpoints (login/refresh/library/import-token, contract: store repo
  * docs/INTEGRATION.md) plus the local /store-imports job so the Asset Store
  * page fully works in demo mode. Any email/password signs in. "Imports"
@@ -34,7 +34,7 @@ interface StorePackDefinition {
   assetId: string
   title: string
   description: string
-  /** Base-mesh folder names — must exist in the fork at the pinned SHA. */
+  /** Base-mesh folder names - must exist in the fork at the pinned SHA. */
   meshes: { name: string; sizeBytes: number }[]
 }
 
@@ -45,7 +45,7 @@ const STORE_PACKS: StorePackDefinition[] = [
     assetId: 'demo-store-medieval-props',
     title: 'Medieval Props (CC0)',
     description:
-      'Forge and armory base meshes from thebasemesh.com — imported from the demo Asset Store.',
+      'Forge and armory base meshes from thebasemesh.com - imported from the demo Asset Store.',
     meshes: [
       { name: 'anvil', sizeBytes: 27964 },
       { name: 'battle_axe', sizeBytes: 46272 },
@@ -57,7 +57,7 @@ const STORE_PACKS: StorePackDefinition[] = [
     assetId: 'demo-store-retro-tech',
     title: 'Retro Tech (CC0)',
     description:
-      'Retro electronics base meshes from thebasemesh.com — imported from the demo Asset Store.',
+      'Retro electronics base meshes from thebasemesh.com - imported from the demo Asset Store.',
     meshes: [
       { name: 'retro_tv', sizeBytes: 239692 },
       { name: 'retro_computer', sizeBytes: 65280 },
@@ -89,12 +89,12 @@ function toLibraryItem(def: StorePackDefinition) {
   }
 }
 
-// Stable manifest item id for a mesh — the value the backend filters on for a
+// Stable manifest item id for a mesh - the value the backend filters on for a
 // partial import, and what the detail view's checkboxes select.
 const packItemId = (assetId: string, meshName: string) =>
   `${assetId}::${meshName}`
 
-/** Asset detail (GET /api/assets/{id}) — items/files/previews the pick-list needs. */
+/** Asset detail (GET /api/assets/{id}) - items/files/previews the pick-list needs. */
 function toAssetDetail(def: StorePackDefinition) {
   return {
     id: def.assetId,
@@ -124,7 +124,7 @@ function toAssetDetail(def: StorePackDefinition) {
   }
 }
 
-// In-memory job table — demo imports are transient; each GET advances the
+// In-memory job table - demo imports are transient; each GET advances the
 // job so the page's polling shows live progress without SignalR.
 interface DemoImportJob {
   id: number
@@ -365,7 +365,7 @@ export const assetStoreHandlers = [
   ),
 
   // ════════════════════════════════════════════════════════════════════════
-  //  LOCAL BACKEND (/store-imports job — progresses on each poll)
+  //  LOCAL BACKEND (/store-imports job - progresses on each poll)
   // ════════════════════════════════════════════════════════════════════════
 
   http.post('*/store-imports', async ({ request }) => {
@@ -419,7 +419,7 @@ export const assetStoreHandlers = [
   }),
 
   // ════════════════════════════════════════════════════════════════════════
-  //  SIGNALR (storeImportHub) — REJECT the negotiate so connect() fails
+  //  SIGNALR (storeImportHub) - REJECT the negotiate so connect() fails
   //  immediately and polling drives progress. (An earlier stub negotiated a
   //  LongPolling transport whose poll GET hung, which stalled the SignalR
   //  handshake for its full timeout before the import controller's poll loop

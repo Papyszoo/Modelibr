@@ -54,7 +54,7 @@ namespace Infrastructure.Migrations
                 table: "ApplicationSettings",
                 newName: "ThumbnailWidth");
 
-            // ThumbnailHeight defaults to 256 (the original schema default) —
+            // ThumbnailHeight defaults to 256 (the original schema default) -
             // 0 would fail the legacy domain validator that required >= 64.
             migrationBuilder.AddColumn<int>(
                 name: "ThumbnailHeight",

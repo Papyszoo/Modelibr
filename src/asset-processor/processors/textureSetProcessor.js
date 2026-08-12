@@ -89,7 +89,7 @@ export class TextureSetProcessor extends BaseProcessor {
         types: Object.keys(texturePaths),
       })
 
-      // Step 2b: Extract source-image metadata (dimensions/format) — non-blocking,
+      // Step 2b: Extract source-image metadata (dimensions/format) - non-blocking,
       // independent of rendering/proxy so resolution is captured even for HDR sets.
       try {
         const dimensionItems = await extractTextureDimensions(
@@ -107,7 +107,7 @@ export class TextureSetProcessor extends BaseProcessor {
       }
 
       // Step 2c: Extract deterministic material pixel stats (tileability, detail
-      // frequency, channel stats) into the extraction substrate. Best-effort —
+      // frequency, channel stats) into the extraction substrate. Best-effort -
       // a stats failure must never fail the thumbnail job.
       try {
         const extraction = await computeTextureSetExtraction(texturePaths)
@@ -206,7 +206,7 @@ export class TextureSetProcessor extends BaseProcessor {
           u => u.success && u.data
         )
 
-        // Step 8: Generate texture web proxies (non-blocking — failure here does not fail the job)
+        // Step 8: Generate texture web proxies (non-blocking - failure here does not fail the job)
         try {
           await this._generateWebProxies(
             textureSet,
@@ -231,7 +231,7 @@ export class TextureSetProcessor extends BaseProcessor {
       }
 
       throw new Error(
-        'Thumbnail upload failed — no valid thumbnail data available'
+        'Thumbnail upload failed - no valid thumbnail data available'
       )
     } finally {
       disarmAbort()
@@ -254,7 +254,7 @@ export class TextureSetProcessor extends BaseProcessor {
   async _renderSwingFrames(cameraDistance, geometryType, jobLogger, renderer) {
     const isPlane = geometryType === 'plane'
 
-    // Swing parameters — gentler for planes
+    // Swing parameters - gentler for planes
     const startAzimuth = isPlane ? -15 : -45
     const endAzimuth = isPlane ? 15 : 30
     const startElevation = isPlane ? 10 : 30

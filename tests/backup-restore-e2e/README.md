@@ -5,7 +5,7 @@ Isolated end-to-end test suite covering the `/backups` API and the Settings UI
 `Program.Main` before the host is built.
 
 Lives in its own docker-compose stack so it never interferes with the main
-`tests/e2e/` suite — different container names, different ports, different
+`tests/e2e/` suite - different container names, different ports, different
 named volumes, and the `data/` directory is bind-mounted locally so specs can
 inspect and mutate it.
 
@@ -42,11 +42,11 @@ npm test                  # run all specs
 npm run test:teardown     # docker compose down -v + rm -rf data/
 ```
 
-`test:setup` runs `npx playwright install --with-deps chromium` for you — Playwright
+`test:setup` runs `npx playwright install --with-deps chromium` for you - Playwright
 ships without browser binaries, and running specs without them gives the
 "Executable doesn't exist at .../chrome-headless-shell" error.
 
-Or, all-in-one (sets up, runs, tears down — exits with the test runner's status):
+Or, all-in-one (sets up, runs, tears down - exits with the test runner's status):
 
 ```bash
 npm run test:full
@@ -61,7 +61,7 @@ npm run test:report
 ## Notes
 
 - This suite uses Playwright's runner but only one project, `workers: 1`,
-  `fullyParallel: false` — restore-on-boot tests restart the webapi container
+  `fullyParallel: false` - restore-on-boot tests restart the webapi container
   and cannot share a stack.
 - The `01-` and `03-` specs delete pre-existing backups in `beforeAll` so each
   run starts clean. The `02-` and `04-` specs mutate the running stack and

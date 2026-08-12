@@ -7,7 +7,7 @@ namespace Application.Search;
 ///
 /// Used two ways: labels are folded into the asset's indexed tokens so conceptual queries
 /// hit (recall), and they are surfaced as <c>suggestedCategories</c> so a user/agent can
-/// confirm-assign a real category — a suggestion never auto-mutates the user's assignment.
+/// confirm-assign a real category - a suggestion never auto-mutates the user's assignment.
 /// No hosted inference: a static, auditable map only.
 ///
 /// <b>Matching is exact, per token.</b> It used to be a substring test, which quietly
@@ -16,7 +16,7 @@ namespace Application.Search;
 /// contains "man", <c>bowl</c> was a <i>weapon</i> because it contains "bow", and
 /// <c>clamp</c> was <i>furniture</i> because it contains "lamp". Compound words are handled
 /// by <see cref="SearchVocabulary"/> joining adjacent tokens before this runs, so
-/// <c>lamp_post</c> still resolves — without letting "lamp" swallow "clamp".
+/// <c>lamp_post</c> still resolves - without letting "lamp" swallow "clamp".
 /// </summary>
 public static class CategorySuggester
 {

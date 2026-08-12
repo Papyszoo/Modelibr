@@ -6,6 +6,6 @@ namespace Application.Extraction.Jobs;
 /// </summary>
 public static class ExtractorFamilies
 {
-    /// <summary>Model scene-graph (re-)extraction — load the file, walk the graph, rebuild parts/derivation/search.</summary>
+    /// <summary>Model scene-graph (re-)extraction - load the file, walk the graph, rebuild parts/derivation/search.</summary>
     public const string Geometry = "Geometry";
 }

@@ -100,7 +100,7 @@ describe('extractSceneGraph', () => {
 
   it('emits a per-part world bounding box that reflects the node transform', () => {
     // Local geometry is a unit cube; a 3× scale must show up in the WORLD box,
-    // not the local one — this is what makes derived part dimensions correct.
+    // not the local one - this is what makes derived part dimensions correct.
     const root = new THREE.Group()
     const mesh = meshNamed('Widget', new THREE.BoxGeometry(1, 1, 1), 'M')
     mesh.scale.set(3, 3, 3)

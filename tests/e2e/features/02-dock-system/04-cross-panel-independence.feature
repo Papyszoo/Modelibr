@@ -14,7 +14,7 @@ Feature: Cross-Panel Tab Independence
     # Activate Settings tab on right to confirm it's not the first tab
     When I click the Settings tab in the right panel
     Then the Settings tab should be active in the right panel
-    # Now click a left panel tab — right panel should stay on Settings
+    # Now click a left panel tab - right panel should stay on Settings
     When I click the Models tab in the left panel
     Then the Settings tab should still be active in the right panel
     And I take a screenshot named "cross-panel-left-click-no-right-change"
@@ -27,7 +27,7 @@ Feature: Cross-Panel Tab Independence
     # Activate Texture Sets on left
     When I click the Texture Sets tab in the left panel
     Then the Texture Sets tab should be active in the left panel
-    # Click a right panel tab — left should stay on Texture Sets
+    # Click a right panel tab - left should stay on Texture Sets
     When I click the Sounds tab in the right panel
     Then the Texture Sets tab should still be active in the left panel
     And I take a screenshot named "cross-panel-right-click-no-left-change"

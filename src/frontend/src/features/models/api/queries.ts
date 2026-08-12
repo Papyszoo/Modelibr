@@ -128,7 +128,7 @@ export function getModelCategoriesQueryOptions() {
 }
 
 // True per-category counts for the sidebar badges. Keyed UNDER ['models'] so
-// any invalidateQueries(['models']) — upload, recycle, move, refresh — also
+// any invalidateQueries(['models']) - upload, recycle, move, refresh - also
 // refreshes the counts; no extra invalidation wiring needed at mutation sites.
 export function getModelCategoryCountsQueryOptions() {
   return queryOptions({

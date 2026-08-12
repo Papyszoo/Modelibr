@@ -11,7 +11,7 @@
 /* Single-row layout: title on the left, tab nav on the right, panels on
    row 2 spanning full width. `display: contents` on the TabView lifts its
    children (nav-container, panels) into the grid so we can place them
-   independently — without splitting the PrimeReact component. */
+   independently - without splitting the PrimeReact component. */
 .container-tab-bar {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -87,7 +87,7 @@
 
 /* Active tab: tint the link's bottom border (PrimeReact's existing
    `margin: 0 0 -2px 0` on the link makes it overlap the nav's bottom
-   border exactly — no double line). */
+   border exactly - no double line). */
 .container-tab-bar .p-tabview-nav li.p-highlight .p-tabview-nav-link {
   color: var(--mod-color-primary);
   border-color: var(--mod-color-primary) !important;

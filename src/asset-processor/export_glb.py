@@ -24,7 +24,7 @@ def ensure_gltf_addon():
     """Make sure the glTF 2.0 exporter operator is available.
 
     The exporter ships enabled by default, but a freshly-extracted portable
-    Blender with no user config may not have it active — enable it explicitly.
+    Blender with no user config may not have it active - enable it explicitly.
     """
     if hasattr(bpy.ops.export_scene, "gltf"):
         return
@@ -50,12 +50,12 @@ def main():
     version = ".".join(str(v) for v in bpy.app.version)
     print(f"export_glb: Blender {version}, target {output_path}", flush=True)
 
-    # When Blender cannot read the input .blend it does NOT abort — it silently
+    # When Blender cannot read the input .blend it does NOT abort - it silently
     # loads the default startup scene (the default cube) and still exits 0.
     # bpy.data.filepath is empty in that case; detect it so the job fails loudly
     # instead of producing a bogus default-cube export.
     if not bpy.data.filepath:
-        fail("Input .blend did not load — Blender fell back to the default startup "
+        fail("Input .blend did not load - Blender fell back to the default startup "
              "scene. The uploaded file is missing, truncated, corrupt, or saved by "
              "a newer Blender than the installed CLI can read.")
 
@@ -64,11 +64,11 @@ def main():
     # are tessellated, metaballs/text become meshes, GPencil exports as nodes.
     EXPORTABLE_TYPES = {"MESH", "CURVE", "SURFACE", "META", "FONT", "GPENCIL"}
     exportable = [o for o in scene_objects if o.type in EXPORTABLE_TYPES]
-    print(f"export_glb: loaded {bpy.data.filepath} — "
+    print(f"export_glb: loaded {bpy.data.filepath} - "
           f"{len(scene_objects)} object(s), {len(exportable)} exportable", flush=True)
     if not exportable:
         fail("Loaded .blend has no exportable geometry in the active scene "
-             "(no MESH/CURVE/SURFACE/META/FONT/GPENCIL objects) — nothing to export.")
+             "(no MESH/CURVE/SURFACE/META/FONT/GPENCIL objects) - nothing to export.")
 
     ensure_gltf_addon()
 
@@ -90,7 +90,7 @@ def main():
     try:
         result = bpy.ops.export_scene.gltf(**kwargs)
     except TypeError as exc:
-        # A keyword unrecognized by this Blender version — retry with the
+        # A keyword unrecognized by this Blender version - retry with the
         # minimal, universally-supported argument set rather than failing.
         print(f"export_glb: retrying with minimal args ({exc})", flush=True)
         try:

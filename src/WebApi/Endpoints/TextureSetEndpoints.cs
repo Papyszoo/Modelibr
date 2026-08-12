@@ -134,7 +134,7 @@ public static class TextureSetEndpoints
             .WithSummary("Updates the tiling scale for a universal texture set")
             .WithOpenApi();
 
-        // Source-image metadata (dimensions/format) — called by the worker
+        // Source-image metadata (dimensions/format) - called by the worker
         app.MapPut("/texture-sets/{id}/texture-metadata", UpdateTextureSetFileMetadata)
             .WithName("Update Texture Set File Metadata")
             .WithSummary("Persists per-texture image dimensions and format (called by worker service)")

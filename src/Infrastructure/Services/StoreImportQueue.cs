@@ -65,7 +65,7 @@ public sealed class StoreImportQueue : BackgroundService, IStoreImportQueue
                 }
                 catch (Exception ex)
                 {
-                    // Never let one job take down the consumer loop. Log job id only — never the token.
+                    // Never let one job take down the consumer loop. Log job id only - never the token.
                     _logger.LogError(ex, "Store import job {JobId} failed in the background consumer", work.JobId);
                 }
             }
@@ -97,7 +97,7 @@ public sealed class StoreImportQueue : BackgroundService, IStoreImportQueue
 
             foreach (var job in orphaned)
             {
-                job.Fail("Interrupted by an application restart. Start the import again — already-imported items are skipped/gap-filled.", clock.UtcNow);
+                job.Fail("Interrupted by an application restart. Start the import again - already-imported items are skipped/gap-filled.", clock.UtcNow);
                 await jobs.UpdateAsync(job, cancellationToken);
             }
 

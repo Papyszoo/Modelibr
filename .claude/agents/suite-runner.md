@@ -12,7 +12,7 @@ You run Modelibr test suites and report a compact, decision-ready verdict.
   (repo root). Suite ids and tiers: `scripts/test-runner/suites.config.mjs`.
 - Everything: `npm run test:all:full`. Fast tier only: `npm run test:all:fast`.
 - Suites are self-contained (Docker up/teardown built in). Docker-needing suites
-  are auto-skipped if the daemon is down — report that as "skipped", never as
+  are auto-skipped if the daemon is down - report that as "skipped", never as
   passed. E2E suites can take 5–20 minutes; that is normal, do not kill them.
 - Before starting Docker suites, check nothing else is using the e2e stack:
   if `curl -s http://127.0.0.1:5178/api/run/active` shows a running Studio run,
@@ -22,7 +22,7 @@ You run Modelibr test suites and report a compact, decision-ready verdict.
 
 Read `test-report/summary.json` for per-suite status/counts. For each FAILED
 suite, extract from `test-report/logs/<id>.log` (and for Playwright suites the
-failing test list) just the failing test names and one-line errors — not stack
+failing test list) just the failing test names and one-line errors - not stack
 traces, not full logs.
 
 ## Report format (keep it under ~25 lines)

@@ -16,7 +16,7 @@ namespace WebApi.Infrastructure;
 /// the archive to <c>restore/processed/</c>.
 ///
 /// Invalid archives go to <c>restore/failed/</c> with an <c>.error.txt</c>
-/// sibling — live data is never touched in that path.
+/// sibling - live data is never touched in that path.
 ///
 /// <c>.pre-restore-*</c> directories are NEVER auto-swept: a failed restore
 /// leaves the operator's only recovery copy on disk, and silently deleting
@@ -37,7 +37,7 @@ public static class RestoreOnBootProcessor
         Directory.CreateDirectory(failedDir);
 
         // Surface stale .pre-restore-* directories (left by a previous failed
-        // restore). We do NOT delete them automatically — they are the only
+        // restore). We do NOT delete them automatically - they are the only
         // recovery copy of the operator's live data and must be removed manually.
         WarnAboutStalePreRestoreDirs(uploadRoot, logger);
         WarnAboutStalePreRestoreDirs(thumbnailRoot, logger);
@@ -49,7 +49,7 @@ public static class RestoreOnBootProcessor
 
         // Refuse to run a second restore on top of an unrecovered pre-restore dir.
         // If those still exist, an operator hasn't finished cleaning up the previous
-        // failure — running another restore now would shadow the recovery copy.
+        // failure - running another restore now would shadow the recovery copy.
         if (HasStalePreRestoreDirs(uploadRoot) || HasStalePreRestoreDirs(thumbnailRoot))
         {
             await MoveToFailedAsync(archive, failedDir,
@@ -81,7 +81,7 @@ public static class RestoreOnBootProcessor
             }
             else if (!manifest.Scope.Database)
             {
-                archiveValidationError = "Manifest claims no database — refusing to restore.";
+                archiveValidationError = "Manifest claims no database - refusing to restore.";
             }
             else
             {
@@ -100,7 +100,7 @@ public static class RestoreOnBootProcessor
                     {
                         archiveValidationError =
                             $"Archive integrity check failed: manifest says {manifest.Stats.UploadsCount} upload " +
-                            $"entries but tar contains {uploadEntries}. Refusing to restore — backup is truncated.";
+                            $"entries but tar contains {uploadEntries}. Refusing to restore - backup is truncated.";
                     }
                 }
             }
@@ -132,7 +132,7 @@ public static class RestoreOnBootProcessor
         {
             await MoveToFailedAsync(archive, failedDir,
                 $"Postgres major version mismatch: archive was made under PG {manifest.PostgresMajorVersion} " +
-                $"but the running server reports PG {liveMajor}. Restore aborted — live data untouched.",
+                $"but the running server reports PG {liveMajor}. Restore aborted - live data untouched.",
                 logger);
             return;
         }
@@ -151,7 +151,7 @@ public static class RestoreOnBootProcessor
             if (!string.Equals(actualSha, manifest.Stats.DatabaseDumpSha256, StringComparison.OrdinalIgnoreCase))
             {
                 await MoveToFailedAsync(archive, failedDir,
-                    $"database.dump SHA-256 mismatch — expected {manifest.Stats.DatabaseDumpSha256}, got {actualSha}. " +
+                    $"database.dump SHA-256 mismatch - expected {manifest.Stats.DatabaseDumpSha256}, got {actualSha}. " +
                     "Archive is corrupted. Live data untouched.",
                     logger);
                 return;
@@ -185,7 +185,7 @@ public static class RestoreOnBootProcessor
             // ── Phase 5: pg_restore with --exit-on-error so exit 1 is fatal ──
             await RunPgRestoreAsync(dumpPath, host, port, user, password, db, logger);
 
-            // Success — drop the pre-restore copies and move the archive aside.
+            // Success - drop the pre-restore copies and move the archive aside.
             DeleteDirectoryQuiet(uploadsPreRestore, logger);
             if (thumbnailsPreRestore != null) DeleteDirectoryQuiet(thumbnailsPreRestore, logger);
 
@@ -197,7 +197,7 @@ public static class RestoreOnBootProcessor
         {
             logger.LogError(ex, "Restore execution failed.");
             // Guarantee the archive leaves the staging directory even if MoveToFailed
-            // itself errors — otherwise the next boot retries the same broken archive
+            // itself errors - otherwise the next boot retries the same broken archive
             // and locks the container in a crash loop.
             await EnsureArchiveOutOfStagingAsync(archive, failedDir, $"Restore execution failed: {ex.Message}", logger);
             throw;
@@ -421,7 +421,7 @@ public static class RestoreOnBootProcessor
 
     /// <summary>
     /// Moves every direct entry of <paramref name="root"/> into a sibling
-    /// <c>{root}/{suffix}</c> directory. Throws if ANY entry cannot be moved —
+    /// <c>{root}/{suffix}</c> directory. Throws if ANY entry cannot be moved -
     /// a partial stage would leave live files mixed with restored files after
     /// extraction, producing silent inconsistency.
     /// </summary>
@@ -444,7 +444,7 @@ public static class RestoreOnBootProcessor
             {
                 throw new InvalidOperationException(
                     $"Failed to stage live entry {entry} into {stageDir}. The restore has been aborted " +
-                    "with live data still in place — fix the cause and retry.", ex);
+                    "with live data still in place - fix the cause and retry.", ex);
             }
         }
         logger.LogInformation("Staged existing tree from {Root} into {StageDir}", root, stageDir);
@@ -537,7 +537,7 @@ public static class RestoreOnBootProcessor
             logger.LogCritical(ex,
                 "Could not rename failed archive in place. Manual cleanup required: delete {Archive} or move it to {FailedDir}.",
                 archive, failedDir);
-            // We deliberately do not throw — the original failure (which the caller
+            // We deliberately do not throw - the original failure (which the caller
             // is about to re-throw) is the real issue. This is best-effort cleanup.
         }
     }

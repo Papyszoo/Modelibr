@@ -9,7 +9,7 @@ interface CanvasErrorBoundaryState {
  * Local error boundary for the R3F Canvas.
  *
  * In React 19 production builds, "Cannot update a component while rendering
- * a different component" (Error #310) is thrown as a real error — not just a
+ * a different component" (Error #310) is thrown as a real error - not just a
  * console warning. This can happen when React Query's useSyncExternalStore
  * resolves cached data during the same render pass as R3F's internal Gl
  * component. The error is transient: on retry the data is already cached

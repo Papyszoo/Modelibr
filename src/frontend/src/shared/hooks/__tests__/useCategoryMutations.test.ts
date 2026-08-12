@@ -13,7 +13,7 @@ import {
 // The factory owns the orchestration shared by every asset type's category
 // sidebar (toasts, active-id updates, delete-branch fallback, selection
 // clearing, invalidation). These tests inject stub behavior and assert that
-// orchestration — the payload building lives in each adopter's own test.
+// orchestration - the payload building lives in each adopter's own test.
 const categories = [
   { id: 1, name: 'Characters', path: 'Characters', parentId: null },
   { id: 2, name: 'Humanoid', path: 'Characters / Humanoid', parentId: 1 },
@@ -69,7 +69,7 @@ describe('useCategoryMutations', () => {
   })
 
   it('forwards the rename payload untouched to the injected renameCategory', async () => {
-    // Regression: the factory must not reshape the caller's payload — the
+    // Regression: the factory must not reshape the caller's payload - the
     // adopter builds it to preserve parentId/description/kind.
     const { result, renameCategory } = setup()
     result.current.renameCategoryMutation.mutate({

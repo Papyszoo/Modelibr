@@ -1,5 +1,5 @@
 // Import PrimeReact core styles (the theme stylesheet itself is managed
-// dynamically — see applyTheme below).
+// dynamically - see applyTheme below).
 import 'primereact/resources/primereact.min.css'
 import 'primeicons/primeicons.css'
 // Import application design tokens + global styles
@@ -9,7 +9,7 @@ import '../src/index.css'
 import type { Preview } from '@storybook/react-vite'
 import { initialize, mswLoader } from 'msw-storybook-addon'
 // The ?url suffix tells Vite to return the URL to the file instead of its
-// contents — same mechanism the app's useTheme hook uses to swap themes.
+// contents - same mechanism the app's useTheme hook uses to swap themes.
 import darkTheme from 'primereact/resources/themes/lara-dark-blue/theme.css?url'
 import lightTheme from 'primereact/resources/themes/lara-light-blue/theme.css?url'
 
@@ -55,7 +55,7 @@ function applyTheme(theme: 'light' | 'dark') {
 // at the origin root) and on the GitHub Pages deploy, where Storybook lives
 // under the `/Modelibr/storybook/` sub-path. MSW resolves this against the
 // iframe's location, so the worker is found at whatever base Storybook is served
-// from — the default absolute `/mockServiceWorker.js` 404s under the sub-path.
+// from - the default absolute `/mockServiceWorker.js` 404s under the sub-path.
 initialize({
   serviceWorker: {
     url: 'mockServiceWorker.js',

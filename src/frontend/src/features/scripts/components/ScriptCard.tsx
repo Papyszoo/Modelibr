@@ -41,7 +41,7 @@ export const ScriptCard = memo(function ScriptCard({
   onDragEnd,
 }: ScriptCardProps) {
   // Description lives in the card tooltip (and is searchable) rather than
-  // taking up card space — the card itself stays icon-forward.
+  // taking up card space - the card itself stays icon-forward.
   const tooltip = script.description
     ? `${script.name}\n\n${script.description}`
     : script.name

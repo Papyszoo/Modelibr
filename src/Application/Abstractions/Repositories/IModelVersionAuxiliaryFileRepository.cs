@@ -3,7 +3,7 @@ using Domain.Models;
 namespace Application.Abstractions.Repositories;
 
 /// <summary>
-/// Persistence for auxiliary (external) glTF resources linked to a model version —
+/// Persistence for auxiliary (external) glTF resources linked to a model version -
 /// the <c>.bin</c> buffers and textures a loose <c>.gltf</c> references. Writes stage
 /// the join (and cascade-insert any new aux file) within the caller's unit of work.
 /// </summary>

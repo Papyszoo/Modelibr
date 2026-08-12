@@ -1,5 +1,5 @@
 /**
- * Part-path identifier — the stable address of one object inside a composite
+ * Part-path identifier - the stable address of one object inside a composite
  * asset's scene graph. It ends up in URLs, API arguments and (later) MCP tool
  * arguments, so the format is decided deliberately here rather than left to
  * emerge. Shared cross-runtime so the three.js walk and the bpy script produce

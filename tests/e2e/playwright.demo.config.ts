@@ -6,14 +6,14 @@ export default defineConfig({
     testDir: "./demo-tests",
     // Headroom for the drained CI runner. These specs run LAST in the e2e job,
     // after ~45 min of main-suite + worker + Docker load, so the same demo app
-    // that renders instantly locally is sluggish here — tight waits lose the
+    // that renders instantly locally is sluggish here - tight waits lose the
     // race. They pass 15/15 locally (real GPU, retries off), so this is timing
     // on an exhausted runner, not an app bug; give it room rather than mask it.
     timeout: 120000, // was 90s
     // Default expect() budget. Most assertions in demo-mode.spec.ts already pass
     // an explicit 15s; this lifts the bare `toBeVisible()` defaults (5s) to match
     // so they don't flake on the loaded runner. A genuinely-broken element still
-    // fails — just after 15s instead of 5s.
+    // fails - just after 15s instead of 5s.
     expect: { timeout: 15000 },
     fullyParallel: false,
     forbidOnly: !!process.env.CI,

@@ -18,7 +18,7 @@ interface TextureSetListProps {
    * and exposes the kind-filter switcher below.
    */
   kind?: TextureSetKind
-  /** True when rendered inside the tab dock — enables per-tab view state. */
+  /** True when rendered inside the tab dock - enables per-tab view state. */
   isTabContent?: boolean
   tabId?: string
 }

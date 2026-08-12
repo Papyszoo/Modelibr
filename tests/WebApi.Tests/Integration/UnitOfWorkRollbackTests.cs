@@ -14,14 +14,14 @@ namespace WebApi.Tests.Integration;
 /// repositories stop self-committing, a command handler's mutations across
 /// multiple repositories only become durable together, via a single
 /// IUnitOfWork.SaveChangesAsync call. If that save fails partway through,
-/// NOTHING from the unit of work persists — not even mutations staged on a
+/// NOTHING from the unit of work persists - not even mutations staged on a
 /// repository whose own write would otherwise have succeeded.
 ///
 /// This has to run against real PostgreSQL (Category=Integration, via
 /// ModelibrWebFactory): EF Core's InMemory provider doesn't reliably enforce
 /// unique constraints the way a relational database does, so it can't
 /// distinguish "the whole SaveChanges rolled back" from "the offending row
-/// just never got added" — see the backend-patterns skill.
+/// just never got added" - see the backend-patterns skill.
 /// </summary>
 [Trait("Category", "Integration")]
 [Collection(PostgresIntegrationCollection.Name)]
@@ -38,7 +38,7 @@ public class UnitOfWorkRollbackTests : IClassFixture<ModelibrWebFactory>
     public async Task SaveChanges_FailureOnSecondRepoMutation_RollsBackFirstRepoMutationToo()
     {
         // Arrange: two repositories that are both fully migrated off
-        // self-commit (settings + packs slices) — ISettingRepository and
+        // self-commit (settings + packs slices) - ISettingRepository and
         // IPackRepository. Stage a valid Setting add (repo #1), then a valid
         // Pack add (repo #2, a different repository/aggregate entirely), then
         // force a real Postgres unique-constraint violation via a second
@@ -47,7 +47,7 @@ public class UnitOfWorkRollbackTests : IClassFixture<ModelibrWebFactory>
 
         // App startup applies migrations itself (Program.cs calls
         // InitializeDatabaseAsync before app.Run), but it swallows failures
-        // to let the app start without DB connectivity — and this test talks
+        // to let the app start without DB connectivity - and this test talks
         // to the DbContext directly, without an HTTP round-trip to fall back
         // on. Re-applying here is idempotent and removes any dependency on
         // that startup path having already won a race against
@@ -67,7 +67,7 @@ public class UnitOfWorkRollbackTests : IClassFixture<ModelibrWebFactory>
         await packRepository.AddAsync(Pack.Create(packName, null, null, null, now));
 
         // The failing mutation: same Key again, still unsaved, so nothing has
-        // caught this yet — the unique index only fires at the database on
+        // caught this yet - the unique index only fires at the database on
         // SaveChanges.
         await settingRepository.AddAsync(Setting.Create(key, "second-value", now));
 
@@ -78,7 +78,7 @@ public class UnitOfWorkRollbackTests : IClassFixture<ModelibrWebFactory>
         Assert.IsType<PostgresException>(thrown.InnerException);
         Assert.Equal(PostgresErrorCodes.UniqueViolation, ((PostgresException)thrown.InnerException!).SqlState);
 
-        // Assert: NOTHING persisted — not the Setting that would have been
+        // Assert: NOTHING persisted - not the Setting that would have been
         // valid on its own, and not the unrelated Pack either. Query through a
         // fresh scope/DbContext so there's no chance of reading back
         // still-tracked, never-actually-saved in-memory state.

@@ -3,7 +3,7 @@ import { type DefaultOptions, QueryClient } from '@tanstack/react-query'
 
 const queryConfig: DefaultOptions = {
   queries: {
-    staleTime: 5 * 60 * 1000, // 5 minutes — matches previous apiCacheStore TTL
+    staleTime: 5 * 60 * 1000, // 5 minutes - matches previous apiCacheStore TTL
     gcTime: 10 * 60 * 1000, // 10 minutes garbage collection
     retry: 1,
     refetchOnWindowFocus: true,

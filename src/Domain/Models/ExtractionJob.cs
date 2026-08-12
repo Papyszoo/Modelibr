@@ -40,7 +40,7 @@ public class ExtractionJob
     public string? ErrorMessage { get; private set; }
 
     /// <summary>
-    /// Detail from a partial-but-usable run — the job can complete while still
+    /// Detail from a partial-but-usable run - the job can complete while still
     /// recording what was skipped. Surfaced in the UI alongside failures.
     /// </summary>
     public string? WarningDetail { get; private set; }
@@ -112,7 +112,7 @@ public class ExtractionJob
         return true;
     }
 
-    /// <summary>Marks the job done. Partial success is valid — pass warning detail to keep it.</summary>
+    /// <summary>Marks the job done. Partial success is valid - pass warning detail to keep it.</summary>
     public void MarkAsCompleted(DateTime completedAt, string? warningDetail = null)
     {
         Status = ExtractionJobStatus.Done;

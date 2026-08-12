@@ -53,7 +53,7 @@ export async function seedDataset(api: BackupApi): Promise<SeedResult> {
     }
 
     // ── A second version for the first model (history coverage).
-    // The new version must reference a DIFFERENT file by content — content-
+    // The new version must reference a DIFFERENT file by content - content-
     // addressable storage rejects uploading the same hash as another version.
     // test.blend is unique to this v2 (not used by any model in the seed list).
     const versionedModelId = modelIds[0];
@@ -88,7 +88,7 @@ export async function seedDataset(api: BackupApi): Promise<SeedResult> {
         ts2.data.textureSetId ?? ts2.data.id,
     ];
 
-    // ── Packs (2) — second one gets a couple of models
+    // ── Packs (2) - second one gets a couple of models
     const packA = await api.createPack("seed-pack-A", "Pack A description");
     const packB = await api.createPack("seed-pack-B", "Pack B description");
     if (![200, 201].includes(packA.status) || ![200, 201].includes(packB.status)) {
@@ -98,7 +98,7 @@ export async function seedDataset(api: BackupApi): Promise<SeedResult> {
     await api.addModelToPack(packIds[1], modelIds[1]);
     await api.addModelToPack(packIds[1], modelIds[2]);
 
-    // ── Projects (2) — first one gets a model
+    // ── Projects (2) - first one gets a model
     const projA = await api.createProject("seed-project-A", "Project A");
     const projB = await api.createProject("seed-project-B", "Project B");
     if (![200, 201].includes(projA.status) || ![200, 201].includes(projB.status)) {

@@ -62,7 +62,7 @@ async function waitForSoundCategoryTab(page: any, categoryName: string) {
         await waitForSoundsUiReady(page);
 
         // Category rows in the shared CategoryTreePanel sidebar (unassigned
-        // bucket + tree nodes) — sounds no longer uses .category-tab tabs.
+        // bucket + tree nodes) - sounds no longer uses .category-tab tabs.
         const categoryTabs = page.locator(
             ".sound-category-sidebar .category-tree-unassigned, .sound-category-sidebar .category-tree .p-treenode-content",
         );
@@ -189,7 +189,7 @@ When(
         );
         await fileInput.setInputFiles(filePath);
 
-        // Wait for upload API response — must succeed before proceeding
+        // Wait for upload API response - must succeed before proceeding
         await uploadResponsePromise;
         await page.waitForLoadState("domcontentloaded");
 
@@ -269,7 +269,7 @@ When(
         }
 
         // Wait for UI to reflect changes reactively (sound card should appear)
-        // After API rename, the UI may not update reactively — reload to ensure fresh state
+        // After API rename, the UI may not update reactively - reload to ensure fresh state
         const soundListPage = new SoundListPage(page);
         await soundListPage.goto();
         await waitForSoundsUiReady(page);
@@ -515,7 +515,7 @@ When("I save the sound changes", async ({ page }) => {
             await dialog.waitFor({ state: "hidden", timeout: 10000 });
             console.log("[Action] Saved sound changes via dialog");
         } else {
-            // Close the dialog — changes were already saved inline
+            // Close the dialog - changes were already saved inline
             const closeButton = dialog.locator(
                 ".p-dialog-header-close, button:has(.pi-times)",
             );
@@ -747,7 +747,7 @@ Then(
     "the sound category {string} should be visible in the category list",
     async ({ page }, categoryName: string) => {
         // Create/rename update the tree reactively (query invalidation), so
-        // a web-first assertion suffices — the reload-scan helper is only
+        // a web-first assertion suffices - the reload-scan helper is only
         // needed to sync categories provisioned via API before the page
         // loaded.
         const categoryRow = page
@@ -982,7 +982,7 @@ Then(
     async ({ page }, categoryName: string) => {
         // Category rows live in the shared CategoryTreePanel sidebar; the
         // old .category-tab selector matched nothing and passed vacuously.
-        // Exact label match — hasText is substring and would over-match.
+        // Exact label match - hasText is substring and would over-match.
         const categoryRow = page
             .locator(
                 ".sound-category-sidebar .category-tree .p-treenode-content",

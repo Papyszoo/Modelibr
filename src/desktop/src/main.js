@@ -28,7 +28,7 @@ const { autoUpdater } = electronUpdater
 
 // The desktop client ships as its own installer in the same GitHub release.
 const DESKTOP_CLIENT_URL = CLIENT_RELEASES_URL
-// One client install at a time — re-entry would download/launch twice.
+// One client install at a time - re-entry would download/launch twice.
 let clientInstallInFlight = false
 
 // Bounds advertised to the configuration UI (saveRuntimeConfig clamps to these).
@@ -140,7 +140,7 @@ function buildTrayMenu() {
   }
 
   return Menu.buildFromTemplate([
-    { label: `Modelibr — ${phaseLabel}`, enabled: false },
+    { label: `Modelibr - ${phaseLabel}`, enabled: false },
     { type: 'separator' },
     { label: 'Show Status', click: () => showStatusWindow() },
     updateItem,
@@ -180,7 +180,7 @@ function refreshTray() {
       : bootPhase === 'error'
         ? 'error'
         : 'starting…'
-  tray.setToolTip(`Modelibr — ${phaseLabel}`)
+  tray.setToolTip(`Modelibr - ${phaseLabel}`)
 
   // On Linux the menu is the live surface, so rebuild it to reflect the phase.
   if (process.platform === 'linux') {
@@ -209,7 +209,7 @@ function createStatusWindow() {
   })
 
   statusWindow.on('close', event => {
-    // Closing the window only hides it — the tray host keeps running.
+    // Closing the window only hides it - the tray host keeps running.
     if (!isQuitting) {
       event.preventDefault()
       statusWindow?.hide()
@@ -286,7 +286,7 @@ function performRestart() {
   refreshTray()
   // Release the single-instance lock before relaunching. app.relaunch() starts
   // the replacement instance as this one exits; if the lock is still held, that
-  // fresh instance fails requestSingleInstanceLock() and immediately quits —
+  // fresh instance fails requestSingleInstanceLock() and immediately quits -
   // leaving nothing running (the "I pressed Restart and nothing happened" case).
   // Releasing it first guarantees the relaunched instance can acquire it.
   app.releaseSingleInstanceLock()
@@ -296,7 +296,7 @@ function performRestart() {
 }
 
 // Quitting stops Modelibr and all its services for everyone using this host
-// (browser tabs and connected desktop clients), so confirm before doing it —
+// (browser tabs and connected desktop clients), so confirm before doing it -
 // it's an easy thing to click by accident. Defaults to Cancel for safety.
 let quitConfirmInFlight = false
 async function confirmAndQuit() {
@@ -313,8 +313,8 @@ async function confirmAndQuit() {
       title: 'Quit Modelibr?',
       message: 'Quit Modelibr?',
       detail:
-        'This stops Modelibr and its services. Anything connected — browser ' +
-        'tabs or desktop clients — will lose access until you start it again.',
+        'This stops Modelibr and its services. Anything connected - browser ' +
+        'tabs or desktop clients - will lose access until you start it again.',
     })
     if (response === 1) {
       app.quit()
@@ -441,7 +441,7 @@ function registerIpc() {
       ...previous,
       ...patch,
     })
-    // updateConfig only changes the *desired* config — the running services keep
+    // updateConfig only changes the *desired* config - the running services keep
     // serving their active ports until a relaunch, so the snapshot/URLs stay
     // valid. hasPendingRestart() then reports the desired-vs-active gap.
     runtimeManager.updateConfig(saved)
@@ -450,7 +450,7 @@ function registerIpc() {
     // current folder until then).
     await runtimeManager.scheduleDataMigrationIfNeeded()
 
-    // Worker settings are applied live by recycling the pool — safe even when a
+    // Worker settings are applied live by recycling the pool - safe even when a
     // port change is also pending, since workers target the active API port.
     // Ports and the data folder still need a full restart to take effect.
     const workersChanged =
@@ -481,7 +481,7 @@ function registerIpc() {
   })
 
   // The folder left behind after a data-folder move. Only surfaced while it
-  // still exists on disk — if the user already deleted it, forget it.
+  // still exists on disk - if the user already deleted it, forget it.
   ipcMain.handle('modelibr:previous-data-folder', async () => {
     if (!runtimeManager) return null
     const record = await readLeftoverFolder(runtimeManager.userDataDir)
@@ -543,7 +543,7 @@ async function shutdown() {
 }
 
 async function bootstrap() {
-  // Menu-bar / tray app — no persistent dock presence on macOS.
+  // Menu-bar / tray app - no persistent dock presence on macOS.
   if (process.platform === 'darwin') {
     app.dock?.hide()
   }
@@ -566,7 +566,7 @@ async function bootstrap() {
   try {
     createTray()
   } catch (error) {
-    runtimeLog('[ModelibrDesktop] Tray unavailable — continuing headless', {
+    runtimeLog('[ModelibrDesktop] Tray unavailable - continuing headless', {
       error: error instanceof Error ? error.message : String(error),
     })
   }
@@ -649,7 +649,7 @@ app.on('before-quit', event => {
   event.preventDefault()
 
   const forceExit = setTimeout(() => {
-    runtimeLog('[ModelibrDesktop] Shutdown exceeded deadline — forcing exit')
+    runtimeLog('[ModelibrDesktop] Shutdown exceeded deadline - forcing exit')
     app.exit(0)
   }, SHUTDOWN_DEADLINE_MS)
   forceExit.unref?.()

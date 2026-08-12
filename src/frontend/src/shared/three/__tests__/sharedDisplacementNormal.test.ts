@@ -148,7 +148,7 @@ void main() {
 
   it('puts the disp-normal token at the start of the cache key', () => {
     // three.js's default Material.customProgramCacheKey returns
-    // `this.onBeforeCompile.toString()` — so even with no prior caller-set
+    // `this.onBeforeCompile.toString()` - so even with no prior caller-set
     // key there is always a "previous" key (the stringified onBeforeCompile
     // we just attached). The disp-normal token must appear at the start so
     // the key is recognisable and stable across material variants.

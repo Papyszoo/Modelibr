@@ -27,7 +27,7 @@ public class ModelVersionAuxiliaryFileTests
     [InlineData("textures/../../etc/passwd")]
     public void NormalizeRelativePath_Rejects_Traversal(string input)
     {
-        // Aux paths are resolved against uploaded siblings only — a '..' segment
+        // Aux paths are resolved against uploaded siblings only - a '..' segment
         // must never be accepted (it is content-addressed storage, but the guard
         // keeps the recorded path honest and blocks any path-based consumer).
         Assert.Throws<ArgumentException>(() => ModelVersionAuxiliaryFile.NormalizeRelativePath(input));

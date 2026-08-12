@@ -74,7 +74,7 @@ namespace Application.Models
                 : await _modelRepository.GetByFileHashAsync(fileEntity.Sha256Hash, cancellationToken);
             if (existingModel != null)
             {
-            // Raise domain event for existing model upload — dispatched from the
+            // Raise domain event for existing model upload - dispatched from the
                 // save pipeline once this aggregate is persisted (see
                 // DomainEventsInterceptor); no manual publish here.
                 existingModel.RaiseModelUploadedEvent(existingModel.ActiveVersion!.Id, fileEntity.Sha256Hash, false, command.GenerateThumbnail);
@@ -113,7 +113,7 @@ namespace Application.Models
             {
                 var model = Model.Create(modelName, _dateTimeProvider.UtcNow);
 
-                // Save the model first — it must be committed BEFORE CreateVersion runs:
+                // Save the model first - it must be committed BEFORE CreateVersion runs:
                 // the first version sets Model.ActiveVersion, and if model and version
                 // are both still Added in one save, EF hits the circular
                 // Model.ActiveVersionId <-> ModelVersion.ModelId FK dependency and throws.
@@ -125,7 +125,7 @@ namespace Application.Models
                 version1.AddFile(fileEntity);
                 await _versionRepository.AddAsync(version1, cancellationToken);
 
-                // Commit again so version1 gets its real database-assigned id —
+                // Commit again so version1 gets its real database-assigned id -
                 // SetModelVersion below copies it into a raw scalar FK (see the
                 // backend-patterns skill's temporary-key trap).
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
@@ -135,7 +135,7 @@ namespace Application.Models
                 await _modelRepository.UpdateAsync(savedModel, cancellationToken);
                 
                 // Raise domain event for new model upload after both model and file are
-                // persisted — dispatched from the save pipeline (see DomainEventsInterceptor);
+                // persisted - dispatched from the save pipeline (see DomainEventsInterceptor);
                 // no manual publish here.
                 savedModel.RaiseModelUploadedEvent(version1.Id, fileEntity.Sha256Hash, true, command.GenerateThumbnail);
 
@@ -166,7 +166,7 @@ namespace Application.Models
     /// </param>
     /// <param name="SkipDeduplication">
     /// Forces a distinct model even when the primary file's hash already exists. Set only
-    /// by callers that own a broader identity than the primary file — today the multi-file
+    /// by callers that own a broader identity than the primary file - today the multi-file
     /// glTF import, whose referenced .bin/textures are part of what the asset IS.
     /// </param>
     public record AddModelCommand(

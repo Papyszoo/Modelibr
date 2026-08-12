@@ -14,7 +14,7 @@ type ImportProgressCallback = (event: StoreImportProgressEvent) => void
 
 /**
  * SignalR client for the local backend's StoreImportHub. Import progress is
- * best-effort push — the import controller also polls the job endpoint, so a
+ * best-effort push - the import controller also polls the job endpoint, so a
  * failed hub connection degrades to polling, never blocks an import.
  */
 class StoreImportSignalRService {

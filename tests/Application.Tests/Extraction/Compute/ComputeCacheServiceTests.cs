@@ -40,12 +40,12 @@ public class ComputeCacheServiceTests
             return Task.FromResult("{\"uvOverlap\":0.03}");
         }
 
-        // Asset A (hash H) — pays for the compute.
+        // Asset A (hash H) - pays for the compute.
         var first = await _service.GetOrComputeAsync(Hash, 1, "uv-overlap", Compute);
         Assert.Equal(1, computeCalls);
         Assert.Equal("{\"uvOverlap\":0.03}", first.Result);
 
-        // Asset B — same geometry hash. Now the cache returns the stored entry.
+        // Asset B - same geometry hash. Now the cache returns the stored entry.
         AssetSearchStub(stored);
         var second = await _service.GetOrComputeAsync(Hash, 1, "uv-overlap", Compute);
 

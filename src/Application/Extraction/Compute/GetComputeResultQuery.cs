@@ -7,7 +7,7 @@ namespace Application.Extraction.Compute;
 /// <summary>
 /// Reads a cached expensive-compute result by geometry hash. Returns the result
 /// when present; otherwise reports it as not-yet-computed so the caller (MCP
-/// compute_on_demand) can decide whether to wait. Ordinary endpoint — the MCP
+/// compute_on_demand) can decide whether to wait. Ordinary endpoint - the MCP
 /// layer wraps it, no MCP-specific compute path.
 /// </summary>
 public record GetComputeResultQuery(string GeometryHash, int GeometryHashVersion, string Metric)

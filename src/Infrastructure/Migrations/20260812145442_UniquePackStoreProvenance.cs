@@ -17,7 +17,7 @@ namespace Infrastructure.Migrations
             // The old non-unique index allowed duplicate provenance stamps, so a database that
             // ran the two-commit importer may already hold them and would fail the index
             // creation below. Keep the OLDEST pack for each store asset stamped and clear the
-            // stamp on the rest — no pack and no imported asset is deleted; the un-stamped
+            // stamp on the rest - no pack and no imported asset is deleted; the un-stamped
             // duplicates simply stop being re-import targets and can be merged or removed by
             // hand.
             migrationBuilder.Sql("""

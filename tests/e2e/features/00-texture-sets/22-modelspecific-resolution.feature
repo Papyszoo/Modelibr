@@ -1,6 +1,6 @@
 # Untagged (runs on every PR): unlike the Universal resolution filter
 # (21-resolution-filter.feature, @serial), Multi-Model sets never get a worker
-# thumbnail pass — the backend extracts their texture dimensions synchronously at
+# thumbnail pass - the backend extracts their texture dimensions synchronously at
 # upload time. So there is no asset-processor poll and no contention, and the
 # assertions are deterministic the moment the upload request returns.
 Feature: Multi-Model Texture Set Resolution

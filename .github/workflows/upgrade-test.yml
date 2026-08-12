@@ -2,19 +2,19 @@ name: Upgrade Test
 
 # Proves a real version-to-version upgrade keeps user data. Two complementary jobs:
 #
-#   reinstall   — installs the FROM release, seeds one of every asset type, then
+#   reinstall   - installs the FROM release, seeds one of every asset type, then
 #                 installs the TO release *over* it (data folder lives in the user
 #                 profile, so it persists) and verifies everything survived. Covers
 #                 all 3 OS and is the only coverage for the Linux .deb and the
 #                 macOS data path.
 #
-#   self-update — exercises the real in-app electron-updater: installs FROM, seeds,
+#   self-update - exercises the real in-app electron-updater: installs FROM, seeds,
 #                 then drives the app's own "download + install" over CDP and
 #                 confirms the relaunched build is the new version with data intact.
-#                 Windows + Linux only — macOS can't self-update while the app is
+#                 Windows + Linux only - macOS can't self-update while the app is
 #                 unsigned (Squirrel.Mac requires code signing; planned for 1.0).
 #
-# Installers come straight from GitHub Releases — no build step. Defaults to
+# Installers come straight from GitHub Releases - no build step. Defaults to
 # "v0.4.3 → latest published release".
 on:
   workflow_dispatch:
@@ -79,7 +79,9 @@ jobs:
           INPUT_TO: ${{ inputs.to_tag }}
         run: |
           set -euo pipefail
-          from="${INPUT_FROM:-v0.3.1}"
+          # Keep in sync with the from_tag input default. This fallback is what
+          # the nightly schedule uses, where inputs.from_tag is empty.
+          from="${INPUT_FROM:-v0.4.3}"
           to="${INPUT_TO:-}"
           if [ -z "$to" ]; then
             to=$(gh release list --exclude-drafts --exclude-pre-releases --limit 1 \
@@ -87,7 +89,7 @@ jobs:
           fi
           [ -n "$to" ] || { echo "Could not resolve a TO release tag"; exit 1; }
           if [ "$from" = "$to" ]; then
-            echo "FROM ($from) equals TO ($to) — nothing to upgrade."; exit 1
+            echo "FROM ($from) equals TO ($to) - nothing to upgrade."; exit 1
           fi
           echo "Upgrading: $from  ->  $to"
           echo "from=$from" >> "$GITHUB_OUTPUT"
@@ -246,7 +248,9 @@ jobs:
           INPUT_TO: ${{ inputs.to_tag }}
         run: |
           set -euo pipefail
-          from="${INPUT_FROM:-v0.3.1}"
+          # Keep in sync with the from_tag input default. This fallback is what
+          # the nightly schedule uses, where inputs.from_tag is empty.
+          from="${INPUT_FROM:-v0.4.3}"
           to="${INPUT_TO:-}"
           if [ -z "$to" ]; then
             to=$(gh release list --exclude-drafts --exclude-pre-releases --limit 1 \
@@ -254,7 +258,7 @@ jobs:
           fi
           [ -n "$to" ] || { echo "Could not resolve a newer release"; exit 1; }
           if [ "$from" = "$to" ]; then
-            echo "FROM ($from) equals latest ($to) — nothing to self-update to."; exit 1
+            echo "FROM ($from) equals latest ($to) - nothing to self-update to."; exit 1
           fi
           echo "Self-update: $from  ->  $to (updater picks latest from the feed)"
           echo "from=$from" >> "$GITHUB_OUTPUT"
@@ -281,7 +285,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          # libfuse2 lets the AppImage run normally so it sets $APPIMAGE — which
+          # libfuse2 lets the AppImage run normally so it sets $APPIMAGE - which
           # electron-updater needs to know which file to replace on self-update.
           sudo apt-get install -y xvfb libfuse2 >/dev/null
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
@@ -313,7 +317,7 @@ jobs:
           echo "::group::Verify the relaunched build is the NEW version, data intact"
           sleep 15  # quitAndInstall relaunches; give it a moment
           if ! wait_ready; then
-            echo "did not auto-relaunch — launching the (updated) AppImage"
+            echo "did not auto-relaunch - launching the (updated) AppImage"
             start_app; wait_ready || { echo "not ready after update"; tail -n 80 /tmp/modelibr.log || true; exit 1; }
           fi
           code=$(http_code http://127.0.0.1:3010/api/scripts)
@@ -380,7 +384,7 @@ jobs:
           Start-Sleep 25
           Dump-Diag 'after-update'
           if (-not (Wait-Ready)) {
-            Write-Host "did not auto-relaunch — starting the (updated) app"
+            Write-Host "did not auto-relaunch - starting the (updated) app"
             Start-App
             if (-not (Wait-Ready)) { throw "app not ready after update" }
           }

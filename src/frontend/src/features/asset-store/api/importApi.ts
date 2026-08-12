@@ -2,7 +2,7 @@ import { client } from '@/lib/apiBase'
 
 import type { StartStoreImportResponse, StoreImportJobDto } from '../types'
 
-// Local Modelibr backend — starts/polls the background import job. The
+// Local Modelibr backend - starts/polls the background import job. The
 // import token is the only store credential in these calls (never the JWT).
 
 export async function startStoreImport(request: {

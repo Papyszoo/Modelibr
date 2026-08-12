@@ -1,4 +1,4 @@
-# Store production incidents — two failures worth not repeating
+# Store production incidents - two failures worth not repeating
 
 Both surfaced on the live store in July 2026 after uploading a ~900-item pack.
 Neither is reachable from Modelibr's own code, but both are failure modes this
@@ -12,7 +12,7 @@ spinner with "Asset Not Found".
 **Root cause:** `GetAssetByIdQueryHandler`, `GetAssetManifestQueryHandler` (the
 Modelibr import path) and `DeleteAssetCommandHandler` each eager-load an asset
 with **four collection includes** (Files, Items, PreviewArtifacts, AssetTags). EF
-Core's default single-query strategy joins them into a **cartesian product** —
+Core's default single-query strategy joins them into a **cartesian product** -
 roughly 900 × 900 × 1800 ≈ billions of rows → Postgres pegged → request timeout.
 The catalog page's `.catch(() => setNotFound(true))` then renders "Asset Not
 Found" for *any* fetch failure, which hid the real error. Small assets never hit
@@ -25,19 +25,19 @@ in the Application layer (core EF only), and unit tests use `UseInMemoryDatabase
 which **throws** on split queries.
 
 **Regression tests:** a config test asserting the provider default (the
-deterministic guard — split vs single return identical deduped rows, so only
+deterministic guard - split vs single return identical deduped rows, so only
 config reliably fails on revert), plus an e2e uploading a 64-item pack against
 real Postgres. Gotchas found writing it: `AddInfrastructure` eagerly needs
 `ConnectionStrings:Default` + `Jwt:Secret`, and
-`FindExtension<RelationalOptionsExtension>()` is exact-type — use
+`FindExtension<RelationalOptionsExtension>()` is exact-type - use
 `options.Extensions.OfType<RelationalOptionsExtension>()`.
 
-**Modelibr is NOT affected** — it already applies `.AsSplitQuery()` to every
+**Modelibr is NOT affected** - it already applies `.AsSplitQuery()` to every
 multi-collection include (`ModelRepository`, `PackRepository.GetById`,
 TextureSet/Sprite/Sound/Script/Project/EnvironmentMap, WebDAV
 `VirtualAssetStore`), because its queries live in Infrastructure repos where
 relational EF is available. **But Modelibr has no global default and relies on
-developers remembering per-query** — a future multi-collection query can regress
+developers remembering per-query** - a future multi-collection query can regress
 exactly this way. See `backend-persistence`.
 
 ## 2. SPA deep-link / refresh 404
@@ -51,8 +51,8 @@ long-cache block with **no index.html fallback**, shadowing the SPA route. In-ap
 navigation worked; a hard refresh asked nginx for a file that doesn't exist.
 
 **Fix:** scope the cache block to real static-file **extensions** via regex
-(`location ~* ^/assets/.+\.(js|mjs|css|png|…)$`) so `/assets/<uuid>` — no
-extension — falls through to `try_files … /index.html`.
+(`location ~* ^/assets/.+\.(js|mjs|css|png|…)$`) so `/assets/<uuid>` - no
+extension - falls through to `try_files … /index.html`.
 
 **Why e2e could never catch it:** the e2e compose builds the frontend with **no
 `target:`**, so the last Dockerfile stage wins = the Vite **dev** server, which
@@ -67,7 +67,7 @@ suite. Check which stage the test stack actually builds.
 
 A test fix written locally but not committed before its PR merged left `main`'s
 test red. **Commit the test fix before the PR merges.** Also: `npm run test | tail`
-masks the real exit code, and `playwright-report/index.html` can be stale —
+masks the real exit code, and `playwright-report/index.html` can be stale -
 capture full output.
 
 Related: [[integration.md]], [[../testing/flakiness.md]]

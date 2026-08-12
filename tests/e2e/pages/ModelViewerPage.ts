@@ -252,7 +252,7 @@ export class ModelViewerPage {
         let saved = false;
         for (let attempt = 0; attempt < 3 && !saved; attempt++) {
             if (attempt > 0) {
-                // Re-open the dialog — the previous attempt closed it without saving
+                // Re-open the dialog - the previous attempt closed it without saving
                 console.log(
                     `[UI] Save was a no-op (attempt ${attempt}), re-opening dialog`,
                 );
@@ -315,7 +315,7 @@ export class ModelViewerPage {
                 // Allow React to process the refetched data
                 await this.page.waitForTimeout(500);
             } else {
-                // Dialog closed without saving — cancel the response listeners
+                // Dialog closed without saving - cancel the response listeners
                 await dialog.waitFor({ state: "hidden", timeout: 15000 });
             }
         }
@@ -436,7 +436,7 @@ export class ModelViewerPage {
             "[Upload] Selected and verified 'Create new version' option",
         );
 
-        // Listen for the API response — match ONLY the create-version endpoint
+        // Listen for the API response - match ONLY the create-version endpoint
         // POST /models/{id}/versions (NOT /models/{id}/versions/{id}/files)
         const createVersionPattern = /\/models\/\d+\/versions(\?|$)/;
         const uploadResponsePromise = this.page
@@ -454,7 +454,7 @@ export class ModelViewerPage {
         await uploadBtn.click();
         console.log("[Upload] Clicked Upload button");
 
-        // Wait for dialog to close — if it stays open, dismiss and fall back to API
+        // Wait for dialog to close - if it stays open, dismiss and fall back to API
         const dialogClosed = await dialog
             .waitFor({ state: "hidden", timeout: 30000 })
             .then(() => true)
@@ -708,7 +708,7 @@ export class ModelViewerPage {
                     },
                 );
             } else {
-                // Keep dropdown open — just wait for re-render
+                // Keep dropdown open - just wait for re-render
                 await this.page.waitForTimeout(pollInterval);
             }
         }
@@ -810,7 +810,7 @@ export class ModelViewerPage {
         await targetItem.scrollIntoViewIfNeeded();
         await targetItem.click();
 
-        // Opening the texture set switches focus to its new tab — return to the
+        // Opening the texture set switches focus to its new tab - return to the
         // model viewer tab so the inline preview is visible for assertions.
         const modelViewerTab = this.page
             .locator(".draggable-tab:has(.pi-box)")
@@ -863,7 +863,7 @@ export class ModelViewerPage {
         await expect(input).toBeVisible({ timeout: 5000 });
         await input.fill(name);
 
-        // Confirm the preset — wait for the API response and subsequent version refetch
+        // Confirm the preset - wait for the API response and subsequent version refetch
         const confirmBtn = this.page.locator(
             '[data-testid="confirm-preset-btn"]',
         );

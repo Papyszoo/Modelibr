@@ -9,7 +9,7 @@ namespace Infrastructure.Tests.Persistence;
 
 /// <summary>
 /// Proves the DbContext's configured FileType converter round-trips every
-/// registered FileType — i.e. that the model is actually wired to
+/// registered FileType - i.e. that the model is actually wired to
 /// FileType.FromValue and not to a hand-maintained mapping that can drift
 /// (the pre-fix switch silently mapped all 19 script types to Unknown).
 /// InMemory is used ONLY to build the model metadata; no queries run, so no

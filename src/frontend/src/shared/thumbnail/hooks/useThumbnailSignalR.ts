@@ -86,7 +86,7 @@ export function useThumbnailSignalR(_modelIds: number[]) {
         old => ({ ...old, ...newData })
       )
 
-      // Update model-level cache (used by grid view) — modelId comes from the event
+      // Update model-level cache (used by grid view) - modelId comes from the event
       queryClient.setQueryData<ThumbnailStatus>(
         ['thumbnail', event.modelId.toString()],
         old => ({ ...old, ...newData })
@@ -95,7 +95,7 @@ export function useThumbnailSignalR(_modelIds: number[]) {
     [queryClient]
   )
 
-  // Handle active version changes — targeted invalidation only
+  // Handle active version changes - targeted invalidation only
   const handleActiveVersionChanged = useCallback(
     (event: ActiveVersionChangedEvent) => {
       queryClient.invalidateQueries({
@@ -185,7 +185,7 @@ export function useModelThumbnailUpdates(
       if (event.status === 'Ready' && event.thumbnailUrl && onThumbnailReady) {
         onThumbnailReady(event.thumbnailUrl)
       }
-      // Update caches via setQueryData — no network request
+      // Update caches via setQueryData - no network request
       queryClient.setQueryData<ThumbnailStatus>(
         ['thumbnail', 'version', event.modelVersionId],
         old => ({ ...old, ...thumbnailStatusFromEvent(event) })
@@ -202,7 +202,7 @@ export function useModelThumbnailUpdates(
 
     const handleActiveVersionChanged = (event: ActiveVersionChangedEvent) => {
       if (event.modelId === modelId) {
-        // Active version changed — need to refetch thumbnail since it points to a new version
+        // Active version changed - need to refetch thumbnail since it points to a new version
         queryClient.invalidateQueries({
           queryKey: ['thumbnail', modelId.toString()],
         })

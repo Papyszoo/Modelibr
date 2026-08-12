@@ -12,7 +12,7 @@ public static class ExtractionAssetTypes
 }
 
 /// <summary>
-/// Extractor families for job scheduling — each can be given its own concurrency
+/// Extractor families for job scheduling - each can be given its own concurrency
 /// limit so large-geometry work never starves script indexing.
 /// </summary>
 public static class ExtractorFamilies
@@ -22,7 +22,7 @@ public static class ExtractorFamilies
     public const string Audio = "Audio";
     public const string Script = "Script";
 
-    /// <summary>On-demand expensive compute (UV overlap, texel density, per-part renders) — its own concurrency lane.</summary>
+    /// <summary>On-demand expensive compute (UV overlap, texel density, per-part renders) - its own concurrency lane.</summary>
     public const string Compute = "Compute";
 }
 

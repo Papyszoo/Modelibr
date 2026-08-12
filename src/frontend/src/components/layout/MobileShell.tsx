@@ -44,7 +44,7 @@ export function MobileShell() {
     tabs[0]?.id ??
     ''
 
-  // Local drag state — cross-panel moves don't apply on mobile (one panel),
+  // Local drag state - cross-panel moves don't apply on mobile (one panel),
   // but DockPanelContent expects these props.
   const [draggedTab, setDraggedTab] = useState<Tab | null>(null)
 

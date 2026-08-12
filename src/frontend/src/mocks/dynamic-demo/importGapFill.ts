@@ -2,7 +2,7 @@
  * Gap-fill rule for the demo Asset Store importer.
  *
  * Lives apart from assetStoreHandlers because that module pulls in the MSW/demo
- * runtime (and `import.meta`), which Jest cannot parse — keeping the rule here makes
+ * runtime (and `import.meta`), which Jest cannot parse - keeping the rule here makes
  * it testable, which is the point: a re-import used to return the existing pack
  * untouched, so items skipped by a first partial run were never added while the demo
  * still reported success.

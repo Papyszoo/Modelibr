@@ -4,7 +4,7 @@ One command to run as many of the project's test suites as possible on this
 machine (great for a local machine with a real GPU, which is far faster than
 GitHub's shared runners) and get a single openable HTML report.
 
-It does **not** reimplement any test orchestration — it shells out to each
+It does **not** reimplement any test orchestration - it shells out to each
 suite's existing command (e.g. `tests/e2e`'s Docker runners) and aggregates the
 results.
 
@@ -30,13 +30,13 @@ In the interactive picker: type suite numbers to toggle, `a` all, `n` none,
 
 ## Behavior
 
-- **Docker guard** — suites that need Docker are skipped (not failed) when the
+- **Docker guard** - suites that need Docker are skipped (not failed) when the
   daemon is down. Some also need the dev Postgres / e2e stack; the suite's own
   command brings the stack up and tears it down where required.
-- **Branch-aware** — a suite whose files aren't on the current branch (e.g. the
+- **Branch-aware** - a suite whose files aren't on the current branch (e.g. the
   `desktop` suite outside `feat/tray-host`) is reported as *not-present*, and
   starts running automatically once those files exist.
-- **Honest exit code** — the process exits non-zero if any selected suite failed.
+- **Honest exit code** - the process exits non-zero if any selected suite failed.
 
 ## Adding a suite
 
@@ -50,7 +50,7 @@ untracked.
 
 | File | Role |
 |------|------|
-| `suites.config.mjs` | the manifest — single source of truth for all suites |
+| `suites.config.mjs` | the manifest - single source of truth for all suites |
 | `index.mjs` | entry point: args, picker, Docker guard, orchestration |
 | `picker.mjs` | dependency-free interactive multi-select |
 | `parsers.mjs` | per-kind command building + result parsing (TRX / JSON / TAP) |

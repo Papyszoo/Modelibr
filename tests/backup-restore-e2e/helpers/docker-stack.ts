@@ -70,7 +70,7 @@ export function listHostDir(relativePath: string): string[] {
 
 /**
  * Delete any `.pre-restore-*` directory under `<HOST_DATA_DIR>/<root>`. The
- * production restore processor refuses to run if these exist — they're the
+ * production restore processor refuses to run if these exist - they're the
  * only on-disk copy of the operator's pre-restore data, and silently sweeping
  * them would be a data-loss bug. In tests we know the previous run was a
  * controlled experiment so it's safe to purge them on setup.

@@ -59,7 +59,7 @@ describe('RendererPool.forceReinit', () => {
     await pool.forceReinit(renderer)
 
     expect(mockReinitialize).toHaveBeenCalledTimes(1)
-    // Only the renderer's own page/browser recovery ran — the pool's shared
+    // Only the renderer's own page/browser recovery ran - the pool's shared
     // browser was launched once at initialize() and never relaunched.
     expect(mockLaunch).toHaveBeenCalledTimes(1)
   })

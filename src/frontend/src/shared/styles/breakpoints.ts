@@ -1,5 +1,5 @@
 /**
- * Responsive breakpoints. Single source of truth — keep in sync with
+ * Responsive breakpoints. Single source of truth - keep in sync with
  * the `--mod-bp-*` documentation values in `tokens.css`.
  *
  * Values are in pixels and represent the *minimum* width at which a

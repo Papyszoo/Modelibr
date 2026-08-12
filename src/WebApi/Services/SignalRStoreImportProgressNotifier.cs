@@ -6,7 +6,7 @@ namespace WebApi.Services;
 
 /// <summary>
 /// SignalR implementation of <see cref="IStoreImportProgressNotifier"/>. Sends progress to the
-/// job's group. Never throws into the caller — a notification failure must not break an import.
+/// job's group. Never throws into the caller - a notification failure must not break an import.
 /// </summary>
 public class SignalRStoreImportProgressNotifier : IStoreImportProgressNotifier
 {

@@ -5,7 +5,7 @@ namespace Application.Abstractions.Repositories;
 /// <summary>
 /// Concurrency-safe persistence for the decoupled extraction queue. Mirrors
 /// <see cref="IThumbnailJobRepository"/> but schedules per extractor family and
-/// never self-commits — the atomic claim is a single UPDATE, so command handlers
+/// never self-commits - the atomic claim is a single UPDATE, so command handlers
 /// still own the unit of work.
 /// </summary>
 public interface IExtractionJobRepository
@@ -17,7 +17,7 @@ public interface IExtractionJobRepository
     Task<ExtractionJob?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// The live (Pending/Processing) job for a target, if any — used for dedup so
+    /// The live (Pending/Processing) job for a target, if any - used for dedup so
     /// re-queuing an asset that is already queued is a no-op.
     /// </summary>
     Task<ExtractionJob?> GetLiveJobAsync(
@@ -29,7 +29,7 @@ public interface IExtractionJobRepository
 
     /// <summary>
     /// The oldest claimable job in a family (Pending, or Processing with an
-    /// expired lock). Read-only — claim it atomically with
+    /// expired lock). Read-only - claim it atomically with
     /// <see cref="TryClaimJobAsync"/>.
     /// </summary>
     Task<ExtractionJob?> GetNextClaimableJobAsync(
@@ -50,7 +50,7 @@ public interface IExtractionJobRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Dead-letters jobs stuck in Processing with an expired lock and no attempts left —
+    /// Dead-letters jobs stuck in Processing with an expired lock and no attempts left -
     /// their worker died and nothing else will ever claim or finish them. Returns the
     /// number of jobs retired. A single UPDATE (no self-commit).
     /// </summary>

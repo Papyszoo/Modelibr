@@ -7,7 +7,7 @@ namespace Application.Abstractions.Services;
 /// <summary>
 /// Server-to-server client for pulling an asset pack from the companion Asset Store.
 /// The import token is passed per call and used only for the store's own host (see the
-/// implementation) — it is never persisted or logged. SSRF guards, timeouts, redirect
+/// implementation) - it is never persisted or logged. SSRF guards, timeouts, redirect
 /// limits and download size limits live in the implementation.
 /// </summary>
 public interface IStoreImportClient
@@ -24,10 +24,10 @@ public interface IStoreImportClient
 
     /// <summary>
     /// Downloads a manifest file/preview from its absolute URL to a temp file (never buffered
-    /// in memory — pack files can be GB-sized), hashing while streaming. Follows redirects
+    /// in memory - pack files can be GB-sized), hashing while streaming. Follows redirects
     /// guardedly (external-tier files 302 to public GitHub raw URLs). Fails if the payload
-    /// wildly exceeds <paramref name="expectedSizeBytes"/> (from the manifest) — or
-    /// <paramref name="maxBytes"/> when given (previews carry no manifest size) — or a
+    /// wildly exceeds <paramref name="expectedSizeBytes"/> (from the manifest) - or
+    /// <paramref name="maxBytes"/> when given (previews carry no manifest size) - or a
     /// redirect targets a private/loopback range. The caller owns (and must dispose) the
     /// returned temp file.
     /// </summary>

@@ -50,7 +50,7 @@ export function buildCatalog({ github = true, build = false, refreshGh = false, 
     const local = collectLocalHistory();
     let githubHist = { available: false, note: "skipped (--no-github)", jobs: {} };
     if (github) {
-        if (!ghCacheOnly) log(color.dim("• github history (gh) — this can take a moment"));
+        if (!ghCacheOnly) log(color.dim("• github history (gh) - this can take a moment"));
         githubHist = collectGithubHistory({ force: refreshGh, cacheOnly: ghCacheOnly });
     }
 
@@ -75,14 +75,14 @@ export function buildCatalog({ github = true, build = false, refreshGh = false, 
         return { ...s, ci: bindings, local: local.bySuite[s.id] || null };
     });
 
-    // Native installer pipeline (feat/tray-host) — the CODE isn't on every
+    // Native installer pipeline (feat/tray-host) - the CODE isn't on every
     // branch, but the GitHub runs are branch-independent data, so surface them.
     const native = Object.entries(githubHist.jobs || {})
         .filter(([k]) => k.startsWith("native-release.yml::"))
         .map(([k, v]) => ({ job: k.split("::")[1], ...v }))
         .sort((a, b) => a.job.localeCompare(b.job));
 
-    // Last local runner run (pass/fail per suite) — embedded so the read-only
+    // Last local runner run (pass/fail per suite) - embedded so the read-only
     // snapshot has it too; the interactive UI fetches it live via /api/summary.
     let latestRun = null;
     try {

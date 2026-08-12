@@ -66,7 +66,7 @@ Given(
                             modelName.includes("multi-version")
                         ) {
                             console.log(
-                                `[AutoProvision] Bridge model "${modelName}" v1 has no files — recovering with test-cube.glb`,
+                                `[AutoProvision] Bridge model "${modelName}" v1 has no files - recovering with test-cube.glb`,
                             );
                             const fsModule = await import("fs");
                             const recoveryPath = path.join(
@@ -93,7 +93,7 @@ Given(
                                 console.log(
                                     `[AutoProvision] Uploaded test-cube.glb to "${modelName}" v1 (id=${v1.id}) ✓`,
                                 );
-                                // Wait for thumbnail generation before proceeding —
+                                // Wait for thumbnail generation before proceeding -
                                 // this prevents the version-switching test from polling
                                 // within its own 90s window.
                                 const { DbHelper } =
@@ -841,7 +841,7 @@ Then("I take a screenshot named {string}", async ({ page }, name: string) => {
 /**
  * Verifies that a shared-state model's card shows a real, loaded thumbnail
  * image. This blocks on an actual asset-processor render, so it only runs on
- * the local GPU lane (@serial) — see 01-model-viewer/03-model-card-thumbnail.feature.
+ * the local GPU lane (@serial) - see 01-model-viewer/03-model-card-thumbnail.feature.
  */
 Then(
     "the model {string} should show a rendered thumbnail in its card",
@@ -857,7 +857,7 @@ Then(
 
         // Reveal the card first: with the category sidebar open the grid is
         // narrower, so a card past the first rows is virtualised out of the DOM
-        // until scrolled to — its thumbnail would never appear otherwise.
+        // until scrolled to - its thumbnail would never appear otherwise.
         await modelListPage.expectModelVisible(model.name);
 
         const modelCard = page
@@ -870,7 +870,7 @@ Then(
         // The card swaps its placeholder for the image via SignalR when ready.
         await expect(thumbnailImg).toBeVisible({ timeout: 120000 });
 
-        // Visible is not enough — verify the image bytes actually decoded.
+        // Visible is not enough - verify the image bytes actually decoded.
         await expect
             .poll(
                 async () =>

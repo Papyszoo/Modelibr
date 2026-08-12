@@ -3,7 +3,7 @@
  *
  * Resolution is extracted by the worker during texture-set processing, so the
  * "resolution is set to" step waits for the worker's dimension write to land
- * (bounded DB poll) and then overrides it to a deterministic value — the worker
+ * (bounded DB poll) and then overrides it to a deterministic value - the worker
  * writes dimensions once per job, early (right after download), so overriding
  * afterwards is race-free.
  */
@@ -23,7 +23,7 @@ const apiHelper = new ApiHelper();
 // Universal (Global Material) sets get per-texture dimensions from the worker as a
 // side effect of their thumbnail job (the only kind the backend enqueues a job for),
 // so this path needs the worker poll below. ModelSpecific (Multi-Model) sets never
-// get a worker pass — the backend extracts their dimensions synchronously at upload
+// get a worker pass - the backend extracts their dimensions synchronously at upload
 // instead (TextureImageMetadataReader), so that path needs no poll (see the
 // Multi-Model scenario in 22-modelspecific-resolution.feature).
 Given(
@@ -123,7 +123,7 @@ When("I view the Multi-Model texture sets", async ({ page }) => {
 });
 
 // Asserts the backend captured the source-image resolution at upload time (no
-// worker pass for Multi-Model sets) — verifies the DB layer directly so a UI-only
+// worker pass for Multi-Model sets) - verifies the DB layer directly so a UI-only
 // pass can't mask a missing extraction.
 Then(
     "the texture set {string} should have extracted resolution {int}",

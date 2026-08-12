@@ -1,6 +1,6 @@
 /**
  * State-machine tests for the per-asset import tracker. Progress arrives
- * from two independent channels (SignalR push + job polling) — these pin
+ * from two independent channels (SignalR push + job polling) - these pin
  * the ordering rules that keep the UI honest when they race.
  */
 import { useAssetStoreImportStore } from '../assetStoreImportStore'
@@ -30,7 +30,7 @@ describe('assetStoreImportStore', () => {
     })
   })
 
-  // Regression: progress events carry only the jobId — routing by assetId
+  // Regression: progress events carry only the jobId - routing by assetId
   // (or applying to the wrong entry) would show pack A's progress on pack B
   // when two imports run at once.
   it('routes progress to the entry with the matching jobId', () => {
@@ -66,7 +66,7 @@ describe('assetStoreImportStore', () => {
     })
   })
 
-  // Regression: SignalR and the poll loop race — a stale "Running" snapshot
+  // Regression: SignalR and the poll loop race - a stale "Running" snapshot
   // arriving after "Completed" must not un-complete the import (the "Open in
   // library" button would flicker back to a spinner forever).
   it('keeps terminal phases sticky against late progress events', () => {
@@ -121,7 +121,7 @@ describe('assetStoreImportStore', () => {
     })
   })
 
-  // Regression: a re-import starts with beginImport — if the old terminal
+  // Regression: a re-import starts with beginImport - if the old terminal
   // entry survived, the sticky-terminal rule above would block all progress
   // of the new run.
   it('beginImport resets a finished entry for a re-import', () => {

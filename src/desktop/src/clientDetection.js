@@ -52,7 +52,7 @@ export async function detectInstalledClientAt(candidates) {
 
 // Best-effort detection of an installed Modelibr desktop client at its default
 // install location. Returns the path to launch, or null. If the user installed
-// to a custom directory this can miss — callers treat a miss as "offer install".
+// to a custom directory this can miss - callers treat a miss as "offer install".
 export async function detectInstalledClient() {
   return detectInstalledClientAt(clientInstallCandidates(process.platform))
 }

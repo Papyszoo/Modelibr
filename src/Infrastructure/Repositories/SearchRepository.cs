@@ -10,7 +10,7 @@ internal sealed class SearchRepository : ISearchRepository
     // Trigram similarity above which a fuzzy identifier match counts. Calibrated on a
     // 1,700-model library: at the old 0.2 the query "strt" confidently returned "strap"
     // and "straw". Fuzzy is a typo-recovery mechanism, so it is also gated on a
-    // single-word query of at least MinFuzzyLength characters — a multi-word brief must
+    // single-word query of at least MinFuzzyLength characters - a multi-word brief must
     // never be answered by whole-string similarity noise.
     private const double TrigramThreshold = 0.45;
     private const int MinFuzzyLength = 4;
@@ -26,7 +26,7 @@ internal sealed class SearchRepository : ISearchRepository
     // Degenerate nodes (empty exporter leftovers) are real documents but never a real
     // answer: "car under 10k tris" used to return an 8-triangle, 0x0x0 m "car-01" first,
     // and "vehicle" ranked it above every actual vehicle. Zero measured volume is the
-    // reliable signal — a triangle floor alone is not, since such nodes routinely carry a
+    // reliable signal - a triangle floor alone is not, since such nodes routinely carry a
     // handful of triangles while a legitimate flat asset (a decal, a plane) carries two.
     private const int MinMeaningfulTriangles = 2;
 
@@ -52,7 +52,7 @@ internal sealed class SearchRepository : ISearchRepository
             .Where(d => d.MaxDimension == null || d.MaxDimension > 0);
 
         // Prominence gate: full only by default; secondary reachable when targeted; never hidden.
-        // Per-document by design — it is a property of the part, not the asset.
+        // Per-document by design - it is a property of the part, not the asset.
         query = request.IncludeSecondary
             ? query.Where(d => d.Prominence != "hidden")
             : query.Where(d => d.Prominence == "full");
@@ -66,7 +66,7 @@ internal sealed class SearchRepository : ISearchRepository
         // asset-level document and then used to admit or reject all of that asset's rows.
         //
         // Applying them per-document was wrong in both directions. A part document only
-        // carries triangles/vertices/UVs — everything else is null — so "under 10k tris"
+        // carries triangles/vertices/UVs - everything else is null - so "under 10k tris"
         // passed a 4-million-triangle asset on the strength of one small part, and
         // hasRig=false passed a rigged model because its parts have a null BoneCount.
         // Conversely, category is only stamped on the asset document, so a category
@@ -200,7 +200,7 @@ internal sealed class SearchRepository : ISearchRepository
         // (against the indexed tokens, their singular form, and the display name) and a
         // document matching MORE words ranks higher. The previous implementation matched
         // the whole phrase contiguously or not at all, which left multi-word queries to
-        // be decided by whole-blob trigram similarity — noise that sometimes landed and
+        // be decided by whole-blob trigram similarity - noise that sometimes landed and
         // sometimes returned an arm bone for "streetlight for a city street".
         //
         // Unrolled to a fixed six slots because EF Core must translate a static shape;
@@ -213,10 +213,10 @@ internal sealed class SearchRepository : ISearchRepository
             if (variant >= variants.Count) return NeverMatches;
             return "% " + variants[variant] + " %";
         }
-        // Unanchored substring match on the display name — a fallback for names the
+        // Unanchored substring match on the display name - a fallback for names the
         // tokenizer split differently ("Mailbox" for "box"). Two rules keep it from
         // becoming noise:
-        //   * minimum length, because a short word matches inside unrelated names —
+        //   * minimum length, because a short word matches inside unrelated names -
         //     "low" in "low poly car" pulled "SM_Env_Flower_01" to rank 2;
         //   * the singular form, so "boxes" reaches "Mailbox" the same way "box" does
         //     (matching the literal plural found 63 assets where the singular found 88).
@@ -257,7 +257,7 @@ internal sealed class SearchRepository : ISearchRepository
             T5 = EF.Functions.ILike(" " + d.Tokens + " ", b50) || EF.Functions.ILike(" " + d.Tokens + " ", b51)
                  || EF.Functions.ILike(" " + d.Symbols + " ", b50) || EF.Functions.ILike(" " + d.Symbols + " ", b51) || EF.Functions.ILike(d.DisplayName, s5),
             // The browse summary is a weaker signal than an authored name, so it is
-            // scored separately and only ever breaks ties — but it must still admit a
+            // scored separately and only ever breaks ties - but it must still admit a
             // document whose text mentions the term, which is recall an agent relies on
             // once assets carry descriptions.
             P0 = EF.Functions.ILike(d.BrowseSummary, s0),
@@ -282,7 +282,7 @@ internal sealed class SearchRepository : ISearchRepository
                  || EF.Functions.ILike(" " + d.ConceptLabels + " ", b51),
             // Whole-name match on the original phrase: "park bench" should still beat a
             // document that merely carries both words separately. Multi-word queries only
-            // — for a single word this just repeats the name match below, and promoting it
+            // - for a single word this just repeats the name match below, and promoting it
             // would rank an incidental substring ("staple" for "aple") above a much better
             // fuzzy match on the real name ("apple").
             PhraseHit = !parsed.IsSingleTerm && EF.Functions.ILike(d.DisplayName, "%" + parsed.Original + "%"),
@@ -320,7 +320,7 @@ internal sealed class SearchRepository : ISearchRepository
         .Where(x => x.Coverage > 0 || x.ConceptCoverage > 0 || x.ProseCoverage > 0);
 
         // Count assets, not documents. An asset is indexed once for itself and once per
-        // part, so the old document count reported "46 chairs" for 17 chairs — and the
+        // part, so the old document count reported "46 chairs" for 17 chairs - and the
         // number changed meaning as soon as a filter was applied, since attributes only
         // live on the asset-level document.
         var total = await scored
@@ -398,7 +398,7 @@ internal sealed class SearchRepository : ISearchRepository
         var pattern = $"%{term.Trim()}%";
         var groups = new List<SearchResultGroup>();
 
-        // Models — match on name OR tag. matched-on prefers a name hit so the
+        // Models - match on name OR tag. matched-on prefers a name hit so the
         // palette can explain why a tag-only result surfaced.
         var modelsQuery = _context.Models
             .AsNoTracking()

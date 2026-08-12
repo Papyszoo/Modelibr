@@ -50,7 +50,7 @@ Then(
         const db = new DbHelper();
         try {
             // The renderable file the viewer/thumbnail pipeline picks up. Asserts
-            // the backend mapped the extension to its renderable FileType — before
+            // the backend mapped the extension to its renderable FileType - before
             // the feature, .stl mapped to a non-renderable type and the upload was
             // rejected outright, so no row would exist here at all.
             const result = await db.query(

@@ -12,7 +12,7 @@ export interface SearchResultItem {
   type: SearchResultType
   id: number
   name: string
-  /** Why this row matched — 'name' or 'tag'. */
+  /** Why this row matched - 'name' or 'tag'. */
   matchedOn: string
 }
 

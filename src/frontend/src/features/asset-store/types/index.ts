@@ -16,7 +16,7 @@ export interface StoreLibraryItem {
   author: string
   /**
    * Distinct item types contained in the entry ("Model", "Sound", …). Replaced
-   * the store's removed `categoryName` — item types are the taxonomy now. The
+   * the store's removed `categoryName` - item types are the taxonomy now. The
    * grid doesn't surface it yet; it is kept so the type matches the wire.
    */
   itemTypes: string[]
@@ -36,7 +36,7 @@ export interface StoreLibraryPage {
   totalPages: number
 }
 
-// Store asset detail (GET {storeUrl}/api/assets/{id}) — public, CORS-allowed for
+// Store asset detail (GET {storeUrl}/api/assets/{id}) - public, CORS-allowed for
 // the Modelibr import page. Used to list a pack's items so the user can pick which
 // ones to import. Item `id` matches the manifest item id the backend filters on.
 
@@ -79,7 +79,7 @@ export interface MintImportTokenResponse {
   expiresAt: string
 }
 
-// Local backend job DTOs (POST/GET /store-imports — prompt 05 backend).
+// Local backend job DTOs (POST/GET /store-imports - prompt 05 backend).
 
 export interface StartStoreImportResponse {
   jobId: number

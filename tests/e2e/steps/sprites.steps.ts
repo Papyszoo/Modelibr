@@ -15,7 +15,7 @@ const { Given, When, Then } = createBdd();
 const API_BASE = process.env.API_BASE_URL || "http://localhost:8090";
 
 // Category rows in the shared CategoryTreePanel sidebar (unassigned bucket +
-// tree nodes) — sprites no longer uses .category-tab chips.
+// tree nodes) - sprites no longer uses .category-tab chips.
 const CATEGORY_ROW_SELECTOR =
     ".sprite-category-sidebar .category-tree-unassigned, .sprite-category-sidebar .category-tree .p-treenode-content";
 
@@ -602,7 +602,7 @@ When(
                 `[Action] UI rename succeeded (${saveResponse.status()})`,
             );
         } else {
-            // UI rename returned an error (e.g., 400 duplicate name) — fall back to API
+            // UI rename returned an error (e.g., 400 duplicate name) - fall back to API
             console.log(
                 `[Action] UI rename returned ${saveResponse.status()}, falling back to API`,
             );
@@ -653,7 +653,7 @@ When("I save the sprite changes", async ({ page }) => {
                 .catch(() => {});
             console.log("[Action] Saved sprite changes via dialog");
         } else {
-            // Close the dialog — changes were already saved inline
+            // Close the dialog - changes were already saved inline
             // Use Escape key instead of clicking close button (avoids React re-render instability)
             await page.keyboard.press("Escape");
             await targetDialog
@@ -750,7 +750,7 @@ When(
 When(
     "I search for sprites with query {string}",
     async ({ page }, query: string) => {
-        // Open the toolbar search panel first — the new shared toolbar
+        // Open the toolbar search panel first - the new shared toolbar
         // keeps it collapsed until clicked. `ensureToolbarSearchOpen`
         // throws if the input cannot be opened, so we don't proceed
         // silently against a closed panel.
@@ -779,7 +779,7 @@ When(
         await spriteListPage.goto();
         await page.waitForLoadState("domcontentloaded");
 
-        // Click the category tab to filter (exact label match — hasText is
+        // Click the category tab to filter (exact label match - hasText is
         // substring and would also hit e.g. "Assign Test Category")
         const categoryTab = page
             .locator(CATEGORY_ROW_SELECTOR)
@@ -829,7 +829,7 @@ async function cleanupSpriteCategoryByName(page: any, name: string) {
             .delete(`${API_BASE}/sprite-categories/${dup.id}`)
             .catch(() => null);
         console.log(
-            `[Cleanup] Deleted existing category "${name}" (ID: ${dup.id}) — status: ${delResponse?.status() ?? "failed"}`,
+            `[Cleanup] Deleted existing category "${name}" (ID: ${dup.id}) - status: ${delResponse?.status() ?? "failed"}`,
         );
     }
 
@@ -882,7 +882,7 @@ async function commitSpriteInlineCategoryName(page: any, name: string) {
 }
 
 async function findSpriteCategoryRow(page: any, categoryName: string) {
-    // Exact label match — hasText is a substring match and would pick
+    // Exact label match - hasText is a substring match and would pick
     // "Assign Test Category" when asked for "Test Category".
     const row = page
         .locator(".sprite-category-sidebar .category-tree .p-treenode-content")

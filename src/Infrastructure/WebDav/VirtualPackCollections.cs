@@ -26,7 +26,7 @@ public sealed class VirtualPacksCollection : VirtualCollectionBase
     public override Task<IStoreItem?> GetItemAsync(string name, IHttpContext httpContext)
     {
         // Packs have their own (case-sensitive, DB-enforced-at-creation-time) uniqueness
-        // check and are not disambiguated with an id suffix — but WebDAV clients on
+        // check and are not disambiguated with an id suffix - but WebDAV clients on
         // Windows/macOS address paths case-insensitively, so a case-only collision must
         // never be guessed at: resolve unambiguously or 404.
         var pack = WebDavUtilities.ResolveSegment(name, _packs, p => p.Id, p => p.Name);

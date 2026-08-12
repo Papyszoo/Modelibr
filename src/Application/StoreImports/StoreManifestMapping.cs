@@ -31,7 +31,7 @@ public static class StoreManifestMapping
     // Store file Role → Modelibr TextureType.
     // GAP (docs/VISION.md): the store collapses height/displacement into "Height", so a
     // displacement map imports as Height. GAP: the store emits "Opacity" where Modelibr's
-    // enum member is "Alpha" — remapped here.
+    // enum member is "Alpha" - remapped here.
     private static readonly IReadOnlyDictionary<string, TextureType> TextureTypeMap =
         new Dictionary<string, TextureType>(StringComparer.Ordinal)
         {
@@ -140,7 +140,7 @@ public static class StoreManifestMapping
     };
 
     /// <summary>
-    /// Reads the optional "category" name from an item's metadataJson — the read side of the
+    /// Reads the optional "category" name from an item's metadataJson - the read side of the
     /// store's CategoryTaxonomy.ValidateItemCategory (taxonomy v1: categories travel as
     /// <c>{"category": "Name"}</c>). Tolerant by design: missing, blank, non-object or
     /// malformed metadata yields null; metadata must never fail an import.

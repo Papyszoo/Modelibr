@@ -18,7 +18,7 @@ namespace Infrastructure.Services;
 /// downgrade, pins the DNS-validated address for the actual connection (no rebinding TOCTOU),
 /// sends the import token only to the store's own ORIGIN (scheme included, so a downgraded
 /// hop never carries it), and caps download size using the manifest's file size. Files stream
-/// to temp files (hashed en route) — payloads are never buffered in memory. The import token
+/// to temp files (hashed en route) - payloads are never buffered in memory. The import token
 /// is never logged.
 /// </summary>
 internal sealed class StoreImportClient : IStoreImportClient
@@ -49,7 +49,7 @@ internal sealed class StoreImportClient : IStoreImportClient
 
     /// <summary>
     /// Resolved address per store origin. The store's own origin is trusted (it may be a LAN or
-    /// loopback address the user chose), so this is NOT a block-list check — it exists so every
+    /// loopback address the user chose), so this is NOT a block-list check - it exists so every
     /// token-bearing request in one import lands on the SAME host. Without it, the origin is
     /// re-resolved per request and a 0-TTL record can move the manifest fetch and the file
     /// downloads to different machines mid-job.
@@ -134,7 +134,7 @@ internal sealed class StoreImportClient : IStoreImportClient
             throw new StoreImportException($"Manifest fetch failed ({(int)response.StatusCode} {response.ReasonPhrase}).");
         }
 
-        // The manifest comes from an untrusted host too — cap it instead of handing the
+        // The manifest comes from an untrusted host too - cap it instead of handing the
         // deserializer an unbounded stream.
         await using var source = await response.Content.ReadAsStreamAsync(cancellationToken);
         using var buffer = new MemoryStream();
@@ -155,7 +155,7 @@ internal sealed class StoreImportClient : IStoreImportClient
         var storeUri = new Uri(storeUrl.TrimEnd('/') + "/", UriKind.Absolute);
 
         // The store emits relative download URLs when Store:PublicBaseUrl is unset (its
-        // StoreUrlProvider falls back to the raw path) — resolve those against the store base
+        // StoreUrlProvider falls back to the raw path) - resolve those against the store base
         // the user entered. Absolute http(s) URLs are used as-is.
         //
         // The http(s) scheme test is load-bearing, not decoration: on Unix
@@ -257,11 +257,11 @@ internal sealed class StoreImportClient : IStoreImportClient
     /// The address to dial for the store's own origin, or null when there is nothing to pin (an
     /// IP-literal host, or a lookup that did not answer). Cached for
     /// <see cref="StoreOriginPinTtl"/> so one import job is consistent; deliberately NOT
-    /// block-list checked — a self-hosted store is allowed to live on a LAN or loopback address.
+    /// block-list checked - a self-hosted store is allowed to live on a LAN or loopback address.
     ///
     /// Pinning the store origin is HARDENING, never a gate: it must not turn into a new way for
     /// an import to fail. A lookup that fails here returns null and the request proceeds with
-    /// the handler's own resolution — the same behavior as before the pin existed — and the real
+    /// the handler's own resolution - the same behavior as before the pin existed - and the real
     /// connection error surfaces from the send instead of a misleading DNS message.
     /// </summary>
     private async Task<IPAddress?> GetStoreOriginPinAsync(Uri storeUri, CancellationToken cancellationToken)
@@ -341,7 +341,7 @@ internal sealed class StoreImportClient : IStoreImportClient
             throw new StoreImportException($"{targetCheck.Error.Code}: {targetCheck.Error.Message}");
 
         // The store's own origin is trusted (may be a chosen LAN/loopback address), so its
-        // address is never block-listed — but it IS pinned, so every token-bearing request in
+        // address is never block-listed - but it IS pinned, so every token-bearing request in
         // this import reaches the same host as the manifest did.
         if (StoreUrlSafety.IsSameOrigin(uri, storeUri))
             return await GetStoreOriginPinAsync(storeUri, cancellationToken);
@@ -352,7 +352,7 @@ internal sealed class StoreImportClient : IStoreImportClient
 
         // Resolve hostnames and validate the resolved addresses so a hostname that points at
         // a private/loopback range is blocked too. The first safe address is pinned for the
-        // connection itself — otherwise a 0-TTL DNS record could pass validation here and
+        // connection itself - otherwise a 0-TTL DNS record could pass validation here and
         // re-resolve to a private address when the request connects (rebinding TOCTOU).
         IPAddress[] addresses;
         try
@@ -373,7 +373,7 @@ internal sealed class StoreImportClient : IStoreImportClient
         foreach (var address in addresses)
         {
             if (StoreUrlSafety.IsBlockedAddress(address, allowLoopback))
-                throw new StoreImportException($"Refusing to download from '{uri.Host}' — it resolves to a private/loopback address.");
+                throw new StoreImportException($"Refusing to download from '{uri.Host}' - it resolves to a private/loopback address.");
         }
 
         return addresses[0];

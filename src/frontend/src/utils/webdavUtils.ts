@@ -74,7 +74,7 @@ export function getWebDavPath(virtualPath: string): WebDavPathInfo {
       //  - The nginx proxy exposes a plain HTTP WebDAV listener on port 80
       //  - Windows WebClient works with HTTP on port 80 with no cert or registry requirements
       //  - HTTPS paths require a trusted certificate AND port 443 (or a registry edit)
-      // Format: \\server\share\path  (HTTP port 80 — the simplest Windows-compatible path)
+      // Format: \\server\share\path  (HTTP port 80 - the simplest Windows-compatible path)
       nativePath = `\\\\${host}\\modelibr\\${cleanPath.replace(/\//g, '\\')}`
       break
 
@@ -243,7 +243,7 @@ export function getMountInstructions(): {
 
   switch (os) {
     case 'windows': {
-      // Use HTTP on port 80 — no certificate trust or registry edits required.
+      // Use HTTP on port 80 - no certificate trust or registry edits required.
       // Windows WebDAV Mini-Redirector uses UNC paths (\\server\share).
       const uncPath = `\\\\${host}\\modelibr`
       const httpWebDavUrl = `http://${host}/modelibr`

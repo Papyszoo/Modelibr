@@ -46,7 +46,7 @@ public class UpdateScriptContentCommandHandlerTests
         _scriptRepository.Setup(r => r.UpdateAsync(It.IsAny<Script>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Script s, CancellationToken _) => s);
 
-        // Act — three lines of new content
+        // Act - three lines of new content
         var result = await _handler.Handle(new UpdateScriptContentCommand(1, "local M = {}\nfunction M.run() end\nreturn M"), CancellationToken.None);
 
         // Assert

@@ -2,7 +2,7 @@ namespace Application.Extraction.Derivation;
 
 /// <summary>
 /// Tunable thresholds for the derived-signal layer. Every value here is a
-/// <b>config-driven guess</b> until the fixture set (prompt 26) calibrates it —
+/// <b>config-driven guess</b> until the fixture set (prompt 26) calibrates it -
 /// wired to config, never hardcoded at a call site, so calibration is a settings
 /// change rather than a code change. Bound once in DI from the "Derivation"
 /// configuration section (falls back to these defaults).

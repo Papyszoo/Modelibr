@@ -154,7 +154,7 @@ export async function analyzeVideoDirectory(rootDir) {
             issues.push("frozen-tail");
         }
         // The cap is a QA ceiling with headroom built into the manifest,
-        // not a trim point — exceeding it means the spec choreography got
+        // not a trim point - exceeding it means the spec choreography got
         // too long and must be tightened (or the cap raised deliberately).
         if (duration > spec.maxDurationSeconds) {
             issues.push("over-max-duration");

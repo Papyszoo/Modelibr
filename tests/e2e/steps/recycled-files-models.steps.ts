@@ -140,7 +140,7 @@ WhenBdd("I recycle the uploaded model", async ({ page }) => {
             `[Action] Recycled model "${recycleTracker.modelName}" (ID: ${recycleTracker.modelId}) via API`,
         );
     } else {
-        throw new Error("No model ID tracked — cannot recycle");
+        throw new Error("No model ID tracked - cannot recycle");
     }
 });
 
@@ -322,7 +322,7 @@ WhenBdd(
 // ============================================
 
 WhenBdd("I restore the model {string}", async ({ page }, modelName: string) => {
-    // Use API-based restore for reliability — all models are named "test-cube"
+    // Use API-based restore for reliability - all models are named "test-cube"
     // so name-based UI matching is ambiguous
     const tracked = modelsByAlias.get(modelName);
     const modelId = tracked?.id ?? recycleTracker.modelId;
@@ -364,7 +364,7 @@ WhenBdd(
         // Always use UI to click Delete Forever (needed for dialog tests)
         const modelCount = await recycleBin.getRecycledModelCount();
         if (modelCount > 0) {
-            // Click on first available card (all named "test-cube" — can't distinguish by name)
+            // Click on first available card (all named "test-cube" - can't distinguish by name)
             await recycleBin.clickDeleteForeverModel(0);
             console.log(
                 `[Action] Clicked Delete Forever on first recycled model card for "${modelName}"`,
@@ -396,7 +396,7 @@ WhenBdd("I confirm the permanent delete", async ({ page }) => {
         const deleteResponse = await page.request.delete(
             `${API_BASE_URL}/recycled/model/${modelId}/permanent`,
         );
-        // If the UI already deleted the right model, API might 404 — that's fine
+        // If the UI already deleted the right model, API might 404 - that's fine
         if (deleteResponse.ok()) {
             console.log(
                 `[Action] Permanently deleted model ID ${modelId} via API`,
@@ -411,7 +411,7 @@ WhenBdd("I confirm the permanent delete", async ({ page }) => {
             );
         }
 
-        // Verify the deletion actually happened — model should be gone
+        // Verify the deletion actually happened - model should be gone
         const verifyResponse = await page.request.get(
             `${API_BASE_URL}/recycled/model/${modelId}`,
         );
@@ -569,7 +569,7 @@ ThenBdd("the database should show the model as soft-deleted", async () => {
             await db.close();
         }
     } else {
-        console.log("[DB] No model ID tracked — skipping DB verification");
+        console.log("[DB] No model ID tracked - skipping DB verification");
     }
 });
 

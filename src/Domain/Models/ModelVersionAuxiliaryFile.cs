@@ -1,8 +1,8 @@
 namespace Domain.Models;
 
 /// <summary>
-/// Links a <see cref="ModelVersion"/> to an auxiliary <see cref="File"/> — an external
-/// glTF buffer (<c>.bin</c>) or texture — together with the <see cref="RelativePath"/>
+/// Links a <see cref="ModelVersion"/> to an auxiliary <see cref="File"/> - an external
+/// glTF buffer (<c>.bin</c>) or texture - together with the <see cref="RelativePath"/>
 /// exactly as the primary <c>.gltf</c> references it (e.g. <c>scene.bin</c>,
 /// <c>textures/wood.png</c>).
 ///
@@ -10,7 +10,7 @@ namespace Domain.Models;
 /// are content-addressed and shared across models: the same bytes can be cited at
 /// different URIs in different groups. Keeping aux files out of
 /// <see cref="ModelVersion.Files"/> (the renderable-file set) means primary-file
-/// selection and file listings are unaffected — the worker's glTF loader resolves the
+/// selection and file listings are unaffected - the worker's glTF loader resolves the
 /// primary's external URIs against these rows.
 /// </summary>
 public class ModelVersionAuxiliaryFile
@@ -76,7 +76,7 @@ public class ModelVersionAuxiliaryFile
             normalized = normalized[2..];
         normalized = normalized.TrimStart('/');
 
-        // Reject traversal — aux paths are resolved against uploaded siblings only.
+        // Reject traversal - aux paths are resolved against uploaded siblings only.
         if (normalized.Split('/').Any(segment => segment == ".."))
             throw new ArgumentException("Relative path cannot contain '..' segments.", nameof(relativePath));
 

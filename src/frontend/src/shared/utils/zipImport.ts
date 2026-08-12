@@ -11,7 +11,7 @@ import { unzipSync } from 'fflate'
  * meant a separate response shape, which is exactly how zip imports silently stopped
  * associating anything and stopped refreshing the grid.
  *
- * Runs entirely in the browser — no network, no hosted service.
+ * Runs entirely in the browser - no network, no hosted service.
  */
 export async function extractZipEntries(zip: File): Promise<File[]> {
   const buffer = new Uint8Array(await zip.arrayBuffer())
@@ -53,7 +53,7 @@ function isArchiveMetadata(path: string): boolean {
 /**
  * Attach an archive-relative path to a File the way a folder picker does.
  * `webkitRelativePath` is read-only on File, so it has to be defined rather than
- * assigned — this is the one place that does it, and `groupFilesForImport` reads it
+ * assigned - this is the one place that does it, and `groupFilesForImport` reads it
  * without caring whether the files came from a picker or an archive.
  */
 function fileWithRelativePath(file: File, relativePath: string): File {

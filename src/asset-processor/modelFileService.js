@@ -34,7 +34,7 @@ export class ModelFileService {
     logger.debug('Fetching model file', { modelId, modelVersionId })
 
     // Retry logic for transient errors (network issues, server overload)
-    // 404 errors are NOT retried — they indicate the model/version is deleted
+    // 404 errors are NOT retried - they indicate the model/version is deleted
     const maxRetries = 3
     const retryDelay = 1000 // 1 second
 
@@ -60,7 +60,7 @@ export class ModelFileService {
           error: error.message,
         })
 
-        // If it's a 404/not-found error, fail immediately — model is likely deleted
+        // If it's a 404/not-found error, fail immediately - model is likely deleted
         if (this.isFileNotFoundError(error)) {
           throw error
         }
@@ -177,7 +177,7 @@ export class ModelFileService {
    * Fetch the auxiliary (external) glTF resources for a model version and return
    * them as a { relativePath: dataUrl } map for the page's LoadingManager to
    * resolve. Downloads each already-uploaded sibling (.bin/textures) and inlines
-   * it as a data URL — offline by construction, no external network. Best-effort:
+   * it as a data URL - offline by construction, no external network. Best-effort:
    * a failed list or download leaves the reference unresolved rather than failing
    * the whole render (matches the "Unresolved reference" warning path).
    * @param {number} modelId

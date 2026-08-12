@@ -422,7 +422,7 @@ export function FilesTab({ textureSet, onMappingChanged }: FilesTabProps) {
 
     // Texture exists for this channel
     if (newTextureType === null) {
-      // User selected "None" — remove the texture mapping
+      // User selected "None" - remove the texture mapping
       try {
         await removeTextureFromSet(textureSet.id, texture.id)
         toast.current?.show({
@@ -613,7 +613,7 @@ export function FilesTab({ textureSet, onMappingChanged }: FilesTabProps) {
                 </span>
               </div>
 
-              {/* Proxy size badges — aggregate across all textures from this file */}
+              {/* Proxy size badges - aggregate across all textures from this file */}
               {(() => {
                 const proxySizes = new Set<number>()
                 fm.existingTextures.forEach(t => {

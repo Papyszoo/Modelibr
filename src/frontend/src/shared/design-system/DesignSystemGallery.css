@@ -1,4 +1,4 @@
-/* Gallery chrome only — everything it showcases must come from tokens or
+/* Gallery chrome only - everything it showcases must come from tokens or
    the primitives themselves. The gallery practices the density it preaches. */
 .dsg {
   display: flex;

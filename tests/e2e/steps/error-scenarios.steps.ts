@@ -33,7 +33,7 @@ When(
         errorState.errorToastText = "";
         errorState.invalidFileBaseName = path.parse(filename).name;
 
-        // Count model cards before upload attempt (informational only — the
+        // Count model cards before upload attempt (informational only - the
         // assertion no longer relies on this number, because parallel workers
         // can add models to the list while this scenario is running).
         const modelCards = page.locator(".model-card");
@@ -80,7 +80,7 @@ When(
             setTimeout(() => observer.disconnect(), 30000);
         });
 
-        // Set the file input — the UI/server should reject non-3D files.
+        // Set the file input - the UI/server should reject non-3D files.
         // Scope to the model-upload input (accept list of 3D formats): ModelGrid also
         // renders a folder picker and a .zip import input, and a bare selector would
         // trip strict mode and get swallowed by the catch below, masking the test.
@@ -200,7 +200,7 @@ Then("an error indicator should be displayed", async ({ page }) => {
         expect(toastText).toBeTruthy();
         console.log(`[Verify] Toast message displayed: "${toastText}" ✓`);
     } else {
-        // Check if the upload simply failed silently — verify model count didn't change
+        // Check if the upload simply failed silently - verify model count didn't change
         // This is a valid "error handling" behavior: the invalid file was silently rejected
         const modelCards = page.locator(".model-card");
         const currentCount = await modelCards.count();
@@ -220,7 +220,7 @@ Then("an error indicator should be displayed", async ({ page }) => {
 Then("the model list should remain unchanged", async ({ page }) => {
     // Parallel workers may add unrelated models to the list during this scenario,
     // so we can't compare absolute counts. Instead, verify the specific invalid
-    // file (e.g. "package.json") did NOT produce a model — that's the actual
+    // file (e.g. "package.json") did NOT produce a model - that's the actual
     // behavior we care about, and it's worker-isolated.
     const baseName = errorState.invalidFileBaseName;
     if (!baseName) {
@@ -337,7 +337,7 @@ When(
         await createSpriteCategoryViaContextMenu(page, name);
 
         // Creation is confirmed by the category row appearing in the tree
-        // (exact label match — hasText is substring and could hit other rows).
+        // (exact label match - hasText is substring and could hit other rows).
         await expect(
             page
                 .locator(

@@ -3,8 +3,8 @@
  *
  * Thumbnail waits are the longest in the suite (240s DB polls, 180s SignalR
  * waits, a 36-minute @slow test timeout). When the worker container dies they
- * all burn that budget in full and then report the UI symptom — "thumbnail never
- * became visible" — which reads as a frontend bug. On 2026-08-10 that turned one
+ * all burn that budget in full and then report the UI symptom - "thumbnail never
+ * became visible" - which reads as a frontend bug. On 2026-08-10 that turned one
  * dead worker into 3 red scenarios and 80 wasted minutes.
  *
  * This does not relax any assertion: the wrapped work must still pass. It only
@@ -42,7 +42,7 @@ function workerDownError(label: string): Error {
             `(${FAILURES_BEFORE_ABORT} consecutive probes over ~${
                 (FAILURES_BEFORE_ABORT * PROBE_INTERVAL_MS) / 1000
             }s) while waiting for: ${label}.\n` +
-            "The worker container is down — this is NOT a frontend or thumbnail-pipeline assertion failure.\n" +
+            "The worker container is down - this is NOT a frontend or thumbnail-pipeline assertion failure.\n" +
             "Diagnose with: docker inspect --format '{{.State.Status}} exit={{.State.ExitCode}} " +
             "oomKilled={{.State.OOMKilled}} restarts={{.RestartCount}}' asset-processor-e2e\n" +
             "Container logs for this failure are written to tests/e2e/container-logs/.",
@@ -52,7 +52,7 @@ function workerDownError(label: string): Error {
 /**
  * Run a thumbnail-dependent wait, failing fast if the worker dies underneath it.
  *
- * @param label What is being waited for — quoted verbatim in the failure message.
+ * @param label What is being waited for - quoted verbatim in the failure message.
  * @param work  The wait itself. Its own failure always wins over the watchdog.
  */
 export async function runWithWorkerWatchdog<T>(

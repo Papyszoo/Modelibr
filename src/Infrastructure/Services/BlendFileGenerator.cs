@@ -75,22 +75,22 @@ public sealed class BlendFileGenerator : IBlendFileGenerator
             if (!process.WaitForExit(TimeSpan.FromSeconds(10)))
             {
                 process.Kill();
-                _logger.LogWarning("Blender --version timed out — generated .blend files will not be available");
+                _logger.LogWarning("Blender --version timed out - generated .blend files will not be available");
                 return false;
             }
 
             if (process.ExitCode == 0)
             {
-                _logger.LogInformation("Blender CLI verified — generated .blend files are available");
+                _logger.LogInformation("Blender CLI verified - generated .blend files are available");
                 return true;
             }
 
-            _logger.LogWarning("Blender --version exited with code {ExitCode} — generated .blend files will not be available", process.ExitCode);
+            _logger.LogWarning("Blender --version exited with code {ExitCode} - generated .blend files will not be available", process.ExitCode);
             return false;
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Blender binary at {Path} cannot execute — generated .blend files will not be available", blenderPath);
+            _logger.LogWarning(ex, "Blender binary at {Path} cannot execute - generated .blend files will not be available", blenderPath);
             return false;
         }
     }
@@ -127,7 +127,7 @@ public sealed class BlendFileGenerator : IBlendFileGenerator
     }
 
     // Known trade-off (not fixed here): the cache is keyed per version, so old versions'
-    // generated .blend files are never cleaned up once a model moves to a newer version —
+    // generated .blend files are never cleaned up once a model moves to a newer version -
     // they just accumulate under generated-blend/. No sweeper exists for this yet (compare
     // BlenderRetentionSweeper, which only covers webdav-blend-temp/orphans). Out of scope
     // for the readiness-rule fix.
@@ -385,7 +385,7 @@ public sealed class BlendFileGenerator : IBlendFileGenerator
     }
 
     // The persisted File.FilePath (written by HashBasedFileStorage) is the single source
-    // of truth for where a file's bytes live on disk — never re-derive the root/aa/bb/hash
+    // of truth for where a file's bytes live on disk - never re-derive the root/aa/bb/hash
     // layout here. See VirtualAssetFile's identical rule (prompt 30, item 4), which this
     // mirrors; this call site was missed when that cleanup landed in the WebDav folder.
     private string GetPhysicalPath(Domain.Models.File file) =>

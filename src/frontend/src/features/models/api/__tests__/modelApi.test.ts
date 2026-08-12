@@ -67,7 +67,7 @@ describe('getModelsPaginated query serialization', () => {
     expect(url).toContain('minTriangleCount=100')
     expect(url).toContain('maxTriangleCount=5000')
     expect(url).toContain('hasConceptImages=true')
-    // `false` must still be sent — it's a meaningful "exclude" filter.
+    // `false` must still be sent - it's a meaningful "exclude" filter.
     expect(url).toContain('hasAnimations=false')
   })
 
@@ -105,7 +105,7 @@ describe('getModelsPaginated query serialization', () => {
 describe('getModelCategoryCounts', () => {
   it('reads the counts endpoint and unwraps the response body', async () => {
     // Regression: the sidebar badges read true totals from this endpoint, not
-    // loaded-page scans — the URL and unwrapping must stay stable.
+    // loaded-page scans - the URL and unwrapping must stay stable.
     mockGet.mockResolvedValue({
       data: {
         categories: [{ categoryId: 5, count: 3 }],

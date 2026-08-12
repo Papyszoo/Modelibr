@@ -7,8 +7,8 @@ namespace WebApi.Tests.Infrastructure;
 
 /// <summary>
 /// Covers prompt 30 item 5: bounded retention for webdav-blend-temp/ (aged-out entries
-/// are quarantined, never deleted — see <see cref="BlenderRetentionSweeper"/>'s remarks
-/// for why) and webdav-blend-orphans/ (aged-out entries are actually deleted — this is
+/// are quarantined, never deleted - see <see cref="BlenderRetentionSweeper"/>'s remarks
+/// for why) and webdav-blend-orphans/ (aged-out entries are actually deleted - this is
 /// the one place bytes disappear). Exercises the sweep logic directly, with an explicit
 /// "now", rather than spinning up the hosted service's 24h timer.
 /// </summary>
@@ -128,7 +128,7 @@ public class BlenderRetentionSweeperTests : IDisposable
         Assert.Equal(1, result.TempSkipped);
         Assert.Equal(2, result.OrphansDeleted); // the pre-existing stale-orphan pair
         // Skipped = the pre-existing fresh-orphan pair (2) PLUS the pair the temp sweep
-        // just quarantined into orphans this same pass (2) — it's brand new, so the
+        // just quarantined into orphans this same pass (2) - it's brand new, so the
         // orphan sweep correctly leaves it alone rather than deleting same-pass output.
         Assert.Equal(4, result.OrphansSkipped);
         Assert.Equal(0, result.Errors);

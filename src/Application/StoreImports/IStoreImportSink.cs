@@ -7,7 +7,7 @@ namespace Application.StoreImports;
 /// Thin 1:1 adapter over Modelibr's existing Application command handlers, expressed in terms
 /// the store importer needs. It exists so the processor can hold its orchestration policy
 /// (dedupe, provenance, hashing, mapping, progress) and delegate the "create X and add to
-/// pack" plumbing here — no parallel persistence path, every method replays through the same
+/// pack" plumbing here - no parallel persistence path, every method replays through the same
 /// handler the UI uses. Each method throws <see cref="StoreImportException"/> when the
 /// underlying handler returns a failure Result.
 /// </summary>
@@ -15,7 +15,7 @@ public interface IStoreImportSink
 {
     // Pack.
     /// <summary>
-    /// Creates the pack AND stamps its store provenance in one transaction — the
+    /// Creates the pack AND stamps its store provenance in one transaction - the
     /// (storeUrl, storeAssetId) pair is the re-import idempotency key, so a pack must never be
     /// visible without it. <see cref="RecordPackProvenanceAsync"/> only re-stamps packs that
     /// already exist.
@@ -53,7 +53,7 @@ public interface IStoreImportSink
     Task<int> CreateEnvironmentMapAsync(IFileUpload file, string name, string? batchId, CancellationToken ct);
     Task AddEnvironmentMapToPackAsync(int packId, int environmentMapId, CancellationToken ct);
 
-    // Category assignment on EXISTING assets — used by the dedupe gap-fill (re-running an
+    // Category assignment on EXISTING assets - used by the dedupe gap-fill (re-running an
     // import categorizes assets that predate category support) and by env-map creation
     // (whose create command has no category parameter). Each implementation preserves the
     // asset's other user-editable metadata: models/env maps re-send their current tags and

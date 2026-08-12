@@ -9,7 +9,7 @@ import { queryClient } from '@/lib/react-query'
 
 /**
  * Asset Store session state. The session is PERSISTED to localStorage (tokens +
- * username) so a page reload or app restart keeps you signed in — the store's
+ * username) so a page reload or app restart keeps you signed in - the store's
  * refresh token is long-lived (7 days), and this is a local-first, self-hosted
  * app. On startup `resumeStoreSession()` (features/asset-store/lib/session)
  * refreshes the stale access token and re-arms the proactive refresh loop.
@@ -39,7 +39,7 @@ interface AssetStoreAuthState {
   }) => void
   /**
    * Refresh rotates both tokens without touching status/username. `previousRefreshToken`
-   * identifies the session the refresh was started for — a result that arrives after a
+   * identifies the session the refresh was started for - a result that arrives after a
    * logout (and possibly a login as someone else) is discarded instead of overwriting
    * the newer session's tokens.
    */
@@ -80,7 +80,7 @@ export const useAssetStoreAuthStore = create<AssetStoreAuthState>()(
 
       setTokens: ({ accessToken, refreshToken, previousRefreshToken }) =>
         set(state =>
-          // A logout — or a logout followed by a login as another account — that
+          // A logout - or a logout followed by a login as another account - that
           // raced the refresh wins. The refresh token identifies the session, so a
           // late response for a session that is gone is dropped, never applied on
           // top of the newer one.
@@ -94,7 +94,7 @@ export const useAssetStoreAuthStore = create<AssetStoreAuthState>()(
         set({ ...initialState, status: 'loggedOut', error: message }),
 
       clearSession: error => {
-        // Every logout path (sign-out, refresh failure) funnels through here —
+        // Every logout path (sign-out, refresh failure) funnels through here -
         // drop the cached library so a next login (possibly a different account)
         // can't be served the previous account's data from the 5-min staleTime.
         // Key literal matches getStoreLibraryQueryOptions in
@@ -107,7 +107,7 @@ export const useAssetStoreAuthStore = create<AssetStoreAuthState>()(
     {
       name: 'modelibr_store_session',
       storage: createJSONStorage(() => localStorage),
-      // Persist only durable session fields — never the transient 'loggingIn'
+      // Persist only durable session fields - never the transient 'loggingIn'
       // status or the last error message.
       partialize: state => ({
         status: state.status === 'loggedIn' ? 'loggedIn' : 'loggedOut',
@@ -123,7 +123,7 @@ export const useAssetStoreAuthStore = create<AssetStoreAuthState>()(
         // store, counts as logged in on rehydrate. A changed or removed
         // VITE_STORE_URL invalidates the persisted tokens instead of letting them
         // be sent to a different origin. (Sessions saved before storeOrigin
-        // existed have none recorded and are likewise discarded — one re-login.)
+        // existed have none recorded and are likewise discarded - one re-login.)
         const loggedIn =
           saved.status === 'loggedIn' &&
           !!saved.accessToken &&

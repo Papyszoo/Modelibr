@@ -27,7 +27,7 @@ export interface EnvironmentAvailability {
 /**
  * Manages environment preset availability based on online/offline status
  * and Cache API state. Loads the HDR texture via RGBELoader and returns
- * it directly — this avoids drei's extension-detection which fails on
+ * it directly - this avoids drei's extension-detection which fails on
  * blob URLs.
  */
 export function useEnvironmentPresets(
@@ -107,7 +107,7 @@ export function useEnvironmentPresets(
         },
         undefined,
         () => {
-          // Loading failed — fall back to bundled city preset
+          // Loading failed - fall back to bundled city preset
           if (cancelled) {
             if (url.startsWith('blob:')) URL.revokeObjectURL(url)
             return

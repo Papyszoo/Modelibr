@@ -76,7 +76,7 @@ internal sealed class CreateStoreImportCommandHandler : ICommandHandler<CreateSt
         if (selectedItemIds is { Length: 0 })
             selectedItemIds = null;
 
-        // The token lives ONLY in this in-memory work item — never persisted, never logged.
+        // The token lives ONLY in this in-memory work item - never persisted, never logged.
         var enqueued = _queue.Enqueue(new StoreImportWorkItem(job.Id, storeUrl, assetId, command.ImportToken.Trim(), selectedItemIds));
         if (!enqueued)
         {

@@ -59,7 +59,7 @@ internal sealed class ScriptRepository : IScriptRepository
                 s.ScriptCategoryId.HasValue &&
                 categoryIds.Contains(s.ScriptCategoryId.Value));
 
-        // EF.Functions.ILike — case-insensitive substring match.
+        // EF.Functions.ILike - case-insensitive substring match.
         // Postgres-specific; an in-memory provider (e.g. Sqlite for unit
         // tests) will throw `The method 'ILike' cannot be translated`.
         if (!string.IsNullOrWhiteSpace(searchName))

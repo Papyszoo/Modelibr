@@ -21,7 +21,7 @@ import {
   SCRIPT_EXTRACTOR_VERSION,
 } from '../scriptExtractor.js'
 
-describe('extractScript — JavaScript', () => {
+describe('extractScript - JavaScript', () => {
   it('extracts functions, classes, imports and comment count', async () => {
     const source = [
       "import { thing } from './thing.js'",
@@ -45,7 +45,7 @@ describe('extractScript — JavaScript', () => {
   })
 })
 
-describe('extractScript — Python', () => {
+describe('extractScript - Python', () => {
   it('extracts def/class and both import forms', async () => {
     const source = [
       'import os',
@@ -69,7 +69,7 @@ describe('extractScript — Python', () => {
   })
 })
 
-describe('extractScript — engine detection', () => {
+describe('extractScript - engine detection', () => {
   it('detects Unity from C# base type and namespace', async () => {
     const source = [
       'using UnityEngine;',
@@ -101,7 +101,7 @@ describe('extractScript — engine detection', () => {
   })
 })
 
-describe('extractScript — sensitive API surfacing', () => {
+describe('extractScript - sensitive API surfacing', () => {
   it('reports network / filesystem / process references without blocking', async () => {
     const source = [
       "const child_process = require('child_process')",
@@ -125,7 +125,7 @@ describe('extractScript — sensitive API surfacing', () => {
   })
 })
 
-describe('extractScript — shader stage + samplers', () => {
+describe('extractScript - shader stage + samplers', () => {
   it('detects fragment stage and sampler uniforms in GLSL', async () => {
     const source = [
       'uniform sampler2D uAlbedo;',
@@ -144,7 +144,7 @@ describe('extractScript — shader stage + samplers', () => {
   })
 })
 
-describe('extractScript — bounds', () => {
+describe('extractScript - bounds', () => {
   it('skips parsing when the source exceeds the byte cap', async () => {
     const big = 'const x = 1\n'.repeat(100) // > 200-byte mocked cap
     const { payload, warnings, outcome } = await extractScript({

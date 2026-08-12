@@ -79,7 +79,7 @@ async function clickMenuItem(label: string) {
 
 describe('CategoryTreePanel selection', () => {
   // Regression: selectionKeys was passed as a `{ key: true }` map, which
-  // PrimeReact Tree only understands in multiple/checkbox modes — in
+  // PrimeReact Tree only understands in multiple/checkbox modes - in
   // selectionMode="single" it expects the key string, so the active
   // category silently never got its p-highlight tint (shipped bug).
   it('highlights the active category node', () => {
@@ -102,7 +102,7 @@ describe('CategoryTreePanel selection', () => {
   })
 
   // Contract with getSelectedTreeId: node keys are String(id) and clicking a
-  // node must surface the numeric id — catches key-format drift between
+  // node must surface the numeric id - catches key-format drift between
   // buildCategoryTree and the selection plumbing.
   it('reports the clicked category id', async () => {
     const user = userEvent.setup()
@@ -179,7 +179,7 @@ describe('CategoryTreePanel context-menu management', () => {
 
   // Regression: PrimeReact Tree ignores expandedKeys updates when no
   // onToggle is set (uncontrolled after the first render), so a childless
-  // category gaining its first child — the create placeholder — stayed
+  // category gaining its first child - the create placeholder - stayed
   // collapsed and the inline editor never appeared (caught by e2e).
   it('shows the inline editor when adding a subcategory to a childless category', async () => {
     const user = userEvent.setup()
@@ -218,7 +218,7 @@ describe('CategoryTreePanel context-menu management', () => {
     )
   })
 
-  // Escape must abandon the edit without firing the callback — otherwise a
+  // Escape must abandon the edit without firing the callback - otherwise a
   // stray keypress could create/rename categories.
   it('cancels the inline editor on Escape without calling back', async () => {
     const user = userEvent.setup()

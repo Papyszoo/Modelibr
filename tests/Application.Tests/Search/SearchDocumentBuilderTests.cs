@@ -48,8 +48,8 @@ public class SearchDocumentBuilderTests
         //
         // The concept label used to be folded into Tokens alongside the authored name.
         // That made an inferred match indistinguishable from a named one, so on a real
-        // library "vehicle" ranked boat_ornament and tram_rail — vehicles only by
-        // inference — level with SM_Veh_Car_Van_01, and alphabetical tie-breaking then
+        // library "vehicle" ranked boat_ornament and tram_rail - vehicles only by
+        // inference - level with SM_Veh_Car_Van_01, and alphabetical tie-breaking then
         // decided the result page. Concepts now have their own field and are ranked
         // below authored names.
         var docs = SearchDocumentBuilder.BuildForModel(

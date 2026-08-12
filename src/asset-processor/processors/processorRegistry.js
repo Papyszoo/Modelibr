@@ -8,7 +8,7 @@ import logger from '../logger.js'
 
 /**
  * Registry that maps job asset types to their processor instances.
- * Implements the Strategy Pattern — the job queue delegates to the correct
+ * Implements the Strategy Pattern - the job queue delegates to the correct
  * processor without knowing the processing details.
  *
  * To add a new processor:

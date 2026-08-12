@@ -14,8 +14,8 @@ namespace WebApi.Services;
 
 /// <summary>
 /// Handles WebDAV OPTIONS, GET and HEAD requests for the virtual asset drive.
-/// PROPFIND is handled separately by <see cref="MacOsPropFindHandler"/> — see
-/// <see cref="RequestHandlerFactory"/> — so it is intentionally not handled here.
+/// PROPFIND is handled separately by <see cref="MacOsPropFindHandler"/> - see
+/// <see cref="RequestHandlerFactory"/> - so it is intentionally not handled here.
 /// </summary>
 public class CustomWebDavHandler : IRequestHandler
 {
@@ -39,7 +39,7 @@ public class CustomWebDavHandler : IRequestHandler
             case "HEAD":
                 return await HandleGetHeadAsync(httpContext, store).ConfigureAwait(false);
             default:
-                // Unknown method — let the dispatcher fall through to a 404/501.
+                // Unknown method - let the dispatcher fall through to a 404/501.
                 return false;
         }
     }
@@ -127,7 +127,7 @@ public class CustomWebDavHandler : IRequestHandler
     /// issues a HEAD on every file while browsing a folder; opening those streams made the
     /// HEAD hang until the client gave up and dropped the file from Finder.
     ///
-    /// Both HEAD and GET always emit Content-Length and Content-Type — macOS webdavfs
+    /// Both HEAD and GET always emit Content-Length and Content-Type - macOS webdavfs
     /// treats a file with missing/invalid length metadata as unavailable.
     /// </summary>
     private static async Task WriteFileAsync(IHttpContext httpContext, IStoreItem item, bool isHead)

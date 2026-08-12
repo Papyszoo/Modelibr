@@ -64,7 +64,7 @@ describe('EnvironmentMapUploadDialog', () => {
 
     render(<EnvironmentMapUploadDialog {...defaultProps} mode="create" />)
 
-    // The name field starts empty — click upload to trigger validation
+    // The name field starts empty - click upload to trigger validation
     await user.click(screen.getByText('Upload'))
 
     await waitFor(() => {

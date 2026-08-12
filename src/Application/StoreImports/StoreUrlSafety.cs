@@ -51,7 +51,7 @@ public static class StoreUrlSafety
     }
 
     /// <summary>
-    /// True when two URLs share a full origin — scheme, host (case-insensitive) and port.
+    /// True when two URLs share a full origin - scheme, host (case-insensitive) and port.
     /// Trust is deliberately origin-based, not host-based: <c>http://store:443</c> is NOT the
     /// same principal as <c>https://store:443</c>, so an https store that redirects to plain
     /// http on its own host must not be handed the import token in cleartext.
@@ -67,7 +67,7 @@ public static class StoreUrlSafety
     /// never be downgraded to http on any hop. The store's OWN origin is trusted (a self-hosted
     /// store may legitimately live on a LAN/loopback address that the user chose), so
     /// same-origin targets always pass. Any OTHER origin must not be a private/link-local
-    /// address — and not loopback either, unless the store itself is loopback (dev). When the
+    /// address - and not loopback either, unless the store itself is loopback (dev). When the
     /// target host is an IP literal it is classified here; hostnames pass this check and the
     /// client additionally resolves + re-validates them via <see cref="IsBlockedAddress"/>.
     /// </summary>
@@ -78,12 +78,12 @@ public static class StoreUrlSafety
                 "StoreImport.InsecureDownloadUrl",
                 $"Refusing to download from a non-http(s) URL ({target.Scheme})."));
 
-        // A transport downgrade is refused before anything else — otherwise an https store
+        // A transport downgrade is refused before anything else - otherwise an https store
         // could redirect to http on its own host/port and read the import token off the wire.
         if (storeUri.Scheme == Uri.UriSchemeHttps && target.Scheme == Uri.UriSchemeHttp)
             return Result.Failure(new Error(
                 "StoreImport.InsecureDownloadUrl",
-                $"Refusing to downgrade to http for '{target.Host}' — the store is https."));
+                $"Refusing to downgrade to http for '{target.Host}' - the store is https."));
 
         // The store's own origin is trusted (it is the URL the user entered).
         if (IsSameOrigin(target, storeUri))
@@ -139,7 +139,7 @@ public static class StoreUrlSafety
             return false;
         }
 
-        // Unknown address family — refuse.
+        // Unknown address family - refuse.
         return true;
     }
 }

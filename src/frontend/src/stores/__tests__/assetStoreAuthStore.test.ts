@@ -90,7 +90,7 @@ describe('session persistence', () => {
   })
 
   // Sessions written before storeOrigin existed carry no binding and cannot be
-  // proven to belong to the configured store — one re-login is the safe answer.
+  // proven to belong to the configured store - one re-login is the safe answer.
   it('discards a legacy session that recorded no store origin', async () => {
     jest
       .spyOn(storeConfig, 'getConfiguredStoreUrl')

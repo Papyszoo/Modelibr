@@ -369,11 +369,11 @@ export function ModelViewer({
   // root, so a React Query hook called inside it would be reaching for a provider
   // that isn't reliably in scope. The scene receives a plain map as a prop.
   //
-  // Only a loose .gltf can have external resources — a cheap over-approximation that
+  // Only a loose .gltf can have external resources - a cheap over-approximation that
   // keeps every .glb/.fbx/.obj open from costing an extra request.
   //
   // `model` is null until its query resolves (see the `if (!model)` guard further
-  // down), and hooks must run before that guard — so every access here is optional.
+  // down), and hooks must run before that guard - so every access here is optional.
   const mayHaveGltfResources = (versionModel || model)?.files?.some(f =>
     f.originalFileName?.toLowerCase().endsWith('.gltf')
   )

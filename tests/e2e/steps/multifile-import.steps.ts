@@ -185,7 +185,7 @@ Then(
             const status = result.rows[0].Status;
             if (status === 3) {
               throw new Error(
-                `Render failed for multi-file model "${modelName}" — external reference likely unresolved`,
+                `Render failed for multi-file model "${modelName}" - external reference likely unresolved`,
               );
             }
             return status ?? -1;
@@ -213,7 +213,7 @@ Then(
     // every size fact and size filter.
     //
     // The Quad fixture spans x/y in [-0.5, 0.5], so its true max dimension is 1.0.
-    // 2.0 is the exact signature of the bug — hence the tight tolerance.
+    // 2.0 is the exact signature of the bug - hence the tight tolerance.
     const { model } = await resolveModel(page);
     const { DbHelper } = await import("../fixtures/db-helper");
     const db = new DbHelper();

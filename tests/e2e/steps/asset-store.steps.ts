@@ -50,7 +50,7 @@ Then(
 
         await checkbox.click();
         await expect(checkbox).not.toBeChecked();
-        // Nothing selected — importing is not offered.
+        // Nothing selected - importing is not offered.
         await expect(storePage.importSelectedButton()).toBeDisabled();
 
         await checkbox.click();
@@ -78,7 +78,7 @@ Then(
         await expect(storePage.openInLibraryButton()).toBeVisible({
             timeout: 60000,
         });
-        console.log("[Assert] Import completed — open-in-library offered");
+        console.log("[Assert] Import completed - open-in-library offered");
     },
 );
 

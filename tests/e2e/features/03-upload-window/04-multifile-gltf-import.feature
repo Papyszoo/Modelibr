@@ -2,7 +2,7 @@ Feature: Multi-file glTF Import
 
   A loose .gltf ships its geometry (.bin) and textures as separate sibling files.
   These scenarios guard the folder/zip import UI plus the ModelVersionAuxiliaryFile
-  persistence and the worker's external-reference resolver — on the pre-feature code
+  persistence and the worker's external-reference resolver - on the pre-feature code
   the external files were dropped and only self-contained .glb imported.
 
   # No render wait, so it stays in the fast PR lane: proves the folder picker groups
@@ -14,7 +14,7 @@ Feature: Multi-file glTF Import
 
   # The worker resolving external references does NOT mean the browser can: the two
   # run different loading managers. The in-app viewer used the shared safe manager,
-  # which replaces every non-/files/<id> URL with a transparent PNG — so the .gltf's
+  # which replaces every non-/files/<id> URL with a transparent PNG - so the .gltf's
   # scene.bin was substituted away and the model opened with no geometry at all.
   # Untagged (fast PR lane): it opens the viewer, no worker render needed.
   Scenario: An imported multi-file glTF loads its geometry in the browser viewer
@@ -24,7 +24,7 @@ Feature: Multi-file glTF Import
     Then the viewer scene should contain the multi-file model's geometry
 
   # A zip is expanded in the browser and imported exactly like a picked folder, so it
-  # goes through the same success callback — the one that associates each imported model
+  # goes through the same success callback - the one that associates each imported model
   # with the pack the import was started from. When zip had its own server-side route it
   # answered a different shape, that callback threw, and nothing was ever associated
   # (nor did the grid refresh) after the progress window had reported success.

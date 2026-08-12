@@ -60,7 +60,7 @@ public class FileRepositoryTests
     {
         // Regression: a recycled (soft-deleted) script still in the bin shares
         // a content-addressed File with a sibling. Permanently deleting the
-        // sibling must NOT hard-delete the File — the global query filter would
+        // sibling must NOT hard-delete the File - the global query filter would
         // hide the recycled script, so the reference check ignores filters.
         await using var context = NewContext();
         var file = CreateFile("cc33dd44ee55ff66aa11bb22cc33dd44ee55ff66aa11bb22cc33dd44ee55ff66");

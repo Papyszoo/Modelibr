@@ -4,7 +4,7 @@
  * wrapper) and the worker Puppeteer thumbnail (via the window side-effect).
  *
  * The problem this solves: three.js's BoxGeometry and many user-uploaded
- * hard-edged meshes carry duplicated vertices at every shared edge — each copy
+ * hard-edged meshes carry duplicated vertices at every shared edge - each copy
  * holds the same position but a face-aligned normal and a face-local UV island.
  * Under per-vertex displacement, those copies push along their own face normal
  * and tear the seam open. Merging the vertices (welding) closes the tear but
@@ -42,7 +42,7 @@ const VERTEX_DISPLACEMENT_INJECTION = `
 
 /**
  * Compute averaged-by-position normals and store them on the geometry as
- * `aDispNormal`. Returns the same geometry for chaining. Idempotent — if the
+ * `aDispNormal`. Returns the same geometry for chaining. Idempotent - if the
  * attribute already exists, leaves it alone. A no-op when position or normal is
  * missing.
  *
@@ -97,7 +97,7 @@ export function addSharedDisplacementNormal(THREE, geometry, tolerance = 1e-4) {
         dispNormals[idx * 3 + 2] = nz
       }
     } else {
-      // The summed normals cancelled to zero — coincident vertices with
+      // The summed normals cancelled to zero - coincident vertices with
       // opposing normals (a zero-thickness shell, back-to-back face pair, or a
       // thin seam). Writing (0,0,0) would make the shader's
       // `normalize(aDispNormal)` produce NaN and collapse those vertices to the
@@ -121,7 +121,7 @@ export function addSharedDisplacementNormal(THREE, geometry, tolerance = 1e-4) {
 /**
  * Swap the displacement direction from `objectNormal` to the `aDispNormal`
  * attribute. Idempotent on the same material (caches via `userData`). No THREE
- * needed — only material hooks are touched.
+ * needed - only material hooks are touched.
  *
  * @param {object} material - A three Material.
  */

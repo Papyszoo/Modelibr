@@ -6,8 +6,8 @@ namespace Application.Search;
 /// The search used to pass the whole raw phrase to every clause: token/name matching
 /// required the phrase to appear contiguously, and the only clause that could match words
 /// in any order was trigram similarity against the entire concatenated token blob. That
-/// made multi-word queries a lottery — <c>traffic light</c> happened to land, while
-/// <c>streetlight for a city street</c> returned an arm bone — and it is why adding words
+/// made multi-word queries a lottery - <c>traffic light</c> happened to land, while
+/// <c>streetlight for a city street</c> returned an arm bone - and it is why adding words
 /// could *raise* the result count instead of narrowing it.
 ///
 /// Now each word is scored independently and a document that matches more of them ranks
@@ -17,7 +17,7 @@ namespace Application.Search;
 public static class SearchQueryParser
 {
     /// <summary>Words scored per query. Beyond this, extra words are ignored rather than
-    /// widening the query further — a brief's first words carry its intent.</summary>
+    /// widening the query further - a brief's first words carry its intent.</summary>
     public const int MaxTerms = 6;
 
     private static readonly HashSet<string> StopWords = new(StringComparer.OrdinalIgnoreCase)
@@ -33,7 +33,7 @@ public static class SearchQueryParser
 
     /// <summary>One query word and the literal forms a document may carry it as.</summary>
     /// <param name="Word">The normalised word (lowercase, abbreviation-expanded).</param>
-    /// <param name="Variants">Forms to match against indexed tokens — the word itself plus
+    /// <param name="Variants">Forms to match against indexed tokens - the word itself plus
     /// its singular, so <c>chairs</c> finds <c>chair</c>.</param>
     public sealed record QueryTerm(string Word, IReadOnlyList<string> Variants);
 
@@ -45,7 +45,7 @@ public static class SearchQueryParser
     {
         public bool IsEmpty => Terms.Count == 0;
 
-        /// <summary>True when the query is a single word — the only case where fuzzy
+        /// <summary>True when the query is a single word - the only case where fuzzy
         /// (trigram) matching is allowed to introduce results on its own.</summary>
         public bool IsSingleTerm => Terms.Count == 1;
     }

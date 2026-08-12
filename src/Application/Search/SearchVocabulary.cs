@@ -2,16 +2,16 @@ namespace Application.Search;
 
 /// <summary>
 /// Deterministic, local-first vocabulary used to widen an asset's indexed tokens and to
-/// normalise a query's words. Three mechanisms, all static and auditable — no inference:
+/// normalise a query's words. Three mechanisms, all static and auditable - no inference:
 ///
 /// <list type="bullet">
-/// <item><b>Abbreviations</b> — game libraries are full of them. Synty ships
+/// <item><b>Abbreviations</b> - game libraries are full of them. Synty ships
 /// <c>SM_Bld_Apartment_01</c>, which tokenises to <c>bld, apartment</c>; without
 /// expansion <c>bld</c> is a meaningless token and the asset is invisible to the word
 /// "building" while a <c>door</c> is not.</item>
-/// <item><b>Compounds</b> — adjacent tokens joined (<c>lamp</c> + <c>post</c> →
+/// <item><b>Compounds</b> - adjacent tokens joined (<c>lamp</c> + <c>post</c> →
 /// <c>lamppost</c>) so multi-word concepts survive the tokenizer's separator split.</item>
-/// <item><b>Synonyms</b> — an asset named <c>lamp_post</c> should answer the query
+/// <item><b>Synonyms</b> - an asset named <c>lamp_post</c> should answer the query
 /// <c>streetlight</c>. Groups are expanded at index time so the query side stays a plain
 /// literal match (and stays explainable).</item>
 /// </list>

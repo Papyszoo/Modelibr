@@ -21,7 +21,7 @@ import type { Locator, Page } from "@playwright/test";
  * Open the New Tab page in the given panel by clicking its "+" button.
  *
  * Pauses are sized so the click lands cleanly on screen in the recorded
- * video — mirroring the human-like timing used elsewhere in this script.
+ * video - mirroring the human-like timing used elsewhere in this script.
  */
 async function openNewTabPageInPanel(
     page: Page,
@@ -169,7 +169,7 @@ test.describe("User Interface", () => {
         const rightPanel = page.locator(".p-splitter-panel").nth(1);
         const rightDockBar = rightPanel.locator(".dock-bar");
 
-        // Find the sprites tab — look for the tab that corresponds to sprites
+        // Find the sprites tab - look for the tab that corresponds to sprites
         // Try to find it by matching tab content/tooltip
         const spritesTab = leftDockBar.locator(".draggable-tab").last();
         const spritesTabBox = await spritesTab.boundingBox();
@@ -285,7 +285,7 @@ test.describe("User Interface", () => {
         await longPause(page);
 
         // ────────────────────────────────────────────────────────────
-        // Final pause — let the viewer absorb the final state
+        // Final pause - let the viewer absorb the final state
         // ────────────────────────────────────────────────────────────
 
         // Move mouse to center so the final frame is clean

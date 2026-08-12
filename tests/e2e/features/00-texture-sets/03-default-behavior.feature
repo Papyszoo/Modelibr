@@ -13,7 +13,7 @@ Feature: Default Texture Set Behavior
 
   # @serial: blocks on a real asset-processor render (waits for the version
   # thumbnail to regenerate to "Ready") and inspects the Three.js scene under
-  # software WebGL — the render-blocking class that times out on GitHub's
+  # software WebGL - the render-blocking class that times out on GitHub's
   # GPU-less PR runners (July 2026). Runs on the local GPU lane instead.
   @three-js @textures @timeout:720000 @serial
   Scenario: Setting a default texture set for a model version
@@ -30,7 +30,7 @@ Feature: Default Texture Set Behavior
 
   @version-independence @timeout:300000 @slow
   # @slow: UI-timing flake on `locator.click` for "version 1 should still have … as default"
-  # — fails both attempts at retries=1 on shared CI. Moved off the gating fast lane until the
+  # - fails both attempts at retries=1 on shared CI. Moved off the gating fast lane until the
   # underlying version-switching race is investigated.
   Scenario: Independent default texture sets for different versions
     # Verifies that each version can have its own default texture set

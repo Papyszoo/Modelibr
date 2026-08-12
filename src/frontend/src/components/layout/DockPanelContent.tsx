@@ -19,7 +19,7 @@ import {
 } from './dock-panel/DockPanelActionsContext'
 
 interface DockPanelContentProps {
-  /** Logical panel identity — drives cross-panel drag routing. */
+  /** Logical panel identity - drives cross-panel drag routing. */
   side: 'left' | 'right'
   /** Visual placement of the dock bar; defaults to mirroring `side`. */
   placement?: DockPlacement

@@ -3,7 +3,7 @@ using System.Globalization;
 namespace Application.Extraction.Derivation;
 
 /// <summary>
-/// Computes the derived-signal layer from raw extraction facts — a pure function
+/// Computes the derived-signal layer from raw extraction facts - a pure function
 /// of (parts + rollups + options), re-runnable in minutes without re-extracting.
 /// It never mutates raw data and never overwrites authored names; inferred guesses
 /// (geometric priors) live in a separate field and stay off until calibrated
@@ -291,7 +291,7 @@ public static class AssetDerivationEngine
         var name = DisplayName(p, tokens);
         var parts = new List<string>();
         // Don't repeat the object type when the display name already fell back to it
-        // (generic/unnamed parts) — avoids "mesh — mesh, 384 tris".
+        // (generic/unnamed parts) - avoids "mesh - mesh, 384 tris".
         if (!string.Equals(name, p.ObjectType, StringComparison.OrdinalIgnoreCase))
         {
             parts.Add(p.ObjectType);
@@ -302,7 +302,7 @@ public static class AssetDerivationEngine
         }
         var dims = FormatDims(p.Dimensions);
         if (dims.Length > 0) parts.Add(dims);
-        return $"{name} — {string.Join(", ", parts)}";
+        return $"{name} - {string.Join(", ", parts)}";
     }
 
     private static string AssetBrowseSummary(
@@ -324,7 +324,7 @@ public static class AssetDerivationEngine
         }
         var dims = FormatDims(asset.WorldDimensions);
         if (dims.Length > 0) segments.Add(dims);
-        var summary = $"{name} — {string.Join(", ", segments)}";
+        var summary = $"{name} - {string.Join(", ", segments)}";
         if (modularKit && gridSize is not null)
         {
             summary += string.Format(CultureInfo.InvariantCulture, "; modular kit ({0:0.##} m grid)", gridSize.Value);

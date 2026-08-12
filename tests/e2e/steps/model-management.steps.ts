@@ -114,7 +114,7 @@ Given("the test model {string} exists", async ({ page }, modelName: string) => {
             );
             model = undefined; // Force recreation
         } else {
-            // Model exists in backend — update shared state with actual name from API
+            // Model exists in backend - update shared state with actual name from API
             const checkData = await checkResponse.json();
             if (checkData.name && checkData.name !== model.name) {
                 console.log(
@@ -177,7 +177,7 @@ Given("the test model {string} exists", async ({ page }, modelName: string) => {
             detailData?.name ||
             path.basename(modelFile, path.extname(modelFile));
 
-        // Store in shared state — use actual name from API (based on filename),
+        // Store in shared state - use actual name from API (based on filename),
         // not the parameterized modelName, so UI card matching works
         getScenarioState(page).saveModel(modelName, {
             id: modelId,

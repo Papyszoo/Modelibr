@@ -13,7 +13,7 @@ type StoreLoginFormValues = z.infer<typeof storeLoginFormSchema>
 
 /**
  * Quiet, compact store sign-in. Credentials go straight to the STORE origin;
- * they never touch the local backend. Tokens stay in memory — signing in
+ * they never touch the local backend. Tokens stay in memory - signing in
  * again after an app restart is expected.
  */
 export function StoreLoginForm() {

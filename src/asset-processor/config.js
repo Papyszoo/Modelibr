@@ -31,7 +31,7 @@ export const config = {
     cameraDistance: parseFloat(process.env.CAMERA_DISTANCE) || 5,
     enableAntialiasing: process.env.ENABLE_ANTIALIASING !== 'false',
     useHardwareAcceleration: process.env.ENABLE_GPU_RENDERING === 'true',
-    // Turntable rig version — the render rig (framing/camera/lighting/background)
+    // Turntable rig version - the render rig (framing/camera/lighting/background)
     // is frozen so the same stills can later serve as vision-model input. Bump
     // ONLY on a deliberate rig change; a bump invalidates cached stills library-wide.
     rigVersion: parseInt(process.env.RENDER_RIG_VERSION, 10) || 1,
@@ -276,7 +276,7 @@ const ALLOWED_THUMBNAIL_SIZES = new Set([64, 128, 256, 512, 1024, 2048])
  * to existing in-memory config on failure.
  *
  * When isAnimated=false, frameCount collapses to 1 (single frame at start angle)
- * — the renderer still produces a webp, just a 1-frame one. This keeps the
+ * - the renderer still produces a webp, just a 1-frame one. This keeps the
  * pipeline uniform without a separate static-thumbnail code path.
  *
  * @param {import('./jobApiClient.js').JobApiClient} apiClient

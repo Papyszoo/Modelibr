@@ -255,7 +255,7 @@ export function ModelGrid({
   const handleCardDragStart = useCallback(
     (event: React.DragEvent<HTMLElement>, model: Model) => {
       if (!isSelectionEnabled) return
-      // Deliberately do NOT mutate selection here — a mid-drag layout shift can
+      // Deliberately do NOT mutate selection here - a mid-drag layout shift can
       // make Chromium cancel the drag before drop fires (see SoundList).
       setDraggedModelId(String(model.id))
       event.dataTransfer.effectAllowed = 'move'
@@ -392,7 +392,7 @@ export function ModelGrid({
       }
 
       // Coordinates are relative to the selection surface's live bounding
-      // rect, which already shifts with the scroll position — so no
+      // rect, which already shifts with the scroll position - so no
       // scrollTop/scrollLeft offset is added here (doing so double-counts the
       // scroll and the box would start away from the cursor). The selection
       // box is absolutely positioned inside the surface, so these surface-

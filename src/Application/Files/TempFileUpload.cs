@@ -6,7 +6,7 @@ namespace Application.Files;
 /// <see cref="IFileUpload"/> backed by a file on disk (a store download parked in a temp
 /// file). Lets GB-sized pulled files flow through the same content-addressed pipeline as a
 /// real multipart upload without ever holding the payload in memory. Does not own the file's
-/// lifetime — the creator (e.g. <c>StoreDownloadedFile</c>) deletes it.
+/// lifetime - the creator (e.g. <c>StoreDownloadedFile</c>) deletes it.
 /// </summary>
 public sealed class TempFileUpload : IFileUpload
 {

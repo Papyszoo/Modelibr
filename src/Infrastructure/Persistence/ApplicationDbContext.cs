@@ -28,7 +28,7 @@ namespace Infrastructure.Persistence
             {
                 // Concurrent identical "add model to pack" requests can race on
                 // the PackModels join table's composite PK. Treat the duplicate
-                // insert as an idempotent no-op — moved here from
+                // insert as an idempotent no-op - moved here from
                 // PackRepository.UpdateAsync when repositories stopped
                 // self-committing (prompt 25); this is the one known-benign
                 // race the app deliberately swallows at the commit boundary.
@@ -520,7 +520,7 @@ namespace Infrastructure.Persistence
                     .HasForeignKey(tp => tp.TextureSetCategoryId)
                     .OnDelete(DeleteBehavior.SetNull);
 
-                // Shared tag vocabulary — reuses the ModelTag pool, mirroring
+                // Shared tag vocabulary - reuses the ModelTag pool, mirroring
                 // the Model and EnvironmentMap tag joins.
                 entity.HasMany(tp => tp.Tags)
                     .WithMany()
@@ -1187,7 +1187,7 @@ namespace Infrastructure.Persistence
                     .OnDelete(DeleteBehavior.Cascade);
             });
 
-            // Configure AssetExtraction — raw, versioned extractor output.
+            // Configure AssetExtraction - raw, versioned extractor output.
             modelBuilder.Entity<AssetExtraction>(entity =>
             {
                 entity.HasKey(e => e.Id);
@@ -1206,7 +1206,7 @@ namespace Infrastructure.Persistence
                 entity.Property(e => e.ExtractedAt).IsRequired();
                 entity.Property(e => e.UpdatedAt).IsRequired();
 
-                // One row per (asset, version, file) — the idempotent upsert key.
+                // One row per (asset, version, file) - the idempotent upsert key.
                 // NULLS NOT DISTINCT so non-versioned assets (VersionId = null) still
                 // dedup on (AssetType, AssetId, FileSha256); Postgres would otherwise
                 // treat every null VersionId as distinct and allow duplicate rows.
@@ -1218,7 +1218,7 @@ namespace Infrastructure.Persistence
                 entity.HasIndex(e => new { e.AssetType, e.ExtractorVersion });
             });
 
-            // Configure AssetPart — per-object scene-graph rows (sub-part findability).
+            // Configure AssetPart - per-object scene-graph rows (sub-part findability).
             modelBuilder.Entity<AssetPart>(entity =>
             {
                 entity.HasKey(e => e.Id);
@@ -1251,7 +1251,7 @@ namespace Infrastructure.Persistence
                 entity.HasIndex(e => e.GeometryHash);
             });
 
-            // Configure ModelVersionAuxiliaryFile — external glTF resources (.bin/textures)
+            // Configure ModelVersionAuxiliaryFile - external glTF resources (.bin/textures)
             // linked to a version with the relative path the primary .gltf references.
             modelBuilder.Entity<ModelVersionAuxiliaryFile>(entity =>
             {
@@ -1261,11 +1261,11 @@ namespace Infrastructure.Persistence
                 entity.Property(e => e.RelativePath).IsRequired().HasMaxLength(500);
                 entity.Property(e => e.CreatedAt).IsRequired();
 
-                // One row per (version, relative path) — a URI is cited once per group.
+                // One row per (version, relative path) - a URI is cited once per group.
                 entity.HasIndex(e => new { e.ModelVersionId, e.RelativePath }).IsUnique();
 
                 // Removing a version drops its aux links; the shared File row survives
-                // (its own cleanup runs when no entity references the hash — see IFileRepository).
+                // (its own cleanup runs when no entity references the hash - see IFileRepository).
                 entity.HasOne(e => e.ModelVersion)
                     .WithMany()
                     .HasForeignKey(e => e.ModelVersionId)
@@ -1277,7 +1277,7 @@ namespace Infrastructure.Persistence
                     .OnDelete(DeleteBehavior.Cascade);
             });
 
-            // Configure ExtractionJob — decoupled extraction queue (mirrors ThumbnailJob).
+            // Configure ExtractionJob - decoupled extraction queue (mirrors ThumbnailJob).
             modelBuilder.Entity<ExtractionJob>(entity =>
             {
                 entity.HasKey(e => e.Id);
@@ -1307,7 +1307,7 @@ namespace Infrastructure.Persistence
                 entity.HasIndex(e => new { e.ExtractorFamily, e.Status, e.CreatedAt });
             });
 
-            // Configure AssetDerivation — derived-signal layer (own DeriveVersion).
+            // Configure AssetDerivation - derived-signal layer (own DeriveVersion).
             modelBuilder.Entity<AssetDerivation>(entity =>
             {
                 entity.HasKey(e => e.Id);
@@ -1333,7 +1333,7 @@ namespace Infrastructure.Persistence
             // projection (multilingual, no stemming).
             modelBuilder.HasPostgresExtension("pg_trgm");
 
-            // Configure AssetSearchDocument — the derived-layer search projection.
+            // Configure AssetSearchDocument - the derived-layer search projection.
             modelBuilder.Entity<AssetSearchDocument>(entity =>
             {
                 entity.HasKey(e => e.Id);
@@ -1380,7 +1380,7 @@ namespace Infrastructure.Persistence
                 // Default result gate: active + current version + prominence.
                 entity.HasIndex(e => new { e.AssetType, e.IsActive, e.IsCurrentVersion, e.Prominence });
 
-                // Trigram GIN over authored identifiers — literal, multilingual, fuzzy.
+                // Trigram GIN over authored identifiers - literal, multilingual, fuzzy.
                 entity.HasIndex(e => e.Tokens).HasMethod("gin").HasOperators("gin_trgm_ops");
                 entity.HasIndex(e => e.DisplayName).HasMethod("gin").HasOperators("gin_trgm_ops");
                 entity.HasIndex(e => e.Symbols).HasMethod("gin").HasOperators("gin_trgm_ops");
@@ -1393,7 +1393,7 @@ namespace Infrastructure.Persistence
                 entity.HasIndex(e => e.CategoryId);
             });
 
-            // Configure SearchLog — one row per deliberate search (from day one).
+            // Configure SearchLog - one row per deliberate search (from day one).
             modelBuilder.Entity<SearchLog>(entity =>
             {
                 entity.HasKey(e => e.Id);
@@ -1409,7 +1409,7 @@ namespace Infrastructure.Persistence
                 entity.HasIndex(e => e.CreatedAt);
             });
 
-            // Configure ComputeCacheEntry — hash-keyed expensive-compute cache.
+            // Configure ComputeCacheEntry - hash-keyed expensive-compute cache.
             modelBuilder.Entity<ComputeCacheEntry>(entity =>
             {
                 entity.HasKey(e => e.Id);
@@ -1420,11 +1420,11 @@ namespace Infrastructure.Persistence
                 entity.Property(e => e.ComputedAt).IsRequired();
                 entity.Property(e => e.UpdatedAt).IsRequired();
 
-                // One result per (hash, hash version, metric) — the cross-asset cache key.
+                // One result per (hash, hash version, metric) - the cross-asset cache key.
                 entity.HasIndex(e => new { e.GeometryHash, e.GeometryHashVersion, e.Metric }).IsUnique();
             });
 
-            // Configure AssetDerivationLineage — schema hook, not yet written to.
+            // Configure AssetDerivationLineage - schema hook, not yet written to.
             modelBuilder.Entity<AssetDerivationLineage>(entity =>
             {
                 entity.HasKey(e => e.Id);
@@ -1440,7 +1440,7 @@ namespace Infrastructure.Persistence
                 entity.HasIndex(e => new { e.SourceAssetType, e.SourceAssetId });
             });
 
-            // Configure AgentOperationLog — append-only audit / reversal hook.
+            // Configure AgentOperationLog - append-only audit / reversal hook.
             modelBuilder.Entity<AgentOperationLog>(entity =>
             {
                 entity.HasKey(e => e.Id);
@@ -1463,7 +1463,7 @@ namespace Infrastructure.Persistence
                 entity.Property(e => e.ClaimedAt).IsRequired();
                 entity.Property(e => e.CompletedAt).IsRequired(false);
 
-                // A retried write with the same key must be a no-op — enforced here.
+                // A retried write with the same key must be a no-op - enforced here.
                 entity.HasIndex(e => e.IdempotencyKey).IsUnique();
                 entity.HasIndex(e => e.BatchId);
                 // Sweeping abandoned Pending claims.

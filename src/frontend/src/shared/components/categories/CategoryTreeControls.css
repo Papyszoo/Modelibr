@@ -1,6 +1,6 @@
 /* Default look = the quiet sidebar: transparent (sits on whatever surface the
    page provides), tight rows, primary-tint selection. This is the app-wide
-   categories standard — don't re-add per-page backgrounds or frames. */
+   categories standard - don't re-add per-page backgrounds or frames. */
 .category-tree-panel {
   display: flex;
   flex-direction: column;
@@ -8,7 +8,7 @@
   padding: 0.5rem;
   background: transparent;
   flex-shrink: 0;
-  /* Rows are UI chrome, not prose — sm, and compact PrimeReact togglers. */
+  /* Rows are UI chrome, not prose - sm, and compact PrimeReact togglers. */
   font-size: var(--mod-text-sm);
 }
 
@@ -76,7 +76,7 @@
 }
 
 /* Inline name editor shown while creating or renaming a category via the
-   context menu — sized to sit inside a tree row without inflating it. */
+   context menu - sized to sit inside a tree row without inflating it. */
 .category-tree-inline-input {
   width: 100%;
   min-width: 0;

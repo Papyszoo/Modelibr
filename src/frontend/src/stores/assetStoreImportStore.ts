@@ -36,7 +36,7 @@ interface AssetStoreImportState {
     itemsTotal: number
     itemsProcessed: number
     itemsFailed: number
-    /** Backend failure reason (job errorMessage / hub message) — shown on the Failed chip. */
+    /** Backend failure reason (job errorMessage / hub message) - shown on the Failed chip. */
     errorMessage?: string | null
   }) => void
   markFailed: (assetId: string, error: string) => void
@@ -60,7 +60,7 @@ function newEntry(assetId: string): AssetStoreImportEntry {
 
 /**
  * Maps a backend job status (SignalR/DTO) onto the UI phase. 'CompletedWithErrors'
- * is terminal too — the job finished, some items failed. Omitting it here left the
+ * is terminal too - the job finished, some items failed. Omitting it here left the
  * import stuck on 'importing' forever (permanent spinner, endless polling); the
  * partial failure is reported through `itemsFailed`.
  */
@@ -115,7 +115,7 @@ export const useAssetStoreImportStore = create<AssetStoreImportState>(
         e => e.jobId === progress.jobId
       )
       if (!entry) return
-      // Terminal states are sticky — a late/out-of-order progress event
+      // Terminal states are sticky - a late/out-of-order progress event
       // (poll vs SignalR race) must not un-complete an import.
       if (TERMINAL_PHASES.includes(entry.phase)) return
 

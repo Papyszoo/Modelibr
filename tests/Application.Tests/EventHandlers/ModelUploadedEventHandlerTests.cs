@@ -86,7 +86,7 @@ public class ModelUploadedEventHandlerTests
         // Act
         var result = await handler.Handle(domainEvent, CancellationToken.None);
 
-        // Assert — handler reports success (the upload itself is not failed),
+        // Assert - handler reports success (the upload itself is not failed),
         // but no thumbnail job is enqueued.
         Assert.True(result.IsSuccess);
         mockThumbnailQueue.Verify(x => x.EnqueueAsync(

@@ -94,8 +94,8 @@ internal class AddFileToVersionCommandHandler : ICommandHandler<AddFileToVersion
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         // This is the asset-processor worker's landing point for the .glb it extracts
-        // from a Blender-saved version (the version is created with only a .blend —
-        // see WebDavMiddleware's Safe-Save MOVE handling — and has no renderable file
+        // from a Blender-saved version (the version is created with only a .blend -
+        // see WebDavMiddleware's Safe-Save MOVE handling - and has no renderable file
         // until this call attaches one). Schedule background .blend regeneration now so
         // generated-{name}.blend reappears in WebDAV listings without waiting for a
         // client GET to trigger generation synchronously.

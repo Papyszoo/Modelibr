@@ -31,7 +31,7 @@ test.describe.serial("Restore rejects bad archives without touching live data", 
         const beforeCount = (await api.listModels()).length;
         expect(beforeCount).toBeGreaterThan(0);
 
-        // Drop a non-tar payload into restore/ — RestoreOnBootProcessor reads
+        // Drop a non-tar payload into restore/ - RestoreOnBootProcessor reads
         // the manifest first, so an unreadable archive must be rejected before
         // any data is touched.
         const badName = "modelibr-bad-0000-00-00-000000.tar";
@@ -48,7 +48,7 @@ test.describe.serial("Restore rejects bad archives without touching live data", 
         // And it must NOT remain in the staging directory.
         expect(hostPathExists(`restore/${badName}`)).toBe(false);
 
-        // Live data is intact — model count unchanged, app responds normally.
+        // Live data is intact - model count unchanged, app responds normally.
         const afterCount = (await api.listModels()).length;
         expect(afterCount).toBe(beforeCount);
     });

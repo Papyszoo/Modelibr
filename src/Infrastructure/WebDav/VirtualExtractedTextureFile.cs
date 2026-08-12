@@ -23,7 +23,7 @@ public sealed class VirtualExtractedTextureFile : IStoreItem, IVirtualFileMetada
     private readonly ILogger<VirtualExtractedTextureFile> _logger;
 
     /// <param name="relativePath">
-    /// The source <c>File.FilePath</c> persisted by <c>HashBasedFileStorage</c> — single
+    /// The source <c>File.FilePath</c> persisted by <c>HashBasedFileStorage</c> - single
     /// source of truth for the physical layout; see item 4 of prompt 30.
     /// </param>
     public VirtualExtractedTextureFile(

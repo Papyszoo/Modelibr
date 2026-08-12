@@ -10,10 +10,10 @@ Editable code assets. Phase-4 refinement pass 2026-06-18; reworked 2026-06-19 on
   `ScriptViewer` / `ScriptEditor` page).
 - Richer C# highlighting + a dedicated GLSL `shader` mode.
 - **Live GLSL/HLSL shader preview** (`ScriptPreview`, raw WebGL,
-  ShaderToy-compatible) — stays live on keystroke.
+  ShaderToy-compatible) - stays live on keystroke.
 - Models-style **category tree** (shared `CategoryTreePanel` +
-  `ScriptCategoryManagerDialog`) — see [[categories.md]].
-- **Script templates** — a built-in catalog (Unity MonoBehaviour, three.js GLSL
+  `ScriptCategoryManagerDialog`) - see [[categories.md]].
+- **Script templates** - a built-in catalog (Unity MonoBehaviour, three.js GLSL
   vert/frag, three.js TSL, Lua, Python) plus custom DB-persisted templates (Domain
   `ScriptTemplate` + migration `AddScriptTemplates` + repo + CQRS + endpoints),
   managed in Settings → Script Templates, selectable in the New Script dialog
@@ -21,7 +21,7 @@ Editable code assets. Phase-4 refinement pass 2026-06-18; reworked 2026-06-19 on
 - Fixed a real bug: `getScriptsPaginated` dropped `packIds` / `projectIds`, so
   every pack/project showed the whole script library.
 
-## three.js scene preview — in-page, NOT an iframe
+## three.js scene preview - in-page, NOT an iframe
 
 `ScriptScenePreview` runs a JS/TS script that `export default`s a three.js
 material (or a setup function) via `new Function`, with THREE and three/tsl
@@ -34,7 +34,7 @@ the shared `viewerSettingsStore`, and the material applied to a **primitive**
 (sphere/cube/plane/cylinder/torus) **or** a library model (obj/fbx/gltf/glb via
 the model-viewer loaders).
 
-- Scene preview is **Run-gated** — explicit Run, never on keystroke. The shader
+- Scene preview is **Run-gated** - explicit Run, never on keystroke. The shader
   preview stays live.
 - A **WebGPU/WebGL2 badge** reports which backend `WebGPURenderer` actually
   initialised. `WebGPURenderer` auto-falls-back to WebGL2 when `navigator.gpu` is
@@ -55,13 +55,13 @@ header. Prefs persist in `scriptPreviewStore`.
 
 ## E2E notes
 
-Docker e2e (`@scripts`) realigned to the page flow — after editing, return to the
+Docker e2e (`@scripts`) realigned to the page flow - after editing, return to the
 list via `clickTab`, **NOT** `navigateToAppClean`, which clears localStorage
 mid-test.
 
 **Assertion bug worth remembering:** `saveEditor()` waited for
 `aria-disabled="true"` on the menubar Save item, but **PrimeReact disables a
-menubar item via the `p-disabled` class** with no `aria-disabled` attribute — so
+menubar item via the `p-disabled` class** with no `aria-disabled` attribute - so
 it timed out even though the save completed. Now asserts
 `toHaveClass(/p-disabled/)`.
 

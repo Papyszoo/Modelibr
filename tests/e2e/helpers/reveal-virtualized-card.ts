@@ -9,7 +9,7 @@ import { Locator, Page } from "@playwright/test";
  * `<sidebar> + <main>` split and moved the scrollable region onto the
  * `*-list-main` / `*-grid-main` element. That also narrows the grid (fewer
  * columns), so cards past the first viewport rows are virtualised out of the
- * DOM until the *inner* container scrolls to them — the outer list shell no
+ * DOM until the *inner* container scrolls to them - the outer list shell no
  * longer scrolls. Locators that assume every card is rendered now need to
  * reveal it first.
  *
@@ -32,7 +32,7 @@ export async function revealVirtualizedCard(
     // Run-before-load guard: when called right after navigation the list is
     // still fetching, so the container is empty/short and the scroll loop below
     // would find nothing and leave the list pinned at the top. Wait until the
-    // content has settled — scrollHeight stable across two consecutive reads —
+    // content has settled - scrollHeight stable across two consecutive reads -
     // so the loop scrolls a fully-rendered grid.
     await waitForStableScrollHeight(page, container);
 

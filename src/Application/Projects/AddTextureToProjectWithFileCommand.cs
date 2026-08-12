@@ -92,7 +92,7 @@ internal sealed class AddTextureToProjectWithFileCommandHandler
         TextureSet textureSet;
         if (existingTextureSet != null)
         {
-            // Reuse the set found by file hash — no new texture is created here, so
+            // Reuse the set found by file hash - no new texture is created here, so
             // there is nothing to extract. The existing texture already captured its
             // dimensions when it was first uploaded; we don't back-fill (that's the
             // separate backfill task).
@@ -100,7 +100,7 @@ internal sealed class AddTextureToProjectWithFileCommandHandler
         }
         else
         {
-            // Create new texture set (ModelSpecific — no worker thumbnail pass)
+            // Create new texture set (ModelSpecific - no worker thumbnail pass)
             textureSet = TextureSet.Create(request.TextureSetName, now);
             await _textureSetRepository.AddAsync(textureSet, cancellationToken);
 

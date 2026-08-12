@@ -347,7 +347,7 @@ export class JobApiClient {
   }
 
   /**
-   * List the auxiliary (external) files linked to a model version — the .bin
+   * List the auxiliary (external) files linked to a model version - the .bin
    * buffers and textures a loose .gltf references, each with the relative path
    * the primary references it by. Used to resolve multi-file glTF imports.
    * @param {number} modelId - The model ID

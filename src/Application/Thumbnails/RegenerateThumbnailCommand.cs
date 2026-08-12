@@ -81,7 +81,7 @@ public class RegenerateThumbnailCommandHandler : ICommandHandler<RegenerateThumb
         }
         else
         {
-            // Create new thumbnail record. Commit before SetThumbnail — it copies
+            // Create new thumbnail record. Commit before SetThumbnail - it copies
             // the thumbnail's id into ModelVersion.ThumbnailId (a raw scalar FK),
             // so the id must be real, not an EF temporary key.
             var newThumbnail = Thumbnail.Create(model.Id, targetVersion.Id, currentTime);

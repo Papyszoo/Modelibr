@@ -45,7 +45,7 @@ interface TexturedModelProps {
 // absent (mutually-exclusive groups: Roughness←Glossiness, Displacement←Height).
 // The MeshPhysicalMaterial slot each type feeds and whether it must be inverted
 // at load come from the shared cross-runtime map
-// (asset-processor/lib/textureChannels.js) — the same source the worker
+// (asset-processor/lib/textureChannels.js) - the same source the worker
 // thumbnail uses, so the viewer and the thumbnail route textures identically.
 const TEXTURE_SLOTS: Array<{
   type: TextureType
@@ -139,7 +139,7 @@ function usePerMaterialTextures(
  * (texture-ready toggle, texture-set change), so without this the old GPU
  * materials leak for the lifetime of the viewing session. Geometries are NOT
  * disposed: Object3D.clone() shares geometry with the source model, and the
- * loaded textures are owned by the extraction hook's cache — disposing either
+ * loaded textures are owned by the extraction hook's cache - disposing either
  * here would corrupt the still-live original.
  */
 function disposePreviousClone(group: THREE.Object3D): void {

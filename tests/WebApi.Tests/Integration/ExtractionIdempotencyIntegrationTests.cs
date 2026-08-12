@@ -9,7 +9,7 @@ using Xunit;
 namespace WebApi.Tests.Integration;
 
 /// <summary>
-/// Prompt 26 idempotency: re-extraction upserts by key, it never duplicates rows —
+/// Prompt 26 idempotency: re-extraction upserts by key, it never duplicates rows -
 /// verified against real PostgreSQL because the guarantee rests on the
 /// NULLS-NOT-DISTINCT unique indexes the InMemory provider doesn't enforce.
 /// </summary>

@@ -86,7 +86,7 @@ function buildTextureUrls(
         }
       }
     }
-    // Original quality — include sourceChannel for client-side extraction
+    // Original quality - include sourceChannel for client-side extraction
     const needsChannelExtract =
       t.sourceChannel !== undefined &&
       t.sourceChannel !== TextureChannel.RGB &&
@@ -115,7 +115,7 @@ function buildTextureUrls(
   )
   if (roughness) urls.roughnessMap = makeInfo(roughness)
 
-  // Glossiness is the inverse of Roughness — same slot, channel inverted at load
+  // Glossiness is the inverse of Roughness - same slot, channel inverted at load
   const glossiness = textureSet.textures.find(
     t => t.textureType === TextureType.Glossiness
   )
@@ -235,7 +235,7 @@ function invertExrTextureInPlace(texture: THREE.Texture): void {
       data[i + 2] = 1 - data[i + 2]
     }
   } else if (data instanceof Uint16Array) {
-    // HalfFloat path — decode, invert, re-encode each value.
+    // HalfFloat path - decode, invert, re-encode each value.
     for (let i = 0; i < data.length; i += 4) {
       for (let c = 0; c < 3; c++) {
         const v = THREE.DataUtils.fromHalfFloat(data[i + c])
@@ -289,7 +289,7 @@ async function loadTextureOffThread(
   invert: boolean = false
 ): Promise<THREE.Texture> {
   if (isExr) {
-    // EXR must use the specialised loader — no ImageBitmap path
+    // EXR must use the specialised loader - no ImageBitmap path
     const exrLoader = new EXRLoader()
     const texture = await exrLoader.loadAsync(url)
     if (invert) invertExrTextureInPlace(texture)
@@ -356,7 +356,7 @@ function TexturedMesh({
   >({})
   const [texturesReady, setTexturesReady] = useState(false)
 
-  // Track loading progress as internal state — avoids cross-reconciler
+  // Track loading progress as internal state - avoids cross-reconciler
   // setState during render (R3F tree → DOM tree) which triggers React #310.
   const [loadingProgress, setLoadingProgress] = useState<TextureLoadingState>({
     isLoading: false,
@@ -370,9 +370,9 @@ function TexturedMesh({
   useEffect(() => {
     onLoadingChange?.(loadingProgress)
   }, [loadingProgress]) // eslint-disable-line react-hooks/exhaustive-deps
-  // onLoadingChange intentionally excluded — stable callback from parent
+  // onLoadingChange intentionally excluded - stable callback from parent
 
-  // Build geometry (memoised — depends only on geometry type)
+  // Build geometry (memoised - depends only on geometry type)
   const geometry = useMemo(
     () => createPreviewGeometry(geometryType),
     [geometryType]
@@ -394,12 +394,12 @@ function TexturedMesh({
       try {
         geo.computeTangents()
       } catch {
-        // computeTangents can fail on degenerate geometry — safe to ignore
+        // computeTangents can fail on degenerate geometry - safe to ignore
       }
     }
   }, [hasNormalMap, geometryType])
 
-  // Simple UV scale — direct multiplier from database value
+  // Simple UV scale - direct multiplier from database value
   const uvScale = geometryParams.uvScale ?? 1
 
   // Stable URL key for dependency tracking
@@ -428,7 +428,7 @@ function TexturedMesh({
     async function loadAll() {
       const result: Record<string, THREE.Texture> = {}
 
-      // Step 1: Deduplicate — fetch each unique URL once
+      // Step 1: Deduplicate - fetch each unique URL once
       const uniqueUrls = new Map<string, { isExr: boolean; isTiff: boolean }>()
       for (const [, info] of entries) {
         if (!uniqueUrls.has(info.url)) {
@@ -521,7 +521,7 @@ function TexturedMesh({
     })
   }, [loadedTextures, uvScale])
 
-  // Filter loaded textures by disabled state — instant, no re-fetch
+  // Filter loaded textures by disabled state - instant, no re-fetch
   const disabled = disabledTextures ?? new Set<string>()
   const strengths = textureStrengths ?? {}
   const isDisabled = (prop: string): boolean => {
@@ -540,7 +540,7 @@ function TexturedMesh({
     return 1
   }
 
-  // Normal map scale vector controlled by strength — must be before any conditional return
+  // Normal map scale vector controlled by strength - must be before any conditional return
   const normalStrength = getStrength('normalMap')
   const normalScale = useMemo(
     () => new THREE.Vector2(normalStrength, normalStrength),
@@ -614,7 +614,7 @@ export function TexturedGeometry({
   onLoadingChange,
   textureQuality = 0,
 }: TexturedGeometryProps) {
-  // Build ALL texture URLs — does NOT depend on disabledTextures
+  // Build ALL texture URLs - does NOT depend on disabledTextures
   // When textureQuality > 0, use proxy files where available
   const textureUrls = useMemo(
     () => buildTextureUrls(textureSet, textureQuality),

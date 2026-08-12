@@ -136,7 +136,7 @@ Then(
             maps[mapBase].name,
         );
         // The filtered card can sit below the fold in the narrower
-        // sidebar-open grid — reveal it in the virtualised list first.
+        // sidebar-open grid - reveal it in the virtualised list first.
         await revealVirtualizedCard(page, ".environment-map-list-main", card);
         await expect(card.first()).toBeVisible({ timeout: 10000 });
     },

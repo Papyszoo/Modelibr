@@ -65,7 +65,7 @@ internal sealed class AssetSearchQueryHandler
 
         var response = await _searchRepository.SearchAssetsAsync(request, cancellationToken);
 
-        // Search logging from day one: one row per deliberate search — query,
+        // Search logging from day one: one row per deliberate search - query,
         // filters, and the results shown in rank order.
         await LogSearchAsync(query, request, response, cancellationToken);
 

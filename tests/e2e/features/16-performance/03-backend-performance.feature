@@ -4,7 +4,7 @@ Feature: Performance - Backend API (ST-6, ST-7, ST-8, ST-9)
   Backend performance smoke tests validating paginated query speed, concurrent
   thumbnail status, SignalR broadcast throughput, and upload storm resilience.
 
-  Excluded from CI — run only with: npm run test:performance
+  Excluded from CI - run only with: npm run test:performance
 
   # ST-6: Paginated query at scale
   @timeout:600000
@@ -22,7 +22,7 @@ Feature: Performance - Backend API (ST-6, ST-7, ST-8, ST-9)
     Then all 10 responses should have status 200
     And every response should arrive within 1000 milliseconds
 
-  # ST-8: SignalR broadcast throughput — no dropped events
+  # ST-8: SignalR broadcast throughput - no dropped events
   @timeout:600000
   Scenario: ST-8 SignalR delivers all thumbnail events without drops
     Given I am on the model list page
@@ -31,7 +31,7 @@ Feature: Performance - Backend API (ST-6, ST-7, ST-8, ST-9)
     And I close the upload window
     And all 5 thumbnails should be generated within 3 minutes
 
-  # ST-9: Upload storm — server stability
+  # ST-9: Upload storm - server stability
   @timeout:600000
   Scenario: ST-9 Server remains stable under concurrent uploads via API
     When I upload 10 models concurrently via the API

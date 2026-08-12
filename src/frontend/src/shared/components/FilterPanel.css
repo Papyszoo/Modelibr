@@ -34,7 +34,7 @@
   gap: 0.75rem;
 }
 
-/* .list-filters-search* rules live in list-toolbar/ListToolbar.css — they
+/* .list-filters-search* rules live in list-toolbar/ListToolbar.css - they
    style ListToolbarSearchInput, which owns those class names. */
 
 .list-filters-row {

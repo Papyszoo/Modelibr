@@ -15,7 +15,7 @@ import logger from './logger.js'
  * The heavy lifting (seam/detail/channel maths) lives in the pure, cross-runtime
  * `lib/materialStats.js`; this worker-only module does the file IO sharp needs
  * (decode + fixed-size resize) and the channel-assignment *validation* the prompt
- * asks for — advisory warnings only, never a hard reject, because stylised
+ * asks for - advisory warnings only, never a hard reject, because stylised
  * materials legitimately break the rules.
  *
  * Determinism: every image is resized to a fixed working square before stats, so
@@ -27,7 +27,7 @@ function extractChannelIndex(sourceChannel) {
   return sourceChannel >= 1 && sourceChannel <= 4 ? sourceChannel - 1 : null
 }
 
-/** SHA-256 of a file's bytes — the per-file half of the set-level invalidation key. */
+/** SHA-256 of a file's bytes - the per-file half of the set-level invalidation key. */
 async function sha256File(filePath) {
   return new Promise((resolve, reject) => {
     const hash = crypto.createHash('sha256')
@@ -66,7 +66,7 @@ async function loadRaw(filePath, sourceChannel, sampleSize) {
 
 /**
  * Advisory channel-assignment checks. Returns warning strings (empty = clean).
- * Deliberately conservative — only flags the clear-cut cases.
+ * Deliberately conservative - only flags the clear-cut cases.
  */
 function validateAssignments(textureType, stats) {
   const warnings = []

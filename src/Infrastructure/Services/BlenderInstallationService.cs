@@ -278,7 +278,7 @@ public sealed class BlenderInstallationService : IBlenderInstallationService
             }
 
             // Verify it works
-            // Note: execution is skipped — the WebApi container may not have x86_64 QEMU support
+            // Note: execution is skipped - the WebApi container may not have x86_64 QEMU support
             // (e.g. ARM64 host running dotnet/aspnet image). The asset-processor container has
             // binfmt_misc/QEMU configured and will be the one actually executing the binary.
             // We just confirm the file exists and is non-empty as a sanity check.
@@ -411,7 +411,7 @@ public sealed class BlenderInstallationService : IBlenderInstallationService
             }
 
             // Runs outside the command pipeline (background install task), so no
-            // decorator commits for us — repositories only stage changes.
+            // decorator commits for us - repositories only stage changes.
             var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
             await unitOfWork.SaveChangesAsync();
         }

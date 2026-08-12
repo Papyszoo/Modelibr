@@ -5,7 +5,7 @@ using SharedKernel;
 namespace Application.Models;
 
 /// <summary>
-/// Returns the auxiliary (external) files linked to a model version — the <c>.bin</c>
+/// Returns the auxiliary (external) files linked to a model version - the <c>.bin</c>
 /// buffers and textures a loose <c>.gltf</c> references, each with the relative path the
 /// primary references it by. The worker uses this to resolve the glTF's external URIs
 /// against already-uploaded files (no network fetch).

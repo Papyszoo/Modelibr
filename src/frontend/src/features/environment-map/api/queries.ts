@@ -62,8 +62,8 @@ export function getEnvironmentMapCategoriesQueryOptions() {
 }
 
 // True per-category counts for the sidebar badges. Keyed UNDER
-// ['environmentMaps'] so any invalidateQueries(['environmentMaps']) — upload,
-// recycle, move, refresh — also refreshes the counts.
+// ['environmentMaps'] so any invalidateQueries(['environmentMaps']) - upload,
+// recycle, move, refresh - also refreshes the counts.
 export function getEnvironmentMapCategoryCountsQueryOptions() {
   return queryOptions({
     queryKey: ['environmentMaps', 'category-counts'] as const,

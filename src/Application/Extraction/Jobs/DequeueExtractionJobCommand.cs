@@ -70,7 +70,7 @@ internal sealed class DequeueExtractionJobCommandHandler
             var won = await _repository.TryClaimJobAsync(candidate.Id, workerId, now, cancellationToken);
             if (!won)
             {
-                continue; // a racing worker claimed it — try the next candidate
+                continue; // a racing worker claimed it - try the next candidate
             }
 
             var claimed = await _repository.GetByIdAsync(candidate.Id, cancellationToken);

@@ -400,7 +400,7 @@ When(
         }).toPass({ timeout: 10000 });
 
         // Upload inherits kind from the currently-active tab (defaults to Global Materials / Universal).
-        // The card is already visible on the current tab — no tab switch needed.
+        // The card is already visible on the current tab - no tab switch needed.
 
         // Store in shared state for subsequent steps (both named map and custom keys)
         getScenarioState(page).saveTextureSet(setName, {
@@ -448,7 +448,7 @@ When(
                 )?.id;
             }
         } catch {
-            // Dropdown not visible — fall back to first version
+            // Dropdown not visible - fall back to first version
         }
 
         if (!versionId) {
@@ -626,7 +626,7 @@ When("I upload a new version {string}", async ({ page }, fileName: string) => {
     }
 
     const filePath = await UniqueFileGenerator.generate(fileName);
-    // Use direct API upload for reliability — the UI dialog's PrimeReact RadioButton
+    // Use direct API upload for reliability - the UI dialog's PrimeReact RadioButton
     // has a timing issue where the "Create new version" selection doesn't always
     // propagate to React state before the Upload button is clicked.
     await modelViewer.uploadNewVersionViaApi(filePath);
@@ -1046,7 +1046,7 @@ Then(
         }, textureType);
 
         console.log(
-            `[Three.js Textures] ${textureType} texture: ${textureInfo.found ? "âœ“" : "âœ—"}`,
+            `[Three.js Textures] ${textureType} texture: ${textureInfo.found ? "âœ“" : "âœ-"}`,
         );
         expect(textureInfo.found).toBe(true);
     },
