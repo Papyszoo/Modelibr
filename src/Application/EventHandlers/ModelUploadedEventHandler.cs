@@ -34,6 +34,15 @@ public class ModelUploadedEventHandler : IDomainEventHandler<ModelUploadedEvent>
             _logger.LogInformation("Handling ModelUploadedEvent for model {ModelId} version {ModelVersionId} with hash {ModelHash}, IsNewModel: {IsNewModel}",
                 domainEvent.ModelId, domainEvent.ModelVersionId, domainEvent.ModelHash, domainEvent.IsNewModel);
 
+            // The upload itself may opt out (e.g. a store import that attaches the store's
+            // already-rendered turntable) — don't queue a redundant render.
+            if (!domainEvent.GenerateThumbnail)
+            {
+                _logger.LogInformation("Skipping thumbnail job enqueue for model {ModelId} version {ModelVersionId} — the upload supplied its own thumbnail.",
+                    domainEvent.ModelId, domainEvent.ModelVersionId);
+                return Result.Success();
+            }
+
             var settings = await _settingsService.GetSettingsAsync(cancellationToken);
             if (!settings.GenerateThumbnailOnUpload)
             {

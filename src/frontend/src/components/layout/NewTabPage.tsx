@@ -151,6 +151,15 @@ const TILES: Tile[] = [
     targetLabel: 'Packs',
   },
   {
+    key: 'asset-store',
+    group: 'organize',
+    icon: 'pi-shopping-bag',
+    label: 'Asset Store',
+    description: 'Import packs from your store library into this instance.',
+    targetType: 'assetStore',
+    targetLabel: 'Asset Store',
+  },
+  {
     key: 'history',
     group: 'organize',
     icon: 'pi-history',
@@ -219,6 +228,7 @@ const RECENT_TAB_ICON: Partial<Record<TabType, string>> = {
   sounds: 'pi-volume-up',
   stageList: 'pi-th-large',
   stageEditor: 'pi-th-large',
+  assetStore: 'pi-shopping-bag',
   settings: 'pi-cog',
   history: 'pi-history',
   recycledFiles: 'pi-trash',

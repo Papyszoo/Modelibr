@@ -77,7 +77,7 @@ namespace Application.Models
             // Raise domain event for existing model upload — dispatched from the
                 // save pipeline once this aggregate is persisted (see
                 // DomainEventsInterceptor); no manual publish here.
-                existingModel.RaiseModelUploadedEvent(existingModel.ActiveVersion!.Id, fileEntity.Sha256Hash, false);
+                existingModel.RaiseModelUploadedEvent(existingModel.ActiveVersion!.Id, fileEntity.Sha256Hash, false, command.GenerateThumbnail);
 
                 // Always track batch upload - generate batch ID if not provided
                 var batchId = command.BatchId ?? Guid.NewGuid().ToString();
@@ -137,7 +137,7 @@ namespace Application.Models
                 // Raise domain event for new model upload after both model and file are
                 // persisted — dispatched from the save pipeline (see DomainEventsInterceptor);
                 // no manual publish here.
-                savedModel.RaiseModelUploadedEvent(version1.Id, fileEntity.Sha256Hash, true);
+                savedModel.RaiseModelUploadedEvent(version1.Id, fileEntity.Sha256Hash, true, command.GenerateThumbnail);
 
                 // Always track batch upload - generate batch ID if not provided
                 var batchId = command.BatchId ?? Guid.NewGuid().ToString();
@@ -160,6 +160,10 @@ namespace Application.Models
         }
     }
 
+    /// <param name="GenerateThumbnail">
+    /// Whether the upload event should ask the worker for a thumbnail. Store imports set
+    /// this false when the manifest already ships a rendered thumbnail for the item.
+    /// </param>
     /// <param name="SkipDeduplication">
     /// Forces a distinct model even when the primary file's hash already exists. Set only
     /// by callers that own a broader identity than the primary file — today the multi-file
@@ -169,6 +173,7 @@ namespace Application.Models
         IFileUpload File,
         string? ModelName = null,
         string? BatchId = null,
+        bool GenerateThumbnail = true,
         bool SkipDeduplication = false) : ICommand<AddModelCommandResponse>;
     public record AddModelCommandResponse(int Id, bool AlreadyExists = false);
 }
