@@ -32,8 +32,57 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Nothing has to remember to bump the version: if it is wrong, no installer is
+  # ever built. electron-builder interpolates src/desktop/package.json's version
+  # into artifactName AND into the electron-updater feed, so a stale value ships
+  # installers named for the previous release and an update feed that advertises
+  # it - users then silently never receive the update. That failure is invisible
+  # until someone reports not being updated, so fail the build here instead.
+  #
+  # The job itself always runs (the check inside is release-only) because a
+  # skipped job would skip every job that `needs` it.
+  verify-version:
+    name: Verify versions match the release tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Check package versions against the release tag
+        if: github.event_name == 'release'
+        shell: bash
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          expected="${TAG#v}"
+          mismatched=0
+          for f in package.json \
+                   src/frontend/package.json \
+                   src/asset-processor/package.json \
+                   src/desktop/package.json \
+                   src/desktop-client/package.json; do
+            actual=$(node -p "require('./$f').version")
+            if [ "$actual" != "$expected" ]; then
+              echo "::error file=$f::version is $actual, expected $expected (from tag $TAG)"
+              mismatched=1
+            else
+              echo "ok  $f = $actual"
+            fi
+          done
+          if [ "$mismatched" -ne 0 ]; then
+            echo ""
+            echo "Release tag $TAG does not match the committed package versions."
+            echo "Bump them on the version branch, then re-run this release."
+            exit 1
+          fi
+          echo ""
+          echo "All package versions match $TAG."
+
   build-installers:
     name: Build ${{ matrix.name }} Installer
+    needs: verify-version
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -538,6 +587,7 @@ jobs:
 
   build-client:
     name: Build ${{ matrix.name }} Client
+    needs: verify-version
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
