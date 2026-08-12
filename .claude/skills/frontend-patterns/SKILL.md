@@ -82,8 +82,13 @@ Real-time via `services/ThumbnailSignalRService.ts` (singleton); events:
 endpoints in `dynamicDemoHandlers.ts` (prevents 405s).
 
 ## Tabs
-New tab type = three places: a case in `TabContent.tsx`, an entry in
-`useTabMenuItems()`, and the `TabType` union in `src/shared/types/ui.ts`.
+New tab type = six places: the `TabType` union in `src/shared/types/ui.ts`,
+a case in `TabContent.tsx`, a tile in `NewTabPage.tsx` (TILES +
+`RECENT_TAB_ICON`), icon + tooltip cases in `DraggableTab.tsx`, a label case
+in `navigationStore.ts` `getTabLabel`, and BOTH allowlists in
+`tabSerialization.ts` (missing there = the tab type is rejected when a saved
+session restores). Ripple: docs-audit checks the union against
+`user-interface.md` (add a `tabLabels` entry in `scripts/docs-audit/index.mjs`).
 
 ## Shared viewer/worker logic (don't duplicate)
 Three.js / geometry / pixel-decode logic that the worker's thumbnail render

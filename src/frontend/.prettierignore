@@ -7,3 +7,8 @@ coverage/
 package-lock.json
 # Auto-generated MSW service worker - do not format
 public/mockServiceWorker.js
+# Playwright run artifacts (gitignored, but Prettier reads .prettierignore only,
+# never .gitignore — an untracked .last-run.json otherwise fails format:check)
+test-results/
+webgl-tests/test-results/
+playwright-report/

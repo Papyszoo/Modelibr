@@ -22,6 +22,9 @@ services:
             - MODELIBR_SKIP_PREMIGRATION_BACKUP=true
         ports:
             - "8090:8080"
+            # Published for store-fixture-e2e, which shares this container's
+            # network namespace (see that service for why).
+            - "9280:9280"
         healthcheck:
             test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
             interval: 5s
@@ -35,6 +38,21 @@ services:
                 condition: service_healthy
         networks:
             - modelibr-e2e
+    # Stand-in for the companion Asset Store (fixtures/store-fixture). It
+    # shares webapi-e2e's network namespace so the ONE configured store URL,
+    # http://localhost:9280, resolves to it from both the browser (via the
+    # host port published on webapi-e2e) and the backend importer (loopback —
+    # the importer allows http only for localhost, and manifest download URLs
+    # must be same-ORIGIN — scheme included — to carry the import token).
+    store-fixture-e2e:
+        build:
+            context: .
+            dockerfile: fixtures/store-fixture/Dockerfile
+        container_name: store-fixture-e2e
+        network_mode: "service:webapi-e2e"
+        depends_on:
+            webapi-e2e:
+                condition: service_started
     frontend-e2e:
         build:
             context: ../../src/frontend
@@ -46,6 +64,7 @@ services:
                 asset-processor: ../../src/asset-processor
             args:
                 VITE_API_BASE_URL: http://localhost:8090
+                VITE_STORE_URL: http://localhost:9280
         container_name: frontend-e2e
         ports:
             - "3002:80"

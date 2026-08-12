@@ -24,6 +24,24 @@ public class Pack : AggregateRoot
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
 
+    // --- Store-import provenance (v0.5 prompt 05) ---
+    // Set when a pack was imported from the companion Asset Store. The
+    // (StoreImportUrl, StoreImportAssetId) pair is the idempotency key that stops a
+    // re-run from creating a second pack and is the anchor for the future
+    // "update my pack" flow. Null for packs created any other way.
+
+    /// <summary>Base URL of the store this pack was imported from, or null.</summary>
+    public string? StoreImportUrl { get; private set; }
+
+    /// <summary>The store's asset id this pack was imported from, or null.</summary>
+    public string? StoreImportAssetId { get; private set; }
+
+    /// <summary>Manifest schema version used at import time, or null.</summary>
+    public int? StoreImportManifestVersion { get; private set; }
+
+    /// <summary>When this pack was imported from the store, or null.</summary>
+    public DateTime? StoreImportedAt { get; private set; }
+
     public File? CustomThumbnailFile { get; private set; }
 
     // Navigation property for many-to-many relationship with Models - EF Core requires this to be settable
@@ -153,6 +171,29 @@ public class Pack : AggregateRoot
         CustomThumbnailFileId = file?.Id;
         CustomThumbnailFile = file;
         UpdatedAt = updatedAt;
+    }
+
+    /// <summary>
+    /// Stamps this pack with the store it was imported from. Idempotent re-imports
+    /// look the pack up by (<paramref name="storeUrl"/>, <paramref name="storeAssetId"/>)
+    /// and re-stamp the manifest version / timestamp for the newest run.
+    /// </summary>
+    public void RecordStoreImport(string storeUrl, string storeAssetId, int manifestVersion, DateTime importedAt)
+    {
+        if (string.IsNullOrWhiteSpace(storeUrl))
+            throw new ArgumentException("Store URL cannot be null or empty.", nameof(storeUrl));
+        if (storeUrl.Length > 500)
+            throw new ArgumentException("Store URL cannot exceed 500 characters.", nameof(storeUrl));
+        if (string.IsNullOrWhiteSpace(storeAssetId))
+            throw new ArgumentException("Store asset id cannot be null or empty.", nameof(storeAssetId));
+        if (storeAssetId.Length > 200)
+            throw new ArgumentException("Store asset id cannot exceed 200 characters.", nameof(storeAssetId));
+
+        StoreImportUrl = storeUrl.Trim();
+        StoreImportAssetId = storeAssetId.Trim();
+        StoreImportManifestVersion = manifestVersion;
+        StoreImportedAt = importedAt;
+        UpdatedAt = importedAt;
     }
 
     /// <summary>

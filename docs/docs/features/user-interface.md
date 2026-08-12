@@ -38,6 +38,7 @@ The interface is split into **two panels** (left and right), each containing mul
 | ------------------ | ------------------------------------------------------ |
 | **Packs**          | Reusable asset bundles                                 |
 | **Projects**       | Project workspaces                                     |
+| **Asset Store**    | Import packs from your store library (optional)        |
 | **History**        | Recent uploads, renames, and version bumps             |
 | **Recycled Files** | Recover deleted items                                  |
 | **Settings**       | Storage, appearance, WebDAV, and Blender CLI           |

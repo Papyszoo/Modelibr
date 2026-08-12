@@ -1,0 +1,229 @@
+/* Asset Store tab — dense, flat on the page surface (no card framing). */
+
+.asset-store-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: var(--mod-space-md);
+  gap: var(--mod-space-sm);
+  overflow: hidden;
+}
+
+.asset-store-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.asset-store-user {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mod-space-xs);
+  font-size: var(--mod-text-sm);
+  color: var(--text-color-secondary);
+}
+
+/* Center the sign-in block in the tab's content area (both axes). */
+.asset-store-login-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+}
+
+/* Sign-in form — quiet block, no card-in-card framing. */
+.asset-store-login {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-sm);
+  width: 20rem;
+  max-width: 100%;
+}
+
+.asset-store-login-hint {
+  margin: 0;
+  font-size: var(--mod-text-sm);
+  color: var(--text-color-secondary);
+}
+
+.asset-store-login-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-xs);
+  font-size: var(--mod-text-sm);
+}
+
+.asset-store-login-field .p-inputtext {
+  width: 100%;
+}
+
+.asset-store-login-error {
+  color: var(--mod-color-danger);
+  font-size: var(--mod-text-xs);
+}
+
+/* Per-tile corner action (rendered in the AssetTile corner slot). */
+.asset-store-action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mod-space-xs);
+}
+
+.asset-store-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mod-space-xs);
+  padding: 0.15rem 0.45rem;
+  border-radius: var(--mod-radius-sm);
+  background: var(--surface-overlay);
+  border: 1px solid var(--surface-border);
+  font-size: var(--mod-text-xs);
+  color: var(--text-color);
+  white-space: nowrap;
+}
+
+.asset-store-chip--imported {
+  color: var(--mod-color-success);
+}
+
+.asset-store-chip--error {
+  color: var(--mod-color-danger);
+}
+
+/* Quiet pager row pinned under the scrolling grid. */
+.asset-store-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--mod-space-sm);
+  font-size: var(--mod-text-sm);
+  color: var(--text-color-secondary);
+}
+
+/* ── Pack detail (pick items, then import) ─────────────────────────────── */
+.asset-store-detail {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: var(--mod-space-sm);
+}
+
+.asset-store-detail-head {
+  display: flex;
+  align-items: center;
+  gap: var(--mod-space-sm);
+}
+
+.asset-store-detail-title {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.asset-store-detail-name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.asset-store-detail-author {
+  font-size: var(--mod-text-xs);
+  color: var(--text-color-secondary);
+}
+
+.asset-store-detail-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.asset-store-item-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.asset-store-item-row {
+  display: flex;
+  align-items: center;
+  gap: var(--mod-space-sm);
+  padding: var(--mod-space-xs) var(--mod-space-sm);
+  border-bottom: 1px solid var(--surface-border);
+  cursor: pointer;
+}
+
+.asset-store-item-row:hover {
+  background: var(--surface-hover);
+}
+
+.asset-store-item-media {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  flex: none;
+  border-radius: var(--mod-radius-sm);
+  background: var(--surface-overlay);
+  color: var(--text-color-secondary);
+  overflow: hidden;
+}
+
+.asset-store-item-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.asset-store-item-name {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--mod-text-sm);
+}
+
+.asset-store-item-type {
+  font-size: var(--mod-text-xs);
+  color: var(--text-color-secondary);
+  white-space: nowrap;
+}
+
+.asset-store-item-size {
+  font-size: var(--mod-text-xs);
+  color: var(--text-color-secondary);
+  white-space: nowrap;
+  min-width: 4rem;
+  text-align: right;
+}
+
+.asset-store-detail-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mod-space-sm);
+  flex-wrap: wrap;
+  padding-top: var(--mod-space-xs);
+  border-top: 1px solid var(--surface-border);
+}
+
+.asset-store-select-all {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mod-space-xs);
+  font-size: var(--mod-text-sm);
+  color: var(--text-color-secondary);
+  cursor: pointer;
+}
+
+.asset-store-detail-action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mod-space-sm);
+  margin-left: auto;
+}

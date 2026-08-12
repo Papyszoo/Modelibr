@@ -27,11 +27,19 @@ public class ModelUploadedEvent : DomainEvent
     /// </summary>
     public bool IsNewModel { get; }
 
-    public ModelUploadedEvent(int modelId, int modelVersionId, string modelHash, bool isNewModel)
+    /// <summary>
+    /// Whether a thumbnail should be generated for this upload. False when the caller already
+    /// has a thumbnail to attach (e.g. a store import reusing the store's rendered turntable),
+    /// so the pipeline must not queue a redundant render.
+    /// </summary>
+    public bool GenerateThumbnail { get; }
+
+    public ModelUploadedEvent(int modelId, int modelVersionId, string modelHash, bool isNewModel, bool generateThumbnail = true)
     {
         ModelId = modelId;
         ModelVersionId = modelVersionId;
         ModelHash = modelHash ?? throw new ArgumentNullException(nameof(modelHash));
         IsNewModel = isNewModel;
+        GenerateThumbnail = generateThumbnail;
     }
 }

@@ -2,47 +2,64 @@ import '@testing-library/jest-dom'
 
 // Mock Vite environment variables for Jest (import.meta.env -> process.env)
 process.env.VITE_API_BASE_URL = 'http://localhost:8080'
+process.env.VITE_STORE_URL = 'https://store.test'
 process.env.DEV = 'true'
 process.env.PROD = 'false'
 process.env.MODE = 'test'
 
 // Mock services that use import.meta.env at module level
 jest.mock('@/lib/apiBase', () => {
-  const mockClient = {
+  const makeMockClient = () => ({
     get: jest.fn(),
     post: jest.fn(),
     put: jest.fn(),
     patch: jest.fn(),
     delete: jest.fn(),
+    request: jest.fn(),
     interceptors: {
       request: { use: jest.fn() },
       response: { use: jest.fn() },
     },
-  }
+  })
+
+  const mockClient = makeMockClient()
 
   class MockApiClientError extends Error {
     status?: number
     code?: string
     details?: unknown
     requestId?: string
+    requestConfig?: unknown
     isNetworkError = false
     isTimeout = false
     isOffline = false
 
-    constructor(message: string) {
+    // Mirrors the real constructor so tests can build errors with status/
+    // isNetworkError/etc. and code under test can branch on them.
+    constructor(message: string, normalized: Record<string, unknown> = {}) {
       super(message)
       this.name = 'ApiClientError'
+      Object.assign(this, normalized)
     }
   }
 
   return {
     __esModule: true,
     client: mockClient,
+    // Each call gets a fresh mock instance — modules that build their own
+    // client (e.g. the asset-store feature) export it for tests to grab.
+    createApiClient: jest.fn(() => makeMockClient()),
     baseURL: 'http://localhost:8080',
     UPLOAD_TIMEOUT: 120000,
     ApiClientError: MockApiClientError,
   }
 })
+
+// storeEnv reads import.meta at module scope (Jest can't parse it) — back
+// the asset-store feature's env read with process.env instead.
+jest.mock('@/features/asset-store/lib/storeEnv', () => ({
+  readStoreUrlEnv: () => process.env.VITE_STORE_URL,
+}))
 
 jest.mock('./services/ApiClient', () => ({
   __esModule: true,

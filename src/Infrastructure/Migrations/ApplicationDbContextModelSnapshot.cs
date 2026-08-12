@@ -1262,6 +1262,20 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<string>("StoreImportAssetId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int?>("StoreImportManifestVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("StoreImportUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime?>("StoreImportedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1276,6 +1290,10 @@ namespace Infrastructure.Migrations
                     b.HasIndex("LicenseType");
 
                     b.HasIndex("Name");
+
+                    b.HasIndex("StoreImportUrl", "StoreImportAssetId")
+                        .IsUnique()
+                        .HasFilter("\"StoreImportUrl\" IS NOT NULL");
 
                     b.ToTable("Packs");
                 });
@@ -1770,6 +1788,72 @@ namespace Infrastructure.Migrations
                     b.HasIndex("Name");
 
                     b.ToTable("Stages");
+                });
+
+            modelBuilder.Entity("Domain.Models.StoreImportJob", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<int>("ItemsCreated")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ItemsFailed")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ItemsSkipped")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ItemsTotal")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ManifestSchemaVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("PackId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ResultJson")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("StoreAssetId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("StoreUrl")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("StoreUrl", "StoreAssetId");
+
+                    b.ToTable("StoreImportJobs");
                 });
 
             modelBuilder.Entity("Domain.Models.Texture", b =>

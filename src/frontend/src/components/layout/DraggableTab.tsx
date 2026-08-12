@@ -32,6 +32,8 @@ const getTabIcon = (tabType: Tab['type']): string => {
       return 'pi pi-briefcase'
     case 'projectViewer':
       return 'pi pi-briefcase'
+    case 'assetStore':
+      return 'pi pi-shopping-bag'
     case 'settings':
       return 'pi pi-cog'
     case 'history':
@@ -83,6 +85,8 @@ const getTabTooltip = (tab: Tab): string => {
       return 'Projects'
     case 'projectViewer':
       return `Project: ${tab.label || tab.projectId || 'Unknown'}`
+    case 'assetStore':
+      return 'Asset Store'
     case 'settings':
       return 'Settings'
     case 'history':

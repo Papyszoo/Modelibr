@@ -65,6 +65,16 @@ internal sealed class PackRepository : IPackRepository
             .FirstOrDefaultAsync(p => p.Name == name, cancellationToken);
     }
 
+    public Task<Pack?> GetByStoreImportAsync(string storeUrl, string storeAssetId, CancellationToken cancellationToken = default)
+    {
+        // Idempotency probe only — the importer just needs the pack's identity, so no
+        // collection navigations are loaded (a big imported pack would drag hundreds of rows).
+        return _context.Packs
+            .FirstOrDefaultAsync(
+                p => p.StoreImportUrl == storeUrl && p.StoreImportAssetId == storeAssetId,
+                cancellationToken);
+    }
+
     public Task UpdateAsync(Pack pack, CancellationToken cancellationToken = default)
     {
         _context.UpdateIfDetached(pack);
