@@ -23,9 +23,9 @@ Drag audio files directly onto the Sound Library panel to upload them.
 
 ### What Happens After Upload
 
-1. **Sound Created** — A new sound entry appears in your library
-2. **Waveform Generated** — A visual waveform preview is generated automatically by the worker service
-3. **Ready to Use** — Click to play, preview, or assign to packs/projects
+1. **Sound Created** - A new sound entry appears in your library
+2. **Waveform Generated** - A visual waveform preview is generated automatically by the worker service
+3. **Ready to Use** - Click to play, preview, or assign to packs/projects
 
 :::tip Batch Upload
 You can drag multiple audio files at once. Each file becomes a separate sound.
@@ -35,18 +35,18 @@ You can drag multiple audio files at once. Each file becomes a separate sound.
 
 Sounds are displayed in a responsive card grid with automatic waveform thumbnails. Each card shows:
 
-- **Waveform preview** — Visual representation of the audio waveform
-- **Name** — The filename (editable)
-- **Duration** — Length of the audio clip
-- **File size** — Original file size
+- **Waveform preview** - Visual representation of the audio waveform
+- **Name** - The filename (editable)
+- **Duration** - Length of the audio clip
+- **File size** - Original file size
 
 ## Playback Controls
 
 Each sound card includes built-in playback controls:
 
-- **Play/Pause** — Click the play button to preview the sound directly in the browser
-- **Playhead** — A visual playhead moves across the waveform during playback
-- **Reset** — Click the reset button to return to the beginning of the track
+- **Play/Pause** - Click the play button to preview the sound directly in the browser
+- **Playhead** - A visual playhead moves across the waveform during playback
+- **Reset** - Click the reset button to return to the beginning of the track
 
 :::tip Quick Preview
 Click anywhere on a sound card to select it, then use the play button to preview the audio without leaving the library view.
@@ -65,7 +65,7 @@ Use the category sidebar (left of the grid) to organize sounds into groups:
 - Right-click anywhere in the sidebar and choose **Add category**, then type
   the name directly in the tree
 - Right-click a category to **Add subcategory**, **Rename**, or **Delete** it
-  — deleting removes the whole branch, and its sounds become uncategorized
+  - deleting removes the whole branch, and its sounds become uncategorized
 - Drag sounds onto a category in the sidebar to move them
 - **All** shows every one of your sounds; **Unassigned** collects sounds
   that aren't in any category

@@ -4,8 +4,8 @@ sidebar_position: 12
 
 # Backups & Restore
 
-Modelibr can back up your whole library — the database plus every uploaded
-file — into a single archive, and restore from one on the next restart. For a
+Modelibr can back up your whole library - the database plus every uploaded
+file - into a single archive, and restore from one on the next restart. For a
 local-first app, "your assets survive" is the core promise, so backups get
 extra protection: an automatic safety-net backup runs before any database
 migration is applied.
@@ -16,7 +16,7 @@ Open the **Settings** page and go to **Backup & Restore**.
 
 1. Click **Create backup**.
 2. Choose whether to include thumbnails. Thumbnails regenerate automatically,
-   so leaving this off keeps the archive smaller — the database and uploaded
+   so leaving this off keeps the archive smaller - the database and uploaded
    files are always included.
 3. The new backup appears in the list as `in_progress`, then flips to
    `ready` once it finishes.
@@ -28,7 +28,7 @@ SHA-256 checksum of the database dump.
 
 ## Restoring a backup
 
-Restores apply on the **next restart**, not immediately — this keeps the
+Restores apply on the **next restart**, not immediately - this keeps the
 restore path simple and crash-safe (the exact same code runs whether you
 triggered it or the app is recovering from an unclean shutdown).
 
@@ -53,12 +53,12 @@ migrations on every startup and, if there are any, takes an automatic backup
 - **Naming**: these backups are named `pre-migration-<timestamp>.tar` so
   they're easy to tell apart from backups you created yourself
   (`modelibr-<timestamp>.tar`). They show up in the same backup list.
-- **Retention**: only the most recent snapshots are kept (3 by default) —
+- **Retention**: only the most recent snapshots are kept (3 by default) -
   older `pre-migration-*` archives are pruned automatically. Backups you
   created yourself are never touched by this cleanup.
 - **If the backup fails**: Modelibr aborts startup rather than applying an
   unprotected migration. The application log explains why. This is
-  intentional — a failed pre-migration backup usually means something (disk
+  intentional - a failed pre-migration backup usually means something (disk
   space, permissions) needs attention before it's safe to proceed.
 
 ### Configuration
@@ -67,13 +67,13 @@ Set these in your `.env` file:
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `MODELIBR_SKIP_PREMIGRATION_BACKUP` | `false` | Set to `true` to skip the automatic backup and apply migrations unconditionally. Not recommended outside throwaway/CI databases — there's no rollback point if the migration goes wrong. |
+| `MODELIBR_SKIP_PREMIGRATION_BACKUP` | `false` | Set to `true` to skip the automatic backup and apply migrations unconditionally. Not recommended outside throwaway/CI databases - there's no rollback point if the migration goes wrong. |
 | `MODELIBR_PREMIGRATION_BACKUP_RETENTION` | `3` | How many `pre-migration-*` snapshots to keep before older ones are pruned. |
 
 ## Notes
 
 - Docker deployments store backups under `./data/backups` on the host.
-- Native (desktop) installs don't yet support backups — the automatic
+- Native (desktop) installs don't yet support backups - the automatic
   pre-migration safety net is disabled there for now and will be enabled once
   desktop backup support ships.
 - Only one backup can run at a time; starting a second while one is in

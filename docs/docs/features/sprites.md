@@ -19,13 +19,13 @@ Modelibr includes a built-in sprite manager for organizing 2D image assets along
 
 Drag image files directly onto the Sprite Library panel to upload them.
 
-**Supported formats:** common image formats — PNG, JPG, WebP, GIF, APNG, BMP
+**Supported formats:** common image formats - PNG, JPG, WebP, GIF, APNG, BMP
 
 ### What Happens After Upload
 
-1. **Sprite Created** — A new sprite entry appears in your library
-2. **Thumbnail Generated** — A preview is generated automatically
-3. **Ready to Use** — Click to view full-size or assign to packs/projects
+1. **Sprite Created** - A new sprite entry appears in your library
+2. **Thumbnail Generated** - A preview is generated automatically
+3. **Ready to Use** - Click to view full-size or assign to packs/projects
 
 :::tip Batch Upload
 You can drag multiple images at once. Each file becomes a separate sprite.
@@ -35,9 +35,9 @@ You can drag multiple images at once. Each file becomes a separate sprite.
 
 Sprites are displayed in a responsive card grid with automatic thumbnails. Each card shows:
 
-- **Preview thumbnail** — Visual preview of the image
-- **Name** — The filename (editable)
-- **File size** — Original file dimensions
+- **Preview thumbnail** - Visual preview of the image
+- **Name** - The filename (editable)
+- **File size** - Original file dimensions
 
 ## Managing Sprites
 
@@ -52,7 +52,7 @@ Use the category sidebar (left of the grid) to organize sprites into groups:
 - Right-click anywhere in the sidebar and choose **Add category**, then type
   the name directly in the tree
 - Right-click a category to **Add subcategory**, **Rename**, or **Delete** it
-  — deleting removes the whole branch, and its sprites become uncategorized
+  - deleting removes the whole branch, and its sprites become uncategorized
 - Drag sprites onto a category in the sidebar to move them
 - **All** shows every one of your sprites; **Unassigned** collects sprites
   that aren't in any category

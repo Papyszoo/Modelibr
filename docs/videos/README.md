@@ -7,7 +7,7 @@ Playwright scripts that generate demo videos for the Docusaurus documentation si
 > screencast pipeline, and includes the finished demo videos in the Docusaurus build
 > for every workflow run (`push`, `pull_request`, and `workflow_dispatch`).
 >
-> Videos are **not** committed to the repository — they are generated fresh for each CI docs build.
+> Videos are **not** committed to the repository - they are generated fresh for each CI docs build.
 
 ## CI Pipeline
 
