@@ -517,6 +517,11 @@ E2E_REPORT.md
 !.claude/skills/
 !.claude/agents/
 !.claude/notes/
+# The generic "[Rr]elease/" build-output rule near the top of this file also
+# matches .claude/notes/release/, which silently kept the entire release
+# knowledge base (history, process, updater state) out of the repo. Re-include
+# it explicitly - it is engineering context, not build output.
+!.claude/notes/release/
 
 # Local test mega-runner output (scripts/test-runner) - repo-root only, so it
 # does not also match the source dirs under scripts/.
