@@ -28,7 +28,7 @@ function HomepageHeader() {
                     </Heading>
                     <p className={styles.heroSubtitle}>
                         Organize and preview your 3D models, textures, sprites,
-                        sounds, and scripts in one place — with animated
+                        sounds, and scripts in one place - with animated
                         thumbnails, version history, and a Blender-ready WebDAV
                         drive. All on your own hardware.
                     </p>
@@ -173,7 +173,7 @@ const FeatureList: FeatureItem[] = [
         title: "Every Asset Type",
         icon: "🗂️",
         description:
-            "Models, texture sets, environment maps, sprites, sounds, and scripts — one searchable library instead of scattered folders.",
+            "Models, texture sets, environment maps, sprites, sounds, and scripts - one searchable library instead of scattered folders.",
     },
     {
         title: "Animated Thumbnails",
@@ -256,7 +256,7 @@ const StepList: StepItem[] = [
         number: "01",
         title: "Install Modelibr",
         description:
-            "Download the desktop app for Windows, macOS, or Linux from GitHub Releases — it bundles everything. Prefer Docker? Clone the repo and run:",
+            "Download the desktop app for Windows, macOS, or Linux from GitHub Releases - it bundles everything. Prefer Docker? Clone the repo and run:",
         code: "cp .env.example .env && docker compose up -d",
     },
     {

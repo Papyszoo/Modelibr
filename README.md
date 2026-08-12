@@ -30,7 +30,7 @@ The live demo stores its data in your browser, so what you add there is visible 
 | **WebDAV access** | Work with the library through a file-browser style workflow when that fits better than a browser-only flow. |
 | **Blender CLI at runtime** | Download Blender CLI from Settings when you need it instead of treating it as a fixed install requirement from day one. |
 | **Recycle bin and deduplication** | Restore deleted assets and avoid wasting storage on identical files. |
-| **Asset Store imports (optional)** | Connect a companion asset store via the Asset Store tab and import packs from your store library with one click — fully optional, the app stays local-first without it. |
+| **Asset Store imports (optional)** | Connect a companion asset store via the Asset Store tab and import packs from your store library with one click - fully optional, the app stays local-first without it. |
 
 ---
 
@@ -40,8 +40,8 @@ The live demo stores its data in your browser, so what you add there is visible 
 
 Download the installer for your platform from the GitHub Releases page and run it. Two installers are published:
 
-- **Modelibr** (host) — the full self-contained app for users who can't run the Docker stack. It bundles the database, WebApi, and worker runtime and runs from a tray / menu-bar icon. Open its **Show Status** window for live service health, the frontend URL, and a **Configuration** panel (app port, worker process count, jobs per worker, GPU acceleration). The host checks GitHub Releases for newer versions and surfaces an update prompt in the tray and status window.
-- **Modelibr Client** (optional) — a thin desktop window that opens a running host in its own app frame instead of a browser tab. Point it at the host URL shown in the host's status window.
+- **Modelibr** (host) - the full self-contained app for users who can't run the Docker stack. It bundles the database, WebApi, and worker runtime and runs from a tray / menu-bar icon. Open its **Show Status** window for live service health, the frontend URL, and a **Configuration** panel (app port, worker process count, jobs per worker, GPU acceleration). The host checks GitHub Releases for newer versions and surfaces an update prompt in the tray and status window.
+- **Modelibr Client** (optional) - a thin desktop window that opens a running host in its own app frame instead of a browser tab. Point it at the host URL shown in the host's status window.
 
 The app and WebDAV are exposed on the same local configurable port.
 
@@ -85,7 +85,7 @@ Open **https://localhost:3010** in your browser. The first visit uses a self-sig
 ```bash
 npm run test:all        # run any subset of the 10 test suites (interactive picker)
 npm run test:all:full   # run everything, non-interactive
-npm run test:site       # Test Studio — browse every test, CI lanes, timings; run with live output
+npm run test:site       # Test Studio - browse every test, CI lanes, timings; run with live output
 npm run test:audit      # flag test suites not tracked by the runner manifest
 ```
 
@@ -123,4 +123,4 @@ Suites are self-contained (Docker stacks start/stop themselves). See
 
 ## License
 
-Business Source License 1.1 — free to use, modify, and self-host. See [LICENSE](LICENSE) for details.
+Business Source License 1.1 - free to use, modify, and self-host. See [LICENSE](LICENSE) for details.

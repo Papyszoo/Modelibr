@@ -6,7 +6,7 @@ title: Changelog
 # Changelog
 
 Full, always-current release notes live on
-[**GitHub Releases**](https://github.com/Papyszoo/Modelibr/releases) — that's
+[**GitHub Releases**](https://github.com/Papyszoo/Modelibr/releases) - that's
 the canonical changelog. Highlights per release:
 
 ## v0.3.1 (2026-07-03)
@@ -24,17 +24,17 @@ the canonical changelog. Highlights per release:
 
 ## v0.2.1 (2026-06-20)
 
-- **Updates are now opt-in** — Modelibr tells you when a new version is available; you choose when to download and install it
+- **Updates are now opt-in** - Modelibr tells you when a new version is available; you choose when to download and install it
 
 ## v0.2.0 (2026-06-20)
 
 - **Global Search (Ctrl/⌘ + K)** across every asset type with result highlighting
-- **Scripts** as a new asset type — code editor, starter templates, live in-page shader/scene preview
+- **Scripts** as a new asset type - code editor, starter templates, live in-page shader/scene preview
 - Richer asset metadata: geometry, animation, and bone data extracted from models and wired into list filters
 
 ## v0.1.0 (2026-06-12)
 
-- First release with **native installers** for Windows, macOS, and Linux — a tray host app bundling the full stack, plus an optional thin desktop client
+- First release with **native installers** for Windows, macOS, and Linux - a tray host app bundling the full stack, plus an optional thin desktop client
 - Automatic update checks, LAN access opt-in, data that survives upgrades and uninstalls
 
 ---

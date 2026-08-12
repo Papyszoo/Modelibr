@@ -4,7 +4,7 @@ sidebar_position: 7
 
 # Scripts
 
-Modelibr stores source code as a first-class asset type. Keep shaders, gameplay snippets, tool scripts, and configuration files in the same library as the models and textures they belong to — with syntax highlighting, live shader previews, and the same organization tools as every other asset type.
+Modelibr stores source code as a first-class asset type. Keep shaders, gameplay snippets, tool scripts, and configuration files in the same library as the models and textures they belong to - with syntax highlighting, live shader previews, and the same organization tools as every other asset type.
 
 :::note Video placeholder
 A dedicated Scripts walkthrough video will be added later.
@@ -14,8 +14,8 @@ A dedicated Scripts walkthrough video will be added later.
 
 There are two ways to add scripts to your library:
 
-- **Upload files** — click **Upload** or drag source files onto the Scripts page
-- **Create in-app** — click **New Script**, pick a name and language, and optionally start from a template
+- **Upload files** - click **Upload** or drag source files onto the Scripts page
+- **Create in-app** - click **New Script**, pick a name and language, and optionally start from a template
 
 **Supported formats:** JavaScript/TypeScript (`.js`, `.jsx`, `.mjs`, `.cjs`, `.ts`, `.tsx`), Python (`.py`), C# (`.cs`), C/C++ (`.c`, `.h`, `.cpp`, `.cc`, `.cxx`, `.hpp`), Lua (`.lua`), Java (`.java`), Go (`.go`), Rust (`.rs`), Ruby (`.rb`), PHP (`.php`), shell (`.sh`), SQL (`.sql`), GDScript (`.gd`), shaders (`.glsl`, `.vert`, `.frag`, `.hlsl`, `.shader`), and data files (`.json`, `.yaml`, `.yml`, `.xml`)
 
@@ -25,7 +25,7 @@ Open a script card to launch the script viewer:
 
 - **Code editor** with syntax highlighting for the script's language
 - **Description** field for notes about what the script does and how to use it
-- **Code/preview splitter** — adjust how much space the editor and the preview take, or toggle the layout
+- **Code/preview splitter** - adjust how much space the editor and the preview take, or toggle the layout
 
 ## Live Shader Preview
 
@@ -41,7 +41,7 @@ The Scripts page includes a **Templates** section:
 
 - Start a new script from a **built-in starter template** instead of an empty file
 - Create **your own templates** and duplicate existing ones
-- Useful for boilerplate you reuse often — a shader skeleton, a component stub, a tool-script header
+- Useful for boilerplate you reuse often - a shader skeleton, a component stub, a tool-script header
 
 ## Organizing Scripts
 
@@ -55,7 +55,7 @@ Use the search box and the filter panel above the grid to narrow the script list
 
 ### Packs and Projects
 
-Scripts are first-class assets in [Packs](./packs) and [Projects](./projects) — open a pack or project and add scripts to it alongside models, textures, sprites, and sounds.
+Scripts are first-class assets in [Packs](./packs) and [Projects](./projects) - open a pack or project and add scripts to it alongside models, textures, sprites, and sounds.
 
 ## Recycling
 

@@ -32,7 +32,7 @@ groups:
 - Right-click anywhere in the sidebar and choose **Add category**, then type
   the name directly in the tree
 - Right-click a category to **Add subcategory**, **Rename**, or **Delete** it
-  — deleting removes the whole branch, and its maps become uncategorized
+  - deleting removes the whole branch, and its maps become uncategorized
 - Drag an environment map card onto a category in the sidebar to move it
 - **All** shows every one of your environment maps; **Unassigned** collects
   maps that aren't in any category
@@ -101,8 +101,8 @@ WebDAV exposes environment maps in three places:
 
 Inside each environment map folder, WebDAV exposes both:
 
-- **Variants** — normalized size-labelled files such as `1K.hdr` for panoramas or `2K_px.hdr` through `2K_nz.hdr` for cube faces
-- **Files** — the original uploaded filenames
+- **Variants** - normalized size-labelled files such as `1K.hdr` for panoramas or `2K_px.hdr` through `2K_nz.hdr` for cube faces
+- **Files** - the original uploaded filenames
 
 ## Demo Mode
 

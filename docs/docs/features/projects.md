@@ -4,7 +4,7 @@ sidebar_position: 8
 
 # Projects
 
-Projects in Modelibr let you group related assets together for organized workflows. A project can contain models, texture sets, environment maps, sprites, sounds, and scripts — everything needed for a game level, scene, or creative work.
+Projects in Modelibr let you group related assets together for organized workflows. A project can contain models, texture sets, environment maps, sprites, sounds, and scripts - everything needed for a game level, scene, or creative work.
 
 <div className="feature-video-container">
   <video controls width="100%" autoPlay muted loop>
@@ -49,7 +49,7 @@ Environment maps are managed as their own asset type inside projects, so scene l
 Right-click an asset within the project and select **Remove from Project**.
 
 :::note
-Removing an asset from a project does NOT delete the asset itself — it only removes the association.
+Removing an asset from a project does NOT delete the asset itself - it only removes the association.
 :::
 
 ## Deleting a Project
