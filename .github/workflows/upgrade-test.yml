@@ -15,16 +15,19 @@ name: Upgrade Test
 #                 unsigned (Squirrel.Mac requires code signing; planned for 1.0).
 #
 # Installers come straight from GitHub Releases — no build step. Defaults to
-# "v0.3.1 → latest published release".
+# "v0.4.3 → latest published release".
 on:
   workflow_dispatch:
     inputs:
       from_tag:
-        # v0.3.1 = first release containing the Windows silent quitAndInstall
-        # fix (#550), so the self-update job exercises the fixed updater path.
+        # Bumped to the previous release on every cut (see the release process
+        # note). v0.4.3 is the last 0.4.x, so this exercises the 0.4.x → 0.5.0
+        # upgrade users will actually take. The self-update job runs the FROM
+        # version's updater code, so an updater fix is only validated live once
+        # two post-fix releases exist.
         description: "Release tag to upgrade FROM"
         required: false
-        default: "v0.3.1"
+        default: "v0.4.3"
         type: string
       to_tag:
         description: "Release tag to upgrade TO (blank = latest published release)"

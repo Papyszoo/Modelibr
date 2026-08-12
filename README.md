@@ -101,6 +101,8 @@ Suites are self-contained (Docker stacks start/stop themselves). See
 - `.fbx`
 - `.gltf`
 - `.glb`
+- `.stl`
+- `.3mf`
 - `.blend`
 
 ## Supported environment map uploads
