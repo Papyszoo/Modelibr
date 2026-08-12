@@ -34,6 +34,17 @@
   box-shadow: 0 0 0 3px rgba(var(--primary-color-rgb), 0.18);
 }
 
+/*
+ * Keyboard focus for a clickable tile (role="button", tabIndex=0). Matches the
+ * app-wide button focus ring in index.css, and is slightly stronger than the
+ * .is-selected ring so a focused tile is still distinguishable when selected.
+ */
+.asset-tile[role='button']:focus-visible {
+  outline: none;
+  border-color: var(--mod-color-primary);
+  box-shadow: 0 0 0 3px rgba(var(--primary-color-rgb), 0.45);
+}
+
 /* ── Media area ────────────────────────────────────────────────── */
 
 .asset-tile-media {
