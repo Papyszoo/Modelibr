@@ -14,20 +14,16 @@ name: Upgrade Test
 #                 Windows + Linux only - macOS can't self-update while the app is
 #                 unsigned (Squirrel.Mac requires code signing; planned for 1.0).
 #
-# Installers come straight from GitHub Releases - no build step. Defaults to
-# "v0.4.3 → latest published release".
+# Installers come straight from GitHub Releases - no build step. Both tags are
+# resolved from the Releases API by the resolve-tags job below, so nothing here
+# needs bumping at release time: the default is always "second-newest release ->
+# newest release".
 on:
   workflow_dispatch:
     inputs:
       from_tag:
-        # Bumped to the previous release on every cut (see the release process
-        # note). v0.4.3 is the last 0.4.x, so this exercises the 0.4.x → 0.5.0
-        # upgrade users will actually take. The self-update job runs the FROM
-        # version's updater code, so an updater fix is only validated live once
-        # two post-fix releases exist.
-        description: "Release tag to upgrade FROM"
+        description: "Release tag to upgrade FROM (blank = the release before TO)"
         required: false
-        default: "v0.4.3"
         type: string
       to_tag:
         description: "Release tag to upgrade TO (blank = latest published release)"
@@ -45,8 +41,54 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Single source of truth for both jobs below. Resolved once, from the Releases
+  # API, so a release cut never needs a tag edited in this file - the previous
+  # hardcoded default went stale for two releases in a row.
+  resolve-tags:
+    name: Resolve FROM / TO release tags
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      from: ${{ steps.tags.outputs.from }}
+      to: ${{ steps.tags.outputs.to }}
+    steps:
+      - name: Resolve tags
+        id: tags
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          INPUT_FROM: ${{ inputs.from_tag }}
+          INPUT_TO: ${{ inputs.to_tag }}
+        run: |
+          set -euo pipefail
+
+          # Newest first. 30 is plenty of history to find the entry before TO.
+          releases=$(gh release list --exclude-drafts --exclude-pre-releases \
+            --limit 30 --json tagName --jq '[.[].tagName]')
+
+          to="${INPUT_TO:-$(jq -r '.[0] // empty' <<<"$releases")}"
+          [ -n "$to" ] || { echo "Could not resolve a TO release tag"; exit 1; }
+
+          # FROM defaults to the release immediately before TO, so an explicit
+          # to_tag still upgrades from its real predecessor rather than from the
+          # newest release overall. If TO isn't in the list (a tag with no
+          # release), fall back to the second-newest.
+          from="${INPUT_FROM:-$(jq -r --arg to "$to" \
+            '(index($to) // 0) as $i | (.[$i + 1] // empty)' <<<"$releases")}"
+          [ -n "$from" ] || { echo "Could not resolve a FROM release tag - is there more than one release?"; exit 1; }
+
+          if [ "$from" = "$to" ]; then
+            echo "FROM ($from) equals TO ($to) - nothing to upgrade."; exit 1
+          fi
+
+          echo "Upgrading: $from  ->  $to"
+          echo "from=$from" >> "$GITHUB_OUTPUT"
+          echo "to=$to" >> "$GITHUB_OUTPUT"
+
   reinstall:
     name: Reinstall ${{ matrix.name }}
+    needs: resolve-tags
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     strategy:
@@ -70,31 +112,6 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Resolve FROM / TO release tags
-        id: tags
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          INPUT_FROM: ${{ inputs.from_tag }}
-          INPUT_TO: ${{ inputs.to_tag }}
-        run: |
-          set -euo pipefail
-          # Keep in sync with the from_tag input default. This fallback is what
-          # the nightly schedule uses, where inputs.from_tag is empty.
-          from="${INPUT_FROM:-v0.4.3}"
-          to="${INPUT_TO:-}"
-          if [ -z "$to" ]; then
-            to=$(gh release list --exclude-drafts --exclude-pre-releases --limit 1 \
-              --json tagName --jq '.[0].tagName // empty')
-          fi
-          [ -n "$to" ] || { echo "Could not resolve a TO release tag"; exit 1; }
-          if [ "$from" = "$to" ]; then
-            echo "FROM ($from) equals TO ($to) - nothing to upgrade."; exit 1
-          fi
-          echo "Upgrading: $from  ->  $to"
-          echo "from=$from" >> "$GITHUB_OUTPUT"
-          echo "to=$to" >> "$GITHUB_OUTPUT"
-
       - name: Download FROM and TO installers
         shell: bash
         env:
@@ -107,8 +124,8 @@ jobs:
             Windows) pat='*windows-x64.exe' ;;
           esac
           mkdir -p old-installer new-installer
-          gh release download "${{ steps.tags.outputs.from }}" --dir old-installer --pattern "$pat"
-          gh release download "${{ steps.tags.outputs.to }}"   --dir new-installer --pattern "$pat"
+          gh release download "${{ needs.resolve-tags.outputs.from }}" --dir old-installer --pattern "$pat"
+          gh release download "${{ needs.resolve-tags.outputs.to }}"   --dir new-installer --pattern "$pat"
           echo "── FROM ──"; ls -la old-installer
           echo "── TO ──";   ls -la new-installer
 
@@ -215,6 +232,7 @@ jobs:
 
   self-update:
     name: Self-update ${{ matrix.name }}
+    needs: resolve-tags
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     strategy:
@@ -239,30 +257,6 @@ jobs:
       - name: Install CDP driver dependency
         run: npm install --no-save playwright-core
 
-      - name: Resolve FROM tag (and confirm a newer release exists)
-        id: tags
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          INPUT_FROM: ${{ inputs.from_tag }}
-          INPUT_TO: ${{ inputs.to_tag }}
-        run: |
-          set -euo pipefail
-          # Keep in sync with the from_tag input default. This fallback is what
-          # the nightly schedule uses, where inputs.from_tag is empty.
-          from="${INPUT_FROM:-v0.4.3}"
-          to="${INPUT_TO:-}"
-          if [ -z "$to" ]; then
-            to=$(gh release list --exclude-drafts --exclude-pre-releases --limit 1 \
-              --json tagName --jq '.[0].tagName // empty')
-          fi
-          [ -n "$to" ] || { echo "Could not resolve a newer release"; exit 1; }
-          if [ "$from" = "$to" ]; then
-            echo "FROM ($from) equals latest ($to) - nothing to self-update to."; exit 1
-          fi
-          echo "Self-update: $from  ->  $to (updater picks latest from the feed)"
-          echo "from=$from" >> "$GITHUB_OUTPUT"
-
       - name: Download FROM installer
         shell: bash
         env:
@@ -276,7 +270,7 @@ jobs:
             Windows) pat='*windows-x64.exe' ;;
           esac
           mkdir -p old-installer
-          gh release download "${{ steps.tags.outputs.from }}" --dir old-installer --pattern "$pat"
+          gh release download "${{ needs.resolve-tags.outputs.from }}" --dir old-installer --pattern "$pat"
           ls -la old-installer
 
       - name: Self-update scenario (Linux)
