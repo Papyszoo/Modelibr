@@ -69,8 +69,9 @@ description: Modelibr git and release conventions - version-branch naming and pr
   main and has **no manual trigger**. This cost 0.4.0–0.4.2 their Docker images.
   Duration caps regress only at CI pace (CI paces recorded waits ~1.5× local), so
   a spec at ~90% of its cap locally will fail CI.
-- **After each release, bump `upgrade-test.yml`'s `from_tag`.** That job runs the
-  FROM version's updater code, so an updater fix is validated live only once two
-  post-fix releases exist; until then it is red by design. electron-updater feeds (`latest*.yml` + `.blockmap`) are attached as
+- **`upgrade-test.yml` needs no tag edit** - its `resolve-tags` job derives FROM/TO
+  from the Releases API. That job runs the FROM version's updater code, so an
+  updater fix is validated live only once two post-fix releases exist; until then
+  it is red by design. electron-updater feeds (`latest*.yml` + `.blockmap`) are attached as
   release assets; the desktop **client** publishes to its own `client` update
   channel so its feed never collides with the host's.
