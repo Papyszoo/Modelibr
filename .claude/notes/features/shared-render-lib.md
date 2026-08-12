@@ -2,7 +2,7 @@
 
 The convention: THREE and UTIF are **injected**, each module has a `.d.ts`
 sibling, and the worker reaches it via a `window.modelibr*` side-effect. It holds
-logic that must behave **identically** across three runtimes — the frontend
+logic that must behave **identically** across three runtimes - the frontend
 viewer, the worker's Puppeteer thumbnail, and demo mode.
 
 **Prompt 16 is fully DONE. No extraction is pending.**
@@ -10,19 +10,19 @@ viewer, the worker's Puppeteer thumbnail, and demo mode.
 ## What is shared
 
 - `tiffDecode.js`, `stlMesh.js` (pre-existing).
-- **`sceneLighting.js`** — the balanced model-preview light rig
+- **`sceneLighting.js`** - the balanced model-preview light rig
   (`DEFAULT_LIGHTING`, `resolveSceneLighting`, `buildSceneLights`). *Fixed:* the
   viewer's drei `<Stage>` was injecting a second light rig that swamped the
   ambient/environment controls.
-- **`textureMaterial.js`** — `resolveTextureMaterialConfig` (metalness/roughness/
+- **`textureMaterial.js`** - `resolveTextureMaterialConfig` (metalness/roughness/
   specular gated on their **own** maps, not the base-color map) + `ensureAoMapUv2`.
   *Fixed two viewer-only drifts:* base-color-gated metalness made non-metals black
   mirrors, and missing uv2 made AO collapse all indirect light.
-- **`displacementNormal.js`** — `addSharedDisplacementNormal(THREE, geom)` +
+- **`displacementNormal.js`** - `addSharedDisplacementNormal(THREE, geom)` +
   `applyDispNormalDisplacement(mat)` (the two displacement GLSL chunks). Frontend
   imports via the `sharedDisplacementNormal.ts` wrapper; worker uses
   `window.modelibrDispNormal`.
-- **`textureChannels.js`** — the texture-type→material-slot map plus the
+- **`textureChannels.js`** - the texture-type→material-slot map plus the
   channel-extraction shaders: `MATERIAL_SLOT_BY_TEXTURE_TYPE` /
   `resolveMaterialSlot`, `TEXTURE_TYPE` / `TEXTURE_CHANNEL` enum mirrors,
   `textureTypeNeedsInvert`, `getChannelUniformIndex` / `channelNeedsExtraction`,
@@ -35,14 +35,14 @@ viewer, the worker's Puppeteer thumbnail, and demo mode.
 
 Render-to-target orchestration stays per-runtime.
 
-## Intentionally NOT shared — do not "dedupe"
+## Intentionally NOT shared - do not "dedupe"
 
 - **`normalizeModel` / framing.** The viewer floors the model at y=0; the worker
   centers on the bbox for the orbit camera. Different by design.
 - `mocks/dynamic-demo/shared.ts`'s `parseTextureType` has its own drifted
   name→number map, but only entries 1/2/5/6 are consumed (the demo filters to
   albedo/normal/roughness/metallic before rendering), so the wrong entries are
-  inert. Out of scope — not worth the fixture-audit risk.
+  inert. Out of scope - not worth the fixture-audit risk.
 
 ## Demo mode is a third parallel implementation
 
@@ -51,7 +51,7 @@ not Puppeteer. It now adopts the shared lib: one `setupSceneLighting` helper
 builds `buildSceneLights` plus a neutral `RoomEnvironment` IBL (replacing 5
 ad-hoc rigs), and `applyTextureMaps` uses `resolveTextureMaterialConfig` +
 `ensureAoMapUv2`. The `normalizeModel` `setScalar` bug is fixed to
-`multiplyScalar`. It intentionally does not share render orchestration —
+`multiplyScalar`. It intentionally does not share render orchestration -
 in-browser constraints differ.
 
 ## Test coverage worth knowing about

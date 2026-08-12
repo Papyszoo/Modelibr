@@ -2,7 +2,7 @@
  * Step definitions for Shared File Protection E2E tests (ISSUE-07)
  * Tests that permanently deleting one model does not affect other models.
  *
- * Note: The server uses model-level deduplication — uploading the same file hash
+ * Note: The server uses model-level deduplication - uploading the same file hash
  * returns the existing model (alreadyExists: true). Therefore, two independent
  * models always have different file hashes. This test verifies that permanent
  * deletion of one model leaves other models and their files intact.

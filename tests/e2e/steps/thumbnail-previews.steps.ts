@@ -167,7 +167,7 @@ When("I open the texture set detail viewer", async ({ page }) => {
     await page.waitForSelector(".texture-set-viewer", { timeout: 10000 });
 });
 
-// "I switch to the Files tab" is defined in texture-types.steps.ts — reused here
+// "I switch to the Files tab" is defined in texture-types.steps.ts - reused here
 
 When("I navigate to the sprites page for thumbnail test", async ({ page }) => {
     const spritesPage = new SpriteListPage(page);

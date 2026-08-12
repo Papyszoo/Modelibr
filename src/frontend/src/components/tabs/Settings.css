@@ -566,7 +566,7 @@
   width: auto;
   cursor: pointer;
 }
-/* Modal still wants visible checkboxes — un-hide via the parent label. */
+/* Modal still wants visible checkboxes - un-hide via the parent label. */
 .settings-checkbox-label:not(.toggle-field) input[type='checkbox'] {
   position: static;
   width: auto;

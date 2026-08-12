@@ -20,7 +20,7 @@ public class ExtractionJobCommandsTests
         return clock;
     }
 
-    /// <summary>Model 42 has one version, id 1 — the version an omitted VersionId resolves to.</summary>
+    /// <summary>Model 42 has one version, id 1 - the version an omitted VersionId resolves to.</summary>
     private static Mock<IModelVersionRepository> Versions()
     {
         var versions = new Mock<IModelVersionRepository>();
@@ -81,7 +81,7 @@ public class ExtractionJobCommandsTests
         // Regression: trigger_rederive omits versionId for a model, and the job used to
         // be queued with a null one. The worker then downloaded the file, extracted it,
         // failed BOTH save calls with a 400 ("modelVersionId": null) and still reported
-        // the job completed — so re-deriving 1,717 models reported success while not one
+        // the job completed - so re-deriving 1,717 models reported success while not one
         // search document changed.
         var repo = new Mock<IExtractionJobRepository>();
         repo.Setup(r => r.GetLiveJobAsync("Model", 42, 1, ExtractorFamilies.Geometry, It.IsAny<CancellationToken>()))
@@ -198,7 +198,7 @@ public class ExtractionJobCommandsTests
     {
         // Regression: an expired lease let another worker re-claim the job. Without an
         // ownership check the original worker could come back and overwrite the newer
-        // run's outcome — marking Done a job the current owner never finished.
+        // run's outcome - marking Done a job the current owner never finished.
         var job = ExtractionJob.Create("Model", 42, ExtractorFamilies.Geometry, Now);
         job.TryClaim("w1", Now);
         job.MarkAsFailed("lease expired", Now);   // released back to the queue

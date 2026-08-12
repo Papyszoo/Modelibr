@@ -401,7 +401,7 @@ export const systemHandlers = [
   }),
 
   // ════════════════════════════════════════════════════════════════════════
-  //  SIGNALR (thumbnailHub) — no-op stubs to prevent 405 errors
+  //  SIGNALR (thumbnailHub) - no-op stubs to prevent 405 errors
   // ════════════════════════════════════════════════════════════════════════
 
   http.post('*/thumbnailHub/negotiate', async () => {

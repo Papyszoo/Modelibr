@@ -11,7 +11,7 @@ const testDir = defineBddConfig({
 const useBlobReporter = !!process.env.PW_MERGE_BLOB;
 
 // Only honour a known value for an env-driven enum, else fall back to the default
-// — so a typo (e.g. PW_TRACE=true) can't make Playwright throw at config load.
+// - so a typo (e.g. PW_TRACE=true) can't make Playwright throw at config load.
 const envEnum = (v: string | undefined, allowed: string[], dflt: string) =>
     v && allowed.includes(v) ? v : dflt;
 
@@ -29,14 +29,14 @@ export default defineConfig({
     // them via PW_RETRIES helps the flaky-timeout tail on slow runners pass.
     retries: process.env.PW_RETRIES ? parseInt(process.env.PW_RETRIES, 10) : 1,
     // Workers are controlled per-phase by run-e2e.js (see its comments for the
-    // current counts — chromium runs 3 both locally and on CI; 4 caused
+    // current counts - chromium runs 3 both locally and on CI; 4 caused
     // asset-processor contention). This value is only the fallback for manual
     // `npx playwright test` runs without PW_WORKERS; 2 keeps database and
     // asset-processor contention low for ad-hoc runs.
     workers: parseInt(process.env.PW_WORKERS || "2", 10),
     // The JSON reporter writes a machine-readable run summary (incl. each
     // failure's message + the path to its trace/screenshot under test-results/)
-    // that an AI agent or script can parse directly — see the e2e-authoring skill.
+    // that an AI agent or script can parse directly - see the e2e-authoring skill.
     reporter: useBlobReporter
         ? [["blob", { outputDir: "blob-report" }]]
         : [
@@ -53,7 +53,7 @@ export default defineConfig({
         // Strict compare: PW_HEADED=0 must not mean headed.
         headless: process.env.PW_HEADED === "1" ? false : undefined,
         // Keep WebGL available when Chromium falls back to software rendering
-        // (SwiftShader) on a GPU-less CI runner — recent Chromium disables WebGL
+        // (SwiftShader) on a GPU-less CI runner - recent Chromium disables WebGL
         // on SwiftShader unless this flag is set. It's a no-op on machines with a
         // real GPU (the Mac Mini lane), so it doesn't force software rendering.
         launchOptions: {
@@ -75,7 +75,7 @@ export default defineConfig({
             testDir,
             grep: /@setup/,
             fullyParallel: false, // Setup tests run sequentially
-            timeout: 300000, // 5 min — thumbnail generation has cold-start latency
+            timeout: 300000, // 5 min - thumbnail generation has cold-start latency
             use: { ...devices["Desktop Chrome"] },
         },
         {
@@ -114,7 +114,7 @@ export default defineConfig({
             grepInvert: /@setup/,
             dependencies: ["setup"],
             fullyParallel: false, // Sequential to get reliable timing measurements
-            timeout: 600000, // 10 min — bulk uploads with thumbnail generation
+            timeout: 600000, // 10 min - bulk uploads with thumbnail generation
             use: { ...devices["Desktop Chrome"] },
         },
     ],

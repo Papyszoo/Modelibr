@@ -27,7 +27,7 @@ const GLOBAL_TEXTURE_DIR = path.resolve(
 // Run-unique ID to prevent collisions across test runs
 const runId = Date.now().toString(36).slice(-4);
 
-// Track created texture sets — exported so other step files (e.g. tiff-preview.steps.ts)
+// Track created texture sets - exported so other step files (e.g. tiff-preview.steps.ts)
 // can register their own sets and reuse the shared "open the texture set viewer for"
 // and "switch to the Preview tab" steps defined below.
 export const createdSets: Record<string, { id: number; name: string }> = {};
@@ -135,7 +135,7 @@ When(
 
         // `narrowVirtualisedList` waits on the count chip, which can briefly
         // read "stable" at its pre-filter value before the search debounce
-        // fires — leaving the target card rendered off-screen in the
+        // fires - leaving the target card rendered off-screen in the
         // VirtuosoGrid, where a plain visibility wait can't recover because
         // nothing scrolls it back into the DOM. Re-narrow + scroll into view
         // until the card actually materialises, so a single stale count read
@@ -172,7 +172,7 @@ When("I switch to the Preview tab", async ({ page }) => {
     await previewTab.click();
 
     // Wait until the Canvas wrapper exists in the DOM. `state: "attached"`
-    // — NOT "visible" (the default). The canvas mounts inside an absolutely-
+    // - NOT "visible" (the default). The canvas mounts inside an absolutely-
     // positioned R3F wrapper that's briefly 0×0 while the flex parent
     // finishes laying out, so a visibility wait here would race against
     // layout and time out before the assertion step even runs.
@@ -191,7 +191,7 @@ When("I switch to the Preview tab", async ({ page }) => {
 Then("the 3D preview canvas should be visible", async ({ page }) => {
     // What this assertion actually proves: the Preview tab mounted the
     // R3F Canvas without the React tree crashing. We don't check CSS
-    // visibility — see `waitForR3FCanvas` for why. The downstream "no
+    // visibility - see `waitForR3FCanvas` for why. The downstream "no
     // console errors" / "has textures applied" steps cover the no-crash
     // invariant via separate channels.
     await waitForR3FCanvas(page, ".texture-preview-canvas");

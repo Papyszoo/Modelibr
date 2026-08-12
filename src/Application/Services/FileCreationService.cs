@@ -58,7 +58,7 @@ internal sealed class FileCreationService : IFileCreationService
         var existingFile = await _fileRepository.GetBySha256HashAsync(hash, cancellationToken);
         if (existingFile != null)
         {
-            // Active file with same hash exists — reuse it
+            // Active file with same hash exists - reuse it
             if (_storage.FileExists(existingFile.FilePath))
             {
                 // Generate thumbnails if they don't already exist (migration case)
@@ -66,7 +66,7 @@ internal sealed class FileCreationService : IFileCreationService
                 return Result.Success(existingFile);
             }
 
-            // Physical file is missing but DB record exists — this shouldn't normally happen.
+            // Physical file is missing but DB record exists - this shouldn't normally happen.
             // Log a warning and proceed to re-upload the file. Clean up the orphan.
             _logger.LogWarning(
                 "Orphaned file record {FileId} detected (hash {Hash}): physical file missing at {Path}. Cleaning up.",
@@ -75,7 +75,7 @@ internal sealed class FileCreationService : IFileCreationService
         }
 
         // Check if a soft-deleted (recycled) file with the same hash exists.
-        // If so, remove the recycled record — the re-upload replaces it as a fresh file.
+        // If so, remove the recycled record - the re-upload replaces it as a fresh file.
         var deletedFile = await _fileRepository.GetDeletedBySha256HashAsync(hash, cancellationToken);
         if (deletedFile != null)
         {

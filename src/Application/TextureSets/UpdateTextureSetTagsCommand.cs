@@ -61,7 +61,7 @@ internal sealed class UpdateTextureSetTagsCommandHandler
     }
 
     // Resolve tag names to ModelTag entities from the shared pool, creating any
-    // that don't exist yet — identical to the model and environment-map flows.
+    // that don't exist yet - identical to the model and environment-map flows.
     private async Task<List<ModelTag>> ResolveTagsAsync(
         IReadOnlyCollection<string>? names,
         DateTime now,

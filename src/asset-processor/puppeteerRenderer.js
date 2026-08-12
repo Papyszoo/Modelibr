@@ -202,7 +202,7 @@ export class PuppeteerRenderer {
 
   /**
    * Check if the current page is actually usable (not detached/crashed).
-   * `page.isClosed()` alone is insufficient — the page object can exist while
+   * `page.isClosed()` alone is insufficient - the page object can exist while
    * the underlying Chromium renderer process has crashed and the frame is detached.
    * @returns {Promise<boolean>} true if page.evaluate() works
    */
@@ -259,7 +259,7 @@ export class PuppeteerRenderer {
 
   /**
    * Public entry point for forcing reinitialization from outside this
-   * renderer — used by RendererPool.forceReinit() when the job holding
+   * renderer - used by RendererPool.forceReinit() when the job holding
    * this renderer times out. Same crash-recovery path as the internal
    * page-crash/frame-detach handling.
    */
@@ -294,7 +294,7 @@ export class PuppeteerRenderer {
         const requestedName = decodeURIComponent(req.url.split('/').pop() || '')
 
         // Sanitize: strip all directory components to prevent path traversal.
-        // path.basename() ensures only a plain filename remains — no ../ or subdirs.
+        // path.basename() ensures only a plain filename remains - no ../ or subdirs.
         const safeName = path.basename(requestedName)
         if (!safeName || safeName === '.' || safeName === '..') {
           res.writeHead(400)
@@ -399,7 +399,7 @@ export class PuppeteerRenderer {
           )
           await this._reinitialize()
         }
-        // Otherwise continue — the new model load will overwrite the scene
+        // Otherwise continue - the new model load will overwrite the scene
       }
 
       // Read the file and convert to data URL
@@ -484,7 +484,7 @@ export class PuppeteerRenderer {
       }
 
       if (result.blockedResourceUrls?.length) {
-        // Not fatal on its own — the model may still render without the reference —
+        // Not fatal on its own - the model may still render without the reference -
         // but it means the file asked us to leave the machine, which we refused.
         logger.warn('Blocked external glTF resource references', {
           count: result.blockedResourceUrls.length,
@@ -574,7 +574,7 @@ export class PuppeteerRenderer {
         const model = new THREE.Group()
         model.add(mesh)
 
-        // Preview primitives are not library assets — make sure no stale
+        // Preview primitives are not library assets - make sure no stale
         // pre-normalization capture from a real model survives behind them.
         window.modelRenderer.rawSceneGraph = null
         const normInfo = window.normalizeModel(model, 2.0)
@@ -610,7 +610,7 @@ export class PuppeteerRenderer {
   /**
    * Load a primitive geometry into the scene for texture set previews.
    * Supports plane (default), sphere, box, cylinder, and torus.
-   * Uses fixed unit sizes — the camera auto-frames the object.
+   * Uses fixed unit sizes - the camera auto-frames the object.
    * @param {string} [geometryType='plane'] - One of 'plane', 'sphere', 'box', 'cylinder', 'torus'
    * @returns {Promise<number>} Polygon count
    */
@@ -694,7 +694,7 @@ export class PuppeteerRenderer {
         const model = new THREE.Group()
         model.add(mesh)
 
-        // Preview primitives are not library assets — make sure no stale
+        // Preview primitives are not library assets - make sure no stale
         // pre-normalization capture from a real model survives behind them.
         window.modelRenderer.rawSceneGraph = null
         const normInfo = window.normalizeModel(model, 2.0)
@@ -845,7 +845,7 @@ export class PuppeteerRenderer {
       materialName: materialName || '(all meshes)',
     })
 
-    // Start a local HTTP server to serve texture files — avoids base64 encoding and
+    // Start a local HTTP server to serve texture files - avoids base64 encoding and
     // massive CDP JSON payloads that crash Chromium's renderer process on large textures.
     // Derive the texture directory from the actual file paths.
     const firstEntry = Object.values(texturePaths)[0]
@@ -858,7 +858,7 @@ export class PuppeteerRenderer {
 
     try {
       // Build lightweight texture metadata with HTTP URLs instead of base64 data.
-      // Only URLs (a few bytes each) are sent through CDP — the browser fetches
+      // Only URLs (a few bytes each) are sent through CDP - the browser fetches
       // full texture data directly from the local server, one at a time.
       const textureData = {}
       for (const [textureType, textureInfo] of Object.entries(texturePaths)) {
@@ -1008,7 +1008,7 @@ export class PuppeteerRenderer {
               })
             }
 
-            // Load EXR texture via fetch + EXRLoader.parse() — preserves full HDR precision
+            // Load EXR texture via fetch + EXRLoader.parse() - preserves full HDR precision
             const loadExrTexture = async (url, flip) => {
               const response = await fetch(url)
               const arrayBuffer = await response.arrayBuffer()
@@ -1034,7 +1034,7 @@ export class PuppeteerRenderer {
               return texture
             }
 
-            // Load TIFF texture via window.UTIF — browsers cannot decode TIFF natively
+            // Load TIFF texture via window.UTIF - browsers cannot decode TIFF natively
             // Load TIFF via the shared decoder (window.modelibrTiff) so this
             // scene and the in-browser viewer interpret the same TIFF identically.
             const loadTiffTexture = async (url, flip) => {
@@ -1085,7 +1085,7 @@ export class PuppeteerRenderer {
 
                 // No material slot for this type (e.g. the SplitChannel source
                 // placeholder, or a type the shared map doesn't know yet). Drop it
-                // instead of stashing the texture under a junk key — keeps the
+                // instead of stashing the texture under a junk key - keeps the
                 // color-space classification from mis-firing on a non-slot string.
                 if (!materialProperty) {
                   console.warn(
@@ -1142,7 +1142,7 @@ export class PuppeteerRenderer {
                 }
                 meshCount++
 
-                // AO maps require a second UV set — copy uv to uv2. Shared with
+                // AO maps require a second UV set - copy uv to uv2. Shared with
                 // the viewer (asset-processor/lib/textureMaterial.js) so both
                 // runtimes light AO-mapped models identically.
                 if (loadedTextures.aoMap) {
@@ -1184,14 +1184,14 @@ export class PuppeteerRenderer {
                     child.material.needsUpdate = true
                     console.log(`Applied ${property} to mesh`)
 
-                    // Special handling per texture type — match frontend behavior
+                    // Special handling per texture type - match frontend behavior
                     if (property === 'emissiveMap') {
                       child.material.emissive = new THREE.Color(0xffffff)
                       child.material.emissiveIntensity = 1.0
                     }
                     if (property === 'displacementMap') {
                       // Bias by -scale/2 so heightmap mid-grey means "no
-                      // displacement" — without it every vertex inflates
+                      // displacement" - without it every vertex inflates
                       // outward and only the grout *recesses*.
                       child.material.displacementScale = 0.02
                       child.material.displacementBias = -0.01
@@ -1199,7 +1199,7 @@ export class PuppeteerRenderer {
                       // edges (cube faces, hard-edge user meshes) stay
                       // watertight while keeping per-face UVs intact for color
                       // sampling. Shared with the viewer
-                      // (asset-processor/lib/displacementNormal.js) — both
+                      // (asset-processor/lib/displacementNormal.js) - both
                       // helpers are idempotent.
                       window.modelibrDispNormal.addSharedDisplacementNormal(
                         THREE,
@@ -1563,7 +1563,7 @@ export class PuppeteerRenderer {
    */
   async extractMaterialNames() {
     if (!this.page || this.page.isClosed()) {
-      logger.warn('Cannot extract material names — page not available')
+      logger.warn('Cannot extract material names - page not available')
       return []
     }
 
@@ -1615,7 +1615,7 @@ export class PuppeteerRenderer {
    */
   async extractTechnicalMetadata() {
     if (!this.page || this.page.isClosed()) {
-      logger.warn('Cannot extract technical metadata — page not available')
+      logger.warn('Cannot extract technical metadata - page not available')
       return null
     }
 
@@ -1725,7 +1725,7 @@ export class PuppeteerRenderer {
    * geometry hash it produces is order-invariant and matches a future bpy pass.
    *
    * Returns the payload captured at load time, BEFORE normalizeModel scaled the
-   * model to fit the thumbnail view box — measuring afterwards would report the
+   * model to fit the thumbnail view box - measuring afterwards would report the
    * framing size (max dimension 2) instead of the asset's real dimensions.
    *
    * Takes no source format: the format is recorded into the payload at load time,
@@ -1735,7 +1735,7 @@ export class PuppeteerRenderer {
    */
   async extractSceneGraph() {
     if (!this.page || this.page.isClosed()) {
-      logger.warn('Cannot extract scene graph — page not available')
+      logger.warn('Cannot extract scene graph - page not available')
       return null
     }
 

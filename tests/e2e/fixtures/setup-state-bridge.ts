@@ -41,7 +41,7 @@ function readState(): PersistedState {
             return JSON.parse(fs.readFileSync(STATE_FILE, "utf-8"));
         }
     } catch {
-        // Corrupted file — start fresh
+        // Corrupted file - start fresh
     }
     return { models: {}, textureSets: {} };
 }

@@ -17,7 +17,7 @@ namespace Infrastructure.Tests.Persistence;
 /// <summary>
 /// Covers prompt 25 part B: DomainEventsInterceptor is the ONLY place domain
 /// events are dispatched from. These tests exercise the interceptor directly
-/// against a real ApplicationDbContext/SaveChanges pipeline — command handlers
+/// against a real ApplicationDbContext/SaveChanges pipeline - command handlers
 /// that raise events (e.g. EnvironmentMap.Create) contain zero dispatch code;
 /// this is what makes that possible.
 /// </summary>
@@ -40,7 +40,7 @@ public class DomainEventsInterceptorTests
         // Arrange: a real dispatcher + a real handler, wired through DI exactly as
         // production does (Application/DependencyInjection.cs assembly-scans
         // IDomainEventHandler<> implementations). The only "dispatch code" anywhere
-        // is the interceptor — this test's Act is just SaveChangesAsync.
+        // is the interceptor - this test's Act is just SaveChangesAsync.
         var handler = new RecordingHandler();
         var services = new ServiceCollection();
         services.AddSingleton<IDomainEventHandler<EnvironmentMapCreatedEvent>>(handler);
@@ -53,14 +53,14 @@ public class DomainEventsInterceptorTests
         var environmentMap = EnvironmentMap.Create("Sunset", DateTime.UtcNow);
         context.EnvironmentMaps.Add(environmentMap);
 
-        // Act — no PublishAsync/ClearDomainEvents call anywhere in this test either;
+        // Act - no PublishAsync/ClearDomainEvents call anywhere in this test either;
         // that's the point.
         await context.SaveChangesAsync();
 
         // Assert
         var handled = Assert.Single(handler.Handled);
         // EnvironmentMapCreatedEvent captures Id at construction time inside
-        // EnvironmentMap.Create — before the entity is tracked/saved — so it's
+        // EnvironmentMap.Create - before the entity is tracked/saved - so it's
         // always 0, independent of this PR; that's a pre-existing characteristic
         // of this event, not something dispatch-after-commit changes.
         Assert.Equal(0, handled.EnvironmentMapId);
@@ -113,7 +113,7 @@ public class DomainEventsInterceptorTests
             x => x.PublishAsync(It.IsAny<IEnumerable<IDomainEvent>>(), It.IsAny<CancellationToken>()),
             Times.Never);
 
-        // The event is still sitting on the aggregate — nothing silently dropped it,
+        // The event is still sitting on the aggregate - nothing silently dropped it,
         // the whole SaveChanges just never got that far.
         Assert.Single(environmentMap.DomainEvents);
     }
@@ -140,7 +140,7 @@ public class DomainEventsInterceptorTests
 
                 stagedOnce = true;
                 // Setting doesn't raise domain events, so this round-trips through
-                // exactly one extra SaveChanges — it terminates on its own.
+                // exactly one extra SaveChanges - it terminates on its own.
                 capturedContext!.Settings.Add(Setting.Create("staged-during-dispatch", "value", DateTime.UtcNow));
             })
             .ReturnsAsync(Result.Success());
@@ -153,7 +153,7 @@ public class DomainEventsInterceptorTests
 
         await context.SaveChangesAsync();
 
-        // Dispatched exactly once (for "Trigger" — Setting raises no events of its
+        // Dispatched exactly once (for "Trigger" - Setting raises no events of its
         // own), but the Setting staged during that dispatch was still flushed by
         // the interceptor's follow-up SaveChanges.
         mockDispatcher.Verify(

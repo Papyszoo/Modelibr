@@ -100,7 +100,7 @@ internal sealed class ThumbnailJobRepository : IThumbnailJobRepository
         // expired-lock reset must be durable within the same claim boundary.
         // COORDINATION (prompt 27): if EnableRetryOnFailure lands on the Npgsql
         // provider, BeginTransactionAsync here must be wrapped in
-        // Database.CreateExecutionStrategy().ExecuteAsync(...) — user-initiated
+        // Database.CreateExecutionStrategy().ExecuteAsync(...) - user-initiated
         // transactions are incompatible with a retrying execution strategy otherwise.
         using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
         

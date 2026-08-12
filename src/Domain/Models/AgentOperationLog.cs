@@ -2,7 +2,7 @@ namespace Domain.Models;
 
 /// <summary>
 /// Lifecycle of an idempotency claim. The claim is written <b>before</b> the mutation it
-/// guards, so "a row exists" cannot mean "the operation happened" — only
+/// guards, so "a row exists" cannot mean "the operation happened" - only
 /// <see cref="Completed"/> does.
 /// </summary>
 public static class AgentOperationStatus
@@ -18,7 +18,7 @@ public static class AgentOperationStatus
 }
 
 /// <summary>
-/// Append-only audit of agent-initiated writes (schema hook — no write endpoints
+/// Append-only audit of agent-initiated writes (schema hook - no write endpoints
 /// exist yet). Detailed enough to review and reverse a batch: an agent that
 /// mis-assigns forty texture channels must be undoable in one action, so each
 /// entry carries the before/after payload, an idempotency key (so a retried write
@@ -28,7 +28,7 @@ public class AgentOperationLog
 {
     public int Id { get; private set; }
 
-    /// <summary>Caller-supplied idempotency key — a repeated write with the same key must not re-apply.</summary>
+    /// <summary>Caller-supplied idempotency key - a repeated write with the same key must not re-apply.</summary>
     public string IdempotencyKey { get; private set; } = string.Empty;
 
     /// <summary>Groups entries that belong to one batch, so the whole batch can be reversed together. Null for singletons.</summary>
@@ -36,7 +36,7 @@ public class AgentOperationLog
 
     /// <summary>
     /// Pending / Completed / Failed (see <see cref="AgentOperationStatus"/>). A row is
-    /// written before its mutation runs, so only Completed proves the write landed —
+    /// written before its mutation runs, so only Completed proves the write landed -
     /// treating any existing row as "already applied" answered a retry with success for
     /// an operation that had crashed halfway or was still running.
     /// </summary>
@@ -61,7 +61,7 @@ public class AgentOperationLog
     public string? AssetType { get; private set; }
     public int? AssetId { get; private set; }
 
-    /// <summary>State before/after as JSON (stored as jsonb) — the basis for review and reversal.</summary>
+    /// <summary>State before/after as JSON (stored as jsonb) - the basis for review and reversal.</summary>
     public string? PayloadBefore { get; private set; }
     public string? PayloadAfter { get; private set; }
 

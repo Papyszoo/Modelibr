@@ -27,7 +27,7 @@ import { parseTrx, parseJestLike, parseTap } from "../test-runner/parsers.mjs";
 // aggregated HTML report itself.
 export const EVERYTHING = {
     id: "everything",
-    name: "Everything — all suites via the local runner",
+    name: "Everything - all suites via the local runner",
     kind: "runner",
     cwd: ".",
     command: "node scripts/test-runner/index.mjs --all --yes --no-open",
@@ -72,7 +72,7 @@ export function buildRunSpec(spec) {
             try {
                 const summaryFile = path.join(REPORT_DIR, "summary.json");
                 // A runner crash before writing summary.json must not attach the
-                // PREVIOUS run's counts to this run — only trust a fresh file.
+                // PREVIOUS run's counts to this run - only trust a fresh file.
                 if (fs.statSync(summaryFile).mtimeMs < builtAt) return null;
                 const j = JSON.parse(fs.readFileSync(summaryFile, "utf8"));
                 const agg = { total: 0, passed: 0, failed: 0, skipped: 0 };

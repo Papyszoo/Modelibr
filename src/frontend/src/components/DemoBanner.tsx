@@ -5,12 +5,12 @@ import { type JSX, useCallback, useEffect, useState } from 'react'
 const BANNER_HEIGHT = '32px'
 
 const DEMO_LIMITATIONS = [
-  'Blender Integration — .blend file uploads and model extraction',
-  'SSL Certificate — HTTPS certificate management',
-  'WebDAV — network drive connectivity for asset access',
-  'Server-side Asset Processing — GPU-powered thumbnail rendering',
-  'File Deduplication — hash-based storage optimization',
-  'SignalR Real-time Updates — live processing status notifications',
+  'Blender Integration - .blend file uploads and model extraction',
+  'SSL Certificate - HTTPS certificate management',
+  'WebDAV - network drive connectivity for asset access',
+  'Server-side Asset Processing - GPU-powered thumbnail rendering',
+  'File Deduplication - hash-based storage optimization',
+  'SignalR Real-time Updates - live processing status notifications',
 ]
 
 export function DemoBanner(): JSX.Element {
@@ -59,7 +59,7 @@ export function DemoBanner(): JSX.Element {
     <>
       <div className="demo-banner" data-testid="demo-banner">
         <span className="demo-banner__text">
-          Demo Mode — data is stored locally in your browser
+          Demo Mode - data is stored locally in your browser
         </span>
         <button
           className="demo-banner__action"

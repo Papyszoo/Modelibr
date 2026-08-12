@@ -37,7 +37,7 @@ test.describe("Backup create / list / download / delete (UI)", () => {
         await settings.setIncludeThumbnails(false);
         await settings.confirmCreateBackup();
 
-        // A row appears — possibly in 'in_progress' state — then transitions to ready.
+        // A row appears - possibly in 'in_progress' state - then transitions to ready.
         const fileName = await settings.waitForFirstBackupRow();
         expect(fileName).toMatch(/^modelibr-\d{4}-\d{2}-\d{2}-\d{6}\.tar$/);
         await settings.waitForRowReady(fileName);
@@ -56,7 +56,7 @@ test.describe("Backup create / list / download / delete (UI)", () => {
 
         // BackupService writes a PAX-format tar containing `manifest.json`,
         // `database.dump`, and `uploads/...`. Verify those names appear in the
-        // archive — substring search keeps this robust against PAX metadata
+        // archive - substring search keeps this robust against PAX metadata
         // blocks (`./PaxHeaders.N/...`) interleaving the real entries.
         const ascii = bytes.toString("binary"); // 1-byte chars; no UTF-8 reinterpretation
         expect(ascii).toContain("database.dump");

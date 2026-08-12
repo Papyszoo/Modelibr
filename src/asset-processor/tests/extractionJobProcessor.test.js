@@ -46,7 +46,7 @@ describe('ExtractionJobProcessor.process', () => {
       fetchAuxiliaryResourceMap: vi.fn().mockResolvedValue(null),
       cleanupFile: vi.fn().mockResolvedValue(undefined),
     }
-    // Both save methods report success/failure as a boolean and never throw —
+    // Both save methods report success/failure as a boolean and never throw -
     // mocking them as `undefined` is what let a failed persist read as success.
     processor.modelDataService = {
       saveSceneGraph: vi.fn().mockResolvedValue(true),
@@ -145,7 +145,7 @@ describe('ExtractionJobProcessor.process', () => {
 
   it('fails the job when persisting the scene graph fails', async () => {
     // Regression: saveSceneGraph converts an API error (400/500/timeout) into
-    // `false`. Ignoring it completed the job having rebuilt nothing, permanently —
+    // `false`. Ignoring it completed the job having rebuilt nothing, permanently -
     // the queue would never retry, and trigger_rederive silently did nothing.
     processor.modelDataService.saveSceneGraph.mockResolvedValue(false)
 

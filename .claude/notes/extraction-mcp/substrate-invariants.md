@@ -1,4 +1,4 @@
-# Substrate invariants — the cross-layer rules the pipeline broke
+# Substrate invariants - the cross-layer rules the pipeline broke
 
 Found by review of PR #579 and fixed in the same branch. Each of these was **green on
 every test** while being wrong: the bugs live in the seams between the worker, the
@@ -12,7 +12,7 @@ Related: [[substrate-and-mcp.md]], [[search-quality.md]]
 upserts the verbatim v2 payload into the same `AssetExtraction` row.
 `UpdateTechnicalMetadataCommand` upserts the flat v1 payload into that *same* row.
 
-So the two writes are not additive — the later one wins the raw payload. The extraction
+So the two writes are not additive - the later one wins the raw payload. The extraction
 executor ran scene graph → technical metadata, meaning **every successful re-derive
 destroyed the raw extraction** it exists to preserve. The thumbnail path happened to run
 them the other way round and was fine, which is why nothing showed.
@@ -24,7 +24,7 @@ no scene graph could be produced.
 
 `ModelDataService.saveSceneGraph` / `saveTechnicalMetadata` convert an API error into
 `false` and never throw. The executor ignored the return and marked the job Done, so a
-transient 400/500/timeout **permanently completed a job that rebuilt nothing** — no
+transient 400/500/timeout **permanently completed a job that rebuilt nothing** - no
 retry, and `trigger_rederive` silently did nothing.
 
 The unit test mocked those methods as `undefined` and still expected success. When you
@@ -34,12 +34,12 @@ mock a boolean-returning API client, mock the boolean.
 
 `normalizeModel(model, 2.0)` multiplies the root scale so the model fits a 2-unit
 thumbnail view box. The scene-graph extractor read `Box3.setFromObject(root)` *after*
-that, so a 10×4×2 m asset was indexed as ~2×0.8×0.4 — corrupting every size fact, size
+that, so a 10×4×2 m asset was indexed as ~2×0.8×0.4 - corrupting every size fact, size
 filter and any future placement reasoning.
 
 Fix: the payload is captured in `loadModel`, before normalization; `extractSceneGraph()`
 returns that capture and refuses rather than measuring a normalized model.
-(`extractTechnicalMetadata` was already correct — it uses the saved `originalSize`.)
+(`extractTechnicalMetadata` was already correct - it uses the saved `originalSize`.)
 
 ## Search: "current version" is `Model.ActiveVersionId`, not arrival order
 
@@ -56,7 +56,7 @@ could each silently swap the asset's searchable version.
 | Transition | What was wrong |
 | --- | --- |
 | soft delete / restore | recycled assets stayed fully searchable (now `IsActive`) |
-| permanent delete | no FK from the projection, so nothing cascaded — documents orphaned |
+| permanent delete | no FK from the projection, so nothing cascaded - documents orphaned |
 | active-version change | current-version marker never moved |
 | `set_category` | category is stamped at extraction time, so an agent could not confirm its own write with a category-filtered search |
 
@@ -78,7 +78,7 @@ Two instances of the same mistake:
 
 - **Extraction jobs.** `finish` validated neither worker identity nor lease, so a worker
   whose lease had lapsed could overwrite the outcome of the run that replaced it. And an
-  expired lock bypassed `MaxAttempts` entirely — a job that reliably hangs the worker
+  expired lock bypassed `MaxAttempts` entirely - a job that reliably hangs the worker
   was re-claimed forever, never dead-lettered.
 - **MCP idempotency.** The key is (correctly) claimed *before* the mutation, but any
   existing row was then read as "already applied". A crash, exception or cancellation
@@ -91,7 +91,7 @@ Two instances of the same mistake:
 
 A loose `.gltf` is identity-incomplete. Dedup ran on the primary hash alone, and the
 second import then **skipped** its own `scene.bin` because a link at that relative path
-already existed — two different assets collapsed into one and the second's geometry was
+already existed - two different assets collapsed into one and the second's geometry was
 lost silently. Identity now compares the referenced resources' hashes; a mismatch
 imports a distinct model instead of merging.
 
@@ -101,7 +101,7 @@ imports a distinct model instead of merging.
 `{batchId, imported[]}`, while every other upload path answered
 `{succeeded, failed, total}`. The shared success callback reads `results.succeeded`, so
 it threw: no imported model was associated with the pack the import was started from,
-and the grid never refreshed — all *after* the progress window had reported success.
+and the grid never refreshed - all *after* the progress window had reported success.
 The renderability/`.blend` gates did not apply either, because they are client-side and
 the archive never passed through them.
 
@@ -118,7 +118,7 @@ waiting for the first shared consumer. Prefer one path with an adapter at the ed
 
 The worker resolving external references says nothing about the browser. The viewer
 attached the shared `safeLoadingManager`, which rewrites anything that isn't
-`/files/<id>` to a transparent PNG — so an imported loose `.gltf` opened with its
+`/files/<id>` to a transparent PNG - so an imported loose `.gltf` opened with its
 `scene.bin` replaced by an image, i.e. **no geometry at all**, while the thumbnail
 looked perfect. The E2E only ever checked worker output.
 

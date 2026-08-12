@@ -33,7 +33,7 @@ export class DockerHelper {
     }
 
     /**
-     * One-line container lifecycle state — what distinguishes "the worker is
+     * One-line container lifecycle state - what distinguishes "the worker is
      * busy" from "the worker is gone". `docker logs --tail` cannot tell them
      * apart: a dead container keeps returning the same frozen tail forever, which
      * is what made the 2026-08-10 e2e-full failure take a dig through the colima
@@ -63,7 +63,7 @@ export class DockerHelper {
      * The e2e stack (docker-compose.e2e.yml) keeps uploads on a NAMED docker
      * volume, not a host bind mount (unlike tests/backup-restore-e2e, which
      * bind-mounts ./data/uploads and can just use fs.readdirSync). `docker exec`
-     * is the only way to reach files under that volume from the test process —
+     * is the only way to reach files under that volume from the test process -
      * this mirrors how `getContainerLogs` above already shells out to `docker`
      * for container introspection, just for files instead of logs. Returns []
      * if the directory doesn't exist yet (e.g. no orphan has ever been
@@ -106,7 +106,7 @@ export class DockerHelper {
 
     /**
      * Remove a single file from inside a running container. Used to clean up
-     * only the specific files a scenario created (e.g. one orphan + its sidecar) —
+     * only the specific files a scenario created (e.g. one orphan + its sidecar) -
      * never a wholesale directory wipe, since parallel/other scenarios' orphan
      * files may coexist in the same directory.
      */

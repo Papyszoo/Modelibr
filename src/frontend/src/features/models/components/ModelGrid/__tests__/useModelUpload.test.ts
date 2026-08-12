@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react'
 
-// Mock blenderEnabledStore — control blenderEnabled value
+// Mock blenderEnabledStore - control blenderEnabled value
 let mockBlenderEnabled = false
 jest.mock('@/stores/blenderEnabledStore', () => ({
   useBlenderEnabledStore: (
@@ -88,7 +88,7 @@ describe('useModelUpload', () => {
     })
 
     // Regression: uploadFolder was passed straight through, so a picked folder
-    // bypassed the renderability/.blend gates the file picker applies — .blend files
+    // bypassed the renderability/.blend gates the file picker applies - .blend files
     // reached the backend with Blender disabled, and .dae/.3ds always did.
     it('refuses .blend primaries in a folder import when Blender is disabled', () => {
       mockBlenderEnabled = false

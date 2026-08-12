@@ -33,7 +33,7 @@ public class ConcurrencyTests : IClassFixture<ModelibrWebFactory>, IAsyncLifetim
     // same "Modelibr_IntegrationTests" database in its ModelibrWebFactory
     // constructor, that one-shot startup migration can land its
     // GetAppliedMigrationsAsync query at the exact moment a sibling class's
-    // constructor issues pg_terminate_backend for a fresh drop/recreate —
+    // constructor issues pg_terminate_backend for a fresh drop/recreate -
     // observed as Npgsql 57P01 "terminating connection due to administrator
     // command", silently swallowed, leaving this app started with no schema
     // (every request then 500s with "relation ... does not exist").
@@ -122,7 +122,7 @@ public class ConcurrencyTests : IClassFixture<ModelibrWebFactory>, IAsyncLifetim
         // Every upload must succeed: sharing one file hash deduplicates the stored file but
         // still creates a model each. This used to 500 under the concurrent insert and the
         // assertion was parked as a comment; the dedup path handles the race now, so it is
-        // asserted for real — a regression that reintroduces the 500 has to fail here.
+        // asserted for real - a regression that reintroduces the 500 has to fail here.
         Assert.Equal(parallelism, successful.Length);
 
         // All successful models should have distinct IDs
@@ -160,7 +160,7 @@ public class ConcurrencyTests : IClassFixture<ModelibrWebFactory>, IAsyncLifetim
 
         // Verify the entity is in a consistent final state
         var getResp = await _client.GetAsync($"/models/{modelId}");
-        // Either it was restored (200) or permanently deleted (404) — not both or neither
+        // Either it was restored (200) or permanently deleted (404) - not both or neither
         Assert.True(
             getResp.StatusCode == HttpStatusCode.OK || getResp.StatusCode == HttpStatusCode.NotFound,
             $"Entity in inconsistent state: GET returned {getResp.StatusCode}");
@@ -223,7 +223,7 @@ public class ConcurrencyTests : IClassFixture<ModelibrWebFactory>, IAsyncLifetim
         // The real invariant: no job is handed to two workers. ThumbnailQueue.DequeueAsync
         // claims via a conditional UPDATE (WHERE Status = Pending), so losers of the race
         // update zero rows and get 204. Sibling tests leave their own pending jobs in the
-        // shared database, so several workers may legitimately claim — just never the same job.
+        // shared database, so several workers may legitimately claim - just never the same job.
         var claimedJobIds = new List<int>();
         foreach (var resp in claimedResponses)
         {

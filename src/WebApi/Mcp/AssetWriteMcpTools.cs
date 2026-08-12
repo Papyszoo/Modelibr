@@ -12,7 +12,7 @@ using ModelContextProtocol.Server;
 namespace WebApi.Mcp;
 
 /// <summary>
-/// Local MCP <b>write</b> tools — the deferred write phase (prompt 30) that lets an agent
+/// Local MCP <b>write</b> tools - the deferred write phase (prompt 30) that lets an agent
 /// do what a user can: tag, categorize, pack, (re-)import, and re-derive. A thin
 /// pass-through over the same command handlers the frontend uses (one source of truth).
 ///
@@ -28,7 +28,7 @@ namespace WebApi.Mcp;
 /// Claiming first also means a claim row is <b>not</b> evidence the write happened, so
 /// every tool body runs through <see cref="Guarded{T}"/>: only a Completed entry replays
 /// as <c>already-applied</c>, a live claim answers <c>in-progress</c> (retryable), and any
-/// exit path — returned failure, thrown exception, cancellation — releases the claim
+/// exit path - returned failure, thrown exception, cancellation - releases the claim
 /// rather than leaving the key permanently burned on an operation that never ran.
 /// </summary>
 [McpServerToolType]
@@ -144,7 +144,7 @@ public sealed class AssetWriteMcpTools
     }
 
     [McpServerTool(Name = "trigger_rederive")]
-    [Description("Queue a re-extraction of an asset so its parts, derived signals, and search index (incl. semantic labels) are rebuilt. Idempotent — a live job is reused.")]
+    [Description("Queue a re-extraction of an asset so its parts, derived signals, and search index (incl. semantic labels) are rebuilt. Idempotent - a live job is reused.")]
     public static Task<object> TriggerRederive(
         ICommandHandler<EnqueueExtractionJobCommand, EnqueueExtractionJobResponse> handler,
         IAgentAudit audit,
@@ -181,7 +181,7 @@ public sealed class AssetWriteMcpTools
         CancellationToken cancellationToken = default)
     {
         // Remote case: bytes must travel over HTTP; point the agent's host at the endpoints.
-        // No claim is taken — nothing has been written, so a repeat is free.
+        // No claim is taken - nothing has been written, so a repeat is free.
         if (string.IsNullOrWhiteSpace(path))
         {
             return Task.FromResult<object>(new
@@ -248,7 +248,7 @@ public sealed class AssetWriteMcpTools
 
     /// <summary>
     /// Claims the key, runs <paramref name="body"/>, and settles the claim on every exit
-    /// path. A thrown exception or a cancellation releases the claim before propagating —
+    /// path. A thrown exception or a cancellation releases the claim before propagating -
     /// otherwise a crashed call would leave the key Pending and a later retry would be
     /// told the operation was already applied when nothing had been.
     /// </summary>
@@ -307,7 +307,7 @@ public sealed class AssetWriteMcpTools
         status = "in-progress",
         operation = prior.Operation,
         claimedAt = prior.ClaimedAt,
-        message = "Another call is applying this idempotency key. It has NOT been applied yet — retry, and it will either complete or be retried for you once the claim lapses.",
+        message = "Another call is applying this idempotency key. It has NOT been applied yet - retry, and it will either complete or be retried for you once the claim lapses.",
     };
 
     private static string Json(object value) => JsonSerializer.Serialize(value);

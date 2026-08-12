@@ -64,7 +64,7 @@ export function useModelUpload({
   // Folder and zip imports run through the same gates as the file picker:
   // renderable-only (the hook's requireThreeJSRenderable) plus the .blend allowance
   // below. Without this they were side doors for .blend/.dae/.3ds files the grid
-  // otherwise refuses — a zip especially, since it used to be unzipped server-side
+  // otherwise refuses - a zip especially, since it used to be unzipped server-side
   // where no client gate applied at all.
   const gatedUploadFolder = useCallback(
     (files: File[] | FileList) =>
@@ -98,7 +98,7 @@ export function useModelUpload({
     uploading,
     uploadProgress,
     uploadMultipleFiles: filteredUploadMultipleFiles,
-    // Multi-file glTF import (folder / .zip) — a zip is expanded in the browser and
+    // Multi-file glTF import (folder / .zip) - a zip is expanded in the browser and
     // then follows the folder path exactly.
     uploadFolder: gatedUploadFolder,
     uploadZip: gatedUploadZip,

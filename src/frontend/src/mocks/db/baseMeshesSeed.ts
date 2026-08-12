@@ -1,5 +1,5 @@
 /**
- * "Base Meshes (CC0)" demo pack — a curated subset of the base-meshes content
+ * "Base Meshes (CC0)" demo pack - a curated subset of the base-meshes content
  * repo, served remotely so no binaries live in this repository.
  *
  * Credits: meshes by The Base Mesh (https://www.thebasemesh.com/, CC0 1.0),
@@ -9,7 +9,7 @@
  *
  * URLs are pinned to a commit SHA so upstream pushes can never break the demo.
  * That commit predates the repo's packs/<slug>/ reorganisation, so the path
- * below is still `models/…` — a pinned URL always describes the tree as it was
+ * below is still `models/…` - a pinned URL always describes the tree as it was
  * at that commit, and GitHub keeps serving it under the current repo name.
  * Each model folder provides `{name}.glb` plus pipeline-identical thumbnails
  * (`{name}.webp` animated turntable, `{name}.png` static fallback).
@@ -195,7 +195,7 @@ export function buildBaseMeshSeed(now: string): {
     name: packRef.name,
     description:
       'CC0 base meshes by The Base Mesh (thebasemesh.com), converted to glTF ' +
-      'by the M3-org/base-meshes project. Real-world scale with basic UVs — ' +
+      'by the M3-org/base-meshes project. Real-world scale with basic UVs - ' +
       'free for any use, no attribution required.',
     licenseType: 'CC0',
     url: 'https://www.thebasemesh.com/',

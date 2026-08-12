@@ -39,7 +39,7 @@ const { Given, When, Then } = createBdd();
  * [Three.js] ✓ Model visible in camera!
  */
 Then("the 3D canvas should be visible", async ({ page }) => {
-    // Wait for version data to load FIRST — the version-dropdown-trigger only
+    // Wait for version data to load FIRST - the version-dropdown-trigger only
     // renders when versions.length > 0.  During the initial render the
     // VersionStrip briefly shows "No versions available" while the API call is
     // in flight, so we must wait for the dropdown before error-checking.
@@ -51,7 +51,7 @@ Then("the 3D canvas should be visible", async ({ page }) => {
         .catch(() => false);
 
     if (!dropdownVisible) {
-        // Version dropdown never appeared — check for genuine error state
+        // Version dropdown never appeared - check for genuine error state
         const noVersionsError = page.locator("text=No versions available");
         const isErrorVisible = await noVersionsError
             .isVisible()
@@ -64,7 +64,7 @@ Then("the 3D canvas should be visible", async ({ page }) => {
             );
         }
         throw new Error(
-            `Version dropdown not found within ${ciTimeout / 1000} s — model may not have loaded. URL: ${currentUrl}`,
+            `Version dropdown not found within ${ciTimeout / 1000} s - model may not have loaded. URL: ${currentUrl}`,
         );
     }
     console.log("[UI] Version dropdown visible - model loaded correctly ✓");

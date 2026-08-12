@@ -41,7 +41,7 @@ function renderToolbar(overrides = {}) {
   return props
 }
 
-describe('EnvironmentMapToolbar — Categories toggle badge', () => {
+describe('EnvironmentMapToolbar - Categories toggle badge', () => {
   // Regression: the "1" badge signals an active category filter while the
   // sidebar is collapsed. An inverted condition or an always-on badge would
   // mislead the user about whether the grid is being narrowed.

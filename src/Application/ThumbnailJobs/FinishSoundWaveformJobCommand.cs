@@ -101,7 +101,7 @@ public class FinishSoundWaveformJobCommandHandler : ICommandHandler<FinishSoundW
 
             // Persist the audio metadata the worker extracted while decoding the
             // file. Best-effort: neither a missing sound nor a persistence error
-            // may fail job completion — the waveform is already uploaded and
+            // may fail job completion - the waveform is already uploaded and
             // metadata is non-essential, so we swallow failures here.
             try
             {
@@ -136,7 +136,7 @@ public class FinishSoundWaveformJobCommandHandler : ICommandHandler<FinishSoundW
         }
 
         // Persist job status last. If the process crashes after the metadata save
-        // above but before this one, the job stays unfinished and is reprocessed —
+        // above but before this one, the job stays unfinished and is reprocessed -
         // the metadata write is idempotent, so that's harmless. The reverse order
         // (finish the job first) would instead risk permanently losing metadata on
         // a crash, since a completed job is never reprocessed.

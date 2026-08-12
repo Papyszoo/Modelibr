@@ -5,7 +5,7 @@
 // from with `Authorization: ImportToken <token>`.
 //
 // It runs inside the webapi container's network namespace (compose
-// `network_mode: service:webapi-e2e`), so ONE url — http://localhost:9280 —
+// `network_mode: service:webapi-e2e`), so ONE url - http://localhost:9280 -
 // reaches it from both the browser (host port publish) and the backend
 // (loopback, which the importer's URL safety allows for http).
 import { createHash } from "node:crypto";
@@ -15,7 +15,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const PORT = Number(process.env.PORT || 9280);
-// The base baked into manifest downloadUrls — must be the store's own host
+// The base baked into manifest downloadUrls - must be the store's own host
 // so the backend trusts it (same-host rule) and sends the import token.
 const PUBLIC_BASE = process.env.PUBLIC_BASE || `http://localhost:${PORT}`;
 
@@ -31,7 +31,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 // The shared test-cube.glb is uploaded RAW by other e2e scenarios (e.g.
 // upload-window, model-categories), so serving it byte-identical makes the
 // importer SHA-256-dedupe onto that pre-existing model (named "test-cube")
-// instead of creating "E2E Test Cube" — failing the provenance scenario in
+// instead of creating "E2E Test Cube" - failing the provenance scenario in
 // full-suite runs. Re-tag the GLB's JSON chunk (spec-compliant asset.extras
 // edit, same technique as fixtures/unique-file-generator.ts) so the store's
 // bytes are unique to the fixture while staying a valid GLB. Deterministic on
@@ -97,7 +97,7 @@ const manifest = {
             id: "11111111-1111-1111-1111-111111111111",
             itemType: "Model",
             name: "E2E Test Cube",
-            // Taxonomy v1 category — the importer must find-or-create the
+            // Taxonomy v1 category - the importer must find-or-create the
             // "Props" model category and file the imported model under it.
             metadataJson: JSON.stringify({ category: "Props" }),
             files: [
@@ -122,7 +122,7 @@ const manifest = {
     ],
 };
 
-// Catalog detail (GET /api/assets/{id}) — what the Asset Store tab's pack
+// Catalog detail (GET /api/assets/{id}) - what the Asset Store tab's pack
 // detail view lists for per-item import selection. Item ids match the
 // manifest's so selectedItemIds round-trip to the importer.
 const assetDetail = {
@@ -194,7 +194,7 @@ const hasImportToken = (req) =>
     hasBearer(req);
 
 const server = http.createServer(async (req, res) => {
-    // Open CORS — mirrors the store's credential-less ModelibrImport policy.
+    // Open CORS - mirrors the store's credential-less ModelibrImport policy.
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");

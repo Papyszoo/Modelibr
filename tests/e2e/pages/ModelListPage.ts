@@ -61,7 +61,7 @@ export class ModelListPage {
     }
 
     async goto() {
-        // Navigate with clean state — default tab is modelList
+        // Navigate with clean state - default tab is modelList
         await navigateToAppClean(this.page);
 
         // Wait for the model list content to be visible. 30s (was 10s): this is
@@ -455,7 +455,7 @@ export class ModelListPage {
                 return;
             }
 
-            // Pack not in dropdown yet — close panel, reload page, retry
+            // Pack not in dropdown yet - close panel, reload page, retry
             await this.page.keyboard.press("Escape");
             await this.page
                 .locator(".p-multiselect-panel")

@@ -101,7 +101,7 @@ internal class SetTextureWebProxyCommandHandler : ICommandHandler<SetTextureWebP
         TextureProxy proxy;
         if (existingProxy != null)
         {
-            // Replace existing proxy — delete old one and create new
+            // Replace existing proxy - delete old one and create new
             await _textureProxyRepository.DeleteByTextureIdAsync(command.TextureId, cancellationToken);
             proxy = TextureProxy.Create(command.TextureId, proxyFile, command.Size, _dateTimeProvider.UtcNow);
             proxy = await _textureProxyRepository.AddAsync(proxy, cancellationToken);

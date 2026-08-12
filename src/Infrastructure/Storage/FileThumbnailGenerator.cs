@@ -50,7 +50,7 @@ public sealed class FileThumbnailGenerator : IFileThumbnailGenerator
             return;
         }
 
-        // Check which previews are missing and only generate those (deduplication — same hash = same content)
+        // Check which previews are missing and only generate those (deduplication - same hash = same content)
         var rgbExists = _previewService.GetPreviewPath(sha256Hash) != null;
         var needsChannels = TextureMimeTypes.Contains(mimeType);
         var rExists = needsChannels && _previewService.GetPreviewPath(sha256Hash, "r") != null;

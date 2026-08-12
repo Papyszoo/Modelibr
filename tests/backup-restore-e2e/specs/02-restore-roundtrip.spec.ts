@@ -15,7 +15,7 @@ import {
     takeSnapshot,
 } from "../helpers/seed-and-snapshot.js";
 
-test.describe.serial("Restore round-trip — verify every entity survives intact", () => {
+test.describe.serial("Restore round-trip - verify every entity survives intact", () => {
     const api = new BackupApi();
 
     test.skip(
@@ -68,13 +68,13 @@ test.describe.serial("Restore round-trip — verify every entity survives intact
         await settings.waitForRowReady(fileName);
 
         // ── 3. Mutate state AFTER the backup. Restore should erase these changes.
-        //         (a) Delete two more models — restore must bring them back.
+        //         (a) Delete two more models - restore must bring them back.
         await api.softDeleteModel(seed.modelIds[1]);
         await api.softDeleteModel(seed.modelIds[2]);
-        //         (b) Create a NEW pack — restore must remove it.
+        //         (b) Create a NEW pack - restore must remove it.
         const interloperPack = await api.createPack("post-backup-pack", "should be gone after restore");
         expect([200, 201]).toContain(interloperPack.status);
-        //         (c) Create a NEW project — restore must remove it.
+        //         (c) Create a NEW project - restore must remove it.
         const interloperProject = await api.createProject("post-backup-project");
         expect([200, 201]).toContain(interloperProject.status);
 
@@ -89,7 +89,7 @@ test.describe.serial("Restore round-trip — verify every entity survives intact
             .poll(() => listHostDir("restore"), { timeout: 10000 })
             .toContain(fileName);
 
-        // ── 5. Restart the webapi container — RestoreOnBootProcessor runs
+        // ── 5. Restart the webapi container - RestoreOnBootProcessor runs
         //         before HTTP is up; wait for /health to come back.
         await restartWebapi();
         await waitForWebapi(180000);
@@ -107,7 +107,7 @@ test.describe.serial("Restore round-trip — verify every entity survives intact
         expect(after.modelIds).toEqual(before.modelIds);
         // Versions per model are unchanged.
         expect(after.versionCountById).toEqual(before.versionCountById);
-        // File hashes on disk match — this proves the upload tree was restored
+        // File hashes on disk match - this proves the upload tree was restored
         // with byte-identical content.
         expect(after.modelHashesById).toEqual(before.modelHashesById);
 
@@ -122,7 +122,7 @@ test.describe.serial("Restore round-trip — verify every entity survives intact
         expect(after.packNameById).toEqual(before.packNameById);
         expect(after.packModelCountById).toEqual(before.packModelCountById);
 
-        // Projects: same — restore must have undone the interloper.
+        // Projects: same - restore must have undone the interloper.
         expect(after.projectIds).toEqual(before.projectIds);
         expect(after.projectNameById).toEqual(before.projectNameById);
         expect(after.projectModelCountById).toEqual(before.projectModelCountById);

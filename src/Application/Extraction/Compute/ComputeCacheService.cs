@@ -8,7 +8,7 @@ namespace Application.Extraction.Compute;
 /// <summary>
 /// Read-through cache for expensive compute, keyed on the geometry hash. The first
 /// asset to request a metric pays for it; every later asset that shares the same
-/// geometry hash gets the stored result without recomputing — this is what makes
+/// geometry hash gets the stored result without recomputing - this is what makes
 /// per-part renders and UV/texel analysis affordable across a kit scene.
 /// </summary>
 public sealed class ComputeCacheService
@@ -30,7 +30,7 @@ public sealed class ComputeCacheService
     /// <summary>
     /// Returns the cached result for (hash, version, metric), or runs
     /// <paramref name="compute"/> exactly once, stores it, and returns it. A second
-    /// call for the same key — even from a different asset — is a pure cache hit.
+    /// call for the same key - even from a different asset - is a pure cache hit.
     /// </summary>
     public async Task<ComputeCacheEntry> GetOrComputeAsync(
         string geometryHash,

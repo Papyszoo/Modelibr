@@ -10,7 +10,7 @@ public sealed record MultiFileImportEntry(string Path, byte[] Content);
 
 /// <summary>
 /// A primary model file paired with the auxiliary (external) files that live under its
-/// directory — the <c>.bin</c> buffers and textures a loose <c>.gltf</c> references. The
+/// directory - the <c>.bin</c> buffers and textures a loose <c>.gltf</c> references. The
 /// auxiliary <see cref="AuxiliaryUpload.RelativePath"/> is expressed relative to the
 /// primary's directory, matching how the primary glTF cites the URI.
 /// </summary>

@@ -21,7 +21,7 @@ export interface PreviewSettingsType {
   // Torus parameters
   torusRadius: number
   torusTube: number
-  // UV Scale — direct texture repeat multiplier
+  // UV Scale - direct texture repeat multiplier
   uvScale: number
   // Texture quality: 0 = Original, 256/512/1024/2048 = proxy size
   textureQuality: number
@@ -105,7 +105,7 @@ export function PreviewSettings({
         </div>
       </div>
 
-      {/* Per-geometry parameter sliders — hidden for Global Materials (Bounds auto-fits) */}
+      {/* Per-geometry parameter sliders - hidden for Global Materials (Bounds auto-fits) */}
       {!isGlobalMaterial && settings.type === 'box' && (
         <div className="settings-group">
           <h4 className="settings-group-title">Cube Parameters</h4>

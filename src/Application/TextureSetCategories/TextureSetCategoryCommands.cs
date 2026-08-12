@@ -98,7 +98,7 @@ internal sealed class UpdateTextureSetCategoryCommandHandler : ICommandHandler<U
             if (command.ParentId.Value == command.Id)
                 return Result.Failure(new Error("InvalidCategoryParent", "A category cannot be its own parent."));
 
-            // Restrict the hierarchy check to the category's own kind — categories
+            // Restrict the hierarchy check to the category's own kind - categories
             // never span kinds.
             var siblings = await _categoryRepository.GetAllByKindAsync(category.Kind, cancellationToken);
             if (HierarchicalCategoryHelpers.IsDescendant(command.Id, command.ParentId.Value, siblings, c => c.Id, c => c.ParentId))

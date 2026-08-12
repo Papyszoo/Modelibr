@@ -1,7 +1,7 @@
 {
     "name": "modelibr-backup-restore-e2e",
     "version": "1.0.0",
-    "description": "E2E tests for backup & restore — runs in an isolated docker-compose stack separate from the main e2e suite.",
+    "description": "E2E tests for backup & restore - runs in an isolated docker-compose stack separate from the main e2e suite.",
     "type": "module",
     "scripts": {
         "test:setup": "npx playwright install --with-deps chromium && docker compose -f docker-compose.backup-e2e.yml up -d --build && node wait-for-services.js",

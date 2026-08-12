@@ -81,7 +81,7 @@ internal class UploadPngThumbnailCommandHandler : ICommandHandler<UploadPngThumb
                 // Create a new thumbnail for this version
                 var thumbnail = Thumbnail.Create(model.Id, targetVersion.Id, now);
                 thumbnailToUpdate = await _thumbnailRepository.AddAsync(thumbnail, cancellationToken);
-                // Commit so the thumbnail gets its real id — SetThumbnail copies it
+                // Commit so the thumbnail gets its real id - SetThumbnail copies it
                 // into ModelVersion.ThumbnailId (a raw scalar FK).
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
                 targetVersion.SetThumbnail(thumbnailToUpdate);

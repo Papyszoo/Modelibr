@@ -14,14 +14,14 @@
   background: var(--surface-ground);
 }
 
-/* Drag-over highlight — dashed borders appear ONLY while dragging files
+/* Drag-over highlight - dashed borders appear ONLY while dragging files
    over the container, never as a plain mouse-hover affordance. */
 .model-grid-container.drag-over {
   border-color: #3182ce;
   background: rgba(49, 130, 206, 0.1);
 }
 
-/* Body: category tree sidebar + models grid, flat on the page background —
+/* Body: category tree sidebar + models grid, flat on the page background -
    the quiet CategoryTreePanel default is the app-wide categories standard. */
 .model-grid-body {
   display: flex;
@@ -57,7 +57,7 @@
 }
 
 /* Toolbar styles for the Models list live in the shared list-toolbar
-   module — see @/shared/components/list-toolbar/ListToolbar.css. */
+   module - see @/shared/components/list-toolbar/ListToolbar.css. */
 
 .model-category-panel-header {
   display: flex;
@@ -70,7 +70,7 @@
   flex: 1;
 }
 
-/* Model Grid — column min-width comes from --model-card-width (set inline
+/* Model Grid - column min-width comes from --model-card-width (set inline
    from the slider). Falls back to 180px when the variable is missing. */
 .model-grid {
   display: grid;
@@ -85,11 +85,11 @@
 .model-grid-selection-surface {
   position: relative;
   flex: 1 1 auto;
-  /* Fill the remaining space below the toolbar via flex-grow — NOT
+  /* Fill the remaining space below the toolbar via flex-grow - NOT
      min-height: 100%. Against a height-bounded .model-grid-container (the
      standalone Models list is a bounded flex column) `min-height: 100%`
      resolves to the *full* container height, so stacked under the toolbar it
-     forced the container to overflow by ~the toolbar height — a phantom
+     forced the container to overflow by ~the toolbar height - a phantom
      scrollbar even with only a few cards that fit. flex:1 already stretches
      the surface to fill the leftover space (drop / rubber-band area), and
      .model-grid-selection-content keeps min-height:100% to fill it. */
@@ -105,7 +105,7 @@
 }
 
 /* Model Card */
-/* Card identity — keep in sync with AssetTile.css (design-system skill). */
+/* Card identity - keep in sync with AssetTile.css (design-system skill). */
 .model-card {
   background: var(--surface-card);
   border: 2px solid transparent;
@@ -467,14 +467,14 @@
   font-weight: 500;
 }
 
-/* Tab content specific styles — suppress the drag-over border/bg when the
+/* Tab content specific styles - suppress the drag-over border/bg when the
    model grid sits inside a tab panel (where the outer container handles D&D). */
 .model-list-tab .model-grid-container {
   border: none;
   background: transparent;
 }
 
-/* Responsive adjustments — keep slider in control, but cap the desktop
+/* Responsive adjustments - keep slider in control, but cap the desktop
    minimum down a notch on narrower windows. */
 @media (max-width: 1200px) {
   .model-grid {
@@ -485,7 +485,7 @@
   }
 }
 
-/* Tablet & smaller — covers Fold 4 unfolded (~673px CSS) and below.
+/* Tablet & smaller - covers Fold 4 unfolded (~673px CSS) and below.
    Container padding shrinks so cards get more horizontal room.
    Toolbar-specific responsive rules live in the shared list-toolbar CSS. */
 @media (max-width: 768px) {
@@ -510,7 +510,7 @@
     font-size: 0.75rem;
   }
 
-  /* Selection checkbox always visible on touch — there's no hover. */
+  /* Selection checkbox always visible on touch - there's no hover. */
   .model-card .model-select-checkbox {
     opacity: 1;
   }

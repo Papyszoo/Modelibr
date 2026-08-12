@@ -20,7 +20,7 @@ const TINY_PNG = Uint8Array.from(
 
 // The story's modelId doubles as the state selector, mirroring the states the
 // component distinguishes. Mocking happens at the network layer via MSW (the
-// repo's story pattern — see HeightCard.stories.tsx); the previous version
+// repo's story pattern - see HeightCard.stories.tsx); the previous version
 // called `jest.spyOn` in a decorator, which throws "jest is not defined" in
 // the browser and broke every later story's visual snapshot.
 const mswHandlers = [
@@ -60,7 +60,7 @@ const meta = {
       description: 'Model ID to fetch thumbnail for',
     },
   },
-  // useThumbnail is a React Query hook — the story needs a provider.
+  // useThumbnail is a React Query hook - the story needs a provider.
   decorators: [
     Story => (
       <QueryClientProvider client={queryClient}>

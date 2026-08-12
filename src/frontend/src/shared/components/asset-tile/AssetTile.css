@@ -1,11 +1,11 @@
 /*
- * AssetTile — presentational card primitive.
+ * AssetTile - presentational card primitive.
  *
  * Mirrors .model-card from ModelGrid.css so every asset tab looks like the
  * gold-standard Models tab. Pull values from --mod-* design tokens so the
  * Lara theme stays in control of colors, radii, and motion.
  *
- * No feature-specific rules live here — callers pass the right markup via the
+ * No feature-specific rules live here - callers pass the right markup via the
  * `media` and `meta` props and choose a variant.
  */
 
@@ -58,7 +58,7 @@
   justify-content: center;
 }
 
-/* Wide variant (env maps — panoramic images) */
+/* Wide variant (env maps - panoramic images) */
 .asset-tile--wide .asset-tile-media {
   aspect-ratio: 2 / 1;
 }
@@ -106,7 +106,7 @@
   font-size: var(--mod-text-xs);
 }
 
-/* ── Bottom overlay — name + optional meta ─────────────────────── */
+/* ── Bottom overlay - name + optional meta ─────────────────────── */
 
 .asset-tile-overlay {
   position: absolute;
@@ -150,7 +150,7 @@
   box-shadow: var(--mod-shadow-sm);
 }
 
-/* ── Add tile — dashed "Add X" call-to-action ──────────────────── */
+/* ── Add tile - dashed "Add X" call-to-action ──────────────────── */
 
 .asset-tile-add {
   position: relative;

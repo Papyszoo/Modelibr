@@ -15,7 +15,7 @@ const TEMP_DIR = path.join(__dirname, "..", "data");
  * `.bin` buffer and `.png` texture. The primary is given a per-run-unique name (and a
  * unique `asset.extras` marker) so its SHA256 doesn't collapse under server-side
  * dedup and the derived model name is unique per scenario. The `.bin`/`.png` keep the
- * exact filenames the `.gltf` references by relative URI (`Quad.bin`, `Quad.png`) —
+ * exact filenames the `.gltf` references by relative URI (`Quad.bin`, `Quad.png`) -
  * that's what the worker's LoadingManager URLModifier resolves against.
  */
 export interface StagedMultiFileGltf {

@@ -1,20 +1,20 @@
 /**
- * Order-invariant geometry hash — shared cross-runtime code (worker Puppeteer
+ * Order-invariant geometry hash - shared cross-runtime code (worker Puppeteer
  * page, and any future consumer). It is the deduplication / instance-grouping /
  * cache key for meshes, so it MUST be identical for the same mesh regardless of
  * how an importer happened to order its vertices or wind its triangles. A bpy
  * native pass and the three.js path both feed the SAME triangulated arrays into
  * this function so their hashes agree (bpy enriches other fields; three.js
- * defines the hash — see prompt 21).
+ * defines the hash - see prompt 21).
  *
  * Canonicalisation (this exact algorithm must be replicated byte-for-byte by any
  * other language that computes the same hash, e.g. the bpy script):
  *   1. Quantise every coordinate to an integer grid: q = round(coord / EPSILON).
  *      Absorbs float noise and importer round-trip drift.
  *   2. Describe each triangle by its three quantised vertex coordinates (NOT by
- *      vertex indices), then sort the three vertices within the triangle — this
+ *      vertex indices), then sort the three vertices within the triangle - this
  *      makes the hash invariant to winding order.
- *   3. Serialise each triangle as "x,y,z;x,y,z;x,y,z" and sort the whole list —
+ *   3. Serialise each triangle as "x,y,z;x,y,z;x,y,z" and sort the whole list -
  *      invariant to triangle order and to vertex-array order.
  *   4. Hash "<vertexCount>|<triangleCount>|<joined triangles>" with FNV-1a 64.
  * A mesh with no faces (point cloud) hashes its sorted unique vertices instead.
@@ -26,7 +26,7 @@
 
 export const GEOMETRY_HASH_VERSION = 1
 
-// Quantisation grid. 1e-5 in model units — fine enough to keep distinct detail,
+// Quantisation grid. 1e-5 in model units - fine enough to keep distinct detail,
 // coarse enough to collapse importer float drift. Part of the versioned contract.
 const EPSILON = 1e-5
 

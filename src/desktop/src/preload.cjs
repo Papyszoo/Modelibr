@@ -1,7 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron')
 
 // Minimal, sandbox-safe bridge for the status window. The renderer never
-// touches Node or Electron internals directly — every action is an IPC call
+// touches Node or Electron internals directly - every action is an IPC call
 // the main process validates and performs.
 contextBridge.exposeInMainWorld('modelibr', {
   getStatus: () => ipcRenderer.invoke('modelibr:get-status'),

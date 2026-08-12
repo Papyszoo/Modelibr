@@ -11,24 +11,24 @@ namespace Infrastructure.Persistence;
 /// <c>DomainEvents</c> from tracked <see cref="AggregateRoot"/> instances and
 /// publishes them AFTER a successful commit, then clears them. Command
 /// handlers never call <c>IDomainEventDispatcher</c> or
-/// <c>ClearDomainEvents</c> themselves — see the backend-patterns skill
+/// <c>ClearDomainEvents</c> themselves - see the backend-patterns skill
 /// (Domain events section).
 ///
 /// Dispatch-after-commit (not inside the same transaction) matches the
 /// pre-existing behavior: handlers used to dispatch manually only after
 /// their repositories had already self-committed. None of the current
-/// <c>IDomainEventHandler</c>s need to join the original transaction —
+/// <c>IDomainEventHandler</c>s need to join the original transaction -
 /// <c>ActiveVersionChangedEventHandler</c> and
 /// <c>ThumbnailStatusChangedEventHandler</c> only push SignalR notifications,
 /// and <c>ModelUploadedEventHandler</c>'s DB write (enqueuing a thumbnail
-/// job) is intentionally a separate, subsequent operation — it should only
+/// job) is intentionally a separate, subsequent operation - it should only
 /// happen once the upload it reacts to is durable.
 ///
 /// The crash window between commit and dispatch is not closed by this (no
-/// outbox — see prompt 25 notes); that's an accepted, documented tradeoff
+/// outbox - see prompt 25 notes); that's an accepted, documented tradeoff
 /// for a local-first app.
 ///
-/// Registered per-DbContext-scope (Scoped in DI — see
+/// Registered per-DbContext-scope (Scoped in DI - see
 /// Infrastructure/DependencyInjection.cs), never Singleton: the recursion
 /// guard below is instance state and must not leak across requests.
 /// </summary>
@@ -65,7 +65,7 @@ public sealed class DomainEventsInterceptor : SaveChangesInterceptor
                 if (_dispatchDepth > MaxDispatchRounds)
                 {
                     _logger.LogError(
-                        "Domain event dispatch exceeded {MaxRounds} rounds after a single SaveChanges — " +
+                        "Domain event dispatch exceeded {MaxRounds} rounds after a single SaveChanges - " +
                         "a handler is likely re-raising events or re-staging writes in a loop. Stopping " +
                         "to avoid unbounded recursion; remaining changes are NOT flushed.",
                         MaxDispatchRounds);
@@ -110,7 +110,7 @@ public sealed class DomainEventsInterceptor : SaveChangesInterceptor
         // Flush them so they aren't silently dropped now that repositories
         // no longer self-commit. SaveChangesAsync re-enters this
         // interceptor, so any domain events THAT save raises get dispatched
-        // too — this settles naturally once a round is a no-op.
+        // too - this settles naturally once a round is a no-op.
         if (context.ChangeTracker.HasChanges())
         {
             await context.SaveChangesAsync(cancellationToken);

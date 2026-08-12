@@ -205,7 +205,7 @@ Then(
 
             if (!thumbnailUpdated) {
                 console.warn(
-                    `[Thumbnail] Warning: Thumbnail was not regenerated within ${timeoutSec}s, but API returns 200 — may have been pre-existing`,
+                    `[Thumbnail] Warning: Thumbnail was not regenerated within ${timeoutSec}s, but API returns 200 - may have been pre-existing`,
                 );
             }
         } finally {

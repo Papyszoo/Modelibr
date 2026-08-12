@@ -148,7 +148,7 @@ class ThumbnailSignalRService {
           'ThumbnailSignalR: Reconnected, re-joining AllModelsGroup and AllEnvironmentMapsGroup'
         )
         this.reconnectAttempts = 0
-        // Re-join groups after reconnect — server-side group membership is tied to connection ID
+        // Re-join groups after reconnect - server-side group membership is tied to connection ID
         try {
           await Promise.all([
             this.joinAllModelsGroup(),

@@ -13,7 +13,7 @@ import { expect, type Locator, type Page } from "@playwright/test";
  *  - the Search button is present but clicking it does not reveal the
  *    `.search-input` within `timeout` ms (panel mechanism broken).
  *
- * Silent failure is *not* a valid outcome here — tests downstream of
+ * Silent failure is *not* a valid outcome here - tests downstream of
  * this helper assume the input is usable.
  */
 export async function ensureToolbarSearchOpen(
@@ -118,7 +118,7 @@ export async function narrowVirtualisedList(
  * Wait for an R3F (react-three-fiber) canvas to finish initialising its
  * WebGL drawing buffer inside the given container. R3F sets the
  * canvas's `width`/`height` drawing-buffer attributes as soon as the
- * WebGL context is created — these are a more stable readiness signal
+ * WebGL context is created - these are a more stable readiness signal
  * than CSS visibility, because the canvas is briefly 0×0 while the
  * absolutely-positioned R3F wrapper waits for the flex parent to lay
  * out.
@@ -129,7 +129,7 @@ export async function narrowVirtualisedList(
  * Default budget is 60s, not 30s: the CI runner has no GPU, so the viewer
  * renders on software WebGL (SwiftShader). Decoding the source textures (EXR/
  * TIFF in particular) plus the first textured render genuinely takes longer
- * there than on a real GPU — the canvas provably mounts (failure call logs
+ * there than on a real GPU - the canvas provably mounts (failure call logs
  * resolve to a visible `<canvas data-engine="three.js r185">`), it's just
  * slower than the old 30s wait. 60s absorbs that without masking a crash; the
  * test-level timeout (300s for these specs) still bounds a genuine hang. On a

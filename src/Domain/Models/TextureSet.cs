@@ -30,7 +30,7 @@ public class TextureSet : AggregateRoot
     public UvMappingMode UvMappingMode { get; private set; } = UvMappingMode.Standard;
     
     /// <summary>
-    /// Physical UV scale — the world-space size of one texture tile.
+    /// Physical UV scale - the world-space size of one texture tile.
     /// Used in Physical UV mapping mode to maintain consistent texel density.
     /// Larger values = bigger tiles (fewer repeats), smaller values = smaller tiles (more repeats).
     /// Only relevant for Universal sets in Physical mode.
@@ -233,7 +233,7 @@ public class TextureSet : AggregateRoot
     /// Updates the UV mapping mode and scale for universal (tileable) texture sets.
     /// </summary>
     /// <param name="uvMappingMode">The UV mapping mode (Standard or Physical)</param>
-    /// <param name="uvScale">Physical UV scale — world-space size of one texture tile</param>
+    /// <param name="uvScale">Physical UV scale - world-space size of one texture tile</param>
     /// <param name="updatedAt">When the update occurred</param>
     /// <exception cref="InvalidOperationException">Thrown when called on a ModelSpecific texture set</exception>
     /// <exception cref="ArgumentException">Thrown when uvScale is not positive</exception>

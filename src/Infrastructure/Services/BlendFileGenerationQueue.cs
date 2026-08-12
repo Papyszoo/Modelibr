@@ -7,13 +7,13 @@ namespace Infrastructure.Services;
 
 /// <summary>
 /// Bounded in-process background queue that (re)generates the cached
-/// generated-{name}.blend WebDAV file for a model version — see
+/// generated-{name}.blend WebDAV file for a model version - see
 /// <see cref="IBlendFileGenerationQueue"/> for when callers enqueue.
 ///
 /// Modeled on the thumbnail job queue's enqueue/consume shape but intentionally lighter:
 /// generation is a single in-process Blender CLI call via <see cref="IBlendFileGenerator"/>,
 /// not distributed work handed to an external worker process, so a Channel + BackgroundService
-/// is enough — no DB-backed job table or dequeue/claim protocol needed.
+/// is enough - no DB-backed job table or dequeue/claim protocol needed.
 ///
 /// Registered as a singleton against BOTH <see cref="IBlendFileGenerationQueue"/> and
 /// <see cref="IHostedService"/> (see Infrastructure/DependencyInjection.cs) so the producer
@@ -24,7 +24,7 @@ public sealed class BlendFileGenerationQueue : BackgroundService, IBlendFileGene
 {
     // Small bound: this only ever holds recently-touched (modelId, versionId) pairs from
     // attach/invalidate events. A burst larger than this almost certainly means duplicate
-    // churn on the same handful of versions, so dropping the oldest is safe — the GET-time
+    // churn on the same handful of versions, so dropping the oldest is safe - the GET-time
     // fallback in GetOrGenerateAsync covers anything that gets dropped.
     private const int Capacity = 64;
 
@@ -47,7 +47,7 @@ public sealed class BlendFileGenerationQueue : BackgroundService, IBlendFileGene
 
     public void Enqueue(int modelId, int versionId)
     {
-        // Skip silently — no Blender install means GetOrGenerateAsync would return null
+        // Skip silently - no Blender install means GetOrGenerateAsync would return null
         // anyway, and callers (request handlers) must never be slowed or failed by this.
         if (!_generator.IsAvailable)
             return;
@@ -82,7 +82,7 @@ public sealed class BlendFileGenerationQueue : BackgroundService, IBlendFileGene
                 }
                 catch (Exception ex)
                 {
-                    // Never let one failed generation take down the consumer loop — the
+                    // Never let one failed generation take down the consumer loop - the
                     // GET-time fallback will retry on next access regardless.
                     _logger.LogWarning(ex,
                         "Background .blend generation failed for model {ModelId} version {VersionId}; the GET-time fallback will retry on next access",

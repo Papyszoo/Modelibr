@@ -70,7 +70,7 @@ export function SplitterLayout() {
   const leftTabs = tabs.filter(t => t.params?.panel !== 'right')
   const rightTabs = tabs.filter(t => t.params?.panel === 'right')
 
-  // Active tabs per panel — left uses activeTabId, right uses activeRightTabId
+  // Active tabs per panel - left uses activeTabId, right uses activeRightTabId
   const activeLeftTab = leftTabs.find(t => t.id === activeTabId)
     ? activeTabId
     : (leftTabs[0]?.id ?? '')

@@ -1,4 +1,4 @@
-/* Compact by design — this is an application header row, not a website hero
+/* Compact by design - this is an application header row, not a website hero
    band. Density budget: vertical padding ≤ --mod-space-sm (page variant:
    --mod-space-md); don't re-pad. */
 .mod-list-header {

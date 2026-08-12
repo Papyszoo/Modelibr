@@ -3,7 +3,7 @@
   flex-direction: column;
   height: 100%;
   padding: 0.75rem;
-  /* The grid container scrolls (.sprite-grid-container) — the page itself
+  /* The grid container scrolls (.sprite-grid-container) - the page itself
      must not, or the category sidebar would scroll out of view. */
   overflow: hidden;
   position: relative;
@@ -72,7 +72,7 @@
   font-size: 0.875rem;
 }
 
-/* Body: category tree sidebar + sprites grid, flat on the page background —
+/* Body: category tree sidebar + sprites grid, flat on the page background -
    the quiet CategoryTreePanel default is the app-wide categories standard. */
 .sprite-list-body {
   display: flex;
@@ -110,7 +110,7 @@
   gap: 1rem;
 }
 
-/* Card identity — keep in sync with AssetTile.css (design-system skill). */
+/* Card identity - keep in sync with AssetTile.css (design-system skill). */
 .sprite-card {
   background: var(--surface-card);
   border: 1px solid var(--surface-border);
@@ -389,7 +389,7 @@
     transform: none;
   }
 
-  /* Visible by default — touch has no hover. */
+  /* Visible by default - touch has no hover. */
   .sprite-select-checkbox {
     opacity: 1;
   }

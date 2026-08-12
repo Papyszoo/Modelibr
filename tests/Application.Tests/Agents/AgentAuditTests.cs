@@ -106,7 +106,7 @@ public class AgentAuditTests
         Assert.False(claim.IsClaimAbandoned(Now.AddMinutes(5), leaseMinutes: 15));
         Assert.True(claim.IsClaimAbandoned(Now.AddMinutes(15), leaseMinutes: 15));
 
-        // A completed operation is never "abandoned" — it is the durable result.
+        // A completed operation is never "abandoned" - it is the durable result.
         claim.MarkCompleted(Now, "Model", 1, "{}");
         Assert.False(claim.IsClaimAbandoned(Now.AddHours(24), leaseMinutes: 15));
     }

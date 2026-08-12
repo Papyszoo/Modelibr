@@ -269,7 +269,7 @@ When("I click the regenerate all thumbnails button", async ({ page }) => {
 When("I open the regenerate all thumbnails confirmation", async ({ page }) => {
     console.log("Opening regenerate-all confirmation modal...");
     const settingsPage = new SettingsPage(page);
-    // The button lives inside the Thumbnail Generation section detail —
+    // The button lives inside the Thumbnail Generation section detail -
     // openSection() first, then click without accepting the modal.
     await settingsPage.openRegenerateAllConfirmation();
 });
@@ -290,7 +290,7 @@ When("I cancel the regenerate confirmation", async ({ page }) => {
 
 Then("a regenerate success message should not be visible", async ({ page }) => {
     console.log("Verifying no regenerate success message appears...");
-    // Brief settle window — the API call would resolve quickly if it had fired.
+    // Brief settle window - the API call would resolve quickly if it had fired.
     await page.waitForTimeout(500);
     const banner = page.locator(".settings-success");
     const visible = await banner.isVisible();
@@ -395,7 +395,7 @@ Then("the save button should be visible", async ({ page }) => {
 // ── Tab-switch persistence ────────────────────────────────────────
 
 // Use clickTab (which clicks the existing tab in the dock bar) instead of
-// navigateToTab — navigateToTab calls navigateToAppClean which wipes
+// navigateToTab - navigateToTab calls navigateToAppClean which wipes
 // localStorage, defeating the per-tab UI-state persistence we're testing.
 
 When("I switch to the model list tab", async ({ page }) => {
@@ -471,7 +471,7 @@ After("@settings-dirty-draft-tab-persistence", async ({ page }) => {
     try {
         const settingsPage = new SettingsPage(page);
         if (!(await settingsPage.isVisible())) return;
-        // Only click discard if it's actually enabled — the test's own
+        // Only click discard if it's actually enabled - the test's own
         // "I click discard" step may have already cleared the dirty state,
         // in which case the button stays visible but disabled and a plain
         // click() would wait for actionability until the test timeout.
@@ -528,7 +528,7 @@ When(
         const settingsPage = new SettingsPage(page);
         await settingsPage.setDuplicateNamePolicy(value);
         // The policy is persisted immediately via /settings/:key, no Save
-        // button to press — wait a tick for the request to land.
+        // button to press - wait a tick for the request to land.
         await page.waitForTimeout(500);
     },
 );

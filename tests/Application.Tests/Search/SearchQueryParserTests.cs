@@ -23,7 +23,7 @@ public class SearchQueryParserTests
     public void Parse_Drops_Stopwords_So_A_Prose_Brief_Behaves_Like_Keywords()
     {
         // Regression: "a rundown city street at night" returned nothing, because the
-        // whole phrase — stopwords included — had to match.
+        // whole phrase - stopwords included - had to match.
         var parsed = SearchQueryParser.Parse("a rundown city street at night");
         Assert.Equal(new[] { "rundown", "city", "street", "night" }, parsed.Terms.Select(t => t.Word));
     }

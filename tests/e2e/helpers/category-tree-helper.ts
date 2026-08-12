@@ -3,8 +3,8 @@ import { expect, type Locator, type Page } from "@playwright/test";
 /**
  * Shared driver for the `CategoryTreePanel` sidebar's right-click category
  * management, used by every asset type (models, texture sets, environment
- * maps, sounds, …). The panel is the same component everywhere — only the
- * page-specific sidebar selector differs — so all the DOM interactions live
+ * maps, sounds, …). The panel is the same component everywhere - only the
+ * page-specific sidebar selector differs - so all the DOM interactions live
  * here once. The old per-type "Manage categories" modal was removed.
  */
 

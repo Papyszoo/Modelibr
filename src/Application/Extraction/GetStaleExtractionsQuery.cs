@@ -8,7 +8,7 @@ namespace Application.Extraction;
 /// Invalidation as a set difference: which already-extracted assets of a type were
 /// produced by an extractor older than <paramref name="CurrentExtractorVersion"/>
 /// and therefore need re-extraction. (Assets that have never been extracted are the
-/// enqueue side, owned by the extractor prompts — this query answers "stale", not
+/// enqueue side, owned by the extractor prompts - this query answers "stale", not
 /// "missing".)
 /// </summary>
 public record GetStaleExtractionsQuery(string AssetType, int CurrentExtractorVersion)

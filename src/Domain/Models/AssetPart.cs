@@ -31,7 +31,7 @@ public class AssetPart
     public int? TriangleCount { get; private set; }
     public int? VertexCount { get; private set; }
 
-    /// <summary>Order-invariant geometry hash (meshes only) — the dedup / instance / cache key.</summary>
+    /// <summary>Order-invariant geometry hash (meshes only) - the dedup / instance / cache key.</summary>
     public string? GeometryHash { get; private set; }
     public int? GeometryHashVersion { get; private set; }
 

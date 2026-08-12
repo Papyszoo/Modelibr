@@ -54,7 +54,7 @@ function withChannel(url: string, channel: TextureChannel): string {
 // ---------------------------------------------------------------------------
 
 /**
- * TexturePreview — displays a thumbnail preview of a texture file.
+ * TexturePreview - displays a thumbnail preview of a texture file.
  *
  * Always uses server-generated preview thumbnails (never the raw file).
  * Channel-specific thumbnails (R, G, B) are served by the backend.

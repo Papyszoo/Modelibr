@@ -28,7 +28,7 @@ export function resolveApiAssetUrl(url?: string | null): string | null {
   try {
     return new URL(url, baseURL).toString()
   } catch {
-    // baseURL is relative (e.g. "/api") — prepend it to the path
+    // baseURL is relative (e.g. "/api") - prepend it to the path
     if (baseURL.startsWith('/') && url.startsWith('/')) {
       return `${baseURL}${url}`
     }
@@ -52,7 +52,7 @@ export interface NormalizedApiError {
   isNetworkError: boolean
   isTimeout: boolean
   isOffline: boolean
-  /** Original axios request config — lets callers retry the request. */
+  /** Original axios request config - lets callers retry the request. */
   requestConfig?: InternalAxiosRequestConfig
 }
 

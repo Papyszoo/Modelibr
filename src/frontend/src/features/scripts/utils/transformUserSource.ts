@@ -1,7 +1,7 @@
 /**
  * Rewrites a user module so it can run via `new Function` with `three` and
  * `three/tsl` injected: `import` lines become local bindings, and the default
- * export becomes the value we read back (`__result`). Best-effort — anything it
+ * export becomes the value we read back (`__result`). Best-effort - anything it
  * can't map surfaces as a normal runtime error in the guarded execution that
  * runs the transformed source.
  *

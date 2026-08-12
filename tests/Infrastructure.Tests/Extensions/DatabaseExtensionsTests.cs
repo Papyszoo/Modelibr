@@ -20,11 +20,11 @@ namespace Infrastructure.Tests.Extensions;
 /// backup while still letting migrations proceed.
 ///
 /// Requires a real PostgreSQL instance (GetPendingMigrationsAsync/MigrateAsync are
-/// relational-only — the InMemory provider used by other Infrastructure.Tests doesn't
+/// relational-only - the InMemory provider used by other Infrastructure.Tests doesn't
 /// support them). Runs against localhost:5432, matching WebApi.Tests'
 /// <c>ModelibrWebFactory</c> credentials. Each test instance gets its OWN uniquely
 /// named database (created in InitializeAsync, dropped in DisposeAsync) rather than
-/// sharing one fixed name — the dev Postgres container this targets is also the shared
+/// sharing one fixed name - the dev Postgres container this targets is also the shared
 /// backend-integration/backup-restore-e2e database, potentially touched by other
 /// suites/worktrees at the same time, and Npgsql pools physical connections per exact
 /// connection-string text, so reusing one fixed database name across instances was
@@ -32,11 +32,11 @@ namespace Infrastructure.Tests.Extensions;
 /// different instance and kill it with "terminating connection due to administrator
 /// command". A unique name per instance removes any possibility of that collision.
 ///
-/// <see cref="IBackupService"/> is mocked — this suite intentionally does NOT depend on
+/// <see cref="IBackupService"/> is mocked - this suite intentionally does NOT depend on
 /// `pg_dump`/`psql` being on PATH (they usually aren't on a bare dev machine or CI
 /// runner; only the backup-restore-e2e Docker image guarantees them). The real backup
 /// pipeline (pg_dump succeeding, archive contents) is covered by
-/// tests/backup-restore-e2e instead — this suite only covers the orchestration
+/// tests/backup-restore-e2e instead - this suite only covers the orchestration
 /// contract: does the migration path actually call the backup and respect its outcome.
 /// </summary>
 [Trait("Category", "Integration")]
@@ -47,7 +47,7 @@ public sealed class DatabaseExtensionsTests : IAsyncLifetime
     private const string Username = "modelibr";
     private const string Password = "ChangeThisStrongPassword123!";
 
-    // Unique per test instance (xUnit creates a fresh instance per [Fact]) — see the
+    // Unique per test instance (xUnit creates a fresh instance per [Fact]) - see the
     // class remarks for why a shared fixed name isn't safe here.
     private readonly string _testDatabase = $"Modelibr_PreMigrationBackupTests_{Guid.NewGuid():N}";
 
@@ -93,7 +93,7 @@ public sealed class DatabaseExtensionsTests : IAsyncLifetime
         }
         catch
         {
-            // Best-effort cleanup — a CI runner without Postgres shouldn't fail teardown
+            // Best-effort cleanup - a CI runner without Postgres shouldn't fail teardown
             // on top of the real failure.
         }
     }
@@ -116,7 +116,7 @@ public sealed class DatabaseExtensionsTests : IAsyncLifetime
 
     /// <summary>
     /// A standalone ApplicationDbContext for assertions, independent of the DI
-    /// container/scope used by the method under test — no scope-disposal bookkeeping
+    /// container/scope used by the method under test - no scope-disposal bookkeeping
     /// needed, just `await using`.
     /// </summary>
     private ApplicationDbContext NewVerificationContext()
@@ -204,7 +204,7 @@ public sealed class DatabaseExtensionsTests : IAsyncLifetime
     public async Task InitializeDatabaseAsync_SkipEnvVarSet_SkipsBackupButStillMigrates()
     {
         var mockBackup = new Mock<IBackupService>(MockBehavior.Strict);
-        // Strict mock: ANY call to IBackupService fails the test — proves the skip
+        // Strict mock: ANY call to IBackupService fails the test - proves the skip
         // path never touches the backup service at all, not even EstimateSizeAsync.
 
         await using var provider = BuildProvider(mockBackup.Object, new Dictionary<string, string?>
@@ -233,7 +233,7 @@ public sealed class DatabaseExtensionsTests : IAsyncLifetime
             await seed.Database.MigrateAsync();
         }
 
-        // Ordinary boot with nothing pending must never resolve IBackupService — the
+        // Ordinary boot with nothing pending must never resolve IBackupService - the
         // strict mock throws on any invocation if it does.
         await DatabaseExtensions.InitializeDatabaseAsync((IServiceProvider)provider);
     }

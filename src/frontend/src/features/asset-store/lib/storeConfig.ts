@@ -1,6 +1,6 @@
 /**
  * Store origin configuration. The Asset Store page is an OPTIONAL online
- * surface — when VITE_STORE_URL is unset the page renders its unconfigured
+ * surface - when VITE_STORE_URL is unset the page renders its unconfigured
  * state and nothing else in the app may depend on it (local-first).
  */
 import { readStoreUrlEnv } from './storeEnv'
@@ -21,7 +21,7 @@ export function getConfiguredStoreUrl(): string | null {
 /**
  * Why a SET VITE_STORE_URL is being ignored, or null when it is unset or
  * valid. Mirrors the backend's StoreUrlSafety rule (https required; http only
- * for loopback) — enforced here too so the login form never posts credentials
+ * for loopback) - enforced here too so the login form never posts credentials
  * over cleartext http to a remote host.
  */
 export function getStoreUrlConfigError(): string | null {
@@ -53,7 +53,7 @@ function isLoopbackHost(hostname: string): boolean {
 /**
  * Resolves a preview/thumbnail URL from a store response against the configured
  * store origin. The store emits RELATIVE urls whenever its own PublicBaseUrl is
- * unset — and a relative `src` in an <img> resolves against Modelibr's origin,
+ * unset - and a relative `src` in an <img> resolves against Modelibr's origin,
  * asking the local app for an image it does not have. Absolute urls are returned
  * untouched; anything unresolvable becomes null so the caller shows its
  * placeholder instead of a broken image.

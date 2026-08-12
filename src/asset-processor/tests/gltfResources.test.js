@@ -35,7 +35,7 @@ describe('buildResourceResolver', () => {
   it('resolves a suffix match against a mangled absolute/base-prefixed URL', () => {
     const resolve = buildResourceResolver(resources)
     // GLTFLoader resolves sub-resources against the main resource's base path,
-    // which for a data-URL main is the base64 blob — the tail still ends with the
+    // which for a data-URL main is the base64 blob - the tail still ends with the
     // URI, and the base64 (no '.') can't collide with a real filename key.
     expect(
       resolve('data:model/gltf+json;base64,ZZAABBCC/textures/wood.png')

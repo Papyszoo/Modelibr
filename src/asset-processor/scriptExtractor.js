@@ -7,7 +7,7 @@ import logger from './logger.js'
  * Script / shader extraction via tree-sitter (parse-only, offline-safe).
  *
  * Grammars are prebuilt WASM shipped by `tree-sitter-wasms` and run through the
- * `web-tree-sitter` WASM runtime — no native toolchain, no network, so it honours
+ * `web-tree-sitter` WASM runtime - no native toolchain, no network, so it honours
  * the local-first invariant. The two packages are ABI-coupled: keep
  * `web-tree-sitter@0.20.x` paired with `tree-sitter-wasms@0.1.x` (grammars built
  * for the 0.20 language ABI). A newer runtime rejects these grammars with a
@@ -16,7 +16,7 @@ import logger from './logger.js'
  * Safety: uploaded code is NEVER executed. We parse only, bounded by a byte cap
  * and a per-file parse timeout (both config-driven), and we *report* which
  * sensitive APIs a script references (network / filesystem / process spawn) as
- * advisory info for whoever downloads it — no score, never a block.
+ * advisory info for whoever downloads it - no score, never a block.
  */
 
 const require = createRequire(import.meta.url)
@@ -165,7 +165,7 @@ const LANGUAGE_SPEC = {
 }
 
 // Sensitive-API identifiers grouped by concern. Matched as whole words against the
-// raw source (advisory only) — false positives are acceptable, silent misses on
+// raw source (advisory only) - false positives are acceptable, silent misses on
 // obvious cases are not.
 const SENSITIVE_APIS = {
   network: [
@@ -362,7 +362,7 @@ export async function extractScript({ language, sourceText }) {
   const lineCount = source.length === 0 ? 0 : source.split(/\r\n|\r|\n/).length
   const warnings = []
 
-  // Signals that never need a parse — always available even for unsupported langs.
+  // Signals that never need a parse - always available even for unsupported langs.
   const base = {
     version: SCRIPT_EXTRACTOR_VERSION,
     language: lang,
@@ -415,7 +415,7 @@ export async function extractScript({ language, sourceText }) {
 
     const spec = LANGUAGE_SPEC[lang] || LANGUAGE_SPEC[grammar] || {}
     const root = tree.rootNode
-    // Imports carry no "name" field — the useful value is the statement text
+    // Imports carry no "name" field - the useful value is the statement text
     // (module specifier + form), deduped and capped.
     const imports = spec.imports?.length
       ? [

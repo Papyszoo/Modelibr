@@ -191,7 +191,7 @@ function STLModel({
   })
   // Shared builder (also used by the worker thumbnail) wraps the raw geometry
   // and surfaces any binary-STL vertex colors. The material only survives in
-  // "Embedded" mode — the default path overrides it in useRenderedModel.
+  // "Embedded" mode - the default path overrides it in useRenderedModel.
   const model = useMemo(() => buildStlModel(THREE, geometry), [geometry])
   const meshRef = useRenderedModel(model, rotationSpeed, preserveMaterials)
 

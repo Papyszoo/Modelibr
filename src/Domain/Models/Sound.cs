@@ -135,7 +135,7 @@ public class Sound : AggregateRoot
 
     /// <summary>
     /// Persists audio metadata extracted by the worker (sample rate, channels, format).
-    /// The worker decodes the file with ffprobe, so its duration is authoritative —
+    /// The worker decodes the file with ffprobe, so its duration is authoritative -
     /// it overwrites the create-time duration when a positive value is provided
     /// (create-time duration is frequently 0 before processing).
     /// Extraction failures degrade to null and simply leave the corresponding field unset.

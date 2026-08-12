@@ -14,7 +14,7 @@ function leftoverPath(userDataDir) {
 
 // After a successful migration the old folder is left in place as a backup. We
 // record it so the UI can offer to open it and reassure the user it's safe to
-// delete — we never delete a data folder ourselves (too easy to lose the DB).
+// delete - we never delete a data folder ourselves (too easy to lose the DB).
 export async function writeLeftoverFolder(userDataDir, folder) {
   await fs.mkdir(userDataDir, { recursive: true })
   await fs.writeFile(leftoverPath(userDataDir), JSON.stringify({ path: folder }), 'utf8')
@@ -71,7 +71,7 @@ export async function clearMigrationMarker(userDataDir) {
 // existing uploads, thumbnails and the embedded database. Safe to run only at
 // startup (Postgres is stopped). No-op when:
 //   - from and to are the same, or `from` doesn't exist; or
-//   - `to` already holds an initialized cluster — so switching *back* to a
+//   - `to` already holds an initialized cluster - so switching *back* to a
 //     folder you used before keeps that folder's own data instead of clobbering
 //     it. Existing files in `to` are never overwritten.
 // Returns true when it actually copied something.

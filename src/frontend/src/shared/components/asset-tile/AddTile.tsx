@@ -1,5 +1,5 @@
 /**
- * AddTile — the dashed "Add X" call-to-action tile.
+ * AddTile - the dashed "Add X" call-to-action tile.
  *
  * Always square (aspect-ratio: 1) regardless of the grid's active variant.
  * The dashed border is the ONLY place in the system where that pattern should

@@ -128,7 +128,7 @@ describe('useFileUpload', () => {
         return result.current.uploadMultipleFiles([mockFile])
       })
 
-      // .blend should NOT be rejected — it bypasses the renderable check
+      // .blend should NOT be rejected - it bypasses the renderable check
       expect(uploadResult.failed).toHaveLength(0)
       expect(uploadResult.succeeded).toHaveLength(1)
       expect(mockUploadModel).toHaveBeenCalledWith(mockFile, expect.anything())
@@ -208,7 +208,7 @@ describe('useFileUpload', () => {
     // A zip is expanded in the browser and then imported through exactly the same
     // path as a picked folder. Regression: it used to POST the archive to a
     // server-side unzip endpoint whose response shape ({batchId, imported[]})
-    // differed from every other upload path, so the success callback threw —
+    // differed from every other upload path, so the success callback threw -
     // nothing was associated with the pack/project the import came from and the
     // grid never refreshed, after the progress UI had already reported success.
     const makeZip = (entries: Record<string, string>): File => {

@@ -53,7 +53,7 @@ Given("a stage named {string} exists", async ({ page }, name: string) => {
         return;
     }
 
-    // Not visible — create via API
+    // Not visible - create via API
     console.log(`[Stages] Stage "${name}" not found, creating via API...`);
     const response = await page.request.post(`${API_BASE}/stages`, {
         data: {

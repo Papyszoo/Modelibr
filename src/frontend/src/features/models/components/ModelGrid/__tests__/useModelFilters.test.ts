@@ -14,7 +14,7 @@ const models = [
 
 // Category scoping moved server-side (useModelData passes categoryIds/
 // uncategorized). filterModels is now a name-search-only client overlay.
-describe('useModelFilters — client name search only', () => {
+describe('useModelFilters - client name search only', () => {
   it('returns every model when the search is empty', () => {
     const { result } = renderHook(() => useModelFilters({}))
     expect(result.current.activeCategoryId).toBe(ALL_CATEGORIES_ID)

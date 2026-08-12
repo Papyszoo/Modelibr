@@ -12,7 +12,7 @@ import { type Model } from '@/utils/fileUtils'
 
 import { useModelCategoryMutations } from '../useModelCategoryMutations'
 
-// Mock the API layer — these tests assert the request the hook constructs,
+// Mock the API layer - these tests assert the request the hook constructs,
 // which is where the real regressions live (dropped parentId, wiped tags).
 jest.mock('@/features/models/api/modelApi', () => ({
   createModelCategory: jest.fn().mockResolvedValue({ id: 99 }),
@@ -73,7 +73,7 @@ describe('useModelCategoryMutations', () => {
 
   it('rename passes the existing parentId through so it is not re-rooted', async () => {
     const { result } = setup()
-    // Renaming the child category (parentId=1) must keep parentId=1 — omitting
+    // Renaming the child category (parentId=1) must keep parentId=1 - omitting
     // it would move the category to the root.
     result.current.renameCategoryMutation.mutate({
       category: categories[1],

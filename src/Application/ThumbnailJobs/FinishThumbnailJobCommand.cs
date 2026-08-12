@@ -102,12 +102,12 @@ public class FinishThumbnailJobCommandHandler : ICommandHandler<FinishThumbnailJ
         var model = await _modelRepository.GetByIdAsync(job.ModelId.Value, cancellationToken);
         if (model == null)
         {
-            _logger.LogWarning("Model {ModelId} not found for thumbnail job {JobId} — marking job as dead to prevent retry backlog", 
+            _logger.LogWarning("Model {ModelId} not found for thumbnail job {JobId} - marking job as dead to prevent retry backlog", 
                 job.ModelId, command.JobId);
             
             // Mark the job as dead immediately to prevent it from being retried.
             // Without this, the job stays in Processing until lock expires, then gets
-            // re-queued — creating a backlog of stale jobs that block legitimate work.
+            // re-queued - creating a backlog of stale jobs that block legitimate work.
             await _thumbnailQueue.CancelActiveJobsForModelAsync(job.ModelId.Value, cancellationToken);
             
             // Return success with Failed status so the worker treats this as handled
@@ -123,7 +123,7 @@ public class FinishThumbnailJobCommandHandler : ICommandHandler<FinishThumbnailJ
             {
                 thumbnail = Thumbnail.Create(job.ModelId.Value, job.ModelVersionId.Value, now);
                 thumbnail = await _thumbnailRepository.AddAsync(thumbnail, cancellationToken);
-                // Commit so the thumbnail gets its real id — SetThumbnail below
+                // Commit so the thumbnail gets its real id - SetThumbnail below
                 // copies it into ModelVersion.ThumbnailId (a raw scalar FK).
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
 

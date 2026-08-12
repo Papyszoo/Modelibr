@@ -1,7 +1,7 @@
 // Drives the host's *in-app* updater headlessly, over the Chrome DevTools
 // Protocol. The host is a tray app that never quits when its window closes
 // (main.js: window-all-closed is a no-op), so a CI job can't trigger an install
-// by killing/closing it — autoInstallOnAppQuit only runs on a real app.quit().
+// by killing/closing it - autoInstallOnAppQuit only runs on a real app.quit().
 // Instead we connect to the running app's status window and call the same update
 // IPC the tray buttons use:
 //
@@ -64,8 +64,8 @@ async function main() {
     throw new Error(`update was not downloaded before timeout (last status: ${state?.status ?? 'none'})`)
   }
 
-  console.log('[drive-update] downloaded — triggering install (quitAndInstall + relaunch)')
-  // This quits the app, so the evaluate / connection won't return cleanly — that's
+  console.log('[drive-update] downloaded - triggering install (quitAndInstall + relaunch)')
+  // This quits the app, so the evaluate / connection won't return cleanly - that's
   // expected. The workflow then waits for the relaunched (new) version on :3010.
   await page.evaluate(() => window.modelibr.openUpdate()).catch(() => {})
   await browser.close().catch(() => {})

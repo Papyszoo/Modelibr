@@ -30,14 +30,14 @@ export const DEFAULT_RUNTIME_CONFIG = Object.freeze({
   dataDirectory: '',
   // Off by default: the app serves on 127.0.0.1 (this machine only). When true
   // the edge server binds 0.0.0.0 so a desktop client on another LAN machine
-  // can connect — but Modelibr has no authentication, so this exposes it to
+  // can connect - but Modelibr has no authentication, so this exposes it to
   // everyone on the network. Opt-in, with a warning in the UI. Needs a restart.
   allowNetworkAccess: false,
 })
 
 // Settings whose new value only takes effect when the whole runtime is
 // restarted (the ports services bind to, and the data folder everything lives
-// under). Worker-pool settings are NOT here — those are applied live by
+// under). Worker-pool settings are NOT here - those are applied live by
 // recycling the workers. Both save paths (the tray IPC handler and the
 // in-browser PUT /api/native/runtime) import this so they can never disagree
 // about what a change requires.

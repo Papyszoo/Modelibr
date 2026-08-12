@@ -112,7 +112,7 @@ export interface VersionAuxiliaryFilesResponse {
 
 /**
  * The external `.bin`/texture resources linked to a model version. The viewer needs
- * these to resolve a loose `.gltf`'s relative URIs — without them GLTFLoader asks for
+ * these to resolve a loose `.gltf`'s relative URIs - without them GLTFLoader asks for
  * `scene.bin` against the page origin and the model cannot load in the browser at all.
  */
 export async function getVersionAuxiliaryFiles(

@@ -1,5 +1,5 @@
 // Shared helpers for the upgrade-integrity scripts (seed + verify). Zero external
-// deps — only Node built-ins — so the scripts run on a bare CI runner against the
+// deps - only Node built-ins - so the scripts run on a bare CI runner against the
 // installed app, exactly like src/desktop/scripts/integration/data-folder-migration.mjs.
 
 import crypto from 'crypto'

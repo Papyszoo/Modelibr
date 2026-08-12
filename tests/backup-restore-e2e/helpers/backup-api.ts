@@ -254,7 +254,7 @@ export class BackupApi {
 
     /**
      * Send a raw WebDAV PUT. Used to seed an in-flight Blender Safe-Save temp
-     * file (PUT ".blend@" without a following MOVE) — no model needs to exist
+     * file (PUT ".blend@" without a following MOVE) - no model needs to exist
      * for this: HandleBlenderTempPutAsync writes straight to webdav-blend-temp/
      * keyed by the request path, with no DB lookup at PUT time.
      */

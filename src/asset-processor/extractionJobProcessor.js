@@ -11,8 +11,8 @@ import logger from './logger.js'
 /**
  * Consumes the decoupled extraction queue (prompt 20 executor). Polls
  * `/extraction-jobs/dequeue` for the Geometry family and re-runs scene-graph
- * extraction for a model version — load the file, walk the graph, and persist the
- * rebuilt parts/derivation/search projection — without re-rendering a thumbnail.
+ * extraction for a model version - load the file, walk the graph, and persist the
+ * rebuilt parts/derivation/search projection - without re-rendering a thumbnail.
  * This is what makes `trigger_rederive` (MCP) actually do work.
  *
  * Reuses the existing worker machinery (ModelFileService, RendererPool,

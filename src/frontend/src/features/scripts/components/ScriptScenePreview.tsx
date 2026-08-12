@@ -292,7 +292,7 @@ function SceneContents({
 }
 
 // R3F v9 accepts an async gl factory; we use it to spin up a WebGPU renderer so
-// TSL / node materials work. (This integration needs a real GPU — it can't be
+// TSL / node materials work. (This integration needs a real GPU - it can't be
 // exercised in jsdom/CI; the error boundary is the backstop if it fails.)
 async function createWebGpuRenderer(
   props: ConstructorParameters<typeof THREE_GPU.WebGPURenderer>[0]

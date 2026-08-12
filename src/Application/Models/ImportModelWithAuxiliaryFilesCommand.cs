@@ -112,7 +112,7 @@ internal class ImportModelWithAuxiliaryFilesCommandHandler
         var linked = 0;
         foreach (var (relativePath, file) in resolved)
         {
-            // Already linked from a prior import of this exact version — nothing to do.
+            // Already linked from a prior import of this exact version - nothing to do.
             if (await _auxiliaryRepository.ExistsAsync(versionId, relativePath, cancellationToken))
             {
                 skipped++;
@@ -153,7 +153,7 @@ internal class ImportModelWithAuxiliaryFilesCommandHandler
             }
             catch (ArgumentException)
             {
-                // Path traversal or empty — never resolve it.
+                // Path traversal or empty - never resolve it.
                 skipped++;
                 continue;
             }
@@ -193,7 +193,7 @@ internal class ImportModelWithAuxiliaryFilesCommandHandler
 
     /// <summary>
     /// True when the version already links a different file at any of the relative paths
-    /// this import brings — i.e. the two imports reference different resources and cannot
+    /// this import brings - i.e. the two imports reference different resources and cannot
     /// be the same asset. Paths the version does not have yet are additive, not a conflict.
     /// </summary>
     private async Task<bool> ReferencedResourcesDifferAsync(

@@ -97,7 +97,7 @@ public class McpWriteRoundTripIntegrationTests : IClassFixture<ModelibrWebFactor
         // Regression (found driving a real 1,700-model MCP import): idempotency used to be
         // a lookup followed by a write. Two in-flight calls sharing a key BOTH passed the
         // lookup, BOTH created a pack, and the loser then tripped the audit log's unique
-        // index — leaving a duplicate pack with no audit row and an opaque tool error.
+        // index - leaving a duplicate pack with no audit row and an opaque tool error.
         // The sequential retry test above cannot see this; only concurrency can.
         await MigrateAsync();
         const string key = "mcp-write-create-pack-concurrent-1";
@@ -117,7 +117,7 @@ public class McpWriteRoundTripIntegrationTests : IClassFixture<ModelibrWebFactor
 
         var responses = await Task.WhenAll(InvokeAsync(), InvokeAsync(), InvokeAsync(), InvokeAsync());
 
-        // Every caller gets a well-formed answer — exactly one applied, the rest stood down.
+        // Every caller gets a well-formed answer - exactly one applied, the rest stood down.
         Assert.Equal(1, responses.Count(r => r.Contains("\"ok\"")));
         // A loser sees "already-applied" if the winner had already completed its claim, and
         // "in-progress" if the claim was still live. Which of the two is a timing detail;

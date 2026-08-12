@@ -7,7 +7,7 @@ namespace Application.Extraction;
 
 /// <summary>
 /// Reads the derived metadata + part detail for an asset (current version). The
-/// ordinary endpoint the MCP <c>get_asset</c>/<c>get_part</c> tools wrap — no
+/// ordinary endpoint the MCP <c>get_asset</c>/<c>get_part</c> tools wrap - no
 /// MCP-specific read path.
 /// </summary>
 public record GetAssetMetadataQuery(string AssetType, int AssetId, string? PartPath = null)

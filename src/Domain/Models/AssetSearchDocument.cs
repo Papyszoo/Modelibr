@@ -6,7 +6,7 @@ namespace Domain.Models;
 /// indexed table scan rather than a join across raw + derived rows.
 ///
 /// Text is split by intent: <see cref="Tokens"/> and <see cref="Symbols"/> are
-/// authored identifiers indexed <b>literally</b> (trigram, no stemming — so
+/// authored identifiers indexed <b>literally</b> (trigram, no stemming - so
 /// <c>ściana</c>/<c>Wandhalterung</c> survive), while <see cref="BrowseSummary"/>
 /// is prose for the full-text vector. <see cref="Prominence"/> keeps secondary
 /// parts out of default results, and <see cref="IsCurrentVersion"/> keeps a
@@ -31,7 +31,7 @@ public class AssetSearchDocument
     /// <summary>
     /// False while the underlying asset is in the recycle bin. Soft delete must hide an
     /// asset from search immediately, and restoring it must bring the asset back without
-    /// waiting for a re-extraction — so deletion state is carried on the projection
+    /// waiting for a re-extraction - so deletion state is carried on the projection
     /// rather than left for the next derive to notice.
     /// </summary>
     public bool IsActive { get; private set; } = true;
@@ -53,7 +53,7 @@ public class AssetSearchDocument
     ///
     /// Kept OUT of <see cref="Tokens"/> deliberately. When both lived in one field a
     /// concept match was indistinguishable from a name match, so a query for "vehicle"
-    /// ranked <c>boat_ornament</c> and <c>tram_rail</c> — labelled vehicles — level with
+    /// ranked <c>boat_ornament</c> and <c>tram_rail</c> - labelled vehicles - level with
     /// <c>SM_Veh_Car_Van_01</c>, and alphabetical tie-breaking then decided the page.
     /// Scored separately, concepts add recall without displacing an authored name.
     /// </summary>
@@ -80,7 +80,7 @@ public class AssetSearchDocument
     public int? PartCount { get; private set; }
     public int? AnimationCount { get; private set; }
 
-    /// <summary>Largest world bounding-box dimension (metres) — the "how big" size filter.</summary>
+    /// <summary>Largest world bounding-box dimension (metres) - the "how big" size filter.</summary>
     public double? MaxDimension { get; private set; }
 
     // ---- prompt-29 category bridge (the assigned user category, the semantic layer) ----

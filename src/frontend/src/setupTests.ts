@@ -46,7 +46,7 @@ jest.mock('@/lib/apiBase', () => {
   return {
     __esModule: true,
     client: mockClient,
-    // Each call gets a fresh mock instance — modules that build their own
+    // Each call gets a fresh mock instance - modules that build their own
     // client (e.g. the asset-store feature) export it for tests to grab.
     createApiClient: jest.fn(() => makeMockClient()),
     baseURL: 'http://localhost:8080',
@@ -55,7 +55,7 @@ jest.mock('@/lib/apiBase', () => {
   }
 })
 
-// storeEnv reads import.meta at module scope (Jest can't parse it) — back
+// storeEnv reads import.meta at module scope (Jest can't parse it) - back
 // the asset-store feature's env read with process.env instead.
 jest.mock('@/features/asset-store/lib/storeEnv', () => ({
   readStoreUrlEnv: () => process.env.VITE_STORE_URL,

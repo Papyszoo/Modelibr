@@ -59,7 +59,7 @@ export function WebDavInstructions(): JSX.Element {
             </p>
             <p>
               <strong>
-                Option A — trust the certificate (one-time setup):
+                Option A - trust the certificate (one-time setup):
               </strong>
             </p>
             <ol>
@@ -86,7 +86,7 @@ export function WebDavInstructions(): JSX.Element {
             </ol>
             <p>
               <strong>
-                Option B — use HTTP instead (recommended for local network):
+                Option B - use HTTP instead (recommended for local network):
               </strong>{' '}
               Add <code>WEBDAV_HTTP_PORT=80</code> to <code>.env</code> and
               restart Docker. HTTP on port 80 needs no certificate and no
@@ -141,7 +141,7 @@ export function WebDavInstructions(): JSX.Element {
         {!isStandardPort && (
           <div className="webdav-port-warning">
             <strong>
-              ⚠ Non-standard port — whitelist Modelibr as trusted WebDAV
+              ⚠ Non-standard port - whitelist Modelibr as trusted WebDAV
               server:
             </strong>
             <p>
@@ -259,7 +259,7 @@ sudo mount -t davfs ${webDavBaseUrl} /mnt/modelibr`}
     )
   }
 
-  // Unknown OS — show all options
+  // Unknown OS - show all options
   return (
     <div className="webdav-instructions">
       <p>Use a WebDAV client to connect to:</p>

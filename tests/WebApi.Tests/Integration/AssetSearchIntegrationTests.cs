@@ -10,7 +10,7 @@ using Xunit;
 namespace WebApi.Tests.Integration;
 
 /// <summary>
-/// Exercises the prompt-24 structured search against real PostgreSQL — the FTS +
+/// Exercises the prompt-24 structured search against real PostgreSQL - the FTS +
 /// pg_trgm behaviour (ranking, literal non-ASCII matching) cannot be reproduced on
 /// EF Core's InMemory provider. Documents are seeded directly into the projection
 /// so these tests cover the search SQL itself, independent of the derive pipeline.

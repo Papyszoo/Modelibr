@@ -9,7 +9,7 @@
   gap: 0.5rem;
 }
 
-/* Body: category tree sidebar + scripts grid, flat on the page background —
+/* Body: category tree sidebar + scripts grid, flat on the page background -
    the quiet CategoryTreePanel default provides the sidebar look; only a
    border separates it from the grid. */
 .script-list-body {

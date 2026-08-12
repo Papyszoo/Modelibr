@@ -1,6 +1,6 @@
 /**
  * Contract tests for the store-origin API client. The store is a separate
- * service — these pin the exact endpoint paths, payload keys, and the
+ * service - these pin the exact endpoint paths, payload keys, and the
  * Authorization scheme from the store's INTEGRATION.md contract, so a silent
  * rename here (which the backend can't catch) goes red.
  */
@@ -39,7 +39,7 @@ beforeEach(() => {
 
 describe('storeApi request construction', () => {
   // Regression: the store rejects a login whose body keys drift from
-  // { email, password } — the 400 would look like "wrong password" to users.
+  // { email, password } - the 400 would look like "wrong password" to users.
   it('loginToStore posts credentials to /api/auth/login and unwraps the body', async () => {
     postMock.mockResolvedValue({
       data: { accessToken: 'a', refreshToken: 'r', username: 'u' },
@@ -55,7 +55,7 @@ describe('storeApi request construction', () => {
   })
 
   // Regression: the library endpoint clamps/pages via `page`/`pageSize`
-  // query params — sending them in the path or renamed returns page 1
+  // query params - sending them in the path or renamed returns page 1
   // forever and the grid silently truncates at the default page size.
   it('getStoreLibrary passes page/pageSize as query params', async () => {
     getMock.mockResolvedValue({ data: { items: [], totalCount: 0 } })
@@ -67,7 +67,7 @@ describe('storeApi request construction', () => {
     })
   })
 
-  // Regression: the mint endpoint is per-asset — a path drift mints a token
+  // Regression: the mint endpoint is per-asset - a path drift mints a token
   // for the wrong asset (or 404s) and every import fails.
   it('mintImportToken posts to the asset-scoped endpoint', async () => {
     postMock.mockResolvedValue({
@@ -85,7 +85,7 @@ describe('attachStoreAuthHeader', () => {
   const makeConfig = () =>
     ({ headers: {} }) as unknown as InternalAxiosRequestConfig
 
-  // Regression: the store expects `Bearer <jwt>` — scheme drift (e.g. the
+  // Regression: the store expects `Bearer <jwt>` - scheme drift (e.g. the
   // ImportToken scheme leaking in here) turns every library call into a 401.
   it('attaches the in-memory access token as a Bearer header', () => {
     loggedInState()
@@ -199,7 +199,7 @@ describe('handleStoreResponseError (401 refresh flow)', () => {
 
   // Regression: a refresh that resolved AFTER the user signed in as someone else
   // was dropped by setTokens (good) but the request was retried and cached
-  // anyway — serving account A's response to account B.
+  // anyway - serving account A's response to account B.
   it('does not retry the request when the session changed mid-refresh', async () => {
     loggedInState()
     postMock.mockImplementation(async () => {
@@ -222,7 +222,7 @@ describe('handleStoreResponseError (401 refresh flow)', () => {
   })
 
   // Regression: two requests 401ing at the same moment each ran their own
-  // refresh — against a store that rotates refresh tokens on use, the second
+  // refresh - against a store that rotates refresh tokens on use, the second
   // refresh (with the now-consumed token) 401ed and logged the user out
   // right after a successful refresh.
   it('shares one refresh between concurrent 401s', async () => {
@@ -284,7 +284,7 @@ describe('refreshStoreTokensOnce', () => {
       username: 'account-b',
     })
 
-    // B's own refresh is a separate call — it must not be handed A's promise.
+    // B's own refresh is a separate call - it must not be handed A's promise.
     postMock.mockResolvedValueOnce({
       data: { accessToken: 'b-access-2', refreshToken: 'b-refresh-2' },
     })

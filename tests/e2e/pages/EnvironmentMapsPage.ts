@@ -77,7 +77,7 @@ export class EnvironmentMapsPage {
         ) {
             await navMenuItem.first().click();
         } else {
-            // No nav menubar in this app variant — go through the New Tab page:
+            // No nav menubar in this app variant - go through the New Tab page:
             // click "+" on the dock bar, then click the Environment Maps tile.
             const addButton = this.page.locator(".dock-bar-left .dock-add-button");
             await expect(addButton).toBeVisible({ timeout: 10000 });
@@ -184,7 +184,7 @@ export class EnvironmentMapsPage {
         // The floating "File Uploads" progress window overlays the (narrower,
         // sidebar-open) grid and swallows pointer events, so a right-click on a
         // card behind it hangs until the test times out. Dismiss it, then
-        // reveal the card — in the narrower grid it may be virtualised out of
+        // reveal the card - in the narrower grid it may be virtualised out of
         // the DOM, and a right-click on a non-rendered card also hangs.
         await new UploadProgressPage(this.page).closeWindowIfVisible();
         await this.waitForEnvironmentMapByName(mapName, 15000);
@@ -335,7 +335,7 @@ export class EnvironmentMapsPage {
         timeout = 30000,
     ): Promise<void> {
         const findCard = async (): Promise<boolean> => {
-            // VirtuosoGrid virtualises cards — scroll progressively to
+            // VirtuosoGrid virtualises cards - scroll progressively to
             // bring off-viewport items into the DOM. The scroll container is
             // `.environment-map-list-main` (the category-sidebar rework moved
             // the scrollable region there; `.environment-map-list` is now the
@@ -364,7 +364,7 @@ export class EnvironmentMapsPage {
         if (await findCard()) return;
 
         // React Query cache may serve stale data after upload.
-        // Reload forces a fresh fetch — same pattern as model-upload steps.
+        // Reload forces a fresh fetch - same pattern as model-upload steps.
         await this.page.reload({ waitUntil: "domcontentloaded" });
         await this.waitForListReady();
 

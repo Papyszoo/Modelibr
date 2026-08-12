@@ -754,7 +754,7 @@ Then(
             environmentMap.id,
         );
 
-        // Retry reading transitions — the in-browser interval may need
+        // Retry reading transitions - the in-browser interval may need
         // one more tick to capture the final loaded state after the
         // Playwright poll above confirmed the thumbnail is visible.
         await expect

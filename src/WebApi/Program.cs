@@ -116,7 +116,7 @@ namespace WebApi
             builder.Services.AddScoped<IStoreImportProgressNotifier, SignalRStoreImportProgressNotifier>();
             builder.Services.AddHostedService<UploadDirectoryInitializer>();
 
-            // Local MCP server (prompt 27) — a thin, read-only pass-through over the
+            // Local MCP server (prompt 27) - a thin, read-only pass-through over the
             // asset-search / metadata / compute query handlers, hosted in-process over
             // HTTP (SSE) so there's one process and one auth posture. Enabled by default;
             // set MCP_ENABLED=false to turn it off.

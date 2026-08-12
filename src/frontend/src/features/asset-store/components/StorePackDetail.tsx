@@ -139,7 +139,7 @@ export function StorePackDetail({ item, onBack }: StorePackDetailProps) {
         <EmptyState
           icon="pi-box"
           title="No selectable items"
-          message="This asset has no separately listed items — importing brings in everything."
+          message="This asset has no separately listed items - importing brings in everything."
           variant="compact"
         />
       )
@@ -158,7 +158,7 @@ export function StorePackDetail({ item, onBack }: StorePackDetailProps) {
             >
               {/*
                 The row itself toggles selection, so the checkbox's own click must
-                not ALSO bubble up to it — that fired toggle() twice and left the
+                not ALSO bubble up to it - that fired toggle() twice and left the
                 checkbox looking inert. The checkbox stays the keyboard-reachable
                 control for the row.
               */}
@@ -257,7 +257,7 @@ export function StorePackDetail({ item, onBack }: StorePackDetailProps) {
                 icon="pi pi-download"
                 size="small"
                 // A pack whose contents failed to load reports zero items, which
-                // reads here as "no separately listed items — import everything".
+                // reads here as "no separately listed items - import everything".
                 // Importing the whole pack because a request failed is not what
                 // the click meant, so wait for the contents.
                 disabled={

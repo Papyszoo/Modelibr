@@ -87,7 +87,7 @@ internal class CreateModelFromBlendCommandHandler : ICommandHandler<CreateModelF
 
             // Create version 1. Commit right away: version.Id is copied into a raw
             // scalar FK (SetModelVersion) and into the ModelUploadedEvent below, and
-            // savedModel.Id goes into the response — both need real ids.
+            // savedModel.Id goes into the response - both need real ids.
             var version = savedModel.CreateVersion("Initial version", _dateTimeProvider.UtcNow);
             version.AddFile(fileEntity);
             await _versionRepository.AddAsync(version, cancellationToken);
@@ -95,7 +95,7 @@ internal class CreateModelFromBlendCommandHandler : ICommandHandler<CreateModelF
 
             fileEntity.SetModelVersion(version.Id);
 
-            // Always raise ModelUploadedEvent for .blend — asset-processor will convert.
+            // Always raise ModelUploadedEvent for .blend - asset-processor will convert.
             // Must happen before the SaveChanges below: the save pipeline dispatches
             // whatever events are on the aggregate at that point (see
             // DomainEventsInterceptor); no manual publish here.

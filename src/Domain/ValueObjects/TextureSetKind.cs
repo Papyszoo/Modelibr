@@ -21,7 +21,7 @@ public enum TextureSetKind
     Universal = 1,
 
     /// <summary>
-    /// Owned by a single model — never surfaced in cross-model browsing or
+    /// Owned by a single model - never surfaced in cross-model browsing or
     /// linking pickers. Lives inside the owning model's Materials panel.
     /// </summary>
     ModelOwned = 2

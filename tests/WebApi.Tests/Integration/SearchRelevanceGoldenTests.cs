@@ -13,20 +13,20 @@ namespace WebApi.Tests.Integration;
 /// Relevance regression suite: does search actually return assets that fit what was
 /// asked for?
 ///
-/// Ranking quality cannot be asserted by unit tests — it is produced by Postgres (ILIKE
+/// Ranking quality cannot be asserted by unit tests - it is produced by Postgres (ILIKE
 /// boundaries, trigram similarity, ordering) over a whole corpus, so this seeds a corpus
 /// of <b>real asset names</b> taken from the libraries Modelibr is tested against
 /// (Kenney/base-meshes style <c>snake_case</c>, Synty <c>SM_Bld_Apartment_01</c>, Khronos
 /// glTF samples) and measures the search the MCP server actually calls.
 ///
-/// Only search documents are seeded — no meshes, no worker, no files — which is what
+/// Only search documents are seeded - no meshes, no worker, no files - which is what
 /// makes a corpus-level relevance suite affordable in CI.
 ///
 /// Each case asserts two things, because only checking for good hits misses the failure
 /// mode that actually shipped:
 /// <list type="number">
 /// <item><b>Relevant</b> names must appear in the top-k (at least <c>MinRelevantInTopK</c>).</item>
-/// <item><b>Forbidden</b> names — genuine near-misses — must never <b>outrank</b> a
+/// <item><b>Forbidden</b> names - genuine near-misses - must never <b>outrank</b> a
 /// relevant hit. Presence alone is not a failure: when a library holds one traffic light,
 /// a light switch at rank 4 is honest recall. A light switch at rank 1 is not.</item>
 /// </list>
@@ -68,11 +68,11 @@ public class SearchRelevanceGoldenTests : IClassFixture<ModelibrWebFactory>
         // Vehicles + the distractors that substring matching used to promote.
         new("SM_Veh_Car_Van_01", 5681), new("SM_Veh_Car_Police_01", 6100),
         new("SM_Veh_Car_Ambo_01", 6449), new("SM_Veh_Truck_01", 7200),
-        // Vehicles only by inference — their names say boat/tram, not "vehicle". They
+        // Vehicles only by inference - their names say boat/tram, not "vehicle". They
         // must be reachable by an intent query but must not outrank a named vehicle.
         new("boat_ornament", 900), new("tram_rail", 400), new("ship_wheel", 700),
         new("credit_card", 92), new("cartwheel", 672), new("car_tire_01", 2176),
-        // Degenerate exporter leftover — a few triangles, zero volume. Must never answer.
+        // Degenerate exporter leftover - a few triangles, zero volume. Must never answer.
         new("car-01", 8, MaxDimension: 0),
 
         // Characters + distractors.
@@ -122,7 +122,7 @@ public class SearchRelevanceGoldenTests : IClassFixture<ModelibrWebFactory>
         new("intent-vehicle", "vehicle",
             Relevant: new[] { "SM_Veh_Car_Van_01", "SM_Veh_Car_Police_01", "SM_Veh_Car_Ambo_01", "SM_Veh_Truck_01" },
             // boat/tram/ship are genuinely vehicles by concept, but an asset whose author
-            // named it a vehicle must come first — this is what the separate concept field
+            // named it a vehicle must come first - this is what the separate concept field
             // buys, and without it alphabetical order decided the page.
             Forbidden: new[] { "credit_card", "cartwheel", "SK_Character_Male_Police", "boat_ornament", "tram_rail", "ship_wheel" },
             MinRelevantInTopK: 3),
@@ -199,7 +199,7 @@ public class SearchRelevanceGoldenTests : IClassFixture<ModelibrWebFactory>
         foreach (var fixture in Corpus)
         {
             // Mirror the real projection: tokenise the authored name, widen it, and fold
-            // in concept labels — so this suite exercises the same pipeline an import does.
+            // in concept labels - so this suite exercises the same pipeline an import does.
             var tokens = Application.Extraction.Derivation.NameTokenizer.Tokenize(fixture.Name);
             var widened = SearchVocabulary.ExpandForIndex(tokens);
             var labels = CategorySuggester.Suggest(widened);
@@ -214,7 +214,7 @@ public class SearchRelevanceGoldenTests : IClassFixture<ModelibrWebFactory>
                 displayName: fixture.Name,
                 tokens: string.Join(' ', widened),
                 conceptLabels: string.Join(' ', labels),
-                browseSummary: $"{fixture.Name} — mesh, {fixture.Triangles} tris",
+                browseSummary: $"{fixture.Name} - mesh, {fixture.Triangles} tris",
                 updatedAt: now,
                 triangleCount: fixture.Triangles,
                 boneCount: fixture.Rigged ? 50 : null,
@@ -260,7 +260,7 @@ public class SearchRelevanceGoldenTests : IClassFixture<ModelibrWebFactory>
             totalPrecision += precision;
             totalMrr += mrr;
 
-            // A near-miss is only a failure when it beats a genuine hit — or when the
+            // A near-miss is only a failure when it beats a genuine hit - or when the
             // query has no genuine hits at all and it shows up regardless.
             var lastRelevantRank = topK.FindLastIndex(h => c.Relevant.Contains(h, StringComparer.OrdinalIgnoreCase));
             var violations = topK
@@ -294,7 +294,7 @@ public class SearchRelevanceGoldenTests : IClassFixture<ModelibrWebFactory>
     public async Task Plural_Queries_Do_Not_Lose_Results_Against_Their_Singular()
     {
         // Regression: the index has no stemming, so "chairs" used to return roughly half
-        // of what "chair" did and "boxes" under a third of "box" — a user typing the
+        // of what "chair" did and "boxes" under a third of "box" - a user typing the
         // natural plural silently saw a smaller library.
         await SeedAsync();
 
@@ -314,7 +314,7 @@ public class SearchRelevanceGoldenTests : IClassFixture<ModelibrWebFactory>
         // Regression: the singular variant of a query word was checked against the
         // authored tokens but NOT against the concept labels or symbols, so an asset
         // reachable only by inference answered "vehicle" and vanished for "vehicles".
-        // On the real library that cost 55 of 226 buildings — and the count-parity check
+        // On the real library that cost 55 of 226 buildings - and the count-parity check
         // above misses it, because assets whose NAME carries the word still matched.
         await SeedAsync();
 
@@ -333,8 +333,8 @@ public class SearchRelevanceGoldenTests : IClassFixture<ModelibrWebFactory>
     [Fact]
     public async Task Degenerate_Nodes_Never_Answer_A_Triangle_Budget_Query()
     {
-        // Regression: "car" under a 10k triangle budget returned "car-01" — 8 triangles,
-        // zero volume — at rank 1. An agent building a scene would place an invisible car.
+        // Regression: "car" under a 10k triangle budget returned "car-01" - 8 triangles,
+        // zero volume - at rank 1. An agent building a scene would place an invisible car.
         await SeedAsync();
 
         using var scope = _factory.Services.CreateScope();
@@ -354,7 +354,7 @@ public class SearchRelevanceGoldenTests : IClassFixture<ModelibrWebFactory>
     public async Task A_Blank_Query_Browses_By_Filter_Alone()
     {
         // Regression: an empty term returned nothing, so every facet list_facets
-        // advertises was unusable on its own — "every rigged asset" was unanswerable.
+        // advertises was unusable on its own - "every rigged asset" was unanswerable.
         await SeedAsync();
 
         using var scope = _factory.Services.CreateScope();

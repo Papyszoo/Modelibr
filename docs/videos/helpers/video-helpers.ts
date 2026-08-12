@@ -15,7 +15,7 @@ const cursorOverlayPages = new WeakSet<Page>();
  * Playwright's screencast does not render the mouse pointer, so smooth
  * mouse movements are invisible and every click looks like teleportation.
  * Inject a synthetic cursor that follows mousemove events and pulses on
- * clicks — this is what makes the recorded interactions readable.
+ * clicks - this is what makes the recorded interactions readable.
  */
 async function ensureCursorOverlayInitScript(page: Page) {
     if (cursorOverlayPages.has(page)) {

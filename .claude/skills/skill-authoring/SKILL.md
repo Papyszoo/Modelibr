@@ -1,13 +1,13 @@
 ---
 name: skill-authoring
-description: How to write and maintain Modelibr agent skills — compactness budget, structure template, staleness rules, what belongs in a skill vs the code vs AGENTS.md. Use when creating or editing anything under .claude/skills/.
+description: How to write and maintain Modelibr agent skills - compactness budget, structure template, staleness rules, what belongs in a skill vs the code vs AGENTS.md. Use when creating or editing anything under .claude/skills/.
 ---
 
 # Skill authoring (keep skills compact and specific)
 
 Skills are loaded into agent context. Every line that doesn't change agent
 behavior is context pollution. The litmus for each line: **"would an agent
-do something wrong without this?"** If no — delete it.
+do something wrong without this?"** If no - delete it.
 
 ## Budget & tone
 
@@ -20,12 +20,12 @@ do something wrong without this?"** If no — delete it.
 
 ## Structure template (in this order, sections optional)
 
-1. **Cardinal rule / traps** — the things that break production or data if
+1. **Cardinal rule / traps** - the things that break production or data if
    an agent doesn't know them. First, always.
-2. **Map** — files with one-line roles. No file trees.
-3. **Rules** — imperatives ("never X", "always Y via Z"), grouped by topic.
-4. **Testing** — what coverage exists, what's manual, what gates apply.
-5. **Verify** — exact commands to run before claiming done.
+2. **Map** - files with one-line roles. No file trees.
+3. **Rules** - imperatives ("never X", "always Y via Z"), grouped by topic.
+4. **Testing** - what coverage exists, what's manual, what gates apply.
+5. **Verify** - exact commands to run before claiming done.
 
 ## Maintenance rules
 
@@ -34,11 +34,11 @@ do something wrong without this?"** If no — delete it.
 - **Prefer replace/delete over append.** A feature that changes behavior
   rewrites the stale line; it doesn't add a second paragraph beside it.
 - Temporary state ("until prompt N lands") is allowed ONLY with the trigger
-  that removes it — and landing prompt N must delete the clause.
+  that removes it - and landing prompt N must delete the clause.
 - Prompt/PR references only when they're the pointer to fuller context an
   agent may need, never as attribution.
 - `description:` frontmatter = trigger conditions, concrete paths ("Use when
-  creating or editing anything under src/X") — that's what decides loading.
+  creating or editing anything under src/X") - that's what decides loading.
 - Don't duplicate AGENTS.md or another skill; name the other skill instead.
 - One domain per skill. If a section serves a different audience/task,
   it's a different skill (or belongs in none).

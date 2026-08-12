@@ -4,7 +4,7 @@ namespace Domain.Models;
 /// A cached expensive-compute result (UV overlap, texel density, exact surface
 /// area, manifold check, per-part render), keyed on the <b>geometry hash</b> rather
 /// than on part identity. A result computed for one instance is instantly available
-/// for every copy and across any asset sharing the geometry — the whole point of
+/// for every copy and across any asset sharing the geometry - the whole point of
 /// canonicalising the hash (prompt 21). One row per (GeometryHash, HashVersion,
 /// Metric); recompute upserts.
 /// </summary>

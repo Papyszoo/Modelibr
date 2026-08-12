@@ -26,7 +26,7 @@ export function ensureUv2(
  * but not custom attributes, so computing it pre-rotation would leave the
  * cap normals pointing along the disk's original +Z) and *before*
  * `mergeGeometries`, so the side rim keeps a purely radial direction and
- * the cap rim keeps a purely vertical direction — otherwise averaging
+ * the cap rim keeps a purely vertical direction - otherwise averaging
  * across pieces would flare the rim outward-and-up under displacement.
  */
 export function createCylinderGeometry(): THREE.BufferGeometry {
@@ -58,7 +58,7 @@ export function createCylinderGeometry(): THREE.BufferGeometry {
  * Create a BufferGeometry for the given primitive type. Each primitive
  * gets a `uv2` (for AO sampling) and an averaged-by-position `aDispNormal`
  * attribute used by the displacement shader injection. Box/cube duplicates
- * survive — face UVs stay per-face (no smear band) and the shared
+ * survive - face UVs stay per-face (no smear band) and the shared
  * displacement direction prevents tearing under displacement.
  */
 export function createPreviewGeometry(

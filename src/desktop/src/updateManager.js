@@ -3,7 +3,7 @@ const RELEASES_PAGE_URL = `https://github.com/${REPO}/releases`
 
 // Wraps electron-updater so the host can check GitHub Releases for a newer build
 // and surface it in the tray. Updates are *opt-in*: we keep checking on launch,
-// but nothing downloads or installs until the user clicks — first "Download
+// but nothing downloads or installs until the user clicks - first "Download
 // update", then "Restart & Install". A user may have good reasons to stay on a
 // stable build, so we never download in the background or install on quit.
 //
@@ -69,7 +69,7 @@ export class UpdateManager {
     this.autoUpdater.on('checking-for-update', () =>
       this.setState({ status: 'checking', error: null })
     )
-    // A newer build exists but we DON'T download it — wait for the user.
+    // A newer build exists but we DON'T download it - wait for the user.
     this.autoUpdater.on('update-available', info =>
       this.setState({ status: 'available', latestVersion: info?.version ?? null, percent: 0 })
     )
@@ -112,7 +112,7 @@ export class UpdateManager {
   }
 
   // The "Download update" button: start pulling the available build down. On
-  // unsigned macOS the download can error — fall back to the releases page so the
+  // unsigned macOS the download can error - fall back to the releases page so the
   // user can grab the installer manually.
   async download() {
     this._wire()
@@ -133,7 +133,7 @@ export class UpdateManager {
     if (this.state.status === 'downloaded') {
       try {
         // isSilent=true: the NSIS installer is assisted (oneClick:false), so a
-        // non-silent update pops the full setup wizard and waits for clicks —
+        // non-silent update pops the full setup wizard and waits for clicks -
         // which never come on an unattended/relaunching update, so the update
         // never applies (the app just relaunches the old version). Silent runs
         // the update in the background; isForceRunAfter=true relaunches into the

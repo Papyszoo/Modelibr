@@ -1,6 +1,6 @@
 namespace Application.Extraction.Derivation;
 
-/// <summary>Prominence — whether and how a part participates in search.</summary>
+/// <summary>Prominence - whether and how a part participates in search.</summary>
 public static class Prominence
 {
     public const string Full = "full";

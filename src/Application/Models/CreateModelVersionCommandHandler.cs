@@ -88,7 +88,7 @@ internal class CreateModelVersionCommandHandler : ICommandHandler<CreateModelVer
 
         // Save version. Commit immediately: savedVersion.Id is copied into raw
         // scalar FKs below (SetModelVersion, SetActiveVersion), carried in the
-        // ModelUploadedEvent, and returned in the response — all need the real
+        // ModelUploadedEvent, and returned in the response - all need the real
         // database-assigned id, not EF's temporary key.
         var savedVersion = await _versionRepository.AddAsync(version, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
@@ -110,7 +110,7 @@ internal class CreateModelVersionCommandHandler : ICommandHandler<CreateModelVer
         // Trigger for renderable files (direct thumbnail) and project files like .blend
         // (asset-processor converts .blend → .glb first, then generates thumbnail).
         // Must happen before the SaveChanges below (includes ActiveVersionChangedEvent
-        // if SetAsActive was true) — the save pipeline dispatches whatever events are
+        // if SetAsActive was true) - the save pipeline dispatches whatever events are
         // on the aggregate at that point (see DomainEventsInterceptor); no manual
         // publish here.
         if (fileType.IsRenderable || fileType.Category == Domain.ValueObjects.FileTypeCategory.Project)

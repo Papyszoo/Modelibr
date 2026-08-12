@@ -34,7 +34,7 @@ public class StoreImportCategoryResolverTests
     public async Task Resolve_WhenOnlyNestedCategoryMatches_CreatesANewRootCategory()
     {
         var h = new Harness();
-        // "UI" exists but only as a child — imports target root-level taxonomy names.
+        // "UI" exists but only as a child - imports target root-level taxonomy names.
         h.SetSoundCategories(
             new SoundCategorySummaryDto { Id = 3, Name = "Music", ParentId = null },
             new SoundCategorySummaryDto { Id = 4, Name = "UI", ParentId = 3 });

@@ -147,7 +147,7 @@ internal sealed class EnvironmentMapRepository : IEnvironmentMapRepository
                 e.EnvironmentMapCategoryId.HasValue &&
                 categoryIds.Contains(e.EnvironmentMapCategoryId.Value));
 
-        // EF.Functions.ILike — case-insensitive substring match.
+        // EF.Functions.ILike - case-insensitive substring match.
         // Postgres-specific; see SoundRepository for the in-memory note.
         if (!string.IsNullOrWhiteSpace(searchName))
         {

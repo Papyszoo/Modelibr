@@ -93,7 +93,7 @@ Given("I open the model info panel", async ({ page }) => {
 Given("the model has at least one tag", async ({ page }) => {
     const infoPanel = page.locator('[data-testid="model-info-panel"]');
 
-    // Wait for tags to render — give the useEffect + React Query time to
+    // Wait for tags to render - give the useEffect + React Query time to
     // deliver fresh model data after the component mounts.
     const firstChip = infoPanel.locator(".p-chip").first();
     const hasChips = await firstChip
@@ -102,7 +102,7 @@ Given("the model has at least one tag", async ({ page }) => {
         .catch(() => false);
 
     if (!hasChips) {
-        // No tags exist on this model — add one so the "remove" step has
+        // No tags exist on this model - add one so the "remove" step has
         // something to work with.
         console.log("[Setup] No tags found on model, adding one...");
         const tagInput = getTagInput(infoPanel);
@@ -180,7 +180,7 @@ When(
 When("I remove the first tag", async ({ page }) => {
     const infoPanel = page.locator('[data-testid="model-info-panel"]');
 
-    // Wait for tag count to stabilise before recording — the component may
+    // Wait for tag count to stabilise before recording - the component may
     // still be rendering chips from a fresh React Query fetch.
     let initialCount = 0;
     await expect(async () => {
@@ -362,7 +362,7 @@ Then("the tag count should have decreased", async ({ page }) => {
     const infoPanel = page.locator('[data-testid="model-info-panel"]');
     await expect(infoPanel).toBeVisible({ timeout: 10000 });
 
-    // Use a retrying assertion — the ModelInfo component initialises tags
+    // Use a retrying assertion - the ModelInfo component initialises tags
     // from the model prop, but the first render may use stale/cached data
     // before React Query delivers the fresh payload.
     await expect(async () => {

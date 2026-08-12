@@ -5,8 +5,8 @@ namespace Application.Tests.Search;
 
 /// <summary>
 /// The concept map decides whether an intent query like "vehicle" finds anything, so it
-/// is pinned from both directions: the concepts an asset MUST get, and — the half that
-/// actually regressed on a real library — the concepts it must NOT get.
+/// is pinned from both directions: the concepts an asset MUST get, and - the half that
+/// actually regressed on a real library - the concepts it must NOT get.
 ///
 /// Every anti-hit here is a wrong answer observed against a 1,700-model library while
 /// matching was a substring test: "credit_card" was a vehicle because "card" contains
@@ -61,7 +61,7 @@ public class CategorySuggesterTests
     public void Suggest_Treats_Building_Parts_As_Environment_Not_Buildings()
     {
         // Someone asking for a "building" wants buildings, not the 200 doors that belong
-        // to them — doors used to fill every slot of the "building" result page.
+        // to them - doors used to fill every slot of the "building" result page.
         var door = SuggestFor("door");
         Assert.DoesNotContain("building", door);
         Assert.Contains("environment", door);

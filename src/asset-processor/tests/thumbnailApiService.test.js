@@ -106,7 +106,7 @@ describe('ThumbnailApiService.uploadMultipleThumbnails metadata', () => {
     expect(posterMetadata).toEqual({ width: 512, height: 512 })
   })
 
-  it('reflects a size change between calls — i.e. reads config live, not at construction time', async () => {
+  it('reflects a size change between calls - i.e. reads config live, not at construction time', async () => {
     const service = new ThumbnailApiService()
     const { webpSpy } = spyOnUploads(service)
 
@@ -122,7 +122,7 @@ describe('ThumbnailApiService.uploadMultipleThumbnails metadata', () => {
     expect(webpSpy.mock.calls[1][2]).toEqual({ width: 2048, height: 2048 })
   })
 
-  it('does NOT hardcode 256 — guards against the regression we just fixed', async () => {
+  it('does NOT hardcode 256 - guards against the regression we just fixed', async () => {
     config.rendering.outputWidth = 64
     config.rendering.outputHeight = 64
 

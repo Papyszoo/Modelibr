@@ -9,7 +9,7 @@ import {
 // The Base Meshes demo pack is stitched together across three modules
 // (demoDb seeding, the seedFileAssets map, the seedRemoteThumbnails map)
 // keyed only by generated ids. An id-scheme drift between them doesn't
-// throw — it silently produces 404 files or endlessly "generating"
+// throw - it silently produces 404 files or endlessly "generating"
 // thumbnails in the hosted demo. These tests pin the cross-module contract.
 describe('baseMeshesSeed', () => {
   const now = '2026-07-12T00:00:00.000Z'

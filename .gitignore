@@ -498,7 +498,7 @@ $RECYCLE.BIN/
 !docs/*.gltf
 !docs/*.glb
 
-# Environment files (secrets) — keep .env.example
+# Environment files (secrets) - keep .env.example
 .env
 !.env.example
 
@@ -512,13 +512,13 @@ E2E_REPORT.md
 # but version the agent-facing docs so they're shared with the repo: skills
 # (conventions), agents (subagent definitions) and notes (engineering context).
 # Anything machine-specific, production, or business-sensitive stays OUT of
-# notes/ — this repo is public. See .claude/notes/README.md.
+# notes/ - this repo is public. See .claude/notes/README.md.
 .claude/*
 !.claude/skills/
 !.claude/agents/
 !.claude/notes/
 
-# Local test mega-runner output (scripts/test-runner) — repo-root only, so it
+# Local test mega-runner output (scripts/test-runner) - repo-root only, so it
 # does not also match the source dirs under scripts/.
 /test-report/
 

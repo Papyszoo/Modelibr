@@ -60,11 +60,11 @@
   padding: 0.4rem 0.6rem;
 }
 
-/* Mobile overlay — keep it inset from screen edges so neither the back-edge
+/* Mobile overlay - keep it inset from screen edges so neither the back-edge
    gesture nor the right-edge gesture can be triggered while dragging the
    slider. Centered horizontally regardless of where the trigger button is. */
 .options-overlay.options-overlay--mobile {
-  /* Anchor positioning is set by PrimeReact via inline left/top — but we
+  /* Anchor positioning is set by PrimeReact via inline left/top - but we
      can override it without breaking the open/close behaviour. */
   left: 1rem !important;
   right: 1rem !important;
@@ -80,7 +80,7 @@
   width: 100%;
 }
 
-/* Hide the little arrow that points back at the trigger — it would be
+/* Hide the little arrow that points back at the trigger - it would be
    detached from our re-positioned panel. */
 .options-overlay.options-overlay--mobile::before,
 .options-overlay.options-overlay--mobile::after {

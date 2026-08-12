@@ -29,7 +29,7 @@ export class SoundProcessor extends BaseProcessor {
    * @returns {Promise<Object>} Waveform metadata { waveformPath, sizeBytes }.
    */
   // No renderer/RendererPool is held here, so there's nothing for the abort
-  // signal to cancel — accept the standard (job, jobLogger, signal) shape
+  // signal to cancel - accept the standard (job, jobLogger, signal) shape
   // for consistency but don't use it.
   // eslint-disable-next-line no-unused-vars
   async process(job, jobLogger, signal) {
@@ -75,7 +75,7 @@ export class SoundProcessor extends BaseProcessor {
       })
 
       // Step 2b: Extract deterministic audio content/quality stats into the
-      // extraction substrate. Best-effort — a stats failure must never fail the
+      // extraction substrate. Best-effort - a stats failure must never fail the
       // waveform job.
       try {
         if (job.soundHash) {
@@ -94,7 +94,7 @@ export class SoundProcessor extends BaseProcessor {
           }
         } else {
           jobLogger.warn(
-            'Skipping audio stat extraction — job has no sound hash'
+            'Skipping audio stat extraction - job has no sound hash'
           )
         }
       } catch (statsError) {

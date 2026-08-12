@@ -199,7 +199,7 @@ export function FloatingWindow({
     .filter(Boolean)
     .join(' ')
 
-  // On mobile, the sheet covers the viewport — let CSS own positioning so
+  // On mobile, the sheet covers the viewport - let CSS own positioning so
   // it survives orientation changes and avoids the URL-bar resize jumps.
   const inlineStyle = isMobile
     ? { zIndex }

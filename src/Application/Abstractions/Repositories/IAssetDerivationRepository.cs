@@ -20,7 +20,7 @@ public interface IAssetDerivationRepository
         int? versionId,
         CancellationToken cancellationToken = default);
 
-    /// <summary>The most recent derivation for an asset (highest version) — the "current" one for reads.</summary>
+    /// <summary>The most recent derivation for an asset (highest version) - the "current" one for reads.</summary>
     Task<AssetDerivation?> GetLatestForAssetAsync(
         string assetType,
         int assetId,

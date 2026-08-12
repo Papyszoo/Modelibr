@@ -38,7 +38,7 @@ Given("at least one model with a thumbnail exists", async ({ page }) => {
     ).toBe(true);
     expect(
         models.length,
-        `No models found via /models?page=1&pageSize=10 — the @setup phase probably didn't run before this @slow scenario`,
+        `No models found via /models?page=1&pageSize=10 - the @setup phase probably didn't run before this @slow scenario`,
     ).toBeGreaterThan(0);
     ctx.modelId = models[0].id;
     console.log(`[Rendering] Using model id=${ctx.modelId} as test subject`);
@@ -110,7 +110,7 @@ When("I regenerate all thumbnails via API", async ({ page }) => {
 
 When("I wait for the regeneration to complete", async ({ page }) => {
     if (ctx.modelId === null) {
-        throw new Error("modelId not set — Background step did not run");
+        throw new Error("modelId not set - Background step did not run");
     }
     const modelId = ctx.modelId;
     const initial = ctx.initialProcessedAt;

@@ -30,7 +30,7 @@ export interface TagInputProps {
 /**
  * Dumb, composable tag editor: a chip list plus a text input with comma/Enter
  * tokenization and suggestions from a shared vocabulary. Holds no server state
- * and knows nothing about asset types — props in, `onChange` out.
+ * and knows nothing about asset types - props in, `onChange` out.
  */
 export function TagInput({
   value,

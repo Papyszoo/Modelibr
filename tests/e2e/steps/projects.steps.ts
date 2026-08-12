@@ -610,7 +610,7 @@ Given(
 
 // ============= Texture Set / Global Material Association Steps =============
 
-// Texture sets in containers are now split into two kinds — "Global Materials"
+// Texture sets in containers are now split into two kinds - "Global Materials"
 // (Universal, kind=1) and "Multi-Model Textures" (ModelSpecific, kind=0). The
 // helpers below take a `kind` arg so the same flow drives both kinds; the
 // existing "texture set" step names continue to mean Multi-Model Textures
@@ -745,7 +745,7 @@ async function addTextureSetOfKindToProject(
         );
     } catch {
         console.log(
-            `[API] No POST /projects/*/texture-sets/* response detected — add ${labels.label} may have failed silently`,
+            `[API] No POST /projects/*/texture-sets/* response detected - add ${labels.label} may have failed silently`,
         );
     }
 
@@ -1061,7 +1061,7 @@ Given(
     },
 );
 
-// Texture set existence check — `kind` corresponds to TextureSetKind:
+// Texture set existence check - `kind` corresponds to TextureSetKind:
 // 0 = ModelSpecific (Multi-Model Textures), 1 = Universal (Global Materials).
 async function ensureTextureSetExists(
     page: Page,
@@ -1073,14 +1073,14 @@ async function ensureTextureSetExists(
         const existing = getScenarioState(page).getTextureSet(textureSetName);
         // If the cached entry has the wrong kind, refresh kind via API. This
         // matters when a previous scenario created the same-named set with
-        // the other kind — the backend rejects duplicate names but the kind
+        // the other kind - the backend rejects duplicate names but the kind
         // lookup is per-id.
         if (existing?.id) {
             const detail = await page.request.get(
                 `${API_BASE}/texture-sets/${existing.id}`,
             );
             if (!detail.ok()) {
-                // Cached in shared state but the backend can't find it —
+                // Cached in shared state but the backend can't find it -
                 // throw rather than proceeding with the wrong kind, which
                 // would surface later as a confusing "card not visible on
                 // the wrong tab" failure.
@@ -1122,7 +1122,7 @@ async function ensureTextureSetExists(
             `[AutoProvision] Created ${logLabel} "${textureSetName}" (ID: ${data.id}, kind: ${kind})`,
         );
     } else {
-        // Texture set likely already exists — look up via GET, then enforce
+        // Texture set likely already exists - look up via GET, then enforce
         // the requested kind.
         const listResp = await page.request.get(`${API_BASE}/texture-sets`);
         const textureSetsResp = await listResp.json();
@@ -1205,7 +1205,7 @@ Then(
             .locator('[data-testid="container-tab-details"]')
             .click();
 
-        // Use retrying assertion — the count may take a moment to update
+        // Use retrying assertion - the count may take a moment to update
         // after a sprite is removed (React Query cache invalidation)
         const statSpan = page.locator(
             '.container-detail-assets span:has-text("sprite")',

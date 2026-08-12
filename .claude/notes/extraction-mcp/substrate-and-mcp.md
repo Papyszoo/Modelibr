@@ -6,7 +6,7 @@ current branch carries the substrate, semantic search, and MCP agent server.
 ## Validating against a fresh instance
 
 Bring up a fresh Docker stack (webapi + worker images rebuilt from the working
-tree) rather than reusing a populated one — the extraction pipeline behaves
+tree) rather than reusing a populated one - the extraction pipeline behaves
 differently against assets that already carry derivations.
 
 Moving `./data/` aside instead of deleting it makes the old instance restorable:
@@ -25,7 +25,7 @@ Moving `./data/` aside instead of deleting it makes the old instance restorable:
 `import_model`, plus the `import_library` prompt. All return real data.
 
 **Every write tool is Model-only.** There is no agent-reachable path for sounds,
-textures, texture sets, sprites or env maps — importing the CC0 sound corpus had to
+textures, texture sets, sprites or env maps - importing the CC0 sound corpus had to
 bypass MCP and POST to `/sounds/with-file`. Nor can an agent bind a texture set,
 create a category, delete, or undo. "Everything a user can do" is about one sixth true.
 
@@ -34,7 +34,7 @@ create a category, delete, or undo. "Everything a user can do" is about one sixt
 **3 packs, 1,357 models, 0 dead extractions:** base-meshes 900 (CC0), glTF Sample
 Assets 118 (`.glb`, rigged/animated/morph/PBR), POLYGON City 339 (Synty FBX).
 Imported via host-side curl scripts, **not** MCP (it's read-only). macOS bash 3.2
-has no `declare -A` — use awk for dedup.
+has no `declare -A` - use awk for dedup.
 
 Works well: name/token/fuzzy (trigram) matching across packs; structural filters
 discriminate (`hasAnimations` → only the rigged Fox; min/maxTriangles; cross-pack);
@@ -49,8 +49,8 @@ discriminate (`hasAnimations` → only the rigged Fox; min/maxTriangles; cross-p
    `worldBoundingBox` via `Box3().setFromObject` (extractor version 1→2),
    `modelDataService.js` forwards it, `SceneGraphDerivationMapper` prefers it
    (local box = fallback for v1/bpy). +3 tests.
-2. **"mesh — mesh" summary.** `AssetDerivationEngine.PartBrowseSummary` no longer
-   repeats the object type when the name already fell back to it → "mesh — 384
+2. **"mesh - mesh" summary.** `AssetDerivationEngine.PartBrowseSummary` no longer
+   repeats the object type when the name already fell back to it → "mesh - 384
    tris, 2×0.4×2 m". The generic-name→object-type fallback itself is intended. +1 test.
 3. **`ModelVersionRepository.GetByIdAsync` lacked `.Include(v => v.Model)`**, so
    `version.Model?.Name` was null during scene-graph import → every asset indexed
@@ -72,7 +72,7 @@ PUT  /models/{id}/default-texture-set
 
 Validated visually (hydrant grey→red, apartment brick+windows), then applied to
 all 339. Synty FBX carry only a generic Maya material `blinn283` with no
-resolvable texture, so they render grey until bound. The set is albedo-only —
+resolvable texture, so they render grey until bound. The set is albedo-only -
 normal/metallic need the pre-upload-fileId flow.
 
 **Viewer color trap:** the default texture-variant strips the model's own
@@ -80,7 +80,7 @@ materials; the user must pick the "Embedded" variant to see colors. Frontend
 model-viewer default, `__embedded__` logic near
 `src/frontend/src/mocks/dynamic-demo/shared.ts:825`.
 
-## Second validation run — 2026-08-09, imported *through* MCP
+## Second validation run - 2026-08-09, imported *through* MCP
 
 Fresh stack (data wiped, images rebuilt), `MCP_WRITE_ENABLED=true`, driven over the
 real `/mcp` transport. **1,717 models imported by the MCP write tools themselves**
@@ -92,7 +92,7 @@ them). This is the run that found the two bugs below.
 
 1. **MCP flags never reached the container.** `MCP_ENABLED` / `MCP_WRITE_ENABLED` were
    read from configuration but absent from both `docker-compose.yml` and
-   `.env.example` — so on the Docker stack (how Modelibr actually runs) writes could
+   `.env.example` - so on the Docker stack (how Modelibr actually runs) writes could
    not be turned on at all and `MCP_ENABLED=false` did not turn the endpoint off.
 2. **Idempotency was a check-then-act race.** Each tool looked the key up, wrote, then
    inserted the audit row. Two concurrent calls with one key both passed the lookup and
@@ -102,14 +102,14 @@ them). This is the run that found the two bugs below.
    claiming the key first (`TryClaimAsync` → handler → `CompleteClaimAsync`, or
    `ReleaseClaimAsync` on failure). Verified live: 5 concurrent same-key calls → 1 pack,
    1 audit row, 4 `already-applied`. Regression test is a **concurrency** integration
-   test — the sequential retry test could never have caught it.
+   test - the sequential retry test could never have caught it.
 
 **Co-located import needs a mount.** `import_model(path)` reads server-side, so the
 library must be visible *inside* the container. colima only mounts `$HOME`, not
 `/Volumes`, so an external-disk corpus has to be staged under `$HOME` and bind-mounted.
 
 **The remote branch is unaudited.** `import_model` without `path` hands back an HTTP
-endpoint and steps out — those uploads get no `AgentOperationLog` entry and no
+endpoint and steps out - those uploads get no `AgentOperationLog` entry and no
 idempotency, the two guarantees the co-located path advertises. It also returns only
 endpoint *paths*, not field names: the real `/models/multifile` contract is `primary` +
 `files[]` + `paths[]` (each aux file's URI relative to the primary), which no agent will
@@ -118,19 +118,19 @@ guess from the description.
 **Pipeline health over ~6,100 jobs: 26 failures (0.4%).**
 
 - 24 sound jobs failed `Unsupported sound file type:` with an *empty* type, on formats
-  that imported fine in bulk — looks like a job-payload/extension-propagation gap, not a
+  that imported fine in bulk - looks like a job-payload/extension-propagation gap, not a
   format gap. Worth a proper look before it is dismissed as noise.
 - 1 `THREE.GLTFLoader: No DRACOLoader instance provided` and 1
   `setKTX2Loader must be called before loading KTX2 textures`. **DRACO and KTX2 are
-  mainstream in modern glTF pipelines** — the worker's loader registers neither, so those
+  mainstream in modern glTF pipelines** - the worker's loader registers neither, so those
   assets can never get a thumbnail or extraction.
 
 Multi-file glTF import (prompt 28) verified live: BoomBox `.gltf` + `.bin` + 4 PNGs →
 5 auxiliary files linked, worker resolved the external refs offline, 6,036 tris /
 1 material / `HasUvs=true` indexed. `compute_on_demand` returns `{"status":"pending"}`
-for every metric, as documented — the cache and endpoints exist, the metric math does not.
+for every metric, as documented - the cache and endpoints exist, the metric math does not.
 
-## v0.6 direction — full agent surface (writes)
+## v0.6 direction - full agent surface (writes)
 
 User's end goal, stated 2026-08-08: MCP should let an agent **do everything a
 user can do in the app**, not just read. This is a larger phase than the
@@ -138,18 +138,18 @@ originally-sketched "prompt 28 write tools".
 
 Agreed design constraints:
 
-- **Keep MCP a thin pass-through over the existing REST API** — one source of
+- **Keep MCP a thin pass-through over the existing REST API** - one source of
   truth. The frontend already routes 100% of its behavior through feature `api/`
   modules on `lib/apiBase.ts`, so "everything the user can do" ≈ "everything the
   API exposes". Don't fork logic into MCP.
 - **File upload when client ≠ server (LAN).** A server-side `import_from_path`
   only works co-located. Remote uploads need the bytes to travel: **MCP = control
-  plane, HTTP = data plane** — an `import_model` tool points at an upload URL
+  plane, HTTP = data plane** - an `import_model` tool points at an upload URL
   (existing `POST /models`), the agent's host streams bytes over HTTP, a second
   call finalizes (name/pack/tags). base64-in-tool-call only for small meshes.
   **Support both** `path` (co-located, zero-copy, local-first) and URL/stream.
 - **Auth/exposure.** Once writes exist and the server is LAN-reachable, an agent
-  on another box can mutate the library — needs a token + scoping (reuse the
+  on another box can mutate the library - needs a token + scoping (reuse the
   store import-token pattern; respect the prompt-23/27 network-exposure threat
   model). MCP must not widen reach without auth.
 - **Audit.** Every agent write routes through the prompt-20 `AgentOperationLog` +

@@ -27,8 +27,8 @@ public class CommandHandlerUnitOfWorkDecoratorRegistrationTests
     public void AllCommandHandlerRegistrations_UseTheDecoratorFactory_NotDirectTypeMapping()
     {
         // Direct type mapping (ImplementationType set, ImplementationFactory
-        // null) is exactly how query/domain-event handlers — and, before this
-        // safety net existed, command handlers too — get registered. Command
+        // null) is exactly how query/domain-event handlers - and, before this
+        // safety net existed, command handlers too - get registered. Command
         // handlers must instead go through a factory (see
         // Application.DependencyInjection.RegisterCommandHandlersWithUnitOfWorkDecorator),
         // which is the only registration path that can wrap the resolved
@@ -43,7 +43,7 @@ public class CommandHandlerUnitOfWorkDecoratorRegistrationTests
             .ToList();
 
         // Sanity check that the scan actually found the many command handlers
-        // in the assembly — an empty list here would make the assertion below
+        // in the assembly - an empty list here would make the assertion below
         // vacuously true and hide a totally broken registration.
         Assert.True(commandHandlerDescriptors.Count > 50,
             $"Expected many ICommandHandler<> registrations from assembly scan, found {commandHandlerDescriptors.Count}. " +
@@ -65,7 +65,7 @@ public class CommandHandlerUnitOfWorkDecoratorRegistrationTests
     public void QueryHandlerRegistrations_UseDirectTypeMapping_NotTheDecoratorFactory()
     {
         // The inverse check: query handlers must NOT go through the
-        // command-handler decorator path — a query silently committing by
+        // command-handler decorator path - a query silently committing by
         // default would hide side effects query handlers must never have.
         var services = new ServiceCollection();
         services.AddApplication();

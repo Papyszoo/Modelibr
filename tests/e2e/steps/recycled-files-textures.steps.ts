@@ -27,7 +27,7 @@ GivenBdd(
     async ({ page }, name: string) => {
         const baseUrl = process.env.API_BASE_URL || "http://localhost:8090";
 
-        // Check if texture set already exists — hard delete it for clean state
+        // Check if texture set already exists - hard delete it for clean state
         const listResponse = await page.request.get(`${baseUrl}/texture-sets`);
         if (listResponse.ok()) {
             const listData = await listResponse.json();
@@ -262,13 +262,13 @@ ThenBdd(
             });
 
         // Navigation lands directly on the kind-locked Multi-Model
-        // Textures tab — the in-page kind switcher no longer exists.
+        // Textures tab - the in-page kind switcher no longer exists.
 
-        // The grid is virtualized — only cards in the visible viewport
+        // The grid is virtualized - only cards in the visible viewport
         // are rendered. Narrow via the toolbar search so the card is
         // guaranteed to be in DOM. `narrowVirtualisedList` opens the
         // search panel (throws if it can't), fills the name, and waits
-        // for the count chip to stabilise — replacing the older
+        // for the count chip to stabilise - replacing the older
         // `waitForTimeout(600)` debounce-assumption sleep.
         await narrowVirtualisedList(page, name);
 

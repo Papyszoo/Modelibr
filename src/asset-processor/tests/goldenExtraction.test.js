@@ -8,7 +8,7 @@ import { extractScript } from '../scriptExtractor.js'
  * The permanent fixture set + golden/determinism/round-trip/idempotency tests
  * (prompt 26), scoped to the DETERMINISTIC layer: the pure extractors whose output
  * is reproducible everywhere. The three.js render-path extraction is deliberately
- * excluded from golden assertions — headless-Chromium/software-GL output varies by
+ * excluded from golden assertions - headless-Chromium/software-GL output varies by
  * environment (see the project memory), which the prompt says to exclude rather
  * than paper over with a loosened assertion.
  *
@@ -79,7 +79,7 @@ function makeMaterialImage(width, height, fn) {
 
 // ---- geometry: determinism + round-trip -------------------------------
 
-describe('geometry hash — determinism + round-trip', () => {
+describe('geometry hash - determinism + round-trip', () => {
   it('is stable across repeated calls (golden)', () => {
     const a = hashGeometry(CUBE)
     const b = hashGeometry(CUBE)
@@ -103,7 +103,7 @@ describe('geometry hash — determinism + round-trip', () => {
 
 // ---- material: mis-assigned channel fixture (golden) ------------------
 
-describe('material stats — golden fixtures', () => {
+describe('material stats - golden fixtures', () => {
   it('a seamless flat colour is tileable with zero seam', () => {
     const flat = makeMaterialImage(16, 16, () => [120, 120, 120])
     const stats = computeMaterialStats(flat)
@@ -120,7 +120,7 @@ describe('material stats — golden fixtures', () => {
 
 // ---- audio: one-silent-channel fixture (golden) -----------------------
 
-describe('audio stats — golden fixtures', () => {
+describe('audio stats - golden fixtures', () => {
   it('stereo with a silent right channel is flagged effectively mono', () => {
     const sr = 8000
     const left = new Float32Array(sr)
@@ -136,7 +136,7 @@ describe('audio stats — golden fixtures', () => {
 
 // ---- scripts: multi-engine fixtures (golden) --------------------------
 
-describe('script extraction — multi-engine golden fixtures', () => {
+describe('script extraction - multi-engine golden fixtures', () => {
   it('detects Unity from a C# fixture', async () => {
     const source =
       'using UnityEngine;\npublic class Enemy : MonoBehaviour {\n  void Update() {}\n}'

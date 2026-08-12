@@ -14,14 +14,14 @@
   background: var(--surface-ground);
 }
 
-/* Drop affordance appears only during an actual drag (.drag-over) — never
+/* Drop affordance appears only during an actual drag (.drag-over) - never
    on plain mouse hover (same rule as ModelGrid). */
 .environment-map-list.drag-over {
   border-color: var(--primary-color);
   background: rgba(var(--primary-color-rgb), 0.1);
 }
 
-/* Body: category tree sidebar + maps grid, flat on the page background —
+/* Body: category tree sidebar + maps grid, flat on the page background -
    the quiet CategoryTreePanel default is the app-wide categories standard. */
 .environment-map-list-body {
   display: flex;
@@ -70,11 +70,11 @@
 .environment-map-selection-surface {
   position: relative;
   flex: 1 1 auto;
-  /* Fill the leftover space below the toolbar via flex-grow — NOT
+  /* Fill the leftover space below the toolbar via flex-grow - NOT
      min-height: 100%. Against the height-bounded .environment-map-list (a
      bounded flex column), `min-height: 100%` resolves to the *full* container
      height, so stacked under the toolbar it forced the container to overflow
-     by ~the toolbar height — a phantom scrollbar even with only a few cards
+     by ~the toolbar height - a phantom scrollbar even with only a few cards
      that fit. flex:1 already stretches the surface to fill the leftover space
      (drop / rubber-band area). */
   min-height: 0;
@@ -84,7 +84,7 @@
   cursor: crosshair;
 }
 
-/* Card identity — keep in sync with AssetTile.css (design-system skill). */
+/* Card identity - keep in sync with AssetTile.css (design-system skill). */
 .environment-map-card {
   min-width: 0;
   border: 2px solid transparent;

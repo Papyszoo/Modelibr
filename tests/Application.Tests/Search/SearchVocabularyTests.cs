@@ -16,7 +16,7 @@ public class SearchVocabularyTests
     {
         var expanded = SearchVocabulary.ExpandForIndex(new[] { "bld", "apartment" });
         Assert.Contains("building", expanded);
-        Assert.Contains("bld", expanded);       // the original is kept — exact search still works
+        Assert.Contains("bld", expanded);       // the original is kept - exact search still works
         Assert.Contains("apartment", expanded);
     }
 

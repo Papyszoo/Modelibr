@@ -20,7 +20,7 @@ public sealed class VirtualAssetFile : IStoreItem, IVirtualFileMetadata
 
     /// <param name="relativePath">
     /// The <c>File.FilePath</c> value persisted by <c>HashBasedFileStorage</c> (e.g.
-    /// <c>"aa/bb/&lt;hash&gt;"</c>) — the single source of truth for where this asset's
+    /// <c>"aa/bb/&lt;hash&gt;"</c>) - the single source of truth for where this asset's
     /// bytes live on disk. Never re-derived from <paramref name="sha256Hash"/> here; see
     /// item 4 of prompt 30.
     /// </param>
@@ -74,14 +74,14 @@ public sealed class VirtualAssetFile : IStoreItem, IVirtualFileMetadata
         if (!File.Exists(physicalPath))
         {
             // A physical blob missing for a File row that's actually referenced by a
-            // model/texture/sprite/sound is a data-safety event, not a routine 404 — log
+            // model/texture/sprite/sound is a data-safety event, not a routine 404 - log
             // it loudly. Returning Stream.Null (rather than an empty/zero-length stream
             // written to the response) is what makes this a 404 instead of a bogus 0-byte
             // download: CustomWebDavHandler.WriteFileAsync checks
             // ReferenceEquals(stream, Stream.Null) and sets response.Status = 404 before
             // ever touching the response body. NWebDav's own GET handler is never reached
-            // for this store — CustomWebDavHandler fully replaces it (see
-            // RequestHandlerFactory) — so this Stream.Null contract is the only mechanism
+            // for this store - CustomWebDavHandler fully replaces it (see
+            // RequestHandlerFactory) - so this Stream.Null contract is the only mechanism
             // that matters here.
             _logger.LogError(
                 "Missing physical blob for asset {Name} (hash {Hash}): expected at {ExpectedPath}",

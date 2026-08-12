@@ -14,7 +14,7 @@ namespace WebApi.Tests.Integration;
 /// search document's DisplayName + tokens. <c>ModelVersionRepository.GetByIdAsync</c>
 /// used to omit <c>.Include(v =&gt; v.Model)</c>, so <c>version.Model</c> was null,
 /// every model's real name was dropped, and the whole library indexed as
-/// "Model {id}" with empty tokens — unsearchable by name unless an internal mesh
+/// "Model {id}" with empty tokens - unsearchable by name unless an internal mesh
 /// happened to share it. Found by importing the 900-model base-meshes library and
 /// seeing every asset doc come back as "Model N". GetByIdAsync must load Model.
 /// </summary>

@@ -132,7 +132,7 @@ export class ThumbnailProcessor extends BaseProcessor {
           const stdout = blenderError.stdout?.toString() || ''
 
           // export_glb.py marks its own failures with an EXPORT_GLB_ERROR:
-          // prefix — prefer that precise reason over raw Blender output.
+          // prefix - prefer that precise reason over raw Blender output.
           // Use findLast so that if the script falls through multiple failure
           // paths (e.g. the TypeError retry also fails), the more specific
           // last reason wins instead of the generic first one.
@@ -158,7 +158,7 @@ export class ThumbnailProcessor extends BaseProcessor {
         }
 
         if (!fs.existsSync(candidateGlbPath)) {
-          throw new Error('Blender GLB export failed — output file not found')
+          throw new Error('Blender GLB export failed - output file not found')
         }
 
         glbConvertedPath = candidateGlbPath
@@ -203,13 +203,13 @@ export class ThumbnailProcessor extends BaseProcessor {
       )
 
       // The "Embedded" variant (__embedded__) means "render the model's own
-      // materials / vertex colors" — keep them instead of the neutral override.
+      // materials / vertex colors" - keep them instead of the neutral override.
       // Same signal that makes _applyTextures skip texture application below.
       const preserveMaterials = (job.mainVariantName || '') === '__embedded__'
 
       // Multi-file glTF: resolve external buffers/textures against the
       // already-uploaded siblings. Only .gltf carries external references
-      // (.glb — including a .blend converted to .glb above — is self-contained).
+      // (.glb - including a .blend converted to .glb above - is self-contained).
       let gltfResources = null
       if (fileInfo.fileType === 'gltf') {
         gltfResources = await this.modelFileService.fetchAuxiliaryResourceMap(
@@ -241,7 +241,7 @@ export class ThumbnailProcessor extends BaseProcessor {
           )
         } else {
           jobLogger.warn(
-            'Skipping technical metadata save — extraction returned no data'
+            'Skipping technical metadata save - extraction returned no data'
           )
         }
       } catch (matError) {
@@ -254,7 +254,7 @@ export class ThumbnailProcessor extends BaseProcessor {
       }
 
       // Step 3.3: Extract and save the full scene graph (per-part rows + rollups
-      // + verbatim raw payload). Best-effort — a scene-graph failure must never
+      // + verbatim raw payload). Best-effort - a scene-graph failure must never
       // fail the thumbnail. Supersedes the flat technical-metadata write above
       // for the raw substrate; both keep the flat projection consistent.
       try {
@@ -266,7 +266,7 @@ export class ThumbnailProcessor extends BaseProcessor {
             sceneGraph
           )
         } else if (!job.modelHash) {
-          jobLogger.warn('Skipping scene-graph save — job has no model hash')
+          jobLogger.warn('Skipping scene-graph save - job has no model hash')
         }
       } catch (sgError) {
         jobLogger.warn('Failed to extract/save scene graph, continuing', {
@@ -285,7 +285,7 @@ export class ThumbnailProcessor extends BaseProcessor {
       // Step 4: Render orbit frames
       if (!config.orbit.enabled) {
         throw new Error(
-          'Orbit rendering is disabled — cannot generate thumbnails'
+          'Orbit rendering is disabled - cannot generate thumbnails'
         )
       }
 
@@ -299,7 +299,7 @@ export class ThumbnailProcessor extends BaseProcessor {
       // Step 5: Encode frames
       if (!config.encoding.enabled) {
         throw new Error(
-          'Frame encoding is disabled — cannot generate thumbnails'
+          'Frame encoding is disabled - cannot generate thumbnails'
         )
       }
 
@@ -307,7 +307,7 @@ export class ThumbnailProcessor extends BaseProcessor {
 
       // Step 6: Upload thumbnails
       if (!this.thumbnailStorage.enabled) {
-        throw new Error('Thumbnail storage is disabled — cannot complete job')
+        throw new Error('Thumbnail storage is disabled - cannot complete job')
       }
 
       const storageResult = await this._storeThumbnails(
@@ -332,7 +332,7 @@ export class ThumbnailProcessor extends BaseProcessor {
       }
 
       throw new Error(
-        'Thumbnail upload failed — no valid thumbnail data available'
+        'Thumbnail upload failed - no valid thumbnail data available'
       )
     } finally {
       disarmAbort()
@@ -360,7 +360,7 @@ export class ThumbnailProcessor extends BaseProcessor {
     const textureMappings = job.textureMappings || []
     const mainVariant = job.mainVariantName || ''
 
-    // "__embedded__" means use the model's original materials — skip all texture application
+    // "__embedded__" means use the model's original materials - skip all texture application
     if (mainVariant === '__embedded__') {
       jobLogger.info(
         'Main variant is __embedded__, preserving original model materials'

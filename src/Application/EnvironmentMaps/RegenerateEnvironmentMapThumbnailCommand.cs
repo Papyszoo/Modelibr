@@ -47,7 +47,7 @@ internal sealed class RegenerateEnvironmentMapThumbnailCommandHandler : ICommand
         await _environmentMapRepository.UpdateAsync(environmentMap, cancellationToken);
         // Commit before enqueueing: previously this update self-committed ahead of
         // the thumbnail-job writes below, which also commit their own (separate)
-        // change via IThumbnailQueue's internal IUnitOfWork use — preserve that order.
+        // change via IThumbnailQueue's internal IUnitOfWork use - preserve that order.
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         var activeVariantIds = environmentMap.Variants

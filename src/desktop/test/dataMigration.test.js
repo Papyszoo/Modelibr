@@ -82,7 +82,7 @@ test('migrate skips a target that is already an initialized data folder', async 
     const from = path.join(base, 'old')
     const to = path.join(base, 'new')
     await writeFile(path.join(from, 'uploads', 'a.glb'), 'FROM')
-    // `to` already has its own cluster + asset — switching back must keep it.
+    // `to` already has its own cluster + asset - switching back must keep it.
     await writeFile(path.join(to, 'postgres', 'PG_VERSION'), '16')
     await writeFile(path.join(to, 'uploads', 'b.glb'), 'TO')
 

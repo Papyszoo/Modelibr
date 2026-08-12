@@ -2,7 +2,7 @@ namespace Application.Abstractions.Services;
 
 /// <summary>
 /// In-memory work item for a queued store import. Holds the import token ONLY in memory for
-/// the lifetime of the background job — it is never written to the persisted job row or logs.
+/// the lifetime of the background job - it is never written to the persisted job row or logs.
 /// </summary>
 /// <param name="JobId">The persisted <c>StoreImportJob</c> id (progress is written back to it).</param>
 /// <param name="StoreUrl">Validated store base URL.</param>

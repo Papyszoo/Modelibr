@@ -243,7 +243,7 @@ public class StoreImportProcessorTests
         Assert.Equal(1, h.Job.ItemsCreated);
         Assert.Contains("SHA-256 mismatch", h.Job.ResultJson);
         Assert.Equal(Domain.ValueObjects.StoreImportJobStatus.CompletedWithErrors, h.Job.Status);
-        // A failed item may leave poisoned staged entities behind — the shared change
+        // A failed item may leave poisoned staged entities behind - the shared change
         // tracker must be reset so subsequent items/saves don't cascade-fail.
         h.TrackerReset.Verify(t => t.Clear(), Times.Once);
     }
@@ -291,7 +291,7 @@ public class StoreImportProcessorTests
     {
         var h = new Harness();
         var mesh = h.MakeFile("u/mesh", RandomBytes(), "Mesh", "chair.glb");
-        // A 3D preview model is not a reusable <img> thumbnail — must fall back to generation.
+        // A 3D preview model is not a reusable <img> thumbnail - must fall back to generation.
         var model3d = h.MakePreview("u/model", "PreviewModel", "model/gltf-binary", "chair.glb");
         h.SetManifest(new StoreManifestItem("Model", "Chair", new[] { mesh }, new[] { model3d }, "item-1"));
         h.Sink.Setup(s => s.CreateModelAsync(It.IsAny<IFileUpload>(), "Chair", It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync(101);
@@ -358,7 +358,7 @@ public class StoreImportProcessorTests
 
         await h.Run();
 
-        // No manifest tags, but the category still needs the UpdateModelTags path — that is
+        // No manifest tags, but the category still needs the UpdateModelTags path - that is
         // the one command that assigns model categories.
         h.Sink.Verify(s => s.SetModelTagsAsync(101, It.Is<IReadOnlyCollection<string>>(t => t.Count == 0), "Chair", 88, It.IsAny<CancellationToken>()), Times.Once);
     }
@@ -393,7 +393,7 @@ public class StoreImportProcessorTests
 
         await h.Run();
 
-        // Re-running an import categorizes assets that predate category support —
+        // Re-running an import categorizes assets that predate category support -
         // the same repair contract as the file gap-fill.
         h.Sink.Verify(s => s.SetSoundCategoryAsync(44, 77, It.IsAny<CancellationToken>()), Times.Once);
         Assert.Equal(1, h.Job.ItemsSkipped);
@@ -410,7 +410,7 @@ public class StoreImportProcessorTests
 
         await h.Run();
 
-        // An existing categorization — the user's or an earlier import's — is never
+        // An existing categorization - the user's or an earlier import's - is never
         // overwritten, and no find-or-create side effects happen either.
         h.CategoryResolver.Verify(r => r.ResolveAsync(It.IsAny<StoreManifestMapping.ImportTarget>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
         h.Sink.Verify(s => s.SetSoundCategoryAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -493,7 +493,7 @@ public class StoreImportProcessorTests
 
         await h.Run();
 
-        // The storefront serves asset detail at /assets/:id — /asset/:id 404s.
+        // The storefront serves asset detail at /assets/:id - /asset/:id 404s.
         h.Sink.Verify(s => s.CreatePackAsync(
             It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(),
             $"{StoreUrl}/assets/{AssetId}",
@@ -516,7 +516,7 @@ public class StoreImportProcessorTests
         h.Sink.Verify(s => s.CreatePackAsync(
             It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(),
             StoreUrl, AssetId, 1, It.IsAny<CancellationToken>()), Times.Once);
-        // No follow-up stamp for a freshly created pack — that path is for re-imports only.
+        // No follow-up stamp for a freshly created pack - that path is for re-imports only.
         h.Sink.Verify(s => s.RecordPackProvenanceAsync(
             It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
@@ -575,7 +575,7 @@ public class StoreImportProcessorTests
 
     /// <summary>
     /// A persisted-looking model whose active version carries files with the given manifest
-    /// hashes — the shape the gap-fill check inspects.
+    /// hashes - the shape the gap-fill check inspects.
     /// </summary>
     private static Model ExistingModel(int id, params StoreManifestFile[] files)
     {

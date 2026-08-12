@@ -60,7 +60,7 @@ export async function stageRestore(
 
 export function getBackupDownloadUrl(fileName: string): string {
   const path = `/backups/${encodeURIComponent(fileName)}`
-  // baseURL may be relative ("/api") or absolute ("http://...") — match either.
+  // baseURL may be relative ("/api") or absolute ("http://...") - match either.
   if (baseURL.startsWith('/')) return `${baseURL}${path}`
   return new URL(path, baseURL).toString()
 }

@@ -13,11 +13,11 @@ import type {
 } from '../types'
 
 /**
- * Axios client for the STORE origin (credential-less CORS — auth is a bearer
+ * Axios client for the STORE origin (credential-less CORS - auth is a bearer
  * token attached here, never cookies). Store credentials and tokens never
  * touch the local Modelibr backend.
  *
- * The module-load base URL is only a seed — the interceptor below re-derives it
+ * The module-load base URL is only a seed - the interceptor below re-derives it
  * per request. `createApiClient('')` (store unset) would otherwise leave an EMPTY
  * baseURL, resolving '/api/library' against Modelibr's own origin and mailing the
  * store bearer token to the local backend.
@@ -28,7 +28,7 @@ export const storeClient: AxiosInstance = createApiClient(
 
 /**
  * Pins every store request to the configured store origin and attaches the
- * access token. Throwing here rejects the request before it is sent — the
+ * access token. Throwing here rejects the request before it is sent - the
  * correct outcome when there is nowhere legitimate to send it. Exported for tests.
  */
 export function attachStoreAuthHeader(
@@ -37,18 +37,18 @@ export function attachStoreAuthHeader(
   const storeUrl = getConfiguredStoreUrl()
   if (!storeUrl) {
     throw new Error(
-      'The Asset Store is not configured (VITE_STORE_URL) — refusing to send a store request.'
+      'The Asset Store is not configured (VITE_STORE_URL) - refusing to send a store request.'
     )
   }
 
   // Re-pin rather than merely check: the seeded baseURL may be stale or empty.
   config.baseURL = storeUrl
   // An absolute config.url ignores baseURL entirely, so validate the resolved
-  // target too — credentials only ever leave for the configured origin.
+  // target too - credentials only ever leave for the configured origin.
   const target = new URL(config.url ?? '', storeUrl)
   if (target.origin !== new URL(storeUrl).origin) {
     throw new Error(
-      `Refusing to send a store request to ${target.origin} — the configured store is ${new URL(storeUrl).origin}.`
+      `Refusing to send a store request to ${target.origin} - the configured store is ${new URL(storeUrl).origin}.`
     )
   }
 
@@ -70,7 +70,7 @@ type RetriableConfig = InternalAxiosRequestConfig & {
  * 401 handling: refresh the tokens once and retry the original request. Only a
  * refresh REJECTED by the store logs the session out (see isTerminalAuthFailure)
  * and only while the session is still the one the refresh started for. Auth
- * endpoints themselves are exempt — a failed login must surface as-is. Exported
+ * endpoints themselves are exempt - a failed login must surface as-is. Exported
  * for tests.
  */
 export async function handleStoreResponseError(
@@ -97,8 +97,8 @@ export async function handleStoreResponseError(
       refreshed = await refreshStoreTokensOnce(startedWith)
     } catch (refreshError) {
       // Two guards before signing anyone out. The session must still be the one
-      // this refresh was started for — otherwise a late failure for account A
-      // would clear account B — and the failure must actually invalidate the
+      // this refresh was started for - otherwise a late failure for account A
+      // would clear account B - and the failure must actually invalidate the
       // token: a busy or briefly broken store is not an expired session.
       const current = useAssetStoreAuthStore.getState()
       if (
@@ -169,7 +169,7 @@ let refreshInFlight: {
 /**
  * Single-flight refresh: concurrent 401 retries (or the proactive session
  * loop racing the interceptor) share ONE refresh call. A store that rotates
- * refresh tokens on use must never see the same token twice — the loser of
+ * refresh tokens on use must never see the same token twice - the loser of
  * that race would 401 and clear a session that just refreshed successfully.
  *
  * The flight is KEYED by refresh token, i.e. by session: a caller holding a

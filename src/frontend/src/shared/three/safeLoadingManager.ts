@@ -32,7 +32,7 @@ function rewriteTextureUrl(url: string): string {
  * does not hit /api/files/<filename> and crash the server route.
  *
  * Modelibr texture sets are loaded out-of-band by useChannelExtractedTextures
- * and TexturedGeometry — they don't go through this manager.
+ * and TexturedGeometry - they don't go through this manager.
  */
 export const safeLoadingManager = new THREE.LoadingManager()
 safeLoadingManager.setURLModifier(rewriteTextureUrl)
@@ -45,7 +45,7 @@ safeLoadingManager.setURLModifier(rewriteTextureUrl)
  *
  * Without this the viewer could not open an imported loose `.gltf` at all: the
  * relative URIs resolve against the file route, 404, and the shared manager replaces
- * them with a transparent pixel — which for the `.bin` buffer means the model has no
+ * them with a transparent pixel - which for the `.bin` buffer means the model has no
  * geometry. The worker's thumbnail renderer already resolves them (via the shared
  * `lib/gltfResources` helper); this is the browser half of the same idea.
  *
@@ -92,7 +92,7 @@ export function createGltfResourceManager(
       if (key.slice(key.lastIndexOf('/') + 1) === base) return byPath.get(key)!
     }
 
-    // Unmapped: same safety net as the shared manager — never a live request.
+    // Unmapped: same safety net as the shared manager - never a live request.
     return TRANSPARENT_PIXEL
   })
   return manager

@@ -181,7 +181,7 @@ export function TextureSetAssociationDialog({
   }
 
   // Filter + group texture sets. Model-owned sets are private to their
-  // owning model — they're hidden outright when viewing a different model.
+  // owning model - they're hidden outright when viewing a different model.
   const allTextureSets = allTextureSetsQuery.data ?? []
   const isLinkedToCurrentModel = (ts: TextureSetDto) =>
     ts.associatedModels.some(m => m.id === currentModelId)
@@ -227,7 +227,7 @@ export function TextureSetAssociationDialog({
 
   return (
     <Dialog
-      header={`Link Texture Set — ${materialName ?? 'Material'}`}
+      header={`Link Texture Set - ${materialName ?? 'Material'}`}
       visible={visible}
       onHide={handleCancel}
       footer={
@@ -390,7 +390,7 @@ function TextureSetCard({
   }
 
   const previewTexture = getPreviewTexture()
-  // Use the server-generated PNG preview, not the raw file — browsers can't
+  // Use the server-generated PNG preview, not the raw file - browsers can't
   // decode formats like TIFF natively, and the raw URL bypasses thumbnailing.
   const previewUrl = previewTexture
     ? getFilePreviewUrl(previewTexture.fileId.toString())

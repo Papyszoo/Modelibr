@@ -93,7 +93,7 @@ describe('JobProcessor timeout cancellation', () => {
     const fakePool = {
       acquire: () => {
         if (slotHeld) {
-          throw new Error('slot already held — pool exhausted')
+          throw new Error('slot already held - pool exhausted')
         }
         slotHeld = true
         return 'the-renderer'
@@ -106,7 +106,7 @@ describe('JobProcessor timeout cancellation', () => {
       },
     }
 
-    // job1's processor acquires the only slot and then hangs forever —
+    // job1's processor acquires the only slot and then hangs forever -
     // like a Puppeteer page.evaluate() that never settles on its own. It
     // only frees the slot if the queue aborts it.
     const job1Processor = (job, signal) =>
@@ -120,7 +120,7 @@ describe('JobProcessor timeout cancellation', () => {
 
     let job2Completed = false
     const job2Processor = async () => {
-      // Throws if job1 still holds the slot — proving the pool actually
+      // Throws if job1 still holds the slot - proving the pool actually
       // recovered instead of deadlocking.
       fakePool.acquire()
       job2Completed = true
@@ -157,7 +157,7 @@ describe('JobProcessor timeout cancellation', () => {
     expect(job1Processor).toHaveBeenCalledTimes(1)
     expect(mockMarkJobFailed).not.toHaveBeenCalled()
 
-    // Wait past the configured job timeout (30ms) — if the timer wasn't
+    // Wait past the configured job timeout (30ms) - if the timer wasn't
     // cleared, it would still fire and report a bogus timeout failure for
     // a job that already finished.
     await new Promise(resolve => setTimeout(resolve, 60))
@@ -167,7 +167,7 @@ describe('JobProcessor timeout cancellation', () => {
 
   it('does not double-report a non-timeout failure the processor already reported itself', async () => {
     // Simulates a BaseProcessor.execute() that already called markFailed
-    // internally before rethrowing — jobProcessor must not call
+    // internally before rethrowing - jobProcessor must not call
     // markJobFailed again for the same job.
     const job1Processor = vi.fn().mockRejectedValue(new Error('render crash'))
 

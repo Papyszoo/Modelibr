@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Local control panel for the test catalog. Binds 127.0.0.1 only. Serves the
 // static UI + catalog.json, and exposes a small API to run a suite and stream its
-// output live over SSE. Commands are built from the manifest (runspec.mjs) — the
+// output live over SSE. Commands are built from the manifest (runspec.mjs) - the
 // client only sends a validated run-spec, never a raw command.
 
 import http from "node:http";
@@ -67,7 +67,7 @@ function ensureCatalog(res) {
     if (missing || catalogDirty || timeStale) {
         try {
             // ghCacheOnly: use the cached GitHub data regardless of its age so a
-            // page load never blocks ~30s on a gh refetch — the ↻ button (and the
+            // page load never blocks ~30s on a gh refetch - the ↻ button (and the
             // CLI catalog build) do the explicit, TTL-respecting refreshes.
             buildCatalog({ github: true, ghCacheOnly: true, quiet: true });
             catalogDirty = false;
@@ -135,7 +135,7 @@ function startRun(spec, res) {
     const suite = getSuite(spec.suiteId);
     if (!suite) return send(res, 400, { error: `unknown suite: ${spec.suiteId}` });
     if (!exists(suite.detectPath)) return send(res, 409, { error: `${suite.name} is not present on this branch` });
-    if (suite.requiresDocker && !dockerUp()) return send(res, 409, { error: "Docker is not running — start it first" });
+    if (suite.requiresDocker && !dockerUp()) return send(res, 409, { error: "Docker is not running - start it first" });
     if (activeRun && activeRun.status === "running") return send(res, 409, { error: "a run is already in progress" });
 
     let rs;
@@ -149,7 +149,7 @@ function startRun(spec, res) {
     fs.mkdirSync(rs.workDir, { recursive: true });
     fs.mkdirSync(path.join(REPORT_DIR, "logs"), { recursive: true });
     // The "everything" run spawns the mega-runner, which clears test-report/logs
-    // at ITS start — so its console log lives at the test-report root instead.
+    // at ITS start - so its console log lives at the test-report root instead.
     const logFile = suite.id === "everything"
         ? path.join(REPORT_DIR, "everything.log")
         : path.join(REPORT_DIR, "logs", `${suite.id}.log`);
@@ -284,7 +284,7 @@ server.listen(PORT, "127.0.0.1", () => {
     }
 });
 
-// Don't orphan a detached run when the server itself is stopped — kill the
+// Don't orphan a detached run when the server itself is stopped - kill the
 // run's process group first so no test processes/containers keep spinning.
 for (const sig of ["SIGINT", "SIGTERM"]) {
     process.on(sig, () => {

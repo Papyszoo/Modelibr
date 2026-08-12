@@ -10,8 +10,8 @@ import { AssetTile } from '../AssetTile'
 describe('AssetTile', () => {
   const media = <div data-testid="media" />
 
-  // Regression: the tile was a bare <div> with onClick — no role, no tabIndex, no
-  // key handling — so every grid in the app was mouse-only.
+  // Regression: the tile was a bare <div> with onClick - no role, no tabIndex, no
+  // key handling - so every grid in the app was mouse-only.
   it('is a focusable button when it is clickable', () => {
     render(<AssetTile media={media} name="Chair" onClick={jest.fn()} />)
 
@@ -38,7 +38,7 @@ describe('AssetTile', () => {
     expect(onClick).not.toHaveBeenCalled()
   })
 
-  // A non-clickable tile must not become an empty tab stop — some grids render
+  // A non-clickable tile must not become an empty tab stop - some grids render
   // purely presentational tiles.
   it('stays inert when there is no onClick', () => {
     render(<AssetTile media={media} name="Chair" />)
@@ -63,7 +63,7 @@ describe('AssetTile', () => {
     expect(event.defaultPrevented).toBe(true)
   })
 
-  // The checkbox slot holds a readOnly indicator, not a control — a key press
+  // The checkbox slot holds a readOnly indicator, not a control - a key press
   // bubbling out of anything the caller nests must not double-fire the tile.
   it('ignores key events bubbling from nested content', () => {
     const onClick = jest.fn()

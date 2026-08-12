@@ -28,7 +28,7 @@ describe('getScriptsPaginated query serialization', () => {
   // Regression: packIds/projectIds were declared on the options type but never
   // appended to the query string, so a brand-new pack/project showed *every*
   // script (the server filter was never applied). TypeScript can't catch a
-  // param that's accepted-but-dropped — only an assertion on the sent URL can.
+  // param that's accepted-but-dropped - only an assertion on the sent URL can.
   it('serializes packIds and projectIds (multi-value)', async () => {
     await getScriptsPaginated({
       page: 1,

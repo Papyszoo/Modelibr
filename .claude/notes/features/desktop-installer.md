@@ -1,10 +1,10 @@
-# Native installer — tray host + thin client
+# Native installer - tray host + thin client
 
 PR #495 (`feat/native-installer`) makes Modelibr installable for non-technical
 users who can't set up the Docker Compose stack. Architecture is **two separate
 Electron apps**.
 
-## Host — `src/desktop/`, productName "Modelibr"
+## Host - `src/desktop/`, productName "Modelibr"
 
 Bundles frontend + WebApi + asset-processor workers + Node + PostgreSQL.
 
@@ -17,13 +17,13 @@ Bundles frontend + WebApi + asset-processor workers + Node + PostgreSQL.
   `saveRuntimeConfig`.
 - `EdgeServer` serves everything on one port (default 3010).
 
-## Client — `src/desktop-client/`, productName "Modelibr Client"
+## Client - `src/desktop-client/`, productName "Modelibr Client"
 
 A thin "extended website" window that loads a running host's URL. Bundles no
 runtime; host URL configurable via `connect.html`. Publishes to its own `client`
 update channel so its electron-updater feed never collides with the host's.
 
-## Key decision — don't reintroduce runtime config into the frontend
+## Key decision - don't reintroduce runtime config into the frontend
 
 The in-frontend "Native Runtime" Settings section was **dropped**. Runtime config
 lives in the host tray window instead. It also conflicted hard with the rewritten
@@ -34,4 +34,4 @@ Settings grid.
 ## Related state
 
 - Self-update per platform: [[../release/updater.md]].
-- Desktop backups are currently **nonfunctional** — [[backups.md]].
+- Desktop backups are currently **nonfunctional** - [[backups.md]].

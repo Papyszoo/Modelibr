@@ -41,14 +41,14 @@ public class McpRoundTripIntegrationTests : IClassFixture<ModelibrWebFactory>
 
         context.AssetDerivations.Add(AssetDerivation.Create(
             "Model", AssetId, 1, 1,
-            "{\"deriveVersion\":1,\"browseSummary\":\"Anvil — 1 part\",\"tokens\":[\"anvil\"]}", now));
+            "{\"deriveVersion\":1,\"browseSummary\":\"Anvil - 1 part\",\"tokens\":[\"anvil\"]}", now));
 
         context.AssetParts.Add(AssetPart.Create(
             "Model", AssetId, 1, "/Anvil", "Anvil", 1, "mesh", now,
             geometryHash: Hash, triangleCount: 500));
 
         context.AssetSearchDocuments.Add(AssetSearchDocument.Create(
-            "Model", AssetId, 1, null, true, "full", "Anvil", "mcpanvil", "Anvil — 1 part", now,
+            "Model", AssetId, 1, null, true, "full", "Anvil", "mcpanvil", "Anvil - 1 part", now,
             triangleCount: 500));
 
         context.ComputeCacheEntries.Add(ComputeCacheEntry.Create(

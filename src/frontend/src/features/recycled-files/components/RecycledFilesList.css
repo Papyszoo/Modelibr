@@ -365,7 +365,7 @@
     transform: none;
   }
 
-  /* Touch — reveal actions and overlay without hover. */
+  /* Touch - reveal actions and overlay without hover. */
   .recycled-card-actions {
     opacity: 1;
   }

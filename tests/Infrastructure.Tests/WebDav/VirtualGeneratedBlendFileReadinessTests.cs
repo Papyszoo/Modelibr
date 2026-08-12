@@ -16,10 +16,10 @@ namespace Infrastructure.Tests.WebDav;
 
 /// <summary>
 /// Covers the generated-{name}.blend readiness rule: the virtual file must only ever be
-/// exposed — in listings AND single-item resolution — once
+/// exposed - in listings AND single-item resolution - once
 /// IBlendFileGenerator.GetCachedSizeBytes confirms a cache file actually exists for
 /// (modelId, newest non-deleted versionId). Exposing it before that means PROPFIND/HEAD
-/// report a size (the source renderable file's) that the GET response can't back up —
+/// report a size (the source renderable file's) that the GET response can't back up -
 /// exactly what corrupted the file on WebDAV clients that truncate reads to the
 /// PROPFIND-reported length (e.g. macOS WebDAVFS). See VirtualGeneratedBlendFile.TryCreate.
 /// </summary>

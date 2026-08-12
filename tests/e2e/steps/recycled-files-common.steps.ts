@@ -330,7 +330,7 @@ GivenBdd(
         await page.waitForLoadState("domcontentloaded");
 
         // Navigation lands directly on the kind-locked Multi-Model
-        // Textures tab — the in-page kind switcher no longer exists. Wait
+        // Textures tab - the in-page kind switcher no longer exists. Wait
         // for the list to render before the toolbar-search helper runs
         // (the removed switcher block used to provide this wait).
         await page.waitForSelector(".texture-set-list", { timeout: 10000 });
@@ -416,7 +416,7 @@ ThenBdd(
     "the recycled files panel in the right should show the deleted file without navigation",
     async ({ page }) => {
         // The RecycledFiles panel in the right panel should update in real time
-        // without any navigation — TanStack Query invalidation triggers the refetch.
+        // without any navigation - TanStack Query invalidation triggers the refetch.
         const filesSection = page.locator(
             ".recycled-section[data-section='files']",
         );

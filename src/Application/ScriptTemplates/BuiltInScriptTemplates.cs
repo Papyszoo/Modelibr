@@ -39,7 +39,7 @@ public static class BuiltInScriptTemplates
             "glsl",
             "ShaderToy-compatible fragment shader; renders live in the preview pane.",
             """
-            // Fragment shader — animated gradient.
+            // Fragment shader - animated gradient.
             // Uniforms iResolution / iTime / iMouse are provided by the preview.
             void mainImage(out vec4 fragColor, in vec2 fragCoord) {
                 vec2 uv = fragCoord / iResolution.xy;
@@ -55,7 +55,7 @@ public static class BuiltInScriptTemplates
             "glsl",
             "A pass-through vertex shader using three.js built-in attributes.",
             """
-            // Vertex shader — passes UVs through to the fragment stage.
+            // Vertex shader - passes UVs through to the fragment stage.
             varying vec2 vUv;
 
             void main() {

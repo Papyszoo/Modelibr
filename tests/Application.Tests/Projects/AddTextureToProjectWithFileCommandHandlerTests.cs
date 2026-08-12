@@ -17,7 +17,7 @@ namespace Application.Tests.Projects;
 /// <summary>
 /// Texture sets created through the project upload path are ModelSpecific (no worker
 /// pass), so their source-image resolution must be extracted on the backend at
-/// upload time — but only when a new texture is created, never when an existing
+/// upload time - but only when a new texture is created, never when an existing
 /// set is reused by file hash.
 /// </summary>
 public class AddTextureToProjectWithFileCommandHandlerTests

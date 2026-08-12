@@ -105,7 +105,7 @@ async function waitForTextureSetTextureTypes(
 
             // 404 may be transient (eventual consistency between create and
             // read after a merge). Try a name-based lookup; on failure, swallow
-            // it and let the outer poll loop retry — never break out of the
+            // it and let the outer poll loop retry - never break out of the
             // retry budget on a single 404.
             try {
                 const fallback = await apiHelper.getTextureSetByName(
@@ -237,7 +237,7 @@ When(
         // Refresh the page to see newly created texture sets
         await page.reload({ waitUntil: "domcontentloaded" });
 
-        // Wait for the (kind-locked Multi-Model) texture list to render —
+        // Wait for the (kind-locked Multi-Model) texture list to render -
         // the in-page kind switcher no longer exists.
         await page.waitForSelector(".texture-set-list", { timeout: 10000 });
 

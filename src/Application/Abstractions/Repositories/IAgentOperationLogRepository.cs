@@ -4,7 +4,7 @@ namespace Application.Abstractions.Repositories;
 
 /// <summary>
 /// Append-only audit of agent-initiated writes (MCP write tools). Idempotency is
-/// enforced by <b>claiming</b> the caller-supplied key before a write is applied — a
+/// enforced by <b>claiming</b> the caller-supplied key before a write is applied - a
 /// lookup-then-write check is not enough, because two concurrent calls carrying the
 /// same key both pass the lookup and both apply the write.
 ///
@@ -29,7 +29,7 @@ public interface IAgentOperationLogRepository
         DateTime now,
         CancellationToken cancellationToken = default);
 
-    /// <summary>Marks an owned claim Completed — the only state a retry may replay as applied.</summary>
+    /// <summary>Marks an owned claim Completed - the only state a retry may replay as applied.</summary>
     Task CompleteClaimAsync(
         string idempotencyKey,
         string? assetType,

@@ -52,7 +52,7 @@ export function OptionsButton({
         icon="pi pi-cog"
         label="Options"
         className="p-button-text p-button-sm options-toggle-btn"
-        // Skip tooltip on touch — it lingers on top of the popover because
+        // Skip tooltip on touch - it lingers on top of the popover because
         // there's no hover-out event to dismiss it.
         tooltip={isMobile ? undefined : 'Display options'}
         tooltipOptions={{ position: 'bottom' }}
@@ -89,7 +89,7 @@ export function OptionsButton({
                 value={animationMode}
                 onChange={e => {
                   // SelectButton emits null when the same option is clicked
-                  // again — ignore so the user can't accidentally unset it.
+                  // again - ignore so the user can't accidentally unset it.
                   if (e.value) {
                     setAnimationMode(e.value as ThumbnailAnimationMode)
                   }

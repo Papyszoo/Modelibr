@@ -7,18 +7,18 @@ namespace Infrastructure.Tests.Architecture;
 /// Source-scan fitness gate for prompt 25 (unit of work + reliable domain-event
 /// dispatch): repositories under src/Infrastructure/Repositories stage
 /// mutations on the shared ApplicationDbContext but must not call
-/// SaveChangesAsync themselves — command handlers commit once via
+/// SaveChangesAsync themselves - command handlers commit once via
 /// IUnitOfWork, so a multi-repository operation is atomic. See the
-/// backend-patterns skill, "Transactions — unit of work" section.
+/// backend-patterns skill, "Transactions - unit of work" section.
 ///
 /// NetArchTest (if/when prompt 21 lands one) can check dependency directions
 /// but can't see inside a method body, hence a plain text scan here.
 ///
 /// The migration is landing one bounded area at a time (prompt 25's own
-/// constraint — a single flag-day commit across 27 repositories isn't safely
+/// constraint - a single flag-day commit across 27 repositories isn't safely
 /// reviewable). <see cref="StillSelfCommitting"/> is the honest, temporary
 /// allowlist of areas not yet migrated; every entry is a concrete follow-up,
-/// not a permanent exception. Shrink it as each area lands — do not add to
+/// not a permanent exception. Shrink it as each area lands - do not add to
 /// it for a NEW repository.
 /// </summary>
 public class RepositoriesDontSelfCommitTests
@@ -26,7 +26,7 @@ public class RepositoriesDontSelfCommitTests
     // Files still calling _context.SaveChangesAsync() internally. Every other
     // area (settings, packs, projects, models, thumbnails, texture sets,
     // sounds, sprites, scripts, env maps, categories, files, stages) has
-    // migrated — regressing one of those must fail this test. Only three
+    // migrated - regressing one of those must fail this test. Only three
     // permanent, individually-justified exceptions remain:
     private static readonly HashSet<string> StillSelfCommitting = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -78,7 +78,7 @@ public class RepositoriesDontSelfCommitTests
             string.Join(", ", offenders) +
             ". Repositories stage mutations only; command handlers commit once via " +
             "IUnitOfWork.SaveChangesAsync. See the backend-patterns skill, " +
-            "\"Transactions — unit of work\" section.");
+            "\"Transactions - unit of work\" section.");
     }
 
     [Fact]
@@ -86,7 +86,7 @@ public class RepositoriesDontSelfCommitTests
     {
         // Keeps the allowlist honest in the other direction: if a listed file
         // was migrated and just never removed from the list here, this test
-        // patiently makes that visible too — silent staleness would let a
+        // patiently makes that visible too - silent staleness would let a
         // future regression back in unnoticed (the file would be "allowed" to
         // self-commit again with no test ever failing).
         var repositoriesDir = FindRepositoriesDirectory();

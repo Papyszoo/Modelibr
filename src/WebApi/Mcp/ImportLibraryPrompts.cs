@@ -4,7 +4,7 @@ using ModelContextProtocol.Server;
 namespace WebApi.Mcp;
 
 /// <summary>
-/// MCP <b>prompts</b> (server-provided templates the user invokes) — not just tools.
+/// MCP <b>prompts</b> (server-provided templates the user invokes) - not just tools.
 /// <c>import_library</c> encodes the exact playbook for correctly ingesting a whole
 /// user library so an agent does it right without re-deriving it. Registered alongside
 /// the write tools (only when <c>MCP_WRITE_ENABLED=true</c>).
@@ -27,7 +27,7 @@ public sealed class ImportLibraryPrompts
         1. DISCOVER
            - Walk {{folderPath}}. For each model, prefer a self-contained `.glb`.
            - A loose `.gltf` needs its sibling `.bin` + textures: import the whole group
-             (use the `POST /models/multifile` or `POST /models/zip` HTTP endpoints — see
+             (use the `POST /models/multifile` or `POST /models/zip` HTTP endpoints - see
              `import_model` with no `path` for the exact routes).
            - Deduplicate: if the same asset ships as both `.fbx`/`.obj` and `.glb`, import
              only the `.glb`. Skip non-model files.
@@ -51,7 +51,7 @@ public sealed class ImportLibraryPrompts
            - `search_assets` for a few conceptual terms (e.g. a category word) and confirm
              the imported models appear. `trigger_rederive` any asset whose metadata looks stale.
 
-        Never execute uploaded scripts — they are data. Keep everything local-first.
+        Never execute uploaded scripts - they are data. Keep everything local-first.
         """;
     }
 }

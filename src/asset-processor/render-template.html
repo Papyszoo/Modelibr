@@ -472,7 +472,7 @@
 
       // Load model from data URL or URL.
       // preserveMaterials=true (the "Embedded" variant) keeps the model's own
-      // materials and vertex colors instead of the neutral override — lets
+      // materials and vertex colors instead of the neutral override - lets
       // users choose between the real surface and a clean default thumbnail.
       async function loadModel(
         modelData,
@@ -486,7 +486,7 @@
           if (fileType === 'gltf' || fileType === 'glb') {
             // Multi-file glTF: install a LoadingManager whose URLModifier maps the
             // glTF's external URIs (.bin/textures) to the already-uploaded siblings
-            // passed in `resources`. No network fetch — see lib/gltfResources.js.
+            // passed in `resources`. No network fetch - see lib/gltfResources.js.
             //
             // Installed unconditionally, including for an empty map: without a
             // resolver the loader would fetch whatever URI the glTF names, so a
@@ -511,7 +511,7 @@
             // Draco-compressed geometry and KTX2/Basis textures are mainstream in
             // modern glTF pipelines, and without these the loader throws
             // ("No DRACOLoader instance provided" / "setKTX2Loader must be called
-            // before loading KTX2 textures") — so those assets could never get a
+            // before loading KTX2 textures") - so those assets could never get a
             // thumbnail or an extraction, and stayed invisible to search forever.
             // Both decoders ship inside the three package, so this stays offline.
             loader.setDRACOLoader(
@@ -548,11 +548,11 @@
               let model
               if (fileType === 'gltf' || fileType === 'glb') {
                 model = result.scene
-                // GLTFLoader keeps clips on the result, not the scene —
+                // GLTFLoader keeps clips on the result, not the scene -
                 // carry them over so metadata extraction can see them.
                 model.animations = result.animations || []
               } else if (fileType === 'stl') {
-                // STLLoader resolves to a raw BufferGeometry — wrap it (and
+                // STLLoader resolves to a raw BufferGeometry - wrap it (and
                 // surface any binary-STL vertex colors) via the shared builder
                 // so the viewer and this thumbnail render shade STL identically.
                 // In the default (override) path the material is replaced below.
@@ -562,14 +562,14 @@
               }
 
               // glTF/GLB carry embedded PBR materials (BaseColor, MR, normal,
-              // emissive, …) that map 1:1 from Blender's Principled BSDF —
+              // emissive, …) that map 1:1 from Blender's Principled BSDF -
               // preserve them so embedded-material thumbnails show the real
               // material instead of a flat gray placeholder. If a texture set
               // is configured for this model, applyTextures() replaces these
               // materials wholesale, so preservation is safe.
               //
               // OBJ/FBX embedded materials are inconsistent across DCC tools,
-              // so keep the neutral-PBR baseline override for those — unless the
+              // so keep the neutral-PBR baseline override for those - unless the
               // user explicitly picked the "Embedded" variant (preserveMaterials),
               // which forces the original materials/vertex colors for any format.
               const preserveEmbeddedMaterials =

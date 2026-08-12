@@ -2,7 +2,7 @@ namespace Application.Abstractions.Files;
 
 /// <summary>
 /// An <see cref="IFileUpload"/> backed by an in-memory byte buffer. Used when the source
-/// bytes don't come from an HTTP form part — e.g. entries extracted from an uploaded
+/// bytes don't come from an HTTP form part - e.g. entries extracted from an uploaded
 /// <c>.zip</c> during multi-file glTF import.
 /// </summary>
 public sealed class InMemoryFileUpload : IFileUpload

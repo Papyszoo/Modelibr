@@ -156,7 +156,7 @@
     text-align: left;
   }
 
-  /* Tighter header on mobile — desktop's 1.5rem 2rem chews ~30% of phone
+  /* Tighter header on mobile - desktop's 1.5rem 2rem chews ~30% of phone
      vertical real estate before any models are visible. */
   .model-list-header-tab {
     flex-direction: row;

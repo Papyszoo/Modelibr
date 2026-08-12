@@ -9,7 +9,7 @@ const TRANSPARENT_PIXEL =
 /**
  * Regression: an imported loose `.gltf` could not be opened in the browser at all.
  * The viewer attached the shared safe loading manager to every loader, which
- * substitutes a transparent pixel for anything that isn't `/files/<id>` — so the
+ * substitutes a transparent pixel for anything that isn't `/files/<id>` - so the
  * glTF's `scene.bin` buffer was replaced with a PNG and the model rendered empty.
  * The worker resolved these references for thumbnails; the browser never did.
  */

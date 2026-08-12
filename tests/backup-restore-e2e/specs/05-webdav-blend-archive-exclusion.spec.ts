@@ -12,8 +12,8 @@ interface OrphanSidecar {
 }
 
 /**
- * Scans uploads/webdav-blend-orphans/ (host bind-mounted here — see
- * docker-compose.backup-e2e.yml — unlike tests/e2e's stack, which needs
+ * Scans uploads/webdav-blend-orphans/ (host bind-mounted here - see
+ * docker-compose.backup-e2e.yml - unlike tests/e2e's stack, which needs
  * docker exec for the same lookup) for the sidecar whose originalRequestPath
  * matches the given WebDAV request path.
  */
@@ -30,7 +30,7 @@ function findOrphanSidecarByRequestPath(
                 return { jsonFileName: name, blendFileName: name.replace(/\.json$/, ".blend") };
             }
         } catch {
-            // Not ours (unreadable/malformed) — keep scanning.
+            // Not ours (unreadable/malformed) - keep scanning.
         }
     }
     return null;
@@ -56,7 +56,7 @@ test.describe("Backup archive excludes in-flight WebDAV temp files but keeps orp
     test("Archive has no uploads/webdav-blend-temp/ entries and includes the seeded uploads/webdav-blend-orphans/ entries", async () => {
         test.setTimeout(120000);
 
-        // ── Seed 1: an in-flight Blender Safe-Save temp file — PUT the ".blend@"
+        // ── Seed 1: an in-flight Blender Safe-Save temp file - PUT the ".blend@"
         // temp upload but deliberately never MOVE it, so it stays exactly the
         // kind of half-finished save BackupService must never ship in an archive.
         // No model needs to exist: HandleBlenderTempPutAsync writes straight to
@@ -70,7 +70,7 @@ test.describe("Backup archive excludes in-flight WebDAV temp files but keeps orp
         expect(tempPut.status).toBeGreaterThanOrEqual(200);
         expect(tempPut.status).toBeLessThan(300);
 
-        // ── Seed 2: an orphan quarantine — Safe-Save MOVE into a model path that
+        // ── Seed 2: an orphan quarantine - Safe-Save MOVE into a model path that
         // doesn't exist. The middleware can't resolve a model, so it quarantines
         // the bytes + a JSON sidecar under webdav-blend-orphans/ instead of
         // deleting them (mirrors tests/e2e's @blend-orphan-quarantine scenario).
@@ -104,20 +104,20 @@ test.describe("Backup archive excludes in-flight WebDAV temp files but keeps orp
             expect(download.status).toBe(200);
             // Same convention as 01-create-list-download.spec.ts: substring-search
             // the raw tar bytes as 1-byte chars, robust against PAX metadata blocks
-            // interleaving the real entries — no tar-parsing dependency needed.
+            // interleaving the real entries - no tar-parsing dependency needed.
             const ascii = download.bytes.toString("binary");
 
             // Excluded: the in-flight temp file must never appear in the archive.
             expect(ascii).not.toContain("uploads/webdav-blend-temp/");
 
             // Included: the orphan quarantine's bytes + sidecar are real user data
-            // that survived a failed save — a restore must bring them back.
+            // that survived a failed save - a restore must bring them back.
             expect(ascii).toContain(`${ORPHAN_DIR_RELATIVE}/${blendFileName}`);
             expect(ascii).toContain(`${ORPHAN_DIR_RELATIVE}/${jsonFileName}`);
 
             await api.deleteBackup(created.data.fileName);
         } finally {
-            // Remove only the specific orphan files this test created — never a
+            // Remove only the specific orphan files this test created - never a
             // wholesale directory wipe, since other specs' orphans may coexist.
             removeHostFileIfExists(`${ORPHAN_DIR_RELATIVE}/${jsonFileName}`);
             removeHostFileIfExists(`${ORPHAN_DIR_RELATIVE}/${blendFileName}`);

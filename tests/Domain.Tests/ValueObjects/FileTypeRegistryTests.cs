@@ -8,7 +8,7 @@ namespace Domain.Tests.ValueObjects;
 /// Drift guards for the FileType registry. The database read side
 /// (ApplicationDbContext's FileType converter) resolves persisted strings via
 /// FileType.FromValue, which is built from FileType.GetAllTypes(). These tests
-/// make it impossible to add a FileType that silently round-trips as Unknown —
+/// make it impossible to add a FileType that silently round-trips as Unknown -
 /// the bug that shipped for all 19 script types (see prompt 15).
 /// </summary>
 public class FileTypeRegistryTests
@@ -50,7 +50,7 @@ public class FileTypeRegistryTests
     [Fact]
     public void GetAllTypes_Values_AreUniqueIgnoringCase()
     {
-        // FromValue is a dictionary keyed by Value — a duplicate would make one
+        // FromValue is a dictionary keyed by Value - a duplicate would make one
         // type unreachable from the database.
         var values = FileType.GetAllTypes().Select(t => t.Value).ToList();
 

@@ -12,7 +12,7 @@ namespace Application.Extraction;
 /// Generic worker-authenticated persistence of a raw extraction for a non-mesh
 /// asset family (TextureSet, Sound, Script, Sprite, EnvironmentMap). Upserts the
 /// verbatim payload into the substrate keyed by (AssetType, AssetId, VersionId,
-/// FileSha256), so re-extraction is idempotent. Models are excluded — they use the
+/// FileSha256), so re-extraction is idempotent. Models are excluded - they use the
 /// bespoke <see cref="Models.ImportModelSceneGraphCommand"/>, which additionally
 /// refreshes the flat technical-metadata projection and per-part rows.
 /// </summary>

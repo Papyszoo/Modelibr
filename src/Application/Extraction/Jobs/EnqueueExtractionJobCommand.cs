@@ -9,7 +9,7 @@ namespace Application.Extraction.Jobs;
 
 /// <summary>
 /// Enqueues a decoupled extraction job (prompt 20). Deduped: re-queuing a target that
-/// already has a live (Pending/Processing) job in the same family is a no-op — the
+/// already has a live (Pending/Processing) job in the same family is a no-op - the
 /// caller gets the existing job id. Powers <c>trigger_rederive</c> and on-demand compute.
 /// </summary>
 internal sealed class EnqueueExtractionJobCommandHandler
@@ -47,8 +47,8 @@ internal sealed class EnqueueExtractionJobCommandHandler
             ? ExtractorFamilies.Geometry
             : command.ExtractorFamily.Trim();
 
-        // Models are versioned, and everything the worker writes back — scene graph,
-        // technical metadata, search documents — is keyed by version. A job queued
+        // Models are versioned, and everything the worker writes back - scene graph,
+        // technical metadata, search documents - is keyed by version. A job queued
         // without one is silently useless: the worker downloads the file, extracts it,
         // fails both save calls with a 400, and still reports the job completed, so a
         // re-derive looks like it worked while the index never changes. Resolve the

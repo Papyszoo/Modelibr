@@ -76,7 +76,7 @@ public class WebDavMiddleware
             {
                 "DELETE" => 204,
                 "GET" or "HEAD" or "PROPFIND" => 404,
-                _        => 201, // PUT, LOCK, PROPFIND, etc. — appear to succeed
+                _        => 201, // PUT, LOCK, PROPFIND, etc. - appear to succeed
             };
             _logger.LogDebug("Ignored macOS AppleDouble file {FileName} ({Method})", requestFileName, method);
             return;
@@ -123,7 +123,7 @@ public class WebDavMiddleware
             return;
         }
 
-        // Intercept UNLOCK for the same paths — always succeed silently.
+        // Intercept UNLOCK for the same paths - always succeed silently.
         if (method == "UNLOCK" && IsNewModelBlendPut(requestPath))
         {
             context.Response.StatusCode = 204;
@@ -146,7 +146,7 @@ public class WebDavMiddleware
             return;
         }
 
-        // Intercept PUT /modelibr/Models/{filename}.blend — create a new model from .blend
+        // Intercept PUT /modelibr/Models/{filename}.blend - create a new model from .blend
         if (method == "PUT" && IsNewModelBlendPut(requestPath))
         {
             await HandleNewModelBlendPutAsync(context, requestPath);
@@ -258,7 +258,7 @@ public class WebDavMiddleware
 
         if (!System.IO.File.Exists(tempFilePath))
         {
-            _logger.LogDebug("Blender temp file {Method} for {Path} — no temp file found", method, requestPath);
+            _logger.LogDebug("Blender temp file {Method} for {Path} - no temp file found", method, requestPath);
             context.Response.StatusCode = 404;
             return;
         }
@@ -380,14 +380,14 @@ public class WebDavMiddleware
 
         if (!System.IO.File.Exists(tempFilePath))
         {
-            // No bytes were ever saved for this MOVE — nothing to quarantine or delete,
+            // No bytes were ever saved for this MOVE - nothing to quarantine or delete,
             // just let Blender continue (it has nothing to lose here).
             _logger.LogWarning("Blender MOVE intercepted but temp file not found at {TempPath}", tempFilePath);
             context.Response.StatusCode = 204;
             return;
         }
 
-        // Data-safety rule: an unprocessed temp file is never deleted on failure — it is
+        // Data-safety rule: an unprocessed temp file is never deleted on failure - it is
         // quarantined (moved + sidecar) so the artist's bytes survive. quarantineReason
         // stays null on every success/no-op path, so the `finally` below only quarantines
         // when something actually went wrong.
@@ -418,12 +418,12 @@ public class WebDavMiddleware
 
             if (string.Equals(uploadedHash, currentBlendHash, StringComparison.OrdinalIgnoreCase))
             {
-                // Content identical — no new version needed
+                // Content identical - no new version needed
                 _logger.LogDebug("Blender save: content unchanged for model {ModelId}, skipping version creation", modelId);
             }
             else
             {
-                // Content changed — create a new version via CQRS
+                // Content changed - create a new version via CQRS
                 _logger.LogInformation("Blender save: content changed for model {ModelId}, creating new version", modelId);
 
                 var fileInfo = new System.IO.FileInfo(tempFilePath);
@@ -437,8 +437,8 @@ public class WebDavMiddleware
                 if (createResult.IsFailure)
                 {
                     // DuplicateFile means the saved content already exists in a previous version.
-                    // Treat as success (204) so Blender is not confused — the data is already stored.
-                    // All other failures are real errors and should surface as 500 — and the bytes
+                    // Treat as success (204) so Blender is not confused - the data is already stored.
+                    // All other failures are real errors and should surface as 500 - and the bytes
                     // must be quarantined, not discarded, since they were never persisted.
                     if (createResult.Error?.Code == "DuplicateFile")
                     {
@@ -483,14 +483,14 @@ public class WebDavMiddleware
         {
             if (quarantineReason != null)
             {
-                // No cancellation token on purpose — a client that disconnects mid-failure
+                // No cancellation token on purpose - a client that disconnects mid-failure
                 // must not be able to cancel the data-safety move/sidecar write.
                 await _orphanQuarantine.QuarantineAsync(
                     tempFilePath, requestPath, quarantineReason, quarantineCandidateIds);
             }
             else
             {
-                // Content is safely persisted (or was a no-op) — the temp copy is no longer needed.
+                // Content is safely persisted (or was a no-op) - the temp copy is no longer needed.
                 try { System.IO.File.Delete(tempFilePath); } catch (Exception ex) { _logger.LogWarning(ex, "Failed to cleanup Blender temp file {Path}", tempFilePath); }
             }
         }
@@ -500,7 +500,7 @@ public class WebDavMiddleware
 
     /// <summary>
     /// Returns true if this is a PUT of a .blend file directly into the Models folder
-    /// (e.g. PUT /modelibr/Models/MyModel.blend) — used to create a new model.
+    /// (e.g. PUT /modelibr/Models/MyModel.blend) - used to create a new model.
     /// </summary>
     private bool IsNewModelBlendPut(string requestPath)
     {
@@ -527,7 +527,7 @@ public class WebDavMiddleware
     /// <summary>
     /// Returns a synthetic WebDAV lock token for a new .blend file path.
     /// macOS Finder (and some Windows clients) require a LOCK response before PUT-ing a new file.
-    /// We generate a per-request UUID token which we do not actually enforce — its sole purpose
+    /// We generate a per-request UUID token which we do not actually enforce - its sole purpose
     /// is to satisfy the client so the subsequent PUT proceeds and carries the full file body.
     /// </summary>
     private async Task HandleSyntheticLockAsync(HttpContext context, string requestPath)
@@ -590,7 +590,7 @@ public class WebDavMiddleware
     }
 
     /// <summary>
-    /// Handles PUT /modelibr/Models/{filename}.blend — creates a new model from a .blend file.
+    /// Handles PUT /modelibr/Models/{filename}.blend - creates a new model from a .blend file.
     /// Returns 403 when Blender integration is disabled or installation is in progress, 201 on success.
     /// </summary>
     private async Task HandleNewModelBlendPutAsync(HttpContext context, string requestPath)
@@ -640,11 +640,11 @@ public class WebDavMiddleware
             // to "create" the file slot before sending a LOCK + actual-content PUT.
             // Storing a 0-byte .blend produces a corrupted model that Blender cannot open.
             // Return 201 (success) so the client does not retry endlessly, but skip model
-            // creation — the follow-up PUT with real content will create the model.
+            // creation - the follow-up PUT with real content will create the model.
             if (fileInfo.Length == 0)
             {
                 _logger.LogWarning(
-                    "PUT .blend '{FileName}' has 0-byte body — returning 201 without creating a model (pre-create stub)",
+                    "PUT .blend '{FileName}' has 0-byte body - returning 201 without creating a model (pre-create stub)",
                     fileName);
                 context.Response.StatusCode = 201;
                 return;
@@ -740,7 +740,7 @@ public class WebDavMiddleware
     /// The {ModelName} segment is resolved via the shared WebDAV disambiguation contract:
     /// an "{name} [{id}]" suffix resolves directly by id; otherwise the plain segment is
     /// matched case-insensitively (WebDAV clients on Windows/macOS treat paths
-    /// case-insensitively) and must match exactly one non-deleted model — an ambiguous
+    /// case-insensitively) and must match exactly one non-deleted model - an ambiguous
     /// match refuses the save rather than guessing which model to overwrite.
     /// </summary>
     private async Task<ModelPathResolution> ResolveModelInfoFromPathAsync(IServiceProvider sp, string requestPath)
@@ -786,7 +786,7 @@ public class WebDavMiddleware
             .AsNoTracking()
             .Where(m => !m.IsDeleted);
 
-        // Case-insensitive for the same reason as the model name below — Windows/macOS
+        // Case-insensitive for the same reason as the model name below - Windows/macOS
         // WebDAV clients treat paths case-insensitively. Projects don't get an id-suffix
         // disambiguation UI (their own creation-time check is still case-sensitive), so
         // this stays a simple case-insensitive filter rather than a full ambiguity guard.
@@ -795,7 +795,7 @@ public class WebDavMiddleware
 
         Domain.Models.Model? model = null;
 
-        // 1. "{name} [{id}]" suffix — resolve directly by id if the name still matches.
+        // 1. "{name} [{id}]" suffix - resolve directly by id if the name still matches.
         if (WebDavUtilities.TryParseIdSuffix(modelSegment!, out var suffixBaseName, out var suffixId))
         {
             var byId = await baseQuery

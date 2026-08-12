@@ -1,5 +1,5 @@
 /*
- * AssetGrid — responsive CSS Grid wrapper for asset tiles.
+ * AssetGrid - responsive CSS Grid wrapper for asset tiles.
  *
  * Column min-width comes from --asset-card-width (set inline via the
  * `cardWidth` prop). Mirrors the responsive clamping in ModelGrid.css so the

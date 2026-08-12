@@ -1,4 +1,4 @@
-// Upgrade-integrity test — STEP 1 (seed). Uploads one of every asset type the
+// Upgrade-integrity test - STEP 1 (seed). Uploads one of every asset type the
 // previous (old) Modelibr version supports through the host's public API, then
 // writes a manifest (name + uploaded-bytes sha256 per asset) for verify-assets.mjs
 // to check after the app has been upgraded in place.
@@ -42,7 +42,7 @@ async function seedOne(spec) {
 
 async function main() {
   const tag = process.env.MODELIBR_SEED_TAG || `${Date.now()}`
-  console.log(`[seed] API ${API_BASE} — tag ${tag}`)
+  console.log(`[seed] API ${API_BASE} - tag ${tag}`)
 
   const records = []
   for (const spec of assetTypes(tag)) {
@@ -51,7 +51,7 @@ async function main() {
 
   const manifest = { tag, apiBase: API_BASE, seededAt: new Date().toISOString(), records }
   await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2))
-  console.log(`[seed] ✅ seeded ${records.length} assets — manifest written to ${manifestPath}`)
+  console.log(`[seed] ✅ seeded ${records.length} assets - manifest written to ${manifestPath}`)
 }
 
 main().catch(error => {

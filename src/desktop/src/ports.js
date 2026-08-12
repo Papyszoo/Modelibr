@@ -23,7 +23,7 @@ export function getEphemeralPort() {
 }
 
 // Returns `preferred` when it's free, otherwise an OS-assigned free port. Used
-// at startup so a configured port that's already in use never blocks boot — the
+// at startup so a configured port that's already in use never blocks boot - the
 // service just binds a free one instead (the saved preference is untouched and
 // tried again next launch).
 export async function resolveUsablePort(preferred) {

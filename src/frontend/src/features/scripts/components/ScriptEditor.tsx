@@ -78,7 +78,7 @@ export function ScriptEditor({
   const [showPreview, setShowPreview] = useState(previewKind === 'shader')
 
   // Scene previews execute user JS, so they run only from an explicit snapshot
-  // (Run button / first reveal) — never on keystroke. Shader previews stay live.
+  // (Run button / first reveal) - never on keystroke. Shader previews stay live.
   const [runSource, setRunSource] = useState('')
 
   // panelPosition drives the body layout; the toggle itself lives in the

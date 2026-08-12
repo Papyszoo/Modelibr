@@ -72,7 +72,7 @@ export async function pickSuites(suites, preselected) {
 
 function render(suites, selected) {
     console.clear();
-    console.log(c.bold(c.cyan("\n  Modelibr — select test suites to run\n")));
+    console.log(c.bold(c.cyan("\n  Modelibr - select test suites to run\n")));
     let lastTier = null;
     suites.forEach((s, idx) => {
         if (s.tier !== lastTier) {

@@ -3,7 +3,7 @@ namespace Domain.Models;
 /// <summary>
 /// Represents a script / source-code asset (e.g. .lua, .cs, .cpp, .py).
 /// Scripts wrap a text file, can be categorized, and their content is editable
-/// in-app — editing re-points the script to a new content-addressed file.
+/// in-app - editing re-points the script to a new content-addressed file.
 /// </summary>
 public class Script : AggregateRoot
 {

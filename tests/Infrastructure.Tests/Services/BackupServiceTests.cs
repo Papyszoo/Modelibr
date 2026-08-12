@@ -8,10 +8,10 @@ namespace Infrastructure.Tests.Services;
 
 /// <summary>
 /// Covers BackupService's pure filesystem bookkeeping (snapshot retention, filename
-/// validation) — none of this needs Postgres or `pg_dump`, unlike CreateSnapshotAsync/
+/// validation) - none of this needs Postgres or `pg_dump`, unlike CreateSnapshotAsync/
 /// StartBackupAsync themselves, so it runs as a fast, non-Integration unit test against
-/// a real temp directory. The safety constraint under test — automatic-snapshot cleanup
-/// must never delete a user-initiated backup — is called out explicitly in the
+/// a real temp directory. The safety constraint under test - automatic-snapshot cleanup
+/// must never delete a user-initiated backup - is called out explicitly in the
 /// pre-migration-backup spec, so it gets its own direct coverage here rather than only
 /// being implied by the higher-level DatabaseExtensionsTests.
 /// </summary>
@@ -62,7 +62,7 @@ public sealed class BackupServiceTests
     public void CleanupSnapshots_NeverDeletesFilesOutsideThePrefix()
     {
         var (service, root) = NewService();
-        // Manual, user-initiated backups — must survive no matter how aggressive the
+        // Manual, user-initiated backups - must survive no matter how aggressive the
         // retention count for the *different* automatic-snapshot prefix is.
         TouchFile(root, "modelibr-2026-01-01-000001.tar");
         TouchFile(root, "modelibr-2026-01-02-000001.tar");

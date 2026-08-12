@@ -7,9 +7,9 @@ interface TagVocabularyResponse {
 }
 
 /**
- * Which asset type's tag vocabulary to load. Tags are strictly per-asset-type —
+ * Which asset type's tag vocabulary to load. Tags are strictly per-asset-type -
  * models and texture sets draw suggestions from separate pools, never a shared
- * one — so the source is explicit.
+ * one - so the source is explicit.
  */
 export type TagVocabularySource = 'model' | 'texture-set'
 

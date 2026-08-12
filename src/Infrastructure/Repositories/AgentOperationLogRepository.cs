@@ -44,7 +44,7 @@ internal sealed class AgentOperationLogRepository : IAgentOperationLogRepository
         }
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
         {
-            // Another caller claimed this key first — the unique index on
+            // Another caller claimed this key first - the unique index on
             // IdempotencyKey is what actually enforces "apply once", not the lookup.
             _context.Entry(claim).State = EntityState.Detached;
         }
@@ -62,7 +62,7 @@ internal sealed class AgentOperationLogRepository : IAgentOperationLogRepository
         }
 
         // Failed, or Pending past its lease: take the claim over atomically. The WHERE
-        // clause is the lock — a concurrent taker updates 0 rows and backs off.
+        // clause is the lock - a concurrent taker updates 0 rows and backs off.
         var abandonedBefore = now.AddMinutes(-leaseMinutes);
         var taken = await _context.AgentOperationLogs
             .Where(l => l.IdempotencyKey == claim.IdempotencyKey &&
@@ -82,7 +82,7 @@ internal sealed class AgentOperationLogRepository : IAgentOperationLogRepository
                     .SetProperty(l => l.PayloadAfter, (string?)null),
                 cancellationToken);
 
-        // 1 row: we now own it. 0 rows: the claim is genuinely in flight — report it.
+        // 1 row: we now own it. 0 rows: the claim is genuinely in flight - report it.
         return taken == 1 ? null : existing;
     }
 
@@ -111,7 +111,7 @@ internal sealed class AgentOperationLogRepository : IAgentOperationLogRepository
         DateTime failedAt,
         CancellationToken cancellationToken = default)
     {
-        // Only a Pending claim may be failed — never downgrade a Completed operation.
+        // Only a Pending claim may be failed - never downgrade a Completed operation.
         return _context.AgentOperationLogs
             .Where(l => l.IdempotencyKey == idempotencyKey && l.Status == AgentOperationStatus.Pending)
             .ExecuteUpdateAsync(

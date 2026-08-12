@@ -3,7 +3,7 @@ import './AssetGrid.css'
 import { type ReactNode } from 'react'
 
 /**
- * AssetGrid — responsive auto-fill CSS Grid that wraps AssetTile children.
+ * AssetGrid - responsive auto-fill CSS Grid that wraps AssetTile children.
  *
  * The column min-width is driven by `--asset-card-width` (set inline from
  * `cardWidth`) so a slider can control density while responsive @media rules

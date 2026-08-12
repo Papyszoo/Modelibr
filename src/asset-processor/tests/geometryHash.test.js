@@ -69,7 +69,7 @@ const CUBE_INDICES = [
 
 function shuffleVerticesAndReindex(positions, indices) {
   // Build a permutation of the vertices, rewrite positions in the new order,
-  // and remap the indices — same mesh, different vertex ordering.
+  // and remap the indices - same mesh, different vertex ordering.
   const vertexCount = positions.length / 3
   const perm = [...Array(vertexCount).keys()]
   // Deterministic shuffle (reverse) so the test is stable.

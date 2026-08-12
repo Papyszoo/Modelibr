@@ -48,7 +48,7 @@ internal class UpdateTextureSetKindCommandHandler : ICommandHandler<UpdateTextur
             }
 
             // A single-model (ModelOwned) set must be tied to exactly one model,
-            // so the owner must be known — otherwise the set could end up
+            // so the owner must be known - otherwise the set could end up
             // ModelOwned while still linked to several models.
             if (command.Kind == TextureSetKind.ModelOwned && !command.OwnerModelId.HasValue)
             {
@@ -66,7 +66,7 @@ internal class UpdateTextureSetKindCommandHandler : ICommandHandler<UpdateTextur
             textureSet.UpdateKind(command.Kind, _dateTimeProvider.UtcNow);
 
             // Converting to a single-model (ModelOwned) kind ties the texture
-            // set to exactly one model — drop links to every other model.
+            // set to exactly one model - drop links to every other model.
             if (command.Kind == TextureSetKind.ModelOwned)
             {
                 var removed = textureSet.RemoveModelVersionsNotOwnedBy(

@@ -23,7 +23,7 @@ import { StoreLoginForm } from './StoreLoginForm'
 import { StorePackDetail } from './StorePackDetail'
 
 /**
- * Asset Store tab — the user signs into the companion store, sees their
+ * Asset Store tab - the user signs into the companion store, sees their
  * library, and imports packs into this Modelibr instance with one click.
  * Browsing/purchasing happens on the store site; this page is library +
  * import only. It is an OPTIONAL online surface: unconfigured, offline, or
@@ -39,7 +39,7 @@ export function AssetStorePage() {
   const [openPack, setOpenPack] = useState<StoreLibraryItem | null>(null)
   const library = useStoreLibraryQuery({ page })
 
-  // A new session (possibly a different account) starts from page 1 — a
+  // A new session (possibly a different account) starts from page 1 - a
   // stale page index could point past the new library's last page. Signing out
   // also closes any open pack detail.
   useEffect(() => {
@@ -108,7 +108,7 @@ export function AssetStorePage() {
       return (
         <ErrorState
           title="Store unavailable"
-          message="Could not load your store library. The store may be down, or you may be offline — your local assets are unaffected."
+          message="Could not load your store library. The store may be down, or you may be offline - your local assets are unaffected."
           onRetry={() => void library.refetch()}
         />
       )

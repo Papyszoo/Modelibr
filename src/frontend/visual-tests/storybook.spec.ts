@@ -54,7 +54,7 @@ test.describe('Visual Regression', () => {
         // `sb-show-main` on <body> once the story mounted cleanly (a render
         // error flips it to `sb-show-errordisplay`, so broken stories still
         // fail here). TRAP: do NOT gate on #storybook-root being 'visible'
-        // or having children — a story whose only child is fixed-positioned
+        // or having children - a story whose only child is fixed-positioned
         // collapses root to a zero-size box (Layout/FloatingWindow), and a
         // portal-only story leaves root empty (Models/FileUploadModal);
         // both render fine. A root-based gate aborts the whole loop and

@@ -1,4 +1,4 @@
-/* Asset Store tab — dense, flat on the page surface (no card framing). */
+/* Asset Store tab - dense, flat on the page surface (no card framing). */
 
 .asset-store-page {
   display: flex;
@@ -31,7 +31,7 @@
   min-height: 100%;
 }
 
-/* Sign-in form — quiet block, no card-in-card framing. */
+/* Sign-in form - quiet block, no card-in-card framing. */
 .asset-store-login {
   display: flex;
   flex-direction: column;

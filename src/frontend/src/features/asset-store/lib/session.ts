@@ -7,7 +7,7 @@ import { isTerminalAuthFailure } from './authFailure'
 /**
  * Store session lifecycle: login/logout plus the proactive access-token
  * refresh loop. The store's access tokens expire after 10 minutes (store
- * contract, Jwt ExpiryMinutes) — refresh at 8 so a request never races the
+ * contract, Jwt ExpiryMinutes) - refresh at 8 so a request never races the
  * expiry; the 401-retry interceptor in storeApi covers the remaining gap.
  */
 const ACCESS_TOKEN_REFRESH_MS = 8 * 60 * 1000
@@ -48,8 +48,8 @@ async function refreshSession(): Promise<void> {
       refreshToken: refreshed.refreshToken,
       previousRefreshToken: startedWith,
     })
-    // Re-arm only when OUR tokens are the ones that landed. A logout — or a
-    // login as someone else — that raced this refresh wins, and that newer
+    // Re-arm only when OUR tokens are the ones that landed. A logout - or a
+    // login as someone else - that raced this refresh wins, and that newer
     // session already armed its own timer; re-arming here would run two loops
     // against one refresh token.
     if (
@@ -59,13 +59,13 @@ async function refreshSession(): Promise<void> {
     }
   } catch (error) {
     const current = useAssetStoreAuthStore.getState()
-    // Not our session any more — whatever happened to this refresh is no longer
+    // Not our session any more - whatever happened to this refresh is no longer
     // anyone's business, and acting on it would disturb the newer session.
     if (current.refreshToken !== startedWith) return
 
     // Only an auth rejection means the token is dead. Network trouble, a
     // rate-limited store (429) or a restarting one (5xx) retry sooner and leave
-    // the session up — the 401-retry interceptor still guards individual calls.
+    // the session up - the 401-retry interceptor still guards individual calls.
     if (!isTerminalAuthFailure(error)) {
       if (current.status === 'loggedIn') {
         refreshTimer = setTimeout(() => void refreshSession(), 60 * 1000)

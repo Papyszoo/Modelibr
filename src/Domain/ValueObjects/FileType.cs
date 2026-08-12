@@ -213,7 +213,7 @@ public sealed class FileType : IEquatable<FileType>
     public static IReadOnlyList<FileType> GetScriptTypes() => ScriptTypes;
 
     // Canonical registry of every predefined FileType. FromValue (the database
-    // read-side lookup) and the drift-guard tests are built from this list — a
+    // read-side lookup) and the drift-guard tests are built from this list - a
     // new FileType MUST be added here, or it will round-trip from the database
     // as Unknown (the exact bug this registry exists to prevent; a test asserts
     // the list matches the static fields above). Lazy so the declaration order
@@ -243,7 +243,7 @@ public sealed class FileType : IEquatable<FileType>
             ? fileType
             : Unknown;
 
-    // Canonical extension for each script language id — used when authoring a
+    // Canonical extension for each script language id - used when authoring a
     // script in-app (no uploaded file), to synthesize a file name.
     private static readonly Dictionary<string, string> ScriptLanguageExtensions = new(StringComparer.OrdinalIgnoreCase)
     {

@@ -73,7 +73,7 @@ describe('textureSetListViewStore persistence migration', () => {
 
   // Regression: fields added after a view was first persisted (e.g.
   // selectedProjectIds) must be backfilled so consumers can read them without
-  // guards — the whole reason the store spreads DEFAULT before persisted state.
+  // guards - the whole reason the store spreads DEFAULT before persisted state.
   it('backfills fields absent from an older persisted view', async () => {
     const views = await loadStoreWith({
       version: 0,

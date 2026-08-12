@@ -9,7 +9,7 @@ namespace WebApi.Infrastructure;
 /// interval for the lifetime of the app. See <see cref="BlenderRetentionSweeper"/> for
 /// the retention rules themselves; this class only owns the schedule.
 ///
-/// A sweep failure is caught and logged, never rethrown — a bad sweep (e.g. a transient
+/// A sweep failure is caught and logged, never rethrown - a bad sweep (e.g. a transient
 /// disk error) must not crash the host or stop future sweeps from running.
 /// </summary>
 public sealed class BlenderRetentionSweepHostedService : BackgroundService
@@ -43,7 +43,7 @@ public sealed class BlenderRetentionSweepHostedService : BackgroundService
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
-                // Normal shutdown mid-sweep — not an error.
+                // Normal shutdown mid-sweep - not an error.
                 break;
             }
             catch (Exception ex)

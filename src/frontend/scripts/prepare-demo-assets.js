@@ -17,7 +17,7 @@ const E2E_ASSETS = path.resolve(FRONTEND_ROOT, '../../tests/e2e/assets')
 const DEMO_ASSETS = path.resolve(FRONTEND_ROOT, 'public/demo-assets')
 const COMMITTED_DEMO_ASSETS = path.resolve(FRONTEND_ROOT, 'public/demo-assets')
 
-// Asset files we want in the demo (skip .blend files — not renderable in browser)
+// Asset files we want in the demo (skip .blend files - not renderable in browser)
 const ALLOWED_EXTENSIONS = new Set([
   '.glb',
   '.fbx',

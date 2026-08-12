@@ -13,7 +13,7 @@ using Xunit;
 namespace Infrastructure.Tests.Services;
 
 /// <summary>
-/// Covers StoreImportQueue — the bounded Channel + BackgroundService consuming store import
+/// Covers StoreImportQueue - the bounded Channel + BackgroundService consuming store import
 /// jobs. The queue is in-memory, so its startup sweep must fail Pending/Running job rows
 /// orphaned by a previous shutdown (no worker will ever resume them).
 /// </summary>

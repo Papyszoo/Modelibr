@@ -18,7 +18,7 @@ const CONTAINERS = [
 
 // Full container logs are written here as well as attached. Attachments live in
 // playwright-report/, which the NEXT suite in the runner (e2e-performance)
-// overwrites — on 2026-08-10 that destroyed the only copy of the worker's dying
+// overwrites - on 2026-08-10 that destroyed the only copy of the worker's dying
 // stderr before it could be read. `*.log` is gitignored under tests/e2e.
 const CONTAINER_LOG_DIR = path.join(__dirname, "..", "container-logs");
 
@@ -44,7 +44,7 @@ After(async ({ $testInfo }) => {
 
             // console.log, not just an attachment: the console reporter prints
             // only the first ~200 chars of a text attachment, so the state line
-            // has to stand alone to reach test-report/logs/<suite>.log — the one
+            // has to stand alone to reach test-report/logs/<suite>.log - the one
             // artifact that outlives the run.
             console.log(`[Hooks] ${name}: ${state}`);
 

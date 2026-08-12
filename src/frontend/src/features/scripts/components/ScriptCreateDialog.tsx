@@ -153,7 +153,7 @@ export function ScriptCreateDialog({
             onChange={e => setDescription(e.target.value)}
             rows={2}
             autoResize
-            placeholder="Optional — what does this script do?"
+            placeholder="Optional - what does this script do?"
             data-testid="script-create-description"
           />
         </div>

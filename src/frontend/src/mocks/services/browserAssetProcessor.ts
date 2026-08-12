@@ -4,8 +4,8 @@
  * Replaces the real backend's asset-processor (Puppeteer + Three.js) and
  * audio waveform generation with purely in-browser alternatives.
  *
- * 1. Model Thumbnails — Three.js WebGLRenderer on an OffscreenCanvas
- * 2. Audio Waveforms  — OfflineAudioContext peak extraction → Canvas 2D PNG
+ * 1. Model Thumbnails - Three.js WebGLRenderer on an OffscreenCanvas
+ * 2. Audio Waveforms  - OfflineAudioContext peak extraction → Canvas 2D PNG
  */
 import {
   ACESFilmicToneMapping,
@@ -80,7 +80,7 @@ const DEMO_LIGHT_CTORS = {
 /**
  * Light a demo render scene with the shared cross-runtime rig
  * (asset-processor/lib/sceneLighting.js) plus the same neutral RoomEnvironment
- * IBL the worker thumbnail uses — so demo thumbnails match the real worker's
+ * IBL the worker thumbnail uses - so demo thumbnails match the real worker's
  * output instead of using a divergent ad-hoc rig.
  */
 function setupSceneLighting(scene: Scene, renderer: WebGLRenderer): void {
@@ -209,7 +209,7 @@ async function assembleAnimatedWebP(
   writeTag(bytes, off, 'WEBP')
   off += 4
 
-  // VP8X — extended features: animation flag (bit 1)
+  // VP8X - extended features: animation flag (bit 1)
   writeTag(bytes, off, 'VP8X')
   off += 4
   view.setUint32(off, 10, true)
@@ -225,7 +225,7 @@ async function assembleAnimatedWebP(
   write24LE(bytes, off, height - 1)
   off += 3
 
-  // ANIM — background colour (BGRA transparent), loop count 0 = infinite
+  // ANIM - background colour (BGRA transparent), loop count 0 = infinite
   writeTag(bytes, off, 'ANIM')
   off += 4
   view.setUint32(off, 6, true)
@@ -235,7 +235,7 @@ async function assembleAnimatedWebP(
   view.setUint16(off, 0, true)
   off += 2 // loop count
 
-  // ANMF chunks — one per frame
+  // ANMF chunks - one per frame
   const w = width - 1
   const h = height - 1
   for (const fc of frameChunks) {
@@ -368,7 +368,7 @@ async function applyTextureMaps(
   }
 
   // Load every supported map by its shared TextureType so the demo applies the
-  // same slots the viewer/worker do — not just the original five. (Specular
+  // same slots the viewer/worker do - not just the original five. (Specular
   // needs MeshPhysicalMaterial, and channel-packed / Glossiness / Displacement
   // maps need the channel extraction the demo doesn't run, so those remain
   // demo-only approximations.)
@@ -509,7 +509,7 @@ async function renderModelWithTextures(
       loader.load(url, resolve, undefined, reject)
     })
   } else if (ext === 'stl') {
-    // STLLoader resolves to a raw BufferGeometry — wrap it via the shared
+    // STLLoader resolves to a raw BufferGeometry - wrap it via the shared
     // builder (same one the viewer and worker thumbnail use).
     const loader = new STLLoader()
     const geometry = await new Promise<BufferGeometry>((resolve, reject) => {
@@ -843,7 +843,7 @@ async function loadEquirectangularEnvTexture(
  * Render an environment map thumbnail as an animated WebP: a polished
  * metallic sphere using the env map for IBL, orbited 360° around the
  * camera. Mirrors the real asset-processor's environmentMapProcessor.js
- * output — tone-mapped through ACES so HDRs no longer blow out to white.
+ * output - tone-mapped through ACES so HDRs no longer blow out to white.
  */
 export async function generateEnvironmentMapThumbnail(
   fileBlob: Blob,

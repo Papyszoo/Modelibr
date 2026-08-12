@@ -70,7 +70,7 @@ describe('silenceEdges', () => {
   })
 })
 
-describe('analyzeStereo — fake-stereo detection', () => {
+describe('analyzeStereo - fake-stereo detection', () => {
   it('flags a silent right channel', () => {
     const left = sine(440, 1)
     const right = new Float32Array(left.length) // silent
@@ -98,7 +98,7 @@ describe('analyzeStereo — fake-stereo detection', () => {
   })
 })
 
-describe('estimateBpm — null on non-musical', () => {
+describe('estimateBpm - null on non-musical', () => {
   it('returns null for white noise', () => {
     expect(estimateBpm(noise(2), SR)).toBeNull()
   })

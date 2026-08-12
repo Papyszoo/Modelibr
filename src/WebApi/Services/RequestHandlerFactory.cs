@@ -149,7 +149,7 @@ public class MacOsPropFindHandler : IRequestHandler
         }
 
         // Non-seekable stream: buffer it.
-        // Do NOT use "using var" — if the body is non-empty we pass this stream to
+        // Do NOT use "using var" - if the body is non-empty we pass this stream to
         // ReplayHttpRequest, which must outlive this method. MemoryStream holds only
         // managed memory so skipping explicit disposal is safe; the GC will collect it.
         var tempBuffer = new MemoryStream();

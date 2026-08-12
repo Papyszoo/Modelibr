@@ -34,7 +34,7 @@ public sealed record AgentClaim(AgentClaimOutcome Outcome, AgentOperationLog? En
 /// The key is <b>claimed before</b> the write runs, not merely looked up. A
 /// lookup-then-write check is a check-then-act race: two concurrent calls with one key
 /// both pass the lookup, both apply the write, and the second then trips the unique
-/// index while its mutation has already landed — which is exactly how a batch import
+/// index while its mutation has already landed - which is exactly how a batch import
 /// with a retried key produced a duplicate pack.
 ///
 /// Because the claim precedes the mutation, a claim row is not proof the mutation

@@ -7,13 +7,13 @@ Canonical contract doc lives in the store repo: `docs/INTEGRATION.md`.
 - `POST /api/library/{assetId}/import-token` mints a **short-lived, single-use,
   asset-scoped** token (~10 min, hash-only `ImportToken` entity, DB-counted
   20/min rate limit).
-- Credential is the header `Authorization: ImportToken <token>` — **never a query
+- Credential is the header `Authorization: ImportToken <token>` - **never a query
   param** (log leakage). Never put a JWT in a deep link.
 - Manifest fetch consumes the token; downloads ride the same token.
 - Integration endpoints get an **open, no-credentials CORS policy**
-  (`ModelibrImport`) — safe because auth is bearer-token, not cookies. A startup
+  (`ModelibrImport`) - safe because auth is bearer-token, not cookies. A startup
   guard throws if any cookie auth scheme registers.
-- Absolute URLs come from `Store:PublicBaseUrl` via `IStoreUrlProvider` — never
+- Absolute URLs come from `Store:PublicBaseUrl` via `IStoreUrlProvider` - never
   the Host header.
 
 ## Manifest v1
@@ -35,7 +35,7 @@ Files are matched to items by `path`. Known v1 gaps logged in store VISION:
 category mapping, license enum, texture coverage, per-item description, sprite
 metadata, `Other`.
 
-## Modelibr side — native importer (PR #578)
+## Modelibr side - native importer (PR #578)
 
 `POST /store-imports {storeUrl, assetId, importToken}` → 202 + job id;
 `GET /store-imports/{id}` = status + per-item outcomes; SignalR `/storeImportHub`.
@@ -43,7 +43,7 @@ metadata, `Other`.
 - Queue follows the `BlendFileGenerationQueue` pattern (in-process Channel +
   BackgroundService, per-job DI scope). Import survives page close; only a
   backend restart fails it.
-- `IStoreImportSink` is a **thin adapter over existing handlers** — no parallel
+- `IStoreImportSink` is a **thin adapter over existing handlers** - no parallel
   persistence layer.
 - Provenance = 4 nullable Pack columns (`StoreImportUrl` / `AssetId` /
   `ManifestVersion` / `ImportedAt`, indexed) = the idempotency key. Re-run yields
@@ -55,7 +55,7 @@ metadata, `Other`.
 - Deliberate deviation from the CLI importer: source channels bind to the real
   `TextureChannel` enum (`R/G/B/A/RGB`), not the CLI's long names.
 - Partial import: `selectedItemIds` filters the manifest; empty = whole pack.
-- Store thumbnails are reused — a model item's `Turntable` (or static
+- Store thumbnails are reused - a model item's `Turntable` (or static
   `Thumbnail`) preview is attached via `UploadThumbnailCommand` and worker
   generation is suppressed via `AddModelCommand.GenerateThumbnail`.
 
@@ -68,7 +68,7 @@ metadata, `Other`.
 wiped in-memory tokens and users appeared logged out. 8-min proactive refresh vs
 the store's 10-min JWT.
 
-**Adding a new tab type touches SIX places** — `ui.ts`, `TabContent`,
+**Adding a new tab type touches SIX places** - `ui.ts`, `TabContent`,
 `NewTabPage` TILES + icons, `DraggableTab`, `navigationStore` label, and **both**
 `tabSerialization` allowlists. (`useTabMenuItems` never existed; the
 frontend-patterns skill was corrected.)

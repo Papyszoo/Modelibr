@@ -11,7 +11,7 @@ import { sql } from '@codemirror/lang-sql'
 import { xml } from '@codemirror/lang-xml'
 import { StreamLanguage } from '@codemirror/language'
 // CodeMirror 6 does not ship official packages for these languages, so we reuse
-// the ported legacy (CodeMirror 5) StreamLanguage modes — fully offline. We use
+// the ported legacy (CodeMirror 5) StreamLanguage modes - fully offline. We use
 // the `clike` factory directly for C# so we can give it a fuller keyword set;
 // `shader` is a GLSL-aware mode used for .glsl/.hlsl/three.js shaders.
 import {
@@ -36,7 +36,7 @@ function words(str: string): Record<string, boolean> {
 // The stock legacy `csharp` mode ships a thin keyword set, so common modern C#
 // (pattern matching, records, nullable, LINQ, file-scoped types) and the Unity
 // API surface go unhighlighted. We rebuild it here with a fuller catalog. Note:
-// `function` is not a C# keyword and is intentionally absent — method names are
+// `function` is not a C# keyword and is intentionally absent - method names are
 // not specially highlighted by lightweight stream modes.
 const csharpExtension: Extension = StreamLanguage.define(
   clike({
@@ -159,8 +159,8 @@ export const SCRIPT_LANGUAGES: { value: string; label: string }[] =
 
 /**
  * Kind of live preview a language supports:
- *  - 'shader' — GLSL/HLSL rendered as a GPU fragment shader (no JS execution).
- *  - 'scene'  — JS/TS that `export default`s a three.js material, rendered on a
+ *  - 'shader' - GLSL/HLSL rendered as a GPU fragment shader (no JS execution).
+ *  - 'scene'  - JS/TS that `export default`s a three.js material, rendered on a
  *    mesh. The user code runs once (guarded); the render loop is ours.
  */
 export type PreviewKind = 'shader' | 'scene'

@@ -1,5 +1,5 @@
 /**
- * Playwright globalSetup — runs ONCE before any test worker starts.
+ * Playwright globalSetup - runs ONCE before any test worker starts.
  *
  * Performs data cleanup from previous runs so that tests start with a
  * manageable dataset.  This MUST NOT run inside step handlers because
@@ -58,7 +58,7 @@ export default async function globalSetup() {
         // Setup phase: clear old bridge file, then clean everything
         clearPersistedState();
         await cleanupStaleModels();
-        await cleanupStaleTextureSets(); // no protected IDs — setup will re-create
+        await cleanupStaleTextureSets(); // no protected IDs - setup will re-create
         await cleanupStaleSprites();
         await cleanupStaleSounds();
     } else {

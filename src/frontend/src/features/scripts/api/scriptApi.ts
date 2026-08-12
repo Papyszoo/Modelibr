@@ -138,7 +138,7 @@ export async function updateScript(
   updates: {
     name?: string
     categoryId?: number | null
-    // Include `description` only when you intend to change it — omitting the key
+    // Include `description` only when you intend to change it - omitting the key
     // leaves the existing description intact; sending '' clears it.
     description?: string
   }

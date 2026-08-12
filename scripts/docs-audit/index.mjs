@@ -1,4 +1,4 @@
-// docs:audit — fail CI when user-facing docs contradict the code.
+// docs:audit - fail CI when user-facing docs contradict the code.
 //
 // Docs drift found in the wild that this script would have caught:
 //   - STL/3MF shipped in 0.3.0 but missing from README + models.md formats
@@ -9,7 +9,7 @@
 // Design: each check reads a SOURCE OF TRUTH in code (FileType registry,
 // TabType union, .env.example, video manifest) and asserts the docs agree.
 // Errors fail the run; warnings print but pass (used for checks whose fix
-// is still in flight — flip them to errors once merged).
+// is still in flight - flip them to errors once merged).
 
 import fs from "fs";
 import path from "path";
@@ -32,9 +32,9 @@ function check(ok, label, detail, { warnOnly = false } = {}) {
     if (ok) {
         passes.push(label);
     } else if (warnOnly) {
-        warnings.push(`${label} — ${detail}`);
+        warnings.push(`${label} - ${detail}`);
     } else {
-        errors.push(`${label} — ${detail}`);
+        errors.push(`${label} - ${detail}`);
     }
 }
 
@@ -63,7 +63,7 @@ const audioExtensions = extensionsForCategory("Audio");
 check(
     modelExtensions.length >= 4 && audioExtensions.length >= 4,
     "FileType registry parsed",
-    `unexpectedly few extensions (models: ${modelExtensions}, audio: ${audioExtensions}) — FileType.cs layout changed? Update scripts/docs-audit.`,
+    `unexpectedly few extensions (models: ${modelExtensions}, audio: ${audioExtensions}) - FileType.cs layout changed? Update scripts/docs-audit.`,
 );
 
 // Tab types from the frontend union.
@@ -75,7 +75,7 @@ const tabTypes = tabTypeBlock
 check(
     tabTypes.length >= 15,
     "TabType union parsed",
-    `only found ${tabTypes.length} tab types — ui.ts layout changed? Update scripts/docs-audit.`,
+    `only found ${tabTypes.length} tab types - ui.ts layout changed? Update scripts/docs-audit.`,
 );
 
 // Frontend port from env template.
@@ -150,7 +150,7 @@ const manifestOutputs = [...read("docs/videos/video-manifest.js").matchAll(
         recycledFiles: "Recycled Files",
     };
     // Exempt tab types must carry a reason. Remove an entry when the feature
-    // becomes user-reachable — the audit will then demand documentation.
+    // becomes user-reachable - the audit will then demand documentation.
     const exempt = {
         stageList: "Stages tile is disabled in NewTabPage ('under rework')",
         stageEditor: "Stages tile is disabled in NewTabPage ('under rework')",
@@ -165,7 +165,7 @@ const manifestOutputs = [...read("docs/videos/video-manifest.js").matchAll(
     check(
         undocumented.length === 0,
         "user-interface.md covers every tab type",
-        `undocumented tab types: ${undocumented.join(", ")} — document them in user-interface.md (and add a label here), or add an exemption with a reason`,
+        `undocumented tab types: ${undocumented.join(", ")} - document them in user-interface.md (and add a label here), or add an exemption with a reason`,
     );
 }
 
@@ -184,7 +184,7 @@ const manifestOutputs = [...read("docs/videos/video-manifest.js").matchAll(
             `${file} uses the real frontend port`,
             urls.length === 0
                 ? "no localhost URL found (quick start removed?)"
-                : `found localhost:${wrong.join(", localhost:")} — FRONTEND_PORT is ${frontendPort} (.env.example)`,
+                : `found localhost:${wrong.join(", localhost:")} - FRONTEND_PORT is ${frontendPort} (.env.example)`,
         );
     }
 }
@@ -244,7 +244,7 @@ for (const w of warnings) console.warn(`⚠ ${w}`);
 for (const e of errors) console.error(`✗ ${e}`);
 
 console.log(
-    `\ndocs:audit — ${passes.length} passed, ${warnings.length} warnings, ${errors.length} errors`,
+    `\ndocs:audit - ${passes.length} passed, ${warnings.length} warnings, ${errors.length} errors`,
 );
 if (errors.length > 0) {
     console.error(

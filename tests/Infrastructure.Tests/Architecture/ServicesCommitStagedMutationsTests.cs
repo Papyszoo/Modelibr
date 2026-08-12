@@ -6,7 +6,7 @@ namespace Infrastructure.Tests.Architecture;
 /// <summary>
 /// Companion gate to <see cref="RepositoriesDontSelfCommitTests"/>: repositories
 /// only stage mutations, and the CommandHandlerUnitOfWorkDecorator commits for
-/// command handlers — but services under src/Infrastructure/Services run
+/// command handlers - but services under src/Infrastructure/Services run
 /// outside the command pipeline (background tasks, own DI scopes), so nothing
 /// commits for them. A service that stages repository mutations without also
 /// calling IUnitOfWork silently drops its writes.
@@ -48,7 +48,7 @@ public class ServicesCommitStagedMutationsTests
             string.Join(", ", offenders) +
             ". Resolve IUnitOfWork from the same scope as the repository and call " +
             "SaveChangesAsync after staging. See the backend-patterns skill, " +
-            "\"Transactions — unit of work\" section.");
+            "\"Transactions - unit of work\" section.");
     }
 
     private static string FindServicesDirectory()

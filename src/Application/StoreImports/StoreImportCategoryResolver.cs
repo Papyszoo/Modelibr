@@ -12,7 +12,7 @@ namespace Application.StoreImports;
 
 /// <summary>
 /// Find-or-create category resolution over the same per-asset-type handlers the UI uses
-/// (no parallel persistence path — mirrors the <see cref="StoreImportSink"/> philosophy).
+/// (no parallel persistence path - mirrors the <see cref="StoreImportSink"/> philosophy).
 /// Lookup is root-level and case-insensitive so an import never duplicates a category the
 /// user already has as e.g. "music" vs the store's "Music". Results (including failures)
 /// are cached per import scope, so one pack with 3,000 categorized items costs one

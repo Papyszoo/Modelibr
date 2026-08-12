@@ -233,7 +233,7 @@ test.describe("Recycled Files", () => {
         await navigateTo(page, "/?leftTabs=modelList&activeLeft=modelList");
         await disableHighlights(page);
 
-        // Wait for model cards — should now be 2 (one kept + one restored)
+        // Wait for model cards - should now be 2 (one kept + one restored)
         await waitForModelCards(page, 2);
         await waitForThumbnails(page, 2, 60000);
         await mediumPause(page);

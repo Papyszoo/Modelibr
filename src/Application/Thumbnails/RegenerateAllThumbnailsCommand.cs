@@ -62,7 +62,7 @@ public class RegenerateAllThumbnailsCommandHandler
 
             // GetAllAsync returns detached entities (AsNoTracking), so the
             // Thumbnail navigation may be stale. Re-fetch by ModelVersionId
-            // to make the create-vs-reset decision idempotent — there IS a
+            // to make the create-vs-reset decision idempotent - there IS a
             // unique constraint on Thumbnails.ModelVersionId, and a bare
             // AddAsync would 500 on the second invocation.
             var existingThumbnail = await _thumbnailRepository
@@ -86,7 +86,7 @@ public class RegenerateAllThumbnailsCommandHandler
             // the per-repo commits used to).
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-            // The Thumbnails table's FK is ModelVersion.ThumbnailId — without
+            // The Thumbnails table's FK is ModelVersion.ThumbnailId - without
             // updating it, the subsequent worker upload (UploadThumbnailCommand)
             // would see ThumbnailId == null and try to AddAsync a fresh row,
             // hitting IX_Thumbnails_ModelVersionId. Use a targeted SQL update

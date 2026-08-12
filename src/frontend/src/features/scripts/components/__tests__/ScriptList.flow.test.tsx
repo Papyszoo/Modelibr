@@ -80,7 +80,7 @@ describe('ScriptList language filter', () => {
     expect(await screen.findByText('player')).toBeInTheDocument()
     expect(screen.getByText('Enemy')).toBeInTheDocument()
 
-    // Open Filters, then the language dropdown — it lists both languages.
+    // Open Filters, then the language dropdown - it lists both languages.
     await user.click(screen.getByRole('button', { name: /^filters$/i }))
     await user.click(screen.getByTestId('language-filter'))
     expect(within(dropdownPanel()).getByText('Lua')).toBeInTheDocument()
