@@ -101,8 +101,14 @@ internal sealed class StoreImportSink : IStoreImportSink
         _getEnvironmentMap = getEnvironmentMap;
     }
 
-    public async Task<int> CreatePackAsync(string name, string? description, string? licenseType, string? url, CancellationToken ct)
-        => Unwrap(await _createPack.Handle(new CreatePackCommand(name, description, licenseType, url), ct)).Id;
+    public async Task<int> CreatePackAsync(
+        string name, string? description, string? licenseType, string? url,
+        string storeUrl, string storeAssetId, int manifestVersion, CancellationToken ct)
+        => Unwrap(await _createPack.Handle(
+            new CreatePackCommand(
+                name, description, licenseType, url,
+                new PackStoreProvenance(storeUrl, storeAssetId, manifestVersion)),
+            ct)).Id;
 
     public Task RecordPackProvenanceAsync(int packId, string storeUrl, string storeAssetId, int manifestVersion, CancellationToken ct)
         => RunAsync(_setProvenance.Handle(new SetPackStoreProvenanceCommand(packId, storeUrl, storeAssetId, manifestVersion), ct));

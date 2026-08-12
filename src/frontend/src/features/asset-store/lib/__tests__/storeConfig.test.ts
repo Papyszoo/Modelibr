@@ -7,6 +7,7 @@ import {
   getConfiguredStoreUrl,
   getStoreUrlConfigError,
   normalizeStoreUrl,
+  resolveStorePreviewUrl,
 } from '../storeConfig'
 
 describe('normalizeStoreUrl', () => {
@@ -85,6 +86,55 @@ describe('store URL scheme enforcement', () => {
     withEnv(undefined, () => {
       expect(getConfiguredStoreUrl()).toBeNull()
       expect(getStoreUrlConfigError()).toBeNull()
+    })
+  })
+})
+
+describe('resolveStorePreviewUrl', () => {
+  const withStore = (value: string | undefined, assertions: () => void) => {
+    const previous = process.env.VITE_STORE_URL
+    if (value === undefined) delete process.env.VITE_STORE_URL
+    else process.env.VITE_STORE_URL = value
+    try {
+      assertions()
+    } finally {
+      if (previous === undefined) delete process.env.VITE_STORE_URL
+      else process.env.VITE_STORE_URL = previous
+    }
+  }
+
+  // Regression: the store emits RELATIVE preview urls whenever its own
+  // PublicBaseUrl is unset, and a relative <img src> resolves against MODELIBR's
+  // origin — every store thumbnail 404'd against the local app.
+  it('resolves a relative preview url against the configured store', () => {
+    withStore('https://store.example.com', () => {
+      expect(resolveStorePreviewUrl('/api/files/42/preview')).toBe(
+        'https://store.example.com/api/files/42/preview'
+      )
+    })
+  })
+
+  it('leaves an absolute url untouched', () => {
+    withStore('https://store.example.com', () => {
+      expect(resolveStorePreviewUrl('https://cdn.example.com/a.webp')).toBe(
+        'https://cdn.example.com/a.webp'
+      )
+    })
+  })
+
+  it('returns null for nothing to show, so callers render their placeholder', () => {
+    withStore('https://store.example.com', () => {
+      expect(resolveStorePreviewUrl(null)).toBeNull()
+      expect(resolveStorePreviewUrl(undefined)).toBeNull()
+      expect(resolveStorePreviewUrl('   ')).toBeNull()
+    })
+  })
+
+  // A relative url with no store configured has no base to resolve against —
+  // null (placeholder) beats pointing the <img> at the local backend.
+  it('returns null for a relative url when the store is unconfigured', () => {
+    withStore(undefined, () => {
+      expect(resolveStorePreviewUrl('/api/files/42/preview')).toBeNull()
     })
   })
 })

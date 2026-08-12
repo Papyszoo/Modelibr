@@ -14,9 +14,10 @@ namespace Infrastructure.Services;
 /// SSRF-hardened, server-to-server store client (v0.5 prompt 05). Treats <c>storeUrl</c> and
 /// the manifest's absolute URLs as untrusted: requires https (http only for loopback),
 /// follows redirects manually with a hop cap while re-validating each target against
-/// private/loopback ranges (external-tier files 302 to GitHub raw), pins the DNS-validated
-/// address for the actual connection (no rebinding TOCTOU), sends the import token only to
-/// the store's own host, and caps download size using the manifest's file size. Files stream
+/// private/loopback ranges (external-tier files 302 to GitHub raw), refuses any https→http
+/// downgrade, pins the DNS-validated address for the actual connection (no rebinding TOCTOU),
+/// sends the import token only to the store's own ORIGIN (scheme included, so a downgraded
+/// hop never carries it), and caps download size using the manifest's file size. Files stream
 /// to temp files (hashed en route) — payloads are never buffered in memory. The import token
 /// is never logged.
 /// </summary>
@@ -33,11 +34,35 @@ internal sealed class StoreImportClient : IStoreImportClient
     /// </summary>
     private static readonly HttpRequestOptionsKey<IPAddress> PinnedAddressKey = new("Modelibr.StoreImport.PinnedAddress");
 
+    /// <summary>
+    /// How long a resolved store-origin address stays pinned. Long enough that one import job
+    /// (manifest + every file) uses ONE address, short enough that a store which legitimately
+    /// moves is picked up on the next import.
+    /// </summary>
+    private static readonly TimeSpan StoreOriginPinTtl = TimeSpan.FromMinutes(5);
+
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<StoreImportClient> _logger;
     private readonly int _maxRedirects;
     private readonly long _absoluteMaxBytes;
     private readonly long _maxManifestBytes;
+
+    /// <summary>
+    /// Resolved address per store origin. The store's own origin is trusted (it may be a LAN or
+    /// loopback address the user chose), so this is NOT a block-list check — it exists so every
+    /// token-bearing request in one import lands on the SAME host. Without it, the origin is
+    /// re-resolved per request and a 0-TTL record can move the manifest fetch and the file
+    /// downloads to different machines mid-job.
+    /// </summary>
+    private readonly Dictionary<string, (IPAddress Address, DateTimeOffset ExpiresAt)> _storeOriginPins = new();
+    private readonly SemaphoreSlim _pinLock = new(1, 1);
+
+    /// <summary>
+    /// Test seam for the pin's host lookup. Not a constructor parameter: the DI container has
+    /// no registration for it and would fail to pick the constructor.
+    /// </summary>
+    internal Func<string, CancellationToken, Task<IPAddress[]>> ResolveHostAsync { get; set; }
+        = (host, ct) => Dns.GetHostAddressesAsync(host, ct);
 
     private static readonly JsonSerializerOptions ManifestJsonOptions = new()
     {
@@ -89,13 +114,21 @@ internal sealed class StoreImportClient : IStoreImportClient
         if (baseValidation.IsFailure)
             throw new StoreImportException($"{baseValidation.Error.Code}: {baseValidation.Error.Message}");
 
-        var manifestUri = new Uri(new Uri(storeUrl.TrimEnd('/') + "/"), $"api/assets/{Uri.EscapeDataString(assetId)}/manifest");
+        var storeUri = new Uri(storeUrl.TrimEnd('/') + "/", UriKind.Absolute);
+        var manifestUri = new Uri(storeUri, $"api/assets/{Uri.EscapeDataString(assetId)}/manifest");
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, manifestUri);
-        request.Headers.Authorization = new AuthenticationHeaderValue(ImportTokenScheme, importToken);
+        // The manifest fetch opens the job, so it also establishes the origin pin every
+        // subsequent same-origin download reuses.
+        using var response = await SendPinnedToStoreOriginAsync(
+            storeUri,
+            () =>
+            {
+                var request = new HttpRequestMessage(HttpMethod.Get, manifestUri);
+                request.Headers.Authorization = new AuthenticationHeaderValue(ImportTokenScheme, importToken);
+                return request;
+            },
+            cancellationToken);
 
-        var client = _httpClientFactory.CreateClient(HttpClientName);
-        using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
             throw new StoreImportException($"Manifest fetch failed ({(int)response.StatusCode} {response.ReasonPhrase}).");
@@ -119,10 +152,24 @@ internal sealed class StoreImportClient : IStoreImportClient
     public async Task<StoreDownloadedFile> DownloadFileAsync(
         string storeUrl, string absoluteUrl, string importToken, long expectedSizeBytes, long? maxBytes, CancellationToken cancellationToken)
     {
-        if (!Uri.TryCreate(absoluteUrl, UriKind.Absolute, out var uri))
-            throw new StoreImportException($"Download URL is not a valid absolute URL: '{absoluteUrl}'.");
+        var storeUri = new Uri(storeUrl.TrimEnd('/') + "/", UriKind.Absolute);
 
-        var storeUri = new Uri(storeUrl, UriKind.Absolute);
+        // The store emits relative download URLs when Store:PublicBaseUrl is unset (its
+        // StoreUrlProvider falls back to the raw path) — resolve those against the store base
+        // the user entered. Absolute http(s) URLs are used as-is.
+        //
+        // The http(s) scheme test is load-bearing, not decoration: on Unix
+        // Uri.TryCreate("/api/files/1", UriKind.Absolute, …) SUCCEEDS and yields
+        // file:///api/files/1, so testing "is it absolute?" alone would send every relative
+        // URL down the absolute path and fail it as a non-http(s) scheme. An absolute
+        // non-http(s) URL still reaches ValidateDownloadTarget below and is refused there.
+        if (!Uri.TryCreate(absoluteUrl, UriKind.Absolute, out var uri)
+            || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        {
+            if (!Uri.TryCreate(storeUri, absoluteUrl, out var resolved))
+                throw new StoreImportException($"Download URL is not a valid URL: '{absoluteUrl}'.");
+            uri = resolved;
+        }
 
         var client = _httpClientFactory.CreateClient(HttpClientName);
         var maxAllowed = maxBytes is > 0
@@ -134,14 +181,28 @@ internal sealed class StoreImportClient : IStoreImportClient
             var pinnedAddress = await ValidateTargetAsync(uri, storeUri, cancellationToken);
 
             using var request = new HttpRequestMessage(HttpMethod.Get, uri);
-            // Send the import token ONLY to the store's own host. A redirect to another host
-            // (e.g. GitHub raw) is served without it, so the token never leaks cross-origin.
-            if (StoreUrlSafety.IsSameHost(uri, storeUri))
+            // Send the import token ONLY to the store's own ORIGIN (scheme included). A redirect
+            // to another origin (e.g. GitHub raw, or a downgrade to http on the same host) is
+            // served without it, so the token never leaks cross-origin or in cleartext.
+            if (StoreUrlSafety.IsSameOrigin(uri, storeUri))
                 request.Headers.Authorization = new AuthenticationHeaderValue(ImportTokenScheme, importToken);
             if (pinnedAddress is not null)
                 request.Options.Set(PinnedAddressKey, pinnedAddress);
 
-            using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            HttpResponseMessage sent;
+            try
+            {
+                sent = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            }
+            catch (HttpRequestException) when (StoreUrlSafety.IsSameOrigin(uri, storeUri))
+            {
+                // Same reasoning as the manifest fetch: a dead pinned address must not poison
+                // the rest of the TTL.
+                InvalidateStoreOriginPin(storeUri);
+                throw;
+            }
+
+            using var response = sent;
 
             if (IsRedirect(response.StatusCode))
             {
@@ -163,6 +224,98 @@ internal sealed class StoreImportClient : IStoreImportClient
 
         throw new StoreImportException($"Too many redirects (> {_maxRedirects}) while downloading.");
     }
+
+    /// <summary>
+    /// Sends a request to the store's own origin over the pinned address, invalidating the pin
+    /// if the connection fails so the next attempt re-resolves. The caller owns the response.
+    /// </summary>
+    private async Task<HttpResponseMessage> SendPinnedToStoreOriginAsync(
+        Uri storeUri, Func<HttpRequestMessage> requestFactory, CancellationToken cancellationToken)
+    {
+        var pinned = await GetStoreOriginPinAsync(storeUri, cancellationToken);
+
+        using var request = requestFactory();
+        if (pinned is not null)
+            request.Options.Set(PinnedAddressKey, pinned);
+
+        var client = _httpClientFactory.CreateClient(HttpClientName);
+        try
+        {
+            return await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        }
+        catch (HttpRequestException)
+        {
+            // The pinned address may simply have gone away (a store that moved, a rotating
+            // A record). Drop it so the next import resolves fresh instead of retrying a dead
+            // address for the rest of the TTL.
+            InvalidateStoreOriginPin(storeUri);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// The address to dial for the store's own origin, or null when there is nothing to pin (an
+    /// IP-literal host, or a lookup that did not answer). Cached for
+    /// <see cref="StoreOriginPinTtl"/> so one import job is consistent; deliberately NOT
+    /// block-list checked — a self-hosted store is allowed to live on a LAN or loopback address.
+    ///
+    /// Pinning the store origin is HARDENING, never a gate: it must not turn into a new way for
+    /// an import to fail. A lookup that fails here returns null and the request proceeds with
+    /// the handler's own resolution — the same behavior as before the pin existed — and the real
+    /// connection error surfaces from the send instead of a misleading DNS message.
+    /// </summary>
+    private async Task<IPAddress?> GetStoreOriginPinAsync(Uri storeUri, CancellationToken cancellationToken)
+    {
+        if (IPAddress.TryParse(storeUri.Host, out _))
+            return null;
+
+        var key = StoreOriginKey(storeUri);
+
+        await _pinLock.WaitAsync(cancellationToken);
+        try
+        {
+            if (_storeOriginPins.TryGetValue(key, out var cached) && cached.ExpiresAt > DateTimeOffset.UtcNow)
+                return cached.Address;
+
+            IPAddress[] addresses;
+            try
+            {
+                addresses = await ResolveHostAsync(storeUri.Host, cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogDebug(ex, "Store import: could not resolve store host '{Host}' to pin it", storeUri.Host);
+                return null;
+            }
+
+            if (addresses.Length == 0)
+                return null;
+
+            var address = addresses[0];
+            _storeOriginPins[key] = (address, DateTimeOffset.UtcNow.Add(StoreOriginPinTtl));
+            return address;
+        }
+        finally
+        {
+            _pinLock.Release();
+        }
+    }
+
+    private void InvalidateStoreOriginPin(Uri storeUri)
+    {
+        _pinLock.Wait();
+        try
+        {
+            _storeOriginPins.Remove(StoreOriginKey(storeUri));
+        }
+        finally
+        {
+            _pinLock.Release();
+        }
+    }
+
+    private static string StoreOriginKey(Uri storeUri)
+        => $"{storeUri.Scheme}://{storeUri.Host.ToLowerInvariant()}:{storeUri.Port}";
 
     private long ComputeMaxAllowedBytes(long expectedSizeBytes)
     {
@@ -187,9 +340,11 @@ internal sealed class StoreImportClient : IStoreImportClient
         if (targetCheck.IsFailure)
             throw new StoreImportException($"{targetCheck.Error.Code}: {targetCheck.Error.Message}");
 
-        // The store's own host is trusted (may be a chosen LAN/loopback address) — no DNS check.
-        if (StoreUrlSafety.IsSameHost(uri, storeUri))
-            return null;
+        // The store's own origin is trusted (may be a chosen LAN/loopback address), so its
+        // address is never block-listed — but it IS pinned, so every token-bearing request in
+        // this import reaches the same host as the manifest did.
+        if (StoreUrlSafety.IsSameOrigin(uri, storeUri))
+            return await GetStoreOriginPinAsync(storeUri, cancellationToken);
 
         // IP literals were classified in ValidateDownloadTarget and need no DNS (or pin).
         if (IPAddress.TryParse(uri.Host, out _))

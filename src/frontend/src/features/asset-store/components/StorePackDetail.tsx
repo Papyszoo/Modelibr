@@ -10,6 +10,7 @@ import { openTabInPanel } from '@/utils/tabNavigation'
 import { useStoreAssetQuery } from '../api/queries'
 import { startImport } from '../lib/importController'
 import { useImportedPackIdResolver } from '../lib/importedPack'
+import { resolveStorePreviewUrl } from '../lib/storeConfig'
 import type { StoreAssetItem, StoreLibraryItem } from '../types'
 
 interface StorePackDetailProps {
@@ -48,8 +49,11 @@ export function StorePackDetail({ item, onBack }: StorePackDetailProps) {
   const previewByItemId = useMemo(() => {
     const map = new Map<string, string>()
     for (const preview of detail.data?.previews ?? []) {
-      if (preview.packItemId && !map.has(preview.packItemId)) {
-        map.set(preview.packItemId, preview.url)
+      // Same relative-url resolution as the library grid: the store's urls are
+      // relative unless it has a PublicBaseUrl set.
+      const resolved = resolveStorePreviewUrl(preview.url)
+      if (preview.packItemId && resolved && !map.has(preview.packItemId)) {
+        map.set(preview.packItemId, resolved)
       }
     }
     return map
@@ -104,7 +108,7 @@ export function StorePackDetail({ item, onBack }: StorePackDetailProps) {
         </span>
         <span className="asset-store-detail-author">{item.author}</span>
       </div>
-      {(importedPackId !== null || entry?.phase === 'completed') && (
+      {(importedPackId != null || entry?.phase === 'completed') && (
         <Button
           label="Open in library"
           icon="pi pi-folder-open"
@@ -152,11 +156,20 @@ export function StorePackDetail({ item, onBack }: StorePackDetailProps) {
               onClick={() => !isImporting && toggle(assetItem.id)}
               data-testid={`asset-store-item-${assetItem.id}`}
             >
-              <Checkbox
-                checked={selectedSet.has(assetItem.id)}
-                disabled={isImporting}
-                onChange={() => toggle(assetItem.id)}
-              />
+              {/*
+                The row itself toggles selection, so the checkbox's own click must
+                not ALSO bubble up to it — that fired toggle() twice and left the
+                checkbox looking inert. The checkbox stays the keyboard-reachable
+                control for the row.
+              */}
+              <span onClick={event => event.stopPropagation()}>
+                <Checkbox
+                  checked={selectedSet.has(assetItem.id)}
+                  disabled={isImporting}
+                  onChange={() => toggle(assetItem.id)}
+                  aria-label={`Select ${assetItem.name}`}
+                />
+              </span>
               <span className="asset-store-item-media">
                 {previewUrl ? (
                   <img src={previewUrl} alt={assetItem.name} loading="lazy" />
@@ -180,7 +193,7 @@ export function StorePackDetail({ item, onBack }: StorePackDetailProps) {
     )
   }
 
-  const importLabel = importedPackId !== null ? 'Re-import' : 'Import'
+  const importLabel = importedPackId != null ? 'Re-import' : 'Import'
   const progressText =
     entry?.phase === 'importing' && entry.itemsTotal > 0
       ? `Importing… ${entry.itemsProcessed}/${entry.itemsTotal}`
@@ -223,6 +236,16 @@ export function StorePackDetail({ item, onBack }: StorePackDetailProps) {
                   {entry.error ?? 'Import failed'}
                 </span>
               )}
+              {/* Backend status CompletedWithErrors: the job finished but some
+                  items did not import. Say so instead of showing a plain success. */}
+              {entry?.phase === 'completed' && entry.itemsFailed > 0 && (
+                <span
+                  className="asset-store-login-error"
+                  data-testid="asset-store-detail-partial"
+                >
+                  {`${entry.itemsFailed} of ${entry.itemsTotal} item(s) failed to import. Re-import to retry them.`}
+                </span>
+              )}
               <Button
                 label={
                   items.length > 0
@@ -233,7 +256,15 @@ export function StorePackDetail({ item, onBack }: StorePackDetailProps) {
                 }
                 icon="pi pi-download"
                 size="small"
-                disabled={items.length > 0 && selectedIds.length === 0}
+                // A pack whose contents failed to load reports zero items, which
+                // reads here as "no separately listed items — import everything".
+                // Importing the whole pack because a request failed is not what
+                // the click meant, so wait for the contents.
+                disabled={
+                  detail.isPending ||
+                  detail.isError ||
+                  (items.length > 0 && selectedIds.length === 0)
+                }
                 onClick={runImport}
                 data-testid="asset-store-detail-import"
               />

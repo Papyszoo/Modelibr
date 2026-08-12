@@ -51,6 +51,31 @@ function isLoopbackHost(hostname: string): boolean {
 }
 
 /**
+ * Resolves a preview/thumbnail URL from a store response against the configured
+ * store origin. The store emits RELATIVE urls whenever its own PublicBaseUrl is
+ * unset — and a relative `src` in an <img> resolves against Modelibr's origin,
+ * asking the local app for an image it does not have. Absolute urls are returned
+ * untouched; anything unresolvable becomes null so the caller shows its
+ * placeholder instead of a broken image.
+ *
+ * This mirrors the same fallback the backend importer applies to download URLs
+ * (StoreImportClient.DownloadFileAsync).
+ */
+export function resolveStorePreviewUrl(
+  url: string | null | undefined
+): string | null {
+  if (!url || !url.trim()) return null
+
+  const storeUrl = getConfiguredStoreUrl()
+  try {
+    // A relative url needs the store as its base; an absolute one ignores it.
+    return new URL(url, storeUrl ? `${storeUrl}/` : undefined).toString()
+  } catch {
+    return null
+  }
+}
+
+/**
  * Normalizes a store URL for provenance matching (the backend stores the
  * storeUrl string it was given; compare case-insensitively and ignore
  * trailing slashes so `https://Store.example/` matches `https://store.example`).

@@ -2,6 +2,7 @@ import { ApiClientError } from '@/lib/apiBase'
 import { useAssetStoreAuthStore } from '@/stores/assetStoreAuthStore'
 
 import { loginToStore, refreshStoreTokensOnce } from '../api/storeApi'
+import { isTerminalAuthFailure } from './authFailure'
 
 /**
  * Store session lifecycle: login/logout plus the proactive access-token
@@ -34,33 +35,46 @@ async function refreshSession(): Promise<void> {
     return
   }
 
+  // Identifies the session this refresh belongs to, for both the success and the
+  // failure path below.
+  const startedWith = auth.refreshToken
+
   try {
     // Single-flight (shared with the 401-retry interceptor): a store that
     // rotates refresh tokens must never receive the same token twice.
-    const refreshed = await refreshStoreTokensOnce(auth.refreshToken)
+    const refreshed = await refreshStoreTokensOnce(startedWith)
     useAssetStoreAuthStore.getState().setTokens({
       accessToken: refreshed.accessToken,
       refreshToken: refreshed.refreshToken,
+      previousRefreshToken: startedWith,
     })
-    // A logout that raced the in-flight refresh wins — don't re-arm a timer
-    // for a session that no longer exists.
-    if (useAssetStoreAuthStore.getState().status === 'loggedIn') {
+    // Re-arm only when OUR tokens are the ones that landed. A logout — or a
+    // login as someone else — that raced this refresh wins, and that newer
+    // session already armed its own timer; re-arming here would run two loops
+    // against one refresh token.
+    if (
+      useAssetStoreAuthStore.getState().refreshToken === refreshed.refreshToken
+    ) {
       scheduleRefresh()
     }
   } catch (error) {
-    // A rejected refresh token means the session is gone; transient network
-    // trouble just retries sooner and leaves the session up (the 401-retry
-    // interceptor still guards individual calls).
-    if (error instanceof ApiClientError && error.isNetworkError) {
-      if (useAssetStoreAuthStore.getState().status === 'loggedIn') {
+    const current = useAssetStoreAuthStore.getState()
+    // Not our session any more — whatever happened to this refresh is no longer
+    // anyone's business, and acting on it would disturb the newer session.
+    if (current.refreshToken !== startedWith) return
+
+    // Only an auth rejection means the token is dead. Network trouble, a
+    // rate-limited store (429) or a restarting one (5xx) retry sooner and leave
+    // the session up — the 401-retry interceptor still guards individual calls.
+    if (!isTerminalAuthFailure(error)) {
+      if (current.status === 'loggedIn') {
         refreshTimer = setTimeout(() => void refreshSession(), 60 * 1000)
       }
       return
     }
+
     cancelRefreshLoop()
-    useAssetStoreAuthStore
-      .getState()
-      .clearSession('Your store session expired. Please sign in again.')
+    current.clearSession('Your store session expired. Please sign in again.')
   }
 }
 
@@ -98,7 +112,8 @@ export function logoutOfStoreSession(): void {
  * Resumes a persisted session on app startup: the stored access token is likely
  * expired after a reload/restart, so refresh once now and re-arm the proactive
  * refresh loop (which is otherwise only started on an interactive login). A
- * rejected refresh token clears the session; a network error keeps it and retries.
+ * refresh REJECTED by the store clears the session; anything transient (offline,
+ * 429, 5xx) keeps it and retries.
  */
 export function resumeStoreSession(): void {
   const auth = useAssetStoreAuthStore.getState()

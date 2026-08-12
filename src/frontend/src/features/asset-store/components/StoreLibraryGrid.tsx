@@ -6,7 +6,11 @@ import {
 import { useAssetStoreImportStore } from '@/stores/assetStoreImportStore'
 import { formatFileSize } from '@/utils/fileUtils'
 
-import { useImportedPackIdResolver } from '../lib/importedPack'
+import {
+  type ImportedPackId,
+  useImportedPackIdResolver,
+} from '../lib/importedPack'
+import { resolveStorePreviewUrl } from '../lib/storeConfig'
 import type { StoreLibraryItem } from '../types'
 
 interface StoreLibraryGridProps {
@@ -25,7 +29,7 @@ function StatusChip({
   importedPackId,
 }: {
   item: StoreLibraryItem
-  importedPackId: number | null
+  importedPackId: ImportedPackId | undefined
 }) {
   const entry = useAssetStoreImportStore(state => state.imports[item.assetId])
 
@@ -58,7 +62,15 @@ function StatusChip({
     )
   }
 
-  if (importedPackId !== null || entry?.phase === 'completed') {
+  // Server truth first: a pack that was imported and then DELETED locally
+  // resolves to null here while the import store still holds a terminal
+  // "completed" entry, and the tile must follow the pack list, not the entry.
+  // The entry only stands in while that list is still loading, so a just-finished
+  // import doesn't flicker back to un-imported.
+  if (
+    importedPackId != null ||
+    (importedPackId === undefined && entry?.phase === 'completed')
+  ) {
     return (
       <span
         className="asset-store-chip asset-store-chip--imported"
@@ -78,32 +90,33 @@ export function StoreLibraryGrid({ items, onOpenPack }: StoreLibraryGridProps) {
 
   return (
     <AssetGrid className="asset-store-grid">
-      {items.map(item => (
-        <AssetTile
-          key={item.assetId}
-          media={
-            item.previewThumbnailUrl ? (
-              <img
-                src={item.previewThumbnailUrl}
-                alt={item.title}
-                loading="lazy"
+      {items.map(item => {
+        // The store serves relative preview urls unless it has a PublicBaseUrl —
+        // resolve them against the store, not against Modelibr's own origin.
+        const previewUrl = resolveStorePreviewUrl(item.previewThumbnailUrl)
+        return (
+          <AssetTile
+            key={item.assetId}
+            media={
+              previewUrl ? (
+                <img src={previewUrl} alt={item.title} loading="lazy" />
+              ) : (
+                <AssetTilePlaceholder icon="pi pi-box" />
+              )
+            }
+            name={item.title}
+            meta={`${item.author} · ${formatFileSize(item.totalSize)}`}
+            checkbox={
+              <StatusChip
+                item={item}
+                importedPackId={importedPackIdFor(item.assetId)}
               />
-            ) : (
-              <AssetTilePlaceholder icon="pi pi-box" />
-            )
-          }
-          name={item.title}
-          meta={`${item.author} · ${formatFileSize(item.totalSize)}`}
-          checkbox={
-            <StatusChip
-              item={item}
-              importedPackId={importedPackIdFor(item.assetId)}
-            />
-          }
-          onClick={() => onOpenPack(item)}
-          dataAttributes={{ 'data-store-asset-id': item.assetId }}
-        />
-      ))}
+            }
+            onClick={() => onOpenPack(item)}
+            dataAttributes={{ 'data-store-asset-id': item.assetId }}
+          />
+        )
+      })}
     </AssetGrid>
   )
 }

@@ -36,7 +36,7 @@ const ITEM: StoreLibraryItem = {
   assetId: 'asset-1',
   title: 'Medieval Props',
   author: 'The Base Mesh',
-  categoryName: 'Props',
+  itemTypes: ['Model'],
   license: 'CC0',
   isPack: true,
   fileCount: 4,
@@ -117,6 +117,53 @@ describe('startImport', () => {
     // Regression: without invalidation the imported pack only appears
     // after a manual reload — the "packs" list must refetch.
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['packs'] })
+    // Regression: an import creates assets of five types, not just the pack —
+    // invalidating only ['packs'] left the new models/sounds/etc. invisible.
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['models'] })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['sounds'] })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['textureSets'] })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['sprites'] })
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ['environmentMaps'],
+    })
+    invalidateSpy.mockRestore()
+  })
+
+  // Regression: the backend finishes a partially-failed import as
+  // 'CompletedWithErrors'. The controller only treated Completed/Failed as
+  // terminal, so the poll loop never stopped: a permanent spinner and a
+  // request every 2.5s forever, with no cache invalidation.
+  it('treats CompletedWithErrors as terminal and stops polling', async () => {
+    storeApi.mintImportToken.mockResolvedValue({ token: 'tok-1' })
+    importApi.startStoreImport.mockResolvedValue({ jobId: 9 })
+    importApi.getStoreImportJob.mockResolvedValue(
+      jobDto({
+        status: 'CompletedWithErrors',
+        packId: 42,
+        itemsCreated: 3,
+        itemsFailed: 1,
+      })
+    )
+    const invalidateSpy = jest
+      .spyOn(queryClient, 'invalidateQueries')
+      .mockResolvedValue()
+
+    const run = startImport(ITEM)
+    await jest.advanceTimersByTimeAsync(0)
+    await jest.advanceTimersByTimeAsync(2500)
+    await run
+
+    expect(entry()).toMatchObject({
+      phase: 'completed',
+      packId: 42,
+      itemsFailed: 1,
+    })
+    expect(importApi.getStoreImportJob).toHaveBeenCalledTimes(1)
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['packs'] })
+
+    // Nothing further is polled once the job is terminal.
+    await jest.advanceTimersByTimeAsync(10000)
+    expect(importApi.getStoreImportJob).toHaveBeenCalledTimes(1)
     invalidateSpy.mockRestore()
   })
 

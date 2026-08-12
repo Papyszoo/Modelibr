@@ -211,7 +211,9 @@ public class StoreImportProcessorTests
 
         await h.Run();
 
-        h.Sink.Verify(s => s.CreatePackAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+        h.Sink.Verify(s => s.CreatePackAsync(
+            It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(),
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
         h.Sink.Verify(s => s.RecordPackProvenanceAsync(9, StoreUrl, AssetId, 1, It.IsAny<CancellationToken>()), Times.Once);
         h.Sink.Verify(s => s.AddModelToPackAsync(9, 55, It.IsAny<CancellationToken>()), Times.Once);
         h.Sink.Verify(s => s.AddSoundToPackAsync(9, 401, It.IsAny<CancellationToken>()), Times.Once);
@@ -415,6 +417,138 @@ public class StoreImportProcessorTests
         Assert.Equal(1, h.Job.ItemsSkipped);
     }
 
+    [Fact]
+    public async Task ProcessAsync_FailsJob_WhenManifestSchemaIsNewerThanSupported()
+    {
+        var h = new Harness();
+        var mesh = h.MakeFile("u/mesh", RandomBytes(), "Mesh", "chair.glb");
+        h.SetManifest(new[] { Item("Model", "Chair", mesh) }, schemaVersion: 2);
+
+        await h.Run();
+
+        // A schema this importer does not understand must not be imported on v1 assumptions.
+        Assert.Equal(Domain.ValueObjects.StoreImportJobStatus.Failed, h.Job.Status);
+        Assert.Contains("schema version 2", h.Job.ErrorMessage);
+        h.Sink.Verify(s => s.CreateModelAsync(It.IsAny<IFileUpload>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    // Regression: HttpClient.Timeout surfaces as TaskCanceledException. Treating every
+    // OperationCanceledException as host shutdown abandoned the job as Running forever,
+    // and the UI polled it every 2.5s with no terminal state ever arriving.
+    [Fact]
+    public async Task ProcessAsync_FailsItem_WhenDownloadTimesOut_AndStillCompletesTheJob()
+    {
+        var h = new Harness();
+        var slow = h.MakeFile("u/slow", RandomBytes(), "Mesh", "slow.glb");
+        var ok = h.MakeFile("u/ok", RandomBytes(), "Audio", "boom.wav");
+        h.SetManifest(new[] { Item("Model", "Chair", slow), Item("Sound", "Boom", ok) });
+        h.FailDownload("u/slow", new TaskCanceledException("The request was canceled due to the configured HttpClient.Timeout of 100 seconds elapsing."));
+        h.Sink.Setup(s => s.CreateSoundAsync(It.IsAny<IFileUpload>(), "Boom", It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>())).ReturnsAsync(401);
+
+        await h.Run();
+
+        Assert.Equal(Domain.ValueObjects.StoreImportJobStatus.CompletedWithErrors, h.Job.Status);
+        Assert.Equal(1, h.Job.ItemsFailed);
+        Assert.Equal(1, h.Job.ItemsCreated); // the timeout did not abort the remaining items
+    }
+
+    [Fact]
+    public async Task ProcessAsync_FailsJob_WhenManifestFetchTimesOut()
+    {
+        var h = new Harness();
+        h.Client
+            .Setup(c => c.FetchManifestAsync(StoreUrl, AssetId, Token, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new TaskCanceledException("HttpClient.Timeout elapsed."));
+
+        await h.Run();
+
+        Assert.Equal(Domain.ValueObjects.StoreImportJobStatus.Failed, h.Job.Status);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_LeavesJobRunning_OnHostShutdownCancellation()
+    {
+        var h = new Harness();
+        var mesh = h.MakeFile("u/mesh", RandomBytes(), "Mesh", "chair.glb");
+        h.SetManifest(new[] { Item("Model", "Chair", mesh) });
+        using var cts = new CancellationTokenSource();
+        h.Client
+            .Setup(c => c.FetchManifestAsync(StoreUrl, AssetId, Token, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new OperationCanceledException(cts.Token));
+        cts.Cancel();
+
+        await h.Run(cancellationToken: cts.Token);
+
+        // Genuine shutdown: the startup sweep marks interrupted jobs Failed on next boot.
+        Assert.Equal(Domain.ValueObjects.StoreImportJobStatus.Running, h.Job.Status);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_RecordsListingUrl_MatchingTheStorefrontRoute()
+    {
+        var h = new Harness();
+        var mesh = h.MakeFile("u/mesh", RandomBytes(), "Mesh", "chair.glb");
+        h.SetManifest(Item("Model", "Chair", mesh));
+        h.Sink.Setup(s => s.CreateModelAsync(It.IsAny<IFileUpload>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync(101);
+
+        await h.Run();
+
+        // The storefront serves asset detail at /assets/:id — /asset/:id 404s.
+        h.Sink.Verify(s => s.CreatePackAsync(
+            It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(),
+            $"{StoreUrl}/assets/{AssetId}",
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    // Regression: provenance used to be a SECOND commit after CreatePackAsync, so a crash
+    // between the two left a pack with no idempotency key and the next import created a
+    // duplicate. Creation must carry the stamp itself.
+    [Fact]
+    public async Task ProcessAsync_StampsProvenance_InTheSameCallThatCreatesThePack()
+    {
+        var h = new Harness();
+        var mesh = h.MakeFile("u/mesh", RandomBytes(), "Mesh", "chair.glb");
+        h.SetManifest(Item("Model", "Chair", mesh));
+        h.Sink.Setup(s => s.CreateModelAsync(It.IsAny<IFileUpload>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync(101);
+
+        await h.Run();
+
+        h.Sink.Verify(s => s.CreatePackAsync(
+            It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(),
+            StoreUrl, AssetId, 1, It.IsAny<CancellationToken>()), Times.Once);
+        // No follow-up stamp for a freshly created pack — that path is for re-imports only.
+        h.Sink.Verify(s => s.RecordPackProvenanceAsync(
+            It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    // Regression: two concurrent imports of the same store asset both pass the
+    // GetByStoreImportAsync lookup; the unique index rejects the loser's insert. The loser must
+    // adopt the winner's pack instead of failing the whole job.
+    [Fact]
+    public async Task ProcessAsync_WhenPackCreationLosesTheRace_AdoptsTheConcurrentlyCreatedPack()
+    {
+        var h = new Harness();
+        var mesh = h.MakeFile("u/mesh", RandomBytes(), "Mesh", "chair.glb");
+        h.SetManifest(Item("Model", "Chair", mesh));
+        h.Sink.Setup(s => s.CreateModelAsync(It.IsAny<IFileUpload>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync(101);
+        h.Sink.Setup(s => s.CreatePackAsync(
+                It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(),
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("duplicate key value violates unique constraint"));
+
+        // The winner's pack is visible by the time we re-resolve.
+        var winner = Pack.Create("Chair Pack", null, null, null, h.Now).WithId(77);
+        h.PackRepo.SetupSequence(r => r.GetByStoreImportAsync(StoreUrl, AssetId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Pack?)null)
+            .ReturnsAsync(winner);
+
+        await h.Run();
+
+        Assert.Equal(77, h.Job.PackId);
+        Assert.Equal(Domain.ValueObjects.StoreImportJobStatus.Completed, h.Job.Status);
+        h.Sink.Verify(s => s.AddModelToPackAsync(77, 101, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
     // ---- helpers ----
 
     private static StoreManifestItem Item(string type, string name, params StoreManifestFile[] files)
@@ -493,7 +627,9 @@ public class StoreImportProcessorTests
             SpriteRepo.Setup(r => r.GetByFileHashAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync((Sprite?)null);
             EnvMapRepo.Setup(r => r.GetByFileHashAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync((EnvironmentMap?)null);
 
-            Sink.Setup(s => s.CreatePackAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>())).ReturnsAsync(NewPackId);
+            Sink.Setup(s => s.CreatePackAsync(
+                It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(),
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(NewPackId);
 
             // Default: items resolve to no category (the common uncategorized-manifest case).
             CategoryResolver
@@ -534,13 +670,18 @@ public class StoreImportProcessorTests
         public void SetManifest(StoreManifestItem a, StoreManifestItem b, IReadOnlyList<string>? tags = null)
             => SetManifest(new[] { a, b }, tags);
 
-        public void SetManifest(IReadOnlyList<StoreManifestItem> items, IReadOnlyList<string>? tags = null)
+        public void SetManifest(IReadOnlyList<StoreManifestItem> items, IReadOnlyList<string>? tags = null, int schemaVersion = 1)
         {
-            var manifest = new StoreManifest(1, "Chair Pack", "A pack", "CC0", tags, items, null);
+            var manifest = new StoreManifest(schemaVersion, "Chair Pack", "A pack", "CC0", tags, items, null);
             Client.Setup(c => c.FetchManifestAsync(StoreUrl, AssetId, Token, It.IsAny<CancellationToken>())).ReturnsAsync(manifest);
         }
 
-        public Task Run(IReadOnlyList<string>? selectedItemIds = null)
+        /// <summary>Makes the fake client throw for one download URL (network failure simulation).</summary>
+        public void FailDownload(string url, Exception exception)
+            => Client.Setup(c => c.DownloadFileAsync(It.IsAny<string>(), url, It.IsAny<string>(), It.IsAny<long>(), It.IsAny<long?>(), It.IsAny<CancellationToken>()))
+                .ThrowsAsync(exception);
+
+        public Task Run(IReadOnlyList<string>? selectedItemIds = null, CancellationToken cancellationToken = default)
         {
             var processor = new StoreImportProcessor(
                 Client.Object, Sink.Object, CategoryResolver.Object, JobRepo.Object, PackRepo.Object, ModelRepo.Object,
@@ -549,7 +690,7 @@ public class StoreImportProcessorTests
                 NullLogger<StoreImportProcessor>.Instance);
 
             return processor.ProcessAsync(
-                new StoreImportWorkItem(JobId, StoreUrl, AssetId, Token, selectedItemIds), CancellationToken.None);
+                new StoreImportWorkItem(JobId, StoreUrl, AssetId, Token, selectedItemIds), cancellationToken);
         }
     }
 }

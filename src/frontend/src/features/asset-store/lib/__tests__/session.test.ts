@@ -165,6 +165,72 @@ describe('refresh loop', () => {
     expect(authState().status).toBe('loggedOut')
   })
 
+  // Regression: a 429 from a rate-limited store, or a 5xx from one that is
+  // restarting, used to be treated as "refresh token rejected" and signed the
+  // user out of a session that was still perfectly valid.
+  it.each([
+    [429, 'Too many requests'],
+    [503, 'Service unavailable'],
+  ])(
+    'keeps the session after a transient %i from the store',
+    async (status, message) => {
+      storeApi.loginToStore.mockResolvedValue(session(1))
+      storeApi.refreshStoreTokensOnce.mockRejectedValueOnce(
+        new ApiClientError(message, {
+          status,
+          isNetworkError: false,
+          isTimeout: false,
+          isOffline: false,
+        })
+      )
+      await loginToStoreSession('me@example.com', 'pw')
+
+      await jest.advanceTimersByTimeAsync(8 * 60 * 1000)
+      expect(authState().status).toBe('loggedIn')
+      expect(authState().accessToken).toBe('access-1')
+
+      // ...and the loop retries a minute later rather than giving up.
+      storeApi.refreshStoreTokensOnce.mockResolvedValue(session(2))
+      await jest.advanceTimersByTimeAsync(60 * 1000)
+      expect(authState().accessToken).toBe('access-2')
+    }
+  )
+
+  // Regression: account A's refresh failing AFTER the user signed in as account
+  // B cleared B's brand-new session.
+  it('does not clear a newer session when an older refresh fails late', async () => {
+    storeApi.loginToStore.mockResolvedValue(session(1))
+    let rejectRefresh: (reason: unknown) => void = () => {}
+    storeApi.refreshStoreTokensOnce.mockReturnValue(
+      new Promise((_, reject) => (rejectRefresh = reject))
+    )
+    await loginToStoreSession('me@example.com', 'pw')
+
+    await jest.advanceTimersByTimeAsync(8 * 60 * 1000) // account A refresh in flight
+
+    // The user signs out and back in as someone else while it is open.
+    logoutOfStoreSession()
+    useAssetStoreAuthStore.getState().setSession({
+      accessToken: 'access-B',
+      refreshToken: 'refresh-B',
+      username: 'other-artist',
+    })
+
+    rejectRefresh(
+      new ApiClientError('invalid refresh token', {
+        status: 401,
+        isNetworkError: false,
+        isTimeout: false,
+        isOffline: false,
+      })
+    )
+    await jest.advanceTimersByTimeAsync(0)
+
+    expect(authState().status).toBe('loggedIn')
+    expect(authState().accessToken).toBe('access-B')
+    expect(authState().error).toBeNull()
+  })
+
   // Regression: a logout racing an IN-FLIGHT refresh used to re-arm the
   // 8-minute timer for a session that no longer existed.
   it('does not re-arm the loop when logout raced an in-flight refresh', async () => {

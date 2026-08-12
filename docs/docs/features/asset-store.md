@@ -30,8 +30,12 @@ store running on `localhost`. Set it empty to disable the store surface.
 Open the **Asset Store** tab from the New Tab page (Organize group) and sign
 in with your store account. Your credentials and tokens talk **directly to
 the store from your browser** — they never pass through your local Modelibr
-backend and are kept in memory only, so you sign in again after restarting
-the app.
+backend.
+
+Your session is kept on this machine so you stay signed in across restarts.
+It is tied to the store address you configured: change `VITE_STORE_URL` and
+the saved session is discarded, so you sign in again. **Sign out** clears it
+immediately.
 
 ## Importing a pack
 

@@ -155,7 +155,8 @@ const libraryItem = {
     assetId: ASSET_ID,
     title: "E2E Props Pack",
     author: "E2E Fixture",
-    categoryName: "Props",
+    // Mirrors the store's LibraryEntryResponse.ItemTypes (its CategoryName is gone).
+    itemTypes: ["Model"],
     license: "CC0",
     isPack: true,
     fileCount: 1,

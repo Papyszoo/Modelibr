@@ -16,7 +16,32 @@ import { getConfiguredStoreUrl } from './storeConfig'
  */
 
 const POLL_INTERVAL_MS = 2500
-const TERMINAL_STATUSES = new Set(['Completed', 'Failed'])
+// Must cover every terminal StoreImportJobStatus the backend can persist.
+// 'CompletedWithErrors' (any item failed) used to be missing here, which left the
+// spinner up and the poll loop hammering the job endpoint forever.
+const TERMINAL_STATUSES = new Set([
+  'Completed',
+  'CompletedWithErrors',
+  'Failed',
+])
+
+// Every collection an import can add to — a finished import must refresh all of
+// them, not just the pack list, or the new assets stay invisible until a manual
+// refetch. Keys mirror the feature api/queries modules.
+const IMPORT_TOUCHED_QUERY_KEYS = [
+  ['packs'],
+  ['models'],
+  ['model-categories'],
+  ['model-tags'],
+  ['textureSets'],
+  ['textureSetCategories'],
+  ['sounds'],
+  ['soundCategories'],
+  ['sprites'],
+  ['spriteCategories'],
+  ['environmentMaps'],
+  ['environment-map-categories'],
+]
 
 // One SignalR subscription feeds every running import.
 let progressSubscribed = false
@@ -37,8 +62,12 @@ function ensureProgressSubscription(): void {
 }
 
 function onImportFinished(): void {
-  // The import created/updated a pack (and possibly many assets) — refetch.
-  void queryClient.invalidateQueries({ queryKey: ['packs'] })
+  // The import created/updated a pack and any of five asset types — refetch all
+  // of them (a partial success still creates assets, so this runs for
+  // CompletedWithErrors too).
+  for (const queryKey of IMPORT_TOUCHED_QUERY_KEYS) {
+    void queryClient.invalidateQueries({ queryKey })
+  }
 }
 
 function applyJobSnapshot(job: StoreImportJobDto): void {
