@@ -64,11 +64,34 @@ export function AssetTile({
     .filter(Boolean)
     .join(' ')
 
+  // A clickable tile is a button: without this it is reachable by mouse only, and
+  // every asset grid in the app (models, textures, sounds, sprites, env maps, store
+  // packs) becomes unusable from the keyboard. Tiles with no onClick stay inert —
+  // making them focusable would just add empty tab stops.
+  //
+  // Nesting is safe here: the `checkbox` slot is a readOnly PrimeReact Checkbox or a
+  // status chip — a rendering of the tile's own state, never a separate control.
+  const interactive = onClick !== undefined
+
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (!onClick) return
+    // Ignore keys bubbling from anything focusable the caller put inside.
+    if (event.target !== event.currentTarget) return
+    if (event.key !== 'Enter' && event.key !== ' ') return
+
+    // Space scrolls the page on a non-button element unless prevented.
+    event.preventDefault()
+    onClick(event as unknown as React.MouseEvent)
+  }
+
   return (
     <div
       className={tileClass}
       onClick={onClick}
       onContextMenu={onContextMenu}
+      role={interactive ? 'button' : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      onKeyDown={interactive ? handleKeyDown : undefined}
       {...dataAttributes}
     >
       {checkbox ? <div className="asset-tile-checkbox">{checkbox}</div> : null}

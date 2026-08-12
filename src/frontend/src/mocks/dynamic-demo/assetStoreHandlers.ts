@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw'
 
 import { BASE_MESHES_COMMIT } from '../db/baseMeshesSeed'
+import { meshHash, missingMeshes } from './importGapFill'
 import type { DemoModel, DemoModelVersion, DemoPack } from '../db/demoDb'
 import {
   getAll,
@@ -145,19 +146,38 @@ async function findImportedPack(assetId: string): Promise<DemoPack | null> {
   return packs.find(p => p.storeImportAssetId === assetId) ?? null
 }
 
-/** Creates the demo pack + models for a finished import (idempotent). */
+/**
+ * Creates the demo pack + models for a finished import.
+ *
+ * Re-import GAP-FILLS: it adds the meshes the pack does not have yet and leaves the
+ * rest alone, which is what the real importer does (StoreImportProcessor dedupes by
+ * file hash and reports "gap-filled N missing file(s)"). Returning the existing pack
+ * untouched made a demo re-import of previously-unselected items silently do nothing
+ * while still reporting success.
+ */
 async function materializeImport(
   def: StorePackDefinition,
   meshes: { name: string; sizeBytes: number }[]
 ): Promise<number> {
   const existing = await findImportedPack(def.assetId)
-  if (existing) return existing.id
+
+  // Which meshes this pack already holds, by the same hash the importer dedupes on.
+  const packModels = existing
+    ? (await getAll('models')).filter(m =>
+        m.packs?.some(p => p.id === existing.id)
+      )
+    : []
+
+  const missing = missingMeshes(meshes, packModels)
+  if (existing && missing.length === 0) return existing.id
 
   const ts = now()
-  const packId = await nextId('packs')
-  const modelRefs: { id: number; name: string }[] = []
+  const packId = existing?.id ?? (await nextId('packs'))
+  const modelRefs: { id: number; name: string }[] = existing
+    ? [...(existing.models ?? [])]
+    : []
 
-  for (const mesh of meshes) {
+  for (const mesh of missing) {
     const modelId = await nextId('models')
     const versionId = await nextId('modelVersions')
     const fileId = await nextId('files')
@@ -175,7 +195,7 @@ async function materializeImport(
           filePath: `${mesh.name}.glb`,
           mimeType: 'model/gltf-binary',
           sizeBytes: mesh.sizeBytes,
-          sha256Hash: `store-import-${mesh.name}`,
+          sha256Hash: meshHash(mesh.name),
           fileType: 'glb',
           isRenderable: true,
           createdAt: ts,
@@ -231,12 +251,15 @@ async function materializeImport(
   }
 
   const pack: DemoPack = {
+    ...(existing ?? {}),
     id: packId,
     name: def.title,
     description: def.description,
     licenseType: 'CC0',
     url: STORE_URL,
-    createdAt: ts,
+    // A gap-filling re-import keeps the pack's original creation time; only
+    // updatedAt and the provenance stamp move (as the real importer does).
+    createdAt: existing?.createdAt ?? ts,
     updatedAt: ts,
     modelCount: modelRefs.length,
     globalMaterialCount: 0,
