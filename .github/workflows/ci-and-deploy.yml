@@ -554,6 +554,15 @@ jobs:
                     fi
                     echo "::endgroup::"
                     echo "video generation attempt $attempt failed"
+                    # Preserve this attempt's Playwright output before the next
+                    # attempt overwrites it. A retry that eventually succeeds
+                    # still hides a real problem - the run that motivated this
+                    # failed attempt 1 and passed attempt 2, leaving no evidence
+                    # at all because the job as a whole was green.
+                    if [ -d test-results ]; then
+                      mkdir -p ../../video-failure-artifacts
+                      cp -r test-results "../../video-failure-artifacts/attempt-$attempt" || true
+                    fi
                   done
                   echo "video generation failed after 3 attempts"
                   exit 1
@@ -567,12 +576,16 @@ jobs:
             # without landing another commit on main. Playwright writes an ARIA
             # page snapshot (error-context.md) next to each failure for free;
             # keep it so the next breakage is diagnosable from the run alone.
+            # always(), not failure(): an attempt can fail and a later one
+            # succeed, leaving the job green with the evidence discarded.
             - name: Upload video failure diagnostics
-              if: failure()
+              if: always()
               uses: actions/upload-artifact@v5
               with:
                   name: video-failure-diagnostics-${{ github.run_number }}
-                  path: docs/videos/test-results/
+                  path: |
+                      video-failure-artifacts/
+                      docs/videos/test-results/
                   retention-days: 14
                   if-no-files-found: ignore
 
