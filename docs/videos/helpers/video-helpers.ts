@@ -512,9 +512,29 @@ export async function dragElementTo(
 /**
  * Navigate to a page and wait for it to load fully.
  */
+const cpuThrottled = new WeakSet<Page>();
+
+/**
+ * CI runs the whole E2E Docker stack AND the capture browser on one small
+ * hosted runner, which is far more CPU-contended than a dev machine - the
+ * difference that makes a clip pass locally (even on SwiftShader) and fail in
+ * CI. VIDEO_CPU_THROTTLE=<rate> applies CDP CPU throttling so that contention
+ * is reproducible locally instead of only after a main push.
+ */
+async function applyCpuThrottle(page: Page) {
+    const rate = Number(process.env.VIDEO_CPU_THROTTLE || "0");
+    if (!rate || rate <= 1 || cpuThrottled.has(page)) {
+        return;
+    }
+    const client = await page.context().newCDPSession(page);
+    await client.send("Emulation.setCPUThrottlingRate", { rate });
+    cpuThrottled.add(page);
+}
+
 export async function navigateTo(page: Page, path: string) {
     // Use localhost (not 127.0.0.1) so browser origin matches CORS allowed origins
     const baseUrl = process.env.FRONTEND_URL || "http://localhost:3002";
+    await applyCpuThrottle(page);
     await ensureCursorOverlayInitScript(page);
     const usedLegacyNavigation = await applyLegacyNavigationState(
         page,

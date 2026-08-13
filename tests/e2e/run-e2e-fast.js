@@ -138,8 +138,21 @@ async function main() {
 
   const chromiumWorkers = process.env.PW_WORKERS || "3";
   console.log(`\n📋 Phase 2: Chromium tests (workers=${chromiumWorkers})\n`);
+  // The @asset-store scenarios sign in to the companion Asset Store, which in
+  // CI is the store-fixture service from docker-compose.e2e.yml. That fixture
+  // shares webapi-e2e's network namespace so the ONE store URL the frontend
+  // was BUILT with (VITE_STORE_URL=http://localhost:9280) resolves to it. An
+  // installed native build carries the real store URL and has no fixture on
+  // 9280, so the sign-in field never appears and the scenario burns its full
+  // timeout. This is an environment gap, not a flake: set
+  // SKIP_STORE_SCENARIOS=1 only where no fixture exists (the native-installer
+  // lane). Docker CI and the local runner leave it unset and keep the coverage.
+  const chromiumArgs =
+    process.env.SKIP_STORE_SCENARIOS === "1"
+      ? `${args} --grep-invert=@asset-store`
+      : args;
   const chromiumResult = run(
-    `npx playwright test --project=chromium --no-deps ${args}`,
+    `npx playwright test --project=chromium --no-deps ${chromiumArgs}`,
     { env: { ...testEnv, PW_WORKERS: chromiumWorkers } },
   );
   preserveBlobs("chromium");

@@ -5,9 +5,15 @@
 // Instead we connect to the running app's status window and call the same update
 // IPC the tray buttons use:
 //
-//   1. poll window.modelibr.getUpdate() until status === 'downloaded'
-//      (electron-updater downloads from the live GitHub release feed),
-//   2. call window.modelibr.openUpdate() → install() → quitAndInstall(), which
+//   1. poll window.modelibr.getUpdate() until an update is 'available',
+//   2. call window.modelibr.downloadUpdate() - the same IPC the tray's Download
+//      button uses. Downloads are OPT-IN (updateManager sets
+//      autoUpdater.autoDownload = false, and a unit test asserts it stays off),
+//      so nothing downloads until this is called. This step used to be missing:
+//      the driver just waited for status 'downloaded' and timed out at
+//      percent 0 with error null, every night, on Linux and Windows,
+//   3. poll until status === 'downloaded',
+//   4. call window.modelibr.openUpdate() → install() → quitAndInstall(), which
 //      installs the new version and relaunches it.
 //
 // Launch the app with --remote-debugging-port=9222 first. Used by the
@@ -50,6 +56,7 @@ async function main() {
 
   const deadline = Date.now() + TIMEOUT_MS
   let state = null
+  let downloadRequested = false
   while (Date.now() < deadline) {
     state = await page.evaluate(() => window.modelibr.getUpdate()).catch(() => null)
     console.log(`[drive-update] update state: ${JSON.stringify(state)}`)
@@ -57,11 +64,29 @@ async function main() {
     if (state?.status === 'error') {
       throw new Error(`updater reported an error: ${state.error ?? 'unknown'}`)
     }
+    // Downloads are opt-in, so an 'available' update sits at percent 0 forever
+    // unless something presses the button for it. Do that once.
+    if (state?.status === 'available' && !downloadRequested) {
+      console.log('[drive-update] update available - requesting download')
+      const requested = await page
+        .evaluate(() => window.modelibr.downloadUpdate())
+        .then(() => true)
+        .catch(error => {
+          console.error(`[drive-update] downloadUpdate() threw: ${error?.message ?? error}`)
+          return false
+        })
+      downloadRequested = requested
+    }
     await sleep(POLL_MS)
   }
 
   if (state?.status !== 'downloaded') {
-    throw new Error(`update was not downloaded before timeout (last status: ${state?.status ?? 'none'})`)
+    const detail = downloadRequested
+      ? 'download was requested but never completed'
+      : 'download was never successfully requested'
+    throw new Error(
+      `update was not downloaded before timeout (last status: ${state?.status ?? 'none'}; ${detail})`,
+    )
   }
 
   console.log('[drive-update] downloaded - triggering install (quitAndInstall + relaunch)')

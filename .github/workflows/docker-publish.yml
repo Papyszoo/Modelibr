@@ -9,18 +9,59 @@ on:
 permissions:
     contents: read
     packages: write
+    # Needed to read the triggering run's job list in the gate below.
+    actions: read
 
 concurrency:
     group: ${{ github.workflow }}-${{ github.ref }}
     cancel-in-progress: true
 
 jobs:
+    # Publishing used to require the WHOLE "CI and Deploy Docs" run to succeed,
+    # which meant a documentation artifact could veto an image build: the
+    # GPU-dependent docs videos cannot render reliably on GitHub's GPU-less
+    # runners, and a red video lane fails build-docs -> skips deploy-docs ->
+    # skips this workflow. There is no manual trigger here, so the images simply
+    # never shipped - that is what cost 0.4.0, 0.4.1, 0.4.2 and 0.5.0 their
+    # Docker images.
+    #
+    # Gate on the "CI Status" job of the triggering run instead. That job already
+    # aggregates exactly the code-correctness lanes (backend, frontend,
+    # asset-processor, e2e) and deliberately excludes videos and docs, so the
+    # images are still gated on every test that says the code works - and on
+    # nothing that merely says a screencast rendered. Verified against the v0.5.0
+    # main push, where "CI Status" was success while the run overall was failure.
+    gate:
+        name: Check code-correctness lanes
+        runs-on: ubuntu-latest
+        if: >-
+            github.event.workflow_run.head_branch == 'main' &&
+            github.event.workflow_run.conclusion != 'cancelled'
+        outputs:
+            ok: ${{ steps.check.outputs.ok }}
+        steps:
+            - name: Resolve CI Status conclusion
+              id: check
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  RUN_ID: ${{ github.event.workflow_run.id }}
+              run: |
+                  conclusion=$(gh api --paginate \
+                    "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/jobs" \
+                    --jq '[.jobs[] | select(.name == "CI Status") | .conclusion] | first // "missing"')
+                  echo "CI Status -> ${conclusion}"
+                  if [ "${conclusion}" = "success" ]; then
+                    echo "ok=true" >> "$GITHUB_OUTPUT"
+                  else
+                    echo "ok=false" >> "$GITHUB_OUTPUT"
+                    echo "::warning::Skipping Docker publish - CI Status was '${conclusion}', not success."
+                  fi
+
     docker-publish:
         name: Build and Publish Docker Images
         runs-on: ubuntu-latest
-        if: >-
-            github.event.workflow_run.conclusion == 'success' &&
-            github.event.workflow_run.head_branch == 'main'
+        needs: [gate]
+        if: needs.gate.outputs.ok == 'true'
 
         steps:
             - name: Checkout code

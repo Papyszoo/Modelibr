@@ -102,6 +102,27 @@ test.describe("Model Management", () => {
             page.locator(".p-splitter-panel").nth(1).locator("canvas").first(),
         ).toBeVisible({ timeout: ciVideoTimeout });
 
+        // Second off-camera prewarm: mount BOTH viewers at once. The prewarm
+        // above only warms the model file and a single viewer; the recorded
+        // beat instead brings up a second canvas while the hero viewer is
+        // already running, and on a GPU-less runner that first two-context
+        // setup is the expensive part. Paying it off-camera keeps it out of the
+        // recording. Without this the recorded clip ran 77.44s against its 75s
+        // cap (analyze gate failed the whole docs lane), and under heavier load
+        // the same wait blew its 30s timeout outright - which is what broke the
+        // v0.5.0 main push and cost that release its Docker image.
+        await navigateTo(
+            page,
+            `/?leftTabs=model-${comparisonModelId}&activeLeft=model-${comparisonModelId}` +
+                `&rightTabs=model-${primaryModelId}&activeRight=model-${primaryModelId}`,
+        );
+        await expect(
+            page.locator(".p-splitter-panel").first().locator("canvas").first(),
+        ).toBeVisible({ timeout: ciVideoTimeout });
+        await expect(
+            page.locator(".p-splitter-panel").nth(1).locator("canvas").first(),
+        ).toBeVisible({ timeout: ciVideoTimeout });
+
         // Start on a polished split view: library on the left, hero model on the right.
         await navigateTo(
             page,
