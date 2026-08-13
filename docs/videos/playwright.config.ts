@@ -32,6 +32,17 @@ export default defineConfig({
             args: [
                 "--disable-blink-features=AutomationControlled",
                 "--no-default-browser-check",
+                // CI runners have no GPU, so Chromium silently falls back to
+                // SwiftShader - which is where the video specs actually break.
+                // Set VIDEO_SOFTWARE_GL=1 to reproduce that path on a machine
+                // that does have a GPU, instead of waiting for a main push.
+                ...(process.env.VIDEO_SOFTWARE_GL === "1"
+                    ? [
+                          "--disable-gpu",
+                          "--use-gl=swiftshader",
+                          "--use-angle=swiftshader",
+                      ]
+                    : []),
             ],
         },
     },

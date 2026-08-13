@@ -561,6 +561,21 @@ jobs:
                   FRONTEND_URL: http://localhost:3002
                   API_BASE_URL: http://localhost:8090
 
+            # Video specs run only on main-push/dispatch, so a failure here is
+            # the first time anyone sees it - and until now the job uploaded
+            # nothing on failure, leaving no way to tell WHY a clip broke
+            # without landing another commit on main. Playwright writes an ARIA
+            # page snapshot (error-context.md) next to each failure for free;
+            # keep it so the next breakage is diagnosable from the run alone.
+            - name: Upload video failure diagnostics
+              if: failure()
+              uses: actions/upload-artifact@v5
+              with:
+                  name: video-failure-diagnostics-${{ github.run_number }}
+                  path: docs/videos/test-results/
+                  retention-days: 14
+                  if-no-files-found: ignore
+
             - name: Upload feature videos
               uses: actions/upload-artifact@v5
               with:
