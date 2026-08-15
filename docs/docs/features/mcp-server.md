@@ -31,19 +31,19 @@ Modelibr API endpoint - there is no separate search or extraction path:
 
 ## What the agent can change (opt-in)
 
-Set `MCP_WRITE_ENABLED=true` in your root `.env` and twelve more tools appear,
+Set `MCP_WRITE_ENABLED=true` in your root `.env` and sixteen more tools appear,
 letting an agent curate the library the way you would in the app. They are a thin
 pass-through over the same command handlers the UI uses, so there is one source
 of truth for what a change means:
 
-| Tool               | What it does                                                                                                                                                             |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `set_tags`         | Replace a model's tags (and optionally its description), preserving its category.                                                                                        |
-| `set_category`     | Assign or clear a model's category without touching tags.                                                                                                                |
-| `create_pack`      | Create a pack (a curated collection).                                                                                                                                    |
-| `add_to_pack`      | Add a model to a pack.                                                                                                                                                   |
-| `trigger_rederive` | Queue a re-extraction so parts, derived signals and the search index are rebuilt.                                                                                        |
-| `import_model`     | Import a model. Pass a `path` the **server** can read for a co-located import; omit `path` to get the HTTP upload endpoints to stream bytes to when the agent is remote. |
+| Tool               | What it does                                                                                                                                                                            |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `set_tags`         | Replace a model's tags (and optionally its description), preserving its category.                                                                                                       |
+| `set_category`     | Assign or clear a model's category without touching tags.                                                                                                                               |
+| `create_pack`      | Create a pack (a curated collection).                                                                                                                                                   |
+| `add_to_pack`      | Add a model to a pack.                                                                                                                                                                  |
+| `trigger_rederive` | Queue a re-extraction so parts, derived signals and the search index are rebuilt.                                                                                                       |
+| `import_model`     | Import a model. Pass a `path` the **server** can read for a co-located import; omit `path` to get an upload ticket plus the HTTP endpoints to stream bytes to when the agent is remote. |
 
 The rest of the library is reachable too, so an agent can build a scene that has
 materials and audio and not only meshes. Each takes a path the **server** can read:
@@ -56,8 +56,9 @@ materials and audio and not only meshes. Each takes a path the **server** can re
 | `import_texture_set`     | Import a whole material in one call: pass every channel file (albedo, normal, roughness, …) and they land in a single texture set.                                       |
 | `add_texture_channel`    | Add one more channel file to an existing texture set.                                                                                                                    |
 | `bind_texture_set`       | Bind a texture set to a model so it renders with it - associates the set with every version of the model and makes it the default. One call for what the UI does in two. |
+| `request_upload_ticket`  | For an agent that is **not** on the server: a single-use ticket plus the exact endpoint and field names for uploading any asset family over HTTP.                        |
 
-Two rules make these safe to retry:
+Three rules make these safe to retry, review and undo:
 
 - **Every write takes an `idempotencyKey`.** The key is claimed before anything is
   applied, and the claim records whether the write actually landed. Repeating a call
@@ -66,8 +67,40 @@ Two rules make these safe to retry:
   been applied yet, retry), or the write simply runs, because the previous attempt
   failed or its caller died. A crashed import run can be restarted without either
   double-applying a write or losing one to a key that was burned by a failure.
-- **Every write is audited.** Modelibr records the operation, target and payload in
-  its agent operation log, so "what did the agent change?" stays answerable.
+- **Every write is audited.** Modelibr records the operation, target, payload and - when
+  tokens are configured - which agent identity performed it, so "what did the agent
+  change?" stays answerable.
+- **Every write can be undone.** Pass the same `batchId` to a run of related calls and
+  `reverse_operation` puts the whole batch back in one call. See below.
+
+### Undo, and deleting
+
+| Tool                | What it does                                                                                                                                                     |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `reverse_operation` | Undo one write by its `idempotencyKey`, or a whole `batchId`, newest first. Restores replaced tags, categories and materials; recycles assets an agent imported. |
+| `delete_asset`      | Recycle a model, sound, sprite, environment map or texture set - a **soft** delete, restorable from the recycle bin.                                             |
+| `restore_asset`     | Bring a recycled asset back.                                                                                                                                     |
+
+`reverse_operation` and `delete_asset` **default to a dry run**: they report exactly what
+would happen and change nothing until you pass `dryRun=false`. Anything that deletes also
+needs `MCP_DESTRUCTIVE_ENABLED=true` on the server, and the `destructive` scope if you use
+tokens.
+
+Undo is honest about its limits. A write whose prior state was never recorded, or an
+operation with no meaningful inverse (re-derivation computes fresh data - there is nothing
+lost to restore), is reported as un-reversible rather than being counted as undone.
+
+### Uploading from an agent that is not on the server
+
+When the agent and the server are on different machines, the agent cannot hand a tool a
+path the server can read. Call `import_model` without a `path` (or
+`request_upload_ticket` for any other family) and you get a **single-use upload ticket**
+plus the endpoint and its exact field names. Send the ticket back as the
+`X-Modelibr-Upload-Ticket` header on the upload, and that upload is audited and
+de-duplicated under your `idempotencyKey` just like a co-located import - a retry of an
+upload that already landed is answered `already-applied` instead of importing a second
+copy. Tickets expire after 30 minutes; an upload the server rejects hands the ticket back
+so you can fix the request and retry.
 
 The server also publishes an `import_library` **prompt** - a guided playbook for
 ingesting a whole folder of models into a categorized pack (dedupe, prefer `.glb`,
@@ -96,18 +129,40 @@ server settings. Once connected, the tools above appear to the agent.
 
 ## Configuration
 
-| Setting             | Default | Effect                                                                                             |
-| ------------------- | ------- | -------------------------------------------------------------------------------------------------- |
-| `MCP_ENABLED`       | `true`  | Set to `false` in your root `.env` to disable the MCP endpoint entirely.                           |
-| `MCP_WRITE_ENABLED` | `false` | Set to `true` to also expose the write tools and the `import_library` prompt. Restart the Web API. |
+| Setting                   | Default | Effect                                                                                                                    |
+| ------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `MCP_ENABLED`             | `true`  | Set to `false` in your root `.env` to disable the MCP endpoint entirely.                                                  |
+| `MCP_WRITE_ENABLED`       | `false` | Set to `true` to also expose the write tools and the `import_library` prompt. Restart the Web API.                        |
+| `MCP_DESTRUCTIVE_ENABLED` | `false` | Set to `true` to let the agent delete (recycle) assets and reverse writes that deleting undoes. Dry runs work either way. |
+| `MCP_TOKENS`              | (unset) | Per-token access scoping - see below. Unset means the endpoint is unauthenticated, as the rest of Modelibr is.            |
 
-The MCP endpoint shares the Web API's network exposure and authentication -
-enabling it does **not** widen what is reachable from off your machine. Keep the
-Web API bound to localhost (or behind your existing reverse proxy) if you do not
-want other devices on your network to reach it. That matters more once writes are
-on: there is no per-agent token scoping yet, so any client that can reach the
-endpoint can use every tool it exposes. Leave `MCP_WRITE_ENABLED=false` unless
-the endpoint is reachable only from machines you trust.
+The MCP endpoint shares the Web API's network exposure - enabling it does **not**
+widen what is reachable from off your machine. Keep the Web API bound to localhost
+(or behind your existing reverse proxy) if you do not want other devices on your
+network to reach it.
+
+### Scoping what a token may do
+
+Modelibr has no user accounts by design, and `MCP_TOKENS` does not add any. It is a
+capability gate on the agent surface alone: without it, any client that can reach the
+endpoint can use every tool the endpoint exposes. Configure it before letting anything
+beyond your own machine reach `/mcp`.
+
+```bash
+MCP_TOKENS=curator:read,write:GENERATE_A_LONG_RANDOM_SECRET;janitor:read,write,destructive:ANOTHER_SECRET
+```
+
+Each entry is `name:scopes:secret`, separated by `;`. Scopes are `read` (search and
+read assets), `write` (import, tag, categorize, pack, bind) and `destructive` (delete,
+and undoing a write that deleting undoes). `write` implies `read`.
+
+Once any token is configured, a caller must present one - as
+`Authorization: Bearer <secret>`, or as an `X-Modelibr-Mcp-Token` header for clients that
+cannot set `Authorization`. The token's **name** is recorded on everything it writes, so
+the audit log answers "which agent did this?" and not only "an agent did this". Secrets
+are held hashed and compared in constant time; a malformed `MCP_TOKENS` fails startup
+rather than silently leaving the endpoint open. Revoke a token by removing its entry and
+restarting the Web API.
 
 ## Notes
 

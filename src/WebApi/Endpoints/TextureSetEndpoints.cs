@@ -53,6 +53,7 @@ public static class TextureSetEndpoints
             .WithName("Create Texture Set With File")
             .WithSummary("Creates a new texture set and uploads a texture file in one operation")
             .DisableAntiforgery()
+            .AddEndpointFilter<AgentUploadTicketFilter>()
             .WithOpenApi();
 
         app.MapPut("/texture-sets/{id}", UpdateTextureSet)

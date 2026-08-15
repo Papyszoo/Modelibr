@@ -81,11 +81,11 @@ public class AgentAuditTests
     [Fact]
     public async Task CompleteAsync_Records_The_Outcome_On_The_Claim()
     {
-        await _audit.CompleteAsync("key-3", "Model", 9, "{\"tags\":[\"pbr\"]}");
+        await _audit.CompleteAsync("key-3", "Model", 9, "{\"tags\":[\"pbr\"]}", "{\"tags\":[\"wood\"]}");
 
         _repo.Verify(
             r => r.CompleteClaimAsync(
-                "key-3", "Model", 9, "{\"tags\":[\"pbr\"]}", Now, It.IsAny<CancellationToken>()),
+                "key-3", "Model", 9, "{\"tags\":[\"pbr\"]}", "{\"tags\":[\"wood\"]}", Now, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 

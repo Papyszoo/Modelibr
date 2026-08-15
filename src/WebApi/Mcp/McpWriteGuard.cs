@@ -30,10 +30,21 @@ internal static class McpWriteGuard
         bool Succeeded,
         string? AssetType = null,
         int? AssetId = null,
-        object? Payload = null);
+        object? Payload = null,
+        object? PayloadBefore = null);
 
     internal static ToolOutcome Applied(object response, string? assetType, int? assetId, object payload) =>
         new(response, Succeeded: true, assetType, assetId, payload);
+
+    /// <summary>
+    /// An applied write that also records the state it replaced, so
+    /// <c>reverse_operation</c> has something to restore. Every tool that overwrites or
+    /// removes prior state must use this overload - a write whose "before" is missing is
+    /// one the agent cannot undo.
+    /// </summary>
+    internal static ToolOutcome Applied(
+        object response, string? assetType, int? assetId, object payload, object? payloadBefore) =>
+        new(response, Succeeded: true, assetType, assetId, payload, payloadBefore);
 
     internal static ToolOutcome Failed(SharedKernel.Error error) =>
         new(new { error = error.Code, message = error.Message }, Succeeded: false);
@@ -41,17 +52,33 @@ internal static class McpWriteGuard
     internal static ToolOutcome Failed(object response) => new(response, Succeeded: false);
 
     /// <summary>
-    /// Claims the key, runs <paramref name="body"/>, and settles the claim on every exit
-    /// path. A thrown exception or a cancellation releases the claim before propagating -
-    /// otherwise a crashed call would leave the key Pending and a later retry would be
-    /// told the operation was already applied when nothing had been.
+    /// Checks the caller's scope, claims the key, runs <paramref name="body"/>, and settles
+    /// the claim on every exit path. A thrown exception or a cancellation releases the
+    /// claim before propagating - otherwise a crashed call would leave the key Pending and
+    /// a later retry would be told the operation was already applied when nothing had been.
+    ///
+    /// The scope check happens <b>before</b> the claim: a denied call must not burn an
+    /// idempotency key, or the operator who then widens the token would find the retry
+    /// answered "already applied" for a write that never ran.
     /// </summary>
     internal static async Task<object> Guarded(
         IAgentAudit audit,
+        McpCallerContext caller,
         AgentWrite write,
         Func<CancellationToken, Task<ToolOutcome>> body,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        McpScope required = McpScope.Write)
     {
+        var denied = caller.Denied(required);
+        if (denied is not null)
+        {
+            return denied;
+        }
+
+        // Attribution is stamped here rather than at each call site so no tool can write
+        // an unattributed row by forgetting to pass it.
+        write = write with { Actor = caller.Actor };
+
         var claim = await audit.TryBeginAsync(write, cancellationToken);
         switch (claim.Outcome)
         {
@@ -75,6 +102,7 @@ internal static class McpWriteGuard
                 outcome.AssetType,
                 outcome.AssetId,
                 outcome.Payload is null ? null : Json(outcome.Payload),
+                outcome.PayloadBefore is null ? null : Json(outcome.PayloadBefore),
                 CancellationToken.None);
             return outcome.Response;
         }

@@ -63,6 +63,7 @@ public static class EnvironmentMapEndpoints
             .WithName("Create Environment Map With File")
             .WithSummary("Creates an environment map and uploads its first variant")
             .DisableAntiforgery()
+            .AddEndpointFilter<AgentUploadTicketFilter>()
             .WithOpenApi();
 
         app.MapPut("/environment-maps/{id}", UpdateEnvironmentMap)

@@ -88,6 +88,7 @@ namespace Infrastructure.Persistence
         public DbSet<ComputeCacheEntry> ComputeCacheEntries => Set<ComputeCacheEntry>();
         public DbSet<AssetDerivationLineage> AssetDerivationLineages => Set<AssetDerivationLineage>();
         public DbSet<AgentOperationLog> AgentOperationLogs => Set<AgentOperationLog>();
+        public DbSet<AgentUploadTicket> AgentUploadTickets => Set<AgentUploadTicket>();
         public DbSet<ModelVersionAuxiliaryFile> ModelVersionAuxiliaryFiles => Set<ModelVersionAuxiliaryFile>();
         public DbSet<StoreImportJob> StoreImportJobs => Set<StoreImportJob>();
 
@@ -1464,6 +1465,7 @@ namespace Infrastructure.Persistence
                     .HasMaxLength(16)
                     .HasDefaultValue(Domain.Models.AgentOperationStatus.Completed);
                 entity.Property(e => e.ClaimedBy).IsRequired(false).HasMaxLength(200);
+                entity.Property(e => e.Actor).IsRequired(false).HasMaxLength(100);
                 entity.Property(e => e.ClaimedAt).IsRequired();
                 entity.Property(e => e.CompletedAt).IsRequired(false);
 
@@ -1472,6 +1474,29 @@ namespace Infrastructure.Persistence
                 entity.HasIndex(e => e.BatchId);
                 // Sweeping abandoned Pending claims.
                 entity.HasIndex(e => new { e.Status, e.ClaimedAt });
+            });
+
+            // Configure AgentUploadTicket - single-use authorisation for one remote upload.
+            modelBuilder.Entity<AgentUploadTicket>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                // Hex SHA-256; the secret itself is never stored.
+                entity.Property(e => e.SecretHash).IsRequired().HasMaxLength(64);
+                entity.Property(e => e.IdempotencyKey).IsRequired().HasMaxLength(200);
+                entity.Property(e => e.Operation).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.AssetType).IsRequired().HasMaxLength(30);
+                entity.Property(e => e.Actor).IsRequired(false).HasMaxLength(100);
+                entity.Property(e => e.BatchId).IsRequired(false).HasMaxLength(200);
+                entity.Property(e => e.IssuedAt).IsRequired();
+                entity.Property(e => e.ExpiresAt).IsRequired();
+                entity.Property(e => e.RedeemedAt).IsRequired(false);
+                entity.Property(e => e.IsSpent).IsRequired().HasDefaultValue(false);
+                entity.Property(e => e.AssetId).IsRequired(false);
+
+                // Redemption looks a ticket up by hash on every remote upload.
+                entity.HasIndex(e => e.SecretHash).IsUnique();
+                // Sweeping expired tickets.
+                entity.HasIndex(e => e.ExpiresAt);
             });
 
             base.OnModelCreating(modelBuilder);

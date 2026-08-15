@@ -72,6 +72,9 @@ internal sealed class AgentOperationLogRepository : IAgentOperationLogRepository
                 setters => setters
                     .SetProperty(l => l.Status, AgentOperationStatus.Pending)
                     .SetProperty(l => l.ClaimedBy, claim.ClaimedBy)
+                    // Attribution follows the claim: the new owner performs the write, so
+                    // leaving the previous actor's name on it would misattribute the audit.
+                    .SetProperty(l => l.Actor, claim.Actor)
                     .SetProperty(l => l.ClaimedAt, now)
                     .SetProperty(l => l.CompletedAt, (DateTime?)null)
                     .SetProperty(l => l.PerformedAt, now)
@@ -91,6 +94,7 @@ internal sealed class AgentOperationLogRepository : IAgentOperationLogRepository
         string? assetType,
         int? assetId,
         string? payloadAfter,
+        string? payloadBefore,
         DateTime completedAt,
         CancellationToken cancellationToken = default)
     {
@@ -102,7 +106,11 @@ internal sealed class AgentOperationLogRepository : IAgentOperationLogRepository
                     .SetProperty(l => l.CompletedAt, completedAt)
                     .SetProperty(l => l.AssetType, assetType)
                     .SetProperty(l => l.AssetId, assetId)
-                    .SetProperty(l => l.PayloadAfter, payloadAfter),
+                    .SetProperty(l => l.PayloadAfter, payloadAfter)
+                    // Coalesce, not overwrite: most tools capture the prior state inside the
+                    // guarded body and pass it here, but a caller that already recorded it at
+                    // claim time must not have it erased by this update.
+                    .SetProperty(l => l.PayloadBefore, l => payloadBefore ?? l.PayloadBefore),
                 cancellationToken);
     }
 
@@ -127,5 +135,34 @@ internal sealed class AgentOperationLogRepository : IAgentOperationLogRepository
         return _context.AgentOperationLogs
             .AsNoTracking()
             .FirstOrDefaultAsync(l => l.IdempotencyKey == idempotencyKey, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<AgentOperationLog>> GetByBatchIdAsync(
+        string batchId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.AgentOperationLogs
+            .AsNoTracking()
+            .Where(l => l.BatchId == batchId)
+            .OrderBy(l => l.Id)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<bool> TryMarkReversedAsync(
+        string idempotencyKey,
+        DateTime reversedAt,
+        CancellationToken cancellationToken = default)
+    {
+        // ReversedAt == null in the WHERE clause is the guard, not a read-then-write check:
+        // two concurrent reversals of one batch would otherwise both apply their inverse.
+        var marked = await _context.AgentOperationLogs
+            .Where(l => l.IdempotencyKey == idempotencyKey &&
+                        l.Status == AgentOperationStatus.Completed &&
+                        l.ReversedAt == null)
+            .ExecuteUpdateAsync(
+                setters => setters.SetProperty(l => l.ReversedAt, reversedAt),
+                cancellationToken);
+
+        return marked == 1;
     }
 }

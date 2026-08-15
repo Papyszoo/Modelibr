@@ -29,12 +29,17 @@ public interface IAgentOperationLogRepository
         DateTime now,
         CancellationToken cancellationToken = default);
 
-    /// <summary>Marks an owned claim Completed - the only state a retry may replay as applied.</summary>
+    /// <summary>
+    /// Marks an owned claim Completed - the only state a retry may replay as applied.
+    /// A null <paramref name="payloadBefore"/> leaves whatever the claim already recorded,
+    /// so a caller that captured the prior state at claim time does not lose it here.
+    /// </summary>
     Task CompleteClaimAsync(
         string idempotencyKey,
         string? assetType,
         int? assetId,
         string? payloadAfter,
+        string? payloadBefore,
         DateTime completedAt,
         CancellationToken cancellationToken = default);
 
@@ -50,4 +55,22 @@ public interface IAgentOperationLogRepository
 
     /// <summary>The entry for an idempotency key, if one exists.</summary>
     Task<AgentOperationLog?> GetByIdempotencyKeyAsync(string idempotencyKey, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Every entry in a batch, oldest first. Reversal walks this list <b>backwards</b>:
+    /// a batch that created a pack and then filled it must be undone in the opposite
+    /// order, or the pack delete trips over its own members.
+    /// </summary>
+    Task<IReadOnlyList<AgentOperationLog>> GetByBatchIdAsync(string batchId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Stamps <see cref="AgentOperationLog.ReversedAt"/> on an entry whose inverse has been
+    /// applied. Only an un-reversed Completed entry is affected, so a repeated
+    /// <c>reverse_operation</c> call cannot undo the same write twice.
+    /// </summary>
+    /// <returns>True when this call is the one that marked it reversed.</returns>
+    Task<bool> TryMarkReversedAsync(
+        string idempotencyKey,
+        DateTime reversedAt,
+        CancellationToken cancellationToken = default);
 }

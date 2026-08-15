@@ -92,6 +92,7 @@ public class McpAssetFamilyImportIntegrationTests : IClassFixture<ModelibrWebFac
             var result = await AssetImportMcpTools.ImportSound(
                 sp.GetRequiredService<ICommandHandler<CreateSoundWithFileCommand, CreateSoundWithFileResponse>>(),
                 sp.GetRequiredService<IAgentAudit>(),
+                McpCallerContext.Unauthenticated(),
                 path,
                 key,
                 name);
@@ -119,6 +120,7 @@ public class McpAssetFamilyImportIntegrationTests : IClassFixture<ModelibrWebFac
             var retry = await AssetImportMcpTools.ImportSound(
                 sp.GetRequiredService<ICommandHandler<CreateSoundWithFileCommand, CreateSoundWithFileResponse>>(),
                 sp.GetRequiredService<IAgentAudit>(),
+                McpCallerContext.Unauthenticated(),
                 path,
                 key,
                 name);
@@ -148,6 +150,7 @@ public class McpAssetFamilyImportIntegrationTests : IClassFixture<ModelibrWebFac
             sp.GetRequiredService<ICommandHandler<CreateTextureSetWithFileCommand, CreateTextureSetWithFileResponse>>(),
             sp.GetRequiredService<ICommandHandler<AddTextureToSetWithFileCommand, AddTextureToTextureSetResponse>>(),
             sp.GetRequiredService<IAgentAudit>(),
+            McpCallerContext.Unauthenticated(),
             setName,
             [
                 new AssetImportMcpTools.TextureChannelImport(WriteFile($"{suffix}-albedo.png", RedPng), "Albedo"),
@@ -185,6 +188,7 @@ public class McpAssetFamilyImportIntegrationTests : IClassFixture<ModelibrWebFac
             sp.GetRequiredService<ICommandHandler<CreateTextureSetWithFileCommand, CreateTextureSetWithFileResponse>>(),
             sp.GetRequiredService<ICommandHandler<AddTextureToSetWithFileCommand, AddTextureToTextureSetResponse>>(),
             sp.GetRequiredService<IAgentAudit>(),
+            McpCallerContext.Unauthenticated(),
             $"never-created-{suffix}",
             [new AssetImportMcpTools.TextureChannelImport(WriteFile($"{suffix}-x.png"), "Metalness")],
             $"mcp-bad-channel-{suffix}");
@@ -215,6 +219,7 @@ public class McpAssetFamilyImportIntegrationTests : IClassFixture<ModelibrWebFac
             sp.GetRequiredService<ICommandHandler<CreateTextureSetWithFileCommand, CreateTextureSetWithFileResponse>>(),
             sp.GetRequiredService<ICommandHandler<AddTextureToSetWithFileCommand, AddTextureToTextureSetResponse>>(),
             sp.GetRequiredService<IAgentAudit>(),
+            McpCallerContext.Unauthenticated(),
             $"bind-material-{suffix}",
             [new AssetImportMcpTools.TextureChannelImport(WriteFile($"{suffix}-bind.png"), "Albedo")],
             $"mcp-bind-set-{suffix}");
@@ -233,7 +238,10 @@ public class McpAssetFamilyImportIntegrationTests : IClassFixture<ModelibrWebFac
         var result = await AssetImportMcpTools.BindTextureSet(
             sp.GetRequiredService<ICommandHandler<AssociateTextureSetWithAllModelVersionsCommand>>(),
             sp.GetRequiredService<ICommandHandler<SetDefaultTextureSetCommand, SetDefaultTextureSetResponse>>(),
+            sp.GetRequiredService<IQueryHandler<GetModelByIdQuery, GetModelByIdQueryResponse>>(),
+            sp.GetRequiredService<IQueryHandler<GetModelVersionQuery, GetModelVersionResponse>>(),
             sp.GetRequiredService<IAgentAudit>(),
+            McpCallerContext.Unauthenticated(),
             set.Id,
             model.Id,
             $"mcp-bind-{suffix}");

@@ -123,6 +123,12 @@ namespace WebApi
             var mcpEnabled = builder.Configuration["MCP_ENABLED"] != "false";
             if (mcpEnabled)
             {
+                // Access tokens are parsed once, at startup, and a malformed MCP_TOKENS
+                // throws here rather than being skipped: a typo that silently disabled
+                // enforcement would leave an endpoint the operator believes is guarded.
+                builder.Services.AddSingleton(WebApi.Mcp.McpTokenRegistry.FromConfiguration(builder.Configuration));
+                builder.Services.AddScoped<WebApi.Mcp.McpCallerContext>();
+
                 var mcpServer = builder.Services.AddMcpServer()
                     .WithHttpTransport()
                     .WithTools<WebApi.Mcp.AssetSearchMcpTools>();
@@ -139,6 +145,10 @@ namespace WebApi
                         // same flag: they are writes, and splitting the gate would mean a
                         // server that is read-only for models but not for materials.
                         .WithTools<WebApi.Mcp.AssetImportMcpTools>()
+                        // Undo. Registered with the write tools because reversing a write is
+                        // only reachable for someone who could perform one; the destructive
+                        // half of it carries its own flag and scope on top.
+                        .WithTools<WebApi.Mcp.AgentUndoMcpTools>()
                         .WithPrompts<WebApi.Mcp.ImportLibraryPrompts>();
                 }
             }
@@ -206,7 +216,14 @@ namespace WebApi
             if (mcpEnabled)
             {
                 // Exposes the MCP endpoint (SSE) at /mcp for a local agent to connect to.
-                app.MapMcp("/mcp");
+                // The token filter sits at the transport so a newly added tool inherits
+                // authentication instead of having to remember it; per-scope checks then
+                // happen where writes and destructive work are performed.
+                // Both type arguments are spelled out because MapMcp returns the general
+                // IEndpointConventionBuilder, not the RouteHandlerBuilder the one-argument
+                // overload of AddEndpointFilter is written against.
+                app.MapMcp("/mcp")
+                    .AddEndpointFilter<IEndpointConventionBuilder, WebApi.Mcp.McpTokenEndpointFilter>();
             }
 
             // Map SignalR hubs

@@ -3,6 +3,7 @@ using Application.Models;
 using Microsoft.AspNetCore.Mvc;
 using SharedKernel;
 using WebApi.Files;
+using WebApi.Infrastructure;
 using WebApi.Services;
 
 namespace WebApi.Endpoints;
@@ -13,7 +14,10 @@ public static class ModelEndpoints
     {
         app.MapPost("/models", CreateModel)
         .WithName("Create Model")
-        .DisableAntiforgery();
+        .DisableAntiforgery()
+        // Audits + de-duplicates the upload when a remote agent presents an upload ticket;
+        // a request without one is untouched (see AgentUploadTicketFilter).
+        .AddEndpointFilter<AgentUploadTicketFilter>();
 
         app.MapPost("/models/{modelId}/files", AddFileToModel)
         .WithName("Add File to Model")
@@ -22,12 +26,14 @@ public static class ModelEndpoints
         app.MapPost("/models/multifile", ImportMultiFileModel)
         .WithName("Import Multi-File Model")
         .WithSummary("Imports a loose primary model (.gltf) plus its external .bin/textures")
-        .DisableAntiforgery();
+        .DisableAntiforgery()
+        .AddEndpointFilter<AgentUploadTicketFilter>();
 
         app.MapPost("/models/zip", ImportModelZip)
         .WithName("Import Model Zip")
         .WithSummary("Imports every model group in a .zip (multi-file glTF resolved by directory)")
-        .DisableAntiforgery();
+        .DisableAntiforgery()
+        .AddEndpointFilter<AgentUploadTicketFilter>();
 
         app.MapPost("/models/{modelId}/tags", UpdateModelTags)
         .WithName("Update Model Tags")

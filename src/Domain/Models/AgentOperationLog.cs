@@ -48,6 +48,14 @@ public class AgentOperationLog
     /// </summary>
     public string? ClaimedBy { get; private set; }
 
+    /// <summary>
+    /// Which agent identity performed this write - the name of the access token it
+    /// presented, or null when the server runs unauthenticated (the local-first default).
+    /// <see cref="ClaimedBy"/> records the machine that holds the claim; this records
+    /// <b>who asked</b>, which is the question an audit reviewing a bad batch is asking.
+    /// </summary>
+    public string? Actor { get; private set; }
+
     /// <summary>When the claim was taken. A Pending claim older than the lease is abandoned.</summary>
     public DateTime ClaimedAt { get; private set; }
 
@@ -79,7 +87,8 @@ public class AgentOperationLog
         int? assetId = null,
         string? payloadBefore = null,
         string? payloadAfter = null,
-        string? claimedBy = null)
+        string? claimedBy = null,
+        string? actor = null)
     {
         if (string.IsNullOrWhiteSpace(idempotencyKey))
             throw new ArgumentException("Idempotency key cannot be null or whitespace.", nameof(idempotencyKey));
@@ -95,6 +104,7 @@ public class AgentOperationLog
             PerformedAt = performedAt,
             Status = AgentOperationStatus.Pending,
             ClaimedBy = string.IsNullOrWhiteSpace(claimedBy) ? null : claimedBy.Trim(),
+            Actor = string.IsNullOrWhiteSpace(actor) ? null : actor.Trim(),
             ClaimedAt = performedAt,
             BatchId = string.IsNullOrWhiteSpace(batchId) ? null : batchId.Trim(),
             AssetType = string.IsNullOrWhiteSpace(assetType) ? null : assetType.Trim(),
@@ -132,10 +142,13 @@ public class AgentOperationLog
     /// Hands a stale Pending claim to a new caller. Used when the previous owner died
     /// between claiming and mutating, which otherwise wedged the key forever.
     /// </summary>
-    public void Reclaim(string? claimedBy, DateTime claimedAt)
+    public void Reclaim(string? claimedBy, DateTime claimedAt, string? actor = null)
     {
         Status = AgentOperationStatus.Pending;
         ClaimedBy = string.IsNullOrWhiteSpace(claimedBy) ? null : claimedBy.Trim();
+        // The new owner is the one accountable for what lands, so attribution follows the
+        // claim. An older actor's name on a write it never performed would be a lie.
+        Actor = string.IsNullOrWhiteSpace(actor) ? null : actor.Trim();
         ClaimedAt = claimedAt;
         CompletedAt = null;
     }

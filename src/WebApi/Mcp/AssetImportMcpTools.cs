@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Services;
 using Application.Agents;
 using Application.EnvironmentMaps;
 using Application.Models;
@@ -8,6 +9,7 @@ using Application.Sprites;
 using Application.TextureSets;
 using Domain.ValueObjects;
 using ModelContextProtocol.Server;
+using WebApi.Infrastructure;
 using static WebApi.Mcp.McpWriteGuard;
 
 namespace WebApi.Mcp;
@@ -44,16 +46,19 @@ public sealed class AssetImportMcpTools
     public static Task<object> ImportSound(
         ICommandHandler<CreateSoundWithFileCommand, CreateSoundWithFileResponse> handler,
         IAgentAudit audit,
+        McpCallerContext caller,
         [Description("Absolute path to an audio file readable by the SERVER.")] string path,
         [Description("Unique key so a retried call does not re-import.")] string idempotencyKey,
         [Description("Optional name (defaults to the file name without its extension).")] string? name = null,
         [Description("Optional sound category id.")] int? categoryId = null,
         [Description("Optional pack id to file the sound under.")] int? packId = null,
+        [Description("Optional batch id. Writes sharing one can be undone together with reverse_operation.")] string? batchId = null,
         CancellationToken cancellationToken = default)
     {
         return Guarded(
             audit,
-            new AgentWrite(idempotencyKey, "import-sound", "Sound"),
+            caller,
+            new AgentWrite(idempotencyKey, "import-sound", "Sound", BatchId: batchId),
             async ct =>
             {
                 var (failure, upload) = await ReadUploadAsync(path, ct);
@@ -87,17 +92,20 @@ public sealed class AssetImportMcpTools
     public static Task<object> ImportSprite(
         ICommandHandler<CreateSpriteWithFileCommand, CreateSpriteWithFileResponse> handler,
         IAgentAudit audit,
+        McpCallerContext caller,
         [Description("Absolute path to an image file readable by the SERVER.")] string path,
         [Description("Unique key so a retried call does not re-import.")] string idempotencyKey,
         [Description("Optional name (defaults to the file name without its extension).")] string? name = null,
         [Description("Static (default), SpriteSheet, Gif or Apng.")] string spriteType = "Static",
         [Description("Optional sprite category id.")] int? categoryId = null,
         [Description("Optional pack id to file the sprite under.")] int? packId = null,
+        [Description("Optional batch id. Writes sharing one can be undone together with reverse_operation.")] string? batchId = null,
         CancellationToken cancellationToken = default)
     {
         return Guarded(
             audit,
-            new AgentWrite(idempotencyKey, "import-sprite", "Sprite"),
+            caller,
+            new AgentWrite(idempotencyKey, "import-sprite", "Sprite", BatchId: batchId),
             async ct =>
             {
                 if (!TryParseEnum<SpriteType>(spriteType, out var parsedType, out var typeError))
@@ -133,16 +141,19 @@ public sealed class AssetImportMcpTools
     public static Task<object> ImportEnvironmentMap(
         ICommandHandler<CreateEnvironmentMapWithFileCommand, CreateEnvironmentMapWithFileResponse> handler,
         IAgentAudit audit,
+        McpCallerContext caller,
         [Description("Absolute path to an HDRI/image file readable by the SERVER.")] string path,
         [Description("Unique key so a retried call does not re-import.")] string idempotencyKey,
         [Description("Optional name (defaults to the file name without its extension).")] string? name = null,
         [Description("Optional resolution label for this variant, e.g. '1k', '4k'.")] string? sizeLabel = null,
         [Description("Optional pack id to file the environment map under.")] int? packId = null,
+        [Description("Optional batch id. Writes sharing one can be undone together with reverse_operation.")] string? batchId = null,
         CancellationToken cancellationToken = default)
     {
         return Guarded(
             audit,
-            new AgentWrite(idempotencyKey, "import-environment-map", "EnvironmentMap"),
+            caller,
+            new AgentWrite(idempotencyKey, "import-environment-map", "EnvironmentMap", BatchId: batchId),
             async ct =>
             {
                 var (failure, upload) = await ReadUploadAsync(path, ct);
@@ -183,16 +194,19 @@ public sealed class AssetImportMcpTools
         ICommandHandler<CreateTextureSetWithFileCommand, CreateTextureSetWithFileResponse> createHandler,
         ICommandHandler<AddTextureToSetWithFileCommand, AddTextureToTextureSetResponse> addHandler,
         IAgentAudit audit,
+        McpCallerContext caller,
         [Description("Name for the texture set, e.g. the material name.")] string name,
         [Description("Every channel of the material. The first creates the set; the rest are added to it.")] TextureChannelImport[] channels,
         [Description("Unique key so a retried call does not re-import.")] string idempotencyKey,
         [Description("ModelSpecific (default) or Universal. Universal = a reusable tiling material; it also gets a generated thumbnail.")] string kind = "ModelSpecific",
         [Description("Optional texture-set category id (must match the chosen kind).")] int? categoryId = null,
+        [Description("Optional batch id. Writes sharing one can be undone together with reverse_operation.")] string? batchId = null,
         CancellationToken cancellationToken = default)
     {
         return Guarded(
             audit,
-            new AgentWrite(idempotencyKey, "import-texture-set", "TextureSet"),
+            caller,
+            new AgentWrite(idempotencyKey, "import-texture-set", "TextureSet", BatchId: batchId),
             async ct =>
             {
                 if (channels is null || channels.Length == 0)
@@ -293,16 +307,19 @@ public sealed class AssetImportMcpTools
     public static Task<object> AddTextureChannel(
         ICommandHandler<AddTextureToSetWithFileCommand, AddTextureToTextureSetResponse> handler,
         IAgentAudit audit,
+        McpCallerContext caller,
         [Description("Target texture set id.")] int textureSetId,
         [Description("Absolute path to the image file, readable by the SERVER.")] string path,
         [Description("Albedo, Normal, Roughness, Metallic, AO, Height, Emissive, Opacity, Specular, SplitChannel...")] string textureType,
         [Description("Unique key so a retried call does not re-add.")] string idempotencyKey,
         [Description("For channel-packed maps only: R, G, B, A or RGB.")] string? sourceChannel = null,
+        [Description("Optional batch id. Writes sharing one can be undone together with reverse_operation.")] string? batchId = null,
         CancellationToken cancellationToken = default)
     {
         return Guarded(
             audit,
-            new AgentWrite(idempotencyKey, "add-texture-channel", "TextureSet", textureSetId),
+            caller,
+            new AgentWrite(idempotencyKey, "add-texture-channel", "TextureSet", textureSetId, BatchId: batchId),
             async ct =>
             {
                 if (!TryParseEnum<TextureType>(textureType, out var parsedType, out var typeError))
@@ -341,19 +358,54 @@ public sealed class AssetImportMcpTools
     public static Task<object> BindTextureSet(
         ICommandHandler<AssociateTextureSetWithAllModelVersionsCommand> associateHandler,
         ICommandHandler<SetDefaultTextureSetCommand, SetDefaultTextureSetResponse> defaultHandler,
+        IQueryHandler<GetModelByIdQuery, GetModelByIdQueryResponse> getModelHandler,
+        IQueryHandler<GetModelVersionQuery, GetModelVersionResponse> versionHandler,
         IAgentAudit audit,
+        McpCallerContext caller,
         [Description("Texture set id to bind.")] int textureSetId,
         [Description("Model id to bind it to.")] int modelId,
         [Description("Unique key so a retried call does not re-bind.")] string idempotencyKey,
         [Description("Also make it the model's default texture set (default true). Set false to associate without changing what renders.")] bool setAsDefault = true,
         [Description("Optional material name to bind against, for models with several materials.")] string? materialName = null,
+        [Description("Optional batch id. Writes sharing one can be undone together with reverse_operation.")] string? batchId = null,
         CancellationToken cancellationToken = default)
     {
         return Guarded(
             audit,
-            new AgentWrite(idempotencyKey, "bind-texture-set", "Model", modelId),
+            caller,
+            new AgentWrite(idempotencyKey, "bind-texture-set", "Model", modelId, BatchId: batchId),
             async ct =>
             {
+                // What renders now, captured before it is replaced. Binding the wrong
+                // material to forty models is the mistake this whole tool makes easy, so
+                // the set it displaces is the one thing undo cannot reconstruct later.
+                // The active version is the one SetDefaultTextureSetCommand targets when no
+                // version is named, so that is the version whose default is about to change.
+                var model = await getModelHandler.Handle(new GetModelByIdQuery(modelId), ct);
+                if (model.IsFailure)
+                {
+                    return Failed(model.Error);
+                }
+
+                int? previousDefault = null;
+                if (model.Value.Model.ActiveVersionId is { } activeVersionId)
+                {
+                    var version = await versionHandler.Handle(new GetModelVersionQuery(activeVersionId), ct);
+                    if (version.IsFailure)
+                    {
+                        return Failed(version.Error);
+                    }
+
+                    previousDefault = version.Value.Version.DefaultTextureSetId;
+                }
+
+                var before = new
+                {
+                    modelId,
+                    textureSetId,
+                    previousDefaultTextureSetId = previousDefault,
+                };
+
                 // Associating covers every version, so a model that gains a version later
                 // does not silently lose its material.
                 var associated = await associateHandler.Handle(
@@ -368,7 +420,7 @@ public sealed class AssetImportMcpTools
                 {
                     return Applied(
                         new { status = "ok", textureSetId, modelId, isDefault = false },
-                        "Model", modelId, new { textureSetId, modelId });
+                        "Model", modelId, new { textureSetId, modelId }, before);
                 }
 
                 var defaulted = await defaultHandler.Handle(
@@ -378,10 +430,79 @@ public sealed class AssetImportMcpTools
                     ? Failed(defaulted.Error)
                     : Applied(
                         new { status = "ok", textureSetId, modelId, isDefault = true },
-                        "Model", modelId, new { textureSetId, modelId, isDefault = true });
+                        "Model", modelId, new { textureSetId, modelId, isDefault = true }, before);
             },
             cancellationToken);
     }
+
+    [McpServerTool(Name = "request_upload_ticket")]
+    [Description("For agents NOT running on the server: get a single-use ticket plus the exact endpoint and field names to upload an asset over HTTP. assetType: Model, Sound, Sprite, EnvironmentMap or TextureSet. The upload is audited under your idempotencyKey, so a retry cannot import twice.")]
+    public static async Task<object> RequestUploadTicket(
+        IAgentUploadTickets tickets,
+        McpCallerContext caller,
+        [Description("Model, Sound, Sprite, EnvironmentMap or TextureSet.")] string assetType,
+        [Description("Unique key the resulting upload is audited under.")] string idempotencyKey,
+        [Description("Optional batch id, so a remote import can be reversed as one batch.")] string? batchId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var denied = caller.Denied(McpScope.Write);
+        if (denied is not null)
+        {
+            return denied;
+        }
+
+        if (!UploadTargets.TryGetValue(assetType, out var target))
+        {
+            return new
+            {
+                error = "UnknownAssetType",
+                message = $"'{assetType}' has no HTTP upload endpoint.",
+                validValues = UploadTargets.Keys.ToArray(),
+            };
+        }
+
+        var ticket = await tickets.IssueAsync(
+            idempotencyKey, target.Operation, target.AssetType, caller.Actor, batchId, cancellationToken);
+
+        return new
+        {
+            status = "upload-required",
+            ticket = new
+            {
+                header = AgentUploadTicketFilter.TicketHeader,
+                value = ticket.Secret,
+                expiresAt = ticket.ExpiresAt,
+                note = "Single use. Send it as a header on the upload below; the upload is then audited and de-duplicated under this call's idempotencyKey.",
+            },
+            upload = new
+            {
+                endpoint = target.Endpoint,
+                contentType = "multipart/form-data",
+                fields = target.Fields,
+            },
+            afterwards = "Curate the result with set_tags / set_category / add_to_pack, or bind a material with bind_texture_set.",
+        };
+    }
+
+    /// <summary>
+    /// Where each family's bytes go, and what the endpoint calls its parts. Returned to the
+    /// agent verbatim: the failure this prevents is an agent guessing a field name, getting
+    /// a 400, and burning a turn per guess.
+    /// </summary>
+    private static readonly IReadOnlyDictionary<string, (string AssetType, string Operation, string Endpoint, object Fields)> UploadTargets =
+        new Dictionary<string, (string, string, string, object)>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Model"] = ("Model", "import-model", "POST /models",
+                new { file = "the model file (required)" }),
+            ["Sound"] = ("Sound", "import-sound", "POST /sounds/with-file",
+                new { file = "the audio file (required)", name = "optional; defaults to the file name", categoryId = "optional", packId = "optional" }),
+            ["Sprite"] = ("Sprite", "import-sprite", "POST /sprites/with-file",
+                new { file = "the image file (required)", name = "optional", spriteType = "Static, SpriteSheet, Gif or Apng", categoryId = "optional", packId = "optional" }),
+            ["EnvironmentMap"] = ("EnvironmentMap", "import-environment-map", "POST /environment-maps/with-file",
+                new { file = "the HDRI / equirectangular image (required)", name = "optional", sizeLabel = "optional, e.g. '4k'", packId = "optional" }),
+            ["TextureSet"] = ("TextureSet", "import-texture-set", "POST /texture-sets/with-file",
+                new { file = "the first channel's image (required)", name = "the material name (required)", textureType = "Albedo, Normal, Roughness...", kind = "ModelSpecific or Universal" }),
+        };
 
     /// <summary>
     /// Parses an enum name case-insensitively and, on failure, returns an outcome that

@@ -47,12 +47,20 @@ public interface IAgentAudit
     /// <summary>Claims <paramref name="write"/>'s key, reporting who owns it and in what state.</summary>
     Task<AgentClaim> TryBeginAsync(AgentWrite write, CancellationToken cancellationToken = default);
 
-    /// <summary>Records the outcome of a write that succeeded, on a claim this caller owns.</summary>
+    /// <summary>
+    /// Records the outcome of a write that succeeded, on a claim this caller owns.
+    ///
+    /// <paramref name="payloadBefore"/> is accepted here, not only at claim time, because
+    /// the state a write replaces is usually read <i>inside</i> the guarded body - after
+    /// the claim. Without it the undo path has nothing to restore. Passing null leaves any
+    /// claim-time value intact rather than erasing it.
+    /// </summary>
     Task CompleteAsync(
         string idempotencyKey,
         string? assetType = null,
         int? assetId = null,
         string? payloadAfter = null,
+        string? payloadBefore = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -60,6 +68,19 @@ public interface IAgentAudit
     /// "already applied" for an operation that never happened.
     /// </summary>
     Task AbandonAsync(string idempotencyKey, CancellationToken cancellationToken = default);
+
+    /// <summary>The recorded entry for one idempotency key, or null if never claimed.</summary>
+    Task<AgentOperationLog?> FindAsync(string idempotencyKey, CancellationToken cancellationToken = default);
+
+    /// <summary>Every entry recorded under one batch id, oldest first.</summary>
+    Task<IReadOnlyList<AgentOperationLog>> FindBatchAsync(string batchId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Marks an entry reversed once its inverse has been applied. Returns false when the
+    /// entry was already reversed - which is what stops a repeated undo from applying an
+    /// inverse twice.
+    /// </summary>
+    Task<bool> TryMarkReversedAsync(string idempotencyKey, CancellationToken cancellationToken = default);
 }
 
 /// <summary>Describes one agent write for the audit log.</summary>
@@ -70,7 +91,8 @@ public sealed record AgentWrite(
     int? AssetId = null,
     string? PayloadBefore = null,
     string? PayloadAfter = null,
-    string? BatchId = null);
+    string? BatchId = null,
+    string? Actor = null);
 
 internal sealed class AgentAudit : IAgentAudit
 {
@@ -104,7 +126,8 @@ internal sealed class AgentAudit : IAgentAudit
             assetId: write.AssetId,
             payloadBefore: write.PayloadBefore,
             payloadAfter: write.PayloadAfter,
-            claimedBy: Environment.MachineName);
+            claimedBy: Environment.MachineName,
+            actor: write.Actor);
 
         var existing = await _repository.TryClaimAsync(claim, ClaimLeaseMinutes, now, cancellationToken);
         if (existing is null)
@@ -122,10 +145,20 @@ internal sealed class AgentAudit : IAgentAudit
         string? assetType = null,
         int? assetId = null,
         string? payloadAfter = null,
+        string? payloadBefore = null,
         CancellationToken cancellationToken = default) =>
         _repository.CompleteClaimAsync(
-            idempotencyKey, assetType, assetId, payloadAfter, _dateTimeProvider.UtcNow, cancellationToken);
+            idempotencyKey, assetType, assetId, payloadAfter, payloadBefore, _dateTimeProvider.UtcNow, cancellationToken);
 
     public Task AbandonAsync(string idempotencyKey, CancellationToken cancellationToken = default) =>
         _repository.FailClaimAsync(idempotencyKey, _dateTimeProvider.UtcNow, cancellationToken);
+
+    public Task<AgentOperationLog?> FindAsync(string idempotencyKey, CancellationToken cancellationToken = default) =>
+        _repository.GetByIdempotencyKeyAsync(idempotencyKey, cancellationToken);
+
+    public Task<IReadOnlyList<AgentOperationLog>> FindBatchAsync(string batchId, CancellationToken cancellationToken = default) =>
+        _repository.GetByBatchIdAsync(batchId, cancellationToken);
+
+    public Task<bool> TryMarkReversedAsync(string idempotencyKey, CancellationToken cancellationToken = default) =>
+        _repository.TryMarkReversedAsync(idempotencyKey, _dateTimeProvider.UtcNow, cancellationToken);
 }
