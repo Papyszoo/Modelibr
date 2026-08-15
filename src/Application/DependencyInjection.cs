@@ -19,6 +19,8 @@ namespace Application
             services.AddScoped<Application.Agents.IAgentAudit, Application.Agents.AgentAudit>();
             services.AddScoped<Application.Agents.IAgentOperationReverser, Application.Agents.AgentOperationReverser>();
             services.AddScoped<Application.Settings.ISettingsService, Application.Settings.SettingsService>();
+            services.AddScoped<Application.Scenes.ISceneAssetFacts, Application.Scenes.SceneAssetFactsProvider>();
+            services.AddScoped<Application.Scenes.ISceneWriter, Application.Scenes.SceneWriter>();
 
             // Store importer (v0.5 prompt 05): the orchestrator and its 1:1 handler adapter.
             // The HTTP client, queue and progress notifier are infrastructure/host concerns

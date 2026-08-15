@@ -1,0 +1,212 @@
+using Domain.Scenes;
+using Xunit;
+
+namespace Domain.Tests.Unit;
+
+/// <summary>
+/// Spatial truth for an agent that cannot see. These are the numbers that decide whether
+/// "place it on the ground" puts a lamp post on the pavement or buries it to its waist, so
+/// they are asserted against hand-computed values rather than against the implementation.
+/// </summary>
+public class SceneSpatialTests
+{
+    private const string ModelType = SceneAssetTypes.Model;
+
+    private static SceneNode Node(string id, Vec3 position, Vec3? scale = null, Vec3? rotation = null, int assetId = 1) =>
+        new(
+            id,
+            new SceneTransform(position, rotation ?? Vec3.Zero, scale ?? Vec3.One),
+            Asset: new SceneAssetRef(ModelType, assetId, 1));
+
+    private static Dictionary<string, SceneAssetFacts> Facts(
+        Vec3 dimensions, string? origin = null, int assetId = 1, double? gridSize = null)
+    {
+        var reference = new SceneAssetRef(ModelType, assetId, 1);
+        return new Dictionary<string, SceneAssetFacts>(StringComparer.Ordinal)
+        {
+            [SceneSpatial.FactsKey(reference)] = new(ModelType, assetId, 1, dimensions, origin, gridSize),
+        };
+    }
+
+    [Fact]
+    public void Footprint_When_Origin_Is_Centered_Straddles_The_Position()
+    {
+        var facts = Facts(new Vec3(2, 4, 2), "centered");
+        var node = Node("lamp", new Vec3(0, 0, 0));
+
+        var box = SceneSpatial.Footprint(node, facts.Values.Single());
+
+        Assert.NotNull(box);
+        Assert.Equal(-2, box!.Value.Min.Y, 6);
+        Assert.Equal(2, box.Value.Max.Y, 6);
+    }
+
+    [Fact]
+    public void Footprint_When_Origin_Is_Bottom_Center_Sits_On_The_Position()
+    {
+        var facts = Facts(new Vec3(2, 4, 2), "bottom-center");
+        var node = Node("lamp", new Vec3(0, 0, 0));
+
+        var box = SceneSpatial.Footprint(node, facts.Values.Single());
+
+        Assert.Equal(0, box!.Value.Min.Y, 6);
+        Assert.Equal(4, box.Value.Max.Y, 6);
+    }
+
+    [Fact]
+    public void Footprint_When_The_Asset_Has_No_Derived_Bounds_Returns_Null()
+    {
+        // Null rather than a guessed unit box: a fabricated footprint would make the
+        // overlap check confidently wrong.
+        Assert.Null(SceneSpatial.Footprint(Node("lamp", Vec3.Zero), facts: null));
+    }
+
+    [Fact]
+    public void Footprint_When_Rotated_45_Degrees_Grows_To_Cover_The_Rotated_Box()
+    {
+        var facts = Facts(new Vec3(2, 1, 2), "centered");
+        var node = Node("wall", Vec3.Zero, rotation: new Vec3(0, 45, 0));
+
+        var box = SceneSpatial.Footprint(node, facts.Values.Single());
+
+        // A 2×2 square turned 45° spans 2·√2 ≈ 2.828 on both ground axes.
+        Assert.Equal(2 * Math.Sqrt(2), box!.Value.Size.X, 5);
+        Assert.Equal(2 * Math.Sqrt(2), box.Value.Size.Z, 5);
+    }
+
+    [Fact]
+    public void GroundedY_When_Origin_Is_Centered_Lifts_The_Node_By_Half_Its_Height()
+    {
+        var facts = Facts(new Vec3(2, 4, 2), "centered");
+        var node = Node("lamp", Vec3.Zero);
+
+        Assert.Equal(2, SceneSpatial.GroundedY(node, facts.Values.Single())!.Value, 6);
+    }
+
+    [Fact]
+    public void GroundedY_When_Origin_Is_Bottom_Center_Leaves_The_Node_Where_It_Is()
+    {
+        var facts = Facts(new Vec3(2, 4, 2), "bottom-center");
+
+        Assert.Equal(0, SceneSpatial.GroundedY(Node("lamp", Vec3.Zero), facts.Values.Single())!.Value, 6);
+    }
+
+    [Fact]
+    public void GroundedY_When_Bounds_Are_Unknown_Returns_Null()
+    {
+        Assert.Null(SceneSpatial.GroundedY(Node("lamp", Vec3.Zero), facts: null));
+    }
+
+    [Fact]
+    public void FindOverlaps_When_Two_Nodes_Share_Volume_Returns_The_Pair()
+    {
+        var facts = Facts(new Vec3(2, 2, 2), "centered");
+        var nodes = new[] { Node("a", Vec3.Zero), Node("b", new Vec3(1, 0, 0)) };
+
+        var overlaps = SceneSpatial.FindOverlaps(nodes, facts);
+
+        var overlap = Assert.Single(overlaps);
+        Assert.Contains("a", new[] { overlap.NodeIdA, overlap.NodeIdB });
+        Assert.Contains("b", new[] { overlap.NodeIdA, overlap.NodeIdB });
+        Assert.True(overlap.IntersectionVolume > 0);
+    }
+
+    [Fact]
+    public void FindOverlaps_When_Two_Nodes_Only_Touch_Returns_Nothing()
+    {
+        // Two walls flush against each other is how a room is built, not a mistake.
+        var facts = Facts(new Vec3(2, 2, 2), "centered");
+        var nodes = new[] { Node("a", Vec3.Zero), Node("b", new Vec3(2, 0, 0)) };
+
+        Assert.Empty(SceneSpatial.FindOverlaps(nodes, facts));
+    }
+
+    [Fact]
+    public void FindOverlaps_Skips_Hidden_Nodes()
+    {
+        var facts = Facts(new Vec3(2, 2, 2), "centered");
+        var nodes = new[] { Node("a", Vec3.Zero), Node("b", Vec3.Zero) with { Visible = false } };
+
+        Assert.Empty(SceneSpatial.FindOverlaps(nodes, facts));
+    }
+
+    [Fact]
+    public void FindScaleWarnings_When_Source_Bounds_Are_Normalised_Warns()
+    {
+        // The base-meshes trap: normalised to ~2 m, so an apple and an apartment arrive the
+        // same size and a scene built from them is uniformly wrong.
+        var facts = Facts(new Vec3(2.0, 1.4, 0.9), "bottom-center");
+
+        var warnings = SceneSpatial.FindScaleWarnings(new[] { Node("apple", Vec3.Zero) }, facts);
+
+        Assert.Equal("NormalizedSourceBounds", Assert.Single(warnings).Code);
+    }
+
+    [Fact]
+    public void FindScaleWarnings_When_An_Explicit_Scale_Is_Set_Does_Not_Warn_About_Normalisation()
+    {
+        var facts = Facts(new Vec3(2.0, 1.4, 0.9), "bottom-center");
+        var node = Node("apple", Vec3.Zero, scale: new Vec3(0.04, 0.04, 0.04));
+
+        Assert.DoesNotContain(
+            SceneSpatial.FindScaleWarnings(new[] { node }, facts),
+            w => w.Code == "NormalizedSourceBounds");
+    }
+
+    [Fact]
+    public void FindScaleWarnings_When_One_Node_Dwarfs_The_Rest_Reports_It()
+    {
+        var facts = new Dictionary<string, SceneAssetFacts>(StringComparer.Ordinal);
+        foreach (var (assetId, size) in new[] { (1, 1.0), (2, 1.0), (3, 500.0) })
+        {
+            var reference = new SceneAssetRef(ModelType, assetId, 1);
+            facts[SceneSpatial.FactsKey(reference)] =
+                new(ModelType, assetId, 1, new Vec3(size, size, size), "centered");
+        }
+
+        var nodes = new[]
+        {
+            Node("small-a", Vec3.Zero, assetId: 1),
+            Node("small-b", new Vec3(10, 0, 0), assetId: 2),
+            Node("enormous", new Vec3(1000, 0, 0), assetId: 3),
+        };
+
+        var warnings = SceneSpatial.FindScaleWarnings(nodes, facts);
+
+        Assert.Contains(warnings, w => w.Code == "ImplausibleRelativeScale" && w.NodeId == "enormous");
+    }
+
+    [Fact]
+    public void SnapToGrid_Rounds_Onto_The_Grid()
+    {
+        var snapped = SceneSpatial.SnapToGrid(new Vec3(2.4, 0, -3.7), 1.0);
+
+        Assert.Equal(2, snapped.X, 6);
+        Assert.Equal(-4, snapped.Z, 6);
+    }
+
+    [Fact]
+    public void SnapToGrid_When_Grid_Is_Not_Positive_Leaves_The_Position_Alone()
+    {
+        var position = new Vec3(2.4, 0, -3.7);
+
+        Assert.Equal(position, SceneSpatial.SnapToGrid(position, 0));
+    }
+
+    [Fact]
+    public void DistributeAlongLine_Spaces_Copies_Inclusively()
+    {
+        var positions = SceneSpatial.DistributeAlongLine(new Vec3(0, 0, 0), new Vec3(10, 0, 0), 3);
+
+        Assert.Equal(3, positions.Count);
+        Assert.Equal(0, positions[0].X, 6);
+        Assert.Equal(5, positions[1].X, 6);
+        Assert.Equal(10, positions[2].X, 6);
+    }
+
+    [Fact]
+    public void DistributeAlongLine_When_Count_Is_One_Returns_The_Start()
+    {
+        Assert.Equal(new Vec3(1, 2, 3), Assert.Single(SceneSpatial.DistributeAlongLine(new Vec3(1, 2, 3), new Vec3(9, 9, 9), 1)));
+    }
+}

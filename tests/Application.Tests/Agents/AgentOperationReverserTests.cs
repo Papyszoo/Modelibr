@@ -3,6 +3,7 @@ using Application.Agents;
 using Application.EnvironmentMaps;
 using Application.Models;
 using Application.Packs;
+using Application.Scenes;
 using Application.Sounds;
 using Application.Sprites;
 using Application.TextureSets;
@@ -34,6 +35,13 @@ public class AgentOperationReverserTests
     private readonly Mock<ICommandHandler<SoftDeleteSpriteCommand>> _deleteSprite = new();
     private readonly Mock<ICommandHandler<SoftDeleteEnvironmentMapCommand>> _deleteEnvironmentMap = new();
     private readonly Mock<ICommandHandler<SoftDeleteTextureSetCommand, SoftDeleteTextureSetResponse>> _deleteTextureSet = new();
+    private readonly Mock<ICommandHandler<RemoveSceneNodeCommand, SceneNodeRemovalResponse>> _removeSceneNode = new();
+    private readonly Mock<ICommandHandler<RestoreSceneNodeCommand, SceneSummary>> _restoreSceneNode = new();
+    private readonly Mock<ICommandHandler<MoveSceneNodeCommand, SceneNodeMoveResponse>> _moveSceneNode = new();
+    private readonly Mock<ICommandHandler<SetSceneLightCommand, SceneLightResponse>> _setSceneLight = new();
+    private readonly Mock<ICommandHandler<ApplySceneMaterialCommand, SceneMaterialResponse>> _applySceneMaterial = new();
+    private readonly Mock<ICommandHandler<UpdateSceneDocumentCommand, SceneView>> _updateSceneDocument = new();
+    private readonly Mock<ICommandHandler<DeleteSceneCommand>> _deleteScene = new();
 
     private readonly AgentOperationReverser _reverser;
 
@@ -42,7 +50,9 @@ public class AgentOperationReverserTests
         _reverser = new AgentOperationReverser(
             _audit.Object, _updateTags.Object, _setCategory.Object, _removeFromPack.Object, _deletePack.Object,
             _setDefault.Object, _removeTexture.Object, _deleteModel.Object, _deleteSound.Object,
-            _deleteSprite.Object, _deleteEnvironmentMap.Object, _deleteTextureSet.Object);
+            _deleteSprite.Object, _deleteEnvironmentMap.Object, _deleteTextureSet.Object,
+            _removeSceneNode.Object, _restoreSceneNode.Object, _moveSceneNode.Object, _setSceneLight.Object,
+            _applySceneMaterial.Object, _updateSceneDocument.Object, _deleteScene.Object);
 
         _audit.Setup(a => a.TryMarkReversedAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);

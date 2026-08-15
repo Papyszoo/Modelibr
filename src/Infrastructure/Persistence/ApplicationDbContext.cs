@@ -60,6 +60,7 @@ namespace Infrastructure.Persistence
         public DbSet<ModelConceptImage> ModelConceptImages => Set<ModelConceptImage>();
         public DbSet<ProjectConceptImage> ProjectConceptImages => Set<ProjectConceptImage>();
         public DbSet<Stage> Stages => Set<Stage>();
+        public DbSet<Scene> Scenes => Set<Scene>();
         public DbSet<Thumbnail> Thumbnails => Set<Thumbnail>();
         public DbSet<ThumbnailJob> ThumbnailJobs => Set<ThumbnailJob>();
         public DbSet<ThumbnailJobEvent> ThumbnailJobEvents => Set<ThumbnailJobEvent>();
@@ -710,6 +711,26 @@ namespace Infrastructure.Persistence
 
                 // Create index for efficient querying by name
                 entity.HasIndex(s => s.Name);
+            });
+
+            // Configure Scene entity - an agent-authorable composition of library assets.
+            // The document is stored as validated JSON rather than shredded into node rows:
+            // it is read and written whole, the editor's undo works on whole documents, and
+            // a relational node table would buy nothing but joins. SchemaVersion is a column
+            // so a future migration can find documents by version without parsing every row.
+            modelBuilder.Entity<Scene>(entity =>
+            {
+                entity.HasKey(s => s.Id);
+                entity.Property(s => s.Name).IsRequired().HasMaxLength(200);
+                entity.Property(s => s.Description).HasMaxLength(2000);
+                entity.Property(s => s.SchemaVersion).IsRequired();
+                entity.Property(s => s.DocumentJson).IsRequired();
+                entity.Property(s => s.Revision).IsRequired();
+                entity.Property(s => s.CreatedAt).IsRequired();
+                entity.Property(s => s.UpdatedAt).IsRequired();
+
+                entity.HasIndex(s => s.Name);
+                entity.HasIndex(s => s.UpdatedAt);
             });
 
             // Configure Thumbnail entity

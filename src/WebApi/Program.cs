@@ -131,7 +131,10 @@ namespace WebApi
 
                 var mcpServer = builder.Services.AddMcpServer()
                     .WithHttpTransport()
-                    .WithTools<WebApi.Mcp.AssetSearchMcpTools>();
+                    .WithTools<WebApi.Mcp.AssetSearchMcpTools>()
+                    // Reading a scene is a read: an agent that can search the library can
+                    // look at what it has already built there.
+                    .WithTools<WebApi.Mcp.SceneReadMcpTools>();
 
                 // Write tools (prompt 30) are opt-in: OFF by default keeps a stock server
                 // read-only so enabling agent writes on a LAN-reachable endpoint is a
@@ -149,6 +152,9 @@ namespace WebApi
                         // only reachable for someone who could perform one; the destructive
                         // half of it carries its own flag and scope on top.
                         .WithTools<WebApi.Mcp.AgentUndoMcpTools>()
+                        // Scene authoring. Same gate as every other write - composing a
+                        // scene creates and destroys state like any other mutation.
+                        .WithTools<WebApi.Mcp.SceneWriteMcpTools>()
                         .WithPrompts<WebApi.Mcp.ImportLibraryPrompts>();
                 }
             }
@@ -196,6 +202,7 @@ namespace WebApi
             app.MapProjectEndpoints();
             app.MapModelCategoryEndpoints();
             app.MapStageEndpoints();
+            app.MapSceneEndpoints();
             app.MapSettingsEndpoints();
             app.MapBatchUploadEndpoints();
             app.MapRecycledFilesEndpoints();

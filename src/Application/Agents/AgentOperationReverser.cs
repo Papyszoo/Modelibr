@@ -3,10 +3,12 @@ using Application.Abstractions.Messaging;
 using Application.EnvironmentMaps;
 using Application.Models;
 using Application.Packs;
+using Application.Scenes;
 using Application.Sounds;
 using Application.Sprites;
 using Application.TextureSets;
 using Domain.Models;
+using Domain.Scenes;
 using SharedKernel;
 
 namespace Application.Agents;
@@ -93,6 +95,13 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
     private readonly ICommandHandler<SoftDeleteSpriteCommand> _deleteSprite;
     private readonly ICommandHandler<SoftDeleteEnvironmentMapCommand> _deleteEnvironmentMap;
     private readonly ICommandHandler<SoftDeleteTextureSetCommand, SoftDeleteTextureSetResponse> _deleteTextureSet;
+    private readonly ICommandHandler<RemoveSceneNodeCommand, SceneNodeRemovalResponse> _removeSceneNode;
+    private readonly ICommandHandler<RestoreSceneNodeCommand, SceneSummary> _restoreSceneNode;
+    private readonly ICommandHandler<MoveSceneNodeCommand, SceneNodeMoveResponse> _moveSceneNode;
+    private readonly ICommandHandler<SetSceneLightCommand, SceneLightResponse> _setSceneLight;
+    private readonly ICommandHandler<ApplySceneMaterialCommand, SceneMaterialResponse> _applySceneMaterial;
+    private readonly ICommandHandler<UpdateSceneDocumentCommand, SceneView> _updateSceneDocument;
+    private readonly ICommandHandler<DeleteSceneCommand> _deleteScene;
 
     public AgentOperationReverser(
         IAgentAudit audit,
@@ -106,7 +115,14 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
         ICommandHandler<SoftDeleteSoundCommand> deleteSound,
         ICommandHandler<SoftDeleteSpriteCommand> deleteSprite,
         ICommandHandler<SoftDeleteEnvironmentMapCommand> deleteEnvironmentMap,
-        ICommandHandler<SoftDeleteTextureSetCommand, SoftDeleteTextureSetResponse> deleteTextureSet)
+        ICommandHandler<SoftDeleteTextureSetCommand, SoftDeleteTextureSetResponse> deleteTextureSet,
+        ICommandHandler<RemoveSceneNodeCommand, SceneNodeRemovalResponse> removeSceneNode,
+        ICommandHandler<RestoreSceneNodeCommand, SceneSummary> restoreSceneNode,
+        ICommandHandler<MoveSceneNodeCommand, SceneNodeMoveResponse> moveSceneNode,
+        ICommandHandler<SetSceneLightCommand, SceneLightResponse> setSceneLight,
+        ICommandHandler<ApplySceneMaterialCommand, SceneMaterialResponse> applySceneMaterial,
+        ICommandHandler<UpdateSceneDocumentCommand, SceneView> updateSceneDocument,
+        ICommandHandler<DeleteSceneCommand> deleteScene)
     {
         _audit = audit;
         _updateTags = updateTags;
@@ -120,6 +136,13 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
         _deleteSprite = deleteSprite;
         _deleteEnvironmentMap = deleteEnvironmentMap;
         _deleteTextureSet = deleteTextureSet;
+        _removeSceneNode = removeSceneNode;
+        _restoreSceneNode = restoreSceneNode;
+        _moveSceneNode = moveSceneNode;
+        _setSceneLight = setSceneLight;
+        _applySceneMaterial = applySceneMaterial;
+        _updateSceneDocument = updateSceneDocument;
+        _deleteScene = deleteScene;
     }
 
     public async Task<Result<ReversalPlan>> PlanAsync(
@@ -253,6 +276,37 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
                 destructive: true,
                 supported: entry.AssetId is > 0,
                 blocker: "The imported asset's id was not recorded."),
+
+        // Scene authoring. Each of these records the exact inverse in PayloadBefore at write
+        // time, which is why undoing twenty placements is twenty removals rather than a
+        // best-effort reconstruction of what the scene used to look like.
+        "place-asset" => Step(entry, $"Remove the node this call placed in scene {entry.AssetId}.", destructive: false,
+            supported: entry.PayloadBefore is not null,
+            blocker: "The placed node's id was not recorded."),
+
+        "move-asset" => Step(entry, $"Put the node back where it was in scene {entry.AssetId}.", destructive: false,
+            supported: entry.PayloadBefore is not null,
+            blocker: "The node's previous transform was not recorded."),
+
+        "remove-asset" => Step(entry, $"Restore the node that was removed from scene {entry.AssetId}.", destructive: false,
+            supported: entry.PayloadBefore is not null,
+            blocker: "The removed node was not recorded, so there is nothing to restore."),
+
+        "set-light" => Step(entry, $"Restore scene {entry.AssetId}'s light to its previous state.", destructive: false,
+            supported: entry.PayloadBefore is not null,
+            blocker: "The light's previous state was not recorded."),
+
+        "apply-material" => Step(entry, $"Restore the node's previous material binding in scene {entry.AssetId}.", destructive: false,
+            supported: entry.PayloadBefore is not null,
+            blocker: "The previous material binding was not recorded."),
+
+        "update-scene-document" => Step(entry, $"Restore scene {entry.AssetId}'s previous document.", destructive: false,
+            supported: entry.PayloadBefore is not null,
+            blocker: "The previous document was not recorded."),
+
+        "create-scene" => Step(entry, $"Delete scene {entry.AssetId}.", destructive: true,
+            supported: entry.AssetId is > 0,
+            blocker: "The created scene's id was not recorded."),
 
         "trigger-rederive" => Step(entry, "Re-derivation cannot be undone.", destructive: false,
             supported: false,
@@ -422,6 +476,137 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
                     : Result.Success($"Recycled texture set {entry.AssetId}.");
             }
 
+            case "place-asset":
+            {
+                var before = Read(entry.PayloadBefore);
+                var nodeId = before is null ? null : ReadString(before.Value, "removedNodeId");
+                if (nodeId is null)
+                {
+                    return Result.Failure<string>(new Error("NoNodeRecorded", "The placed node's id was not recorded."));
+                }
+
+                var result = await _removeSceneNode.Handle(
+                    new RemoveSceneNodeCommand(entry.AssetId!.Value, nodeId), cancellationToken);
+
+                // Already gone is the desired end state, not a failure - the user may have
+                // deleted the node themselves before asking for the undo.
+                return result.IsFailure && result.Error.Code != "Scene.NodeNotFound"
+                    ? Result.Failure<string>(result.Error)
+                    : Result.Success($"Removed node '{nodeId}' from scene {entry.AssetId}.");
+            }
+
+            case "move-asset":
+            {
+                var before = Read(entry.PayloadBefore);
+                var nodeId = before is null ? null : ReadString(before.Value, "nodeId");
+                var transform = before is null ? null : ReadScene<SceneTransform>(before.Value, "transform");
+                if (nodeId is null || transform is null)
+                {
+                    return Result.Failure<string>(new Error("NoPriorState", "The node's previous transform was not recorded."));
+                }
+
+                var result = await _moveSceneNode.Handle(
+                    new MoveSceneNodeCommand(
+                        entry.AssetId!.Value, nodeId, transform.Position, transform.RotationEuler, transform.Scale),
+                    cancellationToken);
+
+                return result.IsFailure
+                    ? Result.Failure<string>(result.Error)
+                    : Result.Success($"Restored node '{nodeId}' to its previous transform in scene {entry.AssetId}.");
+            }
+
+            case "remove-asset":
+            {
+                var before = Read(entry.PayloadBefore);
+                var node = before is null ? null : ReadScene<SceneNode>(before.Value, "restoredNode");
+                if (node is null)
+                {
+                    return Result.Failure<string>(new Error("NoPriorState", "The removed node was not recorded."));
+                }
+
+                var result = await _restoreSceneNode.Handle(
+                    new RestoreSceneNodeCommand(entry.AssetId!.Value, node), cancellationToken);
+
+                return result.IsFailure
+                    ? Result.Failure<string>(result.Error)
+                    : Result.Success($"Restored node '{node.Id}' to scene {entry.AssetId}.");
+            }
+
+            case "set-light":
+            {
+                var before = Read(entry.PayloadBefore);
+                var lightId = before is null ? null : ReadString(before.Value, "lightId");
+                if (lightId is null)
+                {
+                    return Result.Failure<string>(new Error("NoPriorState", "The light's previous state was not recorded."));
+                }
+
+                // No previous light means the write created one, so its inverse deletes it.
+                var previous = ReadScene<SceneLight>(before!.Value, "light");
+                var command = previous is null
+                    ? new SetSceneLightCommand(entry.AssetId!.Value, lightId, Remove: true)
+                    : new SetSceneLightCommand(
+                        entry.AssetId!.Value, lightId, previous.Type, previous.Position,
+                        previous.Intensity, previous.Color, previous.Target, previous.Name);
+
+                var result = await _setSceneLight.Handle(command, cancellationToken);
+
+                return result.IsFailure && result.Error.Code != "Scene.LightNotFound"
+                    ? Result.Failure<string>(result.Error)
+                    : Result.Success(previous is null
+                        ? $"Removed light '{lightId}' from scene {entry.AssetId}, which is how it was before."
+                        : $"Restored light '{lightId}' in scene {entry.AssetId}.");
+            }
+
+            case "apply-material":
+            {
+                var before = Read(entry.PayloadBefore);
+                var nodeId = before is null ? null : ReadString(before.Value, "nodeId");
+                if (nodeId is null)
+                {
+                    return Result.Failure<string>(new Error("NoPriorState", "The previous material binding was not recorded."));
+                }
+
+                var previous = ReadScene<SceneMaterialBinding>(before!.Value, "material");
+                var result = await _applySceneMaterial.Handle(
+                    previous is null
+                        ? new ApplySceneMaterialCommand(entry.AssetId!.Value, nodeId, Clear: true)
+                        : new ApplySceneMaterialCommand(entry.AssetId!.Value, nodeId, previous.TextureSetId, previous.Variant),
+                    cancellationToken);
+
+                return result.IsFailure
+                    ? Result.Failure<string>(result.Error)
+                    : Result.Success(previous is null
+                        ? $"Cleared node '{nodeId}'s material in scene {entry.AssetId}, as it was before."
+                        : $"Restored node '{nodeId}'s previous material in scene {entry.AssetId}.");
+            }
+
+            case "update-scene-document":
+            {
+                var before = Read(entry.PayloadBefore);
+                var document = before is null ? null : ReadScene<SceneDocument>(before.Value, "document");
+                if (document is null)
+                {
+                    return Result.Failure<string>(new Error("NoPriorState", "The previous document was not recorded."));
+                }
+
+                var result = await _updateSceneDocument.Handle(
+                    new UpdateSceneDocumentCommand(entry.AssetId!.Value, SceneDocumentCodec.Serialize(document)),
+                    cancellationToken);
+
+                return result.IsFailure
+                    ? Result.Failure<string>(result.Error)
+                    : Result.Success($"Restored scene {entry.AssetId}'s previous document ({document.Nodes.Count} node(s)).");
+            }
+
+            case "create-scene":
+            {
+                var result = await _deleteScene.Handle(new DeleteSceneCommand(entry.AssetId!.Value), cancellationToken);
+                return result.IsFailure
+                    ? Result.Failure<string>(result.Error)
+                    : Result.Success($"Deleted scene {entry.AssetId}.");
+            }
+
             default:
                 return Result.Failure<string>(new Error(
                     "NotReversible", $"'{entry.Operation}' is not a reversible operation."));
@@ -462,6 +647,33 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
         element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.Number
             ? value.GetInt32()
             : null;
+
+    /// <summary>
+    /// Reads a scene contract type out of a recorded payload.
+    ///
+    /// Case-insensitive on purpose: the audit log serializes an anonymous wrapper with the
+    /// default options (so the contract types inside come out PascalCase) while the scene
+    /// document itself is stored camelCase. Reading either shape here is what stops undo
+    /// from depending on which writer produced the row.
+    /// </summary>
+    private static T? ReadScene<T>(JsonElement element, string property) where T : class
+    {
+        if (!element.TryGetProperty(property, out var value) || value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+        {
+            return null;
+        }
+
+        try
+        {
+            return value.Deserialize<T>(SceneReadOptions);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static readonly JsonSerializerOptions SceneReadOptions = new() { PropertyNameCaseInsensitive = true };
 
     private static bool? ReadBool(JsonElement element, string property) =>
         element.TryGetProperty(property, out var value) && value.ValueKind is JsonValueKind.True or JsonValueKind.False
