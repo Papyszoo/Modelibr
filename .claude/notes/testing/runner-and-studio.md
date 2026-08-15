@@ -9,7 +9,8 @@ Both built on branch `feat/local-test-runner` (2026-06-07). Dependency-free Node
 - `npm run test:audit` - flags suites not listed in the manifest
 
 **Single source of truth: `scripts/test-runner/suites.config.mjs`.** Adding a
-suite = one entry (`kind`: dotnet | jest | vitest | node-test | playwright). The
+suite = one entry (`kind`: dotnet | jest | vitest | node-test | playwright |
+video-pipeline). The
 audit warns about any `*.Tests.csproj`, any `package.json` with a `test` script,
 or any `docker-compose*e2e*` not covered - that's the "keep up with new tests"
 safety net.
@@ -20,6 +21,18 @@ exits non-zero if any selected suite failed. It shells out to each suite's
 existing command - no orchestration is duplicated.
 
 Writes `test-report/index.html` (git-ignored) plus `history.jsonl`.
+
+The `docs-videos` suite (slow tier, Docker) **re-records** all eight clips via
+`videos:generate` and then verifies the collected set. Checking the previous
+render's leftovers was the first design and it was worthless: it says nothing
+about the code you just changed. The value is entirely in re-running the specs -
+they hit the same selectors E2E does, nothing in CI exercises them, and rot
+surfaces at docs-publish time otherwise. Costs a full render and needs a GPU.
+
+`docs/videos/verify-videos.js` is the gate the suite ends with, and stands alone
+(`npm run videos:verify`) for re-checking a set without paying for a render.
+`--complete` is publish strictness (whole set required); the workspace publish
+script wraps that module rather than restating its rules.
 
 ## Test Studio - `scripts/test-catalog/`
 
@@ -37,7 +50,7 @@ timings cached 6h, local history from `test-report/history.jsonl`).
 the client sends a run-spec, `runspec.mjs` builds the command from the manifest
 (user strings passed via env and quoted - no shell injection); output streams over
 SSE. `ui/` is dependency-free vanilla JS and runs **read-only** against a sibling
-`catalog.json` when there's no server (the optional GitHub Pages snapshot).
+`catalog.json` when there's no server (the optional static snapshot).
 
 ## UI conventions
 

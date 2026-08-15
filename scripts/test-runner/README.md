@@ -37,11 +37,18 @@ In the interactive picker: type suite numbers to toggle, `a` all, `n` none,
   `desktop` suite outside `feat/tray-host`) is reported as *not-present*, and
   starts running automatically once those files exist.
 - **Honest exit code** - the process exits non-zero if any selected suite failed.
+- **Docs videos are re-recorded, not just re-checked** - the `docs-videos` suite
+  (slow tier) runs the full `videos:generate` pipeline against the current code,
+  then verifies the collected set. The video specs drive the app through the same
+  selectors E2E does and nothing in CI exercises them, so this is the only thing
+  that catches spec rot before a docs publish. It is the slowest suite here and
+  needs a GPU - software GL renders the clips black. To re-check an existing set
+  without spending the render, run `npm run videos:verify` on its own.
 
 ## Adding a suite
 
 Append one entry to [`suites.config.mjs`](./suites.config.mjs). Pick a `kind`
-(`dotnet | jest | vitest | node-test | playwright`) so results are parsed
+(`dotnet | jest | vitest | node-test | playwright | video-pipeline`) so results are parsed
 correctly, set `cwd`/`command`/`tier`/`detectPath`, and `requiresDocker` if it
 needs the daemon. If you forget, `npm run test:audit` will flag the new suite as
 untracked.

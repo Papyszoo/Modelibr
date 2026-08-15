@@ -7,7 +7,7 @@
 // Fields:
 //   id            unique short id (used for logs/report)
 //   name          human label
-//   kind          dotnet | jest | vitest | node-test | playwright
+//   kind          dotnet | jest | vitest | node-test | playwright | video-verify
 //                 (controls how the run command is built and results parsed)
 //   cwd           working directory relative to repo root
 //   command       canonical command to run (reporter flags are appended per-kind)
@@ -134,6 +134,25 @@ export const suites = [
         detectPath: "tests/backup-restore-e2e/package.json",
         reportPath: "tests/backup-restore-e2e/playwright-report",
         note: "Gating nightly on GitHub (.github/workflows/nightly-e2e.yml, job backup-restore-drill) - needs no GPU, unlike storybook-visual/e2e-full which stay local-only.",
+    },
+    {
+        id: "docs-videos",
+        name: "Docs feature videos (re-record + QA gate, Docker)",
+        kind: "video-pipeline",
+        cwd: ".",
+        // Actually re-records all eight clips against the current code. That is
+        // the point: the video specs drive the app through the same selectors
+        // E2E does, nothing in CI exercises them, and rot only shows up at
+        // docs-publish time otherwise. `videos:generate` is self-contained
+        // (leading teardown, e2e stack up, record -> trim -> analyze -> collect,
+        // teardown) and its analyze step fails the run on a black, frozen or
+        // over-cap clip; the trailing verify re-checks the collected set that a
+        // publish would actually upload.
+        command: "npm run videos:generate && npm run videos:verify",
+        tier: "slow",
+        requiresDocker: true,
+        detectPath: "docs/videos/package.json",
+        note: "Re-records every clip - slowest suite here, and needs a GPU (software GL renders black). Nothing else catches video-spec selector rot.",
     },
     {
         id: "storybook-visual",

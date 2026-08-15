@@ -15,8 +15,10 @@
         "generate:projects": "node run-videos.js --grep \"Projects\" --slugs projects",
         "generate:packs": "node run-videos.js --grep \"Packs\" --slugs packs",
         "analyze": "node analyze-videos.js",
+        "verify": "node verify-videos.js",
         "trim": "node trim-videos.js",
         "collect": "node collect-videos.js",
+        "publish": "node publish-videos.js",
         "clean": "node clean-videos.js"
     },
     "devDependencies": {

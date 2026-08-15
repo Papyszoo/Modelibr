@@ -35,6 +35,13 @@ export const ciMap = {
     "e2e-performance": [
         { workflow: null, jobName: null, note: "Opt-in only; not in CI" },
     ],
+    "docs-videos": [
+        {
+            workflow: null,
+            jobName: null,
+            note: "Not in CI - runners have no GPU, so the clips render black there; the local GPU lane is the only place this runs",
+        },
+    ],
 };
 
 // Workflows worth pulling timing history for.

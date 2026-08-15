@@ -44,7 +44,7 @@ The server binds `127.0.0.1:5178` (override with `MODELIBR_TEST_SITE_PORT`).
   the manifest - user strings (grep, name filter) are passed via env and quoted,
   never interpolated into the shell. One run at a time; output streams over SSE.
 - `ui/` is dependency-free vanilla JS. With no server it runs in **read-only**
-  mode against a sibling `catalog.json` - that's the optional GitHub Pages snapshot
+  mode against a sibling `catalog.json` - that's the optional static snapshot
   (catalog + GitHub timings; no local data, run buttons hidden).
 
 ## Adding a test
