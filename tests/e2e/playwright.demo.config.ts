@@ -31,7 +31,7 @@ export default defineConfig({
           ],
     use: {
         baseURL:
-            process.env.FRONTEND_URL || "http://localhost:3004/Modelibr/demo/",
+            process.env.FRONTEND_URL || "http://localhost:3004/demo/",
         trace: "retain-on-failure",
         screenshot: "only-on-failure",
         video: "retain-on-failure",
