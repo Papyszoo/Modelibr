@@ -94,7 +94,7 @@ export type {
 
 // ─── Helpers ────────────────────────────────────────────────────────────
 
-const DEMO_BASE = import.meta.env.BASE_URL ?? '/Modelibr/demo/'
+const DEMO_BASE = import.meta.env.BASE_URL ?? '/demo/'
 export const assetUrl = (file: string) => `${DEMO_BASE}demo-assets/${file}`
 export const thumbnailUrl = (file: string) =>
   `${DEMO_BASE}demo-assets/thumbnails/${file}`

@@ -8,7 +8,7 @@ Modelibr helps you organize and manage your 3D model library with automatic thum
 
 <div className="feature-video-container">
   <video controls width="100%" autoPlay muted loop>
-    <source src="/Modelibr/videos/model-management.webm" type="video/webm" />
+    <source src="/videos/model-management.webm" type="video/webm" />
     <p className="video-fallback">Demo video is being generated...</p>
   </video>
 </div>

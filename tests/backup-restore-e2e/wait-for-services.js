@@ -3,6 +3,7 @@
  * Waits for the backup-restore-e2e stack to be reachable.
  * Used by `npm run test:setup` after `docker compose up`.
  */
+import { spawnSync } from "child_process";
 import http from "http";
 
 const services = [
@@ -50,6 +51,24 @@ async function waitFor(service) {
     throw new Error(`Timed out waiting for ${service.label}`);
 }
 
+/**
+ * A bare "Timed out waiting for WebApi" says nothing about why, and this stack
+ * runs unattended in the nightly - the container logs are gone by the time
+ * anyone looks. Dump them with the failure so the next red night is diagnosable
+ * from the run log alone.
+ */
+function dumpContainerLogs() {
+    console.error("\n--- docker compose logs (tail) ---");
+    const result = spawnSync(
+        "docker",
+        ["compose", "-f", "docker-compose.backup-e2e.yml", "logs", "--tail=60"],
+        { cwd: import.meta.dirname, encoding: "utf8" },
+    );
+    console.error(result.stdout || "(no output)");
+    if (result.stderr) console.error(result.stderr);
+    console.error("--- end container logs ---\n");
+}
+
 try {
     for (const svc of services) {
         await waitFor(svc);
@@ -57,5 +76,6 @@ try {
     console.log("\nAll backup-restore-e2e services ready\n");
 } catch (err) {
     console.error(`\n${err.message}`);
+    dumpContainerLogs();
     process.exit(1);
 }

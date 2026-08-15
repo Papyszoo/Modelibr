@@ -50,8 +50,9 @@ const PAGES = [
 ]
 const THEMES = ['dark', 'light']
 const PORT = 6030
-// Demo build is compiled with base=/Modelibr/demo/ (GitHub Pages layout).
-const BASE_PATH = '/Modelibr/demo/'
+// Must track the demo `base` in src/frontend/vite.config.js, or the served
+// bundle 404s on its own assets.
+const BASE_PATH = '/demo/'
 
 function parseArgs(argv) {
   const args = { build: true, pages: null, label: null }

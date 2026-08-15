@@ -1,4 +1,4 @@
-name: CI and Deploy Docs
+name: CI and Build Docs
 
 on:
     push:
@@ -13,8 +13,6 @@ concurrency:
 
 permissions:
     contents: read
-    pages: write
-    id-token: write
     actions: read
 
 jobs:
@@ -481,129 +479,8 @@ jobs:
               run: |
                   echo "All CI checks passed!"
 
-    generate-videos:
-        name: Generate Feature Videos
-        runs-on: ubuntu-latest
-        needs: [detect-changes]
-        # Video capture drives the same GPU-dependent WebGL render as the E2E
-        # suite and flakes on GPU-less runners. It is only needed to refresh the
-        # docs-site videos on main, so restrict it to main pushes + manual
-        # dispatch - it no longer runs (or flakes) on PRs.
-        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
-        # A single attempt completes in ~12 minutes; the generate step retries up
-        # to 3x to absorb the software-WebGL flake, so allow headroom (setup +
-        # 3×~12m) while still capping a hung step well below the 6h default.
-        timeout-minutes: 60
-
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v5
-
-            - name: Build and start E2E services
-              timeout-minutes: 15
-              run: |
-                  docker compose -f tests/e2e/docker-compose.e2e.yml up -d --build
-
-            - name: Wait for services to be ready
-              timeout-minutes: 5
-              run: |
-                  echo "Waiting for services to be healthy..."
-                  timeout 120 bash -c 'until curl -sf http://localhost:8090/health; do sleep 5; done'
-                  echo "Backend is ready!"
-                  timeout 60 bash -c 'until curl -sf http://localhost:3002; do sleep 5; done'
-                  echo "Frontend is ready!"
-                  timeout 60 bash -c 'until curl -sf http://localhost:3003/health; do sleep 5; done'
-                  echo "Thumbnail worker is ready!"
-
-            - name: Setup Node.js
-              uses: actions/setup-node@v5
-              with:
-                  node-version: "20"
-
-            - name: Install video dependencies
-              working-directory: docs/videos
-              timeout-minutes: 5
-              run: npm ci
-
-            - name: Install Playwright browsers
-              working-directory: docs/videos
-              timeout-minutes: 10
-              # Drop --with-deps: ubuntu-latest already ships the libs Chromium
-              # needs, and the apt path periodically stalls on Azure mirrors
-              # (Ign: responses that retry for 10+ minutes). The browser binary
-              # itself comes from Playwright's CDN and is unaffected.
-              run: npx playwright install chromium
-
-            - name: Generate videos
-              id: generate
-              working-directory: docs/videos
-              timeout-minutes: 40
-              # Capture uses SwiftShader software WebGL on the GPU-less runner,
-              # which occasionally flakes mid-render - and a single failed clip
-              # fails the whole run, which then blocks the main docs deploy (the
-              # v0.3.0 push flaked once and passed on a plain re-run). Retry a
-              # couple of times to absorb that transient flake instead of
-              # committing the videos to the repo. Each attempt regenerates the
-              # full set; the running stack is reused across attempts.
-              run: |
-                  for attempt in 1 2 3; do
-                    echo "::group::generate videos (attempt $attempt/3)"
-                    if npm run generate; then
-                      echo "::endgroup::"
-                      exit 0
-                    fi
-                    echo "::endgroup::"
-                    echo "video generation attempt $attempt failed"
-                    # Preserve this attempt's Playwright output before the next
-                    # attempt overwrites it. A retry that eventually succeeds
-                    # still hides a real problem - the run that motivated this
-                    # failed attempt 1 and passed attempt 2, leaving no evidence
-                    # at all because the job as a whole was green.
-                    if [ -d test-results ]; then
-                      mkdir -p ../../video-failure-artifacts
-                      cp -r test-results "../../video-failure-artifacts/attempt-$attempt" || true
-                    fi
-                  done
-                  echo "video generation failed after 3 attempts"
-                  exit 1
-              env:
-                  FRONTEND_URL: http://localhost:3002
-                  API_BASE_URL: http://localhost:8090
-
-            # Video specs run only on main-push/dispatch, so a failure here is
-            # the first time anyone sees it - and until now the job uploaded
-            # nothing on failure, leaving no way to tell WHY a clip broke
-            # without landing another commit on main. Playwright writes an ARIA
-            # page snapshot (error-context.md) next to each failure for free;
-            # keep it so the next breakage is diagnosable from the run alone.
-            # always(), not failure(): an attempt can fail and a later one
-            # succeed, leaving the job green with the evidence discarded.
-            - name: Upload video failure diagnostics
-              if: always()
-              uses: actions/upload-artifact@v5
-              with:
-                  name: video-failure-diagnostics-${{ github.run_number }}
-                  path: |
-                      video-failure-artifacts/
-                      docs/videos/test-results/
-                  retention-days: 14
-                  if-no-files-found: ignore
-
-            - name: Upload feature videos
-              uses: actions/upload-artifact@v5
-              with:
-                  name: feature-videos-${{ github.run_number }}
-                  path: docs/static/videos/
-                  retention-days: 30
-                  if-no-files-found: error
-
-            - name: Stop services
-              if: always()
-              run: |
-                  docker compose -f tests/e2e/docker-compose.e2e.yml down -v
-
     build-docs:
-        name: Build Documentation with Reports
+        name: Build Documentation
         runs-on: ubuntu-latest
         needs:
             [
@@ -612,13 +489,12 @@ jobs:
                 frontend-tests,
                 asset-processor-tests,
                 build-storybook,
-                generate-videos,
             ]
-        # Always run to generate reports, even if tests fail
+        # Always run so documentation build failures are reported independently.
         if: always()
 
         steps:
-            - name: Checkout current branch for scripts
+            - name: Checkout current branch
               uses: actions/checkout@v5
               with:
                   path: current-branch
@@ -628,11 +504,6 @@ jobs:
               with:
                   ref: main
                   path: main-branch
-
-            - name: Copy scripts from current branch
-              run: |
-                  mkdir -p .github/scripts
-                  cp -r current-branch/.github/scripts/* .github/scripts/ || true
 
             - name: Copy docs from main branch
               run: |
@@ -645,112 +516,12 @@ jobs:
                   cache: npm
                   cache-dependency-path: docs/package-lock.json
 
-            - name: Download current run artifacts
-              uses: actions/download-artifact@v5
-              continue-on-error: true
-              with:
-                  path: current-run-artifacts
-
-            - name: Prepare current run artifacts for inclusion
-              run: |
-                  mkdir -p docs/static/test-reports/run-${{ github.run_number }}
-
-                  # Copy playwright report if available
-                  if [ -d "current-run-artifacts/playwright-report-${{ github.run_number }}" ]; then
-                    echo "Found current run Playwright report"
-                    # Check if directory has contents before copying
-                    if [ -n "$(find "current-run-artifacts/playwright-report-${{ github.run_number }}" -maxdepth 1 -mindepth 1 2>/dev/null)" ]; then
-                      cp -r "current-run-artifacts/playwright-report-${{ github.run_number }}/." "docs/static/test-reports/run-${{ github.run_number }}/"
-                    else
-                      echo "Playwright report directory is empty"
-                    fi
-                  fi
-
-                  # Copy backend test results if available
-                  if [ -f "current-run-artifacts/backend-test-results-${{ github.run_number }}/backend-results.json" ]; then
-                    echo "Found current run backend test results"
-                    cp "current-run-artifacts/backend-test-results-${{ github.run_number }}/backend-results.json" "docs/static/test-reports/run-${{ github.run_number }}/"
-                  fi
-
-                  # Copy frontend test results if available
-                  if [ -f "current-run-artifacts/frontend-test-results-${{ github.run_number }}/frontend-results.json" ]; then
-                    echo "Found current run frontend test results"
-                    cp "current-run-artifacts/frontend-test-results-${{ github.run_number }}/frontend-results.json" "docs/static/test-reports/run-${{ github.run_number }}/"
-                  fi
-
-                  # Copy asset processor test results if available
-                  if [ -f "current-run-artifacts/asset-processor-test-results-${{ github.run_number }}/asset-processor-results.json" ]; then
-                    echo "Found current run asset processor test results"
-                    cp "current-run-artifacts/asset-processor-test-results-${{ github.run_number }}/asset-processor-results.json" "docs/static/test-reports/run-${{ github.run_number }}/"
-                  fi
-
-                  # Create metadata files for the current run
-                  # Use current time if head_commit timestamp is not available
-                  TIMESTAMP="${{ github.event.head_commit.timestamp }}"
-                  if [ -z "$TIMESTAMP" ]; then
-                    TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-                  fi
-                  echo "$TIMESTAMP" > docs/static/test-reports/run-${{ github.run_number }}/timestamp.txt
-                  # Set conclusion based on test results
-                  # Mark as failure if any test job failed, otherwise success
-                  # (cancelled/skipped jobs are treated as not-failed)
-                  TEST_CONCLUSION="success"
-                  if [ "${{ needs.backend-tests.result }}" = "failure" ] || \
-                     [ "${{ needs.frontend-tests.result }}" = "failure" ] || \
-                     [ "${{ needs.asset-processor-tests.result }}" = "failure" ] || \
-                     [ "${{ needs.e2e-tests.result }}" = "failure" ]; then
-                    TEST_CONCLUSION="failure"
-                  fi
-                  echo "$TEST_CONCLUSION" > docs/static/test-reports/run-${{ github.run_number }}/conclusion.txt
-                  echo "${{ github.run_number }}" > docs/static/test-reports/run-${{ github.run_number }}/run-number.txt
-                  echo "${{ github.ref_name }}" > docs/static/test-reports/run-${{ github.run_number }}/branch.txt
-                  echo "${{ github.run_id }}" > docs/static/test-reports/run-${{ github.run_number }}/run-id.txt
-
-            - name: Fetch last 9 historical test reports from all branches
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-                  GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
-                  CURRENT_RUN_NUMBER: ${{ github.run_number }}
-              run: |
-                  chmod +x .github/scripts/fetch-test-reports.sh
-                  .github/scripts/fetch-test-reports.sh
-
-            - name: Fail if feature video generation did not succeed
-              # Only a genuine failure is fatal; a skipped video job (on PRs and
-              # non-main branches, where videos aren't regenerated) is expected.
-              if: needs.generate-videos.result == 'failure'
-              run: |
-                  echo "Feature video generation must succeed before building documentation."
-                  exit 1
-
-            - name: Download feature videos
-              if: needs.generate-videos.result == 'success'
-              uses: actions/download-artifact@v5
-              with:
-                  name: feature-videos-${{ github.run_number }}
-                  path: docs/static/videos/
-
-            - name: Verify feature videos
-              if: needs.generate-videos.result == 'success'
-              run: |
-                  expected_videos=(
-                    model-management.webm
-                    texture-sets.webm
-                    recycled-files.webm
-                    user-interface.webm
-                    sprites.webm
-                    sounds.webm
-                    projects.webm
-                    packs.webm
-                  )
-
-                  for video in "${expected_videos[@]}"; do
-                    if [ ! -f "docs/static/videos/$video" ]; then
-                      echo "Missing required documentation video: $video"
-                      exit 1
-                    fi
-                  done
-
+            # Feature videos are deliberately absent from this bundle. They need
+            # a real GPU, so they are rendered and published from a maintainer
+            # machine (`npm run videos:generate` + `npm run videos:publish`) and
+            # live under the site's own /videos/ directory. The publish step
+            # protects that directory from the docs sync, so the pages' absolute
+            # /videos/*.webm sources resolve against separately-published clips.
             - name: Download Storybook build
               uses: actions/download-artifact@v5
               continue-on-error: true
@@ -775,26 +546,9 @@ jobs:
                   mkdir -p docs/build/demo
                   cp -r current-branch/src/frontend/dist/* docs/build/demo/
 
-            - name: Upload docs with reports (for preview)
+            - name: Upload documentation site
               uses: actions/upload-artifact@v5
               with:
-                  name: docs-with-reports
+                  name: docs-site
                   path: docs/build/
                   retention-days: 30
-
-            - name: Upload artifact for GitHub Pages
-              uses: actions/upload-pages-artifact@v3
-              with:
-                  path: docs/build
-
-    deploy-docs:
-        name: Deploy to GitHub Pages
-        runs-on: ubuntu-latest
-        needs: [build-docs]
-        # Deploy only from main; environment protection is also configured in repo settings.
-        if: always() && needs.build-docs.result == 'success' && github.ref == 'refs/heads/main'
-
-        steps:
-            - name: Deploy to GitHub Pages
-              id: deployment
-              uses: actions/deploy-pages@v5

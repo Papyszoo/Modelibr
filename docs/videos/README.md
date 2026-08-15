@@ -82,6 +82,19 @@ npm run generate:packs         # Packs
 4. `analyze-videos.js` rejects missing, black, unreadable, frozen-tail, or over-max artifacts.
 5. `collect-videos.js` copies approved outputs into `docs/static/videos/`.
 
+`verify-videos.js` re-checks that collected set later, without re-rendering
+anything - the same manifest caps and analysis report, applied to whatever is on
+disk now:
+
+```bash
+npm run videos:verify                # from the repo root
+npm run videos:verify -- --complete  # publish strictness: the whole set must be present
+```
+
+The whole pipeline (render + this gate) also runs as the `docs-videos` suite in
+`npm run test:all` (slow tier), which is what checks the specs still work against
+the current frontend.
+
 Generated working files live under:
 
 - `.generated/raw/`
@@ -98,7 +111,8 @@ docs/videos/
 ├── video-manifest.js         # canonical video list + duration caps
 ├── video-paths.js            # raw/final/report/static output paths
 ├── trim-videos.js            # ffmpeg-based trimming
-├── analyze-videos.js         # final QA gate
+├── analyze-videos.js         # final QA gate (inside a render run)
+├── verify-videos.js          # re-check the collected set later (test:all + publish)
 ├── collect-videos.js         # copy final videos to static/
 ├── helpers/
 │   └── video-helpers.ts      # Shared navigation, pacing, and screencast helpers
@@ -119,6 +133,6 @@ Videos are embedded in Docusaurus feature pages at `docs/docs/features/*.md` usi
 
 ```html
 <video controls width="100%" autoplay muted loop>
-    <source src="/Modelibr/videos/{feature}.webm" type="video/webm" />
+    <source src="/videos/{feature}.webm" type="video/webm" />
 </video>
 ```

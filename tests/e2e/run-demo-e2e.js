@@ -12,8 +12,8 @@ const FRONTEND_DIR = path.resolve(__dirname, "../../src/frontend");
 const DIST_DIR = path.join(FRONTEND_DIR, "dist");
 const HOST = "127.0.0.1";
 const PORT = 3004;
-const FRONTEND_URL = "http://localhost:3004/Modelibr/demo/";
-const DEMO_BASE_PATH = "/Modelibr/demo/";
+const FRONTEND_URL = "http://localhost:3004/demo/";
+const DEMO_BASE_PATH = "/demo/";
 const VITE_BIN = path.join(
     FRONTEND_DIR,
     "node_modules",

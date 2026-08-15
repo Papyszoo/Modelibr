@@ -8,7 +8,7 @@ Modelibr includes a built-in sound manager for organizing audio assets alongside
 
 <div className="feature-video-container">
   <video controls width="100%" autoPlay muted loop>
-    <source src="/Modelibr/videos/sounds.webm" type="video/webm" />
+    <source src="/videos/sounds.webm" type="video/webm" />
     <p className="video-fallback">Demo video is being generated...</p>
   </video>
 </div>

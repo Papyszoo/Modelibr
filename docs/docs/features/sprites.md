@@ -8,7 +8,7 @@ Modelibr includes a built-in sprite manager for organizing 2D image assets along
 
 <div className="feature-video-container">
   <video controls width="100%" autoPlay muted loop>
-    <source src="/Modelibr/videos/sprites.webm" type="video/webm" />
+    <source src="/videos/sprites.webm" type="video/webm" />
     <p className="video-fallback">Demo video is being generated...</p>
   </video>
 </div>

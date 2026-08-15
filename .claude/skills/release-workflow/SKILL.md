@@ -60,15 +60,31 @@ description: Modelibr git and release conventions - version-branch naming and pr
 ## Releases
 - Cutting a release = merge the version branch (`version/X.Y` or patch branch
   `version/X.Y.Z`) → `main`, then publish a GitHub Release.
-- **`gh release create vX.Y.Z --target main` is the one manual step.** Everything
-  downstream runs off it: installers + updater feeds attach, Docker images
-  publish, docs deploy.
-- **Before tagging, run `npm run videos:generate` locally.** Docs video specs are
-  exercised only at main-push, and a red docs CI **silently blocks Docker
-  Publish** - `docker-publish.yml` fires only on "CI and Deploy Docs" success on
-  main and has **no manual trigger**. This cost 0.4.0–0.4.2 their Docker images.
-  Duration caps regress only at CI pace (CI paces recorded waits ~1.5× local), so
-  a spec at ~90% of its cap locally will fail CI.
+- **`gh release create vX.Y.Z --target main` triggers what is automated:**
+  installers + updater feeds attach, Docker images publish.
+- **The docs site is published by hand, and is not part of the release trigger.**
+  CI only builds it and uploads the `docs-site` artifact; nothing in any workflow
+  deploys it. The maintainer publishes that artifact from the machine holding the
+  deploy target. **Never write that host or path into this repo.**
+- **Docs videos render locally, never in CI and never committed.** CI runners have
+  no GPU, so WebGL clips flake on SwiftShader; and regenerated binaries would grow
+  the pack every release. Do this before tagging, without being asked:
+  1. `npm run videos:generate` - renders all eight clips, fails on a blown cap.
+  2. `npm run videos:verify -- --complete` - re-checks the collected set against
+     the manifest caps and the analysis report (also read
+     `docs/videos/.generated/reports/final-video-analysis.json` if a clip fails).
+     The same gate runs unforced in `npm run test:all` as the `docs-videos` suite.
+  3. `npm run videos:publish` - uploads to the docs asset host. Target comes from
+     `DOCS_VIDEO_PUBLISH_TARGET` in the maintainer's local env.
+  The clips are **not** in the `docs-site` bundle and CI never fetches them. They
+  live under the site's own `/videos/` path, which the docs publish protects from
+  deletion - so the two publishes are independent and cannot clobber each other.
+- **Re-render only when a video's flow changed in the UI.** Nothing in CI exercises
+  the video specs now, so this is the only thing catching selector rot after a
+  redesign - see the ripple rule in `AGENTS.md`.
+- **Docker Publish no longer rides on docs.** Since 0.5.1 it gates on the
+  `CI Status` job rather than the whole run; a red video lane stops withholding
+  images, which is what cost 0.4.0-0.5.0 theirs.
 - **`upgrade-test.yml` needs no tag edit** - its `resolve-tags` job derives FROM/TO
   from the Releases API. That job runs the FROM version's updater code, so an
   updater fix is validated live only once two post-fix releases exist; until then

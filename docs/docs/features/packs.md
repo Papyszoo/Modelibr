@@ -8,7 +8,7 @@ Packs in Modelibr are reusable asset bundles that can be shared across multiple 
 
 <div className="feature-video-container">
   <video controls width="100%" autoPlay muted loop>
-    <source src="/Modelibr/videos/packs.webm" type="video/webm" />
+    <source src="/videos/packs.webm" type="video/webm" />
     <p className="video-fallback">Demo video is being generated...</p>
   </video>
 </div>

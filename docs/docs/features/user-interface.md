@@ -8,7 +8,7 @@ Modelibr uses a flexible panel system that lets you organize your workspace and 
 
 <div className="feature-video-container">
   <video controls width="100%" autoPlay muted loop>
-    <source src="/Modelibr/videos/user-interface.webm" type="video/webm" />
+    <source src="/videos/user-interface.webm" type="video/webm" />
     <p className="video-fallback">Demo video is being generated...</p>
   </video>
 </div>

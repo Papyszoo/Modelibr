@@ -11,12 +11,12 @@ const config: Config = {
         v4: true,
     },
 
-    // GitHub Pages deployment
-    url: "https://Papyszoo.github.io",
-    baseUrl: "/Modelibr/",
+    // Served from the apex domain at the site root.
+    url: "https://modelibr.com",
+    baseUrl: "/",
+    // Not deployment settings - these drive the "Edit this page" GitHub links.
     organizationName: "Papyszoo",
     projectName: "Modelibr",
-    deploymentBranch: "gh-pages",
     trailingSlash: false,
 
     onBrokenLinks: "throw",
@@ -68,17 +68,15 @@ const config: Config = {
                     label: "Documentation",
                 },
                 {
-                    to: "/test-reports",
-                    label: "Test Reports",
-                    position: "left",
-                },
-                {
-                    href: "https://Papyszoo.github.io/Modelibr/storybook/index.html",
+                    // Absolute: these are copied into the build by CI after
+                    // Docusaurus runs, so a root-relative href fails its
+                    // broken-link check.
+                    href: "https://modelibr.com/storybook/index.html",
                     label: "Storybook",
                     position: "left",
                 },
                 {
-                    href: "https://Papyszoo.github.io/Modelibr/demo/",
+                    href: "https://modelibr.com/demo/",
                     label: "Live Demo",
                     position: "left",
                 },

@@ -8,7 +8,7 @@ Texture Sets allow you to manage PBR (Physically Based Rendering) textures and a
 
 <div className="feature-video-container">
   <video controls width="100%" autoPlay muted loop>
-    <source src="/Modelibr/videos/texture-sets.webm" type="video/webm" />
+    <source src="/videos/texture-sets.webm" type="video/webm" />
     <p className="video-fallback">Demo video is being generated...</p>
   </video>
 </div>

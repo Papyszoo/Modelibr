@@ -52,8 +52,8 @@ function applyTheme(theme: 'light' | 'dark') {
 
 // Initialize MSW with default handlers.
 // Use a relative worker URL so registration works both in dev (Storybook served
-// at the origin root) and on the GitHub Pages deploy, where Storybook lives
-// under the `/Modelibr/storybook/` sub-path. MSW resolves this against the
+// at the origin root) and on the deployed site, where Storybook lives
+// under the `/storybook/` sub-path. MSW resolves this against the
 // iframe's location, so the worker is found at whatever base Storybook is served
 // from - the default absolute `/mockServiceWorker.js` 404s under the sub-path.
 initialize({
