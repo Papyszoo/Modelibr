@@ -105,7 +105,6 @@ export const suites = [
         tier: "fast",
         requiresDocker: false,
         detectPath: "src/frontend/playwright.webgl.config.ts",
-        note: "Needs Playwright chromium installed (npx playwright install chromium).",
     },
     {
         id: "asset-processor",
@@ -215,7 +214,6 @@ export const suites = [
         tier: "visual",
         requiresDocker: false,
         detectPath: "src/frontend/playwright.config.ts",
-        note: "Needs Playwright chromium installed (npx playwright install chromium).",
     },
     {
         id: "e2e-performance",

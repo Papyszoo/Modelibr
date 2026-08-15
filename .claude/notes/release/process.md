@@ -69,6 +69,15 @@ the rule.
 - Still true: the self-update job runs the **FROM version's** updater code, so an
   updater fix is validated live only once **two** post-fix releases exist. Until
   then the job is red by design.
+- **Do not reach for that explanation first.** It was wrong for the 0.5.1→0.5.2
+  window and cost a week of the job being ignored. The 8-day red was a real
+  Linux bug: `quitAndInstall` fires `before-quit`, which preventDefaults the quit
+  to stop the runtime and ends with `app.exit(0)` - and `app.exit` skips
+  `will-quit`, where electron-updater installs the AppImage. Updates downloaded
+  and never applied. Read the log before assuming the lane is red by design: the
+  `[drive-update] update state` lines tell you whether the updater actually
+  worked, and `not ready after update` means the relaunch failed, not the
+  download.
 - Nightly `upgrade-test` picks the new release up at the first 07:00 UTC run after
   it is published.
 
