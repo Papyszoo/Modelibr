@@ -38,7 +38,7 @@ function HomepageHeader() {
                                 "button button--lg",
                                 styles.primaryButton,
                             )}
-                            href="https://papyszoo.github.io/Modelibr/demo/"
+                            href="https://modelibr.com/demo/"
                         >
                             <span className={styles.buttonIcon}>🎮</span>
                             Try the Live Demo

@@ -8,7 +8,7 @@ The Recycle Bin provides a safety net for deleted items, allowing you to recover
 
 <div className="feature-video-container">
   <video controls width="100%" autoPlay muted loop>
-    <source src="/Modelibr/videos/recycled-files.webm" type="video/webm" />
+    <source src="/videos/recycled-files.webm" type="video/webm" />
     <p className="video-fallback">Demo video is being generated...</p>
   </video>
 </div>

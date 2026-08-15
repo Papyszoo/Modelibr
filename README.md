@@ -10,7 +10,7 @@ Modelibr is a self-hosted game asset library. It keeps **models**, **texture set
 
 Native installers for Windows, macOS, and Linux are published in the GitHub Releases page. They bundle the local web UI, WebApi, asset processor, and PostgreSQL so non-technical users can run Modelibr without setting up Docker.
 
-**[Main Site](https://papyszoo.github.io/Modelibr/)** | **[Documentation](https://papyszoo.github.io/Modelibr/docs)** | **[Live Demo](https://papyszoo.github.io/Modelibr/demo/)** | **[Discord](https://discord.gg/KgwgTDVP3F)** | **[GitHub Issues](https://github.com/Papyszoo/Modelibr/issues)**
+**[Main Site](https://modelibr.com/)** | **[Documentation](https://modelibr.com/docs)** | **[Live Demo](https://modelibr.com/demo/)** | **[Discord](https://discord.gg/KgwgTDVP3F)** | **[GitHub Issues](https://github.com/Papyszoo/Modelibr/issues)**
 
 The live demo stores its data in your browser, so what you add there is visible only to you.
 
@@ -64,19 +64,19 @@ Open **https://localhost:3010** in your browser. The first visit uses a self-sig
 - Environment maps are exposed through WebDAV globally and inside packs/projects, alongside the rest of the library.
 - Native installers expose WebDAV through the local launcher port by default.
 - Blender-related flows are part of the repository, and Blender CLI can be downloaded at runtime from the Settings page when you want that workflow.
-- If you want more detail, start with the [main site](https://papyszoo.github.io/Modelibr/) and the [documentation](https://papyszoo.github.io/Modelibr/docs).
+- If you want more detail, start with the [main site](https://modelibr.com/) and the [documentation](https://modelibr.com/docs).
 
 ---
 
 ## Read more
 
-- [Getting Started](https://papyszoo.github.io/Modelibr/docs)
-- [Model Management](https://papyszoo.github.io/Modelibr/docs/features/models)
-- [Texture Sets](https://papyszoo.github.io/Modelibr/docs/features/texture-sets)
-- [Environment Maps](https://papyszoo.github.io/Modelibr/docs/features/environment-maps)
-- [Packs](https://papyszoo.github.io/Modelibr/docs/features/packs)
-- [Projects](https://papyszoo.github.io/Modelibr/docs/features/projects)
-- [User Interface](https://papyszoo.github.io/Modelibr/docs/features/user-interface)
+- [Getting Started](https://modelibr.com/docs)
+- [Model Management](https://modelibr.com/docs/features/models)
+- [Texture Sets](https://modelibr.com/docs/features/texture-sets)
+- [Environment Maps](https://modelibr.com/docs/features/environment-maps)
+- [Packs](https://modelibr.com/docs/features/packs)
+- [Projects](https://modelibr.com/docs/features/projects)
+- [User Interface](https://modelibr.com/docs/features/user-interface)
 
 ---
 
