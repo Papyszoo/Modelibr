@@ -1,6 +1,6 @@
 {
   "name": "modelibr-asset-processor",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "Node.js asset processor service for thumbnail rendering, waveform generation, and mesh analysis",
   "main": "index.js",
   "type": "module",

@@ -2,16 +2,22 @@
 // recordings are NEVER cut to the cap (only frozen tails are trimmed).
 // analyze-videos.js fails the pipeline when a recording exceeds its cap -
 // that means the spec choreography must be tightened, or the cap raised
-// here deliberately. Caps include headroom for slower CI rendering.
+// here deliberately.
+//
+// The durations below were measured on 2026-08-15 (v0.5.2) on the local GPU
+// lane, which since 0.5.2 is the only place these render - CI no longer does.
+// The caps still carry the headroom that was added for CI's slower software
+// rendering, so every clip now sits 43-79% under its ceiling. That makes them
+// weak gates: a clip could double in length and still pass. Tighten them
+// deliberately, from more than one measurement, when next touching a spec.
 export const videoManifest = [
     {
         slug: "model-management",
         outputName: "model-management.webm",
         title: "Model Management",
         description: "Compare versions, inspect changes, and keep model history moving.",
-        // ~40s on a local GPU; CI's software rendering paces the recorded
-        // waits to ~61s (observed 3× on the v0.4.2 main push). 45 left no
-        // CI headroom and failed the deploy.
+        // Records 25.3s locally. The old 40s/61s figures were CI-era; the
+        // 75s cap dates from when a software-rendered CI run had to fit.
         maxDurationSeconds: 75,
     },
     {
@@ -19,9 +25,10 @@ export const videoManifest = [
         outputName: "texture-sets.webm",
         title: "Texture Sets",
         description: "Inspect a reusable material built from global texture files.",
-        // Deliberate raise from 40: the choreography measures a stable ~44s
-        // locally (43.6s/44.6s over two runs, zero freeze/black frames), and
-        // main-push CI renders on software GL, which runs longer than local.
+        // Records 11.5s locally - far under the 44s this comment used to
+        // claim, and under half of any other clip. The clip is coherent and
+        // ends on its hero state, so this is choreography that got leaner,
+        // not a truncation; the shortest storyline in the set all the same.
         maxDurationSeconds: 55,
     },
     {
@@ -50,10 +57,8 @@ export const videoManifest = [
         outputName: "sounds.webm",
         title: "Sounds",
         description: "Browse, preview, and inspect sound assets.",
-        // Records ~26s locally. CI software rendering paces recorded waits
-        // ~1.5x local (measured on model-management at v0.4.2), which puts this
-        // at ~39s against the old 40s cap - inside the noise. Raised for CI
-        // headroom, not because the choreography grew.
+        // Records 25.2s locally. The 50s cap was raised for CI headroom that
+        // no longer applies.
         maxDurationSeconds: 50,
     },
     {
@@ -61,9 +66,8 @@ export const videoManifest = [
         outputName: "projects.webm",
         title: "Projects",
         description: "Browse, search, and inspect production-ready project boards.",
-        // Records ~28s locally, which the ~1.5x CI pacing puts at ~43s against
-        // the old 45s cap. Same reasoning as sounds above: too thin a margin to
-        // survive a slow runner, and an overrun blocks the docs deploy.
+        // Records 26.6s locally. The 55s cap was raised for CI headroom that
+        // no longer applies.
         maxDurationSeconds: 55,
     },
     {
