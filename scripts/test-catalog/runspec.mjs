@@ -126,6 +126,8 @@ export function buildRunSpec(spec) {
         if (p.nameFilter) { env.RUN_NAME = String(p.nameFilter); cmd += ' --test-name-pattern "$RUN_NAME"'; summary.push(`name~${p.nameFilter}`); }
         command = cmd;
         parse = (result) => parseTap(result.output);
+    } else if (suite.kind === "checks") {
+        command = suite.command;
     } else if (suite.kind === "video-pipeline") {
         const out = path.join(workDir, "videos.json");
         command = `${suite.command} -- --complete --summary="${out}"`;

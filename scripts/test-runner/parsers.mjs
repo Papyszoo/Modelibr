@@ -39,6 +39,10 @@ export function prepare(suite, workDir) {
             const command = `NODE_OPTIONS="--test-reporter=tap" ${suite.command}`;
             return { command, parse: (result) => parseTap(result.output) };
         }
+        case "checks": {
+            // Lint/format/build gates - pass or fail, nothing to count.
+            return { command: suite.command, parse: () => null };
+        }
         case "video-pipeline": {
             const out = path.join(workDir, "videos.json");
             // Flags land on the trailing verify step. After a full re-render the

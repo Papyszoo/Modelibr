@@ -10,7 +10,7 @@ Both built on branch `feat/local-test-runner` (2026-06-07). Dependency-free Node
 
 **Single source of truth: `scripts/test-runner/suites.config.mjs`.** Adding a
 suite = one entry (`kind`: dotnet | jest | vitest | node-test | playwright |
-video-pipeline). The
+checks | video-pipeline). The
 audit warns about any `*.Tests.csproj`, any `package.json` with a `test` script,
 or any `docker-compose*e2e*` not covered - that's the "keep up with new tests"
 safety net.
@@ -21,6 +21,13 @@ exits non-zero if any selected suite failed. It shells out to each suite's
 existing command - no orchestration is duplicated.
 
 Writes `test-report/index.html` (git-ignored) plus `history.jsonl`.
+
+The fast tier also carries the **non-test CI gates** as `checks` suites -
+`docs-audit`, `frontend-quality`, `asset-processor-quality`, `docs-build` - one
+per CI job, ~20s total. The point is that a green `test:all` means what a green
+PR means. `format:check` is the reason it was worth doing: it is required in CI
+and `npm run lint` does not cover it (ESLint's prettier rule only sees the files
+ESLint lints), so Markdown/JSON/CSS drift passed locally and failed on the PR.
 
 The `docs-videos` suite (slow tier, Docker) **re-records** all eight clips via
 `videos:generate` and then verifies the collected set. Checking the previous

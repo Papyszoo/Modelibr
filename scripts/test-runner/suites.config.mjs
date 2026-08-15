@@ -7,7 +7,8 @@
 // Fields:
 //   id            unique short id (used for logs/report)
 //   name          human label
-//   kind          dotnet | jest | vitest | node-test | playwright | video-verify
+//   kind          dotnet | jest | vitest | node-test | playwright | checks
+//                 | video-pipeline
 //                 (controls how the run command is built and results parsed)
 //   cwd           working directory relative to repo root
 //   command       canonical command to run (reporter flags are appended per-kind)
@@ -22,6 +23,56 @@
 export const tierOrder = ["fast", "slow", "visual", "perf"];
 
 export const suites = [
+    // The non-test CI gates. They are here because "did I break anything" has to
+    // mean the same thing locally as it does on a PR: format:check in particular
+    // is a required check that `npm run lint` does NOT cover (ESLint's
+    // prettier/prettier rule only sees the files ESLint lints), so Markdown/JSON/
+    // CSS drift passes lint locally and fails CI. Each suite mirrors one CI job,
+    // so a red suite here names the job that will go red there.
+    {
+        id: "docs-audit",
+        name: "Docs audit (docs vs code)",
+        kind: "checks",
+        cwd: ".",
+        command: "npm run docs:audit",
+        tier: "fast",
+        requiresDocker: false,
+        detectPath: "scripts/docs-audit/index.mjs",
+        note: "Checks feature docs against the FileType registry, TabType union, ports and the video manifest.",
+    },
+    {
+        id: "frontend-quality",
+        name: "Frontend quality (ESLint + Prettier + build)",
+        kind: "checks",
+        cwd: "src/frontend",
+        command: "npm run lint && npm run format:check && npm run build",
+        tier: "fast",
+        requiresDocker: false,
+        detectPath: "src/frontend/package.json",
+    },
+    {
+        id: "asset-processor-quality",
+        name: "Asset processor quality (ESLint + Prettier)",
+        kind: "checks",
+        cwd: "src/asset-processor",
+        command: "npm run lint && npm run format:check",
+        tier: "fast",
+        requiresDocker: false,
+        detectPath: "src/asset-processor/package.json",
+    },
+    {
+        id: "docs-build",
+        name: "Docs site build (Docusaurus)",
+        kind: "checks",
+        cwd: "docs",
+        // Self-contained like the other suites: the docs workspace is not
+        // installed by a root npm ci.
+        command: "([ -d node_modules ] || npm ci) && npm run build",
+        tier: "fast",
+        requiresDocker: false,
+        detectPath: "docs/package.json",
+        note: "Catches broken links and MDX errors, which only surface at build time.",
+    },
     {
         id: "backend",
         name: "Backend unit (.NET / xUnit)",
