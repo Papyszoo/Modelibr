@@ -48,6 +48,9 @@ let runtimeConfigPath = null
 let updateManager = null
 let isShuttingDown = false
 let isQuitting = false
+// Set once the updater has stopped our children and is about to hand over to
+// electron-updater. `before-quit` must not preventDefault after that point.
+let isQuittingForUpdate = false
 // Guards against re-entrant restarts: calling app.relaunch()/quit() twice spawns
 // duplicate instances and crashes the app. Once a restart is in flight every
 // further request is a no-op.
@@ -118,7 +121,7 @@ function buildTrayMenu() {
   if (update?.status === 'downloaded') {
     updateItem = {
       label: `Restart & Install v${update.latestVersion}`,
-      click: () => updateManager?.install(),
+      click: () => void updateManager?.install(),
     }
   } else if (update?.status === 'downloading') {
     updateItem = {
@@ -403,8 +406,8 @@ function registerIpc() {
     return updateManager?.state ?? null
   })
 
-  ipcMain.handle('modelibr:open-update', () => {
-    updateManager?.install()
+  ipcMain.handle('modelibr:open-update', async () => {
+    await updateManager?.install()
   })
 
   ipcMain.handle('modelibr:get-config', () => {
@@ -560,6 +563,13 @@ async function bootstrap() {
     openExternal: url => void shell.openExternal(url),
     log: runtimeLog,
     onChange: () => refreshTray(),
+    // Shut the runtime down ourselves before electron-updater quits the app.
+    // Leaving it to `before-quit` would preventDefault the quit and finish with
+    // app.exit(0), which skips `will-quit` - where the AppImage install runs.
+    prepareForInstall: async () => {
+      isQuittingForUpdate = true
+      await shutdown()
+    },
   })
 
   registerIpc()
@@ -642,7 +652,10 @@ const SHUTDOWN_DEADLINE_MS = 30000
 app.on('before-quit', event => {
   isQuitting = true
 
-  if (isShuttingDown) {
+  // A quit-for-update has already stopped the runtime. Preventing the quit here
+  // would strand electron-updater's install, which runs during `will-quit` -
+  // app.exit(0) below never gets there.
+  if (isShuttingDown || isQuittingForUpdate) {
     return
   }
 
