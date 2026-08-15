@@ -6,11 +6,18 @@ namespace Application.Search;
 
 /// <summary>
 /// Projects a derived asset (prompt 23) into search documents: one asset-level
-/// document plus one per non-hidden part. Hidden parts (collision proxies,
-/// non-zero LODs, helpers) are left out of the index entirely.
+/// document plus one per non-hidden, non-degenerate part. Hidden parts (collision
+/// proxies, non-zero LODs, helpers) and zero-volume parts are left out of the index
+/// entirely.
 /// </summary>
 public static class SearchDocumentBuilder
 {
+    /// <summary>
+    /// Quality flag set by <c>AssetDerivationEngine</c> when every dimension of a part's
+    /// bounding box is zero or negative.
+    /// </summary>
+    private const string DegenerateBoundsFlag = "degenerate_bounds";
+
     public static IReadOnlyList<AssetSearchDocument> BuildForModel(
         int modelId,
         int versionId,
@@ -89,6 +96,23 @@ public static class SearchDocumentBuilder
         foreach (var part in derived.Parts)
         {
             if (part.Prominence == Prominence.Hidden)
+            {
+                continue;
+            }
+            // A part whose bounding box is zero in every dimension occupies no space, so
+            // it can never be a sensible answer to a query that is looking for something
+            // to place in a scene. Left in the index it actively outranks real geometry:
+            // on the 1,717-model library `car` with maxTriangles=10000 returned an
+            // 8-triangle, 0x0x0 m node at rank #1, because a tiny token blob matches a
+            // short query more completely than a fully-named mesh does. An agent building
+            // a street would have placed an invisible car.
+            //
+            // Excluded rather than demoted, matching how Hidden parts are treated: the
+            // asset-level document is unaffected, so the asset itself stays findable by
+            // name and nothing becomes unreachable. Triangle count is deliberately NOT
+            // part of this test - a low-poly billboard is legitimately 2 triangles, and
+            // zero volume is the signal that actually means "not a placeable thing".
+            if (part.QualityFlags.Contains(DegenerateBoundsFlag))
             {
                 continue;
             }
