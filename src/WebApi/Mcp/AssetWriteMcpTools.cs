@@ -8,6 +8,7 @@ using Application.Extraction.Jobs;
 using Application.Models;
 using Application.Packs;
 using ModelContextProtocol.Server;
+using static WebApi.Mcp.McpWriteGuard;
 
 namespace WebApi.Mcp;
 
@@ -19,17 +20,11 @@ namespace WebApi.Mcp;
 /// Registered ONLY when <c>MCP_WRITE_ENABLED=true</c> (default off), so a stock server
 /// stays read-only and enabling writes is a deliberate, operator-scoped opt-in.
 ///
-/// Every write <b>claims</b> its caller-supplied <c>idempotencyKey</c> in
-/// <see cref="Domain.Models.AgentOperationLog"/> before applying anything. Claiming first
-/// (rather than looking the key up and then writing) is what makes a concurrent batch
-/// import safe: with a lookup, two in-flight calls sharing a key both pass the check and
-/// both apply.
+/// Idempotency-claim plumbing lives in <see cref="McpWriteGuard"/>, shared with
+/// <see cref="AssetImportMcpTools"/>.
 ///
-/// Claiming first also means a claim row is <b>not</b> evidence the write happened, so
-/// every tool body runs through <see cref="Guarded{T}"/>: only a Completed entry replays
-/// as <c>already-applied</c>, a live claim answers <c>in-progress</c> (retryable), and any
-/// exit path - returned failure, thrown exception, cancellation - releases the claim
-/// rather than leaving the key permanently burned on an operation that never ran.
+/// These tools are <b>Model-only</b> by history, not by design: the other asset families
+/// are covered by <see cref="AssetImportMcpTools"/>.
 /// </summary>
 [McpServerToolType]
 public sealed class AssetWriteMcpTools
@@ -182,15 +177,44 @@ public sealed class AssetWriteMcpTools
     {
         // Remote case: bytes must travel over HTTP; point the agent's host at the endpoints.
         // No claim is taken - nothing has been written, so a repeat is free.
+        //
+        // Field names and a worked example are returned, not just endpoint paths. The
+        // obvious reading of "POST /models/multifile (loose .gltf + external .bin)" is
+        // "post the files", which 400s: the real contract pairs each file with the URI it
+        // is referenced by, and an agent gets one guess before it burns a turn.
         if (string.IsNullOrWhiteSpace(path))
         {
             return Task.FromResult<object>(new
             {
                 status = "upload-required",
                 message = "The MCP server can't read a client-side path. Stream the file to the HTTP data plane, then finalise with set_category / add_to_pack.",
-                uploadEndpoint = "POST /models (multipart form field 'file')",
-                multiFileEndpoint = "POST /models/multifile (loose .gltf + external .bin/textures)",
-                zipEndpoint = "POST /models/zip",
+                single = new
+                {
+                    endpoint = "POST /models",
+                    contentType = "multipart/form-data",
+                    fields = new { file = "the model file (required)" },
+                },
+                multiFile = new
+                {
+                    endpoint = "POST /models/multifile",
+                    contentType = "multipart/form-data",
+                    whenToUse = "a loose .gltf that references external .bin/texture files",
+                    fields = new
+                    {
+                        primary = "the .gltf itself (required)",
+                        files = "each referenced file, repeated once per file (required)",
+                        paths = "the URI each files[i] is referenced BY, relative to the primary - same order, same count as files[]",
+                    },
+                    example = "primary=scene.gltf; files=scene.bin, files=textures/wood.png; paths=scene.bin, paths=textures/wood.png",
+                    commonMistake = "Posting only the files and omitting paths[] - the server cannot resolve the glTF's URIs and returns 400 MissingPrimary or a broken import.",
+                },
+                zip = new
+                {
+                    endpoint = "POST /models/zip",
+                    contentType = "multipart/form-data",
+                    fields = new { file = "a .zip containing the model and its companions" },
+                    whenToUse = "simplest correct choice for any multi-file asset - the server unpacks and resolves references itself",
+                },
             });
         }
 
@@ -228,87 +252,4 @@ public sealed class AssetWriteMcpTools
             cancellationToken);
     }
 
-    // ---- claim plumbing -------------------------------------------------------------
-
-    /// <summary>What a guarded tool body produced, and what the audit entry should record.</summary>
-    private sealed record ToolOutcome(
-        object Response,
-        bool Succeeded,
-        string? AssetType = null,
-        int? AssetId = null,
-        object? Payload = null);
-
-    private static ToolOutcome Applied(object response, string? assetType, int? assetId, object payload) =>
-        new(response, Succeeded: true, assetType, assetId, payload);
-
-    private static ToolOutcome Failed(SharedKernel.Error error) =>
-        new(new { error = error.Code, message = error.Message }, Succeeded: false);
-
-    private static ToolOutcome Failed(object response) => new(response, Succeeded: false);
-
-    /// <summary>
-    /// Claims the key, runs <paramref name="body"/>, and settles the claim on every exit
-    /// path. A thrown exception or a cancellation releases the claim before propagating -
-    /// otherwise a crashed call would leave the key Pending and a later retry would be
-    /// told the operation was already applied when nothing had been.
-    /// </summary>
-    private static async Task<object> Guarded(
-        IAgentAudit audit,
-        AgentWrite write,
-        Func<CancellationToken, Task<ToolOutcome>> body,
-        CancellationToken cancellationToken)
-    {
-        var claim = await audit.TryBeginAsync(write, cancellationToken);
-        switch (claim.Outcome)
-        {
-            case AgentClaimOutcome.AlreadyApplied:
-                return AlreadyApplied(claim.Entry!);
-            case AgentClaimOutcome.InProgress:
-                return InProgress(claim.Entry!);
-        }
-
-        try
-        {
-            var outcome = await body(cancellationToken);
-            if (!outcome.Succeeded)
-            {
-                await audit.AbandonAsync(write.IdempotencyKey, CancellationToken.None);
-                return outcome.Response;
-            }
-
-            await audit.CompleteAsync(
-                write.IdempotencyKey,
-                outcome.AssetType,
-                outcome.AssetId,
-                outcome.Payload is null ? null : Json(outcome.Payload),
-                CancellationToken.None);
-            return outcome.Response;
-        }
-        catch
-        {
-            // CancellationToken.None on purpose: the caller's token may already be
-            // cancelled, and releasing the claim is exactly what must still happen.
-            await audit.AbandonAsync(write.IdempotencyKey, CancellationToken.None);
-            throw;
-        }
-    }
-
-    private static object AlreadyApplied(Domain.Models.AgentOperationLog prior) => new
-    {
-        status = "already-applied",
-        operation = prior.Operation,
-        performedAt = prior.PerformedAt,
-        completedAt = prior.CompletedAt,
-        assetId = prior.AssetId,
-    };
-
-    private static object InProgress(Domain.Models.AgentOperationLog prior) => new
-    {
-        status = "in-progress",
-        operation = prior.Operation,
-        claimedAt = prior.ClaimedAt,
-        message = "Another call is applying this idempotency key. It has NOT been applied yet - retry, and it will either complete or be retried for you once the claim lapses.",
-    };
-
-    private static string Json(object value) => JsonSerializer.Serialize(value);
 }
