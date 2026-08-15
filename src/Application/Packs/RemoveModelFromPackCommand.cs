@@ -1,6 +1,7 @@
 using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Extraction;
 using Domain.Services;
 using SharedKernel;
 
@@ -10,17 +11,20 @@ internal class RemoveModelFromPackCommandHandler : ICommandHandler<RemoveModelFr
 {
     private readonly IPackRepository _packRepository;
     private readonly IModelRepository _modelRepository;
+    private readonly IAssetSearchDocumentRepository _searchDocumentRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IUnitOfWork _unitOfWork;
 
     public RemoveModelFromPackCommandHandler(
         IPackRepository packRepository,
         IModelRepository modelRepository,
+        IAssetSearchDocumentRepository searchDocumentRepository,
         IDateTimeProvider dateTimeProvider,
         IUnitOfWork unitOfWork)
     {
         _packRepository = packRepository;
         _modelRepository = modelRepository;
+        _searchDocumentRepository = searchDocumentRepository;
         _dateTimeProvider = dateTimeProvider;
         _unitOfWork = unitOfWork;
     }
@@ -44,6 +48,15 @@ internal class RemoveModelFromPackCommandHandler : ICommandHandler<RemoveModelFr
         pack.RemoveModel(model, _dateTimeProvider.UtcNow);
 
         await _packRepository.UpdateAsync(pack, cancellationToken);
+
+        // Mirror the membership change onto the search projection - see
+        // IAssetSearchDocumentRepository.SetPacksForAssetAsync.
+        var names = await _packRepository.GetNamesByModelIdAsync(model.Id, cancellationToken);
+        await _searchDocumentRepository.SetPacksForAssetAsync(
+            ExtractionAssetTypes.Model,
+            model.Id,
+            names.Where(n => !string.Equals(n, pack.Name, StringComparison.OrdinalIgnoreCase)),
+            cancellationToken);
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         return Result.Success();

@@ -52,10 +52,12 @@ public class AssetSearchIntegrationTests : IClassFixture<ModelibrWebFactory>
         int? boneCount = null,
         double? maxDimension = null,
         int? categoryId = null,
-        string? categoryName = null) =>
+        string? categoryName = null,
+        IEnumerable<string>? packNames = null) =>
         AssetSearchDocument.Create(
             "Model", assetId, versionId, partPath, current, prominence,
             displayName, tokens, browseSummary, DateTime.UtcNow,
+            packNames: packNames,
             triangleCount: triangleCount,
             boneCount: boneCount,
             vertexCount: vertexCount,
@@ -89,6 +91,40 @@ public class AssetSearchIntegrationTests : IClassFixture<ModelibrWebFactory>
         // The tokenised-name hit outranks the prose/substring hit.
         Assert.Equal(90101, result.Hits[0].AssetId);
         Assert.Equal("token", result.Hits[0].MatchedOn);
+    }
+
+    [Fact]
+    public async Task PackName_FindsItsMembers()
+    {
+        // Author-written grouping: the library already knows this asset ships in
+        // "Polygonopolis", so "polygonopolis" should reach it even though nothing in the
+        // asset's own name or tokens says so.
+        await SeedAsync(
+            Doc(91101, tokens: "bench wooden", displayName: "Bench",
+                packNames: new[] { "Polygonopolis" }));
+
+        var result = await SearchAsync(Request("polygonopolis"));
+
+        Assert.Contains(result.Hits, h => h.AssetId == 91101);
+    }
+
+    [Fact]
+    public async Task PackName_RanksBelowTheAssetsOwnName()
+    {
+        // A pack is a container, not a description. "The Base Mesh" has 1,360 members, so
+        // a pack-name match admits a huge undifferentiated set and must never displace a
+        // document that matched on what the asset actually is.
+        await SeedAsync(
+            // Matches only because it lives in a pack of that name.
+            Doc(91111, tokens: "bench wooden", displayName: "Bench",
+                packNames: new[] { "Streetlamp" }),
+            // Matches on its own authored name.
+            Doc(91112, tokens: "streetlamp metal", displayName: "Streetlamp"));
+
+        var result = await SearchAsync(Request("streetlamp"));
+
+        Assert.True(result.Hits.Count >= 2);
+        Assert.Equal(91112, result.Hits[0].AssetId);
     }
 
     [Fact]

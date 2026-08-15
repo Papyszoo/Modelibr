@@ -87,6 +87,18 @@ public class AssetSearchDocument
     public int? CategoryId { get; private set; }
     public string? CategoryName { get; private set; }
 
+    /// <summary>
+    /// Space-joined names of every pack this asset belongs to, denormalised for search.
+    /// Author-written grouping: a human named the pack and chose to put this asset in it,
+    /// so it is free taxonomy the library already has.
+    ///
+    /// Stored space-joined (not one row per pack) so it matches with the same
+    /// boundary-ILIKE shape as <see cref="Tokens"/> and <see cref="ConceptLabels"/>, and
+    /// so a pack change is a single-column patch rather than a projection rebuild.
+    /// Asset-level documents only - a part does not belong to a pack, its asset does.
+    /// </summary>
+    public string? PackNames { get; private set; }
+
     public DateTime UpdatedAt { get; private set; }
 
     public static AssetSearchDocument Create(
@@ -119,7 +131,8 @@ public class AssetSearchDocument
         double? maxDimension = null,
         int? categoryId = null,
         string? categoryName = null,
-        bool isActive = true)
+        bool isActive = true,
+        IEnumerable<string>? packNames = null)
     {
         if (string.IsNullOrWhiteSpace(assetType))
             throw new ArgumentException("Asset type cannot be null or whitespace.", nameof(assetType));
@@ -159,8 +172,29 @@ public class AssetSearchDocument
             MaxDimension = maxDimension,
             CategoryId = categoryId,
             CategoryName = string.IsNullOrWhiteSpace(categoryName) ? null : categoryName.Trim(),
+            PackNames = NormalizePackNames(packNames),
             UpdatedAt = updatedAt
         };
+    }
+
+    /// <summary>
+    /// Trims and space-joins pack names, collapsing empties away. Returns null rather
+    /// than an empty string so "belongs to no pack" is one value, not two.
+    /// </summary>
+    private static string? NormalizePackNames(IEnumerable<string>? packNames)
+    {
+        if (packNames is null) return null;
+        var cleaned = packNames
+            .Where(n => !string.IsNullOrWhiteSpace(n))
+            .Select(n => n.Trim())
+            // Sorted so the stored blob depends only on WHICH packs an asset is in, not on
+            // the order the caller happened to assemble them. Order carries no meaning for
+            // matching (every clause is a boundary ILIKE), so leaving it caller-dependent
+            // would only make the same membership persist as two different strings - and
+            // the backfill migration already sorts.
+            .OrderBy(n => n, StringComparer.Ordinal)
+            .ToList();
+        return cleaned.Count == 0 ? null : string.Join(' ', cleaned);
     }
 
     /// <summary>Flips the current-version marker (used when a newer version becomes active).</summary>
@@ -178,5 +212,18 @@ public class AssetSearchDocument
     {
         CategoryId = categoryId;
         CategoryName = string.IsNullOrWhiteSpace(categoryName) ? null : categoryName.Trim();
+    }
+
+    /// <summary>
+    /// Re-points the denormalised pack names after a membership-only mutation.
+    ///
+    /// Pack membership changes AFTER extraction - add_to_pack, remove, pack rename and
+    /// pack delete all happen without re-deriving the asset - so a projection that only
+    /// learned pack names at build time would be stale from the first add. Patching in
+    /// place is the same contract <see cref="SetCategory"/> already provides.
+    /// </summary>
+    public void SetPacks(IEnumerable<string>? packNames)
+    {
+        PackNames = NormalizePackNames(packNames);
     }
 }

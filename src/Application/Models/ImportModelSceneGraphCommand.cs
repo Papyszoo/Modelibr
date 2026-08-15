@@ -209,7 +209,11 @@ internal sealed class ImportModelSceneGraphCommandHandler : ICommandHandler<Impo
             categoryId: version.Model?.ModelCategoryId,
             categoryName: version.Model?.ModelCategory?.Name,
             // A recycled model must stay out of search after a re-extraction too.
-            isActive: version.Model?.IsDeleted != true && !version.IsDeleted);
+            isActive: version.Model?.IsDeleted != true && !version.IsDeleted,
+            // Pack membership is author-written grouping. It is also patched in place by
+            // the pack commands, so this only seeds it - a re-derive must not blank out
+            // packs the asset joined since the last extraction.
+            packNames: version.Model?.Packs?.Select(p => p.Name));
         foreach (var doc in searchDocs)
         {
             await _searchDocumentRepository.AddAsync(doc, cancellationToken);

@@ -20,6 +20,11 @@ internal sealed class ModelVersionRepository : IModelVersionRepository
         return await _context.ModelVersions
             .Include(v => v.Model)
                 .ThenInclude(m => m.ModelCategory)
+            // Pack names are denormalised onto the search projection, so the rebuild in
+            // ImportModelSceneGraphCommand needs them loaded. Cheap: a model sits in a
+            // handful of packs at most.
+            .Include(v => v.Model)
+                .ThenInclude(m => m.Packs)
             .Include(v => v.Files)
             .Include(v => v.Thumbnail)
             .Include(v => v.TextureMappings)

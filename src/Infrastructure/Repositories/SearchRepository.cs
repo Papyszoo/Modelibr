@@ -280,6 +280,23 @@ internal sealed class SearchRepository : ISearchRepository
                  || EF.Functions.ILike(" " + d.ConceptLabels + " ", b41),
             C5 = EF.Functions.ILike(" " + d.ConceptLabels + " ", b50)
                  || EF.Functions.ILike(" " + d.ConceptLabels + " ", b51),
+            // Pack membership: author-written grouping ("POLYGON City", "CC0 Models").
+            // Ranked BELOW inferred concepts despite being authored, because a pack is a
+            // container, not a description - "The Base Mesh" has 1,360 members, so a
+            // pack-name match admits a huge undifferentiated set and must never displace
+            // a document that matched on what the asset actually is.
+            K0 = EF.Functions.ILike(" " + d.PackNames + " ", b00)
+                 || EF.Functions.ILike(" " + d.PackNames + " ", b01),
+            K1 = EF.Functions.ILike(" " + d.PackNames + " ", b10)
+                 || EF.Functions.ILike(" " + d.PackNames + " ", b11),
+            K2 = EF.Functions.ILike(" " + d.PackNames + " ", b20)
+                 || EF.Functions.ILike(" " + d.PackNames + " ", b21),
+            K3 = EF.Functions.ILike(" " + d.PackNames + " ", b30)
+                 || EF.Functions.ILike(" " + d.PackNames + " ", b31),
+            K4 = EF.Functions.ILike(" " + d.PackNames + " ", b40)
+                 || EF.Functions.ILike(" " + d.PackNames + " ", b41),
+            K5 = EF.Functions.ILike(" " + d.PackNames + " ", b50)
+                 || EF.Functions.ILike(" " + d.PackNames + " ", b51),
             // Whole-name match on the original phrase: "park bench" should still beat a
             // document that merely carries both words separately. Multi-word queries only
             // - for a single word this just repeats the name match below, and promoting it
@@ -303,6 +320,8 @@ internal sealed class SearchRepository : ISearchRepository
                             + (x.P3 ? 1 : 0) + (x.P4 ? 1 : 0) + (x.P5 ? 1 : 0),
             ConceptCoverage = (x.C0 ? 1 : 0) + (x.C1 ? 1 : 0) + (x.C2 ? 1 : 0)
                               + (x.C3 ? 1 : 0) + (x.C4 ? 1 : 0) + (x.C5 ? 1 : 0),
+            PackCoverage = (x.K0 ? 1 : 0) + (x.K1 ? 1 : 0) + (x.K2 ? 1 : 0)
+                           + (x.K3 ? 1 : 0) + (x.K4 ? 1 : 0) + (x.K5 ? 1 : 0),
         })
         .Select(x => new
         {
@@ -312,12 +331,14 @@ internal sealed class SearchRepository : ISearchRepository
             x.LiteralCoverage,
             x.ProseCoverage,
             x.ConceptCoverage,
+            x.PackCoverage,
             // A confident fuzzy match counts as covering the (single) query word, so a
             // near-miss on the real name competes with an incidental substring hit:
             // "aple" must reach "apple", not stop at "staple".
             Coverage = x.LiteralCoverage + (x.Similarity > TrigramThreshold ? 1 : 0),
         })
-        .Where(x => x.Coverage > 0 || x.ConceptCoverage > 0 || x.ProseCoverage > 0);
+        .Where(x => x.Coverage > 0 || x.ConceptCoverage > 0 || x.ProseCoverage > 0
+                    || x.PackCoverage > 0);
 
         // Count assets, not documents. An asset is indexed once for itself and once per
         // part, so the old document count reported "46 chairs" for 17 chairs - and the
@@ -337,6 +358,7 @@ internal sealed class SearchRepository : ISearchRepository
             .OrderByDescending(x => x.PhraseHit)   // the whole phrase in the name wins
             .ThenByDescending(x => x.Coverage)     // then: how many query words the NAME matched
             .ThenByDescending(x => x.ConceptCoverage) // then inferred concepts
+            .ThenByDescending(x => x.PackCoverage)    // then the pack that contains it
             .ThenByDescending(x => x.Doc.PartPath == null) // whole assets before their parts
             .ThenByDescending(x => x.Similarity)   // a close name match beats an incidental one
             .ThenByDescending(x => x.ProseCoverage) // generated summary text is the weakest signal

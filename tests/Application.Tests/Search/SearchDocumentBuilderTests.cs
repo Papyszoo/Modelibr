@@ -88,6 +88,84 @@ public class SearchDocumentBuilderTests
         Assert.Equal("Weapons", asset.CategoryName);
     }
 
+    private static DerivedAsset DerivedWithParts(params DerivedPart[] parts) =>
+        new(
+            DeriveVersion: 1,
+            Tokens: new[] { "car" },
+            OriginConvention: null,
+            GridSize: null,
+            ModularKit: false,
+            ShapeClass: "blocky",
+            LodChains: Array.Empty<DerivedLodChain>(),
+            QualityFlags: Array.Empty<string>(),
+            BrowseSummary: "a car",
+            Unnamed: false,
+            Parts: parts);
+
+    private static DerivedPart PartWithFlags(string path, params string[] qualityFlags) =>
+        new(
+            PartPath: path,
+            Tokens: new[] { "car" },
+            Prominence: Prominence.Full,
+            ShapeClass: "blocky",
+            InstanceGroup: null,
+            InstanceRepresentative: false,
+            QualityFlags: qualityFlags,
+            BrowseSummary: "a car body");
+
+    [Fact]
+    public void BuildForModel_Excludes_Degenerate_Parts_From_The_Index()
+    {
+        // A zero-volume node is not a placeable thing. On the real 1,717-model library,
+        // `car` + maxTriangles=10000 returned an 8-triangle, 0x0x0 m node at rank #1 -
+        // an agent building a street would have placed an invisible car. A short token
+        // blob matches a short query more completely than a fully-named mesh does, so
+        // leaving these in the index lets them outrank real geometry.
+        var docs = SearchDocumentBuilder.BuildForModel(
+            modelId: 1, versionId: 1, isCurrentVersion: true,
+            assetName: "Car",
+            derived: DerivedWithParts(
+                PartWithFlags("Root/Body"),
+                PartWithFlags("Root/Empty", "degenerate_bounds")),
+            rollups: Rollups(), rawParts: new[] { Part() }, now: DateTime.UtcNow);
+
+        var partPaths = docs.Where(d => d.PartPath != null).Select(d => d.PartPath).ToList();
+
+        Assert.Contains("Root/Body", partPaths);
+        Assert.DoesNotContain("Root/Empty", partPaths);
+    }
+
+    [Fact]
+    public void BuildForModel_Keeps_The_Asset_Findable_When_Every_Part_Is_Degenerate()
+    {
+        // Excluding parts must never make the asset itself unreachable - the asset-level
+        // document carries the authored name, so a user searching for it by name still
+        // finds it even when none of its nodes are placeable.
+        var docs = SearchDocumentBuilder.BuildForModel(
+            modelId: 1, versionId: 1, isCurrentVersion: true,
+            assetName: "Car",
+            derived: DerivedWithParts(PartWithFlags("Root/Empty", "degenerate_bounds")),
+            rollups: Rollups(), rawParts: new[] { Part() }, now: DateTime.UtcNow);
+
+        Assert.Single(docs);
+        Assert.Equal("Car", AssetDoc(docs).DisplayName);
+    }
+
+    [Fact]
+    public void BuildForModel_Keeps_Parts_Carrying_Other_Quality_Flags()
+    {
+        // Only zero volume excludes. A part with no UVs or a negative scale is a real
+        // mesh with a fixable problem - and "everything without UVs" is exactly the kind
+        // of filter-only browse query these flags exist to answer.
+        var docs = SearchDocumentBuilder.BuildForModel(
+            modelId: 1, versionId: 1, isCurrentVersion: true,
+            assetName: "Car",
+            derived: DerivedWithParts(PartWithFlags("Root/Body", "no_uvs", "negative_scale")),
+            rollups: Rollups(), rawParts: new[] { Part() }, now: DateTime.UtcNow);
+
+        Assert.Contains(docs, d => d.PartPath == "Root/Body");
+    }
+
     [Fact]
     public void BuildForModel_Without_Category_Leaves_Category_Null()
     {

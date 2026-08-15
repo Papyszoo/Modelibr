@@ -1,6 +1,7 @@
 using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Extraction;
 using Domain.Services;
 using SharedKernel;
 
@@ -11,6 +12,7 @@ internal class AddModelToPackCommandHandler : ICommandHandler<AddModelToPackComm
     private readonly IPackRepository _packRepository;
     private readonly IModelRepository _modelRepository;
     private readonly IBatchUploadRepository _batchUploadRepository;
+    private readonly IAssetSearchDocumentRepository _searchDocumentRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IUnitOfWork _unitOfWork;
 
@@ -18,12 +20,14 @@ internal class AddModelToPackCommandHandler : ICommandHandler<AddModelToPackComm
         IPackRepository packRepository,
         IModelRepository modelRepository,
         IBatchUploadRepository batchUploadRepository,
+        IAssetSearchDocumentRepository searchDocumentRepository,
         IDateTimeProvider dateTimeProvider,
         IUnitOfWork unitOfWork)
     {
         _packRepository = packRepository;
         _modelRepository = modelRepository;
         _batchUploadRepository = batchUploadRepository;
+        _searchDocumentRepository = searchDocumentRepository;
         _dateTimeProvider = dateTimeProvider;
         _unitOfWork = unitOfWork;
     }
@@ -48,6 +52,16 @@ internal class AddModelToPackCommandHandler : ICommandHandler<AddModelToPackComm
         {
             pack.AddModel(model, _dateTimeProvider.UtcNow);
             await _packRepository.UpdateAsync(pack, cancellationToken);
+
+            // Search reads projection state only, so a membership change that never
+            // reaches the projection is invisible until the next re-derive - which for a
+            // freshly imported-then-packed model may never come.
+            var names = await _packRepository.GetNamesByModelIdAsync(model.Id, cancellationToken);
+            await _searchDocumentRepository.SetPacksForAssetAsync(
+                ExtractionAssetTypes.Model,
+                model.Id,
+                names.Append(pack.Name).Distinct(StringComparer.OrdinalIgnoreCase),
+                cancellationToken);
         }
 
         // Update batch upload records for this model to include pack association

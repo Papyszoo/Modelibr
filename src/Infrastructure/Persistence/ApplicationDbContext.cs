@@ -1369,6 +1369,10 @@ namespace Infrastructure.Persistence
                 entity.Property(e => e.MaxDimension).IsRequired(false);
                 entity.Property(e => e.CategoryId).IsRequired(false);
                 entity.Property(e => e.CategoryName).IsRequired(false).HasMaxLength(200);
+                // Space-joined pack names. Generous length because an asset can sit in
+                // several packs; no GIN index, matching ConceptLabels - this is a weak
+                // tie-breaking signal, not a primary retrieval path.
+                entity.Property(e => e.PackNames).IsRequired(false).HasMaxLength(1000);
                 entity.Property(e => e.UpdatedAt).IsRequired();
 
                 // One document per (asset, version, part). NULLS NOT DISTINCT so the
