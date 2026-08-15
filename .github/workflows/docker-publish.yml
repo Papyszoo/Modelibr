@@ -76,6 +76,11 @@ jobs:
                   SHA="${{ github.event.workflow_run.head_sha }}"
                   echo "sha_short=${SHA::7}" >> "$GITHUB_OUTPUT"
                   echo "owner_lc=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+                  # This workflow only ever runs for main, and main only advances
+                  # at a release, so the checked-out version is the released one.
+                  # Without this the images carried no version tag at all and a
+                  # self-hoster had nothing to pin to - only the rolling :dev.
+                  echo "version=$(jq -r .version package.json)" >> "$GITHUB_OUTPUT"
 
             - name: Set up Docker Buildx
               uses: docker/setup-buildx-action@v3
@@ -96,6 +101,7 @@ jobs:
                   tags: |
                       ghcr.io/${{ steps.vars.outputs.owner_lc }}/modelibr-frontend:dev
                       ghcr.io/${{ steps.vars.outputs.owner_lc }}/modelibr-frontend:dev-sha-${{ steps.vars.outputs.sha_short }}
+                      ghcr.io/${{ steps.vars.outputs.owner_lc }}/modelibr-frontend:${{ steps.vars.outputs.version }}
 
             - name: Build and push modelibr-webapi
               uses: docker/build-push-action@v6
@@ -106,6 +112,7 @@ jobs:
                   tags: |
                       ghcr.io/${{ steps.vars.outputs.owner_lc }}/modelibr-webapi:dev
                       ghcr.io/${{ steps.vars.outputs.owner_lc }}/modelibr-webapi:dev-sha-${{ steps.vars.outputs.sha_short }}
+                      ghcr.io/${{ steps.vars.outputs.owner_lc }}/modelibr-webapi:${{ steps.vars.outputs.version }}
 
             - name: Build and push modelibr-asset-processor
               uses: docker/build-push-action@v6
@@ -116,3 +123,4 @@ jobs:
                   tags: |
                       ghcr.io/${{ steps.vars.outputs.owner_lc }}/modelibr-asset-processor:dev
                       ghcr.io/${{ steps.vars.outputs.owner_lc }}/modelibr-asset-processor:dev-sha-${{ steps.vars.outputs.sha_short }}
+                      ghcr.io/${{ steps.vars.outputs.owner_lc }}/modelibr-asset-processor:${{ steps.vars.outputs.version }}
