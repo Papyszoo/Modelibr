@@ -376,7 +376,20 @@ export class EnvironmentMapsPage {
     async openEnvironmentMapByName(name: string): Promise<void> {
         await this.waitForEnvironmentMapByName(name, 15000);
         const card = this.getEnvironmentMapCardByName(name);
-        await card.click();
+        // waitForEnvironmentMapByName returns the moment the card becomes
+        // visible mid-scroll, but VirtuosoGrid is still recycling rows around
+        // it, so the card's box keeps moving. Playwright's actionability check
+        // then never sees it "stable" - the nightly logged `locator resolved to
+        // <article class="environment-map-card">` followed by dozens of
+        // `waiting for element to be visible, enabled and stable`.
+        //
+        // Park the scroll on the card so the grid settles, then bound the
+        // click. The bound is the important half: an unbounded click inherits
+        // the *test* timeout, and one stuck click burned 36 minutes of a
+        // 52-minute nightly before failing.
+        await card.scrollIntoViewIfNeeded({ timeout: 15000 });
+        await expect(card).toBeVisible({ timeout: 15000 });
+        await card.click({ timeout: 15000 });
         await this.waitForViewer(name);
     }
 
