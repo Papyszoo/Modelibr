@@ -6,6 +6,16 @@
 // `note` flags caveats (e.g. built-but-not-run, or not wired into CI at all).
 
 export const ciMap = {
+    "docs-audit": [{ workflow: "ci-and-deploy.yml", jobName: "Docs Audit" }],
+    "frontend-quality": [
+        { workflow: "code-quality.yml", jobName: "Frontend Code Quality" },
+    ],
+    "asset-processor-quality": [
+        { workflow: "code-quality.yml", jobName: "Asset Processor Code Quality" },
+    ],
+    "docs-build": [
+        { workflow: "ci-and-deploy.yml", jobName: "Build Documentation" },
+    ],
     backend: [{ workflow: "ci-and-deploy.yml", jobName: "Backend Unit Tests" }],
     "backend-integration": [
         { workflow: null, jobName: null, note: "Excluded from CI (Category!=Integration filter)" },
@@ -34,6 +44,13 @@ export const ciMap = {
     ],
     "e2e-performance": [
         { workflow: null, jobName: null, note: "Opt-in only; not in CI" },
+    ],
+    "docs-videos": [
+        {
+            workflow: null,
+            jobName: null,
+            note: "Not in CI - runners have no GPU, so the clips render black there; the local GPU lane is the only place this runs",
+        },
     ],
 };
 

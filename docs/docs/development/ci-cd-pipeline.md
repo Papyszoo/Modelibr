@@ -1,173 +1,64 @@
-# CI/CD Pipeline and E2E Test Reports
+# CI/CD Pipeline
 
-This document explains how the unified CI/CD pipeline works and how to access E2E test reports.
+Modelibr uses GitHub Actions to verify changes, build release artifacts, and
+publish the documentation site.
 
-## Overview
+## Verification jobs
 
-Modelibr uses GitHub Actions workflows that:
+The main workflow is `.github/workflows/ci-and-deploy.yml` ("CI and Build Docs").
+It runs the relevant checks for each change, including:
 
-1. Runs all test suites (backend, frontend, asset processor, Blender addon, and E2E tests)
-2. Runs code quality checks (linting, formatting) on frontend and asset processor
-3. Automatically generates the documentation feature videos
-4. Automatically collects the latest 10 test reports
-5. Deploys them alongside the documentation to GitHub Pages
+- .NET backend unit tests
+- React frontend unit tests and formatting checks
+- Asset processor tests and formatting checks
+- Playwright end-to-end tests
+- Storybook production builds
+- Documentation audits and production builds
 
-## Accessing Test Reports
+Test logs and reports remain GitHub Actions artifacts for CI diagnosis. They are
+not copied into the documentation bundle or linked from the public website.
 
-The latest test reports (Backend, Frontend, Asset Processor, Blender Addon, and E2E) are always available on the documentation site, updated after every test run (from any branch):
+## Documentation build
 
-**[View Test Reports](/test-reports)**
+The documentation job creates one `docs-site` artifact containing:
 
-You can also access them from the navigation bar at the top of this site.
+- the Docusaurus documentation and landing page
+- the demo-mode frontend under `/demo/`
+- Storybook under `/storybook/`
 
-### How Reports Are Updated
+Feature videos are **not** in this bundle. Capturing them drives the same WebGL
+render as the end-to-end suite, which is unreliable on GitHub's GPU-less
+runners, so they are rendered on a machine with a GPU and published separately
+to the site's own `/videos/` path. That is why the feature pages reference them
+by absolute URL rather than as build assets.
 
-- **After any CI run completes** (from any branch, whether tests pass or fail):
-    - The workflow generates the documentation feature videos for the current run
-    - The workflow fetches the last 10 test reports from all workflow runs
-    - Builds the documentation using the **main branch** content
-    - Deploys to GitHub Pages with the updated reports
+Run the documentation checks locally with:
 
-- **Report artifacts** are also available:
-    1. Go to the workflow run in GitHub Actions
-    2. Scroll to the "Artifacts" section at the bottom
-    3. Download the `docs-with-reports` artifact
-    4. Extract the zip file and open `test-reports/index.html` in your browser
+```bash
+npm run docs:audit
+cd docs && npm run build
+```
 
-## How It Works
+## Deployment
 
-### Workflow Structure
+Publishing is a manual step, not a workflow. CI builds and uploads the
+`docs-site` artifact; a maintainer publishes it to `modelibr.com` when cutting a
+release, alongside the separately-rendered feature videos.
 
-The workflow is defined in `.github/workflows/ci-and-deploy.yml` and consists of:
+The publish refuses to sync a bundle without an `index.html`, so a partial or
+empty build cannot wipe the live site, and it protects `/videos/` from deletion
+so the independently-published clips survive a documentation update.
 
-1. **Test Jobs** (run on all branches and PRs):
-    - `backend-tests`: .NET unit tests
-    - `frontend-tests`: React unit tests
-    - `asset-processor-tests`: Vitest unit tests for the asset processor (results uploaded as JSON artifact)
-    - `blender-addon-tests`: Python unit tests
-    - `e2e-tests`: Playwright end-to-end tests
-    - `ci-status`: Aggregates results from all tests
+## CI artifacts
 
-2. **Documentation Building and Deployment** (runs after all tests, even if they fail):
-    - Generates the feature demo videos used by the docs site
-    - Checks out the **current branch** for workflow scripts
-    - Checks out the **main branch** for documentation content
-    - Copies scripts from current branch (ensures latest tooling)
-    - Copies docs from main branch (ensures stable content)
-    - Fetches the last 10 test reports from **all workflow runs** (any branch)
-    - Builds the Docusaurus documentation site
-    - Uploads docs with reports as artifact (`docs-with-reports`) for download
-    - **Always deploys to GitHub Pages** after successful build
+Individual jobs upload short-lived artifacts such as unit-test summaries,
+Playwright reports, and Storybook output. Open the relevant workflow run in
+GitHub Actions to inspect or download them. These artifacts are not part of the
+public documentation site.
 
-This means the documentation site is continuously updated with the latest test reports from any branch, while the documentation content itself comes from the main branch.
+## Code quality workflow
 
-### Report Collection Process
-
-The `.github/scripts/fetch-test-reports.sh` script:
-
-1. Uses the GitHub API to fetch recent workflow runs from all branches
-2. Downloads the `playwright-report` artifacts from the last 10 completed E2E test runs
-3. Extracts them to `docs/static/test-reports/run-{number}/`
-4. Generates an index page that displays all reports with metadata (date, time, pass/fail status)
-5. Reports are automatically cleaned up - only the last 10 are kept
-
-### Report Storage
-
-- **During CI**: Reports are uploaded as GitHub Actions artifacts with 30-day retention
-- **On GitHub Pages**: The last 5 reports are embedded in the documentation site
-- **Locally**: Reports are ignored by git (see `docs/.gitignore`)
-
-## For Maintainers
-
-### Triggering a Documentation Deployment
-
-Documentation is automatically deployed to GitHub Pages when:
-
-- A commit is pushed to the `main` branch
-- All CI tests pass successfully
-
-Feature videos for the documentation are generated automatically as part of the same workflow on
-every `push`, `pull_request`, and manual `workflow_dispatch` run so the docs build always has the
-current `/Modelibr/videos/*.webm` assets available.
-
-You can also manually trigger a deployment:
-
-1. Go to the [Actions tab](https://github.com/Papyszoo/Modelibr/actions)
-2. Select the "CI and Deploy Docs" workflow
-3. Click "Run workflow" and select the `main` branch
-
-### Adding More/Fewer Reports
-
-To change the number of reports displayed:
-
-1. Edit `.github/scripts/fetch-test-reports.sh`
-2. Change the condition `if [ ${REPORT_COUNT} -ge 10 ];` to your desired number
-3. Update this documentation accordingly
-
-### Troubleshooting
-
-#### No Reports Showing
-
-If no reports appear on the E2E Reports page:
-
-- Check that E2E tests are running successfully in CI
-- Verify the workflow run has the `playwright-report` artifact
-- Check the workflow logs for the "Fetch last 10 test reports" step
-
-#### Reports Not Updating
-
-- Ensure you're on the `main` branch
-- Check that all CI tests passed
-- Wait a few minutes for GitHub Pages to deploy
-
-#### Script Errors
-
-The fetch script requires:
-
-- `curl` for API calls
-- `jq` for JSON parsing
-- `unzip` for extracting artifacts
-
-These are pre-installed on GitHub Actions runners.
-
-## Technical Details
-
-### Permissions Required
-
-The workflow needs these GitHub permissions:
-
-- `contents: read` - Read repository code
-- `pages: write` - Deploy to GitHub Pages
-- `id-token: write` - OIDC for Pages deployment
-- `actions: read` - Access workflow artifacts
-
-### API Rate Limits
-
-The GitHub API has rate limits:
-
-- 1,000 requests per hour for authenticated requests
-- The fetch script makes ~20 API calls per run
-- This allows for frequent deployments without hitting limits
-
-### Artifact Retention
-
-- Artifacts are retained for 30 days by default
-- After 30 days, older reports may not be available for fetching
-- Reports already on GitHub Pages remain until replaced
-
-## Code Quality Workflow
-
-A separate workflow is defined in `.github/workflows/code-quality.yml` and runs on all branches and PRs:
-
-- `frontend-quality`: Runs ESLint, Prettier checks, and build verification for the frontend
-- `asset-processor-quality`: Runs ESLint, Prettier checks, and unit tests for the asset processor
-- `code-quality-status`: Aggregates results from all quality jobs
-
-## Removed Workflows
-
-This unified workflow replaces:
-
-- `.github/workflows/ci.yml` (standalone CI)
-- `.github/workflows/deploy-docs.yml` (standalone docs deployment)
-
-These separate workflows are no longer needed and have been replaced by the unified approach.
+`.github/workflows/code-quality.yml` runs path-filtered frontend and asset
+processor quality checks. Required checks that must report on every pull request
+remain in the main workflow so branch protection cannot deadlock when a
+path-filtered job is skipped.

@@ -19,7 +19,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { suites } from "../test-runner/suites.config.mjs";
 import { REPO_ROOT, REPORT_DIR } from "../test-runner/util.mjs";
-import { parseTrx, parseJestLike, parseTap } from "../test-runner/parsers.mjs";
+import { parseTrx, parseJestLike, parseTap, parseCounts } from "../test-runner/parsers.mjs";
 
 // Virtual suite: run EVERYTHING through the local mega-runner. Not part of the
 // manifest (the runner would recurse on itself); only the Studio offers it.
@@ -126,6 +126,18 @@ export function buildRunSpec(spec) {
         if (p.nameFilter) { env.RUN_NAME = String(p.nameFilter); cmd += ' --test-name-pattern "$RUN_NAME"'; summary.push(`name~${p.nameFilter}`); }
         command = cmd;
         parse = (result) => parseTap(result.output);
+    } else if (suite.kind === "checks") {
+        command = suite.command;
+    } else if (suite.kind === "video-pipeline") {
+        const out = path.join(workDir, "videos.json");
+        command = `${suite.command} -- --complete --summary="${out}"`;
+        // Skip the ~15-minute re-render and only re-check the set already on
+        // disk. Useful right after a render, useless as a test of current code.
+        if (p.verifyOnly) {
+            command = `npm run videos:verify -- --complete --summary="${out}"`;
+            summary.push("verify only (no re-render)");
+        }
+        parse = () => parseCounts(out);
     } else {
         // playwright (e2e suites). Params flow via env into playwright.config.ts.
         if (p.video && VIDEO.has(p.video)) { env.PW_VIDEO = p.video; summary.push(`video:${p.video}`); }

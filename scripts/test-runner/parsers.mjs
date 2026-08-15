@@ -39,11 +39,34 @@ export function prepare(suite, workDir) {
             const command = `NODE_OPTIONS="--test-reporter=tap" ${suite.command}`;
             return { command, parse: (result) => parseTap(result.output) };
         }
+        case "checks": {
+            // Lint/format/build gates - pass or fail, nothing to count.
+            return { command: suite.command, parse: () => null };
+        }
+        case "video-pipeline": {
+            const out = path.join(workDir, "videos.json");
+            // Flags land on the trailing verify step. After a full re-render the
+            // strict rule applies - every manifest clip must be present and
+            // analysed - and the gate writes its per-clip counts out rather than
+            // making us scrape its console table.
+            const command = `${suite.command} -- --complete --summary="${out}"`;
+            return { command, parse: () => parseCounts(out) };
+        }
         case "playwright":
         default: {
             // Counts aren't reliably machine-readable across the merged-report
             // flow; status comes from the exit code and the HTML report is linked.
-            return { command: suite.command, parse: () => null };
+            //
+            // Install the browser first. These were the only suites that weren't
+            // self-contained, and the failure mode is pure noise: every test in
+            // every Playwright suite dies on `browserType.launch: Executable
+            // doesn't exist` and the run looks catastrophically broken when
+            // nothing is wrong with the code. It bites on a fresh machine and
+            // again after any Playwright bump, because the pinned browser build
+            // number changes with it. Cheap when present - prints "is already
+            // installed" and exits.
+            const command = `npx playwright install chromium && { ${suite.command}; }`;
+            return { command, parse: () => null };
         }
     }
 }
@@ -82,6 +105,22 @@ export function parseJestLike(file) {
             passed: j.numPassedTests ?? 0,
             failed: j.numFailedTests ?? 0,
             skipped: (j.numPendingTests ?? 0) + (j.numTodoTests ?? 0),
+        };
+    } catch {
+        return null;
+    }
+}
+
+/** Reads an already-normalized { total, passed, failed, skipped } file. */
+export function parseCounts(file) {
+    if (!fs.existsSync(file)) return null;
+    try {
+        const c = JSON.parse(fs.readFileSync(file, "utf8"));
+        return {
+            total: c.total ?? 0,
+            passed: c.passed ?? 0,
+            failed: c.failed ?? 0,
+            skipped: c.skipped ?? 0,
         };
     } catch {
         return null;

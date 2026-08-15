@@ -7,7 +7,8 @@
 // Fields:
 //   id            unique short id (used for logs/report)
 //   name          human label
-//   kind          dotnet | jest | vitest | node-test | playwright
+//   kind          dotnet | jest | vitest | node-test | playwright | checks
+//                 | video-pipeline
 //                 (controls how the run command is built and results parsed)
 //   cwd           working directory relative to repo root
 //   command       canonical command to run (reporter flags are appended per-kind)
@@ -22,6 +23,56 @@
 export const tierOrder = ["fast", "slow", "visual", "perf"];
 
 export const suites = [
+    // The non-test CI gates. They are here because "did I break anything" has to
+    // mean the same thing locally as it does on a PR: format:check in particular
+    // is a required check that `npm run lint` does NOT cover (ESLint's
+    // prettier/prettier rule only sees the files ESLint lints), so Markdown/JSON/
+    // CSS drift passes lint locally and fails CI. Each suite mirrors one CI job,
+    // so a red suite here names the job that will go red there.
+    {
+        id: "docs-audit",
+        name: "Docs audit (docs vs code)",
+        kind: "checks",
+        cwd: ".",
+        command: "npm run docs:audit",
+        tier: "fast",
+        requiresDocker: false,
+        detectPath: "scripts/docs-audit/index.mjs",
+        note: "Checks feature docs against the FileType registry, TabType union, ports and the video manifest.",
+    },
+    {
+        id: "frontend-quality",
+        name: "Frontend quality (ESLint + Prettier + build)",
+        kind: "checks",
+        cwd: "src/frontend",
+        command: "npm run lint && npm run format:check && npm run build",
+        tier: "fast",
+        requiresDocker: false,
+        detectPath: "src/frontend/package.json",
+    },
+    {
+        id: "asset-processor-quality",
+        name: "Asset processor quality (ESLint + Prettier)",
+        kind: "checks",
+        cwd: "src/asset-processor",
+        command: "npm run lint && npm run format:check",
+        tier: "fast",
+        requiresDocker: false,
+        detectPath: "src/asset-processor/package.json",
+    },
+    {
+        id: "docs-build",
+        name: "Docs site build (Docusaurus)",
+        kind: "checks",
+        cwd: "docs",
+        // Self-contained like the other suites: the docs workspace is not
+        // installed by a root npm ci.
+        command: "([ -d node_modules ] || npm ci) && npm run build",
+        tier: "fast",
+        requiresDocker: false,
+        detectPath: "docs/package.json",
+        note: "Catches broken links and MDX errors, which only surface at build time.",
+    },
     {
         id: "backend",
         name: "Backend unit (.NET / xUnit)",
@@ -54,7 +105,6 @@ export const suites = [
         tier: "fast",
         requiresDocker: false,
         detectPath: "src/frontend/playwright.webgl.config.ts",
-        note: "Needs Playwright chromium installed (npx playwright install chromium).",
     },
     {
         id: "asset-processor",
@@ -136,6 +186,25 @@ export const suites = [
         note: "Gating nightly on GitHub (.github/workflows/nightly-e2e.yml, job backup-restore-drill) - needs no GPU, unlike storybook-visual/e2e-full which stay local-only.",
     },
     {
+        id: "docs-videos",
+        name: "Docs feature videos (re-record + QA gate, Docker)",
+        kind: "video-pipeline",
+        cwd: ".",
+        // Actually re-records all eight clips against the current code. That is
+        // the point: the video specs drive the app through the same selectors
+        // E2E does, nothing in CI exercises them, and rot only shows up at
+        // docs-publish time otherwise. `videos:generate` is self-contained
+        // (leading teardown, e2e stack up, record -> trim -> analyze -> collect,
+        // teardown) and its analyze step fails the run on a black, frozen or
+        // over-cap clip; the trailing verify re-checks the collected set that a
+        // publish would actually upload.
+        command: "npm run videos:generate && npm run videos:verify",
+        tier: "slow",
+        requiresDocker: true,
+        detectPath: "docs/videos/package.json",
+        note: "Re-records every clip - slowest suite here, and needs a GPU (software GL renders black). Nothing else catches video-spec selector rot.",
+    },
+    {
         id: "storybook-visual",
         name: "Storybook visual regression (Playwright)",
         kind: "playwright",
@@ -145,7 +214,6 @@ export const suites = [
         tier: "visual",
         requiresDocker: false,
         detectPath: "src/frontend/playwright.config.ts",
-        note: "Needs Playwright chromium installed (npx playwright install chromium).",
     },
     {
         id: "e2e-performance",

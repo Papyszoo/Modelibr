@@ -4,10 +4,16 @@ The mechanical rules (branch naming, protection, conventional commits, PR
 targeting) live in the `release-workflow` skill. This file holds the operational
 lessons.
 
-## The one manual step
+## The manual steps
 
-`gh release create vX.Y.Z --target main`. Everything downstream is automated off
-it: installers + electron-updater feeds attach, Docker images publish, docs deploy.
+`gh release create vX.Y.Z --target main` drives what is automated: installers +
+electron-updater feeds attach, and Docker images publish.
+
+**The docs site is not automated.** Since the move off GitHub Pages to a
+self-hosted apex domain, CI only *builds* the site and uploads it as the
+`docs-site` artifact - publishing is a maintainer step run from the machine that
+holds the deploy target, together with the feature videos. See the
+`release-workflow` skill for the ordering.
 
 ## Package versions are enforced, not remembered
 
@@ -27,14 +33,19 @@ job that depends on it.
 
 ## Pre-release checklist beyond the test suites
 
-- **Run the docs-video lane locally: `npm run videos:generate`.** Video specs are
-  exercised only at main-push, and a red docs CI **silently blocks Docker
-  Publish** - `docker-publish.yml` fires only on "CI and Deploy Docs" success on
-  main, and there is **no manual trigger**. This cost 0.4.0–0.4.2 their Docker
-  images.
+- **Render and publish the docs videos: `npm run videos:generate`, then
+  `npm run videos:publish`.** Nothing in CI renders or checks them any more - the
+  GPU-less runner could not do it reliably, and that lane is exactly what failed
+  0.5.1. Read `docs/videos/.generated/reports/final-video-analysis.json` between
+  the two commands; publish refuses on a flagged freeze/black frame anyway.
 - Run the fast e2e lane locally before opening a backend-wide refactor PR.
-- Duration caps in video specs regress only at CI pace - local runs at ~90% of a
-  cap will fail CI at ~135%. See [[../features/docs-videos.md]].
+- Duration caps now apply to the local render, since that render *is* the shipped
+  artifact - there is no slower CI pass to leave headroom for. See
+  [[../features/docs-videos.md]].
+
+**Docker Publish no longer rides on docs.** It gates on the `CI Status` job of the
+triggering run rather than the whole run, so a docs or video problem cannot
+withhold images the way it did for 0.4.0-0.5.0.
 
 ## Patch releases
 
@@ -58,6 +69,15 @@ the rule.
 - Still true: the self-update job runs the **FROM version's** updater code, so an
   updater fix is validated live only once **two** post-fix releases exist. Until
   then the job is red by design.
+- **Do not reach for that explanation first.** It was wrong for the 0.5.1→0.5.2
+  window and cost a week of the job being ignored. The 8-day red was a real
+  Linux bug: `quitAndInstall` fires `before-quit`, which preventDefaults the quit
+  to stop the runtime and ends with `app.exit(0)` - and `app.exit` skips
+  `will-quit`, where electron-updater installs the AppImage. Updates downloaded
+  and never applied. Read the log before assuming the lane is red by design: the
+  `[drive-update] update state` lines tell you whether the updater actually
+  worked, and `not ready after update` means the relaunch failed, not the
+  download.
 - Nightly `upgrade-test` picks the new release up at the first 07:00 UTC run after
   it is published.
 

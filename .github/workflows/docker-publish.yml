@@ -2,7 +2,7 @@ name: Docker Publish
 
 on:
     workflow_run:
-        workflows: ["CI and Deploy Docs"]
+        workflows: ["CI and Build Docs"]
         types: [completed]
         branches: [main]
 
@@ -17,7 +17,7 @@ concurrency:
     cancel-in-progress: true
 
 jobs:
-    # Publishing used to require the WHOLE "CI and Deploy Docs" run to succeed,
+    # Publishing used to require the WHOLE "CI and Build Docs" run to succeed,
     # which meant a documentation artifact could veto an image build: the
     # GPU-dependent docs videos cannot render reliably on GitHub's GPU-less
     # runners, and a red video lane fails build-docs -> skips deploy-docs ->

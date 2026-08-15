@@ -23,12 +23,15 @@ export class UpdateManager {
     openExternal = () => {},
     log = console.log,
     onChange,
+    // Awaited immediately before quitAndInstall - see install().
+    prepareForInstall = async () => {},
   } = {}) {
     this.autoUpdater = autoUpdater
     this.isPackaged = isPackaged
     this.openExternal = openExternal
     this.log = log
     this.onChange = onChange
+    this.prepareForInstall = prepareForInstall
     this.state = {
       // idle | checking | available | downloading | downloaded | up-to-date | error
       status: 'idle',
@@ -129,9 +132,25 @@ export class UpdateManager {
 
   // The "Restart & Install" button: install a downloaded build, otherwise open
   // the releases page (covers unsigned macOS and the "not downloaded yet" case).
-  install() {
+  async install() {
     if (this.state.status === 'downloaded') {
       try {
+        // Stop our child processes BEFORE handing over to electron-updater.
+        //
+        // main.js's `before-quit` handler calls event.preventDefault() so it can
+        // shut postgres/WebApi/worker down gracefully, then finishes with
+        // app.exit(0) - and app.exit() skips `will-quit`, which is where
+        // electron-updater performs the AppImage install. The update therefore
+        // downloaded and never applied: the old binary relaunched with its
+        // children still holding the ports, so the app never came back ready.
+        //
+        // Windows hid this because the NSIS updater is already a separate
+        // process by the time we quit, so preventing our own quit costs it
+        // nothing. Linux does the install in-process during the quit.
+        //
+        // The hook sets main.js's `isQuittingForUpdate`, which makes
+        // `before-quit` return without preventing the quit.
+        await this.prepareForInstall()
         // isSilent=true: the NSIS installer is assisted (oneClick:false), so a
         // non-silent update pops the full setup wizard and waits for clicks -
         // which never come on an unattended/relaunching update, so the update

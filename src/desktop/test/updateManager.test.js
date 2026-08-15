@@ -109,7 +109,7 @@ test('install() restarts into a downloaded build', async () => {
   await mgr.check()
   au.emit('update-downloaded', { version: '0.2.0' })
 
-  mgr.install()
+  await mgr.install()
   assert.equal(au.calls.quitAndInstall, 1)
   // Must install silently: the assisted (oneClick:false) NSIS installer would
   // otherwise pop the wizard and block an unattended update from applying.
@@ -117,9 +117,50 @@ test('install() restarts into a downloaded build', async () => {
   assert.equal(opened.length, 0, 'should restart, not open a browser')
 })
 
+test('install() stops the runtime before quitAndInstall', async () => {
+  // Ordering is the whole point. main.js's before-quit handler preventDefaults
+  // the quit to stop postgres/WebApi gracefully and finishes with app.exit(0),
+  // which skips will-quit - where electron-updater performs the AppImage
+  // install. Shutting down first means the quit is never prevented, so the
+  // update actually applies. Getting this backwards downloads the update and
+  // silently relaunches the old version (v0.5.1, Linux only - Windows's NSIS
+  // updater is already out-of-process by then).
+  const order = []
+  const au = makeFakeAutoUpdater()
+  au.quitAndInstall = (...args) => {
+    order.push('quitAndInstall')
+    au.calls.quitAndInstall++
+    au.calls.quitAndInstallArgs = args
+  }
+  const { mgr } = makeManager({
+    autoUpdater: au,
+    prepareForInstall: async () => {
+      order.push('prepareForInstall')
+    },
+  })
+
+  await mgr.check()
+  au.emit('update-downloaded', { version: '0.2.0' })
+  await mgr.install()
+
+  assert.deepEqual(order, ['prepareForInstall', 'quitAndInstall'])
+})
+
+test('install() does not stop the runtime when there is nothing to install', async () => {
+  let prepared = 0
+  const { mgr } = makeManager({
+    prepareForInstall: async () => {
+      prepared++
+    },
+  })
+
+  await mgr.install()
+  assert.equal(prepared, 0, 'must not tear the app down just to open a browser')
+})
+
 test('install() opens the releases page when nothing is downloaded yet', async () => {
   const { mgr, au, opened } = makeManager()
-  mgr.install()
+  await mgr.install()
   assert.equal(au.calls.quitAndInstall, 0)
   assert.equal(opened.length, 1)
   assert.match(opened[0], /\/releases$/)

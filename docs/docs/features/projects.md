@@ -8,7 +8,7 @@ Projects in Modelibr let you group related assets together for organized workflo
 
 <div className="feature-video-container">
   <video controls width="100%" autoPlay muted loop>
-    <source src="/Modelibr/videos/projects.webm" type="video/webm" />
+    <source src="/videos/projects.webm" type="video/webm" />
     <p className="video-fallback">Demo video is being generated...</p>
   </video>
 </div>

@@ -5,9 +5,12 @@ description: Authoring Modelibr docs feature videos - the record→trim→analyz
 
 # Docs video authoring (Playwright screencast)
 
-Feature videos embedded in `docs/docs/features/*.md`. Generated in CI on every
-docs build (never committed - see the no-committed-binaries rule); regenerate
-locally with one command from the repo root:
+Feature videos embedded in `docs/docs/features/*.md`. Rendered **locally on a GPU
+machine and published straight to the docs asset host** - no workflow renders,
+fetches, or bundles them, and they are never committed (see the
+no-committed-binaries rule). The pages reference them by absolute `/videos/…`
+URL, which resolves against that separate publish.
+Release procedure lives in `release-workflow`. Render from the repo root:
 
 ```bash
 npm run videos:generate                       # full: e2e stack up → all videos → teardown
@@ -34,13 +37,34 @@ Reports: `.generated/reports/raw-video-analysis.json` + `final-video-analysis.js
 (durations, freeze/black segments, per-video issues) - start there when a video
 fails or looks wrong.
 
+`analyze-videos.js` gates the clips *inside* a render run. `verify-videos.js`
+gates the set sitting in `docs/static/videos/` afterwards, re-checking it against
+the manifest and that report:
+
+```bash
+npm run videos:verify              # from the repo root - what test:all runs
+npm run videos:verify -- --complete  # publish strictness: whole set required
+```
+
+It renders nothing, so it is safe anywhere - but on its own it only tells you the
+*last* render was good. To test the specs against current code you must re-record,
+which is what the `docs-videos` suite in `npm run test:all` does (slow tier,
+Docker + GPU): `videos:generate` followed by this gate at `--complete`. That suite
+is the only automated exercise these specs get; treat a redesign as untested
+against the video lane until it has run.
+
+Because a partial re-render (`generate:sprites`) rewrites the report with only
+that slug, older-but-valid clips fall out of it and are flagged *not covered by
+the latest analysis run* - a warning by default, a failure under `--complete`.
+
 ## Duration caps (video-manifest.js)
 
-`maxDurationSeconds` is a **QA ceiling with CI headroom, not a target**.
-Choreograph for roughly **60–70% of the cap** on a fast local machine - CI
-renders without GPU and runs visibly slower, and the fixed-length pauses don't
-shrink. If analyze fails `over-max-duration`: tighten the choreography first;
-raise the cap only for a deliberate reason (and keep the manifest comment true).
+`maxDurationSeconds` is a **QA ceiling, not a target**. Since the local render is
+now the shipped artifact, the cap applies to what you just produced - there is no
+slower CI render to leave headroom for. Still choreograph well under it so a
+slower run doesn't trip the gate. If analyze fails `over-max-duration`: tighten
+the choreography first; raise the cap only for a deliberate reason (and keep the
+manifest comment true - several are stale, measured before pipeline changes).
 
 ## Choreography rules - what makes a good feature video
 

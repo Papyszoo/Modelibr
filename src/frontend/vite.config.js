@@ -10,7 +10,7 @@ export default defineConfig(({ mode }) => {
   const isDemo = mode === 'demo'
 
   return {
-    base: isDemo ? '/Modelibr/demo/' : '/',
+    base: isDemo ? '/demo/' : '/',
     plugins: [react()],
     resolve: {
       alias: {
