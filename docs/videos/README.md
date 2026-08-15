@@ -2,27 +2,33 @@
 
 Playwright scripts that generate demo videos for the Docusaurus documentation site.
 
-> **Videos are generated automatically in CI.** The `generate-videos` job in the
-> GitHub Actions workflow spins up the E2E Docker environment, runs the full
-> screencast pipeline, and includes the finished demo videos in the Docusaurus build
-> for every workflow run (`push`, `pull_request`, and `workflow_dispatch`).
+> **Videos are rendered locally, not in CI.** GitHub runners have no GPU, so the
+> WebGL clips flake under software rendering - that lane blocked the docs deploy
+> for several releases before it was removed in 0.5.2. Rendering now happens on a
+> machine with a GPU and publishes straight to the site's `/videos/` path.
 >
-> Videos are **not** committed to the repository - they are generated fresh for each CI docs build.
+> Videos are **not** committed to the repository, and CI neither renders nor
+> fetches them. The docs bundle CI builds does not contain them; the pages
+> reference them by absolute `/videos/…` URL, which resolves against that
+> separate publish.
 
-## CI Pipeline
-
-The video generation is part of `ci-and-deploy.yml`:
+## Where this runs
 
 ```text
-e2e-tests ──► generate-videos ──► build-docs ──► deploy-docs
-                    │                   │
-                    │   ┌───────────────┘
-                    │   │ downloads final video artifact
-                    │   │ places in docs/static/videos/
-                    ▼   ▼
-       uploads analyzed .webm   builds Docusaurus
-          as artifact           with videos included
+local GPU machine                          CI
+─────────────────                          ──
+npm run videos:generate                    builds the docs-site artifact
+  clean → record → trim → analyze          (no videos in it)
+  → collect to docs/static/videos/
+npm run videos:verify -- --complete
+npm run videos:publish  ──────────────►  site /videos/   (published separately,
+                                          and protected from the docs sync's
+                                          --delete, so neither clobbers the other)
 ```
+
+The `docs-videos` suite in `npm run test:all` (slow tier) runs the same generate
+pipeline against current code, which is the only automated exercise the video
+specs get now that CI does not touch them.
 
 ## Local Development
 
