@@ -73,5 +73,28 @@ public interface IAssetSearchDocumentRepository
         string? categoryName,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Re-points the denormalised pack names after a membership-only mutation: add to
+    /// pack, remove from pack, pack rename, pack delete. None of those re-derive the
+    /// asset, so without this the projection keeps the membership it had at extraction
+    /// time - which for a freshly imported-then-packed asset is none at all.
+    /// </summary>
+    Task SetPacksForAssetAsync(
+        string assetType,
+        int assetId,
+        IEnumerable<string> packNames,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Bulk form of <see cref="SetPacksForAssetAsync"/>, for mutations that change every
+    /// member of a pack at once: rename and delete. Those touch the whole membership, and
+    /// packs are large - `The Base Mesh` has 1,360 members - so the per-asset call in a
+    /// loop is thousands of round trips inside one request. One query in, one query out.
+    /// </summary>
+    Task SetPacksForAssetsAsync(
+        string assetType,
+        IReadOnlyDictionary<int, IReadOnlyList<string>> packNamesByAssetId,
+        CancellationToken cancellationToken = default);
+
     Task UpdateAsync(AssetSearchDocument document, CancellationToken cancellationToken = default);
 }

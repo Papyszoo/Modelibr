@@ -29,7 +29,8 @@ public static class SearchDocumentBuilder
         DateTime now,
         int? categoryId = null,
         string? categoryName = null,
-        bool isActive = true)
+        bool isActive = true,
+        IEnumerable<string>? packNames = null)
     {
         var rawByPath = rawParts
             .GroupBy(p => p.PartPath)
@@ -91,7 +92,11 @@ public static class SearchDocumentBuilder
             animationCount: rollups.AnimationCount,
             maxDimension: maxDimension is > 0 ? maxDimension : null,
             categoryId: categoryId,
-            categoryName: categoryName));
+            categoryName: categoryName,
+            // Asset-level only: a part does not belong to a pack, the asset it came from
+            // does. Putting pack names on parts would also multiply the same weak signal
+            // by the part count and let a many-part asset dominate a pack-name query.
+            packNames: packNames));
 
         foreach (var part in derived.Parts)
         {

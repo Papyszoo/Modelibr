@@ -37,6 +37,41 @@ internal sealed class PackRepository : IPackRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<string>> GetNamesByModelIdAsync(
+        int modelId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.Packs
+            .Where(p => p.Models.Any(m => m.Id == modelId))
+            .Select(p => p.Name)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyDictionary<int, IReadOnlyList<string>>> GetNamesByModelIdsAsync(
+        IEnumerable<int> modelIds,
+        CancellationToken cancellationToken = default)
+    {
+        var ids = modelIds.Distinct().ToList();
+        if (ids.Count == 0)
+        {
+            return new Dictionary<int, IReadOnlyList<string>>();
+        }
+
+        // Flatten the join to (modelId, packName) pairs in one round trip, then group in
+        // memory - grouping server-side would need a second pass to materialise anyway.
+        var pairs = await _context.Packs
+            .SelectMany(
+                p => p.Models.Where(m => ids.Contains(m.Id)),
+                (p, m) => new { ModelId = m.Id, PackName = p.Name })
+            .ToListAsync(cancellationToken);
+
+        return pairs
+            .GroupBy(x => x.ModelId)
+            .ToDictionary(
+                g => g.Key,
+                g => (IReadOnlyList<string>)g.Select(x => x.PackName).ToList());
+    }
+
     public async Task<Pack?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         return await _context.Packs

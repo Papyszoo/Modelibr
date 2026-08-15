@@ -116,6 +116,58 @@ internal sealed class AssetSearchDocumentRepository : IAssetSearchDocumentReposi
         }
     }
 
+    public async Task SetPacksForAssetAsync(
+        string assetType,
+        int assetId,
+        IEnumerable<string> packNames,
+        CancellationToken cancellationToken = default)
+    {
+        var names = packNames as IReadOnlyList<string> ?? packNames.ToList();
+
+        // Asset-level documents only - pack names are not projected onto parts, so
+        // patching them there would write a column that search never reads for a part.
+        var documents = await _context.AssetSearchDocuments
+            .Where(d => d.AssetType == assetType && d.AssetId == assetId && d.PartPath == null)
+            .ToListAsync(cancellationToken);
+
+        foreach (var document in documents)
+        {
+            document.SetPacks(names);
+            _context.UpdateIfDetached(document);
+        }
+    }
+
+    public async Task SetPacksForAssetsAsync(
+        string assetType,
+        IReadOnlyDictionary<int, IReadOnlyList<string>> packNamesByAssetId,
+        CancellationToken cancellationToken = default)
+    {
+        if (packNamesByAssetId.Count == 0)
+        {
+            return;
+        }
+
+        var assetIds = packNamesByAssetId.Keys.ToList();
+
+        // Asset-level documents only, exactly as the single-asset path does.
+        var documents = await _context.AssetSearchDocuments
+            .Where(d => d.AssetType == assetType && assetIds.Contains(d.AssetId) && d.PartPath == null)
+            .ToListAsync(cancellationToken);
+
+        foreach (var document in documents)
+        {
+            // A caller that lists an asset with no remaining packs passes an empty list;
+            // an asset missing from the map entirely is not ours to touch.
+            if (!packNamesByAssetId.TryGetValue(document.AssetId, out var names))
+            {
+                continue;
+            }
+
+            document.SetPacks(names);
+            _context.UpdateIfDetached(document);
+        }
+    }
+
     public async Task<IReadOnlyList<AssetSearchDocument>> GetForOtherVersionsAsync(
         string assetType,
         int assetId,
