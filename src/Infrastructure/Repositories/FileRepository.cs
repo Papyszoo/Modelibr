@@ -21,6 +21,12 @@ internal sealed class FileRepository : IFileRepository
             .FirstOrDefaultAsync(f => f.Id == id, cancellationToken);
     }
 
+    public Task AddAsync(Domain.Models.File file, CancellationToken cancellationToken = default)
+    {
+        _context.Files.Add(file);
+        return Task.CompletedTask;
+    }
+
     public async Task<Domain.Models.File?> GetBySha256HashAsync(string sha256Hash, CancellationToken cancellationToken = default)
     {
         return await _context.Files

@@ -135,6 +135,10 @@ namespace WebApi
                 {
                     mcpServer
                         .WithTools<WebApi.Mcp.AssetWriteMcpTools>()
+                        // Sounds, sprites, environment maps and texture sets. Gated by the
+                        // same flag: they are writes, and splitting the gate would mean a
+                        // server that is read-only for models but not for materials.
+                        .WithTools<WebApi.Mcp.AssetImportMcpTools>()
                         .WithPrompts<WebApi.Mcp.ImportLibraryPrompts>();
                 }
             }

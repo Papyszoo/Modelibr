@@ -5,6 +5,19 @@ namespace Application.Abstractions.Repositories;
 public interface IFileRepository
 {
     Task<Domain.Models.File?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Stages a new file on its own, for the upload-then-attach flow.
+    ///
+    /// <see cref="Application.Services.IFileCreationService"/> writes the bytes to storage
+    /// but returns a <b>detached</b> entity - every existing caller attaches it through the
+    /// aggregate that references it (a texture set, a model version), so the file reaches
+    /// the database as part of that graph and needs no Add of its own. A caller that must
+    /// hand a real file <i>id</i> to a later step has nowhere to put it, which is why
+    /// adding a freshly uploaded channel to an existing texture set had no path at all.
+    /// No commit - the unit of work still owns that.
+    /// </summary>
+    Task AddAsync(Domain.Models.File file, CancellationToken cancellationToken = default);
     Task<Domain.Models.File?> GetDeletedByIdAsync(int id, CancellationToken cancellationToken = default);
     Task<Domain.Models.File?> GetBySha256HashAsync(string sha256Hash, CancellationToken cancellationToken = default);
     
