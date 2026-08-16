@@ -377,7 +377,7 @@ export function ModelViewer({
   const mayHaveGltfResources = (versionModel || model)?.files?.some(f =>
     f.originalFileName?.toLowerCase().endsWith('.gltf')
   )
-  const { resources: gltfResources } = useGltfResources(
+  const { resources: gltfResources, isAwaitingResources } = useGltfResources(
     model?.id,
     currentVersionId,
     mayHaveGltfResources
@@ -913,19 +913,29 @@ export function ModelViewer({
                         }
                       }}
                     >
-                      <ModelPreviewScene
-                        key={`scene-${model.id}-${side}-${selectedVariant}-${selectedVersion?.id || 'original'}-${defaultFileId || 'auto'}`}
-                        model={versionModel || model}
-                        gltfResources={gltfResources}
-                        settings={viewerSettings}
-                        materialTextureSets={
-                          useEmbeddedMaterials ? {} : materialTextureSets
-                        }
-                        defaultFileId={defaultFileId}
-                        preserveMaterials={useEmbeddedMaterials}
-                        cameraState={cameraState}
-                        onCameraChange={handleCameraStateChange}
-                      />
+                      {/*
+                        Held back until the loose-glTF resource map has arrived.
+                        Mounting the scene with an empty map hands the loader a
+                        `.bin` the safe loading manager has rewritten to a
+                        transparent PNG, and `useLoader` caches that failure - so
+                        the model opens as a mesh with zero vertices and never
+                        recovers. See `useGltfResources`.
+                      */}
+                      {isAwaitingResources ? null : (
+                        <ModelPreviewScene
+                          key={`scene-${model.id}-${side}-${selectedVariant}-${selectedVersion?.id || 'original'}-${defaultFileId || 'auto'}`}
+                          model={versionModel || model}
+                          gltfResources={gltfResources}
+                          settings={viewerSettings}
+                          materialTextureSets={
+                            useEmbeddedMaterials ? {} : materialTextureSets
+                          }
+                          defaultFileId={defaultFileId}
+                          preserveMaterials={useEmbeddedMaterials}
+                          cameraState={cameraState}
+                          onCameraChange={handleCameraStateChange}
+                        />
+                      )}
                       {viewerSettings.showPerf && (
                         <PerfSampler statsRef={perfStatsRef} />
                       )}

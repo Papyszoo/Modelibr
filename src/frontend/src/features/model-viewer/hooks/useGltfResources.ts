@@ -21,15 +21,31 @@ export type GltfResourceMap = Record<string, string>
  * Returns an empty map for packed `.glb`/self-contained files: the query is only run
  * when there is a version to ask about, and a version with no auxiliaries answers with
  * an empty list.
+ *
+ * `isAwaitingResources` is the caller's gate, and it is deliberately **positive** - it
+ * reports that the map has not arrived yet, rather than that a query is in flight. The
+ * caller must not start the loader until it is false. `useLoader` caches by URL and
+ * caches failures too, so a loose glTF whose loader starts against an empty map
+ * permanently caches a load that failed on the missing `.bin`: the model opens as a
+ * mesh with zero vertices and never recovers for the life of the page.
+ *
+ * A negative flag is not good enough here, and this is the exact trap the scene-side
+ * gate fell into (see `isAwaitingResources` in `features/scenes`): `enabled` is computed
+ * from the model query's data in the same render, so on the tick that data first lands
+ * this query has not started - and a query that has not started reports
+ * `isLoading: false`. That one tick is all the loader needs.
+ *
+ * An errored query opens the gate on purpose: the map is never coming, and a visible
+ * failure beats a viewport that waits forever.
  */
 export function useGltfResources(
   modelId: number | string | undefined | null,
   versionId: number | string | undefined | null,
   enabled = true
-): { resources: GltfResourceMap; isLoading: boolean } {
+): { resources: GltfResourceMap; isAwaitingResources: boolean } {
   const shouldFetch = Boolean(enabled && modelId && versionId)
 
-  const { data, isLoading } = useQuery({
+  const { data, isSuccess, isError } = useQuery({
     queryKey: [
       'model',
       String(modelId),
@@ -48,5 +64,26 @@ export function useGltfResources(
     resources[auxiliary.relativePath] = getFileUrl(String(auxiliary.fileId))
   }
 
-  return { resources, isLoading: shouldFetch && isLoading }
+  return {
+    resources,
+    isAwaitingResources: isAwaitingGltfResources(shouldFetch, {
+      isSuccess,
+      isError,
+    }),
+  }
+}
+
+/**
+ * The gate itself, as a pure function so it can be asserted directly.
+ *
+ * The failing state is a single render tick inside React Query's scheduling, so
+ * a test that reproduced that tick would be testing React Query rather than
+ * this rule. Mirrors `isAwaitingResources` in `features/scenes` - the same rule
+ * on the scene side, where it was fixed first.
+ */
+export function isAwaitingGltfResources(
+  shouldFetch: boolean,
+  query?: { isSuccess?: boolean; isError?: boolean }
+): boolean {
+  return shouldFetch && !query?.isSuccess && !query?.isError
 }
