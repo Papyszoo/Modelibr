@@ -183,6 +183,59 @@ public class SceneDocumentValidatorTests
     }
 
     [Fact]
+    public void Validate_When_An_Anchor_Names_A_Node_That_Is_Not_Here_Returns_AnchorNodeNotFound()
+    {
+        var node = ModelNode("vase") with { Anchor = new SceneAnchor("table") };
+
+        var issues = SceneDocumentValidator.Validate(DocumentWith(node));
+
+        Assert.Contains(issues, i => i.Code == "AnchorNodeNotFound" && i.Path == "nodes[0].anchor.onNodeId");
+    }
+
+    [Fact]
+    public void Validate_When_A_Node_Rests_On_Itself_Returns_SelfAnchor()
+    {
+        var node = ModelNode("vase") with { Anchor = new SceneAnchor("vase") };
+
+        var issues = SceneDocumentValidator.Validate(DocumentWith(node));
+
+        Assert.Contains(issues, i => i.Code == "SelfAnchor");
+        // Reported once, in the vocabulary of the mistake that was made.
+        Assert.DoesNotContain(issues, i => i.Code == "AnchorCycle");
+    }
+
+    [Fact]
+    public void Validate_When_Anchors_Form_A_Cycle_Returns_AnchorCycle()
+    {
+        // Nodes resting on each other have no resolvable height. Breaking the cycle by
+        // picking a winner would place both somewhere neither caller asked for.
+        var issues = SceneDocumentValidator.Validate(DocumentWith(
+            ModelNode("tray") with { Anchor = new SceneAnchor("book") },
+            ModelNode("book", assetId: 2) with { Anchor = new SceneAnchor("tray") }));
+
+        Assert.Contains(issues, i => i.Code == "AnchorCycle");
+    }
+
+    [Fact]
+    public void Validate_When_A_Chain_Of_Anchors_Ends_Somewhere_Is_Accepted()
+    {
+        var issues = SceneDocumentValidator.Validate(DocumentWith(
+            ModelNode("table"),
+            ModelNode("tray", assetId: 2) with { Anchor = new SceneAnchor("table", Vec3.Zero) },
+            ModelNode("book", assetId: 3) with { Anchor = new SceneAnchor("tray", Vec3.Zero) }));
+
+        Assert.Empty(issues);
+    }
+
+    [Fact]
+    public void Validate_When_A_Front_Axis_Is_Not_One_Of_The_Four_Returns_UnknownFrontAxis()
+    {
+        var issues = SceneDocumentValidator.Validate(DocumentWith(ModelNode("sofa") with { FrontAxis = "+Y" }));
+
+        Assert.Contains(issues, i => i.Code == "UnknownFrontAxis" && i.Path == "nodes[0].frontAxis");
+    }
+
+    [Fact]
     public void Validate_When_The_Environment_Map_Is_Not_An_EnvironmentMap_Returns_InvalidEnvironmentMapRef()
     {
         var document = new SceneDocument(

@@ -49,7 +49,7 @@ public class SceneContractTypeScriptTests
         foreach (var type in new[]
                  {
                      "SceneDocument", "SceneNode", "SceneAssetRef", "ScenePrimitive", "SceneTransform",
-                     "Vec3", "SceneMaterialBinding", "SceneLight", "SceneEnvironment",
+                     "Vec3", "SceneMaterialBinding", "SceneLight", "SceneEnvironment", "SceneAnchor",
                  })
         {
             Assert.Contains($"export interface {type} {{", generated);
@@ -64,6 +64,10 @@ public class SceneContractTypeScriptTests
         Assert.Contains("export type SceneAssetType = ", generated);
         Assert.Contains("assetType: SceneAssetType", generated);
         Assert.Contains("type: SceneLightType", generated);
+
+        // An optional vocabulary keeps its nullability. Emitting it as a bare union would have
+        // the editor demand a front axis on every node while the server treats it as absent.
+        Assert.Contains("frontAxis?: SceneFrontAxis | null", generated);
     }
 
     private static string RepositoryRoot()

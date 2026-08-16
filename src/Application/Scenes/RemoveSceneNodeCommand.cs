@@ -44,6 +44,22 @@ internal sealed class RemoveSceneNodeCommandHandler : ICommandHandler<RemoveScen
                         MoveSceneNodeCommandHandler.NodeNotFound(command.SceneId, command.NodeId));
                 }
 
+                // Refused rather than cascaded, and rather than quietly detaching the nodes
+                // resting on this one. Both alternatives change nodes the caller did not name:
+                // a cascade deletes furniture nobody asked to delete, and a silent detach
+                // leaves an undo that cannot put the arrangement back.
+                var dependents = document.Nodes
+                    .Where(n => n.Anchor is { } anchor && anchor.OnNodeId == command.NodeId)
+                    .Select(n => n.Id)
+                    .ToList();
+
+                if (dependents.Count > 0)
+                {
+                    return Result.Failure<SceneDocument>(new Error(
+                        "Scene.NodeHasDependents",
+                        $"'{command.NodeId}' cannot be removed while {string.Join(", ", dependents.Select(id => $"'{id}'"))} rest{(dependents.Count == 1 ? "s" : "")} on it. Detach or remove them first."));
+                }
+
                 removed = document.Nodes[index];
                 return Result.Success(document with
                 {
@@ -92,7 +108,15 @@ internal sealed class RestoreSceneNodeCommandHandler : ICommandHandler<RestoreSc
                     return Result.Success(document);
                 }
 
-                return Result.Success(document with { Nodes = [.. document.Nodes, command.Node] });
+                // The node it rested on may itself have been removed since. Coming back
+                // standing on its own is the honest outcome; refusing the undo because the
+                // table is gone would strand the node in the audit log instead.
+                var node = command.Node.Anchor is { } anchor &&
+                    !document.Nodes.Any(n => n.Id == anchor.OnNodeId)
+                        ? command.Node with { Anchor = null }
+                        : command.Node;
+
+                return Result.Success(document with { Nodes = [.. document.Nodes, node] });
             },
             cancellationToken,
             // Restoring recorded state, not authoring new: if the asset was recycled after

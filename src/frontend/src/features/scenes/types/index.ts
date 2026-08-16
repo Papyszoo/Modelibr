@@ -1,4 +1,5 @@
 import type {
+  SceneAnchor,
   SceneAssetRef,
   SceneDocument,
   SceneEnvironment,
@@ -11,6 +12,7 @@ import type {
 } from '../api/sceneContract.generated'
 
 export type {
+  SceneAnchor,
   SceneAssetRef,
   SceneDocument,
   SceneEnvironment,
@@ -74,6 +76,17 @@ export interface SceneNodeView {
    * same box the server's overlap check uses.
    */
   originInBounds: Vec3 | null
+  /**
+   * The placement rules the node carries, as the server applies them: whether it
+   * is being held on the ground, what it rests on, and what it is kept facing.
+   * These are why a node can sit somewhere other than the position last written
+   * to it.
+   */
+  groundSnap: boolean
+  faceToward: Vec3 | null
+  /** Always populated - the assumed axis when the node never declared one. */
+  frontAxis: string | null
+  anchor: SceneAnchor | null
 }
 
 /**

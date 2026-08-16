@@ -83,13 +83,30 @@ post is inside the wall on the call that put it there.
 | Tool                    | What it does                                                                                                                                                                       |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `create_scene`          | Create a scene, empty or from a full document.                                                                                                                                     |
-| `place_asset`           | Place one asset. `groundSnap` rests its base on the floor using the asset's own derived origin convention - use it rather than guessing a Y, or a centered-origin asset lands buried to its middle. |
+| `place_asset`           | Place one asset. `groundSnap` rests its base on the floor using the asset's measured origin - use it rather than guessing a Y, or a centered-origin asset lands buried to its middle. `on` rests it on another node instead, and `faceToward` aims it at a point. |
 | `distribute_assets`     | Place several copies evenly along a line, in one write - a row of street lamps, a fence, a colonnade. Spacing is computed server-side, and undo removes the whole row.              |
-| `move_asset`            | Move, rotate or rescale one node; omitted components are left alone.                                                                                                                |
-| `remove_asset`          | Remove a node. The whole node is returned, so the removal can be reversed.                                                                                                          |
+| `move_asset`            | Move, rotate or rescale one node; omitted components are left alone, and so are the placement rules the node carries.                                                               |
+| `remove_asset`          | Remove a node. The whole node is returned, so the removal can be reversed. Refused while other nodes rest on it.                                                                     |
 | `set_light`             | Add, update or remove one light by id. Upsert semantics, so a retried call does not stack a second sun into the scene.                                                              |
 | `apply_material`        | Bind a texture set to one node, for this scene only - the model's own default texture set is untouched.                                                                             |
 | `update_scene_document` | Replace the whole document, for bulk edits. An invalid document is rejected in full, never partially applied.                                                                        |
+
+#### Placement rules stick to the node
+
+Three of these are properties of the node rather than arguments to one call, because "it
+stands on the floor", "it sits on the coffee table" and "it faces the TV" are standing facts
+about a composition, not one-off nudges:
+
+- **`groundSnap`** keeps the base on y=0. A later `move_asset` that supplies a position
+  without restating it keeps the node on the floor; pass `groundSnap=false` to release it.
+- **`on`** rests the node on another node's top face and keeps it there, so moving the
+  furniture underneath carries everything standing on it - and swapping it does not mean
+  recomputing a stacked Y by hand. `align` decides where it starts: `center` on the middle of
+  the top face, `keep` over wherever it already is. `detachAnchor=true` releases it, in place.
+- **`faceToward`** turns the node about Y towards a world point and keeps it aimed there, so
+  moving the TV re-aims the furniture. `frontAxis` says which local axis is the asset's front
+  (`+Z` is assumed - nothing in the library derives it). Setting an explicit `rotationEuler`
+  stops the node tracking anything.
 
 Every scene write accepts an optional `expectedRevision` and is refused if the scene has
 moved on since the agent last read it. Leaving it out means "apply to whatever is there" -

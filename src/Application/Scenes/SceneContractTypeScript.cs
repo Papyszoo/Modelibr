@@ -34,6 +34,7 @@ public static class SceneContractTypeScript
         ["SceneAssetRef.AssetType"] = "SceneAssetType",
         ["SceneLight.Type"] = "SceneLightType",
         ["ScenePrimitive.Shape"] = "ScenePrimitiveShape",
+        ["SceneNode.FrontAxis"] = "SceneFrontAxis",
     };
 
     public static string Generate()
@@ -55,6 +56,18 @@ public static class SceneContractTypeScript
         AppendVocabulary(builder, "SceneAssetType", SceneAssetTypes.All, "Asset families a scene node may reference.");
         AppendVocabulary(builder, "SceneLightType", SceneLightTypes.All, "Light types a scene document may contain.");
         AppendVocabulary(builder, "ScenePrimitiveShape", ScenePrimitiveShapes.All, "Blockout shapes a scene document may contain.");
+        AppendVocabulary(
+            builder,
+            "SceneFrontAxis",
+            SceneFrontAxes.All,
+            "Local axes an asset's front may point along. Y is excluded: facing is a rotation about it.",
+            "SCENE_FRONT_AXES");
+        AppendVocabulary(
+            builder,
+            "SceneAnchorAlignment",
+            SceneAnchorAlignments.All,
+            "How a node is seated on the node it rests on. Decides the anchor offset a write records, and is not itself stored.",
+            "SCENE_ANCHOR_ALIGNMENTS");
 
         foreach (var type in DiscoverTypes())
         {
@@ -66,9 +79,19 @@ public static class SceneContractTypeScript
         return builder.ToString();
     }
 
-    private static void AppendVocabulary(StringBuilder builder, string name, IReadOnlyList<string> values, string summary)
+    /// <summary>
+    /// Emits a closed vocabulary as a const array plus its union type. The constant's name is
+    /// the type's, pluralised - which the default handles for every vocabulary whose name
+    /// takes a bare "s", and <paramref name="constantName"/> covers the ones it does not.
+    /// </summary>
+    private static void AppendVocabulary(
+        StringBuilder builder,
+        string name,
+        IReadOnlyList<string> values,
+        string summary,
+        string? constantName = null)
     {
-        var constantName = ToScreamingSnake(name) + "S";
+        constantName ??= ToScreamingSnake(name) + "S";
 
         builder.AppendLine($"/** {summary} */");
         builder.AppendLine($"export const {constantName} = [{string.Join(", ", values.Select(v => $"'{v}'"))}] as const");
@@ -186,7 +209,10 @@ public static class SceneContractTypeScript
     {
         if (VocabularyProperties.TryGetValue($"{owner.Name}.{property.Name}", out var vocabulary))
         {
-            return vocabulary;
+            // A vocabulary short-circuits the type mapping but not the nullability: an
+            // optional vocabulary property is still allowed to be absent, and emitting it as
+            // non-null would have the editor's compiler insist on a value the server does not.
+            return IsNullableReference(nullability.Create(property)) ? $"{vocabulary} | null" : vocabulary;
         }
 
         return Map(property.PropertyType, nullability.Create(property));

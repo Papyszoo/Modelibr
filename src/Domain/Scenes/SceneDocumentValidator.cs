@@ -144,6 +144,124 @@ public static class SceneDocumentValidator
                 issues.Add(new SceneValidationIssue(
                     $"{path}.material.textureSetId", "InvalidTextureSetId", "A texture set id must be a positive integer."));
             }
+
+            if (node.FrontAxis is not null && SceneFrontAxes.Direction(node.FrontAxis) is null)
+            {
+                issues.Add(new SceneValidationIssue(
+                    $"{path}.frontAxis",
+                    "UnknownFrontAxis",
+                    $"'{node.FrontAxis}' is not a front axis. Known axes: {string.Join(", ", SceneFrontAxes.All)} - Y is excluded because facing is a rotation about it."));
+            }
+
+            if (node.Anchor is { } anchor)
+            {
+                ValidateAnchor(node, anchor, $"{path}.anchor", issues);
+            }
+        }
+
+        ValidateAnchorGraph(document.Nodes, issues);
+    }
+
+    private static void ValidateAnchor(
+        SceneNode node,
+        SceneAnchor anchor,
+        string path,
+        List<SceneValidationIssue> issues)
+    {
+        ValidateId(anchor.OnNodeId, $"{path}.onNodeId", "Node", issues);
+
+        if (string.Equals(anchor.OnNodeId, node.Id, StringComparison.Ordinal))
+        {
+            issues.Add(new SceneValidationIssue(
+                $"{path}.onNodeId", "SelfAnchor", $"Node '{node.Id}' cannot rest on itself."));
+        }
+
+        if (anchor.Offset is { } offset)
+        {
+            ValidateVec3(offset, $"{path}.offset", issues);
+        }
+    }
+
+    /// <summary>
+    /// The rules that are about the anchors as a graph rather than one at a time: an anchor
+    /// must name a node that is here, and the chain must end somewhere.
+    ///
+    /// A cycle is rejected rather than broken arbitrarily. Two nodes resting on each other
+    /// have no resolvable height, and picking one to win would place them somewhere neither
+    /// caller asked for and report success.
+    /// </summary>
+    private static void ValidateAnchorGraph(IReadOnlyList<SceneNode> nodes, List<SceneValidationIssue> issues)
+    {
+        var indexById = new Dictionary<string, int>(StringComparer.Ordinal);
+        for (var i = 0; i < nodes.Count; i++)
+        {
+            if (nodes[i]?.Id is { } id)
+            {
+                indexById.TryAdd(id, i);
+            }
+        }
+
+        // The index a node rests on, or -1. Self-anchors count as no successor: they are
+        // already reported as SelfAnchor, and walking one would say the same thing again in
+        // the vocabulary of cycles.
+        int Anchor(int index)
+        {
+            var node = nodes[index];
+            if (node?.Anchor is not { } anchor ||
+                string.IsNullOrWhiteSpace(anchor.OnNodeId) ||
+                string.Equals(anchor.OnNodeId, node.Id, StringComparison.Ordinal))
+            {
+                return -1;
+            }
+
+            if (!indexById.TryGetValue(anchor.OnNodeId, out var target))
+            {
+                issues.Add(new SceneValidationIssue(
+                    $"nodes[{index}].anchor.onNodeId",
+                    "AnchorNodeNotFound",
+                    $"Node '{node.Id}' rests on '{anchor.OnNodeId}', which is not a node in this scene."));
+                return -1;
+            }
+
+            return target;
+        }
+
+        // Every node has at most one anchor, so the graph is a forest of chains and the walk
+        // is linear: follow each chain once, marking it, and a chain that re-enters a node
+        // still on the current path is a cycle. Walking from every node instead would be
+        // quadratic on a long stack of anchors, which a scene is allowed to have.
+        var state = new byte[nodes.Count];
+        var path = new List<int>();
+
+        for (var start = 0; start < nodes.Count; start++)
+        {
+            if (state[start] != 0)
+            {
+                continue;
+            }
+
+            path.Clear();
+            var current = start;
+
+            while (current >= 0 && state[current] == 0)
+            {
+                state[current] = 1;
+                path.Add(current);
+                current = Anchor(current);
+            }
+
+            if (current >= 0 && state[current] == 1)
+            {
+                issues.Add(new SceneValidationIssue(
+                    $"nodes[{current}].anchor.onNodeId",
+                    "AnchorCycle",
+                    $"Node '{nodes[current]!.Id}' is in a cycle of anchors. Nodes resting on each other have no resolvable height."));
+            }
+
+            foreach (var visited in path)
+            {
+                state[visited] = 2;
+            }
         }
     }
 

@@ -53,7 +53,49 @@ public sealed record SceneNode(
     /// </summary>
     string? SlotId = null,
     SceneMaterialBinding? Material = null,
-    bool Visible = true);
+    bool Visible = true,
+    /// <summary>
+    /// Keep this node's base resting on y=0.
+    ///
+    /// A property of the node rather than an argument to one write, because "put it on the
+    /// floor" is a standing fact about the placement, not a one-off nudge. A later move that
+    /// sets a position without restating the flag used to re-centre the node on its origin
+    /// and half-bury it, and reported that only as a changed footprint.
+    /// </summary>
+    bool? GroundSnap = null,
+    /// <summary>
+    /// Which local axis is this asset's front, from <see cref="SceneFrontAxes"/>. Nothing in
+    /// the derived data knows this, so it is what the caller declared when it last asked to
+    /// face the node somewhere - recorded so the next "face the TV" does not have to restate it.
+    /// </summary>
+    string? FrontAxis = null,
+    /// <summary>
+    /// A world point this node keeps facing, turning about Y.
+    ///
+    /// Kept rather than baked into the rotation because a living room is "everything faces
+    /// the TV": with the point recorded, moving the TV re-aims the furniture instead of
+    /// leaving a room full of objects aimed at where it used to be. Setting a rotation by
+    /// hand clears it - a caller who states an angle is no longer tracking anything.
+    /// </summary>
+    Vec3? FaceToward = null,
+    SceneAnchor? Anchor = null);
+
+/// <summary>
+/// Rests this node on top of another node, and keeps it there.
+///
+/// The point is that "the vase is on the coffee table" survives the table moving. Without it
+/// every stacked Y is arithmetic the caller does by hand, and swapping the furniture
+/// underneath means recomputing and re-issuing every one of them.
+/// </summary>
+/// <param name="OnNodeId">The node this one rests on. Must name a node in the same document, and anchors may not form a cycle.</param>
+/// <param name="Offset">
+/// Displacement from the anchor's reference point - the centre of its top face - to this
+/// node's own (centre X, base Y, centre Z), in world-axis metres.
+///
+/// Null means "wherever this node already is": the offset is captured on the next write and
+/// stored, so a document never keeps a null one for long. Zero is the centred case.
+/// </param>
+public sealed record SceneAnchor(string OnNodeId, Vec3? Offset = null);
 
 /// <summary>
 /// A reference to a library asset, pinned to a version.
@@ -112,6 +154,55 @@ public static class SceneLightTypes
 
     public static readonly IReadOnlyList<string> All =
         new[] { Ambient, Directional, Point, Spot, Hemisphere };
+}
+
+/// <summary>
+/// The local axes an asset's front may point along.
+///
+/// Y is deliberately absent: this exists to answer "which way is it facing", which is a
+/// question about yaw, and an asset whose front points at the sky has no answer to it.
+/// </summary>
+public static class SceneFrontAxes
+{
+    public const string PlusX = "+X";
+    public const string MinusX = "-X";
+    public const string PlusZ = "+Z";
+    public const string MinusZ = "-Z";
+
+    /// <summary>
+    /// What a front axis is assumed to be when nobody said. Not a derived fact - an
+    /// assumption, and the reason the tools name it in their descriptions rather than
+    /// letting a caller discover it by placing a sofa backwards.
+    /// </summary>
+    public const string Default = PlusZ;
+
+    public static readonly IReadOnlyList<string> All = new[] { PlusX, MinusX, PlusZ, MinusZ };
+
+    /// <summary>The axis as a unit direction in the XZ plane, or null when it is not one of the four.</summary>
+    public static (double X, double Z)? Direction(string? axis) => axis switch
+    {
+        PlusX => (1, 0),
+        MinusX => (-1, 0),
+        PlusZ => (0, 1),
+        MinusZ => (0, -1),
+        _ => null,
+    };
+}
+
+/// <summary>
+/// How a node is placed over the anchor it rests on. Not part of the document - it decides
+/// the <see cref="SceneAnchor.Offset"/> a write records, and after that the offset is the
+/// whole truth.
+/// </summary>
+public static class SceneAnchorAlignments
+{
+    /// <summary>Centre it on the anchor's top face.</summary>
+    public const string Center = "center";
+
+    /// <summary>Leave it over whatever part of the anchor it is already over, and only rest it on top.</summary>
+    public const string Keep = "keep";
+
+    public static readonly IReadOnlyList<string> All = new[] { Center, Keep };
 }
 
 /// <summary>The blockout shapes a scene document may contain.</summary>

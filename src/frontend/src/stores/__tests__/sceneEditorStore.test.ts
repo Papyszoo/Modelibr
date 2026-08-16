@@ -158,6 +158,26 @@ describe('sceneEditorStore', () => {
     expect(useSceneEditorStore.getState().document?.nodes).toHaveLength(10)
   })
 
+  it('releases nodes resting on a removed node instead of stranding the anchor', () => {
+    // The server rejects a document whose anchor names a node that is not there,
+    // so leaving it behind would fail the whole save with an error about a node
+    // the user has already deleted.
+    const vase: SceneNode = {
+      ...makeNode('vase'),
+      anchor: { onNodeId: 'table', offset: { x: 0, y: 0, z: 0 } },
+    }
+    useSceneEditorStore
+      .getState()
+      .open(1, makeDocument([makeNode('table'), vase]), 1)
+
+    useSceneEditorStore.getState().removeNode('table')
+
+    const nodes = useSceneEditorStore.getState().document?.nodes ?? []
+    expect(nodes).toHaveLength(1)
+    expect(nodes[0].id).toBe('vase')
+    expect(nodes[0].anchor).toBeNull()
+  })
+
   it('clears the selection when the selected node is removed', () => {
     useSceneEditorStore.getState().open(1, makeDocument([makeNode('lamp')]), 1)
     useSceneEditorStore.getState().selectNode('lamp')

@@ -7,29 +7,59 @@ namespace Application.Scenes;
 /// <summary>
 /// Moves, rotates or rescales one node. Every component is optional and an omitted one is
 /// left alone, so nudging a node along X does not require restating its rotation and scale.
+///
+/// That rule extends to the placement rules the node carries: a move that says nothing about
+/// grounding, facing or what the node rests on keeps all three. The alternative is what this
+/// replaces - a move that supplied only a position silently re-centred the node on its own
+/// origin and reported it as a changed footprint.
 /// </summary>
+/// <param name="GroundSnap">Keep the node's base on y=0. Null leaves the node's current setting alone; false stops it snapping.</param>
+/// <param name="FaceToward">Turn the node to face this world point, and keep it facing there. Null leaves its current facing alone.</param>
+/// <param name="FrontAxis">Which local axis is the asset's front, from <see cref="SceneFrontAxes"/>. Null leaves the node's current declaration alone.</param>
+/// <param name="AnchorTo">Rest this node on that one. Null leaves any existing anchor alone.</param>
+/// <param name="AnchorAlign">How to sit it there, from <see cref="SceneAnchorAlignments"/>. Defaults to centring it.</param>
+/// <param name="AnchorOffset">The exact offset to anchor at, for undo. Overrides <paramref name="AnchorAlign"/>.</param>
+/// <param name="DetachAnchor">Stop resting on another node, leaving this one where it currently is.</param>
+/// <param name="Exact">
+/// Treat the placement rules as the whole state rather than a patch, so an omitted one is
+/// cleared instead of kept. Undo is the caller that needs it: partial updates make some prior
+/// states - a node that faced nothing, or rested on nothing - otherwise unreachable.
+/// </param>
 public sealed record MoveSceneNodeCommand(
     int SceneId,
     string NodeId,
     Vec3? Position = null,
     Vec3? RotationEuler = null,
     Vec3? Scale = null,
-    bool GroundSnap = false,
+    bool? GroundSnap = null,
     double? SnapToGrid = null,
-    int? ExpectedRevision = null) : ICommand<SceneNodeMoveResponse>;
+    int? ExpectedRevision = null,
+    Vec3? FaceToward = null,
+    string? FrontAxis = null,
+    string? AnchorTo = null,
+    string? AnchorAlign = null,
+    Vec3? AnchorOffset = null,
+    bool DetachAnchor = false,
+    bool Exact = false) : ICommand<SceneNodeMoveResponse>;
 
 /// <summary>
-/// The moved node, and the transform it had before.
+/// The moved node, and the placement it had before.
 ///
-/// <paramref name="PreviousTransform"/> is the whole undo record for this operation: the
-/// audit log stores it as the write's "before", and reversing the write is putting it back.
+/// The previous state is the whole undo record for this operation: the audit log stores it as
+/// the write's "before", and reversing the write is putting it back. It carries the placement
+/// rules as well as the transform, because a move can attach, detach, re-aim or un-ground a
+/// node, and an undo that restored only the numbers would leave it attached to the wrong thing.
 /// </summary>
 public sealed record SceneNodeMoveResponse(
     SceneSummary Scene,
     SceneNodeView Node,
     SceneTransform PreviousTransform,
     IReadOnlyList<SceneOverlap> Overlaps,
-    IReadOnlyList<SceneScaleWarning> ScaleWarnings);
+    IReadOnlyList<SceneScaleWarning> ScaleWarnings,
+    bool? PreviousGroundSnap = null,
+    Vec3? PreviousFaceToward = null,
+    string? PreviousFrontAxis = null,
+    SceneAnchor? PreviousAnchor = null);
 
 internal sealed class MoveSceneNodeCommandHandler : ICommandHandler<MoveSceneNodeCommand, SceneNodeMoveResponse>
 {
@@ -46,6 +76,26 @@ internal sealed class MoveSceneNodeCommandHandler : ICommandHandler<MoveSceneNod
         MoveSceneNodeCommand command,
         CancellationToken cancellationToken)
     {
+        var frontAxis = PlaceSceneAssetCommandHandler.ReadFrontAxis(command.FrontAxis);
+        if (frontAxis.IsFailure)
+        {
+            return Result.Failure<SceneNodeMoveResponse>(frontAxis.Error);
+        }
+
+        var anchor = PlaceSceneAssetCommandHandler.ReadAnchor(
+            command.AnchorTo, command.AnchorAlign, command.AnchorOffset);
+        if (anchor.IsFailure)
+        {
+            return Result.Failure<SceneNodeMoveResponse>(anchor.Error);
+        }
+
+        if (command.DetachAnchor && anchor.Value is not null)
+        {
+            return Result.Failure<SceneNodeMoveResponse>(new Error(
+                "Scene.AnchorAmbiguous",
+                "This move both attaches the node to another and detaches it. Pass one or the other."));
+        }
+
         var loaded = await _writer.LoadAsync(command.SceneId, cancellationToken);
         if (loaded.IsFailure)
         {
@@ -59,6 +109,10 @@ internal sealed class MoveSceneNodeCommandHandler : ICommandHandler<MoveSceneNod
         }
 
         var previousTransform = existing.Transform;
+        var previousGroundSnap = existing.GroundSnap;
+        var previousFaceToward = existing.FaceToward;
+        var previousFrontAxis = existing.FrontAxis;
+        var previousAnchor = existing.Anchor;
 
         SceneAssetFacts? facts = null;
         if (existing.Asset is { } asset)
@@ -85,9 +139,15 @@ internal sealed class MoveSceneNodeCommandHandler : ICommandHandler<MoveSceneNod
                         command.Position ?? node.Transform.Position,
                         command.RotationEuler ?? node.Transform.RotationEuler,
                         command.Scale ?? node.Transform.Scale),
+                    GroundSnap = command.GroundSnap ?? (command.Exact ? null : node.GroundSnap),
+                    FrontAxis = frontAxis.Value ?? (command.Exact ? null : node.FrontAxis),
+                    FaceToward = FacingAfter(command, node),
+                    Anchor = command.DetachAnchor
+                        ? null
+                        : anchor.Value ?? (command.Exact ? null : node.Anchor),
                 };
 
-                moved = PlaceSceneAssetCommandHandler.ApplySnapping(moved, facts, command.SnapToGrid, command.GroundSnap);
+                moved = PlaceSceneAssetCommandHandler.ApplyGridSnap(moved, facts, command.SnapToGrid);
 
                 var nodes = document.Nodes.ToArray();
                 nodes[index] = moved;
@@ -108,7 +168,28 @@ internal sealed class MoveSceneNodeCommandHandler : ICommandHandler<MoveSceneNod
             moved,
             previousTransform,
             view.Overlaps.Where(o => o.NodeIdA == command.NodeId || o.NodeIdB == command.NodeId).ToList(),
-            view.ScaleWarnings.Where(w => w.NodeId == command.NodeId).ToList()));
+            view.ScaleWarnings.Where(w => w.NodeId == command.NodeId).ToList(),
+            previousGroundSnap,
+            previousFaceToward,
+            previousFrontAxis,
+            previousAnchor));
+    }
+
+    /// <summary>
+    /// What the node should be facing after this move.
+    ///
+    /// A stated rotation clears a facing point: a caller who gives an angle is setting the
+    /// angle, and leaving the old target in place would have the next write silently turn the
+    /// node back. Undo relies on this too - it replays the previous rotation.
+    /// </summary>
+    private static Vec3? FacingAfter(MoveSceneNodeCommand command, SceneNode node)
+    {
+        if (command.FaceToward is { } target)
+        {
+            return target;
+        }
+
+        return command.Exact || command.RotationEuler is not null ? null : node.FaceToward;
     }
 
     internal static int IndexOfNode(SceneDocument document, string nodeId)

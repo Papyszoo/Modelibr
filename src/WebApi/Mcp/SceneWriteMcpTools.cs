@@ -53,8 +53,12 @@ public sealed class SceneWriteMcpTools
 
     [McpServerTool(Name = "place_asset")]
     [Description("Place a library asset into a scene. Position/rotation/scale default to an identity transform at the origin. " +
-                 "Set groundSnap=true to rest the asset's base on y=0 using its derived origin convention - do this rather than guessing a Y, " +
-                 "because an asset with a centered origin placed at y=0 is buried to its middle. " +
+                 "Set groundSnap=true to rest the asset's base on y=0 using its measured origin - do this rather than guessing a Y, " +
+                 "because an asset with a centered origin placed at y=0 is buried to its middle. It STAYS set: a later move_asset that " +
+                 "does not mention it keeps the asset on the floor. " +
+                 "To stack instead, pass on=\"<nodeId>\" and the asset rests on that node's top face and follows it when it moves - " +
+                 "no arithmetic, and nothing to recompute when the furniture underneath is swapped. " +
+                 "To aim it, pass faceToward=[x,y,z] and it turns about Y to face that point, and keeps facing it. " +
                  "Returns the placed node's world footprint plus any node it now overlaps and any scale warning it triggered.")]
     public static Task<object> PlaceAsset(
         ICommandHandler<PlaceSceneAssetCommand, ScenePlacementResponse> handler,
@@ -71,8 +75,12 @@ public sealed class SceneWriteMcpTools
         [Description("Position in metres as [x,y,z]. Defaults to the origin.")] double[]? position = null,
         [Description("Rotation in degrees as [x,y,z] (XYZ euler). Defaults to none.")] double[]? rotationEuler = null,
         [Description("Scale multiplier as [x,y,z]. Defaults to [1,1,1].")] double[]? scale = null,
-        [Description("Rest the asset's base on y=0 after placing.")] bool groundSnap = false,
+        [Description("Keep the asset's base resting on y=0. Stays set until a later call passes groundSnap=false.")] bool groundSnap = false,
         [Description("Round the position onto a grid of this size in metres. Pass 0 to use the asset's own derived grid.")] double? snapToGrid = null,
+        [Description("Rest this asset on the node with this id, instead of on the floor. It follows that node when it moves.")] string? on = null,
+        [Description("How to sit it on that node: 'center' (default) centres it on the top face; 'keep' rests it on top of wherever the position already puts it.")] string? align = null,
+        [Description("Turn the asset about Y to face this world point [x,y,z], and keep it facing there when either end moves.")] double[]? faceToward = null,
+        [Description("Which local axis is this asset's front: '+Z' (assumed), '-Z', '+X' or '-X'. Nothing in the library derives this - state it when the asset ends up backwards.")] string? frontAxis = null,
         [Description("Optional expected scene revision; the write is refused if the scene has moved on.")] int? expectedRevision = null,
         [Description("Optional batch id. Writes sharing one can be undone together with reverse_operation.")] string? batchId = null,
         CancellationToken cancellationToken = default)
@@ -83,7 +91,8 @@ public sealed class SceneWriteMcpTools
             new AgentWrite(idempotencyKey, "place-asset", "Scene", sceneId, BatchId: batchId),
             async ct =>
             {
-                var vectors = ReadVectors(("position", position), ("rotationEuler", rotationEuler), ("scale", scale));
+                var vectors = ReadVectors(
+                    ("position", position), ("rotationEuler", rotationEuler), ("scale", scale), ("faceToward", faceToward));
                 if (vectors.Failure is { } failure)
                 {
                     return failure;
@@ -93,7 +102,8 @@ public sealed class SceneWriteMcpTools
                     new PlaceSceneAssetCommand(
                         sceneId, assetType, assetId, versionId, nodeId, name, slotId,
                         vectors.Values["position"], vectors.Values["rotationEuler"], vectors.Values["scale"],
-                        groundSnap, snapToGrid, expectedRevision),
+                        groundSnap, snapToGrid, expectedRevision,
+                        vectors.Values["faceToward"], frontAxis, on, align),
                     ct);
 
                 if (result.IsFailure)
@@ -140,8 +150,10 @@ public sealed class SceneWriteMcpTools
         [Description("Optional slot id grouping these with the alternatives proposed for the same role.")] string? slotId = null,
         [Description("Rotation in degrees as [x,y,z], applied to every copy.")] double[]? rotationEuler = null,
         [Description("Scale multiplier as [x,y,z], applied to every copy.")] double[]? scale = null,
-        [Description("Rest each copy's base on y=0 after placing.")] bool groundSnap = false,
+        [Description("Keep every copy's base resting on y=0.")] bool groundSnap = false,
         [Description("Round each position onto a grid of this size in metres. Pass 0 to use the asset's own derived grid.")] double? snapToGrid = null,
+        [Description("Turn every copy to face this world point [x,y,z]. Each one faces it from where it stands, so a row fans out.")] double[]? faceToward = null,
+        [Description("Which local axis is this asset's front: '+Z' (assumed), '-Z', '+X' or '-X'.")] string? frontAxis = null,
         [Description("Optional expected scene revision; the write is refused if the scene has moved on.")] int? expectedRevision = null,
         [Description("Optional batch id. Writes sharing one can be undone together with reverse_operation.")] string? batchId = null,
         CancellationToken cancellationToken = default)
@@ -153,7 +165,8 @@ public sealed class SceneWriteMcpTools
             async ct =>
             {
                 var vectors = ReadVectors(
-                    ("start", start), ("end", end), ("rotationEuler", rotationEuler), ("scale", scale));
+                    ("start", start), ("end", end), ("rotationEuler", rotationEuler), ("scale", scale),
+                    ("faceToward", faceToward));
                 if (vectors.Failure is { } failure)
                 {
                     return failure;
@@ -165,7 +178,8 @@ public sealed class SceneWriteMcpTools
                         vectors.Values["start"]!.Value, vectors.Values["end"]!.Value, count,
                         versionId, nodeIdPrefix, name, slotId,
                         vectors.Values["rotationEuler"], vectors.Values["scale"],
-                        groundSnap, snapToGrid, expectedRevision),
+                        groundSnap, snapToGrid, expectedRevision,
+                        vectors.Values["faceToward"], frontAxis),
                     ct);
 
                 if (result.IsFailure)
@@ -190,8 +204,11 @@ public sealed class SceneWriteMcpTools
     }
 
     [McpServerTool(Name = "move_asset")]
-    [Description("Move, rotate or rescale one node. Omitted components are left alone. Returns the node's new footprint, the transform it had before, " +
-                 "and anything it now overlaps.")]
+    [Description("Move, rotate or rescale one node. Omitted components are left alone - and so are the placement rules the node carries: " +
+                 "a node that was ground-snapped stays on the floor, one that rests on another node stays on it, one that faces a point keeps facing it. " +
+                 "Pass groundSnap=false, detachAnchor=true or an explicit rotationEuler to end each of those. " +
+                 "Moving a node that others rest on moves them with it. " +
+                 "Returns the node's new footprint, the transform it had before, and anything it now overlaps.")]
     public static Task<object> MoveAsset(
         ICommandHandler<MoveSceneNodeCommand, SceneNodeMoveResponse> handler,
         IAgentAudit audit,
@@ -200,10 +217,15 @@ public sealed class SceneWriteMcpTools
         [Description("Node id to move.")] string nodeId,
         [Description("Unique key so a retried call does not move the node twice.")] string idempotencyKey,
         [Description("New position in metres as [x,y,z]. Omit to leave unchanged.")] double[]? position = null,
-        [Description("New rotation in degrees as [x,y,z]. Omit to leave unchanged.")] double[]? rotationEuler = null,
+        [Description("New rotation in degrees as [x,y,z]. Omit to leave unchanged. Setting one stops the node tracking any facing point.")] double[]? rotationEuler = null,
         [Description("New scale as [x,y,z]. Omit to leave unchanged.")] double[]? scale = null,
-        [Description("Rest the asset's base on y=0 after moving.")] bool groundSnap = false,
+        [Description("Keep the node's base on y=0. Omit to leave its current setting alone; pass false to stop it snapping.")] bool? groundSnap = null,
         [Description("Round the position onto a grid of this size in metres. Pass 0 to use the asset's own derived grid.")] double? snapToGrid = null,
+        [Description("Rest this node on the node with this id. Omit to leave any existing anchor alone.")] string? on = null,
+        [Description("How to sit it on that node: 'center' (default) or 'keep'.")] string? align = null,
+        [Description("Stop resting on another node, leaving this one where it currently is.")] bool detachAnchor = false,
+        [Description("Turn the node about Y to face this world point [x,y,z], and keep it facing there.")] double[]? faceToward = null,
+        [Description("Which local axis is this asset's front: '+Z' (assumed), '-Z', '+X' or '-X'.")] string? frontAxis = null,
         [Description("Optional expected scene revision; the write is refused if the scene has moved on.")] int? expectedRevision = null,
         [Description("Optional batch id. Writes sharing one can be undone together with reverse_operation.")] string? batchId = null,
         CancellationToken cancellationToken = default)
@@ -214,7 +236,8 @@ public sealed class SceneWriteMcpTools
             new AgentWrite(idempotencyKey, "move-asset", "Scene", sceneId, BatchId: batchId),
             async ct =>
             {
-                var vectors = ReadVectors(("position", position), ("rotationEuler", rotationEuler), ("scale", scale));
+                var vectors = ReadVectors(
+                    ("position", position), ("rotationEuler", rotationEuler), ("scale", scale), ("faceToward", faceToward));
                 if (vectors.Failure is { } failure)
                 {
                     return failure;
@@ -224,7 +247,8 @@ public sealed class SceneWriteMcpTools
                     new MoveSceneNodeCommand(
                         sceneId, nodeId,
                         vectors.Values["position"], vectors.Values["rotationEuler"], vectors.Values["scale"],
-                        groundSnap, snapToGrid, expectedRevision),
+                        groundSnap, snapToGrid, expectedRevision,
+                        vectors.Values["faceToward"], frontAxis, on, align, DetachAnchor: detachAnchor),
                     ct);
 
                 if (result.IsFailure)
@@ -232,6 +256,9 @@ public sealed class SceneWriteMcpTools
                     return Failed(result.Error);
                 }
 
+                // The whole prior placement, not just the transform: this write can attach,
+                // detach, re-aim or un-ground the node, and an undo that put back only the
+                // numbers would leave it following the wrong thing.
                 return Applied(
                     new
                     {
@@ -242,7 +269,15 @@ public sealed class SceneWriteMcpTools
                         scaleWarnings = result.Value.ScaleWarnings,
                     },
                     "Scene", sceneId, result.Value,
-                    new { nodeId, transform = result.Value.PreviousTransform });
+                    new
+                    {
+                        nodeId,
+                        transform = result.Value.PreviousTransform,
+                        groundSnap = result.Value.PreviousGroundSnap,
+                        faceToward = result.Value.PreviousFaceToward,
+                        frontAxis = result.Value.PreviousFrontAxis,
+                        anchor = result.Value.PreviousAnchor,
+                    });
             },
             cancellationToken);
     }

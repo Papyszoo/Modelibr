@@ -120,6 +120,24 @@ export function ScenePropertyPanel({
                   ? 'unknown'
                   : `${format(-groundOffset)} m`}
               </dd>
+              {/* The rules the server keeps applying to this node. Without them
+                  the panel would report a position the node does not stay in. */}
+              <dt>Rests on</dt>
+              <dd data-testid="scene-properties-rests-on">
+                {facts.anchor
+                  ? facts.anchor.onNodeId
+                  : facts.groundSnap
+                    ? 'the ground, held'
+                    : 'nothing'}
+              </dd>
+              {facts.faceToward ? (
+                <>
+                  <dt>Faces</dt>
+                  <dd>
+                    {`${format(facts.faceToward.x)}, ${format(facts.faceToward.y)}, ${format(facts.faceToward.z)}`}
+                  </dd>
+                </>
+              ) : null}
             </dl>
 
             <Button
@@ -129,11 +147,13 @@ export function ScenePropertyPanel({
               outlined
               className="scene-properties-action"
               onClick={onGroundSnap}
-              disabled={groundOffset == null}
+              disabled={groundOffset == null || facts.anchor != null}
               tooltip={
-                groundOffset == null
-                  ? 'Unknown for this node: either the asset has no derived bounds, or it has moved since it was last saved.'
-                  : 'Rest this node on y = 0 using its origin convention.'
+                facts.anchor
+                  ? `This node rests on '${facts.anchor.onNodeId}'. Detach it before putting it on the floor.`
+                  : groundOffset == null
+                    ? 'Unknown for this node: either the asset has no derived bounds, or it has moved since it was last saved.'
+                    : 'Rest this node on y = 0 using its origin convention.'
               }
             />
           </section>

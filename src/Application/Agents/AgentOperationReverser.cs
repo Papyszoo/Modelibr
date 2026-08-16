@@ -650,9 +650,23 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
                     return Result.Failure<string>(new Error("NoPriorState", "The node's previous transform was not recorded."));
                 }
 
+                // Exact: the recorded placement is the whole prior state. A merging undo would
+                // keep whatever the write attached the node to, or left it facing, and report
+                // success anyway. Entries logged before placement rules existed carry none of
+                // these keys, which reads as "nothing set" - which is what was true then.
+                var anchor = ReadPayload<SceneAnchor>(before!.Value, "anchor");
                 var result = await _moveSceneNode.Handle(
                     new MoveSceneNodeCommand(
-                        entry.AssetId!.Value, nodeId, transform.Position, transform.RotationEuler, transform.Scale),
+                        entry.AssetId!.Value, nodeId, transform.Position, transform.RotationEuler, transform.Scale,
+                        GroundSnap: ReadBool(before.Value, "groundSnap"),
+                        FaceToward: ReadVector(before.Value, "faceToward"),
+                        FrontAxis: ReadString(before.Value, "frontAxis"),
+                        AnchorTo: anchor?.OnNodeId,
+                        // "Keep" when the offset was never captured, so the node is re-seated
+                        // where it stands rather than yanked to the centre of its anchor.
+                        AnchorAlign: anchor is { Offset: null } ? SceneAnchorAlignments.Keep : null,
+                        AnchorOffset: anchor?.Offset,
+                        Exact: true),
                     cancellationToken);
 
                 return result.IsFailure
@@ -826,6 +840,28 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
     }
 
     private static readonly JsonSerializerOptions PayloadReadOptions = new() { PropertyNameCaseInsensitive = true };
+
+    /// <summary>
+    /// The struct twin of <see cref="ReadPayload{T}"/>: <see cref="Vec3"/> is a value type, so
+    /// it cannot go through the class-constrained reader, and a recorded point still has to
+    /// come back as "absent" rather than as the origin when the property is not there.
+    /// </summary>
+    private static Vec3? ReadVector(JsonElement element, string property)
+    {
+        if (!element.TryGetProperty(property, out var value) || value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+        {
+            return null;
+        }
+
+        try
+        {
+            return value.Deserialize<Vec3>(PayloadReadOptions);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
 
     private static bool? ReadBool(JsonElement element, string property) =>
         element.TryGetProperty(property, out var value) && value.ValueKind is JsonValueKind.True or JsonValueKind.False

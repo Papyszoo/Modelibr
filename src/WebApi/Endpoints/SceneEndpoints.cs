@@ -111,7 +111,8 @@ public static class SceneEndpoints
                 new PlaceSceneAssetCommand(
                     id, request.AssetType, request.AssetId, request.VersionId, request.NodeId, request.Name,
                     request.SlotId, request.Position, request.RotationEuler, request.Scale,
-                    request.GroundSnap ?? false, request.SnapToGrid, request.ExpectedRevision),
+                    request.GroundSnap ?? false, request.SnapToGrid, request.ExpectedRevision,
+                    request.FaceToward, request.FrontAxis, request.On, request.Align),
                 cancellationToken);
             return result.IsFailure ? NotFoundOrFailure(result.Error) : Results.Ok(result.Value);
         })
@@ -128,7 +129,9 @@ public static class SceneEndpoints
             var result = await handler.Handle(
                 new MoveSceneNodeCommand(
                     id, nodeId, request.Position, request.RotationEuler, request.Scale,
-                    request.GroundSnap ?? false, request.SnapToGrid, request.ExpectedRevision),
+                    request.GroundSnap, request.SnapToGrid, request.ExpectedRevision,
+                    request.FaceToward, request.FrontAxis, request.On, request.Align,
+                    DetachAnchor: request.DetachAnchor ?? false),
                 cancellationToken);
             return result.IsFailure ? NotFoundOrFailure(result.Error) : Results.Ok(result.Value);
         })
@@ -214,7 +217,11 @@ public record PlaceSceneAssetRequest(
     Vec3? Scale = null,
     bool? GroundSnap = null,
     double? SnapToGrid = null,
-    int? ExpectedRevision = null);
+    int? ExpectedRevision = null,
+    Vec3? FaceToward = null,
+    string? FrontAxis = null,
+    string? On = null,
+    string? Align = null);
 
 public record MoveSceneNodeRequest(
     Vec3? Position = null,
@@ -222,7 +229,12 @@ public record MoveSceneNodeRequest(
     Vec3? Scale = null,
     bool? GroundSnap = null,
     double? SnapToGrid = null,
-    int? ExpectedRevision = null);
+    int? ExpectedRevision = null,
+    Vec3? FaceToward = null,
+    string? FrontAxis = null,
+    string? On = null,
+    string? Align = null,
+    bool? DetachAnchor = null);
 
 public record ApplySceneMaterialRequest(
     int? TextureSetId = null,

@@ -29,6 +29,10 @@ public sealed record SceneSummary(
 /// draws its selection box from it: the outline and the overlap check have to describe the
 /// same box, and they only do that while both read the same number.
 /// </param>
+/// <param name="GroundSnap">Whether this node is being kept resting on y=0.</param>
+/// <param name="FaceToward">The world point this node is being kept facing, if any.</param>
+/// <param name="FrontAxis">The front axis that facing is measured from - the default when the node never declared one.</param>
+/// <param name="Anchor">The node this one rests on, and the offset it rests at.</param>
 public sealed record SceneNodeView(
     string NodeId,
     string? Name,
@@ -43,7 +47,11 @@ public sealed record SceneNodeView(
     string? OriginConvention,
     double? GridSize,
     double? GroundOffset,
-    Vec3? OriginInBounds);
+    Vec3? OriginInBounds,
+    bool GroundSnap = false,
+    Vec3? FaceToward = null,
+    string? FrontAxis = null,
+    SceneAnchor? Anchor = null);
 
 /// <summary>
 /// A scene, its document, and everything derived from the two.
@@ -106,7 +114,13 @@ public static class SceneViewBuilder
             nodeFacts?.OriginConvention,
             nodeFacts?.GridSize,
             groundedY is { } y ? y - node.Transform.Position.Y : null,
-            nodeFacts?.OriginInBounds);
+            nodeFacts?.OriginInBounds,
+            node.GroundSnap ?? false,
+            node.FaceToward,
+            // Reported as the axis facing is actually measured from, so a caller reading a
+            // node back is told the assumption rather than left to infer it from a null.
+            node.FrontAxis ?? SceneFrontAxes.Default,
+            node.Anchor);
     }
 
     /// <summary>Every distinct asset reference a document makes, including its environment map.</summary>

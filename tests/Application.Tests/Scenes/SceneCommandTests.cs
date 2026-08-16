@@ -375,6 +375,205 @@ public class SceneCommandTests
     }
 
     [Fact]
+    public async Task MoveNode_Keeps_A_Node_On_The_Ground_When_The_Move_Does_Not_Mention_Grounding()
+    {
+        // The defect this closes: four nodes dropped to half-buried in one call, because a
+        // move that supplied only a position re-centred them on their origin and reported it
+        // as nothing more than a changed footprint.
+        await Place.Handle(PlaceCommand(nodeId: "lamp", groundSnap: true), CancellationToken.None);
+
+        var result = await new MoveSceneNodeCommandHandler(_writer, _facts.Object).Handle(
+            new MoveSceneNodeCommand(SceneId, "lamp", Position: new Vec3(9, 0, 9)), CancellationToken.None);
+
+        Assert.Equal(2, result.Value.Node.Transform.Position.Y, 6);
+        Assert.Equal(0, result.Value.Node.Footprint!.Value.Min.Y, 6);
+        Assert.True(result.Value.Node.GroundSnap);
+    }
+
+    [Fact]
+    public async Task MoveNode_Can_Stop_A_Node_Being_Held_On_The_Ground()
+    {
+        await Place.Handle(PlaceCommand(nodeId: "lamp", groundSnap: true), CancellationToken.None);
+
+        var result = await new MoveSceneNodeCommandHandler(_writer, _facts.Object).Handle(
+            new MoveSceneNodeCommand(SceneId, "lamp", Position: new Vec3(0, 6, 0), GroundSnap: false),
+            CancellationToken.None);
+
+        Assert.Equal(6, result.Value.Node.Transform.Position.Y, 6);
+        Assert.False(result.Value.Node.GroundSnap);
+    }
+
+    [Fact]
+    public async Task PlaceAsset_On_Another_Node_Rests_It_On_That_Nodes_Top_Face()
+    {
+        await Place.Handle(PlaceCommand(nodeId: "table", groundSnap: true), CancellationToken.None);
+
+        var result = await Place.Handle(
+            new PlaceSceneAssetCommand(SceneId, SceneAssetTypes.Model, ModelId, VersionId, "vase", AnchorTo: "table"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        // The table is 4 m tall resting on the floor, so its top face is at y=4 and a centered
+        // 4 m asset sitting on it has its own centre at 6.
+        Assert.Equal(6, result.Value.Node.Transform.Position.Y, 6);
+        Assert.Equal(4, result.Value.Node.Footprint!.Value.Min.Y, 6);
+        Assert.Equal("table", result.Value.Node.Anchor!.OnNodeId);
+    }
+
+    [Fact]
+    public async Task MoveNode_Carries_Everything_Anchored_To_It()
+    {
+        await Place.Handle(PlaceCommand(nodeId: "table", groundSnap: true), CancellationToken.None);
+        await Place.Handle(
+            new PlaceSceneAssetCommand(SceneId, SceneAssetTypes.Model, ModelId, VersionId, "vase", AnchorTo: "table"),
+            CancellationToken.None);
+
+        var moved = await new MoveSceneNodeCommandHandler(_writer, _facts.Object).Handle(
+            new MoveSceneNodeCommand(SceneId, "table", Position: new Vec3(12, 0, -3)), CancellationToken.None);
+
+        Assert.True(moved.IsSuccess);
+
+        var scene = await new GetSceneByIdQueryHandler(_writer).Handle(new GetSceneByIdQuery(SceneId), CancellationToken.None);
+        var vase = scene.Value.Nodes.Single(n => n.NodeId == "vase");
+
+        Assert.Equal(12, vase.Transform.Position.X, 6);
+        Assert.Equal(-3, vase.Transform.Position.Z, 6);
+        Assert.Equal(6, vase.Transform.Position.Y, 6);
+    }
+
+    [Fact]
+    public async Task MoveNode_Can_Detach_A_Node_From_What_It_Rests_On()
+    {
+        await Place.Handle(PlaceCommand(nodeId: "table", groundSnap: true), CancellationToken.None);
+        await Place.Handle(
+            new PlaceSceneAssetCommand(SceneId, SceneAssetTypes.Model, ModelId, VersionId, "vase", AnchorTo: "table"),
+            CancellationToken.None);
+
+        var handler = new MoveSceneNodeCommandHandler(_writer, _facts.Object);
+        var detached = await handler.Handle(
+            new MoveSceneNodeCommand(SceneId, "vase", DetachAnchor: true), CancellationToken.None);
+
+        Assert.Null(detached.Value.Node.Anchor);
+        // Detaching leaves it where it is rather than dropping it.
+        Assert.Equal(6, detached.Value.Node.Transform.Position.Y, 6);
+
+        await handler.Handle(
+            new MoveSceneNodeCommand(SceneId, "table", Position: new Vec3(30, 0, 0)), CancellationToken.None);
+
+        var scene = await new GetSceneByIdQueryHandler(_writer).Handle(new GetSceneByIdQuery(SceneId), CancellationToken.None);
+        Assert.Equal(0, scene.Value.Nodes.Single(n => n.NodeId == "vase").Transform.Position.X, 6);
+    }
+
+    [Fact]
+    public async Task RemoveNode_Refuses_While_Something_Rests_On_It()
+    {
+        // Cascading would delete furniture nobody asked to delete; detaching silently would
+        // leave an undo that cannot put the arrangement back. Both are worse than saying so.
+        await Place.Handle(PlaceCommand(nodeId: "table", groundSnap: true), CancellationToken.None);
+        await Place.Handle(
+            new PlaceSceneAssetCommand(SceneId, SceneAssetTypes.Model, ModelId, VersionId, "vase", AnchorTo: "table"),
+            CancellationToken.None);
+
+        var result = await new RemoveSceneNodeCommandHandler(_writer).Handle(
+            new RemoveSceneNodeCommand(SceneId, "table"), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.NodeHasDependents", result.Error.Code);
+        Assert.Contains("vase", result.Error.Message);
+    }
+
+    [Fact]
+    public async Task PlaceAsset_Facing_A_Point_Turns_The_Node_Towards_It()
+    {
+        var result = await Place.Handle(
+            new PlaceSceneAssetCommand(
+                SceneId, SceneAssetTypes.Model, ModelId, VersionId, "sofa",
+                Position: new Vec3(0, 0, -5), FaceToward: Vec3.Zero),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        // Standing at z=-5 looking at the origin is looking along +Z, which is the assumed front.
+        Assert.Equal(0, result.Value.Node.Transform.RotationEuler.Y, 6);
+        Assert.Equal(SceneFrontAxes.Default, result.Value.Node.FrontAxis);
+    }
+
+    [Fact]
+    public async Task PlaceAsset_Facing_A_Point_Honours_A_Declared_Front_Axis()
+    {
+        var result = await Place.Handle(
+            new PlaceSceneAssetCommand(
+                SceneId, SceneAssetTypes.Model, ModelId, VersionId, "sofa",
+                Position: new Vec3(0, 0, -5), FaceToward: Vec3.Zero, FrontAxis: SceneFrontAxes.MinusZ),
+            CancellationToken.None);
+
+        Assert.Equal(180, result.Value.Node.Transform.RotationEuler.Y, 6);
+    }
+
+    [Fact]
+    public async Task PlaceAsset_With_A_Front_Axis_That_Is_Not_One_Is_Refused()
+    {
+        var result = await Place.Handle(
+            new PlaceSceneAssetCommand(SceneId, SceneAssetTypes.Model, ModelId, VersionId, FrontAxis: "north"),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.UnknownFrontAxis", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task MoveNode_With_An_Explicit_Rotation_Stops_The_Node_Tracking_What_It_Faced()
+    {
+        await Place.Handle(
+            new PlaceSceneAssetCommand(
+                SceneId, SceneAssetTypes.Model, ModelId, VersionId, "sofa",
+                Position: new Vec3(0, 0, -5), FaceToward: Vec3.Zero),
+            CancellationToken.None);
+
+        var result = await new MoveSceneNodeCommandHandler(_writer, _facts.Object).Handle(
+            new MoveSceneNodeCommand(SceneId, "sofa", RotationEuler: new Vec3(0, 33, 0)), CancellationToken.None);
+
+        Assert.Equal(33, result.Value.Node.Transform.RotationEuler.Y, 6);
+        Assert.Null(result.Value.Node.FaceToward);
+    }
+
+    [Fact]
+    public async Task MoveNode_Records_The_Whole_Placement_It_Replaced_So_Undo_Can_Restore_It()
+    {
+        await Place.Handle(PlaceCommand(nodeId: "table", groundSnap: true), CancellationToken.None);
+        await Place.Handle(
+            new PlaceSceneAssetCommand(
+                SceneId, SceneAssetTypes.Model, ModelId, VersionId, "vase",
+                AnchorTo: "table", FaceToward: new Vec3(10, 0, 0), FrontAxis: SceneFrontAxes.MinusZ),
+            CancellationToken.None);
+
+        var handler = new MoveSceneNodeCommandHandler(_writer, _facts.Object);
+        var detached = await handler.Handle(
+            new MoveSceneNodeCommand(SceneId, "vase", Position: Vec3.Zero, DetachAnchor: true), CancellationToken.None);
+
+        Assert.Equal("table", detached.Value.PreviousAnchor!.OnNodeId);
+        Assert.Equal(new Vec3(10, 0, 0), detached.Value.PreviousFaceToward);
+        Assert.Equal(SceneFrontAxes.MinusZ, detached.Value.PreviousFrontAxis);
+
+        // Putting that state back is what reverse_operation issues.
+        var restored = await handler.Handle(
+            new MoveSceneNodeCommand(
+                SceneId, "vase",
+                detached.Value.PreviousTransform.Position,
+                detached.Value.PreviousTransform.RotationEuler,
+                detached.Value.PreviousTransform.Scale,
+                GroundSnap: detached.Value.PreviousGroundSnap,
+                FaceToward: detached.Value.PreviousFaceToward,
+                FrontAxis: detached.Value.PreviousFrontAxis,
+                AnchorTo: detached.Value.PreviousAnchor.OnNodeId,
+                AnchorOffset: detached.Value.PreviousAnchor.Offset,
+                Exact: true),
+            CancellationToken.None);
+
+        Assert.Equal("table", restored.Value.Node.Anchor!.OnNodeId);
+        Assert.Equal(4, restored.Value.Node.Footprint!.Value.Min.Y, 6);
+    }
+
+    [Fact]
     public async Task DistributeAssets_Spaces_Every_Copy_Between_The_Endpoints_Inclusively()
     {
         var handler = new DistributeSceneAssetsCommandHandler(_writer, _facts.Object);

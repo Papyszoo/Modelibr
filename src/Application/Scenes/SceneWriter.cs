@@ -128,9 +128,17 @@ internal sealed class SceneWriter : ISceneWriter
             return Result.Failure<SceneWriteResult>(mutated.Error);
         }
 
+        // Placement rules the nodes carry - a sticky ground snap, an anchor onto the node
+        // below - are applied here rather than in each handler, so they hold for every write:
+        // an agent's move_asset, the editor's whole-document save, and undo alike. A handler
+        // that had to remember to re-apply them is a handler one refactor away from a scene
+        // where the vase stays behind when the table moves.
+        var facts = await FactsAsync(mutated.Value, cancellationToken);
+        var placed = SceneSpatial.ResolvePlacements(current, mutated.Value, facts);
+
         // The gate. Whatever a mutation produced is a *candidate*, and a candidate that
         // does not validate never reaches the database.
-        var validated = SceneDocumentCodec.Validate(mutated.Value);
+        var validated = SceneDocumentCodec.Validate(placed);
         if (validated.IsFailure)
         {
             return Result.Failure<SceneWriteResult>(validated.Error);
@@ -174,7 +182,6 @@ internal sealed class SceneWriter : ISceneWriter
             return Result.Failure<SceneWriteResult>(saved.Error);
         }
 
-        var facts = await FactsAsync(document, cancellationToken);
         return Result.Success(new SceneWriteResult(scene, document, facts));
     }
 

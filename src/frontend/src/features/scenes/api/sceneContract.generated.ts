@@ -20,11 +20,24 @@ export type SceneLightType = (typeof SCENE_LIGHT_TYPES)[number]
 export const SCENE_PRIMITIVE_SHAPES = ['box', 'plane', 'sphere', 'cylinder', 'cone'] as const
 export type ScenePrimitiveShape = (typeof SCENE_PRIMITIVE_SHAPES)[number]
 
+/** Local axes an asset's front may point along. Y is excluded: facing is a rotation about it. */
+export const SCENE_FRONT_AXES = ['+X', '-X', '+Z', '-Z'] as const
+export type SceneFrontAxis = (typeof SCENE_FRONT_AXES)[number]
+
+/** How a node is seated on the node it rests on. Decides the anchor offset a write records, and is not itself stored. */
+export const SCENE_ANCHOR_ALIGNMENTS = ['center', 'keep'] as const
+export type SceneAnchorAlignment = (typeof SCENE_ANCHOR_ALIGNMENTS)[number]
+
 export interface SceneDocument {
   schemaVersion: number
   nodes: SceneNode[]
   lights: SceneLight[]
   environment?: SceneEnvironment | null
+}
+
+export interface SceneAnchor {
+  onNodeId: string
+  offset?: Vec3 | null
 }
 
 export interface SceneAssetRef {
@@ -63,6 +76,10 @@ export interface SceneNode {
   slotId?: string | null
   material?: SceneMaterialBinding | null
   visible: boolean
+  groundSnap?: boolean | null
+  frontAxis?: SceneFrontAxis | null
+  faceToward?: Vec3 | null
+  anchor?: SceneAnchor | null
 }
 
 export interface ScenePrimitive {

@@ -224,7 +224,15 @@ export const useSceneEditorStore = create<SceneEditorState>((set, get) => ({
   removeNode: nodeId => {
     get().edit(document => ({
       ...document,
-      nodes: document.nodes.filter(node => node.id !== nodeId),
+      nodes: document.nodes
+        .filter(node => node.id !== nodeId)
+        // Nodes resting on the deleted one are released rather than deleted with
+        // it, and stay exactly where they are. Leaving the anchor pointing at a
+        // node that is gone would have the server reject the whole save with an
+        // error about a node the user has already deleted.
+        .map(node =>
+          node.anchor?.onNodeId === nodeId ? { ...node, anchor: null } : node
+        ),
     }))
 
     if (get().selectedNodeId === nodeId) {

@@ -32,7 +32,9 @@ public sealed record DistributeSceneAssetsCommand(
     Vec3? Scale = null,
     bool GroundSnap = false,
     double? SnapToGrid = null,
-    int? ExpectedRevision = null) : ICommand<SceneDistributionResponse>;
+    int? ExpectedRevision = null,
+    Vec3? FaceToward = null,
+    string? FrontAxis = null) : ICommand<SceneDistributionResponse>;
 
 /// <summary>The placed row, plus what is now wrong with the scene because of it.</summary>
 public sealed record SceneDistributionResponse(
@@ -82,10 +84,16 @@ internal sealed class DistributeSceneAssetsCommandHandler
                 "Scene.InvalidVector", "start and end must be finite [x,y,z] positions."));
         }
 
+        var frontAxis = PlaceSceneAssetCommandHandler.ReadFrontAxis(command.FrontAxis);
+        if (frontAxis.IsFailure)
+        {
+            return Result.Failure<SceneDistributionResponse>(frontAxis.Error);
+        }
+
         var assetRef = new SceneAssetRef(command.AssetType, command.AssetId, command.VersionId);
 
-        // Resolved up front, exactly as a single placement does: grounding and grid snapping
-        // need the asset's bounds and origin, and the mutation itself stays synchronous.
+        // Resolved up front, exactly as a single placement does: grid snapping needs the
+        // asset's own derived grid, and the mutation itself stays synchronous.
         var assetFacts = await _facts.ResolveAsync([assetRef], cancellationToken);
         assetFacts.TryGetValue(SceneSpatial.FactsKey(assetRef), out var facts);
 
@@ -112,10 +120,14 @@ internal sealed class DistributeSceneAssetsCommandHandler
                         new SceneTransform(position, command.RotationEuler ?? Vec3.Zero, command.Scale ?? Vec3.One),
                         Asset: assetRef,
                         Name: command.Name,
-                        SlotId: command.SlotId);
+                        SlotId: command.SlotId,
+                        GroundSnap: command.GroundSnap ? true : null,
+                        FrontAxis: frontAxis.Value,
+                        // Each copy faces the point from where it stands, so a row of chairs
+                        // around a table fans out instead of all pointing the same way.
+                        FaceToward: command.FaceToward);
 
-                    nodes.Add(PlaceSceneAssetCommandHandler.ApplySnapping(
-                        node, facts, command.SnapToGrid, command.GroundSnap));
+                    nodes.Add(PlaceSceneAssetCommandHandler.ApplyGridSnap(node, facts, command.SnapToGrid));
                     placedNodeIds.Add(nodeId);
                 }
 

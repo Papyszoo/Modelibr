@@ -290,6 +290,318 @@ public static class SceneSpatial
     }
 
     /// <summary>
+    /// The point something resting on this node sits on: the centre of its top face.
+    /// Null when the node has no derived bounds, because there is then no top face to name.
+    /// </summary>
+    public static Vec3? AnchorReference(SceneNode node, SceneAssetFacts? facts) =>
+        Footprint(node, facts) is { } box ? new Vec3(box.Center.X, box.Max.Y, box.Center.Z) : null;
+
+    /// <summary>This node's own contact point - the centre of its footprint, at its base.</summary>
+    public static Vec3? ContactPoint(SceneNode node, SceneAssetFacts? facts) =>
+        Footprint(node, facts) is { } box ? new Vec3(box.Center.X, box.Min.Y, box.Center.Z) : null;
+
+    /// <summary>
+    /// Moves a node so its contact point lands on <paramref name="target"/>, leaving its
+    /// rotation and scale alone. The footprint is affine in the position, so the required
+    /// move is exactly the difference between where the contact point is and where it should
+    /// be - no search, and no assumption about which way the node is turned.
+    /// </summary>
+    public static SceneNode? WithContactAt(SceneNode node, SceneAssetFacts? facts, Vec3 target)
+    {
+        if (ContactPoint(node, facts) is not { } contact)
+        {
+            return null;
+        }
+
+        var transform = node.Transform ?? SceneTransform.Identity;
+        return node with
+        {
+            Transform = transform with
+            {
+                Position = new Vec3(
+                    transform.Position.X + (target.X - contact.X),
+                    transform.Position.Y + (target.Y - contact.Y),
+                    transform.Position.Z + (target.Z - contact.Z)),
+            },
+        };
+    }
+
+    /// <summary>
+    /// The Y rotation, in degrees, that turns <paramref name="frontAxis"/> to point from
+    /// <paramref name="from"/> towards <paramref name="toward"/>.
+    ///
+    /// Which axis is an asset's front is not derivable from anything the library stores, so
+    /// it is declared rather than guessed - but the trigonometry after that is exactly the
+    /// part an agent gets wrong, and it is the same for every asset. Null when the two points
+    /// share a spot on the ground plane, because "face yourself" has no answer.
+    /// </summary>
+    public static double? FacingYawDegrees(Vec3 from, Vec3 toward, string? frontAxis)
+    {
+        if (SceneFrontAxes.Direction(frontAxis ?? SceneFrontAxes.Default) is not { } axis)
+        {
+            return null;
+        }
+
+        var dx = toward.X - from.X;
+        var dz = toward.Z - from.Z;
+        if (!double.IsFinite(dx) || !double.IsFinite(dz) || (Math.Abs(dx) < 1e-9 && Math.Abs(dz) < 1e-9))
+        {
+            return null;
+        }
+
+        // Yaw rotates the front axis in the XZ plane; the rotation needed is the angle
+        // between where the axis points and where the target is.
+        var yaw = (Math.Atan2(axis.Z, axis.X) - Math.Atan2(dz, dx)) * 180.0 / Math.PI;
+
+        // Normalised to (-180, 180] so a facing change reads as a small number in the
+        // response rather than as 1080 degrees accumulated over four calls.
+        yaw %= 360;
+        return yaw switch
+        {
+            > 180 => yaw - 360,
+            <= -180 => yaw + 360,
+            _ => yaw,
+        };
+    }
+
+    /// <summary>
+    /// Applies the placement rules a node carries with it: an anchor keeps it resting on the
+    /// node below, a facing point keeps it turned towards something, and a sticky ground snap
+    /// keeps it on the floor.
+    ///
+    /// Run on the candidate document of every write, so the rules hold no matter which tool
+    /// (or the editor) produced it. <paramref name="current"/> is the stored document this
+    /// write started from, and it is what tells an anchor that moved from an anchored node
+    /// that was dragged: if the node moved and the thing it rests on did not, the caller
+    /// repositioned it on that surface and the offset is re-captured rather than undone.
+    /// </summary>
+    public static SceneDocument ResolvePlacements(
+        SceneDocument current,
+        SceneDocument candidate,
+        IReadOnlyDictionary<string, SceneAssetFacts> facts)
+    {
+        if (candidate.Nodes is not { Count: > 0 } nodes)
+        {
+            return candidate;
+        }
+
+        var resolved = nodes.ToArray();
+        var indexById = new Dictionary<string, int>(StringComparer.Ordinal);
+        for (var i = 0; i < resolved.Length; i++)
+        {
+            if (resolved[i]?.Id is { } id)
+            {
+                indexById.TryAdd(id, i);
+            }
+        }
+
+        var stored = new Dictionary<string, SceneNode>(StringComparer.Ordinal);
+        foreach (var node in current.Nodes ?? Array.Empty<SceneNode>())
+        {
+            if (node?.Id is { } id)
+            {
+                stored.TryAdd(id, node);
+            }
+        }
+
+        var changed = false;
+
+        foreach (var index in DependencyOrder(resolved, indexById))
+        {
+            var node = resolved[index];
+            if (node is null)
+            {
+                continue;
+            }
+
+            var placed = Resolve(node, resolved, indexById, stored, facts);
+
+            if (!ReferenceEquals(placed, node))
+            {
+                resolved[index] = placed;
+                changed = true;
+            }
+        }
+
+        return changed ? candidate with { Nodes = resolved } : candidate;
+    }
+
+    /// <summary>
+    /// One node's rules, in the order they depend on each other: where it should sit, then
+    /// which way it should point from there, then the move that puts it there.
+    ///
+    /// Facing is resolved from the seat rather than from the node's current position, because
+    /// "put the TV on the console facing the sofa" arrives as one call and the position it
+    /// carries is whatever the caller happened to pass - usually the origin.
+    ///
+    /// A node whose anchor names something that is not here, or that has no derived bounds,
+    /// is left exactly where it is. An anchor that cannot be resolved is a reason not to
+    /// invent a placement, not a reason to drop the node on the floor.
+    /// </summary>
+    private static SceneNode Resolve(
+        SceneNode node,
+        IReadOnlyList<SceneNode> nodes,
+        IReadOnlyDictionary<string, int> indexById,
+        IReadOnlyDictionary<string, SceneNode> stored,
+        IReadOnlyDictionary<string, SceneAssetFacts> facts)
+    {
+        var nodeFacts = FactsFor(node, facts);
+        var anchor = node.Anchor;
+        Vec3? seat = null;
+
+        if (anchor is not null &&
+            indexById.TryGetValue(anchor.OnNodeId, out var targetIndex) &&
+            nodes[targetIndex] is { } target &&
+            AnchorReference(target, FactsFor(target, facts)) is { } reference)
+        {
+            var offset = anchor.Offset;
+            var contact = ContactPoint(node, nodeFacts);
+
+            if (offset is null)
+            {
+                // Attaching without a stated offset: keep the node over the same spot and rest
+                // it on the surface. Capturing the height too would attach a node that was
+                // sitting on the floor at floor height and call it "on the table".
+                offset = contact is { } c ? new Vec3(c.X - reference.X, 0, c.Z - reference.Z) : null;
+            }
+            else if (contact is { } moved && RepositionedOnTheSameSurface(node, anchor, reference, stored, facts))
+            {
+                // The node was repositioned while the surface stayed put, so this is somebody
+                // arranging things on it. The height is captured this time: a stated position
+                // is a stated position, and "on the shelf" needs to be expressible.
+                offset = new Vec3(moved.X - reference.X, moved.Y - reference.Y, moved.Z - reference.Z);
+            }
+
+            if (offset is { } resolvedOffset)
+            {
+                seat = new Vec3(
+                    reference.X + resolvedOffset.X,
+                    reference.Y + resolvedOffset.Y,
+                    reference.Z + resolvedOffset.Z);
+                anchor = anchor with { Offset = resolvedOffset };
+            }
+        }
+
+        var placed = node;
+        var transform = node.Transform ?? SceneTransform.Identity;
+
+        if (node.FaceToward is { } facing)
+        {
+            var from = seat ?? ContactPoint(node, nodeFacts) ?? transform.Position;
+            if (FacingYawDegrees(from, facing, node.FrontAxis) is { } yaw)
+            {
+                placed = placed with
+                {
+                    Transform = transform with { RotationEuler = transform.RotationEuler with { Y = yaw } },
+                };
+            }
+        }
+
+        if (seat is { } contactTarget)
+        {
+            return (WithContactAt(placed, nodeFacts, contactTarget) ?? placed) with { Anchor = anchor };
+        }
+
+        // Only when nothing is holding it up: an anchored node whose anchor could not be
+        // resolved must not be quietly dropped to the floor instead.
+        if (node.Anchor is null && node.GroundSnap is true && GroundedY(placed, nodeFacts) is { } groundedY)
+        {
+            var current = placed.Transform ?? SceneTransform.Identity;
+            return Math.Abs(current.Position.Y - groundedY) < 1e-9
+                ? placed
+                : placed with { Transform = current with { Position = current.Position with { Y = groundedY } } };
+        }
+
+        return placed;
+    }
+
+    /// <summary>
+    /// True when this write moved the node itself while the surface under it stayed put -
+    /// which is somebody repositioning it on that surface, not the anchor pulling it along.
+    /// A write that changes the anchor is excluded: the offset it arrived with is the
+    /// caller's instruction, and re-capturing would immediately discard it.
+    /// </summary>
+    private static bool RepositionedOnTheSameSurface(
+        SceneNode node,
+        SceneAnchor anchor,
+        Vec3 reference,
+        IReadOnlyDictionary<string, SceneNode> stored,
+        IReadOnlyDictionary<string, SceneAssetFacts> facts)
+    {
+        if (!stored.TryGetValue(node.Id, out var previous) || previous.Anchor != anchor)
+        {
+            return false;
+        }
+
+        if (!stored.TryGetValue(anchor.OnNodeId, out var previousTarget) ||
+            AnchorReference(previousTarget, FactsFor(previousTarget, facts)) is not { } previousReference ||
+            !Approximately(previousReference, reference))
+        {
+            return false;
+        }
+
+        return !Approximately(
+            (previous.Transform ?? SceneTransform.Identity).Position,
+            (node.Transform ?? SceneTransform.Identity).Position);
+    }
+
+    private static bool Approximately(Vec3 a, Vec3 b) =>
+        Math.Abs(a.X - b.X) < 1e-9 && Math.Abs(a.Y - b.Y) < 1e-9 && Math.Abs(a.Z - b.Z) < 1e-9;
+
+    /// <summary>
+    /// Node indexes ordered so anything an anchor points at is resolved before the node
+    /// resting on it - a book on a tray on a table has to settle in that order.
+    ///
+    /// Nodes caught in an anchor cycle are still emitted, because this only decides an order:
+    /// rejecting the cycle is <see cref="SceneDocumentValidator"/>'s job, and it runs on the
+    /// document this produces.
+    /// </summary>
+    private static IEnumerable<int> DependencyOrder(
+        IReadOnlyList<SceneNode> nodes,
+        IReadOnlyDictionary<string, int> indexById)
+    {
+        var state = new byte[nodes.Count];
+        var order = new List<int>(nodes.Count);
+        var stack = new Stack<int>();
+
+        for (var start = 0; start < nodes.Count; start++)
+        {
+            if (state[start] != 0)
+            {
+                continue;
+            }
+
+            stack.Push(start);
+            while (stack.Count > 0)
+            {
+                var index = stack.Peek();
+
+                if (state[index] == 0)
+                {
+                    state[index] = 1;
+
+                    if (nodes[index]?.Anchor is { } anchor &&
+                        indexById.TryGetValue(anchor.OnNodeId, out var target) &&
+                        state[target] == 0)
+                    {
+                        stack.Push(target);
+                        continue;
+                    }
+                }
+
+                stack.Pop();
+                if (state[index] != 2)
+                {
+                    state[index] = 2;
+                    order.Add(index);
+                }
+            }
+        }
+
+        return order;
+    }
+
+    /// <summary>
     /// Positions for <paramref name="count"/> copies spaced evenly from
     /// <paramref name="start"/> to <paramref name="end"/> inclusive. A street is mostly
     /// repetition, and repetition an agent has to compute one position at a time is
