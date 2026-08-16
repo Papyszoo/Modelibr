@@ -1,4 +1,4 @@
-import { baseURL, client } from '@/lib/apiBase'
+import { client } from '@/lib/apiBase'
 
 import type {
   SceneAssetFacts,
@@ -77,17 +77,4 @@ export async function getSceneAssetFacts(
     `/scenes/asset-facts?${params.toString()}`
   )
   return response.data
-}
-
-/**
- * The renderable file for a version-pinned node.
- *
- * Pinned on purpose: a scene node references one version, so it must load that
- * version's mesh and not whatever the model's current one happens to be.
- */
-export function getSceneNodeFileUrl(
-  assetId: number,
-  versionId: number
-): string {
-  return `${baseURL}/models/${assetId}/versions/${versionId}/file`
 }

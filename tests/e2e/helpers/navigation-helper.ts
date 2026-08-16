@@ -34,6 +34,7 @@ const TILE_LABELS: Record<string, string> = {
     environmentMaps: "Environment Maps",
     sounds: "Sounds",
     scripts: "Scripts",
+    scenes: "Scenes",
     packs: "Packs",
     projects: "Projects",
     assetStore: "Asset Store",
@@ -47,6 +48,7 @@ const STATE_INJECTABLE_TYPES = new Set(["stageList"]);
 const TAB_ICONS: Record<string, string> = {
     modelList: "pi-list",
     modelViewer: "pi-box",
+    scenes: "pi-box",
     globalMaterials: "pi-palette",
     modelTextures: "pi-images",
     textureSetViewer: "pi-image",

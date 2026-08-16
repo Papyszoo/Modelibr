@@ -99,6 +99,12 @@
   padding: 0 var(--mod-space-2xs);
 }
 
+.scene-hierarchy-flag--error {
+  color: var(--mod-color-danger);
+  border-color: var(--mod-color-danger);
+  background: var(--mod-color-danger-bg);
+}
+
 .scene-hierarchy-flag--warn {
   color: var(--mod-color-warning);
   border-color: var(--mod-color-warning);

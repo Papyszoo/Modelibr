@@ -85,7 +85,22 @@
   width: 100%;
   min-width: 0;
   font-size: var(--mod-text-sm);
-  padding: var(--mod-space-2xs) var(--mod-space-xs);
+  padding: var(--mod-space-2xs) var(--mod-space-2xs);
+}
+
+/* Stacked steppers, sized down so three axes still fit the side panel. */
+.scene-properties-axis .p-inputnumber-button-group {
+  width: 1.1rem;
+}
+
+.scene-properties-axis .p-inputnumber-button {
+  width: 1.1rem;
+  padding: 0;
+}
+
+.scene-properties-axis .p-inputnumber-button .p-icon,
+.scene-properties-axis .p-inputnumber-button .pi {
+  font-size: 0.625rem;
 }
 
 .scene-properties-derived {

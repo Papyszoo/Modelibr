@@ -181,7 +181,13 @@ function VectorField({
               step={step}
               minFractionDigits={0}
               maxFractionDigits={3}
-              size={5}
+              // Steppers because this panel is how a node is moved - nudging a
+              // node along an axis should not mean selecting text and retyping
+              // a number.
+              showButtons
+              buttonLayout="stacked"
+              incrementButtonIcon="pi pi-chevron-up"
+              decrementButtonIcon="pi pi-chevron-down"
               onValueChange={event => {
                 // InputNumber reports null while the field is being cleared;
                 // writing that into the document would fail validation on save

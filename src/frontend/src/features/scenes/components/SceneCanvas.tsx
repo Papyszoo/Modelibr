@@ -4,6 +4,10 @@ import { Grid, OrbitControls } from '@react-three/drei'
 import { Canvas } from '@react-three/fiber'
 import { type JSX } from 'react'
 
+import {
+  sceneAssetSourceKey,
+  useSceneAssetSources,
+} from '../hooks/useSceneAssetSources'
 import type { SceneDocument, SceneLight, SceneNodeView } from '../types'
 import { SceneNodeObject } from './SceneNodeObject'
 
@@ -19,6 +23,8 @@ interface SceneCanvasProps {
   nodeFacts: Map<string, SceneNodeView>
   selectedNodeId: string | null
   onSelectNode: (nodeId: string | null) => void
+  /** Reports an asset that could not be loaded, so the editor can flag the node. */
+  onNodeLoadError: (nodeId: string, message: string) => void
 }
 
 export function SceneCanvas({
@@ -26,7 +32,14 @@ export function SceneCanvas({
   nodeFacts,
   selectedNodeId,
   onSelectNode,
+  onNodeLoadError,
 }: SceneCanvasProps): JSX.Element {
+  // Resolved out here on purpose: react-three-fiber renders the canvas subtree
+  // through its own reconciler root, so the app's React context - the
+  // QueryClient included - is not reachable from inside <Canvas>. Fetching in
+  // there fails at the first hook and the node simply never appears.
+  const sources = useSceneAssetSources(document)
+
   return (
     <div className="scene-canvas" data-testid="scene-canvas">
       <Canvas
@@ -59,8 +72,14 @@ export function SceneCanvas({
               node={node}
               selected={node.id === selectedNodeId}
               onSelect={onSelectNode}
+              source={
+                node.asset
+                  ? sources.get(sceneAssetSourceKey(node.asset))
+                  : undefined
+              }
               sourceDimensions={facts?.sourceDimensions ?? null}
               originConvention={facts?.originConvention ?? null}
+              onLoadError={onNodeLoadError}
             />
           )
         })}

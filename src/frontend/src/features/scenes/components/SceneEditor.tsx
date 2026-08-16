@@ -57,6 +57,18 @@ export function SceneEditor({
 
   const [placeError, setPlaceError] = useState<string | null>(null)
   const [isPlacing, setIsPlacing] = useState(false)
+  const [failedNodes, setFailedNodes] = useState<Map<string, string>>(new Map())
+
+  const handleNodeLoadError = useCallback((nodeId: string, message: string) => {
+    setFailedNodes(previous => {
+      if (previous.get(nodeId) === message) {
+        return previous
+      }
+      const next = new Map(previous)
+      next.set(nodeId, message)
+      return next
+    })
+  }, [])
 
   // The draft is seeded once per (scene, revision): re-seeding on every render
   // of a fetched query would throw away the user's unsaved edits each time
@@ -318,6 +330,7 @@ export function SceneEditor({
               text
               size="small"
               aria-label="Undo"
+              data-testid="scene-editor-undo"
               tooltip="Undo (Ctrl+Z)"
               disabled={!canUndo}
               onClick={undo}
@@ -332,6 +345,7 @@ export function SceneEditor({
               onClick={redo}
             />
             <Button
+              data-testid="scene-editor-save"
               label={isDirty ? 'Save' : 'Saved'}
               icon={isDirty ? 'pi pi-save' : 'pi pi-check'}
               size="small"
@@ -388,6 +402,7 @@ export function SceneEditor({
           <SceneHierarchy
             document={document}
             nodeFacts={nodeFacts}
+            failedNodes={failedNodes}
             overlaps={view.overlaps}
             selectedNodeId={selectedNodeId}
             onSelectNode={selectNode}
@@ -403,6 +418,7 @@ export function SceneEditor({
           nodeFacts={nodeFacts}
           selectedNodeId={selectedNodeId}
           onSelectNode={selectNode}
+          onNodeLoadError={handleNodeLoadError}
         />
 
         <aside className="scene-editor-side scene-editor-side--right">

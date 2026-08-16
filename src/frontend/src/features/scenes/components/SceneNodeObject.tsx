@@ -6,14 +6,23 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader'
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader'
 
-import { useModelByIdQuery } from '@/features/model-viewer/api/queries'
-import { getFileExtension } from '@/utils/fileUtils'
+import {
+  createGltfResourceManager,
+  safeLoadingManager,
+} from '@/shared/three/safeLoadingManager'
 
-import { getSceneNodeFileUrl } from '../api/scenesApi'
+import type { SceneAssetSource } from '../hooks/useSceneAssetSources'
 import type { SceneNode, Vec3 } from '../types'
+import { SceneNodeErrorBoundary } from './SceneNodeErrorBoundary'
 
 /**
  * One node rendered in the scene.
+ *
+ * Everything this needs arrives as props. Nothing in here may use a React
+ * context from the surrounding app - react-three-fiber renders the canvas
+ * subtree through its own reconciler root, so the QueryClient and friends are
+ * not reachable from inside it. Fetching happens in `useSceneAssetSources`,
+ * outside `<Canvas>`.
  *
  * Loaded geometry is placed at the transform the document gives it and **not**
  * normalised. The model viewer deliberately scales every model to a consistent
@@ -27,6 +36,8 @@ interface SceneNodeObjectProps {
   node: SceneNode
   selected: boolean
   onSelect: (nodeId: string) => void
+  /** Resolved file URL, format and glTF resources; undefined until they load. */
+  source?: SceneAssetSource
   /**
    * The referenced asset's own extent and origin convention, from the server's
    * derived facts. Null when it has never been extracted - the selection box is
@@ -34,14 +45,18 @@ interface SceneNodeObjectProps {
    */
   sourceDimensions?: Vec3 | null
   originConvention?: string | null
+  /** Reports an asset that could not be loaded, so the editor can flag it. */
+  onLoadError: (nodeId: string, message: string) => void
 }
 
 export function SceneNodeObject({
   node,
   selected,
   onSelect,
+  source,
   sourceDimensions = null,
   originConvention = null,
+  onLoadError,
 }: SceneNodeObjectProps): JSX.Element | null {
   if (!node.visible) {
     return null
@@ -66,9 +81,15 @@ export function SceneNodeObject({
       {node.primitive ? (
         <ScenePrimitiveMesh node={node} />
       ) : (
-        <Suspense fallback={<PendingMarker />}>
-          <SceneAssetMesh node={node} />
-        </Suspense>
+        <SceneNodeErrorBoundary
+          nodeId={node.id}
+          onError={onLoadError}
+          fallback={<FailedMarker bounds={sourceDimensions} />}
+        >
+          <Suspense fallback={<PendingMarker bounds={sourceDimensions} />}>
+            <SceneAssetMesh source={source} bounds={sourceDimensions} />
+          </Suspense>
+        </SceneNodeErrorBoundary>
       )}
       {selected ? (
         <SelectionOutline
@@ -106,62 +127,70 @@ function ScenePrimitiveMesh({ node }: { node: SceneNode }): JSX.Element | null {
   )
 }
 
-/**
- * Resolves the pinned version's file and hands it to the loader for its format.
- *
- * The format comes from the model's renderable file rather than being guessed
- * from the URL: the version-file endpoint serves bytes at a path that carries
- * no extension.
- */
-function SceneAssetMesh({ node }: { node: SceneNode }): JSX.Element | null {
-  const asset = node.asset
-  const { data: model } = useModelByIdQuery({
-    modelId: String(asset?.assetId ?? ''),
-    queryConfig: { enabled: Boolean(asset) },
-  })
-
-  if (!asset || asset.versionId == null || !model) {
-    return null
+/** Dispatches to the loader for the asset's format. Props only - see the note above. */
+function SceneAssetMesh({
+  source,
+  bounds,
+}: {
+  source?: SceneAssetSource
+  bounds: Vec3 | null
+}): JSX.Element | null {
+  if (!source || source.isLoading) {
+    return <PendingMarker bounds={bounds} />
   }
 
-  const renderable =
-    model.files?.find(file => file.isRenderable) ?? model.files?.[0]
-  if (!renderable) {
-    return null
-  }
-
-  const extension = getFileExtension(renderable.originalFileName)
-  const url = getSceneNodeFileUrl(asset.assetId, asset.versionId)
-
-  switch (extension) {
+  switch (source.extension) {
     case 'glb':
     case 'gltf':
-      return <GltfMesh url={url} />
+      return <GltfMesh url={source.url} resources={source.resources} />
     case 'fbx':
-      return <FbxMesh url={url} />
+      return <FbxMesh url={source.url} />
     case 'obj':
-      return <ObjMesh url={url} />
+      return <ObjMesh url={source.url} />
     case 'stl':
-      return <StlMesh url={url} />
+      return <StlMesh url={source.url} />
     default:
       // A format the viewer cannot load is shown as its bounds rather than
       // dropped - a node missing from the canvas reads as a failed placement.
-      return <PendingMarker />
+      return <PendingMarker bounds={bounds} />
   }
 }
 
-function GltfMesh({ url }: { url: string }): JSX.Element {
-  const gltf = useLoader(GLTFLoader, url)
+function GltfMesh({
+  url,
+  resources,
+}: {
+  url: string
+  resources: Record<string, string>
+}): JSX.Element {
+  // A loose .gltf stores its buffers and textures as relative URIs. They resolve
+  // against the version-file route, 404, and the loader then fails on the
+  // missing .bin with no geometry to show. This map points them at the
+  // auxiliary files the import stored.
+  const manager = useMemo(
+    () => createGltfResourceManager(resources),
+    [resources]
+  )
+  const gltf = useLoader(GLTFLoader, url, loader => {
+    loader.manager = manager
+  })
+
   return <PlacedObject object={gltf.scene} />
 }
 
 function FbxMesh({ url }: { url: string }): JSX.Element {
-  const fbx = useLoader(FBXLoader, url)
+  // The safe manager stops format-internal texture paths ("chest_Specular.tga")
+  // from being fetched against the file route, which 400s and kills the context.
+  const fbx = useLoader(FBXLoader, url, loader => {
+    loader.manager = safeLoadingManager
+  })
   return <PlacedObject object={fbx} />
 }
 
 function ObjMesh({ url }: { url: string }): JSX.Element {
-  const obj = useLoader(OBJLoader, url)
+  const obj = useLoader(OBJLoader, url, loader => {
+    loader.manager = safeLoadingManager
+  })
   return <PlacedObject object={obj} />
 }
 
@@ -194,12 +223,39 @@ function PlacedObject({ object }: { object: THREE.Object3D }): JSX.Element {
   return <primitive object={clone} />
 }
 
+/** Placeholder sized to the asset's real bounds when they are known. */
+function markerSize(bounds: Vec3 | null | undefined): [number, number, number] {
+  return bounds ? [bounds.x, bounds.y, bounds.z] : [1, 1, 1]
+}
+
 /** Shown while an asset loads, and for formats the viewer cannot open. */
-function PendingMarker(): JSX.Element {
+function PendingMarker({
+  bounds,
+}: {
+  bounds: Vec3 | null | undefined
+}): JSX.Element {
   return (
     <mesh>
-      <boxGeometry args={[1, 1, 1]} />
+      <boxGeometry args={markerSize(bounds)} />
       <meshBasicMaterial color="#4b5563" wireframe />
+    </mesh>
+  )
+}
+
+/**
+ * Shown in place of an asset that failed to load. Occupying the node's real
+ * bounds keeps the rest of the scene readable - a hole where a building should
+ * be is more confusing than a marked-out one.
+ */
+function FailedMarker({
+  bounds,
+}: {
+  bounds: Vec3 | null | undefined
+}): JSX.Element {
+  return (
+    <mesh>
+      <boxGeometry args={markerSize(bounds)} />
+      <meshBasicMaterial color="#ef4444" wireframe />
     </mesh>
   )
 }

@@ -11,6 +11,8 @@ import type { SceneDocument, SceneNodeView, SceneOverlap } from '../types'
 interface SceneHierarchyProps {
   document: SceneDocument
   nodeFacts: Map<string, SceneNodeView>
+  /** Nodes whose asset failed to load in the viewport, keyed by node id. */
+  failedNodes: Map<string, string>
   overlaps: SceneOverlap[]
   selectedNodeId: string | null
   onSelectNode: (nodeId: string | null) => void
@@ -29,6 +31,7 @@ interface SceneHierarchyProps {
 export function SceneHierarchy({
   document,
   nodeFacts,
+  failedNodes,
   overlaps,
   selectedNodeId,
   onSelectNode,
@@ -61,10 +64,13 @@ export function SceneHierarchy({
             const facts = nodeFacts.get(node.id)
             const boundsUnknown =
               Boolean(node.asset) && facts?.sourceDimensions == null
+            const loadFailure = failedNodes.get(node.id)
 
             return (
               <li
                 key={node.id}
+                data-testid="scene-node-row"
+                data-node-id={node.id}
                 className={
                   node.id === selectedNodeId
                     ? 'scene-hierarchy-row scene-hierarchy-row--selected'
@@ -93,8 +99,16 @@ export function SceneHierarchy({
                         }`
                       : `blockout · ${node.primitive?.shape ?? 'unknown'}`}
                   </span>
-                  {boundsUnknown || overlapping.has(node.id) ? (
+                  {boundsUnknown || overlapping.has(node.id) || loadFailure ? (
                     <span className="scene-hierarchy-flags">
+                      {loadFailure ? (
+                        <span
+                          className="scene-hierarchy-flag scene-hierarchy-flag--error"
+                          title={loadFailure}
+                        >
+                          failed to load
+                        </span>
+                      ) : null}
                       {boundsUnknown ? (
                         <span
                           className="scene-hierarchy-flag"

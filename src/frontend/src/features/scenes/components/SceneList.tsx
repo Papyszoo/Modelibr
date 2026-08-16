@@ -82,6 +82,7 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
             icon="pi pi-plus"
             label="New scene"
             size="small"
+            data-testid="scene-list-new"
             onClick={() => setIsCreating(true)}
           />
         }
@@ -108,7 +109,10 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
               key={scene.id}
               name={scene.name}
               meta={describeScene(scene)}
-              dataAttributes={{ 'data-scene-id': scene.id }}
+              dataAttributes={{
+                'data-testid': 'scene-tile',
+                'data-scene-id': scene.id,
+              }}
               onClick={() => onOpenScene(scene.id)}
               onContextMenu={event => {
                 event.preventDefault()
@@ -145,6 +149,7 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
               label="Create"
               icon="pi pi-check"
               size="small"
+              data-testid="scene-create-confirm"
               disabled={!name.trim() || createScene.isPending}
               loading={createScene.isPending}
               onClick={() => void handleCreate()}

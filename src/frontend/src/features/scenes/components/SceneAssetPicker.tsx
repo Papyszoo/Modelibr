@@ -99,7 +99,10 @@ export function SceneAssetPicker({
                       ? undefined
                       : 'scene-asset-picker-tile--unpinnable'
                   }
-                  dataAttributes={{ 'data-model-id': model.id }}
+                  dataAttributes={{
+                    'data-testid': 'scene-picker-tile',
+                    'data-model-id': model.id,
+                  }}
                   onClick={
                     disabled || !versionId
                       ? undefined

@@ -1,0 +1,170 @@
+import { Page, expect } from "@playwright/test";
+
+/**
+ * Scenes tab: the list of scenes and the editor for one of them.
+ *
+ * Selectors are `data-testid` per the current contract - this feature is new,
+ * so there is no grandfathered CSS-class locator to inherit. The exceptions are
+ * PrimeReact's body-mounted dialog chrome (`.p-dialog*`), which is the accepted
+ * carve-out.
+ */
+export class ScenesPage {
+    private readonly page: Page;
+
+    private readonly list = '[data-testid="scene-list"]';
+    private readonly newSceneButton = '[data-testid="scene-list-new"]';
+    private readonly sceneTile = '[data-testid="scene-tile"]';
+    private readonly createConfirm = '[data-testid="scene-create-confirm"]';
+    private readonly nameInput = "#scene-name";
+
+    private readonly editor = '[data-testid="scene-editor"]';
+    private readonly saveButton = '[data-testid="scene-editor-save"]';
+    private readonly undoButton = '[data-testid="scene-editor-undo"]';
+    private readonly hierarchy = '[data-testid="scene-hierarchy"]';
+    private readonly nodeRow = '[data-testid="scene-node-row"]';
+    private readonly properties = '[data-testid="scene-properties"]';
+    private readonly pickerTile = '[data-testid="scene-picker-tile"]';
+    private readonly pickerSearch =
+        '[data-testid="scene-asset-picker"] input[type="text"]';
+
+    constructor(page: Page) {
+        this.page = page;
+    }
+
+    async goto(): Promise<void> {
+        const { navigateToTab } = await import("../helpers/navigation-helper");
+        await navigateToTab(this.page, "scenes");
+        await expect(this.page.locator(this.list)).toBeVisible();
+    }
+
+    async createScene(name: string): Promise<void> {
+        await this.page.locator(this.newSceneButton).first().click();
+        await expect(this.page.locator(this.nameInput)).toBeVisible();
+        await this.page.locator(this.nameInput).fill(name);
+        await this.page.locator(this.createConfirm).click();
+
+        // Creating opens the new scene straight away - that is the flow, not an
+        // incidental redirect, so the editor is the assertion that it worked.
+        await expect(this.page.locator(this.editor)).toBeVisible();
+    }
+
+    async backToList(): Promise<void> {
+        await this.page.getByRole("button", { name: "Back to scenes" }).click();
+        await expect(this.page.locator(this.list)).toBeVisible();
+    }
+
+    async openScene(name: string): Promise<void> {
+        await this.page
+            .locator(this.sceneTile)
+            .filter({ hasText: name })
+            .first()
+            .click();
+        await expect(this.page.locator(this.editor)).toBeVisible();
+    }
+
+    sceneTileByName(name: string) {
+        return this.page.locator(this.sceneTile).filter({ hasText: name });
+    }
+
+    async searchLibrary(term: string): Promise<void> {
+        await this.page.locator(this.pickerSearch).fill(term);
+    }
+
+    /** Places the first library result whose tile names `modelName`. */
+    async placeModel(modelName: string): Promise<void> {
+        const tile = this.page
+            .locator(this.pickerTile)
+            .filter({ hasText: modelName })
+            .first();
+        await expect(tile).toBeVisible();
+
+        // The click issues the asset-facts lookup that decides the node's
+        // resting height; scoping the wait to it keeps this off a generic
+        // spinner that other queries also drive.
+        await Promise.all([
+            this.page.waitForResponse(
+                response =>
+                    response.url().includes("/scenes/asset-facts") &&
+                    response.request().method() === "GET",
+            ),
+            tile.click(),
+        ]);
+    }
+
+    async addBlockoutBox(): Promise<void> {
+        await this.page.getByRole("button", { name: "Blockout box" }).click();
+    }
+
+    nodeRows() {
+        return this.page.locator(this.nodeRow);
+    }
+
+    nodeRowById(nodeId: string) {
+        return this.page.locator(`${this.nodeRow}[data-node-id="${nodeId}"]`);
+    }
+
+    async selectNode(nodeId: string): Promise<void> {
+        await this.nodeRowById(nodeId).locator("button").first().click();
+        await expect(this.page.locator(this.properties)).toBeVisible();
+    }
+
+    /**
+     * Types a value into one axis of a transform field and commits it.
+     *
+     * Typed rather than `fill()`ed: PrimeReact's InputNumber maintains its own
+     * value from key events, so a programmatic `fill()` updates the DOM input
+     * without the component ever emitting `onValueChange` - the edit would
+     * appear on screen and never reach the document.
+     */
+    async setTransformAxis(
+        field: "Position" | "Rotation" | "Scale",
+        axis: "x" | "y" | "z",
+        value: number,
+    ): Promise<void> {
+        const input = this.page.locator(`#${field}-${axis}`);
+        await input.click();
+        await input.press("ControlOrMeta+a");
+        await this.page.keyboard.type(String(value));
+        // InputNumber commits on blur.
+        await input.press("Tab");
+
+        await expect(input).toHaveValue(String(value));
+    }
+
+    async readTransformAxis(
+        field: "Position" | "Rotation" | "Scale",
+        axis: "x" | "y" | "z",
+    ): Promise<string> {
+        return (await this.page.locator(`#${field}-${axis}`).inputValue()) ?? "";
+    }
+
+    async save(): Promise<void> {
+        const save = this.page.locator(this.saveButton);
+        await expect(save).toBeEnabled();
+
+        await Promise.all([
+            this.page.waitForResponse(
+                response =>
+                    /\/scenes\/\d+\/document$/.test(new URL(response.url()).pathname) &&
+                    response.request().method() === "PUT",
+            ),
+            save.click(),
+        ]);
+
+        // The button reads "Saved" only once the draft is no longer dirty, so
+        // it doubles as the assertion that the save landed.
+        await expect(save).toHaveText(/Saved/);
+    }
+
+    async undo(): Promise<void> {
+        await this.page.locator(this.undoButton).click();
+    }
+
+    editorLocator() {
+        return this.page.locator(this.editor);
+    }
+
+    hierarchyLocator() {
+        return this.page.locator(this.hierarchy);
+    }
+}
