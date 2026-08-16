@@ -63,6 +63,19 @@ Feature: Scene authoring
     Then the scene viewport should have fetched the model's auxiliary files
     And no node should be flagged as failed to load
 
+  @scene-tab-switch
+  Scenario: An unsaved scene survives a trip to another tab
+    # The dock renders only the ACTIVE tab, so switching away unmounts the
+    # editor. With the open scene held in component state, coming back landed
+    # on the scene list with the unsaved placement gone - silent data loss on
+    # the most ordinary interaction there is.
+    Given a scene named "Interrupted Scene" is open
+    And I have placed the test model into the scene
+    When I switch to the models tab and back to scenes
+    Then the scene editor should be visible
+    And the scene should hold 1 node
+    And the scene should have unsaved changes
+
   @scene-blockout
   Scenario: A blockout box can be added without any library asset
     Given a scene named "Blockout Scene" is open

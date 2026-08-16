@@ -11,13 +11,20 @@ namespace Application.Scenes;
 /// not touch the model's default texture set. An agent dressing one wall in a scene must
 /// not silently re-skin that wall everywhere else in the library.
 /// </summary>
+/// <param name="Exact">
+/// Treat the supplied fields as the whole binding, so an omitted one means "null", not
+/// "unchanged". Without it a binding that had no variant cannot be restored, because a null
+/// variant reads as "keep the variant that is there". Undo sets this - it holds the entire
+/// previous binding and has to reproduce it, not merge into it.
+/// </param>
 public sealed record ApplySceneMaterialCommand(
     int SceneId,
     string NodeId,
     int? TextureSetId = null,
     string? Variant = null,
     bool Clear = false,
-    int? ExpectedRevision = null) : ICommand<SceneMaterialResponse>;
+    int? ExpectedRevision = null,
+    bool Exact = false) : ICommand<SceneMaterialResponse>;
 
 public sealed record SceneMaterialResponse(
     SceneSummary Scene,
@@ -59,6 +66,10 @@ internal sealed class ApplySceneMaterialCommandHandler
                 if (command.Clear)
                 {
                     material = null;
+                }
+                else if (command.Exact)
+                {
+                    material = new SceneMaterialBinding(command.TextureSetId, command.Variant);
                 }
                 else if (command.TextureSetId is null && command.Variant is null)
                 {

@@ -247,7 +247,7 @@ public sealed class AssetWriteMcpTools
             }
 
             var ticket = await tickets.IssueAsync(
-                idempotencyKey, "import-model", "Model", caller.Actor, batchId, cancellationToken);
+                idempotencyKey, "import-model", AgentAssetFamilies.Model, caller.Actor, batchId, cancellationToken);
 
             return new
             {
@@ -318,9 +318,17 @@ public sealed class AssetWriteMcpTools
                     return Failed(result.Error);
                 }
 
+                // Import is content-addressed, so a file already in the library returns the
+                // model that was there. This call then created nothing, and recording it as
+                // an ordinary import would make its "undo" a soft delete of a model the
+                // agent never imported - reversing one duplicate call would recycle the
+                // user's original. The flag is written into the payload the reverser reads,
+                // which is what makes such an entry report "nothing to undo" instead.
                 return Applied(
                     new { status = "ok", modelId = result.Value.Id, alreadyExists = result.Value.AlreadyExists },
-                    "Model", result.Value.Id, result.Value);
+                    AgentAssetFamilies.Model,
+                    result.Value.Id,
+                    new { modelId = result.Value.Id, alreadyExisted = result.Value.AlreadyExists });
             },
             cancellationToken);
     }

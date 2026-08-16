@@ -113,6 +113,14 @@ When(
     },
 );
 
+When("I switch to the models tab and back to scenes", async ({ page }) => {
+    await new ScenesPage(page).switchAwayAndBack("modelList");
+});
+
+Then("the scene should have unsaved changes", async ({ page }) => {
+    expect(await new ScenesPage(page).hasUnsavedChanges()).toBe(true);
+});
+
 When("I reopen the scene {string}", async ({ page }, name: string) => {
     const scenes = new ScenesPage(page);
     await scenes.backToList();

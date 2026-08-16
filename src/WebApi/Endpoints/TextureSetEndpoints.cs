@@ -53,7 +53,7 @@ public static class TextureSetEndpoints
             .WithName("Create Texture Set With File")
             .WithSummary("Creates a new texture set and uploads a texture file in one operation")
             .DisableAntiforgery()
-            .AddEndpointFilter<AgentUploadTicketFilter>()
+            .AcceptsAgentUploadTicket(AgentAssetFamilies.TextureSet)
             .WithOpenApi();
 
         app.MapPut("/texture-sets/{id}", UpdateTextureSet)
@@ -80,6 +80,18 @@ public static class TextureSetEndpoints
         app.MapPost("/texture-sets/{id}/textures", AddTextureToTextureSetEndpoint)
             .WithName("Add Texture to Texture Set")
             .WithSummary("Adds a texture to the specified texture set")
+            .WithOpenApi();
+
+        // The upload counterpart of the route above. That one takes a FileId, so a caller
+        // that is not on the server had no way to add a channel at all: it could create a set
+        // with its first map and then had nowhere to send the other four. This is the route an
+        // upload ticket from request_upload_ticket(assetType=TextureSet, textureSetId=…)
+        // points at, which is what makes a remote multi-channel material import possible.
+        app.MapPost("/texture-sets/{id}/textures/with-file", AddTextureToTextureSetWithFile)
+            .WithName("Add Texture to Texture Set With File")
+            .WithSummary("Adds a channel to an existing texture set from an uploaded file")
+            .DisableAntiforgery()
+            .AcceptsAgentUploadTicket(AgentAssetFamilies.TextureSet)
             .WithOpenApi();
 
         app.MapDelete("/texture-sets/{packId}/textures/{textureId}", RemoveTextureFromPack)
@@ -386,6 +398,35 @@ public static class TextureSetEndpoints
     {
         var result = await commandHandler.Handle(
             new AddTextureToTextureSetCommand(id, request.FileId, request.TextureType, request.SourceChannel), 
+            cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+        }
+
+        return Results.Ok(result.Value);
+    }
+
+    private static async Task<IResult> AddTextureToTextureSetWithFile(
+        int id,
+        IFormFile file,
+        TextureType? textureType,
+        TextureChannel? sourceChannel,
+        ICommandHandler<AddTextureToSetWithFileCommand, AddTextureToTextureSetResponse> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        if (file == null || file.Length == 0)
+        {
+            return Results.BadRequest(new { error = "InvalidInput", message = "File is required." });
+        }
+
+        var result = await commandHandler.Handle(
+            new AddTextureToSetWithFileCommand(
+                id,
+                new WebApi.Files.FormFileUpload(file),
+                textureType ?? TextureType.Albedo,
+                sourceChannel),
             cancellationToken);
 
         if (result.IsFailure)

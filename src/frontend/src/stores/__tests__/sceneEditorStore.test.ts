@@ -11,9 +11,11 @@ import type { SceneDocument, SceneNode } from '@/features/scenes/types'
  * Regressions these catch: an `edit` that mutates the document in place (undo
  * would then restore an object that had already changed under it), a redo
  * branch that survives a new edit (redo would apply a future that never
- * followed from the present), and a `markSaved` that clears history along with
- * the dirty flag (a user who saves would lose the ability to undo what they
- * just saved).
+ * followed from the present), a `markSaved` that clears history along with the
+ * dirty flag (a user who saves would lose the ability to undo what they just
+ * saved), and a `markSaved` that clears the dirty flag for edits the save never
+ * carried (those changes would be marked saved while existing only in the
+ * browser).
  */
 
 function makeDocument(nodes: SceneNode[] = []): SceneDocument {
@@ -88,12 +90,52 @@ describe('sceneEditorStore', () => {
   it('keeps history across a save so a saved edit can still be undone', () => {
     useSceneEditorStore.getState().open(1, makeDocument(), 1)
     useSceneEditorStore.getState().addNode(makeNode('lamp'))
+    const sent = useSceneEditorStore.getState().document!
 
-    useSceneEditorStore.getState().markSaved(2)
+    useSceneEditorStore.getState().markSaved(2, sent)
 
     expect(useSceneEditorStore.getState().isDirty).toBe(false)
     expect(useSceneEditorStore.getState().baseRevision).toBe(2)
     expect(useSceneEditorStore.getState().canUndo()).toBe(true)
+  })
+
+  it('stays dirty when the draft moved on while the save was in flight', () => {
+    // The save sent a snapshot. An edit made before the response arrived was
+    // never part of it, so clearing the dirty flag would report changes as
+    // saved that nothing had sent - and the next save would never send them.
+    useSceneEditorStore.getState().open(1, makeDocument(), 1)
+    useSceneEditorStore.getState().addNode(makeNode('lamp'))
+    const sent = useSceneEditorStore.getState().document!
+
+    useSceneEditorStore.getState().addNode(makeNode('bench'))
+    useSceneEditorStore.getState().markSaved(2, sent)
+
+    expect(useSceneEditorStore.getState().isDirty).toBe(true)
+    // Based on what the server now holds, so the next save carries the bench.
+    expect(useSceneEditorStore.getState().baseRevision).toBe(2)
+  })
+
+  it('remembers which scene is open independently of the loaded draft', () => {
+    // The dock renders only the active tab, so the Scenes tab unmounts on every
+    // switch. Held in component state, the open scene - and the unsaved draft
+    // the editor then discarded on unmount - was lost each time.
+    useSceneEditorStore.getState().openScene(7)
+    expect(useSceneEditorStore.getState().openSceneId).toBe(7)
+    expect(useSceneEditorStore.getState().document).toBeNull()
+
+    useSceneEditorStore.getState().open(7, makeDocument(), 1)
+    useSceneEditorStore.getState().addNode(makeNode('lamp'))
+
+    // Re-opening the scene already open must not throw the draft away.
+    useSceneEditorStore.getState().openScene(7)
+    expect(useSceneEditorStore.getState().isDirty).toBe(true)
+    expect(useSceneEditorStore.getState().document?.nodes).toHaveLength(1)
+
+    // Opening a different scene does.
+    useSceneEditorStore.getState().openScene(8)
+    expect(useSceneEditorStore.getState().openSceneId).toBe(8)
+    expect(useSceneEditorStore.getState().document).toBeNull()
+    expect(useSceneEditorStore.getState().isDirty).toBe(false)
   })
 
   it('bounds the history at the limit, keeping the most recent steps', () => {

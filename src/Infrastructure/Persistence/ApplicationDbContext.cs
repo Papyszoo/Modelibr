@@ -725,7 +725,12 @@ namespace Infrastructure.Persistence
                 entity.Property(s => s.Description).HasMaxLength(2000);
                 entity.Property(s => s.SchemaVersion).IsRequired();
                 entity.Property(s => s.DocumentJson).IsRequired();
-                entity.Property(s => s.Revision).IsRequired();
+                // Concurrency token, not just a counter: every accepted write bumps it, so
+                // the UPDATE carries the revision its writer read and matches no row once
+                // someone else has committed. Without this, an in-memory revision check
+                // passes for both of two concurrent writers - they both read N, both write
+                // N+1, and the first edit is lost with nothing reported anywhere.
+                entity.Property(s => s.Revision).IsRequired().IsConcurrencyToken();
                 entity.Property(s => s.CreatedAt).IsRequired();
                 entity.Property(s => s.UpdatedAt).IsRequired();
 

@@ -28,6 +28,15 @@ public interface IModelVersionRepository
     Task RemoveTextureMappingAsync(int modelVersionId, int textureSetId, string materialName, string variantName, CancellationToken cancellationToken = default);
     Task RemoveTextureMappingsByTextureSetIdAsync(int modelVersionId, int textureSetId, CancellationToken cancellationToken = default);
     Task RemoveTextureMappingByMaterialAsync(int modelVersionId, string materialName, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Removes EVERY mapping for one material slot, across all variants.
+    ///
+    /// Distinct from the singular form above, which removes only the first match. Restoring a
+    /// slot to a recorded state has to empty it first: leaving a second mapping behind would
+    /// keep the binding that is being undone, alongside the one being restored.
+    /// </summary>
+    Task RemoveAllTextureMappingsByMaterialAsync(int modelVersionId, string materialName, CancellationToken cancellationToken = default);
     Task RemoveTextureMappingByMaterialAndVariantAsync(int modelVersionId, string materialName, string variantName, CancellationToken cancellationToken = default);
     Task RemoveTextureMappingsByVariantAsync(int modelVersionId, string variantName, CancellationToken cancellationToken = default);
 }

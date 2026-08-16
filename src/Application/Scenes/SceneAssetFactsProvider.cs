@@ -20,7 +20,24 @@ public interface ISceneAssetFacts
     Task<IReadOnlyDictionary<string, SceneAssetFacts>> ResolveAsync(
         IEnumerable<SceneAssetRef> assets,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The references in <paramref name="assets"/> that name nothing in the library, with the
+    /// reason each one is unusable.
+    ///
+    /// Separate from <see cref="ResolveAsync"/> because the two questions have different
+    /// answers: "this asset has no derived bounds yet" is normal and placement proceeds
+    /// without them, while "there is no such asset" is a reference that will never load. Both
+    /// looked identical to a caller reading absent facts, so a typo'd id produced a scene the
+    /// editor could not render and nothing anywhere said why.
+    /// </summary>
+    Task<IReadOnlyList<SceneAssetReferenceProblem>> FindUnresolvableAsync(
+        IEnumerable<SceneAssetRef> assets,
+        CancellationToken cancellationToken = default);
 }
+
+/// <summary>One asset reference that cannot be resolved, and why.</summary>
+public sealed record SceneAssetReferenceProblem(SceneAssetRef Asset, string Reason);
 
 /// <summary>
 /// Reads bounds off the flat per-version projection and the origin convention off the
@@ -35,14 +52,82 @@ public interface ISceneAssetFacts
 internal sealed class SceneAssetFactsProvider : ISceneAssetFacts
 {
     private readonly IModelVersionRepository _modelVersionRepository;
+    private readonly ISpriteRepository _spriteRepository;
+    private readonly IEnvironmentMapRepository _environmentMapRepository;
     private readonly IAssetDerivationRepository _derivationRepository;
 
     public SceneAssetFactsProvider(
         IModelVersionRepository modelVersionRepository,
+        ISpriteRepository spriteRepository,
+        IEnvironmentMapRepository environmentMapRepository,
         IAssetDerivationRepository derivationRepository)
     {
         _modelVersionRepository = modelVersionRepository;
+        _spriteRepository = spriteRepository;
+        _environmentMapRepository = environmentMapRepository;
         _derivationRepository = derivationRepository;
+    }
+
+    public async Task<IReadOnlyList<SceneAssetReferenceProblem>> FindUnresolvableAsync(
+        IEnumerable<SceneAssetRef> assets,
+        CancellationToken cancellationToken = default)
+    {
+        var problems = new List<SceneAssetReferenceProblem>();
+
+        foreach (var asset in assets.DistinctBy(SceneSpatial.FactsKey))
+        {
+            var reason = await UnresolvableReasonAsync(asset, cancellationToken);
+            if (reason is not null)
+            {
+                problems.Add(new SceneAssetReferenceProblem(asset, reason));
+            }
+        }
+
+        return problems;
+    }
+
+    /// <summary>Why this reference cannot be used, or null when it resolves.</summary>
+    private async Task<string?> UnresolvableReasonAsync(SceneAssetRef asset, CancellationToken cancellationToken)
+    {
+        if (!SceneAssetTypes.IsPlaceable(asset.AssetType))
+        {
+            return $"'{asset.AssetType}' is not a placeable asset family. Placeable: {string.Join(", ", SceneAssetTypes.All)}.";
+        }
+
+        if (asset.AssetType == SceneAssetTypes.Model)
+        {
+            if (asset.VersionId is not { } versionId)
+            {
+                return "A Model node must pin a versionId, or it would re-point itself when the model gets a new version.";
+            }
+
+            var version = await _modelVersionRepository.GetByIdAsync(versionId, cancellationToken);
+            if (version is null)
+            {
+                return $"There is no model version {versionId}.";
+            }
+
+            // A version of a different model is a mismatch, not a near miss: the node would
+            // load geometry that belongs to something else entirely.
+            return version.ModelId != asset.AssetId
+                ? $"Model version {versionId} belongs to model {version.ModelId}, not model {asset.AssetId}."
+                : null;
+        }
+
+        if (asset.VersionId is not null)
+        {
+            return $"{asset.AssetType} assets are not versioned, so this reference must not pin a versionId.";
+        }
+
+        var exists = asset.AssetType switch
+        {
+            SceneAssetTypes.Sprite => await _spriteRepository.GetByIdAsync(asset.AssetId, cancellationToken) is not null,
+            SceneAssetTypes.EnvironmentMap =>
+                await _environmentMapRepository.GetByIdAsync(asset.AssetId, cancellationToken) is not null,
+            _ => true,
+        };
+
+        return exists ? null : $"There is no {asset.AssetType.ToLowerInvariant()} with id {asset.AssetId}.";
     }
 
     public async Task<IReadOnlyDictionary<string, SceneAssetFacts>> ResolveAsync(
@@ -88,8 +173,19 @@ internal sealed class SceneAssetFactsProvider : ISceneAssetFacts
             }
         }
 
-        var derivation = await _derivationRepository.GetLatestForAssetAsync(
-            MapToExtractionType(asset.AssetType), asset.AssetId, cancellationToken);
+        // The PINNED version's derivation, not the newest one. A node pinned to version 1
+        // must keep version 1's origin convention and grid: reading the latest meant
+        // uploading a new version of a model silently changed how an old scene grounded and
+        // snapped it - the exact re-pointing that pinning exists to prevent. Falling back to
+        // the latest is only for an unpinned family or a version that was never derived,
+        // where there is no version-specific answer to prefer.
+        var derivation =
+            (asset.VersionId is { } derivedVersionId
+                ? await _derivationRepository.GetByKeyAsync(
+                    MapToExtractionType(asset.AssetType), asset.AssetId, derivedVersionId, cancellationToken)
+                : null)
+            ?? await _derivationRepository.GetLatestForAssetAsync(
+                MapToExtractionType(asset.AssetType), asset.AssetId, cancellationToken);
 
         var (originConvention, gridSize) = ReadDerivedPlacement(derivation?.Payload);
 

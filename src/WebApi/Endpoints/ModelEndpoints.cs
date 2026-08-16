@@ -17,7 +17,7 @@ public static class ModelEndpoints
         .DisableAntiforgery()
         // Audits + de-duplicates the upload when a remote agent presents an upload ticket;
         // a request without one is untouched (see AgentUploadTicketFilter).
-        .AddEndpointFilter<AgentUploadTicketFilter>();
+        .AcceptsAgentUploadTicket(AgentAssetFamilies.Model);
 
         app.MapPost("/models/{modelId}/files", AddFileToModel)
         .WithName("Add File to Model")
@@ -27,13 +27,13 @@ public static class ModelEndpoints
         .WithName("Import Multi-File Model")
         .WithSummary("Imports a loose primary model (.gltf) plus its external .bin/textures")
         .DisableAntiforgery()
-        .AddEndpointFilter<AgentUploadTicketFilter>();
+        .AcceptsAgentUploadTicket(AgentAssetFamilies.Model);
 
         app.MapPost("/models/zip", ImportModelZip)
         .WithName("Import Model Zip")
         .WithSummary("Imports every model group in a .zip (multi-file glTF resolved by directory)")
         .DisableAntiforgery()
-        .AddEndpointFilter<AgentUploadTicketFilter>();
+        .AcceptsAgentUploadTicket(AgentAssetFamilies.Model);
 
         app.MapPost("/models/{modelId}/tags", UpdateModelTags)
         .WithName("Update Model Tags")

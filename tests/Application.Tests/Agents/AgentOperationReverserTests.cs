@@ -28,8 +28,9 @@ public class AgentOperationReverserTests
     private readonly Mock<ICommandHandler<SetModelCategoryCommand, SetModelCategoryResponse>> _setCategory = new();
     private readonly Mock<ICommandHandler<RemoveModelFromPackCommand>> _removeFromPack = new();
     private readonly Mock<ICommandHandler<DeletePackCommand>> _deletePack = new();
-    private readonly Mock<ICommandHandler<SetDefaultTextureSetCommand, SetDefaultTextureSetResponse>> _setDefault = new();
     private readonly Mock<ICommandHandler<RemoveTextureFromPackCommand>> _removeTexture = new();
+    private readonly Mock<ICommandHandler<AddTextureToTextureSetCommand, AddTextureToTextureSetResponse>> _addTexture = new();
+    private readonly Mock<ICommandHandler<RestoreModelTextureBindingCommand>> _restoreTextureBinding = new();
     private readonly Mock<ICommandHandler<SoftDeleteModelCommand, SoftDeleteModelResponse>> _deleteModel = new();
     private readonly Mock<ICommandHandler<SoftDeleteSoundCommand>> _deleteSound = new();
     private readonly Mock<ICommandHandler<SoftDeleteSpriteCommand>> _deleteSprite = new();
@@ -49,7 +50,8 @@ public class AgentOperationReverserTests
     {
         _reverser = new AgentOperationReverser(
             _audit.Object, _updateTags.Object, _setCategory.Object, _removeFromPack.Object, _deletePack.Object,
-            _setDefault.Object, _removeTexture.Object, _deleteModel.Object, _deleteSound.Object,
+            _removeTexture.Object, _addTexture.Object, _restoreTextureBinding.Object,
+            _deleteModel.Object, _deleteSound.Object,
             _deleteSprite.Object, _deleteEnvironmentMap.Object, _deleteTextureSet.Object,
             _removeSceneNode.Object, _restoreSceneNode.Object, _moveSceneNode.Object, _setSceneLight.Object,
             _applySceneMaterial.Object, _updateSceneDocument.Object, _deleteScene.Object);
@@ -237,5 +239,182 @@ public class AgentOperationReverserTests
         var step = plan.Value.Steps.Single();
         Assert.False(step.IsSupported);
         Assert.Contains("no prior state", step.Blocker);
+    }
+
+    [Fact]
+    public async Task An_Import_That_Matched_An_Existing_Asset_Is_Not_Undone_By_Recycling_It()
+    {
+        // Import is content-addressed, so re-importing bytes already in the library returns
+        // the model that was there and creates nothing. Undoing that entry as an ordinary
+        // import would recycle a model the agent never imported - the user's original.
+        var entry = Completed(
+            "key-dedup", "import-model", "Model", 7,
+            after: "{\"modelId\":7,\"alreadyExisted\":true}");
+        Records(entry);
+
+        var plan = await _reverser.PlanAsync("key-dedup", null);
+        var result = await _reverser.ApplyAsync(plan.Value);
+
+        Assert.False(plan.Value.Steps.Single().IsSupported);
+        Assert.False(plan.Value.IsDestructive);
+        Assert.False(result.Value.Single().Reversed);
+        _deleteModel.Verify(
+            h => h.Handle(It.IsAny<SoftDeleteModelCommand>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task An_Import_That_Created_The_Asset_Is_Still_Undone_By_Recycling_It()
+    {
+        var entry = Completed(
+            "key-fresh", "import-model", "Model", 7,
+            after: "{\"modelId\":7,\"alreadyExisted\":false}");
+        Records(entry);
+        _deleteModel.Setup(h => h.Handle(It.IsAny<SoftDeleteModelCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success(new SoftDeleteModelResponse(true, "recycled")));
+
+        var plan = await _reverser.PlanAsync("key-fresh", null);
+        var result = await _reverser.ApplyAsync(plan.Value);
+
+        Assert.True(result.Value.Single().Reversed);
+        _deleteModel.Verify(
+            h => h.Handle(It.IsAny<SoftDeleteModelCommand>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Adding_A_Channel_Over_An_Existing_One_Is_Reversed_By_Putting_The_Old_One_Back()
+    {
+        // The whole point: removing only the texture the write added would leave the set
+        // permanently short the map it displaced, while reporting the undo as successful.
+        var entry = Completed(
+            "key-chan", "add-texture-channel", "TextureSet", 12,
+            before: "{\"textureSetId\":12,\"replacedTexture\":{\"TextureId\":80,\"FileId\":55,\"TextureType\":\"Normal\",\"SourceChannel\":\"RGB\"}}",
+            after: "{\"textureId\":81}");
+        Records(entry);
+        AddTextureToTextureSetCommand? applied = null;
+        _addTexture.Setup(h => h.Handle(It.IsAny<AddTextureToTextureSetCommand>(), It.IsAny<CancellationToken>()))
+            .Callback<AddTextureToTextureSetCommand, CancellationToken>((c, _) => applied = c)
+            .ReturnsAsync(Result.Success(new AddTextureToTextureSetResponse(
+                82, Domain.ValueObjects.TextureType.Normal, Domain.ValueObjects.TextureChannel.RGB, 12)));
+
+        var plan = await _reverser.PlanAsync("key-chan", null);
+        var result = await _reverser.ApplyAsync(plan.Value);
+
+        Assert.True(result.Value.Single().Reversed);
+        Assert.NotNull(applied);
+        Assert.Equal(12, applied!.TextureSetId);
+        Assert.Equal(55, applied.FileId);
+        Assert.Equal(Domain.ValueObjects.TextureType.Normal, applied.TextureType);
+        // Re-adding evicts the new texture itself, so no separate removal is issued.
+        _removeTexture.Verify(
+            h => h.Handle(It.IsAny<RemoveTextureFromPackCommand>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Adding_A_Channel_Into_An_Empty_Slot_Is_Reversed_By_Removing_It()
+    {
+        var entry = Completed(
+            "key-chan-2", "add-texture-channel", "TextureSet", 12,
+            before: "{\"textureSetId\":12,\"replacedTexture\":null}",
+            after: "{\"textureId\":81}");
+        Records(entry);
+        _removeTexture.Setup(h => h.Handle(It.IsAny<RemoveTextureFromPackCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success());
+
+        var plan = await _reverser.PlanAsync("key-chan-2", null);
+        var result = await _reverser.ApplyAsync(plan.Value);
+
+        Assert.True(result.Value.Single().Reversed);
+        _removeTexture.Verify(
+            h => h.Handle(It.IsAny<RemoveTextureFromPackCommand>(), It.IsAny<CancellationToken>()), Times.Once);
+        _addTexture.Verify(
+            h => h.Handle(It.IsAny<AddTextureToTextureSetCommand>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Binding_A_Texture_Set_Is_Reversed_Across_Every_Version_It_Touched()
+    {
+        // Binding maps the set into EVERY version and fills in each one's default where it
+        // was null. Restoring only the active version's default left the rest bound to the
+        // set the agent chose, while the undo reported success.
+        var entry = Completed(
+            "key-bind", "bind-texture-set", "Model", 42,
+            before: "{\"binding\":{\"ModelId\":42,\"MaterialName\":\"\",\"Versions\":[" +
+                    "{\"ModelVersionId\":1,\"DefaultTextureSetId\":9,\"Mappings\":[{\"TextureSetId\":9,\"MaterialName\":\"\",\"VariantName\":\"\"}]}," +
+                    "{\"ModelVersionId\":2,\"DefaultTextureSetId\":null,\"Mappings\":[]}]}}");
+        Records(entry);
+        RestoreModelTextureBindingCommand? applied = null;
+        _restoreTextureBinding.Setup(h => h.Handle(It.IsAny<RestoreModelTextureBindingCommand>(), It.IsAny<CancellationToken>()))
+            .Callback<RestoreModelTextureBindingCommand, CancellationToken>((c, _) => applied = c)
+            .ReturnsAsync(Result.Success());
+
+        var plan = await _reverser.PlanAsync("key-bind", null);
+        var result = await _reverser.ApplyAsync(plan.Value);
+
+        Assert.True(result.Value.Single().Reversed);
+        Assert.NotNull(applied);
+        Assert.Equal(2, applied!.Snapshot.Versions.Count);
+        Assert.Equal(9, applied.Snapshot.Versions[0].DefaultTextureSetId);
+        Assert.Null(applied.Snapshot.Versions[1].DefaultTextureSetId);
+    }
+
+    [Fact]
+    public async Task A_Bind_Recorded_Before_The_Snapshot_Existed_Is_Reported_Unreversible()
+    {
+        // Entries written by the older tool recorded only previousDefaultTextureSetId. There
+        // is no honest way to restore the other versions from that, so it must not claim to.
+        var entry = Completed(
+            "key-bind-old", "bind-texture-set", "Model", 42,
+            before: "{\"modelId\":42,\"textureSetId\":9,\"previousDefaultTextureSetId\":3}");
+        Records(entry);
+
+        var plan = await _reverser.PlanAsync("key-bind-old", null);
+        var result = await _reverser.ApplyAsync(plan.Value);
+
+        Assert.False(plan.Value.Steps.Single().IsSupported);
+        Assert.False(result.Value.Single().Reversed);
+        _restoreTextureBinding.Verify(
+            h => h.Handle(It.IsAny<RestoreModelTextureBindingCommand>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Distributing_A_Row_Is_Reversed_By_Removing_Every_Node_It_Placed()
+    {
+        var entry = Completed(
+            "key-row", "distribute-assets", "Scene", 3,
+            before: "{\"removedNodeIds\":[\"lamp-1\",\"lamp-2\",\"lamp-3\"]}");
+        Records(entry);
+        var removed = new List<string>();
+        _removeSceneNode.Setup(h => h.Handle(It.IsAny<RemoveSceneNodeCommand>(), It.IsAny<CancellationToken>()))
+            .Callback<RemoveSceneNodeCommand, CancellationToken>((c, _) => removed.Add(c.NodeId))
+            .ReturnsAsync(Result.Success(new SceneNodeRemovalResponse(null!, null!)));
+
+        var plan = await _reverser.PlanAsync("key-row", null);
+        var result = await _reverser.ApplyAsync(plan.Value);
+
+        Assert.True(result.Value.Single().Reversed);
+        Assert.Equal(["lamp-1", "lamp-2", "lamp-3"], removed);
+    }
+
+    [Fact]
+    public async Task Restoring_A_Light_Reproduces_It_Exactly_Rather_Than_Merging_Into_What_Is_There()
+    {
+        // A light that had no target or name is only restorable when null means null. Merge
+        // semantics would keep whatever the write aimed it at and still report success.
+        var entry = Completed(
+            "key-light", "set-light", "Scene", 3,
+            before: "{\"lightId\":\"key\",\"light\":{\"Id\":\"key\",\"Type\":\"point\",\"Position\":{\"X\":1,\"Y\":2,\"Z\":3},\"Intensity\":1.0,\"Color\":\"#ffffff\",\"Target\":null,\"Name\":null}}");
+        Records(entry);
+        SetSceneLightCommand? applied = null;
+        _setSceneLight.Setup(h => h.Handle(It.IsAny<SetSceneLightCommand>(), It.IsAny<CancellationToken>()))
+            .Callback<SetSceneLightCommand, CancellationToken>((c, _) => applied = c)
+            .ReturnsAsync(Result.Success(new SceneLightResponse(null!, null, null)));
+
+        var plan = await _reverser.PlanAsync("key-light", null);
+        await _reverser.ApplyAsync(plan.Value);
+
+        Assert.NotNull(applied);
+        Assert.True(applied!.Exact);
+        Assert.Null(applied.Target);
+        Assert.Null(applied.Name);
     }
 }

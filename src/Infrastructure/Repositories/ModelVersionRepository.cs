@@ -192,6 +192,19 @@ internal sealed class ModelVersionRepository : IModelVersionRepository
         }
     }
 
+    public async Task RemoveAllTextureMappingsByMaterialAsync(int modelVersionId, string materialName, CancellationToken cancellationToken = default)
+    {
+        var mappings = await _context.Set<ModelVersionTextureSet>()
+            .Where(m => m.ModelVersionId == modelVersionId && m.MaterialName == materialName)
+            .ToListAsync(cancellationToken);
+
+        if (mappings.Count > 0)
+        {
+            _context.Set<ModelVersionTextureSet>().RemoveRange(mappings);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+    }
+
     public async Task RemoveTextureMappingByMaterialAndVariantAsync(int modelVersionId, string materialName, string variantName, CancellationToken cancellationToken = default)
     {
         variantName ??= string.Empty;

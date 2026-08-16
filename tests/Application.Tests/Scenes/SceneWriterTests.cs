@@ -1,4 +1,5 @@
 using Application.Abstractions.Repositories;
+using Application.Abstractions.Services;
 using Application.Scenes;
 using Domain.Models;
 using Domain.Scenes;
@@ -22,6 +23,7 @@ public class SceneWriterTests
 
     private readonly Mock<ISceneRepository> _scenes = new();
     private readonly Mock<ISceneAssetFacts> _facts = new();
+    private readonly Mock<ISceneDocumentCommit> _commit = new();
     private readonly Mock<IDateTimeProvider> _clock = new();
     private readonly SceneWriter _writer;
 
@@ -30,8 +32,11 @@ public class SceneWriterTests
         _clock.SetupGet(c => c.UtcNow).Returns(Now);
         _facts.Setup(f => f.ResolveAsync(It.IsAny<IEnumerable<SceneAssetRef>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<string, SceneAssetFacts>(StringComparer.Ordinal));
+        _facts.Setup(f => f.FindUnresolvableAsync(It.IsAny<IEnumerable<SceneAssetRef>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<SceneAssetReferenceProblem>());
+        _commit.Setup(c => c.SaveAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Result.Success());
 
-        _writer = new SceneWriter(_scenes.Object, _facts.Object, _clock.Object);
+        _writer = new SceneWriter(_scenes.Object, _facts.Object, _commit.Object, _clock.Object);
     }
 
     private Scene GivenScene(SceneDocument? document = null, int id = 1)
@@ -144,5 +149,88 @@ public class SceneWriterTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("Scene.StoredDocumentUnreadable", result.Error.Code);
+    }
+
+
+    [Fact]
+    public async Task ApplyAsync_When_A_Concurrent_Write_Won_Reports_A_Revision_Conflict()
+    {
+        // The in-memory revision check above passes for BOTH of two concurrent writers - they
+        // read N, they both write N+1, and one edit vanishes. The database's concurrency
+        // token is what actually catches it, and this is that verdict reaching the caller.
+        GivenScene();
+        _commit.Setup(c => c.SaveAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Failure(new Error("Scene.RevisionConflict", "Someone else committed first.")));
+
+        var result = await _writer.ApplyAsync(
+            1, null, document => Result.Success(document with { Nodes = new[] { ModelNode("lamp") } }));
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.RevisionConflict", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task ApplyAsync_Refuses_A_Write_That_Introduces_A_Reference_To_Nothing()
+    {
+        // A placement against a mistyped id used to succeed and produce a document the editor
+        // could never load, with nothing anywhere saying why.
+        GivenScene();
+        var missing = new SceneAssetRef(SceneAssetTypes.Model, 404, 9);
+        _facts.Setup(f => f.FindUnresolvableAsync(It.IsAny<IEnumerable<SceneAssetRef>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new SceneAssetReferenceProblem(missing, "There is no model version 9.")]);
+
+        var result = await _writer.ApplyAsync(
+            1,
+            null,
+            document => Result.Success(document with
+            {
+                Nodes = new[] { new SceneNode("ghost", SceneTransform.Identity, Asset: missing) },
+            }));
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.AssetNotFound", result.Error.Code);
+        _scenes.Verify(s => s.UpdateAsync(It.IsAny<Scene>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ApplyAsync_Skips_The_Reference_Check_When_The_Caller_Is_Restoring_State()
+    {
+        // Undo restores what was legal when it was recorded. Refusing to put a node back
+        // because its asset has since been recycled would turn a rendering problem into an
+        // undo that cannot run at all.
+        GivenScene()
+;
+        var missing = new SceneAssetRef(SceneAssetTypes.Model, 404, 9);
+        _facts.Setup(f => f.FindUnresolvableAsync(It.IsAny<IEnumerable<SceneAssetRef>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new SceneAssetReferenceProblem(missing, "There is no model version 9.")]);
+
+        var result = await _writer.ApplyAsync(
+            1,
+            null,
+            document => Result.Success(document with
+            {
+                Nodes = new[] { new SceneNode("restored", SceneTransform.Identity, Asset: missing) },
+            }),
+            CancellationToken.None,
+            verifyNewReferences: false);
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task ApplyAsync_Does_Not_Check_References_The_Document_Already_Had()
+    {
+        // Only what a write INTRODUCES is checked. An asset recycled after it was placed must
+        // not make the scene unable to be edited - including by the edit that removes it.
+        var scene = GivenScene(SceneDocument.Empty() with { Nodes = new[] { ModelNode("lamp") } });
+
+        var result = await _writer.ApplyAsync(
+            1, null, document => Result.Success(document with { Nodes = Array.Empty<SceneNode>() }));
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(2, scene.Revision);
+        _facts.Verify(
+            f => f.FindUnresolvableAsync(It.IsAny<IEnumerable<SceneAssetRef>>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 }

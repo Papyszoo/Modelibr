@@ -239,6 +239,38 @@ const manifestOutputs = [...read("docs/videos/video-manifest.js").matchAll(
     );
 }
 
+// ── Check 7: every MCP_* setting reaches the container ─────────────────────
+// The webapi container sees only the variables docker-compose names, so a
+// setting documented in .env.example but missing from that list runs at its
+// default no matter what the operator wrote. This shipped once already: the
+// MCP flags never reached the container, so writes could not be turned on and
+// MCP_ENABLED=false did not turn the endpoint off. The reprise is worse -
+// MCP_TOKENS is what authenticates /mcp, and its default is "unauthenticated".
+{
+    const declared = [...read(".env.example").matchAll(/^#?\s*(MCP_\w+)=/gm)]
+        .map((m) => m[1]);
+    const composeWebapiEnv =
+        read("docker-compose.yml").match(
+            /\n {4}webapi:[\s\S]*?\n {8}environment:\n([\s\S]*?)\n {8}\w/,
+        )?.[1] ?? "";
+    const forwarded = new Set(
+        [...composeWebapiEnv.matchAll(/^\s*-\s*(MCP_\w+)=/gm)].map((m) => m[1]),
+    );
+
+    check(
+        declared.length >= 4,
+        ".env.example MCP settings parsed",
+        `only found ${declared.length} MCP_* settings - .env.example layout changed? Update scripts/docs-audit.`,
+    );
+
+    const missing = declared.filter((name) => !forwarded.has(name));
+    check(
+        missing.length === 0,
+        "docker-compose forwards every MCP_* setting to webapi",
+        `not passed to the container, so setting it in .env does nothing: ${missing.join(", ")}`,
+    );
+}
+
 // ── Report ──────────────────────────────────────────────────────────────────
 for (const p of passes) console.log(`✓ ${p}`);
 for (const w of warnings) console.warn(`⚠ ${w}`);

@@ -31,7 +31,7 @@ Modelibr API endpoint - there is no separate search or extraction path:
 
 ## What the agent can change (opt-in)
 
-Set `MCP_WRITE_ENABLED=true` in your root `.env` and sixteen more tools appear,
+Set `MCP_WRITE_ENABLED=true` in your root `.env` and twenty-four more tools appear,
 letting an agent curate the library the way you would in the app. They are a thin
 pass-through over the same command handlers the UI uses, so there is one source
 of truth for what a change means:
@@ -56,7 +56,7 @@ materials and audio and not only meshes. Each takes a path the **server** can re
 | `import_texture_set`     | Import a whole material in one call: pass every channel file (albedo, normal, roughness, …) and they land in a single texture set.                                       |
 | `add_texture_channel`    | Add one more channel file to an existing texture set.                                                                                                                    |
 | `bind_texture_set`       | Bind a texture set to a model so it renders with it - associates the set with every version of the model and makes it the default. One call for what the UI does in two. |
-| `request_upload_ticket`  | For an agent that is **not** on the server: a single-use ticket plus the exact endpoint and field names for uploading any asset family over HTTP.                        |
+| `request_upload_ticket`  | For an agent that is **not** on the server: a single-use ticket plus the exact endpoint and field names for uploading any asset family over HTTP. Pass `textureSetId` to add one more channel to a material you already created. |
 
 Three rules make these safe to retry, review and undo:
 
@@ -72,6 +72,29 @@ Three rules make these safe to retry, review and undo:
   change?" stays answerable.
 - **Every write can be undone.** Pass the same `batchId` to a run of related calls and
   `reverse_operation` puts the whole batch back in one call. See below.
+
+### Composing scenes
+
+A scene places library assets into a composition - transformed, lit and dressed with
+materials. The server answers every write with the placed node's world footprint, anything
+it now overlaps, and any scale warning it triggered, so an agent finds out that the lamp
+post is inside the wall on the call that put it there.
+
+| Tool                    | What it does                                                                                                                                                                       |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `create_scene`          | Create a scene, empty or from a full document.                                                                                                                                     |
+| `place_asset`           | Place one asset. `groundSnap` rests its base on the floor using the asset's own derived origin convention - use it rather than guessing a Y, or a centered-origin asset lands buried to its middle. |
+| `distribute_assets`     | Place several copies evenly along a line, in one write - a row of street lamps, a fence, a colonnade. Spacing is computed server-side, and undo removes the whole row.              |
+| `move_asset`            | Move, rotate or rescale one node; omitted components are left alone.                                                                                                                |
+| `remove_asset`          | Remove a node. The whole node is returned, so the removal can be reversed.                                                                                                          |
+| `set_light`             | Add, update or remove one light by id. Upsert semantics, so a retried call does not stack a second sun into the scene.                                                              |
+| `apply_material`        | Bind a texture set to one node, for this scene only - the model's own default texture set is untouched.                                                                             |
+| `update_scene_document` | Replace the whole document, for bulk edits. An invalid document is rejected in full, never partially applied.                                                                        |
+
+Every scene write accepts an optional `expectedRevision` and is refused if the scene has
+moved on since the agent last read it. Leaving it out means "apply to whatever is there" -
+but not "apply unconditionally": a write that races another one is still refused rather
+than silently overwriting the edit that landed first.
 
 ### Undo, and deleting
 
@@ -101,6 +124,16 @@ de-duplicated under your `idempotencyKey` just like a co-located import - a retr
 upload that already landed is answered `already-applied` instead of importing a second
 copy. Tickets expire after 30 minutes; an upload the server rejects hands the ticket back
 so you can fix the request and retry.
+
+A ticket is bound to the asset family it was issued for. Presenting a `Sound` ticket at a
+model endpoint is refused rather than recorded, because an audit entry that names the wrong
+family is one whose undo would delete an unrelated asset.
+
+A material is several files, so it takes several tickets: ask for a `TextureSet` ticket to
+create the set with its first channel, then ask again with that set's `textureSetId` (and a
+fresh `idempotencyKey`) for each remaining channel. Each channel upload is audited on its
+own, and adding a channel over one that is already there records what it displaced, so
+undoing it puts the original map back rather than leaving the set a map short.
 
 The server also publishes an `import_library` **prompt** - a guided playbook for
 ingesting a whole folder of models into a categorized pack (dedupe, prefer `.glb`,

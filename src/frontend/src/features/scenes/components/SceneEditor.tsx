@@ -40,7 +40,6 @@ export function SceneEditor({
     isDirty,
     selectedNodeId,
     open,
-    close,
     markSaved,
     edit,
     undo,
@@ -72,7 +71,9 @@ export function SceneEditor({
 
   // The draft is seeded once per (scene, revision): re-seeding on every render
   // of a fetched query would throw away the user's unsaved edits each time
-  // React Query refetched in the background.
+  // React Query refetched in the background. It is also what makes remounting
+  // free - coming back from another tab finds the draft already at this
+  // revision, so nothing is re-seeded and nothing is lost.
   const loadedRevision = view?.scene.revision
   useEffect(() => {
     if (view && (baseRevision === null || loadedRevision !== baseRevision)) {
@@ -82,8 +83,6 @@ export function SceneEditor({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sceneId, loadedRevision])
-
-  useEffect(() => close, [close])
 
   const nodeFacts = useMemo(() => {
     const map = new Map<string, SceneNodeView>()
@@ -220,7 +219,9 @@ export function SceneEditor({
         document,
         expectedRevision: baseRevision,
       })
-      markSaved(saved.scene.revision)
+      // The document that was actually sent, so edits made while the request
+      // was in flight stay dirty instead of being marked saved unsent.
+      markSaved(saved.scene.revision, document)
     } catch (caught) {
       // The server rejects an invalid document in full and says why, per
       // problem. Surfacing that verbatim is the point: the alternative this

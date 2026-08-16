@@ -94,7 +94,11 @@ internal sealed class RestoreSceneNodeCommandHandler : ICommandHandler<RestoreSc
 
                 return Result.Success(document with { Nodes = [.. document.Nodes, command.Node] });
             },
-            cancellationToken);
+            cancellationToken,
+            // Restoring recorded state, not authoring new: if the asset was recycled after
+            // the node was removed, the node comes back and reads as failed-to-load, which is
+            // a far better outcome than an undo that refuses to run.
+            verifyNewReferences: false);
 
         return result.IsFailure
             ? Result.Failure<SceneSummary>(result.Error)

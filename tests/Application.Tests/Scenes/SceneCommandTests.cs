@@ -1,4 +1,6 @@
 using Application.Abstractions.Repositories;
+using Application.Abstractions.Services;
+using SharedKernel;
 using Application.Scenes;
 using Domain.Models;
 using Domain.Scenes;
@@ -24,6 +26,7 @@ public class SceneCommandTests
 
     private readonly Mock<ISceneRepository> _scenes = new();
     private readonly Mock<ISceneAssetFacts> _facts = new();
+    private readonly Mock<ISceneDocumentCommit> _commit = new();
     private readonly SceneWriter _writer;
     private Scene _scene = null!;
 
@@ -32,7 +35,11 @@ public class SceneCommandTests
         var clock = new Mock<IDateTimeProvider>();
         clock.SetupGet(c => c.UtcNow).Returns(Now);
 
-        _writer = new SceneWriter(_scenes.Object, _facts.Object, clock.Object);
+        _facts.Setup(f => f.FindUnresolvableAsync(It.IsAny<IEnumerable<SceneAssetRef>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<SceneAssetReferenceProblem>());
+        _commit.Setup(c => c.SaveAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Result.Success());
+
+        _writer = new SceneWriter(_scenes.Object, _facts.Object, _commit.Object, clock.Object);
 
         GivenFacts(new Vec3(2, 4, 2), "centered");
         GivenScene(SceneDocument.Empty());
@@ -306,5 +313,97 @@ public class SceneCommandTests
 
         Assert.True(result.IsFailure);
         Assert.Equal(before, _scene.DocumentJson);
+    }
+
+
+    [Fact]
+    public async Task SetLight_With_Exact_Restores_A_Light_That_Had_No_Target_Or_Name()
+    {
+        // Partial updates ("make it warmer") are what an agent wants, but they make some prior
+        // states unreachable: nulls read as "keep what is there". Undo is the one caller that
+        // holds the whole previous light and has to reproduce it, target and name included.
+        var handler = new SetSceneLightCommandHandler(_writer);
+        await handler.Handle(
+            new SetSceneLightCommand(
+                SceneId, "key", SceneLightTypes.Spot, new Vec3(5, 10, 5), 1.0, "#ffffff",
+                Target: new Vec3(1, 0, 1), Name: "Key light"),
+            CancellationToken.None);
+
+        var restored = await handler.Handle(
+            new SetSceneLightCommand(
+                SceneId, "key", SceneLightTypes.Spot, new Vec3(5, 10, 5), 1.0, "#ffffff", Exact: true),
+            CancellationToken.None);
+
+        Assert.True(restored.IsSuccess);
+        Assert.Null(restored.Value.Light!.Target);
+        Assert.Null(restored.Value.Light.Name);
+    }
+
+    [Fact]
+    public async Task SetLight_Without_Exact_Still_Leaves_Omitted_Fields_Alone()
+    {
+        var handler = new SetSceneLightCommandHandler(_writer);
+        await handler.Handle(
+            new SetSceneLightCommand(
+                SceneId, "key", SceneLightTypes.Spot, new Vec3(5, 10, 5), 1.0, "#ffffff",
+                Target: new Vec3(1, 0, 1), Name: "Key light"),
+            CancellationToken.None);
+
+        var updated = await handler.Handle(
+            new SetSceneLightCommand(SceneId, "key", Intensity: 2.5), CancellationToken.None);
+
+        Assert.Equal(new Vec3(1, 0, 1), updated.Value.Light!.Target);
+        Assert.Equal("Key light", updated.Value.Light.Name);
+    }
+
+    [Fact]
+    public async Task ApplyMaterial_With_Exact_Restores_A_Binding_That_Had_No_Variant()
+    {
+        await Place.Handle(PlaceCommand(nodeId: "lamp"), CancellationToken.None);
+        var handler = new ApplySceneMaterialCommandHandler(_writer);
+        await handler.Handle(
+            new ApplySceneMaterialCommand(SceneId, "lamp", TextureSetId: 3, Variant: "battle-damaged"),
+            CancellationToken.None);
+
+        var restored = await handler.Handle(
+            new ApplySceneMaterialCommand(SceneId, "lamp", TextureSetId: 3, Variant: null, Exact: true),
+            CancellationToken.None);
+
+        Assert.True(restored.IsSuccess);
+        Assert.Equal(3, restored.Value.Node.Material!.TextureSetId);
+        Assert.Null(restored.Value.Node.Material.Variant);
+    }
+
+    [Fact]
+    public async Task DistributeAssets_Spaces_Every_Copy_Between_The_Endpoints_Inclusively()
+    {
+        var handler = new DistributeSceneAssetsCommandHandler(_writer, _facts.Object);
+
+        var result = await handler.Handle(
+            new DistributeSceneAssetsCommand(
+                SceneId, SceneAssetTypes.Model, ModelId,
+                new Vec3(0, 0, 0), new Vec3(10, 0, 0), 3, VersionId, NodeIdPrefix: "lamp"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(["lamp-1", "lamp-2", "lamp-3"], result.Value.Nodes.Select(n => n.NodeId));
+        Assert.Equal([0, 5, 10], result.Value.Nodes.Select(n => n.Transform.Position.X));
+        // One write, so the row lands together and the revision moves once.
+        Assert.Equal(2, _scene.Revision);
+    }
+
+    [Fact]
+    public async Task DistributeAssets_Rejects_A_Count_Beyond_What_One_Call_May_Place()
+    {
+        var handler = new DistributeSceneAssetsCommandHandler(_writer, _facts.Object);
+
+        var result = await handler.Handle(
+            new DistributeSceneAssetsCommand(
+                SceneId, SceneAssetTypes.Model, ModelId, Vec3.Zero, new Vec3(10, 0, 0), 5_000, VersionId),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.TooManyCopies", result.Error.Code);
+        Assert.Equal(1, _scene.Revision);
     }
 }

@@ -53,8 +53,14 @@ services:
             - BLENDER_INSTALL_PATH=${BLENDER_INSTALL_PATH:-/var/lib/modelibr/blender}
             # Local MCP agent server. Reads are on by default; writes are a
             # deliberate opt-in because the endpoint shares the Web API's exposure.
+            # Every MCP_* variable in .env.example must be forwarded here: the
+            # container sees only what this list names, so a missing row silently
+            # runs the endpoint with that setting's default. MCP_TOKENS defaulting
+            # to unset is what "unauthenticated" means, and this port is published.
             - MCP_ENABLED=${MCP_ENABLED:-true}
             - MCP_WRITE_ENABLED=${MCP_WRITE_ENABLED:-false}
+            - MCP_DESTRUCTIVE_ENABLED=${MCP_DESTRUCTIVE_ENABLED:-false}
+            - MCP_TOKENS=${MCP_TOKENS:-}
         ports:
             - "${HTTPS_PORT:-8443}:${HTTPS_PORT:-8443}"
         volumes:

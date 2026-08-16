@@ -160,6 +160,39 @@ export class ScenesPage {
         await this.page.locator(this.undoButton).click();
     }
 
+    /**
+     * Switches to another already-open tab and back, WITHOUT reloading.
+     *
+     * The dock renders only the active tab, so this is what unmounts the
+     * editor - the interaction that used to discard the open scene and its
+     * unsaved draft. A reload would not test the same thing: it drops the whole
+     * client, and no in-memory draft is expected to survive that.
+     */
+    async switchAwayAndBack(otherTabType: string): Promise<void> {
+        const { clickTab, openTabViaMenu, countTabsByType } = await import(
+            "../helpers/navigation-helper"
+        );
+
+        if ((await countTabsByType(this.page, otherTabType)) === 0) {
+            await openTabViaMenu(this.page, otherTabType, "left");
+        } else {
+            await clickTab(this.page, otherTabType, "left");
+        }
+
+        await expect(this.page.locator(this.editor)).toHaveCount(0);
+
+        await clickTab(this.page, "scenes", "left");
+        await expect(this.page.locator(this.editor)).toBeVisible();
+    }
+
+    /** True while the editor holds edits that have not been saved. */
+    async hasUnsavedChanges(): Promise<boolean> {
+        return (
+            (await this.page.locator(this.saveButton).innerText()).trim() ===
+            "Save"
+        );
+    }
+
     editorLocator() {
         return this.page.locator(this.editor);
     }

@@ -27,7 +27,19 @@ import type {
 export const SCENE_HISTORY_LIMIT = 100
 
 interface SceneEditorState {
-  /** The scene being edited, or null when the editor is closed. */
+  /**
+   * Which scene the Scenes tab has open, independent of whether its draft has
+   * loaded yet.
+   *
+   * Lives here rather than in the tab component because the dock renders only
+   * the ACTIVE tab - switching to another tab unmounts this one. Held in
+   * `useState`, the open scene was forgotten on every tab switch, and the
+   * editor's unmount cleanup then threw away the unsaved draft with it: a user
+   * who glanced at another tab came back to the scene list with their edits
+   * gone.
+   */
+  openSceneId: number | null
+  /** The scene whose draft is loaded, or null when nothing has been seeded. */
   sceneId: number | null
   /** The revision this draft was based on - what a save sends as its expected revision. */
   baseRevision: number | null
@@ -38,10 +50,21 @@ interface SceneEditorState {
   isDirty: boolean
   selectedNodeId: string | null
 
+  /** Opens a scene in the editor, discarding any draft of a different scene. */
+  openScene: (sceneId: number) => void
+  /** Seeds the draft for the open scene once its document has been fetched. */
   open: (sceneId: number, document: SceneDocument, revision: number) => void
   close: () => void
-  /** Marks the current draft as saved at `revision`, clearing the dirty flag but keeping history. */
-  markSaved: (revision: number) => void
+  /**
+   * Records that `savedDocument` was stored as `revision`.
+   *
+   * The saved document is passed in, not assumed to be the current one: a save
+   * sends a snapshot, and edits made while that request was in flight were
+   * never part of it. Clearing the dirty flag unconditionally marked those
+   * edits saved when nothing had sent them - the Save button went to "Saved"
+   * and the changes existed only in the browser.
+   */
+  markSaved: (revision: number, savedDocument: SceneDocument) => void
 
   /** Applies an edit and pushes the previous document onto the undo stack. */
   edit: (mutate: (document: SceneDocument) => SceneDocument) => void
@@ -61,6 +84,7 @@ interface SceneEditorState {
 }
 
 export const useSceneEditorStore = create<SceneEditorState>((set, get) => ({
+  openSceneId: null,
   sceneId: null,
   baseRevision: null,
   document: null,
@@ -69,8 +93,25 @@ export const useSceneEditorStore = create<SceneEditorState>((set, get) => ({
   isDirty: false,
   selectedNodeId: null,
 
+  openScene: sceneId =>
+    set(state =>
+      state.sceneId === sceneId
+        ? { openSceneId: sceneId }
+        : {
+            openSceneId: sceneId,
+            sceneId: null,
+            document: null,
+            baseRevision: null,
+            past: [],
+            future: [],
+            isDirty: false,
+            selectedNodeId: null,
+          }
+    ),
+
   open: (sceneId, document, revision) =>
     set({
+      openSceneId: sceneId,
       sceneId,
       document,
       baseRevision: revision,
@@ -82,6 +123,7 @@ export const useSceneEditorStore = create<SceneEditorState>((set, get) => ({
 
   close: () =>
     set({
+      openSceneId: null,
       sceneId: null,
       document: null,
       baseRevision: null,
@@ -91,7 +133,15 @@ export const useSceneEditorStore = create<SceneEditorState>((set, get) => ({
       selectedNodeId: null,
     }),
 
-  markSaved: revision => set({ baseRevision: revision, isDirty: false }),
+  markSaved: (revision, savedDocument) =>
+    set(state => ({
+      // The server now holds `revision`, so that is what the next save must
+      // base itself on either way.
+      baseRevision: revision,
+      // Still dirty when the draft moved on while the request was in flight -
+      // those edits were never sent, and the next save is what sends them.
+      isDirty: state.document !== savedDocument,
+    })),
 
   edit: mutate => {
     const { document, past } = get()

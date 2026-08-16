@@ -12,6 +12,13 @@ namespace Application.Scenes;
 /// stacking a second sun into the scene.
 /// </summary>
 /// <param name="Remove">Delete the light with this id instead of writing one.</param>
+/// <param name="Exact">
+/// Treat every supplied field as the whole value, so an omitted one means "null", not
+/// "unchanged". Partial updates are what an agent wants ("make the key light warmer"), but
+/// they make some prior states unreachable: a light that had no target or no name cannot be
+/// restored by a command whose nulls mean "keep what is there". Undo sets this, because undo
+/// is the one caller that knows the entire previous light and must reproduce it exactly.
+/// </param>
 public sealed record SetSceneLightCommand(
     int SceneId,
     string LightId,
@@ -22,7 +29,8 @@ public sealed record SetSceneLightCommand(
     Vec3? Target = null,
     string? Name = null,
     bool Remove = false,
-    int? ExpectedRevision = null) : ICommand<SceneLightResponse>;
+    int? ExpectedRevision = null,
+    bool Exact = false) : ICommand<SceneLightResponse>;
 
 public sealed record SceneLightResponse(
     SceneSummary Scene,
@@ -87,14 +95,25 @@ internal sealed class SetSceneLightCommandHandler : ICommandHandler<SetSceneLigh
                         $"Light '{command.LightId}' does not exist yet, so a type is required. Known types: {string.Join(", ", SceneLightTypes.All)}."));
                 }
 
-                var light = new SceneLight(
-                    command.LightId,
-                    command.Type ?? previous!.Type,
-                    command.Position ?? previous?.Position ?? Vec3.Zero,
-                    command.Intensity ?? previous?.Intensity ?? 1.0,
-                    command.Color ?? previous?.Color ?? "#ffffff",
-                    command.Target ?? previous?.Target,
-                    command.Name ?? previous?.Name);
+                // Exact: the caller is stating the whole light, so a null target or name is
+                // an instruction to clear it rather than a gap to fill from what is there.
+                var light = command.Exact
+                    ? new SceneLight(
+                        command.LightId,
+                        command.Type ?? previous!.Type,
+                        command.Position ?? Vec3.Zero,
+                        command.Intensity ?? 1.0,
+                        command.Color ?? "#ffffff",
+                        command.Target,
+                        command.Name)
+                    : new SceneLight(
+                        command.LightId,
+                        command.Type ?? previous!.Type,
+                        command.Position ?? previous?.Position ?? Vec3.Zero,
+                        command.Intensity ?? previous?.Intensity ?? 1.0,
+                        command.Color ?? previous?.Color ?? "#ffffff",
+                        command.Target ?? previous?.Target,
+                        command.Name ?? previous?.Name);
 
                 current = light;
 

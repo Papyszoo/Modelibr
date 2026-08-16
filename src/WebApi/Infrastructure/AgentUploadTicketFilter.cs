@@ -6,6 +6,36 @@ using Application.Agents;
 namespace WebApi.Infrastructure;
 
 /// <summary>
+/// The asset-family names an agent write is recorded under.
+///
+/// One vocabulary because two things have to agree on it: the endpoint that accepts an
+/// upload ticket, and the MCP tool that issued the ticket. They live in different files, so
+/// a typo in either half would only surface as a family mismatch at upload time.
+/// </summary>
+public static class AgentAssetFamilies
+{
+    public const string Model = "Model";
+    public const string Sound = "Sound";
+    public const string Sprite = "Sprite";
+    public const string EnvironmentMap = "EnvironmentMap";
+    public const string TextureSet = "TextureSet";
+}
+
+/// <summary>Registers the upload-ticket filter, bound to the family the endpoint creates.</summary>
+public static class AgentUploadTicketEndpointExtensions
+{
+    /// <summary>
+    /// Audits and de-duplicates this endpoint's upload when a remote agent presents a ticket
+    /// for <paramref name="assetType"/>. A request without a ticket header is untouched, and
+    /// a ticket for another family is refused.
+    /// </summary>
+    public static RouteHandlerBuilder AcceptsAgentUploadTicket(
+        this RouteHandlerBuilder builder,
+        string assetType) =>
+        builder.AddEndpointFilter(new AgentUploadTicketFilter(assetType));
+}
+
+/// <summary>
 /// Gives a remote agent's HTTP upload the same guarantees its co-located equivalent has:
 /// an audit entry and apply-once idempotency.
 ///
@@ -21,6 +51,13 @@ namespace WebApi.Infrastructure;
 /// endpoint's own outcome: a 4xx releases both the claim and the ticket, so the agent can
 /// fix its request and retry with the same key rather than being told the write already
 /// happened.
+///
+/// A ticket is also bound to the family the endpoint creates. <c>AgentUploadTicket</c>
+/// promises "one upload, one family", and only this check enforces it: without it a Sound
+/// ticket presented on <c>POST /models</c> records the new model's id as a <c>Sound</c>
+/// operation, and undoing that entry recycles whatever sound happens to carry the same
+/// number. That is a delete of an unrelated asset, so the mismatch is refused rather than
+/// recorded.
 /// </summary>
 public sealed class AgentUploadTicketFilter : IEndpointFilter
 {
@@ -32,6 +69,22 @@ public sealed class AgentUploadTicketFilter : IEndpointFilter
     /// for storing a second copy of a model's full DTO graph.
     /// </summary>
     private const int MaxRecordedPayloadChars = 8_000;
+
+    private readonly string _assetType;
+
+    /// <param name="assetType">
+    /// The family this endpoint creates - "Model", "Sound", "Sprite", "EnvironmentMap" or
+    /// "TextureSet". A ticket issued for any other family is refused here.
+    /// </param>
+    public AgentUploadTicketFilter(string assetType)
+    {
+        if (string.IsNullOrWhiteSpace(assetType))
+        {
+            throw new ArgumentException("An upload-ticket filter must name the family its endpoint creates.", nameof(assetType));
+        }
+
+        _assetType = assetType.Trim();
+    }
 
     public async ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
     {
@@ -56,6 +109,25 @@ public sealed class AgentUploadTicketFilter : IEndpointFilter
                     remedy = "Request a fresh ticket from the MCP import tool by calling it without a path.",
                 },
                 statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        if (!string.Equals(ticket.AssetType, _assetType, StringComparison.OrdinalIgnoreCase))
+        {
+            // Handed back rather than spent: the ticket is still good, the agent just sent
+            // it to the wrong endpoint. Its idempotency key was never claimed here, so the
+            // retry at the right endpoint is a first attempt, not a replay.
+            await tickets.SettleAsync(ticket.TicketId, succeeded: false, null, CancellationToken.None);
+
+            return Results.Json(
+                new
+                {
+                    error = "UploadTicketFamilyMismatch",
+                    message =
+                        $"This ticket was issued for a {ticket.AssetType} upload, but this endpoint creates a {_assetType}.",
+                    remedy =
+                        $"Send it to the {ticket.AssetType} endpoint, or request a {_assetType} ticket with request_upload_ticket.",
+                },
+                statusCode: StatusCodes.Status409Conflict);
         }
 
         var audit = services.GetRequiredService<IAgentAudit>();

@@ -238,8 +238,7 @@ public class McpAssetFamilyImportIntegrationTests : IClassFixture<ModelibrWebFac
         var result = await AssetImportMcpTools.BindTextureSet(
             sp.GetRequiredService<ICommandHandler<AssociateTextureSetWithAllModelVersionsCommand>>(),
             sp.GetRequiredService<ICommandHandler<SetDefaultTextureSetCommand, SetDefaultTextureSetResponse>>(),
-            sp.GetRequiredService<IQueryHandler<GetModelByIdQuery, GetModelByIdQueryResponse>>(),
-            sp.GetRequiredService<IQueryHandler<GetModelVersionQuery, GetModelVersionResponse>>(),
+            sp.GetRequiredService<IQueryHandler<GetModelTextureBindingsQuery, ModelTextureBindingSnapshot>>(),
             sp.GetRequiredService<IAgentAudit>(),
             McpCallerContext.Unauthenticated(),
             set.Id,
@@ -249,5 +248,81 @@ public class McpAssetFamilyImportIntegrationTests : IClassFixture<ModelibrWebFac
         var json = Json(result);
         Assert.Contains("\"ok\"", json);
         Assert.Contains("\"isDefault\":true", json);
+    }
+
+
+    [Fact]
+    public async Task BindTextureSet_IsUndoneAcrossEveryVersionItTouched()
+    {
+        // The bind writes EVERY version of the model - a mapping into each, and each one's
+        // default texture set wherever that was still null. Undo recorded only the active
+        // version's previous default, so reversing it reported success while leaving the
+        // other versions bound to the set the agent chose. Two versions, because with one
+        // the broken behaviour and the correct one are indistinguishable.
+        await MigrateAsync();
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+
+        using var scope = _factory.Services.CreateScope();
+        var sp = scope.ServiceProvider;
+        var context = sp.GetRequiredService<ApplicationDbContext>();
+
+        var created = await AssetImportMcpTools.ImportTextureSet(
+            sp.GetRequiredService<ICommandHandler<CreateTextureSetWithFileCommand, CreateTextureSetWithFileResponse>>(),
+            sp.GetRequiredService<ICommandHandler<AddTextureToSetWithFileCommand, AddTextureToTextureSetResponse>>(),
+            sp.GetRequiredService<IAgentAudit>(),
+            McpCallerContext.Unauthenticated(),
+            $"undo-material-{suffix}",
+            [new AssetImportMcpTools.TextureChannelImport(WriteFile($"{suffix}-undo.png"), "Albedo")],
+            $"mcp-undo-set-{suffix}");
+        Assert.Contains("\"ok\"", Json(created));
+
+        var set = await context.TextureSets.SingleAsync(s => s.Name == $"undo-material-{suffix}");
+
+        var model = Domain.Models.Model.Create($"undo-model-{suffix}", DateTime.UtcNow);
+        context.Models.Add(model);
+        await context.SaveChangesAsync();
+        model.CreateVersion("v1", DateTime.UtcNow);
+        model.CreateVersion("v2", DateTime.UtcNow);
+        await context.SaveChangesAsync();
+
+        var versionIds = await context.ModelVersions
+            .Where(v => v.ModelId == model.Id)
+            .Select(v => v.Id)
+            .ToListAsync();
+        Assert.Equal(2, versionIds.Count);
+
+        var key = $"mcp-undo-bind-{suffix}";
+        var bound = await AssetImportMcpTools.BindTextureSet(
+            sp.GetRequiredService<ICommandHandler<AssociateTextureSetWithAllModelVersionsCommand>>(),
+            sp.GetRequiredService<ICommandHandler<SetDefaultTextureSetCommand, SetDefaultTextureSetResponse>>(),
+            sp.GetRequiredService<IQueryHandler<GetModelTextureBindingsQuery, ModelTextureBindingSnapshot>>(),
+            sp.GetRequiredService<IAgentAudit>(),
+            McpCallerContext.Unauthenticated(),
+            set.Id,
+            model.Id,
+            key);
+        Assert.Contains("\"ok\"", Json(bound));
+
+        context.ChangeTracker.Clear();
+        Assert.NotEmpty(await context.Set<Domain.Models.ModelVersionTextureSet>()
+            .Where(m => versionIds.Contains(m.ModelVersionId) && m.TextureSetId == set.Id)
+            .ToListAsync());
+
+        var reverser = sp.GetRequiredService<IAgentOperationReverser>();
+        var plan = await reverser.PlanAsync(key, null);
+        Assert.True(plan.IsSuccess);
+        Assert.True(plan.Value.Steps.Single().IsSupported);
+
+        var applied = await reverser.ApplyAsync(plan.Value);
+        Assert.True(applied.Value.Single().Reversed);
+
+        // Every version, not just the active one: no mapping left, and no default left.
+        context.ChangeTracker.Clear();
+        Assert.Empty(await context.Set<Domain.Models.ModelVersionTextureSet>()
+            .Where(m => versionIds.Contains(m.ModelVersionId) && m.TextureSetId == set.Id)
+            .ToListAsync());
+        Assert.All(
+            await context.ModelVersions.Where(v => versionIds.Contains(v.Id)).ToListAsync(),
+            version => Assert.Null(version.DefaultTextureSetId));
     }
 }

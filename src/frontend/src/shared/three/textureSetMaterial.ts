@@ -1,15 +1,25 @@
+import { useMemo } from 'react'
 import * as THREE from 'three'
 
 import {
-  addSharedDisplacementNormal,
-  applyDispNormalDisplacement,
-} from '@/shared/three/sharedDisplacementNormal'
-import { type TextureSetDto } from '@/types'
+  type TextureConfig,
+  useChannelExtractedTextures,
+} from '@/features/model-viewer/hooks/useChannelExtractedTextures'
+import { getFileUrl } from '@/features/models/api/modelApi'
+import { TextureChannel, type TextureSetDto, TextureType } from '@/types'
 
+import {
+  MATERIAL_SLOT_BY_TEXTURE_TYPE,
+  textureTypeNeedsInvert,
+} from '../../../../asset-processor/lib/textureChannels.js'
 import {
   ensureAoMapUv2,
   resolveTextureMaterialConfig,
-} from '../../../../../asset-processor/lib/textureMaterial.js'
+} from '../../../../asset-processor/lib/textureMaterial.js'
+import {
+  addSharedDisplacementNormal,
+  applyDispNormalDisplacement,
+} from './sharedDisplacementNormal'
 
 /** Map of material names to their texture sets. Key "" means apply to all meshes. */
 export type MaterialTextureSets = Record<string, TextureSetDto>
@@ -168,4 +178,97 @@ export function applyMaterialTextures(
       addSharedDisplacementNormal(mesh.geometry)
     }
   })
+}
+
+// Texture types in apply order, each with its fallback when the primary is
+// absent (mutually-exclusive groups: Roughness<-Glossiness, Displacement<-Height).
+// The MeshPhysicalMaterial slot each type feeds and whether it must be inverted
+// at load come from the shared cross-runtime map
+// (asset-processor/lib/textureChannels.js) - the same source the worker
+// thumbnail uses, so every viewer and the thumbnail route textures identically.
+const TEXTURE_SLOTS: Array<{
+  type: TextureType
+  fallback?: TextureType
+}> = [
+  { type: TextureType.Albedo },
+  { type: TextureType.Normal },
+  { type: TextureType.Roughness, fallback: TextureType.Glossiness },
+  { type: TextureType.Metallic },
+  { type: TextureType.Specular },
+  { type: TextureType.AO },
+  { type: TextureType.Emissive },
+  { type: TextureType.Bump },
+  { type: TextureType.Alpha },
+  { type: TextureType.Displacement, fallback: TextureType.Height },
+]
+
+/**
+ * Build a combined texture config map for all material->textureSet mappings.
+ * Keys are namespaced as "materialName::slotName" so the hook loads everything
+ * in one pass.
+ */
+export function buildCombinedTextureConfigs(
+  materialTextureSets: MaterialTextureSets
+): Record<string, TextureConfig> {
+  const configs: Record<string, TextureConfig> = {}
+
+  for (const [materialName, textureSet] of Object.entries(
+    materialTextureSets
+  )) {
+    if (!textureSet?.textures) continue
+    for (const { type, fallback } of TEXTURE_SLOTS) {
+      const slot = MATERIAL_SLOT_BY_TEXTURE_TYPE[type]
+      let tex = textureSet.textures.find(t => t.textureType === type)
+      let chosenType = type
+      if (!tex && fallback) {
+        const fallbackTex = textureSet.textures.find(
+          t => t.textureType === fallback
+        )
+        if (fallbackTex) {
+          tex = fallbackTex
+          chosenType = fallback
+        }
+      }
+      if (tex) {
+        configs[`${materialName}${KEY_SEP}${slot}`] = {
+          url: getFileUrl(tex.fileId.toString()),
+          sourceChannel: tex.sourceChannel ?? TextureChannel.RGB,
+          fileName: tex.fileName,
+          // Glossiness feeds roughnessMap inverted (shared rule).
+          invert: textureTypeNeedsInvert(chosenType),
+        }
+      }
+    }
+  }
+
+  return configs
+}
+
+/**
+ * Loads every channel a set of material->textureSet mappings needs, and reports
+ * when they are ready to build materials from.
+ *
+ * Safe to call inside `<Canvas>`: it touches only three.js and the renderer, no
+ * React context from the surrounding app.
+ */
+export function usePerMaterialTextures(
+  materialTextureSets: MaterialTextureSets,
+  renderer: THREE.WebGLRenderer,
+  flipY: boolean
+): {
+  loadedTextures: Record<string, THREE.Texture | null>
+  texturesReady: boolean
+} {
+  const textureConfigs = useMemo(
+    () => buildCombinedTextureConfigs(materialTextureSets),
+    [materialTextureSets]
+  )
+  const hasTextures = Object.keys(textureConfigs).length > 0
+  const loadedTextures = useChannelExtractedTextures(
+    textureConfigs,
+    renderer,
+    flipY
+  )
+  const texturesReady = hasTextures && Object.keys(loadedTextures).length > 0
+  return { loadedTextures, texturesReady }
 }

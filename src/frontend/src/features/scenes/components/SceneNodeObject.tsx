@@ -1,5 +1,5 @@
-import { useLoader } from '@react-three/fiber'
-import { type JSX, Suspense, useMemo } from 'react'
+import { useLoader, useThree } from '@react-three/fiber'
+import { type JSX, Suspense, useEffect, useMemo } from 'react'
 import * as THREE from 'three'
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
@@ -10,6 +10,12 @@ import {
   createGltfResourceManager,
   safeLoadingManager,
 } from '@/shared/three/safeLoadingManager'
+import {
+  applyMaterialTextures,
+  type MaterialTextureSets,
+  usePerMaterialTextures,
+} from '@/shared/three/textureSetMaterial'
+import type { TextureSetDto } from '@/types'
 
 import type { SceneAssetSource } from '../hooks/useSceneAssetSources'
 import type { SceneNode, Vec3 } from '../types'
@@ -30,6 +36,13 @@ import { SceneNodeErrorBoundary } from './SceneNodeErrorBoundary'
  * about - that a lamp post is four metres and a coffee cup is eight
  * centimetres, and that the server's overlap and scale checks were computed
  * against those numbers.
+ *
+ * A node's `material` binding overrides the source model's own materials, using
+ * the same pipeline the model viewer and the worker's thumbnail render use, so
+ * one texture set looks the same everywhere it is shown. Without it the canvas
+ * drew the source model's original materials no matter what the document said,
+ * and a scene an agent had dressed with `apply_material` looked nothing like
+ * the scene that had been saved.
  */
 
 interface SceneNodeObjectProps {
@@ -38,6 +51,8 @@ interface SceneNodeObjectProps {
   onSelect: (nodeId: string) => void
   /** Resolved file URL, format and glTF resources; undefined until they load. */
   source?: SceneAssetSource
+  /** The texture set this node's material binding points at, once fetched. */
+  materialTextureSet?: TextureSetDto
   /**
    * The referenced asset's own extent and origin convention, from the server's
    * derived facts. Null when it has never been extracted - the selection box is
@@ -54,6 +69,7 @@ export function SceneNodeObject({
   selected,
   onSelect,
   source,
+  materialTextureSet,
   sourceDimensions = null,
   originConvention = null,
   onLoadError,
@@ -87,7 +103,11 @@ export function SceneNodeObject({
           fallback={<FailedMarker bounds={sourceDimensions} />}
         >
           <Suspense fallback={<PendingMarker bounds={sourceDimensions} />}>
-            <SceneAssetMesh source={source} bounds={sourceDimensions} />
+            <SceneAssetMesh
+              source={source}
+              bounds={sourceDimensions}
+              materialTextureSet={materialTextureSet}
+            />
           </Suspense>
         </SceneNodeErrorBoundary>
       )}
@@ -131,24 +151,45 @@ function ScenePrimitiveMesh({ node }: { node: SceneNode }): JSX.Element | null {
 function SceneAssetMesh({
   source,
   bounds,
+  materialTextureSet,
 }: {
   source?: SceneAssetSource
   bounds: Vec3 | null
+  materialTextureSet?: TextureSetDto
 }): JSX.Element | null {
   if (!source || source.isLoading) {
     return <PendingMarker bounds={bounds} />
   }
 
+  // A sprite or an environment map is one picture, not geometry: it is drawn as
+  // a plane at the node's transform rather than pushed through a mesh loader
+  // that would reach it as image bytes and fail to parse.
+  if (source.kind === 'image') {
+    return <ImagePlane url={source.url} bounds={bounds} />
+  }
+
   switch (source.extension) {
     case 'glb':
     case 'gltf':
-      return <GltfMesh url={source.url} resources={source.resources} />
+      return (
+        <GltfMesh
+          url={source.url}
+          resources={source.resources}
+          materialTextureSet={materialTextureSet}
+        />
+      )
     case 'fbx':
-      return <FbxMesh url={source.url} />
+      return (
+        <FbxMesh url={source.url} materialTextureSet={materialTextureSet} />
+      )
     case 'obj':
-      return <ObjMesh url={source.url} />
+      return (
+        <ObjMesh url={source.url} materialTextureSet={materialTextureSet} />
+      )
     case 'stl':
-      return <StlMesh url={source.url} />
+      return (
+        <StlMesh url={source.url} materialTextureSet={materialTextureSet} />
+      )
     default:
       // A format the viewer cannot load is shown as its bounds rather than
       // dropped - a node missing from the canvas reads as a failed placement.
@@ -159,9 +200,11 @@ function SceneAssetMesh({
 function GltfMesh({
   url,
   resources,
+  materialTextureSet,
 }: {
   url: string
   resources: Record<string, string>
+  materialTextureSet?: TextureSetDto
 }): JSX.Element {
   // A loose .gltf stores its buffers and textures as relative URIs. They resolve
   // against the version-file route, 404, and the loader then fails on the
@@ -175,40 +218,108 @@ function GltfMesh({
     loader.manager = manager
   })
 
-  return <PlacedObject object={gltf.scene} />
+  // flipY=false for glTF, matching the model viewer: glTF authors its UVs the
+  // other way up, and getting this wrong turns every bound texture upside down.
+  return (
+    <PlacedObject
+      object={gltf.scene}
+      materialTextureSet={materialTextureSet}
+      flipY={false}
+    />
+  )
 }
 
-function FbxMesh({ url }: { url: string }): JSX.Element {
+function FbxMesh({
+  url,
+  materialTextureSet,
+}: {
+  url: string
+  materialTextureSet?: TextureSetDto
+}): JSX.Element {
   // The safe manager stops format-internal texture paths ("chest_Specular.tga")
   // from being fetched against the file route, which 400s and kills the context.
   const fbx = useLoader(FBXLoader, url, loader => {
     loader.manager = safeLoadingManager
   })
-  return <PlacedObject object={fbx} />
+  return <PlacedObject object={fbx} materialTextureSet={materialTextureSet} />
 }
 
-function ObjMesh({ url }: { url: string }): JSX.Element {
+function ObjMesh({
+  url,
+  materialTextureSet,
+}: {
+  url: string
+  materialTextureSet?: TextureSetDto
+}): JSX.Element {
   const obj = useLoader(OBJLoader, url, loader => {
     loader.manager = safeLoadingManager
   })
-  return <PlacedObject object={obj} />
+  return <PlacedObject object={obj} materialTextureSet={materialTextureSet} />
 }
 
-function StlMesh({ url }: { url: string }): JSX.Element {
+function StlMesh({
+  url,
+  materialTextureSet,
+}: {
+  url: string
+  materialTextureSet?: TextureSetDto
+}): JSX.Element {
   const geometry = useLoader(STLLoader, url)
 
-  return (
-    <mesh geometry={geometry} castShadow receiveShadow>
-      <meshStandardMaterial color="#b0b4bd" roughness={0.6} metalness={0.1} />
-    </mesh>
+  // An STL carries no materials of its own, so it goes through the same clone +
+  // apply path as every other format rather than a bespoke branch that a bound
+  // texture set would not reach. The default material is the one it rendered
+  // with before, for the (common) case of no binding - THREE.Mesh's own default
+  // is unlit white, which would read as a lighting bug.
+  const mesh = useMemo(
+    () =>
+      new THREE.Mesh(
+        geometry,
+        new THREE.MeshStandardMaterial({
+          color: '#b0b4bd',
+          roughness: 0.6,
+          metalness: 0.1,
+        })
+      ),
+    [geometry]
   )
+
+  return <PlacedObject object={mesh} materialTextureSet={materialTextureSet} />
 }
 
 /**
  * Clones the loaded object so the same asset placed forty times along a street
- * does not share one mutable Object3D between every placement.
+ * does not share one mutable Object3D between every placement, and applies the
+ * node's bound texture set to the clone.
+ *
+ * Binding is scene-local, so it must land on the clone and never on the shared
+ * source object - one dressed wall must not re-skin every other placement of
+ * the same model, in this scene or in an open viewer tab.
  */
-function PlacedObject({ object }: { object: THREE.Object3D }): JSX.Element {
+function PlacedObject({
+  object,
+  materialTextureSet,
+  flipY = true,
+}: {
+  object: THREE.Object3D
+  materialTextureSet?: TextureSetDto
+  flipY?: boolean
+}): JSX.Element {
+  const { gl: renderer } = useThree()
+
+  // The empty-string key is the wildcard: a scene binds one material to the
+  // whole placement, not per named mesh material.
+  const materialTextureSets: MaterialTextureSets = useMemo(
+    () => (materialTextureSet ? { '': materialTextureSet } : {}),
+    [materialTextureSet]
+  )
+
+  const { loadedTextures, texturesReady } = usePerMaterialTextures(
+    materialTextureSets,
+    renderer,
+    flipY
+  )
+
   const clone = useMemo(() => {
     const copy = object.clone(true)
     copy.traverse(child => {
@@ -217,10 +328,94 @@ function PlacedObject({ object }: { object: THREE.Object3D }): JSX.Element {
         child.receiveShadow = true
       }
     })
+
+    if (materialTextureSet) {
+      // Until the channels load this leaves the source materials in place, so a
+      // node fades into its bound material rather than flashing untextured.
+      applyMaterialTextures(
+        copy,
+        materialTextureSets,
+        loadedTextures,
+        texturesReady
+      )
+    }
+
     return copy
-  }, [object])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [object, materialTextureSets, loadedTextures, texturesReady])
+
+  // applyMaterialTextures allocates fresh materials on every rebuild, so the
+  // superseded ones are released here. Only materials this clone introduced:
+  // Object3D.clone SHARES materials (and geometry, and the loaded textures) with
+  // the source object, so disposing indiscriminately would blank the original -
+  // and with it every other placement of the same asset, plus any open viewer.
+  useEffect(() => () => disposeClonedMaterials(clone, object), [clone, object])
 
   return <primitive object={clone} />
+}
+
+function collectMaterials(root: THREE.Object3D): Set<THREE.Material> {
+  const materials = new Set<THREE.Material>()
+  root.traverse(child => {
+    const mesh = child as THREE.Mesh
+    if (!mesh.isMesh) return
+    for (const material of Array.isArray(mesh.material)
+      ? mesh.material
+      : [mesh.material]) {
+      if (material) {
+        materials.add(material)
+      }
+    }
+  })
+  return materials
+}
+
+function disposeClonedMaterials(
+  clone: THREE.Object3D,
+  source: THREE.Object3D
+): void {
+  const shared = collectMaterials(source)
+  for (const material of collectMaterials(clone)) {
+    if (!shared.has(material)) {
+      material.dispose()
+    }
+  }
+}
+
+/**
+ * A flat picture standing in world space - how a sprite or an environment map
+ * appears in a scene.
+ *
+ * Double-sided and alpha-tested: a sprite is usually a cut-out with
+ * transparency, and one that vanished when the camera swung behind it would read
+ * as a node that failed to load.
+ */
+function ImagePlane({
+  url,
+  bounds,
+}: {
+  url: string
+  bounds: Vec3 | null | undefined
+}): JSX.Element {
+  const texture = useLoader(THREE.TextureLoader, url)
+
+  // Bounds when the asset has been derived, otherwise the image's own aspect
+  // ratio at one metre tall - a square placeholder would misreport its shape.
+  const aspect = (texture.image?.width ?? 1) / (texture.image?.height ?? 1)
+  const width = bounds?.x ?? aspect
+  const height = bounds?.y ?? 1
+
+  return (
+    <mesh castShadow receiveShadow>
+      <planeGeometry args={[width, height]} />
+      <meshStandardMaterial
+        map={texture}
+        transparent
+        alphaTest={0.01}
+        side={THREE.DoubleSide}
+      />
+    </mesh>
+  )
 }
 
 /** Placeholder sized to the asset's real bounds when they are known. */

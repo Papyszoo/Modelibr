@@ -76,8 +76,22 @@ internal class AddTextureToTextureSetCommandHandler : ICommandHandler<AddTexture
 
             // Remove existing texture of the same type if it exists (for replacement)
             // But skip this for "SplitChannel" type, as we allow multiple unassigned textures
+            //
+            // What gets displaced is reported back, because this is a REPLACEMENT that reads
+            // like an addition. An agent write recorded only the texture it added, so undoing
+            // it removed that one and left the set permanently short the map it had evicted -
+            // reported as reversed, with the original gone. Nothing else can reconstruct it
+            // afterwards, so it is captured here, at the only moment it still exists.
+            ReplacedTextureChannel? replaced = null;
             if (command.TextureType != TextureType.SplitChannel)
             {
+                var displaced = textureSet.Textures.FirstOrDefault(t => t.TextureType == command.TextureType);
+                if (displaced is not null)
+                {
+                    replaced = new ReplacedTextureChannel(
+                        displaced.Id, displaced.FileId, displaced.TextureType, displaced.SourceChannel);
+                }
+
                 textureSet.RemoveTextureOfType(command.TextureType, _dateTimeProvider.UtcNow);
             }
 
@@ -130,7 +144,8 @@ internal class AddTextureToTextureSetCommandHandler : ICommandHandler<AddTexture
                 }
             }
 
-            return Result.Success(new AddTextureToTextureSetResponse(texture.Id, texture.TextureType, texture.SourceChannel));
+            return Result.Success(new AddTextureToTextureSetResponse(
+                texture.Id, texture.TextureType, texture.SourceChannel, command.TextureSetId, replaced));
         }
         catch (ArgumentException ex)
         {
@@ -169,6 +184,18 @@ public record AddTextureToTextureSetCommand(
 ) : ICommand<AddTextureToTextureSetResponse>;
 
 /// <summary>
+/// A texture an add displaced, so the write can be undone by putting it back.
+/// </summary>
+public record ReplacedTextureChannel(int TextureId, int FileId, TextureType TextureType, TextureChannel SourceChannel);
+
+/// <summary>
 /// Response from adding a texture to a set.
 /// </summary>
-public record AddTextureToTextureSetResponse(int TextureId, TextureType TextureType, TextureChannel SourceChannel);
+/// <param name="TextureSetId">The set the texture landed in - carried so an audited HTTP upload can record which asset it changed.</param>
+/// <param name="ReplacedTexture">The same-typed texture this add evicted, or null when the slot was free.</param>
+public record AddTextureToTextureSetResponse(
+    int TextureId,
+    TextureType TextureType,
+    TextureChannel SourceChannel,
+    int TextureSetId = 0,
+    ReplacedTextureChannel? ReplacedTexture = null);

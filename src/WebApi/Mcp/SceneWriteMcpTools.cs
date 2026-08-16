@@ -118,6 +118,77 @@ public sealed class SceneWriteMcpTools
             cancellationToken);
     }
 
+    [McpServerTool(Name = "distribute_assets")]
+    [Description("Place several copies of one asset evenly along a line, from start to end inclusive, in a single write. " +
+                 "Use this for anything repetitive - a row of street lamps, fence posts, a colonnade - rather than issuing one place_asset per copy: " +
+                 "the spacing is computed server-side, the scene's revision moves once, and undoing it removes the whole row. " +
+                 "Returns every placed node plus the overlaps and scale warnings the row caused.")]
+    public static Task<object> DistributeAssets(
+        ICommandHandler<DistributeSceneAssetsCommand, SceneDistributionResponse> handler,
+        IAgentAudit audit,
+        McpCallerContext caller,
+        [Description("Target scene id.")] int sceneId,
+        [Description("Asset family: Model, Sprite or EnvironmentMap.")] string assetType,
+        [Description("Asset id.")] int assetId,
+        [Description("First copy's position in metres as [x,y,z].")] double[] start,
+        [Description("Last copy's position in metres as [x,y,z]. Both ends get a copy.")] double[] end,
+        [Description("How many copies, including both ends. 1 places a single copy at start.")] int count,
+        [Description("Unique key so a retried call does not place the row twice.")] string idempotencyKey,
+        [Description("Version id. REQUIRED for Model - a node without one would re-point itself when the model gets a new version.")] int? versionId = null,
+        [Description("Prefix for the generated node ids, e.g. 'lamp'. Defaults to the asset reference.")] string? nodeIdPrefix = null,
+        [Description("Optional name given to every copy, e.g. 'street lamp'.")] string? name = null,
+        [Description("Optional slot id grouping these with the alternatives proposed for the same role.")] string? slotId = null,
+        [Description("Rotation in degrees as [x,y,z], applied to every copy.")] double[]? rotationEuler = null,
+        [Description("Scale multiplier as [x,y,z], applied to every copy.")] double[]? scale = null,
+        [Description("Rest each copy's base on y=0 after placing.")] bool groundSnap = false,
+        [Description("Round each position onto a grid of this size in metres. Pass 0 to use the asset's own derived grid.")] double? snapToGrid = null,
+        [Description("Optional expected scene revision; the write is refused if the scene has moved on.")] int? expectedRevision = null,
+        [Description("Optional batch id. Writes sharing one can be undone together with reverse_operation.")] string? batchId = null,
+        CancellationToken cancellationToken = default)
+    {
+        return Guarded(
+            audit,
+            caller,
+            new AgentWrite(idempotencyKey, "distribute-assets", "Scene", sceneId, BatchId: batchId),
+            async ct =>
+            {
+                var vectors = ReadVectors(
+                    ("start", start), ("end", end), ("rotationEuler", rotationEuler), ("scale", scale));
+                if (vectors.Failure is { } failure)
+                {
+                    return failure;
+                }
+
+                var result = await handler.Handle(
+                    new DistributeSceneAssetsCommand(
+                        sceneId, assetType, assetId,
+                        vectors.Values["start"]!.Value, vectors.Values["end"]!.Value, count,
+                        versionId, nodeIdPrefix, name, slotId,
+                        vectors.Values["rotationEuler"], vectors.Values["scale"],
+                        groundSnap, snapToGrid, expectedRevision),
+                    ct);
+
+                if (result.IsFailure)
+                {
+                    return Failed(result.Error);
+                }
+
+                // Every node this call created, so undo removes the row rather than one of it.
+                return Applied(
+                    new
+                    {
+                        status = "ok",
+                        scene = result.Value.Scene,
+                        nodes = result.Value.Nodes,
+                        overlaps = result.Value.Overlaps,
+                        scaleWarnings = result.Value.ScaleWarnings,
+                    },
+                    "Scene", sceneId, result.Value,
+                    new { removedNodeIds = result.Value.Nodes.Select(n => n.NodeId).ToArray() });
+            },
+            cancellationToken);
+    }
+
     [McpServerTool(Name = "move_asset")]
     [Description("Move, rotate or rescale one node. Omitted components are left alone. Returns the node's new footprint, the transform it had before, " +
                  "and anything it now overlaps.")]

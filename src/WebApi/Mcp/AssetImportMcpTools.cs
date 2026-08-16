@@ -278,18 +278,27 @@ public sealed class AssetImportMcpTools
 
                     if (result.IsFailure)
                     {
-                        // The set exists and holds the channels added so far. Report both,
-                        // so the agent can add the rest rather than re-importing a duplicate.
-                        return Failed(new
-                        {
-                            error = result.Error.Code,
-                            message = result.Error.Message,
-                            partial = true,
-                            textureSetId = setId,
-                            channelsAdded = added,
-                            failedChannel = channel.Type.ToString(),
-                            recovery = "The set was created. Add the remaining channels with add_texture_channel - do not call import_texture_set again.",
-                        });
+                        // Applied, not Failed, even though a channel did not land: the set and
+                        // the channels before it are already committed. Abandoning the claim
+                        // here released the key while that durable state stayed behind, so the
+                        // partial set was unauditable, unreversible, and a retry of the same
+                        // key built a second one. Completing the claim against the set that
+                        // exists is what makes the recovery advice below true.
+                        return Applied(
+                            new
+                            {
+                                status = "partial",
+                                error = result.Error.Code,
+                                message = result.Error.Message,
+                                partial = true,
+                                textureSetId = setId,
+                                channelsAdded = added,
+                                failedChannel = channel.Type.ToString(),
+                                recovery = "The set was created and is recorded under this idempotencyKey. Add the remaining channels with add_texture_channel - calling import_texture_set again with this key replays this result rather than importing a second set.",
+                            },
+                            AgentAssetFamilies.TextureSet,
+                            setId,
+                            new { setId, channelCount = added.Count, partial = true, failedChannel = channel.Type.ToString() });
                     }
 
                     added.Add(new { textureType = channel.Type.ToString(), textureId = result.Value.TextureId });
@@ -297,13 +306,14 @@ public sealed class AssetImportMcpTools
 
                 return Applied(
                     new { status = "ok", textureSetId = setId, name = created.Value.Name, channels = added },
-                    "TextureSet", setId, new { setId, channelCount = added.Count });
+                    AgentAssetFamilies.TextureSet, setId, new { setId, channelCount = added.Count });
             },
             cancellationToken);
     }
 
     [McpServerTool(Name = "add_texture_channel")]
-    [Description("Add one more channel file to an existing texture set. Use after import_texture_set reports a partial failure, or to complete a set later.")]
+    [Description("Add one more channel file to an existing texture set. Use after import_texture_set reports a partial failure, or to complete a set later. " +
+                 "A channel of the same type already in the set is REPLACED (except SplitChannel, which may repeat) - the displaced one is recorded so the write stays reversible.")]
     public static Task<object> AddTextureChannel(
         ICommandHandler<AddTextureToSetWithFileCommand, AddTextureToTextureSetResponse> handler,
         IAgentAudit audit,
@@ -319,7 +329,7 @@ public sealed class AssetImportMcpTools
         return Guarded(
             audit,
             caller,
-            new AgentWrite(idempotencyKey, "add-texture-channel", "TextureSet", textureSetId, BatchId: batchId),
+            new AgentWrite(idempotencyKey, "add-texture-channel", AgentAssetFamilies.TextureSet, textureSetId, BatchId: batchId),
             async ct =>
             {
                 if (!TryParseEnum<TextureType>(textureType, out var parsedType, out var typeError))
@@ -344,11 +354,24 @@ public sealed class AssetImportMcpTools
                     new AddTextureToSetWithFileCommand(textureSetId, upload!, parsedType, parsedChannel),
                     ct);
 
+                // The displaced channel comes back from the command itself, so the co-located
+                // and the HTTP paths record the same undo state rather than each capturing it
+                // (or forgetting to) on their own.
                 return result.IsFailure
                     ? Failed(result.Error)
                     : Applied(
-                        new { status = "ok", textureSetId, textureId = result.Value.TextureId, textureType = result.Value.TextureType.ToString() },
-                        "TextureSet", textureSetId, result.Value);
+                        new
+                        {
+                            status = "ok",
+                            textureSetId,
+                            textureId = result.Value.TextureId,
+                            textureType = result.Value.TextureType.ToString(),
+                            replacedTextureId = result.Value.ReplacedTexture?.TextureId,
+                        },
+                        AgentAssetFamilies.TextureSet,
+                        textureSetId,
+                        new { textureId = result.Value.TextureId },
+                        new { textureSetId, replacedTexture = result.Value.ReplacedTexture });
             },
             cancellationToken);
     }
@@ -358,8 +381,7 @@ public sealed class AssetImportMcpTools
     public static Task<object> BindTextureSet(
         ICommandHandler<AssociateTextureSetWithAllModelVersionsCommand> associateHandler,
         ICommandHandler<SetDefaultTextureSetCommand, SetDefaultTextureSetResponse> defaultHandler,
-        IQueryHandler<GetModelByIdQuery, GetModelByIdQueryResponse> getModelHandler,
-        IQueryHandler<GetModelVersionQuery, GetModelVersionResponse> versionHandler,
+        IQueryHandler<GetModelTextureBindingsQuery, ModelTextureBindingSnapshot> bindingsHandler,
         IAgentAudit audit,
         McpCallerContext caller,
         [Description("Texture set id to bind.")] int textureSetId,
@@ -373,38 +395,25 @@ public sealed class AssetImportMcpTools
         return Guarded(
             audit,
             caller,
-            new AgentWrite(idempotencyKey, "bind-texture-set", "Model", modelId, BatchId: batchId),
+            new AgentWrite(idempotencyKey, "bind-texture-set", AgentAssetFamilies.Model, modelId, BatchId: batchId),
             async ct =>
             {
                 // What renders now, captured before it is replaced. Binding the wrong
-                // material to forty models is the mistake this whole tool makes easy, so
-                // the set it displaces is the one thing undo cannot reconstruct later.
-                // The active version is the one SetDefaultTextureSetCommand targets when no
-                // version is named, so that is the version whose default is about to change.
-                var model = await getModelHandler.Handle(new GetModelByIdQuery(modelId), ct);
-                if (model.IsFailure)
+                // material to forty models is the mistake this whole tool makes easy, so what
+                // it displaces is the one thing undo cannot reconstruct later.
+                //
+                // The snapshot covers EVERY version, not just the active one: associating
+                // maps the set into all of them, displaces whatever named-material mapping was
+                // there, and fills in each version's default texture set wherever it was still
+                // null. Recording only the active version's previous default described one
+                // version's worth of a change that touched all of them, so undo reported
+                // success while leaving the rest bound to the set the agent chose.
+                var before = await bindingsHandler.Handle(
+                    new GetModelTextureBindingsQuery(modelId, materialName), ct);
+                if (before.IsFailure)
                 {
-                    return Failed(model.Error);
+                    return Failed(before.Error);
                 }
-
-                int? previousDefault = null;
-                if (model.Value.Model.ActiveVersionId is { } activeVersionId)
-                {
-                    var version = await versionHandler.Handle(new GetModelVersionQuery(activeVersionId), ct);
-                    if (version.IsFailure)
-                    {
-                        return Failed(version.Error);
-                    }
-
-                    previousDefault = version.Value.Version.DefaultTextureSetId;
-                }
-
-                var before = new
-                {
-                    modelId,
-                    textureSetId,
-                    previousDefaultTextureSetId = previousDefault,
-                };
 
                 // Associating covers every version, so a model that gains a version later
                 // does not silently lose its material.
@@ -420,7 +429,7 @@ public sealed class AssetImportMcpTools
                 {
                     return Applied(
                         new { status = "ok", textureSetId, modelId, isDefault = false },
-                        "Model", modelId, new { textureSetId, modelId }, before);
+                        AgentAssetFamilies.Model, modelId, new { textureSetId, modelId }, new { binding = before.Value });
                 }
 
                 var defaulted = await defaultHandler.Handle(
@@ -430,19 +439,23 @@ public sealed class AssetImportMcpTools
                     ? Failed(defaulted.Error)
                     : Applied(
                         new { status = "ok", textureSetId, modelId, isDefault = true },
-                        "Model", modelId, new { textureSetId, modelId, isDefault = true }, before);
+                        AgentAssetFamilies.Model, modelId, new { textureSetId, modelId, isDefault = true },
+                        new { binding = before.Value });
             },
             cancellationToken);
     }
 
     [McpServerTool(Name = "request_upload_ticket")]
-    [Description("For agents NOT running on the server: get a single-use ticket plus the exact endpoint and field names to upload an asset over HTTP. assetType: Model, Sound, Sprite, EnvironmentMap or TextureSet. The upload is audited under your idempotencyKey, so a retry cannot import twice.")]
+    [Description("For agents NOT running on the server: get a single-use ticket plus the exact endpoint and field names to upload an asset over HTTP. " +
+                 "assetType: Model, Sound, Sprite, EnvironmentMap or TextureSet. The upload is audited under your idempotencyKey, so a retry cannot import twice. " +
+                 "A material is several files: create the set with the first channel, then ask again with textureSetId set to add each remaining channel.")]
     public static async Task<object> RequestUploadTicket(
         IAgentUploadTickets tickets,
         McpCallerContext caller,
         [Description("Model, Sound, Sprite, EnvironmentMap or TextureSet.")] string assetType,
         [Description("Unique key the resulting upload is audited under.")] string idempotencyKey,
         [Description("Optional batch id, so a remote import can be reversed as one batch.")] string? batchId = null,
+        [Description("TextureSet only: id of an EXISTING set to add one more channel to, instead of creating a new set.")] int? textureSetId = null,
         CancellationToken cancellationToken = default)
     {
         var denied = caller.Denied(McpScope.Write);
@@ -459,6 +472,33 @@ public sealed class AssetImportMcpTools
                 message = $"'{assetType}' has no HTTP upload endpoint.",
                 validValues = UploadTargets.Keys.ToArray(),
             };
+        }
+
+        // Adding a channel to an existing set is a different operation against the same
+        // family. Without this branch a remote agent could upload a material's first channel
+        // and nothing else - every later channel needed a server-readable path it does not
+        // have - so a four-map material was un-importable from anywhere but the server itself.
+        if (textureSetId is { } setId)
+        {
+            if (!string.Equals(target.AssetType, AgentAssetFamilies.TextureSet, StringComparison.Ordinal))
+            {
+                return new
+                {
+                    error = "TextureSetIdNotApplicable",
+                    message = $"textureSetId only applies to TextureSet uploads, not {target.AssetType}.",
+                };
+            }
+
+            target = (
+                AgentAssetFamilies.TextureSet,
+                "add-texture-channel",
+                $"POST /texture-sets/{setId}/textures/with-file",
+                new
+                {
+                    file = "the channel's image (required)",
+                    textureType = "Albedo, Normal, Roughness, Metallic, AO, Height, Emissive, Opacity, Specular, SplitChannel...",
+                    sourceChannel = "channel-packed maps only: R, G, B, A or RGB",
+                });
         }
 
         var ticket = await tickets.IssueAsync(
@@ -480,7 +520,9 @@ public sealed class AssetImportMcpTools
                 contentType = "multipart/form-data",
                 fields = target.Fields,
             },
-            afterwards = "Curate the result with set_tags / set_category / add_to_pack, or bind a material with bind_texture_set.",
+            afterwards = textureSetId is null
+                ? "Curate the result with set_tags / set_category / add_to_pack, or bind a material with bind_texture_set."
+                : "Ask for another ticket with the same textureSetId (and a fresh idempotencyKey) for each remaining channel.",
         };
     }
 
@@ -492,15 +534,15 @@ public sealed class AssetImportMcpTools
     private static readonly IReadOnlyDictionary<string, (string AssetType, string Operation, string Endpoint, object Fields)> UploadTargets =
         new Dictionary<string, (string, string, string, object)>(StringComparer.OrdinalIgnoreCase)
         {
-            ["Model"] = ("Model", "import-model", "POST /models",
+            [AgentAssetFamilies.Model] = (AgentAssetFamilies.Model, "import-model", "POST /models",
                 new { file = "the model file (required)" }),
-            ["Sound"] = ("Sound", "import-sound", "POST /sounds/with-file",
+            [AgentAssetFamilies.Sound] = (AgentAssetFamilies.Sound, "import-sound", "POST /sounds/with-file",
                 new { file = "the audio file (required)", name = "optional; defaults to the file name", categoryId = "optional", packId = "optional" }),
-            ["Sprite"] = ("Sprite", "import-sprite", "POST /sprites/with-file",
+            [AgentAssetFamilies.Sprite] = (AgentAssetFamilies.Sprite, "import-sprite", "POST /sprites/with-file",
                 new { file = "the image file (required)", name = "optional", spriteType = "Static, SpriteSheet, Gif or Apng", categoryId = "optional", packId = "optional" }),
-            ["EnvironmentMap"] = ("EnvironmentMap", "import-environment-map", "POST /environment-maps/with-file",
+            [AgentAssetFamilies.EnvironmentMap] = (AgentAssetFamilies.EnvironmentMap, "import-environment-map", "POST /environment-maps/with-file",
                 new { file = "the HDRI / equirectangular image (required)", name = "optional", sizeLabel = "optional, e.g. '4k'", packId = "optional" }),
-            ["TextureSet"] = ("TextureSet", "import-texture-set", "POST /texture-sets/with-file",
+            [AgentAssetFamilies.TextureSet] = (AgentAssetFamilies.TextureSet, "import-texture-set", "POST /texture-sets/with-file",
                 new { file = "the first channel's image (required)", name = "the material name (required)", textureType = "Albedo, Normal, Roughness...", kind = "ModelSpecific or Universal" }),
         };
 

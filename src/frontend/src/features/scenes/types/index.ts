@@ -1,6 +1,7 @@
 import type {
   SceneAssetRef,
   SceneDocument,
+  SceneEnvironment,
   SceneLight,
   SceneMaterialBinding,
   SceneNode,
@@ -12,6 +13,7 @@ import type {
 export type {
   SceneAssetRef,
   SceneDocument,
+  SceneEnvironment,
   SceneLight,
   SceneMaterialBinding,
   SceneNode,

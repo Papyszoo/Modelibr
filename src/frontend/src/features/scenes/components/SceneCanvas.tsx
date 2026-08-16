@@ -1,14 +1,23 @@
 import './SceneCanvas.css'
 
-import { Grid, OrbitControls } from '@react-three/drei'
-import { Canvas } from '@react-three/fiber'
-import { type JSX } from 'react'
+import { Environment, Grid, OrbitControls } from '@react-three/drei'
+import { Canvas, useLoader, useThree } from '@react-three/fiber'
+import { type JSX, useEffect, useMemo } from 'react'
+import * as THREE from 'three'
+import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader'
+import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader'
 
 import {
   sceneAssetSourceKey,
   useSceneAssetSources,
 } from '../hooks/useSceneAssetSources'
-import type { SceneDocument, SceneLight, SceneNodeView } from '../types'
+import { useSceneMaterials } from '../hooks/useSceneMaterials'
+import type {
+  SceneDocument,
+  SceneEnvironment,
+  SceneLight,
+  SceneNodeView,
+} from '../types'
 import { SceneNodeObject } from './SceneNodeObject'
 
 interface SceneCanvasProps {
@@ -39,6 +48,14 @@ export function SceneCanvas({
   // QueryClient included - is not reachable from inside <Canvas>. Fetching in
   // there fails at the first hook and the node simply never appears.
   const sources = useSceneAssetSources(document)
+  const materials = useSceneMaterials(document)
+
+  // Resolved out here with everything else - the environment map is a library
+  // asset, so its URL comes from a query the canvas subtree cannot run.
+  const environmentMap = document.environment?.environmentMap
+  const environmentMapUrl = environmentMap
+    ? (sources.get(sceneAssetSourceKey(environmentMap))?.url ?? null)
+    : null
 
   return (
     <div className="scene-canvas" data-testid="scene-canvas">
@@ -62,6 +79,11 @@ export function SceneCanvas({
           infiniteGrid
         />
 
+        <SceneEnvironmentRig
+          environment={document.environment ?? null}
+          mapUrl={environmentMapUrl}
+        />
+
         <SceneDocumentLights lights={document.lights} />
 
         {document.nodes.map(node => {
@@ -77,6 +99,7 @@ export function SceneCanvas({
                   ? sources.get(sceneAssetSourceKey(node.asset))
                   : undefined
               }
+              materialTextureSet={materials.get(node.id)}
               sourceDimensions={facts?.sourceDimensions ?? null}
               originConvention={facts?.originConvention ?? null}
               onLoadError={onNodeLoadError}
@@ -138,27 +161,8 @@ function SceneDocumentLights({
               />
             )
           case 'directional':
-            return (
-              <directionalLight
-                key={light.id}
-                position={position}
-                intensity={light.intensity}
-                color={light.color}
-                castShadow
-              />
-            )
           case 'spot':
-            return (
-              <spotLight
-                key={light.id}
-                position={position}
-                intensity={light.intensity}
-                color={light.color}
-                angle={0.5}
-                penumbra={0.4}
-                castShadow
-              />
-            )
+            return <AimedLight key={light.id} light={light} />
           default:
             return (
               <pointLight
@@ -173,4 +177,110 @@ function SceneDocumentLights({
       })}
     </>
   )
+}
+
+/**
+ * A directional or spot light, aimed where the document says.
+ *
+ * three.js aims these at a `target` Object3D that defaults to the origin, and
+ * nothing read `light.target` - so a scene that carefully aimed its key light
+ * at a doorway rendered with every light pointing at 0,0,0. The target object
+ * has to be part of the scene graph for its world matrix to update, hence the
+ * `<primitive>` rather than a bare `new Object3D()`.
+ */
+function AimedLight({ light }: { light: SceneLight }): JSX.Element {
+  const target = useMemo(() => new THREE.Object3D(), [])
+  const aim = light.target ?? { x: 0, y: 0, z: 0 }
+  const position: [number, number, number] = [
+    light.position.x,
+    light.position.y,
+    light.position.z,
+  ]
+
+  return (
+    <>
+      <primitive object={target} position={[aim.x, aim.y, aim.z]} />
+      {light.type === 'spot' ? (
+        <spotLight
+          position={position}
+          target={target}
+          intensity={light.intensity}
+          color={light.color}
+          angle={0.5}
+          penumbra={0.4}
+          castShadow
+        />
+      ) : (
+        <directionalLight
+          position={position}
+          target={target}
+          intensity={light.intensity}
+          color={light.color}
+          castShadow
+        />
+      )}
+    </>
+  )
+}
+
+/**
+ * The scene's environment: image-based lighting, background and exposure.
+ *
+ * The document has carried `environment` since scenes shipped and the viewport
+ * ignored all three fields - a scene authored with an HDRI rendered under the
+ * default lights, and its background colour and exposure did nothing. An agent
+ * could set them, save them, read them back, and never see them.
+ *
+ * The loader is picked by extension because these files are not ordinary
+ * images: an .hdr or .exr put through TextureLoader decodes to nothing usable,
+ * which is the failure that looks like "the environment silently did not
+ * apply".
+ */
+function SceneEnvironmentRig({
+  environment,
+  mapUrl,
+}: {
+  environment: SceneEnvironment | null
+  mapUrl: string | null
+}): JSX.Element | null {
+  const { gl } = useThree()
+
+  // Exposure is in EV stops, so each step doubles the light. Reset to neutral
+  // when the document does not set it, or a scene that once had exposure would
+  // keep it after the field was cleared.
+  const exposureEv = environment?.exposureEv ?? null
+  useEffect(() => {
+    gl.toneMappingExposure = exposureEv === null ? 1 : Math.pow(2, exposureEv)
+    return () => {
+      gl.toneMappingExposure = 1
+    }
+  }, [gl, exposureEv])
+
+  return (
+    <>
+      {environment?.background ? (
+        <color attach="background" args={[environment.background]} />
+      ) : null}
+      {mapUrl ? <SceneEnvironmentMap url={mapUrl} /> : null}
+    </>
+  )
+}
+
+/** Loads one equirectangular environment map and lights the scene with it. */
+function SceneEnvironmentMap({ url }: { url: string }): JSX.Element {
+  const extension = url.split('.').pop()?.toLowerCase() ?? ''
+  const loader =
+    extension === 'exr'
+      ? EXRLoader
+      : extension === 'hdr'
+        ? RGBELoader
+        : THREE.TextureLoader
+
+  const texture = useLoader(loader, url) as THREE.Texture
+  texture.mapping = THREE.EquirectangularReflectionMapping
+
+  // background: the map is what the camera sees as well as what lights the
+  // scene. A scene that lit from an HDRI but showed grey behind it would read
+  // as a half-applied environment.
+  return <Environment map={texture} background />
 }

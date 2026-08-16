@@ -53,6 +53,7 @@ namespace Infrastructure
             services.AddScoped<IAgentOperationLogRepository, AgentOperationLogRepository>();
             services.AddScoped<IAgentUploadTicketRepository, AgentUploadTicketRepository>();
             services.AddScoped<Application.Abstractions.Services.IAgentUploadTickets, Services.AgentUploadTickets>();
+            services.AddScoped<Application.Abstractions.Services.ISceneDocumentCommit, Services.SceneDocumentCommit>();
             services.AddScoped<IAssetDerivationRepository, AssetDerivationRepository>();
             services.AddScoped<IAssetSearchDocumentRepository, AssetSearchDocumentRepository>();
             services.AddScoped<ISearchLogRepository, SearchLogRepository>();
