@@ -34,6 +34,33 @@ interface SceneCanvasProps {
   onSelectNode: (nodeId: string | null) => void
   /** Reports an asset that could not be loaded, so the editor can flag the node. */
   onNodeLoadError: (nodeId: string, message: string) => void
+  /**
+   * Reports each node settling, loaded or failed. Only the headless render view
+   * needs it, to know when the scene is finished before it screenshots.
+   */
+  onNodeLoadSettled?: (nodeId: string, loaded: boolean) => void
+  /**
+   * Where to look from. The editor leaves this off and gets the default
+   * three-quarter view with orbit controls; a render is framed by its caller.
+   */
+  camera?: SceneCameraSpec
+  /** Off for a render - the grid is an editing aid, not part of the scene. */
+  showGrid?: boolean
+  /** Off for a render: no orbit controls, no click-to-select. */
+  interactive?: boolean
+}
+
+/** A camera placement. `target` defaults to the origin, `fov` to the editor's 50. */
+export interface SceneCameraSpec {
+  position: [number, number, number]
+  target?: [number, number, number]
+  fov?: number
+}
+
+const DEFAULT_CAMERA: SceneCameraSpec = {
+  position: [12, 9, 12],
+  target: [0, 0, 0],
+  fov: 50,
 }
 
 export function SceneCanvas({
@@ -42,6 +69,10 @@ export function SceneCanvas({
   selectedNodeId,
   onSelectNode,
   onNodeLoadError,
+  onNodeLoadSettled,
+  camera = DEFAULT_CAMERA,
+  showGrid = true,
+  interactive = true,
 }: SceneCanvasProps): JSX.Element {
   // Resolved out here on purpose: react-three-fiber renders the canvas subtree
   // through its own reconciler root, so the app's React context - the
@@ -61,23 +92,30 @@ export function SceneCanvas({
     <div className="scene-canvas" data-testid="scene-canvas">
       <Canvas
         shadows
-        camera={{ position: [12, 9, 12], fov: 50 }}
+        camera={{
+          position: camera.position,
+          fov: camera.fov ?? DEFAULT_CAMERA.fov,
+        }}
         gl={{ antialias: true, powerPreference: 'high-performance' }}
         dpr={Math.min(window.devicePixelRatio, 2)}
-        onPointerMissed={() => onSelectNode(null)}
+        onPointerMissed={interactive ? () => onSelectNode(null) : undefined}
       >
-        <Grid
-          args={[40, 40]}
-          cellSize={1}
-          cellThickness={0.5}
-          cellColor="#4b5563"
-          sectionSize={5}
-          sectionThickness={1}
-          sectionColor="#6b7280"
-          fadeDistance={80}
-          followCamera={false}
-          infiniteGrid
-        />
+        <SceneCameraAim target={camera.target ?? [0, 0, 0]} />
+
+        {showGrid ? (
+          <Grid
+            args={[40, 40]}
+            cellSize={1}
+            cellThickness={0.5}
+            cellColor="#4b5563"
+            sectionSize={5}
+            sectionThickness={1}
+            sectionColor="#6b7280"
+            fadeDistance={80}
+            followCamera={false}
+            infiniteGrid
+          />
+        ) : null}
 
         <SceneEnvironmentRig
           environment={document.environment ?? null}
@@ -104,14 +142,42 @@ export function SceneCanvas({
               originConvention={facts?.originConvention ?? null}
               originInBounds={facts?.originInBounds ?? null}
               onLoadError={onNodeLoadError}
+              onLoadSettled={onNodeLoadSettled}
             />
           )
         })}
 
-        <OrbitControls makeDefault enableDamping dampingFactor={0.1} />
+        {interactive ? (
+          <OrbitControls makeDefault enableDamping dampingFactor={0.1} />
+        ) : null}
       </Canvas>
     </div>
   )
+}
+
+/**
+ * Points the camera at a target.
+ *
+ * A no-op in the editor, where `OrbitControls` owns the camera and its own
+ * target already defaults to the origin. It matters for a render, which has no
+ * controls: without this the camera keeps the orientation the Canvas gave it, so
+ * moving it to frame a scene would just look at the same direction from a
+ * different place.
+ */
+function SceneCameraAim({
+  target,
+}: {
+  target: [number, number, number]
+}): null {
+  const camera = useThree(state => state.camera)
+  const [x, y, z] = target
+
+  useEffect(() => {
+    camera.lookAt(x, y, z)
+    camera.updateProjectionMatrix()
+  }, [camera, x, y, z])
+
+  return null
 }
 
 /**

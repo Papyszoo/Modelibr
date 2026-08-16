@@ -1,0 +1,18 @@
+/*
+ * Full-bleed and fixed: the renderer sets the viewport size and screenshots the
+ * whole page, so anything that could introduce a scrollbar or a margin would
+ * show up as a band in the returned image.
+ */
+.scene-render-view {
+  position: fixed;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: #1b1f24;
+}
+
+.scene-render-view > * {
+  width: 100%;
+  height: 100%;
+}

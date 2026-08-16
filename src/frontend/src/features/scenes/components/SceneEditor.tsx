@@ -11,8 +11,8 @@ import { useSceneEditorStore } from '@/stores'
 import { useSaveSceneDocumentMutation, useSceneByIdQuery } from '../api/queries'
 import { getSceneAssetFacts } from '../api/scenesApi'
 import { transformsEqual } from '../lib/sceneGeometry'
+import { buildSceneNodeFacts } from '../lib/sceneNodeFacts'
 import { nextLightId, nextNodeId, nextPlacementX } from '../lib/sceneNodeIds'
-import type { SceneNodeView } from '../types'
 import { SceneAssetPicker } from './SceneAssetPicker'
 import { SceneCanvas } from './SceneCanvas'
 import { SceneHierarchy } from './SceneHierarchy'
@@ -84,13 +84,7 @@ export function SceneEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sceneId, loadedRevision])
 
-  const nodeFacts = useMemo(() => {
-    const map = new Map<string, SceneNodeView>()
-    for (const node of view?.nodes ?? []) {
-      map.set(node.nodeId, node)
-    }
-    return map
-  }, [view])
+  const nodeFacts = useMemo(() => buildSceneNodeFacts(view), [view])
 
   const selectedNode =
     document?.nodes.find(node => node.id === selectedNodeId) ?? null

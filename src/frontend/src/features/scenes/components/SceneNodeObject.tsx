@@ -64,6 +64,14 @@ interface SceneNodeObjectProps {
   originInBounds?: Vec3 | null
   /** Reports an asset that could not be loaded, so the editor can flag it. */
   onLoadError: (nodeId: string, message: string) => void
+  /**
+   * Reports that this node has stopped loading, either way. The editor does not
+   * need it - it draws a pending marker and lets the user watch. A headless
+   * render does: it has to know when the scene is finished before it screenshots,
+   * and "finished" includes the nodes that failed. Optional so the editor path
+   * is unchanged.
+   */
+  onLoadSettled?: (nodeId: string, loaded: boolean) => void
 }
 
 export function SceneNodeObject({
@@ -76,6 +84,7 @@ export function SceneNodeObject({
   originConvention = null,
   originInBounds = null,
   onLoadError,
+  onLoadSettled,
 }: SceneNodeObjectProps): JSX.Element | null {
   if (!node.visible) {
     return null
@@ -98,12 +107,19 @@ export function SceneNodeObject({
       }}
     >
       {node.primitive ? (
-        <ScenePrimitiveMesh node={node} />
+        <>
+          <ScenePrimitiveMesh node={node} />
+          {/* Geometry we build ourselves; there is nothing to wait for. */}
+          <SettleSignal nodeId={node.id} loaded onSettled={onLoadSettled} />
+        </>
       ) : (
         <SceneNodeErrorBoundary
           nodeId={node.id}
           resetKey={sourceLoadKey(source)}
-          onError={onLoadError}
+          onError={(nodeId, message) => {
+            onLoadError(nodeId, message)
+            onLoadSettled?.(nodeId, false)
+          }}
           onReset={() => clearCachedLoad(source)}
           fallback={<FailedMarker bounds={sourceDimensions} />}
         >
@@ -113,6 +129,18 @@ export function SceneNodeObject({
               bounds={sourceDimensions}
               materialTextureSet={materialTextureSet}
             />
+            {/*
+              Inside the boundary on purpose: React commits a Suspense
+              boundary's children together, so this effect cannot run until
+              the mesh beside it has actually resolved. Gated on the source
+              being present and done, because `SceneAssetMesh` returns a
+              pending marker rather than suspending while the resource map is
+              still on its way - without the guard a loose glTF would report
+              itself settled one render before its `.bin` arrived.
+            */}
+            {source && !source.isLoading ? (
+              <SettleSignal nodeId={node.id} loaded onSettled={onLoadSettled} />
+            ) : null}
           </Suspense>
         </SceneNodeErrorBoundary>
       )}
@@ -127,6 +155,29 @@ export function SceneNodeObject({
       ) : null}
     </group>
   )
+}
+
+/**
+ * Reports its node as settled, once, when it mounts. Renders nothing.
+ *
+ * A component rather than an effect in `SceneNodeObject` because *where* it sits
+ * in the tree is the whole mechanism: mounted inside the Suspense boundary, it
+ * cannot run before the geometry next to it has resolved.
+ */
+function SettleSignal({
+  nodeId,
+  loaded,
+  onSettled,
+}: {
+  nodeId: string
+  loaded: boolean
+  onSettled?: (nodeId: string, loaded: boolean) => void
+}): null {
+  useEffect(() => {
+    onSettled?.(nodeId, loaded)
+  }, [nodeId, loaded, onSettled])
+
+  return null
 }
 
 function ScenePrimitiveMesh({ node }: { node: SceneNode }): JSX.Element | null {
