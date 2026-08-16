@@ -127,10 +127,11 @@ When("I reopen the scene {string}", async ({ page }, name: string) => {
     await scenes.openScene(name);
 });
 
-/** Auxiliary-file responses seen while a multi-file model was being placed. */
-const auxiliaryFetches = new WeakMap<Page, number[]>();
+/** Successfully served `/files/<id>` URLs seen while multi-file models were placed. */
+const auxiliaryFetches = new WeakMap<Page, string[]>();
 
-Given("I have imported a multi-file glTF model", async ({ page }) => {
+/** Imports one staged multi-file glTF and returns the model name it lands under. */
+async function importMultiFileGltf(page: Page): Promise<string> {
     const { stageMultiFileGltf } = await import(
         "../fixtures/multifile-gltf-fixture"
     );
@@ -150,52 +151,103 @@ Given("I have imported a multi-file glTF model", async ({ page }) => {
         );
     }
 
-    getScenarioState(page).setCustom("sceneMultiFileModelName", staged.modelName);
+    return staged.modelName;
+}
+
+function importedMultiFileModels(page: Page): string[] {
+    const names = getScenarioState(page).getCustom(
+        "sceneMultiFileModelNames",
+    ) as string[] | undefined;
+
+    if (!names?.length) {
+        throw new Error(
+            "No multi-file glTF models were imported by this scenario.",
+        );
+    }
+    return names;
+}
+
+Given("I have imported a multi-file glTF model", async ({ page }) => {
+    getScenarioState(page).setCustom("sceneMultiFileModelNames", [
+        await importMultiFileGltf(page),
+    ]);
 });
 
+Given(
+    "I have imported {int} multi-file glTF models",
+    async ({ page }, count: number) => {
+        // Each staging call gives the primary a unique name and content, so these
+        // are distinct assets rather than one asset placed twice - which is the
+        // whole point: the load gate is per-asset, so one asset cannot expose it.
+        const names: string[] = [];
+        for (let i = 0; i < count; i++) {
+            names.push(await importMultiFileGltf(page));
+        }
+        getScenarioState(page).setCustom("sceneMultiFileModelNames", names);
+    },
+);
+
 When(
-    "I place the imported multi-file model into the scene",
+    "I place every imported multi-file model into the scene",
     async ({ page }) => {
         const scenes = new ScenesPage(page);
-        const modelName = getScenarioState(page).getCustom(
-            "sceneMultiFileModelName",
-        ) as string;
 
-        // The .bin and .png are served from /files/<id>. Recording the statuses
-        // is what makes the assertion below about loading, not about rendering -
-        // software WebGL in CI cannot be asked whether geometry appeared.
-        const statuses: number[] = [];
-        const listener = (response: {
-            url: () => string;
-            status: () => number;
-        }) => {
-            if (/\/files\/\d+(\?|$)/.test(response.url())) {
-                statuses.push(response.status());
+        // The .gltf, its .bin and its .png are all served from /files/<id>.
+        // Recording the URLs is what makes the assertions below about loading,
+        // not about rendering - software WebGL in CI cannot be asked whether
+        // geometry appeared.
+        const served: string[] = [];
+        page.on("response", response => {
+            if (/\/files\/\d+(\?|$)/.test(response.url()) && response.status() === 200) {
+                served.push(response.url());
             }
-        };
-        page.on("response", listener);
-        auxiliaryFetches.set(page, statuses);
+        });
+        auxiliaryFetches.set(page, served);
 
-        await scenes.searchLibrary(modelName);
-        await scenes.placeModel(modelName);
+        for (const modelName of importedMultiFileModels(page)) {
+            await scenes.searchLibrary(modelName);
+            await scenes.placeModel(modelName);
+        }
     },
 );
 
 Then(
     "the scene viewport should have fetched the model's auxiliary files",
     async ({ page }) => {
-        const statuses = auxiliaryFetches.get(page) ?? [];
+        const served = auxiliaryFetches.get(page) ?? [];
 
         // Before the resource map was wired in, the loader asked for the .bin
         // relative to the version-file route and never touched /files/<id> at
         // all - so an empty list here is the exact regression.
         await expect
-            .poll(() => statuses.filter(status => status === 200).length, {
+            .poll(() => served.length, {
                 message:
                     "the viewport never fetched an auxiliary file - the glTF's external .bin was not resolved",
                 timeout: 20000,
             })
             .toBeGreaterThan(0);
+    },
+);
+
+Then(
+    "the scene viewport should have fetched a file for every placed model",
+    async ({ page }) => {
+        const expected = importedMultiFileModels(page).length;
+
+        // One distinct file id per model at minimum - each primary .gltf is its
+        // own file, while the .bin and .png dedupe to one id across copies. This
+        // is the wait: it establishes that every node actually started loading,
+        // so the failed-node assertion that follows is measuring something.
+        await expect
+            .poll(
+                () => new Set(auxiliaryFetches.get(page) ?? []).size,
+                {
+                    message:
+                        "not every placed model fetched its file - some node never started loading",
+                    timeout: 30000,
+                },
+            )
+            .toBeGreaterThanOrEqual(expected);
     },
 );
 

@@ -67,6 +67,13 @@ export interface SceneNodeView {
   originConvention: string | null
   gridSize: number | null
   groundOffset: number | null
+  /**
+   * The measured origin as a 0..1 fraction of the asset's own bounds per axis -
+   * what `originConvention` is a three-way label for, and null only when it was
+   * never measured. The selection outline is drawn from this so it stays the
+   * same box the server's overlap check uses.
+   */
+  originInBounds: Vec3 | null
 }
 
 /**
@@ -84,6 +91,8 @@ export interface SceneAssetFacts {
   originConvention: string | null
   gridSize: number | null
   groundedYAtOrigin: number | null
+  /** See `SceneNodeView.originInBounds`. */
+  originInBounds: Vec3 | null
 }
 
 export interface SceneOverlap {

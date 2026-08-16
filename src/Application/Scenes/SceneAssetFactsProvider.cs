@@ -187,12 +187,26 @@ internal sealed class SceneAssetFactsProvider : ISceneAssetFacts
             ?? await _derivationRepository.GetLatestForAssetAsync(
                 MapToExtractionType(asset.AssetType), asset.AssetId, cancellationToken);
 
-        var (originConvention, gridSize) = ReadDerivedPlacement(derivation?.Payload);
+        var (originConvention, gridSize, originInBounds) = ReadDerivedPlacement(derivation?.Payload);
 
-        return dimensions is null && originConvention is null && gridSize is null
+        // A derivation written before the origin was measured reports null, and null is left
+        // to stand. Rebuilding the fraction from the stored per-part world boxes was tried
+        // and reverted: for a library extracted before `7f0c7c77`, those boxes are the
+        // post-`normalizeModel` thumbnail framing - scaled to a 2-unit view box and
+        // re-centred - so the rebuild returned a centred origin for 1725 of 1762 assets and
+        // silently reproduced the bug this field exists to fix. Nothing distinguishes a
+        // framing box from a real one at read time (the fix did not bump the extractor
+        // version), and a fraction that looks measured but is not is worse than an absent
+        // one. Stale assets fall through to the convention label, exactly as before; a
+        // re-extraction is what populates this properly.
+        return dimensions is null && originConvention is null && gridSize is null && originInBounds is null
             ? null
-            : new SceneAssetFacts(asset.AssetType, asset.AssetId, asset.VersionId, dimensions, originConvention, gridSize);
+            : new SceneAssetFacts(
+                asset.AssetType, asset.AssetId, asset.VersionId, dimensions, originConvention, gridSize, originInBounds);
     }
+
+    private static Vec3? ToVec3(IReadOnlyList<double>? values) =>
+        values is { Count: 3 } ? new Vec3(values[0], values[1], values[2]) : null;
 
     /// <summary>Scene families are named after the extraction families, so this is identity today - kept explicit so a divergence is a compile-time decision.</summary>
     private static string MapToExtractionType(string sceneAssetType) => sceneAssetType switch
@@ -204,15 +218,15 @@ internal sealed class SceneAssetFactsProvider : ISceneAssetFacts
     };
 
     /// <summary>
-    /// Pulls the two placement signals out of the serialized <c>DerivedAsset</c>. A payload
+    /// Pulls the placement signals out of the serialized <c>DerivedAsset</c>. A payload
     /// that does not parse yields nulls rather than throwing: a corrupt derivation row must
     /// degrade placement advice, not fail the user's scene edit.
     /// </summary>
-    private static (string? OriginConvention, double? GridSize) ReadDerivedPlacement(string? payload)
+    private static (string? OriginConvention, double? GridSize, Vec3? OriginInBounds) ReadDerivedPlacement(string? payload)
     {
         if (string.IsNullOrWhiteSpace(payload))
         {
-            return (null, null);
+            return (null, null, null);
         }
 
         try
@@ -221,7 +235,7 @@ internal sealed class SceneAssetFactsProvider : ISceneAssetFacts
             var root = document.RootElement;
             if (root.ValueKind != JsonValueKind.Object)
             {
-                return (null, null);
+                return (null, null, null);
             }
 
             string? origin = null;
@@ -238,11 +252,27 @@ internal sealed class SceneAssetFactsProvider : ISceneAssetFacts
                 grid = gridElement.GetDouble();
             }
 
-            return (origin, grid);
+            Vec3? originInBounds = null;
+            if (root.TryGetProperty(nameof(Application.Extraction.Derivation.DerivedAsset.OriginInBounds), out var fractionElement) &&
+                fractionElement.ValueKind == JsonValueKind.Array)
+            {
+                var axes = new List<double>(3);
+                foreach (var axis in fractionElement.EnumerateArray())
+                {
+                    if (axis.ValueKind == JsonValueKind.Number && axis.TryGetDouble(out var value))
+                    {
+                        axes.Add(value);
+                    }
+                }
+
+                originInBounds = ToVec3(axes);
+            }
+
+            return (origin, grid, originInBounds);
         }
         catch (JsonException)
         {
-            return (null, null);
+            return (null, null, null);
         }
     }
 }

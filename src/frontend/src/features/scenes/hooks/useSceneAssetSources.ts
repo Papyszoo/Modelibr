@@ -205,16 +205,37 @@ export function useSceneAssetSources(
         url: getFileUrl(String(renderable.id)),
         extension,
         resources,
-        // useLoader caches by URL, and it caches failures too. Starting a loose
-        // glTF before its resource map arrives would permanently cache a load
-        // that failed on the missing .bin.
-        isLoading: needsResources && (auxiliary?.isLoading ?? true),
+        isLoading: isAwaitingResources(needsResources, auxiliary),
       })
     })
 
     return sources
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assets, images, versionStamp, auxiliaryStamp, imageStamp])
+}
+
+/**
+ * Whether a loose glTF must keep waiting before the loader is allowed to start.
+ *
+ * `useLoader` caches by URL and caches failures too, so starting a loose glTF
+ * before its resource map arrives permanently caches a load that failed on the
+ * missing `.bin` - the node stays a red box for the life of the page.
+ *
+ * Gated on the map having **arrived**, not on the absence of a loading flag.
+ * `enabled` is computed from the version query's data in the same render, so on
+ * the tick that data first lands the auxiliary query has not started yet - and a
+ * query that has not started reports `isLoading: false`. The old gate opened for
+ * exactly that one tick, which is why several loose-glTF nodes in one scene
+ * failed deterministically while a single-node scene passed.
+ *
+ * An errored query opens the gate deliberately: the map is never coming, and a
+ * visible failure beats a pending marker that spins forever.
+ */
+export function isAwaitingResources(
+  needsResources: boolean,
+  auxiliary?: { isSuccess?: boolean; isError?: boolean }
+): boolean {
+  return needsResources && !auxiliary?.isSuccess && !auxiliary?.isError
 }
 
 /** The file id each non-versioned family renders from. */

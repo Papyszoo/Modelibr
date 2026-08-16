@@ -19,14 +19,19 @@ public class SceneSpatialTests
             Asset: new SceneAssetRef(ModelType, assetId, 1));
 
     private static Dictionary<string, SceneAssetFacts> Facts(
-        Vec3 dimensions, string? origin = null, int assetId = 1, double? gridSize = null)
+        Vec3 dimensions, string? origin = null, int assetId = 1, double? gridSize = null, Vec3? originInBounds = null)
     {
         var reference = new SceneAssetRef(ModelType, assetId, 1);
         return new Dictionary<string, SceneAssetFacts>(StringComparer.Ordinal)
         {
-            [SceneSpatial.FactsKey(reference)] = new(ModelType, assetId, 1, dimensions, origin, gridSize),
+            [SceneSpatial.FactsKey(reference)] = new(ModelType, assetId, 1, dimensions, origin, gridSize, originInBounds),
         };
     }
+
+    /// <summary>The origin on the bottom face, centred in X/Z - how most of the library is authored.</summary>
+    private static readonly Vec3 BaseAtOrigin = new(0.5, 0, 0.5);
+
+    private static readonly Vec3 Centered = new(0.5, 0.5, 0.5);
 
     [Fact]
     public void Footprint_When_Origin_Is_Centered_Straddles_The_Position()
@@ -95,6 +100,78 @@ public class SceneSpatialTests
     public void GroundedY_When_Bounds_Are_Unknown_Returns_Null()
     {
         Assert.Null(SceneSpatial.GroundedY(Node("lamp", Vec3.Zero), facts: null));
+    }
+
+    /// <summary>
+    /// The bug that made every scene levitate: the library is base-at-origin, the derived
+    /// origin was never measured, and an unmeasured origin was read as centred - so
+    /// "ground it" lifted each object by half its own height and the footprint reported back
+    /// to check said <c>minY = 0</c> because it shared the assumption.
+    ///
+    /// Both conventions, each unrotated and turned 90° about X, because that rotation is
+    /// every wall panel in the scene and it swaps which local axis becomes world Y.
+    /// </summary>
+    [Theory]
+    [InlineData(0.0, 0.0)]  // base-at-origin, unrotated
+    [InlineData(0.0, 90.0)] // base-at-origin, laid down
+    [InlineData(0.5, 0.0)]  // centred, unrotated
+    [InlineData(0.5, 90.0)] // centred, laid down
+    public void GroundedY_Rests_The_Base_On_Zero_For_Either_Origin_Convention(double yFraction, double pitch)
+    {
+        var facts = Facts(new Vec3(2, 4, 2), origin: null, originInBounds: new Vec3(0.5, yFraction, 0.5))
+            .Values.Single();
+        var node = Node("asset", new Vec3(3, 17, -5), rotation: new Vec3(pitch, 0, 0));
+
+        var grounded = SceneSpatial.GroundedY(node, facts);
+
+        Assert.NotNull(grounded);
+        var rested = node with { Transform = node.Transform with { Position = node.Transform.Position with { Y = grounded!.Value } } };
+        Assert.Equal(0, SceneSpatial.Footprint(rested, facts)!.Value.Min.Y, 6);
+    }
+
+    [Fact]
+    public void Footprint_When_The_Origin_Is_At_The_Base_Sits_On_The_Position()
+    {
+        var facts = Facts(new Vec3(2, 4, 2), origin: null, originInBounds: BaseAtOrigin);
+
+        var box = SceneSpatial.Footprint(Node("sofa", Vec3.Zero), facts.Values.Single());
+
+        Assert.Equal(0, box!.Value.Min.Y, 6);
+        Assert.Equal(4, box.Value.Max.Y, 6);
+    }
+
+    [Fact]
+    public void Footprint_Prefers_The_Measured_Origin_Over_The_Convention_Label()
+    {
+        // A label and a measurement that disagree: the measurement is the one that came off
+        // the geometry, so it wins. The label is a three-way summary of it.
+        var facts = Facts(new Vec3(2, 4, 2), origin: "centered", originInBounds: BaseAtOrigin);
+
+        Assert.Equal(0, SceneSpatial.Footprint(Node("sofa", Vec3.Zero), facts.Values.Single())!.Value.Min.Y, 6);
+    }
+
+    [Fact]
+    public void Footprint_When_The_Origin_Is_Off_Centre_Uses_The_Exact_Fraction()
+    {
+        // The case no label can express: origin at the base, a quarter of the way along X.
+        // Before the fraction existed this fell through to "centred" like everything else.
+        var facts = Facts(new Vec3(4, 2, 2), origin: null, originInBounds: new Vec3(0.25, 0, 0.5));
+
+        var box = SceneSpatial.Footprint(Node("counter", Vec3.Zero), facts.Values.Single());
+
+        Assert.Equal(-1, box!.Value.Min.X, 6);
+        Assert.Equal(3, box.Value.Max.X, 6);
+        Assert.Equal(0, box.Value.Min.Y, 6);
+    }
+
+    [Fact]
+    public void Footprint_When_The_Origin_Was_Never_Measured_Still_Falls_Back_To_The_Label()
+    {
+        // An asset derived before origins were measured keeps working off its label, so the
+        // overlap and scale checks do not go dark on a library that has not been re-derived.
+        var facts = Facts(new Vec3(2, 4, 2), origin: "bottom-center", originInBounds: null);
+
+        Assert.Equal(0, SceneSpatial.Footprint(Node("lamp", Vec3.Zero), facts.Values.Single())!.Value.Min.Y, 6);
     }
 
     [Fact]

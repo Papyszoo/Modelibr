@@ -20,6 +20,12 @@ public sealed record GetSceneAssetFactsQuery(string AssetType, int AssetId, int?
 /// asset has no derived bounds - the honest answer to "where are its feet" is then
 /// "unknown", and the editor places it at 0 and says so.
 /// </param>
+/// <param name="OriginInBounds">
+/// The measured origin as a 0..1 fraction of the asset's own bounds per axis. The editor
+/// draws its selection box from this, so it stays the same box the server's overlap check
+/// uses; <paramref name="OriginConvention"/> is the three-way label for it, and is null
+/// whenever the origin sits somewhere no label covers.
+/// </param>
 public sealed record SceneAssetFactsView(
     string AssetType,
     int AssetId,
@@ -27,7 +33,8 @@ public sealed record SceneAssetFactsView(
     Vec3? SourceDimensions,
     string? OriginConvention,
     double? GridSize,
-    double? GroundedYAtOrigin);
+    double? GroundedYAtOrigin,
+    Vec3? OriginInBounds);
 
 internal sealed class GetSceneAssetFactsQueryHandler
     : IQueryHandler<GetSceneAssetFactsQuery, SceneAssetFactsView>
@@ -71,6 +78,7 @@ internal sealed class GetSceneAssetFactsQueryHandler
             facts?.WorldDimensions,
             facts?.OriginConvention,
             facts?.GridSize,
-            SceneSpatial.GroundedY(probe, facts)));
+            SceneSpatial.GroundedY(probe, facts),
+            facts?.OriginInBounds));
     }
 }

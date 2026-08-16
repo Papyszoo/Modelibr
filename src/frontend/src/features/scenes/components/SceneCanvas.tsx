@@ -102,6 +102,7 @@ export function SceneCanvas({
               materialTextureSet={materials.get(node.id)}
               sourceDimensions={facts?.sourceDimensions ?? null}
               originConvention={facts?.originConvention ?? null}
+              originInBounds={facts?.originInBounds ?? null}
               onLoadError={onNodeLoadError}
             />
           )

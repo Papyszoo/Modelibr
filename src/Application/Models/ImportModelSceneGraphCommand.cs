@@ -53,7 +53,15 @@ public record SceneGraphRollupsDto(
     int? AnimationCount,
     List<string>? AnimationNames);
 
-public record SceneGraphWorldBoundsDto(List<double>? Dimensions);
+/// <summary>
+/// The asset's world bounding box. <paramref name="Min"/> and <paramref name="Max"/> are
+/// what say where the origin sits inside it; sending only the dimensions is why placement
+/// had to assume a centred origin.
+/// </summary>
+public record SceneGraphWorldBoundsDto(
+    List<double>? Dimensions,
+    List<double>? Min = null,
+    List<double>? Max = null);
 
 internal sealed class ImportModelSceneGraphCommandHandler : ICommandHandler<ImportModelSceneGraphCommand>
 {

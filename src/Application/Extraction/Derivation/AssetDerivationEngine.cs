@@ -107,6 +107,7 @@ public static class AssetDerivationEngine
             DeriveVersion: options.DeriveVersion,
             Tokens: assetTokens,
             OriginConvention: ClassifyOrigin(asset.OriginInBounds, options),
+            OriginInBounds: asset.OriginInBounds,
             GridSize: gridSize,
             ModularKit: modularKit,
             ShapeClass: ClassifyShape(asset.WorldDimensions, options),

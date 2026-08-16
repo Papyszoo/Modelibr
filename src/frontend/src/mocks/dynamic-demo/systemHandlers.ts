@@ -95,6 +95,7 @@ function demoSceneView(scene: DemoScene) {
       originConvention: null,
       gridSize: null,
       groundOffset: null,
+      originInBounds: null,
     })),
     overlaps: [],
     scaleWarnings: [],
@@ -131,6 +132,7 @@ export const systemHandlers = [
       originConvention: null,
       gridSize: null,
       groundedYAtOrigin: null,
+      originInBounds: null,
     })
   }),
 

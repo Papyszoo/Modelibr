@@ -140,6 +140,11 @@ describe('ModelDataService.saveSceneGraph', () => {
     expect(body.fileSha256).toBe('a'.repeat(64))
     expect(body.extractorVersion).toBe(1)
     expect(body.rollups.worldBounds.dimensions).toEqual([1, 1, 1])
+    // min/max travel too: they are what tell the server where the origin sits
+    // inside the bounds. Sending the size alone made it assume every origin was
+    // centred, which floated base-at-origin assets by half their height.
+    expect(body.rollups.worldBounds.min).toEqual([0, 0, 0])
+    expect(body.rollups.worldBounds.max).toEqual([1, 1, 1])
     expect(body.parts).toHaveLength(1)
     // Promoted columns at the top level, everything else nested under detail.
     expect(body.parts[0].partPath).toBe('/Chair/Leg[0]')

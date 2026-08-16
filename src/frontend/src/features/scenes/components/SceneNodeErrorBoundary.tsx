@@ -2,7 +2,19 @@ import { Component, type ReactNode } from 'react'
 
 interface SceneNodeErrorBoundaryProps {
   nodeId: string
+  /**
+   * Identifies what is being loaded - the asset URL plus the resources it needs.
+   * When it changes, this node gets a fresh attempt, because the failure
+   * belonged to what was being loaded before.
+   */
+  resetKey?: string
   onError: (nodeId: string, message: string) => void
+  /**
+   * Drops any cached failure for what this node was loading, called just before
+   * a fresh attempt. Without it a retry is served the old rejection straight
+   * out of the loader cache and fails again without touching the network.
+   */
+  onReset?: () => void
   fallback: ReactNode
   children: ReactNode
 }
@@ -34,9 +46,23 @@ export class SceneNodeErrorBoundary extends Component<
   }
 
   componentDidUpdate(previous: SceneNodeErrorBoundaryProps): void {
+    if (!this.state.hasError) {
+      return
+    }
+
     // A node that was swapped to a different asset deserves a fresh attempt;
-    // the failure belonged to the asset that is no longer there.
-    if (previous.nodeId !== this.props.nodeId && this.state.hasError) {
+    // the failure belonged to the asset that is no longer there. So does one
+    // whose resources have since arrived - a loose glTF that failed on a
+    // missing .bin is loadable the moment its resource map is in hand, and
+    // leaving it broken until a page reload is the difference between a
+    // transient fetch failure and a permanently dead node.
+    if (
+      previous.nodeId !== this.props.nodeId ||
+      previous.resetKey !== this.props.resetKey
+    ) {
+      // Before the retry renders, or the loader cache hands it the same
+      // rejection back without a request.
+      this.props.onReset?.()
       this.setState({ hasError: false })
     }
   }

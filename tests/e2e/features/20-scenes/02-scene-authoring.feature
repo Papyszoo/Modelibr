@@ -59,8 +59,25 @@ Feature: Scene authoring
     # Importing happens on the model list, so come back before authoring.
     And I am on the scenes page
     And a scene named "Multifile Scene" is open
-    When I place the imported multi-file model into the scene
+    When I place every imported multi-file model into the scene
     Then the scene viewport should have fetched the model's auxiliary files
+    And no node should be flagged as failed to load
+
+  @scene-multifile
+  Scenario: Several loose glTF assets in one scene all resolve their buffers
+    # A single-node scene cannot catch this, which is why the scenario above
+    # passed while real scenes showed red boxes. Each loose .gltf must wait for
+    # its own resource map, and the gate that held the loader back keyed off
+    # "not loading" rather than "has arrived" - a query that has not started
+    # yet also reports "not loading". With more than one asset in flight some
+    # nodes started against an empty map, read a bufferView past the end of the
+    # placeholder the loading manager substitutes, and stayed failed for the
+    # life of the page because useLoader caches failures by URL.
+    Given I have imported 2 multi-file glTF models
+    And I am on the scenes page
+    And a scene named "Multifile Crowd Scene" is open
+    When I place every imported multi-file model into the scene
+    Then the scene viewport should have fetched a file for every placed model
     And no node should be flagged as failed to load
 
   @scene-tab-switch

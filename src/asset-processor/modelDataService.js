@@ -432,8 +432,16 @@ export class ModelDataService {
           materialCount: sceneGraph.rollups.materialCount ?? null,
           materialNames: sceneGraph.rollups.materialNames ?? [],
           boneCount: sceneGraph.rollups.boneCount ?? null,
+          // min/max travel alongside the dimensions: they are what place where the
+          // asset's origin sits inside its own bounds. Sending the size alone left the
+          // server assuming every origin was centred, which floated base-at-origin
+          // geometry - most of the library - by half its height.
           worldBounds: sceneGraph.rollups.worldBounds
-            ? { dimensions: sceneGraph.rollups.worldBounds.dimensions }
+            ? {
+                dimensions: sceneGraph.rollups.worldBounds.dimensions,
+                min: sceneGraph.rollups.worldBounds.min ?? null,
+                max: sceneGraph.rollups.worldBounds.max ?? null,
+              }
             : null,
           animationCount: sceneGraph.rollups.animationCount ?? null,
           animationNames: sceneGraph.rollups.animationNames ?? [],

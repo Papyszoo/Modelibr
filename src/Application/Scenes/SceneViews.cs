@@ -23,6 +23,12 @@ public sealed record SceneSummary(
 /// <param name="Footprint">World-space AABB after transform, or null when the asset has no derived bounds.</param>
 /// <param name="SourceDimensions">The asset's own bounds before transform, in metres.</param>
 /// <param name="GroundOffset">How far the node would move on Y to rest on y=0; 0 means it already does.</param>
+/// <param name="OriginInBounds">
+/// The measured origin as a 0..1 fraction of the asset's own bounds per axis - what
+/// <paramref name="OriginConvention"/> is a three-way label for. Sent because the editor
+/// draws its selection box from it: the outline and the overlap check have to describe the
+/// same box, and they only do that while both read the same number.
+/// </param>
 public sealed record SceneNodeView(
     string NodeId,
     string? Name,
@@ -36,7 +42,8 @@ public sealed record SceneNodeView(
     Vec3? SourceDimensions,
     string? OriginConvention,
     double? GridSize,
-    double? GroundOffset);
+    double? GroundOffset,
+    Vec3? OriginInBounds);
 
 /// <summary>
 /// A scene, its document, and everything derived from the two.
@@ -98,7 +105,8 @@ public static class SceneViewBuilder
             nodeFacts?.WorldDimensions,
             nodeFacts?.OriginConvention,
             nodeFacts?.GridSize,
-            groundedY is { } y ? y - node.Transform.Position.Y : null);
+            groundedY is { } y ? y - node.Transform.Position.Y : null,
+            nodeFacts?.OriginInBounds);
     }
 
     /// <summary>Every distinct asset reference a document makes, including its environment map.</summary>

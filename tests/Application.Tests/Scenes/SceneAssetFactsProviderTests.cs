@@ -88,6 +88,44 @@ public class SceneAssetFactsProviderTests
     }
 
     [Fact]
+    public async Task ResolveAsync_Reads_The_Measured_Origin_Off_The_Derivation()
+    {
+        GivenVersion(versionId: 1, modelId: 42);
+
+        _derivations
+            .Setup(r => r.GetByKeyAsync(ExtractionAssetTypes.Model, 42, 1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AssetDerivation.Create(
+                ExtractionAssetTypes.Model, 42, 1, 2,
+                """{"OriginConvention":"bottom-center","OriginInBounds":[0.5,0.0,0.5],"GridSize":1}""",
+                Now));
+
+        var facts = await _provider.ResolveAsync([new SceneAssetRef(SceneAssetTypes.Model, 42, 1)]);
+
+        Assert.Equal(new Vec3(0.5, 0, 0.5), Assert.Single(facts).Value.OriginInBounds);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_When_The_Derivation_Predates_The_Measurement_Reports_No_Origin()
+    {
+        // A pre-v2 payload has no measured origin, and none is invented for it. Rebuilding
+        // one from the stored part world boxes was tried and reverted: for a library
+        // extracted before `7f0c7c77` those boxes are the post-normalizeModel thumbnail
+        // framing, so the rebuild returned "centred" for 1725 of 1762 assets and silently
+        // reproduced the bug this field exists to fix. Absent beats confidently wrong -
+        // placement falls through to the label, and a re-extraction is the real repair.
+        GivenVersion(versionId: 1, modelId: 42);
+
+        _derivations
+            .Setup(r => r.GetByKeyAsync(ExtractionAssetTypes.Model, 42, 1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AssetDerivation.Create(
+                ExtractionAssetTypes.Model, 42, 1, 1, PlacementPayload("centered", 1), Now));
+
+        var facts = await _provider.ResolveAsync([new SceneAssetRef(SceneAssetTypes.Model, 42, 1)]);
+
+        Assert.Null(Assert.Single(facts).Value.OriginInBounds);
+    }
+
+    [Fact]
     public async Task FindUnresolvableAsync_Reports_A_Version_That_Belongs_To_Another_Model()
     {
         GivenVersion(versionId: 1, modelId: 99);

@@ -52,4 +52,50 @@ public class SceneGraphDerivationMapperTests
 
         Assert.Equal(new double[] { 2.5, 2.5, 0.5 }, input.Parts[0].Dimensions);
     }
+
+    [Fact]
+    public void OriginInBounds_IsMeasuredFromTheRollupBox()
+    {
+        // Base-at-origin geometry: the origin is on the bottom face and centred in X/Z.
+        var rollups = Rollups with
+        {
+            WorldBounds = new SceneGraphWorldBoundsDto(
+                new List<double> { 1, 2, 1 },
+                Min: new List<double> { -0.5, 0, -0.5 },
+                Max: new List<double> { 0.5, 2, 0.5 }),
+        };
+
+        var input = SceneGraphDerivationMapper.ToDerivationInput("Asset", rollups, Array.Empty<SceneGraphPartDto>());
+
+        Assert.Equal(new double[] { 0.5, 0, 0.5 }, input.OriginInBounds);
+    }
+
+    [Fact]
+    public void OriginInBounds_FallsBackToTheUnionOfPartBoxes_WhenTheRollupHasNoMinMax()
+    {
+        // The already-imported library: the rollup carries only dimensions, so the origin
+        // has to come from the parts. Two parts, unioning to y ∈ [0, 2].
+        var lower = """{ "worldBoundingBox": { "min": [-0.5,0,-0.5], "max": [0.5,1,0.5] } }""";
+        var upper = """{ "worldBoundingBox": { "min": [-0.5,1,-0.5], "max": [0.5,2,0.5] } }""";
+
+        var input = SceneGraphDerivationMapper.ToDerivationInput(
+            "Asset", Rollups, new[] { Part(lower), Part(upper) });
+
+        Assert.Equal(new double[] { 0.5, 0, 0.5 }, input.OriginInBounds);
+    }
+
+    [Fact]
+    public void OriginInBounds_WhenNothingCarriesAWorldBox_IsNull()
+    {
+        // Null rather than a fabricated 0.5 - "I do not know where its feet are" has to stay
+        // distinguishable from "its origin is centred", which is the whole point of measuring
+        // the origin instead of labelling it.
+        var rollups = Rollups with { WorldBounds = new SceneGraphWorldBoundsDto(null) };
+        var localOnly = """{ "boundingBox": { "min": [0,0,0], "max": [1,1,1] } }""";
+
+        var input = SceneGraphDerivationMapper.ToDerivationInput(
+            "Asset", rollups, new[] { Part(localOnly) });
+
+        Assert.Null(input.OriginInBounds);
+    }
 }

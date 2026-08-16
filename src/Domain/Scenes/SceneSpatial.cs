@@ -6,6 +6,15 @@ namespace Domain.Scenes;
 /// </summary>
 /// <param name="WorldDimensions">Extent of the asset's world bounding box in metres, or null when it was never derived.</param>
 /// <param name="OriginConvention">Where the asset's origin sits: <c>centered</c>, <c>bottom-center</c>, <c>corner</c>, or null when unclassified.</param>
+/// <param name="OriginInBounds">
+/// Where the asset's origin sits inside its own bounds, as a 0..1 fraction per axis
+/// (0 = at the minimum face, 0.5 = centred, 1 = at the maximum face).
+///
+/// This is the measurement <see cref="OriginConvention"/> is a three-way label for, and it
+/// wins wherever both are present: the label collapses everything that is not one of three
+/// exact conventions to null, and a null label used to be read as "centred", which floated
+/// every base-at-origin asset in the library by half its own height.
+/// </param>
 public sealed record SceneAssetFacts(
     string AssetType,
     int AssetId,
@@ -13,7 +22,8 @@ public sealed record SceneAssetFacts(
     Vec3? WorldDimensions = null,
     string? OriginConvention = null,
     /// <summary>Modular-kit grid the asset snaps to, in metres, when the derive step found one.</summary>
-    double? GridSize = null);
+    double? GridSize = null,
+    Vec3? OriginInBounds = null);
 
 /// <summary>An axis-aligned box in world space, metres.</summary>
 public readonly record struct Aabb(Vec3 Min, Vec3 Max)
@@ -99,7 +109,7 @@ public static class SceneSpatial
         }
 
         var origin = node.Asset is not null
-            ? OriginOffset(facts?.OriginConvention, size)
+            ? OriginOffset(facts, size)
             // Primitives are authored centered, like three.js builds them.
             : new Vec3(-size.X / 2, -size.Y / 2, -size.Z / 2);
 
@@ -343,16 +353,32 @@ public static class SceneSpatial
         return dims is { } d && d.IsFinite && d.X > 0 && d.Y > 0 && d.Z > 0 ? d : null;
     }
 
-    /// <summary>Where the local box's minimum corner sits relative to the asset's origin.</summary>
-    private static Vec3 OriginOffset(string? originConvention, Vec3 size) => originConvention switch
+    /// <summary>
+    /// Where the local box's minimum corner sits relative to the asset's origin.
+    ///
+    /// The measured fraction is preferred over the three-way label, and not as a nicety: an
+    /// asset whose origin is at its base but off-centre in X matches no convention, so the
+    /// label is null and the label path has to guess. Guessing is what put every piece of
+    /// furniture in the library into the air by half its height.
+    /// </summary>
+    private static Vec3 OriginOffset(SceneAssetFacts? facts, Vec3 size)
     {
-        "bottom-center" => new Vec3(-size.X / 2, 0, -size.Z / 2),
-        "corner" => Vec3.Zero,
-        // "centered", and the unclassified case. Centered is both the classifier's own
-        // default reading and what a mesh exported without thought comes out as, so an
-        // unknown origin is treated as centered rather than dropped from the check.
-        _ => new Vec3(-size.X / 2, -size.Y / 2, -size.Z / 2),
-    };
+        if (facts?.OriginInBounds is { IsFinite: true } fraction)
+        {
+            return new Vec3(-fraction.X * size.X, -fraction.Y * size.Y, -fraction.Z * size.Z);
+        }
+
+        return facts?.OriginConvention switch
+        {
+            "bottom-center" => new Vec3(-size.X / 2, 0, -size.Z / 2),
+            "corner" => Vec3.Zero,
+            // "centered", and the unclassified case: an asset derived before origins were
+            // measured. Centered is what a mesh exported without thought comes out as, and
+            // it keeps the overlap and scale checks running on a library that has not been
+            // re-derived yet - but it is a guess, and only the branch above is not.
+            _ => new Vec3(-size.X / 2, -size.Y / 2, -size.Z / 2),
+        };
+    }
 
     private static double DegreesToRadians(double degrees) => degrees * Math.PI / 180.0;
 

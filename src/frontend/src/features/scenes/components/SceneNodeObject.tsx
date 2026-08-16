@@ -60,6 +60,8 @@ interface SceneNodeObjectProps {
    */
   sourceDimensions?: Vec3 | null
   originConvention?: string | null
+  /** The measured origin fraction behind that convention; see `SceneNodeView`. */
+  originInBounds?: Vec3 | null
   /** Reports an asset that could not be loaded, so the editor can flag it. */
   onLoadError: (nodeId: string, message: string) => void
 }
@@ -72,6 +74,7 @@ export function SceneNodeObject({
   materialTextureSet,
   sourceDimensions = null,
   originConvention = null,
+  originInBounds = null,
   onLoadError,
 }: SceneNodeObjectProps): JSX.Element | null {
   if (!node.visible) {
@@ -99,7 +102,9 @@ export function SceneNodeObject({
       ) : (
         <SceneNodeErrorBoundary
           nodeId={node.id}
+          resetKey={sourceLoadKey(source)}
           onError={onLoadError}
+          onReset={() => clearCachedLoad(source)}
           fallback={<FailedMarker bounds={sourceDimensions} />}
         >
           <Suspense fallback={<PendingMarker bounds={sourceDimensions} />}>
@@ -115,6 +120,9 @@ export function SceneNodeObject({
         <SelectionOutline
           bounds={node.primitive?.size ?? sourceDimensions}
           originConvention={node.primitive ? 'centered' : originConvention}
+          // Primitives are authored centered, like three.js builds them - the
+          // same exception the server makes in SceneSpatial.Footprint.
+          originInBounds={node.primitive ? null : originInBounds}
         />
       ) : null}
     </group>
@@ -146,6 +154,50 @@ function ScenePrimitiveMesh({ node }: { node: SceneNode }): JSX.Element | null {
     </mesh>
   )
 }
+
+/**
+ * What this node is currently loading: the file, and the resources it resolves
+ * against. A loose glTF that failed with no resource map is a different load
+ * from the same file once its map has arrived, and the boundary uses that to
+ * decide a retry is worth making.
+ */
+function sourceLoadKey(source?: SceneAssetSource): string {
+  if (!source) {
+    return ''
+  }
+
+  return `${source.url}|${Object.keys(source.resources).sort().join(',')}`
+}
+
+/**
+ * Drops a cached load failure so a retry actually reaches the network.
+ * `useLoader` caches by URL and caches rejections too, so without this a node
+ * that failed once is served the same error for the life of the page.
+ */
+function clearCachedLoad(source?: SceneAssetSource): void {
+  if (!source || source.kind !== 'mesh') {
+    return
+  }
+
+  const loader = MESH_LOADERS[source.extension]
+  if (loader) {
+    useLoader.clear(loader, source.url)
+  }
+}
+
+const MESH_LOADERS: Record<string, LoaderConstructor | undefined> = {
+  glb: GLTFLoader,
+  gltf: GLTFLoader,
+  fbx: FBXLoader,
+  obj: OBJLoader,
+  stl: STLLoader,
+}
+
+type LoaderConstructor =
+  | typeof GLTFLoader
+  | typeof FBXLoader
+  | typeof OBJLoader
+  | typeof STLLoader
 
 /** Dispatches to the loader for the asset's format. Props only - see the note above. */
 function SceneAssetMesh({
@@ -463,20 +515,29 @@ function FailedMarker({
 function SelectionOutline({
   bounds,
   originConvention,
+  originInBounds,
 }: {
   bounds: Vec3 | null | undefined
   originConvention: string | null
+  originInBounds: Vec3 | null
 }): JSX.Element | null {
   if (!bounds) {
     return null
   }
 
-  // Where the box sits relative to the node's origin, matching the server's
-  // own reading: an unclassified origin is treated as centered, exactly as
-  // SceneSpatial.OriginOffset does, so the outline and the overlap check
-  // describe the same box.
-  const center =
-    originConvention === 'bottom-center'
+  // Where the box sits relative to the node's origin, matching the server's own
+  // reading exactly as SceneSpatial.OriginOffset does, so the outline and the
+  // overlap check describe the same box. The measured fraction wins over the
+  // three-way label for the same reason it does there: the label is null for
+  // every origin that is not one of three exact conventions, and reading a null
+  // label as "centered" is what drew this box half a height below the asset.
+  const center = originInBounds
+    ? ([
+        (0.5 - originInBounds.x) * bounds.x,
+        (0.5 - originInBounds.y) * bounds.y,
+        (0.5 - originInBounds.z) * bounds.z,
+      ] as const)
+    : originConvention === 'bottom-center'
       ? ([0, bounds.y / 2, 0] as const)
       : originConvention === 'corner'
         ? ([bounds.x / 2, bounds.y / 2, bounds.z / 2] as const)
