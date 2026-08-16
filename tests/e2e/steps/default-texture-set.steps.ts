@@ -6,6 +6,7 @@ import { TextureSetsPage } from "../pages/TextureSetsPage";
 import { SignalRHelper } from "../fixtures/signalr-helper";
 import { DbHelper } from "../fixtures/db-helper";
 import { ApiHelper } from "../helpers/api-helper";
+import { waitForModelViewerCanvas } from "../helpers/viewer-canvas";
 import { getScenarioState } from "../fixtures/shared-state";
 import { persistTextureSet } from "../fixtures/setup-state-bridge";
 import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
@@ -813,10 +814,9 @@ Then("the texture set selector should be visible", async ({ page }) => {
 Then(
     "the model should have textures applied in the 3D scene",
     async ({ page }) => {
-        await page.waitForSelector("canvas", {
-            state: "visible",
-            timeout: 30000,
-        });
+        // The viewer's own canvas - a bare `canvas` selector binds to
+        // whichever three.js canvas is first in the DOM instead.
+        await waitForModelViewerCanvas(page, { timeout: 30000 });
 
         await expect
             .poll(

@@ -159,8 +159,12 @@ Then("no stages should be visible", async ({ page }) => {
 
 Then("the stage editor should be visible", async ({ page }) => {
     console.log("[Stages] Verifying stage editor is visible...");
-    const editor = page.locator("canvas, .scene-editor-container");
-    await expect(editor.first()).toBeVisible({ timeout: 15000 });
+    // `.editor-canvas-container` is the stage editor's own R3F wrapper. The
+    // previous locator was `canvas, .scene-editor-container`, whose second
+    // half matches nothing in the app - so it always fell through to a bare
+    // `canvas` and could be satisfied by any other feature's three.js canvas.
+    const editor = page.locator(".editor-canvas-container canvas");
+    await expect(editor).toBeVisible({ timeout: 15000 });
     console.log("[Stages] Stage editor is visible");
 });
 

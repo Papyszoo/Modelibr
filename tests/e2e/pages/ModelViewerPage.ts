@@ -1,16 +1,25 @@
 import { Page, expect, Locator } from "@playwright/test";
 
+import {
+    MODEL_VIEWER_CANVAS,
+    waitForModelViewerCanvas,
+} from "../helpers/viewer-canvas";
+
 export class ModelViewerPage {
     constructor(private page: Page) {}
+
+    /** The model viewer's own three.js canvas - never another feature's. */
+    get viewerCanvas(): Locator {
+        return this.page.locator(`${MODEL_VIEWER_CANVAS} canvas`);
+    }
 
     async waitForModelLoaded() {
         await expect(
             this.page.locator(".model-viewer-loading"),
         ).not.toBeVisible({ timeout: 30000 });
-        // Also wait for the canvas to be present
-        await expect(this.page.locator("canvas")).toBeVisible({
-            timeout: 30000,
-        });
+        // Also wait for the viewer's own canvas to come up. Scoped on
+        // purpose - see MODEL_VIEWER_CANVAS for what a bare `canvas` binds to.
+        await waitForModelViewerCanvas(this.page, { timeout: 30000 });
     }
 
     /** Version dropdown trigger button */

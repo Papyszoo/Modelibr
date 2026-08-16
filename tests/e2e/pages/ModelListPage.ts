@@ -1,6 +1,7 @@
 import { Page, expect, Locator } from "@playwright/test";
 import { navigateToAppClean } from "../helpers/navigation-helper";
 import { revealVirtualizedCard } from "../helpers/reveal-virtualized-card";
+import { waitForModelViewerCanvas } from "../helpers/viewer-canvas";
 
 export class ModelListPage {
     constructor(private page: Page) {}
@@ -352,11 +353,10 @@ export class ModelListPage {
             await cardToClick.click();
         }
 
-        // Wait for the model viewer to load (canvas element)
-        await this.page.waitForSelector("canvas", {
-            state: "visible",
-            timeout: 30000,
-        });
+        // Wait for the model viewer to load (canvas element). Scoped to the
+        // viewer's own canvas - see MODEL_VIEWER_CANVAS for what a bare
+        // `canvas` selector binds to instead.
+        await waitForModelViewerCanvas(this.page, { timeout: 30000 });
     }
 
     /**
