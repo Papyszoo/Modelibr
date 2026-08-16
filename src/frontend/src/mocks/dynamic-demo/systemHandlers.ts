@@ -19,7 +19,193 @@ import {
   removeRecycledItem,
 } from './shared'
 
+/**
+ * Demo scenes, held in memory for the session.
+ *
+ * Not persisted to the demo IndexedDB like the asset entities are: a scene
+ * references assets by id and version, and the demo's ids are regenerated when
+ * its database is seeded, so a scene surviving a reseed would point at assets
+ * that no longer exist. A session-scoped scene is the honest version of the
+ * feature to demo.
+ */
+interface DemoScene {
+  id: number
+  name: string
+  description: string | null
+  schemaVersion: number
+  revision: number
+  documentJson: string
+  createdAt: string
+  updatedAt: string
+}
+
+const demoScenes = new Map<number, DemoScene>()
+let nextDemoSceneId = 1
+
+const emptySceneDocument = JSON.stringify({
+  schemaVersion: 1,
+  nodes: [],
+  lights: [],
+})
+
+function demoSceneSummary(scene: DemoScene) {
+  const document = JSON.parse(scene.documentJson) as {
+    nodes: unknown[]
+    lights: unknown[]
+  }
+
+  return {
+    id: scene.id,
+    name: scene.name,
+    description: scene.description,
+    schemaVersion: scene.schemaVersion,
+    revision: scene.revision,
+    nodeCount: document.nodes.length,
+    lightCount: document.lights.length,
+    createdAt: scene.createdAt,
+    updatedAt: scene.updatedAt,
+  }
+}
+
+/**
+ * The demo cannot derive geometry, so every node reports unknown bounds and no
+ * overlaps - which is exactly what the real server returns for an asset that
+ * was never extracted, and what the editor is built to display honestly.
+ */
+function demoSceneView(scene: DemoScene) {
+  const document = JSON.parse(scene.documentJson) as {
+    nodes: Array<Record<string, unknown>>
+    lights: unknown[]
+  }
+
+  return {
+    scene: demoSceneSummary(scene),
+    document,
+    nodes: document.nodes.map(node => ({
+      nodeId: node.id,
+      name: node.name ?? null,
+      slotId: node.slotId ?? null,
+      asset: node.asset ?? null,
+      primitive: node.primitive ?? null,
+      transform: node.transform,
+      material: node.material ?? null,
+      visible: node.visible ?? true,
+      footprint: null,
+      sourceDimensions: null,
+      originConvention: null,
+      gridSize: null,
+      groundOffset: null,
+    })),
+    overlaps: [],
+    scaleWarnings: [],
+  }
+}
+
 export const systemHandlers = [
+  // ════════════════════════════════════════════════════════════════════════
+  //  SCENES
+  // ════════════════════════════════════════════════════════════════════════
+
+  http.get('*/scenes', async () => {
+    return HttpResponse.json({
+      scenes: [...demoScenes.values()]
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+        .map(demoSceneSummary),
+    })
+  }),
+
+  http.get('*/scenes/:id', async ({ params }) => {
+    const scene = demoScenes.get(Number(params.id))
+    return scene
+      ? HttpResponse.json(demoSceneView(scene))
+      : HttpResponse.json(
+          { error: 'Scene.NotFound', message: 'No such scene.' },
+          { status: 404 }
+        )
+  }),
+
+  http.post('*/scenes', async ({ request }) => {
+    const body = (await request.json()) as {
+      name: string
+      description?: string
+    }
+    const timestamp = now()
+    const scene: DemoScene = {
+      id: nextDemoSceneId++,
+      name: body.name,
+      description: body.description ?? null,
+      schemaVersion: 1,
+      revision: 1,
+      documentJson: emptySceneDocument,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    }
+    demoScenes.set(scene.id, scene)
+
+    return HttpResponse.json(demoSceneView(scene), { status: 201 })
+  }),
+
+  http.put('*/scenes/:id/document', async ({ params, request }) => {
+    const scene = demoScenes.get(Number(params.id))
+    if (!scene) {
+      return HttpResponse.json(
+        { error: 'Scene.NotFound', message: 'No such scene.' },
+        { status: 404 }
+      )
+    }
+
+    const body = (await request.json()) as {
+      documentJson: string
+      expectedRevision?: number
+    }
+
+    // The revision check is mirrored so the demo behaves like the server when
+    // two tabs edit one scene, rather than accepting a stale write silently.
+    if (
+      body.expectedRevision != null &&
+      body.expectedRevision !== scene.revision
+    ) {
+      return HttpResponse.json(
+        {
+          error: 'Scene.RevisionConflict',
+          message: `Scene ${scene.id} is at revision ${scene.revision}, not the expected ${body.expectedRevision}.`,
+        },
+        { status: 400 }
+      )
+    }
+
+    scene.documentJson = body.documentJson
+    scene.revision += 1
+    scene.updatedAt = now()
+
+    return HttpResponse.json(demoSceneView(scene))
+  }),
+
+  http.put('*/scenes/:id', async ({ params, request }) => {
+    const scene = demoScenes.get(Number(params.id))
+    if (!scene) {
+      return HttpResponse.json(
+        { error: 'Scene.NotFound', message: 'No such scene.' },
+        { status: 404 }
+      )
+    }
+
+    const body = (await request.json()) as {
+      name: string
+      description?: string
+    }
+    scene.name = body.name
+    scene.description = body.description ?? scene.description
+    scene.updatedAt = now()
+
+    return HttpResponse.json(demoSceneSummary(scene))
+  }),
+
+  http.delete('*/scenes/:id', async ({ params }) => {
+    demoScenes.delete(Number(params.id))
+    return new HttpResponse(null, { status: 204 })
+  }),
+
   // ════════════════════════════════════════════════════════════════════════
   //  STAGES
   // ════════════════════════════════════════════════════════════════════════
