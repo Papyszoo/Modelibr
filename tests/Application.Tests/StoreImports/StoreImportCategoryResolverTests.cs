@@ -48,6 +48,89 @@ public class StoreImportCategoryResolverTests
     }
 
     [Fact]
+    public async Task Resolve_WithSubcategory_WhenBothExist_ReturnsChildId()
+    {
+        var h = new Harness();
+        h.SetSoundCategories(
+            new SoundCategorySummaryDto { Id = 3, Name = "UI", ParentId = null },
+            new SoundCategorySummaryDto { Id = 4, Name = "Clicks & Cursors", ParentId = 3 });
+
+        var id = await h.Resolver.ResolveAsync(StoreManifestMapping.ImportTarget.Sound, "UI", "Clicks & Cursors", CancellationToken.None);
+
+        Assert.Equal(4, id);
+        h.CreateSound.Verify(c => c.Handle(It.IsAny<CreateSoundCategoryCommand>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Resolve_WithSubcategory_WhenRootExists_CreatesChildWithParentId()
+    {
+        var h = new Harness();
+        h.SetSoundCategories(
+            new SoundCategorySummaryDto { Id = 3, Name = "UI", ParentId = null });
+        h.CreateSound
+            .Setup(c => c.Handle(It.Is<CreateSoundCategoryCommand>(cmd => cmd.Name == "Clicks & Cursors" && cmd.ParentId == 3), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success(new SoundCategorySummaryDto { Id = 15, Name = "Clicks & Cursors", ParentId = 3 }));
+
+        var id = await h.Resolver.ResolveAsync(StoreManifestMapping.ImportTarget.Sound, "UI", "Clicks & Cursors", CancellationToken.None);
+
+        Assert.Equal(15, id);
+    }
+
+    [Fact]
+    public async Task Resolve_WithSubcategory_WhenNeitherExists_CreatesRootThenChild()
+    {
+        var h = new Harness();
+        h.SetSpriteCategories();
+        h.CreateSprite
+            .Setup(c => c.Handle(It.Is<CreateSpriteCategoryCommand>(cmd => cmd.Name == "UI" && cmd.ParentId == null), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success(new SpriteCategorySummaryDto { Id = 10, Name = "UI", ParentId = null }));
+        h.CreateSprite
+            .Setup(c => c.Handle(It.Is<CreateSpriteCategoryCommand>(cmd => cmd.Name == "Buttons & Controls" && cmd.ParentId == 10), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success(new SpriteCategorySummaryDto { Id = 20, Name = "Buttons & Controls", ParentId = 10 }));
+
+        var id = await h.Resolver.ResolveAsync(StoreManifestMapping.ImportTarget.Sprite, "UI", "Buttons & Controls", CancellationToken.None);
+
+        Assert.Equal(20, id);
+    }
+
+    [Fact]
+    public async Task Resolve_WhenTheSubcategoryCannotBeCreated_FallsBackToItsParent()
+    {
+        // Better than uncategorized, but it must not be silent: a subcategory that can never
+        // be created (a name over the domain's 100-char cap, say) would otherwise file a
+        // whole import one level up with nothing anywhere explaining why.
+        var h = new Harness();
+        h.SetSoundCategories(new SoundCategorySummaryDto { Id = 3, Name = "UI", ParentId = null });
+        h.CreateSound
+            .Setup(c => c.Handle(It.Is<CreateSoundCategoryCommand>(cmd => cmd.ParentId == 3), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Failure<SoundCategorySummaryDto>(new Error("NameTooLong", "Category name is too long.")));
+
+        var id = await h.Resolver.ResolveAsync(
+            StoreManifestMapping.ImportTarget.Sound, "UI", new string('x', 200), CancellationToken.None);
+
+        Assert.Equal(3, id);
+    }
+
+    [Fact]
+    public async Task Resolve_WithSubcategory_ReadsTheCategoryListOnce()
+    {
+        // Both lookups are answered by one read: the queries return every category flat, so
+        // an existing root's children are already in hand, and a root that was just created
+        // cannot have any. A second read per distinct tuple bought nothing.
+        var h = new Harness();
+        h.SetSoundCategories(
+            new SoundCategorySummaryDto { Id = 3, Name = "UI", ParentId = null },
+            new SoundCategorySummaryDto { Id = 4, Name = "Clicks", ParentId = 3 });
+
+        var id = await h.Resolver.ResolveAsync(
+            StoreManifestMapping.ImportTarget.Sound, "UI", "Clicks", CancellationToken.None);
+
+        Assert.Equal(4, id);
+        h.GetSound.Verify(
+            q => q.Handle(It.IsAny<GetAllSoundCategoriesQuery>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task Resolve_CachesPerNameAndTarget_OneLookupForRepeatedItems()
     {
         var h = new Harness();
@@ -129,5 +212,10 @@ public class StoreImportCategoryResolverTests
             => GetSound
                 .Setup(q => q.Handle(It.IsAny<GetAllSoundCategoriesQuery>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(Result.Success(new GetAllSoundCategoriesResponse(categories)));
+
+        public void SetSpriteCategories(params SpriteCategorySummaryDto[] categories)
+            => GetSprite
+                .Setup(q => q.Handle(It.IsAny<GetAllSpriteCategoriesQuery>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(Result.Success(new GetAllSpriteCategoriesResponse(categories)));
     }
 }

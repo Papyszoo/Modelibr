@@ -335,7 +335,7 @@ public class StoreImportProcessorTests
         var file = h.MakeFile("u/sound", RandomBytes(), "Audio", "click.ogg");
         h.SetManifest(new StoreManifestItem("Sound", "Click", new[] { file }, null, "item-1", """{"category": "UI"}"""));
         h.CategoryResolver
-            .Setup(r => r.ResolveAsync(StoreManifestMapping.ImportTarget.Sound, "UI", It.IsAny<CancellationToken>()))
+            .Setup(r => r.ResolveAsync(StoreManifestMapping.ImportTarget.Sound, "UI", null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(77);
         h.Sink.Setup(s => s.CreateSoundAsync(It.IsAny<IFileUpload>(), "Click", It.IsAny<string?>(), 77, It.IsAny<CancellationToken>())).ReturnsAsync(401);
 
@@ -346,13 +346,30 @@ public class StoreImportProcessorTests
     }
 
     [Fact]
+    public async Task Process_SoundItem_WithCategoryAndSubcategory_ResolvesHierarchicalCategory()
+    {
+        var h = new Harness();
+        var file = h.MakeFile("u/sound", RandomBytes(), "Audio", "click.ogg");
+        h.SetManifest(new StoreManifestItem("Sound", "Click", new[] { file }, null, "item-1", """{"category": "UI", "subcategory": "Clicks & Cursors"}"""));
+        h.CategoryResolver
+            .Setup(r => r.ResolveAsync(StoreManifestMapping.ImportTarget.Sound, "UI", "Clicks & Cursors", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(78);
+        h.Sink.Setup(s => s.CreateSoundAsync(It.IsAny<IFileUpload>(), "Click", It.IsAny<string?>(), 78, It.IsAny<CancellationToken>())).ReturnsAsync(401);
+
+        await h.Run();
+
+        h.Sink.Verify(s => s.CreateSoundAsync(It.IsAny<IFileUpload>(), "Click", It.IsAny<string?>(), 78, It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Equal(1, h.Job.ItemsCreated);
+    }
+
+    [Fact]
     public async Task Process_ModelItem_WithCategoryButNoTags_StillAppliesCategoryViaTagsCommand()
     {
         var h = new Harness();
         var mesh = h.MakeFile("u/mesh", RandomBytes(), "Mesh", "chair.glb");
         h.SetManifest(new StoreManifestItem("Model", "Chair", new[] { mesh }, null, "item-1", """{"category": "Furniture"}"""));
         h.CategoryResolver
-            .Setup(r => r.ResolveAsync(StoreManifestMapping.ImportTarget.Model, "Furniture", It.IsAny<CancellationToken>()))
+            .Setup(r => r.ResolveAsync(StoreManifestMapping.ImportTarget.Model, "Furniture", null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(88);
         h.Sink.Setup(s => s.CreateModelAsync(It.IsAny<IFileUpload>(), "Chair", It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync(101);
 
@@ -370,7 +387,7 @@ public class StoreImportProcessorTests
         var file = h.MakeFile("u/env", RandomBytes(), "Panorama", "sky.hdr");
         h.SetManifest(new StoreManifestItem("EnvironmentMap", "Sky", new[] { file }, null, "item-1", """{"category": "Sky"}"""));
         h.CategoryResolver
-            .Setup(r => r.ResolveAsync(StoreManifestMapping.ImportTarget.EnvironmentMap, "Sky", It.IsAny<CancellationToken>()))
+            .Setup(r => r.ResolveAsync(StoreManifestMapping.ImportTarget.EnvironmentMap, "Sky", null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(99);
         h.Sink.Setup(s => s.CreateEnvironmentMapAsync(It.IsAny<IFileUpload>(), "Sky", It.IsAny<string?>(), It.IsAny<CancellationToken>())).ReturnsAsync(601);
 
@@ -388,7 +405,7 @@ public class StoreImportProcessorTests
         h.SoundRepo.Setup(r => r.GetByFileHashAsync(file.Sha256, It.IsAny<CancellationToken>()))
             .ReturnsAsync(ExistingSound(44));
         h.CategoryResolver
-            .Setup(r => r.ResolveAsync(StoreManifestMapping.ImportTarget.Sound, "UI", It.IsAny<CancellationToken>()))
+            .Setup(r => r.ResolveAsync(StoreManifestMapping.ImportTarget.Sound, "UI", null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(77);
 
         await h.Run();
@@ -412,7 +429,7 @@ public class StoreImportProcessorTests
 
         // An existing categorization - the user's or an earlier import's - is never
         // overwritten, and no find-or-create side effects happen either.
-        h.CategoryResolver.Verify(r => r.ResolveAsync(It.IsAny<StoreManifestMapping.ImportTarget>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+        h.CategoryResolver.Verify(r => r.ResolveAsync(It.IsAny<StoreManifestMapping.ImportTarget>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
         h.Sink.Verify(s => s.SetSoundCategoryAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
         Assert.Equal(1, h.Job.ItemsSkipped);
     }
@@ -633,7 +650,7 @@ public class StoreImportProcessorTests
 
             // Default: items resolve to no category (the common uncategorized-manifest case).
             CategoryResolver
-                .Setup(r => r.ResolveAsync(It.IsAny<StoreManifestMapping.ImportTarget>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+                .Setup(r => r.ResolveAsync(It.IsAny<StoreManifestMapping.ImportTarget>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync((int?)null);
 
             // Fake client parks the bytes registered for a URL in a real temp file and

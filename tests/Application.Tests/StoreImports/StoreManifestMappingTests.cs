@@ -124,6 +124,15 @@ public class StoreManifestMappingTests
     }
 
     [Theory]
+    [InlineData("""{"subcategory": "Buttons & Controls"}""", "Buttons & Controls")]
+    [InlineData("""{"category": "UI", "subcategory": "  Buttons & Controls  "}""", "Buttons & Controls")]
+    [InlineData("""{"category": "Effects", "subcategory": "Noise & Overlays", "other": 1}""", "Noise & Overlays")]
+    public void GetItemSubcategory_ReadsSubcategoryFromMetadata(string metadataJson, string expected)
+    {
+        Assert.Equal(expected, StoreManifestMapping.GetItemSubcategory(metadataJson));
+    }
+
+    [Theory]
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
@@ -137,5 +146,20 @@ public class StoreManifestMappingTests
     {
         // Metadata is enrichment - anything unreadable must yield null, never throw.
         Assert.Null(StoreManifestMapping.GetItemCategory(metadataJson));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("{}")]
+    [InlineData("""{"subcategory": null}""")]
+    [InlineData("""{"subcategory": ""}""")]
+    [InlineData("""{"subcategory": 42}""")]
+    [InlineData("""["subcategory"]""")]
+    [InlineData("not json at all")]
+    public void GetItemSubcategory_ToleratesMissingOrMalformedMetadata(string? metadataJson)
+    {
+        Assert.Null(StoreManifestMapping.GetItemSubcategory(metadataJson));
     }
 }

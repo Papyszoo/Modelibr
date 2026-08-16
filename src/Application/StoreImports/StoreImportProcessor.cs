@@ -608,7 +608,11 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
     // assets that predate category support without clobbering manual organization.
     // Resolution is best-effort (see IStoreImportCategoryResolver) and never fails an item.
     private Task<int?> ResolveCategoryAsync(StoreManifestMapping.ImportTarget target, StoreManifestItem item, CancellationToken ct)
-        => _categoryResolver.ResolveAsync(target, StoreManifestMapping.GetItemCategory(item.MetadataJson), ct);
+        => _categoryResolver.ResolveAsync(
+            target,
+            StoreManifestMapping.GetItemCategory(item.MetadataJson),
+            StoreManifestMapping.GetItemSubcategory(item.MetadataJson),
+            ct);
 
     private async Task<StoreDownloadedFile> DownloadAndVerifyAsync(StoreImportWorkItem work, StoreManifestFile file, CancellationToken ct)
     {
