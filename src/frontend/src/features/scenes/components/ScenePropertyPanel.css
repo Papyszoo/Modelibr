@@ -1,16 +1,38 @@
 .scene-properties {
   display: flex;
   flex-direction: column;
-  gap: var(--mod-space-sm);
-  padding: var(--mod-space-sm);
-  overflow-y: auto;
-  font-size: var(--mod-text-sm);
-  color: var(--mod-color-text);
+  min-height: 0;
+  flex: 1;
 }
 
-.scene-properties--empty {
+.scene-properties-header {
+  padding: var(--mod-space-xs);
+  border-bottom: 1px solid var(--mod-color-border);
+}
+
+.scene-properties-header h3 {
+  margin: 0;
+  font-size: var(--mod-text-sm);
+  font-weight: var(--mod-font-weight-semibold);
+  color: var(--mod-color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scene-properties-id {
+  font-size: var(--mod-text-xs);
   color: var(--mod-color-text-muted);
-  padding: var(--mod-space-md);
+  font-family: monospace;
+}
+
+.scene-properties-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-sm);
+  padding: var(--mod-space-xs);
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .scene-properties-field {
@@ -24,20 +46,46 @@
   color: var(--mod-color-text-muted);
 }
 
-.scene-properties-field input {
-  background: var(--mod-color-surface);
-  border: 1px solid var(--mod-color-border);
-  border-radius: var(--mod-radius-sm);
-  color: var(--mod-color-text);
-  padding: var(--mod-space-2xs) var(--mod-space-xs);
-  font-size: var(--mod-text-sm);
+.scene-properties-field > span em {
+  font-style: normal;
+  opacity: 0.7;
+}
+
+.scene-properties-field .p-inputtext {
   width: 100%;
+  font-size: var(--mod-text-sm);
 }
 
 .scene-properties-vector {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--mod-space-2xs);
+}
+
+.scene-properties-axis {
+  display: flex;
+  align-items: center;
+  gap: var(--mod-space-2xs);
+  min-width: 0;
+}
+
+.scene-properties-axis > label {
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+  text-transform: uppercase;
+  width: 0.75rem;
+}
+
+.scene-properties-axis .p-inputnumber {
+  min-width: 0;
+  flex: 1;
+}
+
+.scene-properties-axis .p-inputnumber-input {
+  width: 100%;
+  min-width: 0;
+  font-size: var(--mod-text-sm);
+  padding: var(--mod-space-2xs) var(--mod-space-xs);
 }
 
 .scene-properties-derived {
@@ -69,32 +117,14 @@
 .scene-properties-derived dd {
   margin: 0;
   font-size: var(--mod-text-xs);
+  color: var(--mod-color-text);
 }
 
 .scene-properties-action {
-  background: var(--mod-color-surface);
-  border: 1px solid var(--mod-color-border);
-  border-radius: var(--mod-radius-sm);
-  color: var(--mod-color-text);
-  cursor: pointer;
-  font-size: var(--mod-text-xs);
-  padding: var(--mod-space-2xs) var(--mod-space-xs);
+  width: 100%;
 }
 
-.scene-properties-action:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
-.scene-properties-warnings {
-  list-style: none;
-  margin: 0;
-  padding: var(--mod-space-xs);
-  border-radius: var(--mod-radius-sm);
-  background: var(--mod-color-warning-bg);
-  color: var(--mod-color-warning);
+.scene-properties-warning {
+  justify-content: flex-start;
   font-size: var(--mod-text-xs);
-  display: flex;
-  flex-direction: column;
-  gap: var(--mod-space-2xs);
 }

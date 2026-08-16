@@ -67,6 +67,23 @@ export interface SceneNodeView {
   groundOffset: number | null
 }
 
+/**
+ * What the server knows about an asset before it is placed.
+ *
+ * `groundedYAtOrigin` is the Y that rests it on y=0 unrotated and unscaled, or
+ * null when the asset has never been extracted - in which case the editor
+ * places it at 0 and says the bounds are unknown rather than guessing.
+ */
+export interface SceneAssetFacts {
+  assetType: string
+  assetId: number
+  versionId: number | null
+  sourceDimensions: Vec3 | null
+  originConvention: string | null
+  gridSize: number | null
+  groundedYAtOrigin: number | null
+}
+
 export interface SceneOverlap {
   nodeIdA: string
   nodeIdB: string

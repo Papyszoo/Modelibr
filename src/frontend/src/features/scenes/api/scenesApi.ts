@@ -1,6 +1,12 @@
 import { baseURL, client } from '@/lib/apiBase'
 
-import type { SceneDocument, SceneSummary, SceneView } from '../types'
+import type {
+  SceneAssetFacts,
+  SceneAssetRef,
+  SceneDocument,
+  SceneSummary,
+  SceneView,
+} from '../types'
 
 export async function getScenes(): Promise<SceneSummary[]> {
   const response = await client.get<{ scenes: SceneSummary[] }>('/scenes')
@@ -48,6 +54,28 @@ export async function updateSceneDocument(
     documentJson: JSON.stringify(document),
     expectedRevision,
   })
+  return response.data
+}
+
+/**
+ * Size, origin convention and resting height for an asset the user is about to
+ * place. The server computes the resting height with the same code the write
+ * path uses, so the editor never has to reimplement where an asset's feet are.
+ */
+export async function getSceneAssetFacts(
+  asset: SceneAssetRef
+): Promise<SceneAssetFacts> {
+  const params = new URLSearchParams({
+    assetType: asset.assetType,
+    assetId: String(asset.assetId),
+  })
+  if (asset.versionId != null) {
+    params.append('versionId', String(asset.versionId))
+  }
+
+  const response = await client.get<SceneAssetFacts>(
+    `/scenes/asset-facts?${params.toString()}`
+  )
   return response.data
 }
 

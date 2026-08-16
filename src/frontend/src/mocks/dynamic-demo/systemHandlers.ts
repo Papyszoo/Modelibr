@@ -114,6 +114,26 @@ export const systemHandlers = [
     })
   }),
 
+  // Declared before the /scenes/:id handler because MSW matches in order, and
+  // ':id' would otherwise swallow this path.
+  http.get('*/scenes/asset-facts', async ({ request }) => {
+    const url = new URL(request.url)
+    const versionId = url.searchParams.get('versionId')
+
+    // The demo has no extraction pipeline, so nothing is derived. Nulls here
+    // are the same answer the real server gives for an un-extracted asset:
+    // placement still works, and the editor says the bounds are unknown.
+    return HttpResponse.json({
+      assetType: url.searchParams.get('assetType') ?? 'Model',
+      assetId: Number(url.searchParams.get('assetId') ?? 0),
+      versionId: versionId ? Number(versionId) : null,
+      sourceDimensions: null,
+      originConvention: null,
+      gridSize: null,
+      groundedYAtOrigin: null,
+    })
+  }),
+
   http.get('*/scenes/:id', async ({ params }) => {
     const scene = demoScenes.get(Number(params.id))
     return scene

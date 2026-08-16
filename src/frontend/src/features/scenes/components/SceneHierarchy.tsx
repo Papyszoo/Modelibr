@@ -1,6 +1,10 @@
 import './SceneHierarchy.css'
 
+import { Badge } from 'primereact/badge'
+import { Button } from 'primereact/button'
 import { type JSX } from 'react'
+
+import { EmptyState } from '@/shared/components'
 
 import type { SceneDocument, SceneNodeView, SceneOverlap } from '../types'
 
@@ -35,80 +39,105 @@ export function SceneHierarchy({
     overlaps.flatMap(overlap => [overlap.nodeIdA, overlap.nodeIdB])
   )
 
-  if (document.nodes.length === 0) {
-    return (
-      <div className="scene-hierarchy scene-hierarchy--empty">
-        <p>No assets placed yet.</p>
-        <p className="scene-hierarchy-hint">
-          Place one from the library, or let an agent build the scene over MCP.
-        </p>
-      </div>
-    )
-  }
-
   return (
-    <ul className="scene-hierarchy" data-testid="scene-hierarchy">
-      {document.nodes.map(node => {
-        const facts = nodeFacts.get(node.id)
-        const label = node.name ?? node.id
+    <section className="scene-hierarchy">
+      <header className="scene-hierarchy-header">
+        <h3>Scene</h3>
+        {document.nodes.length > 0 ? (
+          <Badge value={document.nodes.length} severity="secondary" />
+        ) : null}
+      </header>
 
-        return (
-          <li
-            key={node.id}
-            className={
-              node.id === selectedNodeId
-                ? 'scene-hierarchy-row scene-hierarchy-row--selected'
-                : 'scene-hierarchy-row'
-            }
-          >
-            <button
-              type="button"
-              className="scene-hierarchy-label"
-              onClick={() => onSelectNode(node.id)}
-              title={node.id}
-            >
-              <span className="scene-hierarchy-name">{label}</span>
-              <span className="scene-hierarchy-meta">
-                {node.asset
-                  ? `${node.asset.assetType} ${node.asset.assetId}${
-                      node.asset.versionId ? ` · v${node.asset.versionId}` : ''
-                    }`
-                  : `primitive · ${node.primitive?.shape ?? 'unknown'}`}
-              </span>
-              {facts && facts.sourceDimensions === null && node.asset ? (
-                <span
-                  className="scene-hierarchy-flag"
-                  title="This asset has no derived bounds, so overlap and scale checks skip it."
+      {document.nodes.length === 0 ? (
+        <EmptyState
+          variant="compact"
+          icon="pi-box"
+          title="Nothing placed yet"
+          message="Pick a model from the library above, or add a blockout box."
+        />
+      ) : (
+        <ul className="scene-hierarchy-list" data-testid="scene-hierarchy">
+          {document.nodes.map(node => {
+            const facts = nodeFacts.get(node.id)
+            const boundsUnknown =
+              Boolean(node.asset) && facts?.sourceDimensions == null
+
+            return (
+              <li
+                key={node.id}
+                className={
+                  node.id === selectedNodeId
+                    ? 'scene-hierarchy-row scene-hierarchy-row--selected'
+                    : 'scene-hierarchy-row'
+                }
+              >
+                <button
+                  type="button"
+                  className="scene-hierarchy-label"
+                  onClick={() => onSelectNode(node.id)}
+                  title={node.id}
                 >
-                  bounds unknown
-                </span>
-              ) : null}
-              {overlapping.has(node.id) ? (
-                <span className="scene-hierarchy-flag scene-hierarchy-flag--warn">
-                  overlapping
-                </span>
-              ) : null}
-            </button>
+                  <span className="scene-hierarchy-name">
+                    <i
+                      className={node.asset ? 'pi pi-box' : 'pi pi-stop'}
+                      aria-hidden
+                    />
+                    {node.name ?? node.id}
+                  </span>
+                  <span className="scene-hierarchy-meta">
+                    {node.asset
+                      ? `${node.asset.assetType} ${node.asset.assetId}${
+                          node.asset.versionId
+                            ? ` · v${node.asset.versionId}`
+                            : ''
+                        }`
+                      : `blockout · ${node.primitive?.shape ?? 'unknown'}`}
+                  </span>
+                  {boundsUnknown || overlapping.has(node.id) ? (
+                    <span className="scene-hierarchy-flags">
+                      {boundsUnknown ? (
+                        <span
+                          className="scene-hierarchy-flag"
+                          title="This asset has no derived bounds, so overlap and scale checks skip it."
+                        >
+                          bounds unknown
+                        </span>
+                      ) : null}
+                      {overlapping.has(node.id) ? (
+                        <span className="scene-hierarchy-flag scene-hierarchy-flag--warn">
+                          overlapping
+                        </span>
+                      ) : null}
+                    </span>
+                  ) : null}
+                </button>
 
-            <div className="scene-hierarchy-actions">
-              <button
-                type="button"
-                aria-label={node.visible ? 'Hide node' : 'Show node'}
-                onClick={() => onToggleVisible(node.id, !node.visible)}
-              >
-                <i className={node.visible ? 'pi pi-eye' : 'pi pi-eye-slash'} />
-              </button>
-              <button
-                type="button"
-                aria-label="Remove node"
-                onClick={() => onRemoveNode(node.id)}
-              >
-                <i className="pi pi-trash" />
-              </button>
-            </div>
-          </li>
-        )
-      })}
-    </ul>
+                <div className="scene-hierarchy-actions">
+                  <Button
+                    icon={node.visible ? 'pi pi-eye' : 'pi pi-eye-slash'}
+                    text
+                    rounded
+                    size="small"
+                    aria-label={node.visible ? 'Hide node' : 'Show node'}
+                    tooltip={node.visible ? 'Hide' : 'Show'}
+                    onClick={() => onToggleVisible(node.id, !node.visible)}
+                  />
+                  <Button
+                    icon="pi pi-trash"
+                    text
+                    rounded
+                    size="small"
+                    severity="danger"
+                    aria-label="Remove node"
+                    tooltip="Remove"
+                    onClick={() => onRemoveNode(node.id)}
+                  />
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </section>
   )
 }

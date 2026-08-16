@@ -23,6 +23,22 @@ public static class SceneEndpoints
         .WithName("Get All Scenes")
         .WithSummary("List saved scenes");
 
+        // Sits alongside /scenes/{id}: a literal segment outranks a parameter one in route
+        // precedence, so "asset-facts" is never captured as an id.
+        app.MapGet("/scenes/asset-facts", async (
+            string assetType,
+            int assetId,
+            int? versionId,
+            IQueryHandler<GetSceneAssetFactsQuery, SceneAssetFactsView> handler,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await handler.Handle(
+                new GetSceneAssetFactsQuery(assetType, assetId, versionId), cancellationToken);
+            return result.IsFailure ? Failure(result.Error) : Results.Ok(result.Value);
+        })
+        .WithName("Get Scene Asset Facts")
+        .WithSummary("Size, origin convention and resting height for an asset, before placing it");
+
         app.MapGet("/scenes/{id}", async (
             int id,
             IQueryHandler<GetSceneByIdQuery, SceneView> handler,

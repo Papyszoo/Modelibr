@@ -1,16 +1,25 @@
 import './SceneEditor.css'
 
+import { Button } from 'primereact/button'
+import { Message } from 'primereact/message'
 import { type JSX, useCallback, useEffect, useMemo, useState } from 'react'
 
 import { ApiClientError } from '@/lib/apiBase'
+import { ErrorState, ListHeader, LoadingState } from '@/shared/components'
 import { useSceneEditorStore } from '@/stores'
 
 import { useSaveSceneDocumentMutation, useSceneByIdQuery } from '../api/queries'
+import { getSceneAssetFacts } from '../api/scenesApi'
 import { transformsEqual } from '../lib/sceneGeometry'
+import { nextLightId, nextNodeId, nextPlacementX } from '../lib/sceneNodeIds'
 import type { SceneNodeView } from '../types'
+import { SceneAssetPicker } from './SceneAssetPicker'
 import { SceneCanvas } from './SceneCanvas'
 import { SceneHierarchy } from './SceneHierarchy'
 import { ScenePropertyPanel } from './ScenePropertyPanel'
+
+const IDENTITY_ROTATION = { x: 0, y: 0, z: 0 }
+const UNIT_SCALE = { x: 1, y: 1, z: 1 }
 
 interface SceneEditorProps {
   sceneId: number
@@ -40,7 +49,14 @@ export function SceneEditor({
     setNodeTransform,
     updateNode,
     removeNode,
+    addNode,
+    setLight,
+    past,
+    future,
   } = useSceneEditorStore()
+
+  const [placeError, setPlaceError] = useState<string | null>(null)
+  const [isPlacing, setIsPlacing] = useState(false)
 
   // The draft is seeded once per (scene, revision): re-seeding on every render
   // of a fetched query would throw away the user's unsaved edits each time
@@ -81,6 +97,104 @@ export function SceneEditor({
     transformsEqual(selectedFacts.transform, selectedNode?.transform)
       ? selectedFacts.groundOffset
       : null
+
+  /**
+   * Places a library model into the draft.
+   *
+   * The asset's facts are fetched first so the node lands resting on the ground
+   * rather than half-buried - the server computes that height with the same
+   * code its own `place_asset` uses, so a hand-placed node and an agent-placed
+   * one end up in the same spot.
+   */
+  const handlePlaceModel = useCallback(
+    async (model: { id: string; name: string }, versionId: number) => {
+      const current = useSceneEditorStore.getState().document
+      if (!current) {
+        return
+      }
+
+      const assetId = Number(model.id)
+      setPlaceError(null)
+      setIsPlacing(true)
+
+      let groundedY = 0
+      let width: number | null = null
+      try {
+        const facts = await getSceneAssetFacts({
+          assetType: 'Model',
+          assetId,
+          versionId,
+        })
+        groundedY = facts.groundedYAtOrigin ?? 0
+        width = facts.sourceDimensions?.x ?? null
+      } catch (caught) {
+        // Bounds are advisory: an asset that has never been extracted still
+        // places, at y=0, and the panel reports its bounds as unknown. Refusing
+        // the placement would make an un-extracted library unusable by hand.
+        setPlaceError(
+          caught instanceof ApiClientError
+            ? `Placed without bounds: ${caught.message}`
+            : 'Placed without bounds - this asset has no derived size yet.'
+        )
+      } finally {
+        setIsPlacing(false)
+      }
+
+      const nodeId = nextNodeId(current, `model-${assetId}`)
+      addNode({
+        id: nodeId,
+        name: model.name,
+        transform: {
+          position: { x: nextPlacementX(current, width), y: groundedY, z: 0 },
+          rotationEuler: IDENTITY_ROTATION,
+          scale: UNIT_SCALE,
+        },
+        asset: { assetType: 'Model', assetId, versionId },
+        visible: true,
+      })
+      selectNode(nodeId)
+    },
+    [addNode, selectNode]
+  )
+
+  const handleAddPrimitive = useCallback(() => {
+    const current = useSceneEditorStore.getState().document
+    if (!current) {
+      return
+    }
+
+    const nodeId = nextNodeId(current, 'box')
+    addNode({
+      id: nodeId,
+      name: 'Blockout box',
+      transform: {
+        // Primitives are authored centered, so half its height puts it on the
+        // floor - the same offset the server's footprint uses for them.
+        position: { x: nextPlacementX(current, 1), y: 0.5, z: 0 },
+        rotationEuler: IDENTITY_ROTATION,
+        scale: UNIT_SCALE,
+      },
+      primitive: { shape: 'box', size: { x: 1, y: 1, z: 1 } },
+      visible: true,
+    })
+    selectNode(nodeId)
+  }, [addNode, selectNode])
+
+  const handleAddLight = useCallback(() => {
+    const current = useSceneEditorStore.getState().document
+    if (!current) {
+      return
+    }
+
+    setLight({
+      id: nextLightId(current, 'light'),
+      type: 'directional',
+      position: { x: 6, y: 10, z: 6 },
+      intensity: 1.1,
+      color: '#ffffff',
+      name: 'Key light',
+    })
+  }, [setLight])
 
   const handleSave = useCallback(async () => {
     if (!document || baseRevision === null) {
@@ -142,69 +256,135 @@ export function SceneEditor({
   }, [undo, redo])
 
   if (isLoading) {
-    return <div className="scene-editor-status">Loading scene…</div>
+    return <LoadingState message="Loading scene…" />
   }
 
   if (error || !view) {
     return (
-      <div className="scene-editor-status scene-editor-status--error">
-        {error instanceof ApiClientError
-          ? error.message
-          : 'This scene could not be opened.'}
-        <button type="button" onClick={onClose}>
-          Back to scenes
-        </button>
-      </div>
+      <ErrorState
+        title="This scene could not be opened"
+        message={
+          error instanceof ApiClientError
+            ? error.message
+            : 'The scene could not be loaded.'
+        }
+        action={
+          <Button
+            label="Back to scenes"
+            icon="pi pi-arrow-left"
+            size="small"
+            onClick={onClose}
+          />
+        }
+      />
     )
   }
 
   if (!document) {
-    return <div className="scene-editor-status">Preparing editor…</div>
+    return <LoadingState message="Preparing editor…" />
   }
+
+  const canUndo = past.length > 0
+  const canRedo = future.length > 0
 
   return (
     <div className="scene-editor" data-testid="scene-editor">
-      <header className="scene-editor-toolbar">
-        <button type="button" onClick={onClose} aria-label="Back to scenes">
-          <i className="pi pi-arrow-left" />
-        </button>
-        <h2>{view.scene.name}</h2>
-        <span className="scene-editor-revision">rev {baseRevision}</span>
-
-        <div className="scene-editor-toolbar-actions">
-          <button
-            type="button"
-            onClick={undo}
-            disabled={!useSceneEditorStore.getState().canUndo()}
-          >
-            Undo
-          </button>
-          <button
-            type="button"
-            onClick={redo}
-            disabled={!useSceneEditorStore.getState().canRedo()}
-          >
-            Redo
-          </button>
-          <button
-            type="button"
-            className="scene-editor-save"
-            onClick={() => void handleSave()}
-            disabled={!isDirty || save.isPending}
-          >
-            {save.isPending ? 'Saving…' : isDirty ? 'Save' : 'Saved'}
-          </button>
-        </div>
-      </header>
+      <ListHeader
+        variant="tab"
+        className="scene-editor-header"
+        title={
+          <span className="scene-editor-title">
+            <Button
+              icon="pi pi-arrow-left"
+              text
+              rounded
+              size="small"
+              aria-label="Back to scenes"
+              tooltip="Back to scenes"
+              onClick={onClose}
+            />
+            {view.scene.name}
+          </span>
+        }
+        stats={[
+          { icon: 'pi-box', label: `${document.nodes.length} nodes` },
+          { icon: 'pi-sun', label: `${document.lights.length} lights` },
+          { icon: 'pi-history', label: `rev ${baseRevision}` },
+        ]}
+        actions={
+          <div className="scene-editor-actions">
+            <Button
+              icon="pi pi-undo"
+              text
+              size="small"
+              aria-label="Undo"
+              tooltip="Undo (Ctrl+Z)"
+              disabled={!canUndo}
+              onClick={undo}
+            />
+            <Button
+              icon="pi pi-refresh"
+              text
+              size="small"
+              aria-label="Redo"
+              tooltip="Redo (Ctrl+Shift+Z)"
+              disabled={!canRedo}
+              onClick={redo}
+            />
+            <Button
+              label={isDirty ? 'Save' : 'Saved'}
+              icon={isDirty ? 'pi pi-save' : 'pi pi-check'}
+              size="small"
+              loading={save.isPending}
+              disabled={!isDirty || save.isPending}
+              onClick={() => void handleSave()}
+            />
+          </div>
+        }
+      />
 
       {saveError ? (
-        <p className="scene-editor-error" role="alert">
-          {saveError}
-        </p>
+        <Message
+          severity="error"
+          text={saveError}
+          className="scene-editor-message"
+        />
+      ) : null}
+
+      {placeError ? (
+        <Message
+          severity="warn"
+          text={placeError}
+          className="scene-editor-message"
+        />
       ) : null}
 
       <div className="scene-editor-body">
         <aside className="scene-editor-side">
+          <SceneAssetPicker
+            disabled={isPlacing}
+            onPlace={(model, versionId) =>
+              void handlePlaceModel(model, versionId)
+            }
+          />
+
+          <div className="scene-editor-add-row">
+            <Button
+              label="Blockout box"
+              icon="pi pi-stop"
+              size="small"
+              outlined
+              onClick={handleAddPrimitive}
+            />
+            <Button
+              label="Light"
+              icon="pi pi-sun"
+              size="small"
+              outlined
+              onClick={handleAddLight}
+            />
+          </div>
+
           <SceneHierarchy
             document={document}
             nodeFacts={nodeFacts}

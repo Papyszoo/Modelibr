@@ -6,72 +6,38 @@
   background: var(--mod-color-bg);
 }
 
-.scene-editor-status {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--mod-space-sm);
-  padding: var(--mod-space-xl);
-  color: var(--mod-color-text-muted);
-  font-size: var(--mod-text-sm);
-}
-
-.scene-editor-status--error {
-  color: var(--mod-color-danger);
-}
-
-.scene-editor-toolbar {
-  display: flex;
-  align-items: center;
-  gap: var(--mod-space-xs);
+.scene-editor-header {
   padding: var(--mod-space-xs) var(--mod-space-sm);
   border-bottom: 1px solid var(--mod-color-border);
-  background: var(--mod-color-surface);
 }
 
-.scene-editor-toolbar h2 {
-  margin: 0;
-  font-size: var(--mod-text-lg);
-  font-weight: var(--mod-font-weight-semibold);
-  color: var(--mod-color-text);
-}
-
-.scene-editor-revision {
-  font-size: var(--mod-text-xs);
-  color: var(--mod-color-text-muted);
-}
-
-.scene-editor-toolbar-actions {
-  margin-left: auto;
-  display: flex;
+.scene-editor-title {
+  display: inline-flex;
+  align-items: center;
   gap: var(--mod-space-2xs);
 }
 
-.scene-editor-toolbar button {
-  background: var(--mod-color-surface);
-  border: 1px solid var(--mod-color-border);
-  border-radius: var(--mod-radius-sm);
-  color: var(--mod-color-text);
-  cursor: pointer;
-  font-size: var(--mod-text-sm);
-  padding: var(--mod-space-2xs) var(--mod-space-xs);
+.scene-editor-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--mod-space-2xs);
 }
 
-.scene-editor-toolbar button:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
+.scene-editor-message {
+  border-radius: 0;
+  justify-content: flex-start;
+  font-size: var(--mod-text-xs);
 }
 
-.scene-editor-save {
-  border-color: var(--mod-color-primary);
-  color: var(--mod-color-primary);
+.scene-editor-add-row {
+  display: flex;
+  gap: var(--mod-space-2xs);
+  padding: var(--mod-space-xs);
+  border-bottom: 1px solid var(--mod-color-border);
 }
 
-.scene-editor-error {
-  margin: 0;
-  padding: var(--mod-space-xs) var(--mod-space-sm);
-  background: var(--mod-color-danger-bg);
-  color: var(--mod-color-danger);
+.scene-editor-add-row .p-button {
+  flex: 1;
   font-size: var(--mod-text-xs);
 }
 
@@ -79,9 +45,10 @@
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr) 280px;
+  grid-template-columns: 280px minmax(0, 1fr) 280px;
 }
 
+/* A 1px separator rather than a framed panel - content sits flat on the ground surface. */
 .scene-editor-side {
   display: flex;
   flex-direction: column;
@@ -104,7 +71,7 @@
   .scene-editor-side {
     border-right: none;
     border-bottom: 1px solid var(--mod-color-border);
-    max-height: 220px;
+    max-height: 260px;
   }
 
   .scene-editor-side--right {
