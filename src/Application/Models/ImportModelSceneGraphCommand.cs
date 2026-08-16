@@ -221,7 +221,12 @@ internal sealed class ImportModelSceneGraphCommandHandler : ICommandHandler<Impo
             // Pack membership is author-written grouping. It is also patched in place by
             // the pack commands, so this only seeds it - a re-derive must not blank out
             // packs the asset joined since the last extraction.
-            packNames: version.Model?.Packs?.Select(p => p.Name));
+            packNames: version.Model?.Packs?.Select(p => p.Name),
+            // The version's own bounding box, not the rollups': it is written from the
+            // pre-normalization size, so it is real metres for extractions on both sides of
+            // `7f0c7c77`. Indexing the rollups made all 1762 models report a longest axis of
+            // exactly 2 and left the size filters matching nothing.
+            assetDimensions: BoundingBoxOf(version));
         foreach (var doc in searchDocs)
         {
             await _searchDocumentRepository.AddAsync(doc, cancellationToken);
@@ -242,4 +247,14 @@ internal sealed class ImportModelSceneGraphCommandHandler : ICommandHandler<Impo
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }
+
+    /// <summary>
+    /// The version's flat bounding box as a dimension triple, or null when it was never
+    /// measured. This runs after <c>UpdateTechnicalMetadata</c> above, so a fresh extraction
+    /// reads back the size it just wrote and an older row keeps the real one it already had.
+    /// </summary>
+    private static IReadOnlyList<double>? BoundingBoxOf(ModelVersion version) =>
+        version.BoundingBoxX is { } x && version.BoundingBoxY is { } y && version.BoundingBoxZ is { } z
+            ? new[] { x, y, z }
+            : null;
 }

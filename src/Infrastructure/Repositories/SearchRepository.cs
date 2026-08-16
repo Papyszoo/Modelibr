@@ -410,7 +410,11 @@ internal sealed class SearchRepository : ISearchRepository
                 doc.HasAnimations,
                 doc.AnimationCount,
                 doc.ShapeClass,
-                doc.CategoryName));
+                doc.CategoryName,
+                doc.DimensionX is null && doc.DimensionY is null && doc.DimensionZ is null
+                    ? null
+                    : new AssetDimensions(doc.DimensionX, doc.DimensionY, doc.DimensionZ),
+                doc.ScaleConvention));
 
     public async Task<IReadOnlyList<SearchResultGroup>> SearchAsync(
         string term,

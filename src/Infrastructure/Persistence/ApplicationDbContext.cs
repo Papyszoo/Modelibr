@@ -1394,6 +1394,11 @@ namespace Infrastructure.Persistence
                 entity.Property(e => e.PartCount).IsRequired(false);
                 entity.Property(e => e.AnimationCount).IsRequired(false);
                 entity.Property(e => e.MaxDimension).IsRequired(false);
+                // Real-world size per axis, plus whether it can be trusted as one.
+                entity.Property(e => e.DimensionX).IsRequired(false);
+                entity.Property(e => e.DimensionY).IsRequired(false);
+                entity.Property(e => e.DimensionZ).IsRequired(false);
+                entity.Property(e => e.ScaleConvention).IsRequired(false).HasMaxLength(16);
                 entity.Property(e => e.CategoryId).IsRequired(false);
                 entity.Property(e => e.CategoryName).IsRequired(false).HasMaxLength(200);
                 // Space-joined pack names. Generous length because an asset can sit in

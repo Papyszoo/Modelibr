@@ -30,8 +30,11 @@ public sealed class AssetSearchMcpTools
         [Description("Shape class filter: planar | tall | wide | blocky.")] string? shapeClass = null,
         [Description("Engine filter: Unity | Unreal | Godot | ...")] string? engine = null,
         [Description("Asset type filter, e.g. Model.")] string? assetType = null,
-        [Description("Minimum size: largest world bounding-box dimension, in metres.")] double? minSize = null,
-        [Description("Maximum size: largest world bounding-box dimension, in metres.")] double? maxSize = null,
+        [Description("Minimum size: longest axis in real-world metres. Check each hit's facts.scaleConvention - " +
+                     "a 'normalized' asset was scaled into a unit box, so its size is a preview artefact, not a measurement.")]
+        double? minSize = null,
+        [Description("Maximum size: longest axis in real-world metres. See minSize regarding scaleConvention.")]
+        double? maxSize = null,
         [Description("Only rigged (true) / unrigged (false) assets.")] bool? hasRig = null,
         [Description("Minimum bone count.")] int? minBones = null,
         [Description("Maximum bone count.")] int? maxBones = null,
@@ -111,7 +114,7 @@ public sealed class AssetSearchMcpTools
             new { name = "minTriangles / maxTriangles", type = "integer range", appliesTo = "Model" },
             new { name = "minVertices / maxVertices", type = "integer range", appliesTo = "Model" },
             new { name = "minParts / maxParts", type = "integer range", note = "mesh/part count (complexity)" },
-            new { name = "minSize / maxSize", type = "number range", note = "largest world bounding-box dimension, metres" },
+            new { name = "minSize / maxSize", type = "number range", note = "longest axis in real-world metres; every hit also carries facts.dimensions {x,y,z} and facts.scaleConvention (authored | normalized), so a preview-sized asset is not mistaken for a real one" },
             new { name = "hasAnimations", type = "boolean", appliesTo = "Model" },
             new { name = "hasRig", type = "boolean", note = "has a skeleton (bone count > 0)" },
             new { name = "minBones / maxBones", type = "integer range", appliesTo = "Model" },

@@ -56,6 +56,16 @@ public record AssetSearchHit(
 /// (triangle budget, physical size, is it rigged, does it have UVs) is already sitting in
 /// the search document that produced the hit.
 /// </summary>
+/// <param name="Dimensions">
+/// The asset's real extent in metres, per axis. Present so choosing something the right size
+/// does not require placing it first - reading real dimensions used to mean a write
+/// (<c>place_asset</c>) or a <c>get_scene</c>, i.e. one throwaway placement per candidate.
+/// </param>
+/// <param name="ScaleConvention">
+/// <c>authored</c> when <paramref name="Dimensions"/> are real-world size, <c>normalized</c>
+/// when the asset was scaled into a unit box and its size is a preview artefact, null when
+/// there are no bounds to judge. Without it a 2 m armchair and a 2 m wrench read identically.
+/// </param>
 public record AssetSearchFacts(
     int? TriangleCount,
     int? VertexCount,
@@ -68,7 +78,12 @@ public record AssetSearchFacts(
     bool? HasAnimations,
     int? AnimationCount,
     string? ShapeClass,
-    string? CategoryName);
+    string? CategoryName,
+    AssetDimensions? Dimensions = null,
+    string? ScaleConvention = null);
+
+/// <summary>An asset's extent in metres. Null axes mean it was never measured.</summary>
+public record AssetDimensions(double? X, double? Y, double? Z);
 
 /// <summary>Filters passed to the repository (mirrors the query's structural facets).</summary>
 public record AssetSearchRequest(

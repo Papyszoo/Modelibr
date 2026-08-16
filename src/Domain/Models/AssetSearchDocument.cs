@@ -83,6 +83,31 @@ public class AssetSearchDocument
     /// <summary>Largest world bounding-box dimension (metres) - the "how big" size filter.</summary>
     public double? MaxDimension { get; private set; }
 
+    // ---- real-world size, so an agent can pick something the right size (prompt 11-A) ----
+
+    /// <summary>
+    /// The asset's own extent in metres, per axis. Denormalised onto the projection because
+    /// a caller asking "what is roughly sofa-sized" must not have to place the thing to find
+    /// out: the only way to read real dimensions used to be a write (<c>place_asset</c>) or
+    /// <c>get_scene</c>, which cost one throwaway placement per candidate.
+    /// </summary>
+    public double? DimensionX { get; private set; }
+
+    public double? DimensionY { get; private set; }
+
+    public double? DimensionZ { get; private set; }
+
+    /// <summary>
+    /// Whether the dimensions above can be trusted as real-world size:
+    /// <c>authored</c>, <c>normalized</c>, or null when there are no bounds to judge.
+    ///
+    /// The library is genuinely mixed - some packs ship real metres, others ship assets
+    /// scaled into a unit box - and the two are indistinguishable from the numbers alone.
+    /// Without this an agent places a 2 m armchair beside a 2 m wrench and nothing in the
+    /// data ever said the second one was a preview artefact.
+    /// </summary>
+    public string? ScaleConvention { get; private set; }
+
     // ---- prompt-29 category bridge (the assigned user category, the semantic layer) ----
     public int? CategoryId { get; private set; }
     public string? CategoryName { get; private set; }
@@ -132,7 +157,11 @@ public class AssetSearchDocument
         int? categoryId = null,
         string? categoryName = null,
         bool isActive = true,
-        IEnumerable<string>? packNames = null)
+        IEnumerable<string>? packNames = null,
+        double? dimensionX = null,
+        double? dimensionY = null,
+        double? dimensionZ = null,
+        string? scaleConvention = null)
     {
         if (string.IsNullOrWhiteSpace(assetType))
             throw new ArgumentException("Asset type cannot be null or whitespace.", nameof(assetType));
@@ -170,6 +199,10 @@ public class AssetSearchDocument
             PartCount = partCount,
             AnimationCount = animationCount,
             MaxDimension = maxDimension,
+            DimensionX = dimensionX,
+            DimensionY = dimensionY,
+            DimensionZ = dimensionZ,
+            ScaleConvention = scaleConvention,
             CategoryId = categoryId,
             CategoryName = string.IsNullOrWhiteSpace(categoryName) ? null : categoryName.Trim(),
             PackNames = NormalizePackNames(packNames),

@@ -180,4 +180,65 @@ public class SearchDocumentBuilderTests
         Assert.Null(asset.CategoryId);
         Assert.Null(asset.CategoryName);
     }
+
+    /// <summary>
+    /// Size in the index has to be the asset's real size, not the extraction rollups'.
+    ///
+    /// The rollups are the trap: for anything extracted before the capture point moved ahead
+    /// of `normalizeModel`, they hold the thumbnail framing box. On the real library that
+    /// made all 1762 models report a longest axis of exactly 2, so `minSize`/`maxSize`
+    /// matched nothing at all and an agent had to place an asset just to learn how big it is.
+    /// </summary>
+    [Fact]
+    public void BuildForModel_Prefers_The_Versions_Own_Bounds_Over_The_Rollups()
+    {
+        // What the sofa really is (2.188 x 0.788 x 1.023) against what a pre-fix rollup says.
+        var docs = SearchDocumentBuilder.BuildForModel(
+            modelId: 963, versionId: 1, isCurrentVersion: true,
+            assetName: "GlamVelvetSofa", derived: DerivedWith("sofa"),
+            rollups: Rollups(), rawParts: new[] { Part() }, now: DateTime.UtcNow,
+            assetDimensions: new[] { 2.188, 0.788, 1.023 });
+
+        var asset = AssetDoc(docs);
+        Assert.Equal(2.188, asset.DimensionX!.Value, 3);
+        Assert.Equal(0.788, asset.DimensionY!.Value, 3);
+        Assert.Equal(1.023, asset.DimensionZ!.Value, 3);
+        Assert.Equal(2.188, asset.MaxDimension!.Value, 3);
+        Assert.Equal(SearchDocumentBuilder.ScaleAuthored, asset.ScaleConvention);
+    }
+
+    [Fact]
+    public void BuildForModel_Falls_Back_To_The_Rollups_When_The_Version_Has_No_Bounds()
+    {
+        var docs = SearchDocumentBuilder.BuildForModel(
+            modelId: 1, versionId: 1, isCurrentVersion: true,
+            assetName: "Crate", derived: DerivedWith("crate"),
+            rollups: Rollups(), rawParts: new[] { Part() }, now: DateTime.UtcNow,
+            assetDimensions: null);
+
+        // Rollups() is 0.5 x 2.0 x 0.5 - stale or not, an indexed size beats none.
+        Assert.Equal(2.0, AssetDoc(docs).MaxDimension!.Value, 3);
+    }
+
+    [Theory]
+    // A longest axis landing on 1 or 2 almost exactly is an exporter's unit box, not a
+    // measurement - the case that put a 2 m wrench next to a 2 m armchair.
+    [InlineData(2.0, SearchDocumentBuilder.ScaleNormalized)]
+    [InlineData(1.0, SearchDocumentBuilder.ScaleNormalized)]
+    // ...but a real object that happens to be large stays trustworthy.
+    [InlineData(2.188, SearchDocumentBuilder.ScaleAuthored)]
+    [InlineData(0.8, SearchDocumentBuilder.ScaleAuthored)]
+    public void ClassifyScale_Separates_A_Unit_Box_From_A_Measurement(double max, string expected)
+    {
+        Assert.Equal(expected, SearchDocumentBuilder.ClassifyScale(max));
+    }
+
+    [Fact]
+    public void ClassifyScale_Without_Bounds_Is_Null_Rather_Than_Authored()
+    {
+        // "Unknown" must not collapse into "authored": an agent reads the second as a
+        // licence to place the thing at scale 1.
+        Assert.Null(SearchDocumentBuilder.ClassifyScale(null));
+        Assert.Null(SearchDocumentBuilder.ClassifyScale(0));
+    }
 }

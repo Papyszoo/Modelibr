@@ -18,6 +18,39 @@ public static class SearchDocumentBuilder
     /// </summary>
     private const string DegenerateBoundsFlag = "degenerate_bounds";
 
+    /// <summary>
+    /// How close an asset's longest axis must sit to a unit box for its size to be read as a
+    /// preview artefact rather than a measurement. Deliberately tight: an authored 2.19 m
+    /// sofa must stay "authored", and only a longest axis that lands on 1 or 2 almost exactly
+    /// is the fingerprint of a bounds-normalising exporter. On the 1762-model library this
+    /// separates 59 normalised-to-2 and 31 normalised-to-1 assets from 1672 real ones.
+    /// </summary>
+    private const double NormalizedSizeEpsilon = 0.001;
+
+    public const string ScaleAuthored = "authored";
+    public const string ScaleNormalized = "normalized";
+
+    /// <summary>One axis of a dimension triple, or null when it is absent or non-positive.</summary>
+    private static double? Axis(IReadOnlyList<double>? dims, int index) =>
+        dims is { } d && d.Count > index && d[index] > 0 ? d[index] : null;
+
+    /// <summary>
+    /// Whether a set of dimensions can be trusted as real-world size. Null when there is
+    /// nothing to judge - "unknown" and "authored" must not collapse into each other, since
+    /// an agent treats the second as a licence to place at scale 1.
+    /// </summary>
+    public static string? ClassifyScale(double? maxDimension)
+    {
+        if (maxDimension is not { } max || max <= 0)
+        {
+            return null;
+        }
+
+        return Math.Abs(max - 1.0) < NormalizedSizeEpsilon || Math.Abs(max - 2.0) < NormalizedSizeEpsilon
+            ? ScaleNormalized
+            : ScaleAuthored;
+    }
+
     public static IReadOnlyList<AssetSearchDocument> BuildForModel(
         int modelId,
         int versionId,
@@ -30,7 +63,8 @@ public static class SearchDocumentBuilder
         int? categoryId = null,
         string? categoryName = null,
         bool isActive = true,
-        IEnumerable<string>? packNames = null)
+        IEnumerable<string>? packNames = null,
+        IReadOnlyList<double>? assetDimensions = null)
     {
         var rawByPath = rawParts
             .GroupBy(p => p.PartPath)
@@ -60,8 +94,17 @@ public static class SearchDocumentBuilder
             .Where(t => !string.IsNullOrWhiteSpace(t))
             .Distinct(StringComparer.OrdinalIgnoreCase);
 
-        var dims = rollups.WorldBounds?.Dimensions;
+        // Prefer the caller's dimensions - the model version's own bounding box - over the
+        // extraction rollups. The rollups were the only source, and for anything extracted
+        // before `7f0c7c77` they hold the post-`normalizeModel` thumbnail framing box, so
+        // every one of the 1762 models in the library indexed its longest axis as exactly 2
+        // and `minSize`/`maxSize` matched nothing at all. The version row is written from
+        // the pre-normalization size and is real for both old and new extractions.
+        var dims = assetDimensions is { Count: 3 } && assetDimensions.Any(d => d > 0)
+            ? assetDimensions
+            : rollups.WorldBounds?.Dimensions;
         var maxDimension = dims is { Count: > 0 } ? dims.Where(d => d > 0).DefaultIfEmpty(0).Max() : (double?)null;
+        var scaleConvention = ClassifyScale(maxDimension);
         var assetHasUvs = rawParts.Any(p => p.HasUvs == true)
             ? true
             : rawParts.Any(p => p.HasUvs == false) ? false : (bool?)null;
@@ -91,6 +134,10 @@ public static class SearchDocumentBuilder
             partCount: rollups.MeshCount,
             animationCount: rollups.AnimationCount,
             maxDimension: maxDimension is > 0 ? maxDimension : null,
+            dimensionX: Axis(dims, 0),
+            dimensionY: Axis(dims, 1),
+            dimensionZ: Axis(dims, 2),
+            scaleConvention: scaleConvention,
             categoryId: categoryId,
             categoryName: categoryName,
             // Asset-level only: a part does not belong to a pack, the asset it came from
