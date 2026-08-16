@@ -1,0 +1,12 @@
+.scene-canvas {
+  flex: 1;
+  position: relative;
+  min-height: 320px;
+  height: 100%;
+  background: var(--mod-color-bg);
+}
+
+.scene-canvas canvas {
+  display: block;
+  outline: none;
+}

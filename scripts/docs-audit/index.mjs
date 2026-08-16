@@ -144,6 +144,7 @@ const manifestOutputs = [...read("docs/videos/video-manifest.js").matchAll(
         sounds: "Sounds",
         scripts: "Scripts",
         scriptViewer: "Script Viewer",
+        scenes: "Scenes",
         assetStore: "Asset Store",
         settings: "Settings",
         history: "History",

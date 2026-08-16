@@ -259,6 +259,8 @@ export function getTabLabel(
     case 'stageEditor':
       if (stageName) return stageName
       return stageId ? `Stage ${stageId}` : 'Stage Editor'
+    case 'scenes':
+      return 'Scenes'
     case 'assetStore':
       return 'Asset Store'
     case 'history':

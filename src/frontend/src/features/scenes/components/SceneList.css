@@ -1,0 +1,128 @@
+.scene-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-sm);
+  padding: var(--mod-space-md);
+  height: 100%;
+  overflow-y: auto;
+}
+
+.scene-list-status {
+  padding: var(--mod-space-xl);
+  color: var(--mod-color-text-muted);
+  font-size: var(--mod-text-sm);
+  text-align: center;
+}
+
+.scene-list-status--error {
+  color: var(--mod-color-danger);
+}
+
+.scene-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mod-space-sm);
+  flex-wrap: wrap;
+}
+
+.scene-list-header h1 {
+  margin: 0;
+  font-size: var(--mod-text-2xl);
+  font-weight: var(--mod-font-weight-semibold);
+  color: var(--mod-color-text);
+}
+
+.scene-list-create {
+  display: flex;
+  gap: var(--mod-space-xs);
+}
+
+.scene-list-create input {
+  background: var(--mod-color-surface);
+  border: 1px solid var(--mod-color-border);
+  border-radius: var(--mod-radius-sm);
+  color: var(--mod-color-text);
+  padding: var(--mod-space-2xs) var(--mod-space-xs);
+  font-size: var(--mod-text-sm);
+}
+
+.scene-list-create button,
+.scene-list-delete {
+  background: var(--mod-color-surface);
+  border: 1px solid var(--mod-color-border);
+  border-radius: var(--mod-radius-sm);
+  color: var(--mod-color-text);
+  cursor: pointer;
+  font-size: var(--mod-text-sm);
+  padding: var(--mod-space-2xs) var(--mod-space-xs);
+}
+
+.scene-list-create button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.scene-list-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-2xs);
+}
+
+.scene-list-item {
+  display: flex;
+  align-items: center;
+  gap: var(--mod-space-xs);
+  border: 1px solid var(--mod-color-border);
+  border-radius: var(--mod-radius-md);
+  background: var(--mod-color-surface);
+}
+
+.scene-list-item:hover {
+  background: var(--mod-color-surface-hover);
+}
+
+.scene-list-open {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--mod-color-text);
+  padding: var(--mod-space-xs) var(--mod-space-sm);
+  text-align: left;
+}
+
+.scene-list-name {
+  font-size: var(--mod-text-sm);
+  font-weight: var(--mod-font-weight-medium);
+}
+
+.scene-list-meta {
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+}
+
+.scene-list-delete {
+  border: none;
+  background: none;
+  color: var(--mod-color-text-muted);
+  margin-right: var(--mod-space-xs);
+}
+
+.scene-list-delete:hover {
+  color: var(--mod-color-danger);
+}
+
+.scene-list-empty {
+  color: var(--mod-color-text-muted);
+  font-size: var(--mod-text-sm);
+  padding: var(--mod-space-xl);
+  text-align: center;
+}

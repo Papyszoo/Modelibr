@@ -52,6 +52,8 @@ const getTabIcon = (tabType: Tab['type']): string => {
       return 'pi pi-th-large'
     case 'stageEditor':
       return 'pi pi-th-large'
+    case 'scenes':
+      return 'pi pi-box'
     default:
       return 'pi pi-file'
   }
@@ -103,6 +105,8 @@ const getTabTooltip = (tab: Tab): string => {
       return 'Stage Editor'
     case 'stageList':
       return 'Stages List'
+    case 'scenes':
+      return 'Scenes'
     default:
       return tab.label || 'Unknown Tab'
   }

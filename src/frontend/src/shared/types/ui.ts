@@ -17,6 +17,7 @@ export type TabType =
   | 'scriptViewer'
   | 'stageList'
   | 'stageEditor'
+  | 'scenes'
   | 'assetStore'
   | 'settings'
   | 'history'

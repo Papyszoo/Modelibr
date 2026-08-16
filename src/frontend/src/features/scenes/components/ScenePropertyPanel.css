@@ -1,0 +1,100 @@
+.scene-properties {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-sm);
+  padding: var(--mod-space-sm);
+  overflow-y: auto;
+  font-size: var(--mod-text-sm);
+  color: var(--mod-color-text);
+}
+
+.scene-properties--empty {
+  color: var(--mod-color-text-muted);
+  padding: var(--mod-space-md);
+}
+
+.scene-properties-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-2xs);
+}
+
+.scene-properties-field > span {
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+}
+
+.scene-properties-field input {
+  background: var(--mod-color-surface);
+  border: 1px solid var(--mod-color-border);
+  border-radius: var(--mod-radius-sm);
+  color: var(--mod-color-text);
+  padding: var(--mod-space-2xs) var(--mod-space-xs);
+  font-size: var(--mod-text-sm);
+  width: 100%;
+}
+
+.scene-properties-vector {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--mod-space-2xs);
+}
+
+.scene-properties-derived {
+  border-top: 1px solid var(--mod-color-border);
+  padding-top: var(--mod-space-sm);
+}
+
+.scene-properties-derived h4 {
+  margin: 0 0 var(--mod-space-xs);
+  font-size: var(--mod-text-xs);
+  font-weight: var(--mod-font-weight-semibold);
+  color: var(--mod-color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.scene-properties-derived dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--mod-space-2xs) var(--mod-space-xs);
+  margin: 0 0 var(--mod-space-xs);
+}
+
+.scene-properties-derived dt {
+  color: var(--mod-color-text-muted);
+  font-size: var(--mod-text-xs);
+}
+
+.scene-properties-derived dd {
+  margin: 0;
+  font-size: var(--mod-text-xs);
+}
+
+.scene-properties-action {
+  background: var(--mod-color-surface);
+  border: 1px solid var(--mod-color-border);
+  border-radius: var(--mod-radius-sm);
+  color: var(--mod-color-text);
+  cursor: pointer;
+  font-size: var(--mod-text-xs);
+  padding: var(--mod-space-2xs) var(--mod-space-xs);
+}
+
+.scene-properties-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.scene-properties-warnings {
+  list-style: none;
+  margin: 0;
+  padding: var(--mod-space-xs);
+  border-radius: var(--mod-radius-sm);
+  background: var(--mod-color-warning-bg);
+  color: var(--mod-color-warning);
+  font-size: var(--mod-text-xs);
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-2xs);
+}

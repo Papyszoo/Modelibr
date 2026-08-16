@@ -31,6 +31,7 @@ The interface is split into **two panels** (left and right), each containing mul
 | **Sprites**              | 2D sprite sheets, atlases, and UI iconography                      |
 | **Sounds**               | Audio assets - SFX, dialogue, ambient loops                        |
 | **Scripts**              | Source code and shaders with live previews                         |
+| **Scenes**               | Compose library assets into a scene, by hand or through an agent   |
 
 **Organize and system:**
 
