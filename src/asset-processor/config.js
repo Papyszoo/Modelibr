@@ -46,6 +46,20 @@ export const config = {
     enabled: process.env.ORBIT_ENABLED !== 'false', // enable orbit rendering
   },
 
+  // Scene render-back (03-D / 11-M). Unlike every other render here, this one
+  // photographs the running frontend rather than assembling geometry itself -
+  // see sceneRenderer.js for why - so it needs the app's address, not just the
+  // API's.
+  sceneRender: {
+    frontendUrl: process.env.FRONTEND_URL || '',
+    width: parseInt(process.env.SCENE_RENDER_WIDTH, 10) || 768,
+    height: parseInt(process.env.SCENE_RENDER_HEIGHT, 10) || 768,
+    // Generous: a scene is many assets, and on a GPU-less host each one decodes
+    // and uploads through software WebGL. The page reports partial progress, so
+    // a render that overruns still returns a picture rather than nothing.
+    timeoutMs: parseInt(process.env.SCENE_RENDER_TIMEOUT_MS, 10) || 60000,
+  },
+
   // Environment map rendering settings
   environmentMaps: {
     cameraDistanceMultiplier:
