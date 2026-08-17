@@ -52,6 +52,7 @@ namespace Infrastructure.Persistence
         public DbSet<Domain.Models.File> Files => Set<Domain.Models.File>();
         public DbSet<Texture> Textures => Set<Texture>();
         public DbSet<TextureSet> TextureSets => Set<TextureSet>();
+        public DbSet<Material> Materials => Set<Material>();
         public DbSet<Pack> Packs => Set<Pack>();
         public DbSet<Project> Projects => Set<Project>();
         public DbSet<ModelCategory> ModelCategories => Set<ModelCategory>();
@@ -558,6 +559,85 @@ namespace Infrastructure.Persistence
 
                 // Global query filter for soft deletes
                 entity.HasQueryFilter(tp => !tp.IsDeleted);
+            });
+
+            // Configure Material entity - the parameters-only half of the material
+            // library. Browsed together with Universal texture sets, stored apart.
+            modelBuilder.Entity<Material>(entity =>
+            {
+                entity.HasKey(m => m.Id);
+                entity.Property(m => m.Name).IsRequired().HasMaxLength(200);
+                entity.Property(m => m.Description).HasMaxLength(1000);
+                entity.Property(m => m.CategoryId).IsRequired(false);
+                entity.Property(m => m.PreviewGeometryType).IsRequired()
+                    .HasMaxLength(20)
+                    .HasDefaultValue("sphere");
+                entity.Property(m => m.ThumbnailPath).HasMaxLength(500);
+                entity.Property(m => m.PngThumbnailPath).HasMaxLength(500);
+                entity.Property(m => m.CreatedAt).IsRequired();
+                entity.Property(m => m.UpdatedAt).IsRequired();
+                entity.Property(m => m.IsDeleted).IsRequired();
+                entity.Property(m => m.DeletedAt);
+
+                // Flattened rather than a JSON column: the merged browse surface
+                // filters and sorts on these (metallic materials, dark materials),
+                // and a JSON blob cannot be indexed for that without extra work.
+                entity.OwnsOne(m => m.Parameters, parameters =>
+                {
+                    parameters.Property(p => p.BaseColorR).HasColumnName("BaseColorR").IsRequired();
+                    parameters.Property(p => p.BaseColorG).HasColumnName("BaseColorG").IsRequired();
+                    parameters.Property(p => p.BaseColorB).HasColumnName("BaseColorB").IsRequired();
+                    parameters.Property(p => p.BaseColorA).HasColumnName("BaseColorA").IsRequired();
+                    parameters.Property(p => p.Roughness).HasColumnName("Roughness").IsRequired();
+                    parameters.Property(p => p.Metallic).HasColumnName("Metallic").IsRequired();
+                    parameters.Property(p => p.EmissiveR).HasColumnName("EmissiveR").IsRequired();
+                    parameters.Property(p => p.EmissiveG).HasColumnName("EmissiveG").IsRequired();
+                    parameters.Property(p => p.EmissiveB).HasColumnName("EmissiveB").IsRequired();
+                    parameters.Property(p => p.NormalScale).HasColumnName("NormalScale").IsRequired();
+                    parameters.Property(p => p.OcclusionStrength).HasColumnName("OcclusionStrength").IsRequired();
+                    parameters.Property(p => p.Ior).HasColumnName("Ior").IsRequired();
+                    parameters.Property(p => p.AlphaMode).HasColumnName("AlphaMode")
+                        .HasConversion<string>().HasMaxLength(16).IsRequired();
+                    parameters.Property(p => p.AlphaCutoff).HasColumnName("AlphaCutoff").IsRequired();
+                    parameters.Property(p => p.DoubleSided).HasColumnName("DoubleSided").IsRequired();
+                });
+
+                // The shared category vocabulary: the same TextureSetCategory rows
+                // Universal texture sets use. Two pools behind one grid could not be
+                // filtered coherently.
+                entity.HasOne(m => m.Category)
+                    .WithMany()
+                    .HasForeignKey(m => m.CategoryId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                // Shared tag vocabulary - the same ModelTag pool as models,
+                // environment maps and texture sets.
+                entity.HasMany(m => m.Tags)
+                    .WithMany()
+                    .UsingEntity<Dictionary<string, object>>(
+                        "MaterialTagAssignment",
+                        right => right
+                            .HasOne<ModelTag>()
+                            .WithMany()
+                            .HasForeignKey("ModelTagId")
+                            .OnDelete(DeleteBehavior.Cascade),
+                        left => left
+                            .HasOne<Material>()
+                            .WithMany()
+                            .HasForeignKey("MaterialId")
+                            .OnDelete(DeleteBehavior.Cascade),
+                        join =>
+                        {
+                            join.ToTable("MaterialTagAssignments");
+                            join.HasKey("MaterialId", "ModelTagId");
+                            join.HasIndex("ModelTagId");
+                        });
+
+                entity.HasIndex(m => m.Name);
+                entity.HasIndex(m => m.CategoryId);
+                entity.HasIndex(m => m.IsDeleted);
+
+                entity.HasQueryFilter(m => !m.IsDeleted);
             });
 
             // Configure Pack entity
