@@ -4,7 +4,7 @@ import { Button } from 'primereact/button'
 import { InputNumber } from 'primereact/inputnumber'
 import { InputText } from 'primereact/inputtext'
 import { Message } from 'primereact/message'
-import { type JSX } from 'react'
+import { type JSX, type ReactNode } from 'react'
 
 import { EmptyState } from '@/shared/components'
 
@@ -29,6 +29,16 @@ interface ScenePropertyPanelProps {
   onChangeTransform: (transform: SceneTransform) => void
   onRename: (name: string) => void
   onGroundSnap: () => void
+  /**
+   * What dresses this node, rendered at the foot of the panel body.
+   *
+   * Passed in rather than rendered here because it needs queries and this panel
+   * is deliberately presentational - but it must live *inside* the body, which
+   * is the one scrolling box in this column. Rendered as a sibling of the panel
+   * it competed with it for the column's height and ended up drawn over the
+   * transform inputs, which then could not be clicked at all.
+   */
+  materials?: ReactNode
 }
 
 /**
@@ -47,6 +57,7 @@ export function ScenePropertyPanel({
   onChangeTransform,
   onRename,
   onGroundSnap,
+  materials,
 }: ScenePropertyPanelProps): JSX.Element {
   if (!node) {
     return (
@@ -167,6 +178,8 @@ export function ScenePropertyPanel({
             className="scene-properties-warning"
           />
         ))}
+
+        {materials}
       </div>
     </div>
   )

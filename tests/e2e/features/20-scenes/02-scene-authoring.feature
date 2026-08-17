@@ -93,6 +93,43 @@ Feature: Scene authoring
     And the scene should hold 1 node
     And the scene should have unsaved changes
 
+  @scene-dressing
+  Scenario: Dressing a node with a material persists on the saved document
+    # Applying a material to a slot was MCP-only until the editor grew this
+    # panel, so nothing covered the app's half of `apply_material`. The picker
+    # reads the merged material library on purpose: filling a slot is the one
+    # place a texture set and a parameter material are the same kind of answer.
+    Given a PBR material named "Scene Slot Material" exists
+    And a scene named "Dressed Scene" is open
+    And I have placed the test model into the scene
+    When I dress the selected node with the material "Scene Slot Material"
+    And I save the scene
+    And I reopen the scene "Dressed Scene"
+    Then the stored scene document should dress the node with "Scene Slot Material"
+
+  @scene-dressing
+  Scenario: The dressed material is named on the node's property panel
+    # The document stores an id. The panel has to resolve it back to a name, or
+    # a scene an agent dressed reads as a row of opaque numbers.
+    Given a PBR material named "Named Scene Material" exists
+    And a scene named "Panel Dressing Scene" is open
+    And I have placed the test model into the scene
+    When I dress the selected node with the material "Named Scene Material"
+    Then the node's material should read "Named Scene Material"
+
+  @scene-dressing
+  Scenario: Clearing a dressed slot removes the binding rather than nulling it
+    # A cleared binding has to leave the document as if it had never been set:
+    # a null entry fails the document validator on the next save.
+    Given a PBR material named "Removable Scene Material" exists
+    And a scene named "Undressed Scene" is open
+    And I have placed the test model into the scene
+    And I have dressed the selected node with the material "Removable Scene Material"
+    When I clear the node's material
+    And I save the scene
+    And I reopen the scene "Undressed Scene"
+    Then the stored scene document should dress the node with nothing
+
   @scene-blockout
   Scenario: A blockout box can be added without any library asset
     Given a scene named "Blockout Scene" is open

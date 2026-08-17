@@ -12,12 +12,16 @@ import { useSceneEditorStore } from '@/stores'
 import { useSaveSceneDocumentMutation, useSceneByIdQuery } from '../api/queries'
 import { SCENE_STAGES, type SceneStage } from '../api/sceneContract.generated'
 import { getSceneAssetFacts } from '../api/scenesApi'
+import { useSceneMaterials } from '../hooks/useSceneMaterials'
+import { bindNodeMaterial } from '../lib/sceneDressing'
 import { transformsEqual } from '../lib/sceneGeometry'
 import { buildSceneNodeFacts } from '../lib/sceneNodeFacts'
 import { nextLightId, nextNodeId, nextPlacementX } from '../lib/sceneNodeIds'
+import type { SceneMaterialBinding } from '../types'
 import { SceneAssetPicker } from './SceneAssetPicker'
 import { SceneCanvas } from './SceneCanvas'
 import { SceneHierarchy } from './SceneHierarchy'
+import { SceneNodeMaterials } from './SceneNodeMaterials'
 import { ScenePropertyPanel } from './ScenePropertyPanel'
 
 const IDENTITY_ROTATION = { x: 0, y: 0, z: 0 }
@@ -107,6 +111,11 @@ export function SceneEditor({
 
   const nodeFacts = useMemo(() => buildSceneNodeFacts(view), [view])
 
+  // What dresses each node, resolved from ids to names. The canvas resolves the
+  // same bindings to render them, through the same query keys, so the panel
+  // costs no extra request.
+  const dressingByNode = useSceneMaterials(document)
+
   const selectedNode =
     document?.nodes.find(node => node.id === selectedNodeId) ?? null
   const selectedFacts = selectedNodeId
@@ -181,6 +190,30 @@ export function SceneEditor({
       selectNode(nodeId)
     },
     [addNode, selectNode]
+  )
+
+  /**
+   * Dresses the selected node, or clears a slot.
+   *
+   * The binding lands in the draft document rather than going straight to
+   * `PUT /scenes/{id}/material`: dressing then undoes with Ctrl+Z like every
+   * other edit, and one save carries it with whatever else the user changed.
+   * The patch is computed by the same rules the server applies, so a node
+   * dressed here and one dressed by `apply_material` are the same document.
+   */
+  const handleBindMaterial = useCallback(
+    (slot: string | null, binding: SceneMaterialBinding | null) => {
+      const nodeId = useSceneEditorStore.getState().selectedNodeId
+      const current = useSceneEditorStore
+        .getState()
+        .document?.nodes.find(node => node.id === nodeId)
+      if (!nodeId || !current) {
+        return
+      }
+
+      updateNode(nodeId, bindNodeMaterial(current, slot, binding))
+    },
+    [updateNode]
   )
 
   const handleAddPrimitive = useCallback(() => {
@@ -518,6 +551,17 @@ export function SceneEditor({
                 ),
               }))
             }}
+            materials={
+              <SceneNodeMaterials
+                node={selectedNode}
+                dressing={
+                  selectedNodeId
+                    ? dressingByNode.get(selectedNodeId)
+                    : undefined
+                }
+                onBind={handleBindMaterial}
+              />
+            }
           />
         </aside>
       </div>

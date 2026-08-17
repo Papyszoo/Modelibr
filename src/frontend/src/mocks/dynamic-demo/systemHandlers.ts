@@ -225,15 +225,17 @@ export const systemHandlers = [
   //  MATERIALS
   // ════════════════════════════════════════════════════════════════════════
 
-  // The merged browse surface. The demo has no Universal texture sets to fold
-  // in, so every entry here is a parameter material - and each says so through
-  // requiresUvs rather than through which endpoint it came from.
+  // The merged surface the scene's material-slot picker reads: parameter
+  // materials and Global (Universal) texture sets in one list, told apart by
+  // `kind` and by `requiresUvs` rather than by which endpoint they came from.
+  // Both halves are folded in here because the demo is where the merge is
+  // seen - a picker showing only one kind would demonstrate the wrong thing.
   http.get('*/materials/library', async ({ request }) => {
     const url = new URL(request.url)
     const search = url.searchParams.get('searchName')?.toLowerCase() ?? ''
     const requiresUvs = url.searchParams.get('requiresUvs')
 
-    const entries =
+    const parameterEntries =
       requiresUvs === 'true'
         ? []
         : DEMO_MATERIALS.filter(material =>
@@ -254,6 +256,40 @@ export const systemHandlers = [
             createdAt: material.createdAt,
             updatedAt: material.updatedAt,
           }))
+
+    // Kind 1 is Universal - a Global Material. The other kinds belong to one
+    // model and are not offered as something to dress another model with.
+    const globalEntries =
+      requiresUvs === 'false'
+        ? []
+        : (await getAll<DemoTextureSet>('textureSets'))
+            .filter(
+              set => set.kind === 1 && set.name.toLowerCase().includes(search)
+            )
+            .map(set => ({
+              kind: 'GlobalMaterial' as const,
+              id: set.id,
+              name: set.name,
+              description: null,
+              categoryId: set.categoryId ?? null,
+              categoryName: null,
+              requiresUvs: true,
+              previewGeometryType: set.previewGeometryType ?? 'sphere',
+              hasThumbnail: Boolean(set.thumbnailPath),
+              parameters: null,
+              tiling: {
+                tilingScaleX: set.tilingScaleX ?? 1,
+                tilingScaleY: set.tilingScaleY ?? 1,
+                uvMappingMode: set.uvMappingMode ?? 0,
+                uvScale: set.uvScale ?? 1,
+                channelCount: set.textureCount ?? 0,
+              },
+              tags: set.tags ?? [],
+              createdAt: set.createdAt,
+              updatedAt: set.updatedAt,
+            }))
+
+    const entries = [...parameterEntries, ...globalEntries]
 
     return HttpResponse.json({
       entries,

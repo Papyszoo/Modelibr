@@ -27,6 +27,11 @@ export class ScenesPage {
     private readonly pickerSearch =
         '[data-testid="scene-asset-picker"] input[type="text"]';
 
+    private readonly materials = '[data-testid="scene-node-materials"]';
+    private readonly materialPicker = '[data-testid="scene-material-picker"]';
+    private readonly materialEntry =
+        '[data-testid="scene-material-picker-entry"]';
+
     constructor(page: Page) {
         this.page = page;
     }
@@ -93,6 +98,61 @@ export class ScenesPage {
 
     async addBlockoutBox(): Promise<void> {
         await this.page.getByRole("button", { name: "Blockout box" }).click();
+    }
+
+    /**
+     * Dresses the selected node with a material by name.
+     *
+     * `slot` names one of the model's own material slots; omitted, this binds
+     * the node's default binding, which dresses every slot no override names.
+     */
+    async dressSelectedNode(materialName: string, slot = ""): Promise<void> {
+        await expect(this.page.locator(this.materials)).toBeVisible();
+        await this.page
+            .locator(`[data-testid="scene-node-materials-pick-${slot}"]`)
+            .click();
+
+        const picker = this.page.locator(this.materialPicker);
+        await expect(picker).toBeVisible();
+
+        // Searched rather than scrolled: the picker reads the merged library,
+        // which in a real library is every global material as well as every
+        // parameter one, so the first page need not hold the one wanted.
+        await picker.locator('input[type="text"]').fill(materialName);
+
+        const entry = picker
+            .locator(this.materialEntry)
+            .filter({ hasText: materialName })
+            .first();
+        await expect(entry).toBeVisible();
+        await entry.click();
+
+        // The picker closes on pick, which is also the signal that the binding
+        // reached the draft document rather than only the picker's own state.
+        await expect(picker).toBeHidden();
+    }
+
+    /**
+     * The element naming what dresses a slot.
+     *
+     * Returned as a locator rather than as text, so callers assert against it
+     * and wait. The row renders as soon as the binding lands, but the *name*
+     * arrives with the material's own detail fetch a moment later - until then
+     * the row honestly says "Material 2". Reading the text once caught that
+     * intermediate state.
+     */
+    boundMaterialLocator(slot = "") {
+        return this.page
+            .locator(
+                `[data-testid="scene-node-materials-row"][data-slot="${slot}"]`,
+            )
+            .locator(".scene-node-materials-bound-name");
+    }
+
+    async clearSlotMaterial(slot = ""): Promise<void> {
+        await this.page
+            .locator(`[data-testid="scene-node-materials-clear-${slot}"]`)
+            .click();
     }
 
     nodeRows() {

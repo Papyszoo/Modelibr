@@ -1,0 +1,186 @@
+/*
+ * Sits at the foot of the property panel's scrolling body, as an ordinary
+ * block in that flow. It is NOT a sibling of the panel: as one it competed for
+ * the column's height and was drawn over the transform inputs, which stopped
+ * them being clickable at all. Nothing here may introduce a second scroll box
+ * or a height of its own.
+ */
+.scene-node-materials {
+  border-top: 1px solid var(--mod-color-border);
+  padding-top: var(--mod-space-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-xs);
+  flex: 0 0 auto;
+}
+
+.scene-node-materials h4 {
+  margin: 0;
+  font-size: var(--mod-text-xs);
+  font-weight: var(--mod-font-weight-semibold);
+  color: var(--mod-color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.scene-node-materials-note {
+  margin: 0;
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+}
+
+.scene-node-materials-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-2xs);
+}
+
+.scene-node-materials-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mod-space-2xs);
+  min-width: 0;
+}
+
+.scene-node-materials-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.scene-node-materials-slot-name {
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scene-node-materials-bound {
+  display: flex;
+  align-items: center;
+  gap: var(--mod-space-2xs);
+  min-width: 0;
+}
+
+.scene-node-materials-bound-name {
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scene-node-materials-kind,
+.scene-node-materials-entry-meta {
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+  opacity: 0.75;
+  white-space: nowrap;
+}
+
+.scene-node-materials-empty {
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+  font-style: italic;
+}
+
+.scene-node-materials-actions {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+/* The stand-in for anything without a picture of its own: a texture set whose
+   thumbnail has not been generated yet. */
+.scene-node-materials-noart {
+  display: block;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: var(--mod-radius-sm);
+  background: var(--mod-color-surface-raised);
+  border: 1px solid var(--mod-color-border);
+  flex: 0 0 auto;
+}
+
+.scene-node-materials-bound .material-swatch {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: 0 0 auto;
+}
+
+.scene-node-materials-picker .p-dialog-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-xs);
+}
+
+.scene-node-materials-entries {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  /* Capped so a long library scrolls inside the dialog rather than growing it
+     past the viewport. This is the dialog's only scroll container - the first
+     version nested one inside the scrolling property column, and entries could
+     not be reliably clicked because the two scrolled against each other. */
+  max-height: 24rem;
+  overflow-y: auto;
+}
+
+.scene-node-materials-entry {
+  display: flex;
+  align-items: center;
+  gap: var(--mod-space-2xs);
+  width: 100%;
+  padding: var(--mod-space-2xs);
+  border: 1px solid transparent;
+  border-radius: var(--mod-radius-sm);
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.scene-node-materials-entry:hover {
+  background: var(--mod-color-surface-hover);
+}
+
+.scene-node-materials-entry--current {
+  border-color: var(--mod-color-primary);
+}
+
+.scene-node-materials-entry-media {
+  display: flex;
+  flex: 0 0 auto;
+}
+
+.scene-node-materials-entry-media .material-swatch,
+.scene-node-materials-entry-media img {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: var(--mod-radius-sm);
+  object-fit: cover;
+}
+
+.scene-node-materials-entry-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.scene-node-materials-entry-name {
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

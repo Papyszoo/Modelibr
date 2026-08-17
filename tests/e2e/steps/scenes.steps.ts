@@ -102,6 +102,99 @@ When("I add a blockout box", async ({ page }) => {
     await new ScenesPage(page).addBlockoutBox();
 });
 
+/**
+ * Creates a parameter material through the API, or reuses one already named
+ * that way.
+ *
+ * Created over the API rather than through the PBR Materials page: these
+ * scenarios are about dressing a scene node, and driving a second feature's
+ * create dialog to get there would make them fail for that feature's reasons.
+ */
+Given("a PBR material named {string} exists", async ({ page }, name: string) => {
+    const listed = await page.request.get(`${apiBase()}/materials`);
+    expect(listed.ok()).toBeTruthy();
+
+    const existing = (await listed.json()).materials.find(
+        (material: { name: string }) => material.name === name,
+    );
+    if (existing) {
+        return;
+    }
+
+    const created = await page.request.post(`${apiBase()}/materials`, {
+        data: {
+            name,
+            parameters: {
+                baseColorHex: "#B5892B",
+                roughness: 0.4,
+                metallic: 1,
+            },
+        },
+    });
+    expect(created.ok()).toBeTruthy();
+});
+
+When(
+    "I dress the selected node with the material {string}",
+    async ({ page }, materialName: string) => {
+        await new ScenesPage(page).dressSelectedNode(materialName);
+    },
+);
+
+Given(
+    "I have dressed the selected node with the material {string}",
+    async ({ page }, materialName: string) => {
+        await new ScenesPage(page).dressSelectedNode(materialName);
+    },
+);
+
+When("I clear the node's material", async ({ page }) => {
+    await new ScenesPage(page).clearSlotMaterial();
+});
+
+Then(
+    "the node's material should read {string}",
+    async ({ page }, materialName: string) => {
+        // The document stores an id. This is the panel resolving it back to a
+        // name, which is the difference between a readable scene and a row of
+        // opaque numbers. Asserted rather than read, because the name arrives
+        // with the material's detail fetch just after the binding does.
+        await expect(new ScenesPage(page).boundMaterialLocator()).toHaveText(
+            materialName,
+        );
+    },
+);
+
+Then(
+    "the stored scene document should dress the node with {string}",
+    async ({ page }, materialName: string) => {
+        const view = await fetchSceneByName(page, "Dressed Scene");
+        const node = view.document.nodes[0];
+
+        // Asserting on the id alone would pass against a binding pointing at
+        // the wrong material, so the id is resolved back to its name.
+        expect(node.material?.materialId).toBeGreaterThan(0);
+        expect(node.material?.textureSetId ?? null).toBeNull();
+
+        const material = await page.request.get(
+            `${apiBase()}/materials/${node.material.materialId}`,
+        );
+        expect(material.ok()).toBeTruthy();
+        expect((await material.json()).name).toBe(materialName);
+    },
+);
+
+Then(
+    "the stored scene document should dress the node with nothing",
+    async ({ page }) => {
+        // Cleared, not nulled: a null binding left in the document fails the
+        // validator on the next save.
+        const view = await fetchSceneByName(page, "Undressed Scene");
+
+        expect(view.document.nodes[0].material ?? null).toBeNull();
+    },
+);
+
 When("I undo the last edit", async ({ page }) => {
     await new ScenesPage(page).undo();
 });

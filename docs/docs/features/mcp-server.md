@@ -145,6 +145,16 @@ The stage is enforced rather than advised, in two directions:
 Moving **back** a stage is never refused. It is how a scene is reopened to fix exactly
 what the gate stopped.
 
+#### Dressing a node by hand
+
+The scene editor's property panel dresses the selected node too, so `apply_material` is
+not the only way in. The panel lists the node's **default binding** — which dresses every
+slot no override names — and a row per material slot the model declares, and it picks from
+one merged list of **PBR materials and Global Materials** together: filling a slot is the
+one place the mechanism does not matter, and a material that needs UVs says so on its
+entry. A binding made here is scene-local, undoes with the rest of the editor's history,
+and reaches the server on the next save as the same document an agent would have written.
+
 #### Placement rules stick to the node
 
 Three of these are properties of the node rather than arguments to one call, because "it
