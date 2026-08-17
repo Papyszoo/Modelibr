@@ -48,7 +48,12 @@ export type MaterialLibraryEntryKind = 'Material' | 'GlobalMaterial'
 export interface MaterialTilingDto {
   tilingScaleX: number
   tilingScaleY: number
-  uvMappingMode: string
+  /**
+   * `UvMappingMode`, as a number - this enum crosses the wire by value, unlike
+   * `alphaMode` and the entry `kind`, which cross by name. Typed as `string`
+   * here originally, which was simply wrong; nothing read it, so nothing said so.
+   */
+  uvMappingMode: number
   uvScale: number
   channelCount: number
 }

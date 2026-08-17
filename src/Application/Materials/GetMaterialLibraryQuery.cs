@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Models;
@@ -50,6 +51,17 @@ public record MaterialLibraryEntryDto(
     DateTime CreatedAt,
     DateTime UpdatedAt);
 
+/// <summary>
+/// Which table a library entry came from.
+/// </summary>
+/// <remarks>
+/// Serialized by name. This one is read as a discriminator - a caller branches on it
+/// to decide whether to send a <c>materialId</c> or a <c>textureSetId</c> - and
+/// "kind: 0" is exactly the kind of value that gets compared against the wrong thing
+/// and silently takes the other branch. The name costs nothing and cannot be
+/// mistaken.
+/// </remarks>
+[JsonConverter(typeof(JsonStringEnumConverter<MaterialLibraryEntryKind>))]
 public enum MaterialLibraryEntryKind
 {
     /// <summary>A parameters-only material. Needs no UVs and no files.</summary>

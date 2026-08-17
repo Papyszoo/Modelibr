@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Domain.ValueObjects;
 
 /// <summary>
@@ -5,6 +7,15 @@ namespace Domain.ValueObjects;
 /// Mirrors glTF 2.0's alphaMode, which is what the viewport and every
 /// exporter already speak.
 /// </summary>
+/// <remarks>
+/// Serialized by name, unlike most enums in this API, because everything else in
+/// this feature already speaks the glTF names: the column stores them as text, the
+/// MCP tools parse and list them with <c>Enum.GetNames</c>, and the frontend types
+/// them as a string union. Only the REST serializer disagreed, and it sent
+/// <c>alphaMode: 0</c> to a client comparing against "Opaque" - so a transparent
+/// material never read as transparent anywhere in the app.
+/// </remarks>
+[JsonConverter(typeof(JsonStringEnumConverter<AlphaMode>))]
 public enum AlphaMode
 {
     /// <summary>
