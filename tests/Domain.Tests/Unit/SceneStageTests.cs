@@ -85,6 +85,16 @@ public class SceneStageTests
     }
 
     [Fact]
+    public void The_Order_Is_The_Vocabulary_Order()
+    {
+        // Order() is written out rather than derived from All, so this keeps the two from
+        // drifting - a stage that ranked wrong would gate the wrong writes.
+        Assert.Equal(
+            SceneStages.All.ToList(),
+            SceneStages.All.OrderBy(stage => SceneStages.Order(stage)!.Value).ToList());
+    }
+
+    [Fact]
     public void An_Unknown_Stage_Is_Rejected_Rather_Than_Ranked()
     {
         // A typo that ranked as "no stage" would silently un-gate the write the caller was

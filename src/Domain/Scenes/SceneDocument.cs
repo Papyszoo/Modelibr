@@ -265,16 +265,15 @@ public static class SceneStages
     /// A value outside the vocabulary answers null - the document validator rejects those,
     /// and nothing here should quietly rank one.
     /// </summary>
-    public static int? Order(string? stage)
+    public static int? Order(string? stage) => stage switch
     {
-        if (stage is null)
-        {
-            return -1;
-        }
-
-        var index = All.ToList().IndexOf(stage);
-        return index < 0 ? null : index;
-    }
+        null => -1,
+        Layout => 0,
+        Detail => 1,
+        Lit => 2,
+        Dressed => 3,
+        _ => null,
+    };
 
     public static bool IsStage(string? stage) => stage is not null && Order(stage) is >= 0;
 

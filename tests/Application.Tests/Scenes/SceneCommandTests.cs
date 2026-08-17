@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
 using SharedKernel;
@@ -611,5 +612,68 @@ public class SceneCommandTests
         Assert.True(result.IsFailure);
         Assert.Equal("Scene.TooManyCopies", result.Error.Code);
         Assert.Equal(1, _scene.Revision);
+    }
+
+    [Fact]
+    public async Task CreateScene_Refuses_A_Document_That_Claims_A_Stage_It_Does_Not_Hold()
+    {
+        // Creating is the one write with no "before" for SceneWriter's gate to compare
+        // against, so the gate runs in the create handler too. Without it the whole staged
+        // workflow is one call away from optional: hand in a room full of floating furniture
+        // that calls itself dressed, and nothing asks.
+        var unitOfWork = new Mock<IUnitOfWork>();
+        var clock = new Mock<IDateTimeProvider>();
+        clock.SetupGet(c => c.UtcNow).Returns(Now);
+
+        var handler = new CreateSceneCommandHandler(
+            _scenes.Object, _writer, unitOfWork.Object, clock.Object);
+
+        var floating = new SceneDocument(
+            SceneDocument.CurrentSchemaVersion,
+            new[]
+            {
+                new SceneNode(
+                    "sofa",
+                    new SceneTransform(new Vec3(0, 9, 0), Vec3.Zero, Vec3.One),
+                    Asset: new SceneAssetRef(SceneAssetTypes.Model, ModelId, VersionId)),
+            },
+            Array.Empty<SceneLight>(),
+            Stage: SceneStages.Dressed);
+
+        var result = await handler.Handle(
+            new CreateSceneCommand("Levitating Room", DocumentJson: SceneDocumentCodec.Serialize(floating)),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.StageBlocked", result.Error.Code);
+        _scenes.Verify(s => s.AddAsync(It.IsAny<Scene>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task CreateScene_Accepts_The_Same_Document_Without_The_Claim()
+    {
+        var unitOfWork = new Mock<IUnitOfWork>();
+        var clock = new Mock<IDateTimeProvider>();
+        clock.SetupGet(c => c.UtcNow).Returns(Now);
+
+        var handler = new CreateSceneCommandHandler(
+            _scenes.Object, _writer, unitOfWork.Object, clock.Object);
+
+        var floating = new SceneDocument(
+            SceneDocument.CurrentSchemaVersion,
+            new[]
+            {
+                new SceneNode(
+                    "sofa",
+                    new SceneTransform(new Vec3(0, 9, 0), Vec3.Zero, Vec3.One),
+                    Asset: new SceneAssetRef(SceneAssetTypes.Model, ModelId, VersionId)),
+            },
+            Array.Empty<SceneLight>());
+
+        var result = await handler.Handle(
+            new CreateSceneCommand("Work In Progress", DocumentJson: SceneDocumentCodec.Serialize(floating)),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
     }
 }
