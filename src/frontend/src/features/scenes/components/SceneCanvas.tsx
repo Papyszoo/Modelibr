@@ -147,7 +147,7 @@ export function SceneCanvas({
                   ? sources.get(sceneAssetSourceKey(node.asset))
                   : undefined
               }
-              materialTextureSet={materials.get(node.id)}
+              dressing={materials.get(node.id)}
               sourceDimensions={facts?.sourceDimensions ?? null}
               originConvention={facts?.originConvention ?? null}
               originInBounds={facts?.originInBounds ?? null}

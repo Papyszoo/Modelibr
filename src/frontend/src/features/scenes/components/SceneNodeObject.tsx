@@ -6,6 +6,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader'
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader'
 
+import { applyParameterMaterials } from '@/shared/three/parameterMaterial'
 import {
   createGltfResourceManager,
   safeLoadingManager,
@@ -15,9 +16,9 @@ import {
   type MaterialTextureSets,
   usePerMaterialTextures,
 } from '@/shared/three/textureSetMaterial'
-import type { TextureSetDto } from '@/types'
 
 import type { SceneAssetSource } from '../hooks/useSceneAssetSources'
+import type { NodeDressing } from '../hooks/useSceneMaterials'
 import { boundsOffset } from '../lib/sceneGeometry'
 import type { SceneNode, Vec3 } from '../types'
 import { SceneNodeErrorBoundary } from './SceneNodeErrorBoundary'
@@ -52,8 +53,8 @@ interface SceneNodeObjectProps {
   onSelect: (nodeId: string) => void
   /** Resolved file URL, format and glTF resources; undefined until they load. */
   source?: SceneAssetSource
-  /** The texture set this node's material binding points at, once fetched. */
-  materialTextureSet?: TextureSetDto
+  /** Everything dressing this node - texture sets and materials, by slot. */
+  dressing?: NodeDressing
   /**
    * The referenced asset's own extent and origin convention, from the server's
    * derived facts. Null when it has never been extracted - the selection box is
@@ -89,7 +90,7 @@ export function SceneNodeObject({
   selected,
   onSelect,
   source,
-  materialTextureSet,
+  dressing,
   sourceDimensions = null,
   originConvention = null,
   originInBounds = null,
@@ -148,7 +149,7 @@ export function SceneNodeObject({
             <SceneAssetMesh
               source={source}
               bounds={sourceDimensions}
-              materialTextureSet={materialTextureSet}
+              dressing={dressing}
             />
             {/*
               Inside the boundary on purpose: React commits a Suspense
@@ -275,11 +276,11 @@ type LoaderConstructor =
 function SceneAssetMesh({
   source,
   bounds,
-  materialTextureSet,
+  dressing,
 }: {
   source?: SceneAssetSource
   bounds: Vec3 | null
-  materialTextureSet?: TextureSetDto
+  dressing?: NodeDressing
 }): JSX.Element | null {
   if (!source || source.isLoading) {
     return <PendingMarker bounds={bounds} />
@@ -299,21 +300,15 @@ function SceneAssetMesh({
         <GltfMesh
           url={source.url}
           resources={source.resources}
-          materialTextureSet={materialTextureSet}
+          dressing={dressing}
         />
       )
     case 'fbx':
-      return (
-        <FbxMesh url={source.url} materialTextureSet={materialTextureSet} />
-      )
+      return <FbxMesh url={source.url} dressing={dressing} />
     case 'obj':
-      return (
-        <ObjMesh url={source.url} materialTextureSet={materialTextureSet} />
-      )
+      return <ObjMesh url={source.url} dressing={dressing} />
     case 'stl':
-      return (
-        <StlMesh url={source.url} materialTextureSet={materialTextureSet} />
-      )
+      return <StlMesh url={source.url} dressing={dressing} />
     default:
       // A format the viewer cannot load is shown as its bounds rather than
       // dropped - a node missing from the canvas reads as a failed placement.
@@ -324,11 +319,11 @@ function SceneAssetMesh({
 function GltfMesh({
   url,
   resources,
-  materialTextureSet,
+  dressing,
 }: {
   url: string
   resources: Record<string, string>
-  materialTextureSet?: TextureSetDto
+  dressing?: NodeDressing
 }): JSX.Element {
   // A loose .gltf stores its buffers and textures as relative URIs. They resolve
   // against the version-file route, 404, and the loader then fails on the
@@ -344,49 +339,43 @@ function GltfMesh({
 
   // flipY=false for glTF, matching the model viewer: glTF authors its UVs the
   // other way up, and getting this wrong turns every bound texture upside down.
-  return (
-    <PlacedObject
-      object={gltf.scene}
-      materialTextureSet={materialTextureSet}
-      flipY={false}
-    />
-  )
+  return <PlacedObject object={gltf.scene} dressing={dressing} flipY={false} />
 }
 
 function FbxMesh({
   url,
-  materialTextureSet,
+  dressing,
 }: {
   url: string
-  materialTextureSet?: TextureSetDto
+  dressing?: NodeDressing
 }): JSX.Element {
   // The safe manager stops format-internal texture paths ("chest_Specular.tga")
   // from being fetched against the file route, which 400s and kills the context.
   const fbx = useLoader(FBXLoader, url, loader => {
     loader.manager = safeLoadingManager
   })
-  return <PlacedObject object={fbx} materialTextureSet={materialTextureSet} />
+  return <PlacedObject object={fbx} dressing={dressing} />
 }
 
 function ObjMesh({
   url,
-  materialTextureSet,
+  dressing,
 }: {
   url: string
-  materialTextureSet?: TextureSetDto
+  dressing?: NodeDressing
 }): JSX.Element {
   const obj = useLoader(OBJLoader, url, loader => {
     loader.manager = safeLoadingManager
   })
-  return <PlacedObject object={obj} materialTextureSet={materialTextureSet} />
+  return <PlacedObject object={obj} dressing={dressing} />
 }
 
 function StlMesh({
   url,
-  materialTextureSet,
+  dressing,
 }: {
   url: string
-  materialTextureSet?: TextureSetDto
+  dressing?: NodeDressing
 }): JSX.Element {
   const geometry = useLoader(STLLoader, url)
 
@@ -408,7 +397,7 @@ function StlMesh({
     [geometry]
   )
 
-  return <PlacedObject object={mesh} materialTextureSet={materialTextureSet} />
+  return <PlacedObject object={mesh} dressing={dressing} />
 }
 
 /**
@@ -422,21 +411,22 @@ function StlMesh({
  */
 function PlacedObject({
   object,
-  materialTextureSet,
+  dressing,
   flipY = true,
 }: {
   object: THREE.Object3D
-  materialTextureSet?: TextureSetDto
+  dressing?: NodeDressing
   flipY?: boolean
 }): JSX.Element {
   const { gl: renderer } = useThree()
 
-  // The empty-string key is the wildcard: a scene binds one material to the
-  // whole placement, not per named mesh material.
+  // Keyed by the model's material slot name; the empty-string key is the node's
+  // default binding, which dresses every slot no override names.
   const materialTextureSets: MaterialTextureSets = useMemo(
-    () => (materialTextureSet ? { '': materialTextureSet } : {}),
-    [materialTextureSet]
+    () => dressing?.textureSets ?? {},
+    [dressing]
   )
+  const slotMaterials = useMemo(() => dressing?.materials ?? {}, [dressing])
 
   const { loadedTextures, texturesReady } = usePerMaterialTextures(
     materialTextureSets,
@@ -453,7 +443,7 @@ function PlacedObject({
       }
     })
 
-    if (materialTextureSet) {
+    if (Object.keys(materialTextureSets).length > 0) {
       // Until the channels load this leaves the source materials in place, so a
       // node fades into its bound material rather than flashing untextured.
       applyMaterialTextures(
@@ -464,9 +454,19 @@ function PlacedObject({
       )
     }
 
+    // Second, so the two layer predictably on a node that uses both: a tiling
+    // material on the frame, a colour on the cushions. Parameter materials need
+    // nothing loaded, so they appear on the first frame.
+    applyParameterMaterials(copy, slotMaterials)
+
     return copy
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [object, materialTextureSets, loadedTextures, texturesReady])
+  }, [
+    object,
+    materialTextureSets,
+    slotMaterials,
+    loadedTextures,
+    texturesReady,
+  ])
 
   // applyMaterialTextures allocates fresh materials on every rebuild, so the
   // superseded ones are released here. Only materials this clone introduced:
