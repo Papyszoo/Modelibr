@@ -167,7 +167,14 @@ public static class SceneValidator
             }
         }
 
-        var byId = nodes.ToDictionary(n => n.Id, n => n, StringComparer.Ordinal);
+        // TryAdd rather than ToDictionary: this runs on documents that may already be
+        // wrong - that is the point of it - and a duplicate node id must produce a finding,
+        // not an exception out of the tool that was asked what is wrong.
+        var byId = new Dictionary<string, SceneNode>(StringComparer.Ordinal);
+        foreach (var node in nodes)
+        {
+            byId.TryAdd(node.Id, node);
+        }
 
         // A hidden node is not in the picture, so it cannot hold anything up and cannot be
         // the thing something else is buried in.
