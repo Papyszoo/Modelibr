@@ -21,6 +21,7 @@ namespace Application.Scenes;
 /// <param name="FrontAxis">Which local axis is this asset's front, from <see cref="SceneFrontAxes"/>. Defaults to +Z.</param>
 /// <param name="AnchorTo">Rest the asset on this node instead of on the floor.</param>
 /// <param name="AnchorAlign">How to sit it there, from <see cref="SceneAnchorAlignments"/>. Defaults to centring it.</param>
+/// <param name="Suspended">Declare that this node is meant to hang with nothing under it - a pendant lamp, a sign. Contradicts <paramref name="GroundSnap"/> and <paramref name="AnchorTo"/>.</param>
 public sealed record PlaceSceneAssetCommand(
     int SceneId,
     string AssetType,
@@ -38,7 +39,8 @@ public sealed record PlaceSceneAssetCommand(
     Vec3? FaceToward = null,
     string? FrontAxis = null,
     string? AnchorTo = null,
-    string? AnchorAlign = null) : ICommand<ScenePlacementResponse>;
+    string? AnchorAlign = null,
+    bool Suspended = false) : ICommand<ScenePlacementResponse>;
 
 /// <summary>
 /// The placed node plus what is now wrong with the scene because of it.
@@ -124,6 +126,7 @@ internal sealed class PlaceSceneAssetCommandHandler : ICommandHandler<PlaceScene
                     // thing for a node that is being created, and a document full of
                     // groundSnap:false is noise.
                     GroundSnap: command.GroundSnap ? true : null,
+                    Suspended: command.Suspended ? true : null,
                     FrontAxis: frontAxis.Value,
                     FaceToward: command.FaceToward,
                     Anchor: anchor.Value);

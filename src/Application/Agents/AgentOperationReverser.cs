@@ -103,6 +103,7 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
     private readonly ICommandHandler<SetSceneLightCommand, SceneLightResponse> _setSceneLight;
     private readonly ICommandHandler<ApplySceneMaterialCommand, SceneMaterialResponse> _applySceneMaterial;
     private readonly ICommandHandler<UpdateSceneDocumentCommand, SceneView> _updateSceneDocument;
+    private readonly ICommandHandler<SetSceneStageCommand, SceneStageResponse> _setSceneStage;
     private readonly ICommandHandler<DeleteSceneCommand> _deleteScene;
 
     public AgentOperationReverser(
@@ -125,6 +126,7 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
         ICommandHandler<SetSceneLightCommand, SceneLightResponse> setSceneLight,
         ICommandHandler<ApplySceneMaterialCommand, SceneMaterialResponse> applySceneMaterial,
         ICommandHandler<UpdateSceneDocumentCommand, SceneView> updateSceneDocument,
+        ICommandHandler<SetSceneStageCommand, SceneStageResponse> setSceneStage,
         ICommandHandler<DeleteSceneCommand> deleteScene)
     {
         _audit = audit;
@@ -146,6 +148,7 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
         _setSceneLight = setSceneLight;
         _applySceneMaterial = applySceneMaterial;
         _updateSceneDocument = updateSceneDocument;
+        _setSceneStage = setSceneStage;
         _deleteScene = deleteScene;
     }
 
@@ -323,6 +326,10 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
         "update-scene-document" => Step(entry, $"Restore scene {entry.AssetId}'s previous document.", destructive: false,
             supported: entry.PayloadBefore is not null,
             blocker: "The previous document was not recorded."),
+
+        "set-scene-stage" => Step(entry, $"Put scene {entry.AssetId} back to the stage it declared before.", destructive: false,
+            supported: entry.PayloadBefore is not null,
+            blocker: "The scene's previous stage was not recorded."),
 
         "create-scene" => Step(entry, $"Delete scene {entry.AssetId}.", destructive: true,
             supported: entry.AssetId is > 0,
@@ -659,6 +666,7 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
                     new MoveSceneNodeCommand(
                         entry.AssetId!.Value, nodeId, transform.Position, transform.RotationEuler, transform.Scale,
                         GroundSnap: ReadBool(before.Value, "groundSnap"),
+                        Suspended: ReadBool(before.Value, "suspended"),
                         FaceToward: ReadVector(before.Value, "faceToward"),
                         FrontAxis: ReadString(before.Value, "frontAxis"),
                         AnchorTo: anchor?.OnNodeId,
@@ -763,6 +771,30 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
                 return result.IsFailure
                     ? Result.Failure<string>(result.Error)
                     : Result.Success($"Restored scene {entry.AssetId}'s previous document ({document.Nodes.Count} node(s)).");
+            }
+
+            case "set-scene-stage":
+            {
+                var before = Read(entry.PayloadBefore);
+                if (before is null)
+                {
+                    return Result.Failure<string>(new Error("NoPriorState", "The scene's previous stage was not recorded."));
+                }
+
+                // A recorded null stage means the scene was not being authored in stages, and
+                // that is what the undo restores - the same "null means null" rule the light
+                // and material inverses follow. Undoing a *retreat* re-advances the stage and
+                // so goes through the gate: the scene has to still hold together to reclaim
+                // the stage it claimed before, which is the whole point of the gate.
+                var previous = ReadString(before.Value, "stage");
+                var result = await _setSceneStage.Handle(
+                    new SetSceneStageCommand(entry.AssetId!.Value, previous), cancellationToken);
+
+                return result.IsFailure
+                    ? Result.Failure<string>(result.Error)
+                    : Result.Success(previous is null
+                        ? $"Scene {entry.AssetId} is no longer being authored in stages, as it was before."
+                        : $"Put scene {entry.AssetId} back to the '{previous}' stage.");
             }
 
             case "create-scene":

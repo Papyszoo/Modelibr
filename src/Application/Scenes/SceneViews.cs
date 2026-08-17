@@ -4,6 +4,11 @@ using Domain.Scenes;
 namespace Application.Scenes;
 
 /// <summary>Identity and size of a scene, without its document - what a list page shows.</summary>
+/// <param name="Stage">
+/// How far the scene has been taken, from <see cref="SceneStages"/>, or null when it is not
+/// being authored in stages. Lifted out of the document so listing scenes, and the editor's
+/// header, can show it without parsing one.
+/// </param>
 public sealed record SceneSummary(
     int Id,
     string Name,
@@ -13,7 +18,8 @@ public sealed record SceneSummary(
     int NodeCount,
     int LightCount,
     DateTime CreatedAt,
-    DateTime UpdatedAt);
+    DateTime UpdatedAt,
+    string? Stage = null);
 
 /// <summary>
 /// One node with the spatial truth an agent needs to reason about it without a viewport:
@@ -30,6 +36,7 @@ public sealed record SceneSummary(
 /// same box, and they only do that while both read the same number.
 /// </param>
 /// <param name="GroundSnap">Whether this node is being kept resting on y=0.</param>
+/// <param name="Suspended">Whether this node is declared to hang with nothing under it - the third answer, beside ground and anchor, to "what holds it up".</param>
 /// <param name="FaceToward">The world point this node is being kept facing, if any.</param>
 /// <param name="FrontAxis">The front axis that facing is measured from - the default when the node never declared one.</param>
 /// <param name="Anchor">The node this one rests on, and the offset it rests at.</param>
@@ -51,7 +58,8 @@ public sealed record SceneNodeView(
     bool GroundSnap = false,
     Vec3? FaceToward = null,
     string? FrontAxis = null,
-    SceneAnchor? Anchor = null);
+    SceneAnchor? Anchor = null,
+    bool Suspended = false);
 
 /// <summary>
 /// A scene, its document, and everything derived from the two.
@@ -79,7 +87,8 @@ public static class SceneViewBuilder
         document.Nodes.Count,
         document.Lights.Count,
         scene.CreatedAt,
-        scene.UpdatedAt);
+        scene.UpdatedAt,
+        document.Stage);
 
     public static SceneView Build(
         Scene scene,
@@ -120,7 +129,8 @@ public static class SceneViewBuilder
             // Reported as the axis facing is actually measured from, so a caller reading a
             // node back is told the assumption rather than left to infer it from a null.
             node.FrontAxis ?? SceneFrontAxes.Default,
-            node.Anchor);
+            node.Anchor,
+            node.Suspended ?? false);
     }
 
     /// <summary>

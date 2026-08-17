@@ -217,6 +217,136 @@ public class SceneWriterTests
         Assert.True(result.IsSuccess);
     }
 
+    /// <summary>A sofa-sized asset with its base at its origin, so grounding arithmetic is checkable.</summary>
+    private void GivenFactsFor(int assetId, Vec3 dimensions)
+    {
+        var reference = new SceneAssetRef(SceneAssetTypes.Model, assetId, 1);
+        _facts.Setup(f => f.ResolveAsync(It.IsAny<IEnumerable<SceneAssetRef>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, SceneAssetFacts>(StringComparer.Ordinal)
+            {
+                [SceneSpatial.FactsKey(reference)] =
+                    new SceneAssetFacts(SceneAssetTypes.Model, assetId, 1, dimensions, OriginInBounds: new Vec3(0.5, 0, 0.5)),
+            });
+    }
+
+    /// <summary>
+    /// A node in mid-air with nothing under it and nothing said about why.
+    ///
+    /// Not a broken groundSnap on purpose: ResolvePlacements runs on every write and would put
+    /// that one back on the floor before the gate ever saw it. The undeclared floater is the
+    /// one that survives a write, and it is the one the living-room run shipped.
+    /// </summary>
+    private static SceneNode FloatingNode(string id) =>
+        new(
+            id,
+            new SceneTransform(new Vec3(0, 3, 0), Vec3.Zero, Vec3.One),
+            Asset: new SceneAssetRef(SceneAssetTypes.Model, 1, 1));
+
+    [Fact]
+    public async Task ApplyAsync_Refuses_To_Advance_The_Stage_Over_A_Broken_Composition()
+    {
+        // The mechanism the staged workflow rests on. Without it the stages are a comment,
+        // and the run this comes from tuned four lighting setups over a room in which every
+        // object floated half its height.
+        var scene = GivenScene(SceneDocument.Empty() with
+        {
+            Nodes = new[] { FloatingNode("sofa") },
+            Stage = SceneStages.Layout,
+        });
+        GivenFactsFor(1, new Vec3(1.6, 0.8, 0.9));
+
+        var result = await _writer.ApplyAsync(
+            1, null, document => Result.Success(document with { Stage = SceneStages.Dressed }));
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.StageBlocked", result.Error.Code);
+        Assert.Contains("Contact.Unsupported", result.Error.Message);
+        Assert.Contains("suspended=true", result.Error.Message);
+        _scenes.Verify(s => s.UpdateAsync(It.IsAny<Scene>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ApplyAsync_Lets_A_Broken_Scene_Retreat_To_An_Earlier_Stage()
+    {
+        // Going back is how a scene is reopened to fix what the gate refused it for.
+        GivenScene(SceneDocument.Empty() with
+        {
+            Nodes = new[] { FloatingNode("sofa") },
+            Stage = SceneStages.Dressed,
+        });
+        GivenFactsFor(1, new Vec3(1.6, 0.8, 0.9));
+
+        var result = await _writer.ApplyAsync(
+            1, null, document => Result.Success(document with { Stage = SceneStages.Layout }));
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task ApplyAsync_Does_Not_Gate_A_Write_That_Leaves_The_Stage_Alone()
+    {
+        // An ordinary placement into a half-built scene is not the moment to demand that the
+        // scene be finished.
+        GivenScene(SceneDocument.Empty() with
+        {
+            Nodes = new[] { FloatingNode("sofa") },
+            Stage = SceneStages.Layout,
+        });
+        GivenFactsFor(1, new Vec3(1.6, 0.8, 0.9));
+
+        var result = await _writer.ApplyAsync(
+            1,
+            null,
+            document => Result.Success(document with { Nodes = document.Nodes.Append(ModelNode("lamp")).ToArray() }));
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task ApplyAsync_Lets_A_Declared_Hanging_Node_Through_The_Gate()
+    {
+        // The escape that makes the gate a question rather than a wall. Saying so is a durable
+        // fact about the node, so a room with three pendant lamps does not re-argue it at
+        // every stage.
+        GivenScene(SceneDocument.Empty() with
+        {
+            Nodes = new[] { FloatingNode("pendant") with { Suspended = true } },
+            Stage = SceneStages.Layout,
+        });
+        GivenFactsFor(1, new Vec3(0.3, 0.4, 0.3));
+
+        var result = await _writer.ApplyAsync(
+            1, null, document => Result.Success(document with { Stage = SceneStages.Dressed }));
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task ApplyAsync_Reports_The_Warnings_A_Stage_Advance_Carried_Forward()
+    {
+        // Containment does not block - nothing in the document can declare a sunken floor
+        // deliberate - so it comes back on the response instead, said once, at the moment the
+        // caller committed to the stage.
+        GivenScene(SceneDocument.Empty() with
+        {
+            Nodes = new[]
+            {
+                new SceneNode(
+                    "pool",
+                    new SceneTransform(new Vec3(0, -1.2, 0), Vec3.Zero, Vec3.One),
+                    Asset: new SceneAssetRef(SceneAssetTypes.Model, 1, 1)),
+            },
+            Stage = SceneStages.Lit,
+        });
+        GivenFactsFor(1, new Vec3(3, 1, 3));
+
+        var result = await _writer.ApplyAsync(
+            1, null, document => Result.Success(document with { Stage = SceneStages.Dressed }));
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Containment.BelowFloor", Assert.Single(result.Value.Carried).Code);
+    }
+
     [Fact]
     public async Task ApplyAsync_Does_Not_Check_References_The_Document_Already_Had()
     {

@@ -8,12 +8,21 @@ using SharedKernel;
 namespace Application.Scenes;
 
 /// <summary>A scene after a write, with everything the response needs already resolved.</summary>
+/// <param name="StageWarnings">
+/// Containment findings a stage advance carried forward - geometry below the floor, a node
+/// nowhere near the rest of the scene. Empty for every write that did not advance the stage.
+/// These did not block it (nothing in the document can declare a sunken floor deliberate), so
+/// they are said once, at the moment the caller committed to the stage.
+/// </param>
 public sealed record SceneWriteResult(
     Scene Scene,
     SceneDocument Document,
-    IReadOnlyDictionary<string, SceneAssetFacts> Facts)
+    IReadOnlyDictionary<string, SceneAssetFacts> Facts,
+    IReadOnlyList<SceneFinding>? StageWarnings = null)
 {
     public SceneView View => SceneViewBuilder.Build(Scene, Document, Facts);
+
+    public IReadOnlyList<SceneFinding> Carried => StageWarnings ?? Array.Empty<SceneFinding>();
 }
 
 /// <summary>
@@ -43,6 +52,12 @@ public interface ISceneWriter
     /// unconditionally": the revision is a database concurrency token, so a write that races
     /// another one still fails with <c>Scene.RevisionConflict</c> rather than silently
     /// overwriting the edit that landed first.
+    ///
+    /// A write that moves the document to a later <see cref="SceneStages">stage</see> is also
+    /// put through <see cref="SceneStageGate"/> and refused with <c>Scene.StageBlocked</c>
+    /// while the composition contradicts itself. The gate applies to every path on purpose,
+    /// including a whole-document save and an undo: a document is only ever restored to a
+    /// state that already passed it, so nothing legitimate is caught by it twice.
     /// </summary>
     /// <param name="verifyNewReferences">
     /// Whether references this write introduces must name assets that exist. On by default,
@@ -146,6 +161,20 @@ internal sealed class SceneWriter : ISceneWriter
 
         var document = validated.Value;
 
+        // Composition before colour, enforced rather than advised. A write that moves the
+        // scene to a later stage is the one moment the server is entitled to ask whether the
+        // composition holds, and it lives here for the same reason the placement rules do:
+        // a handler that had to remember to call it is a handler one refactor away from a
+        // scene that calls itself dressed while its furniture floats.
+        var (blocking, carried) = SceneStageGate.Check(current, document, facts);
+        if (blocking.Count > 0)
+        {
+            var detail = string.Join(" ", blocking.Select(f => $"[{f.Code}] {f.Message}"));
+            return Result.Failure<SceneWriteResult>(new Error(
+                "Scene.StageBlocked",
+                $"Scene {sceneId} cannot move to the '{document.Stage}' stage while {blocking.Count} node(s) are not standing on anything: {detail} Fix the placements, or declare the ones that are meant to hang with suspended=true. The stage exists so appearance work is not done over a composition that is about to move."));
+        }
+
         // Shape is legal; now check that what it points at exists. Only references this write
         // INTRODUCES are checked: a write must not add a node the editor can never load, but a
         // reference that broke earlier - an asset the user recycled after placing it - must
@@ -182,7 +211,7 @@ internal sealed class SceneWriter : ISceneWriter
             return Result.Failure<SceneWriteResult>(saved.Error);
         }
 
-        return Result.Success(new SceneWriteResult(scene, document, facts));
+        return Result.Success(new SceneWriteResult(scene, document, facts, carried));
     }
 
     /// <summary>Asset references present in the candidate document but not in the stored one.</summary>

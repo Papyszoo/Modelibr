@@ -59,6 +59,7 @@ public sealed class SceneWriteMcpTools
                  "To stack instead, pass on=\"<nodeId>\" and the asset rests on that node's top face and follows it when it moves - " +
                  "no arithmetic, and nothing to recompute when the furniture underneath is swapped. " +
                  "To aim it, pass faceToward=[x,y,z] and it turns about Y to face that point, and keeps facing it. " +
+                 "For something meant to hang with nothing under it - a pendant lamp, a sign - pass suspended=true, or it is reported as floating for the life of the scene. " +
                  "Returns the placed node's world footprint plus any node it now overlaps and any scale warning it triggered.")]
     public static Task<object> PlaceAsset(
         ICommandHandler<PlaceSceneAssetCommand, ScenePlacementResponse> handler,
@@ -81,6 +82,7 @@ public sealed class SceneWriteMcpTools
         [Description("How to sit it on that node: 'center' (default) centres it on the top face; 'keep' rests it on top of wherever the position already puts it.")] string? align = null,
         [Description("Turn the asset about Y to face this world point [x,y,z], and keep it facing there when either end moves.")] double[]? faceToward = null,
         [Description("Which local axis is this asset's front: '+Z' (assumed), '-Z', '+X' or '-X'. Nothing in the library derives this - state it when the asset ends up backwards.")] string? frontAxis = null,
+        [Description("This node is meant to hang in mid-air with nothing under it. Cannot be combined with groundSnap or on.")] bool suspended = false,
         [Description("Optional expected scene revision; the write is refused if the scene has moved on.")] int? expectedRevision = null,
         [Description("Optional batch id. Writes sharing one can be undone together with reverse_operation.")] string? batchId = null,
         CancellationToken cancellationToken = default)
@@ -103,7 +105,7 @@ public sealed class SceneWriteMcpTools
                         sceneId, assetType, assetId, versionId, nodeId, name, slotId,
                         vectors.Values["position"], vectors.Values["rotationEuler"], vectors.Values["scale"],
                         groundSnap, snapToGrid, expectedRevision,
-                        vectors.Values["faceToward"], frontAxis, on, align),
+                        vectors.Values["faceToward"], frontAxis, on, align, suspended),
                     ct);
 
                 if (result.IsFailure)
@@ -209,6 +211,7 @@ public sealed class SceneWriteMcpTools
     [Description("Move, rotate or rescale one node. Omitted components are left alone - and so are the placement rules the node carries: " +
                  "a node that was ground-snapped stays on the floor, one that rests on another node stays on it, one that faces a point keeps facing it. " +
                  "Pass groundSnap=false, detachAnchor=true or an explicit rotationEuler to end each of those. " +
+                 "Pass suspended=true for a node that is meant to hang with nothing under it. " +
                  "Moving a node that others rest on moves them with it. " +
                  "Returns the node's new footprint, the transform it had before, and anything it now overlaps.")]
     public static Task<object> MoveAsset(
@@ -222,6 +225,7 @@ public sealed class SceneWriteMcpTools
         [Description("New rotation in degrees as [x,y,z]. Omit to leave unchanged. Setting one stops the node tracking any facing point.")] double[]? rotationEuler = null,
         [Description("New scale as [x,y,z]. Omit to leave unchanged.")] double[]? scale = null,
         [Description("Keep the node's base on y=0. Omit to leave its current setting alone; pass false to stop it snapping.")] bool? groundSnap = null,
+        [Description("This node is meant to hang in mid-air. Omit to leave its current setting alone; pass false to withdraw the declaration.")] bool? suspended = null,
         [Description("Round the position onto a grid of this size in metres. Pass 0 to use the asset's own derived grid.")] double? snapToGrid = null,
         [Description("Rest this node on the node with this id. Omit to leave any existing anchor alone.")] string? on = null,
         [Description("How to sit it on that node: 'center' (default) or 'keep'.")] string? align = null,
@@ -249,7 +253,7 @@ public sealed class SceneWriteMcpTools
                     new MoveSceneNodeCommand(
                         sceneId, nodeId,
                         vectors.Values["position"], vectors.Values["rotationEuler"], vectors.Values["scale"],
-                        groundSnap, snapToGrid, expectedRevision,
+                        groundSnap, suspended, snapToGrid, expectedRevision,
                         vectors.Values["faceToward"], frontAxis, on, align, DetachAnchor: detachAnchor),
                     ct);
 
@@ -277,6 +281,7 @@ public sealed class SceneWriteMcpTools
                         nodeId,
                         transform = result.Value.PreviousTransform,
                         groundSnap = result.Value.PreviousGroundSnap,
+                        suspended = result.Value.PreviousSuspended,
                         faceToward = result.Value.PreviousFaceToward,
                         frontAxis = result.Value.PreviousFrontAxis,
                         anchor = result.Value.PreviousAnchor,
@@ -403,6 +408,55 @@ public sealed class SceneWriteMcpTools
                         new { status = "ok", scene = result.Value.Scene, node = result.Value.Node },
                         "Scene", sceneId, result.Value,
                         new { nodeId, material = result.Value.PreviousMaterial });
+            },
+            cancellationToken);
+    }
+
+    [McpServerTool(Name = "set_scene_stage")]
+    [Description("Declare how far a scene has been taken: 'layout' (room shell and large forms), 'detail' (props and things resting on things), " +
+                 "'lit', then 'dressed' (colour and materials). Work in this order - appearance tuned over a wrong layout is done twice, " +
+                 "and levitation is obvious in a grey blockout and easy to miss in a lit, textured render. " +
+                 "The stage is enforced, not advisory: MOVING FORWARD IS REFUSED while validate_scene reports a contact or containment ERROR - " +
+                 "something resting on nothing, a node not on the surface it says it is on, geometry under the floor. Fix those and call again. " +
+                 "Moving back is always allowed, and is how a scene is reopened to fix its composition. " +
+                 "Until a scene reaches 'lit' and 'dressed', validate_scene reports missing lights and missing materials as notes instead of warnings, " +
+                 "so the findings that matter now are not buried under the ones that do not yet. " +
+                 "Returns any contact/containment WARNINGS the scene carried forward - those do not block, but they are the ones worth a second look.")]
+    public static Task<object> SetSceneStage(
+        ICommandHandler<SetSceneStageCommand, SceneStageResponse> handler,
+        IAgentAudit audit,
+        McpCallerContext caller,
+        [Description("Target scene id.")] int sceneId,
+        [Description("Unique key so a retried call does not apply twice.")] string idempotencyKey,
+        [Description("The stage: layout | detail | lit | dressed. Omit to stop authoring this scene in stages, which judges it against everything at once.")] string? stage = null,
+        [Description("Optional expected scene revision; the write is refused if the scene has moved on.")] int? expectedRevision = null,
+        [Description("Optional batch id. Writes sharing one can be undone together with reverse_operation.")] string? batchId = null,
+        CancellationToken cancellationToken = default)
+    {
+        return Guarded(
+            audit,
+            caller,
+            new AgentWrite(idempotencyKey, "set-scene-stage", "Scene", sceneId, BatchId: batchId),
+            async ct =>
+            {
+                var result = await handler.Handle(
+                    new SetSceneStageCommand(sceneId, stage, expectedRevision), ct);
+
+                return result.IsFailure
+                    ? Failed(result.Error)
+                    : Applied(
+                        new
+                        {
+                            status = "ok",
+                            scene = result.Value.Scene,
+                            stage = result.Value.Stage,
+                            previousStage = result.Value.PreviousStage,
+                            warnings = result.Value.Warnings,
+                        },
+                        "Scene", sceneId, result.Value,
+                        // Written even when it is null: absent and "was not staged" are
+                        // different answers, and the inverse needs the second one.
+                        new { stage = result.Value.PreviousStage });
             },
             cancellationToken);
     }

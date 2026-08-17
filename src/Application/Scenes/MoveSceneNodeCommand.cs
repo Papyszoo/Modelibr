@@ -14,6 +14,7 @@ namespace Application.Scenes;
 /// origin and reported it as a changed footprint.
 /// </summary>
 /// <param name="GroundSnap">Keep the node's base on y=0. Null leaves the node's current setting alone; false stops it snapping.</param>
+/// <param name="Suspended">Declare that this node is meant to hang with nothing under it. Null leaves the current setting alone; false withdraws the declaration.</param>
 /// <param name="FaceToward">Turn the node to face this world point, and keep it facing there. Null leaves its current facing alone.</param>
 /// <param name="FrontAxis">Which local axis is the asset's front, from <see cref="SceneFrontAxes"/>. Null leaves the node's current declaration alone.</param>
 /// <param name="AnchorTo">Rest this node on that one. Null leaves any existing anchor alone.</param>
@@ -32,6 +33,7 @@ public sealed record MoveSceneNodeCommand(
     Vec3? RotationEuler = null,
     Vec3? Scale = null,
     bool? GroundSnap = null,
+    bool? Suspended = null,
     double? SnapToGrid = null,
     int? ExpectedRevision = null,
     Vec3? FaceToward = null,
@@ -62,6 +64,7 @@ public sealed record SceneNodeMoveResponse(
     IReadOnlyList<SceneScaleWarning> ScaleWarnings,
     IReadOnlyList<SceneFinding> Findings,
     bool? PreviousGroundSnap = null,
+    bool? PreviousSuspended = null,
     Vec3? PreviousFaceToward = null,
     string? PreviousFrontAxis = null,
     SceneAnchor? PreviousAnchor = null);
@@ -117,6 +120,7 @@ internal sealed class MoveSceneNodeCommandHandler : ICommandHandler<MoveSceneNod
 
         var previousTransform = existing.Transform;
         var previousGroundSnap = existing.GroundSnap;
+        var previousSuspended = existing.Suspended;
         var previousFaceToward = existing.FaceToward;
         var previousFrontAxis = existing.FrontAxis;
         var previousAnchor = existing.Anchor;
@@ -147,6 +151,7 @@ internal sealed class MoveSceneNodeCommandHandler : ICommandHandler<MoveSceneNod
                         command.RotationEuler ?? node.Transform.RotationEuler,
                         command.Scale ?? node.Transform.Scale),
                     GroundSnap = command.GroundSnap ?? (command.Exact ? null : node.GroundSnap),
+                    Suspended = command.Suspended ?? (command.Exact ? null : node.Suspended),
                     FrontAxis = frontAxis.Value ?? (command.Exact ? null : node.FrontAxis),
                     FaceToward = FacingAfter(command, node),
                     Anchor = command.DetachAnchor
@@ -183,6 +188,7 @@ internal sealed class MoveSceneNodeCommandHandler : ICommandHandler<MoveSceneNod
             SceneViewBuilder.FindingsFor(
                 result.Value.Document, result.Value.Facts, profiles, [command.NodeId]),
             previousGroundSnap,
+            previousSuspended,
             previousFaceToward,
             previousFrontAxis,
             previousAnchor));

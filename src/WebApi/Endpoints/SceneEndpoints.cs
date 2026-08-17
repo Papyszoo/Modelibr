@@ -92,6 +92,19 @@ public static class SceneEndpoints
         .WithName("Update Scene Document")
         .WithSummary("Replace a scene's document; rejects an invalid one rather than repairing it");
 
+        app.MapPut("/scenes/{id}/stage", async (
+            int id,
+            SetSceneStageRequest request,
+            ICommandHandler<SetSceneStageCommand, SceneStageResponse> handler,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await handler.Handle(
+                new SetSceneStageCommand(id, request.Stage, request.ExpectedRevision), cancellationToken);
+            return result.IsFailure ? NotFoundOrFailure(result.Error) : Results.Ok(result.Value);
+        })
+        .WithName("Set Scene Stage")
+        .WithSummary("Declare how far a scene has been taken; advancing is refused over a broken composition");
+
         app.MapPut("/scenes/{id}", async (
             int id,
             RenameSceneRequest request,
@@ -127,7 +140,8 @@ public static class SceneEndpoints
                     id, request.AssetType, request.AssetId, request.VersionId, request.NodeId, request.Name,
                     request.SlotId, request.Position, request.RotationEuler, request.Scale,
                     request.GroundSnap ?? false, request.SnapToGrid, request.ExpectedRevision,
-                    request.FaceToward, request.FrontAxis, request.On, request.Align),
+                    request.FaceToward, request.FrontAxis, request.On, request.Align,
+                    request.Suspended ?? false),
                 cancellationToken);
             return result.IsFailure ? NotFoundOrFailure(result.Error) : Results.Ok(result.Value);
         })
@@ -144,7 +158,7 @@ public static class SceneEndpoints
             var result = await handler.Handle(
                 new MoveSceneNodeCommand(
                     id, nodeId, request.Position, request.RotationEuler, request.Scale,
-                    request.GroundSnap, request.SnapToGrid, request.ExpectedRevision,
+                    request.GroundSnap, request.Suspended, request.SnapToGrid, request.ExpectedRevision,
                     request.FaceToward, request.FrontAxis, request.On, request.Align,
                     DetachAnchor: request.DetachAnchor ?? false),
                 cancellationToken);
@@ -298,6 +312,9 @@ public record UpdateSceneDocumentRequest(string DocumentJson, int? ExpectedRevis
 
 public record RenameSceneRequest(string Name, string? Description = null);
 
+/// <summary>Null <c>Stage</c> means "stop authoring this scene in stages" - see <c>SetSceneStageCommand</c>.</summary>
+public record SetSceneStageRequest(string? Stage = null, int? ExpectedRevision = null);
+
 public record PlaceSceneAssetRequest(
     string AssetType,
     int AssetId,
@@ -314,7 +331,8 @@ public record PlaceSceneAssetRequest(
     Vec3? FaceToward = null,
     string? FrontAxis = null,
     string? On = null,
-    string? Align = null);
+    string? Align = null,
+    bool? Suspended = null);
 
 public record MoveSceneNodeRequest(
     Vec3? Position = null,
@@ -327,7 +345,8 @@ public record MoveSceneNodeRequest(
     string? FrontAxis = null,
     string? On = null,
     string? Align = null,
-    bool? DetachAnchor = null);
+    bool? DetachAnchor = null,
+    bool? Suspended = null);
 
 public record ApplySceneMaterialRequest(
     int? TextureSetId = null,
