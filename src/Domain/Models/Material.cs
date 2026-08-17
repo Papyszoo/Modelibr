@@ -127,6 +127,21 @@ public class Material : AggregateRoot
         UpdatedAt = updatedAt;
     }
 
+    /// <summary>
+    /// Replaces the tag set wholesale. Tags arrive already resolved against the
+    /// shared pool, as they do for models and texture sets.
+    /// </summary>
+    public void SetTags(IEnumerable<ModelTag> tags, DateTime updatedAt)
+    {
+        ArgumentNullException.ThrowIfNull(tags);
+
+        _tags.Clear();
+        foreach (var tag in tags.Where(tag => tag is not null).DistinctBy(tag => tag.NormalizedName))
+            _tags.Add(tag);
+
+        UpdatedAt = updatedAt;
+    }
+
     public void UpdateCategory(int? categoryId, DateTime updatedAt)
     {
         CategoryId = categoryId;

@@ -67,6 +67,7 @@ namespace Infrastructure
                 ?? new Application.Extraction.Derivation.DerivationOptions();
             services.AddSingleton(derivationOptions);
             services.AddScoped<ITextureSetRepository, TextureSetRepository>();
+            services.AddScoped<IMaterialRepository, MaterialRepository>();
             services.AddScoped<ITextureProxyRepository, TextureProxyRepository>();
             services.AddScoped<IPackRepository, PackRepository>();
             services.AddScoped<IProjectRepository, ProjectRepository>();
