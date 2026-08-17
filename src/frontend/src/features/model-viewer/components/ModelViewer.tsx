@@ -377,10 +377,24 @@ export function ModelViewer({
   const mayHaveGltfResources = (versionModel || model)?.files?.some(f =>
     f.originalFileName?.toLowerCase().endsWith('.gltf')
   )
+  // Versions are a second round trip, and `selectedVersion` is set from an effect
+  // once they land - so between the model resolving and that effect there are many
+  // renders with a `.gltf` on screen and no version to ask about. The gate has to
+  // know that, or it opens for the whole window and the loader starts against an
+  // empty map. `isPending` stays true through the effect tick (data present,
+  // selection not made yet) and goes false only when the list settles with nothing
+  // to select, which is the one case where no version is ever coming.
+  const gltfVersionState = {
+    isKnown: currentVersionId !== undefined,
+    isPending:
+      !(versionsQuery.isSuccess || versionsQuery.isError) ||
+      versions.length > 0,
+  }
   const { resources: gltfResources, isAwaitingResources } = useGltfResources(
     model?.id,
     currentVersionId,
-    mayHaveGltfResources
+    mayHaveGltfResources,
+    gltfVersionState
   )
 
   // Fetch all texture sets for this version so we can build the material map

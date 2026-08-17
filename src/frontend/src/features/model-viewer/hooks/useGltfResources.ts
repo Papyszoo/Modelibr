@@ -37,11 +37,20 @@ export type GltfResourceMap = Record<string, string>
  *
  * An errored query opens the gate on purpose: the map is never coming, and a visible
  * failure beats a viewport that waits forever.
+ *
+ * `version` is what the auxiliary query is keyed on, and the gate needs it separately
+ * from the query's own state: the versions list is a *second* round trip that starts
+ * after the model resolves, so there is a long window in which the model is on screen,
+ * its files already name a `.gltf`, and no version is selected yet. The auxiliary query
+ * cannot even be enabled during that window, so its state says nothing. Left to the
+ * query alone the gate opens for the whole round trip - far more than the one tick
+ * above - and the loader starts against an empty map.
  */
 export function useGltfResources(
   modelId: number | string | undefined | null,
   versionId: number | string | undefined | null,
-  enabled = true
+  enabled: boolean | undefined,
+  version: GltfVersionState
 ): { resources: GltfResourceMap; isAwaitingResources: boolean } {
   const shouldFetch = Boolean(enabled && modelId && versionId)
 
@@ -66,11 +75,20 @@ export function useGltfResources(
 
   return {
     resources,
-    isAwaitingResources: isAwaitingGltfResources(shouldFetch, {
-      isSuccess,
-      isError,
-    }),
+    isAwaitingResources: isAwaitingGltfResources(
+      Boolean(enabled),
+      { isSuccess, isError },
+      version
+    ),
   }
+}
+
+/** Whether the version whose resource map we would fetch is settled yet. */
+export interface GltfVersionState {
+  /** A version is selected, so the auxiliary query is keyed on something real. */
+  isKnown: boolean
+  /** No version yet, but one may still arrive - the list is still resolving. */
+  isPending: boolean
 }
 
 /**
@@ -80,10 +98,33 @@ export function useGltfResources(
  * a test that reproduced that tick would be testing React Query rather than
  * this rule. Mirrors `isAwaitingResources` in `features/scenes` - the same rule
  * on the scene side, where it was fixed first.
+ *
+ * Note what the first argument is and is not. It asks whether this model *may*
+ * have external resources - nothing else. Handing it a flag that also folds in
+ * "and we know which version to ask about" is what left the gate open for the
+ * entire versions round trip: no version means no auxiliary query, which the
+ * gate then read as nothing to wait for. Version state is the third argument
+ * precisely so it cannot be conflated with looseness again.
+ *
+ * The scene side never had this half of the bug because it derives its sources
+ * from the version's own file list - with no version there is no source to load
+ * yet, so its loader cannot start early.
  */
 export function isAwaitingGltfResources(
-  shouldFetch: boolean,
-  query?: { isSuccess?: boolean; isError?: boolean }
+  mayHaveResources: boolean,
+  query: { isSuccess?: boolean; isError?: boolean } | undefined,
+  version: GltfVersionState
 ): boolean {
-  return shouldFetch && !query?.isSuccess && !query?.isError
+  if (!mayHaveResources) {
+    return false
+  }
+
+  // No version, so no auxiliary query to consult. Hold only while one may still
+  // arrive: a model that settles with no versions has nothing more coming, and
+  // holding forever would leave an empty viewport.
+  if (!version.isKnown) {
+    return version.isPending
+  }
+
+  return !query?.isSuccess && !query?.isError
 }
