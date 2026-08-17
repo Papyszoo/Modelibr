@@ -104,14 +104,20 @@ public record MaterialParametersRequest(
     /// </summary>
     public MaterialParameters ApplyTo(MaterialParameters current)
     {
-        var basis = string.IsNullOrWhiteSpace(BaseColorHex)
-            ? current
-            : MaterialParameters.FromHex(BaseColorHex, current.Roughness, current.Metallic);
+        // A hex colour is the deliberate one, so it wins outright: when it is
+        // given the individual components are ignored rather than layered over
+        // it. Leaving them to `??` inverted the documented precedence - a caller
+        // sending both got the floats, which is how a picked colour silently
+        // becomes a different one.
+        var hexGiven = !string.IsNullOrWhiteSpace(BaseColorHex);
+        var basis = hexGiven
+            ? MaterialParameters.FromHex(BaseColorHex!, current.Roughness, current.Metallic)
+            : current;
 
         return MaterialParameters.Create(
-            BaseColorR ?? basis.BaseColorR,
-            BaseColorG ?? basis.BaseColorG,
-            BaseColorB ?? basis.BaseColorB,
+            hexGiven ? basis.BaseColorR : BaseColorR ?? basis.BaseColorR,
+            hexGiven ? basis.BaseColorG : BaseColorG ?? basis.BaseColorG,
+            hexGiven ? basis.BaseColorB : BaseColorB ?? basis.BaseColorB,
             BaseColorA ?? basis.BaseColorA,
             Roughness ?? current.Roughness,
             Metallic ?? current.Metallic,

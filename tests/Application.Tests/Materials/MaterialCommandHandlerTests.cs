@@ -72,6 +72,54 @@ public class MaterialCommandHandlerTests
     }
 
     [Fact]
+    public async Task Create_WithHexAndFloatComponents_LetsTheHexWin()
+    {
+        // MaterialParametersRequest documents the hex as the deliberate one, so
+        // it wins outright when both are given. `BaseColorR ?? basis.BaseColorR`
+        // inverted that: a caller sending both got the floats, and a picked
+        // colour silently became a different one.
+        Material? saved = null;
+        _materials
+            .Setup(r => r.AddAsync(It.IsAny<Material>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Material material, CancellationToken _) => saved = material);
+
+        var result = await CreateHandler().Handle(
+            new CreateMaterialCommand("Contradictory",
+                new MaterialParametersRequest(
+                    BaseColorHex: "#1A1A1A",
+                    BaseColorR: 1f,
+                    BaseColorG: 1f,
+                    BaseColorB: 1f)),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(saved!.Parameters.BaseColorR < 0.02f,
+            "the hex is authoritative, so #1A's linear ~0.0125 must survive the 1.0 components");
+        Assert.True(saved.Parameters.BaseColorG < 0.02f);
+        Assert.True(saved.Parameters.BaseColorB < 0.02f);
+    }
+
+    [Fact]
+    public async Task Create_WithFloatComponentsOnly_UsesThem()
+    {
+        // The other half of the precedence rule: with no hex, the components
+        // are the only colour on offer and must still be applied.
+        Material? saved = null;
+        _materials
+            .Setup(r => r.AddAsync(It.IsAny<Material>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Material material, CancellationToken _) => saved = material);
+
+        var result = await CreateHandler().Handle(
+            new CreateMaterialCommand("Components",
+                new MaterialParametersRequest(BaseColorR: 0.25f, BaseColorG: 0.5f)),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(0.25f, saved!.Parameters.BaseColorR);
+        Assert.Equal(0.5f, saved.Parameters.BaseColorG);
+    }
+
+    [Fact]
     public async Task Create_WithModelSpecificCategory_IsRefused()
     {
         // Materials and global materials share the Universal vocabulary. A
