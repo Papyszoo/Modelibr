@@ -416,3 +416,108 @@ Then(
         expect(slot.body.nodesLoaded).toBeGreaterThan(0);
     },
 );
+
+// --- Validation ------------------------------------------------------------
+
+/**
+ * The last validation response, and the last write response that carried
+ * findings. Same WeakMap-per-page reasoning as the render slot above.
+ */
+const validationState = new WeakMap<
+    Page,
+    { status?: number; body?: any; writeBody?: any }
+>();
+
+function validationSlot(page: Page) {
+    let slot = validationState.get(page);
+    if (!slot) {
+        slot = {};
+        validationState.set(page, slot);
+    }
+    return slot;
+}
+
+/** Every finding code in a validation or write response. */
+function findingCodes(body: any): string[] {
+    return (body?.findings ?? []).map((finding: { code: string }) => finding.code);
+}
+
+When(
+    "I lift the first node of the scene {string} {int} m into the air",
+    async ({ page }, sceneName: string, metres: number) => {
+        const view = await fetchSceneByName(page, sceneName);
+        const node = view.document.nodes[0];
+        expect(node).toBeTruthy();
+
+        const response = await page.request.put(
+            `${apiBase()}/scenes/${view.scene.id}/nodes/${node.id}`,
+            {
+                data: {
+                    position: { x: 0, y: metres, z: 0 },
+                    // Explicitly off: the node was placed on the floor, and a sticky
+                    // groundSnap would put it straight back there.
+                    groundSnap: false,
+                },
+            },
+        );
+
+        expect(response.ok()).toBeTruthy();
+        validationSlot(page).writeBody = await response.json();
+    },
+);
+
+When("I validate the scene {string}", async ({ page }, sceneName: string) => {
+    const view = await fetchSceneByName(page, sceneName);
+    const response = await page.request.get(
+        `${apiBase()}/scenes/${view.scene.id}/validate`,
+    );
+
+    const slot = validationSlot(page);
+    slot.status = response.status();
+    slot.body = response.ok() ? await response.json() : null;
+});
+
+When("I validate the scene with id {int}", async ({ page }, id: number) => {
+    const response = await page.request.get(`${apiBase()}/scenes/${id}/validate`);
+    const slot = validationSlot(page);
+    slot.status = response.status();
+    slot.body = response.ok() ? await response.json() : null;
+});
+
+Then("the validation should report a verdict", async ({ page }) => {
+    const slot = validationSlot(page);
+    expect(slot.status).toBe(200);
+    expect(["ok", "warnings", "errors"]).toContain(slot.body.verdict);
+});
+
+Then("the validation should name its blind spots", async ({ page }) => {
+    // The whole point of the tool: a clean verdict must not read as "the scene
+    // is right". An axis-aligned box cannot see a wall facing the wrong way, and
+    // the response has to say so.
+    const limitations: string[] = validationSlot(page).body.coverage.limitations;
+    expect(limitations.length).toBeGreaterThan(0);
+    expect(limitations.join(" ")).toContain("axis-aligned");
+});
+
+Then(
+    "the validation should report {string}",
+    async ({ page }, code: string) => {
+        expect(findingCodes(validationSlot(page).body)).toContain(code);
+    },
+);
+
+Then(
+    "the move response should report {string}",
+    async ({ page }, code: string) => {
+        // The same check, delivered without being asked for. An agent that has to
+        // make a second call to find out its last write was wrong mostly does not.
+        expect(findingCodes(validationSlot(page).writeBody)).toContain(code);
+    },
+);
+
+Then(
+    "the validation lookup should report it does not exist",
+    async ({ page }) => {
+        expect(validationSlot(page).status).toBe(404);
+    },
+);
