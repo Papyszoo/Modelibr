@@ -52,6 +52,7 @@ function demoSceneSummary(scene: DemoScene) {
   const document = JSON.parse(scene.documentJson) as {
     nodes: unknown[]
     lights: unknown[]
+    stage?: string | null
   }
 
   return {
@@ -64,6 +65,10 @@ function demoSceneSummary(scene: DemoScene) {
     lightCount: document.lights.length,
     createdAt: scene.createdAt,
     updatedAt: scene.updatedAt,
+    // Read off the document like the server does. The demo has no gate to
+    // enforce the stage with, so this reports what the scene claims rather
+    // than anything it has been checked against.
+    stage: document.stage ?? null,
   }
 }
 
@@ -96,6 +101,11 @@ function demoSceneView(scene: DemoScene) {
       gridSize: null,
       groundOffset: null,
       originInBounds: null,
+      groundSnap: node.groundSnap ?? false,
+      suspended: node.suspended ?? false,
+      faceToward: node.faceToward ?? null,
+      frontAxis: node.frontAxis ?? '+Z',
+      anchor: node.anchor ?? null,
     })),
     overlaps: [],
     scaleWarnings: [],
