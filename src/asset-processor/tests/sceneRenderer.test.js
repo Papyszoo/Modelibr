@@ -53,4 +53,24 @@ describe('buildSceneRenderUrl', () => {
       ).toThrow(/positive integer/)
     }
   })
+
+  it('tells the page which API to use, because its own is wrong here', () => {
+    // The bundle is built with the address a user's browser uses. This browser
+    // is inside the worker container, where that address is the worker itself -
+    // so without this the page loads and every request fails at once.
+    const url = new URL(
+      buildSceneRenderUrl('http://frontend', {
+        sceneId: 12,
+        apiBaseUrl: 'http://webapi:8080',
+      })
+    )
+
+    expect(url.searchParams.get('api')).toBe('http://webapi:8080')
+  })
+
+  it('omits the API override when there is nothing to say', () => {
+    const url = new URL(buildSceneRenderUrl('http://frontend', { sceneId: 12 }))
+
+    expect(url.searchParams.has('api')).toBe(false)
+  })
 })

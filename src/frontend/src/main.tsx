@@ -9,6 +9,7 @@ import App from './app/App'
 import { AppProvider } from './app/providers'
 import { SceneRenderView } from './features/scenes/components/SceneRenderView'
 import { sceneViewpointFromName } from './features/scenes/lib/sceneRenderCamera'
+import { overrideApiBaseUrl } from './lib/apiBase'
 
 async function bootstrap() {
   if (import.meta.env.VITE_DEMO_MODE === 'true') {
@@ -42,6 +43,15 @@ function renderTarget() {
   const params = new URLSearchParams(window.location.search)
   if (params.get('render') !== 'scene') {
     return <App />
+  }
+
+  // The renderer's browser lives in the worker container, where the API address
+  // baked in for a user's browser generally does not resolve - so it passes the
+  // one it uses itself. Applied before the view mounts, because the scene
+  // queries and every file URL read it as they go.
+  const apiOverride = params.get('api')
+  if (apiOverride) {
+    overrideApiBaseUrl(apiOverride)
   }
 
   const sceneId = Number(params.get('sceneId'))

@@ -271,6 +271,10 @@ public static class SceneEndpoints
     /// </summary>
     private static IResult NotFoundOrFailure(SharedKernel.Error error) =>
         error.Code is "Scene.NotFound" or "Scene.NodeNotFound" or "Scene.LightNotFound"
+            // A render id that names nothing belongs here for the same reason: the
+            // caller polling for one has to tell "not drawn yet" from "wrong id", and
+            // a 400 makes a lost id look like a malformed request forever.
+            or "SceneRender.NotFound"
             ? Results.NotFound(new { error = error.Code, message = error.Message })
             : Failure(error);
 }

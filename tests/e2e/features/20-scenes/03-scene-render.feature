@@ -37,8 +37,10 @@ Feature: Rendering a scene back
     # and never publishes a status, so a bad viewpoint that reached the renderer
     # would surface a minute later as a timeout - and send someone hunting a slow
     # scene instead of a typo.
+    # No save step: creating a scene already persists it, and the save button is
+    # correctly disabled with nothing pending. This scenario only needs a scene
+    # id to aim a bad request at.
     Given a scene named "Bad Viewpoint Scene" is open
-    And I save the scene
     When I request a render of the scene "Bad Viewpoint Scene" from "sideways"
     Then the render request should be rejected
 

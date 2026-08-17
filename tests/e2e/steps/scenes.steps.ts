@@ -286,7 +286,7 @@ Then(
  */
 const renderState = new WeakMap<
     Page,
-    { renderId?: number; status?: number; body?: any }
+    { renderId?: number; status?: number; body?: any; bodyText?: string }
 >();
 
 function renderSlot(page: Page) {
@@ -299,15 +299,25 @@ function renderSlot(page: Page) {
 }
 
 async function requestRender(page: Page, sceneName: string, viewpoint?: string) {
-    const scene = await fetchSceneByName(page, sceneName);
+    // `view.scene.id`, not `view.id` - GET /scenes/{id} answers with a SceneView
+    // that nests the summary. Reading the wrong one posts to
+    // /scenes/undefined/render, which 404s and looks exactly like a render that
+    // never started.
+    const view = await fetchSceneByName(page, sceneName);
+    const sceneId = view.scene.id;
+    expect(sceneId).toBeGreaterThan(0);
+
     const response = await page.request.post(
-        `${apiBase()}/scenes/${scene.id}/render`,
+        `${apiBase()}/scenes/${sceneId}/render`,
         { data: viewpoint ? { viewpoint } : {} },
     );
 
     const slot = renderSlot(page);
     slot.status = response.status();
-    slot.body = response.ok() ? await response.json() : null;
+    // Kept as text as well: a request that fails has to say why here, or the
+    // only symptom downstream is an undefined renderId.
+    slot.bodyText = await response.text();
+    slot.body = response.ok() ? JSON.parse(slot.bodyText) : null;
     slot.renderId = slot.body?.renderId;
 }
 
@@ -344,6 +354,14 @@ Then("the render lookup should report it does not exist", async ({ page }) => {
 
 Then("the render should complete", async ({ page }) => {
     const slot = renderSlot(page);
+
+    // Asserted on the request first, with its body in the message. Without this
+    // a rejected request reports "undefined is not a number" from the poll
+    // below, which says nothing about why the render never started.
+    expect(
+        slot.status,
+        `Render request failed: HTTP ${slot.status} ${slot.bodyText}`,
+    ).toBeLessThan(300);
     expect(slot.renderId).toBeGreaterThan(0);
 
     // Polled rather than waited on a fixed delay: the render drives a real

@@ -78,7 +78,11 @@ export class SceneRenderer {
       await this.initialize()
     }
 
-    const url = buildSceneRenderUrl(frontendUrl, { sceneId, viewpoint })
+    const url = buildSceneRenderUrl(frontendUrl, {
+      sceneId,
+      viewpoint,
+      apiBaseUrl: config.apiBaseUrl,
+    })
     const page = await this.browser.newPage()
     const pageErrors = []
 
@@ -170,7 +174,7 @@ export class SceneRenderer {
  */
 export function buildSceneRenderUrl(
   frontendUrl,
-  { sceneId, viewpoint = 'iso' }
+  { sceneId, viewpoint = 'iso', apiBaseUrl }
 ) {
   if (!Number.isInteger(Number(sceneId)) || Number(sceneId) <= 0) {
     throw new Error(`sceneId must be a positive integer, got "${sceneId}"`)
@@ -181,5 +185,16 @@ export function buildSceneRenderUrl(
   url.searchParams.set('render', 'scene')
   url.searchParams.set('sceneId', String(sceneId))
   url.searchParams.set('view', String(viewpoint))
+
+  // The API address the page should use, which is not the one it was built
+  // with. VITE_API_BASE_URL is baked in for the browser a user runs - a host
+  // address, reachable because the user is on the host. This browser is inside
+  // the worker container, where that address is the worker itself, so every
+  // request fails at once and the page reports a network error rather than
+  // timing out. We know an address that works, because we use it.
+  if (apiBaseUrl) {
+    url.searchParams.set('api', apiBaseUrl)
+  }
+
   return url.toString()
 }

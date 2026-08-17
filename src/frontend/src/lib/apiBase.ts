@@ -4,7 +4,14 @@ import axios, {
   type InternalAxiosRequestConfig,
 } from 'axios'
 
-export const baseURL =
+/**
+ * Where the API lives.
+ *
+ * `let`, not `const`, so the headless render path can point it somewhere else -
+ * see `overrideApiBaseUrl`. ES module bindings are live, so every importer that
+ * reads this at call time (`getFileUrl` and friends) follows the override.
+ */
+export let baseURL =
   import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
 
 if (import.meta.env.DEV && !import.meta.env.VITE_API_BASE_URL) {
@@ -195,3 +202,25 @@ export function createApiClient(
 }
 
 export const client = createApiClient(baseURL)
+
+/**
+ * Point the app at a different API for this page load.
+ *
+ * `VITE_API_BASE_URL` is baked in at build time and is chosen for the browser a
+ * *user* runs - typically a host address, reachable because the user is on the
+ * host. The headless renderer's browser is not that browser: it runs inside the
+ * worker container, where the user-facing address usually resolves to the worker
+ * itself and every request fails immediately. It has to be told.
+ *
+ * Must run before anything issues a request or builds a file URL. Callers read
+ * `baseURL` at call time, so the reassignment reaches them; the axios instance
+ * already captured its own copy, so that one is set explicitly.
+ *
+ * Only ever called from the `render=scene` bootstrap. Honouring an arbitrary API
+ * origin on the normal app would let a crafted link show a user someone else's
+ * data as if it were their library.
+ */
+export function overrideApiBaseUrl(url: string): void {
+  baseURL = url
+  client.defaults.baseURL = url
+}
