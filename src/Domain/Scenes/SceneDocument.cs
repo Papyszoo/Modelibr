@@ -12,11 +12,21 @@ namespace Domain.Scenes;
 /// language is what the generation exists to prevent - three copies of a schema drift,
 /// and the one that drifts silently is the one an agent writes through.
 /// </summary>
+/// <param name="Stage">
+/// How far the scene has deliberately been taken, from <see cref="SceneStages"/>.
+///
+/// Null means the scene is not being authored in stages, and everything is judged at once -
+/// which is what every document written before this existed says, and what the editor's own
+/// scenes say until someone declares otherwise. Declaring a stage is opting in to being
+/// judged against it: earlier stages stop treating missing light and missing material as
+/// defects, and no stage stops treating a floating object as one.
+/// </param>
 public sealed record SceneDocument(
     int SchemaVersion,
     IReadOnlyList<SceneNode> Nodes,
     IReadOnlyList<SceneLight> Lights,
-    SceneEnvironment? Environment = null)
+    SceneEnvironment? Environment = null,
+    string? Stage = null)
 {
     /// <summary>
     /// The only schema version this build reads or writes.
@@ -78,7 +88,21 @@ public sealed record SceneNode(
     /// hand clears it - a caller who states an angle is no longer tracking anything.
     /// </summary>
     Vec3? FaceToward = null,
-    SceneAnchor? Anchor = null);
+    SceneAnchor? Anchor = null,
+    /// <summary>
+    /// This node hangs in the air on purpose - a pendant lamp, a bird, a sign bracketed off a
+    /// wall - so nothing is expected to be holding it up.
+    ///
+    /// The third answer to "what is under this?", beside <see cref="GroundSnap"/> and
+    /// <see cref="Anchor"/>. It exists because the alternative is a check that fires on every
+    /// hanging light for the life of the scene with no way to answer it, and a check nobody
+    /// can answer is a check everybody learns to skip. Declaring it is what lets a scene move
+    /// on to a later stage with a lamp still in mid-air.
+    ///
+    /// Contradicts both of the other two: something resting on the floor or on another node is
+    /// not suspended, and the document validator rejects the combination rather than picking one.
+    /// </summary>
+    bool? Suspended = null);
 
 /// <summary>
 /// Rests this node on top of another node, and keeps it there.
@@ -203,6 +227,70 @@ public static class SceneAnchorAlignments
     public const string Keep = "keep";
 
     public static readonly IReadOnlyList<string> All = new[] { Center, Keep };
+}
+
+/// <summary>
+/// How far a scene has been taken: composition first, colour last.
+///
+/// The order is the whole content of this vocabulary. A run that tuned four lighting setups
+/// and swapped three floors while every object in the scene was floating half its height
+/// paid for the appearance work twice - once making it, once redoing it after the layout
+/// moved. Flat grey is also the better debugging surface: levitation is obvious in an
+/// untextured blockout and easy to miss in a lit, textured render.
+///
+/// So the stages are not a label. <see cref="SceneValidation"/> judges a scene against the
+/// stage it claims, and a write that <i>advances</i> the stage is refused while the
+/// composition underneath it is broken.
+/// </summary>
+public static class SceneStages
+{
+    /// <summary>Room shell and the large forms. Nothing decorative, nothing dressed.</summary>
+    public const string Layout = "layout";
+
+    /// <summary>Props, and the things resting on other things.</summary>
+    public const string Detail = "detail";
+
+    /// <summary>Lit: there is a key light and the scene has form.</summary>
+    public const string Lit = "lit";
+
+    /// <summary>Dressed: colour, finish, materials. The last thing to do, not the first.</summary>
+    public const string Dressed = "dressed";
+
+    /// <summary>In order. Position in this list is what "later" means.</summary>
+    public static readonly IReadOnlyList<string> All = new[] { Layout, Detail, Lit, Dressed };
+
+    /// <summary>
+    /// Where a stage sits in the sequence. An unstaged document answers -1: it is before
+    /// every stage, so declaring any stage on it is an advance and is gated like one.
+    /// A value outside the vocabulary answers null - the document validator rejects those,
+    /// and nothing here should quietly rank one.
+    /// </summary>
+    public static int? Order(string? stage)
+    {
+        if (stage is null)
+        {
+            return -1;
+        }
+
+        var index = All.ToList().IndexOf(stage);
+        return index < 0 ? null : index;
+    }
+
+    public static bool IsStage(string? stage) => stage is not null && Order(stage) is >= 0;
+
+    /// <summary>
+    /// Whether a scene at <paramref name="stage"/> has reached <paramref name="target"/>, and
+    /// so should be judged against what that stage requires.
+    ///
+    /// An unstaged scene has reached everything. It never opted into staged authoring, so
+    /// suppressing its findings would be a silent weakening of the checks it gets today.
+    /// </summary>
+    public static bool HasReached(string? stage, string target) =>
+        stage is null || (Order(stage) is { } at && Order(target) is { } required && at >= required);
+
+    /// <summary>True when moving from <paramref name="current"/> to <paramref name="candidate"/> claims more than before.</summary>
+    public static bool IsAdvance(string? current, string? candidate) =>
+        Order(candidate) is { } to && Order(current) is { } from && to > from;
 }
 
 /// <summary>The blockout shapes a scene document may contain.</summary>

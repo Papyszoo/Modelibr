@@ -24,6 +24,10 @@ export type ScenePrimitiveShape = (typeof SCENE_PRIMITIVE_SHAPES)[number]
 export const SCENE_FRONT_AXES = ['+X', '-X', '+Z', '-Z'] as const
 export type SceneFrontAxis = (typeof SCENE_FRONT_AXES)[number]
 
+/** How far a scene has been taken, in order. Composition first, colour last - and the order is enforced, not advised. */
+export const SCENE_STAGES = ['layout', 'detail', 'lit', 'dressed'] as const
+export type SceneStage = (typeof SCENE_STAGES)[number]
+
 /** How a node is seated on the node it rests on. Decides the anchor offset a write records, and is not itself stored. */
 export const SCENE_ANCHOR_ALIGNMENTS = ['center', 'keep'] as const
 export type SceneAnchorAlignment = (typeof SCENE_ANCHOR_ALIGNMENTS)[number]
@@ -33,6 +37,7 @@ export interface SceneDocument {
   nodes: SceneNode[]
   lights: SceneLight[]
   environment?: SceneEnvironment | null
+  stage?: SceneStage | null
 }
 
 export interface SceneAnchor {
@@ -80,6 +85,7 @@ export interface SceneNode {
   frontAxis?: SceneFrontAxis | null
   faceToward?: Vec3 | null
   anchor?: SceneAnchor | null
+  suspended?: boolean | null
 }
 
 export interface ScenePrimitive {

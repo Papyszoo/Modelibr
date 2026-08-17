@@ -35,6 +35,7 @@ public static class SceneContractTypeScript
         ["SceneLight.Type"] = "SceneLightType",
         ["ScenePrimitive.Shape"] = "ScenePrimitiveShape",
         ["SceneNode.FrontAxis"] = "SceneFrontAxis",
+        ["SceneDocument.Stage"] = "SceneStage",
     };
 
     public static string Generate()
@@ -62,6 +63,12 @@ public static class SceneContractTypeScript
             SceneFrontAxes.All,
             "Local axes an asset's front may point along. Y is excluded: facing is a rotation about it.",
             "SCENE_FRONT_AXES");
+        AppendVocabulary(
+            builder,
+            "SceneStage",
+            SceneStages.All,
+            "How far a scene has been taken, in order. Composition first, colour last - and the order is enforced, not advised.",
+            "SCENE_STAGES");
         AppendVocabulary(
             builder,
             "SceneAnchorAlignment",

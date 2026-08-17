@@ -88,11 +88,18 @@ public sealed record SceneFinding(
 /// an agent reading "no problems" as "the scene is right". A check that stays quiet about its
 /// blind spots raises confidence in exactly the scenes it cannot judge.
 /// </summary>
+/// <param name="Stage">
+/// The stage the scene was judged against, or null when it declares none. Reported because
+/// the stage decides which findings count: a caller comparing two runs of this tool needs to
+/// know that the second one was quieter because the scene claimed less, not because it
+/// improved.
+/// </param>
 public sealed record SceneValidationCoverage(
     int NodeCount,
     int NodesWithBounds,
     IReadOnlyList<string> NodesWithoutBounds,
-    IReadOnlyList<string> Limitations);
+    IReadOnlyList<string> Limitations,
+    string? Stage = null);
 
 /// <summary>A scene's verdict, everything found, and what was not looked at.</summary>
 public sealed record SceneValidationReport(
@@ -203,7 +210,8 @@ public static class SceneValidator
                 nodes.Count,
                 boxes.Count,
                 withoutBounds,
-                Limitations(withoutBounds.Count)));
+                Limitations(withoutBounds.Count, document.Stage),
+                document.Stage));
     }
 
     /// <summary>
@@ -291,6 +299,13 @@ public static class SceneValidator
                 continue;
             }
 
+            // Declared as hanging, which is the answer to this check rather than an exception
+            // to it. Nothing further to say about what is under it.
+            if (node.Suspended is true)
+            {
+                continue;
+            }
+
             // Nothing declared. Floating is legitimate - a pendant lamp, a bird - so this is
             // a warning naming the height, not a verdict on the placement.
             if (box.Min.Y > ContactToleranceMetres && !IsSupported(node.Id, box, visibleBoxes))
@@ -301,7 +316,7 @@ public static class SceneValidator
                     SceneFindingSeverities.Warning,
                     new[] { node.Id },
                     FormattableString.Invariant(
-                        $"'{Label(node)}' floats {box.Min.Y:0.###} m above the floor with nothing under it. Pass groundSnap=true to rest it on the floor, or on=\"<nodeId>\" to rest it on something.")));
+                        $"'{Label(node)}' floats {box.Min.Y:0.###} m above the floor with nothing under it. Pass groundSnap=true to rest it on the floor, on=\"<nodeId>\" to rest it on something, or suspended=true if it is meant to hang.")));
             }
         }
     }
@@ -473,6 +488,12 @@ public static class SceneValidator
     /// <summary>
     /// Whether the scene will read as anything when it is rendered: is it lit, and is anything
     /// going to have a surface.
+    ///
+    /// This is the one check the scene's <see cref="SceneStages">stage</see> moves. A scene
+    /// being blocked out is <i>meant</i> to be an unlit grey box, and warning about that on
+    /// every call while the layout is still being fixed is how a caller learns to skim the
+    /// findings it does need to read. Premature findings are demoted to info rather than
+    /// dropped: the fact stays visible and stops counting, which is not the same as hiding it.
     /// </summary>
     private static void CheckAppearance(
         SceneDocument document,
@@ -484,9 +505,15 @@ public static class SceneValidator
         var lit = lights.Where(l => l.Intensity > 0).ToList();
         var hasEnvironmentMap = document.Environment?.EnvironmentMap is not null;
 
+        var lightingDue = SceneStages.HasReached(document.Stage, SceneStages.Lit);
+        var materialDue = SceneStages.HasReached(document.Stage, SceneStages.Dressed);
+
         // An environment map lights a scene on its own, so it turns "unlit" from a defect
-        // into a note. Without one, a scene with no key light has no form at all.
-        var unlitSeverity = hasEnvironmentMap ? SceneFindingSeverities.Info : SceneFindingSeverities.Warning;
+        // into a note. Without one, a scene with no key light has no form at all - unless the
+        // scene says it has not been lit yet, in which case it is a statement of fact.
+        var unlitSeverity = hasEnvironmentMap || !lightingDue
+            ? SceneFindingSeverities.Info
+            : SceneFindingSeverities.Warning;
 
         if (nodes.Count > 0 && lit.Count == 0)
         {
@@ -495,9 +522,10 @@ public static class SceneValidator
                 "Appearance.Unlit",
                 unlitSeverity,
                 Array.Empty<string>(),
-                lights.Count == 0
+                (lights.Count == 0
                     ? "This scene has no lights. Add at least one directional or point light, or it renders as flat silhouettes."
-                    : "Every light in this scene has zero intensity, which is the same as having none."));
+                    : "Every light in this scene has zero intensity, which is the same as having none.")
+                + NotYetDue(document.Stage, lightingDue, SceneStages.Lit)));
         }
         else if (nodes.Count > 0 && !lit.Any(IsKeyLight))
         {
@@ -506,7 +534,8 @@ public static class SceneValidator
                 "Appearance.AmbientOnly",
                 unlitSeverity,
                 Array.Empty<string>(),
-                "This scene is lit only by ambient/hemisphere light. Ambient is fill: with no directional, point or spot light nothing casts shade and the render has no form."));
+                "This scene is lit only by ambient/hemisphere light. Ambient is fill: with no directional, point or spot light nothing casts shade and the render has no form."
+                + NotYetDue(document.Stage, lightingDue, SceneStages.Lit)));
         }
 
         if (profiles is null)
@@ -528,9 +557,10 @@ public static class SceneValidator
                 findings.Add(new SceneFinding(
                     SceneChecks.Appearance,
                     "Appearance.NoMaterial",
-                    SceneFindingSeverities.Warning,
+                    materialDue ? SceneFindingSeverities.Warning : SceneFindingSeverities.Info,
                     new[] { node.Id },
-                    $"'{Label(node)}' declares no material and has no texture set bound, so it renders in the viewer's default grey."));
+                    $"'{Label(node)}' declares no material and has no texture set bound, so it renders in the viewer's default grey."
+                    + NotYetDue(document.Stage, materialDue, SceneStages.Dressed)));
                 continue;
             }
 
@@ -611,13 +641,28 @@ public static class SceneValidator
         }
     }
 
-    private static IReadOnlyList<string> Limitations(int nodesWithoutBounds)
+    /// <summary>
+    /// The clause that turns a demoted finding from a mystery into a statement of where the
+    /// scene is. Empty once the finding is due, so a finished scene reads exactly as before.
+    /// </summary>
+    private static string NotYetDue(string? stage, bool due, string dueAt) =>
+        due ? string.Empty : $" This scene is still at the '{stage}' stage, so it is a note rather than a problem - it becomes one at '{dueAt}'.";
+
+    private static IReadOnlyList<string> Limitations(int nodesWithoutBounds, string? stage)
     {
         var limitations = new List<string>
         {
             "Footprints are axis-aligned boxes. A square panel rotated 90° about Y has the same box as one that is not, so nothing here can see that a wall is facing the wrong way - render the scene and look at it.",
             "Nothing here judges composition, colour or whether the room reads as the thing it is meant to be.",
         };
+
+        // Named for the same reason the blind spots are: a quieter answer must never be
+        // mistakable for a better scene.
+        if (stage is not null && !SceneStages.HasReached(stage, SceneStages.Dressed))
+        {
+            limitations.Add(
+                $"This scene declares the '{stage}' stage, so findings that belong to a later stage are reported as notes and do not move the verdict. Contact, containment, identity, orientation, scale and interpenetration are checked at every stage.");
+        }
 
         if (nodesWithoutBounds > 0)
         {

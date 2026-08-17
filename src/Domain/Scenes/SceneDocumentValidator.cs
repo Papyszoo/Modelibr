@@ -65,11 +65,28 @@ public static class SceneDocumentValidator
             return issues;
         }
 
+        ValidateStage(document, issues);
         ValidateNodes(document, issues);
         ValidateLights(document, issues);
         ValidateEnvironment(document, issues);
 
         return issues;
+    }
+
+    /// <summary>
+    /// The stage, when one is declared, has to be one of the four. A typo would otherwise
+    /// rank as no stage at all, which reads as "not authored in stages" - and silently
+    /// un-gates the write the caller was trying to gate.
+    /// </summary>
+    private static void ValidateStage(SceneDocument document, List<SceneValidationIssue> issues)
+    {
+        if (document.Stage is not null && !SceneStages.IsStage(document.Stage))
+        {
+            issues.Add(new SceneValidationIssue(
+                "stage",
+                "UnknownStage",
+                $"'{document.Stage}' is not a scene stage. Use one of: {string.Join(", ", SceneStages.All)} - or omit it to author the scene without stages."));
+        }
     }
 
     private static void ValidateNodes(SceneDocument document, List<SceneValidationIssue> issues)
@@ -156,6 +173,18 @@ public static class SceneDocumentValidator
             if (node.Anchor is { } anchor)
             {
                 ValidateAnchor(node, anchor, $"{path}.anchor", issues);
+            }
+
+            // Three answers to "what holds this up", and they contradict each other. Picking
+            // one silently would leave the caller believing something the scene does not do.
+            if (node.Suspended is true && (node.GroundSnap is true || node.Anchor is not null))
+            {
+                issues.Add(new SceneValidationIssue(
+                    $"{path}.suspended",
+                    "SuspendedAndSupported",
+                    node.GroundSnap is true
+                        ? "A node cannot be suspended and ground-snapped at once. Drop groundSnap to hang it, or drop suspended to rest it on the floor."
+                        : "A node cannot be suspended and resting on another node at once. Detach the anchor to hang it, or drop suspended to leave it resting."));
             }
         }
 
