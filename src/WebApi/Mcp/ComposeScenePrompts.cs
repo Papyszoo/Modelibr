@@ -37,7 +37,7 @@ public sealed class ComposeScenePrompts
         [Description("Existing scene id to continue building. Omit to start a new scene.")] int? sceneId = null)
     {
         var target = sceneId is { } id
-            ? $"Continue scene {id}. Call get_scene({id}) first and work out which stage below it has reached."
+            ? $"Continue scene {id}. Call get_scene({id}) first - its `scene.stage` says which stage below it has reached."
             : "Create the scene with create_scene, then build it up through the stages below.";
 
         return $$"""
@@ -46,18 +46,29 @@ public sealed class ComposeScenePrompts
         Target: {{description}}
         {{target}}
 
-        WORK IN STAGES. Do not dress a scene that is not blocked out yet - fixing the
-        composition after the props are placed means re-placing every one of them.
+        WORK IN STAGES, and declare each one with set_scene_stage. Do not dress a scene
+        that is not blocked out yet - fixing the composition after the props are placed
+        means re-placing every one of them, and levitation that is glaring in a grey
+        blockout is easy to miss in a lit, textured render.
 
-          Stage 1 - Layout.   Room shell (floor, walls), then the large furniture.
-                              Nothing decorative.
-          Stage 2 - Verify.   validate_scene, then render_scene. Fix before continuing.
-          Stage 3 - Detail.   Props, and things resting on other things.
-          Stage 4 - Verify.   Again. Same two calls.
-          Stage 5 - Light.    Ambient is FILL, never key. Add at least one directional,
-                              point or spot light or the scene has no form at all.
-          Stage 6 - Material. Colour and finish, only now that the composition is right.
-          Stage 7 - Render.   Look at the final image.
+          set_scene_stage "layout"    Room shell (floor, walls), then the large
+                                      furniture. Nothing decorative.
+              Verify: validate_scene, then render_scene. Fix before continuing.
+          set_scene_stage "detail"    Props, and things resting on other things.
+              Verify: again, same two calls.
+          set_scene_stage "lit"       Ambient is FILL, never key. Add at least one
+                                      directional, point or spot light or the scene has
+                                      no form at all.
+          set_scene_stage "dressed"   Colour, finish and materials - only now that the
+                                      composition is right.
+              Finish: render_scene, and look at the image.
+
+        The stage is not a label. Until the scene reaches "lit" and "dressed",
+        validate_scene reports missing lights and missing materials as notes rather than
+        warnings, so what is wrong NOW is not buried under what is not due yet. And
+        moving forward is REFUSED while any node is standing on nothing: fix it with
+        groundSnap / on, or pass suspended=true for something meant to hang. Moving back
+        a stage always works, and is how a scene is reopened to fix its composition.
 
         CHOOSING AN ASSET
           - Dimensions in search results are the asset's own, and roughly half the library
@@ -82,6 +93,9 @@ public sealed class ComposeScenePrompts
           - Use faceToward=[x,y,z] to aim things. If an asset ends up backwards, declare
             frontAxis - nothing in the library derives which way an asset faces.
           - For rows - fence posts, a colonnade, street lamps - use distribute_assets.
+          - Anything genuinely hanging in mid-air - a pendant lamp, a sign - needs
+            suspended=true. Otherwise it is reported as floating for the life of the
+            scene, and it will hold up the next set_scene_stage.
 
         VERIFYING - a scene is not correct because its numbers are
           - Read the `findings` on every write response. They are scoped to what you just

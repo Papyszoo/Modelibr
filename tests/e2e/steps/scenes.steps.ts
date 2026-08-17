@@ -521,3 +521,101 @@ Then(
         expect(validationSlot(page).status).toBe(404);
     },
 );
+
+Then(
+    "the validation should report {string} as {string}",
+    async ({ page }, code: string, severity: string) => {
+        const finding = (validationSlot(page).body?.findings ?? []).find(
+            (candidate: { code: string }) => candidate.code === code,
+        );
+        expect(finding, `no ${code} finding in the validation`).toBeTruthy();
+        expect(finding.severity).toBe(severity);
+    },
+);
+
+// --- Stages ----------------------------------------------------------------
+
+/** The last stage change's status and body - refusals included, which is the point. */
+const stageState = new WeakMap<Page, { status?: number; body?: any }>();
+
+When(
+    "I move the scene {string} to the {string} stage",
+    async ({ page }, sceneName: string, stage: string) => {
+        const view = await fetchSceneByName(page, sceneName);
+        const response = await page.request.put(
+            `${apiBase()}/scenes/${view.scene.id}/stage`,
+            { data: { stage } },
+        );
+
+        stageState.set(page, {
+            status: response.status(),
+            body: await response.json(),
+        });
+    },
+);
+
+When(
+    "I declare the first node of the scene {string} as hanging",
+    async ({ page }, sceneName: string) => {
+        const view = await fetchSceneByName(page, sceneName);
+        const node = view.document.nodes[0];
+        expect(node).toBeTruthy();
+
+        const response = await page.request.put(
+            `${apiBase()}/scenes/${view.scene.id}/nodes/${node.id}`,
+            { data: { suspended: true } },
+        );
+
+        expect(response.ok()).toBeTruthy();
+    },
+);
+
+Then(
+    "the scene {string} should report the {string} stage",
+    async ({ page }, sceneName: string, stage: string) => {
+        // Read back through /scenes rather than trusting the write response:
+        // the stage lives in the document, and a stage the list cannot see is a
+        // stage the editor's header cannot show either.
+        const view = await fetchSceneByName(page, sceneName);
+        expect(view.scene.stage).toBe(stage);
+        expect(view.document.stage).toBe(stage);
+    },
+);
+
+Then(
+    "the scene {string} should report no stage",
+    async ({ page }, sceneName: string) => {
+        const view = await fetchSceneByName(page, sceneName);
+        expect(view.scene.stage ?? null).toBeNull();
+    },
+);
+
+Then(
+    "the stage change should be refused for {string}",
+    async ({ page }, code: string) => {
+        const slot = stageState.get(page);
+        expect(slot?.status).toBe(400);
+        expect(slot?.body?.error).toBe("Scene.StageBlocked");
+        // The refusal has to name the finding and the way out of it, or the
+        // caller is left guessing which of twenty nodes is the problem.
+        expect(slot?.body?.message).toContain(code);
+        expect(slot?.body?.message).toContain("suspended=true");
+    },
+);
+
+Then(
+    "the validation of {string} should judge it against the {string} stage",
+    async ({ page }, sceneName: string, stage: string) => {
+        const view = await fetchSceneByName(page, sceneName);
+        const response = await page.request.get(
+            `${apiBase()}/scenes/${view.scene.id}/validate`,
+        );
+        expect(response.ok()).toBeTruthy();
+
+        const body = await response.json();
+        expect(body.coverage.stage).toBe(stage);
+        // Said out loud in the limitations too: a quieter answer must never be
+        // mistakable for a better scene.
+        expect(body.coverage.limitations.join(" ")).toContain(`'${stage}' stage`);
+    },
+);

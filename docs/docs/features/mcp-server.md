@@ -38,7 +38,7 @@ already built there. These five need no write flag either.
 | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `list_scenes`      | Saved scenes with their node and light counts, newest edit first.                                                                                                                                                                                                   |
 | `get_scene`        | A scene's document plus, per node, the world footprint after transform, the source asset's own dimensions, where its origin sits inside those bounds and how far it is off the ground - with every overlapping pair and scale warning in the scene. The viewport-free inspector. |
-| `validate_scene`   | The mistakes the numbers above cannot show: something resting on nothing, geometry under the floor, an asset that is a whole sample scene rather than the prop it was placed as, nodes tilted or upside down, a scene with no key light, objects inside each other. Returns a verdict, findings with stable codes, **and what it could not check**. |
+| `validate_scene`   | The mistakes the numbers above cannot show: something resting on nothing, geometry under the floor, an asset that is a whole sample scene rather than the prop it was placed as, nodes tilted or upside down, a scene with no key light, objects inside each other. Returns a verdict, findings with stable codes, **and what it could not check** - including which stage it judged the scene against. |
 | `render_scene`     | Photograph the scene through the same component the editor draws with, and get the image back. The only check that sees facing, framing and whether an asset loaded at all.                                                                                          |
 | `get_scene_render` | Collect a render by id.                                                                                                                                                                                                                                             |
 
@@ -50,7 +50,7 @@ and look.
 
 ## What the agent can change (opt-in)
 
-Set `MCP_WRITE_ENABLED=true` in your root `.env` and twenty-four more tools appear,
+Set `MCP_WRITE_ENABLED=true` in your root `.env` and twenty-five more tools appear,
 letting an agent curate the library the way you would in the app. They are a thin
 pass-through over the same command handlers the UI uses, so there is one source
 of truth for what a change means:
@@ -110,7 +110,36 @@ the call that put it there rather than at the end of the build.
 | `remove_asset`          | Remove a node. The whole node is returned, so the removal can be reversed. Refused while other nodes rest on it.                                                                     |
 | `set_light`             | Add, update or remove one light by id. Upsert semantics, so a retried call does not stack a second sun into the scene.                                                              |
 | `apply_material`        | Bind a texture set to one node, for this scene only - the model's own default texture set is untouched.                                                                             |
+| `set_scene_stage`       | Declare how far the scene has been taken - `layout`, `detail`, `lit`, `dressed`. Moving forward is refused over a composition that does not hold; moving back always works.        |
 | `update_scene_document` | Replace the whole document, for bulk edits. An invalid document is rejected in full, never partially applied.                                                                        |
+
+#### Composition first, colour last
+
+A scene carries a **stage**: `layout` (room shell and the large forms), `detail` (props,
+and things resting on other things), `lit`, then `dressed` (colour and materials). It is
+the order in which a scene is worth building - appearance tuned over a layout that is
+about to move is made twice, and an object floating half its height is glaring among grey
+volumes and easy to miss in a lit, textured render. The editor's viewport has a **blockout
+view** for exactly this, drawing every node as the volume it occupies; it is on by default
+while a scene is at `layout`.
+
+The stage is enforced rather than advised, in two directions:
+
+- **It decides which findings count.** Until a scene reaches `lit`, "this scene has no key
+  light" is reported as a note; until `dressed`, so is "this node has no material". They
+  are demoted, never hidden - a check that goes silent is indistinguishable from a check
+  that passed - and `coverage.limitations` says which stage the verdict was measured
+  against. A scene that declares no stage is judged against everything at once, exactly as
+  before stages existed.
+- **Moving forward is refused while something is standing on nothing.** That is the one
+  finding a write cannot repair on its own, and it is the one that shipped a living room
+  full of floating furniture. Answer it with `groundSnap`, with `on`, or - for a pendant
+  lamp or a hanging sign - with `suspended=true`, which is a standing fact about the node
+  rather than a way past one call. Geometry below the floor comes back on the response
+  instead of blocking, because nothing in a document can declare a sunken bath deliberate.
+
+Moving **back** a stage is never refused. It is how a scene is reopened to fix exactly
+what the gate stopped.
 
 #### Placement rules stick to the node
 
@@ -128,6 +157,9 @@ about a composition, not one-off nudges:
   moving the TV re-aims the furniture. `frontAxis` says which local axis is the asset's front
   (`+Z` is assumed - nothing in the library derives it). Setting an explicit `rotationEuler`
   stops the node tracking anything.
+- **`suspended`** is the third answer to "what holds this up", beside the floor and an
+  anchor: this node hangs, and nothing is expected to be under it. It contradicts the other
+  two, and a document that claims both is rejected rather than quietly resolved.
 
 Every scene write accepts an optional `expectedRevision` and is refused if the scene has
 moved on since the agent last read it. Leaving it out means "apply to whatever is there" -
@@ -179,8 +211,9 @@ The server also publishes two **prompts** - guided playbooks an agent can invoke
   (dedupe, prefer `.glb`, handle multi-file `.gltf`, then categorize from the suggestions).
 - **`compose_scene`** - building a scene in stages: block out the room and its large
   furniture, verify, add detail, verify again, light it, and only then dress it with
-  materials. It covers the judgement calls the tools cannot enforce, such as never scaling
-  from a search hit's dimensions and never treating a clean validation as a finished scene.
+  materials. The stages themselves are enforced by `set_scene_stage`; the prompt covers the
+  judgement calls the tools cannot, such as never scaling from a search hit's dimensions and
+  never treating a clean validation as a finished scene.
 
 ## Connecting an agent
 
