@@ -175,6 +175,51 @@ function demoMaterial(
   }
 }
 
+type DemoMaterial = ReturnType<typeof demoMaterial>
+
+/**
+ * Patches a demo material's parameters the way the server does: unmentioned
+ * fields keep their value, and a supplied hex wins outright over the float
+ * components rather than being layered with them.
+ */
+function applyParameters(
+  material: DemoMaterial,
+  patch: Record<string, unknown> | undefined
+): DemoMaterial {
+  if (!patch) return material
+
+  const hex = patch.baseColorHex as string | undefined
+  if (hex) {
+    const rebuilt = demoMaterial(material.id, material.name, hex, 0, 0)
+    material.parameters.baseColorHex = hex
+    material.parameters.baseColorR = rebuilt.parameters.baseColorR
+    material.parameters.baseColorG = rebuilt.parameters.baseColorG
+    material.parameters.baseColorB = rebuilt.parameters.baseColorB
+  }
+
+  for (const key of [
+    'baseColorA',
+    'roughness',
+    'metallic',
+    'emissiveR',
+    'emissiveG',
+    'emissiveB',
+    'normalScale',
+    'occlusionStrength',
+    'ior',
+    'alphaMode',
+    'alphaCutoff',
+    'doubleSided',
+  ] as const) {
+    if (patch[key] !== undefined) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(material.parameters as any)[key] = patch[key]
+    }
+  }
+
+  return material
+}
+
 export const systemHandlers = [
   // ════════════════════════════════════════════════════════════════════════
   //  MATERIALS
@@ -217,6 +262,72 @@ export const systemHandlers = [
       pageSize: null,
       totalPages: null,
     })
+  }),
+
+  // Parameter materials only - what the PBR Materials page reads. Separate
+  // from the merged surface above on purpose: the two are browsed apart.
+  http.get('*/materials', async ({ request }) => {
+    const url = new URL(request.url)
+    const search = url.searchParams.get('searchName')?.toLowerCase() ?? ''
+
+    return HttpResponse.json({
+      materials: DEMO_MATERIALS.filter(material =>
+        material.name.toLowerCase().includes(search)
+      ),
+    })
+  }),
+
+  http.post('*/materials', async ({ request }) => {
+    const body = (await request.json()) as {
+      name: string
+      description?: string | null
+      parameters?: Record<string, unknown>
+    }
+
+    const nextId = DEMO_MATERIALS.reduce((max, m) => Math.max(max, m.id), 0) + 1
+    const created = applyParameters(
+      demoMaterial(nextId, body.name, '#cccccc', 0.5, 0),
+      body.parameters
+    )
+    created.description = body.description ?? null
+    DEMO_MATERIALS.push(created)
+
+    return HttpResponse.json(
+      { id: created.id, name: created.name },
+      {
+        status: 201,
+      }
+    )
+  }),
+
+  http.put('*/materials/:id', async ({ params, request }) => {
+    const material = DEMO_MATERIALS.find(m => m.id === Number(params.id))
+    if (!material) {
+      return HttpResponse.json(
+        { error: 'MaterialNotFound', message: 'Material not found.' },
+        { status: 404 }
+      )
+    }
+
+    const body = (await request.json()) as {
+      name?: string
+      description?: string | null
+      parameters?: Record<string, unknown>
+    }
+
+    if (body.name !== undefined) material.name = body.name
+    if (body.description !== undefined) material.description = body.description
+    applyParameters(material, body.parameters)
+    material.updatedAt = now()
+
+    return HttpResponse.json(material)
+  }),
+
+  http.delete('*/materials/:id', async ({ params }) => {
+    const index = DEMO_MATERIALS.findIndex(m => m.id === Number(params.id))
+    if (index >= 0) DEMO_MATERIALS.splice(index, 1)
+
+    return new HttpResponse(null, { status: 204 })
   }),
 
   http.get('*/materials/:id', async ({ params }) => {

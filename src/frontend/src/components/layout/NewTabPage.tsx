@@ -70,9 +70,19 @@ const TILES: Tile[] = [
     group: 'assets',
     icon: 'pi-palette',
     label: 'Global Materials',
-    description: 'Reusable PBR materials shared across many models.',
+    description: 'Reusable texture sets shared across many models.',
     targetType: 'globalMaterials',
     targetLabel: 'Global Materials',
+  },
+  {
+    key: 'pbr-materials',
+    group: 'assets',
+    icon: 'pi-circle-fill',
+    label: 'PBR Materials',
+    description:
+      'Materials made of parameters rather than images - no UVs needed.',
+    targetType: 'pbrMaterials',
+    targetLabel: 'PBR Materials',
   },
   {
     key: 'model-textures',
@@ -225,6 +235,7 @@ const RECENT_TAB_ICON: Partial<Record<TabType, string>> = {
   modelList: 'pi-list',
   modelViewer: 'pi-box',
   globalMaterials: 'pi-palette',
+  pbrMaterials: 'pi-circle-fill',
   modelTextures: 'pi-images',
   textureSetViewer: 'pi-image',
   environmentMaps: 'pi-globe',

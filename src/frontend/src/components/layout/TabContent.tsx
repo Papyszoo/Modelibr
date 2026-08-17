@@ -24,6 +24,11 @@ const TextureSetViewer = lazy(() =>
     default: module.TextureSetViewer,
   }))
 )
+const MaterialList = lazy(() =>
+  import('@/features/materials').then(module => ({
+    default: module.MaterialList,
+  }))
+)
 const EnvironmentMapList = lazy(() =>
   import('@/features/environment-map').then(module => ({
     default: module.EnvironmentMapList,
@@ -143,6 +148,9 @@ export function TabContent({ tab }: TabContentProps): JSX.Element {
             tabId={tab.id}
           />
         )
+
+      case 'pbrMaterials':
+        return <MaterialList />
 
       case 'modelTextures':
         return (

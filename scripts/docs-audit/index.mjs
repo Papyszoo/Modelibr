@@ -132,6 +132,7 @@ const manifestOutputs = [...read("docs/videos/video-manifest.js").matchAll(
         modelViewer: "Model Viewer",
         textureSets: "Texture Sets",
         globalMaterials: "Global Materials",
+        pbrMaterials: "PBR Materials",
         modelTextures: "Multi-Model Textures",
         textureSetViewer: "Texture Set Viewer",
         environmentMaps: "Environment Maps",

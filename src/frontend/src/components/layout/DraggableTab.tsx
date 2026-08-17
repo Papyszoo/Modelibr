@@ -16,6 +16,8 @@ const getTabIcon = (tabType: Tab['type']): string => {
       return 'pi pi-box'
     case 'globalMaterials':
       return 'pi pi-palette'
+    case 'pbrMaterials':
+      return 'pi pi-circle-fill'
     case 'modelTextures':
       return 'pi pi-images'
     case 'textureSetViewer':
@@ -69,6 +71,8 @@ const getTabTooltip = (tab: Tab): string => {
       return `Model: ${tab.label || tab.modelId || 'Unknown'}`
     case 'globalMaterials':
       return 'Global Materials'
+    case 'pbrMaterials':
+      return 'PBR Materials'
     case 'modelTextures':
       return 'Multi-Model Textures'
     case 'textureSetViewer': {

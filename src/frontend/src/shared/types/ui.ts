@@ -3,6 +3,7 @@ export type TabType =
   | 'modelList'
   | 'modelViewer'
   | 'globalMaterials'
+  | 'pbrMaterials'
   | 'modelTextures'
   | 'textureSetViewer'
   | 'environmentMaps'

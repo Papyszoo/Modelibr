@@ -103,6 +103,31 @@ export async function getMaterialById(
   return response.data
 }
 
+export interface GetAllMaterialsResponse {
+  materials: MaterialDto[]
+}
+
+/**
+ * Parameter materials only - the PBR page's source. Deliberately NOT the
+ * merged `/materials/library`: a texture set and a parameter material are
+ * browsed on separate pages, and only merged where the user is picking
+ * something to put in a material slot.
+ */
+export async function getAllMaterials(
+  options: { search?: string; categoryIds?: number[] } = {}
+): Promise<GetAllMaterialsResponse> {
+  const params = new URLSearchParams()
+  if (options.search) params.set('searchName', options.search)
+  for (const id of options.categoryIds ?? [])
+    params.append('categoryIds', String(id))
+
+  const query = params.toString()
+  const response: AxiosResponse<GetAllMaterialsResponse> = await client.get(
+    `/materials${query ? `?${query}` : ''}`
+  )
+  return response.data
+}
+
 export async function getMaterialLibrary(
   options: {
     search?: string
