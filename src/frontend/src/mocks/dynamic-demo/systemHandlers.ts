@@ -94,6 +94,10 @@ function demoSceneView(scene: DemoScene) {
       primitive: node.primitive ?? null,
       transform: node.transform,
       material: node.material ?? null,
+      // Per-slot bindings layered over the default one. Carried through for the
+      // same reason the default binding is: the editor reads the node view, and
+      // a demo scene that dropped them would render undressed.
+      materialSlots: node.materialSlots ?? null,
       visible: node.visible ?? true,
       footprint: null,
       sourceDimensions: null,
@@ -112,7 +116,120 @@ function demoSceneView(scene: DemoScene) {
   }
 }
 
+/**
+ * Parameter materials for the demo. Held here rather than in the demo database
+ * because a material is nothing but numbers - there are no files to seed, which
+ * is the entire point of the type.
+ */
+const DEMO_MATERIALS = [
+  demoMaterial(1, 'Matte Black Plastic', '#1A1A1A', 0.6, 0),
+  demoMaterial(2, 'Brushed Brass', '#B5892B', 0.35, 1),
+  demoMaterial(3, 'Warm Off-White Plaster', '#EDE6D8', 0.95, 0),
+]
+
+function demoMaterial(
+  id: number,
+  name: string,
+  hex: string,
+  roughness: number,
+  metallic: number
+) {
+  const channel = (offset: number) => {
+    const srgb = parseInt(hex.slice(offset, offset + 2), 16) / 255
+    // The same sRGB -> linear curve the server applies, so the demo's numbers
+    // are the numbers the real API would have stored.
+    return srgb <= 0.04045
+      ? srgb / 12.92
+      : Math.pow((srgb + 0.055) / 1.055, 2.4)
+  }
+
+  return {
+    id,
+    name,
+    description: null,
+    categoryId: null,
+    categoryName: null,
+    previewGeometryType: 'sphere',
+    requiresUvs: false,
+    tags: [],
+    createdAt: now(),
+    updatedAt: now(),
+    parameters: {
+      baseColorR: channel(1),
+      baseColorG: channel(3),
+      baseColorB: channel(5),
+      baseColorA: 1,
+      baseColorHex: hex,
+      roughness,
+      metallic,
+      emissiveR: 0,
+      emissiveG: 0,
+      emissiveB: 0,
+      normalScale: 1,
+      occlusionStrength: 1,
+      ior: 1.5,
+      alphaMode: 'Opaque',
+      alphaCutoff: 0.5,
+      doubleSided: false,
+    },
+  }
+}
+
 export const systemHandlers = [
+  // ════════════════════════════════════════════════════════════════════════
+  //  MATERIALS
+  // ════════════════════════════════════════════════════════════════════════
+
+  // The merged browse surface. The demo has no Universal texture sets to fold
+  // in, so every entry here is a parameter material - and each says so through
+  // requiresUvs rather than through which endpoint it came from.
+  http.get('*/materials/library', async ({ request }) => {
+    const url = new URL(request.url)
+    const search = url.searchParams.get('searchName')?.toLowerCase() ?? ''
+    const requiresUvs = url.searchParams.get('requiresUvs')
+
+    const entries =
+      requiresUvs === 'true'
+        ? []
+        : DEMO_MATERIALS.filter(material =>
+            material.name.toLowerCase().includes(search)
+          ).map(material => ({
+            kind: 'Material' as const,
+            id: material.id,
+            name: material.name,
+            description: material.description,
+            categoryId: material.categoryId,
+            categoryName: material.categoryName,
+            requiresUvs: false,
+            previewGeometryType: material.previewGeometryType,
+            hasThumbnail: false,
+            parameters: material.parameters,
+            tiling: null,
+            tags: material.tags,
+            createdAt: material.createdAt,
+            updatedAt: material.updatedAt,
+          }))
+
+    return HttpResponse.json({
+      entries,
+      totalCount: entries.length,
+      page: null,
+      pageSize: null,
+      totalPages: null,
+    })
+  }),
+
+  http.get('*/materials/:id', async ({ params }) => {
+    const material = DEMO_MATERIALS.find(m => m.id === Number(params.id))
+
+    return material
+      ? HttpResponse.json(material)
+      : HttpResponse.json(
+          { error: 'MaterialNotFound', message: 'Material not found.' },
+          { status: 404 }
+        )
+  }),
+
   // ════════════════════════════════════════════════════════════════════════
   //  SCENES
   // ════════════════════════════════════════════════════════════════════════
