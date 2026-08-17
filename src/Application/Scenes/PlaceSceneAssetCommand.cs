@@ -43,24 +43,33 @@ public sealed record PlaceSceneAssetCommand(
 /// <summary>
 /// The placed node plus what is now wrong with the scene because of it.
 ///
-/// Overlaps and scale warnings are scoped to this node: a scene-wide report on every write
-/// would re-report problems the agent already knows about and bury the one it just caused.
+/// Overlaps, scale warnings and findings are all scoped to this node: a scene-wide report on
+/// every write would re-report problems the agent already knows about and bury the one it just
+/// caused.
 /// </summary>
+/// <param name="Findings">
+/// What is wrong with this placement specifically - it is resting on nothing, it is under the
+/// floor, or the asset is a whole sample scene rather than the prop it was placed as. Same
+/// checks <c>validate_scene</c> runs, filtered to this node.
+/// </param>
 public sealed record ScenePlacementResponse(
     SceneSummary Scene,
     SceneNodeView Node,
     IReadOnlyList<SceneOverlap> Overlaps,
-    IReadOnlyList<SceneScaleWarning> ScaleWarnings);
+    IReadOnlyList<SceneScaleWarning> ScaleWarnings,
+    IReadOnlyList<SceneFinding> Findings);
 
 internal sealed class PlaceSceneAssetCommandHandler : ICommandHandler<PlaceSceneAssetCommand, ScenePlacementResponse>
 {
     private readonly ISceneWriter _writer;
     private readonly ISceneAssetFacts _facts;
+    private readonly ISceneAssetProfiles _profiles;
 
-    public PlaceSceneAssetCommandHandler(ISceneWriter writer, ISceneAssetFacts facts)
+    public PlaceSceneAssetCommandHandler(ISceneWriter writer, ISceneAssetFacts facts, ISceneAssetProfiles profiles)
     {
         _writer = writer;
         _facts = facts;
+        _profiles = profiles;
     }
 
     public async Task<Result<ScenePlacementResponse>> Handle(
@@ -134,11 +143,18 @@ internal sealed class PlaceSceneAssetCommandHandler : ICommandHandler<PlaceScene
         var view = result.Value.View;
         var placed = view.Nodes.First(n => n.NodeId == placedNodeId);
 
+        // Only this asset's profile: the findings are filtered to this node anyway, and
+        // profiling every asset in the scene would make each placement cost more the longer
+        // the scene gets.
+        var profiles = await _profiles.ResolveAsync([assetRef], cancellationToken);
+
         return Result.Success(new ScenePlacementResponse(
             view.Scene,
             placed,
             view.Overlaps.Where(o => o.NodeIdA == placedNodeId || o.NodeIdB == placedNodeId).ToList(),
-            view.ScaleWarnings.Where(w => w.NodeId == placedNodeId).ToList()));
+            view.ScaleWarnings.Where(w => w.NodeId == placedNodeId).ToList(),
+            SceneViewBuilder.FindingsFor(
+                result.Value.Document, result.Value.Facts, profiles, [placedNodeId!])));
     }
 
     /// <summary>

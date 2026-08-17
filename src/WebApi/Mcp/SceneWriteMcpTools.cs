@@ -121,6 +121,7 @@ public sealed class SceneWriteMcpTools
                         node = result.Value.Node,
                         overlaps = result.Value.Overlaps,
                         scaleWarnings = result.Value.ScaleWarnings,
+                        findings = result.Value.Findings,
                     },
                     "Scene", sceneId, result.Value,
                     new { removedNodeId = result.Value.Node.NodeId });
@@ -196,6 +197,7 @@ public sealed class SceneWriteMcpTools
                         nodes = result.Value.Nodes,
                         overlaps = result.Value.Overlaps,
                         scaleWarnings = result.Value.ScaleWarnings,
+                        findings = result.Value.Findings,
                     },
                     "Scene", sceneId, result.Value,
                     new { removedNodeIds = result.Value.Nodes.Select(n => n.NodeId).ToArray() });
@@ -267,6 +269,7 @@ public sealed class SceneWriteMcpTools
                         node = result.Value.Node,
                         overlaps = result.Value.Overlaps,
                         scaleWarnings = result.Value.ScaleWarnings,
+                        findings = result.Value.Findings,
                     },
                     "Scene", sceneId, result.Value,
                     new

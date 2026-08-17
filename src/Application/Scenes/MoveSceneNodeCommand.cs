@@ -50,12 +50,17 @@ public sealed record MoveSceneNodeCommand(
 /// rules as well as the transform, because a move can attach, detach, re-aim or un-ground a
 /// node, and an undo that restored only the numbers would leave it attached to the wrong thing.
 /// </summary>
+/// <param name="Findings">
+/// What is wrong with the node where this move left it - resting on nothing, under the floor,
+/// tilted. Same checks <c>validate_scene</c> runs, filtered to this node.
+/// </param>
 public sealed record SceneNodeMoveResponse(
     SceneSummary Scene,
     SceneNodeView Node,
     SceneTransform PreviousTransform,
     IReadOnlyList<SceneOverlap> Overlaps,
     IReadOnlyList<SceneScaleWarning> ScaleWarnings,
+    IReadOnlyList<SceneFinding> Findings,
     bool? PreviousGroundSnap = null,
     Vec3? PreviousFaceToward = null,
     string? PreviousFrontAxis = null,
@@ -65,11 +70,13 @@ internal sealed class MoveSceneNodeCommandHandler : ICommandHandler<MoveSceneNod
 {
     private readonly ISceneWriter _writer;
     private readonly ISceneAssetFacts _facts;
+    private readonly ISceneAssetProfiles _profiles;
 
-    public MoveSceneNodeCommandHandler(ISceneWriter writer, ISceneAssetFacts facts)
+    public MoveSceneNodeCommandHandler(ISceneWriter writer, ISceneAssetFacts facts, ISceneAssetProfiles profiles)
     {
         _writer = writer;
         _facts = facts;
+        _profiles = profiles;
     }
 
     public async Task<Result<SceneNodeMoveResponse>> Handle(
@@ -163,12 +170,18 @@ internal sealed class MoveSceneNodeCommandHandler : ICommandHandler<MoveSceneNod
         var view = result.Value.View;
         var moved = view.Nodes.First(n => n.NodeId == command.NodeId);
 
+        var profiles = moved.Asset is { } movedAsset
+            ? await _profiles.ResolveAsync([movedAsset], cancellationToken)
+            : new Dictionary<string, SceneAssetProfile>(StringComparer.Ordinal);
+
         return Result.Success(new SceneNodeMoveResponse(
             view.Scene,
             moved,
             previousTransform,
             view.Overlaps.Where(o => o.NodeIdA == command.NodeId || o.NodeIdB == command.NodeId).ToList(),
             view.ScaleWarnings.Where(w => w.NodeId == command.NodeId).ToList(),
+            SceneViewBuilder.FindingsFor(
+                result.Value.Document, result.Value.Facts, profiles, [command.NodeId]),
             previousGroundSnap,
             previousFaceToward,
             previousFrontAxis,

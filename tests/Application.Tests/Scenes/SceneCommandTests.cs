@@ -26,6 +26,11 @@ public class SceneCommandTests
 
     private readonly Mock<ISceneRepository> _scenes = new();
     private readonly Mock<ISceneAssetFacts> _facts = new();
+
+    // Profiles decide the identity and appearance findings that ride along with a write.
+    // These tests are about placement, so the default is "nothing profiled", which is also
+    // what a library with nothing extracted yet looks like.
+    private readonly Mock<ISceneAssetProfiles> _profiles = new();
     private readonly Mock<ISceneDocumentCommit> _commit = new();
     private readonly SceneWriter _writer;
     private Scene _scene = null!;
@@ -38,6 +43,8 @@ public class SceneCommandTests
         _facts.Setup(f => f.FindUnresolvableAsync(It.IsAny<IEnumerable<SceneAssetRef>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Array.Empty<SceneAssetReferenceProblem>());
         _commit.Setup(c => c.SaveAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Result.Success());
+        _profiles.Setup(p => p.ResolveAsync(It.IsAny<IEnumerable<SceneAssetRef>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, SceneAssetProfile>(StringComparer.Ordinal));
 
         _writer = new SceneWriter(_scenes.Object, _facts.Object, _commit.Object, clock.Object);
 
@@ -69,7 +76,7 @@ public class SceneCommandTests
         _scenes.Setup(s => s.GetByIdAsync(SceneId, It.IsAny<CancellationToken>())).ReturnsAsync(_scene);
     }
 
-    private PlaceSceneAssetCommandHandler Place => new(_writer, _facts.Object);
+    private PlaceSceneAssetCommandHandler Place => new(_writer, _facts.Object, _profiles.Object);
 
     private static PlaceSceneAssetCommand PlaceCommand(
         string? nodeId = null, Vec3? position = null, bool groundSnap = false, double? snapToGrid = null) =>
@@ -170,7 +177,7 @@ public class SceneCommandTests
     {
         await Place.Handle(PlaceCommand(nodeId: "lamp", position: new Vec3(1, 2, 3)), CancellationToken.None);
 
-        var result = await new MoveSceneNodeCommandHandler(_writer, _facts.Object).Handle(
+        var result = await new MoveSceneNodeCommandHandler(_writer, _facts.Object, _profiles.Object).Handle(
             new MoveSceneNodeCommand(SceneId, "lamp", Position: new Vec3(9, 9, 9)), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -183,7 +190,7 @@ public class SceneCommandTests
     {
         await Place.Handle(PlaceCommand(nodeId: "lamp", position: new Vec3(1, 2, 3)), CancellationToken.None);
 
-        var result = await new MoveSceneNodeCommandHandler(_writer, _facts.Object).Handle(
+        var result = await new MoveSceneNodeCommandHandler(_writer, _facts.Object, _profiles.Object).Handle(
             new MoveSceneNodeCommand(SceneId, "lamp", Scale: new Vec3(2, 2, 2)), CancellationToken.None);
 
         Assert.Equal(new Vec3(1, 2, 3), result.Value.Node.Transform.Position);
@@ -193,7 +200,7 @@ public class SceneCommandTests
     [Fact]
     public async Task MoveNode_When_The_Node_Does_Not_Exist_Returns_NodeNotFound()
     {
-        var result = await new MoveSceneNodeCommandHandler(_writer, _facts.Object).Handle(
+        var result = await new MoveSceneNodeCommandHandler(_writer, _facts.Object, _profiles.Object).Handle(
             new MoveSceneNodeCommand(SceneId, "ghost", Position: Vec3.One), CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -382,7 +389,7 @@ public class SceneCommandTests
         // as nothing more than a changed footprint.
         await Place.Handle(PlaceCommand(nodeId: "lamp", groundSnap: true), CancellationToken.None);
 
-        var result = await new MoveSceneNodeCommandHandler(_writer, _facts.Object).Handle(
+        var result = await new MoveSceneNodeCommandHandler(_writer, _facts.Object, _profiles.Object).Handle(
             new MoveSceneNodeCommand(SceneId, "lamp", Position: new Vec3(9, 0, 9)), CancellationToken.None);
 
         Assert.Equal(2, result.Value.Node.Transform.Position.Y, 6);
@@ -395,7 +402,7 @@ public class SceneCommandTests
     {
         await Place.Handle(PlaceCommand(nodeId: "lamp", groundSnap: true), CancellationToken.None);
 
-        var result = await new MoveSceneNodeCommandHandler(_writer, _facts.Object).Handle(
+        var result = await new MoveSceneNodeCommandHandler(_writer, _facts.Object, _profiles.Object).Handle(
             new MoveSceneNodeCommand(SceneId, "lamp", Position: new Vec3(0, 6, 0), GroundSnap: false),
             CancellationToken.None);
 
@@ -428,7 +435,7 @@ public class SceneCommandTests
             new PlaceSceneAssetCommand(SceneId, SceneAssetTypes.Model, ModelId, VersionId, "vase", AnchorTo: "table"),
             CancellationToken.None);
 
-        var moved = await new MoveSceneNodeCommandHandler(_writer, _facts.Object).Handle(
+        var moved = await new MoveSceneNodeCommandHandler(_writer, _facts.Object, _profiles.Object).Handle(
             new MoveSceneNodeCommand(SceneId, "table", Position: new Vec3(12, 0, -3)), CancellationToken.None);
 
         Assert.True(moved.IsSuccess);
@@ -449,7 +456,7 @@ public class SceneCommandTests
             new PlaceSceneAssetCommand(SceneId, SceneAssetTypes.Model, ModelId, VersionId, "vase", AnchorTo: "table"),
             CancellationToken.None);
 
-        var handler = new MoveSceneNodeCommandHandler(_writer, _facts.Object);
+        var handler = new MoveSceneNodeCommandHandler(_writer, _facts.Object, _profiles.Object);
         var detached = await handler.Handle(
             new MoveSceneNodeCommand(SceneId, "vase", DetachAnchor: true), CancellationToken.None);
 
@@ -529,7 +536,7 @@ public class SceneCommandTests
                 Position: new Vec3(0, 0, -5), FaceToward: Vec3.Zero),
             CancellationToken.None);
 
-        var result = await new MoveSceneNodeCommandHandler(_writer, _facts.Object).Handle(
+        var result = await new MoveSceneNodeCommandHandler(_writer, _facts.Object, _profiles.Object).Handle(
             new MoveSceneNodeCommand(SceneId, "sofa", RotationEuler: new Vec3(0, 33, 0)), CancellationToken.None);
 
         Assert.Equal(33, result.Value.Node.Transform.RotationEuler.Y, 6);
@@ -546,7 +553,7 @@ public class SceneCommandTests
                 AnchorTo: "table", FaceToward: new Vec3(10, 0, 0), FrontAxis: SceneFrontAxes.MinusZ),
             CancellationToken.None);
 
-        var handler = new MoveSceneNodeCommandHandler(_writer, _facts.Object);
+        var handler = new MoveSceneNodeCommandHandler(_writer, _facts.Object, _profiles.Object);
         var detached = await handler.Handle(
             new MoveSceneNodeCommand(SceneId, "vase", Position: Vec3.Zero, DetachAnchor: true), CancellationToken.None);
 
@@ -576,7 +583,7 @@ public class SceneCommandTests
     [Fact]
     public async Task DistributeAssets_Spaces_Every_Copy_Between_The_Endpoints_Inclusively()
     {
-        var handler = new DistributeSceneAssetsCommandHandler(_writer, _facts.Object);
+        var handler = new DistributeSceneAssetsCommandHandler(_writer, _facts.Object, _profiles.Object);
 
         var result = await handler.Handle(
             new DistributeSceneAssetsCommand(
@@ -594,7 +601,7 @@ public class SceneCommandTests
     [Fact]
     public async Task DistributeAssets_Rejects_A_Count_Beyond_What_One_Call_May_Place()
     {
-        var handler = new DistributeSceneAssetsCommandHandler(_writer, _facts.Object);
+        var handler = new DistributeSceneAssetsCommandHandler(_writer, _facts.Object, _profiles.Object);
 
         var result = await handler.Handle(
             new DistributeSceneAssetsCommand(

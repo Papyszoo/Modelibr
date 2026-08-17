@@ -123,6 +123,35 @@ public static class SceneViewBuilder
             node.Anchor);
     }
 
+    /// <summary>
+    /// The validation findings that name the nodes a write just touched.
+    ///
+    /// Rides on the write response for the same reason overlaps do: an agent that has to ask
+    /// a second question to find out its last placement was wrong mostly does not ask. This is
+    /// what catches "the rug you just placed is a twelve-object test scene with two lights in
+    /// it" at the moment it happens rather than at the end of the build.
+    ///
+    /// Scene-wide findings (no lights, no key light) carry no node ids and are deliberately
+    /// dropped here - they are true before and after the write, and repeating them on every
+    /// placement is how a caller learns to skim the response. <c>validate_scene</c> is where
+    /// they are reported.
+    /// </summary>
+    public static IReadOnlyList<SceneFinding> FindingsFor(
+        SceneDocument document,
+        IReadOnlyDictionary<string, SceneAssetFacts> facts,
+        IReadOnlyDictionary<string, SceneAssetProfile> profiles,
+        IReadOnlyCollection<string> nodeIds)
+    {
+        if (nodeIds.Count == 0)
+        {
+            return Array.Empty<SceneFinding>();
+        }
+
+        return SceneValidator.Validate(document, facts, profiles).Findings
+            .Where(finding => finding.NodeIds.Any(nodeIds.Contains))
+            .ToList();
+    }
+
     /// <summary>Every distinct asset reference a document makes, including its environment map.</summary>
     public static IReadOnlyList<SceneAssetRef> ReferencedAssets(SceneDocument document)
     {

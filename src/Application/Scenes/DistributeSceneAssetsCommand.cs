@@ -37,11 +37,17 @@ public sealed record DistributeSceneAssetsCommand(
     string? FrontAxis = null) : ICommand<SceneDistributionResponse>;
 
 /// <summary>The placed row, plus what is now wrong with the scene because of it.</summary>
+/// <param name="Findings">
+/// What is wrong with the copies this call placed. Same checks <c>validate_scene</c> runs,
+/// filtered to the new nodes - a row placed along a line that leaves the floor is one mistake
+/// repeated as many times as there are copies.
+/// </param>
 public sealed record SceneDistributionResponse(
     SceneSummary Scene,
     IReadOnlyList<SceneNodeView> Nodes,
     IReadOnlyList<SceneOverlap> Overlaps,
-    IReadOnlyList<SceneScaleWarning> ScaleWarnings);
+    IReadOnlyList<SceneScaleWarning> ScaleWarnings,
+    IReadOnlyList<SceneFinding> Findings);
 
 internal sealed class DistributeSceneAssetsCommandHandler
     : ICommandHandler<DistributeSceneAssetsCommand, SceneDistributionResponse>
@@ -54,11 +60,16 @@ internal sealed class DistributeSceneAssetsCommandHandler
 
     private readonly ISceneWriter _writer;
     private readonly ISceneAssetFacts _facts;
+    private readonly ISceneAssetProfiles _profiles;
 
-    public DistributeSceneAssetsCommandHandler(ISceneWriter writer, ISceneAssetFacts facts)
+    public DistributeSceneAssetsCommandHandler(
+        ISceneWriter writer,
+        ISceneAssetFacts facts,
+        ISceneAssetProfiles profiles)
     {
         _writer = writer;
         _facts = facts;
+        _profiles = profiles;
     }
 
     public async Task<Result<SceneDistributionResponse>> Handle(
@@ -143,11 +154,14 @@ internal sealed class DistributeSceneAssetsCommandHandler
         var view = result.Value.View;
         var placed = placedNodeIds.ToHashSet(StringComparer.Ordinal);
 
+        var profiles = await _profiles.ResolveAsync([assetRef], cancellationToken);
+
         return Result.Success(new SceneDistributionResponse(
             view.Scene,
             view.Nodes.Where(n => placed.Contains(n.NodeId)).ToList(),
             view.Overlaps.Where(o => placed.Contains(o.NodeIdA) || placed.Contains(o.NodeIdB)).ToList(),
-            view.ScaleWarnings.Where(w => placed.Contains(w.NodeId)).ToList()));
+            view.ScaleWarnings.Where(w => placed.Contains(w.NodeId)).ToList(),
+            SceneViewBuilder.FindingsFor(result.Value.Document, result.Value.Facts, profiles, placed)));
     }
 
     /// <summary>Readable and collision-free, matching what a single placement generates.</summary>
