@@ -54,6 +54,17 @@ public static class SceneEndpoints
         .WithName("Get Scene By Id")
         .WithSummary("Get a scene, its document, per-node footprints, overlaps and scale warnings");
 
+        app.MapGet("/scenes/{id}/validate", async (
+            int id,
+            IQueryHandler<ValidateSceneQuery, SceneValidationView> handler,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await handler.Handle(new ValidateSceneQuery(id), cancellationToken);
+            return result.IsFailure ? NotFoundOrFailure(result.Error) : Results.Ok(result.Value);
+        })
+        .WithName("Validate Scene")
+        .WithSummary("Check a scene for contact, containment, identity, orientation, appearance and scale problems");
+
         app.MapPost("/scenes", async (
             CreateSceneRequest request,
             ICommandHandler<CreateSceneCommand, SceneView> handler,

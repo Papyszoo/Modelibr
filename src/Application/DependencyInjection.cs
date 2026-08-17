@@ -21,6 +21,7 @@ namespace Application
             services.AddScoped<Application.Settings.ISettingsService, Application.Settings.SettingsService>();
             services.AddScoped<Application.Scenes.ISceneAssetFacts, Application.Scenes.SceneAssetFactsProvider>();
             services.AddScoped<Application.Scenes.ISceneWriter, Application.Scenes.SceneWriter>();
+            services.AddScoped<Application.Scenes.ISceneAssetProfiles, Application.Scenes.SceneAssetProfileProvider>();
 
             // Store importer (v0.5 prompt 05): the orchestrator and its 1:1 handler adapter.
             // The HTTP client, queue and progress notifier are infrastructure/host concerns
