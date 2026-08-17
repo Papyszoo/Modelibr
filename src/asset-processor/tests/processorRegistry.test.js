@@ -115,12 +115,13 @@ describe('ProcessorRegistry', () => {
   })
 
   describe('initialization', () => {
-    it('should register Model, Sound, TextureSet, EnvironmentMap, and MeshAnalysis processors', () => {
-      expect(registry.processors.size).toBe(5)
+    it('should register Model, Sound, TextureSet, EnvironmentMap, Scene, and MeshAnalysis processors', () => {
+      expect(registry.processors.size).toBe(6)
       expect(registry.processors.has('Model')).toBe(true)
       expect(registry.processors.has('Sound')).toBe(true)
       expect(registry.processors.has('TextureSet')).toBe(true)
       expect(registry.processors.has('EnvironmentMap')).toBe(true)
+      expect(registry.processors.has('Scene')).toBe(true)
       expect(registry.processors.has('MeshAnalysis')).toBe(true)
     })
 

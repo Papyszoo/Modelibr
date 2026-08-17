@@ -143,7 +143,10 @@ export class SceneRenderer {
         })
       }
 
-      return { image, status, timedOut }
+      // width/height come back with the picture rather than being re-derived by the
+      // caller: they are the viewport this was actually shot at, and a caller reading
+      // them from config would be guessing right only while nothing overrides them.
+      return { image, status, timedOut, width, height }
     } finally {
       await page.close().catch(() => {})
     }

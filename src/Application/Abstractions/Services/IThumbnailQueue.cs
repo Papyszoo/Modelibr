@@ -54,6 +54,17 @@ public interface IThumbnailQueue
     Task<ThumbnailJob> EnqueueEnvironmentMapThumbnailAsync(int environmentMapId, int environmentMapVariantId, bool forceRegenerate = false, int maxAttempts = 3, int lockTimeoutMinutes = 10, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Queue a photograph of a scene from one viewpoint.
+    ///
+    /// No <c>forceRegenerate</c> and no reuse of an existing job, unlike every method
+    /// above. Those exist because a thumbnail derived from unchanged bytes is the same
+    /// picture, so a second request is a duplicate. A scene render asks what the scene
+    /// looks like now, and the scene moves under it - reusing an earlier job would answer
+    /// with a picture of a scene that no longer exists.
+    /// </summary>
+    Task<ThumbnailJob> EnqueueSceneRenderAsync(int sceneId, string viewpoint, int maxAttempts = 3, int lockTimeoutMinutes = 10, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Attempts to dequeue and claim the next pending job for processing.
     /// Includes automatic retry of jobs with expired locks.
     /// </summary>

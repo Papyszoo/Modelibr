@@ -61,6 +61,7 @@ namespace Infrastructure.Persistence
         public DbSet<ProjectConceptImage> ProjectConceptImages => Set<ProjectConceptImage>();
         public DbSet<Stage> Stages => Set<Stage>();
         public DbSet<Scene> Scenes => Set<Scene>();
+        public DbSet<SceneRender> SceneRenders => Set<SceneRender>();
         public DbSet<Thumbnail> Thumbnails => Set<Thumbnail>();
         public DbSet<ThumbnailJob> ThumbnailJobs => Set<ThumbnailJob>();
         public DbSet<ThumbnailJobEvent> ThumbnailJobEvents => Set<ThumbnailJobEvent>();
@@ -736,6 +737,35 @@ namespace Infrastructure.Persistence
 
                 entity.HasIndex(s => s.Name);
                 entity.HasIndex(s => s.UpdatedAt);
+            });
+
+            // Configure SceneRender entity
+            modelBuilder.Entity<SceneRender>(entity =>
+            {
+                entity.HasKey(sr => sr.Id);
+                entity.Property(sr => sr.SceneId).IsRequired();
+                entity.Property(sr => sr.ThumbnailJobId).IsRequired();
+                entity.Property(sr => sr.Viewpoint).IsRequired().HasMaxLength(20);
+                entity.Property(sr => sr.FilePath).IsRequired();
+                entity.Property(sr => sr.SizeBytes).IsRequired();
+                entity.Property(sr => sr.Width).IsRequired();
+                entity.Property(sr => sr.Height).IsRequired();
+                entity.Property(sr => sr.NodesLoaded).IsRequired();
+                entity.Property(sr => sr.NodesFailed).IsRequired();
+                entity.Property(sr => sr.TimedOut).IsRequired();
+                entity.Property(sr => sr.CreatedAt).IsRequired();
+
+                entity.HasOne(sr => sr.Scene)
+                    .WithMany()
+                    .HasForeignKey(sr => sr.SceneId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                // One render per job - a job produces exactly one picture, and a retry
+                // replaces the attempt rather than adding a second row.
+                entity.HasIndex(sr => sr.ThumbnailJobId).IsUnique();
+
+                // The polling path: newest render for a scene.
+                entity.HasIndex(sr => new { sr.SceneId, sr.CreatedAt });
             });
 
             // Configure Thumbnail entity

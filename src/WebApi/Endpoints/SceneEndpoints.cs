@@ -1,6 +1,10 @@
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Repositories;
 using Application.Scenes;
 using Domain.Scenes;
+using Microsoft.AspNetCore.Mvc;
+using WebApi.Files;
+using WebApi.Infrastructure;
 
 namespace WebApi.Endpoints;
 
@@ -183,6 +187,78 @@ public static class SceneEndpoints
         })
         .WithName("Set Scene Light")
         .WithSummary("Add, update or remove one light by id");
+
+        app.MapPost("/scenes/{id}/render", async (
+            int id,
+            RequestSceneRenderRequest? request,
+            ICommandHandler<RequestSceneRenderCommand, RequestSceneRenderResponse> handler,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await handler.Handle(
+                new RequestSceneRenderCommand(id, request?.Viewpoint), cancellationToken);
+            return result.IsFailure ? NotFoundOrFailure(result.Error) : Results.Accepted(value: result.Value);
+        })
+        .WithName("Request Scene Render")
+        .WithSummary("Queue a picture of the scene from one viewpoint");
+
+        app.MapGet("/scene-renders/{renderId}", async (
+            int renderId,
+            IQueryHandler<GetSceneRenderQuery, SceneRenderView> handler,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await handler.Handle(new GetSceneRenderQuery(renderId), cancellationToken);
+            return result.IsFailure ? NotFoundOrFailure(result.Error) : Results.Ok(result.Value);
+        })
+        .WithName("Get Scene Render")
+        .WithSummary("Collect a queued render, or find out it is still being drawn");
+
+        app.MapGet("/scene-renders/{renderId}/file", async (
+            int renderId,
+            IQueryHandler<GetSceneRenderQuery, SceneRenderView> handler,
+            ISceneRenderRepository renderRepository,
+            CancellationToken cancellationToken) =>
+        {
+            var render = await renderRepository.GetByJobIdAsync(renderId, cancellationToken);
+            if (render is null || !System.IO.File.Exists(render.FilePath))
+            {
+                return Results.NotFound();
+            }
+
+            return Results.File(render.FilePath, "image/png");
+        })
+        .WithName("Serve Scene Render")
+        .WithSummary("The rendered image itself");
+
+        // Worker-facing. The bytes come up as multipart while the job's own lifecycle
+        // transition stays a separate small call, so a large upload never holds a queue
+        // transition open - the same split the thumbnail path uses.
+        app.MapPost("/thumbnail-jobs/scenes/{jobId}/render-upload", async (
+            int jobId,
+            IFormFile file,
+            [FromForm] int width,
+            [FromForm] int height,
+            [FromForm] int nodesLoaded,
+            [FromForm] int nodesFailed,
+            [FromForm] bool timedOut,
+            ICommandHandler<UploadSceneRenderCommand, UploadSceneRenderCommandResponse> handler,
+            CancellationToken cancellationToken) =>
+        {
+            if (file is null || file.Length == 0)
+            {
+                return Results.BadRequest(new { error = "InvalidFile", message = "A render file must be provided." });
+            }
+
+            var result = await handler.Handle(
+                new UploadSceneRenderCommand(
+                    jobId, new FormFileUpload(file), width, height, nodesLoaded, nodesFailed, timedOut),
+                cancellationToken);
+
+            return result.IsFailure ? Failure(result.Error) : Results.Ok(result.Value);
+        })
+        .WithName("Upload Scene Render")
+        .WithTags("Thumbnails")
+        .AddEndpointFilter<WorkerApiKeyFilter>()
+        .DisableAntiforgery();
     }
 
     private static IResult Failure(SharedKernel.Error error) =>
@@ -198,6 +274,8 @@ public static class SceneEndpoints
             ? Results.NotFound(new { error = error.Code, message = error.Message })
             : Failure(error);
 }
+
+public record RequestSceneRenderRequest(string? Viewpoint = null);
 
 public record CreateSceneRequest(string Name, string? Description = null, string? DocumentJson = null);
 

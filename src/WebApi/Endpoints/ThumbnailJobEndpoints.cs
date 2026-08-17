@@ -149,6 +149,33 @@ public static class ThumbnailJobEndpoints
         .WithName("Finish Texture Set Thumbnail Job")
         .WithTags("ThumbnailJobs");
 
+        app.MapPost("/thumbnail-jobs/scenes/{jobId:int}/finish", async (
+            int jobId,
+            [FromBody] FinishSceneRenderJobRequest request,
+            ICommandHandler<FinishSceneRenderJobCommand, FinishSceneRenderJobResponse> commandHandler,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await commandHandler.Handle(new FinishSceneRenderJobCommand(
+                jobId,
+                request.Success,
+                request.ErrorMessage), cancellationToken);
+
+            if (result.IsFailure)
+            {
+                return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+            }
+
+            return Results.Ok(new
+            {
+                result.Value.JobId,
+                result.Value.SceneId,
+                result.Value.Status,
+                Message = request.Success ? "Scene render job completed successfully" : "Scene render job marked as failed"
+            });
+        })
+        .WithName("Finish Scene Render Job")
+        .WithTags("ThumbnailJobs");
+
         app.MapPost("/thumbnail-jobs/environment-maps/{jobId:int}/finish", async (
             int jobId,
             [FromBody] FinishEnvironmentMapJobRequest request,
@@ -273,6 +300,15 @@ public record FinishTextureSetJobRequest(
 public record FinishEnvironmentMapJobRequest(
     bool Success,
     string? ThumbnailPath = null,
+    string? ErrorMessage = null);
+
+/// <summary>
+/// No path or size here, unlike its neighbours: the render's bytes and dimensions were
+/// already recorded by the upload that preceded this call, so repeating them would give
+/// the worker a second chance to disagree with itself.
+/// </summary>
+public record FinishSceneRenderJobRequest(
+    bool Success,
     string? ErrorMessage = null);
 
 /// <summary>
