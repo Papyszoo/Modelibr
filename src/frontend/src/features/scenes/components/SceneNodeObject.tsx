@@ -18,6 +18,7 @@ import {
 import type { TextureSetDto } from '@/types'
 
 import type { SceneAssetSource } from '../hooks/useSceneAssetSources'
+import { boundsOffset } from '../lib/sceneGeometry'
 import type { SceneNode, Vec3 } from '../types'
 import { SceneNodeErrorBoundary } from './SceneNodeErrorBoundary'
 
@@ -62,6 +63,15 @@ interface SceneNodeObjectProps {
   originConvention?: string | null
   /** The measured origin fraction behind that convention; see `SceneNodeView`. */
   originInBounds?: Vec3 | null
+  /**
+   * Draw this node as its bounding volume instead of its mesh.
+   *
+   * Composition is judged on volumes, not on meshes: an object floating half its
+   * height is glaring in a grey blockout and easy to miss in a lit, textured
+   * render. It also costs nothing to draw - no mesh is loaded at all - which is
+   * what makes a heavy scene navigable while it is still being laid out.
+   */
+  blockout?: boolean
   /** Reports an asset that could not be loaded, so the editor can flag it. */
   onLoadError: (nodeId: string, message: string) => void
   /**
@@ -83,6 +93,7 @@ export function SceneNodeObject({
   sourceDimensions = null,
   originConvention = null,
   originInBounds = null,
+  blockout = false,
   onLoadError,
   onLoadSettled,
 }: SceneNodeObjectProps): JSX.Element | null {
@@ -106,7 +117,17 @@ export function SceneNodeObject({
         onSelect(node.id)
       }}
     >
-      {node.primitive ? (
+      {blockout ? (
+        <>
+          <BlockoutVolume
+            bounds={node.primitive?.size ?? sourceDimensions}
+            originConvention={node.primitive ? 'centered' : originConvention}
+            originInBounds={node.primitive ? null : originInBounds}
+          />
+          {/* Nothing is loaded in blockout mode, so the node is already settled. */}
+          <SettleSignal nodeId={node.id} loaded onSettled={onLoadSettled} />
+        </>
+      ) : node.primitive ? (
         <>
           <ScenePrimitiveMesh node={node} />
           {/* Geometry we build ourselves; there is nothing to wait for. */}
@@ -562,6 +583,10 @@ function FailedMarker({
  * A wireframe box around the selected node, sized from the server's derived
  * bounds. Omitted entirely when those bounds are unknown: a unit cube drawn
  * around a lamp post would tell the user something false about its size.
+ *
+ * The offset comes from the shared helper so this box and the one blockout mode
+ * draws describe the same volume - and both describe the box the server's
+ * overlap check uses.
  */
 function SelectionOutline({
   bounds,
@@ -576,28 +601,49 @@ function SelectionOutline({
     return null
   }
 
-  // Where the box sits relative to the node's origin, matching the server's own
-  // reading exactly as SceneSpatial.OriginOffset does, so the outline and the
-  // overlap check describe the same box. The measured fraction wins over the
-  // three-way label for the same reason it does there: the label is null for
-  // every origin that is not one of three exact conventions, and reading a null
-  // label as "centered" is what drew this box half a height below the asset.
-  const center = originInBounds
-    ? ([
-        (0.5 - originInBounds.x) * bounds.x,
-        (0.5 - originInBounds.y) * bounds.y,
-        (0.5 - originInBounds.z) * bounds.z,
-      ] as const)
-    : originConvention === 'bottom-center'
-      ? ([0, bounds.y / 2, 0] as const)
-      : originConvention === 'corner'
-        ? ([bounds.x / 2, bounds.y / 2, bounds.z / 2] as const)
-        : ([0, 0, 0] as const)
+  const [x, y, z] = boundsOffset(bounds, originConvention, originInBounds)
 
   return (
-    <mesh position={[center[0], center[1], center[2]]}>
+    <mesh position={[x, y, z]}>
       <boxGeometry args={[bounds.x * 1.02, bounds.y * 1.02, bounds.z * 1.02]} />
       <meshBasicMaterial color="#5b9dff" wireframe transparent opacity={0.8} />
+    </mesh>
+  )
+}
+
+/**
+ * A node drawn as the volume it occupies: a solid, shaded box at the asset's
+ * real bounds, sitting where the asset's origin puts it.
+ *
+ * Solid rather than wireframe on purpose - the wireframe markers already mean
+ * "loading" and "failed", and a third wireframe box would make a blocked-out
+ * scene unreadable. Shaded rather than flat because a flat silhouette hides the
+ * one thing this mode exists to show: which volume is in front of which.
+ *
+ * A node whose asset has never been derived has no bounds to draw, and gets a
+ * unit box marked out in a different colour rather than being dropped - a hole
+ * where an object should be reads as a failed placement.
+ */
+function BlockoutVolume({
+  bounds,
+  originConvention,
+  originInBounds,
+}: {
+  bounds: Vec3 | null | undefined
+  originConvention: string | null
+  originInBounds: Vec3 | null
+}): JSX.Element {
+  const known = bounds ?? { x: 1, y: 1, z: 1 }
+  const [x, y, z] = boundsOffset(known, originConvention, originInBounds)
+
+  return (
+    <mesh position={[x, y, z]} castShadow receiveShadow>
+      <boxGeometry args={[known.x, known.y, known.z]} />
+      <meshStandardMaterial
+        color={bounds ? '#9aa1ac' : '#c08a5a'}
+        roughness={0.9}
+        metalness={0}
+      />
     </mesh>
   )
 }

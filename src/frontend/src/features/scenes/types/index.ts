@@ -7,6 +7,7 @@ import type {
   SceneMaterialBinding,
   SceneNode,
   ScenePrimitive,
+  SceneStage,
   SceneTransform,
   Vec3,
 } from '../api/sceneContract.generated'
@@ -20,6 +21,7 @@ export type {
   SceneMaterialBinding,
   SceneNode,
   ScenePrimitive,
+  SceneStage,
   SceneTransform,
   Vec3,
 }
@@ -47,6 +49,12 @@ export interface SceneSummary {
   lightCount: number
   createdAt: string
   updatedAt: string
+  /**
+   * How far the scene has deliberately been taken, or null when it is not being
+   * authored in stages. Lifted out of the document so a list can show it
+   * without parsing one.
+   */
+  stage: SceneStage | null
 }
 
 /**
@@ -83,6 +91,12 @@ export interface SceneNodeView {
    * to it.
    */
   groundSnap: boolean
+  /**
+   * Declared to hang with nothing under it - the third answer, beside the
+   * ground and an anchor, to "what holds this up". Without it a pendant lamp is
+   * reported as floating for the life of the scene.
+   */
+  suspended: boolean
   faceToward: Vec3 | null
   /** Always populated - the assumed axis when the node never declared one. */
   frontAxis: string | null

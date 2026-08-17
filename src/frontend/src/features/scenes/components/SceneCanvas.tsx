@@ -48,6 +48,15 @@ interface SceneCanvasProps {
   showGrid?: boolean
   /** Off for a render: no orbit controls, no click-to-select. */
   interactive?: boolean
+  /**
+   * Draw every node as its bounding volume instead of its mesh.
+   *
+   * How a composition is judged before it is dressed: an object floating half
+   * its height is glaring among grey volumes and easy to miss in a lit,
+   * textured render. No geometry is loaded in this mode either, which is what
+   * makes a large scene navigable while it is still being laid out.
+   */
+  blockout?: boolean
 }
 
 /** A camera placement. `target` defaults to the origin, `fov` to the editor's 50. */
@@ -73,6 +82,7 @@ export function SceneCanvas({
   camera = DEFAULT_CAMERA,
   showGrid = true,
   interactive = true,
+  blockout = false,
 }: SceneCanvasProps): JSX.Element {
   // Resolved out here on purpose: react-three-fiber renders the canvas subtree
   // through its own reconciler root, so the app's React context - the
@@ -141,6 +151,7 @@ export function SceneCanvas({
               sourceDimensions={facts?.sourceDimensions ?? null}
               originConvention={facts?.originConvention ?? null}
               originInBounds={facts?.originInBounds ?? null}
+              blockout={blockout}
               onLoadError={onNodeLoadError}
               onLoadSettled={onNodeLoadSettled}
             />

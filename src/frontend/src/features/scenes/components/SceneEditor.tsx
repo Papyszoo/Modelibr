@@ -2,6 +2,7 @@ import './SceneEditor.css'
 
 import { Button } from 'primereact/button'
 import { Message } from 'primereact/message'
+import { SelectButton } from 'primereact/selectbutton'
 import { type JSX, useCallback, useEffect, useMemo, useState } from 'react'
 
 import { ApiClientError } from '@/lib/apiBase'
@@ -9,6 +10,7 @@ import { ErrorState, ListHeader, LoadingState } from '@/shared/components'
 import { useSceneEditorStore } from '@/stores'
 
 import { useSaveSceneDocumentMutation, useSceneByIdQuery } from '../api/queries'
+import { SCENE_STAGES, type SceneStage } from '../api/sceneContract.generated'
 import { getSceneAssetFacts } from '../api/scenesApi'
 import { transformsEqual } from '../lib/sceneGeometry'
 import { buildSceneNodeFacts } from '../lib/sceneNodeFacts'
@@ -20,6 +22,20 @@ import { ScenePropertyPanel } from './ScenePropertyPanel'
 
 const IDENTITY_ROTATION = { x: 0, y: 0, z: 0 }
 const UNIT_SCALE = { x: 1, y: 1, z: 1 }
+
+/**
+ * The stage picker's options, plus the "not authored in stages" default every
+ * scene written before stages existed still sits in. Offered rather than
+ * hidden: an unstaged scene is judged against everything at once, which is a
+ * legitimate way to work and the only way that existed until now.
+ */
+const STAGE_OPTIONS: { label: string; value: SceneStage | 'none' }[] = [
+  { label: 'Unstaged', value: 'none' },
+  ...SCENE_STAGES.map(stage => ({
+    label: stage.charAt(0).toUpperCase() + stage.slice(1),
+    value: stage,
+  })),
+]
 
 interface SceneEditorProps {
   sceneId: number
@@ -57,6 +73,11 @@ export function SceneEditor({
   const [placeError, setPlaceError] = useState<string | null>(null)
   const [isPlacing, setIsPlacing] = useState(false)
   const [failedNodes, setFailedNodes] = useState<Map<string, string>>(new Map())
+
+  // Null until the user decides, and then it is theirs. Until then it follows
+  // the stage: a scene being laid out is shown as the volumes its composition
+  // is actually judged on, and a dressed scene is shown dressed.
+  const [blockoutOverride, setBlockoutOverride] = useState<boolean | null>(null)
 
   const handleNodeLoadError = useCallback((nodeId: string, message: string) => {
     setFailedNodes(previous => {
@@ -293,6 +314,18 @@ export function SceneEditor({
 
   const canUndo = past.length > 0
   const canRedo = future.length > 0
+  const stage = document.stage ?? null
+  const blockout = blockoutOverride ?? stage === 'layout'
+
+  /**
+   * The stage is a field of the document, so changing it is an ordinary edit
+   * that the next save carries. That is deliberate: the save then goes through
+   * the same gate an agent's `set_scene_stage` does, and a scene with something
+   * floating is refused with the server's own explanation rather than by a
+   * second rule written here.
+   */
+  const setStage = (next: SceneStage | 'none') =>
+    edit(current => ({ ...current, stage: next === 'none' ? null : next }))
 
   return (
     <div className="scene-editor" data-testid="scene-editor">
@@ -320,6 +353,31 @@ export function SceneEditor({
         ]}
         actions={
           <div className="scene-editor-actions">
+            <SelectButton
+              className="scene-editor-stage"
+              value={stage ?? 'none'}
+              options={STAGE_OPTIONS}
+              data-testid="scene-editor-stage"
+              aria-label="Scene stage"
+              onChange={event => {
+                // PrimeReact reports a click on the already-selected option as
+                // null. Ignoring it keeps the control from silently unstaging a
+                // scene the user only meant to re-confirm.
+                if (event.value != null) {
+                  setStage(event.value as SceneStage | 'none')
+                }
+              }}
+            />
+            <Button
+              icon="pi pi-clone"
+              text={!blockout}
+              size="small"
+              aria-label="Blockout view"
+              data-testid="scene-editor-blockout"
+              aria-pressed={blockout}
+              tooltip="Blockout view - draw every node as its volume"
+              onClick={() => setBlockoutOverride(!blockout)}
+            />
             <Button
               icon="pi pi-undo"
               text
@@ -414,6 +472,7 @@ export function SceneEditor({
           selectedNodeId={selectedNodeId}
           onSelectNode={selectNode}
           onNodeLoadError={handleNodeLoadError}
+          blockout={blockout}
         />
 
         <aside className="scene-editor-side scene-editor-side--right">

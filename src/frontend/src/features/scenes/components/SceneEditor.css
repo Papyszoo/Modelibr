@@ -33,6 +33,16 @@
   gap: var(--mod-space-2xs);
 }
 
+/*
+ * The stage picker sits in the header's action row beside the undo/save
+ * buttons, so it is sized down to match them rather than carrying PrimeReact's
+ * default form-control height, which would make the row a third taller.
+ */
+.scene-editor-stage .p-button {
+  padding: var(--mod-space-2xs) var(--mod-space-xs);
+  font-size: var(--mod-text-xs);
+}
+
 .scene-editor-message {
   border-radius: 0;
   justify-content: flex-start;
