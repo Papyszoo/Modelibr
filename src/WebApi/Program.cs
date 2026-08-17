@@ -134,7 +134,15 @@ namespace WebApi
                     .WithTools<WebApi.Mcp.AssetSearchMcpTools>()
                     // Reading a scene is a read: an agent that can search the library can
                     // look at what it has already built there.
-                    .WithTools<WebApi.Mcp.SceneReadMcpTools>();
+                    .WithTools<WebApi.Mcp.SceneReadMcpTools>()
+                    // Looking at a scene is the same read, in pixels. It is on the read
+                    // side despite queueing a job and writing an image, because the
+                    // alternative denies the agent that can already inspect a scene the
+                    // one view that shows facing, framing and whether an asset loaded -
+                    // and with writes off it can only render scenes the user made. The
+                    // cost is that a reader can queue render work; if that becomes the
+                    // objection, this moves behind MCP_WRITE_ENABLED.
+                    .WithTools<WebApi.Mcp.SceneRenderMcpTools>();
 
                 // Write tools (prompt 30) are opt-in: OFF by default keeps a stock server
                 // read-only so enabling agent writes on a LAN-reachable endpoint is a
