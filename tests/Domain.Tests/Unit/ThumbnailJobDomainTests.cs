@@ -353,6 +353,55 @@ public class ThumbnailJobDomainTests
         Assert.Throws<InvalidOperationException>(() => job.Cancel(cancelledAt.AddMinutes(1)));
     }
 
+    [Fact]
+    public void CreateForScene_WithValidParameters_ShouldCreateSceneRenderJob()
+    {
+        // Arrange
+        var sceneId = 12;
+        var viewpoint = "iso";
+        var createdAt = DateTime.UtcNow;
+
+        // Act
+        var job = ThumbnailJob.CreateForScene(sceneId, viewpoint, createdAt);
+
+        // Assert
+        Assert.Equal("Scene", job.AssetType);
+        Assert.Equal(sceneId, job.SceneId);
+        Assert.Equal(viewpoint, job.SceneViewpoint);
+        Assert.Equal(ThumbnailJobStatus.Pending, job.Status);
+
+        // A scene render carries no asset identity: it is a picture of a scene at a
+        // moment, not a thumbnail derived from a file. Anything that reads this job as
+        // if it were one of the asset types must find nothing to act on.
+        Assert.Null(job.ModelId);
+        Assert.Null(job.ModelVersionId);
+        Assert.Null(job.ModelHash);
+        Assert.Null(job.SoundId);
+        Assert.Null(job.TextureSetId);
+        Assert.Null(job.EnvironmentMapId);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void CreateForScene_WithNonPositiveSceneId_ShouldThrow(int sceneId)
+    {
+        Assert.Throws<ArgumentException>(
+            () => ThumbnailJob.CreateForScene(sceneId, "iso", DateTime.UtcNow));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void CreateForScene_WithBlankViewpoint_ShouldThrow(string viewpoint)
+    {
+        // The viewpoint reaches the renderer as a query parameter, and the app serves
+        // its normal self for an unrecognised one rather than erroring - so a blank
+        // viewpoint would surface as a render that times out, not as a bad request.
+        Assert.Throws<ArgumentException>(
+            () => ThumbnailJob.CreateForScene(12, viewpoint, DateTime.UtcNow));
+    }
+
     private static ThumbnailJob CreateTestJob()
     {
         return ThumbnailJob.Create(

@@ -39,6 +39,8 @@ public static class ThumbnailJobEndpoints
                 TextureSetId = response.Job.TextureSetId,
                 EnvironmentMapId = response.Job.EnvironmentMapId,
                 EnvironmentMapVariantId = response.Job.EnvironmentMapVariantId,
+                SceneId = response.Job.SceneId,
+                SceneViewpoint = response.Job.SceneViewpoint,
                 DefaultTextureSetId = response.Job.ModelVersion?.DefaultTextureSetId,
                 MainVariantName = response.Job.ModelVersion?.MainVariantName ?? "",
                 TextureMappings = response.Job.ModelVersion?.TextureMappings?.Select(tm => new

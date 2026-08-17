@@ -41,9 +41,21 @@ public class ThumbnailJob
     public int? TextureSetId { get; private set; }
     public int? EnvironmentMapId { get; private set; }
     public int? EnvironmentMapVariantId { get; private set; }
-    
+
     /// <summary>
-    /// Type of asset this job is for: "Model", "Sound", or "TextureSet".
+    /// The ID of the scene this render job is for (null for every other asset type).
+    /// </summary>
+    public int? SceneId { get; private set; }
+
+    /// <summary>
+    /// Which way the camera looks for a scene render: iso, front, side or top.
+    /// Null for every other asset type.
+    /// </summary>
+    public string? SceneViewpoint { get; private set; }
+
+    /// <summary>
+    /// Type of asset this job is for: "Model", "Sound", "TextureSet", "EnvironmentMap"
+    /// or "Scene".
     /// </summary>
     public string AssetType { get; private set; } = "Model";
     
@@ -110,6 +122,7 @@ public class ThumbnailJob
     public TextureSet? TextureSet { get; set; }
     public EnvironmentMap? EnvironmentMap { get; set; }
     public EnvironmentMapVariant? EnvironmentMapVariant { get; set; }
+    public Scene? Scene { get; set; }
 
     /// <summary>
     /// Creates a new thumbnail job for model processing.
@@ -199,6 +212,38 @@ public class ThumbnailJob
             AssetType = "EnvironmentMap",
             EnvironmentMapId = environmentMapId,
             EnvironmentMapVariantId = environmentMapVariantId,
+            Status = ThumbnailJobStatus.Pending,
+            MaxAttempts = maxAttempts,
+            LockTimeoutMinutes = lockTimeoutMinutes,
+            CreatedAt = createdAt,
+            UpdatedAt = createdAt
+        };
+    }
+
+    /// <summary>
+    /// Creates a job that photographs a scene through the running app.
+    ///
+    /// Unlike every other job here this one is not deduplicated, and deliberately so: the
+    /// other asset types render a thumbnail *of a file*, so a second job for the same hash
+    /// would produce the same picture. A scene render is a request for what the scene looks
+    /// like from a viewpoint *right now*, and the scene changes under it - two renders of
+    /// the same scene id minutes apart are two different answers, and an agent asking again
+    /// after an edit is asking a new question.
+    /// </summary>
+    public static ThumbnailJob CreateForScene(int sceneId, string viewpoint, DateTime createdAt, int maxAttempts = 3, int lockTimeoutMinutes = 10)
+    {
+        if (sceneId <= 0)
+            throw new ArgumentException("Scene ID must be a positive integer.", nameof(sceneId));
+        if (string.IsNullOrWhiteSpace(viewpoint))
+            throw new ArgumentException("Scene viewpoint cannot be null or whitespace.", nameof(viewpoint));
+        ValidateMaxAttempts(maxAttempts);
+        ValidateLockTimeoutMinutes(lockTimeoutMinutes);
+
+        return new ThumbnailJob
+        {
+            AssetType = "Scene",
+            SceneId = sceneId,
+            SceneViewpoint = viewpoint.Trim(),
             Status = ThumbnailJobStatus.Pending,
             MaxAttempts = maxAttempts,
             LockTimeoutMinutes = lockTimeoutMinutes,

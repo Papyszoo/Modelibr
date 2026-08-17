@@ -771,6 +771,8 @@ namespace Infrastructure.Persistence
                 entity.Property(tj => tj.TextureSetId).IsRequired(false);
                 entity.Property(tj => tj.EnvironmentMapId).IsRequired(false);
                 entity.Property(tj => tj.EnvironmentMapVariantId).IsRequired(false);
+                entity.Property(tj => tj.SceneId).IsRequired(false);
+                entity.Property(tj => tj.SceneViewpoint).IsRequired(false).HasMaxLength(20);
                 entity.Property(tj => tj.Status).IsRequired();
                 entity.Property(tj => tj.AttemptCount).IsRequired();
                 entity.Property(tj => tj.MaxAttempts).IsRequired();
@@ -838,6 +840,16 @@ namespace Infrastructure.Persistence
                 entity.HasIndex(tj => tj.EnvironmentMapVariantId)
                     .IsUnique()
                     .HasFilter("\"EnvironmentMapVariantId\" IS NOT NULL");
+
+                entity.HasOne(tj => tj.Scene)
+                    .WithMany()
+                    .HasForeignKey(tj => tj.SceneId)
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired(false);
+
+                // Deliberately not unique, unlike the hash indexes above. A scene render
+                // asks what the scene looks like now, and the scene moves - so a second
+                // request for the same scene is a new question, not a duplicate.
             });
 
             // Configure ThumbnailJobEvent entity
