@@ -70,6 +70,8 @@ export interface SceneLight {
 export interface SceneMaterialBinding {
   textureSetId?: number | null
   variant?: string | null
+  materialId?: number | null
+  slot?: string | null
 }
 
 export interface SceneNode {
@@ -80,6 +82,7 @@ export interface SceneNode {
   name?: string | null
   slotId?: string | null
   material?: SceneMaterialBinding | null
+  materialSlots?: SceneMaterialBinding[]
   visible: boolean
   groundSnap?: boolean | null
   frontAxis?: SceneFrontAxis | null

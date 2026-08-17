@@ -63,6 +63,15 @@ public sealed record SceneNode(
     /// </summary>
     string? SlotId = null,
     SceneMaterialBinding? Material = null,
+    /// <summary>
+    /// Per-slot overrides: "the cushions of this sofa", not the whole sofa.
+    ///
+    /// Layered over <see cref="Material"/> rather than replacing it - the default binding
+    /// dresses every slot no entry here names. Kept as a second field so every document
+    /// written before slots existed still parses; the codec rejects unknown members, so a
+    /// renamed field would have made the stored scenes unreadable.
+    /// </summary>
+    IReadOnlyList<SceneMaterialBinding>? MaterialSlots = null,
     bool Visible = true,
     /// <summary>
     /// Keep this node's base resting on y=0.
@@ -147,8 +156,23 @@ public readonly record struct Vec3(double X, double Y, double Z)
     public bool IsFinite => double.IsFinite(X) && double.IsFinite(Y) && double.IsFinite(Z);
 }
 
-/// <summary>Binds a texture set (02's <c>bind_texture_set</c> target) to one node.</summary>
-public sealed record SceneMaterialBinding(int? TextureSetId = null, string? Variant = null);
+/// <summary>
+/// Dresses a node, or one material slot of it, for this scene only.
+///
+/// Exactly one source: a <see cref="MaterialId"/> (a parameters-only material - a colour
+/// and a roughness) or a <see cref="TextureSetId"/> (a tiling global material, which needs
+/// UVs). Both at once is rejected rather than resolved, because there is no sensible way to
+/// pick between two surfaces a caller asked for by name.
+///
+/// <see cref="Slot"/> names the model's own material slot ("cushions", "frame"). Null means
+/// the node's default binding, which dresses every slot no override names - the same
+/// layering an engine's material override list uses.
+/// </summary>
+public sealed record SceneMaterialBinding(
+    int? TextureSetId = null,
+    string? Variant = null,
+    int? MaterialId = null,
+    string? Slot = null);
 
 public sealed record SceneLight(
     string Id,

@@ -59,7 +59,9 @@ public sealed record SceneNodeView(
     Vec3? FaceToward = null,
     string? FrontAxis = null,
     SceneAnchor? Anchor = null,
-    bool Suspended = false);
+    bool Suspended = false,
+    /// <summary>Per-slot bindings layered over <see cref="Material"/>. Empty when the node is dressed as a whole.</summary>
+    IReadOnlyList<SceneMaterialBinding>? MaterialSlots = null);
 
 /// <summary>
 /// A scene, its document, and everything derived from the two.
@@ -130,7 +132,8 @@ public static class SceneViewBuilder
             // node back is told the assumption rather than left to infer it from a null.
             node.FrontAxis ?? SceneFrontAxes.Default,
             node.Anchor,
-            node.Suspended ?? false);
+            node.Suspended ?? false,
+            node.MaterialSlots);
     }
 
     /// <summary>

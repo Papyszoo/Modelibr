@@ -123,7 +123,11 @@ public sealed class AssetSearchMcpTools
             new { name = "shapeClass", type = "enum", values = new[] { "planar", "tall", "wide", "blocky" } },
             new { name = "engine", type = "enum", values = new[] { "Unity", "Unreal", "Godot", "Roblox", "Defold", "LÖVE" } },
             new { name = "category", type = "string", note = "matches the assigned category name (partial, case-insensitive); conceptual terms (weapon/animal/building) also hit via the free-text query" },
-            new { name = "assetType", type = "enum", values = new[] { "Model" } },
+            // Deliberately still Model-only. Materials are not in this index and saying
+            // they were would be worse than the gap: they carry no geometry, no parts and
+            // no version, so every filter above is meaningless for them. Browse them with
+            // list_materials instead, which reads the material library directly.
+            new { name = "assetType", type = "enum", values = new[] { "Model" }, note = "materials are browsed with list_materials, not here - they have none of the geometry facets above" },
             new { name = "includeSecondary", type = "boolean", note = "surface secondary-prominence parts" },
         },
     };

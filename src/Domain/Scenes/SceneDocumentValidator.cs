@@ -156,10 +156,29 @@ public static class SceneDocumentValidator
 
             ValidateTransform(node.Transform, $"{path}.transform", issues);
 
-            if (node.Material?.TextureSetId is <= 0)
+            if (node.Material is { } material)
             {
-                issues.Add(new SceneValidationIssue(
-                    $"{path}.material.textureSetId", "InvalidTextureSetId", "A texture set id must be a positive integer."));
+                ValidateMaterialBinding(material, $"{path}.material", requireSlot: false, issues);
+            }
+
+            if (node.MaterialSlots is { Count: > 0 } slots)
+            {
+                var seenSlots = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                for (var s = 0; s < slots.Count; s++)
+                {
+                    var slotPath = $"{path}.materialSlots[{s}]";
+                    ValidateMaterialBinding(slots[s], slotPath, requireSlot: true, issues);
+
+                    var slotName = slots[s].Slot;
+                    if (!string.IsNullOrWhiteSpace(slotName) && !seenSlots.Add(slotName.Trim()))
+                    {
+                        issues.Add(new SceneValidationIssue(
+                            $"{slotPath}.slot",
+                            "DuplicateMaterialSlot",
+                            $"Slot '{slotName}' is dressed twice on this node. Two bindings for one slot have no defined winner."));
+                    }
+                }
             }
 
             if (node.FrontAxis is not null && SceneFrontAxes.Direction(node.FrontAxis) is null)
@@ -189,6 +208,51 @@ public static class SceneDocumentValidator
         }
 
         ValidateAnchorGraph(document.Nodes, issues);
+    }
+
+    private static void ValidateMaterialBinding(
+        SceneMaterialBinding binding,
+        string path,
+        bool requireSlot,
+        List<SceneValidationIssue> issues)
+    {
+        if (binding.TextureSetId is <= 0)
+        {
+            issues.Add(new SceneValidationIssue(
+                $"{path}.textureSetId", "InvalidTextureSetId", "A texture set id must be a positive integer."));
+        }
+
+        if (binding.MaterialId is <= 0)
+        {
+            issues.Add(new SceneValidationIssue(
+                $"{path}.materialId", "InvalidMaterialId", "A material id must be a positive integer."));
+        }
+
+        // Two surfaces asked for by name, with no rule for which wins. Rejected rather
+        // than resolved, the same call the suspended/groundSnap contradiction takes.
+        if (binding.TextureSetId is not null && binding.MaterialId is not null)
+        {
+            issues.Add(new SceneValidationIssue(
+                path,
+                "AmbiguousMaterialBinding",
+                "A binding names both a material and a texture set. Pick one - they are two ways to supply the same surface."));
+        }
+
+        if (requireSlot && string.IsNullOrWhiteSpace(binding.Slot))
+        {
+            issues.Add(new SceneValidationIssue(
+                $"{path}.slot",
+                "MissingMaterialSlot",
+                "A per-slot binding must name the slot it dresses. Use the node's default material binding to dress the whole node."));
+        }
+
+        if (binding.TextureSetId is null && binding.MaterialId is null && binding.Variant is null)
+        {
+            issues.Add(new SceneValidationIssue(
+                path,
+                "EmptyMaterialBinding",
+                "A binding that names nothing has no meaning. Remove it, or give it a material or a texture set."));
+        }
     }
 
     private static void ValidateAnchor(

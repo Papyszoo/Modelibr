@@ -310,6 +310,105 @@ public class SceneCommandTests
     }
 
     [Fact]
+    public async Task ApplyMaterial_Can_Bind_A_Parameter_Material_Instead_Of_A_Texture_Set()
+    {
+        await Place.Handle(PlaceCommand(nodeId: "sofa"), CancellationToken.None);
+
+        var result = await new ApplySceneMaterialCommandHandler(_writer).Handle(
+            new ApplySceneMaterialCommand(SceneId, "sofa", MaterialId: 12), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(12, result.Value.Node.Material!.MaterialId);
+        Assert.Null(result.Value.Node.Material.TextureSetId);
+    }
+
+    [Fact]
+    public async Task ApplyMaterial_With_Both_Sources_Is_Rejected_Rather_Than_Resolved()
+    {
+        await Place.Handle(PlaceCommand(nodeId: "sofa"), CancellationToken.None);
+
+        var result = await new ApplySceneMaterialCommandHandler(_writer).Handle(
+            new ApplySceneMaterialCommand(SceneId, "sofa", TextureSetId: 3, MaterialId: 12),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.MaterialAmbiguous", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task ApplyMaterial_Dresses_One_Slot_Without_Disturbing_The_Rest_Of_The_Node()
+    {
+        // "The cushions of this sofa", which is the thing a scene could not say at all
+        // while the only binding was per-node.
+        await Place.Handle(PlaceCommand(nodeId: "sofa"), CancellationToken.None);
+        var handler = new ApplySceneMaterialCommandHandler(_writer);
+
+        await handler.Handle(
+            new ApplySceneMaterialCommand(SceneId, "sofa", MaterialId: 4), CancellationToken.None);
+        var result = await handler.Handle(
+            new ApplySceneMaterialCommand(SceneId, "sofa", MaterialId: 7, Slot: "cushions"),
+            CancellationToken.None);
+
+        Assert.Equal(4, result.Value.Node.Material!.MaterialId);
+        var slot = Assert.Single(result.Value.Node.MaterialSlots!);
+        Assert.Equal("cushions", slot.Slot);
+        Assert.Equal(7, slot.MaterialId);
+    }
+
+    [Fact]
+    public async Task ApplyMaterial_Replaces_A_Slots_Binding_Rather_Than_Adding_A_Second_One()
+    {
+        await Place.Handle(PlaceCommand(nodeId: "sofa"), CancellationToken.None);
+        var handler = new ApplySceneMaterialCommandHandler(_writer);
+
+        await handler.Handle(
+            new ApplySceneMaterialCommand(SceneId, "sofa", MaterialId: 7, Slot: "cushions"), CancellationToken.None);
+        var second = await handler.Handle(
+            new ApplySceneMaterialCommand(SceneId, "sofa", MaterialId: 9, Slot: "cushions"), CancellationToken.None);
+
+        var slot = Assert.Single(second.Value.Node.MaterialSlots!);
+        Assert.Equal(9, slot.MaterialId);
+        Assert.Equal(7, second.Value.PreviousMaterial!.MaterialId);
+    }
+
+    [Fact]
+    public async Task ApplyMaterial_Clearing_A_Slot_Leaves_The_Nodes_Default_Binding_Alone()
+    {
+        await Place.Handle(PlaceCommand(nodeId: "sofa"), CancellationToken.None);
+        var handler = new ApplySceneMaterialCommandHandler(_writer);
+
+        await handler.Handle(
+            new ApplySceneMaterialCommand(SceneId, "sofa", MaterialId: 4), CancellationToken.None);
+        await handler.Handle(
+            new ApplySceneMaterialCommand(SceneId, "sofa", MaterialId: 7, Slot: "cushions"), CancellationToken.None);
+
+        var cleared = await handler.Handle(
+            new ApplySceneMaterialCommand(SceneId, "sofa", Clear: true, Slot: "cushions"), CancellationToken.None);
+
+        Assert.Equal(4, cleared.Value.Node.Material!.MaterialId);
+        Assert.Null(cleared.Value.Node.MaterialSlots);
+    }
+
+    [Fact]
+    public async Task ApplyMaterial_Naming_A_Material_Drops_The_Texture_Set_It_Replaces()
+    {
+        // A partial update keeps what it does not mention, but not here: the two ids are
+        // alternatives, so keeping the old one would leave a binding that names both and
+        // the document validator rejects that.
+        await Place.Handle(PlaceCommand(nodeId: "sofa"), CancellationToken.None);
+        var handler = new ApplySceneMaterialCommandHandler(_writer);
+
+        await handler.Handle(
+            new ApplySceneMaterialCommand(SceneId, "sofa", TextureSetId: 3), CancellationToken.None);
+        var result = await handler.Handle(
+            new ApplySceneMaterialCommand(SceneId, "sofa", MaterialId: 12), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(12, result.Value.Node.Material!.MaterialId);
+        Assert.Null(result.Value.Node.Material.TextureSetId);
+    }
+
+    [Fact]
     public async Task UpdateSceneDocument_Rejects_An_Invalid_Document_Without_Touching_The_Scene()
     {
         await Place.Handle(PlaceCommand(nodeId: "lamp"), CancellationToken.None);

@@ -377,8 +377,11 @@ public sealed class SceneWriteMcpTools
     }
 
     [McpServerTool(Name = "apply_material")]
-    [Description("Bind a texture set to one node, for this scene only - the model's own default texture set is untouched. " +
-                 "Pass clear=true to remove the binding.")]
+    [Description("Dress one node, for this scene only - the model's own default material is untouched. " +
+                 "Pass materialId for a parameter material (a colour and a roughness, needs no UVs) or textureSetId for a tiling " +
+                 "global material (needs UVs); both ids come from search_assets with assetType 'Material'. " +
+                 "Pass slot to dress one of the model's material slots (\"cushions\") instead of the whole node; " +
+                 "get_asset_metadata lists a model's slots. Pass clear=true to remove the binding.")]
     public static Task<object> ApplyMaterial(
         ICommandHandler<ApplySceneMaterialCommand, SceneMaterialResponse> handler,
         IAgentAudit audit,
@@ -386,9 +389,11 @@ public sealed class SceneWriteMcpTools
         [Description("Target scene id.")] int sceneId,
         [Description("Node id to dress.")] string nodeId,
         [Description("Unique key so a retried call does not apply twice.")] string idempotencyKey,
-        [Description("Texture set id to bind.")] int? textureSetId = null,
+        [Description("Texture set id to bind - a tiling global material. Needs UVs.")] int? textureSetId = null,
         [Description("Optional variant name within the set.")] string? variant = null,
         [Description("Clear the binding instead of setting one.")] bool clear = false,
+        [Description("Material id to bind - a parameter material. Needs no UVs, so it is the safe choice on an asset whose unwrap is bad or missing.")] int? materialId = null,
+        [Description("Material slot to dress, e.g. \"cushions\". Omit to dress every slot no other binding names.")] string? slot = null,
         [Description("Optional expected scene revision; the write is refused if the scene has moved on.")] int? expectedRevision = null,
         [Description("Optional batch id. Writes sharing one can be undone together with reverse_operation.")] string? batchId = null,
         CancellationToken cancellationToken = default)
@@ -400,14 +405,19 @@ public sealed class SceneWriteMcpTools
             async ct =>
             {
                 var result = await handler.Handle(
-                    new ApplySceneMaterialCommand(sceneId, nodeId, textureSetId, variant, clear, expectedRevision), ct);
+                    new ApplySceneMaterialCommand(
+                        sceneId, nodeId, textureSetId, variant, clear, expectedRevision,
+                        MaterialId: materialId, Slot: slot), ct);
 
                 return result.IsFailure
                     ? Failed(result.Error)
+                    // The slot rides along in the before-payload: undoing a slot that had no
+                    // binding records a null material, and without the slot name the reverser
+                    // would clear the whole node instead of that one slot.
                     : Applied(
                         new { status = "ok", scene = result.Value.Scene, node = result.Value.Node },
                         "Scene", sceneId, result.Value,
-                        new { nodeId, material = result.Value.PreviousMaterial });
+                        new { nodeId, slot, material = result.Value.PreviousMaterial });
             },
             cancellationToken);
     }

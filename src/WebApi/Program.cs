@@ -142,7 +142,9 @@ namespace WebApi
                     // and with writes off it can only render scenes the user made. The
                     // cost is that a reader can queue render work; if that becomes the
                     // objection, this moves behind MCP_WRITE_ENABLED.
-                    .WithTools<WebApi.Mcp.SceneRenderMcpTools>();
+                    .WithTools<WebApi.Mcp.SceneRenderMcpTools>()
+                    // Browsing the material library is a read like any other search.
+                    .WithTools<WebApi.Mcp.MaterialReadMcpTools>();
 
                 // Write tools (prompt 30) are opt-in: OFF by default keeps a stock server
                 // read-only so enabling agent writes on a LAN-reachable endpoint is a
@@ -163,6 +165,9 @@ namespace WebApi
                         // Scene authoring. Same gate as every other write - composing a
                         // scene creates and destroys state like any other mutation.
                         .WithTools<WebApi.Mcp.SceneWriteMcpTools>()
+                        // Inventing a material mid-scene. A write, and the cheapest one
+                        // there is: it creates no files at all.
+                        .WithTools<WebApi.Mcp.MaterialWriteMcpTools>()
                         .WithPrompts<WebApi.Mcp.ImportLibraryPrompts>()
                         // The playbook for building a scene. Registered with the write
                         // tools because it is a guide to writing: every stage it describes

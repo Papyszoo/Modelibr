@@ -739,20 +739,27 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
                 }
 
                 var previous = ReadPayload<SceneMaterialBinding>(before!.Value, "material");
+                // Which slot the write touched. Recorded separately because clearing a slot
+                // that held nothing records a null binding, and the slot name is then the
+                // only thing saying "that one slot" rather than "the whole node".
+                var slot = ReadString(before!.Value, "slot") ?? previous?.Slot;
+                var where = slot is null ? $"node '{nodeId}'s material" : $"node '{nodeId}'s '{slot}' slot";
+
                 // Exact, for the same reason as the light above: a binding that carried no
                 // variant is restorable only when null means null.
                 var result = await _applySceneMaterial.Handle(
                     previous is null
-                        ? new ApplySceneMaterialCommand(entry.AssetId!.Value, nodeId, Clear: true)
+                        ? new ApplySceneMaterialCommand(entry.AssetId!.Value, nodeId, Clear: true, Slot: slot)
                         : new ApplySceneMaterialCommand(
-                            entry.AssetId!.Value, nodeId, previous.TextureSetId, previous.Variant, Exact: true),
+                            entry.AssetId!.Value, nodeId, previous.TextureSetId, previous.Variant, Exact: true,
+                            MaterialId: previous.MaterialId, Slot: slot),
                     cancellationToken);
 
                 return result.IsFailure
                     ? Result.Failure<string>(result.Error)
                     : Result.Success(previous is null
-                        ? $"Cleared node '{nodeId}'s material in scene {entry.AssetId}, as it was before."
-                        : $"Restored node '{nodeId}'s previous material in scene {entry.AssetId}.");
+                        ? $"Cleared {where} in scene {entry.AssetId}, as it was before."
+                        : $"Restored {where}'s previous binding in scene {entry.AssetId}.");
             }
 
             case "update-scene-document":
