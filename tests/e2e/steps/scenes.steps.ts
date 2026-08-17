@@ -274,3 +274,127 @@ Then(
         );
     },
 );
+
+// --- Render-back -----------------------------------------------------------
+
+/**
+ * The render request and its result, carried between steps.
+ *
+ * Keyed off the page rather than a module-level variable because the render
+ * scenarios run alongside everything else, and a shared slot would let two
+ * workers overwrite each other's renderId.
+ */
+const renderState = new WeakMap<
+    Page,
+    { renderId?: number; status?: number; body?: any }
+>();
+
+function renderSlot(page: Page) {
+    let slot = renderState.get(page);
+    if (!slot) {
+        slot = {};
+        renderState.set(page, slot);
+    }
+    return slot;
+}
+
+async function requestRender(page: Page, sceneName: string, viewpoint?: string) {
+    const scene = await fetchSceneByName(page, sceneName);
+    const response = await page.request.post(
+        `${apiBase()}/scenes/${scene.id}/render`,
+        { data: viewpoint ? { viewpoint } : {} },
+    );
+
+    const slot = renderSlot(page);
+    slot.status = response.status();
+    slot.body = response.ok() ? await response.json() : null;
+    slot.renderId = slot.body?.renderId;
+}
+
+When(
+    "I request a render of the scene {string}",
+    async ({ page }, sceneName: string) => {
+        await requestRender(page, sceneName);
+    },
+);
+
+When(
+    "I request a render of the scene {string} from {string}",
+    async ({ page }, sceneName: string, viewpoint: string) => {
+        await requestRender(page, sceneName, viewpoint);
+    },
+);
+
+When("I collect the render with id {int}", async ({ page }, id: number) => {
+    const response = await page.request.get(`${apiBase()}/scene-renders/${id}`);
+    const slot = renderSlot(page);
+    slot.status = response.status();
+    slot.body = response.ok() ? await response.json() : null;
+});
+
+Then("the render request should be rejected", async ({ page }) => {
+    const slot = renderSlot(page);
+    expect(slot.status).toBeGreaterThanOrEqual(400);
+    expect(slot.status).toBeLessThan(500);
+});
+
+Then("the render lookup should report it does not exist", async ({ page }) => {
+    expect(renderSlot(page).status).toBe(404);
+});
+
+Then("the render should complete", async ({ page }) => {
+    const slot = renderSlot(page);
+    expect(slot.renderId).toBeGreaterThan(0);
+
+    // Polled rather than waited on a fixed delay: the render drives a real
+    // browser against the real frontend, so how long it takes depends on what
+    // else the worker is doing. The budget matches the tool's own wait.
+    await expect
+        .poll(
+            async () => {
+                const response = await page.request.get(
+                    `${apiBase()}/scene-renders/${slot.renderId}`,
+                );
+                if (!response.ok()) {
+                    return `http ${response.status()}`;
+                }
+                slot.body = await response.json();
+                return slot.body.status;
+            },
+            {
+                message: `Waiting for scene render ${slot.renderId} to be drawn`,
+                timeout: 90000,
+                intervals: [1000, 2000],
+            },
+        )
+        .toBe("Ready");
+});
+
+Then("the render should be a PNG image", async ({ page }) => {
+    const slot = renderSlot(page);
+    const response = await page.request.get(
+        `${apiBase()}/scene-renders/${slot.renderId}/file`,
+    );
+
+    expect(response.ok()).toBeTruthy();
+
+    // The magic bytes, not the content-type header: the header is whatever the
+    // endpoint claims, and a zero-byte or truncated file would still carry it.
+    const body = await response.body();
+    expect(body.length).toBeGreaterThan(1000);
+    expect(body.subarray(0, 8)).toEqual(
+        Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    );
+});
+
+Then(
+    "the render should report every placed node as loaded",
+    async ({ page }) => {
+        // The counts, not the pixels. A render is taken even when a node never
+        // resolves, so "an image came back" is not evidence the scene drew -
+        // this is the assertion that catches a node silently failing.
+        const slot = renderSlot(page);
+        expect(slot.body.nodesFailed).toBe(0);
+        expect(slot.body.nodesLoaded).toBeGreaterThan(0);
+    },
+);
