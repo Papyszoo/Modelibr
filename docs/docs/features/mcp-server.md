@@ -18,8 +18,8 @@ the tools that change anything only appear when you opt in with
 
 ## What the agent can read
 
-These five tools are always available, each a thin wrapper over an ordinary
-Modelibr API endpoint - there is no separate search or extraction path:
+These five library tools are always available, each a thin wrapper over an
+ordinary Modelibr API endpoint - there is no separate search or extraction path:
 
 | Tool                | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -28,6 +28,25 @@ Modelibr API endpoint - there is no separate search or extraction path:
 | `get_part`          | A single part's detail, addressed by its part-path (e.g. `/Building/Roof`).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | `compute_on_demand` | A cached expensive metric (UV overlap, texel density, surface area, …) keyed by geometry hash, or `pending` if it has not been computed yet.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `list_facets`       | The structural filters `search_assets` accepts and their value ranges (including size, rig, materials, UVs, part counts, and category), so the agent can compose filters without guessing.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+
+### Looking at a scene
+
+Reading a scene is a read: an agent that can search the library can look at what it has
+already built there. These five need no write flag either.
+
+| Tool               | What it does                                                                                                                                                                                                                                                        |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `list_scenes`      | Saved scenes with their node and light counts, newest edit first.                                                                                                                                                                                                   |
+| `get_scene`        | A scene's document plus, per node, the world footprint after transform, the source asset's own dimensions, where its origin sits inside those bounds and how far it is off the ground - with every overlapping pair and scale warning in the scene. The viewport-free inspector. |
+| `validate_scene`   | The mistakes the numbers above cannot show: something resting on nothing, geometry under the floor, an asset that is a whole sample scene rather than the prop it was placed as, nodes tilted or upside down, a scene with no key light, objects inside each other. Returns a verdict, findings with stable codes, **and what it could not check**. |
+| `render_scene`     | Photograph the scene through the same component the editor draws with, and get the image back. The only check that sees facing, framing and whether an asset loaded at all.                                                                                          |
+| `get_scene_render` | Collect a render by id.                                                                                                                                                                                                                                             |
+
+`validate_scene` deliberately reports its own blind spots. Footprints are axis-aligned
+boxes, so a square panel rotated 90° about Y is identical to one that is not - nothing on
+the server can see that a wall faces the wrong way. A clean verdict means "nothing I can
+measure is wrong", which is why the tool descriptions all end at the same place: render it
+and look.
 
 ## What the agent can change (opt-in)
 
@@ -77,8 +96,10 @@ Three rules make these safe to retry, review and undo:
 
 A scene places library assets into a composition - transformed, lit and dressed with
 materials. The server answers every write with the placed node's world footprint, anything
-it now overlaps, and any scale warning it triggered, so an agent finds out that the lamp
-post is inside the wall on the call that put it there.
+it now overlaps, any scale warning it triggered, and the `validate_scene` findings that
+name the node it just touched - so an agent finds out that the lamp post is inside the
+wall, or that the "rug" it placed is a twelve-part test scene with two lights in it, on
+the call that put it there rather than at the end of the build.
 
 | Tool                    | What it does                                                                                                                                                                       |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -152,9 +173,14 @@ fresh `idempotencyKey`) for each remaining channel. Each channel upload is audit
 own, and adding a channel over one that is already there records what it displaced, so
 undoing it puts the original map back rather than leaving the set a map short.
 
-The server also publishes an `import_library` **prompt** - a guided playbook for
-ingesting a whole folder of models into a categorized pack (dedupe, prefer `.glb`,
-handle multi-file `.gltf`, then categorize from the suggestions).
+The server also publishes two **prompts** - guided playbooks an agent can invoke by name:
+
+- **`import_library`** - ingesting a whole folder of models into a categorized pack
+  (dedupe, prefer `.glb`, handle multi-file `.gltf`, then categorize from the suggestions).
+- **`compose_scene`** - building a scene in stages: block out the room and its large
+  furniture, verify, add detail, verify again, light it, and only then dress it with
+  materials. It covers the judgement calls the tools cannot enforce, such as never scaling
+  from a search hit's dimensions and never treating a clean validation as a finished scene.
 
 ## Connecting an agent
 
@@ -182,7 +208,7 @@ server settings. Once connected, the tools above appear to the agent.
 | Setting                   | Default | Effect                                                                                                                    |
 | ------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------- |
 | `MCP_ENABLED`             | `true`  | Set to `false` in your root `.env` to disable the MCP endpoint entirely.                                                  |
-| `MCP_WRITE_ENABLED`       | `false` | Set to `true` to also expose the write tools and the `import_library` prompt. Restart the Web API.                        |
+| `MCP_WRITE_ENABLED`       | `false` | Set to `true` to also expose the write tools and the `import_library` / `compose_scene` prompts. Restart the Web API.     |
 | `MCP_DESTRUCTIVE_ENABLED` | `false` | Set to `true` to let the agent delete (recycle) assets and reverse writes that deleting undoes. Dry runs work either way. |
 | `MCP_TOKENS`              | (unset) | Per-token access scoping - see below. Unset means the endpoint is unauthenticated, as the rest of Modelibr is.            |
 

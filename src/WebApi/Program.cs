@@ -163,7 +163,11 @@ namespace WebApi
                         // Scene authoring. Same gate as every other write - composing a
                         // scene creates and destroys state like any other mutation.
                         .WithTools<WebApi.Mcp.SceneWriteMcpTools>()
-                        .WithPrompts<WebApi.Mcp.ImportLibraryPrompts>();
+                        .WithPrompts<WebApi.Mcp.ImportLibraryPrompts>()
+                        // The playbook for building a scene. Registered with the write
+                        // tools because it is a guide to writing: every stage it describes
+                        // is a call that is not there without the gate.
+                        .WithPrompts<WebApi.Mcp.ComposeScenePrompts>();
                 }
             }
             builder.Services.AddHostedService<BlenderRetentionSweepHostedService>();
