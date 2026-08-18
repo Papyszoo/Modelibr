@@ -66,6 +66,7 @@ export default [
     files: [
       'jobProcessor.js',
       'extractionJobProcessor.js',
+      'blenderOperationProcessor.js',
       'jobApiClient.js',
       'modelFileService.js',
       'environmentMapFileService.js',

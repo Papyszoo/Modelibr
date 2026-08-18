@@ -17,6 +17,15 @@ export const config = {
   // Poll interval for the decoupled extraction queue (prompt 20 executor).
   extractionPollIntervalMs:
     parseInt(process.env.EXTRACTION_POLL_INTERVAL_MS, 10) || 5000,
+  // Poll interval for the Blender operation family. Slower than the extraction queue on
+  // purpose: these jobs are minutes long and rare, so a tighter loop only adds requests.
+  blenderPollIntervalMs:
+    parseInt(process.env.BLENDER_POLL_INTERVAL_MS, 10) || 10000,
+  // How long one Blender run may take before it is killed. Comfortably under the queue's
+  // lease for the operation, so a run that overshoots is reported as a failure by the
+  // worker that owns it rather than being silently re-claimed by another.
+  blenderOperationTimeoutMs:
+    parseInt(process.env.BLENDER_OPERATION_TIMEOUT_MS, 10) || 900000,
 
   // Logging
   logLevel: process.env.LOG_LEVEL || 'info',

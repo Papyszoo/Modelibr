@@ -18,7 +18,7 @@ the tools that change anything only appear when you opt in with
 
 ## What the agent can read
 
-These seven library tools are always available, each a thin wrapper over an
+These eight library tools are always available, each a thin wrapper over an
 ordinary Modelibr API endpoint - there is no separate search or extraction path:
 
 | Tool                | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
@@ -30,6 +30,7 @@ ordinary Modelibr API endpoint - there is no separate search or extraction path:
 | `list_facets`       | The structural filters `search_assets` accepts and their value ranges (including size, rig, materials, UVs, part counts, and category), so the agent can compose filters without guessing.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `list_materials`    | Browse the material library: **parameter materials** (a colour and a roughness - no UVs needed) and **tiling global materials** (image channels, which do need UVs) in one list, because both attach to a model's material slot. Every hit carries `requiresUvs`, so an agent dressing an asset with a bad or missing unwrap can ask for only what will look right on it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `get_material`      | One parameter material in full - every factor, its render state, its category and tags.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `get_job_status`    | What a queued job is doing, and once it has finished, what it produced - the new version id an unwrap wrote, for instance. Pass `waitSeconds` to block for the verdict instead of writing a polling loop; the job runs on regardless. This is how you collect the result of any tool that hands back a job id.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |     |
 
 ### Looking at a scene
 
@@ -52,7 +53,7 @@ and look.
 
 ## What the agent can change (opt-in)
 
-Set `MCP_WRITE_ENABLED=true` in your root `.env` and twenty-seven more tools appear,
+Set `MCP_WRITE_ENABLED=true` in your root `.env` and twenty-eight more tools appear,
 letting an agent curate the library the way you would in the app. They are a thin
 pass-through over the same command handlers the UI uses, so there is one source
 of truth for what a change means:
@@ -64,6 +65,7 @@ of truth for what a change means:
 | `create_pack`      | Create a pack (a curated collection).                                                                                                                                                   |
 | `add_to_pack`      | Add a model to a pack.                                                                                                                                                                  |
 | `trigger_rederive` | Queue a re-extraction so parts, derived signals and the search index are rebuilt.                                                                                                       |
+| `generate_uvs`     | Unwrap a model with Blender and store the result as a **new, inactive version** - the uploaded file is never touched. Returns a job id; collect it with `get_job_status`.               |
 | `import_model`     | Import a model. Pass a `path` the **server** can read for a co-located import; omit `path` to get an upload ticket plus the HTTP endpoints to stream bytes to when the agent is remote. |
 
 The rest of the library is reachable too, so an agent can build a scene that has
@@ -155,7 +157,43 @@ one place the mechanism does not matter, and a material that needs UVs says so o
 entry. A binding made here is scene-local, undoes with the rest of the editor's history,
 and reaches the server on the next save as the same document an agent would have written.
 
-#### Placement rules stick to the node
+##### Unwrapping a model that has no UVs
+
+A tiling texture set samples a UV layout, so binding one to a model that has none shows
+nothing. `validate_scene` reports those nodes and `search_assets` carries the same flag, so
+the situation is visible before anything is bound.
+
+There are two ways out, and the cheaper one is usually right:
+
+- **Apply a parameter material.** A colour and a roughness need no UVs and no unwrap. For
+  the grey kit assets that make up most untextured libraries, this is the whole answer.
+- **`generate_uvs`.** Runs Blender on the model and writes the unwrapped result as a **new
+  version**, which is deliberately **not made active**: an unwrap is a proposal, and
+  promoting it would change what every scene referencing that model renders before anyone
+  had looked at it. Review the version in the app and set it active to adopt it.
+
+```
+generate_uvs(modelId: 812, idempotencyKey: "unwrap-812-1")
+  -> { status: "queued", jobId: 91 }
+
+get_job_status(jobId: 91, waitSeconds: 120)
+  -> { status: "Done", result: { versionId: 1904, meshesUnwrapped: 7, uvChannelIndices: [0] } }
+```
+
+`method` defaults to `smart`, which cuts islands wherever faces turn sharply and is what a
+model with no authored seams needs. `angle` follows seams the author marked - on a mesh
+without any it produces one stretched island, and the job says so in its warning rather
+than reporting a clean success. Pass `lightmap: true` to write a second UV channel instead
+of replacing the first.
+
+The output is always a `.glb`, whatever went in. UV channels cross into glTF **by
+position**, not by name, which is why the result reports `uvChannelIndices` - the Blender
+channel name does not survive the export.
+
+Blender is an optional install. Without it the tool answers immediately saying so, rather
+than queueing work nothing can run.
+
+### Placement rules stick to the node
 
 Three of these are properties of the node rather than arguments to one call, because "it
 stands on the floor", "it sits on the coffee table" and "it faces the TV" are standing facts

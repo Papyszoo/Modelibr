@@ -99,7 +99,6 @@ const { ThumbnailProcessor } = await import(
   '../processors/thumbnailProcessor.js'
 )
 const { SoundProcessor } = await import('../processors/soundProcessor.js')
-const { MeshAnalysisProcessor } = await import('../processors/meshProcessor.js')
 const { TextureSetProcessor } = await import(
   '../processors/textureSetProcessor.js'
 )
@@ -115,14 +114,20 @@ describe('ProcessorRegistry', () => {
   })
 
   describe('initialization', () => {
-    it('should register Model, Sound, TextureSet, EnvironmentMap, Scene, and MeshAnalysis processors', () => {
-      expect(registry.processors.size).toBe(6)
+    it('should register Model, Sound, TextureSet, EnvironmentMap and Scene processors', () => {
+      expect(registry.processors.size).toBe(5)
       expect(registry.processors.has('Model')).toBe(true)
       expect(registry.processors.has('Sound')).toBe(true)
       expect(registry.processors.has('TextureSet')).toBe(true)
       expect(registry.processors.has('EnvironmentMap')).toBe(true)
       expect(registry.processors.has('Scene')).toBe(true)
-      expect(registry.processors.has('MeshAnalysis')).toBe(true)
+    })
+
+    it('should NOT register MeshAnalysis - Blender work runs off the extraction queue', () => {
+      // The old entry was a placeholder that threw "not yet implemented" on every job.
+      // Blender operations now arrive with parameters and report a result, which this
+      // registry's job shape cannot carry.
+      expect(registry.processors.has('MeshAnalysis')).toBe(false)
     })
 
     it('should register correct processor types', () => {
@@ -136,9 +141,6 @@ describe('ProcessorRegistry', () => {
       expect(registry.processors.get('EnvironmentMap')).toBeInstanceOf(
         EnvironmentMapProcessor
       )
-      expect(registry.processors.get('MeshAnalysis')).toBeInstanceOf(
-        MeshAnalysisProcessor
-      )
     })
   })
 
@@ -151,14 +153,6 @@ describe('ProcessorRegistry', () => {
     it('should return SoundProcessor for Sound asset type', () => {
       const processor = registry.getProcessor({ assetType: 'Sound', id: 2 })
       expect(processor).toBeInstanceOf(SoundProcessor)
-    })
-
-    it('should return MeshAnalysisProcessor for MeshAnalysis asset type', () => {
-      const processor = registry.getProcessor({
-        assetType: 'MeshAnalysis',
-        id: 3,
-      })
-      expect(processor).toBeInstanceOf(MeshAnalysisProcessor)
     })
 
     it('should return TextureSetProcessor for TextureSet asset type', () => {
