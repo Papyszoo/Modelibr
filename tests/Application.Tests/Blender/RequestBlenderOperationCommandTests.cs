@@ -199,6 +199,138 @@ public class RequestBlenderOperationCommandTests
         Assert.False(result.Value.AlreadyQueued);
     }
 
+    [Fact]
+    public async Task A_Bake_Defaults_To_A_Colour_And_An_Occlusion_Map()
+    {
+        var jobs = Jobs();
+        var handler = Handler(jobs: jobs);
+
+        await handler.Handle(
+            new RequestBlenderOperationCommand(42, BlenderOperations.BakeTextures), CancellationToken.None);
+
+        jobs.Verify(r => r.AddAsync(
+            It.Is<ExtractionJob>(j =>
+                j.ParametersJson!.Contains("\"maps\":[\"diffuse\",\"ao\"]") &&
+                j.ParametersJson.Contains("\"resolution\":1024") &&
+                j.ParametersJson.Contains("\"samples\":32") &&
+                j.ParametersJson.Contains("\"unwrap\":false")),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Rejects_Two_Maps_That_Would_Fight_Over_One_Channel()
+    {
+        // A texture set holds one texture per type. diffuse and combined both become its
+        // Albedo, so the second upload would displace the first and the bake would report
+        // success having quietly thrown a map away.
+        var jobs = Jobs();
+        var handler = Handler(jobs: jobs);
+
+        var result = await handler.Handle(
+            new RequestBlenderOperationCommand(
+                42, BlenderOperations.BakeTextures,
+                ParametersJson: "{\"maps\": [\"diffuse\", \"combined\"]}"),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Blender.InvalidParameters", result.Error.Code);
+        Assert.Contains("Albedo", result.Error.Message);
+        jobs.Verify(r => r.AddAsync(It.IsAny<ExtractionJob>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Rejects_A_Relayout_Bake_With_Nothing_To_Rebuild_The_Material_From()
+    {
+        // Generating a UV layout invalidates every texture the model's material samples.
+        // Without a colour map the operation would succeed and hand back a grey model -
+        // a worse asset than the input.
+        var handler = Handler();
+
+        var result = await handler.Handle(
+            new RequestBlenderOperationCommand(
+                42, BlenderOperations.BakeTextures,
+                ParametersJson: "{\"maps\": [\"ao\", \"normal\"], \"unwrap\": true}"),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Blender.InvalidParameters", result.Error.Code);
+        Assert.Contains("colour map", result.Error.Message);
+    }
+
+    [Fact]
+    public async Task Accepts_A_Relayout_Bake_That_Carries_The_Colour_Across()
+    {
+        var jobs = Jobs();
+        var handler = Handler(jobs: jobs);
+
+        var result = await handler.Handle(
+            new RequestBlenderOperationCommand(
+                42, BlenderOperations.BakeTextures,
+                ParametersJson: "{\"maps\": [\"diffuse\", \"ao\"], \"unwrap\": true}"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        jobs.Verify(r => r.AddAsync(
+            It.Is<ExtractionJob>(j => j.ParametersJson!.Contains("\"unwrap\":true")),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Theory]
+    [InlineData("{\"resolution\": 1000}")]   // not a power of two
+    [InlineData("{\"resolution\": 8192}")]   // past the cap the container can hold
+    [InlineData("{\"resolution\": 64}")]     // below anything usable
+    [InlineData("{\"samples\": 0}")]
+    [InlineData("{\"samples\": 513}")]
+    [InlineData("{\"margin\": -1}")]
+    [InlineData("{\"margin\": 65}")]
+    [InlineData("{\"resolution\": \"big\"}")]
+    public async Task Rejects_Bake_Parameters_Out_Of_Range(string parametersJson)
+    {
+        var jobs = Jobs();
+        var handler = Handler(jobs: jobs);
+
+        var result = await handler.Handle(
+            new RequestBlenderOperationCommand(
+                42, BlenderOperations.BakeTextures, ParametersJson: parametersJson),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Blender.InvalidParameters", result.Error.Code);
+        jobs.Verify(r => r.AddAsync(It.IsAny<ExtractionJob>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Rejects_A_Map_Blender_Has_No_Pass_For()
+    {
+        var handler = Handler();
+
+        var result = await handler.Handle(
+            new RequestBlenderOperationCommand(
+                42, BlenderOperations.BakeTextures, ParametersJson: "{\"maps\": [\"metallic\"]}"),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Contains("metallic", result.Error.Message);
+        Assert.Contains("Known maps", result.Error.Message);
+    }
+
+    [Fact]
+    public async Task Drops_A_Map_Asked_For_Twice_Rather_Than_Baking_It_Twice()
+    {
+        var jobs = Jobs();
+        var handler = Handler(jobs: jobs);
+
+        await handler.Handle(
+            new RequestBlenderOperationCommand(
+                42, BlenderOperations.BakeTextures,
+                ParametersJson: "{\"maps\": [\"ao\", \"AO\", \" ao \"]}"),
+            CancellationToken.None);
+
+        jobs.Verify(r => r.AddAsync(
+            It.Is<ExtractionJob>(j => j.ParametersJson!.Contains("\"maps\":[\"ao\"]")),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
     // ---- fixtures ---------------------------------------------------------------
 
     private static Mock<IExtractionJobRepository> Jobs() => new();

@@ -134,6 +134,8 @@ export class BlenderOperationProcessor {
     switch (job.operation) {
       case 'uv-unwrap':
         return await this.unwrap(job, jobLogger)
+      case 'bake-textures':
+        return await this.bake(job, jobLogger)
       default:
         throw new Error(
           `The '${job.operation}' operation is queued but not implemented yet in this worker.`
@@ -219,6 +221,202 @@ export class BlenderOperationProcessor {
       await fs.promises.unlink(outputPath).catch(() => {})
       await this.modelFileService.cleanupFile(source.filePath).catch(() => {})
     }
+  }
+
+  /**
+   * Bake a model's own appearance and geometry into texture maps, imported as a texture set.
+   *
+   * Two operations behind one name, and `unwrap` picks which:
+   *
+   * - **off** - the maps are baked for the layout the model already has. Nothing about the
+   *   model changes; the output is a texture set bound to the version it was baked from.
+   * - **on** - a fresh non-overlapping layout is generated, the model's current appearance
+   *   is baked onto it, and a NEW model version is written around the result. This is the
+   *   one that helps an atlas-packed asset: its UVs are a small corner of a palette shared
+   *   with hundreds of other models, so maps for that layout would be mostly empty and
+   *   could not be edited without touching every model on the sheet.
+   *
+   * Like an unwrap, the new version is NOT made active. A bake is a proposal.
+   */
+  async bake(job, jobLogger) {
+    const parameters = this.parameters(job)
+    const source = await this.modelFileService.fetchModelFile(
+      job.assetId,
+      job.versionId
+    )
+
+    const outputDir = path.join(os.tmpdir(), `bake-${job.id}-${Date.now()}`)
+    const outputModel = path.join(outputDir, 'rebaked.glb')
+    const unwrap = Boolean(parameters.unwrap)
+
+    try {
+      await fs.promises.mkdir(outputDir, { recursive: true })
+
+      const result = await this.runBlender(
+        'bake_textures.py',
+        [
+          '--input',
+          source.filePath,
+          '--output-dir',
+          outputDir,
+          '--maps',
+          (parameters.maps || ['diffuse', 'ao']).join(','),
+          '--resolution',
+          String(parameters.resolution ?? 1024),
+          '--samples',
+          String(parameters.samples ?? 32),
+          '--margin',
+          String(parameters.margin ?? 16),
+          '--island-margin',
+          String(parameters.islandMargin ?? 0.02),
+          '--angle-limit',
+          String(parameters.angleLimit ?? 66),
+          ...(unwrap ? ['--unwrap', '--output-model', outputModel] : []),
+        ],
+        'BAKE_TEXTURES',
+        jobLogger
+      )
+
+      const setName =
+        parameters.setName || this.bakedSetName(source.originalFileName)
+      const textureSetId = await this.importBakedSet(
+        result.maps,
+        setName,
+        jobLogger
+      )
+
+      // The version the set describes. With a re-layout that is the version just written,
+      // because the maps are laid out for ITS UVs and match no other version of the model.
+      let boundVersionId = job.versionId
+      let created = null
+
+      if (unwrap) {
+        try {
+          created = await this.jobApi.createModelVersion(
+            job.assetId,
+            outputModel,
+            this.bakedModelFileName(source.originalFileName),
+            this.bakeVersionDescription(job, parameters, result),
+            false
+          )
+          boundVersionId = created?.versionId ?? job.versionId
+        } catch (error) {
+          // The set is already in the library at this point. Saying so turns "the job
+          // failed" into something the user can act on rather than hunt for.
+          throw new Error(
+            `${error.message} (texture set ${textureSetId} was already created from this bake ` +
+              'and is not bound to anything - delete it or bind it by hand.)'
+          )
+        }
+      }
+
+      await this.jobApi.associateTextureSetWithModelVersion(
+        textureSetId,
+        boundVersionId
+      )
+
+      return {
+        warning: result.warning || null,
+        payload: {
+          operation: 'bake-textures',
+          modelId: job.assetId,
+          sourceVersionId: job.versionId,
+          textureSetId,
+          textureSetName: setName,
+          boundToVersionId: boundVersionId,
+          maps: result.maps.map(m => ({
+            map: m.map,
+            textureType: m.textureType,
+            sizeBytes: m.sizeBytes,
+          })),
+          resolution: result.resolution,
+          samples: result.samples,
+          meshesBaked: result.meshesBaked,
+          unwrapped: Boolean(result.unwrapped),
+          versionId: created?.versionId ?? null,
+          versionNumber: created?.versionNumber ?? null,
+          setAsActive: false,
+          setAsDefaultTextureSet: false,
+          note: unwrap
+            ? 'A new, inactive version carries the baked layout and maps, and the texture set is bound to it. Review it, then set it active.'
+            : 'The texture set is bound to the version it was baked from. It is not the model default - bind_texture_set makes it so.',
+        },
+      }
+    } finally {
+      await fs.promises
+        .rm(outputDir, { recursive: true, force: true })
+        .catch(() => {})
+      await this.modelFileService.cleanupFile(source.filePath).catch(() => {})
+    }
+  }
+
+  /**
+   * Import the baked maps as one texture set: the first map creates it, the rest join it.
+   *
+   * There is no create-with-many endpoint, and inventing one for this would duplicate the
+   * per-channel validation (one texture per type, the mutually exclusive pairs) that the
+   * add route already enforces.
+   */
+  async importBakedSet(maps, setName, jobLogger) {
+    const [first, ...rest] = maps
+    const createdSet = await this.jobApi.createTextureSetWithFile(
+      first.path,
+      first.fileName,
+      setName,
+      first.textureType
+    )
+
+    const textureSetId = createdSet?.textureSetId
+    if (!textureSetId) {
+      throw new Error(
+        'The texture set was created but the API did not return its id, so the remaining ' +
+          'maps have nowhere to go.'
+      )
+    }
+
+    for (const map of rest) {
+      await this.jobApi.addTextureToSetWithFile(
+        textureSetId,
+        map.path,
+        map.fileName,
+        map.textureType
+      )
+    }
+
+    jobLogger.info('Baked texture set imported', {
+      textureSetId,
+      channels: maps.map(m => m.textureType),
+    })
+    return textureSetId
+  }
+
+  /** Names the set after the model it was baked from, so it is findable without the job id. */
+  bakedSetName(originalFileName) {
+    const base = path
+      .basename(
+        originalFileName || 'model',
+        path.extname(originalFileName || '')
+      )
+      .trim()
+    return `${base || 'model'} (baked)`
+  }
+
+  bakedModelFileName(originalFileName) {
+    const base = path
+      .basename(
+        originalFileName || 'model',
+        path.extname(originalFileName || '')
+      )
+      .trim()
+    return `${base || 'model'}-baked.glb`
+  }
+
+  bakeVersionDescription(job, parameters, result) {
+    const maps = (parameters.maps || []).join(', ')
+    return (
+      `Baked with Blender from version ${job.versionId}: ${maps} at ` +
+      `${result.resolution}px on a generated UV layout.`
+    )
   }
 
   /**

@@ -53,7 +53,7 @@ and look.
 
 ## What the agent can change (opt-in)
 
-Set `MCP_WRITE_ENABLED=true` in your root `.env` and twenty-eight more tools appear,
+Set `MCP_WRITE_ENABLED=true` in your root `.env` and twenty-nine more tools appear,
 letting an agent curate the library the way you would in the app. They are a thin
 pass-through over the same command handlers the UI uses, so there is one source
 of truth for what a change means:
@@ -66,6 +66,7 @@ of truth for what a change means:
 | `add_to_pack`      | Add a model to a pack.                                                                                                                                                                  |
 | `trigger_rederive` | Queue a re-extraction so parts, derived signals and the search index are rebuilt.                                                                                                       |
 | `generate_uvs`     | Unwrap a model with Blender and store the result as a **new, inactive version** - the uploaded file is never touched. Returns a job id; collect it with `get_job_status`.               |
+| `bake_textures`    | Bake a model's own appearance and geometry into texture maps with Blender, imported as a texture set bound to it. Returns a job id; collect it with `get_job_status`.                   |
 | `import_model`     | Import a model. Pass a `path` the **server** can read for a co-located import; omit `path` to get an upload ticket plus the HTTP endpoints to stream bytes to when the agent is remote. |
 
 The rest of the library is reachable too, so an agent can build a scene that has
@@ -192,6 +193,54 @@ channel name does not survive the export.
 
 Blender is an optional install. Without it the tool answers immediately saying so, rather
 than queueing work nothing can run.
+
+##### Baking a model its own textures
+
+`bake_textures` renders a model's own appearance and geometry into image maps - `diffuse`,
+`ao`, `normal`, `roughness`, `emissive`, or `combined` - and imports them as one texture set
+bound to the version they were baked from. It does **not** become the model's default set;
+`bind_texture_set` is the separate, deliberate step that changes what renders.
+
+The `unwrap` flag decides which of two operations you get.
+
+**Left off**, the maps are baked for the UV layout the model already has. Nothing about the
+model changes. This is what you want when the layout is a real per-model unwrap and you are
+adding detail it does not have yet - ambient occlusion, most often.
+
+```
+bake_textures(modelId: 812, idempotencyKey: "bake-812-1", maps: ["ao"])
+  -> { status: "queued", jobId: 96 }
+
+get_job_status(jobId: 96, waitSeconds: 120)
+  -> { status: "Done", result: { textureSetId: 341, boundToVersionId: 1904, maps: [...] } }
+```
+
+**Turned on**, a fresh non-overlapping layout is generated, the model's current appearance is
+baked onto it, and a **new, inactive version** is written around the result. This is the
+answer for an atlas-packed model - `search_assets(uvStatus: "atlas_packed")` finds them.
+Those assets share one palette texture across hundreds of models, so each uses a few percent
+of the UV square; maps baked for that layout would be almost entirely empty, and editing one
+would mean editing every model on the sheet.
+
+The two UV layers do different jobs during that bake, which is what makes the transfer
+possible: the source material keeps sampling the layout it was authored for, while the bake
+writes into the new one.
+
+```
+bake_textures(modelId: 812, idempotencyKey: "bake-812-2",
+              maps: ["diffuse", "ao"], unwrap: true, resolution: 1024)
+```
+
+Turning `unwrap` on **requires a colour map** (`diffuse` or `combined`). The new layout
+invalidates every texture the model's material sampled, so without one the operation would
+report success and hand back a grey model. The new version's material is rebuilt around the
+baked maps and carries them inside the `.glb`, so it renders on its own - and so its
+generated thumbnail is right too.
+
+Two limits worth knowing. Cycles has no metallic bake pass, so a re-layout bake reports a
+warning and renders a metal surface as non-metal. And `resolution` is capped at 4096: a
+4K bake on heavy geometry can exhaust the asset processor, which shows up as the container
+dying rather than the job failing.
 
 ### Placement rules stick to the node
 

@@ -156,12 +156,15 @@ describe('BlenderOperationProcessor', () => {
   })
 
   it('fails an operation it does not implement rather than reporting success', async () => {
-    await processor.process({ ...job, operation: 'bake-textures' })
+    // Was bake-textures until the bake shipped. convert-format is still queued-but-refused,
+    // which is what this guards: the queue accepts the whole family, the worker implements
+    // part of it, and the gap has to be reported rather than reported as success.
+    await processor.process({ ...job, operation: 'convert-format' })
 
     const [, , success, errorMessage] =
       processor.jobApi.finishExtractionJob.mock.calls[0]
     expect(success).toBe(false)
-    expect(errorMessage).toContain('bake-textures')
+    expect(errorMessage).toContain('convert-format')
   })
 
   it('survives parameters it cannot parse', async () => {
@@ -182,5 +185,220 @@ describe('BlenderOperationProcessor', () => {
     // Worth being loud about: an FBX in, a GLB out.
     expect(processor.outputFileName('chair.fbx', {})).toBe('chair-uvs.glb')
     expect(processor.outputFileName('chair.obj', {})).toBe('chair-uvs.glb')
+  })
+})
+
+/**
+ * The bake. Blender is stubbed here too - what is under test is what happens to what it
+ * produced: that the maps become ONE texture set rather than loose textures, that the set
+ * is bound to the version its layout actually matches, and that a re-layout bake's new
+ * version arrives inactive like an unwrap's.
+ */
+describe('BlenderOperationProcessor - bake-textures', () => {
+  let processor
+  let blenderEnabledBefore
+
+  const job = {
+    id: 8,
+    assetType: 'Model',
+    assetId: 42,
+    versionId: 7,
+    operation: 'bake-textures',
+    parametersJson: JSON.stringify({
+      maps: ['diffuse', 'ao'],
+      resolution: 1024,
+      samples: 32,
+      margin: 16,
+      unwrap: false,
+    }),
+  }
+
+  const blenderResult = {
+    maps: [
+      {
+        map: 'diffuse',
+        textureType: 'Albedo',
+        fileName: 'diffuse.png',
+        path: '/tmp/bake/diffuse.png',
+        sizeBytes: 4096,
+        colorSpace: 'srgb',
+      },
+      {
+        map: 'ao',
+        textureType: 'AO',
+        fileName: 'ao.png',
+        path: '/tmp/bake/ao.png',
+        sizeBytes: 2048,
+        colorSpace: 'non-color',
+      },
+    ],
+    resolution: 1024,
+    samples: 32,
+    meshesBaked: 1,
+    unwrapped: false,
+  }
+
+  beforeEach(() => {
+    blenderEnabledBefore = config.blender.enabled
+    config.blender.enabled = true
+
+    processor = new BlenderOperationProcessor()
+    processor.modelFileService = {
+      fetchModelFile: vi.fn().mockResolvedValue({
+        filePath: '/tmp/chair.fbx',
+        fileType: 'fbx',
+        originalFileName: 'chair.fbx',
+      }),
+      cleanupFile: vi.fn().mockResolvedValue(undefined),
+    }
+    processor.jobApi = {
+      dequeueExtractionJob: vi.fn().mockResolvedValue(null),
+      finishExtractionJob: vi.fn().mockResolvedValue(undefined),
+      createModelVersion: vi
+        .fn()
+        .mockResolvedValue({ versionId: 21, versionNumber: 3, fileId: 9 }),
+      createTextureSetWithFile: vi
+        .fn()
+        .mockResolvedValue({ textureSetId: 77, textureId: 1, fileId: 2 }),
+      addTextureToSetWithFile: vi.fn().mockResolvedValue({ textureId: 2 }),
+      associateTextureSetWithModelVersion: vi.fn().mockResolvedValue(undefined),
+    }
+    processor.runBlender = vi.fn().mockResolvedValue(blenderResult)
+  })
+
+  afterEach(() => {
+    config.blender.enabled = blenderEnabledBefore
+  })
+
+  it('imports every baked map into ONE texture set', async () => {
+    // One set, a channel per map - not two loose textures nobody can bind together.
+    await processor.process(job)
+
+    expect(processor.jobApi.createTextureSetWithFile).toHaveBeenCalledWith(
+      '/tmp/bake/diffuse.png',
+      'diffuse.png',
+      'chair (baked)',
+      'Albedo'
+    )
+    expect(processor.jobApi.addTextureToSetWithFile).toHaveBeenCalledWith(
+      77,
+      '/tmp/bake/ao.png',
+      'ao.png',
+      'AO'
+    )
+    expect(processor.jobApi.createTextureSetWithFile).toHaveBeenCalledTimes(1)
+  })
+
+  it('binds the set to the version it was baked from, and to no other', async () => {
+    // A baked set is laid out for one version's UVs. The all-versions form would point it
+    // at layouts it does not match.
+    await processor.process(job)
+
+    expect(
+      processor.jobApi.associateTextureSetWithModelVersion
+    ).toHaveBeenCalledWith(77, 7)
+    expect(processor.jobApi.createModelVersion).not.toHaveBeenCalled()
+  })
+
+  it('writes a re-layout bake as a new INACTIVE version and binds the set to THAT', async () => {
+    processor.runBlender = vi
+      .fn()
+      .mockResolvedValue({ ...blenderResult, unwrapped: true })
+
+    await processor.process({
+      ...job,
+      parametersJson: JSON.stringify({
+        maps: ['diffuse', 'ao'],
+        resolution: 1024,
+        unwrap: true,
+      }),
+    })
+
+    expect(processor.jobApi.createModelVersion).toHaveBeenCalledWith(
+      42,
+      expect.stringContaining('rebaked.glb'),
+      'chair-baked.glb',
+      expect.stringContaining('version 7'),
+      false
+    )
+    // 21, the version just written - not 7, whose layout the maps do not match.
+    expect(
+      processor.jobApi.associateTextureSetWithModelVersion
+    ).toHaveBeenCalledWith(77, 21)
+  })
+
+  it('reports the set, the binding and the maps back on the job', async () => {
+    await processor.process(job)
+
+    const [, , success, error, , resultJson] =
+      processor.jobApi.finishExtractionJob.mock.calls[0]
+    expect(success).toBe(true)
+    expect(error).toBeNull()
+
+    const result = JSON.parse(resultJson)
+    expect(result.textureSetId).toBe(77)
+    expect(result.boundToVersionId).toBe(7)
+    expect(result.maps.map(m => m.textureType)).toEqual(['Albedo', 'AO'])
+    expect(result.setAsDefaultTextureSet).toBe(false)
+  })
+
+  it("carries the script's warning through to the job", async () => {
+    processor.runBlender = vi.fn().mockResolvedValue({
+      ...blenderResult,
+      warning: '1 of 1 meshes had no material',
+    })
+
+    await processor.process(job)
+
+    const [, , success, , warning] =
+      processor.jobApi.finishExtractionJob.mock.calls[0]
+    expect(success).toBe(true)
+    expect(warning).toBe('1 of 1 meshes had no material')
+  })
+
+  it('says where the orphaned set is when the version cannot be written', async () => {
+    // The set is already in the library by then. "The job failed" alone would leave the
+    // user hunting for something this message can just name.
+    processor.runBlender = vi
+      .fn()
+      .mockResolvedValue({ ...blenderResult, unwrapped: true })
+    processor.jobApi.createModelVersion = vi
+      .fn()
+      .mockRejectedValue(new Error('disk full'))
+
+    await processor.process({
+      ...job,
+      parametersJson: JSON.stringify({ maps: ['diffuse'], unwrap: true }),
+    })
+
+    const [, , success, errorMessage] =
+      processor.jobApi.finishExtractionJob.mock.calls[0]
+    expect(success).toBe(false)
+    expect(errorMessage).toContain('disk full')
+    expect(errorMessage).toContain('texture set 77')
+    expect(
+      processor.jobApi.associateTextureSetWithModelVersion
+    ).not.toHaveBeenCalled()
+  })
+
+  it('refuses when the API creates the set but does not say which one', async () => {
+    processor.jobApi.createTextureSetWithFile = vi.fn().mockResolvedValue({})
+
+    await processor.process(job)
+
+    const [, , success, errorMessage] =
+      processor.jobApi.finishExtractionJob.mock.calls[0]
+    expect(success).toBe(false)
+    expect(errorMessage).toContain('did not return its id')
+    expect(processor.jobApi.addTextureToSetWithFile).not.toHaveBeenCalled()
+  })
+
+  it('names the set after the model, so it is findable without the job id', () => {
+    expect(processor.bakedSetName('SM_Prop_CardboardBox_01.fbx')).toBe(
+      'SM_Prop_CardboardBox_01 (baked)'
+    )
+    expect(processor.bakedModelFileName('SM_Prop_CardboardBox_01.fbx')).toBe(
+      'SM_Prop_CardboardBox_01-baked.glb'
+    )
   })
 })

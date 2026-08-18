@@ -538,6 +538,118 @@ export class JobApiClient {
   }
 
   /**
+   * Create a texture set from the first map a bake produced.
+   *
+   * The set is the library's unit for "these images belong to one surface", so a bake
+   * lands as one set with a channel per map rather than as N loose textures nobody can
+   * bind together.
+   *
+   * @param {string} filePath - Local path to the image.
+   * @param {string} fileName - Name to store it under.
+   * @param {string} name - Name for the set.
+   * @param {string} textureType - Albedo, Normal, AO, Roughness, Emissive, ...
+   * @returns {Promise<{textureSetId: number, textureId: number}>}
+   */
+  async createTextureSetWithFile(filePath, fileName, name, textureType) {
+    if (!fs.existsSync(filePath)) {
+      throw new Error(`File not found: ${filePath}`)
+    }
+
+    const formData = new FormData()
+    formData.append('file', fs.createReadStream(filePath), fileName)
+    formData.append('name', name)
+    formData.append('textureType', textureType)
+
+    try {
+      const response = await this.apiClient.post(
+        '/texture-sets/with-file',
+        formData,
+        {
+          headers: formData.getHeaders(),
+          timeout: 300000,
+        }
+      )
+      logger.info('Texture set created', { name, textureType, fileName })
+      return response.data
+    } catch (error) {
+      logger.error('Failed to create texture set', {
+        name,
+        textureType,
+        error: error.message,
+      })
+      throw error
+    }
+  }
+
+  /**
+   * Add one more map to a texture set this worker created.
+   *
+   * @param {number} textureSetId
+   * @param {string} filePath
+   * @param {string} fileName
+   * @param {string} textureType
+   */
+  async addTextureToSetWithFile(textureSetId, filePath, fileName, textureType) {
+    if (!fs.existsSync(filePath)) {
+      throw new Error(`File not found: ${filePath}`)
+    }
+
+    const formData = new FormData()
+    formData.append('file', fs.createReadStream(filePath), fileName)
+    formData.append('textureType', textureType)
+
+    try {
+      const response = await this.apiClient.post(
+        `/texture-sets/${textureSetId}/textures/with-file`,
+        formData,
+        { headers: formData.getHeaders(), timeout: 300000 }
+      )
+      logger.info('Texture added to set', {
+        textureSetId,
+        textureType,
+        fileName,
+      })
+      return response.data
+    } catch (error) {
+      logger.error('Failed to add texture to set', {
+        textureSetId,
+        textureType,
+        error: error.message,
+      })
+      throw error
+    }
+  }
+
+  /**
+   * Bind a texture set to ONE model version.
+   *
+   * Deliberately not the all-versions form. A baked set is laid out for the UV set of the
+   * version it was baked from; mapping it onto every version would point it at layouts it
+   * does not match. Making it the model's default is a separate decision, and a human's.
+   *
+   * @param {number} textureSetId
+   * @param {number} modelVersionId
+   */
+  async associateTextureSetWithModelVersion(textureSetId, modelVersionId) {
+    try {
+      await this.apiClient.post(
+        `/texture-sets/${textureSetId}/model-versions/${modelVersionId}`
+      )
+      logger.info('Texture set associated with model version', {
+        textureSetId,
+        modelVersionId,
+      })
+    } catch (error) {
+      logger.error('Failed to associate texture set with model version', {
+        textureSetId,
+        modelVersionId,
+        error: error.message,
+      })
+      throw error
+    }
+  }
+
+  /**
    * Test API connectivity
    * @returns {Promise<boolean>} True if API is reachable
    */

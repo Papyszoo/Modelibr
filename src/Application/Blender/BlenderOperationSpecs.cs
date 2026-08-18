@@ -64,6 +64,7 @@ public static class BlenderOperationSpecs
         return operation switch
         {
             BlenderOperations.UvUnwrap => NormalizeUvUnwrap(supplied),
+            BlenderOperations.BakeTextures => NormalizeBakeTextures(supplied),
             _ => Result.Success(supplied.ToJsonString())
         };
     }
@@ -123,6 +124,161 @@ public static class BlenderOperationSpecs
             ["lightmap"] = lightmap,
             ["channelName"] = channelName
         }.ToJsonString());
+    }
+
+    /// <summary>
+    /// The maps a bake can produce, and the texture type each becomes in the resulting set.
+    /// </summary>
+    /// <remarks>
+    /// <c>diffuse</c> and <c>combined</c> both land on Albedo, and a texture set holds one
+    /// texture per type - so asking for both is rejected here rather than discovered when the
+    /// second upload displaces the first. They are also different things: <c>diffuse</c> is
+    /// colour with the lighting excluded, <c>combined</c> is a lit render. Binding a lit
+    /// render as a base-colour map lights the model twice.
+    /// </remarks>
+    private static readonly Dictionary<string, string> BakeMaps = new(StringComparer.Ordinal)
+    {
+        ["diffuse"] = "Albedo",
+        ["combined"] = "Albedo",
+        ["ao"] = "AO",
+        ["normal"] = "Normal",
+        ["roughness"] = "Roughness",
+        ["emissive"] = "Emissive"
+    };
+
+    /// <summary>The maps that carry the model's colour, one of which a re-layout needs.</summary>
+    private static readonly string[] ColorMaps = ["diffuse", "combined"];
+
+    /// <summary>
+    /// Bake parameters.
+    /// </summary>
+    /// <remarks>
+    /// <c>unwrap</c> is the parameter that decides what the operation even is. Left off, the
+    /// bake writes maps for the layout the model already has and produces a texture set and
+    /// nothing else. Turned on, it lays out a fresh non-overlapping UV set, bakes the model's
+    /// current appearance onto it, and writes a NEW model version around the result - which
+    /// is the only way to give one of the 775 atlas-packed assets its own textures, because
+    /// their existing layout is a 3% corner of a palette shared with 700 other models.
+    ///
+    /// Turning it on therefore requires a colour map: the new layout invalidates every source
+    /// texture, so without something to rebuild the material from the operation would report
+    /// success and hand back a grey model.
+    /// </remarks>
+    private static Result<string> NormalizeBakeTextures(JsonObject supplied)
+    {
+        var requested = new List<string>();
+        if (supplied["maps"] is JsonArray array)
+        {
+            foreach (var node in array)
+            {
+                var name = node?.GetValue<string>()?.Trim().ToLowerInvariant();
+                if (!string.IsNullOrEmpty(name) && !requested.Contains(name))
+                {
+                    requested.Add(name);
+                }
+            }
+        }
+
+        if (requested.Count == 0)
+        {
+            requested.AddRange(["diffuse", "ao"]);
+        }
+
+        var unknown = requested.Where(m => !BakeMaps.ContainsKey(m)).ToList();
+        if (unknown.Count > 0)
+        {
+            return Result.Failure<string>(new Error(
+                "Blender.InvalidParameters",
+                $"Unknown map(s) {string.Join(", ", unknown)}. Known maps: {string.Join(", ", BakeMaps.Keys.Order())}."));
+        }
+
+        var collisions = requested
+            .GroupBy(m => BakeMaps[m])
+            .Where(g => g.Count() > 1)
+            .ToList();
+        if (collisions.Count > 0)
+        {
+            var clash = collisions[0];
+            return Result.Failure<string>(new Error(
+                "Blender.InvalidParameters",
+                $"{string.Join(" and ", clash)} both become the set's {clash.Key} texture, and a texture set holds one of each. Ask for one of them."));
+        }
+
+        var resolution = (int)ReadDouble(supplied, "resolution", 1024);
+        if (resolution is not (>= 128 and <= 4096) || (resolution & (resolution - 1)) != 0)
+        {
+            return Result.Failure<string>(new Error(
+                "Blender.InvalidParameters",
+                "resolution must be a power of two between 128 and 4096."));
+        }
+
+        var samples = (int)ReadDouble(supplied, "samples", 32);
+        if (samples is not (>= 1 and <= 512))
+        {
+            return Result.Failure<string>(new Error(
+                "Blender.InvalidParameters", "samples must be a whole number between 1 and 512."));
+        }
+
+        var margin = (int)ReadDouble(supplied, "margin", 16);
+        if (margin is not (>= 0 and <= 64))
+        {
+            return Result.Failure<string>(new Error(
+                "Blender.InvalidParameters", "margin must be a whole number of pixels between 0 and 64."));
+        }
+
+        var unwrap = supplied["unwrap"]?.GetValue<bool>() ?? false;
+        if (unwrap && !requested.Any(ColorMaps.Contains))
+        {
+            return Result.Failure<string>(new Error(
+                "Blender.InvalidParameters",
+                "Baking onto a generated UV layout needs a colour map to rebuild the material from, " +
+                "because the new layout invalidates the model's existing textures. " +
+                "Add 'diffuse' to maps, or leave unwrap off to bake onto the layout the model already has."));
+        }
+
+        var islandMargin = ReadDouble(supplied, "islandMargin", 0.02);
+        if (islandMargin is not (>= 0 and <= 0.5))
+        {
+            return Result.Failure<string>(new Error(
+                "Blender.InvalidParameters", "islandMargin must be a number between 0 and 0.5."));
+        }
+
+        var angleLimit = ReadDouble(supplied, "angleLimit", 66);
+        if (angleLimit is not (>= 1 and <= 89))
+        {
+            return Result.Failure<string>(new Error(
+                "Blender.InvalidParameters", "angleLimit must be a number between 1 and 89 degrees."));
+        }
+
+        var setName = supplied["setName"]?.GetValue<string>()?.Trim();
+        if (setName is { Length: > 200 })
+        {
+            return Result.Failure<string>(new Error(
+                "Blender.InvalidParameters", "setName must be 200 characters or fewer."));
+        }
+
+        var maps = new JsonArray();
+        foreach (var map in requested)
+        {
+            maps.Add(map);
+        }
+
+        var normalized = new JsonObject
+        {
+            ["maps"] = maps,
+            ["resolution"] = resolution,
+            ["samples"] = samples,
+            ["margin"] = margin,
+            ["unwrap"] = unwrap,
+            ["islandMargin"] = islandMargin,
+            ["angleLimit"] = angleLimit
+        };
+        if (!string.IsNullOrEmpty(setName))
+        {
+            normalized["setName"] = setName;
+        }
+
+        return Result.Success(normalized.ToJsonString());
     }
 
     /// <summary>

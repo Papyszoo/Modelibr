@@ -136,6 +136,64 @@ public sealed class BlenderWriteMcpTools
             cancellationToken);
     }
 
+    [McpServerTool(Name = "bake_textures")]
+    [Description("Bake a model's own appearance and geometry into texture maps with Blender, imported as a texture set bound to it. " +
+                 "maps: diffuse (base colour, lighting excluded), ao, normal, roughness, emissive, or combined (a lit render - do not bind one as base colour). " +
+                 "Leave unwrap off to bake maps for the UV layout the model already has. Turn it ON for an atlas-packed model " +
+                 "(search_assets(uvStatus:'atlas_packed') finds them): its UVs are a corner of a palette shared with hundreds of other models, so a fresh " +
+                 "layout is generated, the current appearance is baked onto it, and a NEW inactive version is written around the result. " +
+                 "unwrap needs a colour map, because the new layout invalidates the model's existing textures. " +
+                 "Returns a job id: minutes of work, so collect the result with get_job_status. Requires Blender (Settings).")]
+    public static Task<object> BakeTextures(
+        ICommandHandler<RequestBlenderOperationCommand, BlenderOperationRequested> handler,
+        IAgentAudit audit,
+        McpCallerContext caller,
+        [Description("Model id to bake.")] int modelId,
+        [Description("Unique key so a retried call does not queue the bake twice.")] string idempotencyKey,
+        [Description("Maps to bake. Defaults to diffuse and ao. diffuse and combined both become the set's Albedo, so ask for only one.")] string[]? maps = null,
+        [Description("Version id to bake. Defaults to the model's active version.")] int? versionId = null,
+        [Description("Generate a fresh UV layout and write a new version around the bake. Needed for atlas-packed models; requires a colour map.")] bool unwrap = false,
+        [Description("Map size in pixels, a power of two from 128 to 4096. Default 1024. 4096 on heavy geometry can exhaust the worker.")] int? resolution = null,
+        [Description("Cycles samples per pixel, 1-512, default 32. Raise it if AO looks grainy; it is the main cost driver.")] int? samples = null,
+        [Description("Pixels the bake bleeds past each island edge, 0-64, default 16. Raise it if seams show at low mip levels.")] int? margin = null,
+        [Description("Name for the resulting texture set. Defaults to the model's file name with '(baked)'.")] string? setName = null,
+        [Description("Optional batch id. Writes sharing one can be undone together with reverse_operation.")] string? batchId = null,
+        CancellationToken cancellationToken = default)
+    {
+        return Guarded(
+            audit,
+            caller,
+            new AgentWrite(idempotencyKey, "bake-textures", "Model", modelId, batchId),
+            async ct =>
+            {
+                var parameters = BakeParameters(maps, unwrap, resolution, samples, margin, setName);
+                var result = await handler.Handle(
+                    new RequestBlenderOperationCommand(
+                        modelId, BlenderOperations.BakeTextures, versionId, parameters),
+                    ct);
+
+                if (result.IsFailure)
+                {
+                    return Failed(result.Error);
+                }
+
+                var queued = result.Value;
+                return Applied(
+                    new
+                    {
+                        status = queued.AlreadyQueued ? "already-queued" : "queued",
+                        jobId = queued.JobId,
+                        modelId = queued.ModelId,
+                        versionId = queued.VersionId,
+                        note = queued.AlreadyQueued
+                            ? "This bake was already queued for this version; the same job id is returned rather than running it twice."
+                            : "Queued. Collect the texture set id - and the new version id, if unwrap was on - with get_job_status once it finishes.",
+                    },
+                    "Model", queued.ModelId, queued);
+            },
+            cancellationToken);
+    }
+
     /// <summary>
     /// Builds the parameter object from the tool's named arguments, omitting anything the
     /// caller left alone so the defaults live in one place - the validator - rather than
@@ -148,6 +206,23 @@ public sealed class BlenderWriteMcpTools
         if (angleLimit is { } angle) parameters["angleLimit"] = angle;
         if (islandMargin is { } margin) parameters["islandMargin"] = margin;
         if (lightmap) parameters["lightmap"] = true;
+        return System.Text.Json.JsonSerializer.Serialize(parameters);
+    }
+
+    /// <summary>
+    /// Same discipline as <see cref="Parameters"/>: send only what the caller actually chose,
+    /// so every default is stated once, in the validator.
+    /// </summary>
+    private static string BakeParameters(
+        string[]? maps, bool unwrap, int? resolution, int? samples, int? margin, string? setName)
+    {
+        var parameters = new Dictionary<string, object>();
+        if (maps is { Length: > 0 }) parameters["maps"] = maps;
+        if (unwrap) parameters["unwrap"] = true;
+        if (resolution is { } size) parameters["resolution"] = size;
+        if (samples is { } count) parameters["samples"] = count;
+        if (margin is { } bleed) parameters["margin"] = bleed;
+        if (!string.IsNullOrWhiteSpace(setName)) parameters["setName"] = setName.Trim();
         return System.Text.Json.JsonSerializer.Serialize(parameters);
     }
 }

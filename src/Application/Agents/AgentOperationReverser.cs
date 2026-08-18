@@ -345,6 +345,13 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
                      "audit entry records a job id and not a version. Nothing was overwritten either - " +
                      "the unwrap writes a NEW, inactive version. To discard it, delete that version."),
 
+        "bake-textures" => Step(entry, "The queued bake cannot be called back.", destructive: false,
+            supported: false,
+            blocker: "bake_textures queues work and returns before it has produced anything, so the " +
+                     "audit entry records a job id and not what was created. Nothing was overwritten - " +
+                     "the bake adds a texture set, and with unwrap on a NEW, inactive version as well. " +
+                     "get_job_status names both; delete them to discard the bake."),
+
         _ => Step(entry, $"No inverse is defined for '{entry.Operation}'.", destructive: false,
             supported: false,
             blocker: $"'{entry.Operation}' is not a reversible operation."),
