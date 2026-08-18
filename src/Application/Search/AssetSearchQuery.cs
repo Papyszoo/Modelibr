@@ -28,6 +28,11 @@ public record AssetSearchQuery(
     int? MinMaterials = null,
     int? MaxMaterials = null,
     bool? HasUvs = null,
+    /// <summary>
+    /// UV layout: one of <c>unwrapped</c>, <c>atlas_packed</c>, <c>tiled</c>,
+    /// <c>partial</c>, <c>no_uvs</c>. See <see cref="UvStatusClassifier"/>.
+    /// </summary>
+    string? UvStatus = null,
     int? MinParts = null,
     int? MaxParts = null,
     int? MinVertices = null,
@@ -111,7 +116,17 @@ public record AssetSearchFacts(
     string? ShapeClass,
     string? CategoryName,
     AssetDimensions? Dimensions = null,
-    string? ScaleConvention = null);
+    string? ScaleConvention = null,
+    /// <summary>
+    /// How the UVs are laid out - <c>unwrapped</c>, <c>atlas_packed</c>, <c>tiled</c>,
+    /// <c>partial</c>, <c>no_uvs</c>, or null when it could not be measured.
+    ///
+    /// Returned inline beside <c>HasUvs</c> because the two disagree exactly where it
+    /// matters: an atlas-packed asset reports UVs and still cannot take a bake, so an agent
+    /// choosing something to texture needs this to tell "ready" from "needs an unwrap first"
+    /// without a round trip per candidate.
+    /// </summary>
+    string? UvStatus = null);
 
 /// <summary>An asset's extent in metres. Null axes mean it was never measured.</summary>
 public record AssetDimensions(double? X, double? Y, double? Z);
@@ -135,6 +150,7 @@ public record AssetSearchRequest(
     int? MinMaterials = null,
     int? MaxMaterials = null,
     bool? HasUvs = null,
+    string? UvStatus = null,
     int? MinParts = null,
     int? MaxParts = null,
     int? MinVertices = null,

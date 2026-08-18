@@ -138,6 +138,14 @@ internal sealed class SearchRepository : ISearchRepository
         {
             Restrict(q => q.Where(d => d.HasUvs == hasUvs));
         }
+        if (!string.IsNullOrWhiteSpace(request.UvStatus))
+        {
+            // Exact match on a closed vocabulary, unlike the category filter's partial
+            // match: these are five fixed values a caller picks from, so a substring match
+            // would only create ways to select the wrong one.
+            var uvStatus = request.UvStatus.Trim();
+            Restrict(q => q.Where(d => d.UvStatus == uvStatus));
+        }
         if (request.MinParts is int minParts)
         {
             Restrict(q => q.Where(d => d.PartCount >= minParts));
@@ -501,7 +509,8 @@ internal sealed class SearchRepository : ISearchRepository
             doc.DimensionX is null && doc.DimensionY is null && doc.DimensionZ is null
                 ? null
                 : new AssetDimensions(doc.DimensionX, doc.DimensionY, doc.DimensionZ),
-            doc.ScaleConvention);
+            doc.ScaleConvention,
+            doc.UvStatus);
 
     public async Task<IReadOnlyList<SearchResultGroup>> SearchAsync(
         string term,

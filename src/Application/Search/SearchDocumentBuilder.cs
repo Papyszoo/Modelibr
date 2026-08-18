@@ -110,6 +110,10 @@ public static class SearchDocumentBuilder
         var assetHasUvs = rawParts.Any(p => p.HasUvs == true)
             ? true
             : rawParts.Any(p => p.HasUvs == false) ? false : (bool?)null;
+        // Asset-level only. A UV layout is a property of the whole asset - meshes sharing
+        // one atlas between them are correctly unwrapped, and asking the question of each
+        // mesh alone would call every one of them packed. See UvStatusClassifier.
+        var uvStatus = UvStatusClassifier.Classify(rawParts);
 
         docs.Add(AssetSearchDocument.Create(
             assetType: "Model",
@@ -133,6 +137,7 @@ public static class SearchDocumentBuilder
             vertexCount: rollups.TotalVertices,
             materialCount: rollups.MaterialCount,
             hasUvs: assetHasUvs,
+            uvStatus: uvStatus,
             partCount: rollups.MeshCount,
             animationCount: rollups.AnimationCount,
             maxDimension: maxDimension is > 0 ? maxDimension : null,

@@ -113,6 +113,21 @@ internal sealed class ModelRepository : IModelRepository
         return (items, totalCount);
     }
 
+    public async Task<IReadOnlyCollection<int>> GetModelIdsByUvStatusAsync(
+        string uvStatus, CancellationToken cancellationToken = default)
+    {
+        var status = uvStatus.Trim();
+        return await _context.AssetSearchDocuments
+            .AsNoTracking()
+            .Where(d => d.AssetType == "Model"
+                        && d.PartPath == null
+                        && d.IsCurrentVersion
+                        && d.UvStatus == status)
+            .Select(d => d.AssetId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<(IEnumerable<ModelListDto> Items, int TotalCount)> GetPagedListAsync(
         int page, int pageSize,
         IReadOnlyCollection<int>? packIds = null,
@@ -125,6 +140,7 @@ internal sealed class ModelRepository : IModelRepository
         int? minTriangleCount = null,
         int? maxTriangleCount = null,
         bool? hasAnimations = null,
+        string? uvStatus = null,
         bool? uncategorized = null,
         CancellationToken cancellationToken = default)
     {
@@ -172,6 +188,22 @@ internal sealed class ModelRepository : IModelRepository
                 .OrderByDescending(v => v.VersionNumber)
                 .Select(v => v.TriangleCount)
                 .FirstOrDefault() <= maxTriangleCount.Value);
+
+        // UV layout comes from the search projection rather than from ModelVersions: it is
+        // derived from the parts' uvBounds, and denormalising it onto the version row would
+        // give it a second home to fall out of sync from. A model whose projection has not
+        // been built yet simply does not match - "we have not looked at its UVs" must not
+        // read as an answer to "which assets still need unwrapping".
+        if (!string.IsNullOrWhiteSpace(uvStatus))
+        {
+            var status = uvStatus.Trim();
+            query = query.Where(m => _context.AssetSearchDocuments
+                .Any(d => d.AssetType == "Model"
+                          && d.AssetId == m.Id
+                          && d.PartPath == null
+                          && d.IsCurrentVersion
+                          && d.UvStatus == status));
+        }
 
         if (hasAnimations.HasValue)
         {

@@ -30,6 +30,7 @@ namespace Application.Models
                     query.PackIds, query.ProjectIds, query.TextureSetId, query.CategoryIds, normalizedTags, query.HasConceptImages,
                     query.SearchName,
                     query.MinTriangleCount, query.MaxTriangleCount, query.HasAnimations,
+                    query.UvStatus,
                     query.Uncategorized,
                     cancellationToken);
                 modelListDtos = result.Items;
@@ -93,6 +94,15 @@ namespace Application.Models
                 if (query.MaxTriangleCount.HasValue)
                 {
                     models = models.Where(m => m.GetLatestVersion()?.TriangleCount <= query.MaxTriangleCount.Value);
+                }
+
+                if (!string.IsNullOrWhiteSpace(query.UvStatus))
+                {
+                    // Resolved through the projection rather than off the entity: UV layout is
+                    // derived from the parts' uvBounds and lives only in the search index.
+                    var matching = await _modelRepository.GetModelIdsByUvStatusAsync(
+                        query.UvStatus, cancellationToken);
+                    models = models.Where(m => matching.Contains(m.Id));
                 }
 
                 if (query.HasAnimations.HasValue)
@@ -159,6 +169,8 @@ namespace Application.Models
         int? MinTriangleCount = null,
         int? MaxTriangleCount = null,
         bool? HasAnimations = null,
+        /// <summary>UV layout: unwrapped | atlas_packed | tiled | partial | no_uvs.</summary>
+        string? UvStatus = null,
         bool? Uncategorized = null) : IQuery<GetAllModelsQueryResponse>;
     
     public record GetAllModelsQueryResponse(IEnumerable<ModelListDto> Models, int? TotalCount = null, int? Page = null, int? PageSize = null, int? TotalPages = null);

@@ -203,6 +203,7 @@ export async function getModelsPaginated(options: {
   hasAnimations?: boolean
   minTriangleCount?: number
   maxTriangleCount?: number
+  uvStatus?: string
   searchName?: string
 }): Promise<PaginatedResponse<Model>> {
   const params = new URLSearchParams()
@@ -233,6 +234,9 @@ export async function getModelsPaginated(options: {
   }
   if (typeof options.maxTriangleCount === 'number') {
     params.append('maxTriangleCount', String(options.maxTriangleCount))
+  }
+  if (options.uvStatus) {
+    params.append('uvStatus', options.uvStatus)
   }
   if (options.searchName && options.searchName.trim()) {
     params.append('searchName', options.searchName.trim())

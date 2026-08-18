@@ -37,8 +37,18 @@ public interface IModelRepository
         int? minTriangleCount = null,
         int? maxTriangleCount = null,
         bool? hasAnimations = null,
+        string? uvStatus = null,
         bool? uncategorized = null,
         CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Ids of the models whose current version carries this UV layout, from the search
+    /// projection. Exists so the unpaginated list path can honour the filter too - it works
+    /// on materialised entities and cannot reach the projection itself, and a filter the
+    /// caller asked for and silently did not get is worse than no filter at all.
+    /// </summary>
+    Task<IReadOnlyCollection<int>> GetModelIdsByUvStatusAsync(
+        string uvStatus, CancellationToken cancellationToken = default);
+
     Task<CategoryAssetCounts> GetCategoryAssetCountsAsync(CancellationToken cancellationToken = default);
     Task<(int? ActiveVersionId, Domain.Models.Thumbnail? Thumbnail)?> GetThumbnailDataAsync(
         int modelId, CancellationToken cancellationToken = default);

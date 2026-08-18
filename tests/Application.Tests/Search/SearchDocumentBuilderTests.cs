@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Application.Extraction.Derivation;
 using Application.Models;
 using Application.Search;
@@ -87,6 +88,55 @@ public class SearchDocumentBuilderTests
         Assert.True(asset.HasUvs);
         Assert.Equal(7, asset.CategoryId);
         Assert.Equal("Weapons", asset.CategoryName);
+    }
+
+    /// <summary>
+    /// A UV layout is a property of the whole asset, so it belongs on the asset document and
+    /// nowhere else. Projected onto parts it would answer a question nobody can act on: a
+    /// single mesh of a properly unwrapped asset looks packed on its own, and a part is not
+    /// something `generate_uvs` or a bake is aimed at.
+    /// </summary>
+    [Fact]
+    public void BuildForModel_Puts_The_Uv_Layout_On_The_Asset_Doc_Only()
+    {
+        var packed = new SceneGraphPartDto(
+            "Root/Sword", "Sword", "Root", 1, "mesh", 1200, 5000, "hash", true,
+            JsonSerializer.SerializeToElement(new
+            {
+                uvBounds = new { min = new[] { 0.10, 0.10 }, max = new[] { 0.15, 0.15 } },
+            }));
+
+        var docs = SearchDocumentBuilder.BuildForModel(
+            modelId: 1, versionId: 1, isCurrentVersion: true,
+            assetName: "Sword", derived: DerivedWith("sword"),
+            rollups: Rollups(), rawParts: new[] { packed }, now: DateTime.UtcNow);
+
+        Assert.Equal(UvStatusClassifier.AtlasPacked, AssetDoc(docs).UvStatus);
+        Assert.All(docs.Where(d => d.PartPath != null), d => Assert.Null(d.UvStatus));
+    }
+
+    /// <summary>
+    /// The pair that motivated a second field. `hasUvs` says true - correctly, the model has
+    /// UVs and renders because of them - while the layout says those UVs leave no room to
+    /// bake into. An agent filtering on `hasUvs` alone picks this model to texture and fails.
+    /// </summary>
+    [Fact]
+    public void BuildForModel_Reports_An_Atlas_Packed_Asset_As_Having_Uvs_And_As_Needing_An_Unwrap()
+    {
+        var packed = new SceneGraphPartDto(
+            "Root/Prop", "Prop", "Root", 1, "mesh", 300, 200, "hash", true,
+            JsonSerializer.SerializeToElement(new
+            {
+                uvBounds = new { min = new[] { 0.128, 0.372 }, max = new[] { 0.139, 0.383 } },
+            }));
+
+        var asset = AssetDoc(SearchDocumentBuilder.BuildForModel(
+            modelId: 1, versionId: 1, isCurrentVersion: true,
+            assetName: "SM_Prop_CarboardBox_01", derived: DerivedWith("prop"),
+            rollups: Rollups(), rawParts: new[] { packed }, now: DateTime.UtcNow));
+
+        Assert.True(asset.HasUvs);
+        Assert.Equal(UvStatusClassifier.AtlasPacked, asset.UvStatus);
     }
 
     [Fact]

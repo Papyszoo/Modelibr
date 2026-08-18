@@ -71,6 +71,7 @@ public static class ModelEndpoints
             int? minTriangleCount,
             int? maxTriangleCount,
             bool? hasAnimations,
+            string? uvStatus,
             bool? uncategorized,
             IQueryHandler<GetAllModelsQuery, GetAllModelsQueryResponse> queryHandler,
             CancellationToken cancellationToken) =>
@@ -89,6 +90,7 @@ public static class ModelEndpoints
                     MinTriangleCount: minTriangleCount,
                     MaxTriangleCount: maxTriangleCount,
                     HasAnimations: hasAnimations,
+                    UvStatus: string.IsNullOrWhiteSpace(uvStatus) ? null : uvStatus,
                     Uncategorized: uncategorized),
                 cancellationToken);
             

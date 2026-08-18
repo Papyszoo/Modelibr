@@ -40,7 +40,15 @@ public sealed class AssetSearchMcpTools
         [Description("Maximum bone count.")] int? maxBones = null,
         [Description("Minimum material count.")] int? minMaterials = null,
         [Description("Maximum material count.")] int? maxMaterials = null,
-        [Description("Only assets with (true) / without (false) UVs.")] bool? hasUvs = null,
+        [Description("Only assets with (true) / without (false) UVs. Note this is a weaker test than uvStatus: " +
+                     "a palette-atlas model reports true here and still cannot receive a baked texture set.")] bool? hasUvs = null,
+        [Description("UV layout filter - which assets can take a bake as they stand. " +
+                     "unwrapped: UVs cover at least half of their own 0-1 space, bakeable now. " +
+                     "atlas_packed: UVs are real but squeezed under 50% of the space, sharing a palette or atlas " +
+                     "texture with other models - there is no texel budget to bake into, so unwrap first. " +
+                     "tiled: UVs run outside 0-1 (tiling texture or trim sheet), which also cannot take a bake. " +
+                     "partial: some meshes have UVs and some do not. no_uvs: none do.")]
+        string? uvStatus = null,
         [Description("Minimum mesh/part count.")] int? minParts = null,
         [Description("Maximum mesh/part count.")] int? maxParts = null,
         [Description("Minimum vertex count.")] int? minVertices = null,
@@ -52,7 +60,7 @@ public sealed class AssetSearchMcpTools
             new AssetSearchQuery(query, limit, includeSecondary, minTriangles, maxTriangles,
                 hasAnimations, shapeClass, engine, assetType,
                 minSize, maxSize, hasRig, minBones, maxBones, minMaterials, maxMaterials,
-                hasUvs, minParts, maxParts, minVertices, maxVertices, category),
+                hasUvs, uvStatus, minParts, maxParts, minVertices, maxVertices, category),
             cancellationToken);
         return result.IsFailure
             ? new { error = result.Error.Code, message = result.Error.Message }
@@ -126,7 +134,17 @@ public sealed class AssetSearchMcpTools
             new { name = "hasRig", type = "boolean", note = "has a skeleton (bone count > 0)" },
             new { name = "minBones / maxBones", type = "integer range", appliesTo = "Model" },
             new { name = "minMaterials / maxMaterials", type = "integer range", appliesTo = "Model" },
-            new { name = "hasUvs", type = "boolean", appliesTo = "Model" },
+            new { name = "hasUvs", type = "boolean", appliesTo = "Model", note = "presence only; use uvStatus to tell an atlas-packed asset from a bakeable one" },
+            new
+            {
+                name = "uvStatus",
+                type = "enum",
+                values = new[] { "unwrapped", "atlas_packed", "tiled", "partial", "no_uvs" },
+                note = "how the UVs are laid out, and so whether the asset can receive a baked texture set as it stands: " +
+                       "unwrapped covers >=50% of its own 0-1 space; atlas_packed has real UVs squeezed under 50% because it " +
+                       "shares a palette/atlas texture; tiled runs outside 0-1; partial means only some meshes have UVs. " +
+                       "atlas_packed and tiled both need generate_uvs before bake_textures. Also returned on every hit as facts.uvStatus",
+            },
             new { name = "shapeClass", type = "enum", values = new[] { "planar", "tall", "wide", "blocky" } },
             new { name = "engine", type = "enum", values = new[] { "Unity", "Unreal", "Godot", "Roblox", "Defold", "LÖVE" } },
             new { name = "category", type = "string", note = "matches the assigned category name (partial, case-insensitive); conceptual terms (weapon/animal/building) also hit via the free-text query" },

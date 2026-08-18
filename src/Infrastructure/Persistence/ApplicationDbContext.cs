@@ -1534,6 +1534,7 @@ namespace Infrastructure.Persistence
                 entity.Property(e => e.VertexCount).IsRequired(false);
                 entity.Property(e => e.MaterialCount).IsRequired(false);
                 entity.Property(e => e.HasUvs).IsRequired(false);
+                entity.Property(e => e.UvStatus).IsRequired(false).HasMaxLength(16);
                 entity.Property(e => e.PartCount).IsRequired(false);
                 entity.Property(e => e.AnimationCount).IsRequired(false);
                 entity.Property(e => e.MaxDimension).IsRequired(false);
@@ -1570,6 +1571,10 @@ namespace Infrastructure.Persistence
                 entity.HasIndex(e => e.Engine);
                 entity.HasIndex(e => e.MaxDimension);
                 entity.HasIndex(e => e.CategoryId);
+                // "Which assets still need unwrapping before a bake" is a whole-library
+                // sweep, not a term search - it runs with no discriminating text to narrow
+                // the scan first, so this one carries the query on its own.
+                entity.HasIndex(e => e.UvStatus);
             });
 
             // Configure SearchLog - one row per deliberate search (from day one).

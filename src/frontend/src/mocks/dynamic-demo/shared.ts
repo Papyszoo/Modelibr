@@ -711,6 +711,7 @@ export async function enrichModel(model: DemoModel, stringId = false) {
       animationCount: latestVersion?.animationCount ?? null,
       animationNames: latestVersion?.animationNames ?? [],
       boneCount: latestVersion?.boneCount ?? null,
+      uvStatus: latestVersion?.uvStatus ?? null,
       updatedAt: latestVersion?.technicalDetailsUpdatedAt ?? null,
     },
     latestVersionId: latestVersion?.id ?? null,
@@ -721,6 +722,7 @@ export async function enrichModel(model: DemoModel, stringId = false) {
     materialCount: latestVersion?.materialCount ?? null,
     animationCount: latestVersion?.animationCount ?? null,
     boneCount: latestVersion?.boneCount ?? null,
+    uvStatus: latestVersion?.uvStatus ?? null,
   }
 }
 

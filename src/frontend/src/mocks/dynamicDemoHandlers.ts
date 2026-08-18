@@ -722,6 +722,7 @@ export const dynamicDemoHandlers = [
     const hasAnimations = url.searchParams.get('hasAnimations')
     const minTriangleCount = url.searchParams.get('minTriangleCount')
     const maxTriangleCount = url.searchParams.get('maxTriangleCount')
+    const uvStatus = url.searchParams.get('uvStatus')
     const searchName = (url.searchParams.get('searchName') ?? '')
       .trim()
       .toLowerCase()
@@ -790,6 +791,11 @@ export const dynamicDemoHandlers = [
       enriched = enriched.filter(
         m => m.triangleCount != null && m.triangleCount <= max
       )
+    }
+    // A model whose UV layout was never classified does not match, mirroring the server:
+    // "we have not looked at its UVs" is not an answer to "which models need unwrapping".
+    if (uvStatus !== null) {
+      enriched = enriched.filter(m => m.uvStatus === uvStatus)
     }
 
     if (url.searchParams.has('page')) {

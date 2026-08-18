@@ -206,6 +206,8 @@ export function ModelGrid({
     setMinTriangleCount,
     maxTriangleCount,
     setMaxTriangleCount,
+    uvStatus,
+    setUvStatus,
     effectivePackIds,
     effectiveProjectIds,
     handlePackFilterChange,
@@ -652,6 +654,7 @@ export function ModelGrid({
         animatedOnly={animatedOnly}
         minTriangleCount={minTriangleCount}
         maxTriangleCount={maxTriangleCount}
+        uvStatus={uvStatus}
         onPackFilterChange={handlePackFilterChange}
         onProjectFilterChange={handleProjectFilterChange}
         onTagChange={setSelectedTagNames}
@@ -659,6 +662,7 @@ export function ModelGrid({
         onAnimatedOnlyChange={setAnimatedOnly}
         onMinTriangleCountChange={setMinTriangleCount}
         onMaxTriangleCountChange={setMaxTriangleCount}
+        onUvStatusChange={setUvStatus}
         packFilterDisabled={packFilterDisabled}
         projectFilterDisabled={projectFilterDisabled}
         cardWidth={cardWidth}

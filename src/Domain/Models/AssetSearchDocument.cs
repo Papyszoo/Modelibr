@@ -102,6 +102,19 @@ public class AssetSearchDocument
     public int? VertexCount { get; private set; }
     public int? MaterialCount { get; private set; }
     public bool? HasUvs { get; private set; }
+
+    /// <summary>
+    /// How the asset's UVs are laid out - one of <see cref="Application"/>'s
+    /// <c>UvStatusClassifier</c> values, or null when nothing could be measured.
+    ///
+    /// Separate from <see cref="HasUvs"/> because that flag answers the wrong question for
+    /// baking. A palette-atlas model has UVs, so <c>hasUvs</c> is true, and it still cannot
+    /// receive a baked texture set - the whole model sits on a handful of texels of a
+    /// texture it shares with hundreds of others. "Does it have UVs" and "can it be baked
+    /// onto" are different questions, and only the first one was answerable.
+    /// </summary>
+    public string? UvStatus { get; private set; }
+
     public int? PartCount { get; private set; }
     public int? AnimationCount { get; private set; }
 
@@ -176,6 +189,7 @@ public class AssetSearchDocument
         int? vertexCount = null,
         int? materialCount = null,
         bool? hasUvs = null,
+        string? uvStatus = null,
         int? partCount = null,
         int? animationCount = null,
         double? maxDimension = null,
@@ -225,6 +239,7 @@ public class AssetSearchDocument
             VertexCount = vertexCount,
             MaterialCount = materialCount,
             HasUvs = hasUvs,
+            UvStatus = string.IsNullOrWhiteSpace(uvStatus) ? null : uvStatus.Trim(),
             PartCount = partCount,
             AnimationCount = animationCount,
             MaxDimension = maxDimension,

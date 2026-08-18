@@ -30,6 +30,7 @@ function renderFilters(overrides = {}) {
     animatedOnly: false,
     minTriangleCount: null,
     maxTriangleCount: null,
+    uvStatus: null,
     onPackFilterChange: noop,
     onProjectFilterChange: noop,
     onTagChange: noop,
@@ -37,6 +38,7 @@ function renderFilters(overrides = {}) {
     onAnimatedOnlyChange: jest.fn(),
     onMinTriangleCountChange: jest.fn(),
     onMaxTriangleCountChange: jest.fn(),
+    onUvStatusChange: jest.fn(),
     cardWidth: 200,
     onCardWidthChange: noop,
     modelCount: 0,
@@ -81,6 +83,52 @@ describe('ModelsFilters - technical-metadata filters', () => {
     expect(
       screen.getByRole('button', { name: /clear all filters/i })
     ).toBeInTheDocument()
+  })
+})
+
+describe('ModelsFilters - UV layout filter', () => {
+  it('renders the UV layout dropdown', () => {
+    renderFilters()
+    const dropdown = screen.getByTestId('uv-status-filter')
+    expect(dropdown).toBeInTheDocument()
+    // PrimeReact renders the placeholder twice (visible label + a hidden a11y node),
+    // so scope to the label rather than matching text across the document.
+    expect(dropdown.querySelector('.p-dropdown-label')).toHaveTextContent(
+      'UV layout'
+    )
+  })
+
+  /**
+   * The coverage bands are the whole distinction. "Shared atlas" on its own reads as a
+   * synonym for "no UVs" - which is backwards, since those models have UVs and need them -
+   * so every option carries what it means and this locks that they are actually rendered.
+   */
+  it('shows what each option means, not just its name', () => {
+    renderFilters()
+    fireEvent.click(
+      screen
+        .getByTestId('uv-status-filter')
+        .querySelector('.p-dropdown-trigger') as Element
+    )
+
+    expect(screen.getByText('Unwrapped')).toBeInTheDocument()
+    expect(
+      screen.getByText(/UVs cover 50-100% of their own space/)
+    ).toBeInTheDocument()
+    expect(screen.getByText(/UVs exist but use under 50%/)).toBeInTheDocument()
+  })
+
+  it('counts an active UV filter toward the clear-all button', () => {
+    renderFilters({ uvStatus: 'atlas_packed' })
+    expect(
+      screen.getByRole('button', { name: /clear all filters/i })
+    ).toBeInTheDocument()
+  })
+
+  it('clears the UV filter along with the others', () => {
+    const props = renderFilters({ uvStatus: 'atlas_packed' })
+    fireEvent.click(screen.getByRole('button', { name: /clear all filters/i }))
+    expect(props.onUvStatusChange).toHaveBeenCalledWith(null)
   })
 })
 

@@ -1,6 +1,7 @@
 import '@/shared/components/FilterPanel.css'
 
 import { Button } from 'primereact/button'
+import { Dropdown } from 'primereact/dropdown'
 import { InputNumber } from 'primereact/inputnumber'
 import { InputSwitch } from 'primereact/inputswitch'
 import { MultiSelect } from 'primereact/multiselect'
@@ -19,6 +20,7 @@ import {
   ListToolbarSelectionSummary,
   OptionsButton,
 } from '@/shared/components/list-toolbar'
+import { UV_STATUS_OPTIONS, type UvStatus } from '@/shared/types/uvStatus'
 import { type ModelTagDto, type PackDto, type ProjectDto } from '@/types'
 
 interface ModelsFiltersProps {
@@ -38,6 +40,7 @@ interface ModelsFiltersProps {
   animatedOnly: boolean
   minTriangleCount: number | null
   maxTriangleCount: number | null
+  uvStatus: UvStatus | null
   onPackFilterChange: (packIds: number[]) => void
   onProjectFilterChange: (projectIds: number[]) => void
   onTagChange: (tags: string[]) => void
@@ -45,6 +48,7 @@ interface ModelsFiltersProps {
   onAnimatedOnlyChange: (value: boolean) => void
   onMinTriangleCountChange: (value: number | null) => void
   onMaxTriangleCountChange: (value: number | null) => void
+  onUvStatusChange: (value: UvStatus | null) => void
   packFilterDisabled?: boolean
   projectFilterDisabled?: boolean
   cardWidth: number
@@ -82,6 +86,7 @@ export function ModelsFilters({
   animatedOnly,
   minTriangleCount,
   maxTriangleCount,
+  uvStatus,
   onPackFilterChange,
   onProjectFilterChange,
   onTagChange,
@@ -89,6 +94,7 @@ export function ModelsFilters({
   onAnimatedOnlyChange,
   onMinTriangleCountChange,
   onMaxTriangleCountChange,
+  onUvStatusChange,
   packFilterDisabled = false,
   projectFilterDisabled = false,
   cardWidth,
@@ -129,7 +135,8 @@ export function ModelsFilters({
     selectedTagNames.length > 0 ||
     hasConceptImages ||
     animatedOnly ||
-    hasTriangleRange
+    hasTriangleRange ||
+    uvStatus != null
 
   const activeFilterCount = [
     selectedPackIds.length > 0,
@@ -138,6 +145,7 @@ export function ModelsFilters({
     hasConceptImages,
     animatedOnly,
     hasTriangleRange,
+    uvStatus != null,
   ].filter(Boolean).length
   const selectedCountLabel = `${selectedModelCount} model${selectedModelCount === 1 ? '' : 's'}`
 
@@ -339,6 +347,30 @@ export function ModelsFilters({
               data-testid="max-triangle-filter"
             />
           </div>
+          <Dropdown
+            value={uvStatus}
+            options={UV_STATUS_OPTIONS}
+            optionLabel="label"
+            optionValue="value"
+            onChange={e => onUvStatusChange((e.value as UvStatus) ?? null)}
+            placeholder="UV layout"
+            className="list-filters-control models-filter-uv"
+            showClear
+            data-testid="uv-status-filter"
+            // The coverage bands are the whole point of the distinction and cannot be
+            // guessed from a two-word label, so each option carries what it means. Without
+            // it "Shared atlas" reads as a synonym for "no UVs", which is exactly backwards.
+            itemTemplate={(option: (typeof UV_STATUS_OPTIONS)[number]) => (
+              <div className="models-filter-uv-option">
+                <span className="models-filter-uv-option-label">
+                  {option.label}
+                </span>
+                <small className="models-filter-uv-option-description">
+                  {option.description}
+                </small>
+              </div>
+            )}
+          />
           {hasActiveFilters ? (
             <Button
               icon="pi pi-times"
@@ -354,6 +386,7 @@ export function ModelsFilters({
                 onAnimatedOnlyChange(false)
                 onMinTriangleCountChange(null)
                 onMaxTriangleCountChange(null)
+                onUvStatusChange(null)
               }}
             />
           ) : null}

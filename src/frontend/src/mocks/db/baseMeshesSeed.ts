@@ -188,6 +188,8 @@ export function buildBaseMeshSeed(now: string): {
     variantNames: [],
     textureMappings: [],
     textureSetIds: [],
+    // The pack's own description: real-world scale with basic UVs of their own.
+    uvStatus: 'unwrapped',
   }))
 
   const pack: DemoPack = {

@@ -15,6 +15,7 @@ import {
   toCategoryCountMap,
   UNASSIGNED_CATEGORY_ID,
 } from '@/shared/types/categories'
+import { type UvStatus } from '@/shared/types/uvStatus'
 import { type PaginationState } from '@/types'
 
 const PAGE_SIZE = 50
@@ -27,6 +28,7 @@ interface UseModelDataOptions {
   animatedOnly?: boolean
   minTriangleCount?: number | null
   maxTriangleCount?: number | null
+  uvStatus?: UvStatus | null
   textureSetId?: number
   searchQuery?: string
   /** Active sidebar category; scopes the server query (real id or Unassigned). */
@@ -41,6 +43,7 @@ export function useModelData({
   animatedOnly = false,
   minTriangleCount = null,
   maxTriangleCount = null,
+  uvStatus = null,
   textureSetId,
   searchQuery = '',
   activeCategoryId = null,
@@ -86,6 +89,7 @@ export function useModelData({
         animatedOnly,
         minTriangleCount,
         maxTriangleCount,
+        uvStatus,
         searchName: debouncedSearchName || undefined,
       },
     ],
@@ -103,6 +107,7 @@ export function useModelData({
         hasAnimations: animatedOnly || undefined,
         minTriangleCount: minTriangleCount ?? undefined,
         maxTriangleCount: maxTriangleCount ?? undefined,
+        uvStatus: uvStatus ?? undefined,
         searchName: debouncedSearchName || undefined,
       }),
     initialPageParam: 1,
