@@ -184,6 +184,11 @@ export class BlenderOperationProcessor {
       )
 
       const fileName = this.outputFileName(source.originalFileName, parameters)
+      // Creating the version raises ModelUploadedEvent, which queues the normal
+      // thumbnail + scene-graph extraction for it. That is what makes the unwrap
+      // visible to search: hasUvs and the UV metrics are rebuilt by the same pass that
+      // reads any other upload, so "find every asset that still needs unwrapping" keeps
+      // answering correctly without this operation touching the index itself.
       const created = await this.jobApi.createModelVersion(
         job.assetId,
         outputPath,
@@ -198,7 +203,7 @@ export class BlenderOperationProcessor {
           operation: 'uv-unwrap',
           modelId: job.assetId,
           sourceVersionId: job.versionId,
-          versionId: created?.id ?? created?.versionId ?? null,
+          versionId: created?.versionId ?? null,
           versionNumber: created?.versionNumber ?? null,
           setAsActive: false,
           meshesUnwrapped: result.meshesUnwrapped,

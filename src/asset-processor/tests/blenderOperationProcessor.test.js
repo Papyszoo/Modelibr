@@ -59,9 +59,10 @@ describe('BlenderOperationProcessor', () => {
     processor.jobApi = {
       dequeueExtractionJob: vi.fn().mockResolvedValue(null),
       finishExtractionJob: vi.fn().mockResolvedValue(undefined),
+      // The shape CreateModelVersionResponse actually crosses the wire as.
       createModelVersion: vi
         .fn()
-        .mockResolvedValue({ id: 13, versionNumber: 2 }),
+        .mockResolvedValue({ versionId: 13, versionNumber: 2, fileId: 5 }),
     }
     processor.runBlender = vi.fn().mockResolvedValue({
       meshesUnwrapped: 3,
