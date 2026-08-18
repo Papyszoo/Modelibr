@@ -356,6 +356,12 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
             supported: false,
             blocker: "Re-deriving an asset replaces computed data with freshly computed data - there is no prior state to restore, and nothing was lost."),
 
+        "reindex-search" => Step(entry, "A projection rebuild cannot be undone.", destructive: false,
+            supported: false,
+            blocker: "reindex_search rewrites the search index from data already stored elsewhere. " +
+                     "Nothing authored was touched, and running it again reproduces the same rows - " +
+                     "there is no prior state worth restoring."),
+
         "generate-uvs" => Step(entry, "The queued unwrap cannot be called back.", destructive: false,
             supported: false,
             blocker: "generate_uvs queues work and returns before it has produced anything, so the " +

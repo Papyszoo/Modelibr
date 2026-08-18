@@ -49,6 +49,19 @@ public interface IAssetDerivationRepository
         int assetId,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Every (asset, version) key that has a derived row - the worklist for a projection
+    /// rebuild.
+    /// </summary>
+    /// <remarks>
+    /// Keys only, deliberately. The rows themselves carry a jsonb payload per asset, and a
+    /// library-wide rebuild that started by loading all of them would hold the whole derived
+    /// layer in memory before writing its first document.
+    /// </remarks>
+    Task<IReadOnlyList<(int AssetId, int? VersionId)>> GetDerivedKeysAsync(
+        string assetType,
+        CancellationToken cancellationToken = default);
+
     /// <summary>Derived rows whose <see cref="AssetDerivation.DeriveVersion"/> is below the current one (re-derive candidates).</summary>
     Task<IReadOnlyList<AssetDerivation>> GetStaleAsync(
         string assetType,

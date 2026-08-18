@@ -8,6 +8,7 @@ using Application.Agents;
 using Application.Extraction.Jobs;
 using Application.Models;
 using Application.Packs;
+using Application.Search;
 using ModelContextProtocol.Server;
 using WebApi.Infrastructure;
 using static WebApi.Mcp.McpWriteGuard;
@@ -211,6 +212,47 @@ public sealed class AssetWriteMcpTools
                     : Applied(
                         new { status = "ok", jobId = result.Value.JobId, alreadyQueued = result.Value.AlreadyQueued },
                         assetType, assetId, result.Value);
+            },
+            cancellationToken);
+    }
+
+    [McpServerTool(Name = "reindex_search")]
+    [Description("Rebuild the search index from data already stored - no files are read and nothing is re-extracted. " +
+                 "Run it after the search vocabulary changes (new synonyms/abbreviations), or when an asset is findable in the " +
+                 "library but not by search_assets. Omit modelId to rebuild the whole library. " +
+                 "It cannot refresh derived signals such as tokens or prominence - that is trigger_rederive.")]
+    public static Task<object> ReindexSearch(
+        ICommandHandler<ReprojectSearchDocumentsCommand, ReprojectSearchDocumentsResponse> handler,
+        IAgentAudit audit,
+        McpCallerContext caller,
+        [Description("Unique key so a retried call does not rebuild twice.")] string idempotencyKey,
+        [Description("One model id. Omit to rebuild every model in the library.")] int? modelId = null,
+        [Description("Optional batch id, grouping this with related writes.")] string? batchId = null,
+        CancellationToken cancellationToken = default)
+    {
+        return Guarded(
+            audit,
+            caller,
+            new AgentWrite(idempotencyKey, "reindex-search", "Model", modelId ?? 0, BatchId: batchId),
+            async ct =>
+            {
+                var result = await handler.Handle(new ReprojectSearchDocumentsCommand(modelId), ct);
+                if (result.IsFailure)
+                {
+                    return Failed(result.Error);
+                }
+
+                return Applied(
+                    new
+                    {
+                        status = "ok",
+                        scope = modelId is null ? "library" : "model",
+                        reprojected = result.Value.Reprojected,
+                        documentsWritten = result.Value.DocumentsWritten,
+                        skipped = result.Value.Skipped,
+                        notes = result.Value.Notes,
+                    },
+                    "Model", modelId ?? 0, result.Value);
             },
             cancellationToken);
     }

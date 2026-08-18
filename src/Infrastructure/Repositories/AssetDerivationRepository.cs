@@ -92,6 +92,21 @@ internal sealed class AssetDerivationRepository : IAssetDerivationRepository
         return await GetLatestForAssetAsync(assetType, assetId, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<(int AssetId, int? VersionId)>> GetDerivedKeysAsync(
+        string assetType,
+        CancellationToken cancellationToken = default)
+    {
+        var keys = await _context.AssetDerivations
+            .AsNoTracking()
+            .Where(e => e.AssetType == assetType)
+            .OrderBy(e => e.AssetId)
+            .ThenBy(e => e.VersionId)
+            .Select(e => new { e.AssetId, e.VersionId })
+            .ToListAsync(cancellationToken);
+
+        return keys.Select(k => (k.AssetId, k.VersionId)).ToList();
+    }
+
     public async Task<IReadOnlyList<AssetDerivation>> GetStaleAsync(
         string assetType,
         int currentDeriveVersion,

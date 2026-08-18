@@ -38,6 +38,35 @@ public class SearchVocabularyTests
         Assert.Contains("couch", sofa);
     }
 
+    /// <summary>
+    /// The interior vocabulary, from the queries that came back empty against the real
+    /// library while the object itself was sitting in it under another name.
+    /// </summary>
+    [Theory]
+    [InlineData("carpet", "rug")]
+    [InlineData("rug", "carpet")]
+    [InlineData("bookcase", "bookshelf")]
+    [InlineData("shelf", "bookshelf")]
+    [InlineData("television", "tv")]
+    [InlineData("tv", "television")]
+    [InlineData("dresser", "sideboard")]
+    [InlineData("closet", "wardrobe")]
+    [InlineData("pillow", "cushion")]
+    [InlineData("fridge", "refrigerator")]
+    public void ExpandForIndex_Reaches_The_Other_Word_For_The_Same_Object(string authored, string queried)
+    {
+        Assert.Contains(queried, SearchVocabulary.ExpandForIndex(new[] { authored }));
+    }
+
+    [Fact]
+    public void ExpandForIndex_Reaches_A_Synonym_Through_A_Compound()
+    {
+        // "bedside_table" tokenises to bedside + table; the compound is what carries it to
+        // "nightstand", which is the word a scene brief is far more likely to use.
+        var expanded = SearchVocabulary.ExpandForIndex(new[] { "bedside", "table" });
+        Assert.Contains("nightstand", expanded);
+    }
+
     [Fact]
     public void ExpandForIndex_Is_Order_Stable_And_Deduped()
     {

@@ -63,5 +63,34 @@ public static class SearchEndpoints
         })
         .WithName("Asset Search")
         .WithTags("Search");
+
+        // Rebuild the projection search reads, from layers already stored. Separate from
+        // re-extraction because the two fix different staleness: this one rewrites the
+        // index (vocabulary, denormalised tags/packs/category), while trigger_rederive is
+        // what recomputes the signals underneath it.
+        app.MapPost("/search/reindex", async (
+            int? modelId,
+            ICommandHandler<ReprojectSearchDocumentsCommand, ReprojectSearchDocumentsResponse> commandHandler,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await commandHandler.Handle(
+                new ReprojectSearchDocumentsCommand(modelId),
+                cancellationToken);
+
+            if (result.IsFailure)
+            {
+                return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+            }
+
+            return Results.Ok(new
+            {
+                reprojected = result.Value.Reprojected,
+                documentsWritten = result.Value.DocumentsWritten,
+                skipped = result.Value.Skipped,
+                notes = result.Value.Notes,
+            });
+        })
+        .WithName("Reindex Search")
+        .WithTags("Search");
     }
 }
