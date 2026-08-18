@@ -550,7 +550,12 @@ public static class SceneValidator
                 continue;
             }
 
-            var boundInScene = node.Material?.TextureSetId is not null;
+            // Every way a scene can give this node a surface. Reading only the default
+            // texture set called a correctly dressed node bare: a parameter material binds
+            // through MaterialId and needs no texture set at all, and per-slot dressing
+            // never touches node.Material. Both reported Appearance.NoMaterial against a
+            // node that renders exactly as asked.
+            var boundInScene = HasSurface(node.Material) || (node.MaterialSlots?.Any(HasSurface) ?? false);
 
             if (!boundInScene && !profile.HasBoundTextureSet && profile.MaterialCount is 0)
             {
@@ -564,17 +569,45 @@ public static class SceneValidator
                 continue;
             }
 
-            if (!boundInScene && !profile.HasBoundTextureSet && profile.Flags.Contains("missing_uvs"))
+            if (!profile.Flags.Contains("missing_uvs"))
             {
-                findings.Add(new SceneFinding(
-                    SceneChecks.Appearance,
-                    "Appearance.MissingUvs",
-                    SceneFindingSeverities.Info,
-                    new[] { node.Id },
-                    $"'{Label(node)}' has meshes without UVs, so binding a texture set to it will not show a texture until it is unwrapped."));
+                continue;
             }
+
+            // Missing UVs only matter for a tiling texture set - a parameter material is a
+            // colour and a roughness and needs no unwrap, which is exactly why apply_material
+            // recommends it for assets like this one. So a node dressed only by a parameter
+            // material has no UV problem to report.
+            var texturedInScene = node.Material?.TextureSetId is not null
+                || (node.MaterialSlots?.Any(b => b.TextureSetId is not null) ?? false);
+            var textured = texturedInScene || profile.HasBoundTextureSet;
+
+            if (!textured && boundInScene)
+            {
+                continue;
+            }
+
+            // A bound texture set on an un-unwrapped model is the case that actually renders
+            // wrong, so it is the case that has to be loud. The old test suppressed the
+            // finding the moment a set was bound and only ever warned while nothing was -
+            // silent precisely when the mistake had been made.
+            findings.Add(new SceneFinding(
+                SceneChecks.Appearance,
+                "Appearance.MissingUvs",
+                textured ? SceneFindingSeverities.Warning : SceneFindingSeverities.Info,
+                new[] { node.Id },
+                textured
+                    ? $"'{Label(node)}' has a texture set bound but meshes without UVs, so the texture does not show. Unwrap it, or dress it with a parameter material instead."
+                    : $"'{Label(node)}' has meshes without UVs, so binding a texture set to it will not show a texture until it is unwrapped."));
         }
     }
+
+    /// <summary>
+    /// Whether a binding actually supplies a surface. Either source counts: a texture set
+    /// (tiling, needs UVs) or a parameter material (colour + roughness, needs none).
+    /// </summary>
+    private static bool HasSurface(SceneMaterialBinding? binding) =>
+        binding is not null && (binding.TextureSetId is not null || binding.MaterialId is not null);
 
     private static bool IsKeyLight(SceneLight light) =>
         light.Type is SceneLightTypes.Directional or SceneLightTypes.Point or SceneLightTypes.Spot;

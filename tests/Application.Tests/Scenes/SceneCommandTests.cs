@@ -6,6 +6,7 @@ using Application.Scenes;
 using Domain.Models;
 using Domain.Scenes;
 using Domain.Services;
+using Domain.ValueObjects;
 using Moq;
 using Xunit;
 
@@ -33,6 +34,15 @@ public class SceneCommandTests
     // what a library with nothing extracted yet looks like.
     private readonly Mock<ISceneAssetProfiles> _profiles = new();
     private readonly Mock<ISceneDocumentCommit> _commit = new();
+
+    // apply_material resolves what it was asked to bind before it writes. These tests are
+    // about the binding behaviour, so the default library says "yes, that exists" and
+    // records no slots at all - the state an asset extracted before slots were captured is
+    // in, and the one case slot validation deliberately waves through.
+    private readonly Mock<IMaterialRepository> _materials = new();
+    private readonly Mock<ITextureSetRepository> _textureSets = new();
+    private readonly Mock<IAssetPartRepository> _parts = new();
+
     private readonly SceneWriter _writer;
     private Scene _scene = null!;
 
@@ -47,10 +57,34 @@ public class SceneCommandTests
         _profiles.Setup(p => p.ResolveAsync(It.IsAny<IEnumerable<SceneAssetRef>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<string, SceneAssetProfile>(StringComparer.Ordinal));
 
+        _materials.Setup(m => m.GetByIdAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((int _, CancellationToken _) =>
+                Material.Create("brass", MaterialParameters.Default, Now));
+        _textureSets.Setup(t => t.GetByIdAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((int _, CancellationToken _) => TextureSet.Create("oak", Now));
+        _parts.Setup(p => p.GetForAssetAsync(
+                It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<AssetPart>());
+
         _writer = new SceneWriter(_scenes.Object, _facts.Object, _commit.Object, clock.Object);
 
         GivenFacts(new Vec3(2, 4, 2), "centered");
         GivenScene(SceneDocument.Empty());
+    }
+
+    private ApplySceneMaterialCommandHandler Dress => new(
+        _writer, _materials.Object, _textureSets.Object, _parts.Object, _scenes.Object);
+
+    /// <summary>Gives the placed model a set of authored material slots.</summary>
+    private void GivenMaterialSlots(params string[] slots)
+    {
+        var part = AssetPart.Create(
+            SceneAssetTypes.Model, ModelId, VersionId, "root/mesh", "mesh", 0, "mesh", Now,
+            detail: $$"""{"materialSlots":[{{string.Join(",", slots.Select(s => $"\"{s}\""))}}]}""");
+
+        _parts.Setup(p => p.GetForAssetAsync(
+                It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { part });
     }
 
     /// <summary>The asset is 2×4×2 m with a centered origin unless a test says otherwise.</summary>
@@ -287,7 +321,7 @@ public class SceneCommandTests
     public async Task ApplyMaterial_Records_The_Binding_It_Replaced()
     {
         await Place.Handle(PlaceCommand(nodeId: "lamp"), CancellationToken.None);
-        var handler = new ApplySceneMaterialCommandHandler(_writer);
+        var handler = Dress;
 
         await handler.Handle(new ApplySceneMaterialCommand(SceneId, "lamp", TextureSetId: 3), CancellationToken.None);
         var second = await handler.Handle(
@@ -302,7 +336,7 @@ public class SceneCommandTests
     {
         await Place.Handle(PlaceCommand(nodeId: "lamp"), CancellationToken.None);
 
-        var result = await new ApplySceneMaterialCommandHandler(_writer).Handle(
+        var result = await Dress.Handle(
             new ApplySceneMaterialCommand(SceneId, "lamp"), CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -314,7 +348,7 @@ public class SceneCommandTests
     {
         await Place.Handle(PlaceCommand(nodeId: "sofa"), CancellationToken.None);
 
-        var result = await new ApplySceneMaterialCommandHandler(_writer).Handle(
+        var result = await Dress.Handle(
             new ApplySceneMaterialCommand(SceneId, "sofa", MaterialId: 12), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -327,7 +361,7 @@ public class SceneCommandTests
     {
         await Place.Handle(PlaceCommand(nodeId: "sofa"), CancellationToken.None);
 
-        var result = await new ApplySceneMaterialCommandHandler(_writer).Handle(
+        var result = await Dress.Handle(
             new ApplySceneMaterialCommand(SceneId, "sofa", TextureSetId: 3, MaterialId: 12),
             CancellationToken.None);
 
@@ -336,12 +370,87 @@ public class SceneCommandTests
     }
 
     [Fact]
+    public async Task ApplyMaterial_When_The_Material_Does_Not_Exist_Refuses_The_Write()
+    {
+        // The whole failure this closes: the id saved, the node looked dressed, and the
+        // render came back grey with nothing anywhere saying why.
+        await Place.Handle(PlaceCommand(nodeId: "lamp"), CancellationToken.None);
+        _materials.Setup(m => m.GetByIdAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Material?)null);
+
+        var result = await Dress.Handle(
+            new ApplySceneMaterialCommand(SceneId, "lamp", MaterialId: 91), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.MaterialNotFound", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task ApplyMaterial_When_The_TextureSet_Does_Not_Exist_Refuses_The_Write()
+    {
+        await Place.Handle(PlaceCommand(nodeId: "lamp"), CancellationToken.None);
+        _textureSets.Setup(t => t.GetByIdAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((TextureSet?)null);
+
+        var result = await Dress.Handle(
+            new ApplySceneMaterialCommand(SceneId, "lamp", TextureSetId: 91), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.TextureSetNotFound", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task ApplyMaterial_When_The_Slot_Is_Not_One_The_Asset_Declares_Lists_The_Ones_It_Does()
+    {
+        await Place.Handle(PlaceCommand(nodeId: "sofa"), CancellationToken.None);
+        GivenMaterialSlots("cushions", "frame");
+
+        var result = await Dress.Handle(
+            new ApplySceneMaterialCommand(SceneId, "sofa", MaterialId: 7, Slot: "cushion"),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.SlotNotFound", result.Error.Code);
+        // Naming the alternatives is the point - a rejection an agent cannot act on costs
+        // it the same turn the silent write did.
+        Assert.Contains("cushions", result.Error.Message);
+        Assert.Contains("frame", result.Error.Message);
+    }
+
+    [Fact]
+    public async Task ApplyMaterial_When_The_Asset_Records_No_Slots_Accepts_The_Slot_Anyway()
+    {
+        // Assets extracted before slots were captured have none recorded. Refusing them
+        // would block dressing that works, so an absent list is not evidence of a typo.
+        await Place.Handle(PlaceCommand(nodeId: "sofa"), CancellationToken.None);
+
+        var result = await Dress.Handle(
+            new ApplySceneMaterialCommand(SceneId, "sofa", MaterialId: 7, Slot: "cushions"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task ApplyMaterial_Matches_A_Declared_Slot_Regardless_Of_Case()
+    {
+        await Place.Handle(PlaceCommand(nodeId: "sofa"), CancellationToken.None);
+        GivenMaterialSlots("Cushions");
+
+        var result = await Dress.Handle(
+            new ApplySceneMaterialCommand(SceneId, "sofa", MaterialId: 7, Slot: "cushions"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
     public async Task ApplyMaterial_Dresses_One_Slot_Without_Disturbing_The_Rest_Of_The_Node()
     {
         // "The cushions of this sofa", which is the thing a scene could not say at all
         // while the only binding was per-node.
         await Place.Handle(PlaceCommand(nodeId: "sofa"), CancellationToken.None);
-        var handler = new ApplySceneMaterialCommandHandler(_writer);
+        var handler = Dress;
 
         await handler.Handle(
             new ApplySceneMaterialCommand(SceneId, "sofa", MaterialId: 4), CancellationToken.None);
@@ -359,7 +468,7 @@ public class SceneCommandTests
     public async Task ApplyMaterial_Replaces_A_Slots_Binding_Rather_Than_Adding_A_Second_One()
     {
         await Place.Handle(PlaceCommand(nodeId: "sofa"), CancellationToken.None);
-        var handler = new ApplySceneMaterialCommandHandler(_writer);
+        var handler = Dress;
 
         await handler.Handle(
             new ApplySceneMaterialCommand(SceneId, "sofa", MaterialId: 7, Slot: "cushions"), CancellationToken.None);
@@ -375,7 +484,7 @@ public class SceneCommandTests
     public async Task ApplyMaterial_Clearing_A_Slot_Leaves_The_Nodes_Default_Binding_Alone()
     {
         await Place.Handle(PlaceCommand(nodeId: "sofa"), CancellationToken.None);
-        var handler = new ApplySceneMaterialCommandHandler(_writer);
+        var handler = Dress;
 
         await handler.Handle(
             new ApplySceneMaterialCommand(SceneId, "sofa", MaterialId: 4), CancellationToken.None);
@@ -396,7 +505,7 @@ public class SceneCommandTests
         // alternatives, so keeping the old one would leave a binding that names both and
         // the document validator rejects that.
         await Place.Handle(PlaceCommand(nodeId: "sofa"), CancellationToken.None);
-        var handler = new ApplySceneMaterialCommandHandler(_writer);
+        var handler = Dress;
 
         await handler.Handle(
             new ApplySceneMaterialCommand(SceneId, "sofa", TextureSetId: 3), CancellationToken.None);
@@ -467,7 +576,7 @@ public class SceneCommandTests
     public async Task ApplyMaterial_With_Exact_Restores_A_Binding_That_Had_No_Variant()
     {
         await Place.Handle(PlaceCommand(nodeId: "lamp"), CancellationToken.None);
-        var handler = new ApplySceneMaterialCommandHandler(_writer);
+        var handler = Dress;
         await handler.Handle(
             new ApplySceneMaterialCommand(SceneId, "lamp", TextureSetId: 3, Variant: "battle-damaged"),
             CancellationToken.None);

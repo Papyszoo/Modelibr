@@ -25,14 +25,18 @@ public class SceneValidatorTests
         Vec3? rotation = null,
         bool? groundSnap = null,
         SceneAnchor? anchor = null,
-        bool visible = true) =>
+        bool visible = true,
+        SceneMaterialBinding? material = null,
+        IReadOnlyList<SceneMaterialBinding>? materialSlots = null) =>
         new(
             id,
             new SceneTransform(position, rotation ?? Vec3.Zero, Vec3.One),
             Asset: new SceneAssetRef(ModelType, assetId, 1),
             Visible: visible,
             GroundSnap: groundSnap,
-            Anchor: anchor);
+            Anchor: anchor,
+            Material: material,
+            MaterialSlots: materialSlots);
 
     private static Dictionary<string, SceneAssetFacts> Facts(params (int AssetId, Vec3 Dimensions)[] assets)
     {
@@ -300,6 +304,100 @@ public class SceneValidatorTests
             Profiles(new SceneAssetProfile(ModelType, 1, 1, PartCount: 1, MaterialCount: 0)));
 
         Assert.Contains("Appearance.NoMaterial", Codes(report));
+    }
+
+    [Fact]
+    public void A_Parameter_Material_Dresses_A_Node_That_Declares_No_Material_Of_Its_Own()
+    {
+        // The binding that needs no texture set at all. Reading only node.Material's
+        // TextureSetId called this node bare and reported it as rendering grey - against a
+        // node an agent had dressed correctly, and on every subsequent validate call.
+        var document = Document(new[]
+        {
+            Node("sofa", Vec3.Zero, groundSnap: true, material: new SceneMaterialBinding(MaterialId: 4)),
+        });
+
+        var report = SceneValidator.Validate(
+            document,
+            Facts((1, new Vec3(2.2, 0.85, 0.95))),
+            Profiles(new SceneAssetProfile(ModelType, 1, 1, PartCount: 1, MaterialCount: 0)));
+
+        Assert.DoesNotContain("Appearance.NoMaterial", Codes(report));
+    }
+
+    [Fact]
+    public void Per_Slot_Dressing_Counts_As_Having_A_Material()
+    {
+        var document = Document(new[]
+        {
+            Node(
+                "sofa", Vec3.Zero, groundSnap: true,
+                materialSlots: new[] { new SceneMaterialBinding(MaterialId: 4, Slot: "cushions") }),
+        });
+
+        var report = SceneValidator.Validate(
+            document,
+            Facts((1, new Vec3(2.2, 0.85, 0.95))),
+            Profiles(new SceneAssetProfile(ModelType, 1, 1, PartCount: 1, MaterialCount: 0)));
+
+        Assert.DoesNotContain("Appearance.NoMaterial", Codes(report));
+    }
+
+    [Fact]
+    public void A_Texture_Set_Bound_To_A_Model_Without_Uvs_Is_A_Warning_Not_A_Silence()
+    {
+        // The case that actually renders wrong. The old test suppressed the finding as soon
+        // as anything was bound, so it was quiet in exactly the situation it exists for.
+        var document = Document(new[]
+        {
+            Node("sofa", Vec3.Zero, groundSnap: true, material: new SceneMaterialBinding(TextureSetId: 3)),
+        });
+
+        var report = SceneValidator.Validate(
+            document,
+            Facts((1, new Vec3(2.2, 0.85, 0.95))),
+            Profiles(new SceneAssetProfile(
+                ModelType, 1, 1, PartCount: 1, MaterialCount: 1,
+                QualityFlags: new[] { "missing_uvs" })));
+
+        var finding = Assert.Single(report.Findings, f => f.Code == "Appearance.MissingUvs");
+        Assert.Equal(SceneFindingSeverities.Warning, finding.Severity);
+    }
+
+    [Fact]
+    public void A_Parameter_Material_On_A_Model_Without_Uvs_Has_Nothing_To_Report()
+    {
+        // A colour and a roughness need no unwrap, which is why apply_material recommends
+        // them for assets like this one. Warning here would train the caller to ignore it.
+        var document = Document(new[]
+        {
+            Node("sofa", Vec3.Zero, groundSnap: true, material: new SceneMaterialBinding(MaterialId: 4)),
+        });
+
+        var report = SceneValidator.Validate(
+            document,
+            Facts((1, new Vec3(2.2, 0.85, 0.95))),
+            Profiles(new SceneAssetProfile(
+                ModelType, 1, 1, PartCount: 1, MaterialCount: 1,
+                QualityFlags: new[] { "missing_uvs" })));
+
+        Assert.DoesNotContain("Appearance.MissingUvs", Codes(report));
+    }
+
+    [Fact]
+    public void An_Undressed_Model_Without_Uvs_Is_Noted_Before_Anything_Is_Bound()
+    {
+        var document = Document(new[] { Node("sofa", Vec3.Zero, groundSnap: true) });
+
+        var report = SceneValidator.Validate(
+            document,
+            Facts((1, new Vec3(2.2, 0.85, 0.95))),
+            Profiles(new SceneAssetProfile(
+                ModelType, 1, 1, PartCount: 1, MaterialCount: 1,
+                QualityFlags: new[] { "missing_uvs" })));
+
+        var finding = Assert.Single(report.Findings, f => f.Code == "Appearance.MissingUvs");
+        Assert.Equal(SceneFindingSeverities.Info, finding.Severity);
     }
 
     [Fact]

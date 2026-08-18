@@ -378,10 +378,10 @@ public sealed class SceneWriteMcpTools
 
     [McpServerTool(Name = "apply_material")]
     [Description("Dress one node, for this scene only - the model's own default material is untouched. " +
-                 "Pass materialId for a parameter material (a colour and a roughness, needs no UVs) or textureSetId for a tiling " +
-                 "global material (needs UVs); both ids come from search_assets with assetType 'Material'. " +
+                 "Pass materialId for a parameter material (a colour and a roughness, needs no UVs) - browse those with list_materials - " +
+                 "or textureSetId for a tiling global material (needs UVs), from the model's own texture sets. " +
                  "Pass slot to dress one of the model's material slots (\"cushions\") instead of the whole node; " +
-                 "get_asset_metadata lists a model's slots. Pass clear=true to remove the binding.")]
+                 "get_asset returns a model's materialSlots. Pass clear=true to remove the binding.")]
     public static Task<object> ApplyMaterial(
         ICommandHandler<ApplySceneMaterialCommand, SceneMaterialResponse> handler,
         IAgentAudit audit,

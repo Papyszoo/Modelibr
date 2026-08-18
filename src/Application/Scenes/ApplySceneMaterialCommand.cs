@@ -1,4 +1,6 @@
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Repositories;
+using Application.Extraction;
 using Domain.Scenes;
 using SharedKernel;
 
@@ -43,16 +45,43 @@ internal sealed class ApplySceneMaterialCommandHandler
     : ICommandHandler<ApplySceneMaterialCommand, SceneMaterialResponse>
 {
     private readonly ISceneWriter _writer;
+    private readonly IMaterialRepository _materialRepository;
+    private readonly ITextureSetRepository _textureSetRepository;
+    private readonly IAssetPartRepository _partRepository;
+    private readonly ISceneRepository _sceneRepository;
 
-    public ApplySceneMaterialCommandHandler(ISceneWriter writer)
+    public ApplySceneMaterialCommandHandler(
+        ISceneWriter writer,
+        IMaterialRepository materialRepository,
+        ITextureSetRepository textureSetRepository,
+        IAssetPartRepository partRepository,
+        ISceneRepository sceneRepository)
     {
         _writer = writer;
+        _materialRepository = materialRepository;
+        _textureSetRepository = textureSetRepository;
+        _partRepository = partRepository;
+        _sceneRepository = sceneRepository;
     }
 
     public async Task<Result<SceneMaterialResponse>> Handle(
         ApplySceneMaterialCommand command,
         CancellationToken cancellationToken)
     {
+        // Resolved before the write, not inside it. The document validator only ever
+        // checked that ids were positive integers and that the shape was well formed, so a
+        // material that does not exist, a texture set from another install, or a slot name
+        // with a typo all saved cleanly and then rendered as nothing - a silent no-op the
+        // agent had no way to distinguish from a successful dressing.
+        if (!command.Clear)
+        {
+            var resolved = await ResolveReferencesAsync(command, cancellationToken);
+            if (resolved.IsFailure)
+            {
+                return Result.Failure<SceneMaterialResponse>(resolved.Error);
+            }
+        }
+
         SceneMaterialBinding? previous = null;
 
         var result = await _writer.ApplyAsync(
@@ -155,5 +184,99 @@ internal sealed class ApplySceneMaterialCommandHandler
             view.Scene,
             view.Nodes.First(n => n.NodeId == command.NodeId),
             previous));
+    }
+
+    /// <summary>
+    /// Checks that everything the caller named actually exists before the write is attempted.
+    /// Each miss is reported as itself - "material 91 does not exist" is actionable in a way
+    /// that a scene which saved and then rendered grey is not.
+    /// </summary>
+    private async Task<Result> ResolveReferencesAsync(
+        ApplySceneMaterialCommand command,
+        CancellationToken cancellationToken)
+    {
+        if (command.MaterialId is { } materialId)
+        {
+            var material = await _materialRepository.GetByIdAsync(materialId, cancellationToken);
+            if (material is null)
+            {
+                return Result.Failure(new Error(
+                    "Scene.MaterialNotFound",
+                    $"Material {materialId} does not exist. Browse the material library with list_materials."));
+            }
+        }
+
+        if (command.TextureSetId is { } textureSetId)
+        {
+            var textureSet = await _textureSetRepository.GetByIdAsync(textureSetId, cancellationToken);
+            if (textureSet is null)
+            {
+                return Result.Failure(new Error(
+                    "Scene.TextureSetNotFound",
+                    $"Texture set {textureSetId} does not exist."));
+            }
+        }
+
+        return string.IsNullOrWhiteSpace(command.Slot)
+            ? Result.Success()
+            : await ValidateSlotAsync(command.SceneId, command.NodeId, command.Slot.Trim(), cancellationToken);
+    }
+
+    /// <summary>
+    /// Confirms the slot name is one the node's asset actually declares.
+    /// </summary>
+    /// <remarks>
+    /// A misspelled slot used to create a binding for a slot that does not exist: accepted,
+    /// stored, and then matched by nothing at render time. Because the alternative failure is
+    /// worse - blocking a legitimate dressing on data an older extraction never wrote - an
+    /// asset with no recorded slots at all is allowed through. The check only fires when the
+    /// asset does declare slots and the requested one is not among them, which is exactly the
+    /// case where the name can be proven wrong.
+    /// </remarks>
+    private async Task<Result> ValidateSlotAsync(
+        int sceneId,
+        string nodeId,
+        string slot,
+        CancellationToken cancellationToken)
+    {
+        var scene = await _sceneRepository.GetByIdAsync(sceneId, cancellationToken);
+        if (scene is null)
+        {
+            // Let the writer report the missing scene - it owns that error, and duplicating
+            // it here would give the same condition two different codes.
+            return Result.Success();
+        }
+
+        var document = SceneDocumentCodec.ParseStored(scene.DocumentJson, sceneId);
+        if (document.IsFailure)
+        {
+            return Result.Success();
+        }
+
+        var node = document.Value.Nodes.FirstOrDefault(n => n.Id == nodeId);
+        if (node?.Asset is not { } asset)
+        {
+            // No asset means a primitive, which has no authored slots to check against.
+            return Result.Success();
+        }
+
+        var parts = await _partRepository.GetForAssetAsync(
+            asset.AssetType, asset.AssetId, asset.VersionId, cancellationToken);
+
+        var slots = parts
+            .SelectMany(p => AssetPartDetail.MaterialSlots(p.Detail))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(s => s, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (slots.Count == 0 || slots.Contains(slot, StringComparer.OrdinalIgnoreCase))
+        {
+            return Result.Success();
+        }
+
+        return Result.Failure(new Error(
+            "Scene.SlotNotFound",
+            $"'{slot}' is not a material slot on {asset.AssetType} {asset.AssetId}. " +
+            $"Its slots are: {string.Join(", ", slots)}. Omit slot to dress the whole node."));
     }
 }
