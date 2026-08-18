@@ -92,6 +92,11 @@ public record DequeueExtractionJobCommand(string WorkerId, string? ExtractorFami
 public record DequeueExtractionJobResponse(ExtractionJobDto? Job);
 
 /// <summary>The claimed job, projected to the fields the worker needs to run it.</summary>
+/// <param name="Operation">Null for a re-derive; the operation to run for anything else.</param>
+/// <param name="ParametersJson">
+/// The operation's inputs, passed through untouched. The worker parses them, because the
+/// worker is what knows which of them its script understands.
+/// </param>
 public record ExtractionJobDto(
     int Id,
     string AssetType,
@@ -100,9 +105,12 @@ public record ExtractionJobDto(
     string? FileSha256,
     string ExtractorFamily,
     int AttemptCount,
-    int MaxAttempts)
+    int MaxAttempts,
+    string? Operation = null,
+    string? ParametersJson = null)
 {
     public static ExtractionJobDto From(Domain.Models.ExtractionJob job) =>
         new(job.Id, job.AssetType, job.AssetId, job.VersionId, job.FileSha256,
-            job.ExtractorFamily, job.AttemptCount, job.MaxAttempts);
+            job.ExtractorFamily, job.AttemptCount, job.MaxAttempts,
+            job.Operation, job.ParametersJson);
 }

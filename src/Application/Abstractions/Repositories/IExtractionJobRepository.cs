@@ -20,11 +20,18 @@ public interface IExtractionJobRepository
     /// The live (Pending/Processing) job for a target, if any - used for dedup so
     /// re-queuing an asset that is already queued is a no-op.
     /// </summary>
+    /// <param name="operation">
+    /// Narrows the match to one operation. A target is a sufficient identity for a
+    /// re-derive but not for an operation: unwrapping a version while a bake of it is
+    /// still running are two separate pieces of work, and matching on the target alone
+    /// would hand the caller the bake's job id and silently never unwrap anything.
+    /// </param>
     Task<ExtractionJob?> GetLiveJobAsync(
         string assetType,
         int assetId,
         int? versionId,
         string extractorFamily,
+        string? operation = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>

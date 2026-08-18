@@ -90,7 +90,8 @@ public static class ExtractionEndpoints
     {
         var result = await commandHandler.Handle(
             new FinishExtractionJobCommand(
-                id, request.WorkerId ?? string.Empty, request.Success, request.ErrorMessage, request.WarningDetail),
+                id, request.WorkerId ?? string.Empty, request.Success, request.ErrorMessage,
+                request.WarningDetail, request.ResultJson),
             cancellationToken);
 
         if (result.IsFailure)
@@ -230,4 +231,5 @@ public record StoreComputeResultRequest(
 public record DequeueExtractionJobRequest(string? WorkerId, string? ExtractorFamily);
 
 /// <summary><c>WorkerId</c> must be the worker that holds the claim - a lapsed lease may not report an outcome.</summary>
-public record FinishExtractionJobRequest(string? WorkerId, bool Success, string? ErrorMessage, string? WarningDetail);
+public record FinishExtractionJobRequest(
+    string? WorkerId, bool Success, string? ErrorMessage, string? WarningDetail, string? ResultJson = null);

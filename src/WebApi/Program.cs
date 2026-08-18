@@ -144,7 +144,11 @@ namespace WebApi
                     // objection, this moves behind MCP_WRITE_ENABLED.
                     .WithTools<WebApi.Mcp.SceneRenderMcpTools>()
                     // Browsing the material library is a read like any other search.
-                    .WithTools<WebApi.Mcp.MaterialReadMcpTools>();
+                    .WithTools<WebApi.Mcp.MaterialReadMcpTools>()
+                    // Asking what a queued job did. A read about work someone else asked
+                    // for - and the only way an agent can collect the result of anything
+                    // that hands back a job id instead of an answer.
+                    .WithTools<WebApi.Mcp.OperationJobReadMcpTools>();
 
                 // Write tools (prompt 30) are opt-in: OFF by default keeps a stock server
                 // read-only so enabling agent writes on a LAN-reachable endpoint is a
@@ -168,6 +172,9 @@ namespace WebApi
                         // Inventing a material mid-scene. A write, and the cheapest one
                         // there is: it creates no files at all.
                         .WithTools<WebApi.Mcp.MaterialWriteMcpTools>()
+                        // Running Blender on an asset. A write: it adds a version to a
+                        // model, even though what it hands back is a job id.
+                        .WithTools<WebApi.Mcp.BlenderWriteMcpTools>()
                         .WithPrompts<WebApi.Mcp.ImportLibraryPrompts>()
                         // The playbook for building a scene. Registered with the write
                         // tools because it is a guide to writing: every stage it describes

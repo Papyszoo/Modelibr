@@ -67,7 +67,7 @@ internal sealed class FinishExtractionJobCommandHandler
         var now = _dateTimeProvider.UtcNow;
         if (command.Success)
         {
-            job.MarkAsCompleted(now, command.WarningDetail);
+            job.MarkAsCompleted(now, command.WarningDetail, command.ResultJson);
         }
         else
         {
@@ -82,9 +82,15 @@ internal sealed class FinishExtractionJobCommandHandler
     }
 }
 
+/// <param name="ResultJson">
+/// What an operation produced, for the operations that produce something - the version an
+/// unwrap wrote, the texture set a bake imported. Ignored on failure and absent for a
+/// re-derive, which has no outcome to name beyond having run.
+/// </param>
 public record FinishExtractionJobCommand(
     int JobId,
     string WorkerId,
     bool Success,
     string? ErrorMessage = null,
-    string? WarningDetail = null) : ICommand;
+    string? WarningDetail = null,
+    string? ResultJson = null) : ICommand;

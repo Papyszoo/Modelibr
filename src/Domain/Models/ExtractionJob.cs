@@ -32,6 +32,37 @@ public class ExtractionJob
     /// </summary>
     public string ExtractorFamily { get; private set; } = string.Empty;
 
+    /// <summary>
+    /// What this job runs, when it runs something other than plain extraction:
+    /// "uv-unwrap", "bake-textures", "convert-format", "mesh-analysis". Null for the
+    /// re-derive jobs the queue was built for.
+    /// </summary>
+    /// <remarks>
+    /// The distinction the queue did not previously have to make. A re-derive is fully
+    /// described by its target - re-read this version and rebuild what we know about it -
+    /// so a target was a sufficient identity. An operation is not: unwrapping a version and
+    /// baking it are two different pieces of work on the same target, and a queue that
+    /// cannot tell them apart deduplicates one into the other.
+    /// </remarks>
+    public string? Operation { get; private set; }
+
+    /// <summary>The operation's inputs, verbatim, as the caller supplied them. Null for extraction.</summary>
+    /// <remarks>
+    /// Stored as JSON rather than as columns because the parameters differ per operation
+    /// and belong to the script that reads them - an unwrap has a margin and an angle limit,
+    /// a bake has maps, a resolution and a sample count. The queue does not interpret them;
+    /// it hands them to the worker that does.
+    /// </remarks>
+    public string? ParametersJson { get; private set; }
+
+    /// <summary>What the operation produced, written when it finishes. Null until then.</summary>
+    /// <remarks>
+    /// An operation, unlike an extraction, has an outcome worth naming: the new model
+    /// version an unwrap wrote, the texture set a bake imported. Without it a caller polling
+    /// the job learns that it finished and not what it made.
+    /// </remarks>
+    public string? ResultJson { get; private set; }
+
     public ExtractionJobStatus Status { get; private set; } = ExtractionJobStatus.Pending;
 
     public int AttemptCount { get; private set; }
@@ -86,6 +117,40 @@ public class ExtractionJob
         };
     }
 
+    /// <summary>
+    /// Queues an operation - work that changes an asset - rather than an extraction, which
+    /// only re-reads one.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately the same row and the same queue. Claiming, leases, retries and
+    /// dead-lettering are exactly the problems an operation has too, and a second table
+    /// would have to solve them again and then be polled separately. What an operation adds
+    /// is a name, its inputs and, later, its result.
+    /// </remarks>
+    public static ExtractionJob CreateOperation(
+        string assetType,
+        int assetId,
+        string extractorFamily,
+        string operation,
+        DateTime createdAt,
+        string? parametersJson = null,
+        int? versionId = null,
+        string? fileSha256 = null,
+        int maxAttempts = 3,
+        int lockTimeoutMinutes = 10)
+    {
+        ValidateOperation(operation);
+        ValidateParametersJson(parametersJson);
+
+        var job = Create(
+            assetType, assetId, extractorFamily, createdAt,
+            versionId, fileSha256, maxAttempts, lockTimeoutMinutes);
+
+        job.Operation = operation.Trim();
+        job.ParametersJson = string.IsNullOrWhiteSpace(parametersJson) ? null : parametersJson.Trim();
+        return job;
+    }
+
     /// <summary>Claims the job for a worker, respecting an unexpired lock held by another worker.</summary>
     public bool TryClaim(string workerId, DateTime claimedAt)
     {
@@ -113,7 +178,11 @@ public class ExtractionJob
     }
 
     /// <summary>Marks the job done. Partial success is valid - pass warning detail to keep it.</summary>
-    public void MarkAsCompleted(DateTime completedAt, string? warningDetail = null)
+    /// <param name="resultJson">
+    /// What an operation produced. Left as it was when omitted, so a re-derive finishing
+    /// normally does not have to know this field exists.
+    /// </param>
+    public void MarkAsCompleted(DateTime completedAt, string? warningDetail = null, string? resultJson = null)
     {
         Status = ExtractionJobStatus.Done;
         CompletedAt = completedAt;
@@ -122,6 +191,12 @@ public class ExtractionJob
         LockedAt = null;
         ErrorMessage = null;
         WarningDetail = string.IsNullOrWhiteSpace(warningDetail) ? null : warningDetail.Trim();
+
+        if (!string.IsNullOrWhiteSpace(resultJson))
+        {
+            ValidateResultJson(resultJson);
+            ResultJson = resultJson.Trim();
+        }
     }
 
     /// <summary>Records a failure; retries until <see cref="MaxAttempts"/>, then dead-letters.</summary>
@@ -215,6 +290,26 @@ public class ExtractionJob
             throw new ArgumentException("Lock timeout must be at least 1 minute.", nameof(lockTimeoutMinutes));
         if (lockTimeoutMinutes > 60)
             throw new ArgumentException("Lock timeout cannot exceed 60 minutes.", nameof(lockTimeoutMinutes));
+    }
+
+    private static void ValidateOperation(string operation)
+    {
+        if (string.IsNullOrWhiteSpace(operation))
+            throw new ArgumentException("Operation cannot be null or whitespace.", nameof(operation));
+        if (operation.Trim().Length > 50)
+            throw new ArgumentException("Operation cannot exceed 50 characters.", nameof(operation));
+    }
+
+    private static void ValidateParametersJson(string? parametersJson)
+    {
+        if (parametersJson is not null && parametersJson.Length > 4000)
+            throw new ArgumentException("Operation parameters cannot exceed 4000 characters.", nameof(parametersJson));
+    }
+
+    private static void ValidateResultJson(string? resultJson)
+    {
+        if (resultJson is not null && resultJson.Length > 4000)
+            throw new ArgumentException("Operation result cannot exceed 4000 characters.", nameof(resultJson));
     }
 
     private static void ValidateWorkerId(string workerId)

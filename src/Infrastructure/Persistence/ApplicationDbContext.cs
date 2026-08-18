@@ -1442,6 +1442,9 @@ namespace Infrastructure.Persistence
                 entity.Property(e => e.VersionId).IsRequired(false);
                 entity.Property(e => e.FileSha256).IsRequired(false).HasMaxLength(64);
                 entity.Property(e => e.ExtractorFamily).IsRequired().HasMaxLength(30);
+                entity.Property(e => e.Operation).IsRequired(false).HasMaxLength(50);
+                entity.Property(e => e.ParametersJson).IsRequired(false).HasMaxLength(4000);
+                entity.Property(e => e.ResultJson).IsRequired(false).HasMaxLength(4000);
                 entity.Property(e => e.Status).IsRequired();
                 entity.Property(e => e.AttemptCount).IsRequired();
                 entity.Property(e => e.MaxAttempts).IsRequired();
@@ -1453,9 +1456,15 @@ namespace Infrastructure.Persistence
                 entity.Property(e => e.UpdatedAt).IsRequired();
                 entity.Property(e => e.CompletedAt).IsRequired(false);
 
-                // Dedup: at most one live job per (asset, version, family). Filtered so
-                // completed/dead rows don't block re-queuing (Pending=0, Processing=1).
-                entity.HasIndex(e => new { e.AssetType, e.AssetId, e.VersionId, e.ExtractorFamily })
+                // Dedup: at most one live job per (asset, version, family, operation).
+                // Filtered so completed/dead rows don't block re-queuing (Pending=0,
+                // Processing=1). Operation is part of the key because two operations on one
+                // version are two pieces of work - without it, asking to bake a model that
+                // is still being unwrapped would collide with the unwrap and be rejected.
+                // Nulls stay distinct, as before: adding NULLS NOT DISTINCT here would
+                // change dedup for existing re-derive rows during the migration, and the
+                // handler-level check already covers that path.
+                entity.HasIndex(e => new { e.AssetType, e.AssetId, e.VersionId, e.ExtractorFamily, e.Operation })
                     .IsUnique()
                     .HasFilter("\"Status\" IN (0, 1)");
 
