@@ -339,6 +339,12 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
             supported: false,
             blocker: "Re-deriving an asset replaces computed data with freshly computed data - there is no prior state to restore, and nothing was lost."),
 
+        "generate-uvs" => Step(entry, "The queued unwrap cannot be called back.", destructive: false,
+            supported: false,
+            blocker: "generate_uvs queues work and returns before it has produced anything, so the " +
+                     "audit entry records a job id and not a version. Nothing was overwritten either - " +
+                     "the unwrap writes a NEW, inactive version. To discard it, delete that version."),
+
         _ => Step(entry, $"No inverse is defined for '{entry.Operation}'.", destructive: false,
             supported: false,
             blocker: $"'{entry.Operation}' is not a reversible operation."),

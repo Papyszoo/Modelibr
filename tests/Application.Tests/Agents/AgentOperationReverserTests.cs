@@ -243,6 +243,22 @@ public class AgentOperationReverserTests
     }
 
     [Fact]
+    public async Task An_Unwrap_Says_Why_It_Cannot_Be_Called_Back()
+    {
+        // generate_uvs returns before the work has produced anything, so the entry holds a
+        // job id and not a version - there is no id here to undo. The blocker has to say
+        // what to do instead, because unlike a re-derive this operation DID create state.
+        var entry = Completed("key-uv", "generate-uvs", "Model", 812);
+        Records(entry);
+
+        var plan = await _reverser.PlanAsync("key-uv", null);
+
+        var step = plan.Value.Steps.Single();
+        Assert.False(step.IsSupported);
+        Assert.Contains("delete that version", step.Blocker);
+    }
+
+    [Fact]
     public async Task An_Import_That_Matched_An_Existing_Asset_Is_Not_Undone_By_Recycling_It()
     {
         // Import is content-addressed, so re-importing bytes already in the library returns
