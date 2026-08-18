@@ -1,0 +1,239 @@
+import { screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+
+import { renderWithProviders } from '@/test/renderWithProviders'
+
+import type { SceneSlotCandidateView, SceneSlotView } from '../../types'
+import { SceneChoicesPanel } from '../SceneChoicesPanel'
+
+function candidate(
+  overrides: Partial<SceneSlotCandidateView> = {}
+): SceneSlotCandidateView {
+  const id = overrides.id ?? 'A'
+  return {
+    id,
+    ref: `streetlight/${id}`,
+    label: null,
+    asset: { assetType: 'Model', assetId: 12, versionId: 34 },
+    material: null,
+    rationale: 'reads as rundown',
+    chosen: false,
+    rejected: false,
+    rejectedReason: null,
+    facts: {
+      name: 'Lamp Post 03',
+      dimensions: { x: 0.4, y: 4.2, z: 0.4 },
+      partCount: 3,
+      materialCount: 1,
+      qualityFlags: null,
+      cameras: 0,
+      lights: 0,
+    },
+    ...overrides,
+  }
+}
+
+function slot(overrides: Partial<SceneSlotView> = {}): SceneSlotView {
+  return {
+    slotId: 'streetlight',
+    nodeId: 'lamp-1',
+    brief: 'low-poly, under 3k tris',
+    status: 'proposed',
+    chosenCandidateId: null,
+    resolvedBy: null,
+    reopenedReason: null,
+    candidates: [candidate({ id: 'A' }), candidate({ id: 'B' })],
+    ...overrides,
+  }
+}
+
+function renderPanel(
+  slots: SceneSlotView[],
+  overrides: Partial<Parameters<typeof SceneChoicesPanel>[0]> = {}
+) {
+  const props = {
+    slots,
+    isLoading: false,
+    previewRef: null,
+    onPreview: jest.fn(),
+    onChoose: jest.fn(),
+    onReject: jest.fn(),
+    onRejectAll: jest.fn(),
+    onReopen: jest.fn(),
+    busySlotId: null,
+    blocked: null,
+    ...overrides,
+  }
+
+  renderWithProviders(<SceneChoicesPanel {...props} />)
+  return props
+}
+
+describe('SceneChoicesPanel', () => {
+  it('shows each candidate by the name the user says out loud', () => {
+    // The requirement's core: the handle is on the card, verbatim. A card
+    // identified by its position stops meaning anything the moment one is
+    // rejected and the next round is proposed.
+    renderPanel([slot()])
+
+    expect(screen.getByText('streetlight/A')).toBeInTheDocument()
+    expect(screen.getByText('streetlight/B')).toBeInTheDocument()
+  })
+
+  it('shows the numbers next to the rationale', () => {
+    // A rationale on its own is a plausible sentence about an asset nobody
+    // measured - which is exactly what a user cannot overrule.
+    renderPanel([slot()])
+
+    expect(screen.getAllByText('reads as rundown')).toHaveLength(2)
+    expect(
+      screen.getAllByText(/0\.40 × 4\.20 × 0\.40 m · 3 parts · 1 mat/)
+    ).toHaveLength(2)
+  })
+
+  it('calls out an asset that is really a whole sample scene', () => {
+    renderPanel([
+      slot({
+        candidates: [
+          candidate({
+            id: 'A',
+            facts: {
+              name: 'PlaysetLightTest',
+              dimensions: { x: 12, y: 6, z: 9 },
+              partCount: 12,
+              materialCount: 4,
+              qualityFlags: ['missing_uvs'],
+              cameras: 1,
+              lights: 2,
+            },
+          }),
+        ],
+      }),
+    ])
+
+    expect(screen.getByText(/1 camera · 2 lights/)).toBeInTheDocument()
+    expect(screen.getByText('missing_uvs')).toBeInTheDocument()
+  })
+
+  it('keeps a rejected candidate visible with its reason', async () => {
+    // Rejections are feedback, not deletions. The user sees what was already
+    // ruled out, and so does the agent reading the slot back.
+    renderPanel([
+      slot({
+        candidates: [
+          candidate({ id: 'A' }),
+          candidate({ id: 'B', rejected: true, rejectedReason: 'too modern' }),
+        ],
+      }),
+    ])
+
+    expect(screen.getByText('streetlight/B')).toBeInTheDocument()
+    expect(screen.getByText('Rejected: too modern')).toBeInTheDocument()
+    expect(
+      screen.queryByTestId('scene-choices-choose-streetlight/B')
+    ).not.toBeInTheDocument()
+  })
+
+  it('previews a candidate in place without writing anything', async () => {
+    const props = renderPanel([slot()])
+
+    await userEvent.click(screen.getByText('streetlight/B'))
+
+    expect(props.onPreview).toHaveBeenCalledWith(
+      expect.objectContaining({ slotId: 'streetlight' }),
+      expect.objectContaining({ id: 'B' })
+    )
+    expect(props.onChoose).not.toHaveBeenCalled()
+  })
+
+  it('chooses a candidate by its id', async () => {
+    const props = renderPanel([slot()])
+
+    await userEvent.click(
+      screen.getByTestId('scene-choices-choose-streetlight/B')
+    )
+
+    expect(props.onChoose).toHaveBeenCalledWith('streetlight', 'B')
+  })
+
+  it('will not reject anything until a reason is given', async () => {
+    // The reason is the whole point of recording a rejection: it is what the
+    // agent reads back before proposing again.
+    const props = renderPanel([slot()])
+
+    await userEvent.click(screen.getByTestId('scene-choices-none-streetlight'))
+
+    const confirm = screen.getByTestId(
+      'scene-choices-reject-confirm-streetlight'
+    )
+    expect(confirm).toBeDisabled()
+
+    await userEvent.type(
+      screen.getByLabelText('Why none of these work'),
+      'all too modern'
+    )
+    await userEvent.click(confirm)
+
+    expect(props.onRejectAll).toHaveBeenCalledWith(
+      'streetlight',
+      'all too modern'
+    )
+  })
+
+  it('says who settled a decision', async () => {
+    // "The agent proposes, the user decides" is only a guarantee while the
+    // scene can say which of the two happened.
+    renderPanel([
+      slot({
+        status: 'chosen',
+        chosenCandidateId: 'B',
+        resolvedBy: 'agent',
+        candidates: [
+          candidate({ id: 'A' }),
+          candidate({ id: 'B', chosen: true }),
+        ],
+      }),
+    ])
+
+    expect(screen.getByText('chosen · by agent')).toBeInTheDocument()
+  })
+
+  it('shows the reason a whole round was thrown out', () => {
+    renderPanel([
+      slot({
+        status: 'rejected',
+        reopenedReason: 'all too modern',
+        candidates: [
+          candidate({
+            id: 'A',
+            rejected: true,
+            rejectedReason: 'all too modern',
+          }),
+        ],
+      }),
+    ])
+
+    expect(
+      screen.getByText('Round thrown out: all too modern')
+    ).toBeInTheDocument()
+  })
+
+  it('renders nothing when the scene has no decisions', () => {
+    // Most scenes are composed without choices, and a permanent "no decisions"
+    // box would be chrome that never earns its column width.
+    renderPanel([])
+
+    expect(screen.queryByTestId('scene-choices')).not.toBeInTheDocument()
+  })
+
+  it('refuses to write while the editor holds unsaved edits, and says why', () => {
+    renderPanel([slot()], { blocked: 'Save your edits before choosing.' })
+
+    expect(
+      screen.getByText('Save your edits before choosing.')
+    ).toBeInTheDocument()
+    expect(
+      screen.getByTestId('scene-choices-choose-streetlight/B')
+    ).toBeDisabled()
+  })
+})

@@ -38,12 +38,33 @@ Given("I am on the scenes page", async ({ page }) => {
     await new ScenesPage(page).goto();
 });
 
+/**
+ * The scene the scenario is currently working on.
+ *
+ * Recorded so a step can say "the slot 'streetlight'" instead of repeating the
+ * scene's name on every line - these scenarios read as one conversation about
+ * one scene, and restating it four times reads as four separate facts.
+ */
+const openScene = new WeakMap<Page, string>();
+
+function currentSceneName(page: Page): string {
+    const name = openScene.get(page);
+    if (!name) {
+        throw new Error(
+            "No scene has been opened in this scenario - open one before addressing its slots.",
+        );
+    }
+    return name;
+}
+
 Given("a scene named {string} is open", async ({ page }, name: string) => {
     await new ScenesPage(page).createScene(name);
+    openScene.set(page, name);
 });
 
 When("I create a scene named {string}", async ({ page }, name: string) => {
     await new ScenesPage(page).createScene(name);
+    openScene.set(page, name);
 });
 
 Then("the scene editor should be visible", async ({ page }) => {
@@ -218,6 +239,7 @@ When("I reopen the scene {string}", async ({ page }, name: string) => {
     const scenes = new ScenesPage(page);
     await scenes.backToList();
     await scenes.openScene(name);
+    openScene.set(page, name);
 });
 
 /** Successfully served `/files/<id>` URLs seen while multi-file models were placed. */
@@ -710,5 +732,179 @@ Then(
         // Said out loud in the limitations too: a quieter answer must never be
         // mistakable for a better scene.
         expect(body.coverage.limitations.join(" ")).toContain(`'${stage}' stage`);
+    },
+);
+
+// --- Choices ----------------------------------------------------------------
+
+/** One slot as the server projects it - the same view the choices panel reads. */
+async function fetchSlot(page: Page, slotId: string) {
+    const view = await fetchSceneByName(page, currentSceneName(page));
+    const response = await page.request.get(
+        `${apiBase()}/scenes/${view.scene.id}/slots`,
+    );
+    expect(response.ok()).toBeTruthy();
+
+    const { slots } = await response.json();
+    const slot = slots.find(
+        (entry: { slotId: string }) => entry.slotId === slotId,
+    );
+    if (!slot) {
+        throw new Error(
+            `Scene "${currentSceneName(page)}" has no slot "${slotId}".`,
+        );
+    }
+    return slot;
+}
+
+/** The active version of the model the scenes setup phase seeded. */
+async function testModelVersionId(page: Page): Promise<number> {
+    const model = testModel(page);
+    const versions = await page.request.get(
+        `${apiBase()}/models/${model.id}/versions`,
+    );
+    expect(versions.ok()).toBeTruthy();
+    return (await versions.json())[0].id;
+}
+
+/**
+ * Places the seeded model as the node that fills a slot, over the API.
+ *
+ * Written through the document endpoint rather than the picker because these
+ * scenarios are about resolving a decision, not about placing: the slot's node
+ * has to carry a `slotId`, and the picker has no reason to offer one.
+ */
+Given(
+    "the test model is placed in the scene for the slot {string}",
+    async ({ page }, slotId: string) => {
+        const model = testModel(page);
+        const versionId = await testModelVersionId(page);
+        const view = await fetchSceneByName(page, currentSceneName(page));
+
+        const document = {
+            ...view.document,
+            nodes: [
+                {
+                    id: `${slotId}-node`,
+                    name: "street lamp",
+                    slotId,
+                    transform: {
+                        position: { x: 0, y: 0, z: 0 },
+                        rotationEuler: { x: 0, y: 0, z: 0 },
+                        scale: { x: 1, y: 1, z: 1 },
+                    },
+                    asset: {
+                        assetType: "Model",
+                        assetId: Number(model.id),
+                        versionId,
+                    },
+                    visible: true,
+                },
+            ],
+        };
+
+        const saved = await page.request.put(
+            `${apiBase()}/scenes/${view.scene.id}/document`,
+            { data: { documentJson: JSON.stringify(document) } },
+        );
+        expect(saved.ok()).toBeTruthy();
+    },
+);
+
+/**
+ * Proposes a round, the way an agent would.
+ *
+ * Both proposals reference the same seeded model, because what these scenarios
+ * assert is the choice machinery - stable ids, a rejection that is kept, an
+ * attribution that survives - and none of it depends on the proposals being
+ * different assets. The node's own asset is captured as candidate A by the
+ * server, so this leaves the slot offering A, B and C.
+ */
+Given(
+    "two candidates have been proposed for the slot {string}",
+    async ({ page }, slotId: string) => {
+        const model = testModel(page);
+        const versionId = await testModelVersionId(page);
+        const view = await fetchSceneByName(page, currentSceneName(page));
+
+        const proposal = (rationale: string) => ({
+            assetType: "Model",
+            assetId: Number(model.id),
+            versionId,
+            rationale,
+        });
+
+        const response = await page.request.post(
+            `${apiBase()}/scenes/${view.scene.id}/slots/${slotId}/candidates`,
+            {
+                data: {
+                    brief: "low-poly, reads as rundown",
+                    candidates: [
+                        proposal("closest to the brief"),
+                        proposal("cleaner, in case the brief is wrong"),
+                    ],
+                },
+            },
+        );
+        expect(response.ok()).toBeTruthy();
+    },
+);
+
+Then(
+    "the choices panel should offer {string}",
+    async ({ page }, candidateRef: string) => {
+        const scenes = new ScenesPage(page);
+        await expect(scenes.choicesLocator()).toBeVisible();
+        await expect(scenes.candidateCard(candidateRef)).toBeVisible();
+    },
+);
+
+Then(
+    "the choices panel should still offer {string}",
+    async ({ page }, candidateRef: string) => {
+        // "Still" is the assertion: a rejected card stays on screen, greyed,
+        // rather than disappearing. A deletion would lose the reason with it.
+        await expect(
+            new ScenesPage(page).candidateCard(candidateRef),
+        ).toBeVisible();
+    },
+);
+
+When(
+    "I choose the candidate {string}",
+    async ({ page }, candidateRef: string) => {
+        await new ScenesPage(page).chooseCandidate(candidateRef);
+    },
+);
+
+When(
+    "I reject the whole round for the slot {string} saying {string}",
+    async ({ page }, slotId: string, reason: string) => {
+        await new ScenesPage(page).rejectWholeRound(slotId, reason);
+    },
+);
+
+Then(
+    "the slot {string} should be chosen as {string} by {string}",
+    async ({ page }, slotId: string, candidateId: string, resolver: string) => {
+        const slot = await fetchSlot(page, slotId);
+        expect(slot.chosenCandidateId).toBe(candidateId);
+        // The guardrail, checked end to end: a choice made by clicking is
+        // recorded as the user's, whatever any request body might have claimed.
+        expect(slot.resolvedBy).toBe(resolver);
+        expect(slot.status).toBe("chosen");
+    },
+);
+
+Then(
+    "the slot {string} should record {string} against every candidate",
+    async ({ page }, slotId: string, reason: string) => {
+        const slot = await fetchSlot(page, slotId);
+        expect(slot.candidates.length).toBeGreaterThan(0);
+        for (const candidate of slot.candidates) {
+            expect(candidate.rejected).toBe(true);
+            expect(candidate.rejectedReason).toBe(reason);
+        }
+        expect(slot.reopenedReason).toBe(reason);
     },
 );

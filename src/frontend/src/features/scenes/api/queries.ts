@@ -13,7 +13,10 @@ import {
   deleteScene,
   getSceneById,
   getScenes,
+  getSceneSlots,
+  rejectSceneCandidates,
   renameScene,
+  resolveSceneSlot,
   updateSceneDocument,
 } from './scenesApi'
 
@@ -118,4 +121,88 @@ export function useSaveSceneDocumentMutation() {
       void queryClient.invalidateQueries({ queryKey: ['scenes'] })
     },
   })
+}
+
+export function getSceneSlotsQueryOptions(sceneId: number) {
+  return queryOptions({
+    queryKey: ['scenes', 'slots', sceneId] as const,
+    queryFn: () => getSceneSlots(sceneId),
+  })
+}
+
+type UseSceneSlotsQueryOptions = {
+  sceneId: number
+  queryConfig?: QueryConfig<typeof getSceneSlotsQueryOptions>
+}
+
+export function useSceneSlotsQuery({
+  sceneId,
+  queryConfig = {},
+}: UseSceneSlotsQueryOptions) {
+  return useQuery({
+    ...getSceneSlotsQueryOptions(sceneId),
+    ...queryConfig,
+  })
+}
+
+/**
+ * Both slot writes invalidate the scene as well as the slots.
+ *
+ * Choosing a candidate rewrites the slot's node, so the scene the canvas is
+ * drawing is genuinely out of date afterwards - and its revision has moved,
+ * which the editor's next save compares against. Refetching only the slots
+ * would leave the user looking at the asset they just replaced.
+ */
+function useSlotWriteMutation<TInput extends { sceneId: number }>(
+  mutationFn: (input: TInput) => Promise<unknown>
+) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn,
+    onSuccess: (_result, input) => {
+      void queryClient.invalidateQueries({
+        queryKey: ['scenes', 'slots', input.sceneId],
+      })
+      void queryClient.invalidateQueries({
+        queryKey: ['scenes', 'detail', input.sceneId],
+      })
+    },
+  })
+}
+
+export function useResolveSceneSlotMutation() {
+  return useSlotWriteMutation(
+    (input: {
+      sceneId: number
+      slotId: string
+      candidateId?: string
+      clear?: boolean
+      expectedRevision?: number
+    }) =>
+      resolveSceneSlot(input.sceneId, input.slotId, {
+        candidateId: input.candidateId,
+        clear: input.clear,
+        expectedRevision: input.expectedRevision,
+      })
+  )
+}
+
+export function useRejectSceneCandidatesMutation() {
+  return useSlotWriteMutation(
+    (input: {
+      sceneId: number
+      slotId: string
+      reason: string
+      candidateIds?: string[]
+      all?: boolean
+      expectedRevision?: number
+    }) =>
+      rejectSceneCandidates(input.sceneId, input.slotId, {
+        reason: input.reason,
+        candidateIds: input.candidateIds,
+        all: input.all,
+        expectedRevision: input.expectedRevision,
+      })
+  )
 }

@@ -73,6 +73,16 @@ interface SceneNodeObjectProps {
    * what makes a heavy scene navigable while it is still being laid out.
    */
   blockout?: boolean
+  /**
+   * This node fills a slot whose decision is still open.
+   *
+   * Drawn in the viewport, not only listed in the choices panel, because an
+   * unresolved slot is a hole in the scene: the object standing there is a
+   * proposal nobody has agreed to, and a scene that looks finished while three
+   * of its decisions are still open is how an agent's pick becomes the answer
+   * by default.
+   */
+  undecided?: boolean
   /** Reports an asset that could not be loaded, so the editor can flag it. */
   onLoadError: (nodeId: string, message: string) => void
   /**
@@ -95,6 +105,7 @@ export function SceneNodeObject({
   originConvention = null,
   originInBounds = null,
   blockout = false,
+  undecided = false,
   onLoadError,
   onLoadSettled,
 }: SceneNodeObjectProps): JSX.Element | null {
@@ -172,6 +183,13 @@ export function SceneNodeObject({
           originConvention={node.primitive ? 'centered' : originConvention}
           // Primitives are authored centered, like three.js builds them - the
           // same exception the server makes in SceneSpatial.Footprint.
+          originInBounds={node.primitive ? null : originInBounds}
+        />
+      ) : null}
+      {undecided && !selected ? (
+        <UndecidedOutline
+          bounds={node.primitive?.size ?? sourceDimensions}
+          originConvention={node.primitive ? 'centered' : originConvention}
           originInBounds={node.primitive ? null : originInBounds}
         />
       ) : null}
@@ -607,6 +625,42 @@ function SelectionOutline({
     <mesh position={[x, y, z]}>
       <boxGeometry args={[bounds.x * 1.02, bounds.y * 1.02, bounds.z * 1.02]} />
       <meshBasicMaterial color="#5b9dff" wireframe transparent opacity={0.8} />
+    </mesh>
+  )
+}
+
+/**
+ * An amber box around a node whose slot is still open.
+ *
+ * Deliberately the same shape as the selection outline and a different colour,
+ * so "you are looking at this" and "nobody has agreed to this yet" read as two
+ * facts about one node rather than competing for the same affordance. Yields to
+ * the selection outline when both apply - two concentric wireframes say less
+ * than one.
+ *
+ * Like the selection box it is omitted when the asset's bounds are unknown: a
+ * made-up cube around a lamp post would state something false about its size.
+ */
+function UndecidedOutline({
+  bounds,
+  originConvention,
+  originInBounds,
+}: {
+  bounds: Vec3 | null | undefined
+  originConvention: string | null
+  originInBounds: Vec3 | null
+}): JSX.Element | null {
+  if (!bounds) {
+    return null
+  }
+
+  const [x, y, z] = boundsOffset(bounds, originConvention, originInBounds)
+
+  return (
+    <mesh position={[x, y, z]}>
+      <boxGeometry args={[bounds.x * 1.04, bounds.y * 1.04, bounds.z * 1.04]} />
+      {/* Scene content, not chrome - three.js materials take a colour, not a token. */}
+      <meshBasicMaterial color="#f59e0b" wireframe transparent opacity={0.7} />
     </mesh>
   )
 }

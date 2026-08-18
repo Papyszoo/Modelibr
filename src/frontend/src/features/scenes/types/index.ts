@@ -7,6 +7,10 @@ import type {
   SceneMaterialBinding,
   SceneNode,
   ScenePrimitive,
+  SceneSlot,
+  SceneSlotCandidate,
+  SceneSlotResolver,
+  SceneSlotStatus,
   SceneStage,
   SceneTransform,
   Vec3,
@@ -21,6 +25,10 @@ export type {
   SceneMaterialBinding,
   SceneNode,
   ScenePrimitive,
+  SceneSlot,
+  SceneSlotCandidate,
+  SceneSlotResolver,
+  SceneSlotStatus,
   SceneStage,
   SceneTransform,
   Vec3,
@@ -141,4 +149,68 @@ export interface SceneView {
   nodes: SceneNodeView[]
   overlaps: SceneOverlap[]
   scaleWarnings: SceneScaleWarning[]
+}
+
+/**
+ * The measurable half of a proposal - what the library actually knows about the
+ * asset behind a candidate card.
+ *
+ * Shown beside the rationale, never instead of it. A rationale on its own is a
+ * plausible sentence about an asset nobody measured, and it is exactly what a
+ * user cannot overrule: "reads as rundown" sounds right whether the asset is a
+ * lamp post or a twelve-object test scene with two lights in it.
+ *
+ * Null on the candidate when nothing is known - which is itself worth showing,
+ * rather than a card of empty dashes that reads as a rendering bug.
+ */
+export interface SceneCandidateFacts {
+  name: string | null
+  dimensions: Vec3 | null
+  partCount: number | null
+  materialCount: number | null
+  qualityFlags: string[] | null
+  cameras: number
+  lights: number
+}
+
+/** One proposal for a slot, as the user reads it on a card. */
+export interface SceneSlotCandidateView {
+  id: string
+  /** The name a user says out loud - `streetlight/B`. Assembled server-side so nothing spells it differently. */
+  ref: string
+  label: string | null
+  asset: SceneAssetRef | null
+  material: SceneMaterialBinding | null
+  rationale: string | null
+  chosen: boolean
+  rejected: boolean
+  /** Why it was ruled out. Kept and shown, because a rejection is feedback rather than a deletion. */
+  rejectedReason: string | null
+  facts: SceneCandidateFacts | null
+}
+
+/** One decision in the scene, its proposals, and where it stands. */
+export interface SceneSlotView {
+  slotId: string
+  /** The node this slot decides. Exactly one node carries the slot id. */
+  nodeId: string | null
+  brief: string | null
+  status: SceneSlotStatus
+  chosenCandidateId: string | null
+  /** Whether a person or an agent settled it - the guardrail, made visible. */
+  resolvedBy: SceneSlotResolver | null
+  /** The user's reason for throwing out a whole round: "none of these, all too modern". */
+  reopenedReason: string | null
+  candidates: SceneSlotCandidateView[]
+}
+
+export interface SceneSlotsView {
+  scene: SceneSummary
+  slots: SceneSlotView[]
+}
+
+/** What a slot write returns: the scene's new revision, and the slot as it now stands. */
+export interface SceneSlotWriteResponse {
+  scene: SceneSummary
+  slot: SceneSlotView
 }

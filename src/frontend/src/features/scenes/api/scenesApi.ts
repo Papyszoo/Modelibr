@@ -4,6 +4,8 @@ import type {
   SceneAssetFacts,
   SceneAssetRef,
   SceneDocument,
+  SceneSlotsView,
+  SceneSlotWriteResponse,
   SceneSummary,
   SceneView,
 } from '../types'
@@ -75,6 +77,61 @@ export async function getSceneAssetFacts(
 
   const response = await client.get<SceneAssetFacts>(
     `/scenes/asset-facts?${params.toString()}`
+  )
+  return response.data
+}
+
+/**
+ * The scene's open decisions and every proposal made for them.
+ *
+ * Read separately from the scene itself on purpose. The document carries the
+ * slots, but resolving what the library knows about each *candidate* walks the
+ * part list of assets that are not in the scene - a cost worth paying when
+ * someone opens the choices panel and not on every read of every scene.
+ */
+export async function getSceneSlots(sceneId: number): Promise<SceneSlotsView> {
+  const response = await client.get<SceneSlotsView>(`/scenes/${sceneId}/slots`)
+  return response.data
+}
+
+/**
+ * Settles a slot on one candidate, or reopens it.
+ *
+ * The server records this as resolved by the *user* and does not take that from
+ * the request - this endpoint is only reached by a person clicking, and letting
+ * the body claim otherwise would make the one attribution the model exists to
+ * keep a caller-supplied string.
+ */
+export async function resolveSceneSlot(
+  sceneId: number,
+  slotId: string,
+  input: { candidateId?: string; clear?: boolean; expectedRevision?: number }
+): Promise<SceneSlotWriteResponse> {
+  const response = await client.put<SceneSlotWriteResponse>(
+    `/scenes/${sceneId}/slots/${encodeURIComponent(slotId)}/choice`,
+    input
+  )
+  return response.data
+}
+
+/**
+ * Rules candidates out with a reason, or - with `all` - throws out the whole
+ * round and reopens the slot. Rejections are kept and shown greyed, which is
+ * what stops the agent re-offering what was just turned down.
+ */
+export async function rejectSceneCandidates(
+  sceneId: number,
+  slotId: string,
+  input: {
+    reason: string
+    candidateIds?: string[]
+    all?: boolean
+    expectedRevision?: number
+  }
+): Promise<SceneSlotWriteResponse> {
+  const response = await client.post<SceneSlotWriteResponse>(
+    `/scenes/${sceneId}/slots/${encodeURIComponent(slotId)}/rejections`,
+    input
   )
   return response.data
 }

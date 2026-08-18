@@ -57,6 +57,14 @@ interface SceneCanvasProps {
    * makes a large scene navigable while it is still being laid out.
    */
   blockout?: boolean
+  /**
+   * Nodes filling a slot nobody has decided yet, drawn with an amber outline.
+   *
+   * The requirement this answers: an unresolved choice has to be visible in the
+   * scene itself, not only in the panel beside it. A viewport that looks
+   * finished is how an agent's proposal quietly becomes the final answer.
+   */
+  undecidedNodeIds?: ReadonlySet<string>
 }
 
 /** A camera placement. `target` defaults to the origin, `fov` to the editor's 50. */
@@ -83,6 +91,7 @@ export function SceneCanvas({
   showGrid = true,
   interactive = true,
   blockout = false,
+  undecidedNodeIds,
 }: SceneCanvasProps): JSX.Element {
   // Resolved out here on purpose: react-three-fiber renders the canvas subtree
   // through its own reconciler root, so the app's React context - the
@@ -152,6 +161,7 @@ export function SceneCanvas({
               originConvention={facts?.originConvention ?? null}
               originInBounds={facts?.originInBounds ?? null}
               blockout={blockout}
+              undecided={undecidedNodeIds?.has(node.id) ?? false}
               onLoadError={onNodeLoadError}
               onLoadSettled={onNodeLoadSettled}
             />

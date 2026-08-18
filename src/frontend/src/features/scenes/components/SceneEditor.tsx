@@ -9,7 +9,13 @@ import { ApiClientError } from '@/lib/apiBase'
 import { ErrorState, ListHeader, LoadingState } from '@/shared/components'
 import { useSceneEditorStore } from '@/stores'
 
-import { useSaveSceneDocumentMutation, useSceneByIdQuery } from '../api/queries'
+import {
+  useRejectSceneCandidatesMutation,
+  useResolveSceneSlotMutation,
+  useSaveSceneDocumentMutation,
+  useSceneByIdQuery,
+  useSceneSlotsQuery,
+} from '../api/queries'
 import { SCENE_STAGES, type SceneStage } from '../api/sceneContract.generated'
 import { getSceneAssetFacts } from '../api/scenesApi'
 import { useSceneMaterials } from '../hooks/useSceneMaterials'
@@ -17,9 +23,10 @@ import { bindNodeMaterial } from '../lib/sceneDressing'
 import { transformsEqual } from '../lib/sceneGeometry'
 import { buildSceneNodeFacts } from '../lib/sceneNodeFacts'
 import { nextLightId, nextNodeId, nextPlacementX } from '../lib/sceneNodeIds'
-import type { SceneMaterialBinding } from '../types'
+import type { SceneMaterialBinding, SceneSlotView } from '../types'
 import { SceneAssetPicker } from './SceneAssetPicker'
 import { SceneCanvas } from './SceneCanvas'
+import { SceneChoicesPanel } from './SceneChoicesPanel'
 import { SceneHierarchy } from './SceneHierarchy'
 import { SceneNodeMaterials } from './SceneNodeMaterials'
 import { ScenePropertyPanel } from './ScenePropertyPanel'
@@ -51,7 +58,12 @@ export function SceneEditor({
   onClose,
 }: SceneEditorProps): JSX.Element {
   const { data: view, isLoading, error } = useSceneByIdQuery({ sceneId })
+  const { data: slotsView, isLoading: slotsLoading } = useSceneSlotsQuery({
+    sceneId,
+  })
   const save = useSaveSceneDocumentMutation()
+  const resolveSlot = useResolveSceneSlotMutation()
+  const rejectCandidates = useRejectSceneCandidatesMutation()
   const [saveError, setSaveError] = useState<string | null>(null)
 
   const {
@@ -75,6 +87,17 @@ export function SceneEditor({
   } = useSceneEditorStore()
 
   const [placeError, setPlaceError] = useState<string | null>(null)
+
+  // Which candidate the viewport is showing instead of what the slot's node
+  // actually wears. Local state, never a write: looking at four options must
+  // not move the scene's revision four times, and must not disturb anything the
+  // user has already settled.
+  const [preview, setPreview] = useState<{
+    slotId: string
+    candidateId: string
+    ref: string
+  } | null>(null)
+  const [slotError, setSlotError] = useState<string | null>(null)
   const [isPlacing, setIsPlacing] = useState(false)
   const [failedNodes, setFailedNodes] = useState<Map<string, string>>(new Map())
 
@@ -115,6 +138,95 @@ export function SceneEditor({
   // same bindings to render them, through the same query keys, so the panel
   // costs no extra request.
   const dressingByNode = useSceneMaterials(document)
+
+  const slots = useMemo(() => slotsView?.slots ?? [], [slotsView])
+
+  // Every slot nobody has settled, so the viewport can mark the nodes standing
+  // in for a decision that has not been made.
+  const undecidedNodeIds = useMemo(
+    () =>
+      new Set(
+        slots
+          .filter(slot => slot.status !== 'chosen' && slot.nodeId)
+          .map(slot => slot.nodeId as string)
+      ),
+    [slots]
+  )
+
+  /**
+   * The draft with the previewed candidate swapped in, for the canvas only.
+   *
+   * The swap follows the same rule the server applies when a candidate is
+   * actually chosen - the candidate is the whole answer for its slot - so what
+   * the user is looking at is what they would get, rather than a preview that
+   * flatters the proposal.
+   */
+  const canvasDocument = useMemo(() => {
+    if (!document || !preview) {
+      return document
+    }
+
+    const slot = slots.find(entry => entry.slotId === preview.slotId)
+    const candidate = slot?.candidates.find(
+      entry => entry.id === preview.candidateId
+    )
+    if (!slot?.nodeId || !candidate) {
+      return document
+    }
+
+    return {
+      ...document,
+      nodes: document.nodes.map(node =>
+        node.id === slot.nodeId
+          ? {
+              ...node,
+              asset: candidate.asset ?? node.asset,
+              material: candidate.material ?? null,
+            }
+          : node
+      ),
+    }
+  }, [document, preview, slots])
+
+  const handlePreviewCandidate = useCallback(
+    (slot: SceneSlotView, candidateRef: string, candidateId: string) => {
+      setPreview(current =>
+        current?.ref === candidateRef
+          ? null
+          : { slotId: slot.slotId, candidateId, ref: candidateRef }
+      )
+      if (slot.nodeId) {
+        selectNode(slot.nodeId)
+      }
+    },
+    [selectNode]
+  )
+
+  /**
+   * Slot writes go straight to the server, unlike everything else in this
+   * editor, because a choice is not a local edit: it is what the agent reads
+   * back through `get_slots` and what the audit log records as a decision a
+   * person made. They are refused while the draft is dirty rather than merged -
+   * a slot write moves the scene's revision, and merging it into an unsaved
+   * draft would silently discard one of the two.
+   */
+  const slotsBlocked = isDirty
+    ? 'Save your edits before choosing - a choice is written to the scene straight away.'
+    : null
+
+  const runSlotWrite = useCallback(async (write: () => Promise<unknown>) => {
+    setSlotError(null)
+    try {
+      await write()
+      setPreview(null)
+    } catch (caught) {
+      setSlotError(
+        caught instanceof ApiClientError
+          ? caught.message
+          : 'The choice could not be saved.'
+      )
+    }
+  }, [])
 
   const selectedNode =
     document?.nodes.find(node => node.id === selectedNodeId) ?? null
@@ -459,6 +571,14 @@ export function SceneEditor({
         />
       ) : null}
 
+      {slotError ? (
+        <Message
+          severity="error"
+          text={slotError}
+          className="scene-editor-message"
+        />
+      ) : null}
+
       <div className="scene-editor-body">
         <aside className="scene-editor-side">
           <SceneAssetPicker
@@ -500,15 +620,75 @@ export function SceneEditor({
         </aside>
 
         <SceneCanvas
-          document={document}
+          document={canvasDocument ?? document}
           nodeFacts={nodeFacts}
           selectedNodeId={selectedNodeId}
           onSelectNode={selectNode}
           onNodeLoadError={handleNodeLoadError}
           blockout={blockout}
+          undecidedNodeIds={undecidedNodeIds}
         />
 
         <aside className="scene-editor-side scene-editor-side--right">
+          <SceneChoicesPanel
+            slots={slots}
+            isLoading={slotsLoading}
+            previewRef={preview?.ref ?? null}
+            busySlotId={
+              resolveSlot.isPending || rejectCandidates.isPending
+                ? (resolveSlot.variables?.slotId ??
+                  rejectCandidates.variables?.slotId ??
+                  null)
+                : null
+            }
+            blocked={slotsBlocked}
+            onPreview={(slot, candidate) =>
+              handlePreviewCandidate(slot, candidate.ref, candidate.id)
+            }
+            onChoose={(slotId, candidateId) =>
+              void runSlotWrite(() =>
+                resolveSlot.mutateAsync({
+                  sceneId,
+                  slotId,
+                  candidateId,
+                  expectedRevision: baseRevision ?? undefined,
+                })
+              )
+            }
+            onReject={(slotId, candidateIds, reason) =>
+              void runSlotWrite(() =>
+                rejectCandidates.mutateAsync({
+                  sceneId,
+                  slotId,
+                  candidateIds,
+                  reason,
+                  expectedRevision: baseRevision ?? undefined,
+                })
+              )
+            }
+            onRejectAll={(slotId, reason) =>
+              void runSlotWrite(() =>
+                rejectCandidates.mutateAsync({
+                  sceneId,
+                  slotId,
+                  reason,
+                  all: true,
+                  expectedRevision: baseRevision ?? undefined,
+                })
+              )
+            }
+            onReopen={slotId =>
+              void runSlotWrite(() =>
+                resolveSlot.mutateAsync({
+                  sceneId,
+                  slotId,
+                  clear: true,
+                  expectedRevision: baseRevision ?? undefined,
+                })
+              )
+            }
+          />
+
           <ScenePropertyPanel
             node={selectedNode}
             facts={selectedFacts}

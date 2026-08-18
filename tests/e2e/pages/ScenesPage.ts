@@ -28,6 +28,7 @@ export class ScenesPage {
         '[data-testid="scene-asset-picker"] input[type="text"]';
 
     private readonly materials = '[data-testid="scene-node-materials"]';
+    private readonly choices = '[data-testid="scene-choices"]';
     private readonly materialPicker = '[data-testid="scene-material-picker"]';
     private readonly materialEntry =
         '[data-testid="scene-material-picker-entry"]';
@@ -255,6 +256,64 @@ export class ScenesPage {
 
     editorLocator() {
         return this.page.locator(this.editor);
+    }
+
+    choicesLocator() {
+        return this.page.locator(this.choices);
+    }
+
+    /** One candidate card, addressed the way the user says it: `streetlight/B`. */
+    candidateCard(candidateRef: string) {
+        return this.page.locator(
+            `[data-testid="scene-choices-card-${candidateRef}"]`,
+        );
+    }
+
+    /**
+     * Chooses a candidate and waits for the write, not for a spinner.
+     *
+     * A choice is written to the server immediately rather than into the
+     * editor's draft, so the scene detail refetch that follows it is what
+     * "the choice landed" actually means.
+     */
+    async chooseCandidate(candidateRef: string): Promise<void> {
+        const button = this.page.locator(
+            `[data-testid="scene-choices-choose-${candidateRef}"]`,
+        );
+        await expect(button).toBeEnabled();
+
+        await Promise.all([
+            this.page.waitForResponse(
+                response =>
+                    response.url().includes("/choice") &&
+                    response.request().method() === "PUT" &&
+                    response.ok(),
+            ),
+            button.click(),
+        ]);
+    }
+
+    /** The user's "none of these", with the reason the form requires. */
+    async rejectWholeRound(slotId: string, reason: string): Promise<void> {
+        await this.page
+            .locator(`[data-testid="scene-choices-none-${slotId}"]`)
+            .click();
+
+        await this.page.locator(`#reason-${slotId}`).fill(reason);
+
+        await Promise.all([
+            this.page.waitForResponse(
+                response =>
+                    response.url().includes("/rejections") &&
+                    response.request().method() === "POST" &&
+                    response.ok(),
+            ),
+            this.page
+                .locator(
+                    `[data-testid="scene-choices-reject-confirm-${slotId}"]`,
+                )
+                .click(),
+        ]);
     }
 
     hierarchyLocator() {

@@ -28,6 +28,14 @@ export type SceneFrontAxis = (typeof SCENE_FRONT_AXES)[number]
 export const SCENE_STAGES = ['layout', 'detail', 'lit', 'dressed'] as const
 export type SceneStage = (typeof SCENE_STAGES)[number]
 
+/** Where a decision stands. Derived from the slot's candidates rather than stored beside them, so the two cannot disagree. */
+export const SCENE_SLOT_STATUSES = ['proposed', 'chosen', 'rejected'] as const
+export type SceneSlotStatus = (typeof SCENE_SLOT_STATUSES)[number]
+
+/** Who settled a decision. The guardrail made visible: a scene never loses track of which choices a human actually made. */
+export const SCENE_SLOT_RESOLVERS = ['user', 'agent'] as const
+export type SceneSlotResolver = (typeof SCENE_SLOT_RESOLVERS)[number]
+
 /** How a node is seated on the node it rests on. Decides the anchor offset a write records, and is not itself stored. */
 export const SCENE_ANCHOR_ALIGNMENTS = ['center', 'keep'] as const
 export type SceneAnchorAlignment = (typeof SCENE_ANCHOR_ALIGNMENTS)[number]
@@ -38,6 +46,7 @@ export interface SceneDocument {
   lights: SceneLight[]
   environment?: SceneEnvironment | null
   stage?: SceneStage | null
+  slots?: SceneSlot[]
 }
 
 export interface SceneAnchor {
@@ -94,6 +103,24 @@ export interface SceneNode {
 export interface ScenePrimitive {
   shape: ScenePrimitiveShape
   size?: Vec3 | null
+}
+
+export interface SceneSlot {
+  id: string
+  candidates: SceneSlotCandidate[]
+  brief?: string | null
+  chosenCandidateId?: string | null
+  resolvedBy?: SceneSlotResolver | null
+  reopenedReason?: string | null
+}
+
+export interface SceneSlotCandidate {
+  id: string
+  asset?: SceneAssetRef | null
+  material?: SceneMaterialBinding | null
+  rationale?: string | null
+  label?: string | null
+  rejectedReason?: string | null
 }
 
 export interface SceneTransform {

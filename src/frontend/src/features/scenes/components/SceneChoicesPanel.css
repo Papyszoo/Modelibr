@@ -1,0 +1,237 @@
+/*
+ * Sits at the top of the editor's right column, above the property panel, as an
+ * ordinary block in that flow. Like SceneNodeMaterials it must not introduce a
+ * height or a second scroll box of its own - the column already scrolls, and a
+ * nested one strands the lower cards.
+ */
+.scene-choices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-xs);
+  padding-bottom: var(--mod-space-sm);
+  border-bottom: 1px solid var(--mod-color-border);
+  flex: 0 0 auto;
+}
+
+.scene-choices h4 {
+  margin: 0;
+  font-size: var(--mod-text-xs);
+  font-weight: var(--mod-font-weight-semibold);
+  color: var(--mod-color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.scene-choices-blocked {
+  margin: 0;
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-warning);
+}
+
+.scene-choices-note {
+  margin: 0;
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+}
+
+.scene-choices-slot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-2xs);
+}
+
+.scene-choices-slot-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--mod-space-2xs);
+}
+
+/* The name the user says out loud. Shown verbatim, never prettified. */
+.scene-choices-slot-id {
+  font-size: var(--mod-text-sm);
+  font-weight: var(--mod-font-weight-semibold);
+  font-family: monospace;
+}
+
+.scene-choices-status {
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+}
+
+.scene-choices-status--proposed {
+  color: var(--mod-color-warning);
+}
+
+.scene-choices-status--chosen {
+  color: var(--mod-color-success);
+}
+
+.scene-choices-status--rejected {
+  color: var(--mod-color-danger);
+}
+
+.scene-choices-brief,
+.scene-choices-reopened {
+  margin: 0;
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+}
+
+.scene-choices-reopened {
+  color: var(--mod-color-danger);
+}
+
+.scene-choices-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-2xs);
+}
+
+.scene-choices-card {
+  display: flex;
+  align-items: stretch;
+  gap: var(--mod-space-2xs);
+  border: 1px solid var(--mod-color-border);
+  border-radius: var(--mod-radius-md);
+  background: var(--mod-color-surface);
+  min-width: 0;
+}
+
+.scene-choices-card--chosen {
+  border-color: var(--mod-color-success);
+  background: var(--mod-color-success-bg);
+}
+
+/*
+ * Rejections are feedback, not deletions - the card stays legible enough to
+ * read its reason, and plainly out of the running.
+ */
+.scene-choices-card--rejected {
+  opacity: 0.55;
+  background: transparent;
+  border-style: dashed;
+}
+
+.scene-choices-card--previewing {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 1px rgba(var(--primary-color-rgb), 0.24);
+}
+
+.scene-choices-card-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--mod-space-2xs);
+  background: none;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.scene-choices-card-body:disabled {
+  cursor: default;
+}
+
+.scene-choices-card-body:hover:not(:disabled) {
+  background: var(--mod-color-surface-hover);
+}
+
+.scene-choices-card-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--mod-space-2xs);
+  min-width: 0;
+}
+
+/* The handle. Monospace so `streetlight/B` reads as an identifier, not prose. */
+.scene-choices-card-ref {
+  font-family: monospace;
+  font-size: var(--mod-text-xs);
+  font-weight: var(--mod-font-weight-semibold);
+  flex: 0 0 auto;
+}
+
+.scene-choices-card-name {
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scene-choices-card-rationale {
+  font-size: var(--mod-text-xs);
+  line-height: 1.35;
+}
+
+.scene-choices-card-facts {
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.scene-choices-card-facts--unknown {
+  color: var(--mod-color-warning);
+}
+
+.scene-choices-card-flags {
+  margin-left: var(--mod-space-2xs);
+  color: var(--mod-color-warning);
+}
+
+.scene-choices-card-rejected {
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-danger);
+}
+
+.scene-choices-card-actions {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  flex: 0 0 auto;
+  padding-right: 2px;
+}
+
+.scene-choices-slot-actions {
+  display: flex;
+  gap: var(--mod-space-2xs);
+}
+
+.scene-choices-reason {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-2xs);
+  padding: var(--mod-space-2xs);
+  border: 1px solid var(--mod-color-border);
+  border-radius: var(--mod-radius-md);
+  background: var(--mod-color-surface-raised);
+}
+
+.scene-choices-reason label {
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+}
+
+.scene-choices-reason-input {
+  width: 100%;
+  padding: var(--mod-space-2xs);
+  font-size: var(--mod-text-xs);
+  font-family: inherit;
+  color: var(--text-color);
+  background: var(--mod-color-surface);
+  border: 1px solid var(--mod-color-border);
+  border-radius: var(--mod-radius-sm);
+}
+
+.scene-choices-reason-actions {
+  display: flex;
+  gap: var(--mod-space-2xs);
+}

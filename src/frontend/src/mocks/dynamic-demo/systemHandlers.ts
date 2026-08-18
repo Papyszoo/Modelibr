@@ -410,6 +410,20 @@ export const systemHandlers = [
     })
   }),
 
+  // Also declared before '/scenes/:id'. Demo scenes are composed by hand rather
+  // than proposed by an agent, so this always answers "no open decisions" - and
+  // the choices panel renders nothing at all for that, which is the correct
+  // demo experience rather than an empty frame.
+  http.get('*/scenes/:id/slots', async ({ params }) => {
+    const scene = demoScenes.get(Number(params.id))
+    return scene
+      ? HttpResponse.json({ scene: demoSceneSummary(scene), slots: [] })
+      : HttpResponse.json(
+          { error: 'Scene.NotFound', message: 'No such scene.' },
+          { status: 404 }
+        )
+  }),
+
   http.get('*/scenes/:id', async ({ params }) => {
     const scene = demoScenes.get(Number(params.id))
     return scene

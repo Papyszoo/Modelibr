@@ -178,6 +178,30 @@ describe('sceneEditorStore', () => {
     expect(nodes[0].anchor).toBeNull()
   })
 
+  it('takes a slot with the node it decides', () => {
+    // The same trap the dangling anchor above fixes: a slot naming a node that is
+    // not there fails the whole save, for a node the user has already deleted.
+    const lamp: SceneNode = { ...makeNode('lamp-1'), slotId: 'streetlight' }
+    useSceneEditorStore.getState().open(1, {
+      ...makeDocument([lamp]),
+      slots: [
+        {
+          id: 'streetlight',
+          candidates: [
+            {
+              id: 'A',
+              asset: { assetType: 'Model', assetId: 1, versionId: 1 },
+            },
+          ],
+        },
+      ],
+    })
+
+    useSceneEditorStore.getState().removeNode('lamp-1')
+
+    expect(useSceneEditorStore.getState().document?.slots).toBeUndefined()
+  })
+
   it('clears the selection when the selected node is removed', () => {
     useSceneEditorStore.getState().open(1, makeDocument([makeNode('lamp')]), 1)
     useSceneEditorStore.getState().selectNode('lamp')

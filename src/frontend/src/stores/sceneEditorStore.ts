@@ -222,18 +222,30 @@ export const useSceneEditorStore = create<SceneEditorState>((set, get) => ({
     })),
 
   removeNode: nodeId => {
-    get().edit(document => ({
-      ...document,
-      nodes: document.nodes
-        .filter(node => node.id !== nodeId)
-        // Nodes resting on the deleted one are released rather than deleted with
-        // it, and stay exactly where they are. Leaving the anchor pointing at a
-        // node that is gone would have the server reject the whole save with an
-        // error about a node the user has already deleted.
-        .map(node =>
-          node.anchor?.onNodeId === nodeId ? { ...node, anchor: null } : node
-        ),
-    }))
+    get().edit(document => {
+      const removed = document.nodes.find(node => node.id === nodeId)
+      // A slot goes with the node it decides. Left behind it would name a node
+      // that is not there, and the server would reject the whole save - for a
+      // node the user has already deleted, which is the same trap the dangling
+      // anchor below is fixing.
+      const slots = removed?.slotId
+        ? document.slots?.filter(slot => slot.id !== removed.slotId)
+        : document.slots
+
+      return {
+        ...document,
+        nodes: document.nodes
+          .filter(node => node.id !== nodeId)
+          // Nodes resting on the deleted one are released rather than deleted
+          // with it, and stay exactly where they are. Leaving the anchor
+          // pointing at a node that is gone would have the server reject the
+          // whole save with an error about a node the user has already deleted.
+          .map(node =>
+            node.anchor?.onNodeId === nodeId ? { ...node, anchor: null } : node
+          ),
+        slots: slots?.length ? slots : undefined,
+      }
+    })
 
     if (get().selectedNodeId === nodeId) {
       set({ selectedNodeId: null })
