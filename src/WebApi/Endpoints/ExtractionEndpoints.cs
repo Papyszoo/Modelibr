@@ -28,7 +28,7 @@ public static class ExtractionEndpoints
         // Derived metadata + part detail reads (wrapped by MCP get_asset/get_part).
         app.MapGet("/assets/{assetType}/{assetId:int}/metadata", GetAssetMetadata)
             .WithName("Get Asset Metadata")
-            .WithSummary("Derived metadata + parts for an asset's current version")
+            .WithSummary("Derived metadata + parts for an asset (active version unless ?versionId= says otherwise)")
             .WithOpenApi();
 
         app.MapGet("/assets/{assetType}/{assetId:int}/parts/{**partPath}", GetAssetPart)
@@ -106,10 +106,12 @@ public static class ExtractionEndpoints
     private static async Task<IResult> GetAssetMetadata(
         string assetType,
         int assetId,
+        int? versionId,
         IQueryHandler<GetAssetMetadataQuery, AssetMetadataResponse> queryHandler,
         CancellationToken cancellationToken)
     {
-        var result = await queryHandler.Handle(new GetAssetMetadataQuery(assetType, assetId), cancellationToken);
+        var result = await queryHandler.Handle(
+            new GetAssetMetadataQuery(assetType, assetId, VersionId: versionId), cancellationToken);
         return result.IsFailure
             ? Results.NotFound(new { error = result.Error.Code, message = result.Error.Message })
             : Results.Ok(result.Value);
@@ -119,10 +121,12 @@ public static class ExtractionEndpoints
         string assetType,
         int assetId,
         string partPath,
+        int? versionId,
         IQueryHandler<GetAssetMetadataQuery, AssetMetadataResponse> queryHandler,
         CancellationToken cancellationToken)
     {
-        var result = await queryHandler.Handle(new GetAssetMetadataQuery(assetType, assetId, partPath), cancellationToken);
+        var result = await queryHandler.Handle(
+            new GetAssetMetadataQuery(assetType, assetId, partPath, versionId), cancellationToken);
         return result.IsFailure
             ? Results.NotFound(new { error = result.Error.Code, message = result.Error.Message })
             : Results.Ok(result.Value);
