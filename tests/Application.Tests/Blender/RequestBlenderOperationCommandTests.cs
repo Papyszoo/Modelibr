@@ -331,6 +331,39 @@ public class RequestBlenderOperationCommandTests
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    [Fact]
+    public async Task An_Analysis_Defaults_Its_Overlap_Grid()
+    {
+        var jobs = Jobs();
+        var handler = Handler(jobs: jobs);
+
+        await handler.Handle(
+            new RequestBlenderOperationCommand(42, BlenderOperations.MeshAnalysis), CancellationToken.None);
+
+        jobs.Verify(r => r.AddAsync(
+            It.Is<ExtractionJob>(j => j.ParametersJson!.Contains("\"overlapSamples\":512")),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Theory]
+    [InlineData("{\"overlapSamples\": 32}")]
+    [InlineData("{\"overlapSamples\": 4096}")]
+    [InlineData("{\"overlapSamples\": \"fine\"}")]
+    public async Task Rejects_An_Overlap_Grid_Out_Of_Range(string parametersJson)
+    {
+        var jobs = Jobs();
+        var handler = Handler(jobs: jobs);
+
+        var result = await handler.Handle(
+            new RequestBlenderOperationCommand(
+                42, BlenderOperations.MeshAnalysis, ParametersJson: parametersJson),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Blender.InvalidParameters", result.Error.Code);
+        jobs.Verify(r => r.AddAsync(It.IsAny<ExtractionJob>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     // ---- fixtures ---------------------------------------------------------------
 
     private static Mock<IExtractionJobRepository> Jobs() => new();

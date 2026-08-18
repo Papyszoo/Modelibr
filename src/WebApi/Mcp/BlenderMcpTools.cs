@@ -194,6 +194,61 @@ public sealed class BlenderWriteMcpTools
             cancellationToken);
     }
 
+    [McpServerTool(Name = "analyze_meshes")]
+    [Description("Measure a model's geometry with Blender: UV overlap (whether its layout can be baked onto at all), texel density " +
+                 "(so two assets in one scene do not read at different resolutions), exact surface area, and whether each mesh is watertight. " +
+                 "Nothing about the model changes - this only measures. " +
+                 "surface-area and manifold are cached by geometry hash and become answerable through compute_on_demand for every asset sharing that geometry; " +
+                 "the two UV metrics come back on the job only, because they depend on the UV layout and the geometry hash deliberately ignores it. " +
+                 "Returns a job id: collect the numbers with get_job_status. Requires Blender (Settings).")]
+    public static Task<object> AnalyzeMeshes(
+        ICommandHandler<RequestBlenderOperationCommand, BlenderOperationRequested> handler,
+        IAgentAudit audit,
+        McpCallerContext caller,
+        [Description("Model id to measure.")] int modelId,
+        [Description("Unique key so a retried call does not queue the analysis twice.")] string idempotencyKey,
+        [Description("Version id to measure. Defaults to the model's active version.")] int? versionId = null,
+        [Description("Grid resolution UV overlap is measured on, 64-2048, default 512. Higher is more precise and slower.")] int? overlapSamples = null,
+        [Description("Optional batch id. Writes sharing one can be undone together with reverse_operation.")] string? batchId = null,
+        CancellationToken cancellationToken = default)
+    {
+        return Guarded(
+            audit,
+            caller,
+            new AgentWrite(idempotencyKey, "analyze-meshes", "Model", modelId, batchId),
+            async ct =>
+            {
+                var parameters = overlapSamples is { } grid
+                    ? System.Text.Json.JsonSerializer.Serialize(new { overlapSamples = grid })
+                    : "{}";
+
+                var result = await handler.Handle(
+                    new RequestBlenderOperationCommand(
+                        modelId, BlenderOperations.MeshAnalysis, versionId, parameters),
+                    ct);
+
+                if (result.IsFailure)
+                {
+                    return Failed(result.Error);
+                }
+
+                var queued = result.Value;
+                return Applied(
+                    new
+                    {
+                        status = queued.AlreadyQueued ? "already-queued" : "queued",
+                        jobId = queued.JobId,
+                        modelId = queued.ModelId,
+                        versionId = queued.VersionId,
+                        note = queued.AlreadyQueued
+                            ? "This analysis was already queued for this version; the same job id is returned."
+                            : "Queued. Collect the measurements with get_job_status once it finishes.",
+                    },
+                    "Model", queued.ModelId, queued);
+            },
+            cancellationToken);
+    }
+
     /// <summary>
     /// Builds the parameter object from the tool's named arguments, omitting anything the
     /// caller left alone so the defaults live in one place - the validator - rather than

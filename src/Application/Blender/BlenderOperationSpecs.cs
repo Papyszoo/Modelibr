@@ -65,6 +65,7 @@ public static class BlenderOperationSpecs
         {
             BlenderOperations.UvUnwrap => NormalizeUvUnwrap(supplied),
             BlenderOperations.BakeTextures => NormalizeBakeTextures(supplied),
+            BlenderOperations.MeshAnalysis => NormalizeMeshAnalysis(supplied),
             _ => Result.Success(supplied.ToJsonString())
         };
     }
@@ -279,6 +280,32 @@ public static class BlenderOperationSpecs
         }
 
         return Result.Success(normalized.ToJsonString());
+    }
+
+    /// <summary>
+    /// Mesh-analysis parameters.
+    /// </summary>
+    /// <remarks>
+    /// <c>overlapSamples</c> is the resolution of the grid UV overlap is measured on. It is
+    /// the only knob because it is the only cost: overlap is measured by rasterising rather
+    /// than by testing every triangle pair, which on a 60k-triangle asset is the difference
+    /// between seconds and hours. The error is bounded by one cell - 0.2% of the square at
+    /// the default 512.
+    /// </remarks>
+    private static Result<string> NormalizeMeshAnalysis(JsonObject supplied)
+    {
+        var overlapSamples = (int)ReadDouble(supplied, "overlapSamples", 512);
+        if (overlapSamples is not (>= 64 and <= 2048))
+        {
+            return Result.Failure<string>(new Error(
+                "Blender.InvalidParameters",
+                "overlapSamples must be a whole number between 64 and 2048."));
+        }
+
+        return Result.Success(new JsonObject
+        {
+            ["overlapSamples"] = overlapSamples
+        }.ToJsonString());
     }
 
     /// <summary>

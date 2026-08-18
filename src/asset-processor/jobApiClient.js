@@ -650,6 +650,37 @@ export class JobApiClient {
   }
 
   /**
+   * Store an expensive-compute metric under its geometry hash.
+   *
+   * Only for metrics that are a function of the geometry ALONE. The cache is shared by
+   * every asset with the same hash, so a metric that also depends on something the hash
+   * excludes - the UV layout, most of all - would be served to a mesh it was never
+   * measured on.
+   *
+   * @param {string} geometryHash
+   * @param {number} geometryHashVersion
+   * @param {string} metric - "surface-area", "manifold", ...
+   * @param {object} payload
+   */
+  async storeComputeResult(geometryHash, geometryHashVersion, metric, payload) {
+    try {
+      await this.apiClient.put('/compute-cache', {
+        geometryHash,
+        geometryHashVersion,
+        metric,
+        payload,
+      })
+    } catch (error) {
+      logger.error('Failed to store compute result', {
+        geometryHash,
+        metric,
+        error: error.message,
+      })
+      throw error
+    }
+  }
+
+  /**
    * Test API connectivity
    * @returns {Promise<boolean>} True if API is reachable
    */

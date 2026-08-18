@@ -402,3 +402,124 @@ describe('BlenderOperationProcessor - bake-textures', () => {
     )
   })
 })
+
+/**
+ * The analysis. Its whole design question is which of its four numbers may go into a cache
+ * keyed by geometry hash - so that is what these test.
+ */
+describe('BlenderOperationProcessor - mesh-analysis', () => {
+  let processor
+  let blenderEnabledBefore
+
+  const job = {
+    id: 11,
+    assetType: 'Model',
+    assetId: 42,
+    versionId: 7,
+    operation: 'mesh-analysis',
+    parametersJson: JSON.stringify({ overlapSamples: 512 }),
+  }
+
+  const parts = [
+    {
+      object: 'Body',
+      geometryHash: 'dff7e3502d16ec4b',
+      geometryHashVersion: 1,
+      surfaceArea: 12.166688,
+      triangleCount: 224,
+      manifold: { isManifold: false, boundaryEdges: 480, nonManifoldEdges: 0 },
+      uvOverlap: { overlappingFraction: 0, bakeable: true },
+      texelDensity: { uvAreaPerSquareMetre: 0.0145 },
+    },
+  ]
+
+  beforeEach(() => {
+    blenderEnabledBefore = config.blender.enabled
+    config.blender.enabled = true
+
+    processor = new BlenderOperationProcessor()
+    processor.modelFileService = {
+      fetchModelFile: vi.fn().mockResolvedValue({
+        filePath: '/tmp/chair.glb',
+        fileType: 'glb',
+        originalFileName: 'chair.glb',
+      }),
+      cleanupFile: vi.fn().mockResolvedValue(undefined),
+    }
+    processor.jobApi = {
+      finishExtractionJob: vi.fn().mockResolvedValue(undefined),
+      storeComputeResult: vi.fn().mockResolvedValue(undefined),
+    }
+    processor.runBlender = vi.fn().mockResolvedValue({ parts })
+  })
+
+  afterEach(() => {
+    config.blender.enabled = blenderEnabledBefore
+  })
+
+  it('caches only the metrics that depend on geometry alone', async () => {
+    // The cache is shared by every asset with this hash. A UV metric put in it would be
+    // served to a mesh it was never measured on - a model and its re-baked version hash
+    // identically and have entirely different layouts.
+    await processor.process(job)
+
+    const metrics = processor.jobApi.storeComputeResult.mock.calls.map(
+      c => c[2]
+    )
+    expect(metrics).toEqual(['surface-area', 'manifold'])
+    expect(metrics).not.toContain('uv-overlap')
+    expect(metrics).not.toContain('texel-density')
+  })
+
+  it('caches under the hash and hash version the part reported', async () => {
+    await processor.process(job)
+
+    const [hash, hashVersion, metric, payload] =
+      processor.jobApi.storeComputeResult.mock.calls[0]
+    expect(hash).toBe('dff7e3502d16ec4b')
+    expect(hashVersion).toBe(1)
+    expect(metric).toBe('surface-area')
+    expect(payload).toEqual({ surfaceArea: 12.166688, triangleCount: 224 })
+  })
+
+  it('returns the UV metrics on the job, where they are tied to the version measured', async () => {
+    await processor.process(job)
+
+    const [, , success, , , resultJson] =
+      processor.jobApi.finishExtractionJob.mock.calls[0]
+    expect(success).toBe(true)
+
+    const result = JSON.parse(resultJson)
+    expect(result.versionId).toBe(7)
+    expect(result.parts[0].uvOverlap.bakeable).toBe(true)
+    expect(result.parts[0].texelDensity.uvAreaPerSquareMetre).toBe(0.0145)
+    expect(result.cachedMetrics).toEqual({ stored: 2, failed: 0 })
+  })
+
+  it('still reports the measurements when the cache write fails', async () => {
+    // The numbers are already in the job result. Throwing away minutes of Blender to save
+    // a cheap re-computation would be the worse trade.
+    processor.jobApi.storeComputeResult = vi
+      .fn()
+      .mockRejectedValue(new Error('unique violation'))
+
+    await processor.process(job)
+
+    const [, , success, , , resultJson] =
+      processor.jobApi.finishExtractionJob.mock.calls[0]
+    expect(success).toBe(true)
+    const result = JSON.parse(resultJson)
+    expect(result.cachedMetrics).toEqual({ stored: 0, failed: 2 })
+    expect(result.parts[0].surfaceArea).toBe(12.166688)
+  })
+
+  it('skips a mesh that produced no hash rather than caching under an empty key', async () => {
+    processor.runBlender = vi
+      .fn()
+      .mockResolvedValue({ parts: [{ ...parts[0], geometryHash: null }] })
+
+    await processor.process(job)
+
+    expect(processor.jobApi.storeComputeResult).not.toHaveBeenCalled()
+  })
+})

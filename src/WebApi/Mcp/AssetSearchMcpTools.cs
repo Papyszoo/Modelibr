@@ -103,16 +103,49 @@ public sealed class AssetSearchMcpTools
             : result.Value;
     }
 
+    /// <summary>
+    /// Metrics that are NOT a function of the geometry alone, and so can never be answered
+    /// from a geometry-hash-keyed cache.
+    /// </summary>
+    /// <remarks>
+    /// The hash is blind to UVs on purpose - it is what lets every copy of a mesh share one
+    /// answer. A model and its re-baked version therefore hash identically while carrying
+    /// completely different UV layouts, so a cached UV metric would be served to a mesh it
+    /// was never measured on. Saying so beats answering "pending" forever, which is what
+    /// this tool did until 2026-08-18: an answer that never arrives, with no way to tell
+    /// that from one that simply had not been computed yet.
+    /// </remarks>
+    private static readonly Dictionary<string, string> PerLayoutMetrics = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["uv-overlap"] = "UV overlap",
+        ["texel-density"] = "texel density"
+    };
+
     [McpServerTool(Name = "compute_on_demand")]
-    [Description("Return a cached expensive-compute metric (UV overlap, texel density, per-part render, ...) for a geometry hash, " +
-                 "or 'pending' if it has not been computed yet. Results are cached and shared across every asset with the same geometry.")]
+    [Description("Return a cached expensive-compute metric (exact surface area, manifold check, per-part render, ...) for a geometry hash, " +
+                 "or 'pending' if it has not been computed yet. Results are cached and shared across every asset with the same geometry. " +
+                 "Queue the computation with analyze_meshes. UV overlap and texel density are NOT available here - they depend on the UV layout, " +
+                 "which the geometry hash ignores; analyze_meshes returns those on the job itself.")]
     public static async Task<object> ComputeOnDemand(
         IQueryHandler<GetComputeResultQuery, ComputeResultResponse> handler,
         [Description("Order-invariant geometry hash of the target part.")] string geometryHash,
-        [Description("Metric name: uv-overlap | texel-density | surface-area | manifold | part-render.")] string metric,
+        [Description("Metric name: surface-area | manifold | part-render.")] string metric,
         [Description("Geometry hash version (defaults to 1).")] int hashVersion = 1,
         CancellationToken cancellationToken = default)
     {
+        if (PerLayoutMetrics.TryGetValue(metric?.Trim() ?? string.Empty, out var friendly))
+        {
+            return new
+            {
+                status = "unavailable",
+                message = $"{friendly} depends on the UV layout, and this cache is keyed by geometry hash - " +
+                          "which is blind to UVs so that every copy of a mesh can share one answer. A model and its " +
+                          "re-baked version hash identically and have entirely different layouts, so a cached value here " +
+                          "would be wrong for one of them.",
+                instead = "Run analyze_meshes(modelId) and read uvOverlap / texelDensity off the job result, per mesh.",
+            };
+        }
+
         var result = await handler.Handle(
             new GetComputeResultQuery(geometryHash, hashVersion, metric), cancellationToken);
         return result.IsFailure

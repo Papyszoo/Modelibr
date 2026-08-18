@@ -26,7 +26,7 @@ ordinary Modelibr API endpoint - there is no separate search or extraction path:
 | `search_assets`     | Full-text + fuzzy-identifier search with structural filters - triangle/vertex/part counts, size (bounding-box dimension), rig (`hasRig`/bone count), materials, UVs, animations, shape class, engine, asset type, and **category**. Every query word is scored on its own, so a document matching more of them ranks higher, and plurals find their singular. Conceptual queries (`weapon`, `vehicle`, `building`) hit via deterministic concept labels, ranked below assets whose author actually named them that. Tags and descriptions a person assigned are searched too, ranked with authored names rather than with inferred concepts. Leave the query blank to browse by filters alone. Returns one ranked hit **per asset** (current version only), each carrying a short browse summary **and its structural facts** - triangles, size, parts, materials, UVs, rig, animations - so an agent can compare candidates without a follow-up call per hit. A hit always identifies the **whole, placeable asset**; when the query actually matched a mesh inside it, that mesh is reported separately as `matchedPart`, since `place_asset` places the asset and cannot place a part. |
 | `get_asset`         | The derived metadata, part list and `materialSlots` for an asset, plus `suggestedCategories` (deterministic concept-label suggestions the user/agent can confirm-assign). Defaults to the asset's **active** version; pass the `versionId` from a search hit to inspect exactly the version that hit named.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `get_part`          | A single part's detail, addressed by its part-path (e.g. `/Building/Roof`). Takes the same optional `versionId`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| `compute_on_demand` | A cached expensive metric (UV overlap, texel density, surface area, …) keyed by geometry hash, or `pending` if it has not been computed yet.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `compute_on_demand` | A cached expensive metric (exact surface area, manifold check, …) keyed by geometry hash, or `pending` if it has not been computed yet. Queue the computation with `analyze_meshes`. UV overlap and texel density are **not** answerable here - they depend on the UV layout, which the geometry hash ignores.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `list_facets`       | The structural filters `search_assets` accepts and their value ranges (including size, rig, materials, UVs, part counts, and category), so the agent can compose filters without guessing.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `list_materials`    | Browse the material library: **parameter materials** (a colour and a roughness - no UVs needed) and **tiling global materials** (image channels, which do need UVs) in one list, because both attach to a model's material slot. Every hit carries `requiresUvs`, so an agent dressing an asset with a bad or missing unwrap can ask for only what will look right on it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `get_material`      | One parameter material in full - every factor, its render state, its category and tags.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
@@ -53,7 +53,7 @@ and look.
 
 ## What the agent can change (opt-in)
 
-Set `MCP_WRITE_ENABLED=true` in your root `.env` and twenty-nine more tools appear,
+Set `MCP_WRITE_ENABLED=true` in your root `.env` and thirty more tools appear,
 letting an agent curate the library the way you would in the app. They are a thin
 pass-through over the same command handlers the UI uses, so there is one source
 of truth for what a change means:
@@ -67,6 +67,7 @@ of truth for what a change means:
 | `trigger_rederive` | Queue a re-extraction so parts, derived signals and the search index are rebuilt.                                                                                                       |
 | `generate_uvs`     | Unwrap a model with Blender and store the result as a **new, inactive version** - the uploaded file is never touched. Returns a job id; collect it with `get_job_status`.               |
 | `bake_textures`    | Bake a model's own appearance and geometry into texture maps with Blender, imported as a texture set bound to it. Returns a job id; collect it with `get_job_status`.                   |
+| `analyze_meshes`   | Measure a model with Blender - UV overlap, texel density, exact surface area, watertightness. Changes nothing. Returns a job id; collect it with `get_job_status`.                      |
 | `import_model`     | Import a model. Pass a `path` the **server** can read for a co-located import; omit `path` to get an upload ticket plus the HTTP endpoints to stream bytes to when the agent is remote. |
 
 The rest of the library is reachable too, so an agent can build a scene that has
@@ -241,6 +242,42 @@ Two limits worth knowing. Cycles has no metallic bake pass, so a re-layout bake 
 warning and renders a metal surface as non-metal. And `resolution` is capped at 4096: a
 4K bake on heavy geometry can exhaust the asset processor, which shows up as the container
 dying rather than the job failing.
+
+##### Measuring a model before trusting it
+
+`analyze_meshes` runs a geometry pass and changes nothing. It answers four questions no
+bounding box can:
+
+- **UV overlap** - what fraction of the layout sits under another face, and so whether the
+  model can be baked onto at all. Overlapping islands each overwrite the other.
+- **Texel density** - UV area per square metre of real surface, and what that comes to in
+  pixels per metre at 512 / 1024 / 2048 / 4096. Two assets in one scene at very different
+  densities is what reads as "one of these looks cheap".
+- **Surface area** - exact, world-space, with the object's scale applied.
+- **Manifold** - watertight and consistently wound, or how many edges are not.
+
+```
+analyze_meshes(modelId: 812, idempotencyKey: "measure-812-1")
+  -> { status: "queued", jobId: 104 }
+
+get_job_status(jobId: 104, waitSeconds: 120)
+  -> { status: "Done", result: { parts: [ { object: "Body",
+         uvOverlap: { overlappingFraction: 0.0, bakeable: true },
+         texelDensity: { pixelsPerMetre: { "1024": 123.57 } },
+         surfaceArea: 12.166688, manifold: { isManifold: false, boundaryEdges: 480 } } ] } }
+```
+
+**Two of those four are cached and two are not, and the split is not arbitrary.** The
+compute cache is keyed by _geometry hash_ - a hash that deliberately ignores UVs, so that
+every copy of the same mesh shares one answer. Surface area and manifoldness are functions
+of the geometry alone, so they go in it and `compute_on_demand` can answer them for any
+asset with that hash.
+
+UV overlap and texel density are not. A model and the version re-baked from it have
+**identical geometry, identical hashes and completely different UV layouts** - so a cached
+UV metric would be handed to a mesh it was never measured on. Those two come back on the
+job instead, tied to the version actually measured, and `compute_on_demand` says so rather
+than answering `pending` forever.
 
 ### Placement rules stick to the node
 
