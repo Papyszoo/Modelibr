@@ -36,6 +36,7 @@ public static class SceneContractTypeScript
         ["ScenePrimitive.Shape"] = "ScenePrimitiveShape",
         ["SceneNode.FrontAxis"] = "SceneFrontAxis",
         ["SceneDocument.Stage"] = "SceneStage",
+        ["SceneSlot.ResolvedBy"] = "SceneSlotResolver",
     };
 
     public static string Generate()
@@ -69,6 +70,17 @@ public static class SceneContractTypeScript
             SceneStages.All,
             "How far a scene has been taken, in order. Composition first, colour last - and the order is enforced, not advised.",
             "SCENE_STAGES");
+        AppendVocabulary(
+            builder,
+            "SceneSlotStatus",
+            SceneSlotStatuses.All,
+            "Where a decision stands. Derived from the slot's candidates rather than stored beside them, so the two cannot disagree.",
+            "SCENE_SLOT_STATUSES");
+        AppendVocabulary(
+            builder,
+            "SceneSlotResolver",
+            SceneSlotResolvers.All,
+            "Who settled a decision. The guardrail made visible: a scene never loses track of which choices a human actually made.");
         AppendVocabulary(
             builder,
             "SceneAnchorAlignment",

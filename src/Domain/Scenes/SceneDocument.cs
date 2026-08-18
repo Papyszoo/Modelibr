@@ -21,12 +21,18 @@ namespace Domain.Scenes;
 /// judged against it: earlier stages stop treating missing light and missing material as
 /// defects, and no stage stops treating a floating object as one.
 /// </param>
+/// <param name="Slots">
+/// The decisions in this scene that are still the user's to make, each with the candidates
+/// an agent proposed for it. Null on every document written before choices existed, and on
+/// any scene composed without them - a scene where the agent simply placed what it picked.
+/// </param>
 public sealed record SceneDocument(
     int SchemaVersion,
     IReadOnlyList<SceneNode> Nodes,
     IReadOnlyList<SceneLight> Lights,
     SceneEnvironment? Environment = null,
-    string? Stage = null)
+    string? Stage = null,
+    IReadOnlyList<SceneSlot>? Slots = null)
 {
     /// <summary>
     /// The only schema version this build reads or writes.
@@ -57,9 +63,19 @@ public sealed record SceneNode(
     ScenePrimitive? Primitive = null,
     string? Name = null,
     /// <summary>
-    /// Groups this node with the alternatives proposed for the same role ("street lamp,
-    /// third one along"). Written here so 05 can hang a choice UI on the slot model
-    /// without a second schema; unused until then.
+    /// The role this node fills in the scene ("street lamp, third one along"), and the link
+    /// to the <see cref="SceneSlot"/> of the same id that holds the alternatives proposed
+    /// for it.
+    ///
+    /// <b>Corrects the original intent.</b> This field was written expecting one node per
+    /// alternative, grouped by a shared slot id. Choices went the other way: a slot is one
+    /// thing in the world with several proposals for what it should be, so the alternatives
+    /// live in the slot and <b>at most one node carries any given slot id</b> - the node the
+    /// chosen candidate is applied to. Several nodes for one slot would put every rejected
+    /// option in the scene at once.
+    ///
+    /// A node may still carry a slot id with no matching slot: that is a role the agent
+    /// named while placing something and never opened for choice.
     /// </summary>
     string? SlotId = null,
     SceneMaterialBinding? Material = null,
@@ -173,6 +189,191 @@ public sealed record SceneMaterialBinding(
     string? Variant = null,
     int? MaterialId = null,
     string? Slot = null);
+
+/// <summary>
+/// A decision in the scene that the user has not made yet, and the proposals for it.
+///
+/// The point of the whole model: an agent's choice of asset is not a value it writes into
+/// the scene, it is an <b>open question with candidates</b>. A scene built this way records
+/// what was considered and who decided, so a user can overrule a plausible-sounding wrong
+/// answer instead of discovering it in a render.
+///
+/// <see cref="Id"/> is the name the user says out loud - <c>streetlight</c>,
+/// <c>hero-building</c>, <c>road-surface</c> - and it is also the <see cref="SceneNode.SlotId"/>
+/// of the node this slot decides. At most one node carries it.
+/// </summary>
+/// <param name="Brief">
+/// What the agent was looking for ("low-poly, under 3k tris, reads as rundown"). Kept because
+/// it is the only record of the intent the candidates were judged against, and the thing a
+/// user is really rejecting when none of them fit.
+/// </param>
+/// <param name="Candidates">
+/// Every proposal ever made for this slot, <b>including the rejected ones</b>. Rejections are
+/// feedback, not deletions: they are what stops the next round proposing the same asset again,
+/// and what lets the UI grey out what was already ruled out instead of silently re-offering it.
+/// </param>
+/// <param name="ChosenCandidateId">
+/// The candidate whose asset and material the slot's node currently wears, or null while the
+/// slot is still open. Never names a rejected candidate - the validator rejects that document
+/// rather than deciding which of the two statements is true.
+/// </param>
+/// <param name="ResolvedBy">
+/// Who resolved it, from <see cref="SceneSlotResolvers"/>. This is the guardrail made visible:
+/// an agent may auto-resolve a slot when the user asked it to ("just pick sensible ones"), and
+/// the scene must never lose track of which decisions a human actually made.
+/// </param>
+/// <param name="ReopenedReason">
+/// Why the last round was thrown out - the user's "none of these, they are all too modern".
+/// Read back by the agent through <c>get_slots</c>, which is how a rejection becomes a better
+/// next proposal rather than a repeat.
+/// </param>
+public sealed record SceneSlot(
+    string Id,
+    IReadOnlyList<SceneSlotCandidate> Candidates,
+    string? Brief = null,
+    string? ChosenCandidateId = null,
+    string? ResolvedBy = null,
+    string? ReopenedReason = null)
+{
+    /// <summary>
+    /// Where this slot stands, derived rather than stored.
+    ///
+    /// A stored status is a second statement about the same facts, and the two drift: a
+    /// document could say <c>chosen</c> with nothing chosen. The candidates and
+    /// <see cref="ChosenCandidateId"/> are the truth, and this reads them.
+    /// </summary>
+    public string Status =>
+        ChosenCandidateId is not null ? SceneSlotStatuses.Chosen
+        : Candidates.Count > 0 && Candidates.All(c => c.IsRejected) ? SceneSlotStatuses.Rejected
+        : SceneSlotStatuses.Proposed;
+
+    /// <summary>Candidates still on the table - what "choose one of these" actually offers.</summary>
+    public IEnumerable<SceneSlotCandidate> Open => Candidates.Where(c => !c.IsRejected);
+
+    public SceneSlotCandidate? Candidate(string? id) =>
+        id is null ? null : Candidates.FirstOrDefault(c => string.Equals(c.Id, id, StringComparison.Ordinal));
+
+    /// <summary>The candidate the slot's node is currently wearing, if the slot is resolved.</summary>
+    public SceneSlotCandidate? Chosen => Candidate(ChosenCandidateId);
+}
+
+/// <summary>
+/// One proposal for a slot: what to put there, why, and - once someone says so - why not.
+///
+/// <see cref="Id"/> is slot-local and short (<c>A</c>, <c>B</c>, <c>C</c>), so the user
+/// addresses a proposal as <c>streetlight/B</c> and can say it out loud. <b>Ids are never
+/// reused and never renumber.</b> A rejected <c>B</c> stays <c>B</c> for the life of the
+/// scene and the next proposal is <c>D</c> - otherwise "I don't like B" would come to mean a
+/// different asset between two turns of the same conversation.
+/// </summary>
+/// <param name="Asset">The asset proposed, pinned to a version like any other scene reference.</param>
+/// <param name="Material">An optional dressing that comes with the proposal - a slot may be a choice of surface rather than of object.</param>
+/// <param name="Rationale">The agent's one line on why this one. Shown next to the numbers, never instead of them.</param>
+/// <param name="Label">Optional human-readable name for the card, when the asset's own name is not the useful thing to read.</param>
+/// <param name="RejectedReason">
+/// Why this was ruled out. Its presence <b>is</b> the rejection - a separate boolean would be a
+/// second way to say the same thing, and a rejection with no reason teaches the agent nothing.
+/// </param>
+public sealed record SceneSlotCandidate(
+    string Id,
+    SceneAssetRef? Asset = null,
+    SceneMaterialBinding? Material = null,
+    string? Rationale = null,
+    string? Label = null,
+    string? RejectedReason = null)
+{
+    public bool IsRejected => RejectedReason is not null;
+}
+
+/// <summary>Where a slot stands. Derived from the slot, never stored on it.</summary>
+public static class SceneSlotStatuses
+{
+    /// <summary>Open: candidates are on the table and nobody has picked one.</summary>
+    public const string Proposed = "proposed";
+
+    /// <summary>Resolved: one candidate is chosen and its asset is what the node wears.</summary>
+    public const string Chosen = "chosen";
+
+    /// <summary>Every candidate was ruled out and no new ones have been proposed - the agent's turn.</summary>
+    public const string Rejected = "rejected";
+
+    public static readonly IReadOnlyList<string> All = new[] { Proposed, Chosen, Rejected };
+}
+
+/// <summary>
+/// Who resolved a slot.
+///
+/// Two values rather than none, because "the agent proposes, the user decides" is only a real
+/// guarantee while the scene can say which of the two happened.
+/// </summary>
+public static class SceneSlotResolvers
+{
+    /// <summary>A person chose it, in the UI.</summary>
+    public const string User = "user";
+
+    /// <summary>An agent chose it on the user's standing instruction to pick sensible ones.</summary>
+    public const string Agent = "agent";
+
+    public static readonly IReadOnlyList<string> All = new[] { User, Agent };
+
+    public static bool IsResolver(string? value) =>
+        value is not null && All.Contains(value, StringComparer.Ordinal);
+}
+
+/// <summary>
+/// Allocates candidate ids: <c>A</c>, <c>B</c>, … <c>Z</c>, <c>AA</c>, <c>AB</c>, …
+///
+/// A spreadsheet column sequence, because the ids exist to be spoken. The allocation rule is
+/// the important half: the next id is the first in the sequence that <b>no candidate in this
+/// slot has ever held</b>, rejected ones included. Numbering from the count would hand a new
+/// proposal the id of one the user just turned down.
+/// </summary>
+public static class SceneSlotIds
+{
+    /// <summary>How far the sequence may run before a slot is treated as a runaway loop rather than a choice.</summary>
+    public const int MaxCandidates = 64;
+
+    /// <summary>The id at <paramref name="index"/> in the sequence, zero-based: 0 is A, 26 is AA.</summary>
+    public static string At(int index)
+    {
+        if (index < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(index));
+        }
+
+        var id = string.Empty;
+        for (var n = index; ; n = n / 26 - 1)
+        {
+            id = (char)('A' + n % 26) + id;
+            if (n < 26)
+            {
+                return id;
+            }
+        }
+    }
+
+    /// <summary>
+    /// The next <paramref name="count"/> ids no candidate in <paramref name="slot"/> already holds.
+    /// </summary>
+    public static IReadOnlyList<string> Allocate(SceneSlot? slot, int count)
+    {
+        var taken = slot is null
+            ? new HashSet<string>(StringComparer.Ordinal)
+            : slot.Candidates.Select(c => c.Id).ToHashSet(StringComparer.Ordinal);
+
+        var allocated = new List<string>(count);
+        for (var index = 0; allocated.Count < count; index++)
+        {
+            var id = At(index);
+            if (taken.Add(id))
+            {
+                allocated.Add(id);
+            }
+        }
+
+        return allocated;
+    }
+}
 
 public sealed record SceneLight(
     string Id,

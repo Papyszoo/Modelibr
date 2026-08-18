@@ -39,6 +39,26 @@ public sealed class SceneReadMcpTools
             : result.Value;
     }
 
+    [McpServerTool(Name = "get_slots")]
+    [Description("List the decisions in a scene that are the user's to make, with every candidate proposed for each one - " +
+                 "chosen, still open, and rejected. " +
+                 "READ THIS BEFORE PROPOSING ANOTHER ROUND. Rejected candidates carry the reason they were ruled out, and a slot the " +
+                 "user threw out wholesale carries their reason for that too ('none of these, they are all too modern'). " +
+                 "Proposing again without reading them is how an agent re-offers the asset it was just turned down on. " +
+                 "Each candidate reports what the library knows about it - dimensions in metres, part count, materials, quality flags, " +
+                 "and any cameras or lights inside it - so a proposal can be judged on more than its own rationale. " +
+                 "resolvedBy says whether a person or an agent settled each decision.")]
+    public static async Task<object> GetSlots(
+        IQueryHandler<GetSceneSlotsQuery, SceneSlotsView> handler,
+        [Description("Scene id.")] int sceneId,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await handler.Handle(new GetSceneSlotsQuery(sceneId), cancellationToken);
+        return result.IsFailure
+            ? new { error = result.Error.Code, message = result.Error.Message }
+            : result.Value;
+    }
+
     [McpServerTool(Name = "validate_scene")]
     [Description("Check a scene for the mistakes its own numbers cannot show you: things resting on nothing, geometry below the floor, " +
                  "an asset that is a whole sample scene rather than the prop it was placed as, nodes tilted or upside down, " +

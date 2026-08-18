@@ -213,6 +213,71 @@ public static class SceneEndpoints
         .WithName("Set Scene Light")
         .WithSummary("Add, update or remove one light by id");
 
+        app.MapGet("/scenes/{id}/slots", async (
+            int id,
+            IQueryHandler<GetSceneSlotsQuery, SceneSlotsView> handler,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await handler.Handle(new GetSceneSlotsQuery(id), cancellationToken);
+            return result.IsFailure ? NotFoundOrFailure(result.Error) : Results.Ok(result.Value);
+        })
+        .WithName("Get Scene Slots")
+        .WithSummary("The decisions in this scene, their candidates, and what is known about each one");
+
+        app.MapPost("/scenes/{id}/slots/{slotId}/candidates", async (
+            int id,
+            string slotId,
+            ProposeSceneCandidatesRequest request,
+            ICommandHandler<ProposeSceneCandidatesCommand, SceneSlotWriteResponse> handler,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await handler.Handle(
+                new ProposeSceneCandidatesCommand(
+                    id, slotId, request.Candidates ?? [], request.Brief, request.ExpectedRevision),
+                cancellationToken);
+            return result.IsFailure ? NotFoundOrFailure(result.Error) : Results.Ok(result.Value);
+        })
+        .WithName("Propose Scene Candidates")
+        .WithSummary("Offer options for one slot, without deciding it");
+
+        // The UI's choose button. resolvedBy is fixed to "user" here and is not a field on
+        // the request: this endpoint is only ever reached by a person clicking, and letting a
+        // body claim otherwise would make the one attribution the model exists to keep a
+        // caller-supplied string.
+        app.MapPut("/scenes/{id}/slots/{slotId}/choice", async (
+            int id,
+            string slotId,
+            ResolveSceneSlotRequest request,
+            ICommandHandler<ResolveSceneSlotCommand, SceneSlotWriteResponse> handler,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await handler.Handle(
+                new ResolveSceneSlotCommand(
+                    id, slotId, request.CandidateId, SceneSlotResolvers.User,
+                    request.Clear ?? false, request.ExpectedRevision),
+                cancellationToken);
+            return result.IsFailure ? NotFoundOrFailure(result.Error) : Results.Ok(result.Value);
+        })
+        .WithName("Resolve Scene Slot")
+        .WithSummary("Settle a slot on one candidate, or reopen it");
+
+        app.MapPost("/scenes/{id}/slots/{slotId}/rejections", async (
+            int id,
+            string slotId,
+            RejectSceneCandidatesRequest request,
+            ICommandHandler<RejectSceneCandidatesCommand, SceneSlotWriteResponse> handler,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await handler.Handle(
+                new RejectSceneCandidatesCommand(
+                    id, slotId, request.CandidateIds, request.Reason ?? string.Empty,
+                    request.All ?? false, request.ExpectedRevision),
+                cancellationToken);
+            return result.IsFailure ? NotFoundOrFailure(result.Error) : Results.Ok(result.Value);
+        })
+        .WithName("Reject Scene Candidates")
+        .WithSummary("Rule candidates out with a reason, or reject the whole round");
+
         app.MapPost("/scenes/{id}/render", async (
             int id,
             RequestSceneRenderRequest? request,
@@ -352,6 +417,24 @@ public record ApplySceneMaterialRequest(
     int? TextureSetId = null,
     string? Variant = null,
     bool? Clear = null,
+    int? ExpectedRevision = null);
+
+public record ProposeSceneCandidatesRequest(
+    IReadOnlyList<SceneCandidateProposal>? Candidates = null,
+    string? Brief = null,
+    int? ExpectedRevision = null);
+
+/// <summary>Null <c>CandidateId</c> with <c>Clear</c> set reopens the slot.</summary>
+public record ResolveSceneSlotRequest(
+    string? CandidateId = null,
+    bool? Clear = null,
+    int? ExpectedRevision = null);
+
+/// <summary><c>All</c> is the user's "none of these": every candidate still standing is ruled out and the slot reopens.</summary>
+public record RejectSceneCandidatesRequest(
+    string? Reason = null,
+    IReadOnlyList<string>? CandidateIds = null,
+    bool? All = null,
     int? ExpectedRevision = null);
 
 public record SetSceneLightRequest(

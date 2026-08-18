@@ -29,6 +29,13 @@ public static class SceneDocumentValidator
 
     public const int MaxLights = 200;
 
+    /// <summary>
+    /// Ceiling on open decisions in one scene. The same "something has gone wrong" limit the
+    /// node cap is: a scene with a thousand unresolved choices is not a scene a person is
+    /// going to work through, it is an agent looping.
+    /// </summary>
+    public const int MaxSlots = 200;
+
     /// <summary>Longest accepted node/slot/light id.</summary>
     public const int MaxIdLength = 128;
 
@@ -67,6 +74,7 @@ public static class SceneDocumentValidator
 
         ValidateStage(document, issues);
         ValidateNodes(document, issues);
+        ValidateSlots(document, issues);
         ValidateLights(document, issues);
         ValidateEnvironment(document, issues);
 
@@ -105,6 +113,11 @@ public static class SceneDocumentValidator
 
         var seenIds = new HashSet<string>(StringComparer.Ordinal);
 
+        // A slot is one thing in the world with several proposals for what it should be, so
+        // two nodes claiming the same slot would put two of the alternatives on stage at once
+        // and leave "apply the chosen candidate" with no single node to apply it to.
+        var seenSlotIds = new HashSet<string>(StringComparer.Ordinal);
+
         for (var i = 0; i < document.Nodes.Count; i++)
         {
             var node = document.Nodes[i];
@@ -129,6 +142,14 @@ public static class SceneDocumentValidator
             if (node.SlotId is not null)
             {
                 ValidateId(node.SlotId, $"{path}.slotId", "Slot", issues);
+
+                if (!string.IsNullOrWhiteSpace(node.SlotId) && !seenSlotIds.Add(node.SlotId))
+                {
+                    issues.Add(new SceneValidationIssue(
+                        $"{path}.slotId",
+                        "DuplicateSlotNode",
+                        $"Slot '{node.SlotId}' is filled by more than one node. A slot is one place in the scene; its alternatives belong in the slot's candidates, not in extra nodes."));
+                }
             }
 
             var hasAsset = node.Asset is not null;
@@ -208,6 +229,178 @@ public static class SceneDocumentValidator
         }
 
         ValidateAnchorGraph(document.Nodes, issues);
+    }
+
+    /// <summary>
+    /// The open decisions and their proposals.
+    ///
+    /// The rule worth naming is the last one: a slot may not claim a chosen candidate that was
+    /// rejected. Those are two contradictory statements about the same proposal, and a
+    /// validator that picked a winner would silently decide something only the user can.
+    /// </summary>
+    private static void ValidateSlots(SceneDocument document, List<SceneValidationIssue> issues)
+    {
+        if (document.Slots is not { Count: > 0 } slots)
+        {
+            return;
+        }
+
+        if (slots.Count > MaxSlots)
+        {
+            issues.Add(new SceneValidationIssue(
+                "slots", "TooManySlots", $"A scene may hold at most {MaxSlots} slots; this document has {slots.Count}."));
+        }
+
+        var seenSlots = new HashSet<string>(StringComparer.Ordinal);
+        var nodeSlots = document.Nodes is null
+            ? new HashSet<string>(StringComparer.Ordinal)
+            : document.Nodes
+                .Where(n => !string.IsNullOrWhiteSpace(n?.SlotId))
+                .Select(n => n!.SlotId!)
+                .ToHashSet(StringComparer.Ordinal);
+
+        for (var i = 0; i < slots.Count; i++)
+        {
+            var slot = slots[i];
+            var path = $"slots[{i}]";
+
+            if (slot is null)
+            {
+                issues.Add(new SceneValidationIssue(path, "SlotMissing", "A slot entry is null."));
+                continue;
+            }
+
+            ValidateId(slot.Id, $"{path}.id", "Slot", issues);
+
+            if (!string.IsNullOrEmpty(slot.Id) && !seenSlots.Add(slot.Id))
+            {
+                issues.Add(new SceneValidationIssue(
+                    $"{path}.id",
+                    "DuplicateSlotId",
+                    $"Slot id '{slot.Id}' is used more than once. The id is how a user names a decision out loud, so two slots cannot share one."));
+            }
+
+            // A slot with no node decides nothing: choosing a candidate would have nowhere to
+            // apply it. Reported rather than repaired, because inventing a node means inventing
+            // a transform, and a scene is not the place to guess where something goes.
+            if (!string.IsNullOrEmpty(slot.Id) && !nodeSlots.Contains(slot.Id))
+            {
+                issues.Add(new SceneValidationIssue(
+                    $"{path}.id",
+                    "SlotNodeMissing",
+                    $"Slot '{slot.Id}' has no node carrying that slotId. Place the node first, then propose candidates for it - a choice with nowhere to land cannot be applied."));
+            }
+
+            ValidateSlotCandidates(slot, path, issues);
+        }
+    }
+
+    private static void ValidateSlotCandidates(SceneSlot slot, string path, List<SceneValidationIssue> issues)
+    {
+        if (slot.Candidates is null)
+        {
+            issues.Add(new SceneValidationIssue(
+                $"{path}.candidates", "SlotCandidatesMissing", "A slot's 'candidates' array is required (use [] for a slot nobody has proposed for yet)."));
+            return;
+        }
+
+        if (slot.Candidates.Count > SceneSlotIds.MaxCandidates)
+        {
+            issues.Add(new SceneValidationIssue(
+                $"{path}.candidates",
+                "TooManyCandidates",
+                $"A slot may hold at most {SceneSlotIds.MaxCandidates} candidates, rejected ones included; this one has {slot.Candidates.Count}."));
+        }
+
+        var seenCandidates = new HashSet<string>(StringComparer.Ordinal);
+
+        for (var c = 0; c < slot.Candidates.Count; c++)
+        {
+            var candidate = slot.Candidates[c];
+            var candidatePath = $"{path}.candidates[{c}]";
+
+            if (candidate is null)
+            {
+                issues.Add(new SceneValidationIssue(candidatePath, "CandidateMissing", "A candidate entry is null."));
+                continue;
+            }
+
+            ValidateId(candidate.Id, $"{candidatePath}.id", "Candidate", issues);
+
+            if (!string.IsNullOrEmpty(candidate.Id) && !seenCandidates.Add(candidate.Id))
+            {
+                issues.Add(new SceneValidationIssue(
+                    $"{candidatePath}.id",
+                    "DuplicateCandidateId",
+                    $"Candidate id '{candidate.Id}' appears twice in slot '{slot.Id}'. The user picks by this name, so it has to mean one proposal."));
+            }
+
+            if (candidate.Asset is null && candidate.Material is null)
+            {
+                issues.Add(new SceneValidationIssue(
+                    candidatePath,
+                    "EmptyCandidate",
+                    $"Candidate '{candidate.Id}' proposes nothing. Give it an asset, a material, or both - there is no third thing a slot can be filled with."));
+            }
+
+            if (candidate.Asset is { } asset)
+            {
+                ValidateAssetRef(asset, $"{candidatePath}.asset", issues);
+            }
+
+            if (candidate.Material is { } material)
+            {
+                ValidateMaterialBinding(material, $"{candidatePath}.material", requireSlot: false, issues);
+            }
+        }
+
+        if (slot.ChosenCandidateId is { } chosenId)
+        {
+            var chosen = slot.Candidate(chosenId);
+
+            if (chosen is null)
+            {
+                issues.Add(new SceneValidationIssue(
+                    $"{path}.chosenCandidateId",
+                    "ChosenCandidateNotFound",
+                    $"Slot '{slot.Id}' names '{chosenId}' as chosen, but no candidate has that id."));
+            }
+            else if (chosen.IsRejected)
+            {
+                issues.Add(new SceneValidationIssue(
+                    $"{path}.chosenCandidateId",
+                    "ChosenCandidateRejected",
+                    $"Slot '{slot.Id}' has '{chosenId}' both chosen and rejected. Clear the choice or the rejection - which one stands is the user's call, not this validator's."));
+            }
+        }
+
+        if (slot.ResolvedBy is { } resolvedBy)
+        {
+            if (!SceneSlotResolvers.IsResolver(resolvedBy))
+            {
+                issues.Add(new SceneValidationIssue(
+                    $"{path}.resolvedBy",
+                    "UnknownSlotResolver",
+                    $"'{resolvedBy}' is not a slot resolver. Use one of: {string.Join(", ", SceneSlotResolvers.All)}."));
+            }
+
+            // Who decided, on a slot where nothing was decided. Left in place this is how a
+            // scene ends up claiming a human approved something no human ever saw.
+            if (slot.ChosenCandidateId is null)
+            {
+                issues.Add(new SceneValidationIssue(
+                    $"{path}.resolvedBy",
+                    "ResolverWithoutChoice",
+                    $"Slot '{slot.Id}' records who resolved it but has no chosen candidate. Attribution without a decision claims something happened that did not."));
+            }
+        }
+        else if (slot.ChosenCandidateId is not null)
+        {
+            issues.Add(new SceneValidationIssue(
+                $"{path}.resolvedBy",
+                "ChoiceWithoutResolver",
+                $"Slot '{slot.Id}' has a chosen candidate but does not say who chose it. Whether a person or an agent made a decision is the one thing this model exists to keep."));
+        }
     }
 
     private static void ValidateMaterialBinding(

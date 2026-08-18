@@ -105,6 +105,7 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
     private readonly ICommandHandler<UpdateSceneDocumentCommand, SceneView> _updateSceneDocument;
     private readonly ICommandHandler<SetSceneStageCommand, SceneStageResponse> _setSceneStage;
     private readonly ICommandHandler<DeleteSceneCommand> _deleteScene;
+    private readonly ICommandHandler<RestoreSceneSlotCommand, SceneSummary> _restoreSceneSlot;
 
     public AgentOperationReverser(
         IAgentAudit audit,
@@ -127,7 +128,8 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
         ICommandHandler<ApplySceneMaterialCommand, SceneMaterialResponse> applySceneMaterial,
         ICommandHandler<UpdateSceneDocumentCommand, SceneView> updateSceneDocument,
         ICommandHandler<SetSceneStageCommand, SceneStageResponse> setSceneStage,
-        ICommandHandler<DeleteSceneCommand> deleteScene)
+        ICommandHandler<DeleteSceneCommand> deleteScene,
+        ICommandHandler<RestoreSceneSlotCommand, SceneSummary> restoreSceneSlot)
     {
         _audit = audit;
         _updateTags = updateTags;
@@ -150,6 +152,7 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
         _updateSceneDocument = updateSceneDocument;
         _setSceneStage = setSceneStage;
         _deleteScene = deleteScene;
+        _restoreSceneSlot = restoreSceneSlot;
     }
 
     public async Task<Result<ReversalPlan>> PlanAsync(
@@ -330,6 +333,20 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
         "set-scene-stage" => Step(entry, $"Put scene {entry.AssetId} back to the stage it declared before.", destructive: false,
             supported: entry.PayloadBefore is not null,
             blocker: "The scene's previous stage was not recorded."),
+
+        // All three slot writes share one inverse - the slot as it stood, and what its node
+        // was wearing - so they share one description shape too.
+        "propose-candidates" => Step(entry, $"Take back the candidates this call proposed in scene {entry.AssetId}.", destructive: false,
+            supported: entry.PayloadBefore is not null,
+            blocker: "The slot's previous state was not recorded."),
+
+        "resolve-slot" => Step(entry, $"Put the slot in scene {entry.AssetId} back to the choice it held before, and its node back to what it was wearing.", destructive: false,
+            supported: entry.PayloadBefore is not null,
+            blocker: "The slot's previous state was not recorded."),
+
+        "reject-candidates" => Step(entry, $"Withdraw the rejections this call recorded in scene {entry.AssetId}.", destructive: false,
+            supported: entry.PayloadBefore is not null,
+            blocker: "The slot's previous state was not recorded."),
 
         "create-scene" => Step(entry, $"Delete scene {entry.AssetId}.", destructive: true,
             supported: entry.AssetId is > 0,
@@ -704,12 +721,18 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
                     return Result.Failure<string>(new Error("NoPriorState", "The removed node was not recorded."));
                 }
 
+                // Null unless the node was the subject of an open decision, which the
+                // removal took with it.
+                var slot = ReadPayload<SceneSlot>(before!.Value, "restoredSlot");
+
                 var result = await _restoreSceneNode.Handle(
-                    new RestoreSceneNodeCommand(entry.AssetId!.Value, node), cancellationToken);
+                    new RestoreSceneNodeCommand(entry.AssetId!.Value, node, slot), cancellationToken);
 
                 return result.IsFailure
                     ? Result.Failure<string>(result.Error)
-                    : Result.Success($"Restored node '{node.Id}' to scene {entry.AssetId}.");
+                    : Result.Success(slot is null
+                        ? $"Restored node '{node.Id}' to scene {entry.AssetId}."
+                        : $"Restored node '{node.Id}' and the '{slot.Id}' decision to scene {entry.AssetId}.");
             }
 
             case "set-light":
@@ -815,6 +838,34 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
                     : Result.Success(previous is null
                         ? $"Scene {entry.AssetId} is no longer being authored in stages, as it was before."
                         : $"Put scene {entry.AssetId} back to the '{previous}' stage.");
+            }
+
+            case "propose-candidates":
+            case "resolve-slot":
+            case "reject-candidates":
+            {
+                var before = Read(entry.PayloadBefore);
+                var slotId = before is null ? null : ReadString(before.Value, "slotId");
+                if (slotId is null)
+                {
+                    return Result.Failure<string>(new Error("NoPriorState", "The slot's previous state was not recorded."));
+                }
+
+                // A recorded null slot means the write created it, and the inverse of creating
+                // it is removing it - the same "null means null" rule the light, material and
+                // stage inverses follow. Restoring an empty slot instead would leave the scene
+                // claiming a decision nobody ever opened.
+                var slot = ReadPayload<SceneSlot>(before.Value, "slot");
+                var node = ReadPayload<SceneSlotNodeState>(before.Value, "node");
+
+                var result = await _restoreSceneSlot.Handle(
+                    new RestoreSceneSlotCommand(entry.AssetId!.Value, slotId, slot, node), cancellationToken);
+
+                return result.IsFailure
+                    ? Result.Failure<string>(result.Error)
+                    : Result.Success(slot is null
+                        ? $"Removed slot '{slotId}' from scene {entry.AssetId}, which is how it was before."
+                        : $"Restored slot '{slotId}' in scene {entry.AssetId} to its previous state.");
             }
 
             case "create-scene":

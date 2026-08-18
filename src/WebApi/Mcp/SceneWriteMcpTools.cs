@@ -313,10 +313,18 @@ public sealed class SceneWriteMcpTools
                 return result.IsFailure
                     ? Failed(result.Error)
                     : Applied(
-                        new { status = "ok", scene = result.Value.Scene, removedNode = result.Value.RemovedNode },
+                        new
+                        {
+                            status = "ok",
+                            scene = result.Value.Scene,
+                            removedNode = result.Value.RemovedNode,
+                            removedSlot = result.Value.RemovedSlot,
+                        },
                         "Scene", sceneId, result.Value,
                         // The node itself, not its id: nothing else records what was there.
-                        new { restoredNode = result.Value.RemovedNode });
+                        // The slot goes with it, so the inverse has to carry both or undo
+                        // puts the lamp back and loses the open question about it.
+                        new { restoredNode = result.Value.RemovedNode, restoredSlot = result.Value.RemovedSlot });
             },
             cancellationToken);
     }
@@ -470,6 +478,165 @@ public sealed class SceneWriteMcpTools
             },
             cancellationToken);
     }
+
+    /// <summary>One proposal for a slot, as an agent states it.</summary>
+    public sealed record SlotCandidateProposal(
+        [property: Description("Asset family: Model, Sprite or EnvironmentMap. Omit for a candidate that only proposes a surface.")] string? AssetType = null,
+        [property: Description("Asset id.")] int? AssetId = null,
+        [property: Description("Version id. REQUIRED for Model - a candidate without one would re-point itself when the model gets a new version.")] int? VersionId = null,
+        [property: Description("One line on why this one. Say what about it fits the brief; the user reads it next to the measurements.")] string? Rationale = null,
+        [property: Description("Optional card label, when the asset's own name is not the useful thing to read.")] string? Label = null,
+        [property: Description("Optional texture set to dress it with.")] int? TextureSetId = null,
+        [property: Description("Optional material to dress it with. A material and a texture set are two ways to say the same thing - pass one.")] int? MaterialId = null,
+        [property: Description("Optional texture-set variant.")] string? Variant = null);
+
+    [McpServerTool(Name = "propose_candidates")]
+    [Description("Offer the user 2-4 options for one decision in a scene, instead of silently picking one. " +
+                 "USE THIS FOR EVERY MEANINGFUL CHOICE - which building is the hero, what the road surface is, which of six sofas. " +
+                 "The user previews the options and picks; you do not decide unless they told you to. " +
+                 "The slot's node must exist first: place_asset takes a slotId, and this proposes what else that node could be. " +
+                 "The asset already standing there becomes the first candidate automatically, so nothing in the scene is an unlisted default. " +
+                 "Candidate ids are assigned here (A, B, C...) and never reused - a rejected B stays B and the next proposal is D, " +
+                 "so 'streetlight B is too modern' means one thing for the life of the scene. " +
+                 "Call get_slots first when re-proposing: it carries the reasons the last round was turned down. " +
+                 "Give every candidate a rationale - the user sees it beside the asset's real dimensions and part count.")]
+    public static Task<object> ProposeCandidates(
+        ICommandHandler<ProposeSceneCandidatesCommand, SceneSlotWriteResponse> handler,
+        IAgentAudit audit,
+        McpCallerContext caller,
+        [Description("Target scene id.")] int sceneId,
+        [Description("The slot to propose for - the slotId a node in the scene already carries, e.g. 'streetlight'.")] string slotId,
+        [Description("The options. Two to four is the useful range: one is a decision you already made, and ten is a list nobody reads.")] SlotCandidateProposal[] candidates,
+        [Description("Unique key so a retried call does not propose the same round twice.")] string idempotencyKey,
+        [Description("What you were looking for, e.g. 'low-poly, under 3k tris, reads as rundown'. This is what the user is really rejecting when none of them fit - say it once and it sticks for later rounds.")] string? brief = null,
+        [Description("Optional expected scene revision; the write is refused if the scene has moved on.")] int? expectedRevision = null,
+        [Description("Optional batch id. Writes sharing one can be undone together with reverse_operation.")] string? batchId = null,
+        CancellationToken cancellationToken = default)
+    {
+        return Guarded(
+            audit,
+            caller,
+            new AgentWrite(idempotencyKey, "propose-candidates", "Scene", sceneId, BatchId: batchId),
+            async ct =>
+            {
+                var result = await handler.Handle(
+                    new ProposeSceneCandidatesCommand(
+                        sceneId,
+                        slotId,
+                        (candidates ?? []).Select(c => new SceneCandidateProposal(
+                            c.AssetType, c.AssetId, c.VersionId, c.Rationale, c.Label,
+                            c.TextureSetId, c.MaterialId, c.Variant)).ToList(),
+                        brief,
+                        expectedRevision),
+                    ct);
+
+                return result.IsFailure
+                    ? Failed(result.Error)
+                    : Applied(
+                        new { status = "ok", scene = result.Value.Scene, slot = result.Value.Slot },
+                        "Scene", sceneId, result.Value,
+                        SlotBefore(slotId, result.Value));
+            },
+            cancellationToken);
+    }
+
+    [McpServerTool(Name = "resolve_slot")]
+    [Description("Settle a slot on one candidate and apply it to the slot's node. " +
+                 "ONLY DO THIS WHEN THE USER ASKED YOU TO PICK ('just choose sensible ones'). Otherwise propose and stop - " +
+                 "the decision is theirs, and the scene records which of you made each one. " +
+                 "A rejected candidate cannot be chosen: propose it afresh if it should be back on the table. " +
+                 "Pass clear=true to reopen a slot; the node keeps wearing whatever it wears, because reopening a question " +
+                 "is not the same as withdrawing the answer the user can currently see.")]
+    public static Task<object> ResolveSlot(
+        ICommandHandler<ResolveSceneSlotCommand, SceneSlotWriteResponse> handler,
+        IAgentAudit audit,
+        McpCallerContext caller,
+        [Description("Target scene id.")] int sceneId,
+        [Description("The slot to settle.")] string slotId,
+        [Description("Unique key so a retried call does not apply twice.")] string idempotencyKey,
+        [Description("The candidate id to choose, e.g. 'B'. Omit only with clear=true.")] string? candidateId = null,
+        [Description("Reopen the slot instead of choosing.")] bool clear = false,
+        [Description("Optional expected scene revision; the write is refused if the scene has moved on.")] int? expectedRevision = null,
+        [Description("Optional batch id. Writes sharing one can be undone together with reverse_operation.")] string? batchId = null,
+        CancellationToken cancellationToken = default)
+    {
+        return Guarded(
+            audit,
+            caller,
+            new AgentWrite(idempotencyKey, "resolve-slot", "Scene", sceneId, BatchId: batchId),
+            async ct =>
+            {
+                // Always recorded as the agent. A tool call is an agent choosing, whatever it
+                // was told to do - the UI's own endpoint is the only thing that records a user,
+                // which is what keeps "who decided this" answerable rather than claimed.
+                var result = await handler.Handle(
+                    new ResolveSceneSlotCommand(
+                        sceneId, slotId, candidateId, SceneSlotResolvers.Agent, clear, expectedRevision),
+                    ct);
+
+                return result.IsFailure
+                    ? Failed(result.Error)
+                    : Applied(
+                        new { status = "ok", scene = result.Value.Scene, slot = result.Value.Slot },
+                        "Scene", sceneId, result.Value,
+                        SlotBefore(slotId, result.Value));
+            },
+            cancellationToken);
+    }
+
+    [McpServerTool(Name = "reject_candidates")]
+    [Description("Rule candidates out, with the reason - relaying the user's 'not that one, too modern'. " +
+                 "Pass all=true for 'none of these': every option still standing is ruled out and the slot reopens for a fresh round. " +
+                 "Rejections are feedback, not deletions. They stay on the slot with their reasons, which is what stops the next round " +
+                 "re-offering what was just turned down - read them back with get_slots before proposing again.")]
+    public static Task<object> RejectCandidates(
+        ICommandHandler<RejectSceneCandidatesCommand, SceneSlotWriteResponse> handler,
+        IAgentAudit audit,
+        McpCallerContext caller,
+        [Description("Target scene id.")] int sceneId,
+        [Description("The slot the candidates belong to.")] string slotId,
+        [Description("Why they were ruled out. Required - a rejection with no reason teaches the next round nothing.")] string reason,
+        [Description("Unique key so a retried call does not apply twice.")] string idempotencyKey,
+        [Description("Candidate ids to reject, e.g. ['B','C']. Omit with all=true.")] string[]? candidateIds = null,
+        [Description("Reject every candidate still standing - the user's 'none of these'.")] bool all = false,
+        [Description("Optional expected scene revision; the write is refused if the scene has moved on.")] int? expectedRevision = null,
+        [Description("Optional batch id. Writes sharing one can be undone together with reverse_operation.")] string? batchId = null,
+        CancellationToken cancellationToken = default)
+    {
+        return Guarded(
+            audit,
+            caller,
+            new AgentWrite(idempotencyKey, "reject-candidates", "Scene", sceneId, BatchId: batchId),
+            async ct =>
+            {
+                var result = await handler.Handle(
+                    new RejectSceneCandidatesCommand(
+                        sceneId, slotId, candidateIds?.ToList(), reason, all, expectedRevision),
+                    ct);
+
+                return result.IsFailure
+                    ? Failed(result.Error)
+                    : Applied(
+                        new { status = "ok", scene = result.Value.Scene, slot = result.Value.Slot },
+                        "Scene", sceneId, result.Value,
+                        SlotBefore(slotId, result.Value));
+            },
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// The inverse of any slot write: the slot as it stood, plus what its node was wearing.
+    ///
+    /// One shape for all three, because all three amount to replacing one slot. The node half
+    /// is only filled in by <c>resolve_slot</c> - the other two never touch what is on stage -
+    /// and a null slot means the write created it, which the restore reads as "remove it again".
+    /// </summary>
+    private static object SlotBefore(string slotId, SceneSlotWriteResponse response) => new
+    {
+        slotId,
+        slot = response.Previous.Slot,
+        node = response.Previous.Node,
+    };
 
     [McpServerTool(Name = "update_scene_document")]
     [Description("Replace a scene's whole document. Use for bulk edits an agent would otherwise make one call at a time. " +
