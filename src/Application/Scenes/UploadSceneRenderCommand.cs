@@ -21,6 +21,7 @@ internal class UploadSceneRenderCommandHandler : ICommandHandler<UploadSceneRend
 {
     private readonly IThumbnailJobRepository _jobRepository;
     private readonly ISceneRenderRepository _renderRepository;
+    private readonly ISceneRepository _sceneRepository;
     private readonly IFileStorage _fileStorage;
     private readonly IUploadPathProvider _pathProvider;
     private readonly IDateTimeProvider _dateTimeProvider;
@@ -29,6 +30,7 @@ internal class UploadSceneRenderCommandHandler : ICommandHandler<UploadSceneRend
     public UploadSceneRenderCommandHandler(
         IThumbnailJobRepository jobRepository,
         ISceneRenderRepository renderRepository,
+        ISceneRepository sceneRepository,
         IFileStorage fileStorage,
         IUploadPathProvider pathProvider,
         IDateTimeProvider dateTimeProvider,
@@ -36,6 +38,7 @@ internal class UploadSceneRenderCommandHandler : ICommandHandler<UploadSceneRend
     {
         _jobRepository = jobRepository;
         _renderRepository = renderRepository;
+        _sceneRepository = sceneRepository;
         _fileStorage = fileStorage;
         _pathProvider = pathProvider;
         _dateTimeProvider = dateTimeProvider;
@@ -76,6 +79,11 @@ internal class UploadSceneRenderCommandHandler : ICommandHandler<UploadSceneRend
             var storedFileResult = await _fileStorage.SaveAsync(command.RenderFile, FileType.Texture, cancellationToken);
             var fullPath = Path.Combine(_pathProvider.UploadRootPath, storedFileResult.RelativePath);
 
+            // The scene as it stands now that the picture is in. Together with the revision
+            // the job recorded when it was queued this answers "is this a picture of the
+            // scene I asked about" - the question a render used to leave open.
+            var scene = await _sceneRepository.GetByIdAsync(job.SceneId.Value, cancellationToken);
+
             var render = SceneRender.Create(
                 job.SceneId.Value,
                 job.Id,
@@ -87,7 +95,9 @@ internal class UploadSceneRenderCommandHandler : ICommandHandler<UploadSceneRend
                 command.NodesLoaded,
                 command.NodesFailed,
                 command.TimedOut,
-                _dateTimeProvider.UtcNow);
+                _dateTimeProvider.UtcNow,
+                job.SceneRevision,
+                scene?.Revision);
 
             await _renderRepository.AddAsync(render, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);

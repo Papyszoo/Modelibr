@@ -54,6 +54,19 @@ public class ThumbnailJob
     public string? SceneViewpoint { get; private set; }
 
     /// <summary>
+    /// The scene's revision when this render was asked for. Null for every other asset type.
+    /// </summary>
+    /// <remarks>
+    /// Not a pin - the worker still photographs the scene as it finds it, which is the whole
+    /// point of a scene render. This is the other half of the answer: recorded here and
+    /// compared against the revision at upload, it lets the render say whether the picture
+    /// is of the scene the caller asked about. Without it a queued or retried render could
+    /// return an image of a scene that had moved on, and an agent would read it as
+    /// confirmation of the edit it just made.
+    /// </remarks>
+    public int? SceneRevision { get; private set; }
+
+    /// <summary>
     /// Type of asset this job is for: "Model", "Sound", "TextureSet", "EnvironmentMap"
     /// or "Scene".
     /// </summary>
@@ -230,12 +243,14 @@ public class ThumbnailJob
     /// the same scene id minutes apart are two different answers, and an agent asking again
     /// after an edit is asking a new question.
     /// </summary>
-    public static ThumbnailJob CreateForScene(int sceneId, string viewpoint, DateTime createdAt, int maxAttempts = 3, int lockTimeoutMinutes = 10)
+    public static ThumbnailJob CreateForScene(int sceneId, string viewpoint, DateTime createdAt, int maxAttempts = 3, int lockTimeoutMinutes = 10, int? sceneRevision = null)
     {
         if (sceneId <= 0)
             throw new ArgumentException("Scene ID must be a positive integer.", nameof(sceneId));
         if (string.IsNullOrWhiteSpace(viewpoint))
             throw new ArgumentException("Scene viewpoint cannot be null or whitespace.", nameof(viewpoint));
+        if (sceneRevision is <= 0)
+            throw new ArgumentException("Scene revision must be a positive integer when provided.", nameof(sceneRevision));
         ValidateMaxAttempts(maxAttempts);
         ValidateLockTimeoutMinutes(lockTimeoutMinutes);
 
@@ -244,6 +259,7 @@ public class ThumbnailJob
             AssetType = "Scene",
             SceneId = sceneId,
             SceneViewpoint = viewpoint.Trim(),
+            SceneRevision = sceneRevision,
             Status = ThumbnailJobStatus.Pending,
             MaxAttempts = maxAttempts,
             LockTimeoutMinutes = lockTimeoutMinutes,

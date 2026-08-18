@@ -217,11 +217,12 @@ public class ThumbnailQueue : IThumbnailQueue
         string viewpoint,
         int maxAttempts = 3,
         int lockTimeoutMinutes = 10,
+        int? sceneRevision = null,
         CancellationToken cancellationToken = default)
     {
         // No existing-job lookup on purpose - see IThumbnailQueue. Every request for a
         // scene render is its own question, so it gets its own job and its own picture.
-        var job = ThumbnailJob.CreateForScene(sceneId, viewpoint, DateTime.UtcNow, maxAttempts, lockTimeoutMinutes);
+        var job = ThumbnailJob.CreateForScene(sceneId, viewpoint, DateTime.UtcNow, maxAttempts, lockTimeoutMinutes, sceneRevision);
         var createdJob = await _thumbnailJobRepository.AddAsync(job, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         await _queueNotificationService.NotifyJobEnqueuedAsync(createdJob, cancellationToken);

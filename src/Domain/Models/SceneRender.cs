@@ -53,6 +53,24 @@ public class SceneRender
     /// </summary>
     public bool TimedOut { get; private set; }
 
+    /// <summary>The scene's revision when this render was asked for.</summary>
+    public int? RequestedRevision { get; private set; }
+
+    /// <summary>The scene's revision when the picture came back.</summary>
+    /// <remarks>
+    /// The pair is what makes a render verifiable. Equal, and the image shows the scene the
+    /// caller asked about. Different, and the scene was edited while the render was queued
+    /// or retried - the picture is of something else, and an agent reading it as
+    /// confirmation of its own last write would be confirming a scene it never built.
+    /// Reported rather than prevented: re-rendering a scene that has moved is normal, and
+    /// refusing the upload would throw away a picture that took real time to draw.
+    /// </remarks>
+    public int? RenderedRevision { get; private set; }
+
+    /// <summary>Whether the scene changed between the request and the finished picture.</summary>
+    public bool SceneChangedDuringRender =>
+        RequestedRevision is not null && RenderedRevision is not null && RequestedRevision != RenderedRevision;
+
     public DateTime CreatedAt { get; private set; }
 
     // Navigation
@@ -69,7 +87,9 @@ public class SceneRender
         int nodesLoaded,
         int nodesFailed,
         bool timedOut,
-        DateTime createdAt)
+        DateTime createdAt,
+        int? requestedRevision = null,
+        int? renderedRevision = null)
     {
         if (sceneId <= 0)
             throw new ArgumentException("Scene ID must be a positive integer.", nameof(sceneId));
@@ -92,6 +112,8 @@ public class SceneRender
             NodesLoaded = nodesLoaded,
             NodesFailed = nodesFailed,
             TimedOut = timedOut,
+            RequestedRevision = requestedRevision,
+            RenderedRevision = renderedRevision,
             CreatedAt = createdAt
         };
     }

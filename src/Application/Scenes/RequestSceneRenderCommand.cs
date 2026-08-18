@@ -51,10 +51,13 @@ internal class RequestSceneRenderCommandHandler : ICommandHandler<RequestSceneRe
                 "Scene.NotFound", $"Scene with ID {command.SceneId} was not found."));
         }
 
+        // Recorded now, not resolved now: the worker still photographs the scene as it finds
+        // it. Carrying the revision the caller asked about is what lets the finished render
+        // say whether that is still the scene in the picture.
         var job = await _thumbnailQueue.EnqueueSceneRenderAsync(
-            command.SceneId, viewpoint, cancellationToken: cancellationToken);
+            command.SceneId, viewpoint, sceneRevision: scene.Revision, cancellationToken: cancellationToken);
 
-        return Result.Success(new RequestSceneRenderResponse(job.Id, command.SceneId, viewpoint));
+        return Result.Success(new RequestSceneRenderResponse(job.Id, command.SceneId, viewpoint, scene.Revision));
     }
 }
 
@@ -65,4 +68,5 @@ public record RequestSceneRenderCommand(int SceneId, string? Viewpoint = null)
 /// <paramref name="RenderId"/> is the queue job's id. It is what a caller polls with when
 /// the render outlives its patience.
 /// </summary>
-public record RequestSceneRenderResponse(int RenderId, int SceneId, string Viewpoint);
+/// <param name="RequestedRevision">The scene's revision when the render was asked for.</param>
+public record RequestSceneRenderResponse(int RenderId, int SceneId, string Viewpoint, int RequestedRevision);

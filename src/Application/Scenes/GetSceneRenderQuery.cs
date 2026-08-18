@@ -42,7 +42,10 @@ internal class GetSceneRenderQueryHandler : IQueryHandler<GetSceneRenderQuery, S
                 render.NodesFailed,
                 render.TimedOut,
                 render.CreatedAt,
-                ErrorMessage: null));
+                ErrorMessage: null,
+                render.RequestedRevision,
+                render.RenderedRevision,
+                render.SceneChangedDuringRender));
         }
 
         var job = await _jobRepository.GetByIdAsync(query.RenderId, cancellationToken);
@@ -64,7 +67,12 @@ internal class GetSceneRenderQueryHandler : IQueryHandler<GetSceneRenderQuery, S
             NodesFailed: null,
             TimedOut: null,
             CreatedAt: job.CreatedAt,
-            ErrorMessage: job.ErrorMessage));
+            ErrorMessage: job.ErrorMessage,
+            RequestedRevision: job.SceneRevision,
+            // Nothing has been drawn yet, so there is no revision to report as rendered -
+            // and therefore nothing to compare.
+            RenderedRevision: null,
+            SceneChangedDuringRender: false));
     }
 }
 
@@ -82,4 +90,10 @@ public record SceneRenderView(
     int? NodesFailed,
     bool? TimedOut,
     DateTime CreatedAt,
-    string? ErrorMessage);
+    string? ErrorMessage,
+    /// <summary>The scene's revision when this render was asked for.</summary>
+    int? RequestedRevision,
+    /// <summary>The scene's revision when the picture came back, or null while it is still being drawn.</summary>
+    int? RenderedRevision,
+    /// <summary>True when the scene was edited between the request and the finished picture - the image is not of the revision that was asked about.</summary>
+    bool SceneChangedDuringRender);

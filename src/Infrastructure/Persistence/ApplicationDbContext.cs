@@ -833,6 +833,12 @@ namespace Infrastructure.Persistence
                 entity.Property(sr => sr.NodesLoaded).IsRequired();
                 entity.Property(sr => sr.NodesFailed).IsRequired();
                 entity.Property(sr => sr.TimedOut).IsRequired();
+                // Nullable rather than defaulted: renders taken before revisions were
+                // recorded genuinely do not know which revision they show, and a zero would
+                // claim they do.
+                entity.Property(sr => sr.RequestedRevision).IsRequired(false);
+                entity.Property(sr => sr.RenderedRevision).IsRequired(false);
+                entity.Ignore(sr => sr.SceneChangedDuringRender);
                 entity.Property(sr => sr.CreatedAt).IsRequired();
 
                 entity.HasOne(sr => sr.Scene)
@@ -883,6 +889,7 @@ namespace Infrastructure.Persistence
                 entity.Property(tj => tj.EnvironmentMapVariantId).IsRequired(false);
                 entity.Property(tj => tj.SceneId).IsRequired(false);
                 entity.Property(tj => tj.SceneViewpoint).IsRequired(false).HasMaxLength(20);
+                entity.Property(tj => tj.SceneRevision).IsRequired(false);
                 entity.Property(tj => tj.Status).IsRequired();
                 entity.Property(tj => tj.AttemptCount).IsRequired();
                 entity.Property(tj => tj.MaxAttempts).IsRequired();

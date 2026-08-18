@@ -157,11 +157,19 @@ public sealed class SceneRenderMcpTools
             view.NodesLoaded,
             view.NodesFailed,
             view.TimedOut,
-            note = view.NodesFailed > 0
-                ? $"{view.NodesFailed} node(s) failed to load - any gap you see in the picture is one of them, not empty space."
-                : view.TimedOut == true
-                    ? "The scene had not finished loading when this was taken, so it may be mid-load."
-                    : null
+            // Which revision this is a picture of. An agent renders to verify the edit it
+            // just made, and without this it cannot tell that answer apart from a picture
+            // of a scene something else moved while the render sat in the queue.
+            view.RequestedRevision,
+            view.RenderedRevision,
+            view.SceneChangedDuringRender,
+            note = view.SceneChangedDuringRender
+                ? $"The scene changed while this was being drawn (asked at revision {view.RequestedRevision}, drawn at {view.RenderedRevision}). This picture is not of the revision you asked about - render again to verify your own edit."
+                : view.NodesFailed > 0
+                    ? $"{view.NodesFailed} node(s) failed to load - any gap you see in the picture is one of them, not empty space."
+                    : view.TimedOut == true
+                        ? "The scene had not finished loading when this was taken, so it may be mid-load."
+                        : null
         };
 
         return new CallToolResult

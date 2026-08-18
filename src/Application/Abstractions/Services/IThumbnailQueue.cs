@@ -62,7 +62,11 @@ public interface IThumbnailQueue
     /// looks like now, and the scene moves under it - reusing an earlier job would answer
     /// with a picture of a scene that no longer exists.
     /// </summary>
-    Task<ThumbnailJob> EnqueueSceneRenderAsync(int sceneId, string viewpoint, int maxAttempts = 3, int lockTimeoutMinutes = 10, CancellationToken cancellationToken = default);
+    /// <param name="sceneRevision">
+    /// The scene's revision at the moment of asking, so the finished render can report
+    /// whether the scene moved while it was queued.
+    /// </param>
+    Task<ThumbnailJob> EnqueueSceneRenderAsync(int sceneId, string viewpoint, int maxAttempts = 3, int lockTimeoutMinutes = 10, int? sceneRevision = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Attempts to dequeue and claim the next pending job for processing.
