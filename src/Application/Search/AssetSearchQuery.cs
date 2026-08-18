@@ -61,6 +61,11 @@ public record AssetSearchResponse(IReadOnlyList<AssetSearchHit> Hits, int TotalC
 /// The part whose text actually matched, or null when the asset itself did. Its facts are
 /// the part's own, so a caller can see how much of the asset the match accounts for.
 /// </param>
+/// <param name="AlsoAt">
+/// Other asset ids holding the same geometry as this one, collapsed out of the results so
+/// they do not occupy a caller's slots twice. Empty when the asset is unique, or when it
+/// carries no geometry fingerprint to compare.
+/// </param>
 public record AssetSearchHit(
     string AssetType,
     int AssetId,
@@ -71,7 +76,8 @@ public record AssetSearchHit(
     string Prominence,
     string MatchedOn,
     AssetSearchFacts? Facts = null,
-    MatchedPartView? MatchedPart = null);
+    MatchedPartView? MatchedPart = null,
+    IReadOnlyList<int>? AlsoAt = null);
 
 /// <summary>
 /// The mesh inside an asset that a query matched. Distinct from the hit itself so the two

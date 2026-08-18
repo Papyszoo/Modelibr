@@ -331,4 +331,79 @@ public class SearchDocumentBuilderTests
         Assert.Null(SearchDocumentBuilder.ClassifyScale(null));
         Assert.Null(SearchDocumentBuilder.ClassifyScale(0));
     }
+
+    // -- geometry fingerprint ------------------------------------------------------------
+
+    private static SceneGraphPartDto PartHashed(string path, string? geometryHash) =>
+        new(path, path, null, 1, "mesh", 100, 400, geometryHash, true, null);
+
+    /// <summary>
+    /// The golden vector. The migration that backfilled this column restates the same rule
+    /// in SQL, and the two can only be trusted to agree if one of them is pinned: without
+    /// this, retuning either side would split the library into assets fingerprinted two
+    /// different ways, and every duplicate pair straddling the change would stop collapsing.
+    ///
+    /// SHA-256, lowercase hex, over the DISTINCT part hashes sorted ordinally and joined
+    /// with newlines - matching
+    /// <c>encode(sha256(convert_to(string_agg(h, E'\n' ORDER BY h COLLATE "C"), 'UTF8')), 'hex')</c>.
+    /// </summary>
+    [Fact]
+    public void GeometryKey_Matches_The_Golden_Vector_The_Backfill_Restates()
+    {
+        var key = SearchDocumentBuilder.GeometryKeyOf(new[]
+        {
+            PartHashed("/a", "bbb222"),
+            PartHashed("/b", "aaa111"),
+            PartHashed("/c", "ccc333"),
+        });
+
+        Assert.Equal("a31bbab69ec2b024db5f7f57e6220bd21d5fe559db6e0347e3fd1b2b9898116f", key);
+    }
+
+    [Fact]
+    public void GeometryKey_Ignores_Part_Order_And_Repeats()
+    {
+        // Part order is an authoring accident, and a kit that repeats one mesh four times is
+        // the same set of shapes as one that repeats it five times.
+        var a = SearchDocumentBuilder.GeometryKeyOf(new[]
+        {
+            PartHashed("/x", "one"), PartHashed("/y", "two"),
+        });
+        var b = SearchDocumentBuilder.GeometryKeyOf(new[]
+        {
+            PartHashed("/y", "two"), PartHashed("/x", "one"), PartHashed("/z", "two"),
+        });
+
+        Assert.Equal(a, b);
+    }
+
+    [Fact]
+    public void GeometryKey_Separates_Different_Geometry()
+    {
+        Assert.NotEqual(
+            SearchDocumentBuilder.GeometryKeyOf(new[] { PartHashed("/x", "one") }),
+            SearchDocumentBuilder.GeometryKeyOf(new[] { PartHashed("/x", "two") }));
+    }
+
+    [Fact]
+    public void GeometryKey_Is_Null_When_Nothing_Was_Hashed()
+    {
+        // Two assets nobody hashed have nothing in common. A shared "unhashed" sentinel
+        // would collapse the whole unhashed half of a library into one search result.
+        Assert.Null(SearchDocumentBuilder.GeometryKeyOf(Array.Empty<SceneGraphPartDto>()));
+        Assert.Null(SearchDocumentBuilder.GeometryKeyOf(new[] { PartHashed("/x", null) }));
+        Assert.Null(SearchDocumentBuilder.GeometryKeyOf(new[] { PartHashed("/x", "   ") }));
+    }
+
+    [Fact]
+    public void BuildForModel_Fingerprints_The_Asset_But_Never_Its_Parts()
+    {
+        var docs = SearchDocumentBuilder.BuildForModel(
+            modelId: 1, versionId: 1, isCurrentVersion: true,
+            assetName: "Sword", derived: DerivedWith("sword"),
+            rollups: Rollups(), rawParts: new[] { Part() }, now: DateTime.UtcNow);
+
+        Assert.NotNull(AssetDoc(docs).GeometryKey);
+        Assert.All(docs.Where(d => d.PartPath != null), d => Assert.Null(d.GeometryKey));
+    }
 }

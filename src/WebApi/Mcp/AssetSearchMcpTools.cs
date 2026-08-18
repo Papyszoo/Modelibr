@@ -18,7 +18,8 @@ public sealed class AssetSearchMcpTools
 {
     [McpServerTool(Name = "search_assets")]
     [Description("Search the asset library with full-text + fuzzy identifier matching and structural filters. " +
-                 "Returns ranked hits (current version only, prominence-aware) each with a deterministic browse summary.")]
+                 "Returns ranked hits (current version only, prominence-aware) each with a deterministic browse summary. " +
+                 "Assets holding identical geometry are collapsed into one hit; the ids folded into it are listed as `alsoAt`.")]
     public static async Task<object> SearchAssets(
         IQueryHandler<AssetSearchQuery, AssetSearchResponse> handler,
         [Description("Free-text query (asset/part names, tokens, prose).")] string query,

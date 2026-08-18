@@ -162,6 +162,22 @@ public class AssetSearchDocument
     /// </summary>
     public string? PackNames { get; private set; }
 
+    /// <summary>
+    /// Fingerprint of the asset's geometry: its parts' order-invariant geometry hashes,
+    /// sorted and hashed together. Two assets that carry the same key are the same meshes
+    /// under two ids.
+    ///
+    /// Asset-level documents only, and null whenever no part was hashed - an absent
+    /// fingerprint must never read as "matches every other asset that also has none".
+    /// </summary>
+    /// <remarks>
+    /// Game libraries are full of the same prop imported twice: on a real 1,717-model
+    /// library <c>SM_Prop_Couch_01</c> exists at two ids with byte-identical geometry, and
+    /// many POLYGON City props are doubled the same way. Nothing in a search hit said so,
+    /// so an agent comparing candidates spent two of its slots on one couch.
+    /// </remarks>
+    public string? GeometryKey { get; private set; }
+
     public DateTime UpdatedAt { get; private set; }
 
     public static AssetSearchDocument Create(
@@ -202,7 +218,8 @@ public class AssetSearchDocument
         double? dimensionZ = null,
         string? scaleConvention = null,
         IEnumerable<string>? authoredTags = null,
-        string? description = null)
+        string? description = null,
+        string? geometryKey = null)
     {
         if (string.IsNullOrWhiteSpace(assetType))
             throw new ArgumentException("Asset type cannot be null or whitespace.", nameof(assetType));
@@ -227,6 +244,7 @@ public class AssetSearchDocument
             BrowseSummary = browseSummary ?? string.Empty,
             AuthoredTags = NormalizeTags(authoredTags),
             Description = description?.Trim() ?? string.Empty,
+            GeometryKey = string.IsNullOrWhiteSpace(geometryKey) ? null : geometryKey.Trim(),
             TriangleCount = triangleCount,
             HasAnimations = hasAnimations,
             BoneCount = boneCount,

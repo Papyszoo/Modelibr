@@ -189,6 +189,7 @@ public class ReprojectSearchDocumentsCommandTests
             Assert.Equal(expected.UvStatus, actual.UvStatus);
             Assert.Equal(expected.MaxDimension, actual.MaxDimension);
             Assert.Equal(expected.ScaleConvention, actual.ScaleConvention);
+            Assert.Equal(expected.GeometryKey, actual.GeometryKey);
             Assert.Equal(expected.Prominence, actual.Prominence);
             Assert.Equal(expected.IsCurrentVersion, actual.IsCurrentVersion);
         }

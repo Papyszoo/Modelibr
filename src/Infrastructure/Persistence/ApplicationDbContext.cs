@@ -1549,6 +1549,8 @@ namespace Infrastructure.Persistence
                 // several packs; no GIN index, matching ConceptLabels - this is a weak
                 // tie-breaking signal, not a primary retrieval path.
                 entity.Property(e => e.PackNames).IsRequired(false).HasMaxLength(1000);
+                // SHA-256 of the asset's sorted part hashes, hex - fixed width by construction.
+                entity.Property(e => e.GeometryKey).IsRequired(false).HasMaxLength(64);
                 entity.Property(e => e.UpdatedAt).IsRequired();
 
                 // One document per (asset, version, part). NULLS NOT DISTINCT so the
@@ -1575,6 +1577,10 @@ namespace Infrastructure.Persistence
                 // sweep, not a term search - it runs with no discriminating text to narrow
                 // the scan first, so this one carries the query on its own.
                 entity.HasIndex(e => e.UvStatus);
+                // Duplicate collapsing groups the ranked page by this, and it is also how
+                // "is this prop already in the library" is asked. Never a lone predicate on
+                // its own, but always an equality one, so a plain btree carries it.
+                entity.HasIndex(e => e.GeometryKey);
             });
 
             // Configure SearchLog - one row per deliberate search (from day one).

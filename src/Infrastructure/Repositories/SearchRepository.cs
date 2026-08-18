@@ -404,11 +404,59 @@ internal sealed class SearchRepository : ISearchRepository
             })
             .ToListAsync(cancellationToken);
 
-        var best = ranked
+        var perAsset = ranked
             .GroupBy(x => (x.Doc.AssetType, x.Doc.AssetId))
             .Select(g => g.First())
-            .Take(limit)
             .ToList();
+
+        // Then collapse assets that ARE each other. Game libraries are full of the same prop
+        // imported twice - SM_Prop_Couch_01 sits at two ids with byte-identical geometry, and
+        // many POLYGON City props are doubled - and nothing in a hit said so, so one couch
+        // took two of the caller's ten slots and read as a choice between two things.
+        //
+        // The survivor is the best-ranked of the group, and the ones behind it come back as
+        // AlsoAt rather than being dropped: they are real, separately-tagged, separately-
+        // packed assets, and a caller that wants the other id must still be able to see it.
+        //
+        // Two limits, both from doing this in the page rather than in the index. Duplicates
+        // ranked outside the over-fetched window are not compared - in practice identical
+        // geometry comes with near-identical names, so they arrive adjacent. And a hit whose
+        // winning document was a PART carries no fingerprint (a part is not its asset), so it
+        // is never collapsed; the asset-level identity it resolves to is only known further
+        // down, after the fill-in query. Both leave a duplicate visible rather than hiding a
+        // distinct asset, which is the right direction to fail in.
+        var duplicatesOf = new Dictionary<int, List<int>>();
+        var winnerByGeometry = new Dictionary<string, int>(StringComparer.Ordinal);
+        var kept = new List<int>();
+
+        for (var i = 0; i < perAsset.Count; i++)
+        {
+            var doc = perAsset[i].Doc;
+            var key = doc.GeometryKey;
+
+            // No fingerprint is not a match. Two assets nobody hashed have nothing in common,
+            // and treating absence as a shared key would collapse the unhashed half of a
+            // library into a single result.
+            if (string.IsNullOrEmpty(key))
+            {
+                kept.Add(i);
+                continue;
+            }
+
+            if (winnerByGeometry.TryGetValue(key, out var winner))
+            {
+                duplicatesOf[winner].Add(doc.AssetId);
+                continue;
+            }
+
+            winnerByGeometry[key] = doc.AssetId;
+            duplicatesOf[doc.AssetId] = new List<int>();
+            kept.Add(i);
+        }
+
+        // The whole window is folded before the page is cut, so a survivor's AlsoAt names
+        // every duplicate seen - not only the ones that happened to rank above the limit.
+        var best = kept.Take(limit).Select(i => perAsset[i]).ToList();
 
         // A hit must describe the thing place_asset can actually place. Where the winning
         // document is a part, its asset-level document is fetched so the hit carries the
@@ -450,12 +498,19 @@ internal sealed class SearchRepository : ISearchRepository
             }
         }
 
+        // Empty stays null on the wire: a hit that names no duplicates should say nothing,
+        // not carry an empty list every caller has to check.
+        IReadOnlyList<int>? AlsoAtFor(int assetId) =>
+            duplicatesOf.TryGetValue(assetId, out var ids) && ids.Count > 0 ? ids : null;
+
         var hits = best
             .Select(x =>
             {
+                var alsoAt = AlsoAtFor(x.Doc.AssetId);
+
                 if (x.Doc.PartPath is null)
                 {
-                    return ToHit(x.Doc, x.MatchedOn);
+                    return ToHit(x.Doc, x.MatchedOn) with { AlsoAt = alsoAt };
                 }
 
                 var part = new MatchedPartView(
@@ -470,8 +525,8 @@ internal sealed class SearchRepository : ISearchRepository
                 // MatchedPart still marks it as a part match, so nothing claims to be
                 // something it is not.
                 return assetDocs.TryGetValue((x.Doc.AssetType, x.Doc.AssetId, x.Doc.VersionId), out var assetDoc)
-                    ? ToHit(assetDoc, x.MatchedOn) with { MatchedPart = part }
-                    : ToHit(x.Doc, x.MatchedOn) with { MatchedPart = part };
+                    ? ToHit(assetDoc, x.MatchedOn) with { MatchedPart = part, AlsoAt = alsoAt }
+                    : ToHit(x.Doc, x.MatchedOn) with { MatchedPart = part, AlsoAt = alsoAt };
             })
             .ToList();
 

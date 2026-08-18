@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using Application.Extraction.Derivation;
 using Application.Models;
 using Domain.Models;
@@ -114,6 +116,7 @@ public static class SearchDocumentBuilder
         // one atlas between them are correctly unwrapped, and asking the question of each
         // mesh alone would call every one of them packed. See UvStatusClassifier.
         var uvStatus = UvStatusClassifier.Classify(rawParts);
+        var geometryKey = GeometryKeyOf(rawParts);
 
         docs.Add(AssetSearchDocument.Create(
             assetType: "Model",
@@ -156,7 +159,8 @@ public static class SearchDocumentBuilder
             // here as well as patched on a tag edit - otherwise every re-extraction would
             // quietly drop the tags the user had assigned.
             authoredTags: authoredTags,
-            description: description));
+            description: description,
+            geometryKey: geometryKey));
 
         foreach (var part in derived.Parts)
         {
@@ -201,6 +205,41 @@ public static class SearchDocumentBuilder
         }
 
         return docs;
+    }
+
+    /// <summary>
+    /// The asset's geometry fingerprint: its parts' hashes, deduplicated, sorted and hashed
+    /// together, so two imports of the same prop land on the same string.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Sorted because part order is an authoring accident, not a difference in the geometry;
+    /// deduplicated because a kit that repeats one mesh four times and a kit that repeats it
+    /// five times are the same set of shapes to someone choosing what to place.
+    /// </para>
+    /// <para>
+    /// Null when no part carries a hash. Two assets that were both never hashed have nothing
+    /// in common, and a shared "unhashed" sentinel would collapse the entire unhashed half of
+    /// a library into one search result.
+    /// </para>
+    /// </remarks>
+    public static string? GeometryKeyOf(IReadOnlyList<SceneGraphPartDto> rawParts)
+    {
+        var hashes = rawParts
+            .Select(p => p.GeometryHash)
+            .Where(h => !string.IsNullOrWhiteSpace(h))
+            .Select(h => h!.Trim())
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(h => h, StringComparer.Ordinal)
+            .ToList();
+
+        if (hashes.Count == 0)
+        {
+            return null;
+        }
+
+        var joined = string.Join('\n', hashes);
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(joined))).ToLowerInvariant();
     }
 
     private static IEnumerable<string> CategoryNameTokens(string? categoryName)
