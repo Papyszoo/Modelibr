@@ -35,7 +35,7 @@ ordinary Modelibr API endpoint - there is no separate search or extraction path:
 ### Looking at a scene
 
 Reading a scene is a read: an agent that can search the library can look at what it has
-already built there. These five need no write flag either.
+already built there. These six need no write flag either.
 
 | Tool               | What it does                                                                                                                                                                                                                                                                                                                                                                                            |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -44,6 +44,7 @@ already built there. These five need no write flag either.
 | `validate_scene`   | The mistakes the numbers above cannot show: something resting on nothing, geometry under the floor, an asset that is a whole sample scene rather than the prop it was placed as, nodes tilted or upside down, a scene with no key light, objects inside each other. Returns a verdict, findings with stable codes, **and what it could not check** - including which stage it judged the scene against. |
 | `render_scene`     | Photograph the scene through the same component the editor draws with, and get the image back. The only check that sees facing, framing and whether an asset loaded at all. The reply names the scene revision the picture was asked for and the one it was drawn at, so a render that was overtaken by another edit cannot be mistaken for confirmation of your own.                                   |
 | `get_scene_render` | Collect a render by id.                                                                                                                                                                                                                                                                                                                                                                                 |
+| `get_slots`        | The decisions in the scene that are the user's to make, and every candidate proposed for each - chosen, still open, and rejected with the reason it was ruled out. Read it before proposing another round: the reasons are what stop an agent re-offering the asset it was just turned down on.                                                                                                         |
 
 `validate_scene` deliberately reports its own blind spots. Footprints are axis-aligned
 boxes, so a square panel rotated 90° about Y is identical to one that is not - nothing on
@@ -53,7 +54,7 @@ and look.
 
 ## What the agent can change (opt-in)
 
-Set `MCP_WRITE_ENABLED=true` in your root `.env` and thirty more tools appear,
+Set `MCP_WRITE_ENABLED=true` in your root `.env` and thirty-three more tools appear,
 letting an agent curate the library the way you would in the app. They are a thin
 pass-through over the same command handlers the UI uses, so there is one source
 of truth for what a change means:
@@ -119,7 +120,44 @@ the call that put it there rather than at the end of the build.
 | `set_light`             | Add, update or remove one light by id. Upsert semantics, so a retried call does not stack a second sun into the scene.                                                                                                                                                                                                                                                                                                                                                                                               |
 | `apply_material`        | Dress one node, for this scene only - the model's own default material is untouched. Takes a `materialId` (a parameter material, from `list_materials`) or a `textureSetId` (a tiling one), and an optional `slot` to dress one of the model's material slots ("cushions") rather than the whole node - `get_asset` lists them as `materialSlots`. Ids and slot names are resolved before the write, so a material that does not exist or a misspelled slot is refused rather than saved and silently rendered grey. |
 | `set_scene_stage`       | Declare how far the scene has been taken - `layout`, `detail`, `lit`, `dressed`. Moving forward is refused over a composition that does not hold; moving back always works.                                                                                                                                                                                                                                                                                                                                          |
+| `propose_candidates`    | Offer the user two to four options for one decision instead of picking one silently. See below.                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `resolve_slot`          | Settle a slot on one candidate and apply it to the slot's node - or reopen it with `clear`.                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `reject_candidates`     | Rule candidates out with the reason, or throw out the whole round with `all`.                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `update_scene_document` | Replace the whole document, for bulk edits. An invalid document is rejected in full, never partially applied.                                                                                                                                                                                                                                                                                                                                                                                                        |
+
+#### The agent proposes, the user decides
+
+An agent that silently picks assets produces a scene whose choices cannot be argued with.
+So the meaningful decisions in a scene are not values - they are **slots** with
+**candidates**, and the user resolves them.
+
+A slot is a role in the scene (`streetlight`, `hero-building`, `road-surface`) and it is
+the `slotId` a node already carries: place the node with `place_asset(slotId: …)`, then
+call `propose_candidates` to say what else it could be. The asset already standing there
+becomes candidate `A` automatically, so nothing in the scene is an unlisted default.
+
+Candidate ids are assigned by the server and **never reused**: `streetlight/A`, `/B`, `/C`.
+A rejected `B` stays `B` and the next proposal is `D`, so "streetlight B is too modern"
+means one asset for the life of the scene - which is the whole point, because it is what
+lets a person name a proposal out loud and be understood exactly.
+
+Rejections are **feedback, not deletions**. They stay on the slot with the reason they were
+given, the UI greys them rather than hiding them, and `get_slots` reads them back - which
+is how "I don't like any of these" becomes a better next round instead of the same one
+again. The user's "none of these" (`all=true`) rules out everything still standing and
+reopens the slot with their reason attached.
+
+Every slot records **who settled it**. A choice made in the app is `resolvedBy: "user"`; one
+made through `resolve_slot` is always `resolvedBy: "agent"`, whatever the agent was told to
+do. An agent should only resolve a slot when the user asked it to ("just pick sensible
+ones") - and either way the scene can still say which decisions a person actually made.
+
+In the editor, the **Choices panel** lists every slot beside the viewport. Each card shows
+its id verbatim, the agent's rationale, and the asset's real numbers - dimensions, part
+count, materials, and any cameras or lights inside it, because a rationale on its own is a
+plausible sentence about an asset nobody measured. Clicking a card previews it in place
+without writing anything, and a node whose slot is still open is outlined in the viewport
+so a scene cannot look finished while its decisions are not.
 
 #### Composition first, colour last
 

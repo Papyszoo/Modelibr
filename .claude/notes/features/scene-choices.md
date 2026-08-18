@@ -1,0 +1,80 @@
+# Scene choices - slots, candidates, and who decided
+
+_Written 2026-08-18, against `version/0.6`._
+
+An agent that silently picks assets produces a scene whose choices cannot be argued with.
+So a meaningful decision in a scene is not a value - it is a **slot** with **candidates**,
+and the user resolves it. `SceneDocument.Slots`, four MCP tools, four REST endpoints, and
+the editor's Choices panel.
+
+## The model, and the three things it is easy to get wrong
+
+- **A slot is one node.** At most one node carries any given `slotId`
+  (`DuplicateSlotNode`); the alternatives live in the slot's `Candidates`, not as extra
+  nodes. `SceneNode.SlotId` was originally written expecting the opposite - one node per
+  alternative, grouped by a shared id - and several nodes per slot would stand every
+  rejected option in the scene at once.
+- **Candidate ids are allocated by the server and never reused.** `A`..`Z`, `AA`, `AB`.
+  The next id is the first the slot has _never_ held, rejected ones included. Numbering
+  from the candidate count would hand a new proposal the id of one the user just turned
+  down, and "I don't like B" would mean two different assets in two turns of one
+  conversation. Ids exist to be spoken; that is the whole requirement.
+- **Slot status is derived, not stored.** `proposed` / `chosen` / `rejected` is read off
+  the candidates and `ChosenCandidateId`. A stored status is a second statement about the
+  same facts, and the two drift into a document that says `chosen` with nothing chosen.
+
+## Removing a node removes its slot - and that is not the anchor rule
+
+An orphaned slot fails document validation (`SlotNodeMissing`), and a document is
+validated **in full on every write** - so a slot left behind after its node was deleted
+would refuse _every later write to that scene_, citing a node the user had already
+deleted. Shipped as a defect in the first cut; caught before merge.
+
+`RemoveSceneNodeCommand` therefore cascades the slot, and returns it
+(`RemovedSlot`) so `RestoreSceneNodeCommand` puts both back. This is deliberately the
+**opposite** call to the one four lines above it, which _refuses_ to remove a node other
+nodes rest on: an anchor cascade would delete other nodes nobody named, while a slot is
+not a node at all - it is the open question about the one being deleted. The editor's
+local `removeNode` does the same to the draft, or the next save is rejected.
+
+## Contradictions the validator refuses to resolve
+
+Each is a document stating two incompatible things about one decision. None is repaired,
+because repairing one decides something only the user can:
+
+`ChosenCandidateRejected` (picked and ruled out), `ChoiceWithoutResolver` (a decision with
+no record of who made it), `ResolverWithoutChoice` (attribution with no decision behind
+it - a scene claiming a human approved something no human saw).
+
+## Attribution is a property of the endpoint, not the request
+
+`resolve_slot` over MCP **always** writes `resolvedBy: "agent"`, whatever the agent was
+told to do. `PUT /scenes/{id}/slots/{slotId}/choice` **always** writes `"user"` and does
+not read it from the body - that endpoint is only reached by a person clicking. Taking it
+from the request would make the one attribution the model exists to keep a caller-supplied
+string.
+
+## Two performance/correctness boundaries worth not re-deriving
+
+- **Candidate assets are deliberately absent from `SceneViewBuilder.ReferencedAssets`.**
+  That set is what `SceneWriter` verifies and resolves facts for on _every_ edit. Putting
+  proposals in it would mean an asset recycled after being proposed blocks every later
+  edit to the scene - including the one that rejects it. Proposals are verified in the
+  propose handler instead, where the mistake is actually being made.
+- **`get_slots` is a separate read from `get_scene`.** Resolving what the library knows
+  about each candidate walks the part list of assets that are not in the scene; that is
+  worth paying when someone opens the panel, not on every scene read.
+
+## Rejections are feedback, not deletions
+
+A rejected candidate keeps its id, its card and its reason. That is what the next round
+reads back through `get_slots` before proposing again, and it is why a rejected candidate
+**cannot be chosen** - accepting it would silently discard the feedback. The route back is
+a fresh proposal, which correctly gets a new id.
+
+An already-rejected candidate keeps its _original_ reason when a later blanket "none of
+these" sweeps the slot: the first "no" is the one that says something specific.
+
+See also [[shared-render-lib.md]] for what the Choices panel's preview shares with the
+viewer - the preview is a client-side document swap, never a write, so looking at four
+options does not move the scene's revision four times.
