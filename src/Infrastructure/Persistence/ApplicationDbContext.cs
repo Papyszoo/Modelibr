@@ -1498,6 +1498,11 @@ namespace Infrastructure.Persistence
                 entity.Property(e => e.Symbols).IsRequired();
                 entity.Property(e => e.ConceptLabels).IsRequired().HasDefaultValue(string.Empty);
                 entity.Property(e => e.BrowseSummary).IsRequired();
+                // Authored metadata. Non-null with an empty default, like ConceptLabels:
+                // the match clauses concatenate these columns directly, and a NULL would
+                // make the whole expression NULL and drop the document from its tier.
+                entity.Property(e => e.AuthoredTags).IsRequired().HasDefaultValue(string.Empty);
+                entity.Property(e => e.Description).IsRequired().HasDefaultValue(string.Empty);
                 entity.Property(e => e.TriangleCount).IsRequired(false);
                 entity.Property(e => e.HasAnimations).IsRequired(false);
                 entity.Property(e => e.BoneCount).IsRequired(false);

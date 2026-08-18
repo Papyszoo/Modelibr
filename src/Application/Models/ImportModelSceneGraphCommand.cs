@@ -226,7 +226,12 @@ internal sealed class ImportModelSceneGraphCommandHandler : ICommandHandler<Impo
             // pre-normalization size, so it is real metres for extractions on both sides of
             // `7f0c7c77`. Indexing the rollups made all 1762 models report a longest axis of
             // exactly 2 and left the size filters matching nothing.
-            assetDimensions: BoundingBoxOf(version));
+            assetDimensions: BoundingBoxOf(version),
+            // Carried through for the same reason as packs: tags and description are edited
+            // long after import, and a re-derive that rebuilt documents without them would
+            // silently un-find every asset the user had taken the trouble to label.
+            authoredTags: version.Model?.Tags?.Select(t => t.Name),
+            description: version.Model?.Description);
         foreach (var doc in searchDocs)
         {
             await _searchDocumentRepository.AddAsync(doc, cancellationToken);

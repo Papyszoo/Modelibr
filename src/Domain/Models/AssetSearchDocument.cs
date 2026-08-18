@@ -62,6 +62,31 @@ public class AssetSearchDocument
     /// <summary>Human-readable prose line for the full-text vector.</summary>
     public string BrowseSummary { get; private set; } = string.Empty;
 
+    /// <summary>
+    /// Space-joined tags a person assigned to this asset, matched in the same tier as
+    /// <see cref="Tokens"/>.
+    /// </summary>
+    /// <remarks>
+    /// The strongest provenance in the projection and the one that was missing entirely.
+    /// Everything else here is derived from a filename or inferred from it, so a user who
+    /// labelled a model "rustic oak dining chair" could not then find it by any of those
+    /// words - the single most direct statement of what an asset is was the one signal
+    /// search could not see. Ranked with authored tokens rather than with inferred concepts
+    /// because a tag is a name someone chose, not a guess the derive step made.
+    /// Asset-level documents only: tags belong to the asset, not to its meshes.
+    /// </remarks>
+    public string AuthoredTags { get; private set; } = string.Empty;
+
+    /// <summary>
+    /// The asset's user-written description, matched in the prose tier.
+    /// </summary>
+    /// <remarks>
+    /// Prose rather than authored-token tier despite being authored: it is a sentence, and
+    /// a word occurring inside one is weaker evidence than the same word being the asset's
+    /// name. It still has to admit the document, which is the part that was missing.
+    /// </remarks>
+    public string Description { get; private set; } = string.Empty;
+
     // ---- structural filters (nullable; populated where the family supplies them) ----
     public int? TriangleCount { get; private set; }
     public bool? HasAnimations { get; private set; }
@@ -161,7 +186,9 @@ public class AssetSearchDocument
         double? dimensionX = null,
         double? dimensionY = null,
         double? dimensionZ = null,
-        string? scaleConvention = null)
+        string? scaleConvention = null,
+        IEnumerable<string>? authoredTags = null,
+        string? description = null)
     {
         if (string.IsNullOrWhiteSpace(assetType))
             throw new ArgumentException("Asset type cannot be null or whitespace.", nameof(assetType));
@@ -184,6 +211,8 @@ public class AssetSearchDocument
             Symbols = symbols ?? string.Empty,
             ConceptLabels = conceptLabels ?? string.Empty,
             BrowseSummary = browseSummary ?? string.Empty,
+            AuthoredTags = NormalizeTags(authoredTags),
+            Description = description?.Trim() ?? string.Empty,
             TriangleCount = triangleCount,
             HasAnimations = hasAnimations,
             BoneCount = boneCount,
@@ -258,5 +287,35 @@ public class AssetSearchDocument
     public void SetPacks(IEnumerable<string>? packNames)
     {
         PackNames = NormalizePackNames(packNames);
+    }
+
+    /// <summary>
+    /// Re-points the denormalised tags and description after a metadata-only mutation.
+    /// </summary>
+    /// <remarks>
+    /// Tagging does not re-derive an asset, so without this a projection would only ever
+    /// hold the tags an asset happened to have at extraction time - which for anything
+    /// tagged after import is none. Same contract as <see cref="SetCategory"/> and
+    /// <see cref="SetPacks"/>: the write that changes what a person said about an asset
+    /// changes what search can find it by, in the same transaction.
+    /// </remarks>
+    public void SetMetadata(IEnumerable<string>? tags, string? description)
+    {
+        AuthoredTags = NormalizeTags(tags);
+        Description = description?.Trim() ?? string.Empty;
+    }
+
+    /// <summary>
+    /// Trims and space-joins tag names. Empty string rather than null, matching
+    /// <see cref="Tokens"/> - the match clauses concatenate this column directly, and a null
+    /// would turn the whole expression null and silently drop the document from the tier.
+    /// </summary>
+    private static string NormalizeTags(IEnumerable<string>? tags)
+    {
+        if (tags is null) return string.Empty;
+        return string.Join(' ', tags
+            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .Select(t => t.Trim())
+            .OrderBy(t => t, StringComparer.Ordinal));
     }
 }

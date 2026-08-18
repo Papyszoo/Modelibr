@@ -89,6 +89,46 @@ public class SearchDocumentBuilderTests
         Assert.Equal("Weapons", asset.CategoryName);
     }
 
+    [Fact]
+    public void BuildForModel_Puts_Authored_Tags_And_Description_On_The_Asset_Doc_Only()
+    {
+        // A re-derive rebuilds documents wholesale, so the builder has to carry the tags
+        // through - otherwise every re-extraction quietly un-finds a labelled asset.
+        var docs = SearchDocumentBuilder.BuildForModel(
+            modelId: 1, versionId: 1, isCurrentVersion: true,
+            assetName: "Chair", derived: DerivedWith("chair"),
+            rollups: Rollups(), rawParts: new[] { Part() }, now: DateTime.UtcNow,
+            authoredTags: new[] { "oak", "rustic" },
+            description: "A rustic oak dining chair.");
+
+        var asset = AssetDoc(docs);
+        Assert.Equal("oak rustic", asset.AuthoredTags);
+        Assert.Equal("A rustic oak dining chair.", asset.Description);
+
+        // Tags describe the asset. Copying them onto every part would multiply one signal
+        // by the part count and let a many-part model dominate any tag query.
+        Assert.All(docs.Where(d => d.PartPath is not null), part =>
+        {
+            Assert.Equal(string.Empty, part.AuthoredTags);
+            Assert.Equal(string.Empty, part.Description);
+        });
+    }
+
+    [Fact]
+    public void BuildForModel_Without_Tags_Leaves_The_Authored_Fields_Empty_Not_Null()
+    {
+        // The match clauses concatenate these columns, and a null would make the whole
+        // expression null and silently drop the document from its tier.
+        var docs = SearchDocumentBuilder.BuildForModel(
+            modelId: 1, versionId: 1, isCurrentVersion: true,
+            assetName: "Chair", derived: DerivedWith("chair"),
+            rollups: Rollups(), rawParts: new[] { Part() }, now: DateTime.UtcNow);
+
+        var asset = AssetDoc(docs);
+        Assert.Equal(string.Empty, asset.AuthoredTags);
+        Assert.Equal(string.Empty, asset.Description);
+    }
+
     private static DerivedAsset DerivedWithParts(params DerivedPart[] parts) =>
         new(
             DeriveVersion: 1,

@@ -37,6 +37,25 @@ public record AssetSearchQuery(
 
 public record AssetSearchResponse(IReadOnlyList<AssetSearchHit> Hits, int TotalCount);
 
+/// <summary>
+/// One candidate: always the whole asset, plus - when the query matched a mesh inside it -
+/// the evidence that led there.
+/// </summary>
+/// <remarks>
+/// The identity and facts on a hit describe the <b>placeable</b> thing, because
+/// <c>place_asset</c> places an asset and has no way to place a part. Search ranks parts as
+/// well as assets, so the best-ranked document for a hit is often a mesh: a query for
+/// "carpet" can land on a carpet mesh inside a large sample scene. Naming that hit "carpet"
+/// and handing back the carpet's triangle count and bounds - as this did - described
+/// something the caller could not place, while <c>place_asset</c> would drop the entire
+/// sample scene into the scene. The part is real information and stays, but it is reported
+/// as <paramref name="MatchedPart"/>: evidence about why this asset came back, never as the
+/// asset itself.
+/// </remarks>
+/// <param name="MatchedPart">
+/// The part whose text actually matched, or null when the asset itself did. Its facts are
+/// the part's own, so a caller can see how much of the asset the match accounts for.
+/// </param>
 public record AssetSearchHit(
     string AssetType,
     int AssetId,
@@ -46,6 +65,18 @@ public record AssetSearchHit(
     string BrowseSummary,
     string Prominence,
     string MatchedOn,
+    AssetSearchFacts? Facts = null,
+    MatchedPartView? MatchedPart = null);
+
+/// <summary>
+/// The mesh inside an asset that a query matched. Distinct from the hit itself so the two
+/// can never be confused: this is not placeable.
+/// </summary>
+public record MatchedPartView(
+    string PartPath,
+    string DisplayName,
+    string BrowseSummary,
+    string Prominence,
     AssetSearchFacts? Facts = null);
 
 /// <summary>

@@ -60,29 +60,36 @@ public sealed class AssetSearchMcpTools
     }
 
     [McpServerTool(Name = "get_asset")]
-    [Description("Get the derived metadata and part list for an asset's current version.")]
+    [Description("Get the derived metadata, part list and material slot names for an asset. " +
+                 "Pass the versionId from the search hit you are inspecting: without it this answers " +
+                 "about the asset's active version, which is not necessarily the version that hit named.")]
     public static async Task<object> GetAsset(
         IQueryHandler<GetAssetMetadataQuery, AssetMetadataResponse> handler,
         [Description("Asset family, e.g. Model.")] string assetType,
         [Description("Asset id.")] int assetId,
+        [Description("Version to inspect - use the search hit's versionId. Defaults to the active version.")] int? versionId = null,
         CancellationToken cancellationToken = default)
     {
-        var result = await handler.Handle(new GetAssetMetadataQuery(assetType, assetId), cancellationToken);
+        var result = await handler.Handle(
+            new GetAssetMetadataQuery(assetType, assetId, VersionId: versionId), cancellationToken);
         return result.IsFailure
             ? new { error = result.Error.Code, message = result.Error.Message }
             : result.Value;
     }
 
     [McpServerTool(Name = "get_part")]
-    [Description("Get a single part's detail (by its part-path identifier) plus the parent asset's derived metadata.")]
+    [Description("Get a single part's detail (by its part-path identifier) plus the parent asset's derived metadata. " +
+                 "Pass the versionId from the search hit that named this part - part paths are only stable within a version.")]
     public static async Task<object> GetPart(
         IQueryHandler<GetAssetMetadataQuery, AssetMetadataResponse> handler,
         [Description("Asset family, e.g. Model.")] string assetType,
         [Description("Asset id.")] int assetId,
         [Description("Part path (from the scene-graph part-path scheme).")] string partPath,
+        [Description("Version to inspect - use the search hit's versionId. Defaults to the active version.")] int? versionId = null,
         CancellationToken cancellationToken = default)
     {
-        var result = await handler.Handle(new GetAssetMetadataQuery(assetType, assetId, partPath), cancellationToken);
+        var result = await handler.Handle(
+            new GetAssetMetadataQuery(assetType, assetId, partPath, versionId), cancellationToken);
         return result.IsFailure
             ? new { error = result.Error.Code, message = result.Error.Message }
             : result.Value;

@@ -64,7 +64,9 @@ public static class SearchDocumentBuilder
         string? categoryName = null,
         bool isActive = true,
         IEnumerable<string>? packNames = null,
-        IReadOnlyList<double>? assetDimensions = null)
+        IReadOnlyList<double>? assetDimensions = null,
+        IEnumerable<string>? authoredTags = null,
+        string? description = null)
     {
         var rawByPath = rawParts
             .GroupBy(p => p.PartPath)
@@ -143,7 +145,13 @@ public static class SearchDocumentBuilder
             // Asset-level only: a part does not belong to a pack, the asset it came from
             // does. Putting pack names on parts would also multiply the same weak signal
             // by the part count and let a many-part asset dominate a pack-name query.
-            packNames: packNames));
+            packNames: packNames,
+            // Same reasoning, and the same scope: a person tags and describes the asset.
+            // Re-derivation rebuilds documents wholesale, so these have to be carried in
+            // here as well as patched on a tag edit - otherwise every re-extraction would
+            // quietly drop the tags the user had assigned.
+            authoredTags: authoredTags,
+            description: description));
 
         foreach (var part in derived.Parts)
         {

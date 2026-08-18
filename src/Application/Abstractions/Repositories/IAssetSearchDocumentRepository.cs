@@ -96,5 +96,21 @@ public interface IAssetSearchDocumentRepository
         IReadOnlyDictionary<int, IReadOnlyList<string>> packNamesByAssetId,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Re-points the denormalised tags and description after a metadata-only mutation
+    /// (<c>set_tags</c>, the tag editor).
+    /// </summary>
+    /// <remarks>
+    /// The learning loop this projection exists to serve: a user corrects what an asset is
+    /// called, and search can find it by that immediately rather than at the next
+    /// re-derive - which for most assets never comes.
+    /// </remarks>
+    Task SetMetadataForAssetAsync(
+        string assetType,
+        int assetId,
+        IEnumerable<string> tags,
+        string? description,
+        CancellationToken cancellationToken = default);
+
     Task UpdateAsync(AssetSearchDocument document, CancellationToken cancellationToken = default);
 }

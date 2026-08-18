@@ -244,28 +244,49 @@ internal sealed class SearchRepository : ISearchRepository
         var scored = query.Select(d => new
         {
             Doc = d,
+            // Authored tags join the top tier alongside filename tokens and the display
+            // name. A tag is the most deliberate statement of what an asset is that the
+            // library holds - someone typed it about this specific model - so a tag match
+            // has to be able to admit and rank a document on its own, not merely break a
+            // tie behind a filename that happens to contain the word.
             T0 = EF.Functions.ILike(" " + d.Tokens + " ", b00) || EF.Functions.ILike(" " + d.Tokens + " ", b01)
-                 || EF.Functions.ILike(" " + d.Symbols + " ", b00) || EF.Functions.ILike(" " + d.Symbols + " ", b01) || EF.Functions.ILike(d.DisplayName, s0),
+                 || EF.Functions.ILike(" " + d.Symbols + " ", b00) || EF.Functions.ILike(" " + d.Symbols + " ", b01)
+                 || EF.Functions.ILike(" " + d.AuthoredTags + " ", b00) || EF.Functions.ILike(" " + d.AuthoredTags + " ", b01)
+                 || EF.Functions.ILike(d.DisplayName, s0),
             T1 = EF.Functions.ILike(" " + d.Tokens + " ", b10) || EF.Functions.ILike(" " + d.Tokens + " ", b11)
-                 || EF.Functions.ILike(" " + d.Symbols + " ", b10) || EF.Functions.ILike(" " + d.Symbols + " ", b11) || EF.Functions.ILike(d.DisplayName, s1),
+                 || EF.Functions.ILike(" " + d.Symbols + " ", b10) || EF.Functions.ILike(" " + d.Symbols + " ", b11)
+                 || EF.Functions.ILike(" " + d.AuthoredTags + " ", b10) || EF.Functions.ILike(" " + d.AuthoredTags + " ", b11)
+                 || EF.Functions.ILike(d.DisplayName, s1),
             T2 = EF.Functions.ILike(" " + d.Tokens + " ", b20) || EF.Functions.ILike(" " + d.Tokens + " ", b21)
-                 || EF.Functions.ILike(" " + d.Symbols + " ", b20) || EF.Functions.ILike(" " + d.Symbols + " ", b21) || EF.Functions.ILike(d.DisplayName, s2),
+                 || EF.Functions.ILike(" " + d.Symbols + " ", b20) || EF.Functions.ILike(" " + d.Symbols + " ", b21)
+                 || EF.Functions.ILike(" " + d.AuthoredTags + " ", b20) || EF.Functions.ILike(" " + d.AuthoredTags + " ", b21)
+                 || EF.Functions.ILike(d.DisplayName, s2),
             T3 = EF.Functions.ILike(" " + d.Tokens + " ", b30) || EF.Functions.ILike(" " + d.Tokens + " ", b31)
-                 || EF.Functions.ILike(" " + d.Symbols + " ", b30) || EF.Functions.ILike(" " + d.Symbols + " ", b31) || EF.Functions.ILike(d.DisplayName, s3),
+                 || EF.Functions.ILike(" " + d.Symbols + " ", b30) || EF.Functions.ILike(" " + d.Symbols + " ", b31)
+                 || EF.Functions.ILike(" " + d.AuthoredTags + " ", b30) || EF.Functions.ILike(" " + d.AuthoredTags + " ", b31)
+                 || EF.Functions.ILike(d.DisplayName, s3),
             T4 = EF.Functions.ILike(" " + d.Tokens + " ", b40) || EF.Functions.ILike(" " + d.Tokens + " ", b41)
-                 || EF.Functions.ILike(" " + d.Symbols + " ", b40) || EF.Functions.ILike(" " + d.Symbols + " ", b41) || EF.Functions.ILike(d.DisplayName, s4),
+                 || EF.Functions.ILike(" " + d.Symbols + " ", b40) || EF.Functions.ILike(" " + d.Symbols + " ", b41)
+                 || EF.Functions.ILike(" " + d.AuthoredTags + " ", b40) || EF.Functions.ILike(" " + d.AuthoredTags + " ", b41)
+                 || EF.Functions.ILike(d.DisplayName, s4),
             T5 = EF.Functions.ILike(" " + d.Tokens + " ", b50) || EF.Functions.ILike(" " + d.Tokens + " ", b51)
-                 || EF.Functions.ILike(" " + d.Symbols + " ", b50) || EF.Functions.ILike(" " + d.Symbols + " ", b51) || EF.Functions.ILike(d.DisplayName, s5),
+                 || EF.Functions.ILike(" " + d.Symbols + " ", b50) || EF.Functions.ILike(" " + d.Symbols + " ", b51)
+                 || EF.Functions.ILike(" " + d.AuthoredTags + " ", b50) || EF.Functions.ILike(" " + d.AuthoredTags + " ", b51)
+                 || EF.Functions.ILike(d.DisplayName, s5),
             // The browse summary is a weaker signal than an authored name, so it is
             // scored separately and only ever breaks ties - but it must still admit a
             // document whose text mentions the term, which is recall an agent relies on
             // once assets carry descriptions.
-            P0 = EF.Functions.ILike(d.BrowseSummary, s0),
-            P1 = EF.Functions.ILike(d.BrowseSummary, s1),
-            P2 = EF.Functions.ILike(d.BrowseSummary, s2),
-            P3 = EF.Functions.ILike(d.BrowseSummary, s3),
-            P4 = EF.Functions.ILike(d.BrowseSummary, s4),
-            P5 = EF.Functions.ILike(d.BrowseSummary, s5),
+            // The user-written description sits in this tier too: it is authored, but it is
+            // a sentence, and a word inside a sentence is weaker evidence than the same word
+            // being the asset's name. What matters is that it admits the document at all -
+            // a description was previously unsearchable text.
+            P0 = EF.Functions.ILike(d.BrowseSummary, s0) || EF.Functions.ILike(d.Description, s0),
+            P1 = EF.Functions.ILike(d.BrowseSummary, s1) || EF.Functions.ILike(d.Description, s1),
+            P2 = EF.Functions.ILike(d.BrowseSummary, s2) || EF.Functions.ILike(d.Description, s2),
+            P3 = EF.Functions.ILike(d.BrowseSummary, s3) || EF.Functions.ILike(d.Description, s3),
+            P4 = EF.Functions.ILike(d.BrowseSummary, s4) || EF.Functions.ILike(d.Description, s4),
+            P5 = EF.Functions.ILike(d.BrowseSummary, s5) || EF.Functions.ILike(d.Description, s5),
             // Inferred concept labels: recall for intent queries, but ranked below an
             // authored name so "vehicle" puts SM_Veh_Car_Van_01 above boat_ornament.
             C0 = EF.Functions.ILike(" " + d.ConceptLabels + " ", b00)
@@ -375,11 +396,75 @@ internal sealed class SearchRepository : ISearchRepository
             })
             .ToListAsync(cancellationToken);
 
-        var hits = ranked
+        var best = ranked
             .GroupBy(x => (x.Doc.AssetType, x.Doc.AssetId))
             .Select(g => g.First())
             .Take(limit)
-            .Select(x => ToHit(x.Doc, x.MatchedOn))
+            .ToList();
+
+        // A hit must describe the thing place_asset can actually place. Where the winning
+        // document is a part, its asset-level document is fetched so the hit carries the
+        // asset's identity and facts, and the part rides along as evidence. Over-fetching
+        // already pulls many asset-level documents in, but not reliably the ones needed -
+        // a part can outrank its own parent - so the gaps are filled with one extra query
+        // rather than one per hit.
+        // Keyed by version as well as asset: the asset-level facts that describe a part
+        // match have to come from the same version the part belongs to, or the hit would
+        // pair one version's mesh with another version's bounds - the same class of
+        // mismatch that made get_asset answer about a version search never offered.
+        var partMatches = best.Where(x => x.Doc.PartPath is not null).ToList();
+        var assetDocs = ranked
+            .Where(x => x.Doc.PartPath is null)
+            .GroupBy(x => (x.Doc.AssetType, x.Doc.AssetId, x.Doc.VersionId))
+            .ToDictionary(g => g.Key, g => g.First().Doc);
+
+        var missing = partMatches
+            .Select(x => (x.Doc.AssetType, x.Doc.AssetId, x.Doc.VersionId))
+            .Where(key => !assetDocs.ContainsKey(key))
+            .Distinct()
+            .ToList();
+
+        if (missing.Count > 0)
+        {
+            var missingIds = missing.Select(k => k.AssetId).Distinct().ToList();
+            var missingTypes = missing.Select(k => k.AssetType).Distinct().ToList();
+
+            var fetched = await _context.AssetSearchDocuments
+                .AsNoTracking()
+                .Where(d => d.PartPath == null
+                            && missingTypes.Contains(d.AssetType)
+                            && missingIds.Contains(d.AssetId))
+                .ToListAsync(cancellationToken);
+
+            foreach (var doc in fetched)
+            {
+                assetDocs.TryAdd((doc.AssetType, doc.AssetId, doc.VersionId), doc);
+            }
+        }
+
+        var hits = best
+            .Select(x =>
+            {
+                if (x.Doc.PartPath is null)
+                {
+                    return ToHit(x.Doc, x.MatchedOn);
+                }
+
+                var part = new MatchedPartView(
+                    x.Doc.PartPath,
+                    x.Doc.DisplayName,
+                    x.Doc.BrowseSummary,
+                    x.Doc.Prominence,
+                    FactsOf(x.Doc));
+
+                // No asset-level document is a projection gap, not a reason to withhold the
+                // hit. Falling back to the part's own document keeps the asset reachable;
+                // MatchedPart still marks it as a part match, so nothing claims to be
+                // something it is not.
+                return assetDocs.TryGetValue((x.Doc.AssetType, x.Doc.AssetId, x.Doc.VersionId), out var assetDoc)
+                    ? ToHit(assetDoc, x.MatchedOn) with { MatchedPart = part }
+                    : ToHit(x.Doc, x.MatchedOn) with { MatchedPart = part };
+            })
             .ToList();
 
         return new AssetSearchResponse(hits, total);
@@ -398,23 +483,25 @@ internal sealed class SearchRepository : ISearchRepository
             doc.BrowseSummary,
             doc.Prominence,
             matchedOn,
-            new AssetSearchFacts(
-                doc.TriangleCount,
-                doc.VertexCount,
-                doc.PartCount,
-                doc.MaterialCount,
-                doc.MaxDimension,
-                doc.HasUvs,
-                doc.BoneCount is > 0,
-                doc.BoneCount,
-                doc.HasAnimations,
-                doc.AnimationCount,
-                doc.ShapeClass,
-                doc.CategoryName,
-                doc.DimensionX is null && doc.DimensionY is null && doc.DimensionZ is null
-                    ? null
-                    : new AssetDimensions(doc.DimensionX, doc.DimensionY, doc.DimensionZ),
-                doc.ScaleConvention));
+            FactsOf(doc));
+
+    private static AssetSearchFacts FactsOf(Domain.Models.AssetSearchDocument doc) =>
+        new(doc.TriangleCount,
+            doc.VertexCount,
+            doc.PartCount,
+            doc.MaterialCount,
+            doc.MaxDimension,
+            doc.HasUvs,
+            doc.BoneCount is > 0,
+            doc.BoneCount,
+            doc.HasAnimations,
+            doc.AnimationCount,
+            doc.ShapeClass,
+            doc.CategoryName,
+            doc.DimensionX is null && doc.DimensionY is null && doc.DimensionZ is null
+                ? null
+                : new AssetDimensions(doc.DimensionX, doc.DimensionY, doc.DimensionZ),
+            doc.ScaleConvention);
 
     public async Task<IReadOnlyList<SearchResultGroup>> SearchAsync(
         string term,

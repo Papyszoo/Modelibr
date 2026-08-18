@@ -116,6 +116,29 @@ internal sealed class AssetSearchDocumentRepository : IAssetSearchDocumentReposi
         }
     }
 
+    public async Task SetMetadataForAssetAsync(
+        string assetType,
+        int assetId,
+        IEnumerable<string> tags,
+        string? description,
+        CancellationToken cancellationToken = default)
+    {
+        var names = tags as IReadOnlyList<string> ?? tags.ToList();
+
+        // Asset-level documents only. A part is a mesh inside the asset; the tags describe
+        // the asset, and copying them onto every part would multiply one signal by the part
+        // count and let a many-part model dominate any tag query.
+        var documents = await _context.AssetSearchDocuments
+            .Where(d => d.AssetType == assetType && d.AssetId == assetId && d.PartPath == null)
+            .ToListAsync(cancellationToken);
+
+        foreach (var document in documents)
+        {
+            document.SetMetadata(names, description);
+            _context.UpdateIfDetached(document);
+        }
+    }
+
     public async Task SetPacksForAssetAsync(
         string assetType,
         int assetId,
