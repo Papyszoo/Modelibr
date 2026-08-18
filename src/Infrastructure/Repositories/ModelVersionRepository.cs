@@ -25,6 +25,12 @@ internal sealed class ModelVersionRepository : IModelVersionRepository
             // handful of packs at most.
             .Include(v => v.Model)
                 .ThenInclude(m => m.Packs)
+            // Authored tags are denormalised onto the search projection too, and unlike
+            // packs nothing else reloads them: the rebuild reads version.Model.Tags, so
+            // leaving them off here made every re-derive silently blank the tags a user
+            // had typed - the projection kept the name and lost the vocabulary.
+            .Include(v => v.Model)
+                .ThenInclude(m => m.Tags)
             .Include(v => v.Files)
             .Include(v => v.Thumbnail)
             .Include(v => v.TextureMappings)
