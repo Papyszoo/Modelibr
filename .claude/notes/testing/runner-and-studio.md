@@ -90,7 +90,22 @@ derived from feature + scenario tags: untagged → every PR (109), `@slow` → n
   running).
 - `tests/e2e/playwright.config.ts` reads `PW_VIDEO` / `PW_TRACE` / `PW_SCREENSHOT`
   / `PW_RETRIES` / `PW_HEADED` (defaults unchanged) so the run builder's params
-  take effect.
+  take effect. It also reads `PW_HTML_REPORT` / `PW_OUTPUT_DIR`, which the
+  manifest's `env` field sets per suite - see the entry below.
+- **Suites that share a working directory must not share output paths.**
+  `e2e-fast`, `e2e-full` and `e2e-performance` all run Playwright from
+  `tests/e2e`, and all three used to write the default `playwright-report/` +
+  `test-results/`. In a full run each one wiped the previous suite's report,
+  traces, screenshots and videos, and all three links in the aggregated report
+  resolved to whichever ran last - so on 2026-08-18 `e2e-full` reported three
+  failures whose evidence `e2e-performance` had already deleted, and the report
+  showed 15 performance tests where 300 were expected. It had bitten once before
+  (2026-08-10, the worker's dying stderr; the `container-logs/` mirror in
+  `steps/hooks.ts` is the scar). Each suite now claims its own pair via `env` in
+  the manifest, and `discover.mjs`/`test-catalog/util.mjs` skip those dirs by
+  **prefix** so a fourth suite cannot silently fall outside the list. A direct
+  `npx playwright test` and CI (`npm run test:ci`, whose workflow uploads
+  `tests/e2e/playwright-report/`) are untouched - they never set the vars.
 - CI bindings/timings are declared in `ci-map.mjs` (suite id → workflow job
   display-name).
 - **Gotcha:** ignore generated output with anchored paths (`/test-catalog/`,

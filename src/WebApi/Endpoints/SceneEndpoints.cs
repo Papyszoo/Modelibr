@@ -27,6 +27,18 @@ public static class SceneEndpoints
         .WithName("Get All Scenes")
         .WithSummary("List saved scenes");
 
+        app.MapPost("/scenes/resources/resolve", async (
+            ResolveSceneResourcesRequest request,
+            IQueryHandler<ResolveSceneResourcesQuery, SceneResourceManifest> handler,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await handler.Handle(
+                new ResolveSceneResourcesQuery(request.Assets), cancellationToken);
+            return result.IsFailure ? Failure(result.Error) : Results.Ok(result.Value);
+        })
+        .WithName("Resolve Scene Resources")
+        .WithSummary("Resolve files and measured display costs for scene asset references in one batch");
+
         // Sits alongside /scenes/{id}: a literal segment outranks a parameter one in route
         // precedence, so "asset-facts" is never captured as an id.
         app.MapGet("/scenes/asset-facts", async (
@@ -350,6 +362,8 @@ public static class SceneEndpoints
         .AddEndpointFilter<WorkerApiKeyFilter>()
         .DisableAntiforgery();
     }
+
+    public sealed record ResolveSceneResourcesRequest(IReadOnlyList<SceneAssetRef>? Assets);
 
     private static IResult Failure(SharedKernel.Error error) =>
         Results.BadRequest(new { error = error.Code, message = error.Message });

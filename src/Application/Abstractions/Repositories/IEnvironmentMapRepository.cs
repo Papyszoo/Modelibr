@@ -9,6 +9,9 @@ public interface IEnvironmentMapRepository
     Task<IEnumerable<EnvironmentMap>> GetAllDeletedAsync(CancellationToken cancellationToken = default);
     Task<IEnumerable<EnvironmentMap>> GetAllWithDeletedVariantsAsync(CancellationToken cancellationToken = default);
     Task<EnvironmentMap?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<EnvironmentMap>> GetByIdsAsync(
+        IReadOnlyCollection<int> ids,
+        CancellationToken cancellationToken = default);
     Task<EnvironmentMap?> GetDeletedByIdAsync(int id, CancellationToken cancellationToken = default);
     Task<EnvironmentMap?> GetByNameAsync(string name, CancellationToken cancellationToken = default);
     Task<EnvironmentMap?> GetByFileHashAsync(string sha256Hash, CancellationToken cancellationToken = default);

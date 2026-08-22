@@ -389,6 +389,163 @@ export const systemHandlers = [
     })
   }),
 
+  // Literal route before /scenes/:id. The demo has the same batched contract as the real
+  // API even though it has no derivation/preview worker behind the returned empty list.
+  http.post('*/scenes/resources/resolve', async ({ request }) => {
+    const body = (await request.json()) as {
+      assets?: Array<{
+        assetType: string
+        assetId: number
+        versionId?: number | null
+      }>
+    }
+
+    const resources = await Promise.all(
+      (body.assets ?? []).map(async asset => {
+        const failure = (errorCode: string, errorMessage: string) => ({
+          asset,
+          resolved: false,
+          original: null,
+          totalSizeBytes: null,
+          triangleCount: null,
+          materialCount: null,
+          auxiliaries: [],
+          previews: [],
+          errorCode,
+          errorMessage,
+        })
+
+        if (asset.assetType === 'Model') {
+          if (asset.versionId == null) {
+            return failure(
+              'SceneResources.ModelVersionRequired',
+              'A model resource must pin a versionId.'
+            )
+          }
+          const version = await getById('modelVersions', asset.versionId)
+          if (!version || version.modelId !== asset.assetId) {
+            return failure(
+              'SceneResources.ModelVersionNotFound',
+              `Model ${asset.assetId} version ${asset.versionId} was not found.`
+            )
+          }
+          const file =
+            version.files.find(candidate => candidate.isRenderable) ??
+            version.files[0]
+          if (!file) {
+            return failure(
+              'SceneResources.RenderableFileMissing',
+              `Model ${asset.assetId} version ${asset.versionId} has no renderable file.`
+            )
+          }
+          return {
+            asset,
+            resolved: true,
+            original: {
+              fileId: file.id,
+              originalFileName: file.originalFileName,
+              format: file.fileType,
+              mimeType: file.mimeType,
+              sizeBytes: file.sizeBytes,
+              sha256Hash: `demo-${file.id}`,
+            },
+            totalSizeBytes: file.sizeBytes,
+            triangleCount: version.triangleCount ?? null,
+            materialCount: version.materialCount ?? null,
+            auxiliaries: [],
+            previews: [],
+            errorCode: null,
+            errorMessage: null,
+          }
+        }
+
+        if (asset.versionId != null) {
+          return failure(
+            'SceneResources.UnversionedAsset',
+            `${asset.assetType} resources must not pin a versionId.`
+          )
+        }
+
+        if (asset.assetType === 'Sprite') {
+          const sprite = await getById('sprites', asset.assetId)
+          if (!sprite) {
+            return failure(
+              'SceneResources.SpriteNotFound',
+              `There is no sprite with id ${asset.assetId}.`
+            )
+          }
+          return {
+            asset,
+            resolved: true,
+            original: {
+              fileId: sprite.fileId,
+              originalFileName: sprite.fileName,
+              format: sprite.fileName.split('.').pop()?.toLowerCase() ?? '',
+              mimeType: 'image/*',
+              sizeBytes: sprite.fileSizeBytes,
+              sha256Hash: `demo-${sprite.fileId}`,
+            },
+            totalSizeBytes: sprite.fileSizeBytes,
+            triangleCount: null,
+            materialCount: null,
+            auxiliaries: [],
+            previews: [],
+            errorCode: null,
+            errorMessage: null,
+          }
+        }
+
+        if (asset.assetType === 'EnvironmentMap') {
+          const environmentMap = await getById('environmentMaps', asset.assetId)
+          const variant =
+            environmentMap?.variants.find(
+              candidate => candidate.id === environmentMap.previewVariantId
+            ) ??
+            environmentMap?.variants.find(candidate => !candidate.isDeleted)
+          const representative =
+            variant?.panoramicFile ?? variant?.cubeFaces?.pz
+          const fileId =
+            representative?.fileId ?? variant?.previewFileId ?? variant?.fileId
+          if (!environmentMap || !variant || fileId == null) {
+            return failure(
+              'SceneResources.EnvironmentMapNotFound',
+              `Environment map ${asset.assetId} has no preview file.`
+            )
+          }
+          const fileName = representative?.fileName ?? variant.fileName
+          const sizeBytes =
+            representative?.fileSizeBytes ?? variant.fileSizeBytes ?? 0
+          return {
+            asset,
+            resolved: true,
+            original: {
+              fileId,
+              originalFileName: fileName,
+              format: fileName.split('.').pop()?.toLowerCase() ?? '',
+              mimeType: 'image/*',
+              sizeBytes,
+              sha256Hash: `demo-${fileId}`,
+            },
+            totalSizeBytes: sizeBytes,
+            triangleCount: null,
+            materialCount: null,
+            auxiliaries: [],
+            previews: [],
+            errorCode: null,
+            errorMessage: null,
+          }
+        }
+
+        return failure(
+          'SceneResources.UnsupportedAssetType',
+          `'${asset.assetType}' is not a placeable scene asset family.`
+        )
+      })
+    )
+
+    return HttpResponse.json({ resources })
+  }),
+
   // Declared before the /scenes/:id handler because MSW matches in order, and
   // ':id' would otherwise swallow this path.
   http.get('*/scenes/asset-facts', async ({ request }) => {

@@ -134,18 +134,46 @@ internal sealed class SceneAssetFactsProvider : ISceneAssetFacts
         IEnumerable<SceneAssetRef> assets,
         CancellationToken cancellationToken = default)
     {
+        var distinctAssets = assets.DistinctBy(SceneSpatial.FactsKey).ToList();
+        if (distinctAssets.Count == 0)
+        {
+            return new Dictionary<string, SceneAssetFacts>(StringComparer.Ordinal);
+        }
+
+        // Keep these reads sequential. Both repositories share the scoped EF DbContext, so
+        // Task.WhenAll would trade the N+1 for concurrent-operation failures on one context.
+        var modelVersionIds = distinctAssets
+            .Where(asset => asset.AssetType == SceneAssetTypes.Model && asset.VersionId is not null)
+            .Select(asset => asset.VersionId!.Value)
+            .Distinct()
+            .ToList();
+        var versions = modelVersionIds.Count == 0
+            ? []
+            : await _modelVersionRepository.GetByIdsAsync(modelVersionIds, cancellationToken);
+        var versionsById = versions.ToDictionary(version => version.Id);
+
+        var derivationsByAsset = new Dictionary<(string AssetType, int AssetId), IReadOnlyList<Domain.Models.AssetDerivation>>();
+        foreach (var family in distinctAssets.GroupBy(asset => MapToExtractionType(asset.AssetType)))
+        {
+            var assetIds = family.Select(asset => asset.AssetId).Distinct().ToList();
+            var derivations = await _derivationRepository.GetForAssetsAsync(
+                family.Key, assetIds, cancellationToken);
+
+            foreach (var assetDerivations in derivations.GroupBy(derivation => derivation.AssetId))
+            {
+                derivationsByAsset[(family.Key, assetDerivations.Key)] = assetDerivations
+                    .OrderByDescending(derivation => derivation.VersionId)
+                    .ToList();
+            }
+        }
+
         var facts = new Dictionary<string, SceneAssetFacts>(StringComparer.Ordinal);
 
         // Distinct first: a street with forty copies of one lamp post is one lookup, not forty.
-        foreach (var asset in assets.DistinctBy(SceneSpatial.FactsKey))
+        foreach (var asset in distinctAssets)
         {
             var key = SceneSpatial.FactsKey(asset);
-            if (facts.ContainsKey(key))
-            {
-                continue;
-            }
-
-            var resolved = await ResolveOneAsync(asset, cancellationToken);
+            var resolved = ResolveOne(asset, versionsById, derivationsByAsset);
             if (resolved is not null)
             {
                 facts[key] = resolved;
@@ -155,13 +183,16 @@ internal sealed class SceneAssetFactsProvider : ISceneAssetFacts
         return facts;
     }
 
-    private async Task<SceneAssetFacts?> ResolveOneAsync(SceneAssetRef asset, CancellationToken cancellationToken)
+    private static SceneAssetFacts? ResolveOne(
+        SceneAssetRef asset,
+        IReadOnlyDictionary<int, Domain.Models.ModelVersion> versionsById,
+        IReadOnlyDictionary<(string AssetType, int AssetId), IReadOnlyList<Domain.Models.AssetDerivation>> derivationsByAsset)
     {
         Vec3? dimensions = null;
 
         if (asset.AssetType == SceneAssetTypes.Model && asset.VersionId is { } versionId)
         {
-            var version = await _modelVersionRepository.GetByIdAsync(versionId, cancellationToken);
+            versionsById.TryGetValue(versionId, out var version);
 
             // A version belonging to a different model is a mismatched reference, not a
             // near miss: answering with the wrong model's bounds would place the node
@@ -179,13 +210,12 @@ internal sealed class SceneAssetFactsProvider : ISceneAssetFacts
         // snapped it - the exact re-pointing that pinning exists to prevent. Falling back to
         // the latest is only for an unpinned family or a version that was never derived,
         // where there is no version-specific answer to prefer.
-        var derivation =
-            (asset.VersionId is { } derivedVersionId
-                ? await _derivationRepository.GetByKeyAsync(
-                    MapToExtractionType(asset.AssetType), asset.AssetId, derivedVersionId, cancellationToken)
-                : null)
-            ?? await _derivationRepository.GetLatestForAssetAsync(
-                MapToExtractionType(asset.AssetType), asset.AssetId, cancellationToken);
+        derivationsByAsset.TryGetValue(
+            (MapToExtractionType(asset.AssetType), asset.AssetId), out var derivations);
+        var derivation = asset.VersionId is { } derivedVersionId
+            ? derivations?.FirstOrDefault(candidate => candidate.VersionId == derivedVersionId)
+                ?? derivations?.FirstOrDefault()
+            : derivations?.FirstOrDefault();
 
         var (originConvention, gridSize, originInBounds) = ReadDerivedPlacement(derivation?.Payload);
 

@@ -9,6 +9,14 @@ public interface ITextureSetRepository
     Task<IEnumerable<TextureSet>> GetAllAsync(CancellationToken cancellationToken = default);
     Task<IEnumerable<TextureSet>> GetAllDeletedAsync(CancellationToken cancellationToken = default);
     Task<TextureSet?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Batch read for choice-card media: one query for every textureset a scene's
+    /// candidates name, rather than one per card.
+    /// </summary>
+    Task<IReadOnlyList<TextureSet>> GetByIdsAsync(
+        IReadOnlyCollection<int> ids,
+        CancellationToken cancellationToken = default);
     Task<TextureSet?> GetDeletedByIdAsync(int id, CancellationToken cancellationToken = default);
     Task<TextureSet?> GetByNameAsync(string name, CancellationToken cancellationToken = default);
     Task<TextureSet?> GetByFileHashAsync(string sha256Hash, CancellationToken cancellationToken = default);

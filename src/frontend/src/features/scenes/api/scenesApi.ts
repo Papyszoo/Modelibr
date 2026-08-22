@@ -1,5 +1,9 @@
 import { client } from '@/lib/apiBase'
 
+import {
+  measureSceneAsync,
+  scenePerformanceMeasures,
+} from '../lib/scenePerformance'
 import type {
   SceneAssetFacts,
   SceneAssetRef,
@@ -16,7 +20,10 @@ export async function getScenes(): Promise<SceneSummary[]> {
 }
 
 export async function getSceneById(sceneId: number): Promise<SceneView> {
-  const response = await client.get<SceneView>(`/scenes/${sceneId}`)
+  const response = await measureSceneAsync(
+    scenePerformanceMeasures.documentRequest,
+    () => client.get<SceneView>(`/scenes/${sceneId}`)
+  )
   return response.data
 }
 

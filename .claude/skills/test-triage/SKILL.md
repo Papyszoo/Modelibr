@@ -37,7 +37,7 @@ Kind-specific artifacts on top of that:
 | `backend`, `backend-integration` | TRX: `test-report/.work/<suite-id>/trx/*.trx` - failed tests are `<UnitTestResult outcome="Failed">` with `<Message>`/`<StackTrace>` |
 | `frontend` | `test-report/.work/frontend/jest.json` (`testResults[].message` for failures) |
 | `asset-processor` | `test-report/.work/asset-processor/vitest.json` |
-| `e2e-fast` / `e2e-full` / `e2e-performance` | `tests/e2e/playwright-report/index.html` (merged HTML report); `tests/e2e/test-results/<test-dir>/` per failure: screenshots, video `.webm`, `trace.zip`, `error-context.md` |
+| `e2e-fast` / `e2e-full` / `e2e-performance` | **one pair of dirs per suite**, so a full run keeps all three: `tests/e2e/playwright-report-{fast,full,performance}/index.html` (merged HTML report) and `tests/e2e/test-results-{fast,full,performance}/<test-dir>/` per failure: screenshots, video `.webm`, `trace.zip`, `error-context.md`. A direct `npx playwright test` still writes the unsuffixed `playwright-report/` + `test-results/`. |
 | `backup-restore` | `tests/backup-restore-e2e/playwright-report/` + `tests/backup-restore-e2e/test-results/` |
 | `storybook-visual` | `src/frontend/visual-tests/test-results/<test-dir>/` per failure: `error-context.md`, and for pixel diffs `*-expected.png` / `*-actual.png` / `*-diff.png`; baselines in `src/frontend/visual-tests/__snapshots__/` (only exists after a first baseline run) |
 
@@ -93,7 +93,7 @@ starting (built into the suite commands), so stale containers can't skew results
 - Logs are from the **last run only**; `test-report/` is cleared (except
   `history.jsonl`) at each runner start.
 - Playwright HTML reports can also be browsed via Test Studio:
-  `http://127.0.0.1:5178/report/tests/e2e/playwright-report/index.html`.
+  `http://127.0.0.1:5178/report/tests/e2e/playwright-report-full/index.html`.
 - E2E failures may be infra, not the test: check Docker was up and the stack
   became healthy (the log shows the `wait-for-services` output first).
 - Docker runs under **colima** on this machine. Two infra signatures seen before:

@@ -233,7 +233,11 @@ public sealed class AssetWriteMcpTools
         return Guarded(
             audit,
             caller,
-            new AgentWrite(idempotencyKey, "reindex-search", "Model", modelId ?? 0, BatchId: batchId),
+            // modelId, not `modelId ?? 0`: a library-wide reindex has no asset, and the
+            // audit log validates "greater than 0 when provided" - so the zero threw
+            // ArgumentException and made the whole-library form, the documented default,
+            // impossible to call.
+            new AgentWrite(idempotencyKey, "reindex-search", "Model", modelId, BatchId: batchId),
             async ct =>
             {
                 var result = await handler.Handle(new ReprojectSearchDocumentsCommand(modelId), ct);
@@ -252,7 +256,7 @@ public sealed class AssetWriteMcpTools
                         skipped = result.Value.Skipped,
                         notes = result.Value.Notes,
                     },
-                    "Model", modelId ?? 0, result.Value);
+                    "Model", modelId, result.Value);
             },
             cancellationToken);
     }

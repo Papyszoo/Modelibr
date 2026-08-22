@@ -188,6 +188,25 @@ internal sealed class TextureSetRepository : ITextureSetRepository
             .FirstOrDefaultAsync(tp => tp.Id == id, cancellationToken);
     }
 
+    /// <summary>
+    /// Deliberately bare - none of the texture, mapping, pack or tag graph the single-set
+    /// read pulls. A choice card needs the id and whether there is a thumbnail.
+    /// </summary>
+    public async Task<IReadOnlyList<TextureSet>> GetByIdsAsync(
+        IReadOnlyCollection<int> ids,
+        CancellationToken cancellationToken = default)
+    {
+        if (ids.Count == 0)
+        {
+            return [];
+        }
+
+        return await _context.TextureSets
+            .AsNoTracking()
+            .Where(t => ids.Contains(t.Id))
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<TextureSet?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         return await _context.TextureSets

@@ -121,6 +121,16 @@ export interface SceneSlotCandidate {
   rationale?: string | null
   label?: string | null
   rejectedReason?: string | null
+  storeAsset?: SceneStoreAssetRef | null
+}
+
+export interface SceneStoreAssetRef {
+  storeUrl: string
+  storeAssetId: string
+  title?: string | null
+  thumbnailUrl?: string | null
+  price?: number | null
+  currency?: string | null
 }
 
 export interface SceneTransform {

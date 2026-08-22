@@ -55,6 +55,26 @@ internal sealed class MaterialRepository : IMaterialRepository
             .FirstOrDefaultAsync(m => m.Id == id, cancellationToken);
     }
 
+    /// <summary>
+    /// Deliberately bare - no category, no tags. The caller is a choice card wanting a
+    /// colour and a thumbnail path, and the graph the single-material read pulls is a poor
+    /// trade when a scene names a dozen of them.
+    /// </summary>
+    public async Task<IReadOnlyList<Material>> GetByIdsAsync(
+        IReadOnlyCollection<int> ids,
+        CancellationToken cancellationToken = default)
+    {
+        if (ids.Count == 0)
+        {
+            return [];
+        }
+
+        return await _context.Materials
+            .AsNoTracking()
+            .Where(m => ids.Contains(m.Id))
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<Material?> GetDeletedByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         return await _context.Materials

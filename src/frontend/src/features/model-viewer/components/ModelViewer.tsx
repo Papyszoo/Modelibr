@@ -29,6 +29,11 @@ import { useVersionSelection } from '@/features/model-viewer/hooks/useVersionSel
 import { useTextureSetByIdQuery } from '@/features/texture-set/api/queries'
 import { useTextureSetsByModelVersionQuery } from '@/features/texture-set/api/queries'
 import { useTabUiState } from '@/hooks/useTabUiState'
+import {
+  EMPTY_RENDERER_PERF_STATS,
+  type RendererPerfStats,
+} from '@/shared/three/rendererPerformance'
+import { RendererPerfSampler } from '@/shared/three/RendererPerfSampler'
 import { useModelThumbnailUpdates } from '@/shared/thumbnail'
 import { regenerateThumbnail } from '@/shared/thumbnail/api/thumbnailApi'
 import { useBlenderEnabledStore } from '@/stores/blenderEnabledStore'
@@ -46,8 +51,7 @@ import { type ExpandAction, PanelWrapper } from './PanelWrapper'
 import { type MaterialTextureSets } from './TexturedModel'
 import { VersionStrip } from './VersionStrip'
 import { type PanelContent, ViewerMenubar } from './ViewerMenubar'
-import { PerfDisplay, PerfSampler } from './ViewerPerfPanel'
-import { EMPTY_PERF_STATS, type PerfStats } from './viewerPerfStats'
+import { PerfDisplay } from './ViewerPerfPanel'
 import { ViewerSidePanel } from './ViewerSidePanel'
 
 interface ModelViewerProps {
@@ -134,7 +138,7 @@ export function ModelViewer({
   const blenderEnabled = useBlenderEnabledStore(s => s.blenderEnabled)
   const toast = useRef<Toast>(null)
   const statsContainerRef = useRef<HTMLDivElement>(null)
-  const perfStatsRef = useRef<PerfStats>(EMPTY_PERF_STATS)
+  const perfStatsRef = useRef<RendererPerfStats>(EMPTY_RENDERER_PERF_STATS)
   const queryClient = useQueryClient()
   const stableTabId =
     tabId ?? (modelId ? `model-viewer-${modelId}` : 'model-viewer-standalone')
@@ -951,7 +955,7 @@ export function ModelViewer({
                         />
                       )}
                       {viewerSettings.showPerf && (
-                        <PerfSampler statsRef={perfStatsRef} />
+                        <RendererPerfSampler statsRef={perfStatsRef} />
                       )}
                     </Canvas>
                   </CanvasErrorBoundary>

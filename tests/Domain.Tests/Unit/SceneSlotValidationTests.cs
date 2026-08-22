@@ -37,6 +37,62 @@ public class SceneSlotValidationTests
     }
 
     [Fact]
+    public void A_Store_Candidate_Needs_No_Library_Asset()
+    {
+        // The point of part B: an agent can put something the library does not have on the
+        // table. It is a proposal, not a placement, so it needs nothing local at all.
+        var slot = new SceneSlot("streetlight", new[]
+        {
+            new SceneSlotCandidate(
+                "A",
+                Rationale: "nothing in the library is low-poly",
+                StoreAsset: new SceneStoreAssetRef(
+                    "https://store.modelibr.com",
+                    "47f60614-522f-4ced-941c-318ac5c7bd34",
+                    "Quaternius: Ultimate Furniture Pack",
+                    Price: 0m))
+        });
+
+        Assert.Empty(SceneDocumentValidator.Validate(DocumentWith(slot)));
+    }
+
+    [Fact]
+    public void A_Candidate_Naming_Both_A_Library_And_A_Store_Asset_Is_Rejected()
+    {
+        // Two answers with two different costs, and they are settled differently. Folding
+        // them into one card would make "choose A" ambiguous about whether anything is
+        // downloaded.
+        var slot = new SceneSlot("streetlight", new[]
+        {
+            new SceneSlotCandidate(
+                "A",
+                Model(),
+                StoreAsset: new SceneStoreAssetRef("https://store.modelibr.com", "abc"))
+        });
+
+        var issues = SceneDocumentValidator.Validate(DocumentWith(slot));
+
+        Assert.Contains(issues, i => i.Code == "CandidateHasBothAssets");
+    }
+
+    [Fact]
+    public void A_Store_Candidate_On_An_Insecure_Store_Is_Rejected()
+    {
+        // The importer refuses anything but https, so a candidate naming one could never be
+        // acquired - failing here beats failing after the user accepts it.
+        var slot = new SceneSlot("streetlight", new[]
+        {
+            new SceneSlotCandidate(
+                "A",
+                StoreAsset: new SceneStoreAssetRef("http://store.example.com", "abc"))
+        });
+
+        var issues = SceneDocumentValidator.Validate(DocumentWith(slot));
+
+        Assert.Contains(issues, i => i.Code == "InsecureStoreUrl");
+    }
+
+    [Fact]
     public void A_Document_Written_Before_Slots_Existed_Is_Still_Valid()
     {
         // The whole compatibility claim in one assertion: slots are absent, not empty, on

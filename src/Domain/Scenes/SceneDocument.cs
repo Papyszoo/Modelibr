@@ -280,10 +280,47 @@ public sealed record SceneSlotCandidate(
     SceneMaterialBinding? Material = null,
     string? Rationale = null,
     string? Label = null,
-    string? RejectedReason = null)
+    string? RejectedReason = null,
+    SceneStoreAssetRef? StoreAsset = null)
 {
     public bool IsRejected => RejectedReason is not null;
+
+    /// <summary>
+    /// True when this proposal is something the library does not have yet.
+    ///
+    /// The distinction is load-bearing rather than cosmetic: a store candidate cannot be
+    /// chosen the way a library one can, because choosing it means acquiring it, and
+    /// acquisition is the user's call.
+    /// </summary>
+    public bool IsFromStore => StoreAsset is not null;
 }
+
+/// <summary>
+/// A proposal for something in the companion Asset Store - an asset this library does not
+/// hold yet (v0.6 prompt 15, part B).
+///
+/// Deliberately NOT a <see cref="SceneAssetRef"/> with a different id space. Store ids are
+/// Guids and library ids are ints, and a scene that blurred the two would let a node be
+/// placed against an asset that does not exist locally. Nothing here is placeable: a store
+/// candidate becomes real only by being imported, at which point the slot gets a normal
+/// library candidate.
+///
+/// The title and thumbnail are copies, on purpose. They are what the card shows, and a card
+/// that cannot be drawn without the store being up would make an offline scene unreadable -
+/// the store is optional infrastructure everywhere else in this feature and must be here too.
+/// </summary>
+/// <param name="StoreUrl">Which store this id belongs to. Two stores can both hold a Guid.</param>
+/// <param name="StoreAssetId">The store's own asset id.</param>
+/// <param name="Title">What to call it on the card, as the store called it.</param>
+/// <param name="ThumbnailUrl">An absolute store URL, or null when the store had no picture.</param>
+/// <param name="Price">What it costs. 0 is the only value an agent can acquire by itself.</param>
+public sealed record SceneStoreAssetRef(
+    string StoreUrl,
+    string StoreAssetId,
+    string? Title = null,
+    string? ThumbnailUrl = null,
+    decimal? Price = null,
+    string? Currency = null);
 
 /// <summary>Where a slot stands. Derived from the slot, never stored on it.</summary>
 public static class SceneSlotStatuses

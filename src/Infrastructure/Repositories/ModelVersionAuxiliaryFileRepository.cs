@@ -38,4 +38,22 @@ internal sealed class ModelVersionAuxiliaryFileRepository : IModelVersionAuxilia
             .OrderBy(a => a.RelativePath)
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyList<ModelVersionAuxiliaryFile>> GetForVersionsAsync(
+        IReadOnlyCollection<int> modelVersionIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (modelVersionIds.Count == 0)
+        {
+            return [];
+        }
+
+        return await _context.ModelVersionAuxiliaryFiles
+            .AsNoTracking()
+            .Include(auxiliary => auxiliary.File)
+            .Where(auxiliary => modelVersionIds.Contains(auxiliary.ModelVersionId))
+            .OrderBy(auxiliary => auxiliary.ModelVersionId)
+            .ThenBy(auxiliary => auxiliary.RelativePath)
+            .ToListAsync(cancellationToken);
+    }
 }

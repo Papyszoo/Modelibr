@@ -3,10 +3,13 @@ import './SceneChoicesPanel.css'
 import { Button } from 'primereact/button'
 import { type JSX, useState } from 'react'
 
+import { MaterialSwatch } from '@/features/materials/components/MaterialSwatch'
+import { resolveApiAssetUrl } from '@/lib/apiBase'
 import { EmptyState } from '@/shared/components'
 
 import type {
   SceneCandidateFacts,
+  SceneCandidateMedia,
   SceneSlotCandidateView,
   SceneSlotView,
 } from '../types'
@@ -310,11 +313,31 @@ function CandidateCard({
         onClick={() => onPreview(slot, candidate)}
       >
         <span className="scene-choices-card-head">
-          <span className="scene-choices-card-ref">{candidate.ref}</span>
-          <span className="scene-choices-card-name">
-            {candidate.label ?? candidate.facts?.name ?? assetLabel(candidate)}
+          <CandidateMedia candidate={candidate} />
+          <span className="scene-choices-card-heading">
+            <span className="scene-choices-card-ref">{candidate.ref}</span>
+            <span className="scene-choices-card-name">
+              {candidate.label ??
+                candidate.storeAsset?.title ??
+                candidate.facts?.name ??
+                assetLabel(candidate)}
+            </span>
           </span>
         </span>
+
+        {candidate.storeAsset ? (
+          <span className="scene-choices-card-store">
+            <span className="scene-choices-card-store-badge">
+              Not in your library
+            </span>
+            <span className="scene-choices-card-store-price">
+              {formatPrice(
+                candidate.storeAsset.price,
+                candidate.storeAsset.currency
+              )}
+            </span>
+          </span>
+        ) : null}
 
         {candidate.rationale ? (
           <span className="scene-choices-card-rationale">
@@ -333,13 +356,25 @@ function CandidateCard({
 
       {candidate.rejected ? null : (
         <div className="scene-choices-card-actions">
+          {/*
+            A store candidate has no local asset to put on the node, so choosing
+            it is not the same one-click act - it has to be acquired first, and
+            that is the user's call in the store, not a button here that would
+            fail. The card says so instead of offering a choice it cannot honour.
+          */}
           <Button
             icon="pi pi-check"
             size="small"
             text={!candidate.chosen}
             aria-label={`Choose ${candidate.ref}`}
-            tooltip={candidate.chosen ? 'Chosen' : `Choose ${candidate.ref}`}
-            disabled={busy || candidate.chosen}
+            tooltip={
+              candidate.chosen
+                ? 'Chosen'
+                : candidate.choosable
+                  ? `Choose ${candidate.ref}`
+                  : 'Import it from the store first - a store asset is not in this library yet'
+            }
+            disabled={busy || candidate.chosen || !candidate.choosable}
             data-testid={`scene-choices-choose-${candidate.ref}`}
             onClick={() => onChoose(slot.slotId, candidate.id)}
           />
@@ -357,6 +392,112 @@ function CandidateCard({
       )}
     </li>
   )
+}
+
+/**
+ * The picture, resolved server-side and drawn here.
+ *
+ * A store candidate's thumbnail is an absolute URL on another host and is used as
+ * given; a library one is API-relative and goes through the same resolver every
+ * other asset image in the app uses. A thumbnail that is still rendering says so
+ * rather than showing a broken image, because "not yet" and "never" are different
+ * answers about the same asset.
+ */
+function CandidateMedia({
+  candidate,
+}: {
+  candidate: SceneSlotCandidateView
+}): JSX.Element {
+  const media: SceneCandidateMedia | null = candidate.media
+  const storeUrl =
+    media?.storeThumbnailUrl ?? candidate.storeAsset?.thumbnailUrl
+  const assetUrl = media?.assetThumbnailUrl
+    ? resolveApiAssetUrl(media.assetThumbnailUrl)
+    : null
+  const materialUrl = media?.materialThumbnailUrl
+    ? resolveApiAssetUrl(media.materialThumbnailUrl)
+    : null
+  const swatch = media?.materialSwatch ?? null
+
+  // The asset is the primary image; a surface-only candidate promotes its
+  // material to primary, because a card with no picture at all is the thing this
+  // whole part exists to remove.
+  const primary = storeUrl ?? assetUrl
+  const secondary = primary ? (materialUrl ?? null) : null
+
+  return (
+    <span
+      className="scene-choices-card-media"
+      data-testid="scene-choices-card-media"
+    >
+      {primary ? (
+        <img src={primary} alt="" loading="lazy" />
+      ) : materialUrl ? (
+        <img src={materialUrl} alt="" loading="lazy" />
+      ) : swatch ? (
+        <MaterialSwatch
+          parameters={{
+            baseColorHex: swatch.baseColorHex,
+            roughness: swatch.roughness,
+            metallic: swatch.metallic,
+            baseColorA: swatch.opacity,
+            alphaMode: swatch.opacity < 1 ? 'Blend' : 'Opaque',
+          }}
+        />
+      ) : (
+        <span
+          className="scene-choices-card-media-empty"
+          title={
+            media?.assetThumbnailStatus === 'pending'
+              ? 'Thumbnail is still rendering'
+              : 'No preview for this candidate'
+          }
+        >
+          <i
+            className={
+              media?.assetThumbnailStatus === 'pending'
+                ? 'pi pi-hourglass'
+                : 'pi pi-image'
+            }
+          />
+        </span>
+      )}
+
+      {secondary && swatch === null ? (
+        <img
+          className="scene-choices-card-media-material"
+          src={secondary}
+          alt=""
+          loading="lazy"
+        />
+      ) : null}
+
+      {secondary === null && primary && swatch ? (
+        <span className="scene-choices-card-media-material">
+          <MaterialSwatch
+            parameters={{
+              baseColorHex: swatch.baseColorHex,
+              roughness: swatch.roughness,
+              metallic: swatch.metallic,
+              baseColorA: swatch.opacity,
+              alphaMode: swatch.opacity < 1 ? 'Blend' : 'Opaque',
+            }}
+          />
+        </span>
+      ) : null}
+    </span>
+  )
+}
+
+/** Free is worth saying out loud: it is the only price an agent can act on by itself. */
+function formatPrice(
+  price: number | null | undefined,
+  currency: string | null | undefined
+): string {
+  if (price === null || price === undefined) {
+    return 'price unknown'
+  }
+  return price === 0 ? 'Free' : `${price.toFixed(2)} ${currency ?? 'USD'}`
 }
 
 /**

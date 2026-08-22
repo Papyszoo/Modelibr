@@ -17,4 +17,9 @@ public interface IModelVersionAuxiliaryFileRepository
 
     /// <summary>All auxiliary files for a version, each with its linked File loaded, ordered by relative path.</summary>
     Task<IReadOnlyList<ModelVersionAuxiliaryFile>> GetForVersionAsync(int modelVersionId, CancellationToken cancellationToken = default);
+
+    /// <summary>All auxiliary files for a set of pinned versions, loaded in one read.</summary>
+    Task<IReadOnlyList<ModelVersionAuxiliaryFile>> GetForVersionsAsync(
+        IReadOnlyCollection<int> modelVersionIds,
+        CancellationToken cancellationToken = default);
 }

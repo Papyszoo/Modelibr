@@ -41,7 +41,8 @@ public sealed class ComposeScenePrompts
             : "Create the scene with create_scene, then build it up through the stages below.";
 
         return $$"""
-        You are composing a scene in Modelibr from assets already in the library.
+        You are composing a scene in Modelibr, primarily from assets already in the
+        library - see WHEN THE LIBRARY CANNOT ANSWER for the exception.
 
         Target: {{description}}
         {{target}}
@@ -81,6 +82,32 @@ public sealed class ComposeScenePrompts
             asset is not that part - place_asset(assetId) places the whole thing it lives
             in, at the whole thing's size.
           - Prefer .glb. An FBX renders untextured in a scene, by design.
+
+        WHEN THE LIBRARY CANNOT ANSWER
+          The library is the default and the fast answer: search_assets first, every time.
+          But a brief the library cannot meet is a real outcome, and settling for the
+          closest wrong asset is worse than saying so. If STORE_URL is configured,
+          search_store_assets looks at the companion Asset Store.
+          - Reach for it when the library's best hit FAILS the brief - wrong style for the
+            project, wrong scale, no UVs, or nothing at all. Not when the local hit is
+            merely second-best. An agent that proposes downloads for things the user
+            already owns is worse than one that never mentions the store.
+          - Say why it beats the local candidate, in the rationale you pass to
+            propose_candidates. "Nothing in the library is low-poly" is a reason.
+            "Found on the store" is not one.
+          - Never propose a hit whose `alreadyImported` is true - that asset is in the
+            library already; search for it there.
+          - Store search is coarse: it matches an asset's title, author and description,
+            never the names of the items inside a pack, and store tagging is sparse
+            enough that a tag filter returning nothing means nothing. Search wide by
+            itemType and read the items with get_store_asset.
+          - A free asset you can fetch yourself: import_store_asset, then get_store_import
+            for the pack id. A paid one you cannot, ever - propose it as a slot candidate
+            and let the user accept it while signed in. The whole rule in one line: the
+            agent fetches free assets by itself and never paid ones.
+          - The store is remote and optional. StoreCatalog.Unreachable means the store is
+            down, NOT that it has no chairs, and nothing about the local library or the
+            scene depends on it being up.
 
         PLACING
           - Place one, read `node.footprint` and `node.sourceDimensions` off the response,

@@ -4,8 +4,21 @@ import { type JSX } from 'react'
 
 import { type MaterialParametersDto } from '../api/materialApi'
 
+/**
+ * The five fields the swatch actually reads.
+ *
+ * Narrower than `MaterialParametersDto` on purpose: a caller that has a colour and a
+ * roughness - a scene choice card, say - should not have to invent an `ior` and an
+ * `occlusionStrength` to draw one. Every existing caller passes a full DTO and still
+ * satisfies this.
+ */
+export type MaterialSwatchParameters = Pick<
+  MaterialParametersDto,
+  'baseColorHex' | 'roughness' | 'metallic' | 'baseColorA' | 'alphaMode'
+>
+
 interface MaterialSwatchProps {
-  parameters: MaterialParametersDto
+  parameters: MaterialSwatchParameters
   /** Rendered small (tile) or large (editor preview). */
   size?: 'tile' | 'editor'
 }

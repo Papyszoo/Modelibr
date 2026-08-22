@@ -1,5 +1,12 @@
 import { useLoader, useThree } from '@react-three/fiber'
-import { type JSX, Suspense, useEffect, useMemo } from 'react'
+import {
+  type JSX,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react'
 import * as THREE from 'three'
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
@@ -146,36 +153,16 @@ export function SceneNodeObject({
           <SettleSignal nodeId={node.id} loaded onSettled={onLoadSettled} />
         </>
       ) : (
-        <SceneNodeErrorBoundary
+        <SceneNodeAsset
           nodeId={node.id}
-          resetKey={sourceLoadKey(source)}
-          onError={(nodeId, message) => {
-            onLoadError(nodeId, message)
-            onLoadSettled?.(nodeId, false)
-          }}
-          onReset={() => clearCachedLoad(source)}
-          fallback={<FailedMarker bounds={sourceDimensions} />}
-        >
-          <Suspense fallback={<PendingMarker bounds={sourceDimensions} />}>
-            <SceneAssetMesh
-              source={source}
-              bounds={sourceDimensions}
-              dressing={dressing}
-            />
-            {/*
-              Inside the boundary on purpose: React commits a Suspense
-              boundary's children together, so this effect cannot run until
-              the mesh beside it has actually resolved. Gated on the source
-              being present and done, because `SceneAssetMesh` returns a
-              pending marker rather than suspending while the resource map is
-              still on its way - without the guard a loose glTF would report
-              itself settled one render before its `.bin` arrived.
-            */}
-            {source && !source.isLoading ? (
-              <SettleSignal nodeId={node.id} loaded onSettled={onLoadSettled} />
-            ) : null}
-          </Suspense>
-        </SceneNodeErrorBoundary>
+          source={source}
+          bounds={sourceDimensions}
+          originConvention={originConvention}
+          originInBounds={originInBounds}
+          dressing={dressing}
+          onLoadError={onLoadError}
+          onLoadSettled={onLoadSettled}
+        />
       )}
       {selected ? (
         <SelectionOutline
@@ -198,6 +185,105 @@ export function SceneNodeObject({
 }
 
 /**
+ * The loading branch of a node that references a library asset.
+ *
+ * Separate from `SceneNodeObject` because it holds state and that component returns early
+ * for a hidden node. It owns the two-step swap the viewport needs: the geometry resolving
+ * is not the moment the node is ready, because the first frame that draws it still pays
+ * for shader compilation. Bounds therefore stay mounted until the renderer reports the
+ * material set compiled, and only then is the node reported settled - which is also what
+ * releases the next resource, so one node's compile cannot land in the same long task as
+ * the next node's parse.
+ */
+function SceneNodeAsset({
+  nodeId,
+  source,
+  bounds,
+  originConvention,
+  originInBounds,
+  dressing,
+  onLoadError,
+  onLoadSettled,
+}: {
+  nodeId: string
+  source?: SceneAssetSource
+  bounds: Vec3 | null
+  originConvention: string | null
+  originInBounds: Vec3 | null
+  dressing?: NodeDressing
+  onLoadError: (nodeId: string, message: string) => void
+  onLoadSettled?: (nodeId: string, loaded: boolean) => void
+}): JSX.Element {
+  // Keyed by the load rather than a bare boolean: swapping a slot candidate reuses this
+  // component, and a stale `true` would report the new asset ready before it had loaded.
+  const loadKey = sourceLoadKey(source)
+  const [readyKey, setReadyKey] = useState<string | null>(null)
+  const onReady = useCallback(() => setReadyKey(loadKey), [loadKey])
+  const ready = readyKey === loadKey
+
+  return (
+    <SceneNodeErrorBoundary
+      nodeId={nodeId}
+      resetKey={loadKey}
+      onError={(erroredNodeId, message) => {
+        onLoadError(erroredNodeId, message)
+        onLoadSettled?.(erroredNodeId, false)
+      }}
+      onReset={() => clearCachedLoad(source)}
+      fallback={
+        <FailedMarker
+          bounds={bounds}
+          originConvention={originConvention}
+          originInBounds={originInBounds}
+        />
+      }
+    >
+      <Suspense
+        fallback={
+          <PendingMarker
+            bounds={bounds}
+            originConvention={originConvention}
+            originInBounds={originInBounds}
+          />
+        }
+      >
+        <SceneAssetMesh
+          source={source}
+          bounds={bounds}
+          originConvention={originConvention}
+          originInBounds={originInBounds}
+          dressing={dressing}
+          onReady={onReady}
+        />
+        {/*
+          The download has finished but the object is not on screen yet. Without this the
+          node would vanish between the Suspense fallback unmounting and compilation
+          finishing, which reads as an asset that failed to load.
+        */}
+        {!ready ? (
+          <PendingMarker
+            bounds={bounds}
+            originConvention={originConvention}
+            originInBounds={originInBounds}
+          />
+        ) : null}
+        {/*
+          Inside the boundary on purpose: React commits a Suspense boundary's children
+          together, so this effect cannot run until the mesh beside it has actually
+          resolved. Gated on the source being present and done, because `SceneAssetMesh`
+          returns a pending marker rather than suspending while the resource map is still
+          on its way - without the guard a loose glTF would report itself settled one
+          render before its `.bin` arrived.
+        */}
+        {source && !source.isLoading && ready ? (
+          <SettleSignal nodeId={nodeId} loaded onSettled={onLoadSettled} />
+        ) : null}
+      </Suspense>
+    </SceneNodeErrorBoundary>
+  )
+}
+
+/**
  * Reports its node as settled, once, when it mounts. Renders nothing.
  *
  * A component rather than an effect in `SceneNodeObject` because *where* it sits
@@ -216,6 +302,15 @@ function SettleSignal({
   useEffect(() => {
     onSettled?.(nodeId, loaded)
   }, [nodeId, loaded, onSettled])
+
+  return null
+}
+
+/** Reports a node with nothing to compile as ready, once, when it mounts. */
+function ReadySignal({ onReady }: { onReady: () => void }): null {
+  useEffect(() => {
+    onReady()
+  }, [onReady])
 
   return null
 }
@@ -257,7 +352,7 @@ function sourceLoadKey(source?: SceneAssetSource): string {
     return ''
   }
 
-  return `${source.url}|${Object.keys(source.resources).sort().join(',')}`
+  return `${source.url}|${Object.keys(source.resources).sort().join(',')}|${source.error ?? ''}`
 }
 
 /**
@@ -275,6 +370,14 @@ function clearCachedLoad(source?: SceneAssetSource): void {
     useLoader.clear(loader, source.url)
   }
 }
+
+/**
+ * How long a node waits for its shaders before it is shown anyway.
+ *
+ * Long enough that ordinary compilation finishes inside it, short enough that one
+ * pathological material cannot hold the serial resource queue open indefinitely.
+ */
+const COMPILE_WAIT_MS = 2000
 
 const MESH_LOADERS: Record<string, LoaderConstructor | undefined> = {
   glb: GLTFLoader,
@@ -294,21 +397,38 @@ type LoaderConstructor =
 function SceneAssetMesh({
   source,
   bounds,
+  originConvention,
+  originInBounds,
   dressing,
+  onReady,
 }: {
   source?: SceneAssetSource
   bounds: Vec3 | null
+  originConvention: string | null
+  originInBounds: Vec3 | null
   dressing?: NodeDressing
+  /** Called once this node is compiled and on screen; see `SceneNodeAsset`. */
+  onReady: () => void
 }): JSX.Element | null {
   if (!source || source.isLoading) {
-    return <PendingMarker bounds={bounds} />
+    return (
+      <PendingMarker
+        bounds={bounds}
+        originConvention={originConvention}
+        originInBounds={originInBounds}
+      />
+    )
+  }
+
+  if (source.error) {
+    throw new Error(source.error)
   }
 
   // A sprite or an environment map is one picture, not geometry: it is drawn as
   // a plane at the node's transform rather than pushed through a mesh loader
   // that would reach it as image bytes and fail to parse.
   if (source.kind === 'image') {
-    return <ImagePlane url={source.url} bounds={bounds} />
+    return <ImagePlane url={source.url} bounds={bounds} onReady={onReady} />
   }
 
   switch (source.extension) {
@@ -319,18 +439,29 @@ function SceneAssetMesh({
           url={source.url}
           resources={source.resources}
           dressing={dressing}
+          onReady={onReady}
         />
       )
     case 'fbx':
-      return <FbxMesh url={source.url} dressing={dressing} />
+      return <FbxMesh url={source.url} dressing={dressing} onReady={onReady} />
     case 'obj':
-      return <ObjMesh url={source.url} dressing={dressing} />
+      return <ObjMesh url={source.url} dressing={dressing} onReady={onReady} />
     case 'stl':
-      return <StlMesh url={source.url} dressing={dressing} />
+      return <StlMesh url={source.url} dressing={dressing} onReady={onReady} />
     default:
       // A format the viewer cannot load is shown as its bounds rather than
       // dropped - a node missing from the canvas reads as a failed placement.
-      return <PendingMarker bounds={bounds} />
+      // There is nothing to compile, so it is ready as soon as it is drawn.
+      return (
+        <>
+          <PendingMarker
+            bounds={bounds}
+            originConvention={originConvention}
+            originInBounds={originInBounds}
+          />
+          <ReadySignal onReady={onReady} />
+        </>
+      )
   }
 }
 
@@ -338,10 +469,12 @@ function GltfMesh({
   url,
   resources,
   dressing,
+  onReady,
 }: {
   url: string
   resources: Record<string, string>
   dressing?: NodeDressing
+  onReady: () => void
 }): JSX.Element {
   // A loose .gltf stores its buffers and textures as relative URIs. They resolve
   // against the version-file route, 404, and the loader then fails on the
@@ -357,43 +490,56 @@ function GltfMesh({
 
   // flipY=false for glTF, matching the model viewer: glTF authors its UVs the
   // other way up, and getting this wrong turns every bound texture upside down.
-  return <PlacedObject object={gltf.scene} dressing={dressing} flipY={false} />
+  return (
+    <PlacedObject
+      object={gltf.scene}
+      dressing={dressing}
+      flipY={false}
+      onReady={onReady}
+    />
+  )
 }
 
 function FbxMesh({
   url,
   dressing,
+  onReady,
 }: {
   url: string
   dressing?: NodeDressing
+  onReady: () => void
 }): JSX.Element {
   // The safe manager stops format-internal texture paths ("chest_Specular.tga")
   // from being fetched against the file route, which 400s and kills the context.
   const fbx = useLoader(FBXLoader, url, loader => {
     loader.manager = safeLoadingManager
   })
-  return <PlacedObject object={fbx} dressing={dressing} />
+  return <PlacedObject object={fbx} dressing={dressing} onReady={onReady} />
 }
 
 function ObjMesh({
   url,
   dressing,
+  onReady,
 }: {
   url: string
   dressing?: NodeDressing
+  onReady: () => void
 }): JSX.Element {
   const obj = useLoader(OBJLoader, url, loader => {
     loader.manager = safeLoadingManager
   })
-  return <PlacedObject object={obj} dressing={dressing} />
+  return <PlacedObject object={obj} dressing={dressing} onReady={onReady} />
 }
 
 function StlMesh({
   url,
   dressing,
+  onReady,
 }: {
   url: string
   dressing?: NodeDressing
+  onReady: () => void
 }): JSX.Element {
   const geometry = useLoader(STLLoader, url)
 
@@ -415,7 +561,7 @@ function StlMesh({
     [geometry]
   )
 
-  return <PlacedObject object={mesh} dressing={dressing} />
+  return <PlacedObject object={mesh} dressing={dressing} onReady={onReady} />
 }
 
 /**
@@ -431,12 +577,14 @@ function PlacedObject({
   object,
   dressing,
   flipY = true,
+  onReady,
 }: {
   object: THREE.Object3D
   dressing?: NodeDressing
   flipY?: boolean
-}): JSX.Element {
-  const { gl: renderer } = useThree()
+  onReady: () => void
+}): JSX.Element | null {
+  const { gl: renderer, scene, camera } = useThree()
 
   // Keyed by the model's material slot name; the empty-string key is the node's
   // default binding, which dresses every slot no override names.
@@ -493,7 +641,56 @@ function PlacedObject({
   // and with it every other placement of the same asset, plus any open viewer.
   useEffect(() => () => disposeClonedMaterials(clone, object), [clone, object])
 
-  return <primitive object={clone} />
+  // Compiled before it is mounted, not on the frame that first draws it.
+  //
+  // Adding a ready object to the scene graph moves its shader compilation and texture
+  // upload into the next render, which is the long task the user sees as the viewport
+  // locking up. `compileAsync` does that work against the live scene's lights while the
+  // node is still drawn as bounds, and where the driver supports parallel shader
+  // compilation it happens off the main thread entirely.
+  //
+  // A compile that fails, or one that never reports itself finished, still swaps. three
+  // polls the programs for readiness on a timer, so a driver that never flips that flag
+  // would leave this node invisible *and* hold the whole resource queue behind it - a
+  // worse failure than a node that renders with a program still warming up.
+  const [compiled, setCompiled] = useState<THREE.Object3D | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    let waitTimer: number | null = null
+    const swap = (): void => {
+      if (cancelled) {
+        return
+      }
+      if (waitTimer !== null) {
+        window.clearTimeout(waitTimer)
+        waitTimer = null
+      }
+      setCompiled(clone)
+      onReady()
+    }
+
+    clone.updateMatrixWorld(true)
+    try {
+      const compiling = renderer.compileAsync?.(clone, camera, scene)
+      if (compiling) {
+        waitTimer = window.setTimeout(swap, COMPILE_WAIT_MS)
+        compiling.then(swap, swap)
+      } else {
+        swap()
+      }
+    } catch {
+      swap()
+    }
+
+    return () => {
+      cancelled = true
+      if (waitTimer !== null) {
+        window.clearTimeout(waitTimer)
+      }
+    }
+  }, [camera, clone, onReady, renderer, scene])
+
+  return compiled === clone ? <primitive object={clone} /> : null
 }
 
 function collectMaterials(root: THREE.Object3D): Set<THREE.Material> {
@@ -535,9 +732,11 @@ function disposeClonedMaterials(
 function ImagePlane({
   url,
   bounds,
+  onReady,
 }: {
   url: string
   bounds: Vec3 | null | undefined
+  onReady: () => void
 }): JSX.Element {
   const texture = useLoader(THREE.TextureLoader, url)
 
@@ -548,15 +747,19 @@ function ImagePlane({
   const height = bounds?.y ?? 1
 
   return (
-    <mesh castShadow receiveShadow>
-      <planeGeometry args={[width, height]} />
-      <meshStandardMaterial
-        map={texture}
-        transparent
-        alphaTest={0.01}
-        side={THREE.DoubleSide}
-      />
-    </mesh>
+    <>
+      {/* One plane and one texture; there is no material set to precompile. */}
+      <ReadySignal onReady={onReady} />
+      <mesh castShadow receiveShadow>
+        <planeGeometry args={[width, height]} />
+        <meshStandardMaterial
+          map={texture}
+          transparent
+          alphaTest={0.01}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+    </>
   )
 }
 
@@ -568,12 +771,21 @@ function markerSize(bounds: Vec3 | null | undefined): [number, number, number] {
 /** Shown while an asset loads, and for formats the viewer cannot open. */
 function PendingMarker({
   bounds,
+  originConvention,
+  originInBounds,
 }: {
   bounds: Vec3 | null | undefined
+  originConvention?: string | null
+  originInBounds?: Vec3 | null
 }): JSX.Element {
+  const size = bounds ?? { x: 1, y: 1, z: 1 }
+  const offset = bounds
+    ? boundsOffset(size, originConvention ?? null, originInBounds ?? null)
+    : ([0, 0, 0] as const)
+
   return (
-    <mesh>
-      <boxGeometry args={markerSize(bounds)} />
+    <mesh position={offset}>
+      <boxGeometry args={markerSize(size)} />
       <meshBasicMaterial color="#4b5563" wireframe />
     </mesh>
   )
@@ -586,12 +798,21 @@ function PendingMarker({
  */
 function FailedMarker({
   bounds,
+  originConvention,
+  originInBounds,
 }: {
   bounds: Vec3 | null | undefined
+  originConvention?: string | null
+  originInBounds?: Vec3 | null
 }): JSX.Element {
+  const size = bounds ?? { x: 1, y: 1, z: 1 }
+  const offset = bounds
+    ? boundsOffset(size, originConvention ?? null, originInBounds ?? null)
+    : ([0, 0, 0] as const)
+
   return (
-    <mesh>
-      <boxGeometry args={markerSize(bounds)} />
+    <mesh position={offset}>
+      <boxGeometry args={markerSize(size)} />
       <meshBasicMaterial color="#ef4444" wireframe />
     </mesh>
   )

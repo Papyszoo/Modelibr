@@ -52,6 +52,27 @@ internal sealed class EnvironmentMapRepository : IEnvironmentMapRepository
             .FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<EnvironmentMap>> GetByIdsAsync(
+        IReadOnlyCollection<int> ids,
+        CancellationToken cancellationToken = default)
+    {
+        if (ids.Count == 0)
+        {
+            return [];
+        }
+
+        return await _context.EnvironmentMaps
+            .AsNoTracking()
+            .Include(map => map.Variants)
+                .ThenInclude(variant => variant.File)
+            .Include(map => map.Variants)
+                .ThenInclude(variant => variant.FaceFiles)
+                    .ThenInclude(faceFile => faceFile.File)
+            .Where(map => ids.Contains(map.Id))
+            .AsSplitQuery()
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<EnvironmentMap?> GetDeletedByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         return await BaseQuery(includeDeleted: true)

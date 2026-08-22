@@ -37,6 +37,18 @@ const SKIP_DIRS = new Set([
     "coverage",
 ]);
 
+// Suites that share a directory suffix their output dirs (playwright-report-fast,
+// test-results-full, ...), so the families are matched by prefix rather than by
+// an exact name that a new suite would silently fall outside of.
+const SKIP_DIR_PREFIXES = ["playwright-report", "test-results"];
+
+function isSkipped(name) {
+    return (
+        SKIP_DIRS.has(name) ||
+        SKIP_DIR_PREFIXES.some((prefix) => name.startsWith(prefix))
+    );
+}
+
 /** Recursively collect files under `dir` matching `predicate(relPath)`. */
 export function findFiles(dir, predicate, hits = []) {
     let entries;
@@ -48,7 +60,7 @@ export function findFiles(dir, predicate, hits = []) {
     for (const e of entries) {
         const full = path.join(dir, e.name);
         if (e.isDirectory()) {
-            if (SKIP_DIRS.has(e.name)) continue;
+            if (isSkipped(e.name)) continue;
             findFiles(full, predicate, hits);
         } else if (predicate(path.relative(REPO_ROOT, full))) {
             hits.push(full);

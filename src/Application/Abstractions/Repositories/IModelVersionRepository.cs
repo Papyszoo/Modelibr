@@ -5,6 +5,32 @@ namespace Application.Abstractions.Repositories;
 public interface IModelVersionRepository
 {
     Task<ModelVersion?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Loads the lightweight version rows needed by scene composition without the model,
+    /// files, thumbnail, and texture-mapping graph used by the single-version editor read.
+    /// </summary>
+    Task<IReadOnlyList<ModelVersion>> GetByIdsAsync(
+        IReadOnlyCollection<int> ids,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Loads versions with their thumbnail row, for choice cards that show what a candidate
+    /// looks like. A third batch rather than a fatter one: scene writes read versions on
+    /// every edit and must not start paying for a thumbnail join they never render.
+    /// </summary>
+    Task<IReadOnlyList<ModelVersion>> GetWithThumbnailsByIdsAsync(
+        IReadOnlyCollection<int> ids,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Loads pinned versions with only their renderable-file collection for the scene
+    /// resource manifest. Kept separate from the lightweight scene-facts batch.
+    /// </summary>
+    Task<IReadOnlyList<ModelVersion>> GetWithFilesByIdsAsync(
+        IReadOnlyCollection<int> ids,
+        CancellationToken cancellationToken = default);
+
     Task<ModelVersion?> GetDeletedByIdAsync(int id, CancellationToken cancellationToken = default);
     Task<ModelVersion?> GetByModelIdAndVersionNumberAsync(int modelId, int versionNumber, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ModelVersion>> GetByModelIdAsync(int modelId, CancellationToken cancellationToken = default);

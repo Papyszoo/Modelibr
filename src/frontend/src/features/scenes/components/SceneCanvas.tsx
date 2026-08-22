@@ -2,16 +2,22 @@ import './SceneCanvas.css'
 
 import { Environment, Grid, OrbitControls } from '@react-three/drei'
 import { Canvas, useLoader, useThree } from '@react-three/fiber'
-import { type JSX, useEffect, useMemo } from 'react'
+import { type JSX, useCallback, useEffect, useMemo, useState } from 'react'
 import * as THREE from 'three'
 import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader'
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader'
+
+import { RendererPerfSampler } from '@/shared/three/RendererPerfSampler'
 
 import {
   sceneAssetSourceKey,
   useSceneAssetSources,
 } from '../hooks/useSceneAssetSources'
 import { useSceneMaterials } from '../hooks/useSceneMaterials'
+import { useSceneResourceAdmission } from '../hooks/useSceneResourceAdmission'
+import { useSceneViewportMeasurements } from '../hooks/useSceneViewportMeasurements'
+import { useSceneViewportQuality } from '../hooks/useSceneViewportQuality'
+import { buildSceneResourceCandidates } from '../lib/sceneResourcePriority'
 import type {
   SceneDocument,
   SceneEnvironment,
@@ -19,6 +25,7 @@ import type {
   SceneNodeView,
 } from '../types'
 import { SceneNodeObject } from './SceneNodeObject'
+import { SceneResourcePriorityProbe } from './SceneResourcePriorityProbe'
 
 interface SceneCanvasProps {
   /** The draft being edited - the source of truth for what is drawn. */
@@ -99,6 +106,41 @@ export function SceneCanvas({
   // there fails at the first hook and the node simply never appears.
   const sources = useSceneAssetSources(document)
   const materials = useSceneMaterials(document)
+  const viewportQuality = useSceneViewportQuality(interactive)
+
+  // What the camera can see decides what loads next, so the ranking is produced inside the
+  // Canvas - the only place a camera exists - and applied by the queue out here. Held as a
+  // string rather than an array so an unchanged order costs no re-render.
+  const [rankedResourceKeys, setRankedResourceKeys] = useState('')
+  const onRankResources = useCallback((orderedKeys: string[]) => {
+    const ranking = orderedKeys.join('|')
+    setRankedResourceKeys(previous =>
+      previous === ranking ? previous : ranking
+    )
+  }, [])
+  const rankedKeys = useMemo(
+    () => (rankedResourceKeys ? rankedResourceKeys.split('|') : []),
+    [rankedResourceKeys]
+  )
+  const resourceCandidates = useMemo(
+    () => buildSceneResourceCandidates(document, nodeFacts, sources),
+    [document, nodeFacts, sources]
+  )
+
+  const resourceAdmission = useSceneResourceAdmission(
+    document,
+    !blockout,
+    viewportQuality.state === 'moving',
+    selectedNodeId,
+    rankedKeys
+  )
+  const viewportMeasurements = useSceneViewportMeasurements({
+    enabled: interactive && !blockout,
+    resourceSignature: resourceAdmission.resourceSignature,
+    resourceCount: resourceAdmission.resourceCount,
+    completedResourceCount: resourceAdmission.completedResourceCount,
+    qualityState: viewportQuality.state,
+  })
 
   // Resolved out here with everything else - the environment map is a library
   // asset, so its URL comes from a query the canvas subtree cannot run.
@@ -110,16 +152,28 @@ export function SceneCanvas({
   return (
     <div className="scene-canvas" data-testid="scene-canvas">
       <Canvas
-        shadows
+        shadows={viewportQuality.shadowsEnabled}
         camera={{
           position: camera.position,
           fov: camera.fov ?? DEFAULT_CAMERA.fov,
         }}
         gl={{ antialias: true, powerPreference: 'high-performance' }}
-        dpr={Math.min(window.devicePixelRatio, 2)}
+        dpr={viewportQuality.dpr}
         onPointerMissed={interactive ? () => onSelectNode(null) : undefined}
       >
         <SceneCameraAim target={camera.target ?? [0, 0, 0]} />
+        {interactive && !blockout ? (
+          <>
+            <RendererPerfSampler
+              onSample={viewportMeasurements.onRendererSample}
+            />
+            <SceneResourcePriorityProbe
+              candidates={resourceCandidates}
+              qualityState={viewportQuality.state}
+              onRank={onRankResources}
+            />
+          </>
+        ) : null}
 
         {showGrid ? (
           <Grid
@@ -141,7 +195,10 @@ export function SceneCanvas({
           mapUrl={environmentMapUrl}
         />
 
-        <SceneDocumentLights lights={document.lights} />
+        <SceneDocumentLights
+          lights={document.lights}
+          shadowsEnabled={viewportQuality.shadowsEnabled}
+        />
 
         {document.nodes.map(node => {
           const facts = nodeFacts.get(node.id)
@@ -152,7 +209,7 @@ export function SceneCanvas({
               selected={node.id === selectedNodeId}
               onSelect={onSelectNode}
               source={
-                node.asset
+                node.asset && resourceAdmission.isAdmitted(node.asset)
                   ? sources.get(sceneAssetSourceKey(node.asset))
                   : undefined
               }
@@ -163,16 +220,73 @@ export function SceneCanvas({
               blockout={blockout}
               undecided={undecidedNodeIds?.has(node.id) ?? false}
               onLoadError={onNodeLoadError}
-              onLoadSettled={onNodeLoadSettled}
+              onLoadSettled={(nodeId, loaded) => {
+                resourceAdmission.onNodeSettled(nodeId, loaded)
+                onNodeLoadSettled?.(nodeId, loaded)
+              }}
             />
           )
         })}
 
         {interactive ? (
-          <OrbitControls makeDefault enableDamping dampingFactor={0.1} />
+          <OrbitControls
+            makeDefault
+            enableDamping
+            dampingFactor={0.1}
+            onStart={viewportQuality.onControlsStart}
+            onChange={viewportQuality.onControlsChange}
+            onEnd={viewportQuality.onControlsEnd}
+          />
         ) : null}
       </Canvas>
+      {interactive &&
+      !blockout &&
+      resourceAdmission.resourceCount > 0 &&
+      (resourceAdmission.completedResourceCount <
+        resourceAdmission.resourceCount ||
+        resourceAdmission.failedResourceCount > 0) ? (
+        <SceneResourceProgress
+          completed={resourceAdmission.completedResourceCount}
+          total={resourceAdmission.resourceCount}
+          loading={resourceAdmission.activeResourceKey !== null}
+          failed={resourceAdmission.failedResourceCount}
+        />
+      ) : null}
     </div>
+  )
+}
+
+function SceneResourceProgress({
+  completed,
+  total,
+  loading,
+  failed,
+}: {
+  completed: number
+  total: number
+  loading: boolean
+  failed: number
+}): JSX.Element {
+  const parts = [`${completed}/${total} resources`]
+  if (loading) {
+    parts.push('1 loading')
+  }
+  if (failed > 0) {
+    parts.push(`${failed} failed`)
+  }
+
+  return (
+    <output
+      className={
+        failed > 0
+          ? 'scene-canvas__resource-progress scene-canvas__resource-progress--failed'
+          : 'scene-canvas__resource-progress'
+      }
+      data-testid="scene-resource-progress"
+      aria-live="polite"
+    >
+      {parts.join(' · ')}
+    </output>
   )
 }
 
@@ -210,14 +324,20 @@ function SceneCameraAim({
  */
 function SceneDocumentLights({
   lights,
+  shadowsEnabled,
 }: {
   lights: SceneLight[]
+  shadowsEnabled: boolean
 }): JSX.Element {
   if (lights.length === 0) {
     return (
       <>
         <ambientLight intensity={0.6} />
-        <directionalLight position={[8, 12, 6]} intensity={1.1} castShadow />
+        <directionalLight
+          position={[8, 12, 6]}
+          intensity={1.1}
+          castShadow={shadowsEnabled}
+        />
       </>
     )
   }
@@ -250,7 +370,13 @@ function SceneDocumentLights({
             )
           case 'directional':
           case 'spot':
-            return <AimedLight key={light.id} light={light} />
+            return (
+              <AimedLight
+                key={light.id}
+                light={light}
+                shadowsEnabled={shadowsEnabled}
+              />
+            )
           default:
             return (
               <pointLight
@@ -258,7 +384,7 @@ function SceneDocumentLights({
                 position={position}
                 intensity={light.intensity}
                 color={light.color}
-                castShadow
+                castShadow={shadowsEnabled}
               />
             )
         }
@@ -276,7 +402,13 @@ function SceneDocumentLights({
  * has to be part of the scene graph for its world matrix to update, hence the
  * `<primitive>` rather than a bare `new Object3D()`.
  */
-function AimedLight({ light }: { light: SceneLight }): JSX.Element {
+function AimedLight({
+  light,
+  shadowsEnabled,
+}: {
+  light: SceneLight
+  shadowsEnabled: boolean
+}): JSX.Element {
   const target = useMemo(() => new THREE.Object3D(), [])
   const aim = light.target ?? { x: 0, y: 0, z: 0 }
   const position: [number, number, number] = [
@@ -296,7 +428,7 @@ function AimedLight({ light }: { light: SceneLight }): JSX.Element {
           color={light.color}
           angle={0.5}
           penumbra={0.4}
-          castShadow
+          castShadow={shadowsEnabled}
         />
       ) : (
         <directionalLight
@@ -304,7 +436,7 @@ function AimedLight({ light }: { light: SceneLight }): JSX.Element {
           target={target}
           intensity={light.intensity}
           color={light.color}
-          castShadow
+          castShadow={shadowsEnabled}
         />
       )}
     </>

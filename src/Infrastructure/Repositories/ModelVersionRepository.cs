@@ -38,6 +38,53 @@ internal sealed class ModelVersionRepository : IModelVersionRepository
             .FirstOrDefaultAsync(v => v.Id == id, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<ModelVersion>> GetByIdsAsync(
+        IReadOnlyCollection<int> ids,
+        CancellationToken cancellationToken = default)
+    {
+        if (ids.Count == 0)
+        {
+            return [];
+        }
+
+        return await _context.ModelVersions
+            .AsNoTracking()
+            .Where(v => ids.Contains(v.Id))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ModelVersion>> GetWithThumbnailsByIdsAsync(
+        IReadOnlyCollection<int> ids,
+        CancellationToken cancellationToken = default)
+    {
+        if (ids.Count == 0)
+        {
+            return [];
+        }
+
+        return await _context.ModelVersions
+            .AsNoTracking()
+            .Include(v => v.Thumbnail)
+            .Where(v => ids.Contains(v.Id))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ModelVersion>> GetWithFilesByIdsAsync(
+        IReadOnlyCollection<int> ids,
+        CancellationToken cancellationToken = default)
+    {
+        if (ids.Count == 0)
+        {
+            return [];
+        }
+
+        return await _context.ModelVersions
+            .AsNoTracking()
+            .Include(version => version.Files)
+            .Where(version => ids.Contains(version.Id))
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<ModelVersion?> GetByModelIdAndVersionNumberAsync(
         int modelId, 
         int versionNumber, 

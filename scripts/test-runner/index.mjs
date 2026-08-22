@@ -148,7 +148,9 @@ async function runSuite(suite) {
     const result = await runCommand(command, {
         cwd: path.join(REPO_ROOT, suite.cwd),
         logFile,
-        extraEnv: { CI: "true", FORCE_COLOR: "1" },
+        // A suite's own env last: it is how suites that share a working
+        // directory claim separate output paths (see `env` in the manifest).
+        extraEnv: { CI: "true", FORCE_COLOR: "1", ...(suite.env ?? {}) },
     });
 
     let counts = null;

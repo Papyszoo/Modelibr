@@ -10,11 +10,16 @@ namespace Application.Scenes;
 /// </summary>
 internal abstract class SceneSlotHandlerBase
 {
-    protected SceneSlotHandlerBase(ISceneWriter writer, ISceneAssetFacts facts, ISceneAssetProfiles profiles)
+    protected SceneSlotHandlerBase(
+        ISceneWriter writer,
+        ISceneAssetFacts facts,
+        ISceneAssetProfiles profiles,
+        ISceneCandidateMedia media)
     {
         Writer = writer;
         SceneFacts = facts;
         Profiles = profiles;
+        Media = media;
     }
 
     protected ISceneWriter Writer { get; }
@@ -22,6 +27,8 @@ internal abstract class SceneSlotHandlerBase
     protected ISceneAssetFacts SceneFacts { get; }
 
     protected ISceneAssetProfiles Profiles { get; }
+
+    protected ISceneCandidateMedia Media { get; }
 
     internal static int IndexOfSlot(SceneDocument document, string slotId)
     {
@@ -75,8 +82,9 @@ internal abstract class SceneSlotHandlerBase
         var assets = slot.Candidates.Where(c => c.Asset is not null).Select(c => c.Asset!).ToList();
         var facts = await SceneFacts.ResolveAsync(assets, cancellationToken);
         var profiles = await Profiles.ResolveAsync(assets, cancellationToken);
+        var media = await Media.ResolveAsync(document, cancellationToken);
 
-        return SceneSlotViewBuilder.Describe(slot, document, facts, profiles);
+        return SceneSlotViewBuilder.Describe(slot, document, facts, profiles, media);
     }
 }
 
@@ -84,8 +92,8 @@ internal sealed class ProposeSceneCandidatesCommandHandler
     : SceneSlotHandlerBase, ICommandHandler<ProposeSceneCandidatesCommand, SceneSlotWriteResponse>
 {
     public ProposeSceneCandidatesCommandHandler(
-        ISceneWriter writer, ISceneAssetFacts facts, ISceneAssetProfiles profiles)
-        : base(writer, facts, profiles)
+        ISceneWriter writer, ISceneAssetFacts facts, ISceneAssetProfiles profiles, ISceneCandidateMedia media)
+        : base(writer, facts, profiles, media)
     {
     }
 
@@ -219,12 +227,13 @@ internal sealed class ProposeSceneCandidatesCommandHandler
 
             var hasAsset = proposal.AssetType is not null || proposal.AssetId is not null;
             var hasMaterial = proposal.TextureSetId is not null || proposal.MaterialId is not null || proposal.Variant is not null;
+            var hasStore = proposal.StoreUrl is not null || proposal.StoreAssetId is not null;
 
-            if (!hasAsset && !hasMaterial)
+            if (!hasAsset && !hasMaterial && !hasStore)
             {
                 return Result.Failure<IReadOnlyList<SceneSlotCandidate>>(new Error(
                     "Scene.CandidateEmpty",
-                    $"Candidate {i + 1} proposes nothing. Give it an asset (assetType + assetId, and versionId for a Model), a material, or both."));
+                    $"Candidate {i + 1} proposes nothing. Give it an asset (assetType + assetId, and versionId for a Model), a store asset (storeUrl + storeAssetId), a material, or an asset and a material."));
             }
 
             if (hasAsset && (proposal.AssetType is null || proposal.AssetId is null))
@@ -234,13 +243,43 @@ internal sealed class ProposeSceneCandidatesCommandHandler
                     $"Candidate {i + 1} names half an asset reference. Both assetType and assetId are needed."));
             }
 
+            if (hasStore && (proposal.StoreUrl is null || proposal.StoreAssetId is null))
+            {
+                return Result.Failure<IReadOnlyList<SceneSlotCandidate>>(new Error(
+                    "Scene.CandidateIncomplete",
+                    $"Candidate {i + 1} names half a store reference. Both storeUrl and storeAssetId are needed - an id without a store is not addressable."));
+            }
+
+            // One proposal is one answer. "This one from the library, or that one from the
+            // store" is two answers with two different costs, and they are settled
+            // differently: one is chosen, the other has to be acquired first.
+            if (hasAsset && hasStore)
+            {
+                return Result.Failure<IReadOnlyList<SceneSlotCandidate>>(new Error(
+                    "Scene.CandidateHasBothAssets",
+                    $"Candidate {i + 1} names both a library asset and a store asset. Propose them separately."));
+            }
+
             candidates.Add(new SceneSlotCandidate(
                 // Replaced during the mutation, where the slot's already-used ids are visible.
                 "?",
                 hasAsset ? new SceneAssetRef(proposal.AssetType!, proposal.AssetId!.Value, proposal.VersionId) : null,
                 hasMaterial ? new SceneMaterialBinding(proposal.TextureSetId, proposal.Variant, proposal.MaterialId) : null,
                 proposal.Rationale,
-                proposal.Label));
+                proposal.Label,
+                RejectedReason: null,
+                // The title and picture are copied into the scene on purpose: the card has to
+                // draw with the store unreachable, and a proposal nobody can read is a
+                // proposal nobody can judge.
+                StoreAsset: hasStore
+                    ? new SceneStoreAssetRef(
+                        proposal.StoreUrl!.Trim().TrimEnd('/'),
+                        proposal.StoreAssetId!.Trim(),
+                        proposal.StoreTitle,
+                        proposal.StoreThumbnailUrl,
+                        proposal.StorePrice,
+                        proposal.StoreCurrency)
+                    : null));
         }
 
         return Result.Success<IReadOnlyList<SceneSlotCandidate>>(candidates);
@@ -251,8 +290,8 @@ internal sealed class ResolveSceneSlotCommandHandler
     : SceneSlotHandlerBase, ICommandHandler<ResolveSceneSlotCommand, SceneSlotWriteResponse>
 {
     public ResolveSceneSlotCommandHandler(
-        ISceneWriter writer, ISceneAssetFacts facts, ISceneAssetProfiles profiles)
-        : base(writer, facts, profiles)
+        ISceneWriter writer, ISceneAssetFacts facts, ISceneAssetProfiles profiles, ISceneCandidateMedia media)
+        : base(writer, facts, profiles, media)
     {
     }
 
@@ -314,6 +353,19 @@ internal sealed class ResolveSceneSlotCommandHandler
                         $"{(slot.Candidates.Count == 0 ? "nothing yet" : string.Join(", ", slot.Candidates.Select(c => c.Id)))}."));
                 }
 
+                // The agent proposes and the user decides, and for a store candidate the
+                // deciding includes paying for it or at least downloading it. resolve_slot
+                // writes a node's asset from a candidate; a store candidate has no local
+                // asset to write, so this is a wall rather than a policy: import it first,
+                // propose the imported asset, and the slot resolves normally.
+                if (candidate.IsFromStore)
+                {
+                    return Result.Failure<SceneDocument>(new Error(
+                        "Scene.CandidateNotInLibrary",
+                        $"Candidate '{SceneSlotViewBuilder.Ref(command.SlotId, candidate.Id)}' is a store asset, not a library one, so it cannot be chosen as it stands. " +
+                        "Import it first - a free asset with import_store_asset, a paid one by the user accepting it in the app - then propose the imported asset for this slot."));
+                }
+
                 if (candidate.IsRejected)
                 {
                     return Result.Failure<SceneDocument>(new Error(
@@ -366,8 +418,8 @@ internal sealed class RejectSceneCandidatesCommandHandler
     : SceneSlotHandlerBase, ICommandHandler<RejectSceneCandidatesCommand, SceneSlotWriteResponse>
 {
     public RejectSceneCandidatesCommandHandler(
-        ISceneWriter writer, ISceneAssetFacts facts, ISceneAssetProfiles profiles)
-        : base(writer, facts, profiles)
+        ISceneWriter writer, ISceneAssetFacts facts, ISceneAssetProfiles profiles, ISceneCandidateMedia media)
+        : base(writer, facts, profiles, media)
     {
     }
 
@@ -529,12 +581,18 @@ internal sealed class GetSceneSlotsQueryHandler : IQueryHandler<GetSceneSlotsQue
     private readonly ISceneWriter _writer;
     private readonly ISceneAssetFacts _facts;
     private readonly ISceneAssetProfiles _profiles;
+    private readonly ISceneCandidateMedia _media;
 
-    public GetSceneSlotsQueryHandler(ISceneWriter writer, ISceneAssetFacts facts, ISceneAssetProfiles profiles)
+    public GetSceneSlotsQueryHandler(
+        ISceneWriter writer,
+        ISceneAssetFacts facts,
+        ISceneAssetProfiles profiles,
+        ISceneCandidateMedia media)
     {
         _writer = writer;
         _facts = facts;
         _profiles = profiles;
+        _media = media;
     }
 
     public async Task<Result<SceneSlotsView>> Handle(GetSceneSlotsQuery query, CancellationToken cancellationToken)
@@ -550,9 +608,10 @@ internal sealed class GetSceneSlotsQueryHandler : IQueryHandler<GetSceneSlotsQue
 
         var facts = await _facts.ResolveAsync(assets, cancellationToken);
         var profiles = await _profiles.ResolveAsync(assets, cancellationToken);
+        var media = await _media.ResolveAsync(document, cancellationToken);
 
         return Result.Success(new SceneSlotsView(
             SceneViewBuilder.Summarize(scene, document),
-            SceneSlotViewBuilder.DescribeAll(document, facts, profiles)));
+            SceneSlotViewBuilder.DescribeAll(document, facts, profiles, media)));
     }
 }

@@ -53,6 +53,24 @@ internal sealed class AssetDerivationRepository : IAssetDerivationRepository
             .FirstOrDefaultAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<AssetDerivation>> GetForAssetsAsync(
+        string assetType,
+        IReadOnlyCollection<int> assetIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (assetIds.Count == 0)
+        {
+            return [];
+        }
+
+        return await _context.AssetDerivations
+            .AsNoTracking()
+            .Where(e => e.AssetType == assetType && assetIds.Contains(e.AssetId))
+            .OrderBy(e => e.AssetId)
+            .ThenByDescending(e => e.VersionId)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<AssetDerivation?> GetForActiveVersionAsync(
         string assetType,
         int assetId,

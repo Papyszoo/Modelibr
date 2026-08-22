@@ -245,6 +245,20 @@ When("I reopen the scene {string}", async ({ page }, name: string) => {
 /** Successfully served `/files/<id>` URLs seen while multi-file models were placed. */
 const auxiliaryFetches = new WeakMap<Page, string[]>();
 
+interface HeldSceneFile {
+    fileId: number;
+    release: () => void;
+}
+
+interface HeldSceneFiles {
+    primaryFileIds: Set<number>;
+    interceptedFileIds: number[];
+    pending: HeldSceneFile[];
+}
+
+/** Browser-side gates used by the deterministic progressive-loading scenario. */
+const heldSceneFiles = new WeakMap<Page, HeldSceneFiles>();
+
 /** Imports one staged multi-file glTF and returns the model name it lands under. */
 async function importMultiFileGltf(page: Page): Promise<string> {
     const { stageMultiFileGltf } = await import(
@@ -301,6 +315,55 @@ Given(
         getScenarioState(page).setCustom("sceneMultiFileModelNames", names);
     },
 );
+
+Given("the imported scene model files are held", async ({ page }) => {
+    const { ApiHelper } = await import("../helpers/api-helper");
+    const api = new ApiHelper();
+    const primaryFileIds = new Set<number>();
+
+    for (const modelName of importedMultiFileModels(page)) {
+        const model = await api.findModelByName(modelName);
+        expect(model, `Imported model ${modelName} was not found`).toBeTruthy();
+
+        const versionsResponse = await page.request.get(
+            `${apiBase()}/models/${model.id}/versions`,
+        );
+        expect(versionsResponse.ok()).toBeTruthy();
+        const versions = await versionsResponse.json();
+        const primary = versions[0]?.files?.find(
+            (file: { isRenderable: boolean }) => file.isRenderable,
+        );
+        expect(primary?.id, `${modelName} has no renderable primary file`).toBeGreaterThan(0);
+        primaryFileIds.add(primary.id);
+    }
+
+    const state: HeldSceneFiles = {
+        primaryFileIds,
+        interceptedFileIds: [],
+        pending: [],
+    };
+    heldSceneFiles.set(page, state);
+
+    await page.route(/\/files\/\d+(?:\?|$)/, async route => {
+        const fileId = Number(new URL(route.request().url()).pathname.split("/").pop());
+        if (!state.primaryFileIds.has(fileId)) {
+            await route.continue();
+            return;
+        }
+
+        let release = () => {};
+        const gate = new Promise<void>(resolve => {
+            release = resolve;
+        });
+        const held = { fileId, release };
+        state.interceptedFileIds.push(fileId);
+        state.pending.push(held);
+
+        await gate;
+        state.pending = state.pending.filter(candidate => candidate !== held);
+        await route.continue();
+    });
+});
 
 When(
     "I place every imported multi-file model into the scene",
@@ -363,6 +426,49 @@ Then(
                 },
             )
             .toBeGreaterThanOrEqual(expected);
+    },
+);
+
+Then(
+    "the scene should remain interactive and load the held resources serially",
+    async ({ page }) => {
+        const state = heldSceneFiles.get(page);
+        if (!state) {
+            throw new Error("The scene file gate was not installed.");
+        }
+
+        const progress = page.getByTestId("scene-resource-progress");
+        await expect(progress).toContainText("0/2 resources");
+        await expect(progress).toContainText("1 loading");
+
+        // The second primary must not even be requested while the first is held. This is
+        // stronger than watching a spinner: it proves the loader branch was not mounted.
+        await expect
+            .poll(() => new Set(state.interceptedFileIds).size, {
+                message: "waiting for the first admitted scene file request",
+            })
+            .toBe(1);
+
+        // Selection is the interaction the bounds-first state exists to preserve.
+        const scenes = new ScenesPage(page);
+        const secondNodeId = await scenes.nodeRows().nth(1).getAttribute("data-node-id");
+        expect(secondNodeId).toBeTruthy();
+        await scenes.selectNode(secondNodeId!);
+
+        state.pending[0]?.release();
+        await expect
+            .poll(() => new Set(state.interceptedFileIds).size, {
+                message:
+                    "the second scene resource did not start after the first settled",
+                timeout: 30000,
+            })
+            .toBe(2);
+
+        for (const held of [...state.pending]) {
+            held.release();
+        }
+
+        await expect(progress).toBeHidden({ timeout: 30000 });
     },
 );
 
@@ -821,6 +927,36 @@ Given(
  * server, so this leaves the slot offering A, B and C.
  */
 Given(
+    "a store candidate has been proposed for the slot {string}",
+    async ({ page }, slotId: string) => {
+        // No store is needed for this: a store candidate is data the scene
+        // carries - the title, price and picture are copied in when it is
+        // proposed, precisely so the card still reads with the store down.
+        const view = await fetchSceneByName(page, currentSceneName(page));
+
+        const response = await page.request.post(
+            `${apiBase()}/scenes/${view.scene.id}/slots/${slotId}/candidates`,
+            {
+                data: {
+                    brief: "low-poly, reads as rundown",
+                    candidates: [
+                        {
+                            rationale: "nothing in the library is low-poly",
+                            storeUrl: "https://store.modelibr.com",
+                            storeAssetId: "47f60614-522f-4ced-941c-318ac5c7bd34",
+                            storeTitle: "Quaternius: Ultimate Furniture Pack",
+                            storePrice: 0,
+                            storeCurrency: "USD",
+                        },
+                    ],
+                },
+            },
+        );
+        expect(response.ok()).toBeTruthy();
+    },
+);
+
+Given(
     "two candidates have been proposed for the slot {string}",
     async ({ page }, slotId: string) => {
         const model = testModel(page);
@@ -856,6 +992,27 @@ Then(
         const scenes = new ScenesPage(page);
         await expect(scenes.choicesLocator()).toBeVisible();
         await expect(scenes.candidateCard(candidateRef)).toBeVisible();
+    },
+);
+
+Then(
+    "the candidate {string} should be marked as not in the library",
+    async ({ page }, candidateRef: string) => {
+        const scenes = new ScenesPage(page);
+        await expect(
+            scenes.candidateCard(candidateRef).getByText("Not in your library"),
+        ).toBeVisible();
+    },
+);
+
+Then(
+    "the candidate {string} cannot be chosen",
+    async ({ page }, candidateRef: string) => {
+        // Disabled rather than absent: the user should see that this option
+        // exists and what settling on it would cost, not wonder where it went.
+        await expect(
+            page.locator(`[data-testid="scene-choices-choose-${candidateRef}"]`),
+        ).toBeDisabled();
     },
 );
 

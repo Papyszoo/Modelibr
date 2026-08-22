@@ -17,9 +17,12 @@ const CONTAINERS = [
 ] as const;
 
 // Full container logs are written here as well as attached. Attachments live in
-// playwright-report/, which the NEXT suite in the runner (e2e-performance)
-// overwrites - on 2026-08-10 that destroyed the only copy of the worker's dying
-// stderr before it could be read. `*.log` is gitignored under tests/e2e.
+// the run's report directory, and the report used to be shared by all three e2e
+// suites - on 2026-08-10 the next suite in the runner overwrote it and destroyed
+// the only copy of the worker's dying stderr before it could be read. Each suite
+// now owns its report (see PW_HTML_REPORT in suites.config.mjs), but this copy
+// stays: it is plain text a grep can reach without unpacking a report, and it
+// survives a re-run of the same suite. `*.log` is gitignored under tests/e2e.
 const CONTAINER_LOG_DIR = path.join(__dirname, "..", "container-logs");
 
 function slugify(value: string): string {

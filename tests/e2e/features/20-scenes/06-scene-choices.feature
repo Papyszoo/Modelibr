@@ -45,3 +45,16 @@ Feature: Scene choices
     And I reject the whole round for the slot "streetlight" saying "all too modern"
     Then the choices panel should still offer "streetlight/B"
     And the slot "streetlight" should record "all too modern" against every candidate
+
+  @scene-choices-store
+  Scenario: A store candidate is shown as not owned and cannot be chosen
+    # The agent may propose something the library does not have. Settling the
+    # slot on it means acquiring it first, so the card says so instead of
+    # offering a Choose button that the server refuses.
+    Given a scene named "Store Choice Scene" is open
+    And the test model is placed in the scene for the slot "streetlight"
+    And a store candidate has been proposed for the slot "streetlight"
+    When I reopen the scene "Store Choice Scene"
+    Then the choices panel should offer "streetlight/B"
+    And the candidate "streetlight/B" should be marked as not in the library
+    And the candidate "streetlight/B" cannot be chosen

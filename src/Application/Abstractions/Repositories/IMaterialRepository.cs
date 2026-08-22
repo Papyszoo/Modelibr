@@ -8,6 +8,14 @@ public interface IMaterialRepository
     Task<IEnumerable<Material>> GetAllAsync(CancellationToken cancellationToken = default);
     Task<IEnumerable<Material>> GetAllDeletedAsync(CancellationToken cancellationToken = default);
     Task<Material?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Batch read for choice-card media: one query for every material a scene's
+    /// candidates name, rather than one per card.
+    /// </summary>
+    Task<IReadOnlyList<Material>> GetByIdsAsync(
+        IReadOnlyCollection<int> ids,
+        CancellationToken cancellationToken = default);
     Task<Material?> GetDeletedByIdAsync(int id, CancellationToken cancellationToken = default);
     Task<Material?> GetByNameAsync(string name, CancellationToken cancellationToken = default);
     Task<bool> ExistsByNameAsync(string name, CancellationToken cancellationToken = default);

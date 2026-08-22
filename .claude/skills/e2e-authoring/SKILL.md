@@ -74,6 +74,11 @@ browser. (Demo config → `test-results/demo-results.json`.)
   referenced from `results.json` `attachments[].path`. To read the report JSON
   without a browser, the merge now also writes `test-results/results.json`
   directly - use that.
+- **Through the mega-runner** (`npm run test:all`): same layout, but each e2e
+  suite gets its own pair of directories so they stop overwriting each other -
+  `playwright-report-{fast,full,performance}/` and `test-results-{fast,full,
+  performance}/`. The names come from `PW_HTML_REPORT`/`PW_OUTPUT_DIR` in
+  `scripts/test-runner/suites.config.mjs`; unset, the paths above still apply.
 
 Inspecting a `trace.zip`:
 - GUI: `cd tests/e2e && npx playwright show-trace <path>`.

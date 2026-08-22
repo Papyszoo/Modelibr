@@ -75,6 +75,28 @@ a fresh proposal, which correctly gets a new id.
 An already-rejected candidate keeps its _original_ reason when a later blanket "none of
 these" sweeps the slot: the first "no" is the one that says something specific.
 
+## The panel must never be served from cache
+
+`getSceneSlotsQueryOptions` and `getSceneByIdQueryOptions` set `staleTime: 0`, against the
+app-wide five-minute default in `lib/react-query.ts`. That default assumes the user is the
+only author, which is the one thing a scene is not: the agent writes over MCP, and the
+whole review loop is the user looking at what it just wrote. No invalidation can cover it -
+the write never passed through this client - and `refetchOnMount` does nothing while the
+entry is still fresh.
+
+For slots the default was worse than stale data. The panel renders `null` for a scene with
+no slots (most scenes have none), so a cache entry captured when the scene was first opened
+did not show old candidates - it showed **no choices panel at all**, and the decisions the
+agent had just offered stayed invisible until the entry aged out.
+
+Found by the three `06-scene-choices.feature` scenarios, which failed on
+`[data-testid="scene-choices"]` never existing. They seed slots over the API and then
+reopen the scene by clicking, so nothing invalidates anything - the scenarios in
+`02-scene-authoring.feature` only pass because they save through the UI first, and that
+mutation invalidates the whole `['scenes']` key. Worth remembering when writing any e2e
+that seeds through `page.request`: an in-app "reopen" is not a reload, and the cache
+outlives it.
+
 See also [[shared-render-lib.md]] for what the Choices panel's preview shares with the
 viewer - the preview is a client-side document swap, never a write, so looking at four
 options does not move the scene's revision four times.

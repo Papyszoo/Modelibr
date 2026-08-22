@@ -10,6 +10,15 @@ const testDir = defineBddConfig({
 // after all phases, run-e2e.js merges them into a single HTML report.
 const useBlobReporter = !!process.env.PW_MERGE_BLOB;
 
+// Three mega-runner suites (e2e-fast, e2e-full, e2e-performance) share this
+// config, and used to share one report directory with it: whichever ran last
+// silently replaced the other two reports *and* their traces, screenshots and
+// videos, so a full `npm run test:all` left three suite links all pointing at
+// the last one's results. The runner hands each suite its own pair of dirs
+// through these; a bare `npx playwright test` keeps the historical defaults.
+const htmlReportDir = process.env.PW_HTML_REPORT || "playwright-report";
+const artifactDir = process.env.PW_OUTPUT_DIR || "test-results";
+
 // Only honour a known value for an env-driven enum, else fall back to the default
 // - so a typo (e.g. PW_TRACE=true) can't make Playwright throw at config load.
 const envEnum = (v: string | undefined, allowed: string[], dflt: string) =>
@@ -18,6 +27,7 @@ const envEnum = (v: string | undefined, allowed: string[], dflt: string) =>
 export default defineConfig({
     testDir,
     globalSetup: "./global-setup.ts",
+    outputDir: artifactDir,
     // 90s default to allow for thumbnail generation (Puppeteer cold start +
     // rendering takes 30-40s). Overridable via PW_TEST_TIMEOUT so slower
     // deployments (e.g. an installed native build on a contended CI runner) can
@@ -40,8 +50,8 @@ export default defineConfig({
     reporter: useBlobReporter
         ? [["blob", { outputDir: "blob-report" }]]
         : [
-              ["html", { open: "never" }],
-              ["json", { outputFile: "test-results/results.json" }],
+              ["html", { open: "never", outputFolder: htmlReportDir }],
+              ["json", { outputFile: `${artifactDir}/results.json` }],
           ],
     use: {
         baseURL: process.env.FRONTEND_URL || "http://localhost:3002",

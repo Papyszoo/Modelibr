@@ -32,6 +32,16 @@ public interface IAssetDerivationRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Loads every derived row for the requested assets in one read. Scene composition uses
+    /// the exact pinned version when present and otherwise selects the newest row in memory,
+    /// avoiding one or two database round trips per placed asset.
+    /// </summary>
+    Task<IReadOnlyList<AssetDerivation>> GetForAssetsAsync(
+        string assetType,
+        IReadOnlyCollection<int> assetIds,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// The derivation for the asset's <b>active</b> version - the version search returns and
     /// scene nodes pin.
     /// </summary>

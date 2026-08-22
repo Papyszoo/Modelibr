@@ -488,7 +488,13 @@ public sealed class SceneWriteMcpTools
         [property: Description("Optional card label, when the asset's own name is not the useful thing to read.")] string? Label = null,
         [property: Description("Optional texture set to dress it with.")] int? TextureSetId = null,
         [property: Description("Optional material to dress it with. A material and a texture set are two ways to say the same thing - pass one.")] int? MaterialId = null,
-        [property: Description("Optional texture-set variant.")] string? Variant = null);
+        [property: Description("Optional texture-set variant.")] string? Variant = null,
+        [property: Description("For a proposal from the companion Asset Store: which store, e.g. https://store.modelibr.com. Pass it with storeAssetId, and never together with assetId - a store asset is a different answer from a library one.")] string? StoreUrl = null,
+        [property: Description("The store's asset id (a Guid, from search_store_assets). A store candidate is visibly NOT in the library and cannot be resolved by you: the user accepts it, or you import a free one first.")] string? StoreAssetId = null,
+        [property: Description("The store's title for it, copied onto the card so the card still reads when the store is down.")] string? StoreTitle = null,
+        [property: Description("The store's thumbnail URL, copied for the same reason.")] string? StoreThumbnailUrl = null,
+        [property: Description("What it costs. 0 means you could import it yourself with import_store_asset.")] decimal? StorePrice = null,
+        [property: Description("Currency of the price, e.g. USD.")] string? StoreCurrency = null);
 
     [McpServerTool(Name = "propose_candidates")]
     [Description("Offer the user 2-4 options for one decision in a scene, instead of silently picking one. " +
@@ -499,7 +505,11 @@ public sealed class SceneWriteMcpTools
                  "Candidate ids are assigned here (A, B, C...) and never reused - a rejected B stays B and the next proposal is D, " +
                  "so 'streetlight B is too modern' means one thing for the life of the scene. " +
                  "Call get_slots first when re-proposing: it carries the reasons the last round was turned down. " +
-                 "Give every candidate a rationale - the user sees it beside the asset's real dimensions and part count.")]
+                 "Give every candidate a rationale - the user sees it beside the asset's real dimensions and part count. " +
+                 "A candidate may also come from the companion Asset Store (storeUrl + storeAssetId): propose one only when the " +
+                 "library genuinely cannot fill the slot, say why in the rationale, and never one whose alreadyImported is true. " +
+                 "A store candidate is shown as not-yet-owned and CANNOT be resolved by you - the user accepts it, or you import a " +
+                 "free one with import_store_asset and then propose the imported asset.")]
     public static Task<object> ProposeCandidates(
         ICommandHandler<ProposeSceneCandidatesCommand, SceneSlotWriteResponse> handler,
         IAgentAudit audit,
@@ -525,7 +535,9 @@ public sealed class SceneWriteMcpTools
                         slotId,
                         (candidates ?? []).Select(c => new SceneCandidateProposal(
                             c.AssetType, c.AssetId, c.VersionId, c.Rationale, c.Label,
-                            c.TextureSetId, c.MaterialId, c.Variant)).ToList(),
+                            c.TextureSetId, c.MaterialId, c.Variant,
+                            c.StoreUrl, c.StoreAssetId, c.StoreTitle, c.StoreThumbnailUrl,
+                            c.StorePrice, c.StoreCurrency)).ToList(),
                         brief,
                         expectedRevision),
                     ct);

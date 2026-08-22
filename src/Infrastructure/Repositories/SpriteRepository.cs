@@ -108,6 +108,22 @@ internal sealed class SpriteRepository : ISpriteRepository
             .FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Sprite>> GetByIdsAsync(
+        IReadOnlyCollection<int> ids,
+        CancellationToken cancellationToken = default)
+    {
+        if (ids.Count == 0)
+        {
+            return [];
+        }
+
+        return await _context.Sprites
+            .AsNoTracking()
+            .Include(sprite => sprite.File)
+            .Where(sprite => ids.Contains(sprite.Id))
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<Sprite?> GetDeletedByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         return await _context.Sprites

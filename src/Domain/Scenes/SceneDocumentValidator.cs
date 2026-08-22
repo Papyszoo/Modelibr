@@ -335,17 +335,33 @@ public static class SceneDocumentValidator
                     $"Candidate id '{candidate.Id}' appears twice in slot '{slot.Id}'. The user picks by this name, so it has to mean one proposal."));
             }
 
-            if (candidate.Asset is null && candidate.Material is null)
+            if (candidate.Asset is null && candidate.Material is null && candidate.StoreAsset is null)
             {
                 issues.Add(new SceneValidationIssue(
                     candidatePath,
                     "EmptyCandidate",
-                    $"Candidate '{candidate.Id}' proposes nothing. Give it an asset, a material, or both - there is no third thing a slot can be filled with."));
+                    $"Candidate '{candidate.Id}' proposes nothing. Give it an asset, a store asset, a material, or an asset and a material - there is no other thing a slot can be filled with."));
+            }
+
+            // A candidate is one proposal, and "this library asset, or that store asset"
+            // is two. Resolving them differently is the point: a library candidate is
+            // chosen, a store one has to be acquired first.
+            if (candidate.Asset is not null && candidate.StoreAsset is not null)
+            {
+                issues.Add(new SceneValidationIssue(
+                    candidatePath,
+                    "CandidateHasBothAssets",
+                    $"Candidate '{candidate.Id}' names both a library asset and a store asset. Propose them as two candidates - they are two different answers, and only one of them can be chosen without downloading anything."));
             }
 
             if (candidate.Asset is { } asset)
             {
                 ValidateAssetRef(asset, $"{candidatePath}.asset", issues);
+            }
+
+            if (candidate.StoreAsset is { } storeAsset)
+            {
+                ValidateStoreAssetRef(storeAsset, $"{candidatePath}.storeAsset", issues);
             }
 
             if (candidate.Material is { } material)
@@ -548,6 +564,42 @@ public static class SceneDocumentValidator
             {
                 state[visited] = 2;
             }
+        }
+    }
+
+    /// <summary>
+    /// A store proposal only has to be addressable: which store, and which asset there.
+    /// Everything else on it - the title, the picture, the price - is a copy of what the
+    /// store said, kept so the card can be drawn with the store down, and none of it is
+    /// worth failing a scene over if it is missing.
+    /// </summary>
+    private static void ValidateStoreAssetRef(SceneStoreAssetRef store, string path, List<SceneValidationIssue> issues)
+    {
+        if (string.IsNullOrWhiteSpace(store.StoreUrl))
+        {
+            issues.Add(new SceneValidationIssue(
+                $"{path}.storeUrl",
+                "StoreUrlRequired",
+                "A store candidate must say which store it came from - two stores can hold the same id."));
+        }
+        else if (!store.StoreUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            issues.Add(new SceneValidationIssue(
+                $"{path}.storeUrl",
+                "InsecureStoreUrl",
+                $"'{store.StoreUrl}' is not an https URL. The importer refuses anything else, so a candidate naming one could never be acquired."));
+        }
+
+        if (string.IsNullOrWhiteSpace(store.StoreAssetId))
+        {
+            issues.Add(new SceneValidationIssue(
+                $"{path}.storeAssetId", "StoreAssetIdRequired", "A store candidate must name a store asset id."));
+        }
+
+        if (store.Price is < 0)
+        {
+            issues.Add(new SceneValidationIssue(
+                $"{path}.price", "InvalidStorePrice", "A price cannot be negative."));
         }
     }
 

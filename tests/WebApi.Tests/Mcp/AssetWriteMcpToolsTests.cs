@@ -4,6 +4,7 @@ using Application.Abstractions.Services;
 using Application.Agents;
 using Application.Models;
 using Application.Packs;
+using Application.Search;
 using Domain.Models;
 using Moq;
 using SharedKernel;
@@ -87,6 +88,30 @@ public class AssetWriteMcpToolsTests
             Times.Once);
         audit.Verify(a => a.CompleteAsync(
             "key-1", "Model", 1, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ReindexSearch_Without_A_Model_Rebuilds_The_Whole_Library()
+    {
+        // Regression: the audit row was written with assetId 0 for the library-wide form,
+        // and the log validates "greater than 0 when provided" - so the documented default
+        // (omit modelId) threw ArgumentException before the handler was ever reached.
+        var handler = new Mock<ICommandHandler<ReprojectSearchDocumentsCommand, ReprojectSearchDocumentsResponse>>();
+        handler.Setup(h => h.Handle(It.IsAny<ReprojectSearchDocumentsCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success(new ReprojectSearchDocumentsResponse(42, 84, 0, Array.Empty<string>())));
+        var audit = ClaimGranted();
+
+        var result = await AssetWriteMcpTools.ReindexSearch(
+            handler.Object, audit.Object, Caller(), "key-1");
+
+        Assert.Contains("\"ok\"", Json(result));
+        audit.Verify(a => a.TryBeginAsync(
+            It.Is<AgentWrite>(w => w.Operation == "reindex-search" && w.AssetId == null),
+            It.IsAny<CancellationToken>()),
+            Times.Once);
+        audit.Verify(a => a.CompleteAsync(
+            "key-1", "Model", null, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     [Fact]

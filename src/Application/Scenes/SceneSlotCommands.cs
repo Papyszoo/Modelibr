@@ -18,7 +18,13 @@ public sealed record SceneCandidateProposal(
     string? Label = null,
     int? TextureSetId = null,
     int? MaterialId = null,
-    string? Variant = null);
+    string? Variant = null,
+    string? StoreUrl = null,
+    string? StoreAssetId = null,
+    string? StoreTitle = null,
+    string? StoreThumbnailUrl = null,
+    decimal? StorePrice = null,
+    string? StoreCurrency = null);
 
 /// <summary>The state a slot write replaced, and everything its inverse needs to put back.</summary>
 /// <param name="Slot">The slot as it was, or null when this write created it.</param>

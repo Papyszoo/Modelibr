@@ -15,6 +15,16 @@ namespace Application.Scenes;
 /// The name a user says out loud - <c>streetlight/B</c>. Sent already assembled so the card,
 /// the agent's prose and the tool arguments cannot spell it three different ways.
 /// </param>
+/// <param name="StoreAsset">
+/// Set when this proposal is something the library does not hold yet. Mutually exclusive
+/// with <paramref name="Asset"/>, and the reason <paramref name="Choosable"/> exists.
+/// </param>
+/// <param name="Choosable">
+/// Whether the user can settle the slot with this candidate as it stands. False for a store
+/// proposal: choosing it means acquiring it first, which is a different act with a cost and
+/// a download attached, and the card must not offer it as the same one-click choice.
+/// </param>
+/// <param name="Media">What the card can draw. Absent when there is nothing to draw.</param>
 public sealed record SceneSlotCandidateView(
     string Id,
     string Ref,
@@ -25,7 +35,10 @@ public sealed record SceneSlotCandidateView(
     bool Chosen,
     bool Rejected,
     string? RejectedReason,
-    SceneCandidateFacts? Facts);
+    SceneCandidateFacts? Facts,
+    SceneStoreAssetRef? StoreAsset = null,
+    bool Choosable = true,
+    SceneCandidateMedia? Media = null);
 
 /// <summary>
 /// The measurable half of a proposal: what the library actually knows about the asset behind
@@ -92,7 +105,8 @@ public static class SceneSlotViewBuilder
         SceneSlot slot,
         SceneDocument document,
         IReadOnlyDictionary<string, SceneAssetFacts> facts,
-        IReadOnlyDictionary<string, SceneAssetProfile> profiles) => new(
+        IReadOnlyDictionary<string, SceneAssetProfile> profiles,
+        IReadOnlyDictionary<string, SceneCandidateMedia>? media = null) => new(
             slot.Id,
             document.Nodes.FirstOrDefault(n => string.Equals(n.SlotId, slot.Id, StringComparison.Ordinal))?.Id,
             slot.Brief,
@@ -100,15 +114,20 @@ public static class SceneSlotViewBuilder
             slot.ChosenCandidateId,
             slot.ResolvedBy,
             slot.ReopenedReason,
-            slot.Candidates.Select(c => Describe(slot, c, facts, profiles)).ToList());
+            slot.Candidates.Select(c => Describe(slot, c, facts, profiles, media)).ToList());
 
     public static SceneSlotCandidateView Describe(
         SceneSlot slot,
         SceneSlotCandidate candidate,
         IReadOnlyDictionary<string, SceneAssetFacts> facts,
-        IReadOnlyDictionary<string, SceneAssetProfile> profiles) => new(
+        IReadOnlyDictionary<string, SceneAssetProfile> profiles,
+        IReadOnlyDictionary<string, SceneCandidateMedia>? media = null)
+    {
+        var reference = Ref(slot.Id, candidate.Id);
+
+        return new SceneSlotCandidateView(
             candidate.Id,
-            Ref(slot.Id, candidate.Id),
+            reference,
             candidate.Label,
             candidate.Asset,
             candidate.Material,
@@ -116,14 +135,22 @@ public static class SceneSlotViewBuilder
             string.Equals(slot.ChosenCandidateId, candidate.Id, StringComparison.Ordinal),
             candidate.IsRejected,
             candidate.RejectedReason,
-            DescribeFacts(candidate.Asset, facts, profiles));
+            DescribeFacts(candidate.Asset, facts, profiles),
+            candidate.StoreAsset,
+            // A store proposal is not choosable, and the flag is computed here rather than
+            // inferred by each reader: the editor, the agent tools and the tests would
+            // otherwise each get their own chance to forget the rule.
+            Choosable: !candidate.IsFromStore,
+            media is not null && media.TryGetValue(reference, out var found) ? found : null);
+    }
 
     public static IReadOnlyList<SceneSlotView> DescribeAll(
         SceneDocument document,
         IReadOnlyDictionary<string, SceneAssetFacts> facts,
-        IReadOnlyDictionary<string, SceneAssetProfile> profiles) =>
+        IReadOnlyDictionary<string, SceneAssetProfile> profiles,
+        IReadOnlyDictionary<string, SceneCandidateMedia>? media = null) =>
         (document.Slots ?? Array.Empty<SceneSlot>())
-            .Select(slot => Describe(slot, document, facts, profiles))
+            .Select(slot => Describe(slot, document, facts, profiles, media))
             .ToList();
 
     /// <summary>How a candidate is addressed in prose and in tool arguments: <c>slot/candidate</c>.</summary>

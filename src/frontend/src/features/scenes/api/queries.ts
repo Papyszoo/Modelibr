@@ -40,10 +40,21 @@ export function useScenesQuery({
   })
 }
 
+/**
+ * A scene is written from outside this browser, so it is never served stale.
+ *
+ * The global default holds a query fresh for five minutes, which is right for a
+ * library the user is the only author of. A scene is not that: an agent composes
+ * it over MCP while the user has it open, and the whole review loop is the user
+ * looking at what the agent just wrote. Reopening the editor and being shown the
+ * document from before the agent touched it is the failure that matters here,
+ * and no invalidation can cover it - the write never went through this client.
+ */
 export function getSceneByIdQueryOptions(sceneId: number) {
   return queryOptions({
     queryKey: ['scenes', 'detail', sceneId] as const,
     queryFn: () => getSceneById(sceneId),
+    staleTime: 0,
   })
 }
 
@@ -123,10 +134,19 @@ export function useSaveSceneDocumentMutation() {
   })
 }
 
+/**
+ * Slots are the agent's half of the conversation, so they are never served stale
+ * either - and for them the five-minute default was worse than stale data. The
+ * panel renders nothing at all for a scene with no slots (most scenes have
+ * none), so a cache entry captured before the first proposal did not show old
+ * candidates, it showed no choices panel, and the decisions the agent had just
+ * offered were invisible until the entry aged out.
+ */
 export function getSceneSlotsQueryOptions(sceneId: number) {
   return queryOptions({
     queryKey: ['scenes', 'slots', sceneId] as const,
     queryFn: () => getSceneSlots(sceneId),
+    staleTime: 0,
   })
 }
 

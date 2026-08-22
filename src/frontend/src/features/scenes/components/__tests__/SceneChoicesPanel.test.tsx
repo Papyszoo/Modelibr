@@ -29,6 +29,9 @@ function candidate(
       cameras: 0,
       lights: 0,
     },
+    storeAsset: null,
+    choosable: true,
+    media: null,
     ...overrides,
   }
 }
@@ -78,6 +81,118 @@ describe('SceneChoicesPanel', () => {
 
     expect(screen.getByText('streetlight/A')).toBeInTheDocument()
     expect(screen.getByText('streetlight/B')).toBeInTheDocument()
+  })
+
+  it('marks a store candidate as not owned and refuses to choose it', async () => {
+    // The inversion this whole part protects: a store proposal is a suggestion
+    // to acquire something, not a one-click choice. Offering the same Choose
+    // button would promise a write the server refuses.
+    renderPanel([
+      slot({
+        candidates: [
+          candidate({
+            id: 'A',
+            asset: null,
+            facts: null,
+            choosable: false,
+            storeAsset: {
+              storeUrl: 'https://store.modelibr.com',
+              storeAssetId: '47f60614-522f-4ced-941c-318ac5c7bd34',
+              title: 'Quaternius: Ultimate Furniture Pack',
+              thumbnailUrl:
+                'https://store.modelibr.com/api/assets/x/previews/y',
+              price: 0,
+              currency: 'USD',
+            },
+          }),
+        ],
+      }),
+    ])
+
+    expect(screen.getByText('Not in your library')).toBeInTheDocument()
+    expect(screen.getByText('Free')).toBeInTheDocument()
+    expect(
+      screen.getByText('Quaternius: Ultimate Furniture Pack')
+    ).toBeInTheDocument()
+    expect(
+      screen.getByTestId('scene-choices-choose-streetlight/A')
+    ).toBeDisabled()
+  })
+
+  it('shows a paid store candidate at its price', () => {
+    renderPanel([
+      slot({
+        candidates: [
+          candidate({
+            id: 'A',
+            asset: null,
+            facts: null,
+            choosable: false,
+            storeAsset: {
+              storeUrl: 'https://store.modelibr.com',
+              storeAssetId: 'paid-1',
+              title: "Someone else's sofa",
+              thumbnailUrl: null,
+              price: 4.99,
+              currency: 'USD',
+            },
+          }),
+        ],
+      }),
+    ])
+
+    expect(screen.getByText('4.99 USD')).toBeInTheDocument()
+  })
+
+  it('says a thumbnail is still rendering rather than showing a broken image', () => {
+    renderPanel([
+      slot({
+        candidates: [
+          candidate({
+            id: 'A',
+            media: {
+              assetThumbnailUrl: null,
+              assetThumbnailStatus: 'pending',
+              materialThumbnailUrl: null,
+              materialSwatch: null,
+              storeThumbnailUrl: null,
+            },
+          }),
+        ],
+      }),
+    ])
+
+    expect(
+      screen.getByTitle('Thumbnail is still rendering')
+    ).toBeInTheDocument()
+  })
+
+  it('draws a parameter material as a swatch when there is no image', () => {
+    renderPanel([
+      slot({
+        candidates: [
+          candidate({
+            id: 'A',
+            asset: null,
+            facts: null,
+            media: {
+              assetThumbnailUrl: null,
+              assetThumbnailStatus: 'unknown',
+              materialThumbnailUrl: null,
+              materialSwatch: {
+                baseColorHex: '#8b5a2b',
+                roughness: 0.6,
+                metallic: 0,
+                opacity: 1,
+              },
+              storeThumbnailUrl: null,
+            },
+          }),
+        ],
+      }),
+    ])
+
+    expect(screen.getByTestId('material-swatch')).toBeInTheDocument()
   })
 
   it('shows the numbers next to the rationale', () => {

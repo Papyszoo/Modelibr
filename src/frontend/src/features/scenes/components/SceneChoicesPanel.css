@@ -146,9 +146,86 @@
 
 .scene-choices-card-head {
   display: flex;
+  align-items: center;
+  gap: var(--mod-space-2xs);
+  min-width: 0;
+}
+
+/* The identifier and the name stack beside the picture rather than beneath it:
+   the ref is the handle the user speaks and must stay on the first line. */
+.scene-choices-card-heading {
+  display: flex;
   align-items: baseline;
   gap: var(--mod-space-2xs);
   min-width: 0;
+}
+
+/* Fixed square so a row of cards keeps one left edge whether or not each
+   candidate has a picture - a ragged column reads as a loading state. */
+.scene-choices-card-media {
+  position: relative;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--mod-radius-sm);
+  overflow: hidden;
+  background: var(--mod-color-surface-hover);
+}
+
+.scene-choices-card-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* The surface beside the asset, not instead of it: a candidate can be a thing
+   and the finish on it. */
+.scene-choices-card-media-material {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--mod-radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--mod-color-surface);
+}
+
+.scene-choices-card-media-material img {
+  width: 100%;
+  height: 100%;
+}
+
+.scene-choices-card-media-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: var(--mod-color-text-muted);
+  font-size: var(--mod-text-sm);
+}
+
+/* A store candidate must never read as something already owned - the badge is
+   the difference between "pick this" and "this would have to be downloaded". */
+.scene-choices-card-store {
+  display: flex;
+  align-items: center;
+  gap: var(--mod-space-2xs);
+  font-size: var(--mod-text-xs);
+}
+
+.scene-choices-card-store-badge {
+  padding: 0 var(--mod-space-2xs);
+  border-radius: var(--mod-radius-sm);
+  border: 1px dashed var(--mod-color-border);
+  color: var(--mod-color-text-muted);
+}
+
+.scene-choices-card-store-price {
+  color: var(--mod-color-text-muted);
+  font-weight: var(--mod-font-weight-semibold);
 }
 
 /* The handle. Monospace so `streetlight/B` reads as an identifier, not prose. */

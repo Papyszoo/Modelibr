@@ -8,6 +8,9 @@ public interface ISpriteRepository
     Task<IEnumerable<Sprite>> GetAllAsync(CancellationToken cancellationToken = default);
     Task<IEnumerable<Sprite>> GetAllDeletedAsync(CancellationToken cancellationToken = default);
     Task<Sprite?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Sprite>> GetByIdsAsync(
+        IReadOnlyCollection<int> ids,
+        CancellationToken cancellationToken = default);
     Task<Sprite?> GetDeletedByIdAsync(int id, CancellationToken cancellationToken = default);
     Task<Sprite?> GetByNameAsync(string name, CancellationToken cancellationToken = default);
     Task<Sprite?> GetByFileHashAsync(string sha256Hash, CancellationToken cancellationToken = default);

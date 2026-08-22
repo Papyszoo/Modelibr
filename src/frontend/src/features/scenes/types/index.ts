@@ -12,6 +12,7 @@ import type {
   SceneSlotResolver,
   SceneSlotStatus,
   SceneStage,
+  SceneStoreAssetRef,
   SceneTransform,
   Vec3,
 } from '../api/sceneContract.generated'
@@ -30,6 +31,7 @@ export type {
   SceneSlotResolver,
   SceneSlotStatus,
   SceneStage,
+  SceneStoreAssetRef,
   SceneTransform,
   Vec3,
 }
@@ -130,6 +132,49 @@ export interface SceneAssetFacts {
   originInBounds: Vec3 | null
 }
 
+export interface SceneResourceFile {
+  fileId: number
+  originalFileName: string
+  format: string
+  mimeType: string
+  sizeBytes: number
+  sha256Hash: string
+}
+
+export interface SceneResourceAuxiliary {
+  fileId: number
+  relativePath: string
+  originalFileName: string
+  sizeBytes: number
+  sha256Hash: string
+}
+
+export interface SceneResourcePreview {
+  kind: string
+  file: SceneResourceFile
+  triangleCount: number | null
+  byteBudget: number
+  triangleBudget: number
+}
+
+/** One independently cacheable answer from the batched scene resource resolver. */
+export interface SceneResource {
+  asset: SceneAssetRef
+  resolved: boolean
+  original: SceneResourceFile | null
+  totalSizeBytes: number | null
+  triangleCount: number | null
+  materialCount: number | null
+  auxiliaries: SceneResourceAuxiliary[]
+  previews: SceneResourcePreview[]
+  errorCode: string | null
+  errorMessage: string | null
+}
+
+export interface SceneResourceManifest {
+  resources: SceneResource[]
+}
+
 export interface SceneOverlap {
   nodeIdA: string
   nodeIdB: string
@@ -187,6 +232,44 @@ export interface SceneSlotCandidateView {
   /** Why it was ruled out. Kept and shown, because a rejection is feedback rather than a deletion. */
   rejectedReason: string | null
   facts: SceneCandidateFacts | null
+  /** Set when the proposal is something the library does not hold yet. Never set alongside `asset`. */
+  storeAsset: SceneStoreAssetRef | null
+  /**
+   * Whether this candidate can settle the slot as it stands. False for a store
+   * proposal - choosing it means acquiring it first, which is a different act.
+   */
+  choosable: boolean
+  /** What the card can draw. Null when there is nothing to draw. */
+  media: SceneCandidateMedia | null
+}
+
+/** Where a thumbnail stands. A missing one is a normal state, not a broken image. */
+export type SceneCandidateMediaStatus = 'ready' | 'pending' | 'none' | 'unknown'
+
+/**
+ * The picture on a choice card, resolved server-side for the whole scene at once.
+ *
+ * An asset and a material can both be present: the asset is the primary image and the
+ * material sits beside it. A surface-only candidate has only the material half.
+ */
+export interface SceneCandidateMedia {
+  /** API-relative. Null unless `assetThumbnailStatus` is `ready`. */
+  assetThumbnailUrl: string | null
+  assetThumbnailStatus: SceneCandidateMediaStatus
+  /** A global material's rendered swatch, when it has one. */
+  materialThumbnailUrl: string | null
+  /** A parameter-only material's scalars, for the CSS swatch. */
+  materialSwatch: SceneMaterialSwatch | null
+  /** Absolute, and copied into the scene: the card must draw with the store down. */
+  storeThumbnailUrl: string | null
+}
+
+/** The four scalars MaterialSwatch approximates a surface from. */
+export interface SceneMaterialSwatch {
+  baseColorHex: string
+  roughness: number
+  metallic: number
+  opacity: number
 }
 
 /** One decision in the scene, its proposals, and where it stands. */

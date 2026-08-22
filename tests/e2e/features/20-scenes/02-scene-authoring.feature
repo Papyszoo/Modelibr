@@ -80,6 +80,19 @@ Feature: Scene authoring
     Then the scene viewport should have fetched a file for every placed model
     And no node should be flagged as failed to load
 
+  @scene-progressive
+  Scenario: A scene stays interactive and admits one held model resource at a time
+    # Downloads being promises is not enough: releasing every parse together still
+    # monopolises the main thread. Hold both primary files at the browser boundary so
+    # the test can prove the second request does not start until the first node settles.
+    Given I have imported 2 multi-file glTF models
+    And I am on the scenes page
+    And a scene named "Progressive Scene" is open
+    And the imported scene model files are held
+    When I place every imported multi-file model into the scene
+    Then the scene should remain interactive and load the held resources serially
+    And no node should be flagged as failed to load
+
   @scene-tab-switch
   Scenario: An unsaved scene survives a trip to another tab
     # The dock renders only the ACTIVE tab, so switching away unmounts the

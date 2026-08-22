@@ -32,6 +32,7 @@ public class SceneSlotCommandTests
     private readonly Mock<ISceneRepository> _scenes = new();
     private readonly Mock<ISceneAssetFacts> _facts = new();
     private readonly Mock<ISceneAssetProfiles> _profiles = new();
+    private readonly Mock<ISceneCandidateMedia> _media = new();
     private readonly Mock<ISceneDocumentCommit> _commit = new();
     private readonly SceneWriter _writer;
     private Scene _scene = null!;
@@ -87,15 +88,15 @@ public class SceneSlotCommandTests
         _scenes.Setup(s => s.GetByIdAsync(SceneId, It.IsAny<CancellationToken>())).ReturnsAsync(_scene);
     }
 
-    private ProposeSceneCandidatesCommandHandler Propose => new(_writer, _facts.Object, _profiles.Object);
+    private ProposeSceneCandidatesCommandHandler Propose => new(_writer, _facts.Object, _profiles.Object, _media.Object);
 
-    private ResolveSceneSlotCommandHandler Resolve => new(_writer, _facts.Object, _profiles.Object);
+    private ResolveSceneSlotCommandHandler Resolve => new(_writer, _facts.Object, _profiles.Object, _media.Object);
 
-    private RejectSceneCandidatesCommandHandler Reject => new(_writer, _facts.Object, _profiles.Object);
+    private RejectSceneCandidatesCommandHandler Reject => new(_writer, _facts.Object, _profiles.Object, _media.Object);
 
     private RestoreSceneSlotCommandHandler Restore => new(_writer);
 
-    private GetSceneSlotsQueryHandler Slots => new(_writer, _facts.Object, _profiles.Object);
+    private GetSceneSlotsQueryHandler Slots => new(_writer, _facts.Object, _profiles.Object, _media.Object);
 
     private RemoveSceneNodeCommandHandler Remove => new(_writer);
 
@@ -142,6 +143,62 @@ public class SceneSlotCommandTests
         Assert.Equal(4, candidate.Facts!.Dimensions!.Value.Y, 6);
         Assert.Equal(3, candidate.Facts.PartCount);
         Assert.Equal("lamp-43", candidate.Facts.Name);
+    }
+
+    [Fact]
+    public async Task A_Store_Candidate_Is_Proposable_But_Not_Choosable()
+    {
+        // The inversion part B exists for: the agent may put something the library does not
+        // have on the table, and may not settle the slot with it. Acquiring is the user's.
+        var proposed = await Propose.Handle(
+            new ProposeSceneCandidatesCommand(
+                SceneId,
+                Slot,
+                new[]
+                {
+                    new SceneCandidateProposal(
+                        Rationale: "nothing in the library is low-poly",
+                        StoreUrl: "https://store.modelibr.com",
+                        StoreAssetId: "47f60614-522f-4ced-941c-318ac5c7bd34",
+                        StoreTitle: "Quaternius: Ultimate Furniture Pack",
+                        StorePrice: 0m,
+                        StoreCurrency: "USD")
+                }),
+            CancellationToken.None);
+
+        Assert.True(proposed.IsSuccess, proposed.IsFailure ? proposed.Error.Message : null);
+        var candidate = proposed.Value.Slot.Candidates.Single(c => c.StoreAsset is not null);
+        Assert.Equal("47f60614-522f-4ced-941c-318ac5c7bd34", candidate.StoreAsset!.StoreAssetId);
+        Assert.Null(candidate.Asset);
+        Assert.False(candidate.Choosable);
+
+        var resolved = await Resolve.Handle(
+            new ResolveSceneSlotCommand(SceneId, Slot, candidate.Id, SceneSlotResolvers.User),
+            CancellationToken.None);
+
+        Assert.True(resolved.IsFailure);
+        Assert.Equal("Scene.CandidateNotInLibrary", resolved.Error.Code);
+        Assert.Contains("import_store_asset", resolved.Error.Message);
+    }
+
+    [Fact]
+    public async Task A_Candidate_Naming_Both_A_Library_And_A_Store_Asset_Is_Refused()
+    {
+        var result = await Propose.Handle(
+            new ProposeSceneCandidatesCommand(
+                SceneId,
+                Slot,
+                new[]
+                {
+                    new SceneCandidateProposal(
+                        SceneAssetTypes.Model, OtherLampId, VersionId,
+                        StoreUrl: "https://store.modelibr.com",
+                        StoreAssetId: "abc")
+                }),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.CandidateHasBothAssets", result.Error.Code);
     }
 
     [Fact]

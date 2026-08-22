@@ -18,6 +18,10 @@
 //                 absent => suite reported as "not-present" (not a failure)
 //   reportPath    optional path (relative to repo root) to an HTML report dir
 //                 produced by the suite, linked from the aggregated report
+//   env           optional environment overlaid on the suite's command. Suites
+//                 that share a working directory use it to claim their own
+//                 output paths, so a full run doesn't leave them overwriting
+//                 each other's reports and artifacts.
 //   note          optional caveat surfaced in the report
 
 export const tierOrder = ["fast", "slow", "visual", "perf"];
@@ -141,7 +145,16 @@ export const suites = [
         tier: "fast",
         requiresDocker: true,
         detectPath: "tests/e2e/package.json",
-        reportPath: "tests/e2e/playwright-report",
+        // All three e2e suites run the same Playwright config from the same
+        // directory. Sharing its default report and artifact dirs meant the
+        // last suite of a full run replaced the earlier two - reports, traces,
+        // screenshots and videos alike - so a failure could not be triaged
+        // afterwards. Each suite gets its own pair; the configs read these.
+        env: {
+            PW_HTML_REPORT: "playwright-report-fast",
+            PW_OUTPUT_DIR: "test-results-fast",
+        },
+        reportPath: "tests/e2e/playwright-report-fast",
     },
     {
         id: "backend-integration",
@@ -170,7 +183,11 @@ export const suites = [
         tier: "slow",
         requiresDocker: true,
         detectPath: "tests/e2e/package.json",
-        reportPath: "tests/e2e/playwright-report",
+        env: {
+            PW_HTML_REPORT: "playwright-report-full",
+            PW_OUTPUT_DIR: "test-results-full",
+        },
+        reportPath: "tests/e2e/playwright-report-full",
     },
     {
         id: "backup-restore",
@@ -225,6 +242,10 @@ export const suites = [
         tier: "perf",
         requiresDocker: true,
         detectPath: "tests/e2e/package.json",
-        reportPath: "tests/e2e/playwright-report",
+        env: {
+            PW_HTML_REPORT: "playwright-report-performance",
+            PW_OUTPUT_DIR: "test-results-performance",
+        },
+        reportPath: "tests/e2e/playwright-report-performance",
     },
 ];

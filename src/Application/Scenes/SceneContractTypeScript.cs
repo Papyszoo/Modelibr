@@ -267,6 +267,14 @@ public static class SceneContractTypeScript
             return "number";
         }
 
+        // decimal is money - a store candidate's price. It crosses as a JSON number like
+        // every other scalar here; the reason it is decimal on the server is arithmetic
+        // fidelity there, not a wire format the editor could honour anyway.
+        if (type == typeof(decimal))
+        {
+            return "number";
+        }
+
         if (type == typeof(DateTime))
         {
             return "string";

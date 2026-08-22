@@ -28,6 +28,18 @@ const IGNORE_DIRS = new Set([
     ".features-gen",
 ]);
 
+// Suites that share a directory suffix their output dirs (playwright-report-fast,
+// test-results-full, ...), so the families are matched by prefix rather than by
+// an exact name that a new suite would silently fall outside of.
+const IGNORE_DIR_PREFIXES = ["playwright-report", "test-results"];
+
+function isIgnored(name) {
+    return (
+        IGNORE_DIRS.has(name) ||
+        IGNORE_DIR_PREFIXES.some((prefix) => name.startsWith(prefix))
+    );
+}
+
 function walk(dir, hits) {
     let entries;
     try {
@@ -38,7 +50,7 @@ function walk(dir, hits) {
     for (const e of entries) {
         const full = path.join(dir, e.name);
         if (e.isDirectory()) {
-            if (IGNORE_DIRS.has(e.name)) continue;
+            if (isIgnored(e.name)) continue;
             walk(full, hits);
         } else {
             hits.push(path.relative(REPO_ROOT, full));
