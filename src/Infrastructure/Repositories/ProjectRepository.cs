@@ -49,6 +49,9 @@ internal sealed class ProjectRepository : IProjectRepository
             .Include(p => p.CustomThumbnailFile)
             .Include(p => p.ConceptImages)
                 .ThenInclude(ci => ci.File)
+            .Include(p => p.ProfileValues)
+                .ThenInclude(v => v.Option)
+            .Include(p => p.Scenes)
             .AsSplitQuery()
             .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
     }

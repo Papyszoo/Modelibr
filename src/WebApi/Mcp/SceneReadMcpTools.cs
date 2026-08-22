@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using Application.Abstractions.Messaging;
+using Application.Projects.Profile;
 using Application.Scenes;
 using ModelContextProtocol.Server;
 
@@ -27,16 +28,43 @@ public sealed class SceneReadMcpTools
     [McpServerTool(Name = "get_scene")]
     [Description("Get a scene: its document, and per node the world footprint (AABB after transform), the source asset's own dimensions, " +
                  "its origin convention and how far it sits off the ground - plus every overlapping node pair and scale warning in the scene. " +
-                 "This is how to inspect a scene without a viewport; do not infer geometry from the document alone.")]
+                 "This is how to inspect a scene without a viewport; do not infer geometry from the document alone. " +
+                 "When the scene belongs to a project, the response also carries that project's full brief under `project` - " +
+                 "style, budget, world convention and guidance - so the constraints arrive with the scene rather than needing a second call.")]
     public static async Task<object> GetScene(
         IQueryHandler<GetSceneByIdQuery, SceneView> handler,
+        IQueryHandler<GetProjectBriefQuery, ProjectBriefDto> projectHandler,
         [Description("Scene id.")] int sceneId,
         CancellationToken cancellationToken = default)
     {
         var result = await handler.Handle(new GetSceneByIdQuery(sceneId), cancellationToken);
-        return result.IsFailure
-            ? new { error = result.Error.Code, message = result.Error.Message }
-            : result.Value;
+        if (result.IsFailure)
+        {
+            return new { error = result.Error.Code, message = result.Error.Message };
+        }
+
+        // The brief rides along with the scene deliberately. An agent handed a scene id must
+        // not have to know to go looking for the project - the one that does not know is
+        // exactly the one that will place a photoscan into a low-poly game.
+        var project = await BriefFor(projectHandler, result.Value.Scene.ProjectId, cancellationToken);
+
+        return new { scene = result.Value, project };
+    }
+
+    /// <summary>
+    /// The project brief for a scene, or null when it belongs to none. A failure to read it
+    /// is reported as no brief rather than as a failed scene read: the scene is still
+    /// answerable, and an agent that gets an error for the whole call learns nothing.
+    /// </summary>
+    private static async Task<ProjectBriefDto?> BriefFor(
+        IQueryHandler<GetProjectBriefQuery, ProjectBriefDto> handler,
+        int? projectId,
+        CancellationToken cancellationToken)
+    {
+        if (projectId is not int id) return null;
+
+        var brief = await handler.Handle(new GetProjectBriefQuery(id), cancellationToken);
+        return brief.IsSuccess ? brief.Value : null;
     }
 
     [McpServerTool(Name = "get_slots")]

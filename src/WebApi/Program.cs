@@ -158,7 +158,11 @@ namespace WebApi
                     // What the library knows about an asset, and the schema that says what
                     // it could know. A read, and the one an agent needs before it can
                     // usefully fill anything in.
-                    .WithTools<WebApi.Mcp.AssetMetadataReadMcpTools>();
+                    .WithTools<WebApi.Mcp.AssetMetadataReadMcpTools>()
+                    // What is being made. Reading a project's brief is what turns "build a
+                    // scene" into "build a scene for THIS", and there were no project tools
+                    // at all before it.
+                    .WithTools<WebApi.Mcp.ProjectReadMcpTools>();
 
                 // Write tools (prompt 30) are opt-in: OFF by default keeps a stock server
                 // read-only so enabling agent writes on a LAN-reachable endpoint is a
@@ -192,6 +196,10 @@ namespace WebApi
                         // Filling in what an asset says about itself - licence, credit,
                         // style, where it came from. A write like any other tagging call.
                         .WithTools<WebApi.Mcp.AssetMetadataWriteMcpTools>()
+                        // Telling a scene which project it belongs to. A scene write, and
+                        // the only project-shaped one an agent gets - the profile itself is
+                        // the user's statement of intent, not something to infer.
+                        .WithTools<WebApi.Mcp.ProjectWriteMcpTools>()
                         .WithPrompts<WebApi.Mcp.ImportLibraryPrompts>()
                         // The playbook for building a scene. Registered with the write
                         // tools because it is a guide to writing: every stage it describes
@@ -235,6 +243,7 @@ namespace WebApi
             app.MapModelVersionEndpoints();
             app.MapExtractionEndpoints();
             app.MapAssetMetadataEndpoints();
+            app.MapProjectProfileEndpoints();
             app.MapFilesEndpoints();
             app.MapThumbnailEndpoints();
             app.MapThumbnailJobEndpoints();

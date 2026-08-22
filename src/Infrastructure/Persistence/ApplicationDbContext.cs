@@ -95,6 +95,8 @@ namespace Infrastructure.Persistence
         public DbSet<ModelVersionAuxiliaryFile> ModelVersionAuxiliaryFiles => Set<ModelVersionAuxiliaryFile>();
         public DbSet<StoreImportJob> StoreImportJobs => Set<StoreImportJob>();
         public DbSet<AssetMetadata> AssetMetadata => Set<AssetMetadata>();
+        public DbSet<ProjectProfileOption> ProjectProfileOptions => Set<ProjectProfileOption>();
+        public DbSet<ProjectProfileValue> ProjectProfileValues => Set<ProjectProfileValue>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -700,6 +702,25 @@ namespace Infrastructure.Persistence
                 entity.Property(p => p.CreatedAt).IsRequired();
                 entity.Property(p => p.UpdatedAt).IsRequired();
 
+                // The fidelity budget and world convention (prompt 13-A). All nullable, and
+                // NULL means unconstrained - never a default. An agent silently held to a
+                // budget nobody set is worse than one held to none.
+                entity.Property(p => p.MaxTrianglesPerAsset).IsRequired(false);
+                entity.Property(p => p.MaxTextureSize).IsRequired(false);
+                entity.Property(p => p.TargetSceneTriangles).IsRequired(false);
+                entity.Property(p => p.PixelsPerUnit).IsRequired(false);
+                entity.Property(p => p.UnitsPerMetre).IsRequired(false);
+                entity.Property(p => p.UpAxis).IsRequired(false).HasMaxLength(1);
+                entity.Property(p => p.Handedness).IsRequired(false).HasMaxLength(5);
+                entity.Property(p => p.PaletteHex)
+                    .HasColumnType("text[]")
+                    .HasDefaultValueSql("'{}'::text[]");
+
+                entity.HasMany(p => p.ProfileValues)
+                    .WithOne()
+                    .HasForeignKey(v => v.ProjectId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
                 entity.HasOne(p => p.CustomThumbnailFile)
                     .WithMany()
                     .HasForeignKey(p => p.CustomThumbnailFileId)
@@ -818,6 +839,16 @@ namespace Infrastructure.Persistence
 
                 entity.HasIndex(s => s.Name);
                 entity.HasIndex(s => s.UpdatedAt);
+
+                // The project this scene is built for (prompt 13-C). SetNull, not Cascade:
+                // deleting a project must not delete the scenes made for it - they are
+                // still scenes, and re-linking one is a single write.
+                entity.HasOne(s => s.Project)
+                    .WithMany(p => p.Scenes)
+                    .HasForeignKey(s => s.ProjectId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasIndex(s => s.ProjectId);
             });
 
             // Configure SceneRender entity
@@ -1556,6 +1587,45 @@ namespace Infrastructure.Persistence
             // (AssetType, AssetId), shared by every family - the fields here are universal
             // and arrive from a different source than the asset's bytes, so they do not
             // belong as six near-identical column sets on six aggregates.
+            // The project profile's shared vocabulary (prompt 13-B). One table, five
+            // dimensions - five tables would mean a sixth dimension costs a schema change
+            // plus five copies of the same endpoint, query, DTO and picker.
+            modelBuilder.Entity<ProjectProfileOption>(entity =>
+            {
+                entity.ToTable("ProjectProfileOptions");
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Dimension).IsRequired().HasMaxLength(30);
+                entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.NormalizedName).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.IsBuiltIn).IsRequired();
+                entity.Property(e => e.IsHidden).IsRequired();
+                entity.Property(e => e.SortOrder).IsRequired();
+                entity.Property(e => e.CreatedAt).IsRequired();
+                entity.Property(e => e.UpdatedAt).IsRequired();
+
+                // Unique WITHIN a dimension: "Fantasy" is a legitimate genre and a
+                // legitimate style, and they are different options.
+                entity.HasIndex(e => new { e.Dimension, e.NormalizedName }).IsUnique();
+                entity.HasIndex(e => e.Dimension);
+            });
+
+            modelBuilder.Entity<ProjectProfileValue>(entity =>
+            {
+                entity.ToTable("ProjectProfileValues");
+                entity.HasKey(e => new { e.ProjectId, e.OptionId });
+                // Free text, and only the engine dimension uses it today - "authoring" /
+                // "runtime" / "preview" is a convention worth suggesting in a picker and not
+                // worth a sixth vocabulary table.
+                entity.Property(e => e.Role).IsRequired(false).HasMaxLength(50);
+
+                entity.HasOne(e => e.Option)
+                    .WithMany()
+                    .HasForeignKey(e => e.OptionId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(e => e.OptionId);
+            });
+
             modelBuilder.Entity<AssetMetadata>(entity =>
             {
                 entity.ToTable("AssetMetadata");

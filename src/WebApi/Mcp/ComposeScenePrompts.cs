@@ -1,4 +1,6 @@
 using System.ComponentModel;
+using Application.Abstractions.Messaging;
+using Application.Projects.Profile;
 using ModelContextProtocol.Server;
 
 namespace WebApi.Mcp;
@@ -32,13 +34,20 @@ public sealed class ComposeScenePrompts
 {
     [McpServerPrompt(Name = "compose_scene")]
     [Description("Guided playbook: build a complete scene from the library in stages - block out, verify, detail, light, then colour - and verify each stage with validate_scene and render_scene.")]
-    public static string ComposeScene(
+    public static async Task<string> ComposeScene(
+        IQueryHandler<GetProjectBriefQuery, ProjectBriefDto> projectBriefs,
         [Description("What the scene should be, e.g. 'a small living room with a sofa facing a TV'.")] string description,
-        [Description("Existing scene id to continue building. Omit to start a new scene.")] int? sceneId = null)
+        [Description("Existing scene id to continue building. Omit to start a new scene.")] int? sceneId = null,
+        [Description("The project this scene is for. Its brief is inlined below and constrains every asset choice.")] int? projectId = null,
+        CancellationToken cancellationToken = default)
     {
         var target = sceneId is { } id
             ? $"Continue scene {id}. Call get_scene({id}) first - its `scene.stage` says which stage below it has reached."
             : "Create the scene with create_scene, then build it up through the stages below.";
+
+        // Inlined above CHOOSING AN ASSET, which is the section it constrains. A brief that
+        // arrived after the choosing rules would be advice about a decision already made.
+        var projectBlock = await ProjectBlockAsync(projectBriefs, projectId, cancellationToken);
 
         return $$"""
         You are composing a scene in Modelibr, primarily from assets already in the
@@ -71,7 +80,7 @@ public sealed class ComposeScenePrompts
         groundSnap / on, or pass suspended=true for something meant to hang. Moving back
         a stage always works, and is how a scene is reopened to fix its composition.
 
-        CHOOSING AN ASSET
+        {{projectBlock}}CHOOSING AN ASSET
           - Dimensions in search results are the asset's own, and roughly half the library
             is bounds-normalised to about 2 m on its longest axis. A hit reporting a
             longest axis near 2.00 with scaleConvention "normalized" is telling you its
@@ -141,5 +150,49 @@ public sealed class ComposeScenePrompts
         Give every write a unique idempotencyKey, and a shared batchId per stage so a
         stage can be undone in one call with reverse_operation. Everything stays local.
         """;
+    }
+
+    /// <summary>
+    /// The project's constraints as a THIS PROJECT block, or empty when the scene belongs to
+    /// no project. Empty rather than a placeholder: a heading with nothing under it reads as
+    /// a constraint the agent failed to find.
+    /// </summary>
+    private static async Task<string> ProjectBlockAsync(
+        IQueryHandler<GetProjectBriefQuery, ProjectBriefDto> projectBriefs,
+        int? projectId,
+        CancellationToken cancellationToken)
+    {
+        if (projectId is not int id) return string.Empty;
+
+        var result = await projectBriefs.Handle(new GetProjectBriefQuery(id), cancellationToken);
+        if (result.IsFailure) return string.Empty;
+
+        var brief = result.Value;
+        var lines = new List<string> { $"        THIS PROJECT - {brief.Name}" };
+
+        if (!string.IsNullOrWhiteSpace(brief.Description))
+        {
+            lines.Add($"          {brief.Description.Trim()}");
+        }
+
+        foreach (var line in brief.Guidance)
+        {
+            lines.Add($"          - {line}");
+        }
+
+        if (brief.WorldConvention.EngineConversions.Count > 0)
+        {
+            lines.Add($"          - Engine conversions from this project's units: {string.Join("; ", brief.WorldConvention.EngineConversions)}.");
+        }
+
+        if (brief.Guidance.Count == 0 && brief.WorldConvention.EngineConversions.Count == 0)
+        {
+            // A project with an empty profile constrains nothing, and saying so is more
+            // useful than an empty heading - it tells the agent the silence is real.
+            lines.Add("          - This project has no profile set yet, so nothing here narrows the asset choice.");
+        }
+
+        lines.Add(string.Empty);
+        return string.Join(Environment.NewLine, lines) + Environment.NewLine + "        ";
     }
 }

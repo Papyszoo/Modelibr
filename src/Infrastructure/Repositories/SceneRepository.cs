@@ -16,13 +16,20 @@ internal sealed class SceneRepository : ISceneRepository
 
     public async Task<Scene?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
-        return await _context.Scenes.FindAsync([id], cancellationToken);
+        // Includes the project rather than using FindAsync: every scene read reports the
+        // project it belongs to, and a summary that carried a project id with no name would
+        // make the editor and the agent describe the same scene differently. Still tracked -
+        // the write paths take this same read.
+        return await _context.Scenes
+            .Include(s => s.Project)
+            .FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
     }
 
     public async Task<IEnumerable<Scene>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return await _context.Scenes
             .AsNoTracking()
+            .Include(s => s.Project)
             .OrderByDescending(s => s.UpdatedAt)
             .ToListAsync(cancellationToken);
     }

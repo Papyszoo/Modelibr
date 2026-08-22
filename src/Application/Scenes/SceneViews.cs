@@ -19,7 +19,9 @@ public sealed record SceneSummary(
     int LightCount,
     DateTime CreatedAt,
     DateTime UpdatedAt,
-    string? Stage = null);
+    string? Stage = null,
+    int? ProjectId = null,
+    string? ProjectName = null);
 
 /// <summary>
 /// One node with the spatial truth an agent needs to reason about it without a viewport:
@@ -90,7 +92,9 @@ public static class SceneViewBuilder
         document.Lights.Count,
         scene.CreatedAt,
         scene.UpdatedAt,
-        document.Stage);
+        document.Stage,
+        scene.ProjectId,
+        scene.Project?.Name);
 
     public static SceneView Build(
         Scene scene,

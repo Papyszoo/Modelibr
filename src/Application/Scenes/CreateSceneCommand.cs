@@ -13,10 +13,15 @@ namespace Application.Scenes;
 /// an empty document at the current schema version, which is what both "New scene" in the
 /// editor and an agent about to place its first asset want.
 /// </summary>
+/// <param name="ProjectId">
+/// The project this scene is being built for. Optional - a scene without one simply gets no
+/// brief, which is also what every scene that predates the link has.
+/// </param>
 public sealed record CreateSceneCommand(
     string Name,
     string? Description = null,
-    string? DocumentJson = null) : ICommand<SceneView>;
+    string? DocumentJson = null,
+    int? ProjectId = null) : ICommand<SceneView>;
 
 internal sealed class CreateSceneCommandHandler : ICommandHandler<CreateSceneCommand, SceneView>
 {
@@ -72,7 +77,8 @@ internal sealed class CreateSceneCommandHandler : ICommandHandler<CreateSceneCom
             SceneDocumentCodec.Serialize(document),
             document.SchemaVersion,
             _dateTimeProvider.UtcNow,
-            command.Description);
+            command.Description,
+            command.ProjectId);
 
         if (scene.IsFailure)
         {

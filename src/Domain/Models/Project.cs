@@ -1,3 +1,4 @@
+using Domain.Projects;
 using Domain.ValueObjects;
 
 namespace Domain.Models;
@@ -15,6 +16,8 @@ public class Project : AggregateRoot
     private readonly List<Script> _scripts = new();
     private readonly List<EnvironmentMap> _environmentMaps = new();
     private readonly List<ProjectConceptImage> _conceptImages = new();
+    private readonly List<ProjectProfileValue> _profileValues = new();
+    private readonly List<Scene> _scenes = new();
 
     public int Id { get; private set; }
     public string Name { get; private set; } = string.Empty;
@@ -24,7 +27,75 @@ public class Project : AggregateRoot
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
 
+    // ---- the fidelity budget (prompt 13-A) ----
+    // Every one of these is nullable, and NULL means UNCONSTRAINED. It must never be read as
+    // a default: an agent silently held to a budget nobody set is worse than one held to
+    // none. A default may be *offered* from the platform selection, but what is stored is
+    // the number the user accepted - a number the agent reads has to be a number the user saw.
+
+    /// <summary>Per-asset triangle cap. The one profile field today's search can act on numerically.</summary>
+    public int? MaxTrianglesPerAsset { get; private set; }
+
+    public int? MaxTextureSize { get; private set; }
+
+    public int? TargetSceneTriangles { get; private set; }
+
+    /// <summary>
+    /// Pixels per world unit, for 2D projects. Stated in the brief and usable while
+    /// authoring, but <b>not filterable</b>: nothing extracts a sprite's pixel dimensions
+    /// yet, so a check on it would be a check that never runs.
+    /// </summary>
+    public int? PixelsPerUnit { get; private set; }
+
+    // ---- the world convention (prompt 13-A) ----
+    // One AUTHORED convention, defaulted to Modelibr's own. It cannot be looked up from the
+    // engine, because a project has several engines and they disagree - Blender is 1 unit /
+    // Z-up / right-handed, Unity 1 / Y / left, Unreal 100 / Z / left. Picking one silently
+    // is how an asset comes back on its side. The per-engine conversions are REPORTED in the
+    // brief, never resolved here.
+
+    public double? UnitsPerMetre { get; private set; }
+
+    /// <summary><c>X</c>, <c>Y</c> or <c>Z</c>. Null means Modelibr's own (Y-up).</summary>
+    public string? UpAxis { get; private set; }
+
+    /// <summary><c>right</c> or <c>left</c>. Null means Modelibr's own (right-handed).</summary>
+    public string? Handedness { get; private set; }
+
+    /// <summary>
+    /// The project's chosen palette, 3-6 hex colours. Cheap signal, and the one part of
+    /// "reference material" an agent can act on without looking at an image.
+    /// </summary>
+    public List<string> PaletteHex { get; private set; } = new();
+
     public File? CustomThumbnailFile { get; private set; }
+
+    /// <summary>The project's profile assignments across every dimension.</summary>
+    public ICollection<ProjectProfileValue> ProfileValues
+    {
+        get => _profileValues;
+        set
+        {
+            _profileValues.Clear();
+            if (value != null)
+                _profileValues.AddRange(value);
+        }
+    }
+
+    /// <summary>
+    /// Scenes built for this project. The link lives on <see cref="Scene"/> and is nullable:
+    /// deleting a project must not delete its scenes.
+    /// </summary>
+    public ICollection<Scene> Scenes
+    {
+        get => _scenes;
+        set
+        {
+            _scenes.Clear();
+            if (value != null)
+                _scenes.AddRange(value);
+        }
+    }
 
     // Navigation property for many-to-many relationship with Models - EF Core requires this to be settable
     public ICollection<Model> Models
@@ -163,6 +234,144 @@ public class Project : AggregateRoot
         Description = description?.Trim();
         Notes = notes?.Trim();
         UpdatedAt = updatedAt;
+    }
+
+    /// <summary>
+    /// Replaces the profile assignments for <b>one dimension</b>, leaving the others alone.
+    /// Per-dimension rather than wholesale because the UI edits one row at a time, and a
+    /// wholesale write would make "I only touched Style" indistinguishable from "I cleared
+    /// Genre".
+    /// </summary>
+    /// <param name="assignments">Option ids with their optional roles, all from this dimension.</param>
+    public void SetProfileDimension(
+        string dimension,
+        IReadOnlyDictionary<int, string?> assignments,
+        IReadOnlyDictionary<int, string> optionDimensions,
+        DateTime updatedAt)
+    {
+        var normalized = ProjectProfileDimensions.Normalize(dimension)
+            ?? throw new ArgumentException($"'{dimension}' is not a project profile dimension.", nameof(dimension));
+
+        foreach (var (optionId, _) in assignments)
+        {
+            if (!optionDimensions.TryGetValue(optionId, out var optionDimension))
+            {
+                throw new ArgumentException($"Profile option {optionId} does not exist.", nameof(assignments));
+            }
+
+            if (!string.Equals(optionDimension, normalized, StringComparison.OrdinalIgnoreCase))
+            {
+                // Cross-dimension assignment is the mistake this guard exists for: one
+                // vocabulary table means "Low Poly" and "Meta Quest" are rows in the same
+                // place, and nothing in the schema stops a platform being assigned as a style.
+                throw new ArgumentException(
+                    $"Profile option {optionId} belongs to '{optionDimension}', not '{normalized}'.",
+                    nameof(assignments));
+            }
+        }
+
+        _profileValues.RemoveAll(v =>
+            optionDimensions.TryGetValue(v.OptionId, out var d)
+            && string.Equals(d, normalized, StringComparison.OrdinalIgnoreCase));
+
+        var supportsRole = ProjectProfileDimensions.SupportsRole(normalized);
+        foreach (var (optionId, role) in assignments)
+        {
+            _profileValues.Add(ProjectProfileValue.Create(Id, optionId, supportsRole ? role : null));
+        }
+
+        UpdatedAt = updatedAt;
+    }
+
+    /// <summary>
+    /// Sets the fidelity budget and the world convention. Every argument is nullable and a
+    /// null clears the field - these are written as one group from one form, so "leave it
+    /// alone" is not a state this method needs to express.
+    /// </summary>
+    public void SetProfileSettings(
+        int? maxTrianglesPerAsset,
+        int? maxTextureSize,
+        int? targetSceneTriangles,
+        int? pixelsPerUnit,
+        double? unitsPerMetre,
+        string? upAxis,
+        string? handedness,
+        IEnumerable<string>? paletteHex,
+        DateTime updatedAt)
+    {
+        if (maxTrianglesPerAsset is <= 0)
+            throw new ArgumentException("A triangle budget must be greater than 0.", nameof(maxTrianglesPerAsset));
+        if (maxTextureSize is <= 0)
+            throw new ArgumentException("A texture size must be greater than 0.", nameof(maxTextureSize));
+        if (targetSceneTriangles is <= 0)
+            throw new ArgumentException("A scene triangle target must be greater than 0.", nameof(targetSceneTriangles));
+        if (pixelsPerUnit is <= 0)
+            throw new ArgumentException("Pixels per unit must be greater than 0.", nameof(pixelsPerUnit));
+        if (unitsPerMetre is <= 0)
+            throw new ArgumentException("Units per metre must be greater than 0.", nameof(unitsPerMetre));
+
+        var axis = NormalizeAxis(upAxis);
+        var hand = NormalizeHandedness(handedness);
+
+        MaxTrianglesPerAsset = maxTrianglesPerAsset;
+        MaxTextureSize = maxTextureSize;
+        TargetSceneTriangles = targetSceneTriangles;
+        PixelsPerUnit = pixelsPerUnit;
+        UnitsPerMetre = unitsPerMetre;
+        UpAxis = axis;
+        Handedness = hand;
+        PaletteHex = NormalizePalette(paletteHex);
+        UpdatedAt = updatedAt;
+    }
+
+    private static string? NormalizeAxis(string? axis)
+    {
+        if (string.IsNullOrWhiteSpace(axis)) return null;
+        var trimmed = axis.Trim().ToUpperInvariant();
+        return trimmed is "X" or "Y" or "Z"
+            ? trimmed
+            : throw new ArgumentException("Up axis must be X, Y or Z.", nameof(axis));
+    }
+
+    private static string? NormalizeHandedness(string? handedness)
+    {
+        if (string.IsNullOrWhiteSpace(handedness)) return null;
+        var trimmed = handedness.Trim().ToLowerInvariant();
+        return trimmed is "right" or "left"
+            ? trimmed
+            : throw new ArgumentException("Handedness must be right or left.", nameof(handedness));
+    }
+
+    /// <summary>
+    /// Accepts <c>#rrggbb</c> (and the three-digit short form), upper-cased with the hash,
+    /// capped at six. A palette is a signal, not a swatch library; past six it stops saying
+    /// anything about the project's identity.
+    /// </summary>
+    private static List<string> NormalizePalette(IEnumerable<string>? palette)
+    {
+        if (palette is null) return new List<string>();
+
+        var result = new List<string>();
+        foreach (var raw in palette)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) continue;
+
+            var value = raw.Trim().TrimStart('#').ToUpperInvariant();
+            if (value.Length is not (3 or 6) || !value.All(Uri.IsHexDigit))
+            {
+                throw new ArgumentException($"'{raw}' is not a hex colour.", nameof(palette));
+            }
+
+            var normalized = "#" + value;
+            if (!result.Contains(normalized))
+            {
+                result.Add(normalized);
+            }
+
+            if (result.Count == 6) break;
+        }
+
+        return result;
     }
 
     public void SetCustomThumbnail(File? file, DateTime updatedAt)

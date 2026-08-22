@@ -18,7 +18,7 @@ the tools that change anything only appear when you opt in with
 
 ## What the agent can read
 
-These ten library tools are always available, each a thin wrapper over an
+These thirteen library tools are always available, each a thin wrapper over an
 ordinary Modelibr API endpoint - there is no separate search or extraction path:
 
 | Tool                | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
@@ -33,6 +33,9 @@ ordinary Modelibr API endpoint - there is no separate search or extraction path:
 | `get_job_status`    | What a queued job is doing, and once it has finished, what it produced - the new version id an unwrap wrote, for instance. Pass `waitSeconds` to block for the verdict instead of writing a polling loop; the job runs on regardless. This is how you collect the result of any tool that hands back a job id.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |     |
 | `get_metadata_schema` | The asset metadata schema: every field an asset can carry, per family, with its type, its allowed values, whether it is authored, derived or imported, and which store-manifest path populates it. Read it before `set_asset_metadata` - it is the field list that call validates against. |
 | `get_asset_metadata`  | Every schema field's current value for one asset, authored and measured alike, plus `completeness` - the fields a caller could still fill. Use it to ask what an asset is missing instead of reading it and comparing by hand.                                                                                              |
+| `list_projects`       | Every project, one line each: name, style, platforms, the per-asset triangle budget, and how many scenes and models it has. Start here when a request names a project rather than a scene.                                                                                                                     |
+| `get_project`         | A project's full brief - engines and their roles, platforms, genres, styles, camera perspective, the fidelity budget, the world convention and what it converts to in each engine, the palette, concept images, the project's own environment maps, its scenes, and `guidance`: the constraints in plain sentences. |
+| `list_project_profile_options` | The profile vocabulary a project can be assigned from. Built-ins first; a user may have added their own.                                                                                                                                                                                             |
 
 ### Looking at the Asset Store
 
@@ -80,7 +83,7 @@ and look.
 
 ## What the agent can change (opt-in)
 
-Set `MCP_WRITE_ENABLED=true` in your root `.env` and thirty-six more tools appear,
+Set `MCP_WRITE_ENABLED=true` in your root `.env` and thirty-seven more tools appear,
 letting an agent curate the library the way you would in the app. They are a thin
 pass-through over the same command handlers the UI uses, so there is one source
 of truth for what a change means:
@@ -99,6 +102,7 @@ of truth for what a change means:
 | `import_model`     | Import a model. Pass a `path` the **server** can read for a co-located import; omit `path` to get an upload ticket plus the HTTP endpoints to stream bytes to when the agent is remote. |
 | `import_store_asset` | Pull a **free** asset from the companion Asset Store into the library. Returns a job id; collect it with `get_store_import`. |
 | `set_asset_metadata` | Merge schema fields onto an asset - licence, author, credit, style, theme, source - for **any** family. A field you omit is left alone; a field set to `null` is cleared. The call resolves where each field lives, so a caller names fields rather than families. |
+| `set_scene_project`  | Link a scene to a project so its brief applies, or unlink it with `projectId=null`. A scene write: it bumps the revision and is undoable. |
 
 #### Bringing a store asset home
 
@@ -118,6 +122,35 @@ The import runs in the background. `import_store_asset` answers with a job id st
 `get_store_import` reports how far it got and the local pack id once there is one. An asset
 that is already in the library is refused too, so a repeated proposal cannot quietly
 re-download a pack you already have.
+
+#### Building for a project
+
+A project describes **what is being made**: which engines its assets have to work
+in, which platforms it ships to, its genre, its style, its camera perspective,
+and the triangle and texture budget those imply. Link a scene to a project with
+`set_scene_project`, and that description reaches the agent three ways:
+
+- `get_project` returns the brief in full.
+- `get_scene` carries it under `project`, so an agent handed a scene id does not
+  have to know to go looking - the one that does not look is exactly the one that
+  will place a 180k-triangle photoscan into a low-poly game.
+- `compose_scene(projectId:)` inlines it as a **THIS PROJECT** block, above the
+  section on choosing assets.
+
+Two parts of the brief are worth knowing about:
+
+- **`guidance` is the brief in sentences.** An agent that reads nothing else
+  should still come away with the constraints - and it is the same text the app
+  shows the user, so when a choice looks odd you can read exactly what the agent
+  was told.
+- **The engines are reconciled, not resolved.** A project is commonly Blender
+  *and* Unity, and they disagree about up axis and handedness. The brief lists
+  the conversion for each engine and **says where they conflict**, because "works
+  in both" is a constraint the agent has to satisfy deliberately. An engine
+  Modelibr has no figures for contributes no line rather than a guessed one.
+
+A budget is a target, not a refusal. Nothing here hides an asset from search;
+the profile is something to weigh and to say you weighed.
 
 #### What an asset can say about itself
 

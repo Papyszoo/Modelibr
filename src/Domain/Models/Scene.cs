@@ -37,6 +37,23 @@ public class Scene : AggregateRoot
     /// </summary>
     public int Revision { get; private set; }
 
+    /// <summary>
+    /// The project this scene is being built for, or null when it belongs to none
+    /// (prompt 13-C).
+    /// </summary>
+    /// <remarks>
+    /// Nullable and <c>OnDelete(SetNull)</c>: every scene that existed before the link was
+    /// added stays unlinked, because there is no correct owner to invent for one, and
+    /// deleting a project must not delete the scenes built for it.
+    ///
+    /// The profile itself deliberately does <b>not</b> go into the document. The document is
+    /// portable composition; a scene moved to another project must pick up the new project's
+    /// profile rather than carry the old one. Context, not content.
+    /// </remarks>
+    public int? ProjectId { get; private set; }
+
+    public Project? Project { get; private set; }
+
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
 
@@ -58,7 +75,8 @@ public class Scene : AggregateRoot
         string documentJson,
         int schemaVersion,
         DateTime now,
-        string? description = null)
+        string? description = null,
+        int? projectId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -70,7 +88,28 @@ public class Scene : AggregateRoot
             return Result.Failure<Scene>(new Error("Scene.InvalidDocument", "A scene needs a document."));
         }
 
-        return Result.Success(new Scene(name.Trim(), description, schemaVersion, documentJson, now));
+        var scene = new Scene(name.Trim(), description, schemaVersion, documentJson, now)
+        {
+            ProjectId = projectId
+        };
+
+        return Result.Success(scene);
+    }
+
+    /// <summary>
+    /// Links the scene to a project, or clears the link with null.
+    /// </summary>
+    /// <remarks>
+    /// Bumps <see cref="Revision"/> like any other scene write. The revision is the token
+    /// the editor and an agent both watch to notice the scene moved under them, and a link
+    /// change that did not move it is a change the editor never learns about - it would keep
+    /// showing the old project's brief while the agent read the new one.
+    /// </remarks>
+    public void SetProject(int? projectId, DateTime now)
+    {
+        ProjectId = projectId;
+        Revision++;
+        UpdatedAt = now;
     }
 
     /// <summary>

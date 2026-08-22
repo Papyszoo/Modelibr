@@ -57,6 +57,7 @@ namespace Infrastructure
             services.AddScoped<IAssetDerivationRepository, AssetDerivationRepository>();
             services.AddScoped<IAssetSearchDocumentRepository, AssetSearchDocumentRepository>();
             services.AddScoped<IAssetMetadataRepository, AssetMetadataRepository>();
+            services.AddScoped<IProjectProfileOptionRepository, ProjectProfileOptionRepository>();
             services.AddScoped<ISearchLogRepository, SearchLogRepository>();
             services.AddScoped<IComputeCacheRepository, ComputeCacheRepository>();
             services.AddScoped<Application.Extraction.Compute.ComputeCacheService>();
