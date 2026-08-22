@@ -152,6 +152,17 @@ Two parts of the brief are worth knowing about:
 A budget is a target, not a refusal. Nothing here hides an asset from search;
 the profile is something to weigh and to say you weighed.
 
+`validate_scene` checks the scene against the project too, and splits the
+findings the way the stages do: an asset over the budget is reported once the
+scene reaches `detail`, an off-style asset only once it is `dressed` - but an
+asset **more than ten times** over the cap, or from the wrong family entirely,
+is reported at `layout`, while the scene is still grey. "That sofa is a bit
+modern" can wait; "that is a pixel-art sprite in a realistic 3D room" cannot,
+because by the dressing stage a whole hierarchy has been built around it.
+
+None of these ever make the verdict an error, and an asset nobody has described
+is never called off-style - silence about an asset is not evidence against it.
+
 #### What an asset can say about itself
 
 Everything an asset carries beyond its files is described by one versioned

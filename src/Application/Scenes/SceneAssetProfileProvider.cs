@@ -28,15 +28,18 @@ internal sealed class SceneAssetProfileProvider : ISceneAssetProfiles
 {
     private readonly IAssetPartRepository _parts;
     private readonly IAssetDerivationRepository _derivations;
+    private readonly IAssetSearchDocumentRepository _searchDocuments;
     private readonly IModelVersionRepository _modelVersions;
 
     public SceneAssetProfileProvider(
         IAssetPartRepository parts,
         IAssetDerivationRepository derivations,
+        IAssetSearchDocumentRepository searchDocuments,
         IModelVersionRepository modelVersions)
     {
         _parts = parts;
         _derivations = derivations;
+        _searchDocuments = searchDocuments;
         _modelVersions = modelVersions;
     }
 
@@ -111,7 +114,14 @@ internal sealed class SceneAssetProfileProvider : ISceneAssetProfiles
 
         var flags = ReadQualityFlags(derivation?.Payload);
 
-        if (parts.Count == 0 && version is null && flags.Count == 0)
+        // Triangle count and declared styles come off the search projection, which is where
+        // both are already denormalised (prompt 16-F). It describes the asset's CURRENT
+        // version while a node may pin an older one - the validator states that limitation
+        // rather than the check pretending to a precision it does not have.
+        var document = await _searchDocuments.GetCurrentAssetDocumentAsync(
+            ExtractionAssetTypeFor(asset.AssetType), asset.AssetId, cancellationToken);
+
+        if (parts.Count == 0 && version is null && flags.Count == 0 && document is null)
         {
             return null;
         }
@@ -120,13 +130,15 @@ internal sealed class SceneAssetProfileProvider : ISceneAssetProfiles
             asset.AssetType,
             asset.AssetId,
             asset.VersionId,
-            version?.Model?.Name,
+            version?.Model?.Name ?? document?.DisplayName,
             parts.Count,
             cameras,
             lights,
             version?.MaterialCount,
             version is not null && (version.DefaultTextureSetId is not null || version.TextureMappings.Count > 0),
-            flags);
+            flags,
+            document?.TriangleCount,
+            document?.Styles);
     }
 
     private static string ExtractionAssetTypeFor(string sceneAssetType) => sceneAssetType switch

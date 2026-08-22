@@ -26,8 +26,13 @@ public sealed record SceneAssetProfile(
     IReadOnlyList<string>? LightParts = null,
     int? MaterialCount = null,
     bool HasBoundTextureSet = false,
-    IReadOnlyList<string>? QualityFlags = null)
+    IReadOnlyList<string>? QualityFlags = null,
+    int? TriangleCount = null,
+    IReadOnlyList<string>? Styles = null)
 {
+    /// <summary>The asset's declared styles, from the asset metadata schema. Empty when nobody has said.</summary>
+    public IReadOnlyList<string> DeclaredStyles => Styles ?? Array.Empty<string>();
+
     public IReadOnlyList<string> Cameras => CameraParts ?? Array.Empty<string>();
 
     public IReadOnlyList<string> Lights => LightParts ?? Array.Empty<string>();
@@ -45,6 +50,33 @@ public static class SceneChecks
     public const string Appearance = "appearance";
     public const string Scale = "scale";
     public const string Overlap = "overlap";
+
+    /// <summary>The project's own constraints - budget, style, asset family (prompt 13-D4).</summary>
+    public const string Profile = "profile";
+}
+
+/// <summary>
+/// What the project a scene belongs to asks of it (prompt 13-D4). Null when the scene belongs
+/// to no project, which is also what every scene made before the link had.
+/// </summary>
+/// <param name="MaxTrianglesPerAsset">The accepted per-asset cap, or null for unconstrained.</param>
+/// <param name="FamilyHint">
+/// The asset family the project's style implies, or null. This is the one style-shaped rule
+/// reported at every stage: "that is a pixel-art sprite in a realistic 3D room" is structural,
+/// visible in a grey blockout, and expensive to fix once a hierarchy has been built on it.
+/// </param>
+public sealed record SceneProjectConstraints(
+    int ProjectId,
+    string ProjectName,
+    int? MaxTrianglesPerAsset = null,
+    int? TargetSceneTriangles = null,
+    IReadOnlyList<string>? Styles = null,
+    IReadOnlyList<string>? PenaltyTokens = null,
+    string? FamilyHint = null)
+{
+    public IReadOnlyList<string> ProjectStyles => Styles ?? Array.Empty<string>();
+
+    public IReadOnlyList<string> OffStyleTokens => PenaltyTokens ?? Array.Empty<string>();
 }
 
 /// <summary>
@@ -148,10 +180,18 @@ public static class SceneValidator
 
     public const double StrayNodeMinimumDistanceMetres = 10.0;
 
+    /// <summary>
+    /// How far over the per-asset cap a node has to be before the overrun is reported as
+    /// structural rather than as a budget note. Ten times is not "a bit heavy" - it is the
+    /// wrong asset, and it is worth saying at layout, before a hierarchy is built on it.
+    /// </summary>
+    public const int GrossOverBudgetFactor = 10;
+
     public static SceneValidationReport Validate(
         SceneDocument document,
         IReadOnlyDictionary<string, SceneAssetFacts> facts,
-        IReadOnlyDictionary<string, SceneAssetProfile>? profiles = null)
+        IReadOnlyDictionary<string, SceneAssetProfile>? profiles = null,
+        SceneProjectConstraints? project = null)
     {
         var findings = new List<SceneFinding>();
 
@@ -196,6 +236,7 @@ public static class SceneValidator
         CheckAppearance(document, nodes, profiles, findings);
         CheckScale(nodes, facts, findings);
         CheckInterpenetration(nodes, visibleBoxes, findings);
+        CheckProfile(document, nodes, profiles, project, findings);
 
         var verdict = findings.Any(f => f.Severity == SceneFindingSeverities.Error)
             ? SceneVerdicts.Errors
@@ -210,7 +251,7 @@ public static class SceneValidator
                 nodes.Count,
                 boxes.Count,
                 withoutBounds,
-                Limitations(withoutBounds.Count, document.Stage),
+                Limitations(withoutBounds.Count, document.Stage, project),
                 document.Stage));
     }
 
@@ -681,7 +722,131 @@ public static class SceneValidator
     private static string NotYetDue(string? stage, bool due, string dueAt) =>
         due ? string.Empty : $" This scene is still at the '{stage}' stage, so it is a note rather than a problem - it becomes one at '{dueAt}'.";
 
-    private static IReadOnlyList<string> Limitations(int nodesWithoutBounds, string? stage)
+    /// <summary>
+    /// The project's own constraints (prompt 13-D4). Findings, never refusals: a budget is a
+    /// target and the author may knowingly blow it.
+    ///
+    /// <para>
+    /// Stage-aware, but split along a line that matters: <b>taste waits, kind of thing does
+    /// not</b>. "That sofa is a bit modern" is a dressing-stage remark. "That is a pixel-art
+    /// sprite in a realistic 3D room" is structural - it is visible in a grey blockout, and by
+    /// the dressing stage a whole hierarchy has been built around it. So a family mismatch and
+    /// a gross overrun are reported at <c>layout</c>; everything else about style waits for
+    /// <c>dressed</c>, and the budget for <c>detail</c>.
+    /// </para>
+    /// </summary>
+    private static void CheckProfile(
+        SceneDocument document,
+        IReadOnlyList<SceneNode> nodes,
+        IReadOnlyDictionary<string, SceneAssetProfile>? profiles,
+        SceneProjectConstraints? project,
+        List<SceneFinding> findings)
+    {
+        if (project is null)
+        {
+            // Deliberately NOT a finding, against the prompt's first draft. Belonging to no
+            // project is not a thing that is wrong with a scene, and a note on every scene
+            // in the library would turn "no findings" into "one finding" everywhere - the
+            // cry-wolf failure this validator exists to avoid. It is stated as a coverage
+            // limitation instead, which is the honest home for "here is what I did not
+            // check".
+            return;
+        }
+
+        var stage = document.Stage;
+        var budgetDue = stage is null || SceneStages.HasReached(stage, SceneStages.Detail);
+        var styleDue = stage is null || SceneStages.HasReached(stage, SceneStages.Dressed);
+
+        var sceneTriangles = 0;
+        var counted = false;
+
+        foreach (var node in nodes)
+        {
+            if (node.Asset is null) continue;
+            if (profiles is null
+                || !profiles.TryGetValue(SceneSpatial.FactsKey(node.Asset), out var profile)
+                || profile is null)
+            {
+                continue;
+            }
+
+            if (profile.TriangleCount is int triangles)
+            {
+                sceneTriangles += triangles;
+                counted = true;
+
+                if (project.MaxTrianglesPerAsset is int cap && triangles > cap)
+                {
+                    var gross = triangles > (long)cap * GrossOverBudgetFactor;
+                    if (gross || budgetDue)
+                    {
+                        findings.Add(new SceneFinding(
+                            SceneChecks.Profile,
+                            gross ? "GrossOverBudgetAsset" : "OverBudgetAsset",
+                            gross ? SceneFindingSeverities.Warning : SceneFindingSeverities.Info,
+                            new[] { node.Id },
+                            gross
+                                // Invariant, like every other number this server hands an
+                                // agent: a finding that reads differently by server locale is
+                                // a finding whose wording depends on where it ran.
+                                ? FormattableString.Invariant(
+                                    $"'{profile.Name ?? node.Id}' is {triangles:N0} triangles against {project.ProjectName}'s {cap:N0} budget - more than {GrossOverBudgetFactor}x over. That is usually the wrong asset rather than a heavy one; replace it before building anything on it.")
+                                : FormattableString.Invariant(
+                                    $"'{profile.Name ?? node.Id}' is {triangles:N0} triangles, over {project.ProjectName}'s {cap:N0} per-asset budget. A budget is a target - keep it if you mean to, and say so.")));
+                    }
+                }
+            }
+
+            // Family: structural, and said at every stage. The style hint is the only thing
+            // in the profile that can tell a 2D project's assets from a 3D one's.
+            if (project.FamilyHint is { } family
+                && !string.Equals(node.Asset.AssetType, family, StringComparison.OrdinalIgnoreCase))
+            {
+                findings.Add(new SceneFinding(
+                    SceneChecks.Profile,
+                    "WrongAssetFamily",
+                    SceneFindingSeverities.Warning,
+                    new[] { node.Id },
+                    $"'{profile.Name ?? node.Id}' is a {node.Asset.AssetType}, but {project.ProjectName}'s style implies {family} assets. Check this is deliberate before building around it."));
+            }
+
+            if (styleDue && project.ProjectStyles.Count > 0 && profile.DeclaredStyles.Count > 0)
+            {
+                var shares = profile.DeclaredStyles.Any(
+                    s => project.ProjectStyles.Contains(s, StringComparer.OrdinalIgnoreCase));
+
+                var contradicts = profile.DeclaredStyles.Any(
+                    s => project.OffStyleTokens.Contains(s, StringComparer.OrdinalIgnoreCase));
+
+                // Note level only, and only when the asset both misses every project style
+                // AND carries one the project's styles rule out. Style is a judgement, and a
+                // validator that cries wolf about taste stops being read about geometry.
+                if (!shares && contradicts)
+                {
+                    findings.Add(new SceneFinding(
+                        SceneChecks.Profile,
+                        "OffStyleAsset",
+                        SceneFindingSeverities.Info,
+                        new[] { node.Id },
+                        $"'{profile.Name ?? node.Id}' is described as {string.Join(", ", profile.DeclaredStyles)}, which sits outside {project.ProjectName}'s {string.Join(", ", project.ProjectStyles)}. A judgement, not a defect."));
+                }
+            }
+        }
+
+        if (budgetDue && counted && project.TargetSceneTriangles is int sceneCap && sceneTriangles > sceneCap)
+        {
+            findings.Add(new SceneFinding(
+                SceneChecks.Profile,
+                "SceneOverBudget",
+                SceneFindingSeverities.Info,
+                Array.Empty<string>(),
+                FormattableString.Invariant(
+                    $"The scene totals {sceneTriangles:N0} triangles against {project.ProjectName}'s {sceneCap:N0} target.")));
+        }
+    }
+
+    private static IReadOnlyList<string> Limitations(
+        int nodesWithoutBounds, string? stage, SceneProjectConstraints? project)
     {
         var limitations = new List<string>
         {
@@ -701,6 +866,20 @@ public static class SceneValidator
         {
             limitations.Add(
                 $"{nodesWithoutBounds} node(s) have no derived bounds, so contact, containment and overlap could not be checked for them. Re-derive those assets to close the gap.");
+        }
+
+        if (project is null)
+        {
+            limitations.Add(
+                "This scene belongs to no project, so nothing here was judged against a budget or a style. Link it with set_scene_project to have those checked.");
+        }
+        else
+        {
+            // The triangle counts come from each asset's CURRENT version, while a node may
+            // pin an older one. Saying so is cheaper than pretending the check is exact -
+            // and this validator's whole purpose is to not be quietly trusted.
+            limitations.Add(
+                $"Budget findings are measured against each asset's current version; a node pinned to an older version may differ. Style is judged from what an asset declares, so an asset nobody has described is never called off-style.");
         }
 
         return limitations;
