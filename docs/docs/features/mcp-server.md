@@ -18,7 +18,7 @@ the tools that change anything only appear when you opt in with
 
 ## What the agent can read
 
-These eight library tools are always available, each a thin wrapper over an
+These ten library tools are always available, each a thin wrapper over an
 ordinary Modelibr API endpoint - there is no separate search or extraction path:
 
 | Tool                | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
@@ -31,6 +31,8 @@ ordinary Modelibr API endpoint - there is no separate search or extraction path:
 | `list_materials`    | Browse the material library: **parameter materials** (a colour and a roughness - no UVs needed) and **tiling global materials** (image channels, which do need UVs) in one list, because both attach to a model's material slot. Every hit carries `requiresUvs`, so an agent dressing an asset with a bad or missing unwrap can ask for only what will look right on it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `get_material`      | One parameter material in full - every factor, its render state, its category and tags.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `get_job_status`    | What a queued job is doing, and once it has finished, what it produced - the new version id an unwrap wrote, for instance. Pass `waitSeconds` to block for the verdict instead of writing a polling loop; the job runs on regardless. This is how you collect the result of any tool that hands back a job id.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |     |
+| `get_metadata_schema` | The asset metadata schema: every field an asset can carry, per family, with its type, its allowed values, whether it is authored, derived or imported, and which store-manifest path populates it. Read it before `set_asset_metadata` - it is the field list that call validates against. |
+| `get_asset_metadata`  | Every schema field's current value for one asset, authored and measured alike, plus `completeness` - the fields a caller could still fill. Use it to ask what an asset is missing instead of reading it and comparing by hand.                                                                                              |
 
 ### Looking at the Asset Store
 
@@ -78,7 +80,7 @@ and look.
 
 ## What the agent can change (opt-in)
 
-Set `MCP_WRITE_ENABLED=true` in your root `.env` and thirty-five more tools appear,
+Set `MCP_WRITE_ENABLED=true` in your root `.env` and thirty-six more tools appear,
 letting an agent curate the library the way you would in the app. They are a thin
 pass-through over the same command handlers the UI uses, so there is one source
 of truth for what a change means:
@@ -96,6 +98,7 @@ of truth for what a change means:
 | `analyze_meshes`   | Measure a model with Blender - UV overlap, texel density, exact surface area, watertightness. Changes nothing. Returns a job id; collect it with `get_job_status`.                      |
 | `import_model`     | Import a model. Pass a `path` the **server** can read for a co-located import; omit `path` to get an upload ticket plus the HTTP endpoints to stream bytes to when the agent is remote. |
 | `import_store_asset` | Pull a **free** asset from the companion Asset Store into the library. Returns a job id; collect it with `get_store_import`. |
+| `set_asset_metadata` | Merge schema fields onto an asset - licence, author, credit, style, theme, source - for **any** family. A field you omit is left alone; a field set to `null` is cleared. The call resolves where each field lives, so a caller names fields rather than families. |
 
 #### Bringing a store asset home
 
@@ -115,6 +118,29 @@ The import runs in the background. `import_store_asset` answers with a job id st
 `get_store_import` reports how far it got and the local pack id once there is one. An asset
 that is already in the library is refused too, so a repeated proposal cannot quietly
 re-download a pack you already have.
+
+#### What an asset can say about itself
+
+Everything an asset carries beyond its files is described by one versioned
+**asset metadata schema**, the same for every family. `get_metadata_schema`
+returns it: each field's key, type, allowed values, whether it is authored,
+derived or imported, and - for the fields a store import fills - the manifest
+path it comes from.
+
+Three things follow from having it in one place:
+
+- **Licence and credit are on the asset, not lost.** A store import stamps the
+  licence, the author and how the source asks to be credited onto every asset it
+  creates, along with the store, the listing and the pack item it came from.
+  Re-running an import never overwrites a licence someone corrected by hand.
+- **Style and theme are values, not tags.** `Low Poly` is a value of `styles`,
+  so it can be filtered on rather than hoped for in a tag string.
+- **You can ask what is missing.** Every `get_asset_metadata` response carries
+  `completeness`, listing the fields a caller could still fill - which is how a
+  pass over a whole library decides what to work on.
+
+Writing is a merge, on purpose: omit a field and it is left alone, set it to
+`null` and it is cleared. Nothing that fills in one field can blank another.
 
 #### Rebuilding the index versus re-extracting
 

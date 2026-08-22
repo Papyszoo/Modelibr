@@ -94,6 +94,7 @@ namespace Infrastructure.Persistence
         public DbSet<AgentUploadTicket> AgentUploadTickets => Set<AgentUploadTicket>();
         public DbSet<ModelVersionAuxiliaryFile> ModelVersionAuxiliaryFiles => Set<ModelVersionAuxiliaryFile>();
         public DbSet<StoreImportJob> StoreImportJobs => Set<StoreImportJob>();
+        public DbSet<AssetMetadata> AssetMetadata => Set<AssetMetadata>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -1499,6 +1500,63 @@ namespace Infrastructure.Persistence
             modelBuilder.HasPostgresExtension("pg_trgm");
 
             // Configure AssetSearchDocument - the derived-layer search projection.
+            // The asset metadata schema's side table (prompt 16-B). One row per
+            // (AssetType, AssetId), shared by every family - the fields here are universal
+            // and arrive from a different source than the asset's bytes, so they do not
+            // belong as six near-identical column sets on six aggregates.
+            modelBuilder.Entity<AssetMetadata>(entity =>
+            {
+                entity.ToTable("AssetMetadata");
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.AssetType).IsRequired().HasMaxLength(30);
+                entity.Property(e => e.AssetId).IsRequired();
+                entity.Property(e => e.SchemaVersion).IsRequired();
+
+                entity.Property(e => e.Description).IsRequired(false);
+                // text[] rather than a join table: these are values, not a shared
+                // vocabulary. Tags here exist only for the families whose entity has no
+                // ModelTag relation (Sound, Sprite) - part D moves them to the shared pool,
+                // and the schema states which home is current so nothing reads both.
+                entity.Property(e => e.Tags)
+                    .HasColumnType("text[]")
+                    .HasDefaultValueSql("'{}'::text[]");
+                entity.Property(e => e.Styles)
+                    .HasColumnType("text[]")
+                    .HasDefaultValueSql("'{}'::text[]");
+                entity.Property(e => e.Themes)
+                    .HasColumnType("text[]")
+                    .HasDefaultValueSql("'{}'::text[]");
+
+                entity.Property(e => e.License).IsRequired(false).HasMaxLength(40);
+                entity.Property(e => e.LicenseName).IsRequired(false).HasMaxLength(200);
+                entity.Property(e => e.LicenseUrl).IsRequired(false).HasMaxLength(2048);
+                entity.Property(e => e.Author).IsRequired(false).HasMaxLength(200);
+                entity.Property(e => e.CreditName).IsRequired(false).HasMaxLength(200);
+                entity.Property(e => e.CreditUrl).IsRequired(false).HasMaxLength(2048);
+                entity.Property(e => e.AttributionRequired).IsRequired(false);
+
+                entity.Property(e => e.SourceKind).IsRequired(false).HasMaxLength(40);
+                entity.Property(e => e.SourceUrl).IsRequired(false).HasMaxLength(2048);
+                entity.Property(e => e.StoreUrl).IsRequired(false).HasMaxLength(2048);
+                entity.Property(e => e.StoreAssetId).IsRequired(false).HasMaxLength(100);
+                entity.Property(e => e.StoreItemId).IsRequired(false).HasMaxLength(100);
+                entity.Property(e => e.ImportedAt).IsRequired(false);
+
+                entity.Property(e => e.FacetsJson).IsRequired(false).HasColumnType("jsonb");
+
+                entity.Property(e => e.CreatedAt).IsRequired();
+                entity.Property(e => e.UpdatedAt).IsRequired();
+
+                // One row per asset - the read path looks a row up by this pair and the
+                // write path upserts on it.
+                entity.HasIndex(e => new { e.AssetType, e.AssetId }).IsUnique();
+
+                // What a population pass scans: "which assets did this store import give
+                // us", and "which of them still have no licence".
+                entity.HasIndex(e => new { e.StoreUrl, e.StoreAssetId });
+                entity.HasIndex(e => e.StoreItemId);
+            });
+
             modelBuilder.Entity<AssetSearchDocument>(entity =>
             {
                 entity.HasKey(e => e.Id);

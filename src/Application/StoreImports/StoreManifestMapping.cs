@@ -127,6 +127,114 @@ public static class StoreManifestMapping
         };
     }
 
+    /// <summary>
+    /// The store's free-text licence mapped onto the asset metadata schema's vocabulary
+    /// (<see cref="Metadata.AssetMetadataSchema.Licenses"/>), or "Custom" when it is
+    /// something the schema does not know. Separate from <see cref="MapLicense"/>, which
+    /// produces the Pack entity's older licence codes ("CC_BY") - the two vocabularies
+    /// differ and collapsing them would silently mislabel every imported pack.
+    ///
+    /// The raw string is kept alongside as licenseName regardless, so an unrecognized
+    /// spelling loses nothing.
+    /// </summary>
+    public static string? MapSchemaLicense(string? license)
+    {
+        if (string.IsNullOrWhiteSpace(license))
+            return null;
+
+        var normalized = System.Text.RegularExpressions.Regex
+            .Replace(license.Trim().ToUpperInvariant(), "[\\s_]+", "-");
+
+        // Version suffixes are noise for classification: CC-BY-4.0 and CC-BY are the same
+        // licence family as far as "may I use this, and must I credit" goes.
+        normalized = System.Text.RegularExpressions.Regex.Replace(normalized, "-[0-9]+(\\.[0-9]+)*$", "");
+
+        return normalized switch
+        {
+            "CC0" or "CC-ZERO" or "PUBLIC-DOMAIN" => "CC0",
+            "CC-BY" => "CC-BY",
+            "CC-BY-SA" => "CC-BY-SA",
+            "CC-BY-NC" => "CC-BY-NC",
+            "CC-BY-ND" => "CC-BY-ND",
+            "MIT" => "MIT",
+            "APACHE" or "APACHE-2" => "Apache-2.0",
+            "GPL" or "GPLV3" => "GPL-3.0",
+            "ROYALTY-FREE" => "Royalty-Free",
+            "PROPRIETARY" => "Proprietary",
+            _ => "Custom"
+        };
+    }
+
+    /// <summary>
+    /// Whether a licence obliges a credit. Only the licences the schema recognizes can be
+    /// answered; anything else returns null rather than guessing, because guessing "no"
+    /// on an unrecognized licence is the one wrong answer with consequences.
+    /// </summary>
+    public static bool? RequiresAttribution(string? schemaLicense) => schemaLicense switch
+    {
+        "CC0" or "Royalty-Free" => false,
+        "CC-BY" or "CC-BY-SA" or "CC-BY-NC" or "CC-BY-ND" or "MIT" or "Apache-2.0" or "GPL-3.0" => true,
+        _ => null
+    };
+
+    /// <summary>
+    /// The per-family extras an item's metadata carries, as a JSON object - today the
+    /// sprite frame grid the categorization standard specifies
+    /// (<c>spritesheet: { frameWidth, frameHeight, frameCount, type, fps }</c>), flattened
+    /// so its keys match the schema's field keys.
+    ///
+    /// Returns null when the item has none, which is the common case: the store parses
+    /// frame dimensions out of filenames today and only packs built with the annotations
+    /// carry the block. The importer copies what is there and invents nothing.
+    /// </summary>
+    public static string? GetItemFacets(string? metadataJson)
+    {
+        if (string.IsNullOrWhiteSpace(metadataJson))
+            return null;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(metadataJson);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object
+                || !doc.RootElement.TryGetProperty("spritesheet", out var sheet)
+                || sheet.ValueKind != JsonValueKind.Object)
+            {
+                return null;
+            }
+
+            var facets = new Dictionary<string, object>(StringComparer.Ordinal);
+            foreach (var (source, target) in SpritesheetFacetKeys)
+            {
+                if (!sheet.TryGetProperty(source, out var value)) continue;
+
+                switch (value.ValueKind)
+                {
+                    case JsonValueKind.Number when value.TryGetInt32(out var number):
+                        facets[target] = number;
+                        break;
+                    case JsonValueKind.String when !string.IsNullOrWhiteSpace(value.GetString()):
+                        facets[target] = value.GetString()!.Trim();
+                        break;
+                }
+            }
+
+            return facets.Count == 0 ? null : JsonSerializer.Serialize(facets);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static readonly IReadOnlyList<(string Source, string Target)> SpritesheetFacetKeys = new[]
+    {
+        ("frameWidth", "frameWidth"),
+        ("frameHeight", "frameHeight"),
+        ("frameCount", "frameCount"),
+        ("fps", "fps"),
+        ("type", "spritesheetType"),
+    };
+
     /// <summary>The Modelibr import target for a manifest item, given its type (port of planForItem).</summary>
     public static ImportTarget PlanForItem(string? itemType) => itemType switch
     {

@@ -1,7 +1,9 @@
+using System.Text.Json;
 using Application.Abstractions.Files;
 using Application.Abstractions.Messaging;
 using Application.EnvironmentMaps;
 using Application.Files;
+using Application.Metadata;
 using Application.Models;
 using Application.Packs;
 using Application.Sounds;
@@ -46,6 +48,8 @@ internal sealed class StoreImportSink : IStoreImportSink
     private readonly ICommandHandler<UpdateSpriteCommand, UpdateSpriteResponse> _updateSprite;
     private readonly ICommandHandler<UpdateTextureSetCommand, UpdateTextureSetResponse> _updateTextureSet;
     private readonly IQueryHandler<GetEnvironmentMapByIdQuery, GetEnvironmentMapByIdResponse> _getEnvironmentMap;
+    private readonly IQueryHandler<ReadAssetMetadataQuery, AssetMetadataResponse> _readAssetMetadata;
+    private readonly ICommandHandler<SetAssetMetadataCommand, AssetMetadataResponse> _setAssetMetadata;
 
     public StoreImportSink(
         ICommandHandler<CreatePackCommand, CreatePackResponse> createPack,
@@ -72,7 +76,9 @@ internal sealed class StoreImportSink : IStoreImportSink
         ICommandHandler<UpdateSoundCommand, UpdateSoundResponse> updateSound,
         ICommandHandler<UpdateSpriteCommand, UpdateSpriteResponse> updateSprite,
         ICommandHandler<UpdateTextureSetCommand, UpdateTextureSetResponse> updateTextureSet,
-        IQueryHandler<GetEnvironmentMapByIdQuery, GetEnvironmentMapByIdResponse> getEnvironmentMap)
+        IQueryHandler<GetEnvironmentMapByIdQuery, GetEnvironmentMapByIdResponse> getEnvironmentMap,
+        IQueryHandler<ReadAssetMetadataQuery, AssetMetadataResponse> readAssetMetadata,
+        ICommandHandler<SetAssetMetadataCommand, AssetMetadataResponse> setAssetMetadata)
     {
         _createPack = createPack;
         _setProvenance = setProvenance;
@@ -99,6 +105,8 @@ internal sealed class StoreImportSink : IStoreImportSink
         _updateSprite = updateSprite;
         _updateTextureSet = updateTextureSet;
         _getEnvironmentMap = getEnvironmentMap;
+        _readAssetMetadata = readAssetMetadata;
+        _setAssetMetadata = setAssetMetadata;
     }
 
     public async Task<int> CreatePackAsync(
@@ -229,4 +237,22 @@ internal sealed class StoreImportSink : IStoreImportSink
 
     private static async Task RunAsync<T>(Task<Result<T>> resultTask)
         => Unwrap(await resultTask);
+
+    public async Task StampAssetMetadataAsync(
+        string assetType, int assetId, StoreAssetMetadataStamp stamp, CancellationToken ct)
+    {
+        var current = await _readAssetMetadata.Handle(new ReadAssetMetadataQuery(assetType, assetId), ct);
+        var filled = current.IsSuccess
+            ? current.Value.Fields.Where(f => f.Value is not null).Select(f => f.Key)
+            : Enumerable.Empty<string>();
+
+        var fields = StoreMetadataStampFields.Build(assetType, stamp, filled);
+        if (fields.Count == 0)
+        {
+            return;
+        }
+
+        await _setAssetMetadata.Handle(new SetAssetMetadataCommand(assetType, assetId, fields), ct);
+    }
+
 }

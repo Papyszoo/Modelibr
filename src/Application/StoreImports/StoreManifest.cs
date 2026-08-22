@@ -13,7 +13,14 @@ public sealed record StoreManifest(
     string? License,
     IReadOnlyList<string>? Tags,
     IReadOnlyList<StoreManifestItem>? Items,
-    IReadOnlyList<StoreManifestPreview>? Previews);
+    IReadOnlyList<StoreManifestPreview>? Previews,
+    // Attribution. The manifest has carried these since schema v1 and the importer read
+    // none of them, so a CC-BY asset imported with nothing on it saying who to credit.
+    // Author is who made it; CreditName/CreditUrl are how the source asks to be credited,
+    // which is not always the same name.
+    string? Author = null,
+    string? CreditName = null,
+    string? CreditUrl = null);
 
 public sealed record StoreManifestItem(
     string ItemType,

@@ -191,6 +191,20 @@ internal sealed class AssetSearchDocumentRepository : IAssetSearchDocumentReposi
         }
     }
 
+    public Task<AssetSearchDocument?> GetCurrentAssetDocumentAsync(
+        string assetType,
+        int assetId,
+        CancellationToken cancellationToken = default)
+    {
+        return _context.AssetSearchDocuments
+            .AsNoTracking()
+            .Where(d => d.AssetType == assetType &&
+                        d.AssetId == assetId &&
+                        d.PartPath == null &&
+                        d.IsCurrentVersion)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<AssetSearchDocument>> GetForOtherVersionsAsync(
         string assetType,
         int assetId,

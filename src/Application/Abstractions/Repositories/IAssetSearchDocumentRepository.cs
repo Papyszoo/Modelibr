@@ -33,6 +33,17 @@ public interface IAssetSearchDocumentRepository
     /// Clears the current-version flag on every document of an asset EXCEPT the
     /// given version - so exactly one version is searchable by default.
     /// </summary>
+    /// <summary>
+    /// The asset-level document (null PartPath) for the asset's current version, or null when
+    /// nothing has been indexed yet. Read-only - it is the cheapest place the already-measured
+    /// technical facts are denormalised, so the metadata surface reports them from here rather
+    /// than re-deriving them.
+    /// </summary>
+    Task<AssetSearchDocument?> GetCurrentAssetDocumentAsync(
+        string assetType,
+        int assetId,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<AssetSearchDocument>> GetForOtherVersionsAsync(
         string assetType,
         int assetId,

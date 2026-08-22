@@ -154,7 +154,11 @@ namespace WebApi
                     // for - and the only way an agent can collect the result of anything
                     // that hands back a job id instead of an answer.
                     .WithTools<WebApi.Mcp.OperationJobReadMcpTools>()
-                    .WithTools<WebApi.Mcp.StoreImportReadMcpTools>();
+                    .WithTools<WebApi.Mcp.StoreImportReadMcpTools>()
+                    // What the library knows about an asset, and the schema that says what
+                    // it could know. A read, and the one an agent needs before it can
+                    // usefully fill anything in.
+                    .WithTools<WebApi.Mcp.AssetMetadataReadMcpTools>();
 
                 // Write tools (prompt 30) are opt-in: OFF by default keeps a stock server
                 // read-only so enabling agent writes on a LAN-reachable endpoint is a
@@ -185,6 +189,9 @@ namespace WebApi
                         // downloads files and creates a pack - and the one tool here that
                         // reaches outside the machine to do it.
                         .WithTools<WebApi.Mcp.StoreImportMcpTools>()
+                        // Filling in what an asset says about itself - licence, credit,
+                        // style, where it came from. A write like any other tagging call.
+                        .WithTools<WebApi.Mcp.AssetMetadataWriteMcpTools>()
                         .WithPrompts<WebApi.Mcp.ImportLibraryPrompts>()
                         // The playbook for building a scene. Registered with the write
                         // tools because it is a guide to writing: every stage it describes
@@ -227,6 +234,7 @@ namespace WebApi
             app.MapModelEndpoints();
             app.MapModelVersionEndpoints();
             app.MapExtractionEndpoints();
+            app.MapAssetMetadataEndpoints();
             app.MapFilesEndpoints();
             app.MapThumbnailEndpoints();
             app.MapThumbnailJobEndpoints();
