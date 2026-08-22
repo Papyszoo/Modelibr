@@ -7,10 +7,12 @@ namespace Application.Abstractions.Services;
 /// <param name="JobId">The persisted <c>StoreImportJob</c> id (progress is written back to it).</param>
 /// <param name="StoreUrl">Validated store base URL.</param>
 /// <param name="AssetId">Store asset id to import.</param>
-/// <param name="ImportToken">Short-lived, asset-scoped, single-use store import token.</param>
+/// <param name="ImportToken">Short-lived, asset-scoped, single-use store import token, or
+/// <c>null</c> for an anonymous import. Only an approved free asset answers an anonymous
+/// fetch; the store refuses everything else, so a missing token cannot widen access.</param>
 /// <param name="SelectedItemIds">When non-empty, only these manifest item ids are imported (partial pack import); null/empty imports the whole pack.</param>
 public sealed record StoreImportWorkItem(
-    int JobId, string StoreUrl, string AssetId, string ImportToken, IReadOnlyList<string>? SelectedItemIds = null);
+    int JobId, string StoreUrl, string AssetId, string? ImportToken, IReadOnlyList<string>? SelectedItemIds = null);
 
 /// <summary>
 /// Producer side of the in-process store-import queue. The endpoint/command enqueues; a

@@ -31,6 +31,16 @@ public interface IPackRepository
     /// idempotency key). Used to make a re-import a no-op/gap-fill instead of a second pack.
     /// </summary>
     Task<Pack?> GetByStoreImportAsync(string storeUrl, string storeAssetId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Which of these store assets have already been imported from a given store. One query
+    /// for a whole page of store search hits: asking per hit would put a round trip behind
+    /// every result, and the flag exists precisely so a page of hits can be filtered.
+    /// </summary>
+    Task<IReadOnlySet<string>> GetImportedStoreAssetIdsAsync(
+        string storeUrl,
+        IReadOnlyCollection<string> storeAssetIds,
+        CancellationToken cancellationToken = default);
     Task UpdateAsync(Pack pack, CancellationToken cancellationToken = default);
     Task DeleteAsync(Pack pack, CancellationToken cancellationToken = default);
 }

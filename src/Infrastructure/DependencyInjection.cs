@@ -135,6 +135,18 @@ namespace Infrastructure
 
             services.AddScoped<Application.Abstractions.Services.IStoreImportClient, StoreImportClient>();
 
+            // Store catalog reader (v0.6 prompt 15): anonymous, small JSON, short timeout.
+            // Deliberately NOT the importer's client - that one is sized for multi-gigabyte
+            // file transfer, and a catalog query behind a two-minute timeout would let an
+            // unreachable store stall an agent's search instead of answering it.
+            var storeCatalogTimeoutSeconds = configuration.GetValue<int?>("STORE_CATALOG_HTTP_TIMEOUT_SECONDS") ?? 10;
+            services.AddHttpClient(Infrastructure.Services.StoreCatalogClient.HttpClientName, client =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(storeCatalogTimeoutSeconds);
+            });
+
+            services.AddScoped<Application.Abstractions.Services.IStoreCatalogClient, StoreCatalogClient>();
+
             // Registered once as a singleton, exposed through both the producer interface and
             // IHostedService so enqueue (request handlers) and consume (background loop) share
             // the same channel - mirrors the BlendFileGenerationQueue registration above.

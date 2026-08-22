@@ -61,6 +61,11 @@ services:
             - MCP_WRITE_ENABLED=${MCP_WRITE_ENABLED:-false}
             - MCP_DESTRUCTIVE_ENABLED=${MCP_DESTRUCTIVE_ENABLED:-false}
             - MCP_TOKENS=${MCP_TOKENS:-}
+            # The Asset Store the MCP store tools read. Unset here and the container
+            # cannot see the store at all, whatever the browser's VITE_STORE_URL says -
+            # they are two different clients on two different sides.
+            - STORE_URL=${STORE_URL:-}
+            - STORE_CATALOG_HTTP_TIMEOUT_SECONDS=${STORE_CATALOG_HTTP_TIMEOUT_SECONDS:-10}
         ports:
             - "${HTTPS_PORT:-8443}:${HTTPS_PORT:-8443}"
         volumes:

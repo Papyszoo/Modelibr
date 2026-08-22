@@ -110,6 +110,27 @@ internal sealed class PackRepository : IPackRepository
                 cancellationToken);
     }
 
+    public async Task<IReadOnlySet<string>> GetImportedStoreAssetIdsAsync(
+        string storeUrl,
+        IReadOnlyCollection<string> storeAssetIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (storeAssetIds.Count == 0)
+        {
+            return new HashSet<string>();
+        }
+
+        var ids = storeAssetIds.Distinct().ToList();
+        var imported = await _context.Packs
+            .Where(p => p.StoreImportUrl == storeUrl
+                        && p.StoreImportAssetId != null
+                        && ids.Contains(p.StoreImportAssetId))
+            .Select(p => p.StoreImportAssetId!)
+            .ToListAsync(cancellationToken);
+
+        return imported.ToHashSet();
+    }
+
     public Task UpdateAsync(Pack pack, CancellationToken cancellationToken = default)
     {
         _context.UpdateIfDetached(pack);

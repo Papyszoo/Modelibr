@@ -48,8 +48,10 @@ public static class StoreImportEndpoints
 /// <summary>
 /// Request body for POST /store-imports. The frontend obtains <paramref name="ImportToken"/>
 /// from the store's <c>POST /api/library/{assetId}/import-token</c> (browser-side) and hands it
-/// to the local backend, which never sees the user's store JWT. <paramref name="SelectedItemIds"/>
-/// scopes a partial import to specific manifest items; omit or leave empty to import the whole pack.
+/// to the local backend, which never sees the user's store JWT. It may be omitted for an
+/// approved free asset, which the store serves anonymously - a signed-out user can still
+/// import CC0 content. <paramref name="SelectedItemIds"/> scopes a partial import to specific
+/// manifest items; omit or leave empty to import the whole pack.
 /// </summary>
 public record StoreImportRequest(
-    string StoreUrl, string AssetId, string ImportToken, IReadOnlyList<string>? SelectedItemIds = null);
+    string StoreUrl, string AssetId, string? ImportToken = null, IReadOnlyList<string>? SelectedItemIds = null);

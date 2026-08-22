@@ -32,6 +32,30 @@ ordinary Modelibr API endpoint - there is no separate search or extraction path:
 | `get_material`      | One parameter material in full - every factor, its render state, its category and tags.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `get_job_status`    | What a queued job is doing, and once it has finished, what it produced - the new version id an unwrap wrote, for instance. Pass `waitSeconds` to block for the verdict instead of writing a polling loop; the job runs on regardless. This is how you collect the result of any tool that hands back a job id.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |     |
 
+### Looking at the Asset Store
+
+When the library genuinely has nothing that fits, an agent should be able to say what
+would - not settle for the closest wrong asset. Set `STORE_URL` in your root `.env` and
+two more read tools appear, over the companion Asset Store's **public** catalog.
+
+They send no credential, because that catalog needs none. They also acquire nothing: what
+an agent can do here is find and describe, and then propose.
+
+| Tool                  | What it does                                                                                                                                                                                                                                                                                                                       |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `search_store_assets` | Search the store catalog for assets that are **not** in your library, by text, item type, tag and format. Every hit carries `alreadyImported`, so a store asset you already pulled in is never offered back to you as a discovery.                                                                                              |
+| `get_store_asset`     | One store asset in full - its items, preview artifacts, licence and price - plus `canImportWithoutAccount`, the honest answer to whether an agent could fetch it by itself.                                                                                                                                                       |
+
+Store ids are the store's own, not library ids, and nothing found here is placeable until
+it has been imported. A store that is unreachable says so with its own code rather than
+returning an empty catalog - "the store is down" and "the store has no chairs" are
+different answers, and only one of them is a reason to stop looking. Nothing about the
+local library depends on the store being up.
+
+Importing is a separate, opt-in step - see [bringing one home](#bringing-a-store-asset-home)
+below. `get_store_import` is a read and is always present; it reports on an import someone
+already started.
+
 ### Looking at a scene
 
 Reading a scene is a read: an agent that can search the library can look at what it has
@@ -54,7 +78,7 @@ and look.
 
 ## What the agent can change (opt-in)
 
-Set `MCP_WRITE_ENABLED=true` in your root `.env` and thirty-four more tools appear,
+Set `MCP_WRITE_ENABLED=true` in your root `.env` and thirty-five more tools appear,
 letting an agent curate the library the way you would in the app. They are a thin
 pass-through over the same command handlers the UI uses, so there is one source
 of truth for what a change means:
@@ -71,6 +95,26 @@ of truth for what a change means:
 | `bake_textures`    | Bake a model's own appearance and geometry into texture maps with Blender, imported as a texture set bound to it. Returns a job id; collect it with `get_job_status`.                   |
 | `analyze_meshes`   | Measure a model with Blender - UV overlap, texel density, exact surface area, watertightness. Changes nothing. Returns a job id; collect it with `get_job_status`.                      |
 | `import_model`     | Import a model. Pass a `path` the **server** can read for a co-located import; omit `path` to get an upload ticket plus the HTTP endpoints to stream bytes to when the agent is remote. |
+| `import_store_asset` | Pull a **free** asset from the companion Asset Store into the library. Returns a job id; collect it with `get_store_import`. |
+
+#### Bringing a store asset home
+
+`import_store_asset` is the only tool that reaches off the machine to *acquire* something,
+and it can acquire exactly one kind of thing: an asset that is **free and approved** on the
+store. Those are anonymous there - their files are public downloads, and so is the manifest
+listing them - so no store account, no sign-in and no token is involved.
+
+A paid asset is refused, by name and with its price, and no amount of retrying changes that.
+It is not a missing feature: acquiring a paid asset needs the user's own store session,
+which lives in the browser and mints a short-lived, asset-scoped token per import. So the
+agent proposes it and the user accepts it in the app. The short version is worth keeping in
+mind when planning a scene: *an agent can fetch a free asset by itself, but never a paid
+one.*
+
+The import runs in the background. `import_store_asset` answers with a job id straight away;
+`get_store_import` reports how far it got and the local pack id once there is one. An asset
+that is already in the library is refused too, so a repeated proposal cannot quietly
+re-download a pack you already have.
 
 #### Rebuilding the index versus re-extracting
 
@@ -171,11 +215,22 @@ do. An agent should only resolve a slot when the user asked it to ("just pick se
 ones") - and either way the scene can still say which decisions a person actually made.
 
 In the editor, the **Choices panel** lists every slot beside the viewport. Each card shows
-its id verbatim, the agent's rationale, and the asset's real numbers - dimensions, part
-count, materials, and any cameras or lights inside it, because a rationale on its own is a
-plausible sentence about an asset nobody measured. Clicking a card previews it in place
-without writing anything, and a node whose slot is still open is outlined in the viewport
-so a scene cannot look finished while its decisions are not.
+its id verbatim, a thumbnail, the agent's rationale, and the asset's real numbers -
+dimensions, part count, materials, and any cameras or lights inside it, because a rationale
+on its own is a plausible sentence about an asset nobody measured. A candidate that proposes
+a surface as well as a shape shows the material beside the asset; a parameter-only material
+shows as a colour swatch, and a thumbnail that is still rendering says so rather than
+showing a broken image. Clicking a card previews it in place without writing anything, and a
+node whose slot is still open is outlined in the viewport so a scene cannot look finished
+while its decisions are not.
+
+A candidate can also come from the **Asset Store**, when the library genuinely has nothing
+that fits. Such a card is marked *not in your library*, carries the store's own picture and
+its price, and **cannot be chosen** - `resolve_slot` refuses it, and the editor's Choose
+button is disabled. That is deliberate rather than unfinished: settling a slot on a store
+asset means acquiring it first. A free one an agent can fetch itself with
+`import_store_asset` and then propose the imported asset; a paid one only the user can
+accept, signed in to the store.
 
 #### Composition first, colour last
 

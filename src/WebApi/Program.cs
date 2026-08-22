@@ -132,6 +132,11 @@ namespace WebApi
                 var mcpServer = builder.Services.AddMcpServer()
                     .WithHttpTransport()
                     .WithTools<WebApi.Mcp.AssetSearchMcpTools>()
+                    // Browsing the companion Asset Store's PUBLIC catalog is a read, and a
+                    // credential-free one - these tools acquire nothing. They are here so an
+                    // agent that cannot fill a slot from the library can say what would fill
+                    // it, rather than silently settling for the closest wrong asset.
+                    .WithTools<WebApi.Mcp.StoreCatalogMcpTools>()
                     // Reading a scene is a read: an agent that can search the library can
                     // look at what it has already built there.
                     .WithTools<WebApi.Mcp.SceneReadMcpTools>()
@@ -148,7 +153,8 @@ namespace WebApi
                     // Asking what a queued job did. A read about work someone else asked
                     // for - and the only way an agent can collect the result of anything
                     // that hands back a job id instead of an answer.
-                    .WithTools<WebApi.Mcp.OperationJobReadMcpTools>();
+                    .WithTools<WebApi.Mcp.OperationJobReadMcpTools>()
+                    .WithTools<WebApi.Mcp.StoreImportReadMcpTools>();
 
                 // Write tools (prompt 30) are opt-in: OFF by default keeps a stock server
                 // read-only so enabling agent writes on a LAN-reachable endpoint is a
@@ -175,6 +181,10 @@ namespace WebApi
                         // Running Blender on an asset. A write: it adds a version to a
                         // model, even though what it hands back is a job id.
                         .WithTools<WebApi.Mcp.BlenderWriteMcpTools>()
+                        // Pulling a free asset out of the companion store. A write - it
+                        // downloads files and creates a pack - and the one tool here that
+                        // reaches outside the machine to do it.
+                        .WithTools<WebApi.Mcp.StoreImportMcpTools>()
                         .WithPrompts<WebApi.Mcp.ImportLibraryPrompts>()
                         // The playbook for building a scene. Registered with the write
                         // tools because it is a guide to writing: every stage it describes

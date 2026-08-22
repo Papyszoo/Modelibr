@@ -108,7 +108,7 @@ internal sealed class StoreImportClient : IStoreImportClient
             }
         };
 
-    public async Task<StoreManifest> FetchManifestAsync(string storeUrl, string assetId, string importToken, CancellationToken cancellationToken)
+    public async Task<StoreManifest> FetchManifestAsync(string storeUrl, string assetId, string? importToken, CancellationToken cancellationToken)
     {
         var baseValidation = StoreUrlSafety.ValidateStoreBaseUrl(storeUrl);
         if (baseValidation.IsFailure)
@@ -124,7 +124,11 @@ internal sealed class StoreImportClient : IStoreImportClient
             () =>
             {
                 var request = new HttpRequestMessage(HttpMethod.Get, manifestUri);
-                request.Headers.Authorization = new AuthenticationHeaderValue(ImportTokenScheme, importToken);
+                // No token means an anonymous fetch, which the store answers only for an
+                // approved free asset. Sending an empty credential instead would be a
+                // malformed header, not a weaker one.
+                if (!string.IsNullOrWhiteSpace(importToken))
+                    request.Headers.Authorization = new AuthenticationHeaderValue(ImportTokenScheme, importToken);
                 return request;
             },
             cancellationToken);
@@ -150,7 +154,7 @@ internal sealed class StoreImportClient : IStoreImportClient
     }
 
     public async Task<StoreDownloadedFile> DownloadFileAsync(
-        string storeUrl, string absoluteUrl, string importToken, long expectedSizeBytes, long? maxBytes, CancellationToken cancellationToken)
+        string storeUrl, string absoluteUrl, string? importToken, long expectedSizeBytes, long? maxBytes, CancellationToken cancellationToken)
     {
         var storeUri = new Uri(storeUrl.TrimEnd('/') + "/", UriKind.Absolute);
 
@@ -184,7 +188,7 @@ internal sealed class StoreImportClient : IStoreImportClient
             // Send the import token ONLY to the store's own ORIGIN (scheme included). A redirect
             // to another origin (e.g. GitHub raw, or a downgrade to http on the same host) is
             // served without it, so the token never leaks cross-origin or in cleartext.
-            if (StoreUrlSafety.IsSameOrigin(uri, storeUri))
+            if (!string.IsNullOrWhiteSpace(importToken) && StoreUrlSafety.IsSameOrigin(uri, storeUri))
                 request.Headers.Authorization = new AuthenticationHeaderValue(ImportTokenScheme, importToken);
             if (pinnedAddress is not null)
                 request.Options.Set(PinnedAddressKey, pinnedAddress);
