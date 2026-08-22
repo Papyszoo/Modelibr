@@ -19,6 +19,7 @@ public class ImportModelSceneGraphCommandHandlerTests
     private readonly Mock<IAssetExtractionRepository> _extractions = new();
     private readonly Mock<IAssetDerivationRepository> _derivations = new();
     private readonly Mock<IAssetSearchDocumentRepository> _searchDocs = new();
+    private readonly Mock<IAssetMetadataRepository> _assetMetadata = new();
     private readonly Mock<IDateTimeProvider> _clock = new();
     private readonly Mock<IUnitOfWork> _uow = new();
     private readonly ImportModelSceneGraphCommandHandler _handler;
@@ -31,7 +32,7 @@ public class ImportModelSceneGraphCommandHandlerTests
             .ReturnsAsync(Array.Empty<AssetSearchDocument>());
         _handler = new ImportModelSceneGraphCommandHandler(
             _versions.Object, _parts.Object, _extractions.Object, _derivations.Object,
-            _searchDocs.Object, new DerivationOptions(), _clock.Object, _uow.Object);
+            _searchDocs.Object, _assetMetadata.Object, new DerivationOptions(), _clock.Object, _uow.Object);
     }
 
     private static SceneGraphPartDto Part(string path, string type, int? tris = null, string? hash = null) =>

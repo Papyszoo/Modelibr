@@ -68,7 +68,10 @@ public static class SearchDocumentBuilder
         IEnumerable<string>? packNames = null,
         IReadOnlyList<double>? assetDimensions = null,
         IEnumerable<string>? authoredTags = null,
-        string? description = null)
+        string? description = null,
+        IEnumerable<string>? styles = null,
+        IEnumerable<string>? themes = null,
+        string? license = null)
     {
         var rawByPath = rawParts
             .GroupBy(p => p.PartPath)
@@ -160,6 +163,12 @@ public static class SearchDocumentBuilder
             // quietly drop the tags the user had assigned.
             authoredTags: authoredTags,
             description: description,
+            // Carried through a re-derive rather than left to be re-set afterwards: the
+            // projection is rebuilt wholesale, so anything the build does not receive is
+            // silently blanked - the exact defect that once wiped authored tags.
+            styles: styles,
+            themes: themes,
+            license: license,
             geometryKey: geometryKey));
 
         foreach (var part in derived.Parts)

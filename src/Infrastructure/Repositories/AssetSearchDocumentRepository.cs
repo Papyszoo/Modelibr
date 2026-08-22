@@ -191,6 +191,25 @@ internal sealed class AssetSearchDocumentRepository : IAssetSearchDocumentReposi
         }
     }
 
+    public async Task SetSchemaFacetsForAssetAsync(
+        string assetType,
+        int assetId,
+        IEnumerable<string>? styles,
+        IEnumerable<string>? themes,
+        string? license,
+        CancellationToken cancellationToken = default)
+    {
+        // Asset-level documents only: a facet describes the asset, not one of its meshes.
+        var documents = await _context.AssetSearchDocuments
+            .Where(d => d.AssetType == assetType && d.AssetId == assetId && d.PartPath == null)
+            .ToListAsync(cancellationToken);
+
+        foreach (var document in documents)
+        {
+            document.SetSchemaFacets(styles, themes, license);
+        }
+    }
+
     public Task<AssetSearchDocument?> GetCurrentAssetDocumentAsync(
         string assetType,
         int assetId,

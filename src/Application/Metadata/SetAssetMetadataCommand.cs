@@ -32,6 +32,7 @@ internal sealed class SetAssetMetadataCommandHandler
 {
     private readonly IAssetEntityMetadata _entity;
     private readonly IAssetMetadataRepository _metadata;
+    private readonly IAssetSearchDocumentRepository _searchDocuments;
     private readonly IQueryHandler<ReadAssetMetadataQuery, AssetMetadataResponse> _read;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IUnitOfWork _unitOfWork;
@@ -39,12 +40,14 @@ internal sealed class SetAssetMetadataCommandHandler
     public SetAssetMetadataCommandHandler(
         IAssetEntityMetadata entity,
         IAssetMetadataRepository metadata,
+        IAssetSearchDocumentRepository searchDocuments,
         IQueryHandler<ReadAssetMetadataQuery, AssetMetadataResponse> read,
         IDateTimeProvider dateTimeProvider,
         IUnitOfWork unitOfWork)
     {
         _entity = entity;
         _metadata = metadata;
+        _searchDocuments = searchDocuments;
         _read = read;
         _dateTimeProvider = dateTimeProvider;
         _unitOfWork = unitOfWork;
@@ -150,6 +153,12 @@ internal sealed class SetAssetMetadataCommandHandler
         }
 
         stored.StampSchemaVersion(AssetMetadataSchema.Version, now);
+
+        // Search reads projection state only, so the facets a caller just set have to reach
+        // it in the same transaction - otherwise the style is on the asset and search still
+        // cannot find anything by it (prompt 16-F).
+        await _searchDocuments.SetSchemaFacetsForAssetAsync(
+            family, assetId, stored.Styles, stored.Themes, stored.License, cancellationToken);
 
         if (isNew)
         {

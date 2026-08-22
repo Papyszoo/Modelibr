@@ -27,6 +27,7 @@ public class ReprojectSearchDocumentsCommandTests
     private readonly Mock<IAssetPartRepository> _parts = new();
     private readonly Mock<IModelVersionRepository> _versions = new();
     private readonly Mock<IAssetSearchDocumentRepository> _documents = new();
+    private readonly Mock<IAssetMetadataRepository> _assetMetadata = new();
     private readonly Mock<IDateTimeProvider> _clock = new();
     private readonly Mock<IUnitOfWork> _uow = new();
     private readonly ReprojectSearchDocumentsCommandHandler _handler;
@@ -46,6 +47,7 @@ public class ReprojectSearchDocumentsCommandTests
             _parts.Object,
             _versions.Object,
             _documents.Object,
+            _assetMetadata.Object,
             _clock.Object,
             _uow.Object);
     }
@@ -193,6 +195,45 @@ public class ReprojectSearchDocumentsCommandTests
             Assert.Equal(expected.Prominence, actual.Prominence);
             Assert.Equal(expected.IsCurrentVersion, actual.IsCurrentVersion);
         }
+    }
+
+    /// <summary>
+    /// A re-derive rebuilds the projection wholesale, so anything it does not carry in is
+    /// silently blanked - which is exactly how an earlier change wiped authored tags off
+    /// every re-extracted asset. The metadata-schema facets have to survive the same trip.
+    /// </summary>
+    [Fact]
+    public async Task Reprojecting_Carries_The_Metadata_Facets_Rather_Than_Blanking_Them()
+    {
+        GivenStoredModel();
+
+        var metadata = AssetMetadata.Create("Model", ModelId, 1, Now);
+        metadata.SetDescriptive(null, null, new[] { "Low Poly" }, new[] { "Fantasy" }, Now);
+        metadata.SetRights("CC0", "CC0 1.0", null, null, null, null, false, Now);
+        _assetMetadata
+            .Setup(x => x.GetAsync("Model", ModelId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(metadata);
+
+        var result = await _handler.Handle(new ReprojectSearchDocumentsCommand(ModelId), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var assetDocument = _written.Single(d => d.PartPath is null);
+        Assert.Equal(new[] { "Low Poly" }, assetDocument.Styles);
+        Assert.Equal(new[] { "Fantasy" }, assetDocument.Themes);
+        Assert.Equal("CC0", assetDocument.License);
+    }
+
+    [Fact]
+    public async Task Reprojecting_An_Asset_Nobody_Described_Leaves_The_Facets_Empty()
+    {
+        GivenStoredModel();
+
+        var result = await _handler.Handle(new ReprojectSearchDocumentsCommand(ModelId), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var assetDocument = _written.Single(d => d.PartPath is null);
+        Assert.Empty(assetDocument.Styles);
+        Assert.Null(assetDocument.License);
     }
 
     /// <summary>

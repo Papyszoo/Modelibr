@@ -70,6 +70,7 @@ internal sealed class ImportModelSceneGraphCommandHandler : ICommandHandler<Impo
     private readonly IAssetExtractionRepository _assetExtractionRepository;
     private readonly IAssetDerivationRepository _assetDerivationRepository;
     private readonly IAssetSearchDocumentRepository _searchDocumentRepository;
+    private readonly IAssetMetadataRepository _assetMetadataRepository;
     private readonly DerivationOptions _derivationOptions;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IUnitOfWork _unitOfWork;
@@ -80,6 +81,7 @@ internal sealed class ImportModelSceneGraphCommandHandler : ICommandHandler<Impo
         IAssetExtractionRepository assetExtractionRepository,
         IAssetDerivationRepository assetDerivationRepository,
         IAssetSearchDocumentRepository searchDocumentRepository,
+        IAssetMetadataRepository assetMetadataRepository,
         DerivationOptions derivationOptions,
         IDateTimeProvider dateTimeProvider,
         IUnitOfWork unitOfWork)
@@ -89,6 +91,7 @@ internal sealed class ImportModelSceneGraphCommandHandler : ICommandHandler<Impo
         _assetExtractionRepository = assetExtractionRepository;
         _assetDerivationRepository = assetDerivationRepository;
         _searchDocumentRepository = searchDocumentRepository;
+        _assetMetadataRepository = assetMetadataRepository;
         _derivationOptions = derivationOptions;
         _dateTimeProvider = dateTimeProvider;
         _unitOfWork = unitOfWork;
@@ -208,6 +211,9 @@ internal sealed class ImportModelSceneGraphCommandHandler : ICommandHandler<Impo
             ? true
             : version.Model.ActiveVersionId == version.Id;
 
+        var schemaMetadata = await _assetMetadataRepository.GetAsync(
+            ExtractionAssetTypes.Model, version.ModelId, cancellationToken);
+
         await _searchDocumentRepository.RemoveForAssetAsync(
             ExtractionAssetTypes.Model, version.ModelId, version.Id, cancellationToken);
 
@@ -231,7 +237,13 @@ internal sealed class ImportModelSceneGraphCommandHandler : ICommandHandler<Impo
             // long after import, and a re-derive that rebuilt documents without them would
             // silently un-find every asset the user had taken the trouble to label.
             authoredTags: version.Model?.Tags?.Select(t => t.Name),
-            description: version.Model?.Description);
+            description: version.Model?.Description,
+            // A re-derive rebuilds the projection wholesale, so the metadata-schema facets
+            // have to be re-read and carried in - a style someone set would otherwise be
+            // blanked from search by the next extraction (prompt 16-F).
+            styles: schemaMetadata?.Styles,
+            themes: schemaMetadata?.Themes,
+            license: schemaMetadata?.License);
         foreach (var doc in searchDocs)
         {
             await _searchDocumentRepository.AddAsync(doc, cancellationToken);

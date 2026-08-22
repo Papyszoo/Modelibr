@@ -1609,6 +1609,17 @@ namespace Infrastructure.Persistence
                 entity.Property(e => e.PackNames).IsRequired(false).HasMaxLength(1000);
                 // SHA-256 of the asset's sorted part hashes, hex - fixed width by construction.
                 entity.Property(e => e.GeometryKey).IsRequired(false).HasMaxLength(64);
+                // Asset metadata schema facets, denormalised so a profile-driven search can
+                // filter on them (prompt 16-F). Arrays, not space-joined text: the question
+                // is containment ("is this asset Low Poly"), and a substring match over
+                // joined text would answer it wrongly.
+                entity.Property(e => e.Styles)
+                    .HasColumnType("text[]")
+                    .HasDefaultValueSql("'{}'::text[]");
+                entity.Property(e => e.Themes)
+                    .HasColumnType("text[]")
+                    .HasDefaultValueSql("'{}'::text[]");
+                entity.Property(e => e.License).IsRequired(false).HasMaxLength(40);
                 entity.Property(e => e.UpdatedAt).IsRequired();
 
                 // One document per (asset, version, part). NULLS NOT DISTINCT so the
@@ -1619,6 +1630,12 @@ namespace Infrastructure.Persistence
 
                 // Default result gate: active + current version + prominence.
                 entity.HasIndex(e => new { e.AssetType, e.IsActive, e.IsCurrentVersion, e.Prominence });
+
+                // GIN over the facet arrays: a style filter is an array containment test,
+                // which a btree cannot serve.
+                entity.HasIndex(e => e.Styles).HasMethod("gin");
+                entity.HasIndex(e => e.Themes).HasMethod("gin");
+                entity.HasIndex(e => e.License);
 
                 // Trigram GIN over authored identifiers - literal, multilingual, fuzzy.
                 entity.HasIndex(e => e.Tokens).HasMethod("gin").HasOperators("gin_trgm_ops");

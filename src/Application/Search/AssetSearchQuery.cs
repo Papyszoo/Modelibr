@@ -38,7 +38,22 @@ public record AssetSearchQuery(
     int? MinVertices = null,
     int? MaxVertices = null,
     // prompt-29 category bridge
-    string? Category = null) : IQuery<AssetSearchResponse>;
+    string? Category = null,
+    /// <summary>
+    /// Keep only assets carrying at least one of these styles, from the asset metadata
+    /// schema's vocabulary (<c>Low Poly</c>, <c>Realistic</c>, …). Any-of, not all-of: a
+    /// brief that says "low poly or voxel" is one filter, not two searches.
+    /// </summary>
+    IReadOnlyList<string>? Styles = null,
+
+    /// <summary>Keep only assets carrying at least one of these themes. Any-of, as above.</summary>
+    IReadOnlyList<string>? Themes = null,
+
+    /// <summary>
+    /// Keep only assets under this licence. Exact match on a closed vocabulary - the point
+    /// of the filter is "may I ship this", and a near-miss is the wrong answer.
+    /// </summary>
+    string? License = null) : IQuery<AssetSearchResponse>;
 
 public record AssetSearchResponse(IReadOnlyList<AssetSearchHit> Hits, int TotalCount);
 
@@ -132,7 +147,16 @@ public record AssetSearchFacts(
     /// choosing something to texture needs this to tell "ready" from "needs an unwrap first"
     /// without a round trip per candidate.
     /// </summary>
-    string? UvStatus = null);
+    string? UvStatus = null,
+
+    /// <summary>
+    /// The asset's declared styles and themes, and its licence, from the metadata schema.
+    /// Returned inline so a caller comparing candidates against a project's profile - or
+    /// deciding whether it may ship one - does not need a follow-up read per hit.
+    /// </summary>
+    IReadOnlyList<string>? Styles = null,
+    IReadOnlyList<string>? Themes = null,
+    string? License = null);
 
 /// <summary>An asset's extent in metres. Null axes mean it was never measured.</summary>
 public record AssetDimensions(double? X, double? Y, double? Z);
@@ -161,4 +185,7 @@ public record AssetSearchRequest(
     int? MaxParts = null,
     int? MinVertices = null,
     int? MaxVertices = null,
-    string? Category = null);
+    string? Category = null,
+    IReadOnlyList<string>? Styles = null,
+    IReadOnlyList<string>? Themes = null,
+    string? License = null);

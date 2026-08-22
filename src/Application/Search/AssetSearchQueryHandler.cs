@@ -62,7 +62,10 @@ internal sealed class AssetSearchQueryHandler
             query.MaxParts,
             query.MinVertices,
             query.MaxVertices,
-            query.Category);
+            query.Category,
+            query.Styles,
+            query.Themes,
+            query.License);
 
         var response = await _searchRepository.SearchAssetsAsync(request, cancellationToken);
 
@@ -102,6 +105,9 @@ internal sealed class AssetSearchQueryHandler
             request.MinVertices,
             request.MaxVertices,
             request.Category,
+            request.Styles,
+            request.Themes,
+            request.License,
         };
         var resultsShown = response.Hits
             .Select(h => new { h.AssetType, h.AssetId, h.PartPath })

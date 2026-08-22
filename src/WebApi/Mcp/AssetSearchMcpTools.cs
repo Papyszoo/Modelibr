@@ -55,13 +55,17 @@ public sealed class AssetSearchMcpTools
         [Description("Minimum vertex count.")] int? minVertices = null,
         [Description("Maximum vertex count.")] int? maxVertices = null,
         [Description("Category filter: matches the assigned category name (partial, case-insensitive), e.g. 'weapon'.")] string? category = null,
+        [Description("Keep only assets carrying at least one of these styles, e.g. ['Low Poly']. Values come from the asset metadata schema - call get_metadata_schema for the list.")] string[]? styles = null,
+        [Description("Keep only assets carrying at least one of these themes, e.g. ['Sci-Fi']. Schema values, as above.")] string[]? themes = null,
+        [Description("Keep only assets under this licence, e.g. 'CC0'. Exact match on the schema's licence vocabulary.")] string? license = null,
         CancellationToken cancellationToken = default)
     {
         var result = await handler.Handle(
             new AssetSearchQuery(query, limit, includeSecondary, minTriangles, maxTriangles,
                 hasAnimations, shapeClass, engine, assetType,
                 minSize, maxSize, hasRig, minBones, maxBones, minMaterials, maxMaterials,
-                hasUvs, uvStatus, minParts, maxParts, minVertices, maxVertices, category),
+                hasUvs, uvStatus, minParts, maxParts, minVertices, maxVertices, category,
+                styles, themes, license),
             cancellationToken);
         return result.IsFailure
             ? new { error = result.Error.Code, message = result.Error.Message }
@@ -182,6 +186,27 @@ public sealed class AssetSearchMcpTools
             new { name = "shapeClass", type = "enum", values = new[] { "planar", "tall", "wide", "blocky" } },
             new { name = "engine", type = "enum", values = new[] { "Unity", "Unreal", "Godot", "Roblox", "Defold", "LÖVE" } },
             new { name = "category", type = "string", note = "matches the assigned category name (partial, case-insensitive); conceptual terms (weapon/animal/building) also hit via the free-text query" },
+            new
+            {
+                name = "styles",
+                type = "enum list",
+                values = Application.Metadata.AssetMetadataSchema.Styles,
+                note = "any-of. What the asset LOOKS like, from the asset metadata schema - a typed facet, not a tag, so a project brief that says Low Poly can actually filter on it. Also returned on every hit as facts.styles",
+            },
+            new
+            {
+                name = "themes",
+                type = "enum list",
+                values = Application.Metadata.AssetMetadataSchema.Themes,
+                note = "any-of. What world the asset belongs to. Also returned as facts.themes",
+            },
+            new
+            {
+                name = "license",
+                type = "enum",
+                values = Application.Metadata.AssetMetadataSchema.Licenses,
+                note = "exact. Populated by store imports and by set_asset_metadata; absent on assets nobody has said anything about, so filtering on it also excludes everything unlabelled",
+            },
             // Deliberately still Model-only. Materials are not in this index and saying
             // they were would be worse than the gap: they carry no geometry, no parts and
             // no version, so every filter above is meaningless for them. Browse them with

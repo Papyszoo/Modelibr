@@ -178,6 +178,30 @@ public class AssetSearchDocument
     /// </remarks>
     public string? GeometryKey { get; private set; }
 
+    // ---- asset metadata schema facets (prompt 16-F) ----
+
+    /// <summary>
+    /// The asset's declared styles, from the metadata schema's vocabulary.
+    /// </summary>
+    /// <remarks>
+    /// A typed column rather than more words in <see cref="AuthoredTags"/>, because the
+    /// question these answer is a filter, not a match: a project whose profile says
+    /// "Low Poly" needs every asset that IS low poly, and a tag string cannot tell
+    /// <c>Low Poly</c> from <c>low_poly_v2_final</c>. Stored as an array so a filter is a
+    /// containment test rather than a substring one.
+    /// </remarks>
+    public List<string> Styles { get; private set; } = new();
+
+    /// <summary>The asset's declared themes. Same reasoning as <see cref="Styles"/>.</summary>
+    public List<string> Themes { get; private set; } = new();
+
+    /// <summary>
+    /// The recognized licence, from the metadata schema's vocabulary. Denormalised here so
+    /// "find me something I can actually ship" is a filter rather than a per-hit follow-up
+    /// read - which for a page of twenty candidates was twenty round trips nobody made.
+    /// </summary>
+    public string? License { get; private set; }
+
     public DateTime UpdatedAt { get; private set; }
 
     public static AssetSearchDocument Create(
@@ -219,7 +243,10 @@ public class AssetSearchDocument
         string? scaleConvention = null,
         IEnumerable<string>? authoredTags = null,
         string? description = null,
-        string? geometryKey = null)
+        string? geometryKey = null,
+        IEnumerable<string>? styles = null,
+        IEnumerable<string>? themes = null,
+        string? license = null)
     {
         if (string.IsNullOrWhiteSpace(assetType))
             throw new ArgumentException("Asset type cannot be null or whitespace.", nameof(assetType));
@@ -245,6 +272,9 @@ public class AssetSearchDocument
             AuthoredTags = NormalizeTags(authoredTags),
             Description = description?.Trim() ?? string.Empty,
             GeometryKey = string.IsNullOrWhiteSpace(geometryKey) ? null : geometryKey.Trim(),
+            Styles = NormalizeValues(styles),
+            Themes = NormalizeValues(themes),
+            License = string.IsNullOrWhiteSpace(license) ? null : license.Trim(),
             TriangleCount = triangleCount,
             HasAnimations = hasAnimations,
             BoneCount = boneCount,
@@ -336,6 +366,37 @@ public class AssetSearchDocument
     {
         AuthoredTags = NormalizeTags(tags);
         Description = description?.Trim() ?? string.Empty;
+    }
+
+    /// <summary>
+    /// Re-points the denormalised metadata-schema facets after a metadata write.
+    ///
+    /// Same contract as <see cref="SetCategory"/>, <see cref="SetPacks"/> and
+    /// <see cref="SetMetadata"/>: the write that changes what an asset says about itself
+    /// changes what search can filter it by, in the same transaction. Without it, a style
+    /// set today would only reach search the next time the asset happened to be re-derived.
+    /// </summary>
+    public void SetSchemaFacets(IEnumerable<string>? styles, IEnumerable<string>? themes, string? license)
+    {
+        Styles = NormalizeValues(styles);
+        Themes = NormalizeValues(themes);
+        License = string.IsNullOrWhiteSpace(license) ? null : license.Trim();
+    }
+
+    /// <summary>
+    /// Trims, de-duplicates and sorts a facet list, so the stored array depends only on
+    /// WHICH values an asset carries and not on the order a caller assembled them.
+    /// </summary>
+    private static List<string> NormalizeValues(IEnumerable<string>? values)
+    {
+        if (values is null) return new List<string>();
+
+        return values
+            .Where(v => !string.IsNullOrWhiteSpace(v))
+            .Select(v => v.Trim())
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(v => v, StringComparer.Ordinal)
+            .ToList();
     }
 
     /// <summary>

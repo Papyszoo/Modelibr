@@ -170,6 +170,34 @@ internal sealed class SearchRepository : ISearchRepository
             Restrict(q => q.Where(d => d.CategoryName != null && EF.Functions.ILike(d.CategoryName, categoryPattern)));
         }
 
+        if (request.Styles is { Count: > 0 })
+        {
+            // Any-of: a brief that says "low poly or voxel" is one filter, not two searches.
+            // Overlap on the stored array, which the GIN index serves; the values are the
+            // schema's canonical spellings, so no case folding is needed or wanted.
+            var styles = request.Styles.Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s.Trim()).ToArray();
+            if (styles.Length > 0)
+            {
+                Restrict(q => q.Where(d => d.Styles.Any(v => styles.Contains(v))));
+            }
+        }
+        if (request.Themes is { Count: > 0 })
+        {
+            var themes = request.Themes.Where(t => !string.IsNullOrWhiteSpace(t)).Select(t => t.Trim()).ToArray();
+            if (themes.Length > 0)
+            {
+                Restrict(q => q.Where(d => d.Themes.Any(v => themes.Contains(v))));
+            }
+        }
+        if (!string.IsNullOrWhiteSpace(request.License))
+        {
+            // Exact, like uvStatus and unlike category: the question is "may I ship this",
+            // and a partial match that let CC-BY-NC answer a CC-BY filter would be the one
+            // wrong answer with consequences.
+            var license = request.License.Trim();
+            Restrict(q => q.Where(d => d.License == license));
+        }
+
         if (hasStructuralFilter)
         {
             // Snapshot before the closure so the EXISTS subquery is the fully-built one.
@@ -565,7 +593,10 @@ internal sealed class SearchRepository : ISearchRepository
                 ? null
                 : new AssetDimensions(doc.DimensionX, doc.DimensionY, doc.DimensionZ),
             doc.ScaleConvention,
-            doc.UvStatus);
+            doc.UvStatus,
+            doc.Styles.Count == 0 ? null : doc.Styles,
+            doc.Themes.Count == 0 ? null : doc.Themes,
+            doc.License);
 
     public async Task<IReadOnlyList<SearchResultGroup>> SearchAsync(
         string term,

@@ -68,6 +68,27 @@ public class SetAssetMetadataCommandHandlerTests
         Assert.Empty(fixture.Stored.Styles);
     }
 
+    /// <summary>
+    /// Search reads projection state only, so a style that does not reach the projection is
+    /// a style nothing can be found by. Setting one and being unable to filter for it is the
+    /// failure this guards.
+    /// </summary>
+    [Fact]
+    public async Task SettingAFacet_ReachesSearchInTheSameWrite()
+    {
+        var fixture = new Fixture();
+
+        await fixture.Handle(new { styles = new[] { "Low Poly" }, license = "CC0" });
+
+        fixture.SearchDocuments.Verify(r => r.SetSchemaFacetsForAssetAsync(
+            Family,
+            AssetId,
+            It.Is<IEnumerable<string>>(v => v.Contains("Low Poly")),
+            It.IsAny<IEnumerable<string>>(),
+            "CC0",
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
     [Fact]
     public async Task UnknownField_IsRefusedAndNamesTheSchema()
     {
@@ -154,6 +175,7 @@ public class SetAssetMetadataCommandHandlerTests
     {
         public readonly Mock<IAssetEntityMetadata> Entity = new();
         public readonly Mock<IAssetMetadataRepository> Repository = new();
+        public readonly Mock<IAssetSearchDocumentRepository> SearchDocuments = new();
         public readonly Mock<IQueryHandler<ReadAssetMetadataQuery, AssetMetadataResponse>> Read = new();
         public readonly Mock<IUnitOfWork> UnitOfWork = new();
 
@@ -195,7 +217,8 @@ public class SetAssetMetadataCommandHandlerTests
             clock.SetupGet(c => c.UtcNow).Returns(new DateTime(2026, 8, 22, 0, 0, 0, DateTimeKind.Utc));
 
             _handler = new SetAssetMetadataCommandHandler(
-                Entity.Object, Repository.Object, Read.Object, clock.Object, UnitOfWork.Object);
+                Entity.Object, Repository.Object, SearchDocuments.Object, Read.Object,
+                clock.Object, UnitOfWork.Object);
         }
 
         public Task<Result<AssetMetadataResponse>> Handle(object fields, string family = Family)

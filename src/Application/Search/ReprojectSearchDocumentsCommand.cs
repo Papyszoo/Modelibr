@@ -77,6 +77,7 @@ internal sealed class ReprojectSearchDocumentsCommandHandler
     private readonly IAssetPartRepository _partRepository;
     private readonly IModelVersionRepository _modelVersionRepository;
     private readonly IAssetSearchDocumentRepository _searchDocumentRepository;
+    private readonly IAssetMetadataRepository _assetMetadataRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IUnitOfWork _unitOfWork;
 
@@ -85,6 +86,7 @@ internal sealed class ReprojectSearchDocumentsCommandHandler
         IAssetPartRepository partRepository,
         IModelVersionRepository modelVersionRepository,
         IAssetSearchDocumentRepository searchDocumentRepository,
+        IAssetMetadataRepository assetMetadataRepository,
         IDateTimeProvider dateTimeProvider,
         IUnitOfWork unitOfWork)
     {
@@ -92,6 +94,7 @@ internal sealed class ReprojectSearchDocumentsCommandHandler
         _partRepository = partRepository;
         _modelVersionRepository = modelVersionRepository;
         _searchDocumentRepository = searchDocumentRepository;
+        _assetMetadataRepository = assetMetadataRepository;
         _dateTimeProvider = dateTimeProvider;
         _unitOfWork = unitOfWork;
     }
@@ -246,6 +249,9 @@ internal sealed class ReprojectSearchDocumentsCommandHandler
         // decides it - a reprojection must never move which version search answers with.
         var isCurrentVersion = version.Model is null || version.Model.ActiveVersionId == version.Id;
 
+        var schemaMetadata = await _assetMetadataRepository.GetAsync(
+            ExtractionAssetTypes.Model, assetId, cancellationToken);
+
         await _searchDocumentRepository.RemoveForAssetAsync(
             ExtractionAssetTypes.Model, assetId, modelVersionId, cancellationToken);
 
@@ -258,7 +264,13 @@ internal sealed class ReprojectSearchDocumentsCommandHandler
             packNames: version.Model?.Packs?.Select(p => p.Name),
             assetDimensions: BoundingBoxOf(version),
             authoredTags: version.Model?.Tags?.Select(t => t.Name),
-            description: version.Model?.Description);
+            description: version.Model?.Description,
+            // A re-derive rebuilds the projection wholesale, so the metadata-schema facets
+            // have to be re-read and carried in - a style someone set would otherwise be
+            // blanked from search by the next extraction (prompt 16-F).
+            styles: schemaMetadata?.Styles,
+            themes: schemaMetadata?.Themes,
+            license: schemaMetadata?.License);
 
         foreach (var doc in docs)
         {

@@ -39,6 +39,21 @@ public interface IAssetSearchDocumentRepository
     /// technical facts are denormalised, so the metadata surface reports them from here rather
     /// than re-deriving them.
     /// </summary>
+    /// <summary>
+    /// Re-points the denormalised metadata-schema facets (styles, themes, licence) after a
+    /// metadata write. The same in-place patch contract as
+    /// <see cref="SetCategoryForAssetAsync"/> and <see cref="SetMetadataForAssetAsync"/>:
+    /// setting a style has to reach search in the same transaction, or the facet exists but
+    /// nothing can be found by it until the asset next happens to be re-derived.
+    /// </summary>
+    Task SetSchemaFacetsForAssetAsync(
+        string assetType,
+        int assetId,
+        IEnumerable<string>? styles,
+        IEnumerable<string>? themes,
+        string? license,
+        CancellationToken cancellationToken = default);
+
     Task<AssetSearchDocument?> GetCurrentAssetDocumentAsync(
         string assetType,
         int assetId,

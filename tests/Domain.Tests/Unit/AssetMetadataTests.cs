@@ -71,4 +71,48 @@ public class AssetMetadataTests
         Assert.Equal(created, metadata.CreatedAt);
         Assert.Equal(later, metadata.UpdatedAt);
     }
+
+}
+
+/// <summary>The projection side of the metadata-schema facets (prompt 16-F).</summary>
+public class AssetSearchDocumentFacetTests
+{
+    private static AssetSearchDocument Document(
+        IEnumerable<string>? styles = null, string? license = null) =>
+        AssetSearchDocument.Create(
+            "Model", 1, 1, null, isCurrentVersion: true, "full", "Chair",
+            "chair", "A chair", DateTime.UtcNow, styles: styles, license: license);
+
+    [Fact]
+    public void Facets_AreTrimmedDeduplicatedAndSorted()
+    {
+        var document = Document(new[] { "Voxel", " Low Poly ", "Voxel", "" });
+
+        // Sorted so the stored array depends on WHICH values the asset carries, not on the
+        // order a caller happened to assemble them.
+        Assert.Equal(new[] { "Low Poly", "Voxel" }, document.Styles);
+    }
+
+    [Fact]
+    public void AnAssetNobodyDescribed_HasEmptyFacetsNotNullOnes()
+    {
+        var document = Document();
+
+        // Empty, never null: the filter is an array containment test, and a null column
+        // would drop the document out of every query instead of just not matching.
+        Assert.Empty(document.Styles);
+        Assert.Empty(document.Themes);
+        Assert.Null(document.License);
+    }
+
+    [Fact]
+    public void SetSchemaFacets_ReplacesWholesale()
+    {
+        var document = Document(new[] { "Voxel" }, "CC-BY");
+
+        document.SetSchemaFacets(new[] { "Realistic" }, null, null);
+
+        Assert.Equal(new[] { "Realistic" }, document.Styles);
+        Assert.Null(document.License);
+    }
 }
