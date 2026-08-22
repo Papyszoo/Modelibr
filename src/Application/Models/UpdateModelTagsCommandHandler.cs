@@ -59,34 +59,8 @@ internal sealed class UpdateModelTagsCommandHandler
         }
 
         var now = _dateTimeProvider.UtcNow;
-        var sanitizedNames = ModelTag.SanitizeNames(command.Tags);
-        var normalizedNames = sanitizedNames
-            .Select(ModelTag.NormalizeName)
-            .ToArray();
-        var existingTags = normalizedNames.Length == 0
-            ? Array.Empty<ModelTag>()
-            : await _modelTagRepository.GetByNormalizedNamesAsync(normalizedNames, cancellationToken);
-        var tagsByNormalizedName = existingTags.ToDictionary(tag => tag.NormalizedName, StringComparer.Ordinal);
-        var newTags = new List<ModelTag>();
-        var assignedTags = new List<ModelTag>();
-
-        foreach (var tagName in sanitizedNames)
-        {
-            var normalizedName = ModelTag.NormalizeName(tagName);
-            if (!tagsByNormalizedName.TryGetValue(normalizedName, out var tag))
-            {
-                tag = ModelTag.Create(tagName, now);
-                tagsByNormalizedName[normalizedName] = tag;
-                newTags.Add(tag);
-            }
-
-            assignedTags.Add(tag);
-        }
-
-        if (newTags.Count > 0)
-        {
-            await _modelTagRepository.AddRangeAsync(newTags, cancellationToken);
-        }
+        var assignedTags = await AssetTagResolver.ResolveAsync(
+            _modelTagRepository, command.Tags, now, cancellationToken);
 
         model.SetMetadata(assignedTags, command.Description, now);
         model.AssignCategory(command.CategoryId, now);

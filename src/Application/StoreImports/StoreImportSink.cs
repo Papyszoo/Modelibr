@@ -48,6 +48,8 @@ internal sealed class StoreImportSink : IStoreImportSink
     private readonly ICommandHandler<UpdateSpriteCommand, UpdateSpriteResponse> _updateSprite;
     private readonly ICommandHandler<UpdateTextureSetCommand, UpdateTextureSetResponse> _updateTextureSet;
     private readonly IQueryHandler<GetEnvironmentMapByIdQuery, GetEnvironmentMapByIdResponse> _getEnvironmentMap;
+    private readonly ICommandHandler<UpdateSoundMetadataCommand, UpdateSoundMetadataResponse> _updateSoundMetadata;
+    private readonly ICommandHandler<UpdateSpriteMetadataCommand, UpdateSpriteMetadataResponse> _updateSpriteMetadata;
     private readonly IQueryHandler<ReadAssetMetadataQuery, AssetMetadataResponse> _readAssetMetadata;
     private readonly ICommandHandler<SetAssetMetadataCommand, AssetMetadataResponse> _setAssetMetadata;
 
@@ -77,6 +79,8 @@ internal sealed class StoreImportSink : IStoreImportSink
         ICommandHandler<UpdateSpriteCommand, UpdateSpriteResponse> updateSprite,
         ICommandHandler<UpdateTextureSetCommand, UpdateTextureSetResponse> updateTextureSet,
         IQueryHandler<GetEnvironmentMapByIdQuery, GetEnvironmentMapByIdResponse> getEnvironmentMap,
+        ICommandHandler<UpdateSoundMetadataCommand, UpdateSoundMetadataResponse> updateSoundMetadata,
+        ICommandHandler<UpdateSpriteMetadataCommand, UpdateSpriteMetadataResponse> updateSpriteMetadata,
         IQueryHandler<ReadAssetMetadataQuery, AssetMetadataResponse> readAssetMetadata,
         ICommandHandler<SetAssetMetadataCommand, AssetMetadataResponse> setAssetMetadata)
     {
@@ -105,6 +109,8 @@ internal sealed class StoreImportSink : IStoreImportSink
         _updateSprite = updateSprite;
         _updateTextureSet = updateTextureSet;
         _getEnvironmentMap = getEnvironmentMap;
+        _updateSoundMetadata = updateSoundMetadata;
+        _updateSpriteMetadata = updateSpriteMetadata;
         _readAssetMetadata = readAssetMetadata;
         _setAssetMetadata = setAssetMetadata;
     }
@@ -254,5 +260,14 @@ internal sealed class StoreImportSink : IStoreImportSink
 
         await _setAssetMetadata.Handle(new SetAssetMetadataCommand(assetType, assetId, fields), ct);
     }
+
+
+    public Task SetSoundTagsAsync(
+        int soundId, IReadOnlyCollection<string> tags, string? description, CancellationToken ct)
+        => RunAsync(_updateSoundMetadata.Handle(new UpdateSoundMetadataCommand(soundId, tags, description), ct));
+
+    public Task SetSpriteTagsAsync(
+        int spriteId, IReadOnlyCollection<string> tags, string? description, CancellationToken ct)
+        => RunAsync(_updateSpriteMetadata.Handle(new UpdateSpriteMetadataCommand(spriteId, tags, description), ct));
 
 }

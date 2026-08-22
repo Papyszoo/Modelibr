@@ -454,8 +454,8 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         {
             StoreManifestMapping.ImportTarget.Model => await ImportModelAsync(work, packId, item, files, tags, batchId, ct),
             StoreManifestMapping.ImportTarget.TextureSet => await ImportTextureSetAsync(work, packId, item, files, tags, batchId, ct),
-            StoreManifestMapping.ImportTarget.Sound => await ImportSoundAsync(work, packId, item, files, batchId, ct),
-            StoreManifestMapping.ImportTarget.Sprite => await ImportSpriteAsync(work, packId, item, files, batchId, ct),
+            StoreManifestMapping.ImportTarget.Sound => await ImportSoundAsync(work, packId, item, files, tags, batchId, ct),
+            StoreManifestMapping.ImportTarget.Sprite => await ImportSpriteAsync(work, packId, item, files, tags, batchId, ct),
             StoreManifestMapping.ImportTarget.EnvironmentMap => await ImportEnvironmentMapAsync(work, packId, item, files, batchId, ct),
             _ => Skipped(item, OutcomeSkippedUnsupported, $"Unsupported item type '{item.ItemType}'.")
         };
@@ -601,7 +601,7 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
     }
 
     private async Task<StoreImportItemResult> ImportSoundAsync(
-        StoreImportWorkItem work, int packId, StoreManifestItem item, IReadOnlyList<StoreManifestFile> files, string? batchId, CancellationToken ct)
+        StoreImportWorkItem work, int packId, StoreManifestItem item, IReadOnlyList<StoreManifestFile> files, string[] tags, string? batchId, CancellationToken ct)
     {
         var primary = PickPrimary(files, StoreManifestMapping.RoleKind.Audio);
         var extraNote = ExtraFilesNote(files, "sounds");
@@ -620,12 +620,16 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
 
         using var download = await DownloadAndVerifyAsync(work, primary, ct);
         var soundId = await _sink.CreateSoundAsync(download.ToUpload(primary.FileName), item.Name, batchId, categoryId, ct);
+        // Tags + the item name as a description, the same contract models have had since
+        // the first import. Sounds could not carry either until prompt 16-D.
+        if (tags.Length > 0)
+            await _sink.SetSoundTagsAsync(soundId, tags, item.Name, ct);
         await _sink.AddSoundToPackAsync(packId, soundId, ct);
         return Created(item, StoreManifestMapping.ItemTypeSound, soundId, extraNote);
     }
 
     private async Task<StoreImportItemResult> ImportSpriteAsync(
-        StoreImportWorkItem work, int packId, StoreManifestItem item, IReadOnlyList<StoreManifestFile> files, string? batchId, CancellationToken ct)
+        StoreImportWorkItem work, int packId, StoreManifestItem item, IReadOnlyList<StoreManifestFile> files, string[] tags, string? batchId, CancellationToken ct)
     {
         var primary = PickPrimary(files, StoreManifestMapping.RoleKind.Image);
         var extraNote = ExtraFilesNote(files, "sprites");
@@ -644,6 +648,8 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
 
         using var download = await DownloadAndVerifyAsync(work, primary, ct);
         var spriteId = await _sink.CreateSpriteAsync(download.ToUpload(primary.FileName), item.Name, batchId, categoryId, ct);
+        if (tags.Length > 0)
+            await _sink.SetSpriteTagsAsync(spriteId, tags, item.Name, ct);
         await _sink.AddSpriteToPackAsync(packId, spriteId, ct);
         return Created(item, StoreManifestMapping.ItemTypeSprite, spriteId, extraNote);
     }

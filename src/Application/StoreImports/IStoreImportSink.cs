@@ -50,6 +50,12 @@ public interface IStoreImportSink
     Task AddSoundToPackAsync(int packId, int soundId, CancellationToken ct);
     Task<int> CreateSpriteAsync(IFileUpload file, string name, string? batchId, int? categoryId, CancellationToken ct);
     Task AddSpriteToPackAsync(int packId, int spriteId, CancellationToken ct);
+
+    // Tags + description for the two families that could not carry them until prompt 16-D.
+    // The manifest has always sent tags; sounds and sprites had nowhere to put them, which
+    // for a 4,000-sound CC0 pack meant every clip arrived describing itself by filename only.
+    Task SetSoundTagsAsync(int soundId, IReadOnlyCollection<string> tags, string? description, CancellationToken ct);
+    Task SetSpriteTagsAsync(int spriteId, IReadOnlyCollection<string> tags, string? description, CancellationToken ct);
     Task<int> CreateEnvironmentMapAsync(IFileUpload file, string name, string? batchId, CancellationToken ct);
     Task AddEnvironmentMapToPackAsync(int packId, int environmentMapId, CancellationToken ct);
 

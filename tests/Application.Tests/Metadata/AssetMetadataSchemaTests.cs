@@ -48,25 +48,27 @@ public class AssetMetadataSchemaTests
     [Theory]
     [InlineData("Model", "entity")]
     [InlineData("Material", "entity")]
+    [InlineData("Sound", "entity")]
+    [InlineData("Sprite", "entity")]
     [InlineData("TextureSet", "metadata")]
     [InlineData("EnvironmentMap", "metadata")]
-    [InlineData("Sound", "metadata")]
-    [InlineData("Sprite", "metadata")]
     public void Description_LivesWhereTheFamilyActuallyKeepsIt(string family, string expectedStorage)
     {
         Assert.Equal(expectedStorage, AssetMetadataSchema.Field(family, "description")!.Storage);
     }
 
     [Theory]
-    [InlineData("Model", "entity")]
-    [InlineData("TextureSet", "entity")]
-    [InlineData("Material", "entity")]
-    [InlineData("EnvironmentMap", "entity")]
-    [InlineData("Sound", "metadata")]
-    [InlineData("Sprite", "metadata")]
-    public void Tags_LiveWhereTheFamilyActuallyKeepsThem(string family, string expectedStorage)
+    [InlineData("Model")]
+    [InlineData("TextureSet")]
+    [InlineData("Material")]
+    [InlineData("EnvironmentMap")]
+    [InlineData("Sound")]
+    [InlineData("Sprite")]
+    public void Tags_LiveOnTheEntityForEveryFamily(string family)
     {
-        Assert.Equal(expectedStorage, AssetMetadataSchema.Field(family, "tags")!.Storage);
+        // Since part D, every family is on the shared ModelTag pool. If a new family ever
+        // arrives without one, this is where that shows up rather than in a silent null.
+        Assert.Equal("entity", AssetMetadataSchema.Field(family, "tags")!.Storage);
     }
 
     [Fact]

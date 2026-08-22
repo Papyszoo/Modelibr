@@ -187,19 +187,21 @@ public static class AssetMetadataSchema
     }
 
     /// <summary>
-    /// Families whose entity already has a <c>Description</c> column. The rest keep theirs in
-    /// the side table until part D gives them one - the schema states which, so the surface
-    /// does not have to guess and a reader is not misled.
+    /// Families whose entity has its own <c>Description</c> column. <c>TextureSet</c> and
+    /// <c>EnvironmentMap</c> still keep theirs in the side table - the schema states which,
+    /// so the surface does not have to guess and a reader is not misled.
     /// </summary>
     private static bool DescriptionOnEntity(string family)
-        => family is Families.Model or Families.Material;
+        => family is Families.Model or Families.Material or Families.Sound or Families.Sprite;
 
     /// <summary>
-    /// Families already wired to the shared <c>ModelTag</c> pool. <c>Sound</c> and
-    /// <c>Sprite</c> are not, so their tags live in the side table until part D.
+    /// Families wired to the shared <c>ModelTag</c> pool - since part D, all of them.
+    /// Kept as a predicate rather than collapsed to <c>true</c> because it is the thing the
+    /// storage pointer is derived from, and a new family arrives untagged.
     /// </summary>
     private static bool TagsOnEntity(string family)
-        => family is Families.Model or Families.TextureSet or Families.Material or Families.EnvironmentMap;
+        => family is Families.Model or Families.TextureSet or Families.Material
+            or Families.EnvironmentMap or Families.Sound or Families.Sprite;
 
     private static IEnumerable<AssetMetadataField> Identity(string family)
     {

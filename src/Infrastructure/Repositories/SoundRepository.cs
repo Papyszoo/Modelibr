@@ -111,6 +111,7 @@ internal sealed class SoundRepository : ISoundRepository
         return await _context.Sounds
             .Include(s => s.File)
             .Include(s => s.Category)
+            .Include(s => s.Tags)
             .Include(s => s.Packs)
             .Include(s => s.Projects)
             .AsSplitQuery()

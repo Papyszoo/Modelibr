@@ -1093,6 +1093,7 @@ namespace Infrastructure.Persistence
                 entity.Property(s => s.Name).IsRequired().HasMaxLength(200);
                 entity.Property(s => s.FileId).IsRequired();
                 entity.Property(s => s.SpriteType).IsRequired();
+                entity.Property(s => s.Description).IsRequired(false);
                 entity.Property(s => s.CreatedAt).IsRequired();
                 entity.Property(s => s.UpdatedAt).IsRequired();
                 entity.Property(s => s.IsDeleted).IsRequired();
@@ -1103,6 +1104,31 @@ namespace Infrastructure.Persistence
                     .WithMany()
                     .HasForeignKey(s => s.FileId)
                     .OnDelete(DeleteBehavior.Cascade);
+
+
+                // Shared tag vocabulary - the same ModelTag pool as every other taggable
+                // family (prompt 16-D). Sprites were the last two families with no tags
+                // at all, which made "tag what you imported" a per-family question.
+                entity.HasMany(s => s.Tags)
+                    .WithMany()
+                    .UsingEntity<Dictionary<string, object>>(
+                        "SpriteTagAssignment",
+                        right => right
+                            .HasOne<ModelTag>()
+                            .WithMany()
+                            .HasForeignKey("ModelTagId")
+                            .OnDelete(DeleteBehavior.Cascade),
+                        left => left
+                            .HasOne<Sprite>()
+                            .WithMany()
+                            .HasForeignKey("SpriteId")
+                            .OnDelete(DeleteBehavior.Cascade),
+                        join =>
+                        {
+                            join.ToTable("SpriteTagAssignments");
+                            join.HasKey("SpriteId", "ModelTagId");
+                            join.HasIndex("ModelTagId");
+                        });
 
                 // Configure optional relationship with SpriteCategory
                 entity.HasOne(s => s.Category)
@@ -1148,6 +1174,7 @@ namespace Infrastructure.Persistence
                 entity.Property(s => s.SampleRate).IsRequired(false);
                 entity.Property(s => s.Channels).IsRequired(false);
                 entity.Property(s => s.Format).IsRequired(false).HasMaxLength(20);
+                entity.Property(s => s.Description).IsRequired(false);
                 entity.Property(s => s.CreatedAt).IsRequired();
                 entity.Property(s => s.UpdatedAt).IsRequired();
                 entity.Property(s => s.IsDeleted).IsRequired();
@@ -1158,6 +1185,31 @@ namespace Infrastructure.Persistence
                     .WithMany()
                     .HasForeignKey(s => s.FileId)
                     .OnDelete(DeleteBehavior.Cascade);
+
+                // Shared tag vocabulary - the same ModelTag pool as every other taggable
+                // family (prompt 16-D). Sounds were the last two families with no tags
+                // at all, which made "tag what you imported" a per-family question.
+                entity.HasMany(s => s.Tags)
+                    .WithMany()
+                    .UsingEntity<Dictionary<string, object>>(
+                        "SoundTagAssignment",
+                        right => right
+                            .HasOne<ModelTag>()
+                            .WithMany()
+                            .HasForeignKey("ModelTagId")
+                            .OnDelete(DeleteBehavior.Cascade),
+                        left => left
+                            .HasOne<Sound>()
+                            .WithMany()
+                            .HasForeignKey("SoundId")
+                            .OnDelete(DeleteBehavior.Cascade),
+                        join =>
+                        {
+                            join.ToTable("SoundTagAssignments");
+                            join.HasKey("SoundId", "ModelTagId");
+                            join.HasIndex("ModelTagId");
+                        });
+
 
                 // Configure optional relationship with SoundCategory
                 entity.HasOne(s => s.Category)

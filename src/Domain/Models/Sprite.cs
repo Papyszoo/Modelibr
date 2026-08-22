@@ -10,12 +10,19 @@ public class Sprite : AggregateRoot
 {
     private readonly List<Pack> _packs = new();
     private readonly List<Project> _projects = new();
+    private readonly List<ModelTag> _tags = new();
 
     public int Id { get; private set; }
     public string Name { get; private set; } = string.Empty;
     public int FileId { get; private set; }
     public SpriteType SpriteType { get; private set; }
     public int? SpriteCategoryId { get; private set; }
+
+    /// <summary>
+    /// What the sprite is, in prose. Same reasoning as <see cref="Sound.Description"/>:
+    /// every other family had one and this one had nowhere to put it.
+    /// </summary>
+    public string? Description { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
     public bool IsDeleted { get; private set; }
@@ -26,6 +33,37 @@ public class Sprite : AggregateRoot
 
     // Navigation property for the optional category
     public SpriteCategory? Category { get; set; }
+
+    /// <summary>Tags, from the shared <see cref="ModelTag"/> pool.</summary>
+    public ICollection<ModelTag> Tags
+    {
+        get => _tags;
+        set
+        {
+            _tags.Clear();
+            if (value != null)
+                _tags.AddRange(value);
+        }
+    }
+
+    /// <summary>
+    /// Replaces the tags and description together - the same contract every other taggable
+    /// family uses.
+    /// </summary>
+    public void SetMetadata(IEnumerable<ModelTag> tags, string? description, DateTime updatedAt)
+    {
+        _tags.Clear();
+        if (tags != null)
+        {
+            foreach (var tag in tags.GroupBy(tag => tag.NormalizedName).Select(group => group.First()))
+            {
+                _tags.Add(tag);
+            }
+        }
+
+        Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
+        UpdatedAt = updatedAt;
+    }
 
     // Navigation property for one-to-one relationship with thumbnail
     public Thumbnail? Thumbnail { get; set; }

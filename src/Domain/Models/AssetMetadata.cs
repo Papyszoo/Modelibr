@@ -19,9 +19,12 @@ namespace Domain.Models;
 /// </para>
 ///
 /// <para>
-/// It also carries <see cref="Description"/> and <see cref="Tags"/>, but <b>only for the
-/// families whose entity has none</b> (Sound and Sprite). The schema says which family keeps
-/// which where; nothing reads both homes for one family.
+/// It also carries <see cref="Description"/> and <see cref="Tags"/> for families whose
+/// entity has no column of its own - today that is <see cref="Description"/> for TextureSet
+/// and EnvironmentMap, and <see cref="Tags"/> for nobody, since part D gave Sound and Sprite
+/// their own. The schema's storage pointer says which home is current for each family, and
+/// nothing reads both homes for one family. <see cref="Tags"/> is kept rather than dropped
+/// because it is the fallback a new family lands on before it grows its own join.
 /// </para>
 /// </summary>
 public class AssetMetadata : AggregateRoot

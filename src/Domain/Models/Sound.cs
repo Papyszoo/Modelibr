@@ -8,11 +8,19 @@ public class Sound : AggregateRoot
 {
     private readonly List<Pack> _packs = new();
     private readonly List<Project> _projects = new();
+    private readonly List<ModelTag> _tags = new();
 
     public int Id { get; private set; }
     public string Name { get; private set; } = string.Empty;
     public int FileId { get; private set; }
     public int? SoundCategoryId { get; private set; }
+
+    /// <summary>
+    /// What the sound is, in prose. Matched by search in the prose tier, like every other
+    /// family's - sounds simply had nowhere to put it until the metadata schema said they
+    /// should.
+    /// </summary>
+    public string? Description { get; private set; }
     public double Duration { get; private set; }
     public string? Peaks { get; private set; }
 
@@ -41,6 +49,21 @@ public class Sound : AggregateRoot
 
     // Navigation property for the optional category
     public SoundCategory? Category { get; set; }
+
+    /// <summary>
+    /// Tags, from the shared <see cref="ModelTag"/> pool - the same join every other
+    /// taggable family uses.
+    /// </summary>
+    public ICollection<ModelTag> Tags
+    {
+        get => _tags;
+        set
+        {
+            _tags.Clear();
+            if (value != null)
+                _tags.AddRange(value);
+        }
+    }
 
     // Navigation property for many-to-many relationship with Packs - EF Core requires this to be settable
     public ICollection<Pack> Packs
@@ -116,6 +139,30 @@ public class Sound : AggregateRoot
     /// </summary>
     /// <param name="categoryId">The new category ID, or null to remove category</param>
     /// <param name="updatedAt">When the update occurred</param>
+    /// <summary>
+    /// Replaces the tags and description together, the same contract
+    /// <see cref="Model.SetMetadata"/> uses - they are written by one call because they are
+    /// edited as one thing, and a partial write would make "leave the tags alone" impossible
+    /// to express.
+    /// </summary>
+    public void SetMetadata(IEnumerable<ModelTag> tags, string? description, DateTime updatedAt)
+    {
+        _tags.Clear();
+        if (tags != null)
+        {
+            foreach (var tag in tags.GroupBy(tag => tag.NormalizedName).Select(group => group.First()))
+            {
+                _tags.Add(tag);
+            }
+        }
+
+        Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
+        UpdatedAt = updatedAt;
+    }
+
+    /// <summary>
+    /// Updates the category assignment.
+    /// </summary>
     public void UpdateCategory(int? categoryId, DateTime updatedAt)
     {
         SoundCategoryId = categoryId;

@@ -79,6 +79,8 @@ internal sealed class AssetEntityMetadataGateway : IAssetEntityMetadata
     private readonly ICommandHandler<UpdateEnvironmentMapMetadataCommand, UpdateEnvironmentMapMetadataResponse> _updateEnvironmentMap;
     private readonly ICommandHandler<UpdateSoundCommand, UpdateSoundResponse> _updateSound;
     private readonly ICommandHandler<UpdateSpriteCommand, UpdateSpriteResponse> _updateSprite;
+    private readonly ICommandHandler<UpdateSoundMetadataCommand, UpdateSoundMetadataResponse> _updateSoundMetadata;
+    private readonly ICommandHandler<UpdateSpriteMetadataCommand, UpdateSpriteMetadataResponse> _updateSpriteMetadata;
 
     public AssetEntityMetadataGateway(
         IModelRepository models,
@@ -99,7 +101,9 @@ internal sealed class AssetEntityMetadataGateway : IAssetEntityMetadata
         ICommandHandler<UpdateMaterialCommand, MaterialDto> updateMaterial,
         ICommandHandler<UpdateEnvironmentMapMetadataCommand, UpdateEnvironmentMapMetadataResponse> updateEnvironmentMap,
         ICommandHandler<UpdateSoundCommand, UpdateSoundResponse> updateSound,
-        ICommandHandler<UpdateSpriteCommand, UpdateSpriteResponse> updateSprite)
+        ICommandHandler<UpdateSpriteCommand, UpdateSpriteResponse> updateSprite,
+        ICommandHandler<UpdateSoundMetadataCommand, UpdateSoundMetadataResponse> updateSoundMetadata,
+        ICommandHandler<UpdateSpriteMetadataCommand, UpdateSpriteMetadataResponse> updateSpriteMetadata)
     {
         _models = models;
         _textureSets = textureSets;
@@ -120,6 +124,8 @@ internal sealed class AssetEntityMetadataGateway : IAssetEntityMetadata
         _updateEnvironmentMap = updateEnvironmentMap;
         _updateSound = updateSound;
         _updateSprite = updateSprite;
+        _updateSoundMetadata = updateSoundMetadata;
+        _updateSpriteMetadata = updateSpriteMetadata;
     }
 
     public async Task<Result<AssetEntityMetadataState>> ReadAsync(
@@ -184,8 +190,8 @@ internal sealed class AssetEntityMetadataGateway : IAssetEntityMetadata
                 if (sound is null) return NotFound(family, assetId);
                 return Result.Success(new AssetEntityMetadataState(
                     sound.Name,
-                    null,
-                    Array.Empty<string>(),
+                    sound.Description,
+                    TagNames(sound.Tags.Select(t => t.Name)),
                     sound.SoundCategoryId,
                     await CategoryNameAsync(_soundCategories, sound.SoundCategoryId, cancellationToken)));
             }
@@ -196,8 +202,8 @@ internal sealed class AssetEntityMetadataGateway : IAssetEntityMetadata
                 if (sprite is null) return NotFound(family, assetId);
                 return Result.Success(new AssetEntityMetadataState(
                     sprite.Name,
-                    null,
-                    Array.Empty<string>(),
+                    sprite.Description,
+                    TagNames(sprite.Tags.Select(t => t.Name)),
                     sprite.SpriteCategoryId,
                     await CategoryNameAsync(_spriteCategories, sprite.SpriteCategoryId, cancellationToken)));
             }
@@ -296,18 +302,42 @@ internal sealed class AssetEntityMetadataGateway : IAssetEntityMetadata
 
             case AssetMetadataSchema.Families.Sound:
             {
-                if (!write.SetCategory) return Result.Success();
-                var result = await _updateSound.Handle(
-                    new UpdateSoundCommand(assetId, null, categoryId), cancellationToken);
-                return result.IsFailure ? Result.Failure(result.Error) : Result.Success();
+                if (write.SetTags || write.SetDescription)
+                {
+                    var metadataResult = await _updateSoundMetadata.Handle(
+                        new UpdateSoundMetadataCommand(assetId, tags, description), cancellationToken);
+                    if (metadataResult.IsFailure) return Result.Failure(metadataResult.Error);
+                }
+
+                if (write.SetCategory)
+                {
+                    var result = await _updateSound.Handle(
+                        new UpdateSoundCommand(assetId, null, categoryId), cancellationToken);
+                    if (result.IsFailure) return Result.Failure(result.Error);
+                }
+
+                return Result.Success();
             }
 
             case AssetMetadataSchema.Families.Sprite:
             {
-                if (!write.SetCategory) return Result.Success();
-                var result = await _updateSprite.Handle(
-                    new UpdateSpriteCommand(assetId, null, null, categoryId), cancellationToken);
-                return result.IsFailure ? Result.Failure(result.Error) : Result.Success();
+                if (write.SetTags || write.SetDescription)
+                {
+                    var metadataResult = await _updateSpriteMetadata.Handle(
+                        new UpdateSpriteMetadataCommand(assetId, tags, description), cancellationToken);
+                    if (metadataResult.IsFailure) return Result.Failure(metadataResult.Error);
+                }
+
+                if (write.SetCategory)
+                {
+                    // SpriteType null means "unchanged" on this command; this is a category
+                    // write, not a retyping.
+                    var result = await _updateSprite.Handle(
+                        new UpdateSpriteCommand(assetId, null, null, categoryId), cancellationToken);
+                    if (result.IsFailure) return Result.Failure(result.Error);
+                }
+
+                return Result.Success();
             }
 
             default:

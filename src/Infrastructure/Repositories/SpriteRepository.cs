@@ -102,6 +102,7 @@ internal sealed class SpriteRepository : ISpriteRepository
         return await _context.Sprites
             .Include(s => s.File)
             .Include(s => s.Category)
+            .Include(s => s.Tags)
             .Include(s => s.Packs)
             .Include(s => s.Projects)
             .AsSplitQuery()
