@@ -106,5 +106,20 @@ public static class SearchEndpoints
         .WithName("Get Index Status")
         .WithSummary("How much of the library is derived, indexed, and behind the current projection")
         .WithTags("Search");
+
+        app.MapGet("/search/facet-ranges", async (
+            string? assetType,
+            IQueryHandler<GetSearchFacetRangesQuery, SearchFacetRangesResponse> handler,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await handler.Handle(new GetSearchFacetRangesQuery(assetType), cancellationToken);
+
+            return result.IsFailure
+                ? Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message })
+                : Results.Ok(result.Value);
+        })
+        .WithName("Get Search Facet Ranges")
+        .WithSummary("The real distribution behind each numeric filter, and the values the categorical ones hold")
+        .WithTags("Search");
     }
 }

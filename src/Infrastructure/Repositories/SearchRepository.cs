@@ -1,5 +1,7 @@
+using System.Linq.Expressions;
 using Application.Abstractions.Repositories;
 using Application.Search;
+using Domain.Models;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -912,4 +914,138 @@ internal sealed class SearchRepository : ISearchRepository
         var items = await query.Take(perTypeLimit).ToListAsync(cancellationToken);
         groups.Add(new SearchResultGroup(type, total, items));
     }
+
+    public async Task<SearchFacetRangesResponse> GetFacetRangesAsync(
+        string? assetType,
+        CancellationToken cancellationToken = default)
+    {
+        // Asset-level, current-version, active - the exact set search_assets filters over.
+        // Reading a range from a wider set would describe assets a filter cannot reach.
+        var documents = _context.AssetSearchDocuments
+            .AsNoTracking()
+            .Where(d => d.PartPath == null && d.IsCurrentVersion && d.IsActive);
+
+        var family = assetType?.Trim();
+        if (!string.IsNullOrEmpty(family))
+        {
+            documents = documents.Where(d => d.AssetType == family);
+        }
+
+        var indexed = await documents.CountAsync(cancellationToken);
+
+        var ranges = new List<SearchFacetRange>();
+
+        foreach (var (field, selector) in NumericFacets)
+        {
+            if (await RangeAsync(documents, field, selector, cancellationToken) is { } range)
+            {
+                ranges.Add(range);
+            }
+        }
+
+        var values = new Dictionary<string, IReadOnlyList<SearchFacetValue>>(StringComparer.Ordinal)
+        {
+            ["category"] = await ScalarValuesAsync(documents, d => d.CategoryName, cancellationToken),
+            ["uvStatus"] = await ScalarValuesAsync(documents, d => d.UvStatus, cancellationToken),
+            ["license"] = await ScalarValuesAsync(documents, d => d.License, cancellationToken),
+            ["shapeClass"] = await ScalarValuesAsync(documents, d => d.ShapeClass, cancellationToken),
+            ["styles"] = await ListValuesAsync(documents, d => d.Styles, cancellationToken),
+            ["themes"] = await ListValuesAsync(documents, d => d.Themes, cancellationToken),
+        };
+
+        return new SearchFacetRangesResponse(
+            string.IsNullOrEmpty(family) ? null : family,
+            indexed,
+            ranges,
+            values,
+            Array.Empty<string>());
+    }
+
+    /// <summary>The numeric filters worth describing, and how to read each one off a document.</summary>
+    private static readonly (string Field, Expression<Func<AssetSearchDocument, double?>> Selector)[] NumericFacets =
+    [
+        ("triangles", d => (double?)d.TriangleCount),
+        ("vertices", d => (double?)d.VertexCount),
+        ("parts", d => (double?)d.PartCount),
+        ("materials", d => (double?)d.MaterialCount),
+        ("size", d => d.MaxDimension),
+    ];
+
+    /// <summary>
+    /// Quartiles by ordinal position rather than a database percentile function.
+    ///
+    /// Four small indexed reads, and portable: <c>percentile_cont</c> is Postgres-only, and
+    /// this is the one place the search layer would have needed a dialect-specific query.
+    /// </summary>
+    private static async Task<SearchFacetRange?> RangeAsync(
+        IQueryable<AssetSearchDocument> documents,
+        string field,
+        Expression<Func<AssetSearchDocument, double?>> selector,
+        CancellationToken cancellationToken)
+    {
+        var measured = documents.Select(selector).Where(v => v != null).Select(v => v!.Value);
+
+        var count = await measured.CountAsync(cancellationToken);
+        if (count == 0)
+        {
+            return null;
+        }
+
+        var ordered = measured.OrderBy(v => v);
+
+        async Task<double> At(int index) =>
+            await ordered.Skip(Math.Clamp(index, 0, count - 1)).FirstAsync(cancellationToken);
+
+        return new SearchFacetRange(
+            field,
+            count,
+            await At(0),
+            await At(count / 4),
+            await At(count / 2),
+            await At(count * 3 / 4),
+            await ordered.LastOrDefaultAsync(cancellationToken));
+    }
+
+    private static async Task<IReadOnlyList<SearchFacetValue>> ScalarValuesAsync(
+        IQueryable<AssetSearchDocument> documents,
+        Expression<Func<AssetSearchDocument, string?>> selector,
+        CancellationToken cancellationToken)
+    {
+        var counts = await documents
+            .Select(selector)
+            .Where(v => v != null && v != "")
+            .GroupBy(v => v!)
+            .Select(g => new { Value = g.Key, Count = g.Count() })
+            .OrderByDescending(g => g.Count)
+            .Take(MaxFacetValues)
+            .ToListAsync(cancellationToken);
+
+        return counts.Select(c => new SearchFacetValue(c.Value, c.Count)).ToList();
+    }
+
+    /// <summary>
+    /// Counts over a list-valued column. Materialised and grouped in memory on purpose: the
+    /// column is a jsonb array, and the set of distinct styles in a library is tiny next to
+    /// the set of assets - so this reads one small column, not a table.
+    /// </summary>
+    private static async Task<IReadOnlyList<SearchFacetValue>> ListValuesAsync(
+        IQueryable<AssetSearchDocument> documents,
+        Expression<Func<AssetSearchDocument, List<string>>> selector,
+        CancellationToken cancellationToken)
+    {
+        var lists = await documents.Select(selector).ToListAsync(cancellationToken);
+
+        return lists
+            .SelectMany(list => list ?? [])
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .GroupBy(value => value, StringComparer.OrdinalIgnoreCase)
+            .Select(g => new SearchFacetValue(g.First(), g.Count()))
+            .OrderByDescending(v => v.Count)
+            .Take(MaxFacetValues)
+            .ToList();
+    }
+
+    /// <summary>Cap on values reported per categorical facet. Enough to choose from, not a dump.</summary>
+    private const int MaxFacetValues = 40;
+
 }

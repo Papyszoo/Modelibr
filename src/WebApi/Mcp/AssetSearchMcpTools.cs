@@ -347,8 +347,27 @@ public sealed class AssetSearchMcpTools
             : result.Value;
     }
 
+    [McpServerTool(Name = "get_facet_ranges")]
+    [Description("What the filters mean IN THIS LIBRARY: the real quartiles behind triangles, vertices, parts, materials and size, " +
+                 "and the values category, uvStatus, licence, shape and style/theme actually hold, with counts. " +
+                 "CALL THIS BEFORE TURNING A BRIEF INTO A FILTER. 'Low poly' is a phrase, and whether it means under 2,000 triangles " +
+                 "or under 200 depends on the corpus - a threshold guessed from experience returns nothing and gives you no signal about why. " +
+                 "Quartiles, not averages: a handful of sample scenes with 100k triangles each drags a mean somewhere no asset actually is. " +
+                 "A facet with no values is a LABELLING gap, not a broken filter, and the notes say which.")]
+    public static async Task<object> GetFacetRanges(
+        IQueryHandler<GetSearchFacetRangesQuery, SearchFacetRangesResponse> handler,
+        [Description("Optional family to describe, e.g. Model. Omit for the whole library.")] string? assetType = null,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await handler.Handle(new GetSearchFacetRangesQuery(assetType), cancellationToken);
+        return result.IsFailure
+            ? new { error = result.Error.Code, message = result.Error.Message }
+            : result.Value;
+    }
+
     [McpServerTool(Name = "list_facets")]
-    [Description("List the structural filters search_assets accepts, so filters can be composed without guessing.")]
+    [Description("List the structural filters search_assets accepts, so filters can be composed without guessing. " +
+                 "This is the static vocabulary - call get_facet_ranges for what those filters mean in THIS library.")]
     public static object ListFacets() => new
     {
         filters = new object[]
