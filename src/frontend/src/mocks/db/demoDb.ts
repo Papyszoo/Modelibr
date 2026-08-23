@@ -312,6 +312,15 @@ export interface DemoProject {
   sounds: { id: number; name: string }[]
   scripts: { id: number; name: string }[]
   environmentMaps?: { id: number; name: string }[]
+  /**
+   * The project profile as the demo stores it (v0.6 prompt 13). Optional, because
+   * every seeded project predates it and a project with no profile is a real and
+   * ordinary state - it means the agent is given nothing to go on.
+   */
+  profile?: {
+    dimensions: Record<string, { optionId: number; role?: string | null }[]>
+    settings: Record<string, number | null>
+  }
 }
 
 export interface DemoCategory {

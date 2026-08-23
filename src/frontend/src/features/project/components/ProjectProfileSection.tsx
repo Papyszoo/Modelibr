@@ -88,7 +88,7 @@ export function ProjectProfileSection({
   // Server state is the source of truth; the draft only exists between an edit
   // and a save. Re-seeding on every brief change is what makes "Discard" free.
   useEffect(() => {
-    if (!brief) {
+    if (!isBrief(brief)) {
       return
     }
     setDraft(seed(brief))
@@ -182,8 +182,18 @@ export function ProjectProfileSection({
       }),
   })
 
-  if (isLoading || !brief || !draft || !budget) {
-    return <p className="project-profile-note">Loading profile…</p>
+  // Shape-checked, not just truthy. This panel sits inside the project page, and a
+  // malformed response - a proxy returning HTML for a 404, say - would otherwise throw
+  // during render and unmount the page around it, taking the description and notes with
+  // it. A section that cannot draw itself must fail alone.
+  if (isLoading || !isBrief(brief) || !draft || !budget) {
+    return (
+      <p className="project-profile-note">
+        {isLoading
+          ? 'Loading profile…'
+          : 'This project has no profile to show.'}
+      </p>
+    )
   }
 
   const suggestion = brief.budgetSuggestion
@@ -451,6 +461,25 @@ function ProjectBrief({ brief }: { brief: ProjectBriefDto }): JSX.Element {
         </div>
       ) : null}
     </div>
+  )
+}
+
+/**
+ * Whether a response is actually a brief.
+ *
+ * Only the fields this component reads without guarding. Cheap, and the difference
+ * between one section saying it cannot draw and the whole project page disappearing.
+ */
+function isBrief(brief: unknown): brief is ProjectBriefDto {
+  const candidate = brief as ProjectBriefDto | undefined
+  return (
+    !!candidate &&
+    typeof candidate === 'object' &&
+    Array.isArray(candidate.styles) &&
+    Array.isArray(candidate.guidance) &&
+    !!candidate.budget &&
+    !!candidate.worldConvention &&
+    !!candidate.styleSignals
   )
 }
 

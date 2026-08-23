@@ -104,7 +104,7 @@ export function SceneProjectBrief({
             This scene belongs to no project, so the agent is given no budget,
             style or world convention to work to.
           </p>
-        ) : isLoading || !brief ? (
+        ) : isLoading || !Array.isArray(brief?.guidance) ? (
           <p className="scene-project-brief-note">Loading…</p>
         ) : brief.guidance.length === 0 ? (
           <p

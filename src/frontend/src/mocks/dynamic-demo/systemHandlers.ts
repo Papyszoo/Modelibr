@@ -37,6 +37,132 @@ interface DemoScene {
   documentJson: string
   createdAt: string
   updatedAt: string
+  /** The project this scene belongs to, or null (v0.6 prompt 13-C). */
+  projectId: number | null
+  projectName: string | null
+}
+
+/** What a person has typed about an asset in this demo session. */
+const demoMetadata = new Map<string, Record<string, unknown>>()
+
+/**
+ * A cut-down metadata schema. The panel renders whatever it is given, so this
+ * shows the shape - grouped fields, closed vocabularies, and a read-only
+ * imported field with its provenance badge - without the server's full list.
+ */
+const demoMetadataFields = [
+  {
+    key: 'description',
+    label: 'Description',
+    group: 'descriptive',
+    type: 'multiline',
+    provenance: 'authored',
+    storage: 'entity',
+    repeats: false,
+    readOnly: false,
+  },
+  {
+    key: 'styles',
+    label: 'Styles',
+    group: 'descriptive',
+    type: 'enum',
+    provenance: 'authored',
+    storage: 'metadata',
+    repeats: true,
+    readOnly: false,
+    allowedValues: ['Low Poly', 'Realistic', 'Stylized', 'Voxel'],
+  },
+  {
+    key: 'themes',
+    label: 'Themes',
+    group: 'descriptive',
+    type: 'enum',
+    provenance: 'authored',
+    storage: 'metadata',
+    repeats: true,
+    readOnly: false,
+    allowedValues: ['Fantasy', 'Sci-Fi', 'Modern', 'Historical'],
+  },
+  {
+    key: 'license',
+    label: 'Licence',
+    group: 'rights',
+    type: 'enum',
+    provenance: 'authored',
+    storage: 'metadata',
+    repeats: false,
+    readOnly: false,
+    allowedValues: ['CC0', 'CC-BY', 'Proprietary'],
+  },
+  {
+    key: 'author',
+    label: 'Author',
+    group: 'rights',
+    type: 'text',
+    provenance: 'authored',
+    storage: 'metadata',
+    repeats: false,
+    readOnly: false,
+  },
+  {
+    key: 'sourceKind',
+    label: 'Source',
+    group: 'provenance',
+    type: 'text',
+    provenance: 'imported',
+    storage: 'metadata',
+    repeats: false,
+    readOnly: true,
+    description: 'Where this asset came from. Written by the importer.',
+  },
+]
+
+const demoMetadataFamilies = [
+  'Model',
+  'Sprite',
+  'Sound',
+  'TextureSet',
+  'EnvironmentMap',
+  'Material',
+].map(assetType => ({ assetType, fields: demoMetadataFields }))
+
+function demoMetadataResponse(assetType: string, assetId: number) {
+  const stored = demoMetadata.get(`${assetType}:${assetId}`) ?? {}
+
+  const fields = demoMetadataFields.map(field => ({
+    key: field.key,
+    group: field.group,
+    type: field.type,
+    repeats: field.repeats,
+    readOnly: field.readOnly,
+    provenance: field.provenance,
+    storage: field.storage,
+    value:
+      stored[field.key] ??
+      (field.key === 'sourceKind' ? 'demo-seed' : field.repeats ? [] : null),
+  }))
+
+  // Counted over what a person could fill, so a derived value cannot make an
+  // asset look complete because the extractor did its job.
+  const fillable = demoMetadataFields.filter(f => !f.readOnly)
+  const filled = fillable.filter(f => {
+    const value = stored[f.key]
+    return Array.isArray(value) ? value.length > 0 : value != null
+  })
+
+  return {
+    assetType,
+    assetId,
+    name: `${assetType} ${assetId}`,
+    schemaVersion: Object.keys(stored).length > 0 ? 1 : 0,
+    currentSchemaVersion: 1,
+    fields,
+    completeness: {
+      fillableFieldCount: fillable.length,
+      filledFieldCount: filled.length,
+      missingKeys: fillable.filter(f => !filled.includes(f)).map(f => f.key),
+    },
+  }
 }
 
 const demoScenes = new Map<number, DemoScene>()
@@ -69,6 +195,8 @@ function demoSceneSummary(scene: DemoScene) {
     // enforce the stage with, so this reports what the scene claims rather
     // than anything it has been checked against.
     stage: document.stage ?? null,
+    projectId: scene.projectId,
+    projectName: scene.projectName,
   }
 }
 
@@ -571,10 +699,86 @@ export const systemHandlers = [
   // than proposed by an agent, so this always answers "no open decisions" - and
   // the choices panel renders nothing at all for that, which is the correct
   // demo experience rather than an empty frame.
+  // ══════════════════════════════════════════════════════════════════════════
+  //  ASSET METADATA (v0.6 prompt 16)
+  // ══════════════════════════════════════════════════════════════════════════
+  //
+  //  The demo carries a cut-down schema rather than the server's full one: enough
+  //  to show what the panel is for - one contract over every family, with the
+  //  vocabularies closed - without turning a walkthrough into data entry.
+
+  http.get('*/metadata/schema', ({ request }) => {
+    const family = new URL(request.url).searchParams.get('assetType')
+    const families = demoMetadataFamilies.filter(
+      f => !family || f.assetType === family
+    )
+    return HttpResponse.json({ version: 1, families })
+  }),
+
+  http.get('*/metadata/:assetType/:assetId', ({ params }) =>
+    HttpResponse.json(
+      demoMetadataResponse(String(params.assetType), Number(params.assetId))
+    )
+  ),
+
+  http.patch('*/metadata/:assetType/:assetId', async ({ params, request }) => {
+    const assetType = String(params.assetType)
+    const assetId = Number(params.assetId)
+    const patch = (await request.json()) as Record<string, unknown>
+
+    // A merge, exactly as the server does it: an absent key leaves the field
+    // alone and an explicit null clears it. A demo that replaced would teach the
+    // opposite of the contract.
+    const stored = demoMetadata.get(`${assetType}:${assetId}`) ?? {}
+    for (const [key, value] of Object.entries(patch)) {
+      if (value === null) {
+        delete stored[key]
+      } else {
+        stored[key] = value
+      }
+    }
+    demoMetadata.set(`${assetType}:${assetId}`, stored)
+
+    return HttpResponse.json(demoMetadataResponse(assetType, assetId))
+  }),
+
+  // Linking is a scene write in the real server - the revision moves and it is
+  // audited - so the demo moves the revision too rather than treating it as a label.
+  http.put('*/scenes/:id/project', async ({ params, request }) => {
+    const scene = demoScenes.get(Number(params.id))
+    if (!scene) {
+      return HttpResponse.json(
+        { error: 'SceneNotFound', message: 'No such scene.' },
+        { status: 404 }
+      )
+    }
+
+    const body = (await request.json()) as { projectId: number | null }
+    const previousProjectId = scene.projectId
+    const project =
+      body.projectId === null ? null : await getById('projects', body.projectId)
+
+    scene.projectId = project?.id ?? null
+    scene.projectName = project?.name ?? null
+    scene.revision += 1
+    scene.updatedAt = now()
+
+    return HttpResponse.json({
+      sceneId: scene.id,
+      projectId: scene.projectId,
+      previousProjectId,
+      revision: scene.revision,
+    })
+  }),
+
   http.get('*/scenes/:id/slots', async ({ params }) => {
     const scene = demoScenes.get(Number(params.id))
     return scene
-      ? HttpResponse.json({ scene: demoSceneSummary(scene), slots: [] })
+      ? HttpResponse.json({
+          scene: demoSceneSummary(scene),
+          slots: [],
+          recommendationSummary: null,
+        })
       : HttpResponse.json(
           { error: 'Scene.NotFound', message: 'No such scene.' },
           { status: 404 }
@@ -606,6 +810,8 @@ export const systemHandlers = [
       documentJson: emptySceneDocument,
       createdAt: timestamp,
       updatedAt: timestamp,
+      projectId: null,
+      projectName: null,
     }
     demoScenes.set(scene.id, scene)
 
