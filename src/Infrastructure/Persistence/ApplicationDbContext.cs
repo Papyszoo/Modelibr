@@ -63,6 +63,7 @@ namespace Infrastructure.Persistence
         public DbSet<Stage> Stages => Set<Stage>();
         public DbSet<Scene> Scenes => Set<Scene>();
         public DbSet<SceneRender> SceneRenders => Set<SceneRender>();
+        public DbSet<SceneAssetUsage> SceneAssetUsages => Set<SceneAssetUsage>();
         public DbSet<Thumbnail> Thumbnails => Set<Thumbnail>();
         public DbSet<ThumbnailJob> ThumbnailJobs => Set<ThumbnailJob>();
         public DbSet<ThumbnailJobEvent> ThumbnailJobEvents => Set<ThumbnailJobEvent>();
@@ -849,6 +850,32 @@ namespace Infrastructure.Persistence
                     .OnDelete(DeleteBehavior.SetNull);
 
                 entity.HasIndex(s => s.ProjectId);
+            });
+
+            // What each scene's nodes point at, so a project's derived asset list is a join
+            // rather than a scan over every scene document (prompt 13-C).
+            modelBuilder.Entity<SceneAssetUsage>(entity =>
+            {
+                // The node, not the asset: twelve chairs are twelve rows sharing one asset id,
+                // and keying on the asset would collapse them and undercount "used in".
+                entity.HasKey(u => new { u.SceneId, u.NodeId });
+                // 200 against the document validator's 128-character id limit: the column is
+                // the looser of the two on purpose, so the validator stays the single place
+                // the rule is stated and a future relaxation is not also a migration.
+                entity.Property(u => u.NodeId).IsRequired().HasMaxLength(200);
+                entity.Property(u => u.AssetType).IsRequired().HasMaxLength(50);
+                entity.Property(u => u.AssetId).IsRequired();
+
+                entity.HasOne(u => u.Scene)
+                    .WithMany()
+                    .HasForeignKey(u => u.SceneId)
+                    // Cascade, unlike the scene's own project link: these rows describe a
+                    // document that no longer exists, so keeping them would be keeping a lie.
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                // The index GetScenesUsingAsset reads - "which scenes stand on this model",
+                // asked the first time someone tries to delete one.
+                entity.HasIndex(u => new { u.AssetType, u.AssetId });
             });
 
             // Configure SceneRender entity

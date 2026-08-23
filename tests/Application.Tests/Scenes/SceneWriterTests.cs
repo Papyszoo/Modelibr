@@ -22,6 +22,7 @@ public class SceneWriterTests
     private static readonly DateTime Now = new(2026, 8, 16, 12, 0, 0, DateTimeKind.Utc);
 
     private readonly Mock<ISceneRepository> _scenes = new();
+    private readonly Mock<ISceneAssetUsageRepository> _usage = new();
     private readonly Mock<ISceneAssetFacts> _facts = new();
     private readonly Mock<ISceneDocumentCommit> _commit = new();
     private readonly Mock<IDateTimeProvider> _clock = new();
@@ -36,7 +37,7 @@ public class SceneWriterTests
             .ReturnsAsync(Array.Empty<SceneAssetReferenceProblem>());
         _commit.Setup(c => c.SaveAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Result.Success());
 
-        _writer = new SceneWriter(_scenes.Object, _facts.Object, _commit.Object, _clock.Object);
+        _writer = new SceneWriter(_scenes.Object, _facts.Object, _commit.Object, _clock.Object, _usage.Object);
     }
 
     private Scene GivenScene(SceneDocument? document = null, int id = 1)
@@ -361,6 +362,45 @@ public class SceneWriterTests
         Assert.Equal(2, scene.Revision);
         _facts.Verify(
             f => f.FindUnresolvableAsync(It.IsAny<IEnumerable<SceneAssetRef>>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    /// <summary>
+    /// The projection rides the write it describes (prompt 13-C). Rebuilt here rather than in
+    /// each handler because SceneWriter is the one point every document write funnels through
+    /// - update_scene_document and the editor's whole-document PUT both replace the document
+    /// outright, and a projection maintained anywhere else drifts on the path nobody tested.
+    /// </summary>
+    [Fact]
+    public async Task AnAcceptedWrite_RebuildsWhatTheSceneReferences()
+    {
+        GivenScene();
+        IReadOnlyList<SceneAssetUsage>? written = null;
+        _usage.Setup(u => u.ReplaceForSceneAsync(1, It.IsAny<IReadOnlyList<SceneAssetUsage>>(), It.IsAny<CancellationToken>()))
+            .Callback<int, IReadOnlyList<SceneAssetUsage>, CancellationToken>((_, rows, _) => written = rows)
+            .Returns(Task.CompletedTask);
+
+        var result = await _writer.ApplyAsync(1, null, document => Result.Success(
+            document with { Nodes = new[] { ModelNode("sofa", 41), ModelNode("lamp", 42) } }));
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(new[] { "sofa", "lamp" }, written!.Select(r => r.NodeId).ToArray());
+        Assert.Equal(new[] { 41, 42 }, written.Select(r => r.AssetId).ToArray());
+    }
+
+    [Fact]
+    public async Task ARejectedWrite_LeavesTheProjectionAlone()
+    {
+        GivenScene();
+
+        var result = await _writer.ApplyAsync(1, null, document => Result.Success(
+            document with { Nodes = new[] { ModelNode("sofa"), ModelNode("sofa") } }));
+
+        // Whatever a mutation produced is a candidate, and a candidate that does not validate
+        // must not reach the index any more than it reaches the document.
+        Assert.True(result.IsFailure);
+        _usage.Verify(
+            u => u.ReplaceForSceneAsync(It.IsAny<int>(), It.IsAny<IReadOnlyList<SceneAssetUsage>>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 }

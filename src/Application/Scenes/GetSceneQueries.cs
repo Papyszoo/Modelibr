@@ -1,5 +1,6 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Domain.Scenes;
 using SharedKernel;
 
 namespace Application.Scenes;
@@ -66,5 +67,51 @@ internal sealed class GetAllScenesQueryHandler : IQueryHandler<GetAllScenesQuery
         }
 
         return Result.Success(new GetAllScenesResponse(summaries));
+    }
+}
+
+/// <summary>
+/// Which scenes stand on one asset (prompt 13-C).
+/// </summary>
+/// <remarks>
+/// Falls out of the projection the derived project list needed, and answers the question asked
+/// the first time someone tries to delete a model: a scene that references a recycled asset
+/// still loads, still names it, and shows a node that will never render.
+/// </remarks>
+public sealed record GetScenesUsingAssetQuery(string AssetType, int AssetId)
+    : IQuery<ScenesUsingAssetResponse>;
+
+public sealed record ScenesUsingAssetResponse(
+    string AssetType,
+    int AssetId,
+    IReadOnlyList<SceneUsingAsset> Scenes);
+
+internal sealed class GetScenesUsingAssetQueryHandler
+    : IQueryHandler<GetScenesUsingAssetQuery, ScenesUsingAssetResponse>
+{
+    private readonly ISceneAssetUsageRepository _usage;
+
+    public GetScenesUsingAssetQueryHandler(ISceneAssetUsageRepository usage)
+    {
+        _usage = usage;
+    }
+
+    public async Task<Result<ScenesUsingAssetResponse>> Handle(
+        GetScenesUsingAssetQuery query, CancellationToken cancellationToken)
+    {
+        var assetType = query.AssetType?.Trim() ?? string.Empty;
+
+        if (!SceneAssetTypes.IsPlaceable(assetType))
+        {
+            // Named rather than answered with an empty list: "no scenes use this" and "no
+            // scene can use this kind of thing" are different answers, and only one of them
+            // means it is safe to delete.
+            return Result.Failure<ScenesUsingAssetResponse>(new Error(
+                "Scene.AssetTypeNotPlaceable",
+                $"'{query.AssetType}' is not something a scene can place. Placeable families: {string.Join(", ", SceneAssetTypes.All)}."));
+        }
+
+        var scenes = await _usage.ScenesUsingAsync(assetType, query.AssetId, cancellationToken);
+        return Result.Success(new ScenesUsingAssetResponse(assetType, query.AssetId, scenes));
     }
 }

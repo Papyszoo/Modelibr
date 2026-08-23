@@ -55,6 +55,21 @@ public static class SceneEndpoints
         .WithName("Get Scene Asset Facts")
         .WithSummary("Size, origin convention and resting height for an asset, before placing it");
 
+        // Asked before deleting an asset: a scene that references a recycled model still
+        // loads, still names it, and shows a node that will never render (prompt 13-C).
+        app.MapGet("/scenes/using/{assetType}/{assetId:int}", async (
+            string assetType,
+            int assetId,
+            IQueryHandler<GetScenesUsingAssetQuery, ScenesUsingAssetResponse> handler,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await handler.Handle(
+                new GetScenesUsingAssetQuery(assetType, assetId), cancellationToken);
+            return result.IsFailure ? Failure(result.Error) : Results.Ok(result.Value);
+        })
+        .WithName("Get Scenes Using Asset")
+        .WithSummary("Which scenes reference an asset - the question asked before deleting it");
+
         app.MapGet("/scenes/{id}", async (
             int id,
             IQueryHandler<GetSceneByIdQuery, SceneView> handler,

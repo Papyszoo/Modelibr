@@ -77,6 +77,7 @@ namespace Infrastructure
             services.AddScoped<IModelTagRepository, ModelTagRepository>();
             services.AddScoped<IStageRepository, StageRepository>();
             services.AddScoped<ISceneRepository, SceneRepository>();
+            services.AddScoped<ISceneAssetUsageRepository, SceneAssetUsageRepository>();
             services.AddScoped<ISceneRenderRepository, SceneRenderRepository>();
             services.AddScoped<IApplicationSettingsRepository, ApplicationSettingsRepository>();
             services.AddScoped<ISettingRepository, SettingRepository>();

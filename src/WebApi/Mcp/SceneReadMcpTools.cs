@@ -104,4 +104,21 @@ public sealed class SceneReadMcpTools
             ? new { error = result.Error.Code, message = result.Error.Message }
             : result.Value;
     }
+
+    [McpServerTool(Name = "get_scenes_using_asset")]
+    [Description("Which scenes reference an asset, and how many nodes in each. Ask before recycling or replacing one: " +
+                 "a scene that points at a deleted asset still loads and still names it, showing a node that will never render. " +
+                 "Also what makes an asset part of a project without being a member of it - a project's asset list unions in " +
+                 "whatever its scenes use, so an asset listed here belongs to those scenes' projects too.")]
+    public static async Task<object> GetScenesUsingAsset(
+        IQueryHandler<GetScenesUsingAssetQuery, ScenesUsingAssetResponse> handler,
+        [Description("Asset family: Model | Sprite | EnvironmentMap.")] string assetType,
+        [Description("Asset id.")] int assetId,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await handler.Handle(new GetScenesUsingAssetQuery(assetType, assetId), cancellationToken);
+        return result.IsFailure
+            ? new { error = result.Error.Code, message = result.Error.Message }
+            : result.Value;
+    }
 }

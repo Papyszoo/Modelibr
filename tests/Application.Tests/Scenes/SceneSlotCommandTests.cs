@@ -30,6 +30,7 @@ public class SceneSlotCommandTests
     private const string Slot = "streetlight";
 
     private readonly Mock<ISceneRepository> _scenes = new();
+    private readonly Mock<ISceneAssetUsageRepository> _usage = new();
     private readonly Mock<ISceneAssetFacts> _facts = new();
     private readonly Mock<ISceneAssetProfiles> _profiles = new();
     private readonly Mock<ISceneCandidateMedia> _media = new();
@@ -63,7 +64,7 @@ public class SceneSlotCommandTests
 
         _commit.Setup(c => c.SaveAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Result.Success());
 
-        _writer = new SceneWriter(_scenes.Object, _facts.Object, _commit.Object, clock.Object);
+        _writer = new SceneWriter(_scenes.Object, _facts.Object, _commit.Object, clock.Object, _usage.Object);
 
         GivenScene(new SceneDocument(
             SceneDocument.CurrentSchemaVersion,

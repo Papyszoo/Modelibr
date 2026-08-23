@@ -27,6 +27,7 @@ public class SceneCommandTests
     private const int VersionId = 7;
 
     private readonly Mock<ISceneRepository> _scenes = new();
+    private readonly Mock<ISceneAssetUsageRepository> _usage = new();
     private readonly Mock<ISceneAssetFacts> _facts = new();
 
     // Profiles decide the identity and appearance findings that ride along with a write.
@@ -66,7 +67,7 @@ public class SceneCommandTests
                 It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Array.Empty<AssetPart>());
 
-        _writer = new SceneWriter(_scenes.Object, _facts.Object, _commit.Object, clock.Object);
+        _writer = new SceneWriter(_scenes.Object, _facts.Object, _commit.Object, clock.Object, _usage.Object);
 
         GivenFacts(new Vec3(2, 4, 2), "centered");
         GivenScene(SceneDocument.Empty());
@@ -834,7 +835,7 @@ public class SceneCommandTests
         clock.SetupGet(c => c.UtcNow).Returns(Now);
 
         var handler = new CreateSceneCommandHandler(
-            _scenes.Object, _writer, unitOfWork.Object, clock.Object);
+            _scenes.Object, _writer, unitOfWork.Object, clock.Object, _usage.Object);
 
         var floating = new SceneDocument(
             SceneDocument.CurrentSchemaVersion,
@@ -865,7 +866,7 @@ public class SceneCommandTests
         clock.SetupGet(c => c.UtcNow).Returns(Now);
 
         var handler = new CreateSceneCommandHandler(
-            _scenes.Object, _writer, unitOfWork.Object, clock.Object);
+            _scenes.Object, _writer, unitOfWork.Object, clock.Object, _usage.Object);
 
         var floating = new SceneDocument(
             SceneDocument.CurrentSchemaVersion,

@@ -29,17 +29,20 @@ internal sealed class CreateSceneCommandHandler : ICommandHandler<CreateSceneCom
     private readonly ISceneWriter _writer;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly ISceneAssetUsageRepository _usage;
 
     public CreateSceneCommandHandler(
         ISceneRepository scenes,
         ISceneWriter writer,
         IUnitOfWork unitOfWork,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        ISceneAssetUsageRepository usage)
     {
         _scenes = scenes;
         _writer = writer;
         _unitOfWork = unitOfWork;
         _dateTimeProvider = dateTimeProvider;
+        _usage = usage;
     }
 
     public async Task<Result<SceneView>> Handle(CreateSceneCommand command, CancellationToken cancellationToken)
@@ -89,6 +92,16 @@ internal sealed class CreateSceneCommandHandler : ICommandHandler<CreateSceneCom
         // Commit here rather than leaving it to the decorator: the response carries the
         // database-assigned id, which is an EF temporary placeholder until this runs.
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // Creation is the one document write that does not go through SceneWriter, and it can
+        // be handed a full document - so it indexes what that document references too, in a
+        // second save because the rows need the id the first one assigned.
+        var referenced = SceneAssetUsageProjection.From(scene.Value.Id, document);
+        if (referenced.Count > 0)
+        {
+            await _usage.ReplaceForSceneAsync(scene.Value.Id, referenced, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+        }
 
         return Result.Success(SceneViewBuilder.Build(scene.Value, document, newFacts));
     }

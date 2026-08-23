@@ -80,17 +80,20 @@ internal sealed class SceneWriter : ISceneWriter
     private readonly ISceneAssetFacts _facts;
     private readonly ISceneDocumentCommit _commit;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly ISceneAssetUsageRepository _usage;
 
     public SceneWriter(
         ISceneRepository scenes,
         ISceneAssetFacts facts,
         ISceneDocumentCommit commit,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        ISceneAssetUsageRepository usage)
     {
         _scenes = scenes;
         _facts = facts;
         _commit = commit;
         _dateTimeProvider = dateTimeProvider;
+        _usage = usage;
     }
 
     public async Task<Result<(Scene Scene, SceneDocument Document)>> LoadAsync(
@@ -199,6 +202,14 @@ internal sealed class SceneWriter : ISceneWriter
         }
 
         await _scenes.UpdateAsync(scene, cancellationToken);
+
+        // The index of what this scene now points at, rebuilt from the accepted document and
+        // committed with it (prompt 13-C). Here rather than in each handler for the same
+        // reason the placement rules are: this is the one point every document write funnels
+        // through, and a projection maintained anywhere else drifts on exactly the path
+        // nobody tested.
+        await _usage.ReplaceForSceneAsync(
+            scene.Id, SceneAssetUsageProjection.From(scene.Id, document), cancellationToken);
 
         // Committed here rather than left to the trailing unit-of-work commit: the revision
         // check above only compares what THIS request loaded, so two writers that both read
