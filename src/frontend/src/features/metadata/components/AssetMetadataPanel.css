@@ -1,0 +1,81 @@
+.asset-metadata {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-sm);
+}
+
+.asset-metadata-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mod-space-sm);
+  flex-wrap: wrap;
+}
+
+.asset-metadata-completeness {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--mod-text-xs);
+}
+
+.asset-metadata-actions {
+  display: flex;
+  gap: var(--mod-space-2xs);
+}
+
+.asset-metadata-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-xs);
+}
+
+.asset-metadata-group h4 {
+  margin: 0;
+  font-size: var(--mod-text-xs);
+  font-weight: var(--mod-font-weight-semibold);
+  color: var(--mod-color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.asset-metadata-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.asset-metadata-field > label {
+  display: flex;
+  align-items: baseline;
+  gap: var(--mod-space-2xs);
+  font-size: var(--mod-text-sm);
+}
+
+.asset-metadata-note {
+  margin: 0;
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+}
+
+/* Says where a value came from. A read-only field is still shown - an imported
+   licence is how an asset states its rights, and hiding it would make a store
+   import look like an asset nobody knows anything about. */
+.asset-metadata-badge {
+  padding: 0 4px;
+  border: 1px solid var(--mod-color-border);
+  border-radius: var(--mod-radius-sm);
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.asset-metadata-select {
+  padding: 6px 8px;
+  border: 1px solid var(--mod-color-border);
+  border-radius: var(--mod-radius-sm);
+  background: var(--mod-color-surface);
+  color: inherit;
+  font-size: var(--mod-text-sm);
+}

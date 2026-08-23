@@ -652,6 +652,7 @@ export function ModelViewer({
     hierarchy: 'Hierarchy',
     materials: 'Materials',
     modelInfo: 'Model Info',
+    metadata: 'Metadata',
     uvMap: 'UV Map',
     thumbnail: 'Thumbnail Details',
   }

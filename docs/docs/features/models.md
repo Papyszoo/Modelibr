@@ -95,10 +95,33 @@ The viewer includes floating control buttons:
 - **Add Version** - Upload a new version of this model
 - **Viewer Settings** - Adjust lighting and environment
 - **Model Info** - View file details and metadata
+- **Metadata** - Edit what the asset says about itself: description, style, theme, licence, author and provenance
 - **Texture Sets** - Apply textures to the model
 - **Model Hierarchy** - Explore mesh structure
 - **Thumbnail Details** - View and regenerate thumbnail
 - **UV Map** - Preview UV mapping
+
+### Metadata
+
+The **Metadata** panel edits everything an asset can say about itself, laid out from the
+versioned metadata schema rather than a per-page form - so all six asset families share one
+contract and one set of vocabularies.
+
+Fields are grouped as identity, classification, description, rights, provenance and
+technical. Style and theme are closed vocabularies: a value outside them is one no search
+filter will ever match, so the picker offers the schema's own list.
+
+Two things it deliberately does:
+
+- **Read-only fields are shown, not hidden**, with a badge saying where the value came from
+  (`imported`, `derived`). An imported licence is how an asset states its rights; hiding it
+  would make a store import look like an asset nobody knows anything about.
+- **Saving sends only what changed.** Clearing a field sends an explicit "no value" rather
+  than an empty string, and untouched fields are not sent at all - so saving this panel
+  cannot overwrite something an agent wrote while it was open.
+
+The header counts how much is filled, over the fields a person could actually fill. Derived
+values are excluded: an asset is not complete because the extractor did its job.
 
 ## Version Control
 
