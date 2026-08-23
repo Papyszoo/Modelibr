@@ -54,6 +54,15 @@ public interface IAssetSearchDocumentRepository
         string? license,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// How many assets have a current-version document, per family.
+    ///
+    /// One aggregate query, not a read of the projection: an agent asking "is the library
+    /// indexed yet" must not pull 23,000 rows to count them.
+    /// </summary>
+    Task<IReadOnlyDictionary<string, int>> CountIndexedAssetsByTypeAsync(
+        CancellationToken cancellationToken = default);
+
     Task<AssetSearchDocument?> GetCurrentAssetDocumentAsync(
         string assetType,
         int assetId,

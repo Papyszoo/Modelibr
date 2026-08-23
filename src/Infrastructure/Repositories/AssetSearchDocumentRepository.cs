@@ -20,6 +20,21 @@ internal sealed class AssetSearchDocumentRepository : IAssetSearchDocumentReposi
         return Task.CompletedTask;
     }
 
+    public async Task<IReadOnlyDictionary<string, int>> CountIndexedAssetsByTypeAsync(
+        CancellationToken cancellationToken = default)
+    {
+        // Asset-level rows only (null PartPath) and current-version only, which is exactly
+        // what search answers from - so this counts what is findable, not what is stored.
+        var counts = await _context.AssetSearchDocuments
+            .AsNoTracking()
+            .Where(d => d.PartPath == null && d.IsCurrentVersion)
+            .GroupBy(d => d.AssetType)
+            .Select(g => new { AssetType = g.Key, Count = g.Select(d => d.AssetId).Distinct().Count() })
+            .ToListAsync(cancellationToken);
+
+        return counts.ToDictionary(c => c.AssetType, c => c.Count, StringComparer.Ordinal);
+    }
+
     public async Task RemoveForAssetAsync(
         string assetType,
         int assetId,

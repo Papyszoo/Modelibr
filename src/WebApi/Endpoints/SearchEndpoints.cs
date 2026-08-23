@@ -92,5 +92,19 @@ public static class SearchEndpoints
         })
         .WithName("Reindex Search")
         .WithTags("Search");
+
+        app.MapGet("/search/index-status", async (
+            IQueryHandler<GetIndexStatusQuery, IndexStatusResponse> handler,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await handler.Handle(new GetIndexStatusQuery(), cancellationToken);
+
+            return result.IsFailure
+                ? Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message })
+                : Results.Ok(result.Value);
+        })
+        .WithName("Get Index Status")
+        .WithSummary("How much of the library is derived, indexed, and behind the current projection")
+        .WithTags("Search");
     }
 }

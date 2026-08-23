@@ -125,6 +125,27 @@ internal sealed class AssetDerivationRepository : IAssetDerivationRepository
         return keys.Select(k => (k.AssetId, k.VersionId)).ToList();
     }
 
+    public async Task<IReadOnlyList<(string AssetType, int Derived, int Stale)>> CountDerivedByTypeAsync(
+        int currentDeriveVersion,
+        CancellationToken cancellationToken = default)
+    {
+        var counts = await _context.AssetDerivations
+            .AsNoTracking()
+            .GroupBy(e => e.AssetType)
+            .Select(g => new
+            {
+                AssetType = g.Key,
+                Derived = g.Count(),
+                Stale = g.Count(e => e.DeriveVersion < currentDeriveVersion),
+            })
+            .ToListAsync(cancellationToken);
+
+        return counts
+            .Select(c => (c.AssetType, c.Derived, c.Stale))
+            .OrderBy(c => c.AssetType, StringComparer.Ordinal)
+            .ToList();
+    }
+
     public async Task<IReadOnlyList<AssetDerivation>> GetStaleAsync(
         string assetType,
         int currentDeriveVersion,

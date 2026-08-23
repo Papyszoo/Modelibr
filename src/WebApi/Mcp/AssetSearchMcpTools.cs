@@ -331,6 +331,22 @@ public sealed class AssetSearchMcpTools
             : new { status = result.Value.Status, result = result.Value.Result };
     }
 
+    [McpServerTool(Name = "get_index_status")]
+    [Description("How much of the library is findable. USE THIS AFTER A BULK IMPORT rather than searching for something and guessing: " +
+                 "an asset can be derived and still not indexed, in which case it exists and search cannot see it. " +
+                 "Reports, per family, how many assets have a derived row, how many have a current search document, and how many were " +
+                 "derived under an older projection. The `notes` say what the numbers do NOT mean - read them before concluding the " +
+                 "library is ready. reindex_search rebuilds documents from stored derivations; trigger_rederive moves a stale row forward.")]
+    public static async Task<object> GetIndexStatus(
+        IQueryHandler<GetIndexStatusQuery, IndexStatusResponse> handler,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await handler.Handle(new GetIndexStatusQuery(), cancellationToken);
+        return result.IsFailure
+            ? new { error = result.Error.Code, message = result.Error.Message }
+            : result.Value;
+    }
+
     [McpServerTool(Name = "list_facets")]
     [Description("List the structural filters search_assets accepts, so filters can be composed without guessing.")]
     public static object ListFacets() => new

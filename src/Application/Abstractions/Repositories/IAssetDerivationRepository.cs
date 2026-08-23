@@ -20,6 +20,18 @@ public interface IAssetDerivationRepository
         int? versionId,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Derived rows per family, and how many of them are behind
+    /// <paramref name="currentDeriveVersion"/>.
+    ///
+    /// Aggregated in the database. "How much of my library is indexed" is a question an
+    /// agent asks in a loop while an import runs, and answering it by reading every row
+    /// would make asking it the expensive part.
+    /// </summary>
+    Task<IReadOnlyList<(string AssetType, int Derived, int Stale)>> CountDerivedByTypeAsync(
+        int currentDeriveVersion,
+        CancellationToken cancellationToken = default);
+
     /// <summary>The most recent derivation for an asset (highest version).</summary>
     /// <remarks>
     /// Highest version id, which is NOT the same thing as the version the rest of the app
