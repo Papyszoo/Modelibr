@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Application.Abstractions.Messaging;
 using Application.EnvironmentMaps;
+using Application.Metadata;
 using Application.Models;
 using Application.Packs;
 using Application.Scenes;
@@ -106,6 +107,8 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
     private readonly ICommandHandler<SetSceneStageCommand, SceneStageResponse> _setSceneStage;
     private readonly ICommandHandler<DeleteSceneCommand> _deleteScene;
     private readonly ICommandHandler<RestoreSceneSlotCommand, SceneSummary> _restoreSceneSlot;
+    private readonly ICommandHandler<SetSceneProjectCommand, SetSceneProjectResponse> _setSceneProject;
+    private readonly ICommandHandler<SetAssetMetadataCommand, AssetMetadataResponse> _setAssetMetadata;
 
     public AgentOperationReverser(
         IAgentAudit audit,
@@ -129,7 +132,9 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
         ICommandHandler<UpdateSceneDocumentCommand, SceneView> updateSceneDocument,
         ICommandHandler<SetSceneStageCommand, SceneStageResponse> setSceneStage,
         ICommandHandler<DeleteSceneCommand> deleteScene,
-        ICommandHandler<RestoreSceneSlotCommand, SceneSummary> restoreSceneSlot)
+        ICommandHandler<RestoreSceneSlotCommand, SceneSummary> restoreSceneSlot,
+        ICommandHandler<SetSceneProjectCommand, SetSceneProjectResponse> setSceneProject,
+        ICommandHandler<SetAssetMetadataCommand, AssetMetadataResponse> setAssetMetadata)
     {
         _audit = audit;
         _updateTags = updateTags;
@@ -153,6 +158,8 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
         _setSceneStage = setSceneStage;
         _deleteScene = deleteScene;
         _restoreSceneSlot = restoreSceneSlot;
+        _setSceneProject = setSceneProject;
+        _setAssetMetadata = setAssetMetadata;
     }
 
     public async Task<Result<ReversalPlan>> PlanAsync(
@@ -257,6 +264,14 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
     /// </summary>
     private static ReversalStep Describe(AgentOperationLog entry) => entry.Operation switch
     {
+        "set-scene-project" => Step(entry, $"Link scene {entry.AssetId} back to the project it belonged to before.", destructive: false,
+            supported: entry.PayloadBefore is not null,
+            blocker: "The previous project link was not recorded, so there is nothing to restore."),
+
+        "set-asset-metadata" => Step(entry, $"Restore the metadata fields this write changed on {entry.AssetType} {entry.AssetId}.", destructive: false,
+            supported: entry.PayloadBefore is not null,
+            blocker: "The prior metadata was not recorded, so there is nothing to restore."),
+
         "set-tags" => Step(entry, $"Restore the tags, description and category model {entry.AssetId} had before.", destructive: false,
             supported: entry.PayloadBefore is not null,
             blocker: "The prior tags were not recorded, so there is nothing to restore."),
@@ -380,6 +395,64 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
             blocker: $"'{entry.Operation}' is not a reversible operation."),
     };
 
+    /// <summary>A JSON null, which is how <c>set_asset_metadata</c> is told to clear a field.</summary>
+    private static readonly JsonElement NullJson = JsonDocument.Parse("null").RootElement.Clone();
+
+    /// <summary>
+    /// The writable schema fields in a recorded <c>AssetMetadataResponse</c>, keyed by field key,
+    /// with a null entry for a field that held no value.
+    ///
+    /// Read-only fields are skipped deliberately: triangle counts and the rest are derived, so
+    /// restoring one is neither possible nor meaningful, and <c>set_asset_metadata</c> refuses
+    /// them anyway.
+    /// </summary>
+    private static Dictionary<string, JsonElement?> WritableFieldValues(JsonElement payload)
+    {
+        var values = new Dictionary<string, JsonElement?>(StringComparer.Ordinal);
+
+        if (!payload.TryGetProperty("fields", out var fields) || fields.ValueKind != JsonValueKind.Array)
+        {
+            return values;
+        }
+
+        foreach (var field in fields.EnumerateArray())
+        {
+            if (!field.TryGetProperty("key", out var key) || key.ValueKind != JsonValueKind.String)
+            {
+                continue;
+            }
+
+            if (field.TryGetProperty("readOnly", out var readOnly) && readOnly.ValueKind == JsonValueKind.True)
+            {
+                continue;
+            }
+
+            values[key.GetString()!] = field.TryGetProperty("value", out var value) ? value.Clone() : null;
+        }
+
+        return values;
+    }
+
+    /// <summary>
+    /// Whether two recorded field values are the same. Compared by raw text rather than by
+    /// value so that a repeating field (styles, themes) is compared as a whole rather than
+    /// element by element - reordering one is still a change worth undoing.
+    /// </summary>
+    private static bool SameJson(JsonElement? left, JsonElement? right)
+    {
+        if (left is null && right is null)
+        {
+            return true;
+        }
+
+        if (left is null || right is null)
+        {
+            return false;
+        }
+
+        return string.Equals(left.Value.GetRawText(), right.Value.GetRawText(), StringComparison.Ordinal);
+    }
+
     /// <summary>The binding snapshot a <c>bind-texture-set</c> recorded, or null when it has none.</summary>
     private static ModelTextureBindingSnapshot? BindingBefore(AgentOperationLog entry)
     {
@@ -467,6 +540,72 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
 
         switch (entry.Operation)
         {
+            case "set-scene-project":
+            {
+                var before = Read(entry.PayloadBefore);
+                if (before is null)
+                {
+                    return Result.Failure<string>(new Error(
+                        "NoPriorState", "The previous project link was not recorded."));
+                }
+
+                // Absent means the scene belonged to no project, which is a state worth
+                // restoring, not a missing value - so a null projectId is the payload here.
+                var projectId = ReadInt(before.Value, "projectId");
+                var relink = await _setSceneProject.Handle(
+                    new SetSceneProjectCommand(entry.AssetId!.Value, projectId), cancellationToken);
+
+                return relink.IsFailure
+                    ? Result.Failure<string>(relink.Error)
+                    : Result.Success(projectId is null
+                        ? $"Unlinked scene {entry.AssetId} from its project, as it was before."
+                        : $"Linked scene {entry.AssetId} back to project {projectId}.");
+            }
+
+            case "set-asset-metadata":
+            {
+                var before = Read(entry.PayloadBefore);
+                if (before is null)
+                {
+                    return Result.Failure<string>(new Error(
+                        "NoPriorState", "The prior metadata was not recorded."));
+                }
+
+                var after = Read(entry.PayloadAfter);
+                var priorValues = WritableFieldValues(before.Value);
+                var newValues = after is null
+                    ? new Dictionary<string, JsonElement?>(StringComparer.Ordinal)
+                    : WritableFieldValues(after.Value);
+
+                // Only the keys this write actually changed. A metadata write is a merge, so
+                // restoring every writable field would also overwrite ones it never touched -
+                // including anything a later write set.
+                var patch = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+                foreach (var (key, newValue) in newValues)
+                {
+                    priorValues.TryGetValue(key, out var priorValue);
+                    if (!SameJson(priorValue, newValue))
+                    {
+                        patch[key] = priorValue ?? NullJson;
+                    }
+                }
+
+                if (patch.Count == 0)
+                {
+                    return Result.Success(
+                        $"{entry.AssetType} {entry.AssetId}'s metadata already holds what it did before.");
+                }
+
+                var restored = await _setAssetMetadata.Handle(
+                    new SetAssetMetadataCommand(entry.AssetType!, entry.AssetId!.Value, patch),
+                    cancellationToken);
+
+                return restored.IsFailure
+                    ? Result.Failure<string>(restored.Error)
+                    : Result.Success(
+                        $"Restored {patch.Count} metadata field(s) on {entry.AssetType} {entry.AssetId}.");
+            }
+
             case "set-tags":
             {
                 var before = Read(entry.PayloadBefore);

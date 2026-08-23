@@ -1,6 +1,7 @@
 using Application.Abstractions.Messaging;
 using Application.Agents;
 using Application.EnvironmentMaps;
+using Application.Metadata;
 using Application.Models;
 using Application.Packs;
 using Application.Scenes;
@@ -45,6 +46,8 @@ public class AgentOperationReverserTests
     private readonly Mock<ICommandHandler<SetSceneStageCommand, SceneStageResponse>> _setSceneStage = new();
     private readonly Mock<ICommandHandler<DeleteSceneCommand>> _deleteScene = new();
     private readonly Mock<ICommandHandler<RestoreSceneSlotCommand, SceneSummary>> _restoreSceneSlot = new();
+    private readonly Mock<ICommandHandler<SetSceneProjectCommand, SetSceneProjectResponse>> _setSceneProject = new();
+    private readonly Mock<ICommandHandler<SetAssetMetadataCommand, AssetMetadataResponse>> _setAssetMetadata = new();
 
     private readonly AgentOperationReverser _reverser;
 
@@ -56,7 +59,8 @@ public class AgentOperationReverserTests
             _deleteModel.Object, _deleteSound.Object,
             _deleteSprite.Object, _deleteEnvironmentMap.Object, _deleteTextureSet.Object,
             _removeSceneNode.Object, _restoreSceneNode.Object, _moveSceneNode.Object, _setSceneLight.Object,
-            _applySceneMaterial.Object, _updateSceneDocument.Object, _setSceneStage.Object, _deleteScene.Object, _restoreSceneSlot.Object);
+            _applySceneMaterial.Object, _updateSceneDocument.Object, _setSceneStage.Object, _deleteScene.Object, _restoreSceneSlot.Object,
+            _setSceneProject.Object, _setAssetMetadata.Object);
 
         _audit.Setup(a => a.TryMarkReversedAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
@@ -434,5 +438,118 @@ public class AgentOperationReverserTests
         Assert.True(applied!.Exact);
         Assert.Null(applied.Target);
         Assert.Null(applied.Name);
+    }
+
+    // ---- set-scene-project and set-asset-metadata -------------------------------------
+    // Both tools advertised "undoable with reverse_operation" in their own descriptions and
+    // both recorded a before-state, but neither had a case here, so reverse_operation
+    // answered "not a reversible operation". These pin the inverse that was promised.
+
+    [Fact]
+    public async Task Reversing_A_Scene_Project_Link_Restores_The_Previous_Project()
+    {
+        Records(Completed("k1", "set-scene-project", "Scene", 2,
+            before: """{"projectId":7}""",
+            after: """{"sceneId":2,"projectId":null}"""));
+        _setSceneProject
+            .Setup(h => h.Handle(It.IsAny<SetSceneProjectCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success(new SetSceneProjectResponse(2, 7, "Restored", null, 5)));
+
+        var plan = await _reverser.PlanAsync("k1", null);
+        Assert.True(plan.Value.Steps[0].IsSupported);
+
+        var applied = await _reverser.ApplyAsync(plan.Value);
+
+        Assert.True(applied.Value[0].Reversed);
+        _setSceneProject.Verify(h => h.Handle(
+            It.Is<SetSceneProjectCommand>(c => c.SceneId == 2 && c.ProjectId == 7),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Reversing_A_Link_That_Replaced_No_Project_Unlinks_The_Scene()
+    {
+        // A scene that belonged to nothing is a state worth restoring, not a missing value.
+        Records(Completed("k1", "set-scene-project", "Scene", 2,
+            before: """{"projectId":null}""",
+            after: """{"sceneId":2,"projectId":3}"""));
+        _setSceneProject
+            .Setup(h => h.Handle(It.IsAny<SetSceneProjectCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success(new SetSceneProjectResponse(2, null, null, 3, 6)));
+
+        var applied = await _reverser.ApplyAsync((await _reverser.PlanAsync("k1", null)).Value);
+
+        Assert.True(applied.Value[0].Reversed);
+        _setSceneProject.Verify(h => h.Handle(
+            It.Is<SetSceneProjectCommand>(c => c.ProjectId == null), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    private const string MetadataBefore = """
+        {"assetType":"Model","assetId":9,"fields":[
+          {"key":"styles","readOnly":false},
+          {"key":"license","readOnly":false,"value":"CC0"},
+          {"key":"description","readOnly":false,"value":"a chair"},
+          {"key":"triangleCount","readOnly":true,"value":216}]}
+        """;
+
+    private const string MetadataAfter = """
+        {"assetType":"Model","assetId":9,"fields":[
+          {"key":"styles","readOnly":false,"value":["Low Poly"]},
+          {"key":"license","readOnly":false,"value":"MIT"},
+          {"key":"description","readOnly":false,"value":"a chair"},
+          {"key":"triangleCount","readOnly":true,"value":216}]}
+        """;
+
+    [Fact]
+    public async Task Reversing_A_Metadata_Write_Restores_Only_The_Fields_It_Changed()
+    {
+        // A metadata write is a merge, so the inverse must be one too. Restoring every
+        // writable field would also overwrite ones this write never touched.
+        Records(Completed("k1", "set-asset-metadata", "Model", 9,
+            before: MetadataBefore, after: MetadataAfter));
+        _setAssetMetadata
+            .Setup(h => h.Handle(It.IsAny<SetAssetMetadataCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success(new AssetMetadataResponse(
+                "Model", 9, "chair", 1, 1, Array.Empty<AssetMetadataValue>(),
+                new AssetMetadataCompleteness(0, 0, Array.Empty<string>()))));
+
+        var applied = await _reverser.ApplyAsync((await _reverser.PlanAsync("k1", null)).Value);
+
+        Assert.True(applied.Value[0].Reversed);
+        _setAssetMetadata.Verify(h => h.Handle(
+            It.Is<SetAssetMetadataCommand>(c =>
+                // styles was unset before, so it is cleared; license goes back to CC0
+                c.Fields.Count == 2
+                && c.Fields.ContainsKey("styles")
+                && c.Fields.ContainsKey("license")
+                // description did not change, so it is not touched
+                && !c.Fields.ContainsKey("description")
+                // derived fields are never written back
+                && !c.Fields.ContainsKey("triangleCount")),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Reversing_A_Metadata_Write_That_Changed_Nothing_Writes_Nothing()
+    {
+        Records(Completed("k1", "set-asset-metadata", "Model", 9,
+            before: MetadataAfter, after: MetadataAfter));
+
+        var applied = await _reverser.ApplyAsync((await _reverser.PlanAsync("k1", null)).Value);
+
+        Assert.True(applied.Value[0].Reversed);
+        _setAssetMetadata.Verify(h => h.Handle(
+            It.IsAny<SetAssetMetadataCommand>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task A_Metadata_Write_With_No_Recorded_Before_State_Is_Not_Reversible()
+    {
+        Records(Completed("k1", "set-asset-metadata", "Model", 9, before: null, after: MetadataAfter));
+
+        var plan = await _reverser.PlanAsync("k1", null);
+
+        Assert.False(plan.Value.Steps[0].IsSupported);
+        Assert.Contains("not recorded", plan.Value.Steps[0].Blocker);
     }
 }
