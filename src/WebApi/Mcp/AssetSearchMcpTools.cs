@@ -244,11 +244,11 @@ public sealed class AssetSearchMcpTools
                  "Pass the versionId from the search hit you are inspecting: without it this answers " +
                  "about the asset's active version, which is not necessarily the version that hit named. " +
                  "The response also carries `surfaces`: the horizontal faces something can be rested on, " +
-                 "largest first, each with its HEIGHT ABOVE THE ASSET'S BASE and its extent. " +
-                 "READ THESE BEFORE STACKING. place_asset(on:) rests a node on the target's whole-asset " +
+                 "largest first, each with an `index`, its HEIGHT ABOVE THE ASSET'S BASE and its extent. " +
+                 "READ THESE BEFORE STACKING. place_asset(on:) alone rests a node on the target's whole-asset " +
                  "bounding-box top, which is right for a table and wrong for anything with structure - " +
-                 "it puts a cushion on a sofa's BACK rather than its seat. Use the surface height to place " +
-                 "the node yourself with an explicit position, or say so in the rationale when you stack anyway.")]
+                 "it puts a cushion on a sofa's BACK rather than its seat. Pass that `index` as " +
+                 "place_asset(onSurface:) and the node is seated on the surface you meant.")]
     public static async Task<object> GetAsset(
         IQueryHandler<GetAssetMetadataQuery, AssetMetadataResponse> handler,
         [Description("Asset family, e.g. Model.")] string assetType,

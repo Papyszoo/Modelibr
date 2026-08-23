@@ -149,7 +149,17 @@ public sealed record SceneNode(
 /// Null means "wherever this node already is": the offset is captured on the next write and
 /// stored, so a document never keeps a null one for long. Zero is the centred case.
 /// </param>
-public sealed record SceneAnchor(string OnNodeId, Vec3? Offset = null);
+/// <param name="Surface">
+/// Which of the target asset's resting surfaces this offset was measured from, as the index
+/// <c>get_asset</c> reported it under.
+///
+/// Recorded, not resolved. <see cref="Offset"/> is still the whole truth - the surface is
+/// read once, at the write that named it, and turned into an offset from the reference
+/// point. Keeping the index live would move every vase in the library the day the derive
+/// step grouped part tops differently; keeping it as a label lets a reader see that the
+/// cushion was put on the seat rather than on the sofa's back.
+/// </param>
+public sealed record SceneAnchor(string OnNodeId, Vec3? Offset = null, int? Surface = null);
 
 /// <summary>
 /// A reference to a library asset, pinned to a version.

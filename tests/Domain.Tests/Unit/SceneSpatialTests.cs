@@ -33,6 +33,86 @@ public class SceneSpatialTests
 
     private static readonly Vec3 Centered = new(0.5, 0.5, 0.5);
 
+    // --- resting surfaces (11-E) -------------------------------------------------------
+
+    [Fact]
+    public void SurfacePoint_Is_The_Named_Height_Above_The_Assets_Base()
+    {
+        // A 2x1x2 sofa standing on the floor. Its box top is y=1 - the back - and the seat
+        // the caller means is 0.45 up from the base.
+        var facts = Facts(new Vec3(2, 1, 2), "bottom-center", originInBounds: BaseAtOrigin);
+        var node = Node("sofa", new Vec3(3, 0, -2));
+
+        var point = SceneSpatial.SurfacePoint(node, facts[SceneSpatial.FactsKey(Reference())], 0.45, 0, 0);
+
+        Assert.NotNull(point);
+        Assert.Equal(0.45, point!.Value.Y, 6);
+        Assert.Equal(3, point.Value.X, 6);
+        Assert.Equal(-2, point.Value.Z, 6);
+
+        // And the whole point: the box top is somewhere else entirely.
+        Assert.Equal(1, SceneSpatial.AnchorReference(node, facts[SceneSpatial.FactsKey(Reference())])!.Value.Y, 6);
+    }
+
+    [Fact]
+    public void SurfacePoint_Scales_With_The_Node()
+    {
+        // A surface height is in the asset's own metres. A node scaled to double size has
+        // its seat twice as high, or a cushion placed on it hangs in mid-air.
+        var facts = Facts(new Vec3(2, 1, 2), "bottom-center", originInBounds: BaseAtOrigin);
+        var node = Node("sofa", Vec3.Zero, scale: new Vec3(2, 2, 2));
+
+        var point = SceneSpatial.SurfacePoint(node, facts[SceneSpatial.FactsKey(Reference())], 0.45, 0, 0);
+
+        Assert.Equal(0.9, point!.Value.Y, 6);
+    }
+
+    [Fact]
+    public void SurfacePoint_Turns_The_Surfaces_Own_Offset_With_The_Node()
+    {
+        // The seat is 0.3 forward of the sofa's centre. Turn the sofa 90 degrees about Y and
+        // the seat has to turn with it - otherwise every cushion in a rotated room lands
+        // behind the furniture.
+        var facts = Facts(new Vec3(2, 1, 2), "bottom-center", originInBounds: BaseAtOrigin);
+        var node = Node("sofa", Vec3.Zero, rotation: new Vec3(0, 90, 0));
+
+        var point = SceneSpatial.SurfacePoint(node, facts[SceneSpatial.FactsKey(Reference())], 0.45, 0, 0.3);
+
+        Assert.Equal(0.3, point!.Value.X, 6);
+        Assert.Equal(0.45, point.Value.Y, 6);
+        Assert.Equal(0, point.Value.Z, 6);
+    }
+
+    [Fact]
+    public void The_Difference_Between_A_Surface_And_The_Box_Top_Does_Not_Move_With_The_Node()
+    {
+        // This is what lets a surface be stored as an ordinary anchor offset, and what lets a
+        // batch entry rest on a node the same batch has not grounded yet: the offset is a
+        // difference between two points on the SAME node, so translating the node cancels.
+        var facts = Facts(new Vec3(2, 1, 2), "bottom-center", originInBounds: BaseAtOrigin);
+        var key = SceneSpatial.FactsKey(Reference());
+
+        static double Delta(SceneNode node, SceneAssetFacts facts) =>
+            SceneSpatial.SurfacePoint(node, facts, 0.45, 0, 0)!.Value.Y
+            - SceneSpatial.AnchorReference(node, facts)!.Value.Y;
+
+        Assert.Equal(
+            Delta(Node("sofa", Vec3.Zero), facts[key]),
+            Delta(Node("sofa", new Vec3(12, 7, -30)), facts[key]),
+            9);
+    }
+
+    [Fact]
+    public void SurfacePoint_Is_Null_Without_Derived_Bounds()
+    {
+        // Same rule as every other spatial answer here: no measurement, no guess.
+        var node = Node("sofa", Vec3.Zero);
+
+        Assert.Null(SceneSpatial.SurfacePoint(node, facts: null, 0.45, 0, 0));
+    }
+
+    private static SceneAssetRef Reference(int assetId = 1) => new(ModelType, assetId, 1);
+
     [Fact]
     public void Footprint_When_Origin_Is_Centered_Straddles_The_Position()
     {

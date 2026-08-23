@@ -53,6 +53,7 @@ export interface SceneDocument {
 export interface SceneAnchor {
   onNodeId: string
   offset?: Vec3 | null
+  surface?: number | null
 }
 
 export interface SceneAssetRef {

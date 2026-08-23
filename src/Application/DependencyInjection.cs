@@ -20,6 +20,7 @@ namespace Application
             services.AddScoped<Application.Agents.IAgentOperationReverser, Application.Agents.AgentOperationReverser>();
             services.AddScoped<Application.Settings.ISettingsService, Application.Settings.SettingsService>();
             services.AddScoped<Application.Scenes.ISceneAssetFacts, Application.Scenes.SceneAssetFactsProvider>();
+            services.AddScoped<Application.Scenes.ISceneAssetSurfaces, Application.Scenes.SceneAssetSurfaceProvider>();
             services.AddScoped<Application.Scenes.ISceneWriter, Application.Scenes.SceneWriter>();
             services.AddScoped<Application.Scenes.ISceneAssetProfiles, Application.Scenes.SceneAssetProfileProvider>();
             services.AddScoped<Application.Scenes.ISceneCandidateMedia, Application.Scenes.SceneCandidateMediaProvider>();

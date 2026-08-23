@@ -443,6 +443,63 @@ public static class SceneSpatial
     public static Vec3? AnchorReference(SceneNode node, SceneAssetFacts? facts) =>
         Footprint(node, facts) is { } box ? new Vec3(box.Center.X, box.Max.Y, box.Center.Z) : null;
 
+    /// <summary>
+    /// The world point of one of this node's <b>resting surfaces</b> - a table top, a sofa
+    /// seat, a shelf board - given that surface's height above the asset's own base and the
+    /// centre of its footprint relative to the asset's centre.
+    ///
+    /// Takes the three numbers rather than the derived surface record because the surfaces
+    /// are read off part boxes in the Application layer, and the geometry that turns them
+    /// into a world point belongs here with everything else that knows about origins,
+    /// rotation and scale.
+    ///
+    /// This is what makes <c>place_asset(on:, onSurface:)</c> land on the seat rather than on
+    /// the sofa's back: <see cref="AnchorReference"/> can only ever name the whole-asset box
+    /// top, which is right by luck for a table and wrong for anything with structure.
+    ///
+    /// Null on the same terms as <see cref="Footprint"/> - no derived bounds, no surface.
+    /// </summary>
+    /// <param name="height">Metres above the asset's own base.</param>
+    /// <param name="centerX">The surface centre's X, relative to the asset's centre, in the asset's own metres.</param>
+    /// <param name="centerZ">The same on Z.</param>
+    public static Vec3? SurfacePoint(
+        SceneNode node,
+        SceneAssetFacts? facts,
+        double height,
+        double centerX,
+        double centerZ)
+    {
+        if (LocalSize(node, facts) is not { } size)
+        {
+            return null;
+        }
+
+        var origin = node.Asset is not null
+            ? OriginOffset(facts, size)
+            : new Vec3(-size.X / 2, -size.Y / 2, -size.Z / 2);
+
+        var transform = node.Transform ?? SceneTransform.Identity;
+        var scale = transform.Scale;
+
+        // Scaled, then rotated, then translated - the same order the eight corners take in
+        // Footprint, so a surface on a turned sofa lands where the sofa's own box says it is.
+        var local = new Vec3(
+            (origin.X + (size.X / 2) + centerX) * scale.X,
+            (origin.Y + height) * scale.Y,
+            (origin.Z + (size.Z / 2) + centerZ) * scale.Z);
+
+        var rotated = RotateXyz(
+            local,
+            DegreesToRadians(transform.RotationEuler.X),
+            DegreesToRadians(transform.RotationEuler.Y),
+            DegreesToRadians(transform.RotationEuler.Z));
+
+        return new Vec3(
+            rotated.X + transform.Position.X,
+            rotated.Y + transform.Position.Y,
+            rotated.Z + transform.Position.Z);
+    }
+
     /// <summary>This node's own contact point - the centre of its footprint, at its base.</summary>
     public static Vec3? ContactPoint(SceneNode node, SceneAssetFacts? facts) =>
         Footprint(node, facts) is { } box ? new Vec3(box.Center.X, box.Min.Y, box.Center.Z) : null;
@@ -617,6 +674,11 @@ public static class SceneSpatial
                 // arranging things on it. The height is captured this time: a stated position
                 // is a stated position, and "on the shelf" needs to be expressible.
                 offset = new Vec3(moved.X - reference.X, moved.Y - reference.Y, moved.Z - reference.Z);
+
+                // And the surface label goes with it. It says which face the offset was
+                // measured from, and the offset it described is the one just overwritten -
+                // a node dragged off the seat would otherwise keep claiming to be on it.
+                anchor = anchor with { Surface = null };
             }
 
             if (offset is { } resolvedOffset)

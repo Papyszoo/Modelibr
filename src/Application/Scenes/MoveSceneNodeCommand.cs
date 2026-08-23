@@ -20,6 +20,11 @@ namespace Application.Scenes;
 /// <param name="AnchorTo">Rest this node on that one. Null leaves any existing anchor alone.</param>
 /// <param name="AnchorAlign">How to sit it there, from <see cref="SceneAnchorAlignments"/>. Defaults to centring it.</param>
 /// <param name="AnchorOffset">The exact offset to anchor at, for undo. Overrides <paramref name="AnchorAlign"/>.</param>
+/// <param name="AnchorSurface">The surface label to restore alongside <paramref name="AnchorOffset"/>, for undo. Does not re-measure anything.</param>
+/// <param name="OnSurface">
+/// Which of the anchor target's resting surfaces to sit on, as the index <c>get_asset</c>
+/// reports it under. Only meaningful with <paramref name="AnchorTo"/>.
+/// </param>
 /// <param name="DetachAnchor">Stop resting on another node, leaving this one where it currently is.</param>
 /// <param name="Exact">
 /// Treat the placement rules as the whole state rather than a patch, so an omitted one is
@@ -42,7 +47,9 @@ public sealed record MoveSceneNodeCommand(
     string? AnchorAlign = null,
     Vec3? AnchorOffset = null,
     bool DetachAnchor = false,
-    bool Exact = false) : ICommand<SceneNodeMoveResponse>;
+    bool Exact = false,
+    int? OnSurface = null,
+    int? AnchorSurface = null) : ICommand<SceneNodeMoveResponse>;
 
 /// <summary>
 /// The moved node, and the placement it had before.
@@ -74,12 +81,18 @@ internal sealed class MoveSceneNodeCommandHandler : ICommandHandler<MoveSceneNod
     private readonly ISceneWriter _writer;
     private readonly ISceneAssetFacts _facts;
     private readonly ISceneAssetProfiles _profiles;
+    private readonly ISceneAssetSurfaces _surfaces;
 
-    public MoveSceneNodeCommandHandler(ISceneWriter writer, ISceneAssetFacts facts, ISceneAssetProfiles profiles)
+    public MoveSceneNodeCommandHandler(
+        ISceneWriter writer,
+        ISceneAssetFacts facts,
+        ISceneAssetProfiles profiles,
+        ISceneAssetSurfaces surfaces)
     {
         _writer = writer;
         _facts = facts;
         _profiles = profiles;
+        _surfaces = surfaces;
     }
 
     public async Task<Result<SceneNodeMoveResponse>> Handle(
@@ -93,7 +106,7 @@ internal sealed class MoveSceneNodeCommandHandler : ICommandHandler<MoveSceneNod
         }
 
         var anchor = ScenePlacementRules.ReadAnchor(
-            command.AnchorTo, command.AnchorAlign, command.AnchorOffset);
+            command.AnchorTo, command.AnchorAlign, command.AnchorOffset, command.AnchorSurface);
         if (anchor.IsFailure)
         {
             return Result.Failure<SceneNodeMoveResponse>(anchor.Error);
@@ -132,6 +145,24 @@ internal sealed class MoveSceneNodeCommandHandler : ICommandHandler<MoveSceneNod
             resolved.TryGetValue(SceneSpatial.FactsKey(asset), out facts);
         }
 
+        // The anchor a surface belongs to may be the one this move states, or the one the node
+        // already had - "put the book on the shelf's second board" is a move that restates
+        // nothing about what it rests on.
+        var effectiveAnchor = command.DetachAnchor ? null : anchor.Value ?? existing.Anchor;
+
+        var seating = SceneSurfaceSeating.Empty;
+        if (command.OnSurface is not null && effectiveAnchor is { } surfaceAnchor)
+        {
+            var resolvedSeating = await SceneSurfaceSeating.ResolveAsync(
+                _writer, _facts, _surfaces, command.SceneId, [surfaceAnchor.OnNodeId], [], cancellationToken);
+            if (resolvedSeating.IsFailure)
+            {
+                return Result.Failure<SceneNodeMoveResponse>(resolvedSeating.Error);
+            }
+
+            seating = resolvedSeating.Value;
+        }
+
         var result = await _writer.ApplyAsync(
             command.SceneId,
             command.ExpectedRevision,
@@ -160,6 +191,22 @@ internal sealed class MoveSceneNodeCommandHandler : ICommandHandler<MoveSceneNod
                 };
 
                 moved = ScenePlacementRules.ApplyGridSnap(moved, facts, command.SnapToGrid);
+
+                if (command.OnSurface is { } surfaceIndex)
+                {
+                    var seated = seating.Seat(
+                        moved,
+                        facts,
+                        document.Nodes.ToDictionary(n => n.Id, StringComparer.Ordinal),
+                        surfaceIndex);
+
+                    if (seated.IsFailure)
+                    {
+                        return Result.Failure<SceneDocument>(seated.Error);
+                    }
+
+                    moved = seated.Value;
+                }
 
                 var nodes = document.Nodes.ToArray();
                 nodes[index] = moved;

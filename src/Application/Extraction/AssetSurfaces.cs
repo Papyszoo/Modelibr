@@ -18,12 +18,19 @@ namespace Application.Extraction;
 /// <param name="Extent">The surface's width and depth in metres, as [x, z].</param>
 /// <param name="Center">Where its middle sits relative to the asset's base and centre, as [x, y, z].</param>
 /// <param name="Parts">The part paths whose tops sit at this height. Several is normal - two arms of one shelf.</param>
+/// <param name="Index">
+/// This surface's position in the reported list, largest first. It is the name a caller uses
+/// to point at one: <c>place_asset(on: "sofa", onSurface: 1)</c>. Reported explicitly rather
+/// than left implicit in the array order, because a caller that has to count array positions
+/// to name a thing will eventually miscount.
+/// </param>
 public sealed record AssetSurface(
     double Height,
     double Area,
     IReadOnlyList<double> Extent,
     IReadOnlyList<double> Center,
-    IReadOnlyList<string> Parts);
+    IReadOnlyList<string> Parts,
+    int Index = 0);
 
 /// <summary>
 /// Turns measured part boxes into the resting surfaces a caller can act on.
@@ -142,6 +149,7 @@ public static class AssetSurfaces
             .OrderByDescending(s => s.Area)
             .ThenByDescending(s => s.Height)
             .Take(MaxSurfaces)
+            .Select((s, index) => s with { Index = index })
             .ToList();
     }
 

@@ -56,6 +56,22 @@ public class McpToolSchemaTests
         Assert.Contains("array", TypeNames(position));
     }
 
+    [Fact]
+    public void OnSurface_Is_Described_As_An_Integer_On_Both_Placement_Paths()
+    {
+        // A nullable int inside an object inside an array is the same trap as the vector
+        // above: a client that reads no type sends a string, and a placement that names the
+        // sofa's seat is refused before the handler sees it.
+        Assert.Contains("integer", TypeNames(Property(SchemaFor("place_asset", "PlaceAsset"), "onSurface")));
+
+        var entry = Property(SchemaFor("place_assets_batch", "PlaceAssetsBatch"), "placements")
+            .GetProperty("items")
+            .GetProperty("properties")
+            .GetProperty("onSurface");
+
+        Assert.Contains("integer", TypeNames(entry));
+    }
+
     /// <summary>The type names a schema node declares, whether as a string or an array of them.</summary>
     private static IReadOnlyList<string> TypeNames(JsonElement node)
     {

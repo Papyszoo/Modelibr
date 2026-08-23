@@ -54,15 +54,18 @@ internal sealed class PlaceSceneAssetsBatchCommandHandler
     private readonly ISceneWriter _writer;
     private readonly ISceneAssetFacts _facts;
     private readonly ISceneAssetProfiles _profiles;
+    private readonly ISceneAssetSurfaces _surfaces;
 
     public PlaceSceneAssetsBatchCommandHandler(
         ISceneWriter writer,
         ISceneAssetFacts facts,
-        ISceneAssetProfiles profiles)
+        ISceneAssetProfiles profiles,
+        ISceneAssetSurfaces surfaces)
     {
         _writer = writer;
         _facts = facts;
         _profiles = profiles;
+        _surfaces = surfaces;
     }
 
     public async Task<Result<SceneBatchPlacementResponse>> Handle(
@@ -119,6 +122,21 @@ internal sealed class PlaceSceneAssetsBatchCommandHandler
                 return Fail(anchor.Error.Code, $"{where}: {anchor.Error.Message}");
             }
 
+            // A surface becomes an offset from the target's own reference point, and that
+            // difference does not move when the target does - so an entry may rest on a
+            // surface of a node this same batch is about to create. 'keep' is the exception:
+            // it measures this node's X/Z against the target's, and the target has not been
+            // grounded or anchored yet, so both numbers are provisional.
+            if (placement.OnSurface is not null &&
+                placement.AnchorAlign == SceneAnchorAlignments.Keep &&
+                placement.AnchorTo is { } keepTarget &&
+                requestedIds.Contains(keepTarget))
+            {
+                return Fail(
+                    "Scene.SurfaceKeepInBatch",
+                    $"{where}: align 'keep' with onSurface cannot rest on '{keepTarget}', which this same batch creates - its final position is not settled yet. Drop align, or place '{keepTarget}' in an earlier call.");
+            }
+
             if (placement.NodeId is { } requested && !requestedIds.Add(requested))
             {
                 return Fail(
@@ -139,6 +157,27 @@ internal sealed class PlaceSceneAssetsBatchCommandHandler
 
         var facts = await _facts.ResolveAsync(references, cancellationToken);
 
+        // Surfaces only for the entries that name one. An entry may rest on a node an earlier
+        // entry creates, so the batch's own references are offered as targets too - that node
+        // is not in the stored document yet, but its asset is right here.
+        var seating = SceneSurfaceSeating.Empty;
+        var surfaceTargets = prepared
+            .Where(p => p.Placement.OnSurface is not null && p.Anchor is not null)
+            .Select(p => p.Anchor!.OnNodeId)
+            .ToList();
+
+        if (surfaceTargets.Count > 0)
+        {
+            var resolved = await SceneSurfaceSeating.ResolveAsync(
+                _writer, _facts, _surfaces, command.SceneId, surfaceTargets, references, cancellationToken);
+            if (resolved.IsFailure)
+            {
+                return Result.Failure<SceneBatchPlacementResponse>(resolved.Error);
+            }
+
+            seating = resolved.Value;
+        }
+
         var placedNodeIds = new List<string>(prepared.Count);
 
         var result = await _writer.ApplyAsync(
@@ -156,6 +195,7 @@ internal sealed class PlaceSceneAssetsBatchCommandHandler
 
                 var taken = document.Nodes.Select(n => n.Id).ToHashSet(StringComparer.Ordinal);
                 var nodes = document.Nodes.ToList();
+                var nodesById = document.Nodes.ToDictionary(n => n.Id, StringComparer.Ordinal);
 
                 placedNodeIds.Clear();
 
@@ -195,9 +235,23 @@ internal sealed class PlaceSceneAssetsBatchCommandHandler
 
                     facts.TryGetValue(SceneSpatial.FactsKey(entry.Placement.Reference), out var assetFacts);
 
-                    nodes.Add(ScenePlacementRules.BuildNode(
-                        entry.Placement, nodeId, entry.FrontAxis, entry.Anchor, assetFacts));
+                    var node = ScenePlacementRules.BuildNode(
+                        entry.Placement, nodeId, entry.FrontAxis, entry.Anchor, assetFacts);
 
+                    if (entry.Placement.OnSurface is { } surfaceIndex)
+                    {
+                        var seated = seating.Seat(node, assetFacts, nodesById, surfaceIndex);
+                        if (seated.IsFailure)
+                        {
+                            return Result.Failure<SceneDocument>(
+                                new Error(seated.Error.Code, $"{where}: {seated.Error.Message}"));
+                        }
+
+                        node = seated.Value;
+                    }
+
+                    nodes.Add(node);
+                    nodesById[nodeId] = node;
                     placedNodeIds.Add(nodeId);
                 }
 

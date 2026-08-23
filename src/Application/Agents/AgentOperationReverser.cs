@@ -935,6 +935,10 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
                         // where it stands rather than yanked to the centre of its anchor.
                         AnchorAlign: anchor is { Offset: null } ? SceneAnchorAlignments.Keep : null,
                         AnchorOffset: anchor?.Offset,
+                        // Restored, not re-measured: the offset above is what the node
+                        // actually had, and re-reading the surface would undo to a position
+                        // the scene never held if the derive step has since changed.
+                        AnchorSurface: anchor?.Surface,
                         Exact: true),
                     cancellationToken);
 

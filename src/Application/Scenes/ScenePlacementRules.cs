@@ -1,3 +1,4 @@
+using Application.Extraction;
 using Domain.Scenes;
 using SharedKernel;
 
@@ -27,7 +28,8 @@ public sealed record ScenePlacementRequest(
     string? FrontAxis = null,
     string? AnchorTo = null,
     string? AnchorAlign = null,
-    bool Suspended = false)
+    bool Suspended = false,
+    int? OnSurface = null)
 {
     public SceneAssetRef Reference => new(AssetType, AssetId, VersionId);
 }
@@ -69,7 +71,16 @@ public static class ScenePlacementRules
     /// After that the offset is the whole truth, which is what lets a later nudge move the
     /// vase across the table without detaching it from the table.
     /// </summary>
-    public static Result<SceneAnchor?> ReadAnchor(string? anchorTo, string? align, Vec3? offset = null)
+    /// <param name="surfaceLabel">
+    /// The <see cref="SceneAnchor.Surface"/> to record alongside an exact offset. Only undo
+    /// passes it: it restores a label that was already resolved, where
+    /// <see cref="RestOnSurface"/> resolves one and computes the offset from it.
+    /// </param>
+    public static Result<SceneAnchor?> ReadAnchor(
+        string? anchorTo,
+        string? align,
+        Vec3? offset = null,
+        int? surfaceLabel = null)
     {
         if (string.IsNullOrWhiteSpace(anchorTo))
         {
@@ -82,7 +93,7 @@ public static class ScenePlacementRules
 
         if (offset is not null)
         {
-            return Result.Success<SceneAnchor?>(new SceneAnchor(anchorTo, offset));
+            return Result.Success<SceneAnchor?>(new SceneAnchor(anchorTo, offset, surfaceLabel));
         }
 
         var effective = align ?? SceneAnchorAlignments.Center;
@@ -96,6 +107,105 @@ public static class ScenePlacementRules
         // Null offset means "capture where it already is" - the resolution pass fills it in.
         return Result.Success<SceneAnchor?>(new SceneAnchor(
             anchorTo, effective == SceneAnchorAlignments.Center ? Vec3.Zero : null));
+    }
+
+    /// <summary>
+    /// Seats an already-anchored node on one of the target's <b>resting surfaces</b> instead
+    /// of on its whole-asset box top.
+    ///
+    /// The surface is read once, here, and turned into an ordinary anchor offset. Nothing
+    /// downstream learns a new concept: the node follows the target when it moves, undo
+    /// restores an offset, and the editor drags it the same way it drags anything else. The
+    /// index is kept on the anchor as a label only - see <see cref="SceneAnchor.Surface"/>
+    /// for why it is not re-read.
+    ///
+    /// The failures are deliberately distinct. "This asset was never measured into parts" is
+    /// a library state the caller can fix by re-extracting; "this asset has no surface" is a
+    /// fact about the asset; "there is no surface 4" is a caller mistake, and that one lists
+    /// what there is, because an agent that has to call <c>get_asset</c> again to find out is
+    /// an agent that will guess instead.
+    /// </summary>
+    public static Result<SceneNode> RestOnSurface(
+        SceneNode node,
+        SceneAssetFacts? nodeFacts,
+        SceneNode target,
+        SceneAssetFacts? targetFacts,
+        IReadOnlyList<AssetSurface>? surfaces,
+        int surfaceIndex)
+    {
+        if (node.Anchor is not { } anchor)
+        {
+            return Result.Failure<SceneNode>(new Error(
+                "Scene.SurfaceWithoutAnchor",
+                "A surface was named without a node to rest on. Pass the node id to anchor to as well - a surface belongs to that node."));
+        }
+
+        if (surfaces is null)
+        {
+            return Result.Failure<SceneNode>(new Error(
+                "Scene.SurfacesUnknown",
+                $"Node '{target.Id}' has no measured parts, so it has no surfaces to name. Re-extract the asset, or omit onSurface and rest on its top face."));
+        }
+
+        if (surfaces.Count == 0)
+        {
+            return Result.Failure<SceneNode>(new Error(
+                "Scene.NoSurfaces",
+                $"Node '{target.Id}' has no horizontal face big enough to rest anything on. Omit onSurface to rest on its top face."));
+        }
+
+        if (surfaceIndex < 0 || surfaceIndex >= surfaces.Count)
+        {
+            var available = string.Join(", ", surfaces.Select(s =>
+                FormattableString.Invariant($"{s.Index} at {s.Height:0.###} m ({s.Area:0.###} m²)")));
+            return Result.Failure<SceneNode>(new Error(
+                "Scene.UnknownSurface",
+                $"Node '{target.Id}' has no surface {surfaceIndex}. It has {surfaces.Count}: {available}."));
+        }
+
+        var surface = surfaces[surfaceIndex];
+
+        if (SceneSpatial.AnchorReference(target, targetFacts) is not { } reference ||
+            SceneSpatial.SurfacePoint(target, targetFacts, surface.Height, surface.Center[0], surface.Center[2])
+                is not { } point)
+        {
+            return Result.Failure<SceneNode>(new Error(
+                "Scene.AnchorBoundsUnknown",
+                $"Node '{target.Id}' has no derived bounds, so a surface height cannot be turned into a position. Place it with an explicit position instead."));
+        }
+
+        // The offset the document stores is measured from the anchor's own reference point,
+        // so the surface becomes the difference between the two. That keeps one meaning of
+        // "offset" in the document rather than a second one that only surface anchors use.
+        Vec3? offset;
+        if (anchor.Offset is { } stated)
+        {
+            offset = new Vec3(
+                stated.X + (point.X - reference.X),
+                stated.Y + (point.Y - reference.Y),
+                stated.Z + (point.Z - reference.Z));
+        }
+        else
+        {
+            // align:'keep' - the caller chose the X/Z itself and only wants the height. The
+            // resolution pass would capture that X/Z for us, but it would capture Y=0 with
+            // it, which is exactly the wrong height.
+            offset = SceneSpatial.ContactPoint(node, nodeFacts) is { } contact
+                ? new Vec3(contact.X - reference.X, point.Y - reference.Y, contact.Z - reference.Z)
+                : null;
+        }
+
+        if (offset is not { } resolved)
+        {
+            return Result.Failure<SceneNode>(new Error(
+                "Scene.AnchorBoundsUnknown",
+                $"The asset being placed has no derived bounds, so 'keep' cannot say where it already is. Use the default alignment, or place it with an explicit position."));
+        }
+
+        return Result.Success(node with
+        {
+            Anchor = anchor with { Offset = resolved, Surface = surface.Index },
+        });
     }
 
     /// <summary>

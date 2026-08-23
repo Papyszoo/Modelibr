@@ -168,7 +168,7 @@ public static class SceneEndpoints
                     request.SlotId, request.Position, request.RotationEuler, request.Scale,
                     request.GroundSnap ?? false, request.SnapToGrid, request.ExpectedRevision,
                     request.FaceToward, request.FrontAxis, request.On, request.Align,
-                    request.Suspended ?? false),
+                    request.Suspended ?? false, request.OnSurface),
                 cancellationToken);
             return result.IsFailure ? NotFoundOrFailure(result.Error) : Results.Ok(result.Value);
         })
@@ -253,7 +253,7 @@ public static class SceneEndpoints
                     id, nodeId, request.Position, request.RotationEuler, request.Scale,
                     request.GroundSnap, request.Suspended, request.SnapToGrid, request.ExpectedRevision,
                     request.FaceToward, request.FrontAxis, request.On, request.Align,
-                    DetachAnchor: request.DetachAnchor ?? false),
+                    DetachAnchor: request.DetachAnchor ?? false, OnSurface: request.OnSurface),
                 cancellationToken);
             return result.IsFailure ? NotFoundOrFailure(result.Error) : Results.Ok(result.Value);
         })
@@ -479,7 +479,7 @@ public static class SceneEndpoints
         new(request.AssetType, request.AssetId, request.VersionId, request.NodeId, request.Name,
             request.SlotId, request.Position, request.RotationEuler, request.Scale,
             request.GroundSnap ?? false, request.SnapToGrid, request.FaceToward, request.FrontAxis,
-            request.On, request.Align, request.Suspended ?? false);
+            request.On, request.Align, request.Suspended ?? false, request.OnSurface);
 
     /// <summary>
     /// "Not found" is the one failure that deserves its own status here: the editor and an
@@ -524,7 +524,8 @@ public record PlaceSceneAssetRequest(
     string? FrontAxis = null,
     string? On = null,
     string? Align = null,
-    bool? Suspended = null);
+    bool? Suspended = null,
+    int? OnSurface = null);
 
 /// <summary>
 /// A heterogeneous layout applied in one write. Entries are applied in array order, so an
@@ -575,7 +576,8 @@ public record MoveSceneNodeRequest(
     string? On = null,
     string? Align = null,
     bool? DetachAnchor = null,
-    bool? Suspended = null);
+    bool? Suspended = null,
+    int? OnSurface = null);
 
 public record ApplySceneMaterialRequest(
     int? TextureSetId = null,

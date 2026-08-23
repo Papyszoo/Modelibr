@@ -58,6 +58,8 @@ public sealed class SceneWriteMcpTools
                  "does not mention it keeps the asset on the floor. " +
                  "To stack instead, pass on=\"<nodeId>\" and the asset rests on that node's top face and follows it when it moves - " +
                  "no arithmetic, and nothing to recompute when the furniture underneath is swapped. " +
+                 "A top face is right for a table and WRONG for anything with structure - it puts a cushion on the sofa's back and a book above the shelf. " +
+                 "Add onSurface=<index> to rest on a named surface instead: call get_asset on what you are stacking ONTO, read its `surfaces` list, and pass the index of the one you mean. " +
                  "To aim it, pass faceToward=[x,y,z] and it turns about Y to face that point, and keeps facing it. " +
                  "For something meant to hang with nothing under it - a pendant lamp, a sign - pass suspended=true, or it is reported as floating for the life of the scene. " +
                  "Returns the placed node's world footprint plus any node it now overlaps and any scale warning it triggered.")]
@@ -80,6 +82,7 @@ public sealed class SceneWriteMcpTools
         [Description("Round the position onto a grid of this size in metres. Pass 0 to use the asset's own derived grid.")] double? snapToGrid = null,
         [Description("Rest this asset on the node with this id, instead of on the floor. It follows that node when it moves.")] string? on = null,
         [Description("How to sit it on that node: 'center' (default) centres it on the top face; 'keep' rests it on top of wherever the position already puts it.")] string? align = null,
+        [Description("Which of that node's resting surfaces to sit on - the `index` from get_asset's `surfaces` list, largest surface first. Omitted uses the whole-asset top face. Requires 'on'.")] int? onSurface = null,
         [Description("Turn the asset about Y to face this world point [x,y,z], and keep it facing there when either end moves.")] double[]? faceToward = null,
         [Description("Which local axis is this asset's front: '+Z' (assumed), '-Z', '+X' or '-X'. Nothing in the library derives this - state it when the asset ends up backwards.")] string? frontAxis = null,
         [Description("This node is meant to hang in mid-air with nothing under it. Cannot be combined with groundSnap or on.")] bool suspended = false,
@@ -105,7 +108,7 @@ public sealed class SceneWriteMcpTools
                         sceneId, assetType, assetId, versionId, nodeId, name, slotId,
                         vectors.Values["position"], vectors.Values["rotationEuler"], vectors.Values["scale"],
                         groundSnap, snapToGrid, expectedRevision,
-                        vectors.Values["faceToward"], frontAxis, on, align, suspended),
+                        vectors.Values["faceToward"], frontAxis, on, align, suspended, onSurface),
                     ct);
 
                 if (result.IsFailure)
@@ -151,6 +154,7 @@ public sealed class SceneWriteMcpTools
         [property: Description("Which local axis is this asset's front: '+Z' (assumed), '-Z', '+X' or '-X'.")] string? FrontAxis = null,
         [property: Description("Rest this asset on the node with this id - either one already in the scene, or one an EARLIER entry of this batch created. Naming a later entry is refused.")] string? On = null,
         [property: Description("How to sit it on that node: 'center' (default) or 'keep'.")] string? Align = null,
+        [property: Description("Which of that node's resting surfaces to sit on - the `index` from get_asset's `surfaces` list. Omitted uses its whole-asset top face. Requires On.")] int? OnSurface = null,
         [property: Description("This node is meant to hang in mid-air with nothing under it. Cannot be combined with groundSnap or on.")] bool Suspended = false);
 
     [McpServerTool(Name = "place_assets_batch")]
@@ -203,7 +207,7 @@ public sealed class SceneWriteMcpTools
                         vectors.Values[$"placements[{index}].scale"],
                         entry.GroundSnap, entry.SnapToGrid,
                         vectors.Values[$"placements[{index}].faceToward"],
-                        entry.FrontAxis, entry.On, entry.Align, entry.Suspended));
+                        entry.FrontAxis, entry.On, entry.Align, entry.Suspended, entry.OnSurface));
                 }
 
                 var result = await handler.Handle(
@@ -448,6 +452,7 @@ public sealed class SceneWriteMcpTools
                  "Pass groundSnap=false, detachAnchor=true or an explicit rotationEuler to end each of those. " +
                  "Pass suspended=true for a node that is meant to hang with nothing under it. " +
                  "Moving a node that others rest on moves them with it. " +
+                 "Pass onSurface=<index> to re-seat it on a named resting surface of whatever it is on - the `index` from get_asset's `surfaces` list. " +
                  "Returns the node's new footprint, the transform it had before, and anything it now overlaps.")]
     public static Task<object> MoveAsset(
         ICommandHandler<MoveSceneNodeCommand, SceneNodeMoveResponse> handler,
@@ -464,6 +469,7 @@ public sealed class SceneWriteMcpTools
         [Description("Round the position onto a grid of this size in metres. Pass 0 to use the asset's own derived grid.")] double? snapToGrid = null,
         [Description("Rest this node on the node with this id. Omit to leave any existing anchor alone.")] string? on = null,
         [Description("How to sit it on that node: 'center' (default) or 'keep'.")] string? align = null,
+        [Description("Which of that node's resting surfaces to sit on - the `index` from get_asset's `surfaces` list. Works with the anchor this node already has, so a re-seat need not restate 'on'.")] int? onSurface = null,
         [Description("Stop resting on another node, leaving this one where it currently is.")] bool detachAnchor = false,
         [Description("Turn the node about Y to face this world point [x,y,z], and keep it facing there.")] double[]? faceToward = null,
         [Description("Which local axis is this asset's front: '+Z' (assumed), '-Z', '+X' or '-X'.")] string? frontAxis = null,
@@ -489,7 +495,8 @@ public sealed class SceneWriteMcpTools
                         sceneId, nodeId,
                         vectors.Values["position"], vectors.Values["rotationEuler"], vectors.Values["scale"],
                         groundSnap, suspended, snapToGrid, expectedRevision,
-                        vectors.Values["faceToward"], frontAxis, on, align, DetachAnchor: detachAnchor),
+                        vectors.Values["faceToward"], frontAxis, on, align,
+                        DetachAnchor: detachAnchor, OnSurface: onSurface),
                     ct);
 
                 if (result.IsFailure)

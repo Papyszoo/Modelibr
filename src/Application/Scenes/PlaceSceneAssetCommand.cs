@@ -21,6 +21,11 @@ namespace Application.Scenes;
 /// <param name="FrontAxis">Which local axis is this asset's front, from <see cref="SceneFrontAxes"/>. Defaults to +Z.</param>
 /// <param name="AnchorTo">Rest the asset on this node instead of on the floor.</param>
 /// <param name="AnchorAlign">How to sit it there, from <see cref="SceneAnchorAlignments"/>. Defaults to centring it.</param>
+/// <param name="OnSurface">
+/// Which of the anchor target's resting surfaces to sit on, as the index <c>get_asset</c>
+/// reports it under. Omitted rests the asset on the target's whole-asset top face, which is
+/// right for a table and wrong for a sofa, a shelf or a sink.
+/// </param>
 /// <param name="Suspended">Declare that this node is meant to hang with nothing under it - a pendant lamp, a sign. Contradicts <paramref name="GroundSnap"/> and <paramref name="AnchorTo"/>.</param>
 public sealed record PlaceSceneAssetCommand(
     int SceneId,
@@ -40,7 +45,8 @@ public sealed record PlaceSceneAssetCommand(
     string? FrontAxis = null,
     string? AnchorTo = null,
     string? AnchorAlign = null,
-    bool Suspended = false) : ICommand<ScenePlacementResponse>;
+    bool Suspended = false,
+    int? OnSurface = null) : ICommand<ScenePlacementResponse>;
 
 /// <summary>
 /// The placed node plus what is now wrong with the scene because of it.
@@ -66,12 +72,18 @@ internal sealed class PlaceSceneAssetCommandHandler : ICommandHandler<PlaceScene
     private readonly ISceneWriter _writer;
     private readonly ISceneAssetFacts _facts;
     private readonly ISceneAssetProfiles _profiles;
+    private readonly ISceneAssetSurfaces _surfaces;
 
-    public PlaceSceneAssetCommandHandler(ISceneWriter writer, ISceneAssetFacts facts, ISceneAssetProfiles profiles)
+    public PlaceSceneAssetCommandHandler(
+        ISceneWriter writer,
+        ISceneAssetFacts facts,
+        ISceneAssetProfiles profiles,
+        ISceneAssetSurfaces surfaces)
     {
         _writer = writer;
         _facts = facts;
         _profiles = profiles;
+        _surfaces = surfaces;
     }
 
     public async Task<Result<ScenePlacementResponse>> Handle(
@@ -97,6 +109,21 @@ internal sealed class PlaceSceneAssetCommandHandler : ICommandHandler<PlaceScene
         // are the writer's resolution pass, which sees the whole document.
         var assetFacts = await _facts.ResolveAsync([assetRef], cancellationToken);
         assetFacts.TryGetValue(SceneSpatial.FactsKey(assetRef), out var facts);
+
+        // Only when a surface was named: resolving one costs a part query per asset, and a
+        // placement that rests on a top face has no use for it.
+        var seating = SceneSurfaceSeating.Empty;
+        if (command.OnSurface is not null && command.AnchorTo is { } surfaceTarget)
+        {
+            var resolved = await SceneSurfaceSeating.ResolveAsync(
+                _writer, _facts, _surfaces, command.SceneId, [surfaceTarget], [], cancellationToken);
+            if (resolved.IsFailure)
+            {
+                return Result.Failure<ScenePlacementResponse>(resolved.Error);
+            }
+
+            seating = resolved.Value;
+        }
 
         string? placedNodeId = null;
 
@@ -132,6 +159,22 @@ internal sealed class PlaceSceneAssetCommandHandler : ICommandHandler<PlaceScene
                     frontAxis.Value,
                     anchor.Value,
                     facts);
+
+                if (command.OnSurface is { } surfaceIndex)
+                {
+                    var seated = seating.Seat(
+                        node,
+                        facts,
+                        document.Nodes.ToDictionary(n => n.Id, StringComparer.Ordinal),
+                        surfaceIndex);
+
+                    if (seated.IsFailure)
+                    {
+                        return Result.Failure<SceneDocument>(seated.Error);
+                    }
+
+                    node = seated.Value;
+                }
 
                 placedNodeId = nodeId;
                 return Result.Success(document with { Nodes = [.. document.Nodes, node] });

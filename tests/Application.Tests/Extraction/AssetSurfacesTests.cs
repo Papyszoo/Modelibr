@@ -34,6 +34,19 @@ public class AssetSurfacesTests
     }
 
     [Fact]
+    public void Each_Surface_Carries_The_Index_A_Placement_Names_It_By()
+    {
+        // place_asset(onSurface:) takes this number. Reported rather than left implicit in
+        // the array order, because a caller that counts positions eventually miscounts.
+        var surfaces = AssetSurfaces.From([
+            Part("/Table/Top", -0.6, 0.7, -0.4, 0.6, 0.75, 0.4),
+            Part("/Table/Shelf", -0.5, 0.2, -0.3, 0.5, 0.25, 0.3),
+        ]);
+
+        Assert.Equal([0, 1], surfaces.Select(s => s.Index));
+    }
+
+    [Fact]
     public void The_Dominant_Surface_Comes_First()
     {
         // "Largest first" is the whole ranking: an agent taking surfaces[0] should get the
