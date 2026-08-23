@@ -51,6 +51,20 @@ public class ImportFolderSignalTests
         Assert.Empty(ImportFolderSignal.Segments("/assets/models/fbx"));
     }
 
+    /// <summary>
+    /// Regression: a folder segment becomes a tag, and the tag vocabulary refuses anything
+    /// past 100 characters by throwing. An unbounded segment therefore failed the whole
+    /// import it was supposed to describe.
+    /// </summary>
+    [Fact]
+    public void Segments_Ignores_A_Folder_Named_In_A_Sentence()
+    {
+        var longName = new string('x', 140);
+        var segments = ImportFolderSignal.Segments($"/library/{longName}/Weapons");
+
+        Assert.Equal(new[] { "Weapons" }, segments);
+    }
+
     [Fact]
     public void Tokens_Widen_The_Way_Authored_Names_Do()
     {

@@ -67,6 +67,14 @@ public static class ImportFolderSignal
     private const int MinSegmentLength = 3;
 
     /// <summary>
+    /// The longest segment worth keeping. A directory named in a sentence is a note someone
+    /// left themselves, not a category - and the tag vocabulary refuses anything past this
+    /// length, so an unbounded segment would throw on the way to becoming a tag and fail the
+    /// import it was meant to describe.
+    /// </summary>
+    private const int MaxSegmentLength = 100;
+
+    /// <summary>
     /// The meaningful folder segments, <b>deepest first</b>, capped at <see cref="MaxDepth"/>.
     /// Deepest first because the directory immediately containing a file is the one that
     /// describes it most closely.
@@ -92,7 +100,7 @@ public static class ImportFolderSignal
             var segment = parts[i].Trim(' ', '.');
             // Everything from here up is where the disk is organised. Stop, don't skip.
             if (RootSegments.Contains(segment)) break;
-            if (segment.Length < MinSegmentLength) continue;
+            if (segment.Length is < MinSegmentLength or > MaxSegmentLength) continue;
             // A drive letter, a UNC host, or a version directory says nothing about content.
             if (segment.All(char.IsDigit)) continue;
             if (segment.Contains(':')) continue;

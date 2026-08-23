@@ -6,6 +6,7 @@ using Application.Services;
 using Domain.Models;
 using Domain.Services;
 using Domain.ValueObjects;
+using Microsoft.Extensions.Logging;
 using SharedKernel;
 
 namespace Application.Models
@@ -19,6 +20,7 @@ namespace Application.Models
         private readonly IBatchUploadRepository _batchUploadRepository;
         private readonly ISettingRepository _settingRepository;
         private readonly ICommandHandler<ApplyImportAutomationCommand, ImportAutomationResponse> _importAutomation;
+        private readonly ILogger<AddModelCommandHandler> _logger;
         private readonly IUnitOfWork _unitOfWork;
 
         public AddModelCommandHandler(
@@ -29,6 +31,7 @@ namespace Application.Models
             IBatchUploadRepository batchUploadRepository,
             ISettingRepository settingRepository,
             ICommandHandler<ApplyImportAutomationCommand, ImportAutomationResponse> importAutomation,
+            ILogger<AddModelCommandHandler> logger,
             IUnitOfWork unitOfWork)
         {
             _modelRepository = modelRepository;
@@ -38,6 +41,7 @@ namespace Application.Models
             _batchUploadRepository = batchUploadRepository;
             _settingRepository = settingRepository;
             _importAutomation = importAutomation;
+            _logger = logger;
             _unitOfWork = unitOfWork;
         }
 
@@ -163,10 +167,22 @@ namespace Application.Models
                 // and needs its real id and its (empty) tag set to be durable first.
                 if (command.AutoAssignMetadata)
                 {
-                    await _importAutomation.Handle(
-                        new ApplyImportAutomationCommand(
-                            savedModel.Id, command.SourceFolder, command.SiblingFileNames),
-                        cancellationToken);
+                    // Never fatal. The model is already committed and is perfectly usable
+                    // uncategorised; turning a guess that could not be made into a failed
+                    // import would be the worst possible trade.
+                    try
+                    {
+                        await _importAutomation.Handle(
+                            new ApplyImportAutomationCommand(
+                                savedModel.Id, command.SourceFolder, command.SiblingFileNames),
+                            cancellationToken);
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        _logger.LogError(ex,
+                            "Import automation failed for model {ModelId}; it was imported without a suggested category or tags.",
+                            savedModel.Id);
+                    }
                 }
 
                 return Result.Success(new AddModelCommandResponse(savedModel.Id, false));
