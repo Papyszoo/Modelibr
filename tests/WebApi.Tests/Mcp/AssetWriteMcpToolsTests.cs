@@ -238,7 +238,7 @@ public class AssetWriteMcpToolsTests
         var tickets = Tickets();
 
         var result = await AssetWriteMcpTools.ImportModel(
-            handler.Object, audit.Object, Caller(), tickets.Object, "key-1", path: null);
+            handler.Object, MultiFile().Object, audit.Object, Caller(), tickets.Object, "key-1", path: null);
 
         var json = Json(result);
         Assert.Contains("upload-required", json);
@@ -264,7 +264,8 @@ public class AssetWriteMcpToolsTests
         var audit = ClaimGranted();
 
         var result = await AssetWriteMcpTools.ImportModel(
-            handler.Object, audit.Object, Caller(), Tickets().Object, "key-1", path: "/nonexistent/nope.glb");
+            handler.Object, MultiFile().Object, audit.Object, Caller(), Tickets().Object, "key-1",
+            path: "/nonexistent/nope.glb");
 
         Assert.Contains("PathNotFound", Json(result));
         audit.Verify(a => a.AbandonAsync("key-1", It.IsAny<CancellationToken>()), Times.Once);
@@ -288,6 +289,13 @@ public class AssetWriteMcpToolsTests
         handler.Verify(h => h.Handle(It.IsAny<CreatePackCommand>(), It.IsAny<CancellationToken>()), Times.Never);
         audit.Verify(a => a.TryBeginAsync(It.IsAny<AgentWrite>(), It.IsAny<CancellationToken>()), Times.Never);
     }
+
+    /// <summary>
+    /// The multi-file route <c>import_model</c> falls back to when a path import finds
+    /// texture siblings. Unused by these cases - none of them point at a real folder.
+    /// </summary>
+    private static Mock<ICommandHandler<ImportModelWithAuxiliaryFilesCommand, ImportModelWithAuxiliaryFilesResponse>> MultiFile()
+        => new();
 
     /// <summary>Ticket issuer returning a fixed secret, so the tool's response can be asserted on.</summary>
     private static Mock<IAgentUploadTickets> Tickets()

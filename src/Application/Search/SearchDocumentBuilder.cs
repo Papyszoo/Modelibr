@@ -71,7 +71,8 @@ public static class SearchDocumentBuilder
         string? description = null,
         IEnumerable<string>? styles = null,
         IEnumerable<string>? themes = null,
-        string? license = null)
+        string? license = null,
+        string? sourceFolder = null)
     {
         var rawByPath = rawParts
             .GroupBy(p => p.PartPath)
@@ -120,6 +121,10 @@ public static class SearchDocumentBuilder
         // mesh alone would call every one of them packed. See UvStatusClassifier.
         var uvStatus = UvStatusClassifier.Classify(rawParts);
         var geometryKey = GeometryKeyOf(rawParts);
+        // The folder the asset was imported from, as its own weak tier. Derived here rather
+        // than stored pre-tokenised so a change to what counts as a meaningful segment is a
+        // reprojection away, like every other rule in this builder.
+        var folderTokens = ImportFolderSignal.Tokens(sourceFolder);
 
         docs.Add(AssetSearchDocument.Create(
             assetType: "Model",
@@ -169,7 +174,10 @@ public static class SearchDocumentBuilder
             styles: styles,
             themes: themes,
             license: license,
-            geometryKey: geometryKey));
+            geometryKey: geometryKey,
+            // Asset-level only, for the same reason packs are: the folder describes the
+            // asset that came out of it, not each of its meshes.
+            folderTokens: folderTokens));
 
         foreach (var part in derived.Parts)
         {

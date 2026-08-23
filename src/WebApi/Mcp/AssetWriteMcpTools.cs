@@ -10,6 +10,7 @@ using Application.Models;
 using Application.Packs;
 using Application.Search;
 using ModelContextProtocol.Server;
+using SharedKernel;
 using WebApi.Infrastructure;
 using static WebApi.Mcp.McpWriteGuard;
 
@@ -216,6 +217,58 @@ public sealed class AssetWriteMcpTools
             cancellationToken);
     }
 
+    [McpServerTool(Name = "collapse_duplicate_assets")]
+    [Description("Keep one copy of a same-geometry group and RECYCLE the rest. Get the groups from get_duplicate_assets. " +
+                 "You must name the survivor - the two copies of a prop are usually an FBX and an OBJ, and only the user knows which " +
+                 "their pipeline reads. Every id is re-checked against the survivor's fingerprint before anything is recycled, so a " +
+                 "stale listing cannot delete a different asset. Recycled, not merged: restore_asset brings one back untouched. " +
+                 "Run with dryRun=true first.")]
+    public static Task<object> CollapseDuplicateAssets(
+        ICommandHandler<CollapseDuplicateAssetsCommand, CollapseDuplicateAssetsResponse> handler,
+        IAgentAudit audit,
+        McpCallerContext caller,
+        [Description("Unique key so a retried call does not recycle twice.")] string idempotencyKey,
+        [Description("The model id to keep.")] int survivorModelId,
+        [Description("The model ids to recycle. Each must carry the survivor's geometry fingerprint.")] int[] redundantModelIds,
+        [Description("Report what would happen and change nothing (default true).")] bool dryRun = true,
+        [Description("Optional batch id. Writes sharing one can be undone together with reverse_operation.")] string? batchId = null,
+        CancellationToken cancellationToken = default)
+    {
+        return Guarded(
+            audit,
+            caller,
+            new AgentWrite(idempotencyKey, "collapse-duplicate-assets", AgentAssetFamilies.Model, survivorModelId, BatchId: batchId),
+            async ct =>
+            {
+                var result = await handler.Handle(
+                    new CollapseDuplicateAssetsCommand(
+                        survivorModelId, redundantModelIds ?? Array.Empty<int>(), dryRun),
+                    ct);
+
+                if (result.IsFailure)
+                {
+                    return Failed(result.Error);
+                }
+
+                return Applied(
+                    new
+                    {
+                        status = dryRun ? "dry-run" : "ok",
+                        survivorModelId,
+                        recycled = result.Value.Recycled,
+                        message = dryRun
+                            ? $"Would recycle {result.Value.Recycled.Count} copy/copies and keep model {survivorModelId}. Re-run with dryRun=false to apply."
+                            : $"Recycled {result.Value.Recycled.Count} copy/copies. Each is restorable with restore_asset.",
+                    },
+                    AgentAssetFamilies.Model,
+                    survivorModelId,
+                    // What the undo needs: the ids that were recycled, so reversing this
+                    // restores exactly those and nothing else.
+                    dryRun ? null : new { recycled = result.Value.Recycled });
+            },
+            cancellationToken);
+    }
+
     [McpServerTool(Name = "reindex_search")]
     [Description("Rebuild the search index from data already stored - no files are read and nothing is re-extracted. " +
                  "Run it after the search vocabulary changes (new synonyms/abbreviations), or when an asset is findable in the " +
@@ -265,6 +318,7 @@ public sealed class AssetWriteMcpTools
     [Description("Import a model. Co-located: pass a server-readable file `path` and it is imported. Remote (client != server): omit `path` to get the HTTP upload endpoints to stream bytes to (control plane here, data plane over HTTP).")]
     public static async Task<object> ImportModel(
         ICommandHandler<AddModelCommand, AddModelCommandResponse> handler,
+        ICommandHandler<ImportModelWithAuxiliaryFilesCommand, ImportModelWithAuxiliaryFilesResponse> multiFileHandler,
         IAgentAudit audit,
         McpCallerContext caller,
         IAgentUploadTickets tickets,
@@ -333,8 +387,27 @@ public sealed class AssetWriteMcpTools
                     return Failed(new { error = "PathUnreadable", message = ex.Message });
                 }
 
+                // The folder and what else is in it are free taxonomy that only this branch
+                // ever sees: a path import knows both, and an HTTP upload knows neither.
+                // POLYGON City's `SourceFiles/Characters/` and a folder of `SM_Veh_*`
+                // neighbours are what classify the assets whose own name says nothing.
+                var folder = Path.GetDirectoryName(path);
+                var siblings = SiblingModelNames(folder);
+
                 var upload = new InMemoryFileUpload(Path.GetFileName(path), bytes);
-                var result = await handler.Handle(new AddModelCommand(upload, name), ct);
+
+                // A format that keeps its textures in separate files gets them attached here
+                // rather than left on disk. Binding a material was a manual two-step even for
+                // the user, and for a path import it was not possible at all - which is why
+                // the FBX/OBJ texture-resolution path had nothing to resolve: every FBX in
+                // the library had been imported one file at a time, with its .png siblings
+                // still sitting beside it on disk.
+                var textures = await ReadTextureSiblingsAsync(path, folder, ct);
+                var result = textures.Count > 0
+                    ? await ImportWithTexturesAsync(
+                        multiFileHandler, upload, textures, name, folder, siblings, ct)
+                    : await handler.Handle(
+                        new AddModelCommand(upload, name, SourceFolder: folder, SiblingFileNames: siblings), ct);
                 if (result.IsFailure)
                 {
                     return Failed(result.Error);
@@ -355,4 +428,143 @@ public sealed class AssetWriteMcpTools
             cancellationToken);
     }
 
+    /// <summary>
+    /// The names of the other files in a folder, capped, for the import automation's
+    /// naming-convention signal. Best effort: an unreadable or enormous directory yields
+    /// nothing rather than failing an import that is otherwise fine.
+    /// </summary>
+    private static IReadOnlyList<string>? SiblingModelNames(string? folder)
+    {
+        if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder))
+        {
+            return null;
+        }
+
+        try
+        {
+            // Enumerate lazily and stop at the cap: a library root can hold thousands of
+            // files, and the shared-token intersection is decided by the first handful.
+            return Directory.EnumerateFiles(folder)
+                .Take(SiblingSampleSize)
+                .Select(Path.GetFileName)
+                .Where(n => !string.IsNullOrWhiteSpace(n))
+                .Select(n => n!)
+                .ToList();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>How many neighbours are enough to read a naming convention off.</summary>
+    private const int SiblingSampleSize = 64;
+
+    /// <summary>Model formats whose textures live in separate files beside them.</summary>
+    private static readonly string[] TextureReferencingFormats = { ".fbx", ".obj", ".gltf", ".dae" };
+
+    /// <summary>Image extensions worth attaching. Mirrors what the file registry accepts as a texture.</summary>
+    private static readonly string[] TextureExtensions =
+        { ".png", ".jpg", ".jpeg", ".tga", ".bmp", ".tif", ".tiff", ".exr" };
+
+    /// <summary>
+    /// Subdirectories a texture set conventionally sits in, checked alongside the model's own
+    /// folder. Relative, so the auxiliary keeps the path the model file references it by.
+    /// </summary>
+    private static readonly string[] TextureSubfolders = { "textures", "Textures", "tex", "maps" };
+
+    /// <summary>
+    /// The model's texture files, read off disk and paired with the relative path the model
+    /// references them by. Empty for a self-contained format, an unreadable folder, or a
+    /// shared texture directory that carries nothing matching this model's name.
+    /// </summary>
+    private static async Task<IReadOnlyList<AuxiliaryUpload>> ReadTextureSiblingsAsync(
+        string modelPath,
+        string? folder,
+        CancellationToken cancellationToken)
+    {
+        var extension = Path.GetExtension(modelPath);
+        if (string.IsNullOrWhiteSpace(folder) ||
+            !TextureReferencingFormats.Contains(extension, StringComparer.OrdinalIgnoreCase) ||
+            !Directory.Exists(folder))
+        {
+            return Array.Empty<AuxiliaryUpload>();
+        }
+
+        List<string> candidates;
+        int modelFileCount;
+        try
+        {
+            candidates = TextureFilesIn(folder, string.Empty).ToList();
+            foreach (var sub in TextureSubfolders)
+            {
+                var subPath = Path.Combine(folder, sub);
+                if (Directory.Exists(subPath))
+                {
+                    candidates.AddRange(TextureFilesIn(subPath, sub + "/"));
+                }
+            }
+
+            // How many models share this folder decides which of the two rules applies.
+            modelFileCount = Directory
+                .EnumerateFiles(folder)
+                .Count(f => MultiFileImportGrouping.IsPrimary(f));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return Array.Empty<AuxiliaryUpload>();
+        }
+
+        var chosen = ImportFolderSignal.SelectTextureSiblings(
+            Path.GetFileName(modelPath), candidates, modelFileCount);
+
+        var uploads = new List<AuxiliaryUpload>(chosen.Count);
+        foreach (var relative in chosen)
+        {
+            try
+            {
+                var absolute = Path.Combine(folder, relative.Replace('/', Path.DirectorySeparatorChar));
+                var bytes = await File.ReadAllBytesAsync(absolute, cancellationToken);
+                uploads.Add(new AuxiliaryUpload(
+                    relative, new InMemoryFileUpload(Path.GetFileName(absolute), bytes)));
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // One unreadable texture is not a reason to import the model without any of
+                // them - skip it and keep the rest.
+            }
+        }
+
+        return uploads;
+    }
+
+    /// <summary>Image files directly in a directory, named by their path relative to the model.</summary>
+    private static IEnumerable<string> TextureFilesIn(string directory, string prefix) =>
+        Directory.EnumerateFiles(directory)
+            .Where(f => TextureExtensions.Contains(Path.GetExtension(f), StringComparer.OrdinalIgnoreCase))
+            .Select(f => prefix + Path.GetFileName(f));
+
+    /// <summary>
+    /// Imports through the multi-file route so the textures are linked to the created
+    /// version, then reshapes the answer into the one <c>import_model</c> already returns -
+    /// the caller asked to import a model, not to learn which route carried it.
+    /// </summary>
+    private static async Task<Result<AddModelCommandResponse>> ImportWithTexturesAsync(
+        ICommandHandler<ImportModelWithAuxiliaryFilesCommand, ImportModelWithAuxiliaryFilesResponse> multiFileHandler,
+        IFileUpload upload,
+        IReadOnlyList<AuxiliaryUpload> textures,
+        string? name,
+        string? folder,
+        IReadOnlyList<string>? siblings,
+        CancellationToken cancellationToken)
+    {
+        var result = await multiFileHandler.Handle(
+            new ImportModelWithAuxiliaryFilesCommand(
+                upload, textures, BatchId: null, SourceFolder: folder, SiblingNames: siblings),
+            cancellationToken);
+
+        return result.IsFailure
+            ? Result.Failure<AddModelCommandResponse>(result.Error)
+            : Result.Success(new AddModelCommandResponse(result.Value.Id, result.Value.AlreadyExists));
+    }
 }

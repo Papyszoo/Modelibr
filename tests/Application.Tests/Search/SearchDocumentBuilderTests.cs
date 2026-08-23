@@ -406,4 +406,38 @@ public class SearchDocumentBuilderTests
         Assert.NotNull(AssetDoc(docs).GeometryKey);
         Assert.All(docs.Where(d => d.PartPath != null), d => Assert.Null(d.GeometryKey));
     }
+
+    [Fact]
+    public void BuildForModel_Puts_Folder_Tokens_In_Their_Own_Tier_On_The_Asset_Only()
+    {
+        var docs = SearchDocumentBuilder.BuildForModel(
+            modelId: 1, versionId: 1, isCurrentVersion: true,
+            assetName: "SM_Bld_Apartment_01", derived: DerivedWith("bld", "apartment"),
+            rollups: Rollups(), rawParts: new[] { Part() }, now: DateTime.UtcNow,
+            sourceFolder: "/library/POLYGONCity/SourceFiles/Characters");
+
+        var asset = AssetDoc(docs);
+        var folder = asset.FolderTokens!.Split(' ');
+
+        Assert.Contains("characters", folder);
+        // Kept out of the authored tokens: the folder describes the group, not this asset,
+        // and merging the two would let a neighbour's word rank as this model's name.
+        Assert.DoesNotContain("characters", asset.Tokens.Split(' '));
+
+        // A part does not come out of a folder - its asset does.
+        Assert.All(docs.Where(d => d.PartPath != null), d => Assert.Null(d.FolderTokens));
+    }
+
+    [Fact]
+    public void BuildForModel_Leaves_FolderTokens_Null_When_Nothing_Captured_A_Folder()
+    {
+        var docs = SearchDocumentBuilder.BuildForModel(
+            modelId: 1, versionId: 1, isCurrentVersion: true,
+            assetName: "Sword", derived: DerivedWith("sword"),
+            rollups: Rollups(), rawParts: new[] { Part() }, now: DateTime.UtcNow);
+
+        // An HTTP upload carries a filename and no path at all. Absent, not empty: "no
+        // folder" has to be one value, not two.
+        Assert.Null(AssetDoc(docs).FolderTokens);
+    }
 }

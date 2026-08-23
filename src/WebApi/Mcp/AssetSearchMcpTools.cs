@@ -369,6 +369,23 @@ public sealed class AssetSearchMcpTools
             : result.Value;
     }
 
+    [McpServerTool(Name = "get_duplicate_assets")]
+    [Description("Groups of models that ARE each other: same meshes, two ids, found by geometry fingerprint rather than by name. " +
+                 "A real library import produces these by the hundred - an FBX and an OBJ of one prop land as two assets, and their " +
+                 "part names differ so nothing keyed on names could match them. Search already collapses duplicates within a page of " +
+                 "results, so this is for library hygiene: deciding which copy is the real one. Act on it with collapse_duplicate_assets.")]
+    public static async Task<object> GetDuplicateAssets(
+        IQueryHandler<DuplicateAssetsQuery, DuplicateAssetsResponse> handler,
+        [Description("1-based page (default 1).")] int page = 1,
+        [Description("Groups per page, 1-100 (default 25).")] int pageSize = 25,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await handler.Handle(new DuplicateAssetsQuery(page, pageSize), cancellationToken);
+        return result.IsFailure
+            ? new { error = result.Error.Code, message = result.Error.Message }
+            : result.Value;
+    }
+
     [McpServerTool(Name = "list_facets")]
     [Description("List the structural filters search_assets accepts, so filters can be composed without guessing. " +
                  "This is the static vocabulary - call get_facet_ranges for what those filters mean in THIS library.")]

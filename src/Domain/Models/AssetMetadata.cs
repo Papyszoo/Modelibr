@@ -32,6 +32,7 @@ public class AssetMetadata : AggregateRoot
     private readonly List<string> _tags = new();
     private readonly List<string> _styles = new();
     private readonly List<string> _themes = new();
+    private readonly List<string> _autoTags = new();
 
     public int Id { get; private set; }
 
@@ -89,6 +90,54 @@ public class AssetMetadata : AggregateRoot
     public string? StoreItemId { get; private set; }
 
     public DateTime? ImportedAt { get; private set; }
+
+    /// <summary>
+    /// The directory the asset's primary file was read from at import, as the importing
+    /// side saw it. Present for path imports and archives - an HTTP upload carries a
+    /// filename and nothing else, so it stays null there.
+    /// </summary>
+    /// <remarks>
+    /// Kept because the folder an asset sits in is a real, free taxonomy that nothing else
+    /// records: POLYGON City ships <c>SourceFiles/Characters/…</c>, and an asset in a folder
+    /// of <c>SM_Veh_*</c> is a vehicle even when its own name is <c>SM_Veh_Wheel_03</c>. It
+    /// feeds both the low-weight folder tier in search and the import-time tag suggestions.
+    /// </remarks>
+    public string? SourceFolder { get; private set; }
+
+    // ---- import automation (prompt 06-C) ----
+
+    /// <summary>
+    /// Tags the import automation added, as opposed to ones a person typed. The tags
+    /// themselves live in the family's own tag relation - this is the provenance record
+    /// that says which of them were machine-derived, so a review screen can show what was
+    /// guessed and a correction can tell the two apart.
+    /// </summary>
+    public ICollection<string> AutoTags
+    {
+        get => _autoTags;
+        set => Replace(_autoTags, value);
+    }
+
+    /// <summary>
+    /// The category the import automation assigned, or null when nothing matched or the
+    /// asset already had one. The assignment itself lives on the asset; this records that
+    /// it was inferred rather than chosen.
+    /// </summary>
+    public int? AutoCategoryId { get; private set; }
+
+    /// <summary>
+    /// When the automation last ran for this asset. Non-null is the "already done" marker:
+    /// automation runs <b>once</b>, because its inputs (the name and the folder) do not
+    /// change, and re-running it on every re-derive would keep re-adding tags the user had
+    /// deliberately removed.
+    /// </summary>
+    public DateTime? AutoAppliedAt { get; private set; }
+
+    /// <summary>
+    /// When a person confirmed or corrected what the automation did. Null while the asset
+    /// is still waiting in the "N assets categorized automatically - review" queue.
+    /// </summary>
+    public DateTime? AutoReviewedAt { get; private set; }
 
     /// <summary>
     /// Schema-declared per-family extras that do not earn a column, as a JSON object.
@@ -171,6 +220,40 @@ public class AssetMetadata : AggregateRoot
         StoreItemId = Trimmed(storeItemId);
         ImportedAt = importedAt;
         UpdatedAt = updatedAt;
+    }
+
+    /// <summary>Records where the asset's primary file was read from at import.</summary>
+    public void SetSourceFolder(string? sourceFolder, DateTime updatedAt)
+    {
+        SourceFolder = Trimmed(sourceFolder);
+        UpdatedAt = updatedAt;
+    }
+
+    /// <summary>
+    /// Records what the import automation applied. Called once per asset - see
+    /// <see cref="AutoAppliedAt"/> - with the tags it added and the category it chose.
+    /// </summary>
+    public void RecordAutoAssignment(
+        IEnumerable<string>? autoTags,
+        int? autoCategoryId,
+        DateTime appliedAt)
+    {
+        Replace(_autoTags, autoTags);
+        AutoCategoryId = autoCategoryId;
+        AutoAppliedAt = appliedAt;
+        UpdatedAt = appliedAt;
+    }
+
+    /// <summary>
+    /// Marks the automation's guesses as seen by a person. Idempotent, and deliberately
+    /// separate from correcting them: accepting and editing both end the review, and the
+    /// screen only needs to know the asset has left the queue.
+    /// </summary>
+    public void MarkAutoReviewed(DateTime reviewedAt)
+    {
+        if (AutoAppliedAt is null) return;
+        AutoReviewedAt = reviewedAt;
+        UpdatedAt = reviewedAt;
     }
 
     public void SetFacets(string? facetsJson, DateTime updatedAt)

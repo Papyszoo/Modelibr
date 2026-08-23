@@ -225,6 +225,74 @@ internal sealed class AssetSearchDocumentRepository : IAssetSearchDocumentReposi
         }
     }
 
+    public async Task<DuplicateGeometryPage> GetDuplicateGeometryGroupsAsync(
+        string assetType,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        // Asset-level, current-version, live documents that actually carry a fingerprint.
+        // An unhashed asset must never group with every other unhashed asset - "we both
+        // have no fingerprint" is not a thing in common.
+        var eligible = _context.AssetSearchDocuments
+            .AsNoTracking()
+            .Where(d => d.AssetType == assetType &&
+                        d.PartPath == null &&
+                        d.IsCurrentVersion &&
+                        d.IsActive &&
+                        d.GeometryKey != null);
+
+        var grouped = eligible
+            .GroupBy(d => d.GeometryKey!)
+            .Select(g => new { GeometryKey = g.Key, Count = g.Count() })
+            .Where(g => g.Count > 1);
+
+        var totals = await grouped
+            .GroupBy(_ => 1)
+            .Select(g => new { Groups = g.Count(), Assets = g.Sum(x => x.Count) })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (totals is null)
+        {
+            return new DuplicateGeometryPage(0, 0, Array.Empty<DuplicateGeometryGroup>());
+        }
+
+        // Biggest groups first - a prop imported six times is more worth a decision than a
+        // pair - then by key so the ordering is total and paging cannot repeat a group.
+        var keys = await grouped
+            .OrderByDescending(g => g.Count)
+            .ThenBy(g => g.GeometryKey)
+            .Skip(Math.Max(0, page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(g => g.GeometryKey)
+            .ToListAsync(cancellationToken);
+
+        if (keys.Count == 0)
+        {
+            return new DuplicateGeometryPage(
+                totals.Groups, totals.Assets - totals.Groups, Array.Empty<DuplicateGeometryGroup>());
+        }
+
+        var members = await eligible
+            .Where(d => keys.Contains(d.GeometryKey!))
+            .Select(d => new { Key = d.GeometryKey!, d.AssetId, d.TriangleCount })
+            .ToListAsync(cancellationToken);
+
+        var groups = keys
+            .Select(key => new DuplicateGeometryGroup(
+                key,
+                members
+                    .Where(m => m.Key == key)
+                    .Select(m => new DuplicateGeometryMember(m.AssetId, m.TriangleCount))
+                    .ToList()))
+            .Where(g => g.Members.Count > 1)
+            .ToList();
+
+        // One asset per group is the original; the rest are the copies.
+        return new DuplicateGeometryPage(
+            totals.Groups, totals.Assets - totals.Groups, groups);
+    }
+
     public Task<AssetSearchDocument?> GetCurrentAssetDocumentAsync(
         string assetType,
         int assetId,

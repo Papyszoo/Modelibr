@@ -163,6 +163,22 @@ public class AssetSearchDocument
     public string? PackNames { get; private set; }
 
     /// <summary>
+    /// Space-joined tokens from the folder the asset was imported from, widened the same
+    /// way authored names are.
+    ///
+    /// A separate, weaker tier for the same reason <see cref="ConceptLabels"/> is one: the
+    /// folder describes a <i>group</i>, not this asset. Ranked just above
+    /// <see cref="PackNames"/> because a folder is a much narrower group than a pack -
+    /// <c>SourceFiles/Characters</c> holds characters, while "POLYGON City" holds 696
+    /// assets of every kind - and well below an authored name, so an asset that IS a
+    /// vehicle always outranks one that merely sits next to vehicles.
+    ///
+    /// Asset-level documents only, and null when nothing captured a folder: HTTP uploads
+    /// carry a filename and no path at all, and an absent weak signal is not a wrong one.
+    /// </summary>
+    public string? FolderTokens { get; private set; }
+
+    /// <summary>
     /// Fingerprint of the asset's geometry: its parts' order-invariant geometry hashes,
     /// sorted and hashed together. Two assets that carry the same key are the same meshes
     /// under two ids.
@@ -237,6 +253,7 @@ public class AssetSearchDocument
         string? categoryName = null,
         bool isActive = true,
         IEnumerable<string>? packNames = null,
+        IEnumerable<string>? folderTokens = null,
         double? dimensionX = null,
         double? dimensionY = null,
         double? dimensionZ = null,
@@ -298,8 +315,25 @@ public class AssetSearchDocument
             CategoryId = categoryId,
             CategoryName = string.IsNullOrWhiteSpace(categoryName) ? null : categoryName.Trim(),
             PackNames = NormalizePackNames(packNames),
+            FolderTokens = NormalizeBlob(folderTokens),
             UpdatedAt = updatedAt
         };
+    }
+
+    /// <summary>
+    /// Trims, deduplicates and space-joins a token list into a matchable blob. Returns null
+    /// rather than an empty string so "nothing here" is one value, not two.
+    /// </summary>
+    private static string? NormalizeBlob(IEnumerable<string>? values)
+    {
+        if (values is null) return null;
+        var cleaned = values
+            .Where(v => !string.IsNullOrWhiteSpace(v))
+            .Select(v => v.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(v => v, StringComparer.Ordinal)
+            .ToList();
+        return cleaned.Count == 0 ? null : string.Join(' ', cleaned);
     }
 
     /// <summary>

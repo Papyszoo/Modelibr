@@ -20,6 +20,30 @@ public interface IAssetMetadataRepository
         IReadOnlyCollection<int> assetIds,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// The assets the import automation classified that nobody has looked at yet, newest
+    /// first, plus how many there are in total.
+    /// </summary>
+    /// <remarks>
+    /// The review queue's only query. Paged because a 1,700-model import puts 1,700 assets
+    /// in it at once, and the screen shows a page while the count drives the banner.
+    /// </remarks>
+    Task<(IReadOnlyList<AssetMetadata> Items, int TotalCount)> GetPendingAutoReviewAsync(
+        string assetType,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The rows for a set of assets that the automation classified and nobody has reviewed.
+    /// The write side of the review action - it must not mark an asset reviewed that was
+    /// never guessed at, or reviewed twice.
+    /// </summary>
+    Task<IReadOnlyList<AssetMetadata>> GetPendingAutoReviewByIdsAsync(
+        string assetType,
+        IReadOnlyCollection<int> assetIds,
+        CancellationToken cancellationToken = default);
+
     Task AddAsync(AssetMetadata metadata, CancellationToken cancellationToken = default);
 
     Task UpdateAsync(AssetMetadata metadata, CancellationToken cancellationToken = default);

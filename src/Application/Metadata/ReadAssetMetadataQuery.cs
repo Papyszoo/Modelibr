@@ -110,6 +110,7 @@ internal sealed class ReadAssetMetadataQueryHandler
                 "creditUrl" => stored?.CreditUrl,
                 "attributionRequired" => stored?.AttributionRequired,
                 "sourceKind" => stored?.SourceKind,
+                "sourceFolder" => stored?.SourceFolder,
                 "sourceUrl" => stored?.SourceUrl,
                 "storeUrl" => stored?.StoreUrl,
                 "storeAssetId" => stored?.StoreAssetId,

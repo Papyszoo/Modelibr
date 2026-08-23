@@ -1690,6 +1690,16 @@ namespace Infrastructure.Persistence
                 entity.Property(e => e.StoreAssetId).IsRequired(false).HasMaxLength(100);
                 entity.Property(e => e.StoreItemId).IsRequired(false).HasMaxLength(100);
                 entity.Property(e => e.ImportedAt).IsRequired(false);
+                entity.Property(e => e.SourceFolder).IsRequired(false).HasMaxLength(1024);
+
+                // Import automation (prompt 06-C). The tags themselves live in the family's
+                // own vocabulary; this is only the record of which of them were guessed.
+                entity.Property(e => e.AutoTags)
+                    .HasColumnType("text[]")
+                    .HasDefaultValueSql("'{}'::text[]");
+                entity.Property(e => e.AutoCategoryId).IsRequired(false);
+                entity.Property(e => e.AutoAppliedAt).IsRequired(false);
+                entity.Property(e => e.AutoReviewedAt).IsRequired(false);
 
                 entity.Property(e => e.FacetsJson).IsRequired(false).HasColumnType("jsonb");
 
@@ -1704,6 +1714,12 @@ namespace Infrastructure.Persistence
                 // us", and "which of them still have no licence".
                 entity.HasIndex(e => new { e.StoreUrl, e.StoreAssetId });
                 entity.HasIndex(e => e.StoreItemId);
+
+                // What the review screen asks: which assets did the automation classify and
+                // has anyone looked at them yet. Filtered so the index covers only the rows
+                // that can ever be in that queue, rather than every asset in the library.
+                entity.HasIndex(e => new { e.AssetType, e.AutoAppliedAt, e.AutoReviewedAt })
+                    .HasFilter("\"AutoAppliedAt\" IS NOT NULL");
             });
 
             modelBuilder.Entity<AssetSearchDocument>(entity =>
@@ -1756,6 +1772,9 @@ namespace Infrastructure.Persistence
                 // several packs; no GIN index, matching ConceptLabels - this is a weak
                 // tie-breaking signal, not a primary retrieval path.
                 entity.Property(e => e.PackNames).IsRequired(false).HasMaxLength(1000);
+                // Bounded like PackNames: three folder levels, widened, is tens of tokens -
+                // an unbounded text column here would be an invitation to index a path.
+                entity.Property(e => e.FolderTokens).IsRequired(false).HasMaxLength(1000);
                 // SHA-256 of the asset's sorted part hashes, hex - fixed width by construction.
                 entity.Property(e => e.GeometryKey).IsRequired(false).HasMaxLength(64);
                 // Asset metadata schema facets, denormalised so a profile-driven search can

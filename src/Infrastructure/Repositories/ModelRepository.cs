@@ -307,6 +307,21 @@ internal sealed class ModelRepository : IModelRepository
         return new CategoryAssetCounts(perCategory, uncategorized, total);
     }
 
+    public async Task<IReadOnlyList<ModelIdentity>> GetIdentitiesAsync(
+        IReadOnlyCollection<int> ids, CancellationToken cancellationToken = default)
+    {
+        if (ids.Count == 0)
+        {
+            return Array.Empty<ModelIdentity>();
+        }
+
+        return await _context.Models
+            .AsNoTracking()
+            .Where(m => ids.Contains(m.Id))
+            .Select(m => new ModelIdentity(m.Id, m.Name, m.ActiveVersionId))
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<Model?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         return await _context.Models

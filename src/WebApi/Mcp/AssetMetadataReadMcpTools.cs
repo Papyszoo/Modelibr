@@ -47,4 +47,19 @@ public sealed class AssetMetadataReadMcpTools
             ? new { error = result.Error.Code, message = result.Error.Message }
             : result.Value;
     }
+
+    [McpServerTool(Name = "get_import_suggestions")]
+    [Description("What the import automation categorized and tagged on its own, and nobody has confirmed yet. Each entry says what it decided and what it decided it from (the folder). Settle them with review_import_suggestions.")]
+    public static async Task<object> GetImportSuggestions(
+        IQueryHandler<ImportSuggestionsQuery, ImportSuggestionsResponse> handler,
+        [Description("1-based page (default 1).")] int page = 1,
+        [Description("Entries per page, 1-200 (default 50).")] int pageSize = 50,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await handler.Handle(new ImportSuggestionsQuery(page, pageSize), cancellationToken);
+
+        return result.IsFailure
+            ? new { error = result.Error.Code, message = result.Error.Message }
+            : result.Value;
+    }
 }

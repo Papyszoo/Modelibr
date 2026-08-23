@@ -80,6 +80,16 @@ public class ModelUploadedEventHandlerTests
             It.IsAny<int>(),
             It.IsAny<int>(),
             CancellationToken.None), Times.Once);
+
+        // And indexing is queued alongside it, not behind it. Scene-graph extraction used
+        // to ride on the thumbnail render, so becoming searchable sat at the back of the
+        // thumbnail queue - which on a 1,700-model import is hours of waiting for a walk
+        // over a scene graph that takes milliseconds.
+        mockExtraction.Verify(h => h.Handle(
+            It.Is<EnqueueExtractionJobCommand>(c =>
+                c.AssetId == 1 && c.VersionId == 10 &&
+                c.ExtractorFamily == ExtractorFamilies.Geometry),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -127,7 +137,7 @@ public class ModelUploadedEventHandlerTests
     /// found by search.
     /// </summary>
     [Fact]
-    public async Task Handle_CallerSuppliedThumbnail_QueuesGeometryExtractionInstead()
+    public async Task Handle_CallerSuppliedThumbnail_StillQueuesGeometryExtraction()
     {
         // Arrange
         var mockThumbnailQueue = new Mock<IThumbnailQueue>();

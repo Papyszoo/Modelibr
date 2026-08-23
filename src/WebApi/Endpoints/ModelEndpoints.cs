@@ -311,8 +311,14 @@ public static class ModelEndpoints
             auxiliaries.Add(new AuxiliaryUpload(paths[i] ?? string.Empty, new FormFileUpload(auxFiles[i])));
         }
 
+        // Optional: the directory the group came from, which a folder upload knows and a
+        // single-file drop does not. Weak taxonomy plus provenance, never required - an
+        // absent folder is one less signal, not a bad request.
+        var folder = form["folder"].FirstOrDefault();
+
         var result = await commandHandler.Handle(
-            new ImportModelWithAuxiliaryFilesCommand(new FormFileUpload(primary), auxiliaries, batchId),
+            new ImportModelWithAuxiliaryFilesCommand(
+                new FormFileUpload(primary), auxiliaries, batchId, folder),
             cancellationToken);
 
         if (result.IsFailure)

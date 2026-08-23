@@ -125,5 +125,47 @@ public static class SearchEndpoints
         .WithName("Get Search Facet Ranges")
         .WithSummary("The real distribution behind each numeric filter, and the values the categorical ones hold")
         .WithTags("Search");
+
+        app.MapGet("/search/duplicates", async (
+            int? page,
+            int? pageSize,
+            IQueryHandler<DuplicateAssetsQuery, DuplicateAssetsResponse> handler,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await handler.Handle(
+                new DuplicateAssetsQuery(page ?? 1, pageSize ?? 25), cancellationToken);
+
+            return result.IsFailure
+                ? Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message })
+                : Results.Ok(result.Value);
+        })
+        .WithName("Get Duplicate Assets")
+        .WithSummary("Groups of assets that carry the same geometry - the same meshes under two ids")
+        .WithTags("Search");
+
+        app.MapPost("/search/duplicates/collapse", async (
+            CollapseDuplicatesRequest body,
+            ICommandHandler<CollapseDuplicateAssetsCommand, CollapseDuplicateAssetsResponse> handler,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await handler.Handle(
+                new CollapseDuplicateAssetsCommand(
+                    body.SurvivorModelId, body.RedundantModelIds ?? Array.Empty<int>(), body.DryRun),
+                cancellationToken);
+
+            return result.IsFailure
+                ? Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message })
+                : Results.Ok(result.Value);
+        })
+        .WithName("Collapse Duplicate Assets")
+        .WithSummary("Keeps one copy of a same-geometry group and recycles the rest (restorable)")
+        .WithTags("Search");
     }
+
+    /// <param name="SurvivorModelId">The copy to keep.</param>
+    /// <param name="RedundantModelIds">The copies to recycle. Each must carry the survivor's geometry.</param>
+    public record CollapseDuplicatesRequest(
+        int SurvivorModelId,
+        IReadOnlyList<int>? RedundantModelIds,
+        bool DryRun = false);
 }

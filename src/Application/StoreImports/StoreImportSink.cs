@@ -135,7 +135,12 @@ internal sealed class StoreImportSink : IStoreImportSink
 
     public async Task<int> CreateModelAsync(IFileUpload primaryFile, string name, string? batchId, bool generateThumbnail, CancellationToken ct)
         => Unwrap(await _addModel.Handle(
-            new AddModelCommand(primaryFile, name, batchId, GenerateThumbnail: generateThumbnail), ct)).Id;
+            new AddModelCommand(
+                primaryFile, name, batchId,
+                GenerateThumbnail: generateThumbnail,
+                // The manifest already says what this is - category, tags, licence, author.
+                // Guessing a category from the file name over that would be strictly worse.
+                AutoAssignMetadata: false), ct)).Id;
 
     public Task AddFileToModelAsync(int modelId, IFileUpload file, CancellationToken ct)
         => RunAsync<AddFileToModelCommandResponse>(_addFileToModel.Handle(new AddFileToModelCommand(modelId, file), ct));

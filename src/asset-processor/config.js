@@ -17,6 +17,22 @@ export const config = {
   // Poll interval for the decoupled extraction queue (prompt 20 executor).
   extractionPollIntervalMs:
     parseInt(process.env.EXTRACTION_POLL_INTERVAL_MS, 10) || 5000,
+  // How many extraction jobs run at once. Its own budget, separate from
+  // MAX_CONCURRENT_JOBS: that setting governs thumbnail rendering, and extraction used to
+  // have no knob at all - one job at a time behind a 10-per-tick cap, which is a hard
+  // ceiling of 120 jobs/min no matter what the machine can do. Re-deriving a 1,700-model
+  // library after a vocabulary change therefore took 20-40 minutes of pure waiting.
+  //
+  // Each concurrent job holds a renderer from the pool, so the pool is sized to match.
+  extractionConcurrency: Math.max(
+    1,
+    parseInt(process.env.EXTRACTION_CONCURRENCY, 10) || 3
+  ),
+  // Per-tick claim cap, scaled by the concurrency budget. The interval picks up whatever
+  // is left, so this bounds one tick rather than the queue.
+  extractionBatchSize:
+    parseInt(process.env.EXTRACTION_BATCH_SIZE, 10) ||
+    Math.max(1, parseInt(process.env.EXTRACTION_CONCURRENCY, 10) || 3) * 10,
   // Poll interval for the Blender operation family. Slower than the extraction queue on
   // purpose: these jobs are minutes long and rare, so a tighter loop only adds requests.
   blenderPollIntervalMs:

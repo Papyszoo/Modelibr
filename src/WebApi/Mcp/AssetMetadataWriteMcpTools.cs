@@ -4,6 +4,7 @@ using Application.Abstractions.Messaging;
 using Application.Agents;
 using Application.Metadata;
 using ModelContextProtocol.Server;
+using WebApi.Infrastructure;
 using static WebApi.Mcp.McpWriteGuard;
 
 namespace WebApi.Mcp;
@@ -76,6 +77,51 @@ public sealed class AssetMetadataWriteMcpTools
                     assetId,
                     result.Value,
                     before.IsSuccess ? before.Value : null);
+            },
+            cancellationToken);
+    }
+
+    [McpServerTool(Name = "review_import_suggestions")]
+    [Description("Settle what the import automation guessed, in bulk: accept=true keeps the categories and tags it applied, accept=false takes them back. Omit modelIds to settle everything waiting (bounded per call - repeat while `remaining` > 0). Taking back never undoes a decision a person made since: a category someone changed and a tag someone else added are left alone.")]
+    public static Task<object> ReviewImportSuggestions(
+        ICommandHandler<ReviewImportSuggestionsCommand, ReviewImportSuggestionsResponse> handler,
+        IAgentAudit audit,
+        McpCallerContext caller,
+        [Description("Unique key so a retried call does not re-apply.")] string idempotencyKey,
+        [Description("True to keep the automation's guesses, false to take them back.")] bool accept = true,
+        [Description("Which models to settle. Omit for every asset waiting.")] int[]? modelIds = null,
+        [Description("Optional batch id. Writes sharing one can be undone together with reverse_operation.")] string? batchId = null,
+        CancellationToken cancellationToken = default)
+    {
+        return Guarded(
+            audit,
+            caller,
+            new AgentWrite(idempotencyKey, "review-import-suggestions", AgentAssetFamilies.Model, BatchId: batchId),
+            async ct =>
+            {
+                var result = await handler.Handle(
+                    new ReviewImportSuggestionsCommand(modelIds?.ToList(), accept), ct);
+
+                if (result.IsFailure)
+                {
+                    return Failed(result.Error);
+                }
+
+                // Deliberately no undo payload. Accepting changes nothing but a review
+                // marker, and rejecting is itself the undo - reversing it would mean
+                // re-applying guesses a person has just rejected.
+                return Applied(
+                    new
+                    {
+                        status = "ok",
+                        reviewed = result.Value.Reviewed,
+                        categoriesCleared = result.Value.CategoriesCleared,
+                        tagsRemoved = result.Value.TagsRemoved,
+                        remaining = result.Value.Remaining,
+                    },
+                    AgentAssetFamilies.Model,
+                    null,
+                    null);
             },
             cancellationToken);
     }

@@ -225,3 +225,77 @@ describe('ExtractionJobProcessor.process', () => {
     )
   })
 })
+
+describe('ExtractionJobProcessor.drain', () => {
+  /**
+   * A processor whose queue holds `count` jobs, with `process` stubbed so a drain can be
+   * observed without loading anything. Records how many jobs were in flight at the peak.
+   */
+  function processorWith(count) {
+    const processor = new ExtractionJobProcessor()
+    let remaining = count
+    let inFlight = 0
+    let peakInFlight = 0
+
+    processor.jobApi = {
+      dequeueExtractionJob: vi.fn().mockImplementation(async () => {
+        if (remaining <= 0) return null
+        remaining -= 1
+        return { id: count - remaining, assetType: 'Model', versionId: 1, assetId: 1 }
+      }),
+    }
+    processor.process = vi.fn().mockImplementation(async () => {
+      inFlight += 1
+      peakInFlight = Math.max(peakInFlight, inFlight)
+      // Yield, so lanes actually overlap rather than each completing synchronously.
+      await new Promise((resolve) => setTimeout(resolve, 1))
+      inFlight -= 1
+    })
+
+    return { processor, peak: () => peakInFlight }
+  }
+
+  it('runs jobs up to the concurrency budget at once', async () => {
+    const { processor, peak } = processorWith(12)
+
+    await processor.drain()
+
+    // One at a time behind a 10-per-tick cap was a hard 120 jobs/min ceiling no matter
+    // what the machine could do - the reason re-deriving a library took 20-40 minutes.
+    expect(processor.process).toHaveBeenCalledTimes(12)
+    expect(peak()).toBeGreaterThan(1)
+    expect(peak()).toBeLessThanOrEqual(config.extractionConcurrency)
+  })
+
+  it('stops at the batch size and leaves the rest for the next tick', async () => {
+    const { processor } = processorWith(config.extractionBatchSize + 25)
+
+    await processor.drain()
+
+    expect(processor.process.mock.calls.length).toBeLessThanOrEqual(
+      config.extractionBatchSize
+    )
+  })
+
+  it('stops asking once one lane finds the queue empty', async () => {
+    const { processor } = processorWith(1)
+
+    await processor.drain()
+
+    // The lanes share the "it's empty" answer instead of each paying its own empty round
+    // trip: one claim that returned a job, and at most one empty answer per lane.
+    expect(processor.jobApi.dequeueExtractionJob.mock.calls.length).toBeLessThanOrEqual(
+      1 + config.extractionConcurrency
+    )
+  })
+
+  it('does not re-enter while a drain is still running', async () => {
+    const { processor } = processorWith(6)
+
+    const first = processor.drain()
+    await processor.drain()
+    await first
+
+    expect(processor.process).toHaveBeenCalledTimes(6)
+  })
+})

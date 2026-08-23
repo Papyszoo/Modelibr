@@ -270,7 +270,8 @@ internal sealed class ReprojectSearchDocumentsCommandHandler
             // blanked from search by the next extraction (prompt 16-F).
             styles: schemaMetadata?.Styles,
             themes: schemaMetadata?.Themes,
-            license: schemaMetadata?.License);
+            license: schemaMetadata?.License,
+            sourceFolder: schemaMetadata?.SourceFolder);
 
         foreach (var doc in docs)
         {

@@ -380,6 +380,21 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<DateTime?>("AutoAppliedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("AutoCategoryId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("AutoReviewedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.PrimitiveCollection<string[]>("AutoTags")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text[]")
+                        .HasDefaultValueSql("'{}'::text[]");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -414,6 +429,10 @@ namespace Infrastructure.Migrations
 
                     b.Property<int>("SchemaVersion")
                         .HasColumnType("integer");
+
+                    b.Property<string>("SourceFolder")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
 
                     b.Property<string>("SourceKind")
                         .HasMaxLength(40)
@@ -464,6 +483,9 @@ namespace Infrastructure.Migrations
                         .IsUnique();
 
                     b.HasIndex("StoreUrl", "StoreAssetId");
+
+                    b.HasIndex("AssetType", "AutoAppliedAt", "AutoReviewedAt")
+                        .HasFilter("\"AutoAppliedAt\" IS NOT NULL");
 
                     b.ToTable("AssetMetadata", (string)null);
                 });
@@ -617,6 +639,10 @@ namespace Infrastructure.Migrations
                     b.Property<string>("Engine")
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
+
+                    b.Property<string>("FolderTokens")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
 
                     b.Property<string>("GeometryKey")
                         .HasMaxLength(64)

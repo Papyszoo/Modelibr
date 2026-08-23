@@ -14,7 +14,17 @@ public sealed record MultiFileImportEntry(string Path, byte[] Content);
 /// auxiliary <see cref="AuxiliaryUpload.RelativePath"/> is expressed relative to the
 /// primary's directory, matching how the primary glTF cites the URI.
 /// </summary>
-public sealed record ImportGroup(IFileUpload Primary, IReadOnlyList<AuxiliaryUpload> Auxiliaries);
+/// <param name="SourceFolder">
+/// The primary's directory within the archive, empty at the archive root. Carried through
+/// as import provenance and as the weak folder taxonomy signal - an archive laid out as
+/// <c>SourceFiles/Characters/…</c> is saying something the file names do not.
+/// </param>
+/// <param name="SiblingNames">The names of the other primary model files in that directory.</param>
+public sealed record ImportGroup(
+    IFileUpload Primary,
+    IReadOnlyList<AuxiliaryUpload> Auxiliaries,
+    string? SourceFolder = null,
+    IReadOnlyList<string>? SiblingNames = null);
 
 /// <summary>An auxiliary file plus the relative path the primary references it by.</summary>
 public sealed record AuxiliaryUpload(string RelativePath, IFileUpload File);
@@ -52,9 +62,19 @@ public static class MultiFileImportGrouping
                     new InMemoryFileUpload(FileNameOf(e.Path), e.Content)))
                 .ToList();
 
+            // The other importable files beside this one, which is what a naming convention
+            // is read off. Auxiliaries are excluded on purpose: a folder of one .gltf and
+            // its twelve textures has no convention to read.
+            var siblings = primaries
+                .Where(e => !ReferenceEquals(e, primary) && DirectoryOf(e.Path) == dir)
+                .Select(e => FileNameOf(e.Path))
+                .ToList();
+
             groups.Add(new ImportGroup(
                 new InMemoryFileUpload(FileNameOf(primary.Path), primary.Content),
-                auxiliaries));
+                auxiliaries,
+                dir.Length == 0 ? null : dir,
+                siblings));
         }
 
         return groups;

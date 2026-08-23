@@ -18,7 +18,9 @@ public class McpToolSchemaTests
     private static JsonElement SchemaFor(string toolName, string methodName)
     {
         var method = typeof(SceneWriteMcpTools).GetMethod(methodName)
-                     ?? typeof(AssetSearchMcpTools).GetMethod(methodName);
+                     ?? typeof(AssetSearchMcpTools).GetMethod(methodName)
+                     ?? typeof(AssetWriteMcpTools).GetMethod(methodName)
+                     ?? typeof(AssetMetadataWriteMcpTools).GetMethod(methodName);
         Assert.NotNull(method);
 
         var tool = McpServerTool.Create(method!);
@@ -97,6 +99,21 @@ public class McpToolSchemaTests
 
         Assert.Equal("array", parameter.GetProperty("type").GetString());
         Assert.Equal("object", parameter.GetProperty("items").GetProperty("type").GetString());
+    }
+
+    [Theory]
+    [InlineData("collapse_duplicate_assets", "CollapseDuplicateAssets", "redundantModelIds")]
+    [InlineData("review_import_suggestions", "ReviewImportSuggestions", "modelIds")]
+    public void The_Bulk_Curation_Tools_Describe_Their_Id_Lists_As_Arrays_Of_Integers(
+        string toolName, string methodName, string parameterName)
+    {
+        // Both take a plain int[] and both recycle or revert what they are given. A client
+        // that reads no item type sends the list as a string, and the call is refused before
+        // the handler - the same shape that made set_asset_metadata uncallable.
+        var parameter = Property(SchemaFor(toolName, methodName), parameterName);
+
+        Assert.Contains("array", TypeNames(parameter));
+        Assert.Contains("integer", TypeNames(parameter.GetProperty("items")));
     }
 
     [Fact]

@@ -66,7 +66,9 @@ internal class ImportModelWithAuxiliaryFilesCommandHandler
         // Reuse the model-creation path (dedup, batch tracking, domain events, save
         // ordering) for the primary; it commits before we read the version id below.
         var modelResult = await _addModelHandler.Handle(
-            new AddModelCommand(command.Primary, BatchId: command.BatchId),
+            new AddModelCommand(
+                command.Primary, BatchId: command.BatchId,
+                SourceFolder: command.SourceFolder, SiblingFileNames: command.SiblingNames),
             cancellationToken);
         if (modelResult.IsFailure)
             return Result.Failure<ImportModelWithAuxiliaryFilesResponse>(modelResult.Error);
@@ -93,7 +95,9 @@ internal class ImportModelWithAuxiliaryFilesCommandHandler
                 model.Id);
 
             var distinctResult = await _addModelHandler.Handle(
-                new AddModelCommand(command.Primary, BatchId: command.BatchId, SkipDeduplication: true),
+                new AddModelCommand(
+                    command.Primary, BatchId: command.BatchId, SkipDeduplication: true,
+                    SourceFolder: command.SourceFolder, SiblingFileNames: command.SiblingNames),
                 cancellationToken);
             if (distinctResult.IsFailure)
                 return Result.Failure<ImportModelWithAuxiliaryFilesResponse>(distinctResult.Error);
@@ -224,10 +228,14 @@ internal class ImportModelWithAuxiliaryFilesCommandHandler
     }
 }
 
+/// <param name="SourceFolder">The directory the primary came out of, when the route knew one.</param>
+/// <param name="SiblingNames">The other importable file names in that directory.</param>
 public record ImportModelWithAuxiliaryFilesCommand(
     IFileUpload Primary,
     IReadOnlyList<AuxiliaryUpload> Auxiliaries,
-    string? BatchId = null) : ICommand<ImportModelWithAuxiliaryFilesResponse>;
+    string? BatchId = null,
+    string? SourceFolder = null,
+    IReadOnlyList<string>? SiblingNames = null) : ICommand<ImportModelWithAuxiliaryFilesResponse>;
 
 public record ImportModelWithAuxiliaryFilesResponse(
     int Id,

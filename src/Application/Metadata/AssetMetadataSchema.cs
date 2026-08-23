@@ -362,6 +362,16 @@ public static class AssetMetadataSchema
             AllowedValues: SourceKinds);
 
         yield return new AssetMetadataField(
+            Key: "sourceFolder",
+            Label: "Imported from",
+            Group: Groups.Provenance,
+            Type: FieldTypes.Text,
+            Provenance: FieldProvenance.Imported,
+            Storage: AssetMetadataStorage.Metadata,
+            ReadOnly: true,
+            Description: "The folder the asset's file was read from at import. Captured for path and archive imports; a plain HTTP upload carries a filename and no path at all.");
+
+        yield return new AssetMetadataField(
             Key: "sourceUrl",
             Label: "Source URL",
             Group: Groups.Provenance,

@@ -147,5 +147,33 @@ public interface IAssetSearchDocumentRepository
         string? description,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Groups of assets whose current version carries the same geometry fingerprint - the
+    /// same meshes under two ids - newest fingerprint first, paged.
+    /// </summary>
+    /// <remarks>
+    /// Read off the projection rather than the parts table because the fingerprint is only
+    /// computed there, and because the projection already knows which version is current and
+    /// which assets are recycled. Asset-level documents only: a part is not an asset.
+    /// </remarks>
+    Task<DuplicateGeometryPage> GetDuplicateGeometryGroupsAsync(
+        string assetType,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default);
+
     Task UpdateAsync(AssetSearchDocument document, CancellationToken cancellationToken = default);
 }
+
+/// <param name="TotalGroups">Groups in the library, not on this page.</param>
+/// <param name="TotalRedundant">How many assets are the second-or-later copy of something.</param>
+public sealed record DuplicateGeometryPage(
+    int TotalGroups,
+    int TotalRedundant,
+    IReadOnlyList<DuplicateGeometryGroup> Groups);
+
+public sealed record DuplicateGeometryGroup(
+    string GeometryKey,
+    IReadOnlyList<DuplicateGeometryMember> Members);
+
+public sealed record DuplicateGeometryMember(int AssetId, int? TriangleCount);

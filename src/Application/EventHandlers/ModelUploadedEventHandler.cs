@@ -13,16 +13,34 @@ namespace Application.EventHandlers;
 /// gated by the GenerateThumbnailOnUpload application setting.
 ///
 /// <para>
-/// Whenever that thumbnail job is <b>skipped</b>, this handler queues a Geometry
-/// extraction job instead. Scene-graph extraction rides on the thumbnail render
-/// (the worker's thumbnail processor is what calls <c>saveSceneGraph</c>), so
-/// "don't render a thumbnail" used to silently mean "never index this model":
-/// no parts, no technical metadata, no search document. A store import attaches
-/// the store's own turntable and so takes exactly that path - the imported model
-/// existed with a picture and could not be found by <c>search_assets</c>.
-/// Indexing is not thumbnailing, and neither reason for skipping the render
-/// (the caller supplied its own, or the operator turned rendering off) is a
-/// reason to leave the asset out of search.
+/// It <b>always</b> queues a Geometry extraction job as well. Scene-graph extraction rides
+/// on the thumbnail render (the worker's thumbnail processor is what calls
+/// <c>saveSceneGraph</c>), which made "indexed" wait for "rendered" in two different ways.
+/// </para>
+///
+/// <para>
+/// It made skipping the render mean never indexing at all: no parts, no technical metadata,
+/// no search document. A store import attaches the store's own turntable and took exactly
+/// that path - the imported model existed with a picture and could not be found by
+/// <c>search_assets</c>.
+/// </para>
+///
+/// <para>
+/// And when the render was <i>not</i> skipped it put becoming searchable at the back of the
+/// thumbnail queue, which on a 1,700-model import is hours. A turntable render plus frame
+/// encoding is orders of magnitude more work than walking a scene graph, so the two belong
+/// in different queues with different budgets - which they already are, and nothing was
+/// using it. An asset now becomes findable while its picture is still rendering.
+/// </para>
+///
+/// <para>
+/// The cost is that a fresh import walks its scene graph twice, once per queue. Both writes
+/// are full replaces of the same derived rows from the same file, so the second is
+/// redundant rather than wrong; if the two ever land at the same instant one transaction
+/// loses and its job retries, which is what both queues already do under contention. The
+/// alternative - teaching the thumbnail path to skip an extraction that already exists -
+/// would silently disable <c>trigger_rederive</c>, whose whole purpose is to redo an
+/// extraction whose inputs did not change.
 /// </para>
 /// </summary>
 public class ModelUploadedEventHandler : IDomainEventHandler<ModelUploadedEvent>
@@ -51,13 +69,17 @@ public class ModelUploadedEventHandler : IDomainEventHandler<ModelUploadedEvent>
             _logger.LogInformation("Handling ModelUploadedEvent for model {ModelId} version {ModelVersionId} with hash {ModelHash}, IsNewModel: {IsNewModel}",
                 domainEvent.ModelId, domainEvent.ModelVersionId, domainEvent.ModelHash, domainEvent.IsNewModel);
 
+            // Indexing first, unconditionally: it is the cheap half, and it is what decides
+            // whether the asset can be found at all.
+            await EnqueueGeometryExtractionAsync(domainEvent, "every upload is indexed", cancellationToken);
+
             // The upload itself may opt out (e.g. a store import that attaches the store's
             // already-rendered turntable) - don't queue a redundant render.
             if (!domainEvent.GenerateThumbnail)
             {
                 _logger.LogInformation("Skipping thumbnail job enqueue for model {ModelId} version {ModelVersionId} - the upload supplied its own thumbnail.",
                     domainEvent.ModelId, domainEvent.ModelVersionId);
-                return await EnqueueGeometryExtractionAsync(domainEvent, "the upload supplied its own thumbnail", cancellationToken);
+                return Result.Success();
             }
 
             var settings = await _settingsService.GetSettingsAsync(cancellationToken);
@@ -65,7 +87,7 @@ public class ModelUploadedEventHandler : IDomainEventHandler<ModelUploadedEvent>
             {
                 _logger.LogInformation("Skipping thumbnail job enqueue for model {ModelId} version {ModelVersionId} - GenerateThumbnailOnUpload is disabled.",
                     domainEvent.ModelId, domainEvent.ModelVersionId);
-                return await EnqueueGeometryExtractionAsync(domainEvent, "thumbnail rendering is disabled", cancellationToken);
+                return Result.Success();
             }
 
             // Enqueue thumbnail generation job - the queue handles idempotency automatically
@@ -91,9 +113,9 @@ public class ModelUploadedEventHandler : IDomainEventHandler<ModelUploadedEvent>
     }
 
     /// <summary>
-    /// Queues the Geometry extraction that the skipped thumbnail render would otherwise
-    /// have carried, so the model still gets parts, technical metadata and a search
-    /// document. Deduped by the queue, so a re-upload of the same version is a no-op.
+    /// Queues the Geometry extraction that makes the model searchable - parts, technical
+    /// metadata and a search document - independently of whether a picture is being
+    /// rendered for it. Deduped by the queue, so a re-upload of the same version is a no-op.
     /// </summary>
     private async Task<Result> EnqueueGeometryExtractionAsync(
         ModelUploadedEvent domainEvent,
@@ -116,14 +138,14 @@ public class ModelUploadedEventHandler : IDomainEventHandler<ModelUploadedEvent>
             // recover, rather than surfacing a red event-dispatch error for an asset that
             // uploaded fine.
             _logger.LogError(
-                "Failed to enqueue geometry extraction for model {ModelId} version {ModelVersionId} after skipping the thumbnail job ({Reason}): {Error}. " +
-                "The model will not appear in search until it is re-derived.",
+                "Failed to enqueue geometry extraction for model {ModelId} version {ModelVersionId} ({Reason}): {Error}. " +
+                "The model will not appear in search until a thumbnail render or a re-derive indexes it.",
                 domainEvent.ModelId, domainEvent.ModelVersionId, reason, result.Error.Message);
             return Result.Success();
         }
 
         _logger.LogInformation(
-            "Enqueued geometry extraction job {JobId} for model {ModelId} version {ModelVersionId} because the thumbnail job was skipped ({Reason}). AlreadyQueued: {AlreadyQueued}",
+            "Enqueued geometry extraction job {JobId} for model {ModelId} version {ModelVersionId} ({Reason}). AlreadyQueued: {AlreadyQueued}",
             result.Value.JobId, domainEvent.ModelId, domainEvent.ModelVersionId, reason, result.Value.AlreadyQueued);
 
         return Result.Success();

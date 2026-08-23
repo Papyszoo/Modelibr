@@ -504,6 +504,23 @@ internal sealed class SearchRepository : ISearchRepository
                  || EF.Functions.ILike(" " + pd.Doc.PackNames + " ", b41),
             K5 = EF.Functions.ILike(" " + pd.Doc.PackNames + " ", b50)
                  || EF.Functions.ILike(" " + pd.Doc.PackNames + " ", b51),
+            // The folder the asset was imported from. Ranked ABOVE the pack and below the
+            // inferred concepts: a folder is a much narrower group than a pack - POLYGON
+            // City's `SourceFiles/Characters` holds characters while the pack itself holds
+            // 696 assets of every kind - but it still describes the group rather than this
+            // asset, so it must never displace something that matched on its own name.
+            F0 = EF.Functions.ILike(" " + pd.Doc.FolderTokens + " ", b00)
+                 || EF.Functions.ILike(" " + pd.Doc.FolderTokens + " ", b01),
+            F1 = EF.Functions.ILike(" " + pd.Doc.FolderTokens + " ", b10)
+                 || EF.Functions.ILike(" " + pd.Doc.FolderTokens + " ", b11),
+            F2 = EF.Functions.ILike(" " + pd.Doc.FolderTokens + " ", b20)
+                 || EF.Functions.ILike(" " + pd.Doc.FolderTokens + " ", b21),
+            F3 = EF.Functions.ILike(" " + pd.Doc.FolderTokens + " ", b30)
+                 || EF.Functions.ILike(" " + pd.Doc.FolderTokens + " ", b31),
+            F4 = EF.Functions.ILike(" " + pd.Doc.FolderTokens + " ", b40)
+                 || EF.Functions.ILike(" " + pd.Doc.FolderTokens + " ", b41),
+            F5 = EF.Functions.ILike(" " + pd.Doc.FolderTokens + " ", b50)
+                 || EF.Functions.ILike(" " + pd.Doc.FolderTokens + " ", b51),
             // Whole-name match on the original phrase: "park bench" should still beat a
             // document that merely carries both words separately. Multi-word queries only
             // - for a single word this just repeats the name match below, and promoting it
@@ -532,6 +549,8 @@ internal sealed class SearchRepository : ISearchRepository
                               + (x.C3 ? 1 : 0) + (x.C4 ? 1 : 0) + (x.C5 ? 1 : 0),
             PackCoverage = (x.K0 ? 1 : 0) + (x.K1 ? 1 : 0) + (x.K2 ? 1 : 0)
                            + (x.K3 ? 1 : 0) + (x.K4 ? 1 : 0) + (x.K5 ? 1 : 0),
+            FolderCoverage = (x.F0 ? 1 : 0) + (x.F1 ? 1 : 0) + (x.F2 ? 1 : 0)
+                             + (x.F3 ? 1 : 0) + (x.F4 ? 1 : 0) + (x.F5 ? 1 : 0),
         })
         .Select(x => new
         {
@@ -545,13 +564,14 @@ internal sealed class SearchRepository : ISearchRepository
             x.ProseCoverage,
             x.ConceptCoverage,
             x.PackCoverage,
+            x.FolderCoverage,
             // A confident fuzzy match counts as covering the (single) query word, so a
             // near-miss on the real name competes with an incidental substring hit:
             // "aple" must reach "apple", not stop at "staple".
             Coverage = x.LiteralCoverage + (x.Similarity > TrigramThreshold ? 1 : 0),
         })
         .Where(x => x.Coverage > 0 || x.ConceptCoverage > 0 || x.ProseCoverage > 0
-                    || x.PackCoverage > 0);
+                    || x.PackCoverage > 0 || x.FolderCoverage > 0);
 
         // The enforced triangle cap, applied after scoring so the two counts below differ by
         // exactly the assets it removed. An agent that gets three results has to be able to
@@ -596,6 +616,7 @@ internal sealed class SearchRepository : ISearchRepository
             .ThenByDescending(x => x.BoostHits)       // then: how much its text reads like it
             .ThenBy(x => x.PenaltyHits)               // and down when it reads like another style
             .ThenByDescending(x => x.ConceptCoverage) // then inferred concepts
+            .ThenByDescending(x => x.FolderCoverage)  // then the folder it was imported from
             .ThenByDescending(x => x.PackCoverage)    // then the pack that contains it
             .ThenByDescending(x => x.Doc.PartPath == null) // whole assets before their parts
             .ThenByDescending(x => x.Similarity)   // a close name match beats an incidental one
@@ -609,6 +630,8 @@ internal sealed class SearchRepository : ISearchRepository
                     : x.LiteralCoverage > 0 ? "token"
                     : x.Coverage > x.LiteralCoverage ? "fuzzy"
                     : x.ConceptCoverage > 0 ? "concept"
+                    : x.FolderCoverage > 0 ? "folder"
+                    : x.PackCoverage > 0 ? "pack"
                     : "summary",
             })
             .ToListAsync(cancellationToken);
@@ -972,6 +995,12 @@ internal sealed class SearchRepository : ISearchRepository
                 || EF.Functions.ILike(" " + d.ConceptLabels + " ", "%" + v1 + "%")
                 || EF.Functions.ILike(" " + d.AuthoredTags + " ", "%" + v0 + "%")
                 || EF.Functions.ILike(" " + d.AuthoredTags + " ", "%" + v1 + "%")
+                // Folder tokens admit a document in the search above, so they have to count
+                // here too. This block exists to explain a thin result set, and it can only
+                // do that while "how many assets carry this word" means the same set of
+                // fields the query itself looked at.
+                || EF.Functions.ILike(" " + d.FolderTokens + " ", "%" + v0 + "%")
+                || EF.Functions.ILike(" " + d.FolderTokens + " ", "%" + v1 + "%")
                 || EF.Functions.ILike(d.DisplayName, "%" + shortest + "%"));
 
             // Assets, not documents - an asset is indexed once for itself and once per part,

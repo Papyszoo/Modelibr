@@ -18,6 +18,7 @@ namespace Application.Models
         private readonly IDateTimeProvider _dateTimeProvider;
         private readonly IBatchUploadRepository _batchUploadRepository;
         private readonly ISettingRepository _settingRepository;
+        private readonly ICommandHandler<ApplyImportAutomationCommand, ImportAutomationResponse> _importAutomation;
         private readonly IUnitOfWork _unitOfWork;
 
         public AddModelCommandHandler(
@@ -27,6 +28,7 @@ namespace Application.Models
             IDateTimeProvider dateTimeProvider,
             IBatchUploadRepository batchUploadRepository,
             ISettingRepository settingRepository,
+            ICommandHandler<ApplyImportAutomationCommand, ImportAutomationResponse> importAutomation,
             IUnitOfWork unitOfWork)
         {
             _modelRepository = modelRepository;
@@ -35,6 +37,7 @@ namespace Application.Models
             _dateTimeProvider = dateTimeProvider;
             _batchUploadRepository = batchUploadRepository;
             _settingRepository = settingRepository;
+            _importAutomation = importAutomation;
             _unitOfWork = unitOfWork;
         }
 
@@ -151,6 +154,21 @@ namespace Application.Models
                 await _batchUploadRepository.AddAsync(batchUpload, cancellationToken);
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
 
+                // Classify what just landed, from the file name plus whatever the importing
+                // route knew about where it came from. New models only: a re-import that
+                // resolved to an existing asset returned above, and re-deciding an asset a
+                // person has since curated is exactly what this must not do.
+                //
+                // After the commit above on purpose - the automation reads the model back
+                // and needs its real id and its (empty) tag set to be durable first.
+                if (command.AutoAssignMetadata)
+                {
+                    await _importAutomation.Handle(
+                        new ApplyImportAutomationCommand(
+                            savedModel.Id, command.SourceFolder, command.SiblingFileNames),
+                        cancellationToken);
+                }
+
                 return Result.Success(new AddModelCommandResponse(savedModel.Id, false));
             }
             catch (ArgumentException ex)
@@ -169,11 +187,30 @@ namespace Application.Models
     /// by callers that own a broader identity than the primary file - today the multi-file
     /// glTF import, whose referenced .bin/textures are part of what the asset IS.
     /// </param>
+    /// <param name="SourceFolder">
+    /// The directory the primary file came out of, as the importing route saw it: an
+    /// absolute server path for a path import, the archive-relative directory for a zip.
+    /// Null for a plain HTTP upload, which carries a filename and nothing else. Recorded as
+    /// provenance and read as a weak taxonomy signal - see <see cref="Search.ImportFolderSignal"/>.
+    /// </param>
+    /// <param name="SiblingFileNames">
+    /// The names of the other importable files in that same folder. The naming convention a
+    /// folder follows is what classifies the assets whose own name does not - <c>SM_Veh_Wheel_03</c>
+    /// is a vehicle part only because everything beside it is <c>SM_Veh_*</c>.
+    /// </param>
+    /// <param name="AutoAssignMetadata">
+    /// Whether to let the import classify itself. False for callers that arrive with real
+    /// metadata of their own - a store import carries the manifest's category and tags, and
+    /// guessing over them would be strictly worse.
+    /// </param>
     public record AddModelCommand(
         IFileUpload File,
         string? ModelName = null,
         string? BatchId = null,
         bool GenerateThumbnail = true,
-        bool SkipDeduplication = false) : ICommand<AddModelCommandResponse>;
+        bool SkipDeduplication = false,
+        string? SourceFolder = null,
+        IReadOnlyList<string>? SiblingFileNames = null,
+        bool AutoAssignMetadata = true) : ICommand<AddModelCommandResponse>;
     public record AddModelCommandResponse(int Id, bool AlreadyExists = false);
 }

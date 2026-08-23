@@ -49,6 +49,14 @@ public interface IModelRepository
     Task<IReadOnlyCollection<int>> GetModelIdsByUvStatusAsync(
         string uvStatus, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Just the name and active version of a set of models, in one query. For list surfaces
+    /// that hold model ids from somewhere else - the import review queue holds them from the
+    /// metadata side table - and need a name and a picture, not an aggregate each.
+    /// </summary>
+    Task<IReadOnlyList<ModelIdentity>> GetIdentitiesAsync(
+        IReadOnlyCollection<int> ids, CancellationToken cancellationToken = default);
+
     Task<CategoryAssetCounts> GetCategoryAssetCountsAsync(CancellationToken cancellationToken = default);
     Task<(int? ActiveVersionId, Domain.Models.Thumbnail? Thumbnail)?> GetThumbnailDataAsync(
         int modelId, CancellationToken cancellationToken = default);

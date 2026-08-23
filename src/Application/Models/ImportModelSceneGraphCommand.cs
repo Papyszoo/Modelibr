@@ -243,7 +243,10 @@ internal sealed class ImportModelSceneGraphCommandHandler : ICommandHandler<Impo
             // blanked from search by the next extraction (prompt 16-F).
             styles: schemaMetadata?.Styles,
             themes: schemaMetadata?.Themes,
-            license: schemaMetadata?.License);
+            license: schemaMetadata?.License,
+            // Captured once at import and carried through every re-derive from here, so the
+            // weak folder tier survives a projection rebuild the way tags and packs do.
+            sourceFolder: schemaMetadata?.SourceFolder);
         foreach (var doc in searchDocs)
         {
             await _searchDocumentRepository.AddAsync(doc, cancellationToken);

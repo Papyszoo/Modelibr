@@ -32,6 +32,47 @@ public static class AssetMetadataEndpoints
             .WithName("Set Asset Metadata Values")
             .WithSummary("Merges schema fields onto an asset; absent = unchanged, null = cleared")
             .WithOpenApi();
+
+        app.MapGet("/metadata/import-suggestions", GetImportSuggestions)
+            .WithName("Get Import Suggestions")
+            .WithSummary("Assets the import automation categorized or tagged that nobody has reviewed yet")
+            .WithOpenApi();
+
+        app.MapPost("/metadata/import-suggestions/review", ReviewImportSuggestions)
+            .WithName("Review Import Suggestions")
+            .WithSummary("Accepts or takes back the import automation's guesses, in bulk")
+            .WithOpenApi();
+    }
+
+    /// <param name="ModelIds">Which assets to settle. Omit or leave empty to settle everything waiting.</param>
+    /// <param name="Accept">True keeps what was applied, false takes it back.</param>
+    public record ReviewImportSuggestionsRequest(IReadOnlyList<int>? ModelIds, bool Accept = true);
+
+    private static async Task<IResult> GetImportSuggestions(
+        [FromQuery] int? page,
+        [FromQuery] int? pageSize,
+        IQueryHandler<ImportSuggestionsQuery, ImportSuggestionsResponse> handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.Handle(
+            new ImportSuggestionsQuery(page ?? 1, pageSize ?? 50), cancellationToken);
+
+        return result.IsFailure
+            ? Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message })
+            : Results.Ok(result.Value);
+    }
+
+    private static async Task<IResult> ReviewImportSuggestions(
+        [FromBody] ReviewImportSuggestionsRequest body,
+        ICommandHandler<ReviewImportSuggestionsCommand, ReviewImportSuggestionsResponse> handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.Handle(
+            new ReviewImportSuggestionsCommand(body.ModelIds, body.Accept), cancellationToken);
+
+        return result.IsFailure
+            ? Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message })
+            : Results.Ok(result.Value);
     }
 
     private static async Task<IResult> GetSchema(
