@@ -823,6 +823,167 @@ public class SceneCommandTests
         Assert.Equal(1, _scene.Revision);
     }
 
+    private PlaceSceneAssetsBatchCommandHandler Batch => new(_writer, _facts.Object, _profiles.Object);
+
+    private static ScenePlacementRequest BatchEntry(
+        string? nodeId = null,
+        Vec3? position = null,
+        bool groundSnap = false,
+        string? anchorTo = null,
+        string? frontAxis = null) =>
+        new(SceneAssetTypes.Model, ModelId, VersionId, nodeId,
+            Position: position, GroundSnap: groundSnap, AnchorTo: anchorTo, FrontAxis: frontAxis);
+
+    [Fact]
+    public async Task PlaceAssetsBatch_Places_Every_Entry_In_One_Revision()
+    {
+        var result = await Batch.Handle(
+            new PlaceSceneAssetsBatchCommand(SceneId, [
+                BatchEntry("sofa", new Vec3(0, 0, 0)),
+                BatchEntry("table", new Vec3(4, 0, 0)),
+                BatchEntry("lamp", new Vec3(8, 0, 0)),
+            ]),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(["sofa", "table", "lamp"], result.Value.Nodes.Select(n => n.NodeId));
+        // The whole point of the verb: three assets, one revision.
+        Assert.Equal(2, _scene.Revision);
+    }
+
+    [Fact]
+    public async Task PlaceAssetsBatch_Generates_Distinct_Ids_For_Entries_That_Ask_For_None()
+    {
+        var result = await Batch.Handle(
+            new PlaceSceneAssetsBatchCommand(SceneId, [BatchEntry(), BatchEntry(), BatchEntry()]),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(3, result.Value.Nodes.Select(n => n.NodeId).Distinct().Count());
+    }
+
+    [Fact]
+    public async Task PlaceAssetsBatch_Can_Rest_An_Entry_On_One_Placed_Earlier_In_The_Same_Call()
+    {
+        // 2x4x2 with a centered origin: grounding puts the table's centre at y=2 and its top
+        // at y=4, so the lamp resting on it has its own centre at y=6. This is the case that
+        // makes array order a contract rather than a detail - neither node exists until this
+        // write, so nothing outside the batch could have anchored them.
+        var result = await Batch.Handle(
+            new PlaceSceneAssetsBatchCommand(SceneId, [
+                BatchEntry("table", groundSnap: true),
+                BatchEntry("lamp", anchorTo: "table"),
+            ]),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(6, result.Value.Nodes.Single(n => n.NodeId == "lamp").Transform.Position.Y, 6);
+    }
+
+    [Fact]
+    public async Task PlaceAssetsBatch_Refuses_An_Entry_Resting_On_A_Later_One()
+    {
+        var result = await Batch.Handle(
+            new PlaceSceneAssetsBatchCommand(SceneId, [
+                BatchEntry("lamp", anchorTo: "table"),
+                BatchEntry("table"),
+            ]),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.AnchorNotFound", result.Error.Code);
+        // Names the entry, so the agent knows which one to move.
+        Assert.Contains("placement 0", result.Error.Message);
+        Assert.Equal(1, _scene.Revision);
+    }
+
+    [Fact]
+    public async Task PlaceAssetsBatch_Writes_Nothing_When_One_Entry_Is_Invalid()
+    {
+        var result = await Batch.Handle(
+            new PlaceSceneAssetsBatchCommand(SceneId, [
+                BatchEntry("sofa"),
+                BatchEntry("table", frontAxis: "sideways"),
+                BatchEntry("lamp"),
+            ]),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.UnknownFrontAxis", result.Error.Code);
+        Assert.Contains("placement 1", result.Error.Message);
+        // All or nothing: the two valid entries did not land either.
+        Assert.Equal(1, _scene.Revision);
+        Assert.DoesNotContain("sofa", _scene.DocumentJson);
+    }
+
+    [Fact]
+    public async Task PlaceAssetsBatch_Refuses_Two_Entries_Asking_For_The_Same_Node_Id()
+    {
+        var result = await Batch.Handle(
+            new PlaceSceneAssetsBatchCommand(SceneId, [BatchEntry("lamp"), BatchEntry("lamp")]),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.DuplicateNodeId", result.Error.Code);
+        Assert.Equal(1, _scene.Revision);
+    }
+
+    [Fact]
+    public async Task PlaceAssetsBatch_Refuses_An_Entry_Reusing_A_Node_Id_Already_In_The_Scene()
+    {
+        await Place.Handle(PlaceCommand(nodeId: "lamp"), CancellationToken.None);
+
+        var result = await Batch.Handle(
+            new PlaceSceneAssetsBatchCommand(SceneId, [BatchEntry("lamp")]),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.DuplicateNodeId", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task PlaceAssetsBatch_Rejects_An_Empty_Request_Rather_Than_Moving_The_Revision()
+    {
+        var result = await Batch.Handle(
+            new PlaceSceneAssetsBatchCommand(SceneId, []), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.EmptyBatch", result.Error.Code);
+        Assert.Equal(1, _scene.Revision);
+    }
+
+    [Fact]
+    public async Task PlaceAssetsBatch_Rejects_More_Entries_Than_One_Call_May_Place()
+    {
+        var placements = Enumerable.Range(0, 501).Select(_ => BatchEntry()).ToList();
+
+        var result = await Batch.Handle(
+            new PlaceSceneAssetsBatchCommand(SceneId, placements), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.TooManyPlacements", result.Error.Code);
+        Assert.Equal(1, _scene.Revision);
+    }
+
+    [Fact]
+    public async Task PlaceAssetsBatch_Asks_About_Each_Distinct_Asset_Once_Not_Once_Per_Entry()
+    {
+        _facts.Invocations.Clear();
+
+        await Batch.Handle(
+            new PlaceSceneAssetsBatchCommand(SceneId, [BatchEntry(), BatchEntry(), BatchEntry()]),
+            CancellationToken.None);
+
+        // The handler's own up-front read is the first one; the writer then reads the whole
+        // document for its resolution pass. What must not happen is a read per entry - twelve
+        // identical chairs is one asset, and this verb exists to stop asking twelve times.
+        var upFront = (IEnumerable<SceneAssetRef>)_facts.Invocations
+            .First(i => i.Method.Name == nameof(ISceneAssetFacts.ResolveAsync))
+            .Arguments[0];
+
+        Assert.Single(upFront);
+    }
+
     [Fact]
     public async Task CreateScene_Refuses_A_Document_That_Claims_A_Stage_It_Does_Not_Hold()
     {

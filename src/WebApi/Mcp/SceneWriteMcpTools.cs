@@ -131,6 +131,107 @@ public sealed class SceneWriteMcpTools
             cancellationToken);
     }
 
+    /// <summary>
+    /// One entry of a batch placement. Mirrors <c>place_asset</c>'s spatial fields exactly -
+    /// a batch must not grow a second vocabulary for grounding, anchoring or facing.
+    /// </summary>
+    public sealed record BatchPlacement(
+        [property: Description("Asset family: Model, Sprite or EnvironmentMap.")] string AssetType,
+        [property: Description("Asset id.")] int AssetId,
+        [property: Description("Version id. REQUIRED for Model - a node without one would re-point itself when the model gets a new version.")] int? VersionId = null,
+        [property: Description("Stable node id. Generated from the asset reference when omitted. Give one when a later entry needs to rest on this node.")] string? NodeId = null,
+        [property: Description("Optional human-readable node name, e.g. 'reading lamp, by the sofa'.")] string? Name = null,
+        [property: Description("Optional slot id grouping this with the alternatives proposed for the same role.")] string? SlotId = null,
+        [property: Description("Position in metres as [x,y,z]. Defaults to the origin.")] double[]? Position = null,
+        [property: Description("Rotation in degrees as [x,y,z] (XYZ euler). Defaults to none.")] double[]? RotationEuler = null,
+        [property: Description("Scale multiplier as [x,y,z]. Defaults to [1,1,1].")] double[]? Scale = null,
+        [property: Description("Keep this asset's base resting on y=0, using its measured origin.")] bool GroundSnap = false,
+        [property: Description("Round the position onto a grid of this size in metres. Pass 0 to use the asset's own derived grid.")] double? SnapToGrid = null,
+        [property: Description("Turn this asset about Y to face this world point [x,y,z].")] double[]? FaceToward = null,
+        [property: Description("Which local axis is this asset's front: '+Z' (assumed), '-Z', '+X' or '-X'.")] string? FrontAxis = null,
+        [property: Description("Rest this asset on the node with this id - either one already in the scene, or one an EARLIER entry of this batch created. Naming a later entry is refused.")] string? On = null,
+        [property: Description("How to sit it on that node: 'center' (default) or 'keep'.")] string? Align = null,
+        [property: Description("This node is meant to hang in mid-air with nothing under it. Cannot be combined with groundSnap or on.")] bool Suspended = false);
+
+    [McpServerTool(Name = "place_assets_batch")]
+    [Description("Place a whole layout of DIFFERENT assets - a sofa, a table, two lamps, a rug - in ONE write. " +
+                 "Use this instead of a run of place_asset calls whenever you already know what the room contains: " +
+                 "the scene's revision moves once, the user cannot edit the scene out from under you halfway through, " +
+                 "and undoing it takes the whole layout back out rather than one node of it. " +
+                 "Every entry speaks exactly the same placement vocabulary as place_asset, including groundSnap, on/align, faceToward and suspended. " +
+                 "Entries are applied IN ARRAY ORDER, so an entry may rest on a node an earlier entry created - put the table before the vase. " +
+                 "Nothing is written unless every entry is valid: an error names the entry index and the node id it asked for, so you repair that one and resend. " +
+                 "For many copies of ONE asset along a line, use distribute_assets instead - it computes the spacing for you. " +
+                 "Returns every placed node plus the overlaps, scale warnings and validator findings the layout caused, each keyed by node id.")]
+    public static Task<object> PlaceAssetsBatch(
+        ICommandHandler<PlaceSceneAssetsBatchCommand, SceneBatchPlacementResponse> handler,
+        IAgentAudit audit,
+        McpCallerContext caller,
+        [Description("Target scene id.")] int sceneId,
+        [Description("The placements, applied in this order.")] BatchPlacement[] placements,
+        [Description("Unique key so a retried call does not place the layout twice.")] string idempotencyKey,
+        [Description("Optional expected scene revision; the whole batch is refused if the scene has moved on.")] int? expectedRevision = null,
+        [Description("Optional batch id. Writes sharing one can be undone together with reverse_operation.")] string? batchId = null,
+        CancellationToken cancellationToken = default)
+    {
+        return Guarded(
+            audit,
+            caller,
+            new AgentWrite(idempotencyKey, "place-assets-batch", "Scene", sceneId, BatchId: batchId),
+            async ct =>
+            {
+                var requests = new List<ScenePlacementRequest>((placements ?? []).Length);
+
+                for (var index = 0; index < (placements ?? []).Length; index++)
+                {
+                    var entry = placements![index];
+                    var vectors = ReadVectors(
+                        ($"placements[{index}].position", entry.Position),
+                        ($"placements[{index}].rotationEuler", entry.RotationEuler),
+                        ($"placements[{index}].scale", entry.Scale),
+                        ($"placements[{index}].faceToward", entry.FaceToward));
+
+                    if (vectors.Failure is { } failure)
+                    {
+                        return failure;
+                    }
+
+                    requests.Add(new ScenePlacementRequest(
+                        entry.AssetType, entry.AssetId, entry.VersionId, entry.NodeId, entry.Name, entry.SlotId,
+                        vectors.Values[$"placements[{index}].position"],
+                        vectors.Values[$"placements[{index}].rotationEuler"],
+                        vectors.Values[$"placements[{index}].scale"],
+                        entry.GroundSnap, entry.SnapToGrid,
+                        vectors.Values[$"placements[{index}].faceToward"],
+                        entry.FrontAxis, entry.On, entry.Align, entry.Suspended));
+                }
+
+                var result = await handler.Handle(
+                    new PlaceSceneAssetsBatchCommand(sceneId, requests, expectedRevision), ct);
+
+                if (result.IsFailure)
+                {
+                    return Failed(result.Error);
+                }
+
+                // Every node this call created, so undo takes the layout back out whole -
+                // the reason for placing it in one write in the first place.
+                return Applied(
+                    new
+                    {
+                        status = "ok",
+                        scene = result.Value.Scene,
+                        nodes = result.Value.Nodes,
+                        overlaps = result.Value.Overlaps,
+                        scaleWarnings = result.Value.ScaleWarnings,
+                        findings = result.Value.Findings,
+                    },
+                    "Scene", sceneId, result.Value,
+                    new { removedNodeIds = result.Value.Nodes.Select(n => n.NodeId).ToArray() });
+            },
+            cancellationToken);
+    }
+
     [McpServerTool(Name = "distribute_assets")]
     [Description("Place several copies of one asset evenly along a line, from start to end inclusive, in a single write. " +
                  "Use this for anything repetitive - a row of street lamps, fence posts, a colonnade - rather than issuing one place_asset per copy: " +

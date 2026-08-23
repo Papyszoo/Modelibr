@@ -95,7 +95,7 @@ internal sealed class DistributeSceneAssetsCommandHandler
                 "Scene.InvalidVector", "start and end must be finite [x,y,z] positions."));
         }
 
-        var frontAxis = PlaceSceneAssetCommandHandler.ReadFrontAxis(command.FrontAxis);
+        var frontAxis = ScenePlacementRules.ReadFrontAxis(command.FrontAxis);
         if (frontAxis.IsFailure)
         {
             return Result.Failure<SceneDistributionResponse>(frontAxis.Error);
@@ -117,28 +117,34 @@ internal sealed class DistributeSceneAssetsCommandHandler
             document =>
             {
                 var taken = document.Nodes.Select(n => n.Id).ToHashSet(StringComparer.Ordinal);
-                var prefix = command.NodeIdPrefix ?? $"{command.AssetType.ToLowerInvariant()}-{command.AssetId}";
+                var prefix = command.NodeIdPrefix ?? ScenePlacementRules.NodeIdPrefix(assetRef);
                 var nodes = document.Nodes.ToList();
 
                 placedNodeIds.Clear();
 
                 foreach (var position in positions)
                 {
-                    var nodeId = NextNodeId(taken, prefix);
+                    var nodeId = ScenePlacementRules.NextNodeId(taken, prefix);
 
-                    var node = new SceneNode(
+                    nodes.Add(ScenePlacementRules.BuildNode(
+                        new ScenePlacementRequest(
+                            command.AssetType, command.AssetId, command.VersionId,
+                            Name: command.Name,
+                            SlotId: command.SlotId,
+                            Position: position,
+                            RotationEuler: command.RotationEuler,
+                            Scale: command.Scale,
+                            GroundSnap: command.GroundSnap,
+                            SnapToGrid: command.SnapToGrid,
+                            // Each copy faces the point from where it stands, so a row of
+                            // chairs around a table fans out instead of all pointing the
+                            // same way.
+                            FaceToward: command.FaceToward),
                         nodeId,
-                        new SceneTransform(position, command.RotationEuler ?? Vec3.Zero, command.Scale ?? Vec3.One),
-                        Asset: assetRef,
-                        Name: command.Name,
-                        SlotId: command.SlotId,
-                        GroundSnap: command.GroundSnap ? true : null,
-                        FrontAxis: frontAxis.Value,
-                        // Each copy faces the point from where it stands, so a row of chairs
-                        // around a table fans out instead of all pointing the same way.
-                        FaceToward: command.FaceToward);
+                        frontAxis.Value,
+                        anchor: null,
+                        facts));
 
-                    nodes.Add(PlaceSceneAssetCommandHandler.ApplyGridSnap(node, facts, command.SnapToGrid));
                     placedNodeIds.Add(nodeId);
                 }
 
@@ -162,18 +168,5 @@ internal sealed class DistributeSceneAssetsCommandHandler
             view.Overlaps.Where(o => placed.Contains(o.NodeIdA) || placed.Contains(o.NodeIdB)).ToList(),
             view.ScaleWarnings.Where(w => placed.Contains(w.NodeId)).ToList(),
             SceneViewBuilder.FindingsFor(result.Value.Document, result.Value.Facts, profiles, placed)));
-    }
-
-    /// <summary>Readable and collision-free, matching what a single placement generates.</summary>
-    private static string NextNodeId(HashSet<string> taken, string prefix)
-    {
-        for (var i = 1; ; i++)
-        {
-            var candidate = $"{prefix}-{i}";
-            if (taken.Add(candidate))
-            {
-                return candidate;
-            }
-        }
     }
 }

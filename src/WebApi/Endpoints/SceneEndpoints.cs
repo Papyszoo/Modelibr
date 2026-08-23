@@ -175,6 +175,23 @@ public static class SceneEndpoints
         .WithName("Place Scene Asset")
         .WithSummary("Place a library asset into a scene");
 
+        app.MapPost("/scenes/{id}/nodes/batch", async (
+            int id,
+            PlaceSceneAssetsBatchRequest request,
+            ICommandHandler<PlaceSceneAssetsBatchCommand, SceneBatchPlacementResponse> handler,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await handler.Handle(
+                new PlaceSceneAssetsBatchCommand(
+                    id,
+                    (request.Placements ?? []).Select(ToPlacement).ToList(),
+                    request.ExpectedRevision),
+                cancellationToken);
+            return result.IsFailure ? NotFoundOrFailure(result.Error) : Results.Ok(result.Value);
+        })
+        .WithName("Place Scene Assets Batch")
+        .WithSummary("Place a heterogeneous layout into a scene in one write");
+
         app.MapPut("/scenes/{id}/nodes/{nodeId}", async (
             int id,
             string nodeId,
@@ -384,6 +401,16 @@ public static class SceneEndpoints
         Results.BadRequest(new { error = error.Code, message = error.Message });
 
     /// <summary>
+    /// A REST placement in the shared vocabulary the batch command speaks. Kept here rather
+    /// than on the request record so the wire type stays a plain DTO.
+    /// </summary>
+    private static ScenePlacementRequest ToPlacement(PlaceSceneAssetRequest request) =>
+        new(request.AssetType, request.AssetId, request.VersionId, request.NodeId, request.Name,
+            request.SlotId, request.Position, request.RotationEuler, request.Scale,
+            request.GroundSnap ?? false, request.SnapToGrid, request.FaceToward, request.FrontAxis,
+            request.On, request.Align, request.Suspended ?? false);
+
+    /// <summary>
     /// "Not found" is the one failure that deserves its own status here: the editor and an
     /// agent both need to tell "this scene is gone" apart from "your edit was wrong", and a
     /// 400 for both makes a deleted scene look like a bad request forever.
@@ -427,6 +454,14 @@ public record PlaceSceneAssetRequest(
     string? On = null,
     string? Align = null,
     bool? Suspended = null);
+
+/// <summary>
+/// A heterogeneous layout applied in one write. Entries are applied in array order, so an
+/// entry may rest <c>On</c> a node an earlier entry created.
+/// </summary>
+public record PlaceSceneAssetsBatchRequest(
+    IReadOnlyList<PlaceSceneAssetRequest>? Placements,
+    int? ExpectedRevision = null);
 
 public record MoveSceneNodeRequest(
     Vec3? Position = null,

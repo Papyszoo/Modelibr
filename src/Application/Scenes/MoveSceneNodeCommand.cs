@@ -86,13 +86,13 @@ internal sealed class MoveSceneNodeCommandHandler : ICommandHandler<MoveSceneNod
         MoveSceneNodeCommand command,
         CancellationToken cancellationToken)
     {
-        var frontAxis = PlaceSceneAssetCommandHandler.ReadFrontAxis(command.FrontAxis);
+        var frontAxis = ScenePlacementRules.ReadFrontAxis(command.FrontAxis);
         if (frontAxis.IsFailure)
         {
             return Result.Failure<SceneNodeMoveResponse>(frontAxis.Error);
         }
 
-        var anchor = PlaceSceneAssetCommandHandler.ReadAnchor(
+        var anchor = ScenePlacementRules.ReadAnchor(
             command.AnchorTo, command.AnchorAlign, command.AnchorOffset);
         if (anchor.IsFailure)
         {
@@ -159,7 +159,7 @@ internal sealed class MoveSceneNodeCommandHandler : ICommandHandler<MoveSceneNod
                         : anchor.Value ?? (command.Exact ? null : node.Anchor),
                 };
 
-                moved = PlaceSceneAssetCommandHandler.ApplyGridSnap(moved, facts, command.SnapToGrid);
+                moved = ScenePlacementRules.ApplyGridSnap(moved, facts, command.SnapToGrid);
 
                 var nodes = document.Nodes.ToArray();
                 nodes[index] = moved;

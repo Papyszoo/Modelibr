@@ -78,13 +78,13 @@ internal sealed class PlaceSceneAssetCommandHandler : ICommandHandler<PlaceScene
         PlaceSceneAssetCommand command,
         CancellationToken cancellationToken)
     {
-        var frontAxis = ReadFrontAxis(command.FrontAxis);
+        var frontAxis = ScenePlacementRules.ReadFrontAxis(command.FrontAxis);
         if (frontAxis.IsFailure)
         {
             return Result.Failure<ScenePlacementResponse>(frontAxis.Error);
         }
 
-        var anchor = ReadAnchor(command.AnchorTo, command.AnchorAlign);
+        var anchor = ScenePlacementRules.ReadAnchor(command.AnchorTo, command.AnchorAlign);
         if (anchor.IsFailure)
         {
             return Result.Failure<ScenePlacementResponse>(anchor.Error);
@@ -105,33 +105,33 @@ internal sealed class PlaceSceneAssetCommandHandler : ICommandHandler<PlaceScene
             command.ExpectedRevision,
             document =>
             {
-                var nodeId = command.NodeId ?? NextNodeId(document, assetRef);
-                if (document.Nodes.Any(n => n.Id == nodeId))
+                var taken = document.Nodes.Select(n => n.Id).ToHashSet(StringComparer.Ordinal);
+                var nodeId = command.NodeId ?? ScenePlacementRules.NextNodeId(
+                    taken, ScenePlacementRules.NodeIdPrefix(assetRef));
+
+                if (command.NodeId is not null && taken.Contains(nodeId))
                 {
                     return Result.Failure<SceneDocument>(new Error(
                         "Scene.DuplicateNodeId",
                         $"Scene {command.SceneId} already has a node with id '{nodeId}'. Omit nodeId to have one generated, or move the existing node instead."));
                 }
 
-                var node = new SceneNode(
+                var node = ScenePlacementRules.BuildNode(
+                    new ScenePlacementRequest(
+                        command.AssetType, command.AssetId, command.VersionId,
+                        Name: command.Name,
+                        SlotId: command.SlotId,
+                        Position: command.Position,
+                        RotationEuler: command.RotationEuler,
+                        Scale: command.Scale,
+                        GroundSnap: command.GroundSnap,
+                        SnapToGrid: command.SnapToGrid,
+                        FaceToward: command.FaceToward,
+                        Suspended: command.Suspended),
                     nodeId,
-                    new SceneTransform(
-                        command.Position ?? Vec3.Zero,
-                        command.RotationEuler ?? Vec3.Zero,
-                        command.Scale ?? Vec3.One),
-                    Asset: assetRef,
-                    Name: command.Name,
-                    SlotId: command.SlotId,
-                    // Recorded rather than applied here: false and "not asked" mean the same
-                    // thing for a node that is being created, and a document full of
-                    // groundSnap:false is noise.
-                    GroundSnap: command.GroundSnap ? true : null,
-                    Suspended: command.Suspended ? true : null,
-                    FrontAxis: frontAxis.Value,
-                    FaceToward: command.FaceToward,
-                    Anchor: anchor.Value);
-
-                node = ApplyGridSnap(node, facts, command.SnapToGrid);
+                    frontAxis.Value,
+                    anchor.Value,
+                    facts);
 
                 placedNodeId = nodeId;
                 return Result.Success(document with { Nodes = [.. document.Nodes, node] });
@@ -158,104 +158,5 @@ internal sealed class PlaceSceneAssetCommandHandler : ICommandHandler<PlaceScene
             view.ScaleWarnings.Where(w => w.NodeId == placedNodeId).ToList(),
             SceneViewBuilder.FindingsFor(
                 result.Value.Document, result.Value.Facts, profiles, [placedNodeId!])));
-    }
-
-    /// <summary>
-    /// Rounds the position onto a grid. Runs before the writer's resolution pass, which is
-    /// what rests the node on the floor or on another node - snapping Y to a grid afterwards
-    /// would lift the asset back off the surface it was just seated on.
-    /// </summary>
-    internal static SceneNode ApplyGridSnap(SceneNode node, SceneAssetFacts? facts, double? snapToGrid)
-    {
-        if (snapToGrid is not { } grid)
-        {
-            return node;
-        }
-
-        // 0 means "whatever grid this asset was authored on" - a modular kit knows its own
-        // module size, and an agent should not have to look it up to align a wall.
-        var effective = grid > 0 ? grid : facts?.GridSize ?? 0;
-        return effective > 0
-            ? node with
-            {
-                Transform = node.Transform with { Position = SceneSpatial.SnapToGrid(node.Transform.Position, effective) },
-            }
-            : node;
-    }
-
-    /// <summary>
-    /// Checks a declared front axis against the vocabulary. Null passes through: no axis
-    /// declared means the default, and recording "+Z" on every node would turn an assumption
-    /// into something that reads like a measurement.
-    /// </summary>
-    internal static Result<string?> ReadFrontAxis(string? frontAxis)
-    {
-        if (frontAxis is null)
-        {
-            return Result.Success<string?>(null);
-        }
-
-        return SceneFrontAxes.Direction(frontAxis) is null
-            ? Result.Failure<string?>(new Error(
-                "Scene.UnknownFrontAxis",
-                $"'{frontAxis}' is not a front axis. Use one of: {string.Join(", ", SceneFrontAxes.All)}."))
-            : Result.Success<string?>(frontAxis);
-    }
-
-    /// <summary>
-    /// Turns "on this node, aligned like that" into the anchor the document stores.
-    ///
-    /// The alignment only decides the offset the anchor starts with: centred is an offset of
-    /// zero, and keeping means the offset is captured from wherever the node already is.
-    /// After that the offset is the whole truth, which is what lets a later nudge move the
-    /// vase across the table without detaching it from the table.
-    /// </summary>
-    internal static Result<SceneAnchor?> ReadAnchor(string? anchorTo, string? align, Vec3? offset = null)
-    {
-        if (string.IsNullOrWhiteSpace(anchorTo))
-        {
-            return align is null
-                ? Result.Success<SceneAnchor?>(null)
-                : Result.Failure<SceneAnchor?>(new Error(
-                    "Scene.AnchorTargetMissing",
-                    "An alignment was given without a node to rest on. Pass the node id to anchor to."));
-        }
-
-        if (offset is not null)
-        {
-            return Result.Success<SceneAnchor?>(new SceneAnchor(anchorTo, offset));
-        }
-
-        var effective = align ?? SceneAnchorAlignments.Center;
-        if (!SceneAnchorAlignments.All.Contains(effective, StringComparer.Ordinal))
-        {
-            return Result.Failure<SceneAnchor?>(new Error(
-                "Scene.UnknownAnchorAlignment",
-                $"'{align}' is not an alignment. Use one of: {string.Join(", ", SceneAnchorAlignments.All)}."));
-        }
-
-        // Null offset means "capture where it already is" - the resolution pass fills it in.
-        return Result.Success<SceneAnchor?>(new SceneAnchor(
-            anchorTo, effective == SceneAnchorAlignments.Center ? Vec3.Zero : null));
-    }
-
-    /// <summary>
-    /// A readable, collision-free id: <c>model-42-1</c>, <c>model-42-2</c>. Readable matters
-    /// because these ids appear in the agent's own transcript, in undo payloads and in 05's
-    /// choice UI, where a GUID tells nobody which node is the lamp post.
-    /// </summary>
-    private static string NextNodeId(SceneDocument document, SceneAssetRef asset)
-    {
-        var prefix = $"{asset.AssetType.ToLowerInvariant()}-{asset.AssetId}";
-        var taken = document.Nodes.Select(n => n.Id).ToHashSet(StringComparer.Ordinal);
-
-        for (var i = 1; ; i++)
-        {
-            var candidate = $"{prefix}-{i}";
-            if (taken.Add(candidate))
-            {
-                return candidate;
-            }
-        }
     }
 }

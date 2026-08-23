@@ -325,6 +325,10 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
             supported: entry.PayloadBefore is not null,
             blocker: "The placed nodes' ids were not recorded."),
 
+        "place-assets-batch" => Step(entry, $"Remove the whole layout this call placed in scene {entry.AssetId}.", destructive: false,
+            supported: entry.PayloadBefore is not null,
+            blocker: "The placed nodes' ids were not recorded."),
+
         "move-asset" => Step(entry, $"Put the node back where it was in scene {entry.AssetId}.", destructive: false,
             supported: entry.PayloadBefore is not null,
             blocker: "The node's previous transform was not recorded."),
@@ -841,6 +845,7 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
             }
 
             case "distribute-assets":
+            case "place-assets-batch":
             {
                 var before = Read(entry.PayloadBefore);
                 var nodeIds = before is null
@@ -851,7 +856,10 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
                     return Result.Failure<string>(new Error("NoNodesRecorded", "The placed nodes' ids were not recorded."));
                 }
 
-                foreach (var nodeId in nodeIds)
+                // Reverse order, because a batch entry may rest on one placed before it and a
+                // node cannot be removed while something is anchored to it. A distributed row
+                // has no anchors, so reversing costs it nothing.
+                foreach (var nodeId in nodeIds.Reverse())
                 {
                     var removed = await _removeSceneNode.Handle(
                         new RemoveSceneNodeCommand(entry.AssetId!.Value, nodeId), cancellationToken);

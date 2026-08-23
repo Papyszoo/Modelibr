@@ -414,7 +414,31 @@ public class AgentOperationReverserTests
         var result = await _reverser.ApplyAsync(plan.Value);
 
         Assert.True(result.Value.Single().Reversed);
-        Assert.Equal(["lamp-1", "lamp-2", "lamp-3"], removed);
+        // Reverse order: a row has no anchors so it does not care, but the same code undoes a
+        // heterogeneous batch, where the vase must come off the table before the table goes.
+        Assert.Equal(["lamp-3", "lamp-2", "lamp-1"], removed);
+    }
+
+    [Fact]
+    public async Task Undoing_A_Batch_Removes_What_Rests_On_Something_Before_The_Thing_It_Rests_On()
+    {
+        // The batch placed the table first so the lamp could rest on it. Removing in that
+        // same order would hit "a node cannot be removed while something rests on it" and
+        // leave the layout half-undone.
+        var entry = Completed(
+            "key-batch", "place-assets-batch", "Scene", 3,
+            before: "{\"removedNodeIds\":[\"table\",\"lamp\"]}");
+        Records(entry);
+        var removed = new List<string>();
+        _removeSceneNode.Setup(h => h.Handle(It.IsAny<RemoveSceneNodeCommand>(), It.IsAny<CancellationToken>()))
+            .Callback<RemoveSceneNodeCommand, CancellationToken>((c, _) => removed.Add(c.NodeId))
+            .ReturnsAsync(Result.Success(new SceneNodeRemovalResponse(null!, null!)));
+
+        var plan = await _reverser.PlanAsync("key-batch", null);
+        var result = await _reverser.ApplyAsync(plan.Value);
+
+        Assert.True(result.Value.Single().Reversed);
+        Assert.Equal(["lamp", "table"], removed);
     }
 
     [Fact]
