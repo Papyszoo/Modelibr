@@ -306,33 +306,9 @@ public sealed class AssetWriteMcpTools
                     expiresAt = ticket.ExpiresAt,
                     note = "Single use, and bound to this call's idempotencyKey - the upload is audited under it, and a repeat of an upload that already landed is answered 'already-applied' instead of importing twice.",
                 },
-                single = new
-                {
-                    endpoint = "POST /models",
-                    contentType = "multipart/form-data",
-                    fields = new { file = "the model file (required)" },
-                },
-                multiFile = new
-                {
-                    endpoint = "POST /models/multifile",
-                    contentType = "multipart/form-data",
-                    whenToUse = "a loose .gltf that references external .bin/texture files",
-                    fields = new
-                    {
-                        primary = "the .gltf itself (required)",
-                        files = "each referenced file, repeated once per file (required)",
-                        paths = "the URI each files[i] is referenced BY, relative to the primary - same order, same count as files[]",
-                    },
-                    example = "primary=scene.gltf; files=scene.bin, files=textures/wood.png; paths=scene.bin, paths=textures/wood.png",
-                    commonMistake = "Posting only the files and omitting paths[] - the server cannot resolve the glTF's URIs and returns 400 MissingPrimary or a broken import.",
-                },
-                zip = new
-                {
-                    endpoint = "POST /models/zip",
-                    contentType = "multipart/form-data",
-                    fields = new { file = "a .zip containing the model and its companions" },
-                    whenToUse = "simplest correct choice for any multi-file asset - the server unpacks and resolves references itself",
-                },
+                single = McpUploadContracts.Describe(McpUploadContracts.Targets[AgentAssetFamilies.Model]),
+                // The routes a model may need INSTEAD of POST /models, handed over unasked.
+                alternatives = McpUploadContracts.ModelAlternatives,
             };
         }
 

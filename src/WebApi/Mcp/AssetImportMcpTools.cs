@@ -446,8 +446,9 @@ public sealed class AssetImportMcpTools
     }
 
     [McpServerTool(Name = "request_upload_ticket")]
-    [Description("For agents NOT running on the server: get a single-use ticket plus the exact endpoint and field names to upload an asset over HTTP. " +
+    [Description("For agents NOT running on the server: get a single-use ticket plus the exact endpoint, field names and a WORKED EXAMPLE to upload an asset over HTTP. " +
                  "assetType: Model, Sound, Sprite, EnvironmentMap or TextureSet. The upload is audited under your idempotencyKey, so a retry cannot import twice. " +
+                 "For Model the response also carries `alternatives` - the multi-file and zip routes a loose .gltf needs; POST /models alone imports it without its geometry. " +
                  "A material is several files: create the set with the first channel, then ask again with textureSetId set to add each remaining channel.")]
     public static async Task<object> RequestUploadTicket(
         IAgentUploadTickets tickets,
@@ -464,13 +465,13 @@ public sealed class AssetImportMcpTools
             return denied;
         }
 
-        if (!UploadTargets.TryGetValue(assetType, out var target))
+        if (!McpUploadContracts.Targets.TryGetValue(assetType, out var target))
         {
             return new
             {
                 error = "UnknownAssetType",
                 message = $"'{assetType}' has no HTTP upload endpoint.",
-                validValues = UploadTargets.Keys.ToArray(),
+                validValues = McpUploadContracts.Targets.Keys.ToArray(),
             };
         }
 
@@ -489,16 +490,7 @@ public sealed class AssetImportMcpTools
                 };
             }
 
-            target = (
-                AgentAssetFamilies.TextureSet,
-                "add-texture-channel",
-                $"POST /texture-sets/{setId}/textures/with-file",
-                new
-                {
-                    file = "the channel's image (required)",
-                    textureType = "Albedo, Normal, Roughness, Metallic, AO, Height, Emissive, Opacity, Specular, SplitChannel...",
-                    sourceChannel = "channel-packed maps only: R, G, B, A or RGB",
-                });
+            target = McpUploadContracts.AddTextureChannel(setId);
         }
 
         var ticket = await tickets.IssueAsync(
@@ -514,37 +506,18 @@ public sealed class AssetImportMcpTools
                 expiresAt = ticket.ExpiresAt,
                 note = "Single use. Send it as a header on the upload below; the upload is then audited and de-duplicated under this call's idempotencyKey.",
             },
-            upload = new
-            {
-                endpoint = target.Endpoint,
-                contentType = "multipart/form-data",
-                fields = target.Fields,
-            },
+            upload = McpUploadContracts.Describe(target),
+            // The routes a model may need INSTEAD of POST /models. Handed over unasked: an
+            // agent uploading a loose .gltf has no reason to suspect another contract
+            // exists, and discovers it as a 400 or as an import with no geometry.
+            alternatives = string.Equals(target.AssetType, AgentAssetFamilies.Model, StringComparison.Ordinal)
+                ? McpUploadContracts.ModelAlternatives
+                : null,
             afterwards = textureSetId is null
                 ? "Curate the result with set_tags / set_category / add_to_pack, or bind a material with bind_texture_set."
                 : "Ask for another ticket with the same textureSetId (and a fresh idempotencyKey) for each remaining channel.",
         };
     }
-
-    /// <summary>
-    /// Where each family's bytes go, and what the endpoint calls its parts. Returned to the
-    /// agent verbatim: the failure this prevents is an agent guessing a field name, getting
-    /// a 400, and burning a turn per guess.
-    /// </summary>
-    private static readonly IReadOnlyDictionary<string, (string AssetType, string Operation, string Endpoint, object Fields)> UploadTargets =
-        new Dictionary<string, (string, string, string, object)>(StringComparer.OrdinalIgnoreCase)
-        {
-            [AgentAssetFamilies.Model] = (AgentAssetFamilies.Model, "import-model", "POST /models",
-                new { file = "the model file (required)" }),
-            [AgentAssetFamilies.Sound] = (AgentAssetFamilies.Sound, "import-sound", "POST /sounds/with-file",
-                new { file = "the audio file (required)", name = "optional; defaults to the file name", categoryId = "optional", packId = "optional" }),
-            [AgentAssetFamilies.Sprite] = (AgentAssetFamilies.Sprite, "import-sprite", "POST /sprites/with-file",
-                new { file = "the image file (required)", name = "optional", spriteType = "Static, SpriteSheet, Gif or Apng", categoryId = "optional", packId = "optional" }),
-            [AgentAssetFamilies.EnvironmentMap] = (AgentAssetFamilies.EnvironmentMap, "import-environment-map", "POST /environment-maps/with-file",
-                new { file = "the HDRI / equirectangular image (required)", name = "optional", sizeLabel = "optional, e.g. '4k'", packId = "optional" }),
-            [AgentAssetFamilies.TextureSet] = (AgentAssetFamilies.TextureSet, "import-texture-set", "POST /texture-sets/with-file",
-                new { file = "the first channel's image (required)", name = "the material name (required)", textureType = "Albedo, Normal, Roughness...", kind = "ModelSpecific or Universal" }),
-        };
 
     /// <summary>
     /// Parses an enum name case-insensitively and, on failure, returns an outcome that

@@ -20,6 +20,23 @@ internal sealed class SearchRepository : ISearchRepository
     // Shortest query word allowed to match as an unanchored substring of a display name.
     private const int MinSubstringLength = 4;
 
+    /// <summary>
+    /// How close a name has to be before it is offered as "did you mean". Deliberately looser
+    /// than <see cref="TrigramThreshold"/>: that one admits a result into the answer, this one
+    /// only names a word the caller might have meant, and a suggestion nobody has to act on
+    /// can afford to be wrong.
+    /// </summary>
+    private const double DidYouMeanThreshold = 0.3;
+
+    private const int MaxDidYouMean = 3;
+
+    /// <summary>
+    /// How far to over-fetch before de-duplicating names. A library holds the same prop
+    /// imported twice under the same name, and three suggestions that are all "Chair 01"
+    /// suggest nothing.
+    /// </summary>
+    private const int DidYouMeanOverfetch = 4;
+
     // How many ranked documents to pull per requested hit before collapsing them to one
     // row per asset. An asset contributes one document plus one per part, so a small
     // multiple is enough to fill the page without a second round trip.
@@ -913,6 +930,90 @@ internal sealed class SearchRepository : ISearchRepository
 
         var items = await query.Take(perTypeLimit).ToListAsync(cancellationToken);
         groups.Add(new SearchResultGroup(type, total, items));
+    }
+
+    /// <summary>
+    /// Per-word corpus counts, and the nearest names for a word the library has never heard.
+    ///
+    /// One query per word, capped by the parser at six. It runs the same clauses the search
+    /// itself scores on - indexed tokens, concept labels and the display name - so "matched
+    /// nothing" here means the same thing it means there. A count taken from anywhere else
+    /// would tell the caller its word was fine while the search kept refusing it.
+    /// </summary>
+    public async Task<IReadOnlyList<SearchTermDiagnostic>> ExplainTermsAsync(
+        IReadOnlyList<SearchQueryParser.QueryTerm> terms,
+        string? assetType,
+        CancellationToken cancellationToken = default)
+    {
+        var diagnostics = new List<SearchTermDiagnostic>(terms.Count);
+
+        foreach (var term in terms)
+        {
+            var documents = _context.AssetSearchDocuments
+                .AsNoTracking()
+                .Where(d => d.IsCurrentVersion && d.IsActive && d.Prominence != "hidden");
+
+            if (!string.IsNullOrWhiteSpace(assetType))
+            {
+                documents = documents.Where(d => d.AssetType == assetType);
+            }
+
+            // Unrolled to two variant slots for the same reason the search is: EF Core has to
+            // translate a static shape, and the parser never produces more than the word and
+            // its singular.
+            var shortest = term.Variants[term.Variants.Count - 1];
+            var v0 = " " + term.Variants[0] + " ";
+            var v1 = " " + shortest + " ";
+
+            var matching = documents.Where(d =>
+                EF.Functions.ILike(" " + d.Tokens + " ", "%" + v0 + "%")
+                || EF.Functions.ILike(" " + d.Tokens + " ", "%" + v1 + "%")
+                || EF.Functions.ILike(" " + d.ConceptLabels + " ", "%" + v0 + "%")
+                || EF.Functions.ILike(" " + d.ConceptLabels + " ", "%" + v1 + "%")
+                || EF.Functions.ILike(" " + d.AuthoredTags + " ", "%" + v0 + "%")
+                || EF.Functions.ILike(" " + d.AuthoredTags + " ", "%" + v1 + "%")
+                || EF.Functions.ILike(d.DisplayName, "%" + shortest + "%"));
+
+            // Assets, not documents - an asset is indexed once for itself and once per part,
+            // so a document count would tell the caller it has 46 chairs when it has 17.
+            var matches = await matching
+                .Select(d => new { d.AssetType, d.AssetId })
+                .Distinct()
+                .CountAsync(cancellationToken);
+
+            var nearest = Array.Empty<string>() as IReadOnlyList<string>;
+
+            if (matches == 0)
+            {
+                // Only for a word nothing carries. Offering "did you mean" beside a word that
+                // already matched 600 assets is noise, and it is the zero case where the
+                // caller is otherwise about to retry with another invented word.
+                // Ordered and taken in SQL, de-duplicated here. Postgres refuses a SELECT
+                // DISTINCT ordered by an expression that is not in the select list, and the
+                // similarity score is exactly that - so the distinct has to happen after.
+                var candidates = await documents
+                    .Where(d => d.PartPath == null)
+                    .Select(d => new
+                    {
+                        d.DisplayName,
+                        Similarity = EF.Functions.TrigramsSimilarity(d.DisplayName, term.Word),
+                    })
+                    .Where(x => x.Similarity > DidYouMeanThreshold)
+                    .OrderByDescending(x => x.Similarity)
+                    .Take(MaxDidYouMean * DidYouMeanOverfetch)
+                    .ToListAsync(cancellationToken);
+
+                nearest = candidates
+                    .Select(x => x.DisplayName)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Take(MaxDidYouMean)
+                    .ToList();
+            }
+
+            diagnostics.Add(new SearchTermDiagnostic(term.Word, matches, nearest));
+        }
+
+        return diagnostics;
     }
 
     public async Task<SearchFacetRangesResponse> GetFacetRangesAsync(

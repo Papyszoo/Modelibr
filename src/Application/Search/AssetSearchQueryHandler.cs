@@ -14,6 +14,16 @@ internal sealed class AssetSearchQueryHandler
 {
     private const int MaxLimit = 100;
 
+    /// <summary>
+    /// At or below this many assets, the response explains itself: how many assets carry each
+    /// word on its own, and what the library does hold for a word it has never heard.
+    ///
+    /// It is a per-word query, so it is not run for a search that already answered. Three is
+    /// the point where a caller stops choosing between candidates and starts guessing at
+    /// another query - and a guess with no signal is what turns one call into four.
+    /// </summary>
+    private const int ThinResultThreshold = 3;
+
     private readonly ISearchRepository _searchRepository;
     private readonly ISearchLogRepository _searchLogRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
@@ -102,12 +112,107 @@ internal sealed class AssetSearchQueryHandler
         // pinned asset has a preview.
         response = response with { Hits = await WithMediaAsync(response.Hits, cancellationToken) };
 
+        response = response with
+        {
+            Query = await ExplainAsync(term, query.AssetType, response.TotalCount, cancellationToken),
+        };
+
         // Search logging from day one: one row per deliberate search - query,
         // filters, and the results shown in rank order.
         await LogSearchAsync(query, request, response, cancellationToken);
 
         return Result.Success(response);
     }
+
+    /// <summary>
+    /// What the search understood, so a caller that got junk can fix it in one more call
+    /// rather than three.
+    ///
+    /// The parse is free - it is the same pure function the repository ran - so the words
+    /// kept and dropped are always reported. The per-word corpus counts are not free, and are
+    /// measured only for a result thin enough that the caller is about to retry blind.
+    /// </summary>
+    private async Task<AssetSearchQueryView?> ExplainAsync(
+        string term,
+        string? assetType,
+        int totalCount,
+        CancellationToken cancellationToken)
+    {
+        var parsed = SearchQueryParser.Parse(term);
+        if (parsed.IsEmpty && parsed.IgnoredWords.Count == 0)
+        {
+            // A blank query means "everything matching the filters". There is no query to
+            // explain, and an empty explanation on every browse call is noise.
+            return null;
+        }
+
+        var diagnostics = totalCount <= ThinResultThreshold && !parsed.IsEmpty
+            ? await _searchRepository.ExplainTermsAsync(parsed.Terms, assetType, cancellationToken)
+            : Array.Empty<SearchTermDiagnostic>();
+
+        // The words kept and dropped are still worth reporting when the counts are missing.
+        // This block explains a search; it must never be the reason one fails.
+        var byWord = (diagnostics ?? Array.Empty<SearchTermDiagnostic>())
+            .ToDictionary(d => d.Word, StringComparer.OrdinalIgnoreCase);
+
+        var terms = parsed.Terms
+            .Select(t => byWord.TryGetValue(t.Word, out var d)
+                ? new SearchTermView(t.Word, t.Variants, d.Matches, d.NearestNames.Count == 0 ? null : d.NearestNames)
+                : new SearchTermView(t.Word, t.Variants))
+            .ToList();
+
+        return new AssetSearchQueryView(
+            parsed.Original,
+            terms,
+            parsed.IgnoredWords.Select(w => new SearchIgnoredWordView(w.Word, w.Reason)).ToList(),
+            Note(terms, parsed, totalCount));
+    }
+
+    /// <summary>
+    /// One sentence, or nothing. A caller reading a thin result should not have to compare two
+    /// arrays to notice that half its words are not in this library.
+    /// </summary>
+    private static string? Note(
+        IReadOnlyList<SearchTermView> terms,
+        SearchQueryParser.ParsedQuery parsed,
+        int totalCount)
+    {
+        var unknown = terms.Where(t => t.Matches == 0).Select(t => t.Word).ToList();
+        if (unknown.Count > 0)
+        {
+            var suggestions = terms
+                .Where(t => t.Matches == 0 && t.DidYouMean is { Count: > 0 })
+                .SelectMany(t => t.DidYouMean!)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Take(3)
+                .ToList();
+
+            var nearest = suggestions.Count == 0
+                ? " Nothing in the library is close to it - try a broader word, or search with filters alone."
+                : $" The nearest names here are: {string.Join(", ", suggestions)}.";
+
+            return unknown.Count == terms.Count
+                ? $"No asset in this library carries {Words(unknown)}, so nothing this search returned matched on {(unknown.Count == 1 ? "it" : "them")}.{nearest}"
+                : $"No asset in this library carries {Words(unknown)}; the search ran on the rest.{nearest}";
+        }
+
+        var beyondLimit = parsed.IgnoredWords
+            .Where(w => w.Reason == SearchQueryParser.IgnoredReasons.BeyondWordLimit)
+            .Select(w => w.Word)
+            .ToList();
+
+        if (beyondLimit.Count > 0)
+        {
+            return $"Only the first {SearchQueryParser.MaxTerms} words were scored; {Words(beyondLimit)} {(beyondLimit.Count == 1 ? "was" : "were")} not. Put the words that matter first.";
+        }
+
+        return totalCount == 0 && parsed.Terms.Count > 1
+            ? "Every word is known here, but no asset carries enough of them together. Drop the least important word and search again."
+            : null;
+    }
+
+    private static string Words(IReadOnlyList<string> words)
+        => string.Join(", ", words.Select(w => $"'{w}'"));
 
     private async Task<IReadOnlyList<AssetSearchHit>> WithMediaAsync(
         IReadOnlyList<AssetSearchHit> hits,

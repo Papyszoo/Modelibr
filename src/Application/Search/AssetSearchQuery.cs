@@ -81,10 +81,56 @@ public record AssetSearchQuery(
 /// even in <c>bias</c>, where it changed only the order: a caller that cannot see the profile
 /// cannot tell a ranking it disagrees with from one it never asked for.
 /// </param>
+/// <param name="Query">
+/// What the search actually ran: the words it kept, the words it dropped, and - when the
+/// result was thin enough that the caller is about to guess - which of those words the
+/// library has never heard of, with the nearest things it has.
+///
+/// The gap this closes: a query that returned junk gave no signal about <i>why</i>, so the
+/// next call was a guess and the one after that was another. Three round trips became one.
+/// </param>
 public record AssetSearchResponse(
     IReadOnlyList<AssetSearchHit> Hits,
     int TotalCount,
-    AssetSearchProfileView? Profile = null);
+    AssetSearchProfileView? Profile = null,
+    AssetSearchQueryView? Query = null);
+
+/// <summary>
+/// The query, as the search understood it.
+/// </summary>
+/// <param name="Terms">The words scored, in order, after stopword removal and abbreviation expansion.</param>
+/// <param name="Ignored">The words the caller sent that were not scored, each with its reason.</param>
+/// <param name="Note">
+/// One sentence, present only when something needs saying. A caller reading a thin result
+/// should not have to compare two arrays to notice that half its words matched nothing.
+/// </param>
+public record AssetSearchQueryView(
+    string Original,
+    IReadOnlyList<SearchTermView> Terms,
+    IReadOnlyList<SearchIgnoredWordView> Ignored,
+    string? Note = null);
+
+/// <param name="Variants">The literal forms matched against the index - the word plus its singular.</param>
+/// <param name="Matches">
+/// How many assets in the library carry this word at all, ignoring every other word and every
+/// filter. Null when it was not measured: it costs a query per word, and a search that already
+/// returned plenty does not need it.
+/// </param>
+/// <param name="DidYouMean">
+/// The nearest names the library does hold, for a word it has never heard. Empty when the word
+/// matched something, or when nothing is close enough to be worth offering.
+/// </param>
+public record SearchTermView(
+    string Word,
+    IReadOnlyList<string> Variants,
+    int? Matches = null,
+    IReadOnlyList<string>? DidYouMean = null);
+
+/// <param name="Reason">
+/// From <see cref="SearchQueryParser.IgnoredReasons"/>: <c>stopword</c>,
+/// <c>beyond-word-limit</c> or <c>duplicate</c>.
+/// </param>
+public record SearchIgnoredWordView(string Word, string Reason);
 
 /// <summary>
 /// The profile a search ran under, reported back on the response (prompt 13-D3).

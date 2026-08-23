@@ -49,6 +49,16 @@ public class AssetSearchProfileResolutionTests
                 0,
                 _captured!.Profile is null ? null : ProfileSearchBiasBuilder.Describe(_captured.Profile, null)));
 
+        // These searches return nothing, which is thin enough for the response to explain
+        // itself. That path is covered by AssetSearchQueryExplanationTests; here it just
+        // needs to answer.
+        _search
+            .Setup(r => r.ExplainTermsAsync(
+                It.IsAny<IReadOnlyList<SearchQueryParser.QueryTerm>>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<SearchTermDiagnostic>());
+
         var clock = new Mock<IDateTimeProvider>();
         clock.SetupGet(c => c.UtcNow).Returns(Now);
 

@@ -21,7 +21,11 @@ public sealed class AssetSearchMcpTools
                  "Returns ranked hits (current version only, prominence-aware) each with a deterministic browse summary. " +
                  "Assets holding identical geometry are collapsed into one hit; the ids folded into it are listed as `alsoAt`. " +
                  "Pass projectId (or sceneId) to search on behalf of a project: its style ranks the results and its triangle " +
-                 "budget is reported on each hit as facts.profileFit. The response's `profile` block always says what was applied.")]
+                 "budget is reported on each hit as facts.profileFit. The response's `profile` block always says what was applied. " +
+                 "The response also carries `query`: the words the search actually ran on, the words it dropped (stopwords, " +
+                 "anything past the sixth) and - WHEN THE RESULT IS THIN - how many assets carry each word on its own, plus " +
+                 "the nearest names for a word this library has never heard. READ `query.note` BEFORE RETRYING: it is the " +
+                 "difference between fixing the query and guessing at another one.")]
     public static async Task<object> SearchAssets(
         IQueryHandler<AssetSearchQuery, AssetSearchResponse> handler,
         [Description("Free-text query (asset/part names, tokens, prose).")] string query,
