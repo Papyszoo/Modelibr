@@ -54,8 +54,46 @@ public readonly record struct Aabb(Vec3 Min, Vec3 Max)
     }
 }
 
-/// <summary>A pair of nodes whose footprints share volume.</summary>
-public sealed record SceneOverlap(string NodeIdA, string NodeIdB, double IntersectionVolume);
+/// <summary>
+/// How two overlapping footprints overlap. The AABB check finds real errors, but on its own
+/// it cannot tell a cushion sitting on a sofa from a floor lamp inside an armchair - and a
+/// scene that permanently reports "5 overlaps" with no way to rank them is a scene where the
+/// one that matters is buried under four that are correct by construction.
+/// </summary>
+public static class SceneOverlapKinds
+{
+    /// <summary>
+    /// One sits on the other: the shared volume is a thin slab at a horizontal contact plane.
+    /// A cushion on a sofa, legs on a rug, a vase on a table.
+    /// </summary>
+    public const string Resting = "resting";
+
+    /// <summary>
+    /// One is almost entirely inside the other. For solid geometry this is the buried case -
+    /// a prop inside a wall - and it is never right by accident.
+    /// </summary>
+    public const string Contained = "contained";
+
+    /// <summary>Two volumes genuinely interpenetrating, neither resting nor contained.</summary>
+    public const string Intersecting = "intersecting";
+
+    public static readonly IReadOnlyList<string> All = new[] { Resting, Contained, Intersecting };
+}
+
+/// <summary>A pair of nodes whose footprints share volume, and what kind of sharing it is.</summary>
+/// <param name="Kind">From <see cref="SceneOverlapKinds"/>.</param>
+/// <param name="LikelyIntentional">
+/// Whether this pair is probably fine. True for resting contact, for a declared anchor, and
+/// for a graze small enough to be an axis-aligned box being larger than the rotated object
+/// inside it. <b>A hint, not a verdict</b> - it exists so an agent can act on the two that
+/// matter instead of re-reading five every time it writes.
+/// </param>
+public sealed record SceneOverlap(
+    string NodeIdA,
+    string NodeIdB,
+    double IntersectionVolume,
+    string Kind = SceneOverlapKinds.Intersecting,
+    bool LikelyIntentional = false);
 
 /// <summary>A node whose placed size looks wrong next to the rest of the scene.</summary>
 public sealed record SceneScaleWarning(string NodeId, string Code, string Message);
@@ -167,11 +205,21 @@ public static class SceneSpatial
         IReadOnlyDictionary<string, SceneAssetFacts> facts)
     {
         var boxes = new List<(string NodeId, Aabb Box)>();
+        var anchored = new HashSet<string>(StringComparer.Ordinal);
+
         foreach (var node in nodes)
         {
             if (node?.Id is null || !node.Visible)
             {
                 continue;
+            }
+
+            // A declared anchor is the scene saying this pair touches on purpose. Recorded
+            // both ways round so the classification does not depend on which of the two the
+            // pair loop happens to reach first.
+            if (node.Anchor is { OnNodeId: var target })
+            {
+                anchored.Add(PairKey(node.Id, target));
             }
 
             if (Footprint(node, FactsFor(node, facts)) is { } box)
@@ -195,13 +243,112 @@ public static class SceneSpatial
                 var volume = boxes[i].Box.IntersectionVolume(boxes[j].Box);
                 if (volume > minimumVolume)
                 {
-                    overlaps.Add(new SceneOverlap(boxes[i].NodeId, boxes[j].NodeId, volume));
+                    var (kind, intentional) = Classify(
+                        boxes[i].Box,
+                        boxes[j].Box,
+                        volume,
+                        anchored.Contains(PairKey(boxes[i].NodeId, boxes[j].NodeId)));
+
+                    overlaps.Add(new SceneOverlap(boxes[i].NodeId, boxes[j].NodeId, volume, kind, intentional));
                 }
             }
         }
 
-        return overlaps.OrderByDescending(o => o.IntersectionVolume).ToList();
+        // Worst first still, but the ones that are probably fine sink below the ones that
+        // are not - so the first entry an agent reads is the one worth acting on.
+        return overlaps
+            .OrderBy(o => o.LikelyIntentional)
+            .ThenByDescending(o => o.IntersectionVolume)
+            .ToList();
     }
+
+    /// <summary>Order-independent key for a pair of node ids.</summary>
+    private static string PairKey(string a, string b) =>
+        string.CompareOrdinal(a, b) <= 0 ? $"{a}\u0000{b}" : $"{b}\u0000{a}";
+
+    /// <summary>
+    /// Fraction of the smaller box's volume that has to be shared before the pair reads as
+    /// one thing inside another rather than two things touching.
+    /// </summary>
+    private const double ContainedFraction = 0.9;
+
+    /// <summary>
+    /// Below this fraction of the smaller box, a shared volume is a graze. It is the answer
+    /// to rotation: a chair turned 55 degrees has an axis-aligned box much larger than the
+    /// chair, so its near-misses read as collisions that are not there.
+    /// </summary>
+    private const double GrazeFraction = 0.02;
+
+    /// <summary>
+    /// How much of the shorter box's height the shared slab may take up and still read as
+    /// resting on rather than sunk into. A quarter is generous on purpose: a pair only
+    /// reaches this check once it has already penetrated past
+    /// <see cref="OverlapToleranceMetres"/>, so a stricter figure would classify nothing.
+    /// </summary>
+    private const double RestingSlabFraction = 0.25;
+
+    /// <summary>
+    /// What kind of overlap this is, from the two boxes alone.
+    ///
+    /// Deliberately geometric and conservative. It cannot know that the two walls meeting at
+    /// a corner are meant to; it can know that the shared volume is a thin slab at the top
+    /// face of one box, which is what "resting on" looks like from the outside, and that a
+    /// prop 95% inside a wall is not.
+    /// </summary>
+    private static (string Kind, bool LikelyIntentional) Classify(
+        Aabb a, Aabb b, double sharedVolume, bool declaredAnchor)
+    {
+        var smaller = Math.Min(Volume(a), Volume(b));
+
+        if (smaller <= 0)
+        {
+            return (SceneOverlapKinds.Intersecting, declaredAnchor);
+        }
+
+        var fraction = sharedVolume / smaller;
+
+        if (fraction >= ContainedFraction)
+        {
+            // Containment is the one case a declared anchor cannot excuse: resting on
+            // something does not put you inside it.
+            return (SceneOverlapKinds.Contained, false);
+        }
+
+        if (declaredAnchor || RestsOn(a, b) || RestsOn(b, a))
+        {
+            return (SceneOverlapKinds.Resting, true);
+        }
+
+        return (SceneOverlapKinds.Intersecting, fraction < GrazeFraction);
+    }
+
+    /// <summary>
+    /// Whether <paramref name="upper"/> is sitting on <paramref name="lower"/>.
+    ///
+    /// Three conditions together, and all three are needed. The shared slab has to be the top
+    /// of the lower box against the bottom of the upper one; the upper box has to start above
+    /// the lower one's floor, which is what separates "on the armchair" from "both standing on
+    /// the floor and interpenetrating"; and the slab has to be thin relative to the shorter of
+    /// the two, which is what separates "slightly sunk into the table" from "inside it".
+    /// </summary>
+    private static bool RestsOn(Aabb upper, Aabb lower)
+    {
+        var sharedMinY = Math.Max(upper.Min.Y, lower.Min.Y);
+        var sharedMaxY = Math.Min(upper.Max.Y, lower.Max.Y);
+        var sharedHeight = sharedMaxY - sharedMinY;
+        var shorter = Math.Min(upper.Max.Y - upper.Min.Y, lower.Max.Y - lower.Min.Y);
+
+        return shorter > 0
+            && Math.Abs(sharedMaxY - lower.Max.Y) <= OverlapToleranceMetres
+            && Math.Abs(sharedMinY - upper.Min.Y) <= OverlapToleranceMetres
+            && upper.Min.Y > lower.Min.Y + OverlapToleranceMetres
+            && sharedHeight <= shorter * RestingSlabFraction;
+    }
+
+    private static double Volume(Aabb box) =>
+        Math.Max(0, box.Max.X - box.Min.X)
+        * Math.Max(0, box.Max.Y - box.Min.Y)
+        * Math.Max(0, box.Max.Z - box.Min.Z);
 
     /// <summary>
     /// Placed sizes that do not hang together, plus the normalisation trap: an asset whose

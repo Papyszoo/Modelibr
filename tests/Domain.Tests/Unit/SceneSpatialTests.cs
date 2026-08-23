@@ -208,6 +208,88 @@ public class SceneSpatialTests
     }
 
     [Fact]
+    public void FindOverlaps_Calls_A_Thing_Sitting_On_Another_Resting_Rather_Than_A_Collision()
+    {
+        // A cushion on a sofa, a vase on a table. The AABB check finds them all correctly and
+        // then cannot rank them, which is why "5 overlaps, all fine" used to read exactly
+        // like "5 overlaps, all bugs".
+        var table = Facts(new Vec3(2, 1, 2), "bottom-center");
+        var vase = Facts(new Vec3(0.3, 0.4, 0.3), "bottom-center", assetId: 2);
+        var facts = table.Concat(vase).ToDictionary(e => e.Key, e => e.Value, StringComparer.Ordinal);
+
+        var nodes = new[]
+        {
+            Node("table", Vec3.Zero),
+            // Sunk 5 cm into the table's top face - not perfect contact, because a pair that
+            // only grazes is below the overlap tolerance and never reported at all.
+            Node("vase", new Vec3(0, 0.95, 0), assetId: 2),
+        };
+
+        var overlap = Assert.Single(SceneSpatial.FindOverlaps(nodes, facts));
+
+        Assert.Equal(SceneOverlapKinds.Resting, overlap.Kind);
+        Assert.True(overlap.LikelyIntentional);
+    }
+
+    [Fact]
+    public void FindOverlaps_Calls_A_Node_Buried_In_Another_Contained_And_Never_Intentional()
+    {
+        var big = Facts(new Vec3(4, 4, 4), "centered");
+        var small = Facts(new Vec3(0.5, 0.5, 0.5), "centered", assetId: 2);
+        var facts = big.Concat(small).ToDictionary(e => e.Key, e => e.Value, StringComparer.Ordinal);
+
+        var nodes = new[] { Node("wall", Vec3.Zero), Node("lamp", Vec3.Zero, assetId: 2) };
+
+        var overlap = Assert.Single(SceneSpatial.FindOverlaps(nodes, facts));
+
+        Assert.Equal(SceneOverlapKinds.Contained, overlap.Kind);
+        Assert.False(overlap.LikelyIntentional);
+    }
+
+    [Fact]
+    public void FindOverlaps_Treats_A_Declared_Anchor_As_Resting_Even_When_The_Boxes_Say_Otherwise()
+    {
+        // The document saying "this rests on that" is the scene's own statement of intent,
+        // and it outranks a box that a rotation made larger than the object inside it.
+        var facts = Facts(new Vec3(2, 2, 2), "centered");
+        var nodes = new[]
+        {
+            Node("table", Vec3.Zero),
+            Node("book", new Vec3(0.9, 0.5, 0)) with { Anchor = new SceneAnchor("table", Vec3.Zero) },
+        };
+
+        var overlap = Assert.Single(SceneSpatial.FindOverlaps(nodes, facts));
+
+        Assert.Equal(SceneOverlapKinds.Resting, overlap.Kind);
+        Assert.True(overlap.LikelyIntentional);
+    }
+
+    [Fact]
+    public void FindOverlaps_Reports_A_Real_Collision_Before_One_That_Is_Probably_Fine()
+    {
+        // Ordering is the payoff: the first entry an agent reads is the one worth acting on,
+        // not whichever happens to share the most volume.
+        var big = Facts(new Vec3(2, 2, 2), "centered");
+        var small = Facts(new Vec3(0.4, 0.4, 0.4), "centered", assetId: 2);
+        var facts = big.Concat(small).ToDictionary(e => e.Key, e => e.Value, StringComparer.Ordinal);
+
+        var nodes = new[]
+        {
+            Node("armchair", Vec3.Zero),
+            Node("sofa", new Vec3(1, 0, 0)),
+            // Rests on the armchair's top face, sunk slightly: a wide shared slab, but a
+            // thin one, and starting well above the armchair's own base.
+            Node("cushion", new Vec3(0, 1.15, 0), assetId: 2),
+        };
+
+        var overlaps = SceneSpatial.FindOverlaps(nodes, facts);
+
+        Assert.Equal(SceneOverlapKinds.Intersecting, overlaps[0].Kind);
+        Assert.False(overlaps[0].LikelyIntentional);
+        Assert.All(overlaps.Skip(1), o => Assert.True(o.LikelyIntentional));
+    }
+
+    [Fact]
     public void FindScaleWarnings_When_Source_Bounds_Are_Normalised_Warns()
     {
         // The base-meshes trap: normalised to ~2 m, so an apple and an apartment arrive the

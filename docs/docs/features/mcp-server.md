@@ -297,6 +297,24 @@ showing a broken image. Clicking a card previews it in place without writing any
 node whose slot is still open is outlined in the viewport so a scene cannot look finished
 while its decisions are not.
 
+#### Overlaps say what kind of overlap they are
+
+The AABB overlap check finds real errors - a console poking through a wall, a floor lamp
+inside an armchair - but on its own it cannot rank them. A finished room reports five
+overlaps that are all correct by construction (cushions on the sofa, legs on the rug, two
+walls meeting at a corner), and "5 overlaps, all fine" reads exactly like "5 overlaps, all
+bugs".
+
+Every overlap now carries a `kind` - `resting`, `contained` or `intersecting` - and a
+`likelyIntentional` hint. Resting contact and a declared `on:` anchor are intentional; so is
+a graze too small to be anything but an axis-aligned box being larger than the rotated
+object inside it, which is the other thing that used to produce phantom collisions. Being
+almost entirely inside something else is never intentional. The list is ordered so the
+overlaps worth acting on come first.
+
+It is a hint, not a verdict: the geometry cannot know the two walls are meant to meet, only
+that the shared volume is a thin slab at one box's top face.
+
 #### Lighting has one rule, and two failure modes that look the same
 
 Over-lighting and ambient-only both render a white scene, for opposite reasons - so "it

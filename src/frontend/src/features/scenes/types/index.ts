@@ -179,6 +179,14 @@ export interface SceneOverlap {
   nodeIdA: string
   nodeIdB: string
   intersectionVolume: number
+  /** How they overlap: `resting`, `contained` or `intersecting`. */
+  kind: 'resting' | 'contained' | 'intersecting'
+  /**
+   * Probably fine - resting contact, a declared anchor, or a graze small enough
+   * to be an axis-aligned box larger than the rotated object inside it. A hint
+   * for ranking, never a verdict.
+   */
+  likelyIntentional: boolean
 }
 
 export interface SceneScaleWarning {
