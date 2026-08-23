@@ -216,7 +216,12 @@ internal sealed class StoreCatalogClient : IStoreCatalogClient
         dto.FileSize,
         Absolute(dto.ThumbnailUrl, baseUrl),
         AlreadyImported: false,
-        CreditName: NullIfBlank(dto.CreditName));
+        CreditName: NullIfBlank(dto.CreditName),
+        MatchedItems: dto.MatchedItems?
+            .Select(i => new StoreCatalogMatchedItem(
+                i.Id.ToString(), NullIfBlank(i.Name), NullIfBlank(i.ItemType)))
+            .ToList(),
+        MatchedItemCount: dto.MatchedItemCount);
 
     private static void AddIfPresent(List<string> parameters, string name, string? value)
     {
@@ -270,7 +275,17 @@ internal sealed class StoreCatalogClient : IStoreCatalogClient
         string? CreditUrl,
         string? License,
         List<StoreAssetItemDto>? Items,
-        List<StoreAssetPreviewDto>? Previews);
+        List<StoreAssetPreviewDto>? Previews,
+        // Sent only by a store that searches inside packs. An older deployment omits both,
+        // which deserializes to null/0 and is reported as "not answered" rather than "no
+        // items matched" - the two mean opposite things to an agent choosing what to import.
+        List<StoreMatchedItemDto>? MatchedItems,
+        int MatchedItemCount);
+
+    private sealed record StoreMatchedItemDto(
+        Guid Id,
+        string? Name,
+        string? ItemType);
 
     private sealed record StoreAssetItemDto(
         Guid Id,

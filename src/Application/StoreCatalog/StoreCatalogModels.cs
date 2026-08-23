@@ -47,7 +47,25 @@ public sealed record StoreCatalogAsset(
     string? CreditName = null,
     string? License = null,
     IReadOnlyList<StoreCatalogItem>? Items = null,
-    IReadOnlyList<StoreCatalogPreview>? Previews = null);
+    IReadOnlyList<StoreCatalogPreview>? Previews = null,
+    IReadOnlyList<StoreCatalogMatchedItem>? MatchedItems = null,
+    int MatchedItemCount = 0);
+
+/// <summary>
+/// One item inside a pack whose name matched the search term.
+///
+/// A pack is found by its own title and description, which say nothing about the thousands
+/// of things inside it - so a search that matched on an item reports which ones, and these
+/// ids are what a partial import selects on. That is the whole route from "I need an
+/// armchair" to acquiring one model rather than a 2 GB pack.
+///
+/// Older store deployments do not send this. Absent is not empty: it means the store could
+/// not answer the question, not that nothing inside the pack matched.
+/// </summary>
+public sealed record StoreCatalogMatchedItem(
+    string ItemId,
+    string? Name,
+    string? ItemType);
 
 /// <summary>
 /// One typed item inside a store pack, from the public asset detail. The store's own

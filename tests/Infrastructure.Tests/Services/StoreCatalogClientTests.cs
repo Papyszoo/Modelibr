@@ -267,4 +267,61 @@ public class StoreCatalogClientTests
         Assert.Equal("StoreCatalog.AssetNotFound", result.Error.Code);
         Assert.Empty(handler.Requests);
     }
+
+    private const string PageWithMatchedItems = """
+        {
+          "items": [
+            { "id": "33333333-3333-3333-3333-333333333333", "title": "The Base Mesh",
+              "author": "cc0-person", "thumbnailUrl": "/t.png",
+              "itemTypes": ["Model"], "formats": ["glb"], "tags": [],
+              "fileSize": 2048, "isPack": true, "itemCount": 1360, "downloadCount": 0,
+              "price": 0, "currency": "USD",
+              "matchedItemCount": 15,
+              "matchedItems": [
+                { "id": "44444444-4444-4444-4444-444444444444", "name": "Dining Chair 01", "itemType": "Model" },
+                { "id": "55555555-5555-5555-5555-555555555555", "name": "Office Chair", "itemType": "Model" }
+              ] }
+          ],
+          "page": 1, "pageSize": 12, "totalCount": 1, "totalPages": 1
+        }
+        """;
+
+    [Fact]
+    public async Task SearchAsync_Carries_The_Items_That_Matched_Inside_A_Pack()
+    {
+        // These ids are what a partial import selects on, so they are the difference between
+        // acquiring one chair and acquiring a 1,360-model pack.
+        var (client, _) = Build(_ => Json(PageWithMatchedItems));
+
+        var result = await client.SearchAsync(
+            new Application.StoreCatalog.StoreCatalogQuery("chair", FreeOnly: false), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var hit = Assert.Single(result.Value.Assets);
+        Assert.Equal(15, hit.MatchedItemCount);
+        Assert.NotNull(hit.MatchedItems);
+        Assert.Equal(2, hit.MatchedItems!.Count);
+        Assert.Equal("44444444-4444-4444-4444-444444444444", hit.MatchedItems[0].ItemId);
+        Assert.Equal("Dining Chair 01", hit.MatchedItems[0].Name);
+        Assert.Equal("Model", hit.MatchedItems[0].ItemType);
+    }
+
+    [Fact]
+    public async Task SearchAsync_Against_A_Store_That_Cannot_Search_Items_Leaves_MatchedItems_Null()
+    {
+        // Null, not empty. An older store omitting the field means "I did not answer that
+        // question"; an empty list would mean "nothing inside the pack matched", and an
+        // agent choosing what to import must not read the first as the second.
+        var (client, _) = Build(_ => Json(OnePage));
+
+        var result = await client.SearchAsync(
+            new Application.StoreCatalog.StoreCatalogQuery("chair", FreeOnly: false), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.All(result.Value.Assets, a =>
+        {
+            Assert.Null(a.MatchedItems);
+            Assert.Equal(0, a.MatchedItemCount);
+        });
+    }
 }

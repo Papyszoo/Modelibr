@@ -27,9 +27,15 @@ public sealed class StoreCatalogMcpTools
                  "An unreachable store returns error code StoreCatalog.Unreachable - that is not an empty store.")]
     public static async Task<object> SearchStoreAssets(
         IQueryHandler<SearchStoreAssetsQuery, StoreCatalogSearchResponse> handler,
-        [Description("Free-text query. It matches an asset's title, author and description only - NOT the names " +
-                     "of the items inside a pack. A twenty-model furniture pack is found by 'furniture', not by " +
-                     "'armchair', so search wide and read the items in get_store_asset.")] string? query = null,
+        [Description("Free-text query. It matches an asset's title, author and description, and - against a " +
+                     "store that supports it - the names of the items inside a pack. When a hit matched on its " +
+                     "items, `matchedItems` names them with their store item ids and `matchedItemCount` says how " +
+                     "many matched in total (the list is capped, the count is not). Those ids are what " +
+                     "import_store_asset's selectedItemIds takes, so this is how you acquire one model out of a " +
+                     "thousand-item pack instead of the whole pack. A hit that matched on the pack's own title " +
+                     "reports no matched items - that is the pack answering, not an empty result. An older store " +
+                     "omits both fields entirely, which means it could not search inside packs: fall back to " +
+                     "reading get_store_asset's items.")] string? query = null,
         [Description("Item type filter, using the store's own taxonomy, e.g. Model | Texture | Sound | Sprite. " +
                      "This is the reliable narrowing filter - prefer it over tag.")] string? itemType = null,
         [Description("Tag filter, from the store's tag vocabulary - not this library's. Note that store tagging " +
