@@ -46,6 +46,59 @@ interface DemoScene {
 const demoMetadata = new Map<string, Record<string, unknown>>()
 
 /**
+ * The import review queue (v0.6 prompt 06-C).
+ *
+ * Seeded rather than derived, because the demo imports nothing: the point is to
+ * show what the banner is for - a category and some tags worked out from a name
+ * and a folder, waiting for someone to keep or discard them. Settling one takes
+ * it out of the queue for the rest of the session, so both answers are visible.
+ */
+const demoImportSuggestions = [
+  {
+    modelId: 1,
+    name: 'SM_Bld_Apartment_01',
+    thumbnailUrl: null,
+    thumbnailStatus: 'none',
+    categoryId: 101,
+    categoryName: 'Buildings',
+    tags: ['Downtown'],
+    sourceFolder: '/library/POLYGONCity/SourceFiles/Downtown',
+    appliedAt: new Date().toISOString(),
+  },
+  {
+    modelId: 2,
+    name: 'SM_Veh_Wheel_03',
+    thumbnailUrl: null,
+    thumbnailStatus: 'none',
+    categoryId: 102,
+    categoryName: 'Vehicles',
+    tags: ['Parts'],
+    sourceFolder: '/library/POLYGONCity/SourceFiles/Parts',
+    appliedAt: new Date().toISOString(),
+  },
+  {
+    modelId: 3,
+    name: 'oak_barrel',
+    thumbnailUrl: null,
+    thumbnailStatus: 'none',
+    categoryId: 103,
+    categoryName: 'Props',
+    tags: ['Medieval'],
+    sourceFolder: '/library/Medieval/Props',
+    appliedAt: new Date().toISOString(),
+  },
+]
+
+/** Model ids a demo visitor has already settled, kept for the session only. */
+const demoSettledSuggestions = new Set<number>()
+
+function demoPendingSuggestions() {
+  return demoImportSuggestions.filter(
+    s => !demoSettledSuggestions.has(s.modelId)
+  )
+}
+
+/**
  * A cut-down metadata schema. The panel renders whatever it is given, so this
  * shows the shape - grouped fields, closed vocabularies, and a read-only
  * imported field with its provenance badge - without the server's full list.
@@ -706,6 +759,51 @@ export const systemHandlers = [
   //  The demo carries a cut-down schema rather than the server's full one: enough
   //  to show what the panel is for - one contract over every family, with the
   //  vocabularies closed - without turning a walkthrough into data entry.
+
+  // Registered ahead of the `:assetType/:assetId` routes below: MSW matches in
+  // order, and `/metadata/import-suggestions` must not be read as an asset.
+  http.get('*/metadata/import-suggestions', ({ request }) => {
+    const url = new URL(request.url)
+    const page = Number(url.searchParams.get('page') ?? '1')
+    const pageSize = Number(url.searchParams.get('pageSize') ?? '50')
+    const pending = demoPendingSuggestions()
+
+    return HttpResponse.json({
+      total: pending.length,
+      page,
+      pageSize,
+      items: pending.slice((page - 1) * pageSize, page * pageSize),
+    })
+  }),
+
+  http.post('*/metadata/import-suggestions/review', async ({ request }) => {
+    const body = (await request.json()) as {
+      accept: boolean
+      modelIds?: number[]
+    }
+    const targets =
+      body.modelIds && body.modelIds.length > 0
+        ? demoPendingSuggestions().filter(s =>
+            body.modelIds!.includes(s.modelId)
+          )
+        : demoPendingSuggestions()
+
+    for (const suggestion of targets) {
+      demoSettledSuggestions.add(suggestion.modelId)
+    }
+
+    return HttpResponse.json({
+      reviewed: targets.length,
+      // Accepting keeps what was applied; only an undo takes anything back.
+      categoriesCleared: body.accept
+        ? 0
+        : targets.filter(s => s.categoryId != null).length,
+      tagsRemoved: body.accept
+        ? 0
+        : targets.reduce((sum, s) => sum + s.tags.length, 0),
+      remaining: demoPendingSuggestions().length,
+    })
+  }),
 
   http.get('*/metadata/schema', ({ request }) => {
     const family = new URL(request.url).searchParams.get('assetType')

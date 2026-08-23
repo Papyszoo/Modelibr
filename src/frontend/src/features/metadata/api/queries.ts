@@ -1,8 +1,18 @@
-import { queryOptions, useQuery } from '@tanstack/react-query'
+import {
+  queryOptions,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 
 import { type QueryConfig } from '@/lib/react-query'
 
-import { getAssetMetadata, getAssetMetadataSchema } from './metadataApi'
+import {
+  getAssetMetadata,
+  getAssetMetadataSchema,
+  getImportSuggestions,
+  reviewImportSuggestions,
+} from './metadataApi'
 
 /**
  * The schema is one declaration for the whole app and changes only when the
@@ -51,5 +61,61 @@ export function useAssetMetadataQuery({
   return useQuery({
     ...getAssetMetadataQueryOptions(assetType, assetId),
     ...queryConfig,
+  })
+}
+
+/**
+ * The import review queue. Kept short-lived rather than cached: an import running
+ * in the background adds to it continuously, and a banner showing a stale count is
+ * worse than one that flickers.
+ */
+export function getImportSuggestionsQueryOptions(page = 1, pageSize = 50) {
+  return queryOptions({
+    queryKey: ['metadata', 'import-suggestions', page, pageSize] as const,
+    queryFn: () => getImportSuggestions(page, pageSize),
+    staleTime: 30 * 1000,
+  })
+}
+
+export function useImportSuggestionsQuery({
+  page = 1,
+  pageSize = 50,
+  queryConfig = {},
+}: {
+  page?: number
+  pageSize?: number
+  queryConfig?: QueryConfig<typeof getImportSuggestionsQueryOptions>
+} = {}) {
+  return useQuery({
+    ...getImportSuggestionsQueryOptions(page, pageSize),
+    ...queryConfig,
+  })
+}
+
+/**
+ * Accepts or takes back the automation's guesses.
+ *
+ * Invalidates the model list and the category counts as well as the queue itself:
+ * rejecting removes categories and tags from real assets, and a sidebar still
+ * counting them would be describing a library that no longer exists.
+ */
+export function useReviewImportSuggestionsMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      accept,
+      modelIds,
+    }: {
+      accept: boolean
+      modelIds?: number[]
+    }) => reviewImportSuggestions(accept, modelIds),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ['metadata', 'import-suggestions'],
+      })
+      void queryClient.invalidateQueries({ queryKey: ['models'] })
+      void queryClient.invalidateQueries({ queryKey: ['model-tags'] })
+    },
   })
 }

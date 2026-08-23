@@ -4,6 +4,8 @@ import type {
   AssetMetadataPatch,
   AssetMetadataResponse,
   AssetMetadataSchemaResponse,
+  ImportSuggestionsResponse,
+  ReviewImportSuggestionsResult,
 } from '../types'
 
 /**
@@ -44,6 +46,36 @@ export async function setAssetMetadata(
   const response = await client.patch<AssetMetadataResponse>(
     `/metadata/${assetType}/${assetId}`,
     fields
+  )
+  return response.data
+}
+
+/**
+ * The review queue: what the import automation categorized and tagged on its own
+ * and nobody has settled yet.
+ */
+export async function getImportSuggestions(
+  page = 1,
+  pageSize = 50
+): Promise<ImportSuggestionsResponse> {
+  const response = await client.get<ImportSuggestionsResponse>(
+    '/metadata/import-suggestions',
+    { params: { page, pageSize } }
+  )
+  return response.data
+}
+
+/**
+ * Settles the automation's guesses. `modelIds` omitted means everything waiting,
+ * which the server bounds per call - repeat while `remaining` is above zero.
+ */
+export async function reviewImportSuggestions(
+  accept: boolean,
+  modelIds?: number[]
+): Promise<ReviewImportSuggestionsResult> {
+  const response = await client.post<ReviewImportSuggestionsResult>(
+    '/metadata/import-suggestions/review',
+    { accept, modelIds }
   )
   return response.data
 }

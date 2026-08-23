@@ -26,8 +26,10 @@ The easiest way to upload models is to drag and drop files directly onto the Mod
 ### What Happens After Upload
 
 1. **Model Created** - A new model entry appears in your library
-2. **Thumbnail Generated** - The worker service renders a preview image
-3. **Ready to View** - Click to open in the 3D viewer
+2. **Indexed** - The model is walked and made searchable straight away, without
+   waiting for its picture
+3. **Thumbnail Generated** - The worker service renders a preview image
+4. **Ready to View** - Click to open in the 3D viewer
 
 :::tip Batch Upload
 You can drag multiple files at once. Each file becomes a separate model.
@@ -54,6 +56,30 @@ scene graph are extracted, and when you open it in the viewer - so a multi-file
 `.gltf` looks and behaves like its packed `.glb` twin. Nothing is ever fetched from
 the network: only the files you uploaded are used, and a reference that points
 anywhere else is refused rather than requested.
+
+### Automatic Categories and Tags
+
+An import classifies itself where it can. A new model gets a **category** worked
+out from its own name, the folder it came from, and what the files beside it are
+called - which is how `SM_Veh_Wheel_03` ends up under Vehicles - plus **tags**
+from the folder's name.
+
+It only ever suggests:
+
+- A category is filled in only when the model has none. One you set is never
+  replaced.
+- Tags are added, never removed.
+- It runs once per model, when it arrives.
+
+Everything it works out waits for you. A strip above the model grid says how many
+models were categorized automatically; **Review** lists them with what was chosen
+and the folder it was chosen from, and **Keep all** clears the queue. In the review
+list you can pick out individual models and keep or undo just those - undoing takes
+back only what the import applied, never a category or tag you have set since.
+
+The folder is known for imports that come from a path or an archive. A file
+dragged into the browser carries a name and nothing else, so those models are
+classified from their name alone.
 
 ## Organizing with Categories
 

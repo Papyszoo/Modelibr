@@ -13,6 +13,7 @@ import {
 } from 'react'
 import { type GridComponents, VirtuosoGrid } from 'react-virtuoso'
 
+import { ImportSuggestionsBanner } from '@/features/metadata'
 import { useTabContext } from '@/hooks/useTabContext'
 import { CategoryTreePanel } from '@/shared/components/categories/CategoryTreePanel'
 import { EmptyState } from '@/shared/components/feedback'
@@ -684,6 +685,10 @@ export function ModelGrid({
           activeCategoryId != null && activeCategoryId !== ALL_CATEGORIES_ID
         }
       />
+
+      {/* What the import guessed, waiting for a person. Renders nothing when the
+          queue is empty, which is the normal state. */}
+      <ImportSuggestionsBanner />
 
       <div className="model-grid-body">
         {showCategorySidebar && isCategoryPanelOpen && (

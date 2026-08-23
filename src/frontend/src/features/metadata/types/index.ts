@@ -98,3 +98,39 @@ export interface AssetMetadataResponse {
  * wipe the description someone wrote.
  */
 export type AssetMetadataPatch = Record<string, unknown>
+
+/**
+ * One asset the import automation classified on its own, waiting for a person to
+ * confirm or correct it.
+ *
+ * `sourceFolder` is the evidence, not decoration: the tags come from it, and a
+ * reviewer deciding whether "Characters" belongs on this asset needs to see that
+ * it was sitting in a folder of that name.
+ */
+export interface ImportSuggestionItem {
+  modelId: number
+  name: string
+  thumbnailUrl?: string | null
+  thumbnailStatus: string
+  categoryId?: number | null
+  categoryName?: string | null
+  tags: string[]
+  sourceFolder?: string | null
+  appliedAt: string
+}
+
+export interface ImportSuggestionsResponse {
+  /** Assets waiting in total, not on this page - the banner's number. */
+  total: number
+  page: number
+  pageSize: number
+  items: ImportSuggestionItem[]
+}
+
+export interface ReviewImportSuggestionsResult {
+  reviewed: number
+  categoriesCleared: number
+  tagsRemoved: number
+  /** Still waiting after this call. A whole-queue action is bounded, so repeat while > 0. */
+  remaining: number
+}

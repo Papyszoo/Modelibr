@@ -241,14 +241,19 @@ describe('ExtractionJobProcessor.drain', () => {
       dequeueExtractionJob: vi.fn().mockImplementation(async () => {
         if (remaining <= 0) return null
         remaining -= 1
-        return { id: count - remaining, assetType: 'Model', versionId: 1, assetId: 1 }
+        return {
+          id: count - remaining,
+          assetType: 'Model',
+          versionId: 1,
+          assetId: 1,
+        }
       }),
     }
     processor.process = vi.fn().mockImplementation(async () => {
       inFlight += 1
       peakInFlight = Math.max(peakInFlight, inFlight)
       // Yield, so lanes actually overlap rather than each completing synchronously.
-      await new Promise((resolve) => setTimeout(resolve, 1))
+      await new Promise(resolve => setTimeout(resolve, 1))
       inFlight -= 1
     })
 
@@ -284,9 +289,9 @@ describe('ExtractionJobProcessor.drain', () => {
 
     // The lanes share the "it's empty" answer instead of each paying its own empty round
     // trip: one claim that returned a job, and at most one empty answer per lane.
-    expect(processor.jobApi.dequeueExtractionJob.mock.calls.length).toBeLessThanOrEqual(
-      1 + config.extractionConcurrency
-    )
+    expect(
+      processor.jobApi.dequeueExtractionJob.mock.calls.length
+    ).toBeLessThanOrEqual(1 + config.extractionConcurrency)
   })
 
   it('does not re-enter while a drain is still running', async () => {
