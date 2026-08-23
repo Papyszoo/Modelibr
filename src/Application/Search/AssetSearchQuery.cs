@@ -148,7 +148,8 @@ public record AssetSearchHit(
     string MatchedOn,
     AssetSearchFacts? Facts = null,
     MatchedPartView? MatchedPart = null,
-    IReadOnlyList<int>? AlsoAt = null);
+    IReadOnlyList<int>? AlsoAt = null,
+    Application.Media.AssetThumbnail? Media = null);
 
 /// <summary>
 /// The mesh inside an asset that a query matched. Distinct from the hit itself so the two

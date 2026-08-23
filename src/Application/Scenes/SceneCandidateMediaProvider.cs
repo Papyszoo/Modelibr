@@ -1,4 +1,5 @@
 using Application.Abstractions.Repositories;
+using Application.Media;
 using Domain.Models;
 using Domain.Scenes;
 using Domain.ValueObjects;
@@ -76,22 +77,19 @@ public sealed record SceneMaterialSwatch(
 
 internal sealed class SceneCandidateMediaProvider : ISceneCandidateMedia
 {
-    private readonly IModelVersionRepository _modelVersions;
-    private readonly ISpriteRepository _sprites;
-    private readonly IEnvironmentMapRepository _environmentMaps;
+    // The asset half is not resolved here. It is the same question a search hit asks, and a
+    // card that disagreed with the hit that produced it would report the library as being in
+    // two states at once.
+    private readonly IAssetThumbnails _thumbnails;
     private readonly IMaterialRepository _materials;
     private readonly ITextureSetRepository _textureSets;
 
     public SceneCandidateMediaProvider(
-        IModelVersionRepository modelVersions,
-        ISpriteRepository sprites,
-        IEnvironmentMapRepository environmentMaps,
+        IAssetThumbnails thumbnails,
         IMaterialRepository materials,
         ITextureSetRepository textureSets)
     {
-        _modelVersions = modelVersions;
-        _sprites = sprites;
-        _environmentMaps = environmentMaps;
+        _thumbnails = thumbnails;
         _materials = materials;
         _textureSets = textureSets;
     }
@@ -111,27 +109,16 @@ internal sealed class SceneCandidateMediaProvider : ISceneCandidateMedia
         }
 
         // One read per family for the whole document, not one per card.
-        var versionIds = Distinct(candidates
-            .Where(c => c.Candidate.Asset?.AssetType == SceneAssetTypes.Model)
-            .Select(c => c.Candidate.Asset!.VersionId));
-        var spriteIds = Distinct(candidates
-            .Where(c => c.Candidate.Asset?.AssetType == SceneAssetTypes.Sprite)
-            .Select(c => (int?)c.Candidate.Asset!.AssetId));
-        var environmentMapIds = Distinct(candidates
-            .Where(c => c.Candidate.Asset?.AssetType == SceneAssetTypes.EnvironmentMap)
-            .Select(c => (int?)c.Candidate.Asset!.AssetId));
+        var thumbnails = await _thumbnails.ResolveAsync(
+            candidates
+                .Where(c => c.Candidate.Asset is not null)
+                .Select(c => new AssetThumbnailRef(
+                    c.Candidate.Asset!.AssetType, c.Candidate.Asset.AssetId, c.Candidate.Asset.VersionId)),
+            cancellationToken);
+
         var materialIds = Distinct(candidates.Select(c => c.Candidate.Material?.MaterialId));
         var textureSetIds = Distinct(candidates.Select(c => c.Candidate.Material?.TextureSetId));
 
-        var versions = versionIds.Count == 0
-            ? Array.Empty<ModelVersion>()
-            : await _modelVersions.GetWithThumbnailsByIdsAsync(versionIds, cancellationToken);
-        var sprites = spriteIds.Count == 0
-            ? Array.Empty<Sprite>()
-            : await _sprites.GetByIdsAsync(spriteIds, cancellationToken);
-        var environmentMaps = environmentMapIds.Count == 0
-            ? Array.Empty<EnvironmentMap>()
-            : await _environmentMaps.GetByIdsAsync(environmentMapIds, cancellationToken);
         var materials = materialIds.Count == 0
             ? Array.Empty<Material>()
             : await _materials.GetByIdsAsync(materialIds, cancellationToken);
@@ -139,9 +126,6 @@ internal sealed class SceneCandidateMediaProvider : ISceneCandidateMedia
             ? Array.Empty<TextureSet>()
             : await _textureSets.GetByIdsAsync(textureSetIds, cancellationToken);
 
-        var versionsById = versions.ToDictionary(v => v.Id);
-        var spritesById = sprites.ToDictionary(s => s.Id);
-        var environmentMapsById = environmentMaps.ToDictionary(e => e.Id);
         var materialsById = materials.ToDictionary(m => m.Id);
         var textureSetsById = textureSets.ToDictionary(t => t.Id);
 
@@ -149,9 +133,14 @@ internal sealed class SceneCandidateMediaProvider : ISceneCandidateMedia
 
         foreach (var (slot, candidate) in candidates)
         {
-            var (assetUrl, assetStatus) = candidate.Asset is null
-                ? (null, SceneCandidateMediaStatus.Unknown)
-                : DescribeAsset(candidate.Asset, versionsById, spritesById, environmentMapsById);
+            var thumbnail = candidate.Asset is null
+                ? null
+                : thumbnails.GetValueOrDefault(
+                    new AssetThumbnailRef(
+                        candidate.Asset.AssetType, candidate.Asset.AssetId, candidate.Asset.VersionId).Key);
+
+            var assetUrl = thumbnail?.Url;
+            var assetStatus = thumbnail?.Status ?? SceneCandidateMediaStatus.Unknown;
 
             string? materialUrl = null;
             SceneMaterialSwatch? swatch = null;
@@ -196,51 +185,6 @@ internal sealed class SceneCandidateMediaProvider : ISceneCandidateMedia
         }
 
         return media;
-    }
-
-    private static (string? Url, string Status) DescribeAsset(
-        SceneAssetRef asset,
-        IReadOnlyDictionary<int, ModelVersion> versions,
-        IReadOnlyDictionary<int, Sprite> sprites,
-        IReadOnlyDictionary<int, EnvironmentMap> environmentMaps)
-    {
-        switch (asset.AssetType)
-        {
-            case SceneAssetTypes.Model:
-                if (asset.VersionId is not { } versionId || !versions.TryGetValue(versionId, out var version))
-                {
-                    return (null, SceneCandidateMediaStatus.Unknown);
-                }
-
-                // Pinned to the candidate's own version, not the model's active one: choosing
-                // this candidate places THAT version, and a card showing a different one
-                // would be arguing for an asset the user is not about to get.
-                var thumbnail = version.Thumbnail;
-                if (thumbnail?.Status != ThumbnailStatus.Ready)
-                {
-                    return (null, thumbnail is null
-                        ? SceneCandidateMediaStatus.None
-                        : SceneCandidateMediaStatus.Pending);
-                }
-
-                return (
-                    $"/model-versions/{version.Id}/thumbnail/file?t={thumbnail.UpdatedAt:yyyyMMddHHmmss}",
-                    SceneCandidateMediaStatus.Ready);
-
-            case SceneAssetTypes.Sprite:
-                return sprites.TryGetValue(asset.AssetId, out var sprite)
-                    ? ($"/files/{sprite.FileId}/preview?channel=rgb", SceneCandidateMediaStatus.Ready)
-                    : (null, SceneCandidateMediaStatus.Unknown);
-
-            case SceneAssetTypes.EnvironmentMap:
-                return environmentMaps.TryGetValue(asset.AssetId, out var environmentMap)
-                    ? ($"/environment-maps/{environmentMap.Id}/preview?v={environmentMap.UpdatedAt.Ticks}",
-                       SceneCandidateMediaStatus.Ready)
-                    : (null, SceneCandidateMediaStatus.Unknown);
-
-            default:
-                return (null, SceneCandidateMediaStatus.Unknown);
-        }
     }
 
     /// <summary>

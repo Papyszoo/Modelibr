@@ -1,5 +1,6 @@
 using Application.Abstractions;
 using Application.Abstractions.Repositories;
+using Application.Media;
 using Application.Search;
 using Domain.Models;
 using Domain.Projects;
@@ -32,8 +33,14 @@ public class AssetSearchProfileResolutionTests
 
     private AssetSearchRequest? _captured;
 
+    private readonly Mock<IAssetThumbnails> _thumbnails = new();
+
     public AssetSearchProfileResolutionTests()
     {
+        _thumbnails
+            .Setup(t => t.ResolveAsync(It.IsAny<IEnumerable<AssetThumbnailRef>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, AssetThumbnail>(StringComparer.Ordinal));
+
         _search
             .Setup(r => r.SearchAssetsAsync(It.IsAny<AssetSearchRequest>(), It.IsAny<CancellationToken>()))
             .Callback<AssetSearchRequest, CancellationToken>((r, _) => _captured = r)
@@ -51,7 +58,8 @@ public class AssetSearchProfileResolutionTests
             clock.Object,
             new Mock<IUnitOfWork>().Object,
             _projects.Object,
-            _scenes.Object);
+            _scenes.Object,
+            _thumbnails.Object);
     }
 
     private void GivenProject(int id, string name, string? style = "Low Poly", int? budget = null)

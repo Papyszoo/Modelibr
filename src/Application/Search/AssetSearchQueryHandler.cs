@@ -2,6 +2,7 @@ using System.Text.Json;
 using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Media;
 using Domain.Models;
 using Domain.Services;
 using SharedKernel;
@@ -19,6 +20,7 @@ internal sealed class AssetSearchQueryHandler
     private readonly IUnitOfWork _unitOfWork;
     private readonly IProjectRepository _projects;
     private readonly ISceneRepository _scenes;
+    private readonly IAssetThumbnails _thumbnails;
 
     public AssetSearchQueryHandler(
         ISearchRepository searchRepository,
@@ -26,8 +28,10 @@ internal sealed class AssetSearchQueryHandler
         IDateTimeProvider dateTimeProvider,
         IUnitOfWork unitOfWork,
         IProjectRepository projects,
-        ISceneRepository scenes)
+        ISceneRepository scenes,
+        IAssetThumbnails thumbnails)
     {
+        _thumbnails = thumbnails;
         _searchRepository = searchRepository;
         _searchLogRepository = searchLogRepository;
         _dateTimeProvider = dateTimeProvider;
@@ -92,11 +96,39 @@ internal sealed class AssetSearchQueryHandler
             response = response with { Profile = unapplied };
         }
 
+        // The picture, resolved for the whole page in one read. Without it, showing ten
+        // candidates costs ten extra calls - and the choice cards resolve the same thing
+        // through the same service, so the two surfaces cannot disagree about whether a
+        // pinned asset has a preview.
+        response = response with { Hits = await WithMediaAsync(response.Hits, cancellationToken) };
+
         // Search logging from day one: one row per deliberate search - query,
         // filters, and the results shown in rank order.
         await LogSearchAsync(query, request, response, cancellationToken);
 
         return Result.Success(response);
+    }
+
+    private async Task<IReadOnlyList<AssetSearchHit>> WithMediaAsync(
+        IReadOnlyList<AssetSearchHit> hits,
+        CancellationToken cancellationToken)
+    {
+        if (hits.Count == 0)
+        {
+            return hits;
+        }
+
+        var thumbnails = await _thumbnails.ResolveAsync(
+            hits.Select(h => new AssetThumbnailRef(h.AssetType, h.AssetId, h.VersionId)),
+            cancellationToken);
+
+        return hits
+            .Select(hit => hit with
+            {
+                Media = thumbnails.GetValueOrDefault(
+                    new AssetThumbnailRef(hit.AssetType, hit.AssetId, hit.VersionId).Key),
+            })
+            .ToList();
     }
 
     private async Task LogSearchAsync(

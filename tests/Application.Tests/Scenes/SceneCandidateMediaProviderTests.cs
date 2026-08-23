@@ -1,4 +1,5 @@
 using Application.Abstractions.Repositories;
+using Application.Media;
 using Application.Scenes;
 using Domain.Models;
 using Domain.Scenes;
@@ -40,8 +41,11 @@ public class SceneCandidateMediaProviderTests
             .ReturnsAsync((IReadOnlyCollection<int> ids, CancellationToken _) =>
                 (IReadOnlyList<Material>)_givenMaterials.Where(m => ids.Contains(m.Id)).ToList());
 
+        // The real thumbnail resolver rather than a mock of it: the point of extracting it
+        // was that a card and a search hit answer the same question the same way, and a
+        // stubbed answer here would stop testing that.
         _provider = new SceneCandidateMediaProvider(
-            _versions.Object, _sprites.Object, _environmentMaps.Object,
+            new AssetThumbnailProvider(_versions.Object, _sprites.Object, _environmentMaps.Object),
             _materials.Object, _textureSets.Object);
     }
 

@@ -25,6 +25,7 @@ namespace Application
             services.AddScoped<Application.Scenes.ISceneCandidateMedia, Application.Scenes.SceneCandidateMediaProvider>();
             services.AddScoped<Application.Scenes.ISceneProjectConstraints, Application.Scenes.SceneProjectConstraintsProvider>();
             services.AddScoped<Application.Metadata.IAssetEntityMetadata, Application.Metadata.AssetEntityMetadataGateway>();
+            services.AddScoped<Application.Media.IAssetThumbnails, Application.Media.AssetThumbnailProvider>();
 
             // Store importer (v0.5 prompt 05): the orchestrator and its 1:1 handler adapter.
             // The HTTP client, queue and progress notifier are infrastructure/host concerns

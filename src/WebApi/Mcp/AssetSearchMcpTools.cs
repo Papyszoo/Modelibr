@@ -89,6 +89,156 @@ public sealed class AssetSearchMcpTools
             };
     }
 
+    /// <summary>
+    /// One question in a batch of them. Deliberately a small subset of <c>search_assets</c>'s
+    /// arguments: a batch is for asking ten similar questions at once, and a per-entry copy
+    /// of thirty filters would be a second search contract to keep in step with the first.
+    /// </summary>
+    public sealed record SearchRequest(
+        [property: Description("Free-text query for this entry.")] string Query,
+        [property: Description("Your own label for this entry, echoed back so you can match answers to questions. Defaults to the query.")] string? Label = null,
+        [property: Description("Max results for this entry (1-100). Falls back to the call's limit.")] int? Limit = null,
+        [property: Description("Asset type filter for this entry, e.g. Model.")] string? AssetType = null,
+        [property: Description("Minimum triangle count for this entry.")] int? MinTriangles = null,
+        [property: Description("Maximum triangle count for this entry.")] int? MaxTriangles = null,
+        [property: Description("Minimum size for this entry: longest axis in metres.")] double? MinSize = null,
+        [property: Description("Maximum size for this entry: longest axis in metres.")] double? MaxSize = null,
+        [property: Description("Category filter for this entry.")] string? Category = null);
+
+    [McpServerTool(Name = "search_many")]
+    [Description("Run several searches in ONE call. A scene brief is a batch of questions - a sofa, a coffee table, a rug, " +
+                 "two lamps - and asking them one at a time is one round trip each, every one of them re-entering your context. " +
+                 "Each entry gets its own query and optional filters; projectId/sceneId and applyProfile are set once for the " +
+                 "whole call, because a brief is searched on behalf of one project. " +
+                 "Answers come back in request order, each with your own label, so nothing has to be matched up by guessing. " +
+                 "An entry that fails does not fail the batch - it comes back with its own error and the others still answer.")]
+    public static async Task<object> SearchMany(
+        IQueryHandler<AssetSearchQuery, AssetSearchResponse> handler,
+        [Description("The searches to run. Two to twenty is the useful range.")] SearchRequest[] searches,
+        [Description("Default max results per entry (1-100).")] int limit = 10,
+        [Description("Search every entry on behalf of this project: its style ranks the results and its budget rides along.")] int? projectId = null,
+        [Description("Search on behalf of this scene's project. A shortcut for looking the project up yourself.")] int? sceneId = null,
+        [Description("How much of the project's profile to apply: bias (default), enforce or off.")] string? applyProfile = null,
+        CancellationToken cancellationToken = default)
+    {
+        var entries = searches ?? [];
+
+        if (entries.Length == 0)
+        {
+            return new { error = "EmptyBatch", message = "searches is empty; pass at least one query." };
+        }
+
+        if (entries.Length > MaxBatchedSearches)
+        {
+            return new
+            {
+                error = "TooManySearches",
+                message = $"searches has {entries.Length} entries; at most {MaxBatchedSearches} run in one call. Split the brief.",
+            };
+        }
+
+        var results = new List<object>(entries.Length);
+
+        for (var index = 0; index < entries.Length; index++)
+        {
+            var entry = entries[index];
+            var label = entry.Label ?? entry.Query;
+
+            var result = await handler.Handle(
+                new AssetSearchQuery(
+                    entry.Query,
+                    entry.Limit ?? limit,
+                    AssetType: entry.AssetType,
+                    MinTriangles: entry.MinTriangles,
+                    MaxTriangles: entry.MaxTriangles,
+                    MinSize: entry.MinSize,
+                    MaxSize: entry.MaxSize,
+                    Category: entry.Category,
+                    ProjectId: projectId,
+                    SceneId: sceneId,
+                    ApplyProfile: applyProfile),
+                cancellationToken);
+
+            // One bad entry does not lose the nine good answers. A batch that failed whole
+            // would make the batching worse than the loop it replaces.
+            results.Add(result.IsFailure
+                ? new { index, label, query = entry.Query, error = result.Error.Code, message = result.Error.Message }
+                : new
+                {
+                    index,
+                    label,
+                    query = entry.Query,
+                    hits = (object)result.Value.Hits,
+                    totalCount = result.Value.TotalCount,
+                    profile = result.Value.Profile,
+                });
+        }
+
+        return new { searches = results, count = results.Count };
+    }
+
+    /// <summary>Cap on one batched read. Twenty is more questions than any one brief has.</summary>
+    private const int MaxBatchedSearches = 20;
+
+    /// <summary>One asset to look up in a batch.</summary>
+    public sealed record AssetRequest(
+        [property: Description("Asset family, e.g. Model.")] string AssetType,
+        [property: Description("Asset id.")] int AssetId,
+        [property: Description("Version to inspect - use the search hit's versionId. Defaults to the active version.")] int? VersionId = null);
+
+    [McpServerTool(Name = "get_assets")]
+    [Description("Get the derived metadata, parts and material slots for SEVERAL assets in one call. " +
+                 "Use this after a search rather than one get_asset per hit: comparing ten candidates was ten round trips. " +
+                 "Pass each hit's versionId, or you get answers about whatever version is active rather than the one you saw. " +
+                 "Answers come back in request order; one that cannot be read carries its own error and the rest still answer.")]
+    public static async Task<object> GetAssets(
+        IQueryHandler<GetAssetMetadataQuery, AssetMetadataResponse> handler,
+        [Description("The assets to look up.")] AssetRequest[] assets,
+        CancellationToken cancellationToken = default)
+    {
+        var entries = assets ?? [];
+
+        if (entries.Length == 0)
+        {
+            return new { error = "EmptyBatch", message = "assets is empty; pass at least one asset." };
+        }
+
+        if (entries.Length > MaxBatchedAssets)
+        {
+            return new
+            {
+                error = "TooManyAssets",
+                message = $"assets has {entries.Length} entries; at most {MaxBatchedAssets} are read in one call.",
+            };
+        }
+
+        var results = new List<object>(entries.Length);
+
+        for (var index = 0; index < entries.Length; index++)
+        {
+            var entry = entries[index];
+            var result = await handler.Handle(
+                new GetAssetMetadataQuery(entry.AssetType, entry.AssetId, VersionId: entry.VersionId),
+                cancellationToken);
+
+            results.Add(result.IsFailure
+                ? new
+                {
+                    index,
+                    assetType = entry.AssetType,
+                    assetId = entry.AssetId,
+                    error = result.Error.Code,
+                    message = result.Error.Message,
+                }
+                : new { index, assetType = entry.AssetType, assetId = entry.AssetId, asset = (object)result.Value });
+        }
+
+        return new { assets = results, count = results.Count };
+    }
+
+    /// <summary>Cap on one batched metadata read, matching the search cap's intent.</summary>
+    private const int MaxBatchedAssets = 50;
+
     [McpServerTool(Name = "get_asset")]
     [Description("Get the derived metadata, part list and material slot names for an asset. " +
                  "Pass the versionId from the search hit you are inspecting: without it this answers " +
