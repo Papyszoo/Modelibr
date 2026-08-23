@@ -25,7 +25,7 @@ public sealed class AssetMetadataWriteMcpTools
         McpCallerContext caller,
         [Description("Asset family, e.g. Model.")] string assetType,
         [Description("Asset id.")] int assetId,
-        [Description("JSON object of schema field keys to values, e.g. {\"license\":\"CC0\",\"styles\":[\"Low Poly\"],\"author\":\"Kenney\"}. Call get_metadata_schema for the keys.")] JsonElement fields,
+        [Description("JSON object of schema field keys to values, e.g. {\"license\":\"CC0\",\"styles\":[\"Low Poly\"],\"author\":\"Kenney\"}. A JSON string holding that object is accepted too. Call get_metadata_schema for the keys.")] JsonElement fields,
         [Description("Unique key so a retried call does not re-apply.")] string idempotencyKey,
         [Description("Optional batch id. Writes sharing one can be undone together with reverse_operation.")] string? batchId = null,
         CancellationToken cancellationToken = default)
@@ -36,17 +36,22 @@ public sealed class AssetMetadataWriteMcpTools
             new AgentWrite(idempotencyKey, "set-asset-metadata", assetType, assetId, BatchId: batchId),
             async ct =>
             {
-                if (fields.ValueKind != JsonValueKind.Object)
+                // `fields` is a JsonElement, which the schema generator cannot describe - it
+                // emits no `type` for the parameter at all. Clients that must pick one send
+                // the patch as a JSON *string*, so accept that shape as well: refusing it
+                // left this tool uncallable from any such client.
+                if (!TryReadPatch(fields, out var fieldsObject))
                 {
                     return Failed(new
                     {
                         error = "InvalidMetadataPatch",
-                        message = "`fields` must be a JSON object of schema field keys to values."
+                        message = "`fields` must be a JSON object of schema field keys to values, "
+                            + "or a JSON string holding one."
                     });
                 }
 
                 var patch = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
-                foreach (var property in fields.EnumerateObject())
+                foreach (var property in fieldsObject.EnumerateObject())
                 {
                     patch[property.Name] = property.Value.Clone();
                 }
@@ -73,5 +78,44 @@ public sealed class AssetMetadataWriteMcpTools
                     before.IsSuccess ? before.Value : null);
             },
             cancellationToken);
+    }
+
+    /// <summary>
+    /// Resolves the two shapes <c>fields</c> arrives in: a JSON object from a client that can
+    /// send one, and a JSON string holding that object from a client that cannot. Anything
+    /// else - including a string that does not parse, or parses to a non-object - is refused.
+    /// </summary>
+    private static bool TryReadPatch(JsonElement fields, out JsonElement patch)
+    {
+        if (fields.ValueKind == JsonValueKind.Object)
+        {
+            patch = fields;
+            return true;
+        }
+
+        if (fields.ValueKind == JsonValueKind.String)
+        {
+            var raw = fields.GetString();
+            if (!string.IsNullOrWhiteSpace(raw))
+            {
+                try
+                {
+                    using var parsed = JsonDocument.Parse(raw);
+                    if (parsed.RootElement.ValueKind == JsonValueKind.Object)
+                    {
+                        // Clone so the value outlives the JsonDocument being disposed here.
+                        patch = parsed.RootElement.Clone();
+                        return true;
+                    }
+                }
+                catch (JsonException)
+                {
+                    // Falls through to the refusal below, which names both accepted shapes.
+                }
+            }
+        }
+
+        patch = default;
+        return false;
     }
 }
