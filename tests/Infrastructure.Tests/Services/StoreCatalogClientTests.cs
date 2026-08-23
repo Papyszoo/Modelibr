@@ -321,7 +321,8 @@ public class StoreCatalogClientTests
         Assert.All(result.Value.Assets, a =>
         {
             Assert.Null(a.MatchedItems);
-            Assert.Equal(0, a.MatchedItemCount);
+            // Null, not 0 - a count of zero would read as "nothing inside matched".
+            Assert.Null(a.MatchedItemCount);
         });
     }
 }

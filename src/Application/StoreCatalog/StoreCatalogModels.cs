@@ -49,7 +49,10 @@ public sealed record StoreCatalogAsset(
     IReadOnlyList<StoreCatalogItem>? Items = null,
     IReadOnlyList<StoreCatalogPreview>? Previews = null,
     IReadOnlyList<StoreCatalogMatchedItem>? MatchedItems = null,
-    int MatchedItemCount = 0);
+    // Nullable, and null whenever MatchedItems is: a plain 0 alongside an absent list reads
+    // as "nothing inside this pack matched", which is the opposite of "this store cannot
+    // search inside packs". The two must be absent together or present together.
+    int? MatchedItemCount = null);
 
 /// <summary>
 /// One item inside a pack whose name matched the search term.

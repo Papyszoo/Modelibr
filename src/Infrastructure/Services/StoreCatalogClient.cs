@@ -221,7 +221,8 @@ internal sealed class StoreCatalogClient : IStoreCatalogClient
             .Select(i => new StoreCatalogMatchedItem(
                 i.Id.ToString(), NullIfBlank(i.Name), NullIfBlank(i.ItemType)))
             .ToList(),
-        MatchedItemCount: dto.MatchedItemCount);
+        // Tied to MatchedItems so the pair is never half-answered.
+        MatchedItemCount: dto.MatchedItems is null ? null : dto.MatchedItemCount);
 
     private static void AddIfPresent(List<string> parameters, string name, string? value)
     {
