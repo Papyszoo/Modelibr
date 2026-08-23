@@ -47,6 +47,7 @@ export interface SceneDocument {
   environment?: SceneEnvironment | null
   stage?: SceneStage | null
   slots?: SceneSlot[]
+  recommendationSummary?: string | null
 }
 
 export interface SceneAnchor {
@@ -112,6 +113,7 @@ export interface SceneSlot {
   chosenCandidateId?: string | null
   resolvedBy?: SceneSlotResolver | null
   reopenedReason?: string | null
+  recommendedCandidateId?: string | null
 }
 
 export interface SceneSlotCandidate {

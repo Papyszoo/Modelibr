@@ -305,6 +305,28 @@ public static class SceneEndpoints
         .WithName("Resolve Scene Slot")
         .WithSummary("Settle a slot on one candidate, or reopen it");
 
+        // The UI's "Accept N recommendations" button, and the same rule as the single-choice
+        // endpoint: resolvedBy is fixed to "user" here rather than read from the body. An
+        // agent told "just choose sensible ones" keeps resolving as the agent - it may get its
+        // own batch verb one day, but it cannot travel through this contract to get the
+        // human's attribution.
+        app.MapPut("/scenes/{id}/slots/recommendations/accept", async (
+            int id,
+            AcceptSceneRecommendationsRequest request,
+            ICommandHandler<AcceptSceneRecommendationsCommand, SceneRecommendationsResponse> handler,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await handler.Handle(
+                new AcceptSceneRecommendationsCommand(
+                    id,
+                    (request.Choices ?? []).Select(c => new SceneRecommendation(c.SlotId, c.CandidateId)).ToList(),
+                    request.ExpectedRevision),
+                cancellationToken);
+            return result.IsFailure ? NotFoundOrFailure(result.Error) : Results.Ok(result.Value);
+        })
+        .WithName("Accept Scene Recommendations")
+        .WithSummary("Settle several slots on their recommended candidates, in one write");
+
         app.MapPost("/scenes/{id}/slots/{slotId}/rejections", async (
             int id,
             string slotId,
@@ -500,6 +522,18 @@ public record RejectSceneCandidatesRequest(
     IReadOnlyList<string>? CandidateIds = null,
     bool? All = null,
     int? ExpectedRevision = null);
+
+/// <summary>
+/// The slot/candidate pairs the user confirmed in the dialog. Sent back rather than derived
+/// server-side on purpose: the user accepted a specific list they were shown, and a
+/// recommendation that changed between rendering and clicking must fail rather than settle
+/// something they never saw.
+/// </summary>
+public record AcceptSceneRecommendationsRequest(
+    IReadOnlyList<SceneRecommendationRequest>? Choices,
+    int? ExpectedRevision = null);
+
+public record SceneRecommendationRequest(string SlotId, string CandidateId);
 
 public record SetSceneLightRequest(
     string? Type = null,

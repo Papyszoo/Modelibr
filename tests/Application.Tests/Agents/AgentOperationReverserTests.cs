@@ -46,6 +46,7 @@ public class AgentOperationReverserTests
     private readonly Mock<ICommandHandler<SetSceneStageCommand, SceneStageResponse>> _setSceneStage = new();
     private readonly Mock<ICommandHandler<DeleteSceneCommand>> _deleteScene = new();
     private readonly Mock<ICommandHandler<RestoreSceneSlotCommand, SceneSummary>> _restoreSceneSlot = new();
+    private readonly Mock<ICommandHandler<RestoreSceneRecommendationsCommand, SceneRecommendationsResponse>> _restoreSceneRecommendations = new();
     private readonly Mock<ICommandHandler<SetSceneProjectCommand, SetSceneProjectResponse>> _setSceneProject = new();
     private readonly Mock<ICommandHandler<SetAssetMetadataCommand, AssetMetadataResponse>> _setAssetMetadata = new();
 
@@ -60,7 +61,7 @@ public class AgentOperationReverserTests
             _deleteSprite.Object, _deleteEnvironmentMap.Object, _deleteTextureSet.Object,
             _removeSceneNode.Object, _restoreSceneNode.Object, _moveSceneNode.Object, _setSceneLight.Object,
             _applySceneMaterial.Object, _updateSceneDocument.Object, _setSceneStage.Object, _deleteScene.Object, _restoreSceneSlot.Object,
-            _setSceneProject.Object, _setAssetMetadata.Object);
+            _restoreSceneRecommendations.Object, _setSceneProject.Object, _setAssetMetadata.Object);
 
         _audit.Setup(a => a.TryMarkReversedAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);

@@ -241,6 +241,12 @@ export interface SceneSlotCandidateView {
   choosable: boolean
   /** What the card can draw. Null when there is nothing to draw. */
   media: SceneCandidateMedia | null
+  /**
+   * The agent advises this one. Never implies `chosen`: recommended-and-not-chosen,
+   * chosen-and-not-recommended and both are three different things to a user deciding
+   * whether their pick followed the advice or overruled it.
+   */
+  recommended: boolean
 }
 
 /** Where a thumbnail stands. A missing one is a normal state, not a broken image. */
@@ -285,11 +291,34 @@ export interface SceneSlotView {
   /** The user's reason for throwing out a whole round: "none of these, all too modern". */
   reopenedReason: string | null
   candidates: SceneSlotCandidateView[]
+  /** What the agent advises for this slot. Advice, never a decision. */
+  recommendedCandidateId: string | null
+  /**
+   * Whether a bulk accept may act on this slot's recommendation: it exists, the slot is
+   * unresolved, and the candidate is neither rejected nor a store proposal. Server-derived
+   * so the panel and the endpoint cannot disagree about which slots "Accept N" covers.
+   */
+  recommendationAcceptable: boolean
 }
 
 export interface SceneSlotsView {
   scene: SceneSummary
   slots: SceneSlotView[]
+  /** The agent's authored line about the recommended set as a whole. Shown verbatim. */
+  recommendationSummary: string | null
+}
+
+/** One slot/candidate pair, as sent to the bulk-accept endpoint. */
+export interface SceneRecommendationChoice {
+  slotId: string
+  candidateId: string
+}
+
+/** What the bulk accept returns: the scene's new revision and the slots it settled. */
+export interface SceneRecommendationsResponse {
+  scene: SceneSummary
+  slots: SceneSlotView[]
+  summary: string | null
 }
 
 /** What a slot write returns: the scene's new revision, and the slot as it now stands. */

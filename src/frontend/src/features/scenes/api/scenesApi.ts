@@ -8,6 +8,8 @@ import type {
   SceneAssetFacts,
   SceneAssetRef,
   SceneDocument,
+  SceneRecommendationChoice,
+  SceneRecommendationsResponse,
   SceneSlotsView,
   SceneSlotWriteResponse,
   SceneSummary,
@@ -116,6 +118,29 @@ export async function resolveSceneSlot(
 ): Promise<SceneSlotWriteResponse> {
   const response = await client.put<SceneSlotWriteResponse>(
     `/scenes/${sceneId}/slots/${encodeURIComponent(slotId)}/choice`,
+    input
+  )
+  return response.data
+}
+
+/**
+ * Settles several slots on their recommended candidates, in one write.
+ *
+ * Deliberately not a loop over `resolveSceneSlot`: each of those moves the scene's
+ * revision, so a conflict partway through would leave "Accept all" a lie - some
+ * slots settled, some not, and no single revision to report. The pairs the user
+ * confirmed are sent back so a recommendation that changed between rendering and
+ * clicking fails the whole call rather than settling something nobody saw.
+ */
+export async function acceptSceneRecommendations(
+  sceneId: number,
+  input: {
+    choices: SceneRecommendationChoice[]
+    expectedRevision?: number
+  }
+): Promise<SceneRecommendationsResponse> {
+  const response = await client.put<SceneRecommendationsResponse>(
+    `/scenes/${sceneId}/slots/recommendations/accept`,
     input
   )
   return response.data

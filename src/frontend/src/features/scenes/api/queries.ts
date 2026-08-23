@@ -7,13 +7,14 @@ import {
 
 import { type QueryConfig } from '@/lib/react-query'
 
-import type { SceneDocument } from '../types'
+import type { SceneDocument, SceneRecommendationChoice } from '../types'
 import {
   createScene,
   deleteScene,
   getSceneById,
   getScenes,
   getSceneSlots,
+  acceptSceneRecommendations,
   rejectSceneCandidates,
   renameScene,
   resolveSceneSlot,
@@ -203,6 +204,24 @@ export function useResolveSceneSlotMutation() {
       resolveSceneSlot(input.sceneId, input.slotId, {
         candidateId: input.candidateId,
         clear: input.clear,
+        expectedRevision: input.expectedRevision,
+      })
+  )
+}
+
+/**
+ * The "Accept N recommendations" action. One call, one revision - the whole reason
+ * this is not a loop over `useResolveSceneSlotMutation`.
+ */
+export function useAcceptSceneRecommendationsMutation() {
+  return useSlotWriteMutation(
+    (input: {
+      sceneId: number
+      choices: SceneRecommendationChoice[]
+      expectedRevision?: number
+    }) =>
+      acceptSceneRecommendations(input.sceneId, {
+        choices: input.choices,
         expectedRevision: input.expectedRevision,
       })
   )

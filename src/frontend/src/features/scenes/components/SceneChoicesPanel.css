@@ -312,3 +312,138 @@
   display: flex;
   gap: var(--mod-space-2xs);
 }
+
+/*
+ * Scene intent & recommendations (prompt 14-D).
+ *
+ * A collapsible header row that arranges facts already in the scene. With
+ * nothing recommended it is one line, so it costs the column almost nothing on
+ * the scenes that never get advice.
+ */
+.scene-choices-intent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-2xs);
+  padding: var(--mod-space-2xs);
+  border: 1px solid var(--mod-color-border);
+  border-radius: var(--mod-radius-sm);
+  background: var(--mod-color-surface-raised);
+}
+
+.scene-choices-intent-head {
+  display: flex;
+  align-items: center;
+  gap: var(--mod-space-2xs);
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.scene-choices-intent-title {
+  font-size: var(--mod-text-xs);
+  font-weight: var(--mod-font-weight-semibold);
+}
+
+.scene-choices-intent-counts {
+  margin-left: auto;
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+}
+
+.scene-choices-intent-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-2xs);
+}
+
+.scene-choices-intent-description,
+.scene-choices-intent-summary {
+  margin: 0;
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text);
+}
+
+.scene-choices-intent-summary {
+  color: var(--mod-color-text-muted);
+  font-style: italic;
+}
+
+.scene-choices-intent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.scene-choices-intent-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--mod-space-2xs);
+  font-size: var(--mod-text-xs);
+}
+
+.scene-choices-intent-ref {
+  font-family: monospace;
+  font-weight: var(--mod-font-weight-semibold);
+}
+
+.scene-choices-intent-label {
+  color: var(--mod-color-text-muted);
+}
+
+.scene-choices-intent-rationale {
+  flex: 1 1 100%;
+  color: var(--mod-color-text-muted);
+}
+
+/* Whether the human followed the advice or overruled it - the point of keeping
+   a recommendation on a resolved slot. */
+.scene-choices-intent-outcome {
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+}
+
+.scene-choices-confirm-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 0 var(--mod-space-xs);
+  padding: 0;
+  list-style: none;
+  font-family: monospace;
+  font-size: var(--mod-text-xs);
+}
+
+.scene-choices-confirm-actions {
+  display: flex;
+  gap: var(--mod-space-2xs);
+  justify-content: flex-end;
+  margin-top: var(--mod-space-xs);
+}
+
+/*
+ * Recommended is an outline, not a fill. --chosen owns the filled treatment,
+ * and a recommended card that read as selected would tell the user a decision
+ * had been made for them.
+ */
+.scene-choices-card--recommended:not(.scene-choices-card--chosen) {
+  border-color: var(--mod-color-primary);
+}
+
+.scene-choices-card-recommended {
+  flex: 0 0 auto;
+  padding: 0 4px;
+  border: 1px solid var(--mod-color-primary);
+  border-radius: var(--mod-radius-sm);
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}

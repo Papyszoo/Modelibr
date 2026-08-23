@@ -568,4 +568,221 @@ public class SceneSlotCommandTests
         Assert.True(result.IsFailure);
         Assert.Equal("Scene.RevisionConflict", result.Error.Code);
     }
+
+    private SetSceneRecommendationsCommandHandler Recommend =>
+        new(_writer, _facts.Object, _profiles.Object, _media.Object, _constraints.Object);
+
+    private RestoreSceneRecommendationsCommandHandler RestoreRecommendations =>
+        new(_writer, _facts.Object, _profiles.Object, _media.Object, _constraints.Object);
+
+    private AcceptSceneRecommendationsCommandHandler Accept =>
+        new(_writer, _facts.Object, _profiles.Object, _media.Object, _constraints.Object);
+
+    [Fact]
+    public async Task Recommending_A_Candidate_Advises_Without_Deciding()
+    {
+        // The whole separation: the agent may say which one it would pick and still leave the
+        // picking to the user. A verb that did both would have no way to advise.
+        await ProposeTwo();
+
+        var result = await Recommend.Handle(
+            new SetSceneRecommendationsCommand(
+                SceneId, [new SceneRecommendation(Slot, "B")], "warm and low-poly throughout"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Message : null);
+        var slot = result.Value.Slots.Single();
+        Assert.Equal("B", slot.RecommendedCandidateId);
+        Assert.True(slot.RecommendationAcceptable);
+        Assert.Null(slot.ChosenCandidateId);
+        Assert.Null(slot.ResolvedBy);
+        Assert.Equal(SceneSlotStatuses.Proposed, slot.Status);
+        Assert.Equal("warm and low-poly throughout", result.Value.Summary);
+        // The node keeps wearing what it wore - advice moves nothing.
+        Assert.Equal(LampId, SceneDocumentCodec.Parse(_scene.DocumentJson).Value.Nodes[0].Asset!.AssetId);
+    }
+
+    [Fact]
+    public async Task A_Recommendation_Marks_Its_Card_Without_Marking_It_Chosen()
+    {
+        await ProposeTwo();
+        await Recommend.Handle(
+            new SetSceneRecommendationsCommand(SceneId, [new SceneRecommendation(Slot, "B")]),
+            CancellationToken.None);
+
+        var view = await Slots.Handle(new GetSceneSlotsQuery(SceneId), CancellationToken.None);
+        var candidate = view.Value.Slots.Single().Candidates.Single(c => c.Id == "B");
+
+        Assert.True(candidate.Recommended);
+        Assert.False(candidate.Chosen);
+    }
+
+    [Fact]
+    public async Task Recommending_Replaces_The_Whole_Set_So_An_Omitted_Slot_Stops_Being_Advised()
+    {
+        // One statement about the scene, not an accumulation of per-slot edits nobody can see
+        // the shape of.
+        await ProposeTwo();
+        await Recommend.Handle(
+            new SetSceneRecommendationsCommand(SceneId, [new SceneRecommendation(Slot, "B")]),
+            CancellationToken.None);
+
+        var result = await Recommend.Handle(
+            new SetSceneRecommendationsCommand(SceneId, []), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(SceneDocumentCodec.Parse(_scene.DocumentJson).Value.Slots!.Single().RecommendedCandidateId);
+    }
+
+    [Fact]
+    public async Task Recommending_A_Rejected_Candidate_Is_Refused()
+    {
+        await ProposeTwo();
+        await Reject.Handle(
+            new RejectSceneCandidatesCommand(SceneId, Slot, ["B"], "too modern"), CancellationToken.None);
+
+        var result = await Recommend.Handle(
+            new SetSceneRecommendationsCommand(SceneId, [new SceneRecommendation(Slot, "B")]),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.CandidateRejected", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task A_Recommendation_Survives_Its_Candidate_Being_Rejected_But_Stops_Being_Acceptable()
+    {
+        // Kept as history so the panel can still say what was advised; excluded from bulk
+        // approval so it cannot be acted on.
+        await ProposeTwo();
+        await Recommend.Handle(
+            new SetSceneRecommendationsCommand(SceneId, [new SceneRecommendation(Slot, "B")]),
+            CancellationToken.None);
+        await Reject.Handle(
+            new RejectSceneCandidatesCommand(SceneId, Slot, ["B"], "too modern"), CancellationToken.None);
+
+        var view = await Slots.Handle(new GetSceneSlotsQuery(SceneId), CancellationToken.None);
+        var slot = view.Value.Slots.Single();
+
+        Assert.Equal("B", slot.RecommendedCandidateId);
+        Assert.False(slot.RecommendationAcceptable);
+    }
+
+    [Fact]
+    public async Task Undoing_A_Recommendation_Write_Restores_The_Whole_Previous_Set()
+    {
+        await ProposeTwo();
+        await Recommend.Handle(
+            new SetSceneRecommendationsCommand(SceneId, [new SceneRecommendation(Slot, "B")], "first take"),
+            CancellationToken.None);
+
+        var replaced = await Recommend.Handle(
+            new SetSceneRecommendationsCommand(SceneId, [new SceneRecommendation(Slot, "C")], "second take"),
+            CancellationToken.None);
+
+        var previous = replaced.Value.Previous!;
+        Assert.Equal("first take", previous.Summary);
+
+        await RestoreRecommendations.Handle(
+            new RestoreSceneRecommendationsCommand(SceneId, previous.Recommendations, previous.Summary),
+            CancellationToken.None);
+
+        var document = SceneDocumentCodec.Parse(_scene.DocumentJson).Value;
+        Assert.Equal("B", document.Slots!.Single().RecommendedCandidateId);
+        Assert.Equal("first take", document.RecommendationSummary);
+    }
+
+    [Fact]
+    public async Task Accepting_A_Recommendation_Settles_The_Slot_As_The_User()
+    {
+        await ProposeTwo();
+        await Recommend.Handle(
+            new SetSceneRecommendationsCommand(SceneId, [new SceneRecommendation(Slot, "B")]),
+            CancellationToken.None);
+
+        var result = await Accept.Handle(
+            new AcceptSceneRecommendationsCommand(SceneId, [new SceneRecommendation(Slot, "B")]),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Message : null);
+        var slot = result.Value.Slots.Single();
+        Assert.Equal("B", slot.ChosenCandidateId);
+        Assert.Equal(SceneSlotResolvers.User, slot.ResolvedBy);
+        // The choice reached the node, exactly as a single resolve would.
+        Assert.Equal(OtherLampId, SceneDocumentCodec.Parse(_scene.DocumentJson).Value.Nodes[0].Asset!.AssetId);
+    }
+
+    [Fact]
+    public async Task Accepting_A_Recommendation_That_Has_Since_Changed_Settles_Nothing()
+    {
+        // "Accept all" has to be all: a stale pair changes nothing, rather than settling the
+        // slots before it and reporting a partial success as success.
+        await ProposeTwo();
+        await Recommend.Handle(
+            new SetSceneRecommendationsCommand(SceneId, [new SceneRecommendation(Slot, "C")]),
+            CancellationToken.None);
+
+        var result = await Accept.Handle(
+            new AcceptSceneRecommendationsCommand(SceneId, [new SceneRecommendation(Slot, "B")]),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.RecommendationChanged", result.Error.Code);
+        Assert.Null(SceneDocumentCodec.Parse(_scene.DocumentJson).Value.Slots!.Single().ChosenCandidateId);
+    }
+
+    [Fact]
+    public async Task Accepting_A_Slot_Somebody_Already_Settled_Is_Refused()
+    {
+        await ProposeTwo();
+        await Recommend.Handle(
+            new SetSceneRecommendationsCommand(SceneId, [new SceneRecommendation(Slot, "B")]),
+            CancellationToken.None);
+        await Resolve.Handle(
+            new ResolveSceneSlotCommand(SceneId, Slot, "C", SceneSlotResolvers.User), CancellationToken.None);
+
+        var result = await Accept.Handle(
+            new AcceptSceneRecommendationsCommand(SceneId, [new SceneRecommendation(Slot, "B")]),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.SlotAlreadyResolved", result.Error.Code);
+        // The recommendation is kept on a resolved slot, which is what lets the UI say the
+        // user overruled it.
+        var document = SceneDocumentCodec.Parse(_scene.DocumentJson).Value;
+        Assert.Equal("B", document.Slots!.Single().RecommendedCandidateId);
+        Assert.Equal("C", document.Slots!.Single().ChosenCandidateId);
+    }
+
+    [Fact]
+    public async Task Recommending_A_Slot_Twice_In_One_Call_Is_Refused()
+    {
+        await ProposeTwo();
+
+        var result = await Recommend.Handle(
+            new SetSceneRecommendationsCommand(
+                SceneId, [new SceneRecommendation(Slot, "B"), new SceneRecommendation(Slot, "C")]),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.DuplicateRecommendation", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task A_Recommendation_Summary_Beyond_The_Cap_Is_Refused()
+    {
+        // Bounded so the field stays the one to three sentences the user reads, rather than
+        // becoming the place an agent parks its deliberation.
+        await ProposeTwo();
+
+        var result = await Recommend.Handle(
+            new SetSceneRecommendationsCommand(
+                SceneId,
+                [new SceneRecommendation(Slot, "B")],
+                new string('x', SceneDocumentValidator.MaxRecommendationSummaryLength + 1)),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Contains("RecommendationSummaryTooLong", result.Error.Message);
+    }
 }

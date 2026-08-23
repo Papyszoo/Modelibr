@@ -32,7 +32,12 @@ public sealed record SceneDocument(
     IReadOnlyList<SceneLight> Lights,
     SceneEnvironment? Environment = null,
     string? Stage = null,
-    IReadOnlyList<SceneSlot>? Slots = null)
+    IReadOnlyList<SceneSlot>? Slots = null,
+    // 1-3 sentences of authored, user-facing rationale about the recommended set as a whole -
+    // what direction it takes and what it trades away. Deliberately NOT a scratch pad or a
+    // deliberation transcript: it is shown to the user verbatim, and its length is bounded by
+    // the validator so it cannot become one.
+    string? RecommendationSummary = null)
 {
     /// <summary>
     /// The only schema version this build reads or writes.
@@ -212,6 +217,12 @@ public sealed record SceneMaterialBinding(
 /// feedback, not deletions: they are what stops the next round proposing the same asset again,
 /// and what lets the UI grey out what was already ruled out instead of silently re-offering it.
 /// </param>
+/// <param name="RecommendedCandidateId">
+/// The candidate the agent currently advises. <b>Advice, not a decision</b>: setting it never
+/// changes the node, <paramref name="ChosenCandidateId"/> or <paramref name="ResolvedBy"/>,
+/// and the user is free to pick a different one. It survives its candidate being rejected, so
+/// a resolved slot can still say whether the human followed the advice or overruled it.
+/// </param>
 /// <param name="ChosenCandidateId">
 /// The candidate whose asset and material the slot's node currently wears, or null while the
 /// slot is still open. Never names a rejected candidate - the validator rejects that document
@@ -233,7 +244,8 @@ public sealed record SceneSlot(
     string? Brief = null,
     string? ChosenCandidateId = null,
     string? ResolvedBy = null,
-    string? ReopenedReason = null)
+    string? ReopenedReason = null,
+    string? RecommendedCandidateId = null)
 {
     /// <summary>
     /// Where this slot stands, derived rather than stored.
@@ -255,6 +267,22 @@ public sealed record SceneSlot(
 
     /// <summary>The candidate the slot's node is currently wearing, if the slot is resolved.</summary>
     public SceneSlotCandidate? Chosen => Candidate(ChosenCandidateId);
+
+    /// <summary>The candidate the agent currently advises, if any. Advice, never a decision.</summary>
+    public SceneSlotCandidate? Recommended => Candidate(RecommendedCandidateId);
+
+    /// <summary>
+    /// Whether this recommendation can be accepted as it stands.
+    ///
+    /// A recommendation survives its candidate being rejected - the pointer stays as history,
+    /// so the UI can still say what was advised and what the user did instead - but a rejected
+    /// or already-chosen one is not something a bulk accept may act on. Kept here rather than
+    /// re-derived by each reader, because "recommended" and "acceptable" being the same test
+    /// in three places is how they stop being the same test.
+    /// </summary>
+    public bool HasAcceptableRecommendation =>
+        ChosenCandidateId is null
+        && Recommended is { IsRejected: false, IsFromStore: false };
 }
 
 /// <summary>

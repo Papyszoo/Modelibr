@@ -597,6 +597,74 @@ public sealed class SceneWriteMcpTools
         [property: Description("What it costs. 0 means you could import it yourself with import_store_asset.")] decimal? StorePrice = null,
         [property: Description("Currency of the price, e.g. USD.")] string? StoreCurrency = null);
 
+    /// <summary>One slot and the candidate advised for it.</summary>
+    public sealed record SlotRecommendation(
+        [property: Description("The slot, e.g. 'sofa'.")] string SlotId,
+        [property: Description("The candidate in that slot you advise, e.g. 'B'.")] string CandidateId);
+
+    [McpServerTool(Name = "set_scene_recommendations")]
+    [Description("State which candidate you'd go with in each slot - WITHOUT choosing any of them. " +
+                 "This is advice the user can see, follow or overrule; it changes no node and resolves no slot. " +
+                 "Use it once you have proposed for several slots and want to say what combination you think works together, " +
+                 "instead of hinting by putting your favourite first - card order is not a recommendation and the UI will not read it as one. " +
+                 "It replaces the WHOLE set: a slot you leave out becomes unrecommended, so send every slot you still advise on. " +
+                 "Every candidate must exist and still be open - recommending something the user already rejected puts their own rejection back in front of them. " +
+                 "summary is one to three sentences the user reads verbatim about the direction the set takes and what it trades away " +
+                 "('warm walnut, cream fabric and matte brass keep the room cohesive while every hero prop stays under the project budget'). " +
+                 "It is NOT a place to record your deliberation, and its length is capped. " +
+                 "get_slots reads both back. The user can then accept the recommendations in one action in the app - which is recorded as THEIR choice, not yours.")]
+    public static Task<object> SetSceneRecommendations(
+        ICommandHandler<SetSceneRecommendationsCommand, SceneRecommendationsResponse> handler,
+        IAgentAudit audit,
+        McpCallerContext caller,
+        [Description("Target scene id.")] int sceneId,
+        [Description("The complete set of slot/candidate pairs you advise. Omitted slots become unrecommended.")] SlotRecommendation[] recommendations,
+        [Description("Unique key so a retried call does not restate the advice twice.")] string idempotencyKey,
+        [Description("One to three sentences on the set as a whole, shown to the user as written. Pass an empty string to clear it.")] string? summary = null,
+        [Description("Optional expected scene revision; the write is refused if the scene has moved on.")] int? expectedRevision = null,
+        [Description("Optional batch id. Writes sharing one can be undone together with reverse_operation.")] string? batchId = null,
+        CancellationToken cancellationToken = default)
+    {
+        return Guarded(
+            audit,
+            caller,
+            new AgentWrite(idempotencyKey, "set-scene-recommendations", "Scene", sceneId, BatchId: batchId),
+            async ct =>
+            {
+                var result = await handler.Handle(
+                    new SetSceneRecommendationsCommand(
+                        sceneId,
+                        (recommendations ?? []).Select(r => new SceneRecommendation(r.SlotId, r.CandidateId)).ToList(),
+                        summary,
+                        expectedRevision),
+                    ct);
+
+                if (result.IsFailure)
+                {
+                    return Failed(result.Error);
+                }
+
+                // The inverse is the set this replaced, summary included - the write states
+                // the whole set at once, so undoing one slot of it would leave the scene
+                // advising a combination nobody ever recommended.
+                return Applied(
+                    new
+                    {
+                        status = "ok",
+                        scene = result.Value.Scene,
+                        slots = result.Value.Slots,
+                        summary = result.Value.Summary,
+                    },
+                    "Scene", sceneId, result.Value,
+                    new
+                    {
+                        recommendations = result.Value.Previous?.Recommendations ?? [],
+                        summary = result.Value.Previous?.Summary,
+                    });
+            },
+            cancellationToken);
+    }
+
     [McpServerTool(Name = "propose_candidates")]
     [Description("Offer the user 2-4 options for one decision in a scene, instead of silently picking one. " +
                  "USE THIS FOR EVERY MEANINGFUL CHOICE - which building is the hero, what the road surface is, which of six sofas. " +

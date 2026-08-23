@@ -94,6 +94,38 @@ internal abstract class SceneSlotHandlerBase
 
         return SceneSlotViewBuilder.Describe(slot, document, facts, profiles, media, project);
     }
+
+    /// <summary>
+    /// Several slots at once, resolved in one pass rather than one <see cref="ProjectAsync"/>
+    /// call each - a bulk write that answered with N sequential lookups would give back the
+    /// cost it just saved.
+    /// </summary>
+    protected async Task<IReadOnlyList<SceneSlotView>> ProjectAllAsync(
+        SceneDocument document,
+        int sceneId,
+        IEnumerable<string> slotIds,
+        CancellationToken cancellationToken)
+    {
+        var wanted = slotIds.ToHashSet(StringComparer.Ordinal);
+        var slots = (document.Slots ?? Array.Empty<SceneSlot>())
+            .Where(slot => wanted.Contains(slot.Id))
+            .ToList();
+
+        var assets = slots
+            .SelectMany(slot => slot.Candidates)
+            .Where(c => c.Asset is not null)
+            .Select(c => c.Asset!)
+            .ToList();
+
+        var facts = await SceneFacts.ResolveAsync(assets, cancellationToken);
+        var profiles = await Profiles.ResolveAsync(assets, cancellationToken);
+        var media = await Media.ResolveAsync(document, cancellationToken);
+        var project = await Constraints.ForSceneAsync(sceneId, cancellationToken);
+
+        return slots
+            .Select(slot => SceneSlotViewBuilder.Describe(slot, document, facts, profiles, media, project))
+            .ToList();
+    }
 }
 
 internal sealed class ProposeSceneCandidatesCommandHandler
@@ -627,6 +659,7 @@ internal sealed class GetSceneSlotsQueryHandler : IQueryHandler<GetSceneSlotsQue
 
         return Result.Success(new SceneSlotsView(
             SceneViewBuilder.Summarize(scene, document),
-            SceneSlotViewBuilder.DescribeAll(document, facts, profiles, media, project)));
+            SceneSlotViewBuilder.DescribeAll(document, facts, profiles, media, project),
+            document.RecommendationSummary));
     }
 }

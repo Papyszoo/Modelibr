@@ -5,11 +5,12 @@ import { type JSX, useState } from 'react'
 
 import { MaterialSwatch } from '@/features/materials/components/MaterialSwatch'
 import { resolveApiAssetUrl } from '@/lib/apiBase'
-import { EmptyState } from '@/shared/components'
+import { Dialog, EmptyState } from '@/shared/components'
 
 import type {
   SceneCandidateFacts,
   SceneCandidateMedia,
+  SceneRecommendationChoice,
   SceneSlotCandidateView,
   SceneSlotView,
 } from '../types'
@@ -38,6 +39,14 @@ import type {
 interface SceneChoicesPanelProps {
   slots: SceneSlotView[]
   isLoading: boolean
+  /** The scene's own description, shown verbatim at the top of the review section. */
+  sceneDescription?: string | null
+  /** The agent's authored line about the recommended set. Shown verbatim; never synthesized here. */
+  recommendationSummary?: string | null
+  /** Settles every listed slot on its recommendation, in one write, as the user. */
+  onAcceptRecommendations?: (choices: SceneRecommendationChoice[]) => void
+  /** Set while the bulk accept is in flight - it belongs to no single slot, so busySlotId cannot express it. */
+  acceptBusy?: boolean
   /** The candidate being previewed in the viewport, as `slotId/candidateId`. */
   previewRef: string | null
   onPreview: (slot: SceneSlotView, candidate: SceneSlotCandidateView) => void
@@ -58,6 +67,10 @@ interface SceneChoicesPanelProps {
 export function SceneChoicesPanel({
   slots,
   isLoading,
+  sceneDescription = null,
+  recommendationSummary = null,
+  onAcceptRecommendations,
+  acceptBusy = false,
   previewRef,
   onPreview,
   onChoose,
@@ -77,6 +90,16 @@ export function SceneChoicesPanel({
   return (
     <section className="scene-choices" data-testid="scene-choices">
       <h4>Choices</h4>
+
+      {isLoading ? null : (
+        <SceneIntent
+          slots={slots}
+          sceneDescription={sceneDescription}
+          recommendationSummary={recommendationSummary}
+          busy={busySlotId !== null || blocked !== null || acceptBusy}
+          onAcceptRecommendations={onAcceptRecommendations}
+        />
+      )}
 
       {blocked ? <p className="scene-choices-blocked">{blocked}</p> : null}
 
@@ -98,6 +121,214 @@ export function SceneChoicesPanel({
         ))
       )}
     </section>
+  )
+}
+
+/**
+ * Scene intent & recommendations - what the agent was aiming at, and what it
+ * advises, above the cards.
+ *
+ * Every line here is an *authored* fact already in the scene or the slot view:
+ * the scene's own description, the agent's summary, the counts, and each
+ * recommended `slot/candidate` with the rationale it was proposed with. The
+ * browser does not synthesize prose about a set of cards, and it does not ask
+ * for or display private deliberation - there is no such field to show.
+ *
+ * With nothing recommended and no summary this stays a one-line status row
+ * rather than an empty decorative panel.
+ */
+function SceneIntent({
+  slots,
+  sceneDescription,
+  recommendationSummary,
+  busy,
+  onAcceptRecommendations,
+}: {
+  slots: SceneSlotView[]
+  sceneDescription: string | null
+  recommendationSummary: string | null
+  busy: boolean
+  onAcceptRecommendations?: (choices: SceneRecommendationChoice[]) => void
+}): JSX.Element | null {
+  const [expanded, setExpanded] = useState(true)
+  const [confirming, setConfirming] = useState(false)
+
+  const unresolved = slots.filter(slot => slot.status === 'proposed').length
+  const resolved = slots.filter(slot => slot.status === 'chosen').length
+  const rejected = slots.filter(slot => slot.status === 'rejected').length
+
+  // `recommendationAcceptable` is the server's answer, not a second copy of the
+  // rule: it already accounts for the slot being unresolved and the candidate
+  // being neither rejected nor a store proposal.
+  const acceptable = slots.filter(slot => slot.recommendationAcceptable)
+
+  const recommended = slots
+    .map(slot => ({
+      slot,
+      candidate:
+        slot.candidates.find(
+          candidate => candidate.id === slot.recommendedCandidateId
+        ) ?? null,
+    }))
+    .filter(
+      (
+        entry
+      ): entry is { slot: SceneSlotView; candidate: SceneSlotCandidateView } =>
+        entry.candidate !== null
+    )
+
+  const choices: SceneRecommendationChoice[] = acceptable.map(slot => ({
+    slotId: slot.slotId,
+    candidateId: slot.recommendedCandidateId as string,
+  }))
+
+  // Two is the threshold on purpose: accepting one recommendation is what the
+  // card's own choose button already is, and a bulk action for it would be a
+  // second path to the same write.
+  const canAcceptAll =
+    choices.length >= 2 && onAcceptRecommendations !== undefined
+
+  if (slots.length === 0) {
+    return null
+  }
+
+  return (
+    <div className="scene-choices-intent" data-testid="scene-choices-intent">
+      <button
+        type="button"
+        className="scene-choices-intent-head"
+        aria-expanded={expanded}
+        onClick={() => setExpanded(current => !current)}
+      >
+        <i
+          className={`pi ${expanded ? 'pi-chevron-down' : 'pi-chevron-right'}`}
+          aria-hidden="true"
+        />
+        <span className="scene-choices-intent-title">
+          Scene intent &amp; recommendations
+        </span>
+        <span
+          className="scene-choices-intent-counts"
+          data-testid="scene-choices-counts"
+        >
+          {unresolved} open · {resolved} settled · {rejected} rejected
+        </span>
+      </button>
+
+      {expanded ? (
+        <div className="scene-choices-intent-body">
+          {sceneDescription ? (
+            <p className="scene-choices-intent-description">
+              {sceneDescription}
+            </p>
+          ) : null}
+
+          {recommendationSummary ? (
+            <p
+              className="scene-choices-intent-summary"
+              data-testid="scene-choices-summary"
+            >
+              {recommendationSummary}
+            </p>
+          ) : null}
+
+          {recommended.length > 0 ? (
+            <ul className="scene-choices-intent-list">
+              {recommended.map(({ slot, candidate }) => (
+                <li key={slot.slotId}>
+                  <span className="scene-choices-intent-ref">
+                    {candidate.ref}
+                  </span>
+                  <span className="scene-choices-intent-label">
+                    {candidate.label ??
+                      candidate.facts?.name ??
+                      candidate.storeAsset?.title ??
+                      slot.slotId}
+                  </span>
+                  {/*
+                    The rationale it was proposed with, not a new one. A
+                    recommendation is a pointer at an existing candidate, so the
+                    argument for it is the argument already on the card.
+                  */}
+                  {candidate.rationale ? (
+                    <span className="scene-choices-intent-rationale">
+                      {candidate.rationale}
+                    </span>
+                  ) : null}
+                  {slot.chosenCandidateId !== null ? (
+                    <span className="scene-choices-intent-outcome">
+                      {slot.chosenCandidateId === candidate.id
+                        ? 'followed'
+                        : `overruled · chose ${slot.chosenCandidateId}`}
+                    </span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="scene-choices-note">
+              Nothing is recommended yet. Every slot is still an open question.
+            </p>
+          )}
+
+          {canAcceptAll ? (
+            <Button
+              label={`Accept ${choices.length} recommendations`}
+              icon="pi pi-check-circle"
+              size="small"
+              disabled={busy}
+              data-testid="scene-choices-accept-all"
+              onClick={() => setConfirming(true)}
+            />
+          ) : null}
+        </div>
+      ) : null}
+
+      {/*
+        The exact mappings, before anything is written. "Accept all" is one
+        irreversible-feeling action over several decisions, and the user has to
+        be able to see which decisions those are - and to cancel and keep
+        choosing card by card instead.
+      */}
+      <Dialog
+        open={confirming}
+        onClose={() => setConfirming(false)}
+        size="sm"
+        header={`Accept ${choices.length} recommendations`}
+      >
+        <ul
+          className="scene-choices-confirm-list"
+          data-testid="scene-choices-confirm-list"
+        >
+          {acceptable.map(slot => (
+            <li key={slot.slotId}>
+              <strong>{slot.slotId}</strong> → {slot.recommendedCandidateId}
+            </li>
+          ))}
+        </ul>
+        <p className="scene-choices-note">
+          These are recorded as your choices, not the agent&apos;s.
+        </p>
+        <div className="scene-choices-confirm-actions">
+          <Button
+            label="Accept"
+            size="small"
+            disabled={busy}
+            data-testid="scene-choices-accept-confirm"
+            onClick={() => {
+              setConfirming(false)
+              onAcceptRecommendations?.(choices)
+            }}
+          />
+          <Button
+            label="Cancel"
+            size="small"
+            text
+            onClick={() => setConfirming(false)}
+          />
+        </div>
+      </Dialog>
+    </div>
   )
 }
 
@@ -292,6 +523,10 @@ function CandidateCard({
   const classes = [
     'scene-choices-card',
     candidate.chosen ? 'scene-choices-card--chosen' : '',
+    // Marked, deliberately not styled as selected: "recommended" and "chosen"
+    // are different states, and a recommended card that looked chosen would
+    // misreport who decided.
+    candidate.recommended ? 'scene-choices-card--recommended' : '',
     candidate.rejected ? 'scene-choices-card--rejected' : '',
     previewing ? 'scene-choices-card--previewing' : '',
   ]
@@ -316,6 +551,14 @@ function CandidateCard({
           <CandidateMedia candidate={candidate} />
           <span className="scene-choices-card-heading">
             <span className="scene-choices-card-ref">{candidate.ref}</span>
+            {candidate.recommended ? (
+              <span
+                className="scene-choices-card-recommended"
+                data-testid={`scene-choices-recommended-${candidate.ref}`}
+              >
+                Recommended
+              </span>
+            ) : null}
             <span className="scene-choices-card-name">
               {candidate.label ??
                 candidate.storeAsset?.title ??

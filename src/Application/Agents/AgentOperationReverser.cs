@@ -107,6 +107,7 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
     private readonly ICommandHandler<SetSceneStageCommand, SceneStageResponse> _setSceneStage;
     private readonly ICommandHandler<DeleteSceneCommand> _deleteScene;
     private readonly ICommandHandler<RestoreSceneSlotCommand, SceneSummary> _restoreSceneSlot;
+    private readonly ICommandHandler<RestoreSceneRecommendationsCommand, SceneRecommendationsResponse> _restoreSceneRecommendations;
     private readonly ICommandHandler<SetSceneProjectCommand, SetSceneProjectResponse> _setSceneProject;
     private readonly ICommandHandler<SetAssetMetadataCommand, AssetMetadataResponse> _setAssetMetadata;
 
@@ -133,6 +134,7 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
         ICommandHandler<SetSceneStageCommand, SceneStageResponse> setSceneStage,
         ICommandHandler<DeleteSceneCommand> deleteScene,
         ICommandHandler<RestoreSceneSlotCommand, SceneSummary> restoreSceneSlot,
+        ICommandHandler<RestoreSceneRecommendationsCommand, SceneRecommendationsResponse> restoreSceneRecommendations,
         ICommandHandler<SetSceneProjectCommand, SetSceneProjectResponse> setSceneProject,
         ICommandHandler<SetAssetMetadataCommand, AssetMetadataResponse> setAssetMetadata)
     {
@@ -158,6 +160,7 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
         _setSceneStage = setSceneStage;
         _deleteScene = deleteScene;
         _restoreSceneSlot = restoreSceneSlot;
+        _restoreSceneRecommendations = restoreSceneRecommendations;
         _setSceneProject = setSceneProject;
         _setAssetMetadata = setAssetMetadata;
     }
@@ -324,6 +327,10 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
         "distribute-assets" => Step(entry, $"Remove the row of nodes this call placed in scene {entry.AssetId}.", destructive: false,
             supported: entry.PayloadBefore is not null,
             blocker: "The placed nodes' ids were not recorded."),
+
+        "set-scene-recommendations" => Step(entry, $"Put scene {entry.AssetId}'s recommendations back as they were.", destructive: false,
+            supported: entry.PayloadBefore is not null,
+            blocker: "The previous recommendation set was not recorded."),
 
         "place-assets-batch" => Step(entry, $"Remove the whole layout this call placed in scene {entry.AssetId}.", destructive: false,
             supported: entry.PayloadBefore is not null,
@@ -1064,6 +1071,33 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
                     : Result.Success(slot is null
                         ? $"Removed slot '{slotId}' from scene {entry.AssetId}, which is how it was before."
                         : $"Restored slot '{slotId}' in scene {entry.AssetId} to its previous state.");
+            }
+
+            case "set-scene-recommendations":
+            {
+                var before = Read(entry.PayloadBefore);
+                if (before is null)
+                {
+                    return Result.Failure<string>(new Error(
+                        "NoPriorState", "The previous recommendation set was not recorded."));
+                }
+
+                // The whole set at once, because that is what the forward write states. An
+                // undo that restored one slot would leave the scene advising a combination
+                // nobody ever recommended.
+                var recommendations =
+                    ReadPayload<List<SceneRecommendation>>(before.Value, "recommendations") ?? [];
+                var summary = ReadString(before.Value, "summary");
+
+                var result = await _restoreSceneRecommendations.Handle(
+                    new RestoreSceneRecommendationsCommand(entry.AssetId!.Value, recommendations, summary),
+                    cancellationToken);
+
+                return result.IsFailure
+                    ? Result.Failure<string>(result.Error)
+                    : Result.Success(recommendations.Count == 0
+                        ? $"Scene {entry.AssetId} recommends nothing again, as it did before."
+                        : $"Restored scene {entry.AssetId}'s previous {recommendations.Count} recommendation(s).");
             }
 
             case "create-scene":

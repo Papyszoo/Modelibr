@@ -10,6 +10,7 @@ import { ErrorState, ListHeader, LoadingState } from '@/shared/components'
 import { useSceneEditorStore } from '@/stores'
 
 import {
+  useAcceptSceneRecommendationsMutation,
   useRejectSceneCandidatesMutation,
   useResolveSceneSlotMutation,
   useSaveSceneDocumentMutation,
@@ -64,6 +65,7 @@ export function SceneEditor({
   const save = useSaveSceneDocumentMutation()
   const resolveSlot = useResolveSceneSlotMutation()
   const rejectCandidates = useRejectSceneCandidatesMutation()
+  const acceptRecommendations = useAcceptSceneRecommendationsMutation()
   const [saveError, setSaveError] = useState<string | null>(null)
 
   const {
@@ -633,6 +635,8 @@ export function SceneEditor({
           <SceneChoicesPanel
             slots={slots}
             isLoading={slotsLoading}
+            sceneDescription={view?.scene.description ?? null}
+            recommendationSummary={slotsView?.recommendationSummary ?? null}
             previewRef={preview?.ref ?? null}
             busySlotId={
               resolveSlot.isPending || rejectCandidates.isPending
@@ -640,6 +644,16 @@ export function SceneEditor({
                   rejectCandidates.variables?.slotId ??
                   null)
                 : null
+            }
+            acceptBusy={acceptRecommendations.isPending}
+            onAcceptRecommendations={choices =>
+              void runSlotWrite(() =>
+                acceptRecommendations.mutateAsync({
+                  sceneId,
+                  choices,
+                  expectedRevision: baseRevision ?? undefined,
+                })
+              )
             }
             blocked={slotsBlocked}
             onPreview={(slot, candidate) =>

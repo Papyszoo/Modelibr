@@ -25,6 +25,11 @@ namespace Application.Scenes;
 /// a download attached, and the card must not offer it as the same one-click choice.
 /// </param>
 /// <param name="Media">What the card can draw. Absent when there is nothing to draw.</param>
+/// <param name="Recommended">
+/// The agent advises this one. Never <paramref name="Chosen"/> by implication: a card can be
+/// recommended and not chosen, chosen and not recommended, or both - and the three read
+/// differently to a user deciding whether they were followed or overruled.
+/// </param>
 /// <param name="ProfileFit">
 /// How this candidate measures against the project the scene belongs to (prompt 13-D5), or
 /// null when it belongs to none. <b>Derived here, never taken from the rationale</b>: the
@@ -45,7 +50,8 @@ public sealed record SceneSlotCandidateView(
     SceneStoreAssetRef? StoreAsset = null,
     bool Choosable = true,
     SceneCandidateMedia? Media = null,
-    SceneCandidateProfileFit? ProfileFit = null);
+    SceneCandidateProfileFit? ProfileFit = null,
+    bool Recommended = false);
 
 /// <summary>
 /// A candidate measured against its scene's project (prompt 13-D5).
@@ -101,6 +107,16 @@ public sealed record SceneCandidateFacts(
 /// <summary>One open decision, its proposals, and where it stands.</summary>
 /// <param name="NodeId">The node in the scene this slot decides. Always present on a stored slot - a slot with no node fails validation.</param>
 /// <param name="Status">From <see cref="SceneSlotStatuses"/>, derived from the candidates rather than stored beside them.</param>
+/// <param name="RecommendedCandidateId">
+/// What the agent advises. Distinct from <paramref name="ChosenCandidateId"/> in both meaning
+/// and presentation: "recommended" and "chosen" are different states, and a card that looked
+/// selected because it was recommended would misreport who decided.
+/// </param>
+/// <param name="RecommendationAcceptable">
+/// Whether a bulk accept may act on this slot's recommendation - it exists, the slot is
+/// unresolved, and the candidate is neither rejected nor a store proposal. Computed here so
+/// the panel, the endpoint and the tests cannot disagree about it.
+/// </param>
 public sealed record SceneSlotView(
     string SlotId,
     string? NodeId,
@@ -109,10 +125,19 @@ public sealed record SceneSlotView(
     string? ChosenCandidateId,
     string? ResolvedBy,
     string? ReopenedReason,
-    IReadOnlyList<SceneSlotCandidateView> Candidates);
+    IReadOnlyList<SceneSlotCandidateView> Candidates,
+    string? RecommendedCandidateId = null,
+    bool RecommendationAcceptable = false);
 
 /// <summary>Every decision in a scene that is still, or was ever, the user's to make.</summary>
-public sealed record SceneSlotsView(SceneSummary Scene, IReadOnlyList<SceneSlotView> Slots);
+/// <param name="RecommendationSummary">
+/// The authored line about the recommended set as a whole. Shown verbatim; the browser does
+/// not synthesize prose about a set of cards.
+/// </param>
+public sealed record SceneSlotsView(
+    SceneSummary Scene,
+    IReadOnlyList<SceneSlotView> Slots,
+    string? RecommendationSummary = null);
 
 /// <summary>The response every slot write returns: the scene's new revision, and the slot as it now stands.</summary>
 public sealed record SceneSlotResponse(SceneSummary Scene, SceneSlotView Slot);
@@ -150,7 +175,9 @@ public static class SceneSlotViewBuilder
             slot.ChosenCandidateId,
             slot.ResolvedBy,
             slot.ReopenedReason,
-            slot.Candidates.Select(c => Describe(slot, c, facts, profiles, media, project)).ToList());
+            slot.Candidates.Select(c => Describe(slot, c, facts, profiles, media, project)).ToList(),
+            slot.RecommendedCandidateId,
+            slot.HasAcceptableRecommendation);
 
     public static SceneSlotCandidateView Describe(
         SceneSlot slot,
@@ -179,7 +206,8 @@ public static class SceneSlotViewBuilder
             // otherwise each get their own chance to forget the rule.
             Choosable: !candidate.IsFromStore,
             media is not null && media.TryGetValue(reference, out var found) ? found : null,
-            DescribeProfileFit(candidate.Asset, profiles, project));
+            DescribeProfileFit(candidate.Asset, profiles, project),
+            Recommended: string.Equals(slot.RecommendedCandidateId, candidate.Id, StringComparison.Ordinal));
     }
 
     public static IReadOnlyList<SceneSlotView> DescribeAll(

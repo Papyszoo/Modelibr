@@ -40,6 +40,15 @@ public static class SceneDocumentValidator
     public const int MaxIdLength = 128;
 
     /// <summary>
+    /// Ceiling on the recommendation summary, in characters.
+    ///
+    /// The field is specified as one to three sentences the user reads verbatim. A bound is
+    /// what keeps it that: without one it becomes the place an agent parks its deliberation,
+    /// and a scene document is not a transcript.
+    /// </summary>
+    public const int MaxRecommendationSummaryLength = 600;
+
+    /// <summary>
     /// Smallest accepted absolute scale factor on any axis. A zero scale collapses geometry
     /// to nothing and reads as an invisible node rather than an error; a negative one mirrors
     /// it, which is legal but must be deliberate, so only the magnitude is floored.
@@ -73,6 +82,7 @@ public static class SceneDocumentValidator
         }
 
         ValidateStage(document, issues);
+        ValidateRecommendationSummary(document, issues);
         ValidateNodes(document, issues);
         ValidateSlots(document, issues);
         ValidateLights(document, issues);
@@ -94,6 +104,17 @@ public static class SceneDocumentValidator
                 "stage",
                 "UnknownStage",
                 $"'{document.Stage}' is not a scene stage. Use one of: {string.Join(", ", SceneStages.All)} - or omit it to author the scene without stages."));
+        }
+    }
+
+    private static void ValidateRecommendationSummary(SceneDocument document, List<SceneValidationIssue> issues)
+    {
+        if (document.RecommendationSummary is { Length: > MaxRecommendationSummaryLength } summary)
+        {
+            issues.Add(new SceneValidationIssue(
+                "recommendationSummary",
+                "RecommendationSummaryTooLong",
+                $"recommendationSummary is {summary.Length} characters; at most {MaxRecommendationSummaryLength} are kept. It is one to three sentences the user reads as written, not a place to record deliberation."));
         }
     }
 
@@ -292,6 +313,19 @@ public static class SceneDocumentValidator
             }
 
             ValidateSlotCandidates(slot, path, issues);
+
+            // Advice that points at nothing is worse than no advice: the panel would mark no
+            // card recommended while the document insists one is, and a bulk accept would
+            // silently skip the slot.
+            if (slot.RecommendedCandidateId is { } recommended
+                && slot.Candidates is not null
+                && slot.Candidate(recommended) is null)
+            {
+                issues.Add(new SceneValidationIssue(
+                    $"{path}.recommendedCandidateId",
+                    "RecommendedCandidateMissing",
+                    $"Slot '{slot.Id}' recommends candidate '{recommended}', which it does not hold. A recommendation names one of that slot's own candidates."));
+            }
         }
     }
 

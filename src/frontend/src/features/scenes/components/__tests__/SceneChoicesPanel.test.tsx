@@ -32,6 +32,7 @@ function candidate(
     storeAsset: null,
     choosable: true,
     media: null,
+    recommended: false,
     ...overrides,
   }
 }
@@ -46,6 +47,8 @@ function slot(overrides: Partial<SceneSlotView> = {}): SceneSlotView {
     resolvedBy: null,
     reopenedReason: null,
     candidates: [candidate({ id: 'A' }), candidate({ id: 'B' })],
+    recommendedCandidateId: null,
+    recommendationAcceptable: false,
     ...overrides,
   }
 }
@@ -350,5 +353,132 @@ describe('SceneChoicesPanel', () => {
     expect(
       screen.getByTestId('scene-choices-choose-streetlight/B')
     ).toBeDisabled()
+  })
+
+  it('marks a recommended card without making it look chosen', () => {
+    // "Recommended" and "chosen" are different states. A recommended card that
+    // read as selected would tell the user a decision had been made for them.
+    renderPanel([
+      slot({
+        recommendedCandidateId: 'B',
+        recommendationAcceptable: true,
+        candidates: [
+          candidate({ id: 'A' }),
+          candidate({ id: 'B', recommended: true }),
+        ],
+      }),
+    ])
+
+    expect(
+      screen.getByTestId('scene-choices-recommended-streetlight/B')
+    ).toBeInTheDocument()
+    expect(
+      screen.getByTestId('scene-choices-choose-streetlight/B')
+    ).toBeEnabled()
+  })
+
+  it('shows the authored summary verbatim rather than composing one', () => {
+    renderPanel([slot()], {
+      recommendationSummary:
+        'warm walnut and matte brass keep the room cohesive',
+    })
+
+    expect(screen.getByTestId('scene-choices-summary')).toHaveTextContent(
+      'warm walnut and matte brass keep the room cohesive'
+    )
+  })
+
+  it('offers no bulk accept for a single recommendation', () => {
+    // One recommendation is what the card's own choose button already is; a
+    // bulk action for it would be a second path to the same write.
+    renderPanel(
+      [
+        slot({
+          recommendedCandidateId: 'B',
+          recommendationAcceptable: true,
+          candidates: [
+            candidate({ id: 'A' }),
+            candidate({ id: 'B', recommended: true }),
+          ],
+        }),
+      ],
+      { onAcceptRecommendations: jest.fn() }
+    )
+
+    expect(
+      screen.queryByTestId('scene-choices-accept-all')
+    ).not.toBeInTheDocument()
+  })
+
+  it('lists the exact mappings before accepting them, and sends only those', async () => {
+    const onAcceptRecommendations = jest.fn()
+    renderPanel(
+      [
+        slot({
+          slotId: 'streetlight',
+          recommendedCandidateId: 'B',
+          recommendationAcceptable: true,
+          candidates: [
+            candidate({ id: 'A' }),
+            candidate({ id: 'B', recommended: true }),
+          ],
+        }),
+        slot({
+          slotId: 'bench',
+          nodeId: 'bench-1',
+          recommendedCandidateId: 'A',
+          recommendationAcceptable: true,
+          candidates: [candidate({ id: 'A', recommended: true })],
+        }),
+        // Recommended, but its candidate was rejected - kept as history and
+        // excluded from the bulk accept, which is the server's own verdict.
+        slot({
+          slotId: 'rug',
+          nodeId: 'rug-1',
+          recommendedCandidateId: 'A',
+          recommendationAcceptable: false,
+          candidates: [
+            candidate({
+              id: 'A',
+              recommended: true,
+              rejected: true,
+              rejectedReason: 'too modern',
+            }),
+          ],
+        }),
+      ],
+      { onAcceptRecommendations }
+    )
+
+    await userEvent.click(screen.getByTestId('scene-choices-accept-all'))
+    const listed = screen.getByTestId('scene-choices-confirm-list')
+    expect(listed).toHaveTextContent('streetlight → B')
+    expect(listed).toHaveTextContent('bench → A')
+    expect(listed).not.toHaveTextContent('rug')
+
+    await userEvent.click(screen.getByTestId('scene-choices-accept-confirm'))
+
+    expect(onAcceptRecommendations).toHaveBeenCalledWith([
+      { slotId: 'streetlight', candidateId: 'B' },
+      { slotId: 'bench', candidateId: 'A' },
+    ])
+  })
+
+  it('says whether the user followed the recommendation or overruled it', () => {
+    renderPanel([
+      slot({
+        status: 'chosen',
+        resolvedBy: 'user',
+        chosenCandidateId: 'A',
+        recommendedCandidateId: 'B',
+        recommendationAcceptable: false,
+        candidates: [
+          candidate({ id: 'A', chosen: true }),
+          candidate({ id: 'B', recommended: true }),
+        ],
+      }),
+    ])
+
+    expect(screen.getByText('overruled · chose A')).toBeInTheDocument()
   })
 })
