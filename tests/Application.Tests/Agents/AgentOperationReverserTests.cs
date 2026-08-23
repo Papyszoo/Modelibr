@@ -552,4 +552,59 @@ public class AgentOperationReverserTests
         Assert.False(plan.Value.Steps[0].IsSupported);
         Assert.Contains("not recorded", plan.Value.Steps[0].Blocker);
     }
+
+    // The shape actually stored: audit payloads are serialized with default options, so a
+    // payload built from a typed record (which AssetMetadataResponse is) arrives PascalCased.
+    // The hand-written camelCase fixtures above passed while production silently restored
+    // nothing, so these two pin the real shape.
+
+    private const string PascalMetadataBefore = """
+        {"AssetType":"Model","AssetId":9,"Fields":[
+          {"Key":"styles","ReadOnly":false},
+          {"Key":"license","ReadOnly":false,"Value":"CC0"},
+          {"Key":"triangleCount","ReadOnly":true,"Value":216}]}
+        """;
+
+    private const string PascalMetadataAfter = """
+        {"AssetType":"Model","AssetId":9,"Fields":[
+          {"Key":"styles","ReadOnly":false,"Value":["Low Poly"]},
+          {"Key":"license","ReadOnly":false,"Value":"CC0"},
+          {"Key":"triangleCount","ReadOnly":true,"Value":216}]}
+        """;
+
+    [Fact]
+    public async Task A_Metadata_Payload_Stored_In_Pascal_Case_Is_Still_Reversed()
+    {
+        Records(Completed("k1", "set-asset-metadata", "Model", 9,
+            before: PascalMetadataBefore, after: PascalMetadataAfter));
+        _setAssetMetadata
+            .Setup(h => h.Handle(It.IsAny<SetAssetMetadataCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success(new AssetMetadataResponse(
+                "Model", 9, "chair", 1, 1, Array.Empty<AssetMetadataValue>(),
+                new AssetMetadataCompleteness(0, 0, Array.Empty<string>()))));
+
+        var applied = await _reverser.ApplyAsync((await _reverser.PlanAsync("k1", null)).Value);
+
+        Assert.True(applied.Value[0].Reversed);
+        _setAssetMetadata.Verify(h => h.Handle(
+            It.Is<SetAssetMetadataCommand>(c =>
+                c.Fields.Count == 1 && c.Fields.ContainsKey("styles")),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task A_Metadata_Write_With_An_Unreadable_After_Payload_Fails_Rather_Than_Claiming_Success()
+    {
+        // Regression: an unreadable payload produced an empty diff, which was reported as
+        // "already holds what it did before" and marked the entry reversed - a successful-
+        // looking undo that restored nothing.
+        Records(Completed("k1", "set-asset-metadata", "Model", 9,
+            before: MetadataBefore, after: """{"unrelated":true}"""));
+
+        var applied = await _reverser.ApplyAsync((await _reverser.PlanAsync("k1", null)).Value);
+
+        Assert.False(applied.Value[0].Reversed);
+        _setAssetMetadata.Verify(h => h.Handle(
+            It.IsAny<SetAssetMetadataCommand>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
 }

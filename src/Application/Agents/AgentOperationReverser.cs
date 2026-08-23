@@ -399,35 +399,71 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
     private static readonly JsonElement NullJson = JsonDocument.Parse("null").RootElement.Clone();
 
     /// <summary>
+    /// Looks a property up without caring about its case.
+    ///
+    /// Audit payloads are serialized with default options, so a payload built from an
+    /// anonymous object keeps the lowercase names it was written with, while one built from
+    /// a typed record arrives PascalCased. Every other reader here reads the former; the
+    /// metadata payloads are the latter, and rows already written carry both shapes.
+    /// </summary>
+    private static bool TryGetPropertyInsensitive(JsonElement element, string name, out JsonElement value)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            if (element.TryGetProperty(name, out value))
+            {
+                return true;
+            }
+
+            foreach (var property in element.EnumerateObject())
+            {
+                if (string.Equals(property.Name, name, StringComparison.OrdinalIgnoreCase))
+                {
+                    value = property.Value;
+                    return true;
+                }
+            }
+        }
+
+        value = default;
+        return false;
+    }
+
+    /// <summary>
     /// The writable schema fields in a recorded <c>AssetMetadataResponse</c>, keyed by field key,
-    /// with a null entry for a field that held no value.
+    /// with a null entry for a field that held no value. Returns null when the payload carries no
+    /// field list at all - which means the inverse cannot be computed, not that nothing changed.
     ///
     /// Read-only fields are skipped deliberately: triangle counts and the rest are derived, so
     /// restoring one is neither possible nor meaningful, and <c>set_asset_metadata</c> refuses
     /// them anyway.
     /// </summary>
-    private static Dictionary<string, JsonElement?> WritableFieldValues(JsonElement payload)
+    private static Dictionary<string, JsonElement?>? WritableFieldValues(JsonElement payload)
     {
-        var values = new Dictionary<string, JsonElement?>(StringComparer.Ordinal);
-
-        if (!payload.TryGetProperty("fields", out var fields) || fields.ValueKind != JsonValueKind.Array)
+        if (!TryGetPropertyInsensitive(payload, "fields", out var fields)
+            || fields.ValueKind != JsonValueKind.Array)
         {
-            return values;
+            return null;
         }
+
+        var values = new Dictionary<string, JsonElement?>(StringComparer.Ordinal);
 
         foreach (var field in fields.EnumerateArray())
         {
-            if (!field.TryGetProperty("key", out var key) || key.ValueKind != JsonValueKind.String)
+            if (!TryGetPropertyInsensitive(field, "key", out var key) || key.ValueKind != JsonValueKind.String)
             {
                 continue;
             }
 
-            if (field.TryGetProperty("readOnly", out var readOnly) && readOnly.ValueKind == JsonValueKind.True)
+            if (TryGetPropertyInsensitive(field, "readOnly", out var readOnly)
+                && readOnly.ValueKind == JsonValueKind.True)
             {
                 continue;
             }
 
-            values[key.GetString()!] = field.TryGetProperty("value", out var value) ? value.Clone() : null;
+            values[key.GetString()!] = TryGetPropertyInsensitive(field, "value", out var value)
+                ? value.Clone()
+                : null;
         }
 
         return values;
@@ -565,17 +601,26 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
             case "set-asset-metadata":
             {
                 var before = Read(entry.PayloadBefore);
-                if (before is null)
+                var priorValues = before is null ? null : WritableFieldValues(before.Value);
+                if (priorValues is null)
                 {
                     return Result.Failure<string>(new Error(
                         "NoPriorState", "The prior metadata was not recorded."));
                 }
 
                 var after = Read(entry.PayloadAfter);
-                var priorValues = WritableFieldValues(before.Value);
-                var newValues = after is null
-                    ? new Dictionary<string, JsonElement?>(StringComparer.Ordinal)
-                    : WritableFieldValues(after.Value);
+                var newValues = after is null ? null : WritableFieldValues(after.Value);
+                if (newValues is null)
+                {
+                    // Without the resulting state there is no way to know which keys this
+                    // write touched, and a merge cannot be inverted by guessing. Reporting
+                    // success here would mark the entry reversed while leaving the values in
+                    // place - the one outcome an undo must never produce.
+                    return Result.Failure<string>(new Error(
+                        "NoResultingState",
+                        "The metadata this write produced was not recorded, so the fields it "
+                        + "changed cannot be identified."));
+                }
 
                 // Only the keys this write actually changed. A metadata write is a merge, so
                 // restoring every writable field would also overwrite ones it never touched -
