@@ -25,6 +25,12 @@ namespace Application.Scenes;
 /// a download attached, and the card must not offer it as the same one-click choice.
 /// </param>
 /// <param name="Media">What the card can draw. Absent when there is nothing to draw.</param>
+/// <param name="ProfileFit">
+/// How this candidate measures against the project the scene belongs to (prompt 13-D5), or
+/// null when it belongs to none. <b>Derived here, never taken from the rationale</b>: the
+/// numbers are what let a user overrule a plausible-sounding wrong answer, and a number the
+/// agent typed is a number the agent could have typed wrong.
+/// </param>
 public sealed record SceneSlotCandidateView(
     string Id,
     string Ref,
@@ -38,7 +44,36 @@ public sealed record SceneSlotCandidateView(
     SceneCandidateFacts? Facts,
     SceneStoreAssetRef? StoreAsset = null,
     bool Choosable = true,
-    SceneCandidateMedia? Media = null);
+    SceneCandidateMedia? Media = null,
+    SceneCandidateProfileFit? ProfileFit = null);
+
+/// <summary>
+/// A candidate measured against its scene's project (prompt 13-D5).
+///
+/// <para>
+/// A candidate that violates the profile is still allowed to be proposed - it says so instead
+/// of being dropped. The point is not to gate the agent's suggestions, it is that the user
+/// deciding between two cards can see what each one is being measured against.
+/// </para>
+/// </summary>
+/// <param name="WithinBudget">
+/// Null when the project sets no per-asset budget, or when nothing measured the asset. Neither
+/// is "over" and neither is "within".
+/// </param>
+/// <param name="DeclaresProjectStyle">True when the asset's own declared styles include one of the project's.</param>
+/// <param name="Contradicts">
+/// Declared styles the project's styles rule out. Empty for an asset nobody has described -
+/// silence about an asset is not evidence against it.
+/// </param>
+/// <param name="Summary">The line a card prints, assembled from the fields above.</param>
+public sealed record SceneCandidateProfileFit(
+    string ProjectName,
+    int? Triangles,
+    int? Budget,
+    bool? WithinBudget,
+    bool DeclaresProjectStyle,
+    IReadOnlyList<string> Contradicts,
+    string Summary);
 
 /// <summary>
 /// The measurable half of a proposal: what the library actually knows about the asset behind
@@ -106,7 +141,8 @@ public static class SceneSlotViewBuilder
         SceneDocument document,
         IReadOnlyDictionary<string, SceneAssetFacts> facts,
         IReadOnlyDictionary<string, SceneAssetProfile> profiles,
-        IReadOnlyDictionary<string, SceneCandidateMedia>? media = null) => new(
+        IReadOnlyDictionary<string, SceneCandidateMedia>? media = null,
+        SceneProjectConstraints? project = null) => new(
             slot.Id,
             document.Nodes.FirstOrDefault(n => string.Equals(n.SlotId, slot.Id, StringComparison.Ordinal))?.Id,
             slot.Brief,
@@ -114,14 +150,15 @@ public static class SceneSlotViewBuilder
             slot.ChosenCandidateId,
             slot.ResolvedBy,
             slot.ReopenedReason,
-            slot.Candidates.Select(c => Describe(slot, c, facts, profiles, media)).ToList());
+            slot.Candidates.Select(c => Describe(slot, c, facts, profiles, media, project)).ToList());
 
     public static SceneSlotCandidateView Describe(
         SceneSlot slot,
         SceneSlotCandidate candidate,
         IReadOnlyDictionary<string, SceneAssetFacts> facts,
         IReadOnlyDictionary<string, SceneAssetProfile> profiles,
-        IReadOnlyDictionary<string, SceneCandidateMedia>? media = null)
+        IReadOnlyDictionary<string, SceneCandidateMedia>? media = null,
+        SceneProjectConstraints? project = null)
     {
         var reference = Ref(slot.Id, candidate.Id);
 
@@ -141,16 +178,18 @@ public static class SceneSlotViewBuilder
             // inferred by each reader: the editor, the agent tools and the tests would
             // otherwise each get their own chance to forget the rule.
             Choosable: !candidate.IsFromStore,
-            media is not null && media.TryGetValue(reference, out var found) ? found : null);
+            media is not null && media.TryGetValue(reference, out var found) ? found : null,
+            DescribeProfileFit(candidate.Asset, profiles, project));
     }
 
     public static IReadOnlyList<SceneSlotView> DescribeAll(
         SceneDocument document,
         IReadOnlyDictionary<string, SceneAssetFacts> facts,
         IReadOnlyDictionary<string, SceneAssetProfile> profiles,
-        IReadOnlyDictionary<string, SceneCandidateMedia>? media = null) =>
+        IReadOnlyDictionary<string, SceneCandidateMedia>? media = null,
+        SceneProjectConstraints? project = null) =>
         (document.Slots ?? Array.Empty<SceneSlot>())
-            .Select(slot => Describe(slot, document, facts, profiles, media))
+            .Select(slot => Describe(slot, document, facts, profiles, media, project))
             .ToList();
 
     /// <summary>How a candidate is addressed in prose and in tool arguments: <c>slot/candidate</c>.</summary>
@@ -190,5 +229,100 @@ public static class SceneSlotViewBuilder
             profile?.Flags is { Count: > 0 } flags ? flags : null,
             profile?.Cameras.Count ?? 0,
             profile?.Lights.Count ?? 0);
+    }
+
+    /// <summary>
+    /// The candidate measured against its scene's project (prompt 13-D5).
+    /// </summary>
+    /// <remarks>
+    /// Derived from the same profile the validator reads, rather than parsed out of the
+    /// agent's rationale. 05's cards already show real numbers; the numbers are what let a user
+    /// overrule a plausible-sounding wrong answer - but only once something says what they are
+    /// being measured against.
+    ///
+    /// <para>
+    /// The off-style test is the validator's: an asset is only called out when it declares a
+    /// style the project's styles rule out. An asset nobody has described says nothing, and
+    /// silence is not evidence against it.
+    /// </para>
+    /// </remarks>
+    private static SceneCandidateProfileFit? DescribeProfileFit(
+        SceneAssetRef? asset,
+        IReadOnlyDictionary<string, SceneAssetProfile> profiles,
+        SceneProjectConstraints? project)
+    {
+        if (asset is null || project is null)
+        {
+            return null;
+        }
+
+        profiles.TryGetValue(SceneSpatial.FactsKey(asset), out var profile);
+
+        var triangles = profile?.TriangleCount;
+        var budget = project.MaxTrianglesPerAsset;
+        var within = budget is int cap && triangles is int tris ? tris <= cap : (bool?)null;
+
+        var declared = profile?.DeclaredStyles ?? Array.Empty<string>();
+        var matches = declared.Any(s => project.ProjectStyles.Contains(s, StringComparer.OrdinalIgnoreCase));
+        var contradicts = declared
+            .Where(s => project.OffStyleTokens.Contains(s, StringComparer.OrdinalIgnoreCase))
+            .ToList();
+
+        return new SceneCandidateProfileFit(
+            project.ProjectName,
+            triangles,
+            budget,
+            within,
+            matches,
+            contradicts,
+            SummarizeFit(project, triangles, budget, within, matches, contradicts, declared));
+    }
+
+    private static string SummarizeFit(
+        SceneProjectConstraints project,
+        int? triangles,
+        int? budget,
+        bool? within,
+        bool matches,
+        IReadOnlyList<string> contradicts,
+        IReadOnlyList<string> declared)
+    {
+        var parts = new List<string>();
+
+        // Invariant formatting, like every other agent-facing number here: a card that reads
+        // "5 000" on one machine and "5,000" on another is a card whose wording depends on
+        // where the server happens to run.
+        parts.Add(triangles is int tris
+            ? FormattableString.Invariant($"{tris:N0} triangles")
+            : "triangle count unknown");
+
+        parts.Add(budget switch
+        {
+            null => $"{project.ProjectName} sets no per-asset budget",
+            int cap when within == true => FormattableString.Invariant($"inside the {cap:N0} budget"),
+            int cap when within == false => FormattableString.Invariant($"over the {cap:N0} budget"),
+            int cap => FormattableString.Invariant($"nothing to compare against the {cap:N0} budget"),
+        });
+
+        if (contradicts.Count > 0)
+        {
+            parts.Add($"described as {string.Join(", ", contradicts)}, which {project.ProjectName}'s style rules out");
+        }
+        else if (matches)
+        {
+            parts.Add($"matches {string.Join(", ", project.ProjectStyles)}");
+        }
+        else if (declared.Count > 0)
+        {
+            parts.Add($"described as {string.Join(", ", declared)}");
+        }
+        else if (project.ProjectStyles.Count > 0)
+        {
+            // Said out loud rather than left blank: an empty style line reads as "checked and
+            // fine", and on this library almost nothing has been described yet.
+            parts.Add("nothing says what style it is");
+        }
+
+        return string.Join("; ", parts) + ".";
     }
 }

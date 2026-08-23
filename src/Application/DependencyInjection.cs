@@ -23,6 +23,7 @@ namespace Application
             services.AddScoped<Application.Scenes.ISceneWriter, Application.Scenes.SceneWriter>();
             services.AddScoped<Application.Scenes.ISceneAssetProfiles, Application.Scenes.SceneAssetProfileProvider>();
             services.AddScoped<Application.Scenes.ISceneCandidateMedia, Application.Scenes.SceneCandidateMediaProvider>();
+            services.AddScoped<Application.Scenes.ISceneProjectConstraints, Application.Scenes.SceneProjectConstraintsProvider>();
             services.AddScoped<Application.Metadata.IAssetEntityMetadata, Application.Metadata.AssetEntityMetadataGateway>();
 
             // Store importer (v0.5 prompt 05): the orchestrator and its 1:1 handler adapter.

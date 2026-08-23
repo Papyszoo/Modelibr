@@ -88,15 +88,17 @@ public class SceneSlotCommandTests
         _scenes.Setup(s => s.GetByIdAsync(SceneId, It.IsAny<CancellationToken>())).ReturnsAsync(_scene);
     }
 
-    private ProposeSceneCandidatesCommandHandler Propose => new(_writer, _facts.Object, _profiles.Object, _media.Object);
+    private readonly Mock<ISceneProjectConstraints> _constraints = new();
 
-    private ResolveSceneSlotCommandHandler Resolve => new(_writer, _facts.Object, _profiles.Object, _media.Object);
+    private ProposeSceneCandidatesCommandHandler Propose => new(_writer, _facts.Object, _profiles.Object, _media.Object, _constraints.Object);
 
-    private RejectSceneCandidatesCommandHandler Reject => new(_writer, _facts.Object, _profiles.Object, _media.Object);
+    private ResolveSceneSlotCommandHandler Resolve => new(_writer, _facts.Object, _profiles.Object, _media.Object, _constraints.Object);
+
+    private RejectSceneCandidatesCommandHandler Reject => new(_writer, _facts.Object, _profiles.Object, _media.Object, _constraints.Object);
 
     private RestoreSceneSlotCommandHandler Restore => new(_writer);
 
-    private GetSceneSlotsQueryHandler Slots => new(_writer, _facts.Object, _profiles.Object, _media.Object);
+    private GetSceneSlotsQueryHandler Slots => new(_writer, _facts.Object, _profiles.Object, _media.Object, _constraints.Object);
 
     private RemoveSceneNodeCommandHandler Remove => new(_writer);
 

@@ -192,6 +192,12 @@ public sealed class ComposeScenePrompts
             lines.Add("          - This project has no profile set yet, so nothing here narrows the asset choice.");
         }
 
+        // How to act on the profile, not just what it says. A brief the agent reads and then
+        // searches as if it had not is a brief that changed nothing (prompt 13-D3/D5).
+        lines.Add(FormattableString.Invariant(
+            $"          - Search with search_assets(projectId: {brief.Id}). It ranks by this project's style and puts each hit's profileFit beside it; applyProfile: \"enforce\" makes the budget a filter and says how many assets that removed."));
+        lines.Add("          - Every candidate you propose is measured against this profile by the server, not by your rationale. Read the profileFit back, and if you propose something outside the profile, say so rather than letting the card be the only thing that mentions it.");
+
         lines.Add(string.Empty);
         return string.Join(Environment.NewLine, lines) + Environment.NewLine + "        ";
     }

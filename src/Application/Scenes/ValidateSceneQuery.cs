@@ -1,6 +1,5 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
-using Domain.Projects;
 using Domain.Scenes;
 using SharedKernel;
 
@@ -36,21 +35,18 @@ internal sealed class ValidateSceneQueryHandler : IQueryHandler<ValidateSceneQue
     private readonly ISceneWriter _writer;
     private readonly ISceneAssetFacts _facts;
     private readonly ISceneAssetProfiles _profiles;
-    private readonly ISceneRepository _scenes;
-    private readonly IProjectRepository _projects;
+    private readonly ISceneProjectConstraints _constraints;
 
     public ValidateSceneQueryHandler(
         ISceneWriter writer,
         ISceneAssetFacts facts,
         ISceneAssetProfiles profiles,
-        ISceneRepository scenes,
-        IProjectRepository projects)
+        ISceneProjectConstraints constraints)
     {
         _writer = writer;
         _facts = facts;
         _profiles = profiles;
-        _scenes = scenes;
-        _projects = projects;
+        _constraints = constraints;
     }
 
     public async Task<Result<SceneValidationView>> Handle(
@@ -70,7 +66,7 @@ internal sealed class ValidateSceneQueryHandler : IQueryHandler<ValidateSceneQue
         var profiles = await _profiles.ResolveAsync(references, cancellationToken);
         var problems = await _facts.FindUnresolvableAsync(references, cancellationToken);
 
-        var constraints = await ProjectConstraintsAsync(query.SceneId, cancellationToken);
+        var constraints = await _constraints.ForSceneAsync(query.SceneId, cancellationToken);
 
         var report = SceneValidator.Validate(document, facts, profiles, constraints);
 
@@ -84,48 +80,5 @@ internal sealed class ValidateSceneQueryHandler : IQueryHandler<ValidateSceneQue
             report.Findings,
             problems,
             report.Coverage));
-    }
-
-    /// <summary>
-    /// What the scene's project asks of it (prompt 13-D4), or null when it belongs to none.
-    /// </summary>
-    /// <remarks>
-    /// Read here rather than carried on the document: the profile is context, not content.
-    /// A scene moved to another project has to pick up the new project's constraints, and a
-    /// copy inside the document would keep answering for the old one.
-    /// </remarks>
-    private async Task<SceneProjectConstraints?> ProjectConstraintsAsync(
-        int sceneId, CancellationToken cancellationToken)
-    {
-        var scene = await _scenes.GetByIdAsync(sceneId, cancellationToken);
-        if (scene?.ProjectId is not int projectId)
-        {
-            return null;
-        }
-
-        var project = await _projects.GetByIdAsync(projectId, cancellationToken);
-        if (project is null)
-        {
-            return null;
-        }
-
-        var styles = project.ProfileValues
-            .Where(v => v.Option is not null
-                        && string.Equals(v.Option.Dimension, ProjectProfileDimensions.Style, StringComparison.OrdinalIgnoreCase))
-            .Select(v => v.Option.Name)
-            .ToList();
-
-        var signals = ProjectStyleSignals.Merge(styles);
-
-        return new SceneProjectConstraints(
-            project.Id,
-            project.Name,
-            project.MaxTrianglesPerAsset,
-            project.TargetSceneTriangles,
-            styles,
-            // The style's penalty tokens double as the "styles this project rules out" set:
-            // an asset declared Realistic in a Low Poly project is exactly what they name.
-            signals.PenaltyTokens,
-            signals.FamilyHint);
     }
 }

@@ -506,6 +506,10 @@ public sealed class SceneWriteMcpTools
                  "so 'streetlight B is too modern' means one thing for the life of the scene. " +
                  "Call get_slots first when re-proposing: it carries the reasons the last round was turned down. " +
                  "Give every candidate a rationale - the user sees it beside the asset's real dimensions and part count. " +
+                 "When the scene belongs to a project, every candidate also comes back with a profileFit line measuring it " +
+                 "against that project's budget and style - derived here, not from your rationale. Read it back and say which " +
+                 "way you went: a candidate that breaks the profile may still be proposed, but say so rather than leaving the " +
+                 "card to be the only thing that mentions it. " +
                  "A candidate may also come from the companion Asset Store (storeUrl + storeAssetId): propose one only when the " +
                  "library genuinely cannot fill the slot, say why in the rationale, and never one whose alreadyImported is true. " +
                  "A store candidate is shown as not-yet-owned and CANNOT be resolved by you - the user accepts it, or you import a " +

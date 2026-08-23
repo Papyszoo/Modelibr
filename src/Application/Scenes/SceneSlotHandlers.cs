@@ -14,12 +14,14 @@ internal abstract class SceneSlotHandlerBase
         ISceneWriter writer,
         ISceneAssetFacts facts,
         ISceneAssetProfiles profiles,
-        ISceneCandidateMedia media)
+        ISceneCandidateMedia media,
+        ISceneProjectConstraints constraints)
     {
         Writer = writer;
         SceneFacts = facts;
         Profiles = profiles;
         Media = media;
+        Constraints = constraints;
     }
 
     protected ISceneWriter Writer { get; }
@@ -29,6 +31,8 @@ internal abstract class SceneSlotHandlerBase
     protected ISceneAssetProfiles Profiles { get; }
 
     protected ISceneCandidateMedia Media { get; }
+
+    protected ISceneProjectConstraints Constraints { get; }
 
     internal static int IndexOfSlot(SceneDocument document, string slotId)
     {
@@ -74,6 +78,7 @@ internal abstract class SceneSlotHandlerBase
     protected async Task<SceneSlotView> ProjectAsync(
         SceneDocument document,
         string slotId,
+        int sceneId,
         CancellationToken cancellationToken)
     {
         var index = IndexOfSlot(document, slotId);
@@ -83,8 +88,11 @@ internal abstract class SceneSlotHandlerBase
         var facts = await SceneFacts.ResolveAsync(assets, cancellationToken);
         var profiles = await Profiles.ResolveAsync(assets, cancellationToken);
         var media = await Media.ResolveAsync(document, cancellationToken);
+        // What the scene's project asks of each proposal, so a card can state what its
+        // numbers are being measured against (prompt 13-D5). Null when the scene is unlinked.
+        var project = await Constraints.ForSceneAsync(sceneId, cancellationToken);
 
-        return SceneSlotViewBuilder.Describe(slot, document, facts, profiles, media);
+        return SceneSlotViewBuilder.Describe(slot, document, facts, profiles, media, project);
     }
 }
 
@@ -92,8 +100,9 @@ internal sealed class ProposeSceneCandidatesCommandHandler
     : SceneSlotHandlerBase, ICommandHandler<ProposeSceneCandidatesCommand, SceneSlotWriteResponse>
 {
     public ProposeSceneCandidatesCommandHandler(
-        ISceneWriter writer, ISceneAssetFacts facts, ISceneAssetProfiles profiles, ISceneCandidateMedia media)
-        : base(writer, facts, profiles, media)
+        ISceneWriter writer, ISceneAssetFacts facts, ISceneAssetProfiles profiles, ISceneCandidateMedia media,
+        ISceneProjectConstraints constraints)
+        : base(writer, facts, profiles, media, constraints)
     {
     }
 
@@ -207,7 +216,7 @@ internal sealed class ProposeSceneCandidatesCommandHandler
             ? Result.Failure<SceneSlotWriteResponse>(result.Error)
             : Result.Success(new SceneSlotWriteResponse(
                 result.Value.View.Scene,
-                await ProjectAsync(result.Value.Document, command.SlotId, cancellationToken),
+                await ProjectAsync(result.Value.Document, command.SlotId, command.SceneId, cancellationToken),
                 previous ?? new SceneSlotSnapshot(null)));
     }
 
@@ -290,8 +299,9 @@ internal sealed class ResolveSceneSlotCommandHandler
     : SceneSlotHandlerBase, ICommandHandler<ResolveSceneSlotCommand, SceneSlotWriteResponse>
 {
     public ResolveSceneSlotCommandHandler(
-        ISceneWriter writer, ISceneAssetFacts facts, ISceneAssetProfiles profiles, ISceneCandidateMedia media)
-        : base(writer, facts, profiles, media)
+        ISceneWriter writer, ISceneAssetFacts facts, ISceneAssetProfiles profiles, ISceneCandidateMedia media,
+        ISceneProjectConstraints constraints)
+        : base(writer, facts, profiles, media, constraints)
     {
     }
 
@@ -409,7 +419,7 @@ internal sealed class ResolveSceneSlotCommandHandler
             ? Result.Failure<SceneSlotWriteResponse>(result.Error)
             : Result.Success(new SceneSlotWriteResponse(
                 result.Value.View.Scene,
-                await ProjectAsync(result.Value.Document, command.SlotId, cancellationToken),
+                await ProjectAsync(result.Value.Document, command.SlotId, command.SceneId, cancellationToken),
                 previous ?? new SceneSlotSnapshot(null)));
     }
 }
@@ -418,8 +428,9 @@ internal sealed class RejectSceneCandidatesCommandHandler
     : SceneSlotHandlerBase, ICommandHandler<RejectSceneCandidatesCommand, SceneSlotWriteResponse>
 {
     public RejectSceneCandidatesCommandHandler(
-        ISceneWriter writer, ISceneAssetFacts facts, ISceneAssetProfiles profiles, ISceneCandidateMedia media)
-        : base(writer, facts, profiles, media)
+        ISceneWriter writer, ISceneAssetFacts facts, ISceneAssetProfiles profiles, ISceneCandidateMedia media,
+        ISceneProjectConstraints constraints)
+        : base(writer, facts, profiles, media, constraints)
     {
     }
 
@@ -504,7 +515,7 @@ internal sealed class RejectSceneCandidatesCommandHandler
             ? Result.Failure<SceneSlotWriteResponse>(result.Error)
             : Result.Success(new SceneSlotWriteResponse(
                 result.Value.View.Scene,
-                await ProjectAsync(result.Value.Document, command.SlotId, cancellationToken),
+                await ProjectAsync(result.Value.Document, command.SlotId, command.SceneId, cancellationToken),
                 previous ?? new SceneSlotSnapshot(null)));
     }
 }
@@ -582,17 +593,20 @@ internal sealed class GetSceneSlotsQueryHandler : IQueryHandler<GetSceneSlotsQue
     private readonly ISceneAssetFacts _facts;
     private readonly ISceneAssetProfiles _profiles;
     private readonly ISceneCandidateMedia _media;
+    private readonly ISceneProjectConstraints _constraints;
 
     public GetSceneSlotsQueryHandler(
         ISceneWriter writer,
         ISceneAssetFacts facts,
         ISceneAssetProfiles profiles,
-        ISceneCandidateMedia media)
+        ISceneCandidateMedia media,
+        ISceneProjectConstraints constraints)
     {
         _writer = writer;
         _facts = facts;
         _profiles = profiles;
         _media = media;
+        _constraints = constraints;
     }
 
     public async Task<Result<SceneSlotsView>> Handle(GetSceneSlotsQuery query, CancellationToken cancellationToken)
@@ -609,9 +623,10 @@ internal sealed class GetSceneSlotsQueryHandler : IQueryHandler<GetSceneSlotsQue
         var facts = await _facts.ResolveAsync(assets, cancellationToken);
         var profiles = await _profiles.ResolveAsync(assets, cancellationToken);
         var media = await _media.ResolveAsync(document, cancellationToken);
+        var project = await _constraints.ForSceneAsync(query.SceneId, cancellationToken);
 
         return Result.Success(new SceneSlotsView(
             SceneViewBuilder.Summarize(scene, document),
-            SceneSlotViewBuilder.DescribeAll(document, facts, profiles, media)));
+            SceneSlotViewBuilder.DescribeAll(document, facts, profiles, media, project)));
     }
 }
