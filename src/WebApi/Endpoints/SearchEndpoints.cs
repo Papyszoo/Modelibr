@@ -59,7 +59,11 @@ public static class SearchEndpoints
                 return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
             }
 
-            return Results.Ok(new { hits = result.Value.Hits, totalCount = result.Value.TotalCount });
+            // The whole response, not a two-field projection of it. `profile` says what a
+            // project's style did to the ranking and `query` says what the search understood
+            // - both are how a caller tells a result it disagrees with from one it never
+            // asked for, and this endpoint was quietly dropping them on the floor.
+            return Results.Ok(result.Value);
         })
         .WithName("Asset Search")
         .WithTags("Search");
