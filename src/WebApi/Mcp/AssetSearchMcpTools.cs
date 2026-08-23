@@ -242,7 +242,13 @@ public sealed class AssetSearchMcpTools
     [McpServerTool(Name = "get_asset")]
     [Description("Get the derived metadata, part list and material slot names for an asset. " +
                  "Pass the versionId from the search hit you are inspecting: without it this answers " +
-                 "about the asset's active version, which is not necessarily the version that hit named.")]
+                 "about the asset's active version, which is not necessarily the version that hit named. " +
+                 "The response also carries `surfaces`: the horizontal faces something can be rested on, " +
+                 "largest first, each with its HEIGHT ABOVE THE ASSET'S BASE and its extent. " +
+                 "READ THESE BEFORE STACKING. place_asset(on:) rests a node on the target's whole-asset " +
+                 "bounding-box top, which is right for a table and wrong for anything with structure - " +
+                 "it puts a cushion on a sofa's BACK rather than its seat. Use the surface height to place " +
+                 "the node yourself with an explicit position, or say so in the rationale when you stack anyway.")]
     public static async Task<object> GetAsset(
         IQueryHandler<GetAssetMetadataQuery, AssetMetadataResponse> handler,
         [Description("Asset family, e.g. Model.")] string assetType,

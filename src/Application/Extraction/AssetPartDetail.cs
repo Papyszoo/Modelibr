@@ -44,4 +44,78 @@ public static class AssetPartDetail
             return Array.Empty<string>();
         }
     }
+
+    /// <summary>
+    /// The part's world-space bounding box, as the worker measured it while walking the
+    /// scene graph.
+    ///
+    /// World rather than local on purpose: a sofa's cushion is only useful to a caller if it
+    /// knows where the cushion is <b>in the asset</b>, and a local box plus a chain of parent
+    /// transforms is a computation the caller would have to redo and could get wrong.
+    /// </summary>
+    public static AssetPartBounds? Bounds(string? detail)
+    {
+        if (string.IsNullOrWhiteSpace(detail))
+        {
+            return null;
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(detail);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object ||
+                !doc.RootElement.TryGetProperty("worldBoundingBox", out var box) ||
+                box.ValueKind != JsonValueKind.Object)
+            {
+                return null;
+            }
+
+            var min = Triple(box, "min");
+            var max = Triple(box, "max");
+
+            return min is null || max is null
+                ? null
+                : new AssetPartBounds(min, max, new[]
+                {
+                    max[0] - min[0],
+                    max[1] - min[1],
+                    max[2] - min[2],
+                });
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static double[]? Triple(JsonElement box, string name)
+    {
+        if (!box.TryGetProperty(name, out var value) ||
+            value.ValueKind != JsonValueKind.Array ||
+            value.GetArrayLength() != 3)
+        {
+            return null;
+        }
+
+        var triple = new double[3];
+        var index = 0;
+
+        foreach (var component in value.EnumerateArray())
+        {
+            if (!component.TryGetDouble(out var number))
+            {
+                return null;
+            }
+
+            triple[index++] = number;
+        }
+
+        return triple;
+    }
 }
+
+/// <summary>A part's world-space extent, in the asset's own coordinates.</summary>
+public sealed record AssetPartBounds(
+    IReadOnlyList<double> Min,
+    IReadOnlyList<double> Max,
+    IReadOnlyList<double> Dimensions);

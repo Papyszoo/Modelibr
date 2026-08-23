@@ -35,13 +35,21 @@ public record AssetMetadataResponse(
     // Every slot name on the asset, deduplicated. apply_material dresses a node, not a
     // part, so the union is the set that call can actually target - reading it off the
     // per-part lists would make the caller reassemble it every time.
-    IReadOnlyList<string> MaterialSlots);
+    IReadOnlyList<string> MaterialSlots,
+    // The horizontal faces something can be rested on, largest first. Derived from the part
+    // boxes rather than stored: it is a reading of them, and a stored reading would go stale
+    // the moment the derive step improved.
+    IReadOnlyList<AssetSurface>? Surfaces = null);
 
 /// <param name="MaterialSlots">
 /// The part's own material slot names, as authored. These are the strings
 /// <c>apply_material</c>'s <c>slot</c> argument expects; the worker extracts them into the
 /// part's detail JSON, but nothing surfaced them, so the slot argument could only ever be
 /// guessed at.
+/// </param>
+/// <param name="Bounds">
+/// Where this part sits inside the asset, in world space. Null for a part the derive step
+/// never measured - a group node, or an asset extracted before part boxes were captured.
 /// </param>
 public record AssetPartView(
     string PartPath,
@@ -53,7 +61,8 @@ public record AssetPartView(
     int? VertexCount,
     string? GeometryHash,
     bool? HasUvs,
-    IReadOnlyList<string> MaterialSlots);
+    IReadOnlyList<string> MaterialSlots,
+    AssetPartBounds? Bounds = null);
 
 internal sealed class GetAssetMetadataQueryHandler
     : IQueryHandler<GetAssetMetadataQuery, AssetMetadataResponse>
@@ -108,7 +117,8 @@ internal sealed class GetAssetMetadataQueryHandler
             .Select(p => new AssetPartView(
                 p.PartPath, p.Name, p.ParentPath, p.Depth, p.ObjectType,
                 p.TriangleCount, p.VertexCount, p.GeometryHash, p.HasUvs,
-                AssetPartDetail.MaterialSlots(p.Detail)))
+                AssetPartDetail.MaterialSlots(p.Detail),
+                AssetPartDetail.Bounds(p.Detail)))
             .ToList();
 
         if (!string.IsNullOrEmpty(query.PartPath) && partViews.Count == 0)
@@ -130,9 +140,15 @@ internal sealed class GetAssetMetadataQueryHandler
             .OrderBy(s => s, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
+        // Derived from every part, like the material slots above: the useful question is
+        // what this ASSET offers to rest something on, and filtering to one part path would
+        // answer it about a screw.
+        var surfaces = AssetSurfaces.From(
+            parts.Select(p => (p.PartPath, AssetPartDetail.Bounds(p.Detail))));
+
         return Result.Success(new AssetMetadataResponse(
             assetType, query.AssetId, derivation.VersionId, derivation.DeriveVersion, derived, partViews,
-            suggestedCategories, materialSlots));
+            suggestedCategories, materialSlots, surfaces));
     }
 
     /// <summary>Pull the token list out of the serialized DerivedAsset payload.</summary>
