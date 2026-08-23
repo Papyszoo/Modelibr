@@ -1,10 +1,14 @@
 import './SceneProjectBrief.css'
 
 import { Button } from 'primereact/button'
+import { Dropdown } from 'primereact/dropdown'
 import { OverlayPanel } from 'primereact/overlaypanel'
 import { type JSX, useRef, useState } from 'react'
 
+import { useProjectsQuery } from '@/features/project/api/queries'
 import { useProjectBriefQuery } from '@/features/project/api/queries'
+
+import { useSetSceneProjectMutation } from '../api/queries'
 
 /**
  * The project a scene belongs to, and - behind it - the brief the agent was
@@ -20,10 +24,12 @@ import { useProjectBriefQuery } from '@/features/project/api/queries'
  * the brief.
  */
 export function SceneProjectBrief({
+  sceneId,
   projectId,
   projectName,
 }: {
-  projectId: number
+  sceneId: number
+  projectId: number | null
   projectName: string | null
 }): JSX.Element {
   const panel = useRef<OverlayPanel>(null)
@@ -32,20 +38,27 @@ export function SceneProjectBrief({
   // never expand.
   const [requested, setRequested] = useState(false)
   const { data: brief, isLoading } = useProjectBriefQuery({
-    projectId,
+    projectId: projectId ?? 0,
+    queryConfig: { enabled: requested && projectId !== null },
+  })
+  const { data: projects = [] } = useProjectsQuery({
     queryConfig: { enabled: requested },
   })
+  const link = useSetSceneProjectMutation()
 
   return (
     <>
       <Button
         className="scene-project-chip"
-        label={projectName ?? `Project ${projectId}`}
+        label={
+          projectName ??
+          (projectId === null ? 'No project' : `Project ${projectId}`)
+        }
         icon="pi pi-folder"
         text
         size="small"
         data-testid="scene-project-chip"
-        aria-label={`Project brief for ${projectName ?? projectId}`}
+        aria-label="Project brief"
         tooltip="What the agent was told about this project"
         onClick={event => {
           setRequested(true)
@@ -59,7 +72,39 @@ export function SceneProjectBrief({
           Verbatim what the agent is given.
         </p>
 
-        {isLoading || !brief ? (
+        {/*
+          Linking is a scene write - the revision moves and it is undoable -
+          because the project decides what the agent searches for and what
+          validate_scene measures the scene against. It is a decision, not a
+          label, so it is changed deliberately here rather than inline.
+        */}
+        <Dropdown
+          className="scene-project-brief-select"
+          value={projectId}
+          options={[
+            { label: 'No project', value: null },
+            ...projects.map(project => ({
+              label: project.name,
+              value: project.id,
+            })),
+          ]}
+          disabled={link.isPending}
+          data-testid="scene-project-select"
+          ariaLabel="Project this scene belongs to"
+          onChange={event =>
+            link.mutate({ sceneId, projectId: event.value ?? null })
+          }
+        />
+
+        {projectId === null ? (
+          <p
+            className="scene-project-brief-note"
+            data-testid="scene-project-brief-unlinked"
+          >
+            This scene belongs to no project, so the agent is given no budget,
+            style or world convention to work to.
+          </p>
+        ) : isLoading || !brief ? (
           <p className="scene-project-brief-note">Loading…</p>
         ) : brief.guidance.length === 0 ? (
           <p

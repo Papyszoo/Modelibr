@@ -18,6 +18,7 @@ import {
   rejectSceneCandidates,
   renameScene,
   resolveSceneSlot,
+  setSceneProject,
   updateSceneDocument,
 } from './scenesApi'
 
@@ -224,6 +225,14 @@ export function useAcceptSceneRecommendationsMutation() {
         choices: input.choices,
         expectedRevision: input.expectedRevision,
       })
+  )
+}
+
+/** Links a scene to a project, or clears the link. */
+export function useSetSceneProjectMutation() {
+  return useSlotWriteMutation(
+    (input: { sceneId: number; projectId: number | null }) =>
+      setSceneProject(input.sceneId, input.projectId)
   )
 }
 

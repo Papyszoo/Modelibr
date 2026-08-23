@@ -124,6 +124,26 @@ export async function resolveSceneSlot(
 }
 
 /**
+ * Links a scene to a project, or clears the link with null.
+ *
+ * A scene write like any other: the revision moves, it is audited, and it can be
+ * reversed. The project is what biases the agent's search and what
+ * `validate_scene` measures the scene against, so linking is a decision rather
+ * than a label.
+ */
+export async function setSceneProject(
+  sceneId: number,
+  projectId: number | null
+): Promise<{ sceneId: number; projectId: number | null; revision: number }> {
+  const response = await client.put<{
+    sceneId: number
+    projectId: number | null
+    revision: number
+  }>(`/scenes/${sceneId}/project`, { projectId })
+  return response.data
+}
+
+/**
  * Settles several slots on their recommended candidates, in one write.
  *
  * Deliberately not a loop over `resolveSceneSlot`: each of those moves the scene's

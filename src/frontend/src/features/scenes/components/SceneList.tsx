@@ -1,10 +1,12 @@
 import './SceneList.css'
 
 import { Button } from 'primereact/button'
+import { Dropdown } from 'primereact/dropdown'
 import { InputText } from 'primereact/inputtext'
 import { InputTextarea } from 'primereact/inputtextarea'
 import { type JSX, useState } from 'react'
 
+import { useProjectsQuery } from '@/features/project/api/queries'
 import { AddTile, AssetGrid, AssetTile } from '@/shared/components/asset-tile'
 import {
   Dialog,
@@ -19,6 +21,7 @@ import {
   useCreateSceneMutation,
   useDeleteSceneMutation,
   useScenesQuery,
+  useSetSceneProjectMutation,
 } from '../api/queries'
 import type { SceneSummary } from '../types'
 
@@ -29,11 +32,14 @@ interface SceneListProps {
 export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
   const { data: scenes, isLoading, error, refetch } = useScenesQuery()
   const createScene = useCreateSceneMutation()
+  const linkProject = useSetSceneProjectMutation()
+  const { data: projects = [] } = useProjectsQuery()
   const deleteScene = useDeleteSceneMutation()
 
   const [isCreating, setIsCreating] = useState(false)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [projectId, setProjectId] = useState<number | null>(null)
   const [pendingDelete, setPendingDelete] = useState<SceneSummary | null>(null)
 
   const handleCreate = async () => {
@@ -46,9 +52,18 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
       name: trimmed,
       description: description.trim() || undefined,
     })
+
+    // A second call rather than a field on create: linking is its own audited
+    // scene write, and folding it into creation would give it no revision of
+    // its own to undo.
+    if (projectId !== null) {
+      await linkProject.mutateAsync({ sceneId: created.scene.id, projectId })
+    }
+
     setIsCreating(false)
     setName('')
     setDescription('')
+    setProjectId(null)
     onOpenScene(created.scene.id)
   }
 
@@ -170,6 +185,27 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
                 void handleCreate()
               }
             }}
+          />
+
+          {/*
+            Optional, and worth setting: a scene's project is what biases the
+            agent's search, what its budget is measured against, and what world
+            convention it composes in. A scene with none gets none of that.
+          */}
+          <label htmlFor="scene-project">Project</label>
+          <Dropdown
+            inputId="scene-project"
+            value={projectId}
+            options={[
+              { label: 'No project', value: null },
+              ...projects.map(project => ({
+                label: project.name,
+                value: project.id,
+              })),
+            ]}
+            placeholder="No project"
+            data-testid="scene-create-project"
+            onChange={event => setProjectId(event.value ?? null)}
           />
 
           <label htmlFor="scene-description">Description</label>

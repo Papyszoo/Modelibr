@@ -492,12 +492,11 @@ export function SceneEditor({
               onClick={onClose}
             />
             {view.scene.name}
-            {view.scene.projectId !== null ? (
-              <SceneProjectBrief
-                projectId={view.scene.projectId}
-                projectName={view.scene.projectName}
-              />
-            ) : null}
+            <SceneProjectBrief
+              sceneId={sceneId}
+              projectId={view.scene.projectId}
+              projectName={view.scene.projectName}
+            />
           </span>
         }
         stats={[

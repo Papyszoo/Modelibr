@@ -84,7 +84,12 @@ the selected engines disagree - one Z-up, one Y-up - the conflict is **stated, n
 resolved**: "works in both" is a constraint someone has to decide about.
 
 A scene linked to a project shows the project as a chip in the scene editor's header, and
-the same brief opens from there.
+the same brief opens from there. The chip is also where the link is changed or cleared - a
+scene belonging to no project says so plainly, because it means the agent gets no budget, no
+style and no world convention rather than a quiet default. **New scene** takes a project up
+front for the same reason.
+
+Linking is a scene write: the revision moves, it is audited, and it can be reversed.
 
 ## Deleting a Project
 
