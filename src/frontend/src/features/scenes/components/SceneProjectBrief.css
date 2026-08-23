@@ -1,0 +1,24 @@
+.scene-project-chip {
+  font-size: var(--mod-text-xs);
+}
+
+.scene-project-brief {
+  max-width: 28rem;
+}
+
+.scene-project-brief h4 {
+  margin: 0;
+  font-size: var(--mod-text-sm);
+}
+
+.scene-project-brief-note {
+  margin: 0;
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+}
+
+.scene-project-brief ul {
+  margin: var(--mod-space-2xs) 0 0;
+  padding-left: var(--mod-space-sm);
+  font-size: var(--mod-text-xs);
+}

@@ -11,11 +11,14 @@ import {
   type GetAllSoundsResponse,
   type GetAllSpritesResponse,
   type GetAllTextureSetsResponse,
+  type ProjectBriefDto,
   type ProjectConceptImageDto,
   type ProjectDetailDto,
   type ProjectDto,
+  type ProjectProfileOptionDto,
   type ScriptDto,
   type SoundDto,
+  type SetProjectProfileRequest,
   type SpriteDto,
   type TextureSetDto,
   type UpdateProjectRequest,
@@ -250,3 +253,51 @@ export async function getEnvironmentMapsByProject(
 }
 
 export type { ProjectConceptImageDto }
+
+// --- Profile (v0.6 prompt 13) ---
+
+/**
+ * The profile vocabulary. Shared across every project, so it is fetched once and
+ * cached rather than per project page.
+ */
+export async function getProjectProfileOptions(): Promise<
+  ProjectProfileOptionDto[]
+> {
+  const response = await client.get<{ options: ProjectProfileOptionDto[] }>(
+    '/projects/profile-options'
+  )
+  return response.data.options
+}
+
+/** Adds a vocabulary option the built-ins do not cover. */
+export async function createProjectProfileOption(
+  dimension: string,
+  name: string
+): Promise<ProjectProfileOptionDto> {
+  const response = await client.post<ProjectProfileOptionDto>(
+    '/projects/profile-options',
+    { dimension, name }
+  )
+  return response.data
+}
+
+/** The project's brief - the same one the agent is given. */
+export async function getProjectBrief(
+  projectId: number
+): Promise<ProjectBriefDto> {
+  const response = await client.get<ProjectBriefDto>(
+    `/projects/${projectId}/profile`
+  )
+  return response.data
+}
+
+export async function setProjectProfile(
+  projectId: number,
+  request: SetProjectProfileRequest
+): Promise<ProjectBriefDto> {
+  const response = await client.put<ProjectBriefDto>(
+    `/projects/${projectId}/profile`,
+    request
+  )
+  return response.data
+}

@@ -28,6 +28,7 @@ import type { SceneMaterialBinding, SceneSlotView } from '../types'
 import { SceneAssetPicker } from './SceneAssetPicker'
 import { SceneCanvas } from './SceneCanvas'
 import { SceneChoicesPanel } from './SceneChoicesPanel'
+import { SceneProjectBrief } from './SceneProjectBrief'
 import { SceneHierarchy } from './SceneHierarchy'
 import { SceneNodeMaterials } from './SceneNodeMaterials'
 import { ScenePropertyPanel } from './ScenePropertyPanel'
@@ -491,6 +492,12 @@ export function SceneEditor({
               onClick={onClose}
             />
             {view.scene.name}
+            {view.scene.projectId !== null ? (
+              <SceneProjectBrief
+                projectId={view.scene.projectId}
+                projectName={view.scene.projectName}
+              />
+            ) : null}
           </span>
         }
         stats={[

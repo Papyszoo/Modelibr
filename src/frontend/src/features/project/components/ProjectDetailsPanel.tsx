@@ -22,6 +22,8 @@ import { ImageLightboxDialog } from '@/shared/components/ImageLightboxDialog'
 import { projectDetailsFormSchema } from '@/shared/validation/formSchemas'
 import { type ProjectDetailDto } from '@/types'
 
+import { ProjectProfileSection } from './ProjectProfileSection'
+
 type ProjectDetailsInput = z.input<typeof projectDetailsFormSchema>
 type ProjectDetailsOutput = z.output<typeof projectDetailsFormSchema>
 
@@ -192,6 +194,13 @@ export function ProjectDetailsPanel({
                 />
               </div>
             </div>
+          </div>
+
+          <div className="container-rich-block">
+            <ProjectProfileSection
+              projectId={project.id}
+              showToast={showToast}
+            />
           </div>
 
           <div className="container-rich-block">

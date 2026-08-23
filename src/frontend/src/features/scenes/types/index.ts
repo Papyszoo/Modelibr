@@ -65,6 +65,9 @@ export interface SceneSummary {
    * without parsing one.
    */
   stage: SceneStage | null
+  /** The project this scene belongs to, or null. */
+  projectId: number | null
+  projectName: string | null
 }
 
 /**
