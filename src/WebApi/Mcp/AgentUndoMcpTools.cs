@@ -28,7 +28,6 @@ namespace WebApi.Mcp;
 [McpServerToolType]
 public sealed class AgentUndoMcpTools
 {
-    private const string DestructiveFlag = "MCP_DESTRUCTIVE_ENABLED";
 
     [McpServerTool(Name = "reverse_operation")]
     [Description("Undo one agent write by its idempotencyKey, or every write in a batch by its batchId. Pass exactly one. Defaults to a dry run that reports what WOULD be undone - pass dryRun=false to apply it.")]
@@ -267,13 +266,4 @@ public sealed class AgentUndoMcpTools
         validValues = DeletableAssetTypes,
     };
 
-    private static bool DestructiveEnabled(IConfiguration configuration) =>
-        configuration[DestructiveFlag] == "true";
-
-    private static object DestructiveDisabled(string what) => new
-    {
-        error = "DestructiveDisabled",
-        message = $"{what}, and {DestructiveFlag} is not enabled on this server.",
-        remedy = $"Ask the operator to set {DestructiveFlag}=true and restart the Web API. Until then, dry runs still work.",
-    };
 }

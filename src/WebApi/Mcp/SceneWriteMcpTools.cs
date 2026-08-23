@@ -308,6 +308,140 @@ public sealed class SceneWriteMcpTools
             cancellationToken);
     }
 
+    [McpServerTool(Name = "place_primitive")]
+    [Description("Put a blockout box, plane, sphere, cylinder or cone into a scene, with an optional colour. " +
+                 "USE THIS FOR ARCHITECTURE - walls, floors, ceilings, platforms, massing blocks - rather than searching the library for something " +
+                 "wall-shaped and stretching it: a stretched library asset turns out to be slatted, or asphalt-black, and you only find out from a render. " +
+                 "For a whole room shell, call create_room instead - it computes the five boxes and their thickness offsets for you. " +
+                 "size is the shape's extents in metres; a primitive is authored centred on its own origin, so a 3 m tall box at y=1.5 stands on the floor " +
+                 "(or pass groundSnap=true and let the server do it). " +
+                 "color is #rrggbb; omit it for neutral blockout grey.")]
+    public static Task<object> PlacePrimitive(
+        ICommandHandler<PlaceScenePrimitiveCommand, ScenePlacementResponse> handler,
+        IAgentAudit audit,
+        McpCallerContext caller,
+        [Description("Target scene id.")] int sceneId,
+        [Description("Shape: box, plane, sphere, cylinder or cone.")] string shape,
+        [Description("Unique key so a retried call does not place the shape twice.")] string idempotencyKey,
+        [Description("Extents in metres as [x,y,z]. Defaults to a 1 m unit. A plane uses x and z.")] double[]? size = null,
+        [Description("Surface colour as #rrggbb. Omit for neutral blockout grey.")] string? color = null,
+        [Description("Stable node id. Generated from the shape when omitted.")] string? nodeId = null,
+        [Description("Optional human-readable node name, e.g. 'back wall'.")] string? name = null,
+        [Description("Position in metres as [x,y,z]. Defaults to the origin.")] double[]? position = null,
+        [Description("Rotation in degrees as [x,y,z] (XYZ euler).")] double[]? rotationEuler = null,
+        [Description("Scale multiplier as [x,y,z]. Prefer sizing with 'size' - scale multiplies it.")] double[]? scale = null,
+        [Description("Rest the shape's base on y=0 rather than centring it there.")] bool groundSnap = false,
+        [Description("Optional expected scene revision; the write is refused if the scene has moved on.")] int? expectedRevision = null,
+        [Description("Optional batch id. Writes sharing one can be undone together with reverse_operation.")] string? batchId = null,
+        CancellationToken cancellationToken = default)
+    {
+        return Guarded(
+            audit,
+            caller,
+            new AgentWrite(idempotencyKey, "place-primitive", "Scene", sceneId, BatchId: batchId),
+            async ct =>
+            {
+                var vectors = ReadVectors(
+                    ("size", size), ("position", position), ("rotationEuler", rotationEuler), ("scale", scale));
+                if (vectors.Failure is { } failure)
+                {
+                    return failure;
+                }
+
+                var result = await handler.Handle(
+                    new PlaceScenePrimitiveCommand(
+                        sceneId, shape, vectors.Values["size"], color, nodeId, name,
+                        vectors.Values["position"], vectors.Values["rotationEuler"], vectors.Values["scale"],
+                        groundSnap, expectedRevision),
+                    ct);
+
+                if (result.IsFailure)
+                {
+                    return Failed(result.Error);
+                }
+
+                return Applied(
+                    new
+                    {
+                        status = "ok",
+                        scene = result.Value.Scene,
+                        node = result.Value.Node,
+                        overlaps = result.Value.Overlaps,
+                        findings = result.Value.Findings,
+                    },
+                    "Scene", sceneId, result.Value,
+                    new { removedNodeId = result.Value.Node.NodeId });
+            },
+            cancellationToken);
+    }
+
+    [McpServerTool(Name = "create_room")]
+    [Description("Emit a whole room shell - floor, four walls and optionally a ceiling - from three numbers, in one write. " +
+                 "This is how you give a scene an interior. Do NOT build a room out of library assets: the arithmetic is fiddly " +
+                 "(a wall centred on the room's edge is half outside it) and the assets are wrong in ways only a render reveals. " +
+                 "width is X, depth is Z, height is Y, all in metres and all INTERNAL - the walls sit outside them, so the clear " +
+                 "floor space is exactly what you asked for. " +
+                 "The floor's TOP face is at the centre's Y, so furniture placed with groundSnap=true stands on the floor rather than inside it. " +
+                 "Node ids are '<prefix>-floor', '-wall-north' (-Z), '-wall-south' (+Z), '-wall-west' (-X), '-wall-east' (+X) and '-ceiling', " +
+                 "so you can move or recolour one of them afterwards by name. " +
+                 "Undo removes the whole shell.")]
+    public static Task<object> CreateRoom(
+        ICommandHandler<CreateSceneRoomCommand, SceneDistributionResponse> handler,
+        IAgentAudit audit,
+        McpCallerContext caller,
+        [Description("Target scene id.")] int sceneId,
+        [Description("Internal width in metres (X).")] double width,
+        [Description("Internal depth in metres (Z).")] double depth,
+        [Description("Internal height in metres (Y). 2.4-2.7 is an ordinary domestic ceiling.")] double height,
+        [Description("Unique key so a retried call does not build the room twice.")] string idempotencyKey,
+        [Description("Where the floor's centre sits as [x,y,z]. Defaults to the origin.")] double[]? center = null,
+        [Description("Wall and floor thickness in metres. Defaults to 0.1.")] double? wallThickness = null,
+        [Description("Also emit a ceiling. Off by default - a ceiling hides the room from every camera above it.")] bool includeCeiling = false,
+        [Description("Prefix for the generated node ids. Defaults to 'room'.")] string? nodeIdPrefix = null,
+        [Description("Floor colour as #rrggbb. Omit for neutral blockout grey.")] string? floorColor = null,
+        [Description("Wall and ceiling colour as #rrggbb.")] string? wallColor = null,
+        [Description("Optional expected scene revision; the write is refused if the scene has moved on.")] int? expectedRevision = null,
+        [Description("Optional batch id. Writes sharing one can be undone together with reverse_operation.")] string? batchId = null,
+        CancellationToken cancellationToken = default)
+    {
+        return Guarded(
+            audit,
+            caller,
+            new AgentWrite(idempotencyKey, "create-room", "Scene", sceneId, BatchId: batchId),
+            async ct =>
+            {
+                var vectors = ReadVectors(("center", center));
+                if (vectors.Failure is { } failure)
+                {
+                    return failure;
+                }
+
+                var result = await handler.Handle(
+                    new CreateSceneRoomCommand(
+                        sceneId, width, depth, height, vectors.Values["center"], wallThickness,
+                        includeCeiling, nodeIdPrefix, floorColor, wallColor, expectedRevision),
+                    ct);
+
+                if (result.IsFailure)
+                {
+                    return Failed(result.Error);
+                }
+
+                return Applied(
+                    new
+                    {
+                        status = "ok",
+                        scene = result.Value.Scene,
+                        nodes = result.Value.Nodes,
+                        overlaps = result.Value.Overlaps,
+                        findings = result.Value.Findings,
+                    },
+                    "Scene", sceneId, result.Value,
+                    new { removedNodeIds = result.Value.Nodes.Select(n => n.NodeId).ToArray() });
+            },
+            cancellationToken);
+    }
+
     [McpServerTool(Name = "move_asset")]
     [Description("Move, rotate or rescale one node. Omitted components are left alone - and so are the placement rules the node carries: " +
                  "a node that was ground-snapped stays on the floor, one that rests on another node stays on it, one that faces a point keeps facing it. " +
@@ -430,9 +564,69 @@ public sealed class SceneWriteMcpTools
             cancellationToken);
     }
 
+    [McpServerTool(Name = "set_lighting_preset")]
+    [Description("Light a scene correctly in one call. USE THIS BEFORE set_light - lighting is the one thing you cannot check " +
+                 "by reading the scene back, and both ways of getting it wrong render the same white picture. " +
+                 "Presets: 'interior-daylight' (sun through a window plus sky fill), 'interior-evening' (dim ambient, warm " +
+                 "practical, soft key), 'studio' (key, fill and rim, for looking at one object). " +
+                 "Each is ambient as FILL plus at least one key light, which is the rule that stops a scene rendering as flat " +
+                 "white cut-outs. Replaces the scene's lights by default - the failure this exists to fix is an accumulation of " +
+                 "six lights nobody can reason about - so pass replace=false only when you deliberately want to keep what is there. " +
+                 "Adjust with set_light afterwards, from a rig that already has form. Undo restores the previous rig exactly.")]
+    public static Task<object> SetLightingPreset(
+        ICommandHandler<SetSceneLightingPresetCommand, SceneLightingPresetResponse> handler,
+        IAgentAudit audit,
+        McpCallerContext caller,
+        [Description("Target scene id.")] int sceneId,
+        [Description("Preset: interior-daylight | interior-evening | studio.")] string preset,
+        [Description("Unique key so a retried call does not apply twice.")] string idempotencyKey,
+        [Description("Replace the scene's existing lights (default). False keeps them and upserts the preset's by id.")] bool replace = true,
+        [Description("Optional expected scene revision; the write is refused if the scene has moved on.")] int? expectedRevision = null,
+        [Description("Optional batch id. Writes sharing one can be undone together with reverse_operation.")] string? batchId = null,
+        CancellationToken cancellationToken = default)
+    {
+        return Guarded(
+            audit,
+            caller,
+            new AgentWrite(idempotencyKey, "set-lighting-preset", "Scene", sceneId, BatchId: batchId),
+            async ct =>
+            {
+                var result = await handler.Handle(
+                    new SetSceneLightingPresetCommand(sceneId, preset, replace, expectedRevision), ct);
+
+                if (result.IsFailure)
+                {
+                    return Failed(result.Error);
+                }
+
+                // The whole previous rig, because the preset replaced the whole rig. An undo
+                // that restored the lights one by one would leave whichever ones the preset
+                // happened not to reuse.
+                return Applied(
+                    new
+                    {
+                        status = "ok",
+                        scene = result.Value.Scene,
+                        preset = result.Value.Preset,
+                        lights = result.Value.Lights,
+                    },
+                    "Scene", sceneId, result.Value,
+                    new { lights = result.Value.Previous });
+            },
+            cancellationToken);
+    }
+
     [McpServerTool(Name = "set_light")]
     [Description("Add, update or remove one light by id. Upsert semantics: an existing light with this id is updated in place, " +
-                 "so a retried call does not stack a second sun into the scene. A new light requires a type.")]
+                 "so a retried call does not stack a second sun into the scene. A new light requires a type. " +
+                 "AMBIENT IS FILL, NEVER KEY. A scene lit only by ambient light has no shading at all - every surface is lit " +
+                 "equally, so nothing has form and it reads as white paper cut-outs. It is a mistake 100% of the time, and " +
+                 "validate_scene reports it. A scene needs at least one directional, point or spot light. " +
+                 "Sane starting intensities: ambient 0.2-0.4, directional 0.8-1.5, hemisphere 0.3-0.6, point/spot 1-20 " +
+                 "depending on distance (a table lamp a metre from what it lights is nearer 2 than 20). " +
+                 "'ambient 0.35 + one directional 1.2' is a correct interior rig; six lights at 1.5 is a blown-out white one. " +
+                 "Over-lighting and ambient-only look the SAME from a render - both come back white - so read the finding " +
+                 "rather than guessing which way to move.")]
     public static Task<object> SetLight(
         ICommandHandler<SetSceneLightCommand, SceneLightResponse> handler,
         IAgentAudit audit,
@@ -870,6 +1064,95 @@ public sealed class SceneWriteMcpTools
                         new { document = before.Value.Document });
             },
             cancellationToken);
+    }
+
+    [McpServerTool(Name = "delete_scene")]
+    [Description("Delete a scene. Defaults to a dry run; pass dryRun=false to apply. " +
+                 "Unlike delete_asset there is NO recycle bin for scenes - this is a hard delete. " +
+                 "reverse_operation can recreate the scene from its recorded document, but it comes back with a NEW id, " +
+                 "so anything that referenced the old one still points at nothing. " +
+                 "Use it to clean up the scratch scenes you make while probing; be sure before you use it on one a person composed.")]
+    public static Task<object> DeleteScene(
+        ICommandHandler<DeleteSceneCommand> handler,
+        IQueryHandler<GetSceneByIdQuery, SceneView> readHandler,
+        IAgentAudit audit,
+        McpCallerContext caller,
+        IConfiguration configuration,
+        [Description("Scene id to delete.")] int sceneId,
+        [Description("Unique key so a retried call does not re-apply.")] string idempotencyKey,
+        [Description("True (default) reports what would be deleted without deleting it.")] bool dryRun = true,
+        [Description("Optional batch id, so a group of deletions can be reversed together.")] string? batchId = null,
+        CancellationToken cancellationToken = default)
+    {
+        return DeleteSceneAsync(
+            handler, readHandler, audit, caller, configuration, sceneId, idempotencyKey, dryRun, batchId,
+            cancellationToken);
+    }
+
+    private static async Task<object> DeleteSceneAsync(
+        ICommandHandler<DeleteSceneCommand> handler,
+        IQueryHandler<GetSceneByIdQuery, SceneView> readHandler,
+        IAgentAudit audit,
+        McpCallerContext caller,
+        IConfiguration configuration,
+        int sceneId,
+        string idempotencyKey,
+        bool dryRun,
+        string? batchId,
+        CancellationToken cancellationToken)
+    {
+        // Read first, for both halves: the dry run says what would go, and the real delete
+        // needs the document recorded before the row is gone. Afterwards there is nothing
+        // left to read, and an undo with no document is an undo that restores an empty scene.
+        var before = await readHandler.Handle(new GetSceneByIdQuery(sceneId), cancellationToken);
+        if (before.IsFailure)
+        {
+            return Failed(before.Error);
+        }
+
+        if (dryRun)
+        {
+            return new
+            {
+                status = "dry-run",
+                wouldDelete = new
+                {
+                    sceneId,
+                    name = before.Value.Scene.Name,
+                    nodes = before.Value.Nodes.Count,
+                },
+                message = $"Would delete scene {sceneId} ('{before.Value.Scene.Name}') and its {before.Value.Nodes.Count} node(s). " +
+                          "Scenes have no recycle bin; an undo recreates it under a new id. Re-run with dryRun=false to apply.",
+            };
+        }
+
+        if (!DestructiveEnabled(configuration))
+        {
+            return DestructiveDisabled("Deleting scenes");
+        }
+
+        return await Guarded(
+            audit,
+            caller,
+            new AgentWrite(idempotencyKey, "delete-scene", "Scene", sceneId, BatchId: batchId),
+            async ct =>
+            {
+                var result = await handler.Handle(new DeleteSceneCommand(sceneId), ct);
+                return result.IsFailure
+                    ? Failed(result.Error)
+                    : Applied(
+                        new { status = "ok", sceneId, deleted = true },
+                        "Scene", sceneId,
+                        new { sceneId, deleted = true },
+                        new
+                        {
+                            name = before.Value.Scene.Name,
+                            description = before.Value.Scene.Description,
+                            document = before.Value.Document,
+                        });
+            },
+            cancellationToken,
+            McpScope.Destructive);
     }
 
     /// <summary>

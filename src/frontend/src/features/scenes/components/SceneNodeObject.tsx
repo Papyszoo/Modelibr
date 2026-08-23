@@ -336,7 +336,16 @@ function ScenePrimitiveMesh({ node }: { node: SceneNode }): JSX.Element | null {
       ) : (
         <coneGeometry args={[size.x / 2, size.y, 32]} />
       )}
-      <meshStandardMaterial color="#8a8f98" roughness={0.8} metalness={0.05} />
+      {/*
+        The primitive's own colour when it declares one - a room shell that comes
+        back neutral grey is a room shell nobody can tell the floor from the walls
+        in. Falls back to blockout grey, which is what an unstated colour means.
+      */}
+      <meshStandardMaterial
+        color={primitive.color ?? '#8a8f98'}
+        roughness={0.8}
+        metalness={0.05}
+      />
     </mesh>
   )
 }

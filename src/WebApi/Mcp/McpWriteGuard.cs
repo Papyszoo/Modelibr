@@ -157,5 +157,23 @@ internal static class McpWriteGuard
         message = "Another call is applying this idempotency key. It has NOT been applied yet - retry, and it will either complete or be retried for you once the claim lapses.",
     };
 
+    /// <summary>
+    /// The operator flag that permits work nothing can quietly undo.
+    ///
+    /// Here rather than on one tool class because two of them gate on it, and a second copy
+    /// of the flag name is a second thing to get wrong the day it is renamed.
+    /// </summary>
+    internal const string DestructiveFlag = "MCP_DESTRUCTIVE_ENABLED";
+
+    internal static bool DestructiveEnabled(IConfiguration configuration) =>
+        configuration[DestructiveFlag] == "true";
+
+    internal static object DestructiveDisabled(string what) => new
+    {
+        error = "DestructiveDisabled",
+        message = $"{what}, and {DestructiveFlag} is not enabled on this server.",
+        remedy = $"Ask the operator to set {DestructiveFlag}=true and restart the Web API. Until then, dry runs still work.",
+    };
+
     private static string Json(object value) => JsonSerializer.Serialize(value);
 }

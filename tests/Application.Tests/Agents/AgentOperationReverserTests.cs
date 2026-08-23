@@ -45,6 +45,8 @@ public class AgentOperationReverserTests
     private readonly Mock<ICommandHandler<UpdateSceneDocumentCommand, SceneView>> _updateSceneDocument = new();
     private readonly Mock<ICommandHandler<SetSceneStageCommand, SceneStageResponse>> _setSceneStage = new();
     private readonly Mock<ICommandHandler<DeleteSceneCommand>> _deleteScene = new();
+    private readonly Mock<ICommandHandler<CreateSceneCommand, SceneView>> _createScene = new();
+    private readonly Mock<ICommandHandler<RestoreSceneLightsCommand, SceneSummary>> _restoreSceneLights = new();
     private readonly Mock<ICommandHandler<RestoreSceneSlotCommand, SceneSummary>> _restoreSceneSlot = new();
     private readonly Mock<ICommandHandler<RestoreSceneRecommendationsCommand, SceneRecommendationsResponse>> _restoreSceneRecommendations = new();
     private readonly Mock<ICommandHandler<SetSceneProjectCommand, SetSceneProjectResponse>> _setSceneProject = new();
@@ -60,7 +62,7 @@ public class AgentOperationReverserTests
             _deleteModel.Object, _deleteSound.Object,
             _deleteSprite.Object, _deleteEnvironmentMap.Object, _deleteTextureSet.Object,
             _removeSceneNode.Object, _restoreSceneNode.Object, _moveSceneNode.Object, _setSceneLight.Object,
-            _applySceneMaterial.Object, _updateSceneDocument.Object, _setSceneStage.Object, _deleteScene.Object, _restoreSceneSlot.Object,
+            _applySceneMaterial.Object, _updateSceneDocument.Object, _setSceneStage.Object, _deleteScene.Object, _createScene.Object, _restoreSceneLights.Object, _restoreSceneSlot.Object,
             _restoreSceneRecommendations.Object, _setSceneProject.Object, _setAssetMetadata.Object);
 
         _audit.Setup(a => a.TryMarkReversedAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))

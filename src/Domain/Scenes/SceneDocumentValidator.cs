@@ -692,6 +692,12 @@ public static class SceneDocumentValidator
         {
             ValidateVec3(size, $"{path}.size", issues, requirePositive: true);
         }
+
+        if (primitive.Color is not null && !IsHexColor(primitive.Color))
+        {
+            issues.Add(new SceneValidationIssue(
+                $"{path}.color", "InvalidColor", "A primitive's colour must be a hex string such as '#c9c2b6'."));
+        }
     }
 
     private static void ValidateTransform(SceneTransform? transform, string path, List<SceneValidationIssue> issues)

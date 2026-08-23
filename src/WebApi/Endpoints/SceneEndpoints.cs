@@ -192,6 +192,55 @@ public static class SceneEndpoints
         .WithName("Place Scene Assets Batch")
         .WithSummary("Place a heterogeneous layout into a scene in one write");
 
+        app.MapPost("/scenes/{id}/primitives", async (
+            int id,
+            PlaceScenePrimitiveRequest request,
+            ICommandHandler<PlaceScenePrimitiveCommand, ScenePlacementResponse> handler,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await handler.Handle(
+                new PlaceScenePrimitiveCommand(
+                    id, request.Shape, request.Size, request.Color, request.NodeId, request.Name,
+                    request.Position, request.RotationEuler, request.Scale,
+                    request.GroundSnap ?? false, request.ExpectedRevision),
+                cancellationToken);
+            return result.IsFailure ? NotFoundOrFailure(result.Error) : Results.Ok(result.Value);
+        })
+        .WithName("Place Scene Primitive")
+        .WithSummary("Put a blockout shape into a scene");
+
+        app.MapPost("/scenes/{id}/rooms", async (
+            int id,
+            CreateSceneRoomRequest request,
+            ICommandHandler<CreateSceneRoomCommand, SceneDistributionResponse> handler,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await handler.Handle(
+                new CreateSceneRoomCommand(
+                    id, request.Width, request.Depth, request.Height, request.Center,
+                    request.WallThickness, request.IncludeCeiling ?? false, request.NodeIdPrefix,
+                    request.FloorColor, request.WallColor, request.ExpectedRevision),
+                cancellationToken);
+            return result.IsFailure ? NotFoundOrFailure(result.Error) : Results.Ok(result.Value);
+        })
+        .WithName("Create Scene Room")
+        .WithSummary("Emit a floor, four walls and optionally a ceiling in one write");
+
+        app.MapPut("/scenes/{id}/lighting-preset", async (
+            int id,
+            SetSceneLightingPresetRequest request,
+            ICommandHandler<SetSceneLightingPresetCommand, SceneLightingPresetResponse> handler,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await handler.Handle(
+                new SetSceneLightingPresetCommand(
+                    id, request.Preset, request.Replace ?? true, request.ExpectedRevision),
+                cancellationToken);
+            return result.IsFailure ? NotFoundOrFailure(result.Error) : Results.Ok(result.Value);
+        })
+        .WithName("Set Scene Lighting Preset")
+        .WithSummary("Replace a scene's lights with a rig that is known to work");
+
         app.MapPut("/scenes/{id}/nodes/{nodeId}", async (
             int id,
             string nodeId,
@@ -483,6 +532,35 @@ public record PlaceSceneAssetRequest(
 /// </summary>
 public record PlaceSceneAssetsBatchRequest(
     IReadOnlyList<PlaceSceneAssetRequest>? Placements,
+    int? ExpectedRevision = null);
+
+public record PlaceScenePrimitiveRequest(
+    string Shape,
+    Vec3? Size = null,
+    string? Color = null,
+    string? NodeId = null,
+    string? Name = null,
+    Vec3? Position = null,
+    Vec3? RotationEuler = null,
+    Vec3? Scale = null,
+    bool? GroundSnap = null,
+    int? ExpectedRevision = null);
+
+public record CreateSceneRoomRequest(
+    double Width,
+    double Depth,
+    double Height,
+    Vec3? Center = null,
+    double? WallThickness = null,
+    bool? IncludeCeiling = null,
+    string? NodeIdPrefix = null,
+    string? FloorColor = null,
+    string? WallColor = null,
+    int? ExpectedRevision = null);
+
+public record SetSceneLightingPresetRequest(
+    string Preset,
+    bool? Replace = null,
     int? ExpectedRevision = null);
 
 public record MoveSceneNodeRequest(

@@ -297,6 +297,21 @@ showing a broken image. Clicking a card previews it in place without writing any
 node whose slot is still open is outlined in the viewport so a scene cannot look finished
 while its decisions are not.
 
+#### Lighting has one rule, and two failure modes that look the same
+
+Over-lighting and ambient-only both render a white scene, for opposite reasons - so "it
+looks white" tells an agent nothing about which way to move, and a reasonable correction to
+one produces the other.
+
+The rule is **ambient is fill, never key**. A scene with no directional, point or spot light
+has no shading at all: every surface is lit equally and it reads as white paper cut-outs.
+`validate_scene` reports both ends - `Appearance.AmbientOnly` and `Appearance.Overlit` -
+so the finding, rather than the render, says which mistake was made.
+
+`set_lighting_preset` is the way out of that loop: one call emits a rig that already has
+form, and `set_light` adjusts from there. Sane starting intensities are ambient 0.2-0.4,
+directional 0.8-1.5, hemisphere 0.3-0.6, and point/spot 1-20 by distance.
+
 #### Recommending is not choosing
 
 An agent may say which candidate it would go with. `set_scene_recommendations` states the

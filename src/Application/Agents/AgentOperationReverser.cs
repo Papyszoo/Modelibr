@@ -106,6 +106,8 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
     private readonly ICommandHandler<UpdateSceneDocumentCommand, SceneView> _updateSceneDocument;
     private readonly ICommandHandler<SetSceneStageCommand, SceneStageResponse> _setSceneStage;
     private readonly ICommandHandler<DeleteSceneCommand> _deleteScene;
+    private readonly ICommandHandler<CreateSceneCommand, SceneView> _createScene;
+    private readonly ICommandHandler<RestoreSceneLightsCommand, SceneSummary> _restoreSceneLights;
     private readonly ICommandHandler<RestoreSceneSlotCommand, SceneSummary> _restoreSceneSlot;
     private readonly ICommandHandler<RestoreSceneRecommendationsCommand, SceneRecommendationsResponse> _restoreSceneRecommendations;
     private readonly ICommandHandler<SetSceneProjectCommand, SetSceneProjectResponse> _setSceneProject;
@@ -133,6 +135,8 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
         ICommandHandler<UpdateSceneDocumentCommand, SceneView> updateSceneDocument,
         ICommandHandler<SetSceneStageCommand, SceneStageResponse> setSceneStage,
         ICommandHandler<DeleteSceneCommand> deleteScene,
+        ICommandHandler<CreateSceneCommand, SceneView> createScene,
+        ICommandHandler<RestoreSceneLightsCommand, SceneSummary> restoreSceneLights,
         ICommandHandler<RestoreSceneSlotCommand, SceneSummary> restoreSceneSlot,
         ICommandHandler<RestoreSceneRecommendationsCommand, SceneRecommendationsResponse> restoreSceneRecommendations,
         ICommandHandler<SetSceneProjectCommand, SetSceneProjectResponse> setSceneProject,
@@ -159,6 +163,8 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
         _updateSceneDocument = updateSceneDocument;
         _setSceneStage = setSceneStage;
         _deleteScene = deleteScene;
+        _createScene = createScene;
+        _restoreSceneLights = restoreSceneLights;
         _restoreSceneSlot = restoreSceneSlot;
         _restoreSceneRecommendations = restoreSceneRecommendations;
         _setSceneProject = setSceneProject;
@@ -327,6 +333,24 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
         "distribute-assets" => Step(entry, $"Remove the row of nodes this call placed in scene {entry.AssetId}.", destructive: false,
             supported: entry.PayloadBefore is not null,
             blocker: "The placed nodes' ids were not recorded."),
+
+        "set-lighting-preset" => Step(entry, $"Put scene {entry.AssetId}'s previous lighting rig back.", destructive: false,
+            supported: entry.PayloadBefore is not null,
+            blocker: "The rig this preset replaced was not recorded."),
+
+        "place-primitive" => Step(entry, $"Remove the blockout shape this call placed in scene {entry.AssetId}.", destructive: false,
+            supported: entry.PayloadBefore is not null,
+            blocker: "The placed node's id was not recorded."),
+
+        "create-room" => Step(entry, $"Remove the room shell this call built in scene {entry.AssetId}.", destructive: false,
+            supported: entry.PayloadBefore is not null,
+            blocker: "The shell's node ids were not recorded."),
+
+        // A scene has no recycle bin, so the honest description says what the inverse can and
+        // cannot do: the content comes back, the id does not.
+        "delete-scene" => Step(entry, $"Recreate deleted scene {entry.AssetId} from its recorded document, under a NEW id.", destructive: false,
+            supported: entry.PayloadBefore is not null,
+            blocker: "The deleted scene's document was not recorded, so there is nothing to recreate it from."),
 
         "set-scene-recommendations" => Step(entry, $"Put scene {entry.AssetId}'s recommendations back as they were.", destructive: false,
             supported: entry.PayloadBefore is not null,
@@ -832,6 +856,7 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
                     : Result.Success($"Recycled texture set {entry.AssetId}.");
             }
 
+            case "place-primitive":
             case "place-asset":
             {
                 var before = Read(entry.PayloadBefore);
@@ -853,6 +878,7 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
 
             case "distribute-assets":
             case "place-assets-batch":
+            case "create-room":
             {
                 var before = Read(entry.PayloadBefore);
                 var nodeIds = before is null
@@ -1098,6 +1124,57 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
                     : Result.Success(recommendations.Count == 0
                         ? $"Scene {entry.AssetId} recommends nothing again, as it did before."
                         : $"Restored scene {entry.AssetId}'s previous {recommendations.Count} recommendation(s).");
+            }
+
+            case "set-lighting-preset":
+            {
+                var before = Read(entry.PayloadBefore);
+                if (before is null)
+                {
+                    return Result.Failure<string>(new Error(
+                        "NoPriorState", "The rig this preset replaced was not recorded."));
+                }
+
+                // The whole rig at once, through the same preset command's replace path -
+                // restoring light by light would leave behind whichever preset lights the
+                // old rig had no counterpart for.
+                var lights = ReadPayload<List<SceneLight>>(before.Value, "lights") ?? [];
+
+                var result = await _restoreSceneLights.Handle(
+                    new RestoreSceneLightsCommand(entry.AssetId!.Value, lights), cancellationToken);
+
+                return result.IsFailure
+                    ? Result.Failure<string>(result.Error)
+                    : Result.Success(lights.Count == 0
+                        ? $"Scene {entry.AssetId} has no lights again, as it did before."
+                        : $"Restored scene {entry.AssetId}'s previous {lights.Count} light(s).");
+            }
+
+            case "delete-scene":
+            {
+                var before = Read(entry.PayloadBefore);
+                var document = before is null ? null : ReadString(before.Value, "document");
+                if (document is null)
+                {
+                    return Result.Failure<string>(new Error(
+                        "NoPriorState",
+                        "The deleted scene's document was not recorded, so there is nothing to recreate it from."));
+                }
+
+                var name = (before is null ? null : ReadString(before.Value, "name")) ?? $"Scene {entry.AssetId}";
+                var description = before is null ? null : ReadString(before.Value, "description");
+
+                var result = await _createScene.Handle(
+                    new CreateSceneCommand(name, description, document), cancellationToken);
+
+                // The new id is said out loud rather than glossed over. A scene comes back
+                // with its content intact and its identity changed, and a caller that assumed
+                // otherwise would go on addressing a scene that no longer exists.
+                return result.IsFailure
+                    ? Result.Failure<string>(result.Error)
+                    : Result.Success(
+                        $"Recreated deleted scene {entry.AssetId} as '{name}' with id {result.Value.Scene.Id}. " +
+                        "Its content is restored; its id is new, because a deleted scene cannot be given its old one back.");
             }
 
             case "create-scene":

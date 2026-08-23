@@ -160,8 +160,22 @@ public sealed record SceneAnchor(string OnNodeId, Vec3? Offset = null);
 /// </summary>
 public sealed record SceneAssetRef(string AssetType, int AssetId, int? VersionId = null);
 
-/// <summary>Blockout geometry. A minority case by design - useful for massing, not for building a library scene out of.</summary>
-public sealed record ScenePrimitive(string Shape, Vec3? Size = null);
+/// <summary>
+/// Blockout geometry. A minority case by design - useful for massing, not for building a
+/// library scene out of.
+///
+/// <para>
+/// The exception is a room shell. Walls, a floor and a ceiling are the one part of a scene
+/// that should never require an asset search: the alternative is stretching a library asset
+/// seven times its size and discovering from a screenshot that it was slatted, or asphalt.
+/// </para>
+/// </summary>
+/// <param name="Color">
+/// An <c>#rrggbb</c> surface colour. Null draws the neutral blockout grey. A raw colour
+/// rather than a material binding on purpose - a wall the agent has to create a Material for
+/// first is a wall it will get wrong for two calls instead of none.
+/// </param>
+public sealed record ScenePrimitive(string Shape, Vec3? Size = null, string? Color = null);
 
 /// <summary>Position in metres, rotation in degrees (XYZ euler), scale as a multiplier.</summary>
 public sealed record SceneTransform(Vec3 Position, Vec3 RotationEuler, Vec3 Scale)

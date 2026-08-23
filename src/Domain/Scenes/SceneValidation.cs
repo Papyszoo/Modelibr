@@ -579,6 +579,27 @@ public static class SceneValidator
                 + NotYetDue(document.Stage, lightingDue, SceneStages.Lit)));
         }
 
+        // The other half of the same trap. Over-lighting and ambient-only both render white,
+        // for opposite reasons, so a scene that only reported one of them left an agent to
+        // guess which way to move - and guessing wrong makes the render worse in a way that
+        // still looks like the same symptom.
+        if (nodes.Count > 0 && lit.Count > 0)
+        {
+            var ambient = lit.Where(l => !IsKeyLight(l)).Sum(l => l.Intensity);
+            var key = lit.Where(IsKeyLight).Sum(l => l.Intensity);
+
+            if (ambient > MaxSaneAmbient || key > MaxSaneKey)
+            {
+                findings.Add(new SceneFinding(
+                    SceneChecks.Appearance,
+                    "Appearance.Overlit",
+                    SceneFindingSeverities.Warning,
+                    Array.Empty<string>(),
+                    $"This scene's lights total {ambient:0.##} ambient/hemisphere and {key:0.##} key intensity, which renders blown out - white, with the same look as a scene lit only by ambient. " +
+                    $"A correct interior rig is about one directional at 0.8-1.5 plus ambient near 0.3. Cut intensities rather than adding more lights; keep ambient under {MaxSaneAmbient} and total key under {MaxSaneKey}."));
+            }
+        }
+
         if (profiles is null)
         {
             return;
@@ -649,6 +670,20 @@ public static class SceneValidator
     /// </summary>
     private static bool HasSurface(SceneMaterialBinding? binding) =>
         binding is not null && (binding.TextureSetId is not null || binding.MaterialId is not null);
+
+    /// <summary>
+    /// Where fill stops being fill. Above this every surface is lit near-equally and the
+    /// render loses its shading, which is the ambient-only failure arriving by a different
+    /// route.
+    /// </summary>
+    private const double MaxSaneAmbient = 0.8;
+
+    /// <summary>
+    /// Total directional/point/spot intensity past which an ordinary interior renders blown
+    /// out. Generous on purpose - a real rig of a key plus two practicals sits well under it,
+    /// and the failure this catches was six lights at 1.5.
+    /// </summary>
+    private const double MaxSaneKey = 6.0;
 
     private static bool IsKeyLight(SceneLight light) =>
         light.Type is SceneLightTypes.Directional or SceneLightTypes.Point or SceneLightTypes.Spot;

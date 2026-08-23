@@ -984,6 +984,156 @@ public class SceneCommandTests
         Assert.Single(upFront);
     }
 
+    private PlaceScenePrimitiveCommandHandler Primitive => new(_writer);
+
+    private CreateSceneRoomCommandHandler Room => new(_writer);
+
+    private SetSceneLightingPresetCommandHandler Lighting => new(_writer);
+
+    [Fact]
+    public async Task PlacePrimitive_Puts_A_Coloured_Box_In_The_Scene()
+    {
+        var result = await Primitive.Handle(
+            new PlaceScenePrimitiveCommand(
+                SceneId, ScenePrimitiveShapes.Box, new Vec3(4, 0.1, 3), "#c9c2b6", "floor"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Message : null);
+        var node = SceneDocumentCodec.Parse(_scene.DocumentJson).Value.Nodes.Single(n => n.Id == "floor");
+        Assert.Equal("#c9c2b6", node.Primitive!.Color);
+        Assert.Null(node.Asset);
+    }
+
+    [Fact]
+    public async Task PlacePrimitive_With_A_Colour_That_Is_Not_A_Hex_String_Is_Refused()
+    {
+        var result = await Primitive.Handle(
+            new PlaceScenePrimitiveCommand(SceneId, ScenePrimitiveShapes.Box, Color: "beige"),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Contains("InvalidColor", result.Error.Message);
+        Assert.Equal(1, _scene.Revision);
+    }
+
+    [Fact]
+    public async Task CreateRoom_Puts_The_Floors_Top_Face_At_The_Given_Height()
+    {
+        // The convention a person means by "a 5 by 4 room": furniture ground-snapped to y=0
+        // stands ON the floor, not inside it. A floor centred on y=0 would bury half of it.
+        var result = await Room.Handle(
+            new CreateSceneRoomCommand(SceneId, 5, 4, 2.6, WallThickness: 0.2),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Message : null);
+        var floor = result.Value.Nodes.Single(n => n.NodeId == "room-floor");
+        Assert.Equal(-0.1, floor.Transform.Position.Y, 6);
+        Assert.Equal(0, floor.Footprint!.Value.Max.Y, 6);
+    }
+
+    [Fact]
+    public async Task CreateRoom_Leaves_The_Internal_Space_That_Was_Asked_For()
+    {
+        // The walls sit OUTSIDE the stated width and depth. A wall centred on the room's
+        // edge would be half inside it, and the clear floor would be short by a thickness
+        // on each side - the arithmetic this verb exists to stop an agent doing by hand.
+        var result = await Room.Handle(
+            new CreateSceneRoomCommand(SceneId, 5, 4, 2.6, WallThickness: 0.2),
+            CancellationToken.None);
+
+        var west = result.Value.Nodes.Single(n => n.NodeId == "room-wall-west");
+        var east = result.Value.Nodes.Single(n => n.NodeId == "room-wall-east");
+
+        Assert.Equal(-2.5, west.Footprint!.Value.Max.X, 6);
+        Assert.Equal(2.5, east.Footprint!.Value.Min.X, 6);
+    }
+
+    [Fact]
+    public async Task CreateRoom_Emits_The_Shell_In_One_Revision_And_Skips_The_Ceiling_By_Default()
+    {
+        var result = await Room.Handle(
+            new CreateSceneRoomCommand(SceneId, 5, 4, 2.6), CancellationToken.None);
+
+        Assert.Equal(
+            ["room-floor", "room-wall-north", "room-wall-south", "room-wall-west", "room-wall-east"],
+            result.Value.Nodes.Select(n => n.NodeId));
+        Assert.Equal(2, _scene.Revision);
+    }
+
+    [Fact]
+    public async Task CreateRoom_Does_Not_Report_Its_Own_Corners_As_Overlaps()
+    {
+        // The shell touches itself by construction. Reporting four correct overlaps would
+        // bury the one that matters - a sofa halfway through a wall.
+        var result = await Room.Handle(
+            new CreateSceneRoomCommand(SceneId, 5, 4, 2.6, IncludeCeiling: true),
+            CancellationToken.None);
+
+        Assert.Empty(result.Value.Overlaps);
+    }
+
+    [Fact]
+    public async Task CreateRoom_Refuses_A_Wall_Thicker_Than_The_Room()
+    {
+        var result = await Room.Handle(
+            new CreateSceneRoomCommand(SceneId, 2, 2, 2.6, WallThickness: 5),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.InvalidRoom", result.Error.Code);
+        Assert.Equal(1, _scene.Revision);
+    }
+
+    [Fact]
+    public async Task CreateRoom_Twice_With_The_Same_Prefix_Is_Refused_Rather_Than_Silently_Doubled()
+    {
+        await Room.Handle(new CreateSceneRoomCommand(SceneId, 5, 4, 2.6), CancellationToken.None);
+
+        var second = await Room.Handle(
+            new CreateSceneRoomCommand(SceneId, 5, 4, 2.6), CancellationToken.None);
+
+        Assert.True(second.IsFailure);
+        Assert.Equal("Scene.DuplicateNodeId", second.Error.Code);
+    }
+
+    [Fact]
+    public async Task LightingPreset_Replaces_The_Rig_With_Ambient_Fill_Plus_A_Key()
+    {
+        // The rule an agent cannot discover from a render: ambient is fill, never key.
+        var result = await Lighting.Handle(
+            new SetSceneLightingPresetCommand(SceneId, SceneLightingPresets.InteriorDaylight),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Message : null);
+        Assert.Contains(result.Value.Lights, l => l.Type == SceneLightTypes.Ambient);
+        Assert.Contains(result.Value.Lights, l => l.Type == SceneLightTypes.Directional && l.Intensity > 0);
+    }
+
+    [Fact]
+    public async Task LightingPreset_Applied_Twice_Does_Not_Stack_A_Second_Rig()
+    {
+        await Lighting.Handle(
+            new SetSceneLightingPresetCommand(SceneId, SceneLightingPresets.Studio), CancellationToken.None);
+
+        var second = await Lighting.Handle(
+            new SetSceneLightingPresetCommand(SceneId, SceneLightingPresets.Studio), CancellationToken.None);
+
+        Assert.Equal(3, second.Value.Lights.Count);
+        // And it hands back what it replaced, so the write can be reversed whole.
+        Assert.Equal(3, second.Value.Previous.Count);
+    }
+
+    [Fact]
+    public async Task LightingPreset_With_A_Name_That_Is_Not_One_Lists_The_Ones_That_Are()
+    {
+        var result = await Lighting.Handle(
+            new SetSceneLightingPresetCommand(SceneId, "cinematic"), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.UnknownLightingPreset", result.Error.Code);
+        Assert.Contains("interior-daylight", result.Error.Message);
+    }
+
     [Fact]
     public async Task CreateScene_Refuses_A_Document_That_Claims_A_Stage_It_Does_Not_Hold()
     {

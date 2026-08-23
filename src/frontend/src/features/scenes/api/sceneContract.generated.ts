@@ -104,6 +104,7 @@ export interface SceneNode {
 export interface ScenePrimitive {
   shape: ScenePrimitiveShape
   size?: Vec3 | null
+  color?: string | null
 }
 
 export interface SceneSlot {
