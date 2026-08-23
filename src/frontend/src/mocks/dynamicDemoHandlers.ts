@@ -1571,9 +1571,10 @@ export const dynamicDemoHandlers = [
     }
   ),
 
-  // External glTF resources linked to a version. The demo library ships packed
-  // .glb seeds, so this is always empty - but it must answer, not 404: the viewer
-  // asks for it whenever a version carries a loose .gltf.
+  // The sibling files linked to a version - a loose .gltf's .bin and textures, an
+  // FBX's or OBJ's texture files. The demo library ships packed .glb seeds, so
+  // this is always empty - but it must answer, not 404: the viewer asks for it
+  // whenever a version carries any of those three formats.
   http.get(
     '*/models/:modelId/versions/:versionId/auxiliary-files',
     async ({ params }) => {

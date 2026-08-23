@@ -11,7 +11,7 @@ import { STLLoader } from 'three/examples/jsm/loaders/STLLoader'
 import { LoadingPlaceholder } from '@/components/LoadingPlaceholder'
 import { useModelObject } from '@/features/model-viewer/hooks/useModelObject'
 import {
-  createGltfResourceManager,
+  createResourceManager,
   safeLoadingManager,
 } from '@/shared/three/safeLoadingManager'
 import { THREEJS_SUPPORTED_FORMATS } from '@/utils/fileUtils'
@@ -116,13 +116,16 @@ function OBJModel({
   modelUrl,
   rotationSpeed,
   preserveMaterials = false,
+  resources,
 }: {
   modelUrl: string
   rotationSpeed: number
   preserveMaterials?: boolean
+  resources?: Record<string, string>
 }) {
+  const manager = useMemo(() => createResourceManager(resources), [resources])
   const model = useLoader(OBJLoader, modelUrl, loader => {
-    loader.manager = safeLoadingManager
+    loader.manager = manager
   })
   const meshRef = useRenderedModel(model, rotationSpeed, preserveMaterials)
 
@@ -133,19 +136,16 @@ function GLTFModel({
   modelUrl,
   rotationSpeed,
   preserveMaterials = false,
-  gltfResources,
+  resources,
 }: {
   modelUrl: string
   rotationSpeed: number
   preserveMaterials?: boolean
-  gltfResources?: Record<string, string>
+  resources?: Record<string, string>
 }) {
   // A loose .gltf references its buffers/textures relatively; those must be mapped to
   // the version's uploaded auxiliary files or the model loads with no geometry at all.
-  const manager = useMemo(
-    () => createGltfResourceManager(gltfResources),
-    [gltfResources]
-  )
+  const manager = useMemo(() => createResourceManager(resources), [resources])
   const gltf = useLoader(GLTFLoader, modelUrl, loader => {
     loader.manager = manager
   })
@@ -162,13 +162,19 @@ function FBXModel({
   modelUrl,
   rotationSpeed,
   preserveMaterials = false,
+  resources,
 }: {
   modelUrl: string
   rotationSpeed: number
   preserveMaterials?: boolean
+  resources?: Record<string, string>
 }) {
+  // An FBX names its textures the way the artist's machine had them. Without
+  // this map they are rewritten to a transparent pixel and the model renders
+  // untextured - the reason an FBX could never show a texture at all.
+  const manager = useMemo(() => createResourceManager(resources), [resources])
   const model = useLoader(FBXLoader, modelUrl, loader => {
-    loader.manager = safeLoadingManager
+    loader.manager = manager
   })
   const meshRef = useRenderedModel(model, rotationSpeed, preserveMaterials)
 
@@ -246,14 +252,17 @@ export function Model({
   fileExtension,
   rotationSpeed = 0.002,
   preserveMaterials = false,
-  gltfResources,
+  resources,
 }: {
   modelUrl: string
   fileExtension: string
   rotationSpeed?: number
   preserveMaterials?: boolean
-  /** Relative-path -> URL map for a multi-file glTF's external resources. */
-  gltfResources?: Record<string, string>
+  /**
+   * Relative-path -> URL map for the sibling files an asset references: a loose
+   * glTF's `.bin` and textures, an FBX's or OBJ's texture files.
+   */
+  resources?: Record<string, string>
 }) {
   return (
     <Suspense fallback={<LoadingPlaceholder />}>
@@ -262,6 +271,7 @@ export function Model({
           modelUrl={modelUrl}
           rotationSpeed={rotationSpeed}
           preserveMaterials={preserveMaterials}
+          resources={resources}
         />
       )}
       {fileExtension === 'fbx' && (
@@ -269,6 +279,7 @@ export function Model({
           modelUrl={modelUrl}
           rotationSpeed={rotationSpeed}
           preserveMaterials={preserveMaterials}
+          resources={resources}
         />
       )}
       {(fileExtension === 'gltf' || fileExtension === 'glb') && (
@@ -276,7 +287,7 @@ export function Model({
           modelUrl={modelUrl}
           rotationSpeed={rotationSpeed}
           preserveMaterials={preserveMaterials}
-          gltfResources={gltfResources}
+          resources={resources}
         />
       )}
       {fileExtension === 'stl' && (

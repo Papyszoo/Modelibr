@@ -14,10 +14,7 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader'
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader'
 
 import { applyParameterMaterials } from '@/shared/three/parameterMaterial'
-import {
-  createGltfResourceManager,
-  safeLoadingManager,
-} from '@/shared/three/safeLoadingManager'
+import { createResourceManager } from '@/shared/three/safeLoadingManager'
 import {
   applyMaterialTextures,
   type MaterialTextureSets,
@@ -452,9 +449,23 @@ function SceneAssetMesh({
         />
       )
     case 'fbx':
-      return <FbxMesh url={source.url} dressing={dressing} onReady={onReady} />
+      return (
+        <FbxMesh
+          url={source.url}
+          resources={source.resources}
+          dressing={dressing}
+          onReady={onReady}
+        />
+      )
     case 'obj':
-      return <ObjMesh url={source.url} dressing={dressing} onReady={onReady} />
+      return (
+        <ObjMesh
+          url={source.url}
+          resources={source.resources}
+          dressing={dressing}
+          onReady={onReady}
+        />
+      )
     case 'stl':
       return <StlMesh url={source.url} dressing={dressing} onReady={onReady} />
     default:
@@ -489,10 +500,7 @@ function GltfMesh({
   // against the version-file route, 404, and the loader then fails on the
   // missing .bin with no geometry to show. This map points them at the
   // auxiliary files the import stored.
-  const manager = useMemo(
-    () => createGltfResourceManager(resources),
-    [resources]
-  )
+  const manager = useMemo(() => createResourceManager(resources), [resources])
   const gltf = useLoader(GLTFLoader, url, loader => {
     loader.manager = manager
   })
@@ -511,32 +519,42 @@ function GltfMesh({
 
 function FbxMesh({
   url,
+  resources,
   dressing,
   onReady,
 }: {
   url: string
+  resources: Record<string, string>
   dressing?: NodeDressing
   onReady: () => void
 }): JSX.Element {
-  // The safe manager stops format-internal texture paths ("chest_Specular.tga")
-  // from being fetched against the file route, which 400s and kills the context.
+  // An FBX names its textures the way the artist's machine had them
+  // ("chest_Specular.tga", sometimes a whole Windows path). Those resolve
+  // against the file route and 400, so they used to be rewritten to a
+  // transparent pixel unconditionally - which is why an FBX rendered
+  // untextured in a scene, always. The map points them at the sibling files
+  // the import stored; anything it cannot place still falls back to the pixel.
+  const manager = useMemo(() => createResourceManager(resources), [resources])
   const fbx = useLoader(FBXLoader, url, loader => {
-    loader.manager = safeLoadingManager
+    loader.manager = manager
   })
   return <PlacedObject object={fbx} dressing={dressing} onReady={onReady} />
 }
 
 function ObjMesh({
   url,
+  resources,
   dressing,
   onReady,
 }: {
   url: string
+  resources: Record<string, string>
   dressing?: NodeDressing
   onReady: () => void
 }): JSX.Element {
+  const manager = useMemo(() => createResourceManager(resources), [resources])
   const obj = useLoader(OBJLoader, url, loader => {
-    loader.manager = safeLoadingManager
+    loader.manager = manager
   })
   return <PlacedObject object={obj} dressing={dressing} onReady={onReady} />
 }

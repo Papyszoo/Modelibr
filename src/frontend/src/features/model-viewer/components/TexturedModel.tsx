@@ -9,7 +9,7 @@ import { STLLoader } from 'three/examples/jsm/loaders/STLLoader'
 
 import { useModelObject } from '@/features/model-viewer/hooks/useModelObject'
 import {
-  createGltfResourceManager,
+  createResourceManager,
   safeLoadingManager,
 } from '@/shared/three/safeLoadingManager'
 import {
@@ -28,7 +28,7 @@ interface TexturedModelProps {
   rotationSpeed: number
   materialTextureSets: MaterialTextureSets
   /** Relative-path -> URL map for a multi-file glTF's external resources. */
-  gltfResources?: Record<string, string>
+  resources?: Record<string, string>
 }
 
 // Shared props for per-format components
@@ -36,7 +36,7 @@ interface FormatComponentProps {
   modelUrl: string
   rotationSpeed: number
   materialTextureSets: MaterialTextureSets
-  gltfResources?: Record<string, string>
+  resources?: Record<string, string>
 }
 
 /**
@@ -165,7 +165,7 @@ function GLTFModelWithTextures({
   modelUrl,
   rotationSpeed,
   materialTextureSets,
-  gltfResources,
+  resources,
 }: FormatComponentProps) {
   const meshRef = useRef<THREE.Group>(null)
   const { setModelObject } = useModelObject()
@@ -180,10 +180,7 @@ function GLTFModelWithTextures({
 
   // See Model.tsx: a loose .gltf's relative buffer/texture URIs must resolve to the
   // version's auxiliary files, otherwise it loads as an empty scene.
-  const manager = useMemo(
-    () => createGltfResourceManager(gltfResources),
-    [gltfResources]
-  )
+  const manager = useMemo(() => createResourceManager(resources), [resources])
   const gltf = useLoader(GLTFLoader, modelUrl, loader => {
     loader.manager = manager
   })
@@ -373,7 +370,7 @@ export function TexturedModel({
   fileExtension,
   rotationSpeed,
   materialTextureSets,
-  gltfResources,
+  resources,
 }: TexturedModelProps) {
   if (fileExtension === 'obj') {
     return (
@@ -399,7 +396,7 @@ export function TexturedModel({
         modelUrl={modelUrl}
         rotationSpeed={rotationSpeed}
         materialTextureSets={materialTextureSets}
-        gltfResources={gltfResources}
+        resources={resources}
       />
     )
   }

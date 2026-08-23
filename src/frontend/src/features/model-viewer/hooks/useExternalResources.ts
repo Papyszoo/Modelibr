@@ -6,7 +6,7 @@ import {
 } from '@/features/models/api/modelApi'
 
 /** Map of the relative path a glTF references -> a URL that serves those bytes. */
-export type GltfResourceMap = Record<string, string>
+export type ExternalResourceMap = Record<string, string>
 
 /**
  * Resolves a loose `.gltf`'s external resources (its `.bin` buffers and textures) to
@@ -46,12 +46,12 @@ export type GltfResourceMap = Record<string, string>
  * query alone the gate opens for the whole round trip - far more than the one tick
  * above - and the loader starts against an empty map.
  */
-export function useGltfResources(
+export function useExternalResources(
   modelId: number | string | undefined | null,
   versionId: number | string | undefined | null,
   enabled: boolean | undefined,
-  version: GltfVersionState
-): { resources: GltfResourceMap; isAwaitingResources: boolean } {
+  version: ResourceVersionState
+): { resources: ExternalResourceMap; isAwaitingResources: boolean } {
   const shouldFetch = Boolean(enabled && modelId && versionId)
 
   const { data, isSuccess, isError } = useQuery({
@@ -68,14 +68,14 @@ export function useGltfResources(
     staleTime: 5 * 60 * 1000,
   })
 
-  const resources: GltfResourceMap = {}
+  const resources: ExternalResourceMap = {}
   for (const auxiliary of data?.auxiliaries ?? []) {
     resources[auxiliary.relativePath] = getFileUrl(String(auxiliary.fileId))
   }
 
   return {
     resources,
-    isAwaitingResources: isAwaitingGltfResources(
+    isAwaitingResources: isAwaitingExternalResources(
       Boolean(enabled),
       { isSuccess, isError },
       version
@@ -84,7 +84,7 @@ export function useGltfResources(
 }
 
 /** Whether the version whose resource map we would fetch is settled yet. */
-export interface GltfVersionState {
+export interface ResourceVersionState {
   /** A version is selected, so the auxiliary query is keyed on something real. */
   isKnown: boolean
   /** No version yet, but one may still arrive - the list is still resolving. */
@@ -110,10 +110,10 @@ export interface GltfVersionState {
  * from the version's own file list - with no version there is no source to load
  * yet, so its loader cannot start early.
  */
-export function isAwaitingGltfResources(
+export function isAwaitingExternalResources(
   mayHaveResources: boolean,
   query: { isSuccess?: boolean; isError?: boolean } | undefined,
-  version: GltfVersionState
+  version: ResourceVersionState
 ): boolean {
   if (!mayHaveResources) {
     return false

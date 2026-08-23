@@ -24,7 +24,7 @@ import {
   useModelVersionsQuery,
 } from '@/features/model-viewer/api/queries'
 import { useFileUploadHandlers } from '@/features/model-viewer/hooks/useFileUploadHandlers'
-import { useGltfResources } from '@/features/model-viewer/hooks/useGltfResources'
+import { useExternalResources } from '@/features/model-viewer/hooks/useExternalResources'
 import { useVersionSelection } from '@/features/model-viewer/hooks/useVersionSelection'
 import { useTextureSetByIdQuery } from '@/features/texture-set/api/queries'
 import { useTextureSetsByModelVersionQuery } from '@/features/texture-set/api/queries'
@@ -368,19 +368,26 @@ export function ModelViewer({
     setSelectedVariant(variantName)
   }, [])
 
-  // External glTF resources (a loose .gltf's .bin/textures) for this version.
+  // The sibling files this version references - a loose .gltf's .bin and textures,
+  // an FBX's or OBJ's texture files.
   // Fetched HERE, outside <Canvas>: R3F renders the scene into its own reconciler
   // root, so a React Query hook called inside it would be reaching for a provider
   // that isn't reliably in scope. The scene receives a plain map as a prop.
   //
-  // Only a loose .gltf can have external resources - a cheap over-approximation that
-  // keeps every .glb/.fbx/.obj open from costing an extra request.
+  // Which formats can reference a sibling file: a loose .gltf (its .bin and
+  // textures) and FBX/OBJ (their texture files). Restricting this to .gltf was
+  // the second half of "an FBX can never show a texture" - the map the loader
+  // needed was never even fetched. A packed .glb, an .stl and a .3mf carry
+  // everything inside them and still cost no extra request.
   //
   // `model` is null until its query resolves (see the `if (!model)` guard further
   // down), and hooks must run before that guard - so every access here is optional.
-  const mayHaveGltfResources = (versionModel || model)?.files?.some(f =>
-    f.originalFileName?.toLowerCase().endsWith('.gltf')
-  )
+  const mayHaveExternalResources = (versionModel || model)?.files?.some(f => {
+    const name = f.originalFileName?.toLowerCase() ?? ''
+    return (
+      name.endsWith('.gltf') || name.endsWith('.fbx') || name.endsWith('.obj')
+    )
+  })
   // Versions are a second round trip, and `selectedVersion` is set from an effect
   // once they land - so between the model resolving and that effect there are many
   // renders with a `.gltf` on screen and no version to ask about. The gate has to
@@ -394,10 +401,10 @@ export function ModelViewer({
       !(versionsQuery.isSuccess || versionsQuery.isError) ||
       versions.length > 0,
   }
-  const { resources: gltfResources, isAwaitingResources } = useGltfResources(
+  const { resources: resources, isAwaitingResources } = useExternalResources(
     model?.id,
     currentVersionId,
-    mayHaveGltfResources,
+    mayHaveExternalResources,
     gltfVersionState
   )
 
@@ -938,13 +945,13 @@ export function ModelViewer({
                         `.bin` the safe loading manager has rewritten to a
                         transparent PNG, and `useLoader` caches that failure - so
                         the model opens as a mesh with zero vertices and never
-                        recovers. See `useGltfResources`.
+                        recovers. See `useExternalResources`.
                       */}
                       {isAwaitingResources ? null : (
                         <ModelPreviewScene
                           key={`scene-${model.id}-${side}-${selectedVariant}-${selectedVersion?.id || 'original'}-${defaultFileId || 'auto'}`}
                           model={versionModel || model}
-                          gltfResources={gltfResources}
+                          resources={resources}
                           settings={viewerSettings}
                           materialTextureSets={
                             useEmbeddedMaterials ? {} : materialTextureSets

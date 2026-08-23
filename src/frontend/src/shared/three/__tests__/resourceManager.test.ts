@@ -1,5 +1,5 @@
 import {
-  createGltfResourceManager,
+  createResourceManager,
   safeLoadingManager,
 } from '../safeLoadingManager'
 
@@ -13,12 +13,12 @@ const TRANSPARENT_PIXEL =
  * glTF's `scene.bin` buffer was replaced with a PNG and the model rendered empty.
  * The worker resolved these references for thumbnails; the browser never did.
  */
-describe('createGltfResourceManager', () => {
+describe('createResourceManager', () => {
   const resolve = (
     resources: Record<string, string> | null | undefined,
     url: string
   ): string => {
-    const manager = createGltfResourceManager(resources)
+    const manager = createResourceManager(resources)
     return manager.resolveURL(url)
   }
 
@@ -72,9 +72,45 @@ describe('createGltfResourceManager', () => {
     )
   })
 
+  it('resolves an FBX-baked absolute Windows path by its file name', () => {
+    // An FBX records the path the artist's machine had. This is why every FBX in
+    // the library rendered untextured: nothing could turn that string into a URL,
+    // so it was rewritten to a transparent pixel unconditionally.
+    expect(
+      resolve(
+        { 'chest_Specular.png': '/api/files/91' },
+        'C:\\Assets\\Chest\\chest_Specular.png'
+      )
+    ).toBe('/api/files/91')
+  })
+
+  it('resolves a recorded .tga to the .png the pack actually shipped', () => {
+    // Last-resort stem match. Exporters rewrite the extension routinely, and the
+    // alternative for a whole FBX pack is no textures at all.
+    expect(
+      resolve({ 'chest_Specular.png': '/api/files/91' }, 'chest_Specular.tga')
+    ).toBe('/api/files/91')
+  })
+
+  it('does not let a stem match displace a real path', () => {
+    // Two textures of the same name in different folders. The exact path wins;
+    // the loose stem rule must never reorder that.
+    const resources = {
+      'textures/wood.png': '/api/files/1',
+      'wood.png': '/api/files/2',
+    }
+    expect(resolve(resources, 'textures/wood.png')).toBe('/api/files/1')
+  })
+
+  it('does not invent a match for an unrelated name', () => {
+    expect(resolve({ 'chest_Specular.png': '/api/files/91' }, 'door.tga')).toBe(
+      TRANSPARENT_PIXEL
+    )
+  })
+
   it('returns the shared manager unchanged when there is nothing to resolve', () => {
     // Packed .glb and every non-glTF format must keep exactly their old behaviour.
-    expect(createGltfResourceManager(null)).toBe(safeLoadingManager)
-    expect(createGltfResourceManager({})).toBe(safeLoadingManager)
+    expect(createResourceManager(null)).toBe(safeLoadingManager)
+    expect(createResourceManager({})).toBe(safeLoadingManager)
   })
 })
