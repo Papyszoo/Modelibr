@@ -265,7 +265,14 @@ internal sealed class ApplyImportAutomationCommandHandler
             "Created automatically the first time an import was classified as this.",
             parentId: null,
             now);
-        return await _categoryRepository.AddAsync(created, cancellationToken);
+        var added = await _categoryRepository.AddAsync(created, cancellationToken);
+
+        // Committed here, not with everything else at the end. Until this runs the new
+        // row's Id is an EF temporary placeholder, and the caller copies it straight into
+        // `Model.ModelCategoryId` and `AssetMetadata.AutoCategoryId` - raw scalar FKs that
+        // EF will not fix up for us. See the temporary-key trap in backend-persistence.
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        return added;
     }
 
     /// <summary>

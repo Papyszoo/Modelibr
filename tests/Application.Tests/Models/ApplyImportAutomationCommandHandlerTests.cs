@@ -32,8 +32,22 @@ public class ApplyImportAutomationCommandHandlerTests
 
         _categories.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Array.Empty<ModelCategory>());
+        // Staged, not committed - which is what a repository does. The id stays 0 until
+        // something calls SaveChangesAsync, exactly as EF leaves a temporary key.
+        ModelCategory? pendingCategory = null;
         _categories.Setup(r => r.AddAsync(It.IsAny<ModelCategory>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((ModelCategory c, CancellationToken _) => c.WithId(7));
+            .ReturnsAsync((ModelCategory c, CancellationToken _) =>
+            {
+                pendingCategory = c;
+                return c;
+            });
+        _uow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .Callback(() =>
+            {
+                pendingCategory?.WithId(7);
+                pendingCategory = null;
+            })
+            .Returns(Task.CompletedTask);
         _tags.Setup(r => r.GetByNormalizedNamesAsync(
                 It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Array.Empty<ModelTag>());
@@ -69,6 +83,26 @@ public class ApplyImportAutomationCommandHandlerTests
         Assert.True(result.Value.Applied);
         Assert.Equal("Buildings", result.Value.CategoryName);
         Assert.Equal(7, model.ModelCategoryId);
+    }
+
+    /// <summary>
+    /// Regression: a freshly created category's id is an EF temporary placeholder until
+    /// something commits, and it is copied straight into two raw scalar FKs
+    /// (`Model.ModelCategoryId`, `AssetMetadata.AutoCategoryId`) that EF will not fix up.
+    /// Reading it before the commit assigned every such import to a category id that never
+    /// existed.
+    /// </summary>
+    [Fact]
+    public async Task Handle_Reads_A_New_Categorys_Id_Only_After_It_Is_Real()
+    {
+        var model = Given("Police_Car_01");
+
+        var result = await _handler.Handle(
+            new ApplyImportAutomationCommand(1), CancellationToken.None);
+
+        Assert.Equal(7, result.Value.CategoryId);
+        Assert.Equal(7, model.ModelCategoryId);
+        Assert.Equal(7, _saved!.AutoCategoryId);
     }
 
     [Fact]
