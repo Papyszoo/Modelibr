@@ -53,9 +53,65 @@ public record AssetSearchQuery(
     /// Keep only assets under this licence. Exact match on a closed vocabulary - the point
     /// of the filter is "may I ship this", and a near-miss is the wrong answer.
     /// </summary>
-    string? License = null) : IQuery<AssetSearchResponse>;
+    string? License = null,
 
-public record AssetSearchResponse(IReadOnlyList<AssetSearchHit> Hits, int TotalCount);
+    /// <summary>
+    /// Search on behalf of this project: its style ranks results and its budget is reported
+    /// (or, in <c>enforce</c>, applied). See <see cref="ApplyProfile"/>.
+    /// </summary>
+    int? ProjectId = null,
+
+    /// <summary>
+    /// Search on behalf of this scene's project. A convenience over <see cref="ProjectId"/> -
+    /// an agent handed a scene id should not have to look its project up first. A scene that
+    /// belongs to no project applies no profile, and the response says so.
+    /// </summary>
+    int? SceneId = null,
+
+    /// <summary>
+    /// How much of the resolved profile to apply: <c>off</c>, <c>bias</c> (the default when a
+    /// project is resolved) or <c>enforce</c>. An unrecognised value is an error, never a
+    /// silent fallback - the whole point of the parameter is that the caller knows which of
+    /// the three it got.
+    /// </summary>
+    string? ApplyProfile = null) : IQuery<AssetSearchResponse>;
+
+/// <param name="Profile">
+/// What the project's profile did to this search, or null when none was resolved. Present
+/// even in <c>bias</c>, where it changed only the order: a caller that cannot see the profile
+/// cannot tell a ranking it disagrees with from one it never asked for.
+/// </param>
+public record AssetSearchResponse(
+    IReadOnlyList<AssetSearchHit> Hits,
+    int TotalCount,
+    AssetSearchProfileView? Profile = null);
+
+/// <summary>
+/// The profile a search ran under, reported back on the response (prompt 13-D3).
+/// </summary>
+/// <param name="Applied">
+/// False when a profile was asked for and none took effect - <c>applyProfile: "off"</c>, or a
+/// scene that belongs to no project. <see cref="Note"/> says which.
+/// </param>
+/// <param name="RemovedByBudget">
+/// How many otherwise-matching assets the enforced cap removed. Null in every other mode.
+/// <b>An agent that gets three results has to be able to see that a cap it did not set is the
+/// reason</b>, and relax it; a hard filter that does not say what it took out is the trap this
+/// whole parameter exists to avoid.
+/// </param>
+public record AssetSearchProfileView(
+    string Mode,
+    bool Applied,
+    int? ProjectId = null,
+    string? ProjectName = null,
+    IReadOnlyList<string>? Styles = null,
+    int? TriangleCap = null,
+    string? TriangleCapSource = null,
+    int? RemovedByBudget = null,
+    IReadOnlyList<string>? BoostTokens = null,
+    IReadOnlyList<string>? PenaltyTokens = null,
+    string? FamilyHint = null,
+    string? Note = null);
 
 /// <summary>
 /// One candidate: always the whole asset, plus - when the query matched a mesh inside it -
@@ -156,7 +212,40 @@ public record AssetSearchFacts(
     /// </summary>
     IReadOnlyList<string>? Styles = null,
     IReadOnlyList<string>? Themes = null,
-    string? License = null);
+    string? License = null,
+
+    /// <summary>
+    /// How this hit measures against the project the search ran for, or null when it ran for
+    /// none. The numbers, not a verdict: an over-budget asset is still returned, still
+    /// placeable, and still the right answer when the caller decides it is.
+    /// </summary>
+    AssetProfileFit? ProfileFit = null);
+
+/// <summary>
+/// One hit, measured against the project's profile (prompt 13-D3).
+/// </summary>
+/// <param name="Budget">The per-asset triangle cap the profile carries, or null when it sets none.</param>
+/// <param name="WithinBudget">
+/// Null when there is no cap, or when the asset has no triangles to compare - a sound is not
+/// over a triangle budget, and saying it is would make the flag useless for the assets it is
+/// about.
+/// </param>
+/// <param name="StyleSignals">Which of the project's style tokens this asset's text carries.</param>
+/// <param name="Contradicts">
+/// Which of the style's penalty tokens it carries. Reported so a candidate that violates the
+/// profile can be proposed <i>and say so</i>, rather than being quietly dropped.
+/// </param>
+/// <param name="DeclaresProjectStyle">
+/// True when the asset's own declared styles include one of the project's - the strongest
+/// signal available, and the one the metadata schema exists to make possible.
+/// </param>
+public record AssetProfileFit(
+    int? Triangles,
+    int? Budget,
+    bool? WithinBudget,
+    IReadOnlyList<string> StyleSignals,
+    IReadOnlyList<string> Contradicts,
+    bool DeclaresProjectStyle);
 
 /// <summary>An asset's extent in metres. Null axes mean it was never measured.</summary>
 public record AssetDimensions(double? X, double? Y, double? Z);
@@ -188,4 +277,5 @@ public record AssetSearchRequest(
     string? Category = null,
     IReadOnlyList<string>? Styles = null,
     IReadOnlyList<string>? Themes = null,
-    string? License = null);
+    string? License = null,
+    ProfileSearchBias? Profile = null);

@@ -19,7 +19,9 @@ public sealed class AssetSearchMcpTools
     [McpServerTool(Name = "search_assets")]
     [Description("Search the asset library with full-text + fuzzy identifier matching and structural filters. " +
                  "Returns ranked hits (current version only, prominence-aware) each with a deterministic browse summary. " +
-                 "Assets holding identical geometry are collapsed into one hit; the ids folded into it are listed as `alsoAt`.")]
+                 "Assets holding identical geometry are collapsed into one hit; the ids folded into it are listed as `alsoAt`. " +
+                 "Pass projectId (or sceneId) to search on behalf of a project: its style ranks the results and its triangle " +
+                 "budget is reported on each hit as facts.profileFit. The response's `profile` block always says what was applied.")]
     public static async Task<object> SearchAssets(
         IQueryHandler<AssetSearchQuery, AssetSearchResponse> handler,
         [Description("Free-text query (asset/part names, tokens, prose).")] string query,
@@ -58,6 +60,14 @@ public sealed class AssetSearchMcpTools
         [Description("Keep only assets carrying at least one of these styles, e.g. ['Low Poly']. Values come from the asset metadata schema - call get_metadata_schema for the list.")] string[]? styles = null,
         [Description("Keep only assets carrying at least one of these themes, e.g. ['Sci-Fi']. Schema values, as above.")] string[]? themes = null,
         [Description("Keep only assets under this licence, e.g. 'CC0'. Exact match on the schema's licence vocabulary.")] string? license = null,
+        [Description("Search for this project: its styles rank the results and its triangle budget rides along on every hit. " +
+                     "Read the brief first with get_project - the profile explains what the ranking is doing.")] int? projectId = null,
+        [Description("Search for this scene's project. A shortcut for looking the project up yourself; a scene that belongs to " +
+                     "no project applies no profile, and the response says so rather than failing.")] int? sceneId = null,
+        [Description("How much of the project's profile to apply. " +
+                     "bias (default): style ranks the results, the budget is reported per hit and nothing is removed. " +
+                     "enforce: the triangle budget also becomes a filter, and the response says how many assets it removed. " +
+                     "off: ordinary search. Only meaningful with projectId or sceneId.")] string? applyProfile = null,
         CancellationToken cancellationToken = default)
     {
         var result = await handler.Handle(
@@ -65,11 +75,18 @@ public sealed class AssetSearchMcpTools
                 hasAnimations, shapeClass, engine, assetType,
                 minSize, maxSize, hasRig, minBones, maxBones, minMaterials, maxMaterials,
                 hasUvs, uvStatus, minParts, maxParts, minVertices, maxVertices, category,
-                styles, themes, license),
+                styles, themes, license, projectId, sceneId, applyProfile),
             cancellationToken);
         return result.IsFailure
             ? new { error = result.Error.Code, message = result.Error.Message }
-            : new { hits = result.Value.Hits, totalCount = result.Value.TotalCount };
+            : new
+            {
+                hits = result.Value.Hits,
+                totalCount = result.Value.TotalCount,
+                // Always returned when a profile was asked for, including when it was not
+                // applied. A ranking the caller cannot see is one it cannot argue with.
+                profile = result.Value.Profile,
+            };
     }
 
     [McpServerTool(Name = "get_asset")]
@@ -213,6 +230,16 @@ public sealed class AssetSearchMcpTools
             // list_materials instead, which reads the material library directly.
             new { name = "assetType", type = "enum", values = new[] { "Model" }, note = "materials are browsed with list_materials, not here - they have none of the geometry facets above" },
             new { name = "includeSecondary", type = "boolean", note = "surface secondary-prominence parts" },
+            new
+            {
+                name = "projectId / sceneId + applyProfile",
+                type = "enum",
+                values = Application.Search.AssetSearchProfileModes.All,
+                note = "search on behalf of a project. bias (default) ranks by the project's style and reports its triangle " +
+                       "budget on each hit as facts.profileFit; enforce also filters on the budget and reports how many assets " +
+                       "that removed; off is ordinary search. Style tokens demote, they never exclude - the only hard filter " +
+                       "here is the budget, and only under enforce",
+            },
         },
     };
 }

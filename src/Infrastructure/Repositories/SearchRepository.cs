@@ -30,6 +30,11 @@ internal sealed class SearchRepository : ISearchRepository
     // handful of triangles while a legitimate flat asset (a decal, a plane) carries two.
     private const int MinMeaningfulTriangles = 2;
 
+    // How many of a project profile's boost/penalty tokens ranking matches. Fixed because EF
+    // Core must translate a static shape - the same reason query terms are unrolled to six
+    // slots below. The Application layer truncates to this and reports what it dropped.
+    private const int StyleTokenSlots = 8;
+
     private readonly ApplicationDbContext _context;
 
     public SearchRepository(ApplicationDbContext context)
@@ -208,28 +213,130 @@ internal sealed class SearchRepository : ISearchRepository
                 a.VersionId == d.VersionId));
         }
 
+        // The project profile (prompt 13-D3). Two separate things:
+        //
+        //   * ranking - every document is scored against the profile's style, always, in both
+        //     `bias` and `enforce`. This only reorders.
+        //   * the triangle cap - a hard filter, and ONLY in `enforce`. A silent hard filter is
+        //     the trap here: it produces an agent that concludes the library has no sofas. So
+        //     it is applied after scoring rather than folded into the filters above, which is
+        //     what lets the same query say how many assets it removed.
+        //
+        // The cap is evaluated at asset level like every other structural filter - a part's own
+        // triangle count says nothing about whether the asset it belongs to fits a budget.
+        var profile = request.Profile;
+        IQueryable<Domain.Models.AssetSearchDocument>? overBudget = null;
+        if (profile is { } p && p.EnforcesBudget)
+        {
+            var cap = p.TriangleCap!.Value;
+            overBudget = _context.AssetSearchDocuments
+                .AsNoTracking()
+                // An asset with no triangles is not over a triangle budget. Comparing null
+                // against the cap would quietly drop every sound and sprite from an enforced
+                // search, which is not what a budget means.
+                .Where(d => d.PartPath == null && d.IsCurrentVersion && d.IsActive && d.TriangleCount > cap);
+        }
+
+        // The style slots, unrolled for the same reason the query terms below are: EF Core
+        // translates a static shape. The Application layer has already truncated the profile's
+        // token lists to StyleTokenSlots and reported anything that did not fit.
+        //
+        // Both query paths score with these same locals rather than sharing a projection
+        // method: a projection into a named type cannot be consumed downstream by EF, and a
+        // style score that differed between the ranked and browse paths would make "search for
+        // nothing" and "search for a word" disagree about what the project prefers.
+        const string NoStyleToken = "%__no_style_token__%";
+        string StyleSlot(IReadOnlyList<string>? tokens, int i)
+            => tokens is not null && i < tokens.Count ? "% " + tokens[i] + " %" : NoStyleToken;
+
+        var boostTokens = profile?.BoostTokens;
+        var penaltyTokens = profile?.PenaltyTokens;
+        string y0 = StyleSlot(boostTokens, 0), y1 = StyleSlot(boostTokens, 1),
+               y2 = StyleSlot(boostTokens, 2), y3 = StyleSlot(boostTokens, 3),
+               y4 = StyleSlot(boostTokens, 4), y5 = StyleSlot(boostTokens, 5),
+               y6 = StyleSlot(boostTokens, 6), y7 = StyleSlot(boostTokens, 7);
+        string z0 = StyleSlot(penaltyTokens, 0), z1 = StyleSlot(penaltyTokens, 1),
+               z2 = StyleSlot(penaltyTokens, 2), z3 = StyleSlot(penaltyTokens, 3),
+               z4 = StyleSlot(penaltyTokens, 4), z5 = StyleSlot(penaltyTokens, 5),
+               z6 = StyleSlot(penaltyTokens, 6), z7 = StyleSlot(penaltyTokens, 7);
+
+        // Declared styles are a typed facet, not text, so they are matched as an array overlap
+        // - and they are the strongest signal there is: the asset itself says what it is,
+        // rather than a word in its filename suggesting it.
+        var declaredStyles = profile is null ? Array.Empty<string>() : profile.Styles.ToArray();
+
         // Filter-only browse: a blank query means "everything that passes the filters",
         // so an agent can ask for "every rigged asset" without inventing a word. This
         // used to return nothing, which made every facet in list_facets unusable alone.
         if (parsed.IsEmpty)
         {
             var browseLimit = Math.Clamp(request.Limit, 1, 100);
-            var browseTotal = await query
-                .Select(d => new { d.AssetType, d.AssetId })
+            var browseScored = query
+                .Select(d => new
+                {
+                    Doc = d,
+                    // The text a style token is matched against, space-padded so a token matches
+                    // on word boundaries rather than inside a longer word. Pack names are
+                    // deliberately absent: "POLYGON City" contains 696 assets, and letting a
+                    // pack carry a style signal would score every member of it identically,
+                    // which is the opposite of choosing between them.
+                    Blob = " " + d.Tokens + " " + d.AuthoredTags + " " + d.ConceptLabels + " " + d.DisplayName + " ",
+                })
+                .Select(x => new
+                {
+                    x.Doc,
+                    DeclaresStyle = declaredStyles.Length > 0 && x.Doc.Styles.Any(v => declaredStyles.Contains(v)),
+                    BoostHits = (EF.Functions.ILike(x.Blob, y0) ? 1 : 0) + (EF.Functions.ILike(x.Blob, y1) ? 1 : 0)
+                                + (EF.Functions.ILike(x.Blob, y2) ? 1 : 0) + (EF.Functions.ILike(x.Blob, y3) ? 1 : 0)
+                                + (EF.Functions.ILike(x.Blob, y4) ? 1 : 0) + (EF.Functions.ILike(x.Blob, y5) ? 1 : 0)
+                                + (EF.Functions.ILike(x.Blob, y6) ? 1 : 0) + (EF.Functions.ILike(x.Blob, y7) ? 1 : 0),
+                    PenaltyHits = (EF.Functions.ILike(x.Blob, z0) ? 1 : 0) + (EF.Functions.ILike(x.Blob, z1) ? 1 : 0)
+                                  + (EF.Functions.ILike(x.Blob, z2) ? 1 : 0) + (EF.Functions.ILike(x.Blob, z3) ? 1 : 0)
+                                  + (EF.Functions.ILike(x.Blob, z4) ? 1 : 0) + (EF.Functions.ILike(x.Blob, z5) ? 1 : 0)
+                                  + (EF.Functions.ILike(x.Blob, z6) ? 1 : 0) + (EF.Functions.ILike(x.Blob, z7) ? 1 : 0),
+                });
+            var browseKept = overBudget is null
+                ? browseScored
+                : browseScored.Where(x => !overBudget.Any(a =>
+                    a.AssetType == x.Doc.AssetType && a.AssetId == x.Doc.AssetId && a.VersionId == x.Doc.VersionId));
+
+            var browseTotal = await browseKept
+                .Select(x => new { x.Doc.AssetType, x.Doc.AssetId })
                 .Distinct()
                 .CountAsync(cancellationToken);
-            var browseDocs = await query
-                .OrderByDescending(d => d.PartPath == null) // whole assets before parts
-                .ThenBy(d => d.DisplayName)
+
+            int? browseRemoved = null;
+            if (overBudget is not null)
+            {
+                var withoutCap = await browseScored
+                    .Select(x => new { x.Doc.AssetType, x.Doc.AssetId })
+                    .Distinct()
+                    .CountAsync(cancellationToken);
+                browseRemoved = withoutCap - browseTotal;
+            }
+
+            // A filter-only browse has no relevance to rank by, so the profile is the only
+            // ordering signal there is: "everything for this project" should lead with what
+            // matches its style rather than with whatever sorts first alphabetically.
+            var browseDocs = await browseKept
+                .OrderByDescending(x => x.DeclaresStyle)
+                .ThenByDescending(x => x.BoostHits)
+                .ThenBy(x => x.PenaltyHits)
+                .ThenByDescending(x => x.Doc.PartPath == null) // whole assets before parts
+                .ThenBy(x => x.Doc.DisplayName)
                 .Take(browseLimit * AssetGroupingOverfetch)
+                .Select(x => x.Doc)
                 .ToListAsync(cancellationToken);
             var browseHits = browseDocs
                 .GroupBy(d => (d.AssetType, d.AssetId))
                 .Select(g => g.First())
                 .Take(browseLimit)
-                .Select(d => ToHit(d))
+                .Select(d => ToHit(d, "browse", profile))
                 .ToList();
-            return new AssetSearchResponse(browseHits, browseTotal);
+            return new AssetSearchResponse(
+                browseHits,
+                browseTotal,
+                profile is null ? null : ProfileSearchBiasBuilder.Describe(profile, browseRemoved));
         }
 
         // Per-word matching with coverage ranking. Each query word is scored on its own
@@ -277,38 +384,55 @@ internal sealed class SearchRepository : ISearchRepository
         var fuzzyAllowed = parsed.IsSingleTerm && parsed.Terms[0].Word.Length >= MinFuzzyLength;
         var fuzzyTerm = fuzzyAllowed ? parsed.Terms[0].Word : NeverMatches;
 
-        var scored = query.Select(d => new
+        var scored = query
+            .Select(d => new
+            {
+                Doc = d,
+                Blob = " " + d.Tokens + " " + d.AuthoredTags + " " + d.ConceptLabels + " " + d.DisplayName + " ",
+            })
+            .Select(pd => new
         {
-            Doc = d,
+            pd.Doc,
+            // The profile's three signals, carried through every stage below so it can decide
+            // ties in the ORDER BY without a second pass over the documents.
+            DeclaresStyle = declaredStyles.Length > 0 && pd.Doc.Styles.Any(v => declaredStyles.Contains(v)),
+            BoostHits = (EF.Functions.ILike(pd.Blob, y0) ? 1 : 0) + (EF.Functions.ILike(pd.Blob, y1) ? 1 : 0)
+                        + (EF.Functions.ILike(pd.Blob, y2) ? 1 : 0) + (EF.Functions.ILike(pd.Blob, y3) ? 1 : 0)
+                        + (EF.Functions.ILike(pd.Blob, y4) ? 1 : 0) + (EF.Functions.ILike(pd.Blob, y5) ? 1 : 0)
+                        + (EF.Functions.ILike(pd.Blob, y6) ? 1 : 0) + (EF.Functions.ILike(pd.Blob, y7) ? 1 : 0),
+            PenaltyHits = (EF.Functions.ILike(pd.Blob, z0) ? 1 : 0) + (EF.Functions.ILike(pd.Blob, z1) ? 1 : 0)
+                          + (EF.Functions.ILike(pd.Blob, z2) ? 1 : 0) + (EF.Functions.ILike(pd.Blob, z3) ? 1 : 0)
+                          + (EF.Functions.ILike(pd.Blob, z4) ? 1 : 0) + (EF.Functions.ILike(pd.Blob, z5) ? 1 : 0)
+                          + (EF.Functions.ILike(pd.Blob, z6) ? 1 : 0) + (EF.Functions.ILike(pd.Blob, z7) ? 1 : 0),
             // Authored tags join the top tier alongside filename tokens and the display
             // name. A tag is the most deliberate statement of what an asset is that the
             // library holds - someone typed it about this specific model - so a tag match
             // has to be able to admit and rank a document on its own, not merely break a
             // tie behind a filename that happens to contain the word.
-            T0 = EF.Functions.ILike(" " + d.Tokens + " ", b00) || EF.Functions.ILike(" " + d.Tokens + " ", b01)
-                 || EF.Functions.ILike(" " + d.Symbols + " ", b00) || EF.Functions.ILike(" " + d.Symbols + " ", b01)
-                 || EF.Functions.ILike(" " + d.AuthoredTags + " ", b00) || EF.Functions.ILike(" " + d.AuthoredTags + " ", b01)
-                 || EF.Functions.ILike(d.DisplayName, s0),
-            T1 = EF.Functions.ILike(" " + d.Tokens + " ", b10) || EF.Functions.ILike(" " + d.Tokens + " ", b11)
-                 || EF.Functions.ILike(" " + d.Symbols + " ", b10) || EF.Functions.ILike(" " + d.Symbols + " ", b11)
-                 || EF.Functions.ILike(" " + d.AuthoredTags + " ", b10) || EF.Functions.ILike(" " + d.AuthoredTags + " ", b11)
-                 || EF.Functions.ILike(d.DisplayName, s1),
-            T2 = EF.Functions.ILike(" " + d.Tokens + " ", b20) || EF.Functions.ILike(" " + d.Tokens + " ", b21)
-                 || EF.Functions.ILike(" " + d.Symbols + " ", b20) || EF.Functions.ILike(" " + d.Symbols + " ", b21)
-                 || EF.Functions.ILike(" " + d.AuthoredTags + " ", b20) || EF.Functions.ILike(" " + d.AuthoredTags + " ", b21)
-                 || EF.Functions.ILike(d.DisplayName, s2),
-            T3 = EF.Functions.ILike(" " + d.Tokens + " ", b30) || EF.Functions.ILike(" " + d.Tokens + " ", b31)
-                 || EF.Functions.ILike(" " + d.Symbols + " ", b30) || EF.Functions.ILike(" " + d.Symbols + " ", b31)
-                 || EF.Functions.ILike(" " + d.AuthoredTags + " ", b30) || EF.Functions.ILike(" " + d.AuthoredTags + " ", b31)
-                 || EF.Functions.ILike(d.DisplayName, s3),
-            T4 = EF.Functions.ILike(" " + d.Tokens + " ", b40) || EF.Functions.ILike(" " + d.Tokens + " ", b41)
-                 || EF.Functions.ILike(" " + d.Symbols + " ", b40) || EF.Functions.ILike(" " + d.Symbols + " ", b41)
-                 || EF.Functions.ILike(" " + d.AuthoredTags + " ", b40) || EF.Functions.ILike(" " + d.AuthoredTags + " ", b41)
-                 || EF.Functions.ILike(d.DisplayName, s4),
-            T5 = EF.Functions.ILike(" " + d.Tokens + " ", b50) || EF.Functions.ILike(" " + d.Tokens + " ", b51)
-                 || EF.Functions.ILike(" " + d.Symbols + " ", b50) || EF.Functions.ILike(" " + d.Symbols + " ", b51)
-                 || EF.Functions.ILike(" " + d.AuthoredTags + " ", b50) || EF.Functions.ILike(" " + d.AuthoredTags + " ", b51)
-                 || EF.Functions.ILike(d.DisplayName, s5),
+            T0 = EF.Functions.ILike(" " + pd.Doc.Tokens + " ", b00) || EF.Functions.ILike(" " + pd.Doc.Tokens + " ", b01)
+                 || EF.Functions.ILike(" " + pd.Doc.Symbols + " ", b00) || EF.Functions.ILike(" " + pd.Doc.Symbols + " ", b01)
+                 || EF.Functions.ILike(" " + pd.Doc.AuthoredTags + " ", b00) || EF.Functions.ILike(" " + pd.Doc.AuthoredTags + " ", b01)
+                 || EF.Functions.ILike(pd.Doc.DisplayName, s0),
+            T1 = EF.Functions.ILike(" " + pd.Doc.Tokens + " ", b10) || EF.Functions.ILike(" " + pd.Doc.Tokens + " ", b11)
+                 || EF.Functions.ILike(" " + pd.Doc.Symbols + " ", b10) || EF.Functions.ILike(" " + pd.Doc.Symbols + " ", b11)
+                 || EF.Functions.ILike(" " + pd.Doc.AuthoredTags + " ", b10) || EF.Functions.ILike(" " + pd.Doc.AuthoredTags + " ", b11)
+                 || EF.Functions.ILike(pd.Doc.DisplayName, s1),
+            T2 = EF.Functions.ILike(" " + pd.Doc.Tokens + " ", b20) || EF.Functions.ILike(" " + pd.Doc.Tokens + " ", b21)
+                 || EF.Functions.ILike(" " + pd.Doc.Symbols + " ", b20) || EF.Functions.ILike(" " + pd.Doc.Symbols + " ", b21)
+                 || EF.Functions.ILike(" " + pd.Doc.AuthoredTags + " ", b20) || EF.Functions.ILike(" " + pd.Doc.AuthoredTags + " ", b21)
+                 || EF.Functions.ILike(pd.Doc.DisplayName, s2),
+            T3 = EF.Functions.ILike(" " + pd.Doc.Tokens + " ", b30) || EF.Functions.ILike(" " + pd.Doc.Tokens + " ", b31)
+                 || EF.Functions.ILike(" " + pd.Doc.Symbols + " ", b30) || EF.Functions.ILike(" " + pd.Doc.Symbols + " ", b31)
+                 || EF.Functions.ILike(" " + pd.Doc.AuthoredTags + " ", b30) || EF.Functions.ILike(" " + pd.Doc.AuthoredTags + " ", b31)
+                 || EF.Functions.ILike(pd.Doc.DisplayName, s3),
+            T4 = EF.Functions.ILike(" " + pd.Doc.Tokens + " ", b40) || EF.Functions.ILike(" " + pd.Doc.Tokens + " ", b41)
+                 || EF.Functions.ILike(" " + pd.Doc.Symbols + " ", b40) || EF.Functions.ILike(" " + pd.Doc.Symbols + " ", b41)
+                 || EF.Functions.ILike(" " + pd.Doc.AuthoredTags + " ", b40) || EF.Functions.ILike(" " + pd.Doc.AuthoredTags + " ", b41)
+                 || EF.Functions.ILike(pd.Doc.DisplayName, s4),
+            T5 = EF.Functions.ILike(" " + pd.Doc.Tokens + " ", b50) || EF.Functions.ILike(" " + pd.Doc.Tokens + " ", b51)
+                 || EF.Functions.ILike(" " + pd.Doc.Symbols + " ", b50) || EF.Functions.ILike(" " + pd.Doc.Symbols + " ", b51)
+                 || EF.Functions.ILike(" " + pd.Doc.AuthoredTags + " ", b50) || EF.Functions.ILike(" " + pd.Doc.AuthoredTags + " ", b51)
+                 || EF.Functions.ILike(pd.Doc.DisplayName, s5),
             // The browse summary is a weaker signal than an authored name, so it is
             // scored separately and only ever breaks ties - but it must still admit a
             // document whose text mentions the term, which is recall an agent relies on
@@ -317,58 +441,61 @@ internal sealed class SearchRepository : ISearchRepository
             // a sentence, and a word inside a sentence is weaker evidence than the same word
             // being the asset's name. What matters is that it admits the document at all -
             // a description was previously unsearchable text.
-            P0 = EF.Functions.ILike(d.BrowseSummary, s0) || EF.Functions.ILike(d.Description, s0),
-            P1 = EF.Functions.ILike(d.BrowseSummary, s1) || EF.Functions.ILike(d.Description, s1),
-            P2 = EF.Functions.ILike(d.BrowseSummary, s2) || EF.Functions.ILike(d.Description, s2),
-            P3 = EF.Functions.ILike(d.BrowseSummary, s3) || EF.Functions.ILike(d.Description, s3),
-            P4 = EF.Functions.ILike(d.BrowseSummary, s4) || EF.Functions.ILike(d.Description, s4),
-            P5 = EF.Functions.ILike(d.BrowseSummary, s5) || EF.Functions.ILike(d.Description, s5),
+            P0 = EF.Functions.ILike(pd.Doc.BrowseSummary, s0) || EF.Functions.ILike(pd.Doc.Description, s0),
+            P1 = EF.Functions.ILike(pd.Doc.BrowseSummary, s1) || EF.Functions.ILike(pd.Doc.Description, s1),
+            P2 = EF.Functions.ILike(pd.Doc.BrowseSummary, s2) || EF.Functions.ILike(pd.Doc.Description, s2),
+            P3 = EF.Functions.ILike(pd.Doc.BrowseSummary, s3) || EF.Functions.ILike(pd.Doc.Description, s3),
+            P4 = EF.Functions.ILike(pd.Doc.BrowseSummary, s4) || EF.Functions.ILike(pd.Doc.Description, s4),
+            P5 = EF.Functions.ILike(pd.Doc.BrowseSummary, s5) || EF.Functions.ILike(pd.Doc.Description, s5),
             // Inferred concept labels: recall for intent queries, but ranked below an
             // authored name so "vehicle" puts SM_Veh_Car_Van_01 above boat_ornament.
-            C0 = EF.Functions.ILike(" " + d.ConceptLabels + " ", b00)
-                 || EF.Functions.ILike(" " + d.ConceptLabels + " ", b01),
-            C1 = EF.Functions.ILike(" " + d.ConceptLabels + " ", b10)
-                 || EF.Functions.ILike(" " + d.ConceptLabels + " ", b11),
-            C2 = EF.Functions.ILike(" " + d.ConceptLabels + " ", b20)
-                 || EF.Functions.ILike(" " + d.ConceptLabels + " ", b21),
-            C3 = EF.Functions.ILike(" " + d.ConceptLabels + " ", b30)
-                 || EF.Functions.ILike(" " + d.ConceptLabels + " ", b31),
-            C4 = EF.Functions.ILike(" " + d.ConceptLabels + " ", b40)
-                 || EF.Functions.ILike(" " + d.ConceptLabels + " ", b41),
-            C5 = EF.Functions.ILike(" " + d.ConceptLabels + " ", b50)
-                 || EF.Functions.ILike(" " + d.ConceptLabels + " ", b51),
+            C0 = EF.Functions.ILike(" " + pd.Doc.ConceptLabels + " ", b00)
+                 || EF.Functions.ILike(" " + pd.Doc.ConceptLabels + " ", b01),
+            C1 = EF.Functions.ILike(" " + pd.Doc.ConceptLabels + " ", b10)
+                 || EF.Functions.ILike(" " + pd.Doc.ConceptLabels + " ", b11),
+            C2 = EF.Functions.ILike(" " + pd.Doc.ConceptLabels + " ", b20)
+                 || EF.Functions.ILike(" " + pd.Doc.ConceptLabels + " ", b21),
+            C3 = EF.Functions.ILike(" " + pd.Doc.ConceptLabels + " ", b30)
+                 || EF.Functions.ILike(" " + pd.Doc.ConceptLabels + " ", b31),
+            C4 = EF.Functions.ILike(" " + pd.Doc.ConceptLabels + " ", b40)
+                 || EF.Functions.ILike(" " + pd.Doc.ConceptLabels + " ", b41),
+            C5 = EF.Functions.ILike(" " + pd.Doc.ConceptLabels + " ", b50)
+                 || EF.Functions.ILike(" " + pd.Doc.ConceptLabels + " ", b51),
             // Pack membership: author-written grouping ("POLYGON City", "CC0 Models").
             // Ranked BELOW inferred concepts despite being authored, because a pack is a
             // container, not a description - "The Base Mesh" has 1,360 members, so a
             // pack-name match admits a huge undifferentiated set and must never displace
             // a document that matched on what the asset actually is.
-            K0 = EF.Functions.ILike(" " + d.PackNames + " ", b00)
-                 || EF.Functions.ILike(" " + d.PackNames + " ", b01),
-            K1 = EF.Functions.ILike(" " + d.PackNames + " ", b10)
-                 || EF.Functions.ILike(" " + d.PackNames + " ", b11),
-            K2 = EF.Functions.ILike(" " + d.PackNames + " ", b20)
-                 || EF.Functions.ILike(" " + d.PackNames + " ", b21),
-            K3 = EF.Functions.ILike(" " + d.PackNames + " ", b30)
-                 || EF.Functions.ILike(" " + d.PackNames + " ", b31),
-            K4 = EF.Functions.ILike(" " + d.PackNames + " ", b40)
-                 || EF.Functions.ILike(" " + d.PackNames + " ", b41),
-            K5 = EF.Functions.ILike(" " + d.PackNames + " ", b50)
-                 || EF.Functions.ILike(" " + d.PackNames + " ", b51),
+            K0 = EF.Functions.ILike(" " + pd.Doc.PackNames + " ", b00)
+                 || EF.Functions.ILike(" " + pd.Doc.PackNames + " ", b01),
+            K1 = EF.Functions.ILike(" " + pd.Doc.PackNames + " ", b10)
+                 || EF.Functions.ILike(" " + pd.Doc.PackNames + " ", b11),
+            K2 = EF.Functions.ILike(" " + pd.Doc.PackNames + " ", b20)
+                 || EF.Functions.ILike(" " + pd.Doc.PackNames + " ", b21),
+            K3 = EF.Functions.ILike(" " + pd.Doc.PackNames + " ", b30)
+                 || EF.Functions.ILike(" " + pd.Doc.PackNames + " ", b31),
+            K4 = EF.Functions.ILike(" " + pd.Doc.PackNames + " ", b40)
+                 || EF.Functions.ILike(" " + pd.Doc.PackNames + " ", b41),
+            K5 = EF.Functions.ILike(" " + pd.Doc.PackNames + " ", b50)
+                 || EF.Functions.ILike(" " + pd.Doc.PackNames + " ", b51),
             // Whole-name match on the original phrase: "park bench" should still beat a
             // document that merely carries both words separately. Multi-word queries only
             // - for a single word this just repeats the name match below, and promoting it
             // would rank an incidental substring ("staple" for "aple") above a much better
             // fuzzy match on the real name ("apple").
-            PhraseHit = !parsed.IsSingleTerm && EF.Functions.ILike(d.DisplayName, "%" + parsed.Original + "%"),
+            PhraseHit = !parsed.IsSingleTerm && EF.Functions.ILike(pd.Doc.DisplayName, "%" + parsed.Original + "%"),
             // Compare against the display name as well as the token blob: a typo is a
             // misspelling of the NAME ("aple"), and similarity against a long
             // concatenated token list is too diluted to recover it.
-            TokenSimilarity = EF.Functions.TrigramsSimilarity(d.Tokens, fuzzyTerm),
-            NameSimilarity = EF.Functions.TrigramsSimilarity(d.DisplayName, fuzzyTerm),
+            TokenSimilarity = EF.Functions.TrigramsSimilarity(pd.Doc.Tokens, fuzzyTerm),
+            NameSimilarity = EF.Functions.TrigramsSimilarity(pd.Doc.DisplayName, fuzzyTerm),
         })
         .Select(x => new
         {
             x.Doc,
+            x.DeclaresStyle,
+            x.BoostHits,
+            x.PenaltyHits,
             x.PhraseHit,
             Similarity = x.TokenSimilarity > x.NameSimilarity ? x.TokenSimilarity : x.NameSimilarity,
             LiteralCoverage = (x.T0 ? 1 : 0) + (x.T1 ? 1 : 0) + (x.T2 ? 1 : 0)
@@ -383,6 +510,9 @@ internal sealed class SearchRepository : ISearchRepository
         .Select(x => new
         {
             x.Doc,
+            x.DeclaresStyle,
+            x.BoostHits,
+            x.PenaltyHits,
             x.PhraseHit,
             x.Similarity,
             x.LiteralCoverage,
@@ -397,23 +527,48 @@ internal sealed class SearchRepository : ISearchRepository
         .Where(x => x.Coverage > 0 || x.ConceptCoverage > 0 || x.ProseCoverage > 0
                     || x.PackCoverage > 0);
 
+        // The enforced triangle cap, applied after scoring so the two counts below differ by
+        // exactly the assets it removed. An agent that gets three results has to be able to
+        // see that a cap it did not set is the reason, and relax it.
+        var withinBudget = overBudget is null
+            ? scored
+            : scored.Where(x => !overBudget.Any(a =>
+                a.AssetType == x.Doc.AssetType && a.AssetId == x.Doc.AssetId && a.VersionId == x.Doc.VersionId));
+
         // Count assets, not documents. An asset is indexed once for itself and once per
         // part, so the old document count reported "46 chairs" for 17 chairs - and the
         // number changed meaning as soon as a filter was applied, since attributes only
         // live on the asset-level document.
-        var total = await scored
+        var total = await withinBudget
             .Select(x => new { x.Doc.AssetType, x.Doc.AssetId })
             .Distinct()
             .CountAsync(cancellationToken);
+
+        int? removedByBudget = null;
+        if (overBudget is not null)
+        {
+            var withoutCap = await scored
+                .Select(x => new { x.Doc.AssetType, x.Doc.AssetId })
+                .Distinct()
+                .CountAsync(cancellationToken);
+            removedByBudget = withoutCap - total;
+        }
 
         var limit = Math.Clamp(request.Limit, 1, 100);
 
         // Over-fetch, then keep the best-ranked document per asset. The same asset used
         // to occupy several of the caller's top-k slots with itself and its parts, which
         // is wasted context for an agent choosing between candidates.
-        var ranked = await scored
+        var ranked = await withinBudget
             .OrderByDescending(x => x.PhraseHit)   // the whole phrase in the name wins
             .ThenByDescending(x => x.Coverage)     // then: how many query words the NAME matched
+            // The project's profile decides between hits the query cannot tell apart, which is
+            // the whole of what `bias` does. It sits here, below relevance and above every
+            // weaker text signal: a 180k photoscan matches the word "chair" exactly as
+            // completely as a low-poly one, so positive boosts alone could never demote it.
+            .ThenByDescending(x => x.DeclaresStyle)   // the asset says it IS this style
+            .ThenByDescending(x => x.BoostHits)       // then: how much its text reads like it
+            .ThenBy(x => x.PenaltyHits)               // and down when it reads like another style
             .ThenByDescending(x => x.ConceptCoverage) // then inferred concepts
             .ThenByDescending(x => x.PackCoverage)    // then the pack that contains it
             .ThenByDescending(x => x.Doc.PartPath == null) // whole assets before their parts
@@ -538,9 +693,11 @@ internal sealed class SearchRepository : ISearchRepository
 
                 if (x.Doc.PartPath is null)
                 {
-                    return ToHit(x.Doc, x.MatchedOn) with { AlsoAt = alsoAt };
+                    return ToHit(x.Doc, x.MatchedOn, profile) with { AlsoAt = alsoAt };
                 }
 
+                // No profileFit on the part: it is evidence about why the asset came back, and
+                // a budget is a property of the thing place_asset would place.
                 var part = new MatchedPartView(
                     x.Doc.PartPath,
                     x.Doc.DisplayName,
@@ -553,19 +710,71 @@ internal sealed class SearchRepository : ISearchRepository
                 // MatchedPart still marks it as a part match, so nothing claims to be
                 // something it is not.
                 return assetDocs.TryGetValue((x.Doc.AssetType, x.Doc.AssetId, x.Doc.VersionId), out var assetDoc)
-                    ? ToHit(assetDoc, x.MatchedOn) with { MatchedPart = part, AlsoAt = alsoAt }
-                    : ToHit(x.Doc, x.MatchedOn) with { MatchedPart = part, AlsoAt = alsoAt };
+                    ? ToHit(assetDoc, x.MatchedOn, profile) with { MatchedPart = part, AlsoAt = alsoAt }
+                    : ToHit(x.Doc, x.MatchedOn, profile) with { MatchedPart = part, AlsoAt = alsoAt };
             })
             .ToList();
 
-        return new AssetSearchResponse(hits, total);
+        return new AssetSearchResponse(
+            hits,
+            total,
+            profile is null ? null : ProfileSearchBiasBuilder.Describe(profile, removedByBudget));
+    }
+
+    /// <summary>
+    /// The text a style token is matched against, space-padded so a token matches on word
+    /// boundaries rather than inside a longer word. The in-memory twin of the blob
+    /// <see cref="WithProfileScore"/> builds in SQL - the two have to agree, or a hit would
+    /// report tokens other than the ones that moved its rank.
+    /// </summary>
+    /// <remarks>
+    /// Pack names are deliberately absent. "POLYGON City" is a container of 696 assets, and
+    /// letting a pack name carry a style signal would score every member of a pack identically
+    /// - which is the opposite of choosing between them.
+    /// </remarks>
+    private static string StyleBlob(Domain.Models.AssetSearchDocument d)
+        => " " + d.Tokens + " " + d.AuthoredTags + " " + d.ConceptLabels + " " + d.DisplayName + " ";
+
+    /// <summary>
+    /// How one asset measures against the profile the search ran for (prompt 13-D3).
+    /// </summary>
+    /// <remarks>
+    /// Matched in memory over the page rather than in SQL: the ranking needs a score for every
+    /// candidate row, but naming the tokens is only interesting for the hits actually returned.
+    /// The membership test is the in-memory equivalent of the boundary ILIKE above, so the
+    /// tokens reported are the same ones that moved the rank.
+    /// </remarks>
+    private static AssetProfileFit? FitOf(
+        Domain.Models.AssetSearchDocument doc, ProfileSearchBias? profile)
+    {
+        if (profile is null)
+        {
+            return null;
+        }
+
+        var blob = StyleBlob(doc).ToLowerInvariant();
+        var matched = profile.BoostTokens.Where(t => blob.Contains(" " + t + " ", StringComparison.Ordinal)).ToList();
+        var contradicts = profile.PenaltyTokens.Where(t => blob.Contains(" " + t + " ", StringComparison.Ordinal)).ToList();
+
+        return new AssetProfileFit(
+            doc.TriangleCount,
+            profile.TriangleCap,
+            // Two different nulls collapse to one honest answer: no cap to measure against, and
+            // no triangles to measure. Neither is "over budget", and neither is "within" it.
+            profile.TriangleCap is int cap && doc.TriangleCount is int tris ? tris <= cap : null,
+            matched,
+            contradicts,
+            profile.Styles.Count > 0 && doc.Styles.Any(v => profile.Styles.Contains(v, StringComparer.Ordinal)));
     }
 
     /// <summary>
     /// Projects a search document into a hit, carrying the structural facts inline so a
     /// caller can choose between candidates without a follow-up call per hit.
     /// </summary>
-    private static AssetSearchHit ToHit(Domain.Models.AssetSearchDocument doc, string matchedOn = "browse") =>
+    private static AssetSearchHit ToHit(
+        Domain.Models.AssetSearchDocument doc,
+        string matchedOn = "browse",
+        ProfileSearchBias? profile = null) =>
         new(doc.AssetType,
             doc.AssetId,
             doc.VersionId,
@@ -574,9 +783,10 @@ internal sealed class SearchRepository : ISearchRepository
             doc.BrowseSummary,
             doc.Prominence,
             matchedOn,
-            FactsOf(doc));
+            FactsOf(doc, profile));
 
-    private static AssetSearchFacts FactsOf(Domain.Models.AssetSearchDocument doc) =>
+    private static AssetSearchFacts FactsOf(
+        Domain.Models.AssetSearchDocument doc, ProfileSearchBias? profile = null) =>
         new(doc.TriangleCount,
             doc.VertexCount,
             doc.PartCount,
@@ -596,7 +806,8 @@ internal sealed class SearchRepository : ISearchRepository
             doc.UvStatus,
             doc.Styles.Count == 0 ? null : doc.Styles,
             doc.Themes.Count == 0 ? null : doc.Themes,
-            doc.License);
+            doc.License,
+            FitOf(doc, profile));
 
     public async Task<IReadOnlyList<SearchResultGroup>> SearchAsync(
         string term,
