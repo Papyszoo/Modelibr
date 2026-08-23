@@ -32,8 +32,12 @@ internal sealed class SearchRepository : ISearchRepository
 
     // How many of a project profile's boost/penalty tokens ranking matches. Fixed because EF
     // Core must translate a static shape - the same reason query terms are unrolled to six
-    // slots below. The Application layer truncates to this and reports what it dropped.
-    private const int StyleTokenSlots = 8;
+    // slots below.
+    //
+    // Defined FROM the builder's limit rather than beside it: the builder truncates the lists
+    // and reports what it dropped, and raising one number without the other would silently
+    // ignore tokens the response claims were applied.
+    private const int StyleTokenSlots = ProfileSearchBiasBuilder.MaxRankedTokens;
 
     private readonly ApplicationDbContext _context;
 
@@ -251,6 +255,9 @@ internal sealed class SearchRepository : ISearchRepository
 
         var boostTokens = profile?.BoostTokens;
         var penaltyTokens = profile?.PenaltyTokens;
+        System.Diagnostics.Debug.Assert(
+            (boostTokens?.Count ?? 0) <= StyleTokenSlots && (penaltyTokens?.Count ?? 0) <= StyleTokenSlots,
+            "The profile handed more style tokens than ranking has slots to match them in.");
         string y0 = StyleSlot(boostTokens, 0), y1 = StyleSlot(boostTokens, 1),
                y2 = StyleSlot(boostTokens, 2), y3 = StyleSlot(boostTokens, 3),
                y4 = StyleSlot(boostTokens, 4), y5 = StyleSlot(boostTokens, 5),
