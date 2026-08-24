@@ -26,7 +26,7 @@ public class RepositoriesDontSelfCommitTests
     // Files still calling _context.SaveChangesAsync() internally. Every other
     // area (settings, packs, projects, models, thumbnails, texture sets,
     // sounds, sprites, scripts, env maps, categories, files, stages) has
-    // migrated - regressing one of those must fail this test. Only three
+    // migrated - regressing one of those must fail this test. Only four
     // permanent, individually-justified exceptions remain:
     private static readonly HashSet<string> StillSelfCommitting = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -43,6 +43,12 @@ public class RepositoriesDontSelfCommitTests
         // its unique violation and recover by loading the existing row (see the
         // comment block in the file).
         "ModelVersionRepository.cs",
+        // CategoryRootInserts is the same primitive again, factored into one file
+        // precisely so this exception stays one entry instead of six: a root
+        // category insert must be attempted before its unique violation can be
+        // caught and the winning row loaded. The six category repositories that
+        // call it remain ordinary staging repositories. Stays permanently.
+        "CategoryRootInserts.cs",
         // ThumbnailJobRepository's GetNextPendingJobAsync opens an explicit
         // BeginTransactionAsync + SaveChangesAsync for claim semantics: the
         // expired-lock reset must be durable inside the claim boundary. Stays

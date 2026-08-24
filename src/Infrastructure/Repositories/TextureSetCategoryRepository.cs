@@ -69,4 +69,21 @@ internal sealed class TextureSetCategoryRepository : ITextureSetCategoryReposito
         _context.TextureSetCategories.Remove(category);
         return Task.CompletedTask;
     }
+
+    public Task<CategoryRootInsert<TextureSetCategory>> AddRootAsync(
+        TextureSetCategory candidate, CancellationToken cancellationToken = default)
+    {
+        // Scoped by Kind as well as name, because this tree is partitioned: Universal
+        // (Global Materials) and ModelSpecific (Multi-Model Textures) are separate types
+        // that never share a vocabulary, so a "Stone" root in each is two categories, not a
+        // duplicate. The database's root index is on (Kind, lower(Name)) for the same reason.
+        return CategoryRootInserts.AddRootAsync(
+            _context,
+            _context.TextureSetCategories,
+            candidate,
+            c => c.ParentId == null &&
+                 c.Kind == candidate.Kind &&
+                 c.Name.ToLower() == candidate.Name.ToLower(),
+            cancellationToken);
+    }
 }

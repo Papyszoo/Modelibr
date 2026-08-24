@@ -24,6 +24,15 @@ public class CategoryCommandHandlerTests
     public CategoryCommandHandlerTests()
     {
         _dateTimeProvider.Setup(x => x.UtcNow).Returns(_now);
+        _repository
+            .Setup(x => x.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<EnvironmentMapCategory>());
+        // A root goes in through AddRootAsync: it inserts and commits in one step so the
+        // unique index can settle a race between two callers, and reports which row won.
+        _repository
+            .Setup(x => x.AddRootAsync(It.IsAny<EnvironmentMapCategory>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((EnvironmentMapCategory cat, CancellationToken _) =>
+                new CategoryRootInsert<EnvironmentMapCategory>(cat.WithId(1), Created: true));
     }
 
     // ──────────────────────────────────────────────
@@ -37,10 +46,6 @@ public class CategoryCommandHandlerTests
             .Setup(x => x.GetByNameAsync("Outdoor", null, It.IsAny<CancellationToken>()))
             .ReturnsAsync((EnvironmentMapCategory?)null);
 
-        _repository
-            .Setup(x => x.AddAsync(It.IsAny<EnvironmentMapCategory>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((EnvironmentMapCategory cat, CancellationToken _) => cat.WithId(1));
-
         var handler = new CreateEnvironmentMapCategoryCommandHandler(
             _repository.Object, _dateTimeProvider.Object, _unitOfWork.Object);
 
@@ -52,7 +57,55 @@ public class CategoryCommandHandlerTests
         Assert.Equal("Outdoor", result.Value.Name);
         Assert.Equal("Outdoor environments", result.Value.Description);
         Assert.Null(result.Value.ParentId);
-        _repository.Verify(x => x.AddAsync(It.IsAny<EnvironmentMapCategory>(), It.IsAny<CancellationToken>()), Times.Once);
+        _repository.Verify(
+            x => x.AddRootAsync(It.IsAny<EnvironmentMapCategory>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>
+    /// Roots are unique ignoring case and the database enforces it, so the pre-check has to
+    /// use the same comparison - otherwise creating "outdoor" next to "Outdoor" gets a
+    /// failed insert instead of an error the caller can show.
+    /// </summary>
+    [Fact]
+    public async Task Create_When_A_Root_Differs_Only_In_Case_Returns_CategoryAlreadyExists()
+    {
+        var existing = EnvironmentMapCategory.Create("Outdoor", null, null, _now).WithId(5);
+        _repository
+            .Setup(x => x.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { existing });
+
+        var handler = new CreateEnvironmentMapCategoryCommandHandler(
+            _repository.Object, _dateTimeProvider.Object, _unitOfWork.Object);
+
+        var result = await handler.Handle(
+            new CreateEnvironmentMapCategoryCommand("outdoor", null, null), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("CategoryAlreadyExists", result.Error.Code);
+        _repository.Verify(
+            x => x.AddRootAsync(It.IsAny<EnvironmentMapCategory>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>
+    /// And when two callers both pass that pre-check, the loser is told so rather than
+    /// silently adopting the winner's row: a create is a request to make something new.
+    /// </summary>
+    [Fact]
+    public async Task Create_When_A_Concurrent_Caller_Won_The_Root_Returns_CategoryAlreadyExists()
+    {
+        var winner = EnvironmentMapCategory.Create("Outdoor", null, null, _now).WithId(5);
+        _repository
+            .Setup(x => x.AddRootAsync(It.IsAny<EnvironmentMapCategory>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CategoryRootInsert<EnvironmentMapCategory>(winner, Created: false));
+
+        var handler = new CreateEnvironmentMapCategoryCommandHandler(
+            _repository.Object, _dateTimeProvider.Object, _unitOfWork.Object);
+
+        var result = await handler.Handle(
+            new CreateEnvironmentMapCategoryCommand("Outdoor", null, null), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("CategoryAlreadyExists", result.Error.Code);
     }
 
     [Fact]

@@ -31,13 +31,40 @@ internal static class CategoryCommandHandlers
                 new Error("CategoryAlreadyExists", $"A {categoryTypeName} named '{name}' already exists in this branch."));
         }
 
+        // Roots are compared case-insensitively, children are not - which is not an
+        // inconsistency but the two rules the database enforces. Root names are the ones
+        // the import automation invents from concept labels, and it treats "Vehicles" and
+        // "vehicles" as one thing; a hand-built branch has always been free to hold both.
+        if (parentId is null && await FindRootByNameAsync(repository, name.Trim(), cancellationToken) is not null)
+        {
+            return Result.Failure<CategorySummaryDto>(
+                new Error("CategoryAlreadyExists", $"A top-level {categoryTypeName} named '{name}' already exists."));
+        }
+
         try
         {
             var category = factory(name, description, parentId, now);
-            await repository.AddAsync(category, cancellationToken);
-            // Commit immediately: category.Id is database-assigned and is needed
-            // below for the response DTO.
-            await unitOfWork.SaveChangesAsync(cancellationToken);
+
+            if (parentId is null)
+            {
+                // The insert races: two callers can both pass the check above. AddRootAsync
+                // lets the unique index settle it and hands back whichever row won.
+                var inserted = await repository.AddRootAsync(category, cancellationToken);
+                if (!inserted.Created)
+                {
+                    return Result.Failure<CategorySummaryDto>(
+                        new Error("CategoryAlreadyExists", $"A top-level {categoryTypeName} named '{name}' already exists."));
+                }
+
+                category = inserted.Category;
+            }
+            else
+            {
+                await repository.AddAsync(category, cancellationToken);
+                // Commit immediately: category.Id is database-assigned and is needed
+                // below for the response DTO.
+                await unitOfWork.SaveChangesAsync(cancellationToken);
+            }
 
             var path = category.Name;
             if (parentId.HasValue)
@@ -99,6 +126,19 @@ internal static class CategoryCommandHandlers
                 new Error("CategoryAlreadyExists", $"A {categoryTypeName} named '{name}' already exists in this branch."));
         }
 
+        // Renaming or promoting INTO the root is subject to the root rule, which the
+        // exact-name check above cannot see. Refused here rather than left to the unique
+        // index, so the caller gets an error it can show instead of a failed save.
+        if (parentId is null)
+        {
+            var rootClash = await FindRootByNameAsync(repository, name.Trim(), cancellationToken);
+            if (rootClash is not null && rootClash.Id != id)
+            {
+                return Result.Failure(
+                    new Error("CategoryAlreadyExists", $"A top-level {categoryTypeName} named '{name}' already exists."));
+            }
+        }
+
         try
         {
             category.Update(name, description, now);
@@ -111,6 +151,22 @@ internal static class CategoryCommandHandlers
         {
             return Result.Failure(new Error("CategoryUpdateFailed", ex.Message));
         }
+    }
+
+    /// <summary>
+    /// The root whose name matches <paramref name="name"/> the way the database enforces
+    /// root uniqueness: ignoring case. Scans the loaded tree rather than adding a query per
+    /// tree - a category list is tens of rows, and every caller here already needs it.
+    /// </summary>
+    private static async Task<TCategory?> FindRootByNameAsync<TCategory>(
+        IHierarchicalCategoryRepository<TCategory> repository,
+        string name,
+        CancellationToken cancellationToken)
+        where TCategory : class, IHierarchicalCategory<TCategory>
+    {
+        var all = await repository.GetAllAsync(cancellationToken);
+        return all.FirstOrDefault(c =>
+            c.ParentId is null && string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase));
     }
 
     internal static async Task<Result> DeleteAsync<TCategory>(

@@ -41,6 +41,12 @@ public class ApplyImportAutomationCommandHandlerTests
                 pendingCategory = c;
                 return c;
             });
+        // A ROOT category goes in through AddRootAsync, which inserts and commits in one
+        // step so it can catch the unique violation two concurrent imports produce. The id
+        // is real by the time it returns - that is the whole reason it commits.
+        _categories.Setup(r => r.AddRootAsync(It.IsAny<ModelCategory>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ModelCategory c, CancellationToken _) =>
+                new CategoryRootInsert<ModelCategory>(c.WithId(7), Created: true));
         _uow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .Callback(() =>
             {
@@ -118,7 +124,7 @@ public class ApplyImportAutomationCommandHandlerTests
         Assert.Equal(42, model.ModelCategoryId);
         Assert.Null(result.Value.CategoryId);
         _categories.Verify(
-            r => r.AddAsync(It.IsAny<ModelCategory>(), It.IsAny<CancellationToken>()), Times.Never);
+            r => r.AddRootAsync(It.IsAny<ModelCategory>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -218,6 +224,6 @@ public class ApplyImportAutomationCommandHandlerTests
         Assert.Equal(12, result.Value.CategoryId);
         Assert.Equal(12, model.ModelCategoryId);
         _categories.Verify(
-            r => r.AddAsync(It.IsAny<ModelCategory>(), It.IsAny<CancellationToken>()), Times.Never);
+            r => r.AddRootAsync(It.IsAny<ModelCategory>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }

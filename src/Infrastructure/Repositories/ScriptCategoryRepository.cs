@@ -56,4 +56,18 @@ internal sealed class ScriptCategoryRepository : IScriptCategoryRepository
         _context.ScriptCategories.Remove(category);
         return Task.CompletedTask;
     }
+
+    public Task<CategoryRootInsert<ScriptCategory>> AddRootAsync(
+        ScriptCategory candidate, CancellationToken cancellationToken = default)
+    {
+        // Case-insensitive, matching the partial unique index the database now carries on
+        // roots - so the row this recovers is exactly the one the index refused to let in
+        // alongside the candidate.
+        return CategoryRootInserts.AddRootAsync(
+            _context,
+            _context.ScriptCategories,
+            candidate,
+            c => c.ParentId == null && c.Name.ToLower() == candidate.Name.ToLower(),
+            cancellationToken);
+    }
 }

@@ -265,14 +265,22 @@ internal sealed class ApplyImportAutomationCommandHandler
             "Created automatically the first time an import was classified as this.",
             parentId: null,
             now);
-        var added = await _categoryRepository.AddAsync(created, cancellationToken);
 
         // Committed here, not with everything else at the end. Until this runs the new
         // row's Id is an EF temporary placeholder, and the caller copies it straight into
         // `Model.ModelCategoryId` and `AssetMetadata.AutoCategoryId` - raw scalar FKs that
         // EF will not fix up for us. See the temporary-key trap in backend-persistence.
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
-        return added;
+        //
+        // AddRootAsync rather than AddAsync + SaveChanges, because the read-then-create
+        // above is a check-then-act and a folder upload sends its models in parallel. The
+        // database now refuses a second root of the same name; this hands back whichever
+        // row won it, so both imports land in one category instead of splitting it.
+        //
+        // Reconciling after the fact - scan, keep the lowest id, delete the rest - was
+        // tried and is not equivalent: the higher-id transaction can run its scan before
+        // the lower-id one commits, find nothing to defer to, and keep its own row.
+        var inserted = await _categoryRepository.AddRootAsync(created, cancellationToken);
+        return inserted.Category;
     }
 
     /// <summary>

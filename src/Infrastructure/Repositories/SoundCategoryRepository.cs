@@ -56,4 +56,18 @@ internal sealed class SoundCategoryRepository : ISoundCategoryRepository
         _context.SoundCategories.Remove(category);
         return Task.CompletedTask;
     }
+
+    public Task<CategoryRootInsert<SoundCategory>> AddRootAsync(
+        SoundCategory candidate, CancellationToken cancellationToken = default)
+    {
+        // Case-insensitive, matching the partial unique index the database now carries on
+        // roots - so the row this recovers is exactly the one the index refused to let in
+        // alongside the candidate.
+        return CategoryRootInserts.AddRootAsync(
+            _context,
+            _context.SoundCategories,
+            candidate,
+            c => c.ParentId == null && c.Name.ToLower() == candidate.Name.ToLower(),
+            cancellationToken);
+    }
 }
