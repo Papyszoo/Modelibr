@@ -8,17 +8,20 @@ import { InputText } from 'primereact/inputtext'
 import { InputTextarea } from 'primereact/inputtextarea'
 import { type JSX, useEffect, useMemo, useState } from 'react'
 
+import { TextureSetKind } from '@/features/texture-set/types'
 import { TagInput } from '@/shared/components/tags/TagInput'
 
 import { setAssetMetadata } from '../api/metadataApi'
 import {
   useAssetMetadataQuery,
   useAssetMetadataSchemaQuery,
+  useCategoryOptionsQuery,
 } from '../api/queries'
 import type {
   AssetMetadataField,
   AssetMetadataGroup,
   AssetMetadataResponse,
+  CategoryRefValue,
 } from '../types'
 
 /**
@@ -103,6 +106,15 @@ export function AssetMetadataPanel({
     return map
   }, [values])
 
+  // Which half of the texture-set tree this asset's category may come from. The
+  // server answers it because only the server knows: a Material is always
+  // Universal, a TextureSet is whatever THAT set is, and the other four families
+  // have no partitions and send null.
+  const categoryKind = useMemo(
+    () => parseCategoryKind(values?.categoryKind),
+    [values?.categoryKind]
+  )
+
   const save = useMutation({
     mutationFn: () => setAssetMetadata(assetType, assetId, draft),
     onSuccess: async () => {
@@ -168,6 +180,7 @@ export function AssetMetadataPanel({
               <Field
                 key={field.key}
                 field={field}
+                categoryKind={categoryKind}
                 value={
                   field.key in draft ? draft[field.key] : current.get(field.key)
                 }
@@ -217,10 +230,12 @@ function Completeness({
 function Field({
   field,
   value,
+  categoryKind,
   onChange,
 }: {
   field: AssetMetadataField
   value: unknown
+  categoryKind: TextureSetKind | null
   onChange: (value: unknown) => void
 }): JSX.Element {
   const id = `metadata-${field.key}`
@@ -240,7 +255,13 @@ function Field({
         <p className="asset-metadata-note">{field.description}</p>
       ) : null}
 
-      <Editor field={field} id={id} value={value} onChange={onChange} />
+      <Editor
+        field={field}
+        id={id}
+        value={value}
+        categoryKind={categoryKind}
+        onChange={onChange}
+      />
     </div>
   )
 }
@@ -249,11 +270,13 @@ function Editor({
   field,
   id,
   value,
+  categoryKind,
   onChange,
 }: {
   field: AssetMetadataField
   id: string
   value: unknown
+  categoryKind: TextureSetKind | null
   onChange: (value: unknown) => void
 }): JSX.Element {
   const disabled = field.readOnly
@@ -330,6 +353,18 @@ function Editor({
         </select>
       )
 
+    case 'categoryRef':
+      return (
+        <CategoryRefEditor
+          field={field}
+          id={id}
+          disabled={disabled}
+          value={value}
+          categoryKind={categoryKind}
+          onChange={onChange}
+        />
+      )
+
     default:
       return (
         <InputText
@@ -341,5 +376,108 @@ function Editor({
           onChange={event => onChange(event.target.value || null)}
         />
       )
+  }
+}
+
+/**
+ * The category picker for a `categoryRef` field.
+ *
+ * Its own control rather than a case in the switch above because the value has
+ * two shapes and neither is a string: it READS as `{ id, name }` - the id to
+ * write with, the name to show - and it WRITES as the bare integer id, which is
+ * the only thing the patch contract accepts. Rendered by the text fallback it
+ * showed "[object Object]" and submitted that string back.
+ *
+ * The tree comes from the family the schema names, which is not always this
+ * asset's family: a Material's category lives in the TextureSet tree.
+ */
+function CategoryRefEditor({
+  field,
+  id,
+  disabled,
+  value,
+  categoryKind,
+  onChange,
+}: {
+  field: AssetMetadataField
+  id: string
+  disabled: boolean
+  value: unknown
+  /**
+   * The asset's own category kind, for the partitioned texture-set tree. Comes
+   * from the metadata response rather than the schema: the schema is per family
+   * and says which TREE the field points at; this says which half, and two
+   * texture sets in one family disagree about it.
+   */
+  categoryKind: TextureSetKind | null
+  onChange: (value: unknown) => void
+}): JSX.Element {
+  const family = field.categoryFamily ?? null
+  const { data: options = [], isLoading } = useCategoryOptionsQuery({
+    family,
+    kind: categoryKind,
+  })
+
+  // Either shape is accepted: `{ id, name }` as the server reads it back, or a
+  // bare id, which is what sits in the draft after the user picks one.
+  const selectedId =
+    typeof value === 'number'
+      ? value
+      : value && typeof value === 'object'
+        ? ((value as CategoryRefValue).id ?? null)
+        : null
+
+  const known = options.some(option => option.id === selectedId)
+
+  return (
+    <select
+      id={id}
+      className="asset-metadata-select"
+      disabled={disabled || isLoading}
+      value={selectedId === null ? '' : String(selectedId)}
+      data-testid={`metadata-category-${field.key}`}
+      // The id, as a number. An empty selection clears the field, which the
+      // patch contract spells null rather than "".
+      onChange={event =>
+        onChange(event.target.value === '' ? null : Number(event.target.value))
+      }
+    >
+      <option value="">{isLoading ? 'Loading…' : '—'}</option>
+      {/*
+        A category the tree no longer offers still has to be selectable, or
+        opening the panel on such an asset would silently re-point it at
+        nothing the moment anything else on the panel is saved.
+      */}
+      {selectedId !== null && !known ? (
+        <option value={String(selectedId)}>
+          {(value && typeof value === 'object'
+            ? (value as CategoryRefValue).name
+            : null) ?? `Category ${selectedId}`}
+        </option>
+      ) : null}
+      {options.map(option => (
+        <option key={option.id} value={String(option.id)}>
+          {option.path || option.name}
+        </option>
+      ))}
+    </select>
+  )
+}
+
+/**
+ * The server sends the kind by name; the picker needs the enum the texture-set
+ * API takes. Unknown or absent is null, which the query reads as "not
+ * partitioned" rather than guessing a half.
+ */
+function parseCategoryKind(
+  kind: string | null | undefined
+): TextureSetKind | null {
+  switch (kind) {
+    case 'Universal':
+      return TextureSetKind.Universal
+    case 'ModelSpecific':
+      return TextureSetKind.ModelSpecific
+    default:
+      return null
   }
 }

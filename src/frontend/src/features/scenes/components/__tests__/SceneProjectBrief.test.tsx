@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { renderWithProviders } from '@/test/renderWithProviders'
@@ -69,5 +69,62 @@ describe('SceneProjectBrief', () => {
     await userEvent.click(await screen.findByText('Rooftop chase'))
 
     expect(scenes.setSceneProject).toHaveBeenCalledWith(2, 4)
+  })
+
+  it('refuses to link while the editor holds an unsaved draft', async () => {
+    // Linking moves the scene's revision, and the draft was opened against the
+    // old one - a save afterwards is refused as a conflict with nothing to
+    // reconcile it.
+    projects.getProjectBrief.mockResolvedValue({ guidance: [] } as never)
+
+    renderWithProviders(
+      <SceneProjectBrief
+        sceneId={2}
+        projectId={null}
+        projectName={null}
+        blocked="Save your edits first."
+      />
+    )
+
+    await userEvent.click(screen.getByTestId('scene-project-chip'))
+
+    expect(
+      await screen.findByTestId('scene-project-blocked')
+    ).toHaveTextContent('Save your edits first.')
+    await userEvent.click(screen.getByTestId('scene-project-select'))
+    expect(screen.queryByText('Rooftop chase')).not.toBeInTheDocument()
+    expect(scenes.setSceneProject).not.toHaveBeenCalled()
+  })
+
+  it('reports the link write as in flight, so the editor can hold edits', async () => {
+    // The other direction of the same exclusion: the editor reseeds its draft
+    // from a new revision only while the draft is clean, so an edit made DURING
+    // the link leaves it dirty at the old revision and the next save is refused.
+    projects.getProjectBrief.mockResolvedValue({ guidance: [] } as never)
+    let settle!: (value: unknown) => void
+    scenes.setSceneProject.mockReturnValue(
+      new Promise(resolve => {
+        settle = resolve
+      }) as never
+    )
+    const pending: boolean[] = []
+
+    renderWithProviders(
+      <SceneProjectBrief
+        sceneId={2}
+        projectId={null}
+        projectName={null}
+        onPendingChange={value => pending.push(value)}
+      />
+    )
+
+    await userEvent.click(screen.getByTestId('scene-project-chip'))
+    await userEvent.click(screen.getByTestId('scene-project-select'))
+    await userEvent.click(await screen.findByText('Rooftop chase'))
+
+    await waitFor(() => expect(pending).toContain(true))
+
+    settle({ sceneId: 2, projectId: 4, revision: 9 })
+    await waitFor(() => expect(pending[pending.length - 1]).toBe(false))
   })
 })

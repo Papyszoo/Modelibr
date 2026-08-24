@@ -1,6 +1,7 @@
-import { screen, waitFor } from '@testing-library/react'
+import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
+import { client } from '@/lib/apiBase'
 import { renderWithProviders } from '@/test/renderWithProviders'
 
 import * as metadataApi from '../../api/metadataApi'
@@ -14,6 +15,11 @@ import { AssetMetadataPanel } from '../AssetMetadataPanel'
 jest.mock('../../api/metadataApi')
 
 const api = metadataApi as jest.Mocked<typeof metadataApi>
+
+// The picker's options come from each family's own api module, which talks to
+// the shared axios client - so the URL it asks for is the assertion that matters.
+const mockGet = client.get as jest.Mock
+const requested: string[] = []
 
 function field(
   overrides: Partial<AssetMetadataField> = {}
@@ -221,6 +227,190 @@ describe('AssetMetadataPanel', () => {
     await waitFor(() => expect(api.setAssetMetadata).toHaveBeenCalled())
     expect(api.setAssetMetadata).toHaveBeenCalledWith('Model', 7, {
       styles: ['Low Poly'],
+    })
+  })
+})
+
+/**
+ * The category picker, which is the one field whose value has two shapes and
+ * whose option list lives in another feature's tree.
+ *
+ * Two things were wrong before: the panel asked for the tree without saying
+ * which KIND, and the texture-set endpoint binds a missing kind to
+ * ModelSpecific rather than rejecting it - so a Material (Universal only) and a
+ * Universal texture set both silently got the wrong half of the tree. And the
+ * picker owned its own query key, so nothing that edited a category refreshed it.
+ */
+describe('AssetMetadataPanel - the category picker', () => {
+  const categoryField = (family: string) =>
+    field({
+      key: 'category',
+      label: 'Category',
+      group: 'classification',
+      type: 'categoryRef',
+      categoryFamily: family,
+    })
+
+  const categoryValue = (current: unknown) =>
+    value({
+      key: 'category',
+      group: 'classification',
+      type: 'categoryRef',
+      value: current,
+    })
+
+  function setup({
+    assetType,
+    categoryFamily = assetType,
+    categoryKind = null,
+    current = null,
+  }: {
+    assetType: string
+    categoryFamily?: string
+    categoryKind?: string | null
+    current?: unknown
+  }) {
+    api.getAssetMetadataSchema.mockResolvedValue({
+      version: 1,
+      families: [{ assetType, fields: [categoryField(categoryFamily)] }],
+    })
+    api.getAssetMetadata.mockResolvedValue(
+      response({
+        assetType,
+        fields: [categoryValue(current)],
+        categoryKind,
+      })
+    )
+    api.setAssetMetadata.mockResolvedValue(
+      response({ assetType, fields: [categoryValue(current)] })
+    )
+
+    return renderWithProviders(
+      <AssetMetadataPanel assetType={assetType} assetId={7} />
+    )
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    mockGet.mockImplementation((url: string) => {
+      requested.push(url)
+      return Promise.resolve({
+        data: {
+          categories: [
+            { id: 3, name: 'Props', parentId: null, path: 'Props' },
+            {
+              id: 4,
+              name: 'Furniture',
+              parentId: 3,
+              path: 'Props / Furniture',
+            },
+          ],
+        },
+      })
+    })
+    requested.length = 0
+  })
+
+  it('reads a Model category from the model tree', async () => {
+    setup({ assetType: 'Model' })
+
+    await screen.findByTestId('metadata-category-category')
+
+    await waitFor(() => expect(requested).toContain('/model-categories'))
+  })
+
+  it('reads a Material category from the UNIVERSAL half of the texture-set tree', async () => {
+    // Materials use the shared Universal vocabulary and only that one. Asking
+    // without a kind returned ModelSpecific, because the endpoint binds a
+    // missing enum to its zero value rather than refusing.
+    setup({ assetType: 'Material', categoryKind: 'Universal' })
+
+    await screen.findByTestId('metadata-category-category')
+
+    await waitFor(() =>
+      expect(requested).toContain('/texture-set-categories?kind=1')
+    )
+  })
+
+  it('reads a Universal texture set category from the Universal half', async () => {
+    setup({ assetType: 'TextureSet', categoryKind: 'Universal' })
+
+    await screen.findByTestId('metadata-category-category')
+
+    await waitFor(() =>
+      expect(requested).toContain('/texture-set-categories?kind=1')
+    )
+  })
+
+  it('reads a ModelSpecific texture set category from the ModelSpecific half', async () => {
+    // The half that differs BETWEEN two assets of the same family, which is why
+    // the kind comes from the asset's metadata rather than from the schema.
+    setup({ assetType: 'TextureSet', categoryKind: 'ModelSpecific' })
+
+    await screen.findByTestId('metadata-category-category')
+
+    await waitFor(() =>
+      expect(requested).toContain('/texture-set-categories?kind=0')
+    )
+  })
+
+  it('shares the family category query key, so editing a category refreshes the picker', async () => {
+    // Not a key of its own: creating, renaming, moving or deleting a category
+    // invalidates the family's key, and a picker keyed elsewhere would go on
+    // offering the tree as it was when the panel opened.
+    const { queryClient } = setup({ assetType: 'Model' })
+
+    await screen.findByTestId('metadata-category-category')
+    await waitFor(() => expect(requested).toContain('/model-categories'))
+
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: ['model-categories'] })
+    })
+
+    await waitFor(() =>
+      expect(requested.filter(u => u === '/model-categories')).toHaveLength(2)
+    )
+  })
+
+  it('writes the bare id the patch contract accepts, not the object it reads back', async () => {
+    setup({ assetType: 'Model' })
+
+    const select = await screen.findByTestId('metadata-category-category')
+    await userEvent.selectOptions(select, '4')
+    await userEvent.click(screen.getByTestId('asset-metadata-save'))
+
+    await waitFor(() => expect(api.setAssetMetadata).toHaveBeenCalled())
+    expect(api.setAssetMetadata).toHaveBeenCalledWith('Model', 7, {
+      category: 4,
+    })
+  })
+
+  it('keeps a category the tree no longer offers selectable', async () => {
+    // Otherwise opening the panel on such an asset silently re-points it at
+    // nothing the moment anything else is saved.
+    setup({
+      assetType: 'Model',
+      current: { id: 99, name: 'Retired' },
+    })
+
+    const select = (await screen.findByTestId(
+      'metadata-category-category'
+    )) as HTMLSelectElement
+
+    expect(select.value).toBe('99')
+    expect(screen.getByRole('option', { name: 'Retired' })).toBeInTheDocument()
+  })
+
+  it('clears the field as null rather than an empty string', async () => {
+    setup({ assetType: 'Model', current: { id: 3, name: 'Props' } })
+
+    const select = await screen.findByTestId('metadata-category-category')
+    await userEvent.selectOptions(select, '')
+    await userEvent.click(screen.getByTestId('asset-metadata-save'))
+
+    await waitFor(() => expect(api.setAssetMetadata).toHaveBeenCalled())
+    expect(api.setAssetMetadata).toHaveBeenCalledWith('Model', 7, {
+      category: null,
     })
   })
 })

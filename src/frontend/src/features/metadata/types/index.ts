@@ -90,6 +90,16 @@ export interface AssetMetadataResponse {
   currentSchemaVersion: number
   fields: AssetMetadataValue[]
   completeness: AssetMetadataCompleteness
+  /**
+   * Which half of a partitioned category tree this asset's `category` may come
+   * from - `Universal` or `ModelSpecific` - or null for a family whose tree has
+   * no partitions.
+   *
+   * A fact about the asset rather than the family, which is why it is here and
+   * not on the schema: a Material always takes Universal, and a TextureSet takes
+   * its own kind's, which differs between two sets in the same family.
+   */
+  categoryKind?: string | null
 }
 
 /**
@@ -133,4 +143,10 @@ export interface ReviewImportSuggestionsResult {
   tagsRemoved: number
   /** Still waiting after this call. A whole-queue action is bounded, so repeat while > 0. */
   remaining: number
+}
+
+/** What a `categoryRef` field reads back as: the id the write needs, plus a name to show. */
+export interface CategoryRefValue {
+  id: number
+  name: string | null
 }

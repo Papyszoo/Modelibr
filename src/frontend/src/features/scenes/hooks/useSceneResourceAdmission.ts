@@ -31,8 +31,8 @@ export interface SceneResourceAdmission {
 /**
  * Builds the stable unique-resource queue behind progressive scene loading.
  *
- * The queue is membership, not order: it records which unique resources exist and which
- * nodes place each one. What loads next is decided by selection first and then by the
+ * The queue is membership, not order: it records which unique VISIBLE resources exist and
+ * which nodes place each one. What loads next is decided by selection first and then by the
  * camera-aware ranking in `lib/sceneResourcePriority`, with document order surviving only
  * as the deterministic fallback. Repeated placements share one queue entry but all of
  * their nodes must commit before the next resource is promoted, because cloning and
@@ -46,7 +46,13 @@ export function buildSceneResourceQueue(
   const keyByNodeId = new Map<string, string>()
 
   for (const node of document.nodes) {
-    if (!node.asset) {
+    // A hidden node draws nothing, so it loads nothing and never settles.
+    // Queueing one would leave its resource permanently un-promoted, and every
+    // resource behind it un-admitted - and when a hidden node shares an asset
+    // with a visible one, that key can never complete at all, because the
+    // settle check below requires EVERY placement to report in. Toggling
+    // visibility changes the signature, so unhiding queues it again.
+    if (!node.asset || !node.visible) {
       continue
     }
 

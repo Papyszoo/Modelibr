@@ -19,6 +19,7 @@ import {
 } from '../api/queries'
 import { SCENE_STAGES, type SceneStage } from '../api/sceneContract.generated'
 import { getSceneAssetFacts } from '../api/scenesApi'
+import { useProjectLinkSerialization } from '../hooks/useProjectLinkSerialization'
 import { useSceneMaterials } from '../hooks/useSceneMaterials'
 import { bindNodeMaterial } from '../lib/sceneDressing'
 import { transformsEqual } from '../lib/sceneGeometry'
@@ -28,9 +29,9 @@ import type { SceneMaterialBinding, SceneSlotView } from '../types'
 import { SceneAssetPicker } from './SceneAssetPicker'
 import { SceneCanvas } from './SceneCanvas'
 import { SceneChoicesPanel } from './SceneChoicesPanel'
-import { SceneProjectBrief } from './SceneProjectBrief'
 import { SceneHierarchy } from './SceneHierarchy'
 import { SceneNodeMaterials } from './SceneNodeMaterials'
+import { SceneProjectBrief } from './SceneProjectBrief'
 import { ScenePropertyPanel } from './ScenePropertyPanel'
 
 const IDENTITY_ROTATION = { x: 0, y: 0, z: 0 }
@@ -59,7 +60,12 @@ export function SceneEditor({
   sceneId,
   onClose,
 }: SceneEditorProps): JSX.Element {
-  const { data: view, isLoading, error } = useSceneByIdQuery({ sceneId })
+  const {
+    data: view,
+    isLoading,
+    isFetching: sceneFetching,
+    error,
+  } = useSceneByIdQuery({ sceneId })
   const { data: slotsView, isLoading: slotsLoading } = useSceneSlotsQuery({
     sceneId,
   })
@@ -76,18 +82,37 @@ export function SceneEditor({
     selectedNodeId,
     open,
     markSaved,
-    edit,
+    edit: editDraft,
     undo,
     redo,
     selectNode,
-    setNodeTransform,
-    updateNode,
-    removeNode,
-    addNode,
-    setLight,
+    setNodeTransform: setNodeTransformDraft,
+    updateNode: updateNodeDraft,
+    removeNode: removeNodeDraft,
+    addNode: addNodeDraft,
+    setLight: setLightDraft,
     past,
     future,
   } = useSceneEditorStore()
+
+  // Editing is held while a project link is moving the scene's revision. The
+  // reasoning - and why the hold outlives the mutation - is in the hook.
+  const { editsBlocked, onPendingChange: handleLinkPendingChange } =
+    useProjectLinkSerialization({
+      loadedRevision: view?.scene.revision,
+      baseRevision,
+      isFetching: sceneFetching,
+    })
+
+  // One guard, applied where the draft actions enter this component, so every
+  // call site inherits it rather than each one remembering to ask. Wrapped with
+  // useCallback because these identities are dependencies of the handlers below.
+  const setNodeTransform = useGuardedEdit(setNodeTransformDraft, editsBlocked)
+  const updateNode = useGuardedEdit(updateNodeDraft, editsBlocked)
+  const removeNode = useGuardedEdit(removeNodeDraft, editsBlocked)
+  const addNode = useGuardedEdit(addNodeDraft, editsBlocked)
+  const setLight = useGuardedEdit(setLightDraft, editsBlocked)
+  const edit = useGuardedEdit(editDraft, editsBlocked)
 
   const [placeError, setPlaceError] = useState<string | null>(null)
 
@@ -375,6 +400,14 @@ export function SceneEditor({
       return
     }
 
+    // Held while a link is moving the revision: this save carries baseRevision,
+    // and sending it against a revision the link has already replaced is the
+    // conflict rather than a way of avoiding one.
+    if (editsBlocked) {
+      setSaveError(editsBlocked)
+      return
+    }
+
     setSaveError(null)
     try {
       const saved = await save.mutateAsync({
@@ -395,7 +428,7 @@ export function SceneEditor({
           : 'The scene could not be saved.'
       )
     }
-  }, [document, baseRevision, sceneId, save, markSaved])
+  }, [document, baseRevision, sceneId, save, markSaved, editsBlocked])
 
   // Undo/redo on the usual chord. Scoped to the editor being mounted, and
   // ignored while a text field has focus so typing in the name box does not
@@ -496,6 +529,12 @@ export function SceneEditor({
               sceneId={sceneId}
               projectId={view.scene.projectId}
               projectName={view.scene.projectName}
+              blocked={
+                isDirty
+                  ? 'Save your edits before changing the project - linking is written to the scene straight away, and your unsaved draft could not be saved afterwards.'
+                  : null
+              }
+              onPendingChange={handleLinkPendingChange}
             />
           </span>
         }
@@ -556,12 +595,21 @@ export function SceneEditor({
               icon={isDirty ? 'pi pi-save' : 'pi pi-check'}
               size="small"
               loading={save.isPending}
-              disabled={!isDirty || save.isPending}
+              disabled={!isDirty || save.isPending || editsBlocked !== null}
               onClick={() => void handleSave()}
             />
           </div>
         }
       />
+
+      {editsBlocked ? (
+        <Message
+          severity="info"
+          text={editsBlocked}
+          className="scene-editor-message"
+          data-testid="scene-editor-link-pending"
+        />
+      ) : null}
 
       {saveError ? (
         <Message
@@ -766,5 +814,27 @@ export function SceneEditor({
         </aside>
       </div>
     </div>
+  )
+}
+
+/**
+ * Wraps a draft-mutating action so it does nothing while editing is held.
+ *
+ * A hook rather than a plain wrapper because the resulting function is a
+ * dependency of half the handlers in this component: a new identity every render
+ * would rebuild all of them every render, and re-run every effect keyed on one.
+ */
+function useGuardedEdit<A extends unknown[]>(
+  action: (...args: A) => void,
+  blocked: string | null
+): (...args: A) => void {
+  return useCallback(
+    (...args: A) => {
+      if (blocked) {
+        return
+      }
+      action(...args)
+    },
+    [action, blocked]
   )
 }

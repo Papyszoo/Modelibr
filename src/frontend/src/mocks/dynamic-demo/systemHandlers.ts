@@ -170,19 +170,53 @@ const demoMetadataFields = [
   },
 ]
 
-const demoMetadataFamilies = [
-  'Model',
-  'Sprite',
-  'Sound',
-  'TextureSet',
-  'EnvironmentMap',
-  'Material',
-].map(assetType => ({ assetType, fields: demoMetadataFields }))
+/**
+ * Which category tree each family's `categoryRef` points at, and - for the two
+ * that borrow the partitioned texture-set tree - which half of it.
+ *
+ * A Material always takes Universal categories. A TextureSet takes its own
+ * kind's, so the demo picks one per asset id below rather than declaring it
+ * here: two texture sets in one family disagree, which is exactly the case a
+ * family-level answer gets wrong.
+ */
+const DEMO_CATEGORY_KIND: Record<string, 'Universal' | 'ModelSpecific' | null> =
+  {
+    Model: null,
+    Sprite: null,
+    Sound: null,
+    EnvironmentMap: null,
+    Material: 'Universal',
+    TextureSet: 'Universal',
+  }
+
+const demoMetadataFamilies = Object.keys(DEMO_CATEGORY_KIND).map(assetType => ({
+  assetType,
+  fields: [
+    ...demoMetadataFields,
+    // The category picker is a real request in the panel - it fetches the
+    // family's category tree - so the demo has to declare the field or the
+    // whole control is never exercised there.
+    {
+      key: 'category',
+      label: 'Category',
+      group: 'classification',
+      type: 'categoryRef',
+      provenance: 'authored',
+      storage: 'entity',
+      repeats: false,
+      readOnly: false,
+      categoryFamily: assetType,
+      description: "The asset's category, from this family's own tree.",
+    },
+  ],
+}))
 
 function demoMetadataResponse(assetType: string, assetId: number) {
   const stored = demoMetadata.get(`${assetType}:${assetId}`) ?? {}
+  const family = demoMetadataFamilies.find(f => f.assetType === assetType)
+  const familyFields = family?.fields ?? demoMetadataFields
 
-  const fields = demoMetadataFields.map(field => ({
+  const fields = familyFields.map(field => ({
     key: field.key,
     group: field.group,
     type: field.type,
@@ -197,7 +231,7 @@ function demoMetadataResponse(assetType: string, assetId: number) {
 
   // Counted over what a person could fill, so a derived value cannot make an
   // asset look complete because the extractor did its job.
-  const fillable = demoMetadataFields.filter(f => !f.readOnly)
+  const fillable = familyFields.filter(f => !f.readOnly)
   const filled = fillable.filter(f => {
     const value = stored[f.key]
     return Array.isArray(value) ? value.length > 0 : value != null
@@ -210,6 +244,16 @@ function demoMetadataResponse(assetType: string, assetId: number) {
     schemaVersion: Object.keys(stored).length > 0 ? 1 : 0,
     currentSchemaVersion: 1,
     fields,
+    // A fact about the ASSET, which is why it is on the response and not the
+    // schema: a TextureSet's category must match that set's own kind, and the
+    // demo alternates them so the picker is exercised on both halves of the
+    // tree rather than only the one the enum's zero value would have given.
+    categoryKind:
+      assetType === 'TextureSet'
+        ? assetId % 2 === 0
+          ? 'ModelSpecific'
+          : 'Universal'
+        : (DEMO_CATEGORY_KIND[assetType] ?? null),
     completeness: {
       fillableFieldCount: fillable.length,
       filledFieldCount: filled.length,

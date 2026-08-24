@@ -49,6 +49,31 @@ describe('scene resource admission', () => {
     jest.restoreAllMocks()
   })
 
+  it('leaves hidden nodes out of the queue entirely', () => {
+    // Regression: a hidden node renders nothing, so it never reports a settle - but it
+    // was still queued. Its resource was promoted and then waited on forever, and
+    // everything behind it stayed un-admitted. Worse when a hidden node SHARED an asset
+    // with a visible one: that key could never complete at all, because completing
+    // requires every placement of it to have reported in.
+    const hidden = { ...modelNode('lamp-off', 9, 2), visible: false }
+    const queue = buildSceneResourceQueue(
+      documentWith([modelNode('sofa', 42, 3), hidden])
+    )
+
+    expect(queue.keys).toEqual(['Model:42:3'])
+    expect(queue.keyByNodeId.has('lamp-off')).toBe(false)
+    expect(nextSceneResourceKey(queue, new Set(['Model:42:3']))).toBeNull()
+  })
+
+  it('does not let a hidden placement block the asset a visible one shares with it', () => {
+    const visible = modelNode('sofa-a', 42, 3)
+    const hidden = { ...modelNode('sofa-b', 42, 3), visible: false }
+    const queue = buildSceneResourceQueue(documentWith([visible, hidden]))
+
+    // Only the visible placement has to settle for the resource to complete.
+    expect(queue.nodeIdsByKey.get('Model:42:3')).toEqual(['sofa-a'])
+  })
+
   it('deduplicates repeated placements into one deterministic queue entry', () => {
     // Regression: mounting one loader per node let 20 copies of one asset compete with
     // every other model even though useLoader shares their URL. The queue is per resource,

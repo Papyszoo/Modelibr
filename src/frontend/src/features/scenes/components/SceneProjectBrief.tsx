@@ -3,7 +3,7 @@ import './SceneProjectBrief.css'
 import { Button } from 'primereact/button'
 import { Dropdown } from 'primereact/dropdown'
 import { OverlayPanel } from 'primereact/overlaypanel'
-import { type JSX, useRef, useState } from 'react'
+import { type JSX, useEffect, useRef, useState } from 'react'
 
 import { useProjectsQuery } from '@/features/project/api/queries'
 import { useProjectBriefQuery } from '@/features/project/api/queries'
@@ -27,10 +27,32 @@ export function SceneProjectBrief({
   sceneId,
   projectId,
   projectName,
+  blocked = null,
+  onPendingChange,
 }: {
   sceneId: number
   projectId: number | null
   projectName: string | null
+  /**
+   * Why linking is refused right now, or null when it is allowed. Set while the
+   * editor's draft is dirty: linking is a server write that moves the scene's
+   * revision, and the draft the user is holding was opened against the old one,
+   * so a save afterwards is refused as a conflict with nothing to reconcile it.
+   */
+  blocked?: string | null
+  /**
+   * Reports the link write's in-flight state to whoever owns the editor around
+   * this control.
+   *
+   * The block above is one direction of a two-way exclusion and on its own it is
+   * only half a fix. Linking moves the scene's revision, and the editor reseeds
+   * its draft from a new revision only while the draft is clean - so an edit made
+   * DURING the link leaves the draft dirty at the old revision, the reseed is
+   * skipped, and the next save is refused as a conflict over a revision the user
+   * never saw. The editor needs to know this is happening to hold edits until the
+   * refetch has landed.
+   */
+  onPendingChange?: (pending: boolean) => void
 }): JSX.Element {
   const panel = useRef<OverlayPanel>(null)
   // Only fetched once the user asks, and then kept. A scene editor that pulled
@@ -45,6 +67,12 @@ export function SceneProjectBrief({
     queryConfig: { enabled: requested },
   })
   const link = useSetSceneProjectMutation()
+
+  // Reported rather than lifted wholesale: the mutation and its options belong
+  // with the control that offers it, and the editor only needs the one bit.
+  useEffect(() => {
+    onPendingChange?.(link.isPending)
+  }, [link.isPending, onPendingChange])
 
   return (
     <>
@@ -77,6 +105,10 @@ export function SceneProjectBrief({
           because the project decides what the agent searches for and what
           validate_scene measures the scene against. It is a decision, not a
           label, so it is changed deliberately here rather than inline.
+
+          And, like every other direct server write the editor offers, it is
+          refused while the draft is dirty: it moves the revision the unsaved
+          draft was opened against, and the editor has no way to merge the two.
         */}
         <Dropdown
           className="scene-project-brief-select"
@@ -88,13 +120,22 @@ export function SceneProjectBrief({
               value: project.id,
             })),
           ]}
-          disabled={link.isPending}
+          disabled={link.isPending || blocked !== null}
           data-testid="scene-project-select"
           ariaLabel="Project this scene belongs to"
           onChange={event =>
             link.mutate({ sceneId, projectId: event.value ?? null })
           }
         />
+
+        {blocked ? (
+          <p
+            className="scene-project-brief-note"
+            data-testid="scene-project-blocked"
+          >
+            {blocked}
+          </p>
+        ) : null}
 
         {projectId === null ? (
           <p

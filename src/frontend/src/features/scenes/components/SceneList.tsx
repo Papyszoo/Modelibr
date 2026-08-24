@@ -4,10 +4,10 @@ import { Button } from 'primereact/button'
 import { Dropdown } from 'primereact/dropdown'
 import { InputText } from 'primereact/inputtext'
 import { InputTextarea } from 'primereact/inputtextarea'
-import { type JSX, useState } from 'react'
+import { type JSX, useRef, useState } from 'react'
 
 import { useProjectsQuery } from '@/features/project/api/queries'
-import { AddTile, AssetGrid, AssetTile } from '@/shared/components/asset-tile'
+import { ApiClientError } from '@/lib/apiBase'
 import {
   Dialog,
   EmptyState,
@@ -15,7 +15,7 @@ import {
   ListHeader,
   LoadingState,
 } from '@/shared/components'
-import { ApiClientError } from '@/lib/apiBase'
+import { AddTile, AssetGrid, AssetTile } from '@/shared/components/asset-tile'
 
 import {
   useCreateSceneMutation,
@@ -41,30 +41,140 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
   const [description, setDescription] = useState('')
   const [projectId, setProjectId] = useState<number | null>(null)
   const [pendingDelete, setPendingDelete] = useState<SceneSummary | null>(null)
+  const [createError, setCreateError] = useState<string | null>(null)
 
+  /**
+   * The scene that exists, and the project it still wants, after a link failed.
+   *
+   * Creating is two writes - the scene, then the link, because linking is its
+   * own audited scene write and folding it into creation would leave it no
+   * revision of its own to undo. So a failure between them is real, and it must
+   * not lose what the user asked for: the scene id is kept so a retry links THAT
+   * scene rather than making a second one, and the dialog stays open saying so.
+   */
+  const [linkFailure, setLinkFailure] = useState<{
+    sceneId: number
+    projectId: number
+  } | null>(null)
+
+  /**
+   * In-flight guard, synchronous on purpose.
+   *
+   * `createScene.isPending` is React state: it is set when the mutation's render
+   * lands, not when it starts. Two clicks in the same tick - or a held Enter,
+   * which repeats far faster than React commits - both read the old `false` and
+   * both create a scene. Only a ref changes in the same turn of the event loop
+   * that read it.
+   */
+  const submitting = useRef(false)
+
+  const canSubmit = Boolean(name.trim()) || linkFailure !== null
+  const isBusy = createScene.isPending || linkProject.isPending
+
+  /**
+   * The one guarded submission path. Enter, the Create button and any repeat of
+   * either land here, so the guard cannot be bypassed by the route that does not
+   * go through a disabled attribute - `disabled` describes a button, and a
+   * keydown handler is not a button.
+   */
   const handleCreate = async () => {
+    if (submitting.current) {
+      return
+    }
+
+    // A retry after a link failure links the scene that already exists. Creating
+    // again here is exactly the duplicate this whole path is arranged to avoid.
+    if (linkFailure) {
+      submitting.current = true
+      try {
+        await linkAndFinish(linkFailure.sceneId, linkFailure.projectId)
+      } finally {
+        submitting.current = false
+      }
+      return
+    }
+
     const trimmed = name.trim()
     if (!trimmed) {
       return
     }
 
-    const created = await createScene.mutateAsync({
-      name: trimmed,
-      description: description.trim() || undefined,
-    })
+    submitting.current = true
+    setCreateError(null)
 
-    // A second call rather than a field on create: linking is its own audited
-    // scene write, and folding it into creation would give it no revision of
-    // its own to undo.
-    if (projectId !== null) {
-      await linkProject.mutateAsync({ sceneId: created.scene.id, projectId })
+    try {
+      let created
+      try {
+        created = await createScene.mutateAsync({
+          name: trimmed,
+          description: description.trim() || undefined,
+        })
+      } catch (caught) {
+        setCreateError(
+          caught instanceof ApiClientError
+            ? caught.message
+            : 'The scene could not be created.'
+        )
+        return
+      }
+
+      // Past this point the scene EXISTS. The form must never return to a state
+      // where submitting it would create another one - see `linkFailure`.
+      if (projectId === null) {
+        finish(created.scene.id)
+        return
+      }
+
+      await linkAndFinish(created.scene.id, projectId)
+    } finally {
+      submitting.current = false
+    }
+  }
+
+  const linkAndFinish = async (sceneId: number, wantedProjectId: number) => {
+    setCreateError(null)
+    try {
+      await linkProject.mutateAsync({ sceneId, projectId: wantedProjectId })
+    } catch (caught) {
+      // Reported, not swallowed. The scene is real and the link is not, and a
+      // user who asked for a project and silently got none has no way to know.
+      setLinkFailure({ sceneId, projectId: wantedProjectId })
+      setCreateError(
+        caught instanceof ApiClientError
+          ? `The scene was created, but linking it to the project failed: ${caught.message}`
+          : 'The scene was created, but linking it to the project failed.'
+      )
+      return
     }
 
+    setLinkFailure(null)
+    finish(sceneId)
+  }
+
+  const finish = (sceneId: number) => {
     setIsCreating(false)
     setName('')
     setDescription('')
     setProjectId(null)
-    onOpenScene(created.scene.id)
+    setCreateError(null)
+    setLinkFailure(null)
+    onOpenScene(sceneId)
+  }
+
+  /** Give up on the link and open the scene that was created anyway. */
+  const openWithoutLink = () => {
+    if (linkFailure) {
+      finish(linkFailure.sceneId)
+    }
+  }
+
+  const closeCreate = () => {
+    // Dismissing after a link failure still leaves a real scene behind, so the
+    // form is reset rather than kept - reopening it must not offer to retry a
+    // link for a scene the user has walked away from.
+    setIsCreating(false)
+    setCreateError(null)
+    setLinkFailure(null)
   }
 
   if (isLoading) {
@@ -149,41 +259,70 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
 
       <Dialog
         open={isCreating}
-        onClose={() => setIsCreating(false)}
+        onClose={closeCreate}
         header="New scene"
         size="sm"
         footer={
           <>
+            {linkFailure ? (
+              <Button
+                label="Open without a project"
+                text
+                size="small"
+                data-testid="scene-create-skip-link"
+                onClick={openWithoutLink}
+              />
+            ) : (
+              <Button label="Cancel" text size="small" onClick={closeCreate} />
+            )}
             <Button
-              label="Cancel"
-              text
-              size="small"
-              onClick={() => setIsCreating(false)}
-            />
-            <Button
-              label="Create"
-              icon="pi pi-check"
+              label={linkFailure ? 'Retry link' : 'Create'}
+              icon={linkFailure ? 'pi pi-refresh' : 'pi pi-check'}
               size="small"
               data-testid="scene-create-confirm"
-              disabled={!name.trim() || createScene.isPending}
-              loading={createScene.isPending}
+              // Both pending flags, not just the first: the scene is already
+              // created while the project link is in flight, so a button that
+              // re-enabled there would make a second one on the next click.
+              // The real guard is inside handleCreate - this only stops the
+              // button LOOKING available.
+              disabled={!canSubmit || isBusy}
+              loading={isBusy}
               onClick={() => void handleCreate()}
             />
           </>
         }
       >
         <div className="scene-list-form">
+          {createError ? (
+            <p
+              className="scene-list-form-error"
+              data-testid="scene-create-error"
+            >
+              {createError}
+            </p>
+          ) : null}
           <label htmlFor="scene-name">Name</label>
           <InputText
             id="scene-name"
             value={name}
             autoFocus
             placeholder="Rundown city street"
+            // The scene already exists once a link has failed; renaming it is a
+            // different operation and not one this dialog offers.
+            disabled={linkFailure !== null}
             onChange={event => setName(event.target.value)}
             onKeyDown={event => {
-              if (event.key === 'Enter') {
-                void handleCreate()
+              // Enter goes through the SAME guarded handler as the button, and
+              // is refused on the same conditions. It used to call handleCreate
+              // whatever the button's disabled state said.
+              if (event.key !== 'Enter') {
+                return
               }
+              event.preventDefault()
+              if (!canSubmit || isBusy) {
+                return
+              }
+              void handleCreate()
             }}
           />
 
@@ -205,6 +344,7 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
             ]}
             placeholder="No project"
             data-testid="scene-create-project"
+            disabled={linkFailure !== null}
             onChange={event => setProjectId(event.value ?? null)}
           />
 
@@ -215,6 +355,7 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
             rows={3}
             autoResize
             placeholder="What this scene is for - optional, and useful to an agent."
+            disabled={linkFailure !== null}
             onChange={event => setDescription(event.target.value)}
           />
         </div>

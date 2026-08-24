@@ -43,3 +43,9 @@
   font-size: var(--mod-text-sm);
   color: var(--mod-color-text);
 }
+
+.scene-list-form-error {
+  margin: 0 0 var(--mod-space-xs);
+  font-size: var(--mod-text-sm);
+  color: var(--mod-color-danger);
+}

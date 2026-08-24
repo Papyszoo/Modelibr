@@ -5,7 +5,14 @@ import {
   useQueryClient,
 } from '@tanstack/react-query'
 
+import { getEnvironmentMapCategories } from '@/features/environment-map/api/environmentMapCategoryApi'
+import { getModelCategories } from '@/features/models/api/modelApi'
+import { getAllSoundCategories } from '@/features/sounds/api/soundApi'
+import { getAllSpriteCategories } from '@/features/sprite/api/spriteApi'
+import { getAllTextureSetCategories } from '@/features/texture-set/api/textureSetApi'
+import { TextureSetKind } from '@/features/texture-set/types'
 import { type QueryConfig } from '@/lib/react-query'
+import type { HierarchicalCategory } from '@/shared/types/categories'
 
 import {
   getAssetMetadata,
@@ -93,6 +100,13 @@ export function useImportSuggestionsQuery({
 }
 
 /**
+ * How many follow-up calls a whole-queue action will make before giving up. At
+ * 500 suggestions a call this covers 25,000 - more than an import produces - and
+ * anything past it leaves `remaining` non-zero for the banner to keep showing.
+ */
+const MAX_REVIEW_PASSES = 50
+
+/**
  * Accepts or takes back the automation's guesses.
  *
  * Invalidates the model list and the category counts as well as the queue itself:
@@ -103,13 +117,39 @@ export function useReviewImportSuggestionsMutation() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: ({
+    mutationFn: async ({
       accept,
       modelIds,
     }: {
       accept: boolean
       modelIds?: number[]
-    }) => reviewImportSuggestions(accept, modelIds),
+    }) => {
+      // A whole-queue action is bounded server-side (500 per call), so one call
+      // is not the action the button promises. Repeat while the server says work
+      // is left, accumulating the counts so the caller sees what the WHOLE
+      // action did rather than what its last page did.
+      let result = await reviewImportSuggestions(accept, modelIds)
+      if (modelIds) {
+        return result
+      }
+
+      const total = { ...result }
+      // Bounded rather than `while (remaining > 0)`: a server that kept
+      // reporting work left would otherwise spin here forever.
+      for (
+        let pass = 0;
+        pass < MAX_REVIEW_PASSES && result.remaining > 0;
+        pass++
+      ) {
+        result = await reviewImportSuggestions(accept)
+        total.reviewed += result.reviewed
+        total.categoriesCleared += result.categoriesCleared
+        total.tagsRemoved += result.tagsRemoved
+        total.remaining = result.remaining
+      }
+
+      return total
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: ['metadata', 'import-suggestions'],
@@ -117,5 +157,121 @@ export function useReviewImportSuggestionsMutation() {
       void queryClient.invalidateQueries({ queryKey: ['models'] })
       void queryClient.invalidateQueries({ queryKey: ['model-tags'] })
     },
+  })
+}
+
+/**
+ * The category tree behind a `categoryRef` field.
+ *
+ * <p>
+ * Deliberately built on each family's EXISTING query - same fetcher, same query
+ * key - rather than on a fetcher of its own. A separate key would be a second
+ * copy of the same list that nothing invalidates: creating, renaming, moving or
+ * deleting a category invalidates the family's key, and a picker keyed
+ * elsewhere would go on offering the tree as it was when the panel opened.
+ * Reusing the key means the picker is already correct on the next render, with
+ * no invalidation wiring of its own to remember.
+ * </p>
+ *
+ * <p>
+ * `kind` is required for the texture-set tree and meaningless everywhere else.
+ * It comes from the asset, not the schema: a Material always takes Universal
+ * categories, and a TextureSet takes its own kind's, which differs between two
+ * sets in the same family. The endpoint binds a missing kind to ModelSpecific
+ * rather than rejecting it, so omitting it does not fail - it quietly returns
+ * the wrong half of the tree.
+ * </p>
+ */
+export function getCategoryOptionsQueryOptions(
+  family: string,
+  kind: TextureSetKind | null
+): CategoryOptionsQuery {
+  switch (family) {
+    case 'Model':
+      return {
+        queryKey: ['model-categories'],
+        queryFn: () => getModelCategories(),
+      }
+
+    case 'Sound':
+      return {
+        queryKey: ['soundCategories'],
+        queryFn: async () => (await getAllSoundCategories()).categories,
+      }
+
+    case 'Sprite':
+      return {
+        queryKey: ['spriteCategories'],
+        queryFn: async () => (await getAllSpriteCategories()).categories,
+      }
+
+    case 'EnvironmentMap':
+      return {
+        queryKey: ['environment-map-categories'],
+        queryFn: () => getEnvironmentMapCategories(),
+      }
+
+    case 'TextureSet':
+    case 'Material': {
+      // Universal is the fallback rather than the enum's zero value: a Material
+      // only ever uses Universal, and a TextureSet whose kind has not loaded yet
+      // is better shown the shared vocabulary than the model-specific one.
+      const resolved = kind ?? TextureSetKind.Universal
+      return {
+        queryKey: ['textureSetCategories', resolved],
+        queryFn: () => getAllTextureSetCategories(resolved),
+      }
+    }
+
+    default:
+      return {
+        queryKey: ['metadata', 'categories', 'unsupported', family],
+        queryFn: async () => [],
+      }
+  }
+}
+
+/**
+ * One shape for all five, so the hook below has a single type to assign back.
+ * `queryOptions()` would pin each branch's key as a literal tuple, and a union
+ * of five of those cannot be handed to one `useQuery` call.
+ */
+interface CategoryOptionsQuery {
+  queryKey: readonly unknown[]
+  queryFn: () => Promise<HierarchicalCategory[]>
+}
+
+/** Families whose `categoryRef` this picker can actually fill. */
+const CATEGORY_FAMILIES = new Set([
+  'Model',
+  'Sound',
+  'Sprite',
+  'EnvironmentMap',
+  'TextureSet',
+  'Material',
+])
+
+export function useCategoryOptionsQuery({
+  family,
+  kind = null,
+  enabled = true,
+}: {
+  family: string | null | undefined
+  /** The asset's category kind, for the partitioned texture-set tree. */
+  kind?: TextureSetKind | null
+  enabled?: boolean
+}) {
+  // Narrower than the usual `queryConfig` seam on purpose: the picker only ever
+  // needs to switch itself off, and a config typed over five different query
+  // keys cannot be assigned back to any one of them.
+  const { queryKey, queryFn } = getCategoryOptionsQueryOptions(
+    family ?? '',
+    kind
+  )
+
+  return useQuery({
+    queryKey,
+    queryFn,
+    enabled: enabled && Boolean(family) && CATEGORY_FAMILIES.has(family ?? ''),
   })
 }
