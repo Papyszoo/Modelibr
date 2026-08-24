@@ -47,6 +47,13 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<string>("ClaimToken")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("");
+
                     b.Property<DateTime>("ClaimedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -75,6 +82,13 @@ namespace Infrastructure.Migrations
 
                     b.Property<DateTime>("PerformedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ReversalClaimedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ReversalToken")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
 
                     b.Property<DateTime?>("ReversedAt")
                         .HasColumnType("timestamp with time zone");
