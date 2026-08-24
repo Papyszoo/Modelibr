@@ -1,6 +1,7 @@
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
+import { Readable } from 'stream'
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
@@ -298,5 +299,250 @@ describe('ModelFileService.fetchModelFileWithAuxiliaries', () => {
 
     expect(result.auxiliaryCount).toBe(1)
     expect(attempts).toBe(2)
+  })
+})
+
+/**
+ * Real streams, real files, real directories.
+ *
+ * The existing staging tests mock `writeStreamToFile` because what they care
+ * about is which paths the service decides to stage. These care about the
+ * opposite - what is left on disk when the write itself goes wrong - and a
+ * mocked helper cannot leave a half-written file behind, which is precisely the
+ * thing that was leaking.
+ */
+describe('ModelFileService partial-write cleanup', () => {
+  let service
+  let tempDir
+
+  beforeEach(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'modelibr-partial-'))
+    service = new ModelFileService()
+    service.tempDir = tempDir
+  })
+
+  /** A readable that emits one chunk and then genuinely fails. */
+  function failingStream(chunk, message = 'connection reset') {
+    const stream = new Readable({ read() {} })
+    process.nextTick(() => {
+      stream.push(chunk)
+      stream.destroy(new Error(message))
+    })
+    return stream
+  }
+
+  /** A readable that delivers its payload and ends cleanly. */
+  function goodStream(chunk) {
+    const stream = new Readable({ read() {} })
+    process.nextTick(() => {
+      stream.push(chunk)
+      stream.push(null)
+    })
+    return stream
+  }
+
+  it('removes the partial file when the source stream fails mid-write', async () => {
+    const target = path.join(tempDir, 'partial.glb')
+
+    await expect(
+      service.writeStreamToFile(failingStream(Buffer.alloc(1024)), target)
+    ).rejects.toThrow(/Stream error/)
+
+    // A truncated .glb left here is a plausible-looking model file that nothing
+    // will ever come back for.
+    expect(fs.existsSync(target)).toBe(false)
+  })
+
+  it('removes the partial file when the destination cannot be written', async () => {
+    // A path whose parent is a FILE: createWriteStream accepts it and the write
+    // stream errors, which is the other half of the same failure.
+    const blocker = path.join(tempDir, 'blocker')
+    fs.writeFileSync(blocker, 'not a directory')
+
+    await expect(
+      service.writeStreamToFile(
+        goodStream(Buffer.alloc(16)),
+        path.join(blocker, 'x.glb')
+      )
+    ).rejects.toThrow(/Failed to write file/)
+
+    expect(fs.readFileSync(blocker, 'utf8')).toBe('not a directory')
+  })
+
+  it('leaves the file in place when the write succeeds', async () => {
+    const target = path.join(tempDir, 'whole.glb')
+
+    await service.writeStreamToFile(goodStream(Buffer.from('glTF')), target)
+
+    expect(fs.readFileSync(target, 'utf8')).toBe('glTF')
+  })
+
+  it('removes the downloaded primary when inspecting it afterwards fails', async () => {
+    // The post-write step - a stat that throws because the file went away or the
+    // directory became unreadable. The caller gets an error, not a path, so this
+    // function is the last one that knows where the file is.
+    const response = {
+      headers: { 'content-disposition': 'filename="chair.obj"' },
+      data: null,
+    }
+    let written = null
+    vi.spyOn(service, 'writeStreamToFile').mockImplementation(async (_, to) => {
+      written = to
+      fs.writeFileSync(to, 'v 0 0 0\n')
+    })
+    vi.spyOn(fs, 'statSync').mockImplementation(() => {
+      throw new Error('ENOENT: no such file or directory')
+    })
+
+    await expect(service.processFileResponse(response, 7, 1)).rejects.toThrow(
+      /ENOENT/
+    )
+
+    vi.restoreAllMocks()
+    expect(written).not.toBeNull()
+    expect(fs.existsSync(written)).toBe(false)
+  })
+})
+
+describe('ModelFileService.cleanupOldFiles', () => {
+  let service
+  let tempDir
+
+  const HOUR = 60 * 60 * 1000
+
+  beforeEach(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'modelibr-sweep-'))
+    service = new ModelFileService()
+    service.tempDir = tempDir
+  })
+
+  /** Creates an entry and backdates it so the sweep considers it stale. */
+  function aged(relativePath, { directory = false, hoursOld = 3 } = {}) {
+    const target = path.join(tempDir, relativePath)
+    if (directory) {
+      fs.mkdirSync(target, { recursive: true })
+    } else {
+      fs.mkdirSync(path.dirname(target), { recursive: true })
+      fs.writeFileSync(target, 'x')
+    }
+
+    const when = new Date(Date.now() - hoursOld * HOUR)
+    fs.utimesSync(target, when, when)
+    return target
+  }
+
+  it('removes stale files', async () => {
+    const stale = aged('7_1700000000.glb')
+
+    const summary = await service.cleanupOldFiles(HOUR)
+
+    expect(fs.existsSync(stale)).toBe(false)
+    expect(summary).toEqual({ cleanedCount: 1, failedCount: 0 })
+  })
+
+  it('removes a stale staging DIRECTORY, which unlink never could', async () => {
+    // The leak: a crash between mkdtemp and the operation's own cleanup leaves
+    // one of these, and unlinkSync on a directory throws.
+    const stale = aged('model-7-abc123', { directory: true })
+    fs.writeFileSync(path.join(stale, 'chair.obj'), 'v 0 0 0\n')
+    // Writing inside it refreshed the directory's own mtime - backdate again.
+    const when = new Date(Date.now() - 3 * HOUR)
+    fs.utimesSync(stale, when, when)
+
+    const summary = await service.cleanupOldFiles(HOUR)
+
+    expect(fs.existsSync(stale)).toBe(false)
+    expect(summary.cleanedCount).toBe(1)
+  })
+
+  it('removes a stale staging directory with nested contents', async () => {
+    const stale = aged('model-9-def456', { directory: true })
+    fs.mkdirSync(path.join(stale, 'textures', 'pbr'), { recursive: true })
+    fs.writeFileSync(path.join(stale, 'textures', 'pbr', 'wood.png'), 'png')
+    fs.writeFileSync(path.join(stale, 'chair.mtl'), 'newmtl wood\n')
+    // Backdate again: writing inside it refreshed the directory's own mtime.
+    const when = new Date(Date.now() - 3 * HOUR)
+    fs.utimesSync(stale, when, when)
+
+    const summary = await service.cleanupOldFiles(HOUR)
+
+    expect(fs.existsSync(stale)).toBe(false)
+    expect(summary.cleanedCount).toBe(1)
+  })
+
+  it('leaves fresh entries alone', async () => {
+    const fresh = aged('recent.glb', { hoursOld: 0 })
+    const freshDir = aged('model-1-fresh', { directory: true, hoursOld: 0 })
+
+    const summary = await service.cleanupOldFiles(HOUR)
+
+    expect(fs.existsSync(fresh)).toBe(true)
+    expect(fs.existsSync(freshDir)).toBe(true)
+    expect(summary).toEqual({ cleanedCount: 0, failedCount: 0 })
+  })
+
+  it('sweeps a mix of stale files and directories in one pass', async () => {
+    const staleFile = aged('old.glb')
+    const staleDir = aged('model-3-ghi789', { directory: true })
+    const freshFile = aged('new.glb', { hoursOld: 0 })
+
+    const summary = await service.cleanupOldFiles(HOUR)
+
+    expect(fs.existsSync(staleFile)).toBe(false)
+    expect(fs.existsSync(staleDir)).toBe(false)
+    expect(fs.existsSync(freshFile)).toBe(true)
+    expect(summary).toEqual({ cleanedCount: 2, failedCount: 0 })
+  })
+
+  it('carries on past an entry it cannot remove, and counts it', async () => {
+    // The behaviour the old loop did not have: one bad entry took every entry
+    // after it down with it, so a single undeletable directory meant nothing was
+    // ever cleaned again.
+    const first = aged('a-old.glb')
+    const stubborn = aged('b-stubborn', { directory: true })
+    const last = aged('c-old.glb')
+
+    const realRm = fs.rmSync
+    vi.spyOn(fs, 'rmSync').mockImplementation((target, options) => {
+      if (target === stubborn) throw new Error('EACCES: permission denied')
+      return realRm(target, options)
+    })
+
+    const summary = await service.cleanupOldFiles(HOUR)
+    vi.restoreAllMocks()
+
+    expect(fs.existsSync(first)).toBe(false)
+    // The one that failed is still there, reported rather than hidden...
+    expect(fs.existsSync(stubborn)).toBe(true)
+    // ...and the entry AFTER it was still swept.
+    expect(fs.existsSync(last)).toBe(false)
+    expect(summary).toEqual({ cleanedCount: 2, failedCount: 1 })
+  })
+
+  it('carries on past an entry it cannot even read', async () => {
+    const stale = aged('readable.glb')
+    const realLstat = fs.lstatSync
+    vi.spyOn(fs, 'lstatSync').mockImplementation((target, options) => {
+      if (String(target).endsWith('unreadable')) {
+        throw new Error('EACCES: permission denied')
+      }
+      return realLstat(target, options)
+    })
+    fs.writeFileSync(path.join(tempDir, 'unreadable'), 'x')
+
+    const summary = await service.cleanupOldFiles(HOUR)
+    vi.restoreAllMocks()
+
+    expect(fs.existsSync(stale)).toBe(false)
+    expect(summary).toEqual({ cleanedCount: 1, failedCount: 1 })
+  })
+
+  it('is a no-op when the temp directory does not exist', async () => {
+    service.tempDir = path.join(tempDir, 'gone')
+
+    expect(await service.cleanupOldFiles(HOUR)).toEqual({
+      cleanedCount: 0,
+      failedCount: 0,
+    })
   })
 })

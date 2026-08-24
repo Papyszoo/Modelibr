@@ -116,14 +116,24 @@ export class ModelFileService {
     // Write stream to temporary file
     await this.writeStreamToFile(response.data, tempFilePath)
 
-    logger.info('Model file fetched successfully', {
-      modelId,
-      modelVersionId,
-      originalFileName,
-      fileType,
-      tempFilePath,
-      fileSize: fs.statSync(tempFilePath).size,
-    })
+    // Everything after the write is still this function's responsibility for the
+    // file: it returns a path or it throws, and a throw means nobody downstream
+    // has the path to clean up with. Inspecting the result is the case that
+    // actually happens - a stat on a file the filesystem filled to capacity
+    // mid-write.
+    try {
+      logger.info('Model file fetched successfully', {
+        modelId,
+        modelVersionId,
+        originalFileName,
+        fileType,
+        tempFilePath,
+        fileSize: fs.statSync(tempFilePath).size,
+      })
+    } catch (error) {
+      await this.cleanupFile(tempFilePath)
+      throw error
+    }
 
     return {
       filePath: tempFilePath,
@@ -165,11 +175,13 @@ export class ModelFileService {
         fs.unlinkSync(filePath)
         logger.debug('Cleaned up temporary file', { filePath })
       }
+      return true
     } catch (error) {
       logger.warn('Failed to cleanup temporary file', {
         filePath,
         error: error.message,
       })
+      return false
     }
   }
 
@@ -365,11 +377,13 @@ export class ModelFileService {
         fs.rmSync(workDir, { recursive: true, force: true })
         logger.debug('Cleaned up staging directory', { workDir })
       }
+      return true
     } catch (error) {
       logger.warn('Failed to cleanup staging directory', {
         workDir,
         error: error.message,
       })
+      return false
     }
   }
 
@@ -479,20 +493,42 @@ export class ModelFileService {
   async writeStreamToFile(stream, filePath) {
     return new Promise((resolve, reject) => {
       const writeStream = fs.createWriteStream(filePath)
+      let settled = false
+
+      // Whatever went wrong, the file this function created is now a truncated
+      // copy of a model - and the caller is about to see an error, not a path,
+      // so nobody else will ever come back for it. Left behind it is a byte-for-
+      // byte plausible .glb that a later pass could pick up, and disk that only
+      // the periodic sweep reclaims.
+      const fail = (message, error) => {
+        if (settled) return
+        settled = true
+
+        // Close first: a stream still holding the descriptor is a stream that
+        // can write another chunk after the unlink and recreate the file.
+        writeStream.destroy()
+        try {
+          if (fs.existsSync(filePath)) fs.unlinkSync(filePath)
+        } catch (cleanupError) {
+          logger.warn('Failed to remove a partially written file', {
+            filePath,
+            error: cleanupError.message,
+          })
+        }
+
+        reject(new Error(`${message}: ${error.message}`))
+      }
 
       stream.pipe(writeStream)
 
       writeStream.on('finish', () => {
+        if (settled) return
+        settled = true
         resolve()
       })
 
-      writeStream.on('error', error => {
-        reject(new Error(`Failed to write file: ${error.message}`))
-      })
-
-      stream.on('error', error => {
-        reject(new Error(`Stream error: ${error.message}`))
-      })
+      writeStream.on('error', error => fail('Failed to write file', error))
+      stream.on('error', error => fail('Stream error', error))
     })
   }
 
@@ -548,30 +584,65 @@ export class ModelFileService {
   }
 
   /**
-   * Clean up all temporary files older than specified age
+   * Remove everything in the temp directory older than `maxAgeMs` - files and
+   * staging directories alike.
+   *
+   * The directories are the reason this is not a one-liner. A crash between
+   * `mkdtemp` and the operation's own cleanup leaves a `model-<id>-XXXXXX/`
+   * behind, and this sweep used to call `unlinkSync` on every entry - which
+   * fails with EPERM/EISDIR on a directory, threw out of the loop, and so left
+   * not only that directory but every entry after it, forever. On a worker that
+   * stages a model per job, "forever" fills the disk.
+   *
+   * One broken entry no longer ends the sweep either: each is removed on its
+   * own, and what could not be removed is counted and reported rather than
+   * silently taking the rest with it.
+   *
    * @param {number} maxAgeMs - Maximum age in milliseconds (default: 1 hour)
+   * @returns {Promise<{cleanedCount: number, failedCount: number}>}
    */
   async cleanupOldFiles(maxAgeMs = 60 * 60 * 1000) {
+    const summary = { cleanedCount: 0, failedCount: 0 }
+
     try {
-      if (!fs.existsSync(this.tempDir)) return
+      if (!fs.existsSync(this.tempDir)) return summary
 
-      const files = fs.readdirSync(this.tempDir)
+      const entries = fs.readdirSync(this.tempDir)
       const now = Date.now()
-      let cleanedCount = 0
 
-      for (const file of files) {
-        const filePath = path.join(this.tempDir, file)
-        const stats = fs.statSync(filePath)
+      for (const entry of entries) {
+        const entryPath = path.join(this.tempDir, entry)
 
-        if (now - stats.mtime.getTime() > maxAgeMs) {
-          await this.cleanupFile(filePath)
-          cleanedCount++
+        try {
+          // lstat, not stat: a dangling symlink is exactly the kind of entry
+          // that used to abort the whole sweep, and it is still stale rubbish
+          // that should go.
+          const stats = fs.lstatSync(entryPath)
+          if (now - stats.mtime.getTime() <= maxAgeMs) continue
+
+          const removed = stats.isDirectory()
+            ? await this.cleanupDirectory(entryPath)
+            : await this.cleanupFile(entryPath)
+
+          if (removed) {
+            summary.cleanedCount++
+          } else {
+            summary.failedCount++
+          }
+        } catch (error) {
+          // Reading one entry failed - it vanished under us, or its permissions
+          // changed. Note it and carry on to the rest.
+          summary.failedCount++
+          logger.warn('Skipped an unreadable temporary entry', {
+            entryPath,
+            error: error.message,
+          })
         }
       }
 
-      if (cleanedCount > 0) {
-        logger.info('Cleaned up old temporary files', {
-          cleanedCount,
+      if (summary.cleanedCount > 0 || summary.failedCount > 0) {
+        logger.info('Cleaned up old temporary entries', {
+          ...summary,
           tempDir: this.tempDir,
         })
       }
@@ -581,5 +652,7 @@ export class ModelFileService {
         tempDir: this.tempDir,
       })
     }
+
+    return summary
   }
 }
