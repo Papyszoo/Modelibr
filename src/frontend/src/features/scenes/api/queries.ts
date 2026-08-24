@@ -5,7 +5,9 @@ import {
   useQueryClient,
 } from '@tanstack/react-query'
 
+import { ApiClientError } from '@/lib/apiBase'
 import { type QueryConfig } from '@/lib/react-query'
+import { useSceneLinkHoldStore } from '@/stores'
 
 import type { SceneDocument, SceneRecommendationChoice } from '../types'
 import {
@@ -183,13 +185,41 @@ function useSlotWriteMutation<TInput extends { sceneId: number }>(
   return useMutation({
     mutationFn,
     onSuccess: (_result, input) => {
-      void queryClient.invalidateQueries({
-        queryKey: ['scenes', 'slots', input.sceneId],
-      })
-      void queryClient.invalidateQueries({
-        queryKey: ['scenes', 'detail', input.sceneId],
-      })
+      invalidateSceneWrite(queryClient, input.sceneId)
     },
+  })
+}
+
+/**
+ * When the scene's cached detail was last successfully fetched, or 0.
+ *
+ * Recorded when a write settles so the hold can insist on data fetched AFTER it:
+ * a cache entry from before the write looks every bit as authoritative and is
+ * about a scene that no longer exists.
+ */
+function sceneFetchedAt(
+  queryClient: ReturnType<typeof useQueryClient>,
+  sceneId: number
+): number {
+  return (
+    queryClient.getQueryState(['scenes', 'detail', sceneId])?.dataUpdatedAt ?? 0
+  )
+}
+
+/**
+ * What every direct scene write invalidates. Extracted so the project-link
+ * mutation - which needs its own callbacks and cannot use the helper above -
+ * cannot drift from the writes it is serialised against.
+ */
+function invalidateSceneWrite(
+  queryClient: ReturnType<typeof useQueryClient>,
+  sceneId: number
+) {
+  void queryClient.invalidateQueries({
+    queryKey: ['scenes', 'slots', sceneId],
+  })
+  void queryClient.invalidateQueries({
+    queryKey: ['scenes', 'detail', sceneId],
   })
 }
 
@@ -228,12 +258,105 @@ export function useAcceptSceneRecommendationsMutation() {
   )
 }
 
-/** Links a scene to a project, or clears the link. */
-export function useSetSceneProjectMutation() {
-  return useSlotWriteMutation(
-    (input: { sceneId: number; projectId: number | null }) =>
-      setSceneProject(input.sceneId, input.projectId)
+/**
+ * True when a failed link write is KNOWN to have changed nothing on the server.
+ *
+ * Only a request the server itself answered and refused qualifies: a validation
+ * error, a missing scene, a conflict, a rejected token. Everything else - a
+ * network error, a timeout, a 5xx, an error object this client does not
+ * recognise - reached an unknown point in the write and may have committed. That
+ * distinction is the whole of what makes releasing the hold safe, so the default
+ * is the careful one: unknown means unknown.
+ *
+ * 408 is deliberately not in the refusal set: a request timeout says the server
+ * gave up waiting, not that it declined to act.
+ */
+export function isDefiniteLinkRefusal(error: unknown): boolean {
+  if (!(error instanceof ApiClientError)) {
+    return false
+  }
+
+  if (error.isNetworkError || error.isTimeout || error.isOffline) {
+    return false
+  }
+
+  return (
+    error.status !== undefined &&
+    error.status >= 400 &&
+    error.status < 500 &&
+    error.status !== 408
   )
+}
+
+/**
+ * Links a scene to a project, or clears the link.
+ *
+ * <p>
+ * Unlike the other slot writes this one drives the scene's <b>serialization
+ * hold</b> (see `sceneLinkHoldStore`), and it does so from the mutation rather
+ * than from the control that renders the dropdown. Reporting the mutation's
+ * status up to a component was the previous design and it lost the hold in three
+ * ways: the component could unmount mid-write, a transport error looked exactly
+ * like a refusal, and the revision the server had just reported was thrown away
+ * instead of being the thing the editor waited for.
+ * </p>
+ *
+ * <p>
+ * Here the hold is opened before the request goes out and settled by the
+ * request's own outcome, so it exists for exactly as long as the write is
+ * unresolved - no matter what is mounted.
+ * </p>
+ */
+export function useSetSceneProjectMutation() {
+  const queryClient = useQueryClient()
+
+  // Read imperatively rather than subscribed: these callbacks only ever WRITE the
+  // hold, and subscribing would re-render the control that owns this mutation
+  // every time any scene's hold moved.
+  const hold = () => useSceneLinkHoldStore.getState()
+
+  return useMutation({
+    mutationFn: (input: { sceneId: number; projectId: number | null }) =>
+      setSceneProject(input.sceneId, input.projectId),
+
+    // Before the request, not after: a hold opened on the response would leave
+    // the whole in-flight window unguarded.
+    onMutate: input => {
+      hold().begin(input.sceneId)
+    },
+
+    onSuccess: (result, input) => {
+      // The revision the server produced, taken from its own answer, together
+      // with how fresh the scene data was at this moment. Waiting for "some
+      // refetch to land" instead was how a hold could release on a stale read
+      // that happened to arrive at the right time.
+      hold().applied(
+        input.sceneId,
+        result.revision,
+        sceneFetchedAt(queryClient, input.sceneId)
+      )
+      invalidateSceneWrite(queryClient, input.sceneId)
+    },
+
+    onError: (error, input) => {
+      if (isDefiniteLinkRefusal(error)) {
+        // The server answered and said no. Nothing moved, nothing is coming, and
+        // holding the editor for a refetch that will never be queued is how it
+        // used to go read-only for the rest of the session.
+        hold().release(input.sceneId)
+        return
+      }
+
+      // Unknown. The write may be durable, so the hold stays and turns into a
+      // reconciliation: the scene is refetched and editing resumes only once the
+      // draft sits on whatever the server actually has.
+      hold().ambiguous(
+        input.sceneId,
+        sceneFetchedAt(queryClient, input.sceneId)
+      )
+      invalidateSceneWrite(queryClient, input.sceneId)
+    },
+  })
 }
 
 export function useRejectSceneCandidatesMutation() {

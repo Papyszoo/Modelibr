@@ -1,6 +1,8 @@
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
+import { ApiClientError } from '@/lib/apiBase'
+import { useSceneLinkHoldStore } from '@/stores'
 import { renderWithProviders } from '@/test/renderWithProviders'
 
 import * as projectApi from '../../../project/api/projectApi'
@@ -13,9 +15,36 @@ jest.mock('../../api/scenesApi')
 const projects = projectApi as jest.Mocked<typeof projectApi>
 const scenes = scenesApi as jest.Mocked<typeof scenesApi>
 
+/**
+ * A refusal the server actually answered: nothing was written, and a retry is
+ * the right advice.
+ */
+function refusal() {
+  return new ApiClientError('That project no longer exists.', {
+    status: 404,
+    isNetworkError: false,
+    isTimeout: false,
+    isOffline: false,
+  })
+}
+
+/**
+ * A failure that reached an unknown point in the write. The server may have
+ * committed and the answer never came back, so this must NOT be treated as a
+ * refusal.
+ */
+function transportFailure() {
+  return new ApiClientError('Network Error', {
+    isNetworkError: true,
+    isTimeout: false,
+    isOffline: false,
+  })
+}
+
 describe('SceneProjectBrief', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    useSceneLinkHoldStore.setState({ holds: {} })
     projects.getAllProjects.mockResolvedValue([
       { id: 4, name: 'Rooftop chase' },
     ] as never)
@@ -103,10 +132,10 @@ describe('SceneProjectBrief', () => {
     expect(scenes.setSceneProject).not.toHaveBeenCalled()
   })
 
-  it('reports the link write as in flight, then as succeeded', async () => {
-    // The other direction of the same exclusion: the editor reseeds its draft
-    // from a new revision only while the draft is clean, so an edit made DURING
-    // the link leaves it dirty at the old revision and the next save is refused.
+  it("opens the scene's hold before the request goes out", async () => {
+    // The hold has to cover the whole in-flight window. Opened on the response
+    // instead, everything between the click and the answer was unguarded - and
+    // that window is precisely when an edit produces the conflict.
     projects.getProjectBrief.mockResolvedValue({ guidance: [] } as never)
     let settle!: (value: unknown) => void
     scenes.setSceneProject.mockReturnValue(
@@ -114,54 +143,140 @@ describe('SceneProjectBrief', () => {
         settle = resolve
       }) as never
     )
-    const statuses: string[] = []
 
     renderWithProviders(
-      <SceneProjectBrief
-        sceneId={2}
-        projectId={null}
-        projectName={null}
-        onLinkStatusChange={status => statuses.push(status)}
-      />
+      <SceneProjectBrief sceneId={2} projectId={null} projectName={null} />
     )
 
     await pickProject()
 
-    await waitFor(() => expect(statuses).toContain('pending'))
+    await waitFor(() =>
+      expect(useSceneLinkHoldStore.getState().holds[2]?.phase).toBe('pending')
+    )
 
     settle({ sceneId: 2, projectId: 4, revision: 9 })
-    await waitFor(() => expect(statuses[statuses.length - 1]).toBe('success'))
+
+    // And the server's own revision is what the hold then waits for, rather than
+    // "some refetch landing" - a number the client guessed at was how a stale
+    // read could end the hold.
+    await waitFor(() =>
+      expect(useSceneLinkHoldStore.getState().holds[2]).toMatchObject({
+        phase: 'awaiting-revision',
+        targetRevision: 9,
+      })
+    )
   })
 
-  it('reports a refused link as failed, not merely as no longer pending', async () => {
-    // The bit that was missing. The editor holds edits until the refetch the
-    // link queued has landed - and a rejected link queues nothing, so "not
-    // pending any more" told it to keep waiting for an event that never comes.
-    // The editor stayed read-only until the tab was closed.
+  it('releases the hold when the server REFUSES the link', async () => {
+    // A refusal moved nothing and queues no refetch, so a hold waiting for one
+    // waits forever - the editor was read-only until the tab was closed.
     projects.getProjectBrief.mockResolvedValue({ guidance: [] } as never)
-    scenes.setSceneProject.mockRejectedValue(new Error('nope'))
-    const statuses: string[] = []
+    scenes.setSceneProject.mockRejectedValue(refusal())
+
+    renderWithProviders(
+      <SceneProjectBrief sceneId={2} projectId={null} projectName={null} />
+    )
+
+    await pickProject()
+
+    await screen.findByTestId('scene-project-error')
+    expect(useSceneLinkHoldStore.getState().holds[2]).toBeUndefined()
+  })
+
+  it('KEEPS the hold when the failure cannot say whether the write landed', async () => {
+    // The finding. A dropped connection is not a refusal: the server may have
+    // committed and the answer never made it back. Releasing here hands the
+    // editor back over a scene that may have moved underneath it, and the next
+    // save is the conflict this whole mechanism exists to prevent.
+    projects.getProjectBrief.mockResolvedValue({ guidance: [] } as never)
+    scenes.setSceneProject.mockRejectedValue(transportFailure())
+
+    renderWithProviders(
+      <SceneProjectBrief sceneId={2} projectId={null} projectName={null} />
+    )
+
+    await pickProject()
+
+    await waitFor(() =>
+      expect(useSceneLinkHoldStore.getState().holds[2]?.phase).toBe(
+        'reconciling'
+      )
+    )
+  })
+
+  it('offers a retry for a refusal and an explanation for an ambiguity', async () => {
+    // The two failures need different advice. "Try again" after a request that
+    // may have committed is an invitation to link twice.
+    projects.getProjectBrief.mockResolvedValue({ guidance: [] } as never)
+    scenes.setSceneProject.mockRejectedValue(transportFailure())
+
+    renderWithProviders(
+      <SceneProjectBrief sceneId={2} projectId={null} projectName={null} />
+    )
+
+    await pickProject()
+
+    const error = await screen.findByTestId('scene-project-error')
+    expect(error).toHaveTextContent(/re-read from the server/i)
+    expect(error).not.toHaveTextContent(/Pick a project again/i)
+  })
+
+  it('refuses a second link while one is still in flight, even from the keyboard', async () => {
+    // The dropdown is disabled while the mutation is pending, but a disabled
+    // PrimeReact control still has a keyboard path - and "disabled" is styling,
+    // not a rule about the write.
+    projects.getProjectBrief.mockResolvedValue({ guidance: [] } as never)
+    scenes.setSceneProject.mockReturnValue(new Promise(() => {}) as never)
+
+    renderWithProviders(
+      <SceneProjectBrief sceneId={2} projectId={null} projectName={null} />
+    )
+
+    await pickProject()
+    await waitFor(() => expect(scenes.setSceneProject).toHaveBeenCalledTimes(1))
+
+    await userEvent.click(screen.getByTestId('scene-project-select'), {
+      pointerEventsCheck: 0,
+    })
+    const option = screen.queryByText('Rooftop chase')
+    if (option) {
+      await userEvent.click(option, { pointerEventsCheck: 0 })
+    }
+
+    expect(scenes.setSceneProject).toHaveBeenCalledTimes(1)
+  })
+
+  it('refuses to link while another scene write is in flight', async () => {
+    // The other direction of the exclusion, which the editor expresses by
+    // passing a reason down. Enforced in the handler, not only on the control.
+    projects.getProjectBrief.mockResolvedValue({ guidance: [] } as never)
 
     renderWithProviders(
       <SceneProjectBrief
         sceneId={2}
         projectId={null}
         projectName={null}
-        onLinkStatusChange={status => statuses.push(status)}
+        blocked="Wait for the change being saved to finish."
       />
     )
 
-    await pickProject()
+    await userEvent.click(screen.getByTestId('scene-project-chip'))
+    await userEvent.click(screen.getByTestId('scene-project-select'), {
+      pointerEventsCheck: 0,
+    })
+    const option = screen.queryByText('Rooftop chase')
+    if (option) {
+      await userEvent.click(option, { pointerEventsCheck: 0 })
+    }
 
-    await waitFor(() => expect(statuses).toContain('error'))
-    expect(statuses).not.toContain('success')
+    expect(scenes.setSceneProject).not.toHaveBeenCalled()
   })
 
   it('shows why a link was refused, and leaves the control ready to retry', async () => {
     // It used to fail silently: the dropdown snapped back to the project the
     // scene still had, and nothing said anything.
     projects.getProjectBrief.mockResolvedValue({ guidance: [] } as never)
-    scenes.setSceneProject.mockRejectedValue(new Error('nope'))
+    scenes.setSceneProject.mockRejectedValue(refusal())
 
     renderWithProviders(
       <SceneProjectBrief sceneId={2} projectId={null} projectName={null} />

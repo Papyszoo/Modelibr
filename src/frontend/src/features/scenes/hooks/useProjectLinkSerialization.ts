@@ -1,21 +1,36 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect } from 'react'
 
-/**
- * The link mutation's state, as React Query reports it. Passed through verbatim
- * rather than reduced to a boolean - "not pending" is two different situations,
- * and telling them apart is the whole of what this hook needs.
- */
-export type ProjectLinkStatus = 'idle' | 'pending' | 'success' | 'error'
+import { useSceneLinkHoldStore } from '@/stores'
 
 export interface ProjectLinkSerialization {
   /** Why editing is held, or null when it is not. */
   editsBlocked: string | null
-  /** Pass to the control that owns the link mutation. */
-  onLinkStatusChange: (status: ProjectLinkStatus) => void
+  /**
+   * True when the hold is waiting to find out what a write did, rather than
+   * waiting for a known revision to arrive. Worth saying out loud - it is the
+   * one case where the user is looking at a scene whose state nobody can yet
+   * vouch for.
+   */
+  isReconciling: boolean
 }
 
 export const LINK_PENDING_MESSAGE =
   'This scene is being linked to a project. Its revision is moving, so editing is held for a moment - nothing is lost.'
+
+export const LINK_RECONCILING_MESSAGE =
+  'The project link did not come back with an answer, so this scene is being re-read from the server. Editing is held until it is known what was saved - nothing is lost.'
+
+/**
+ * How long to wait before asking for the scene again after a fetch failed while
+ * a hold is open.
+ *
+ * A hold that waits for authoritative data needs that data to actually arrive.
+ * React Query gives up after its own retries, and nothing else would come along
+ * to try again until the user switched windows - so the same drop that made the
+ * link ambiguous would also leave the editor held indefinitely. This keeps
+ * asking, at a pace that is a retry rather than a spin.
+ */
+export const LINK_RECONCILE_RETRY_MS = 2000
 
 /**
  * Serialises scene editing against the project-link write.
@@ -34,116 +49,156 @@ export const LINK_PENDING_MESSAGE =
  * <p>
  * So editing is held for the window, and the window is not the mutation. The
  * mutation settles when the server answers; the refetch it invalidates lands
- * afterwards, and the draft is reseeded after that. Holding only while
- * `isPending` reopens the gap in the middle, which is the same bug one tick
- * later - so the hold runs until the draft is actually sitting on the revision
- * the query now reports.
+ * afterwards, and the draft is reseeded after that. Holding only while the
+ * mutation is pending reopens the gap in the middle, which is the same bug one
+ * tick later.
  * </p>
  *
+ * <h4>What this hook is not</h4>
+ *
  * <p>
- * Which is correct only for a link that <b>succeeded</b>. A rejected link
- * invalidates nothing, so the revision never moves and no refetch ever lands -
- * and a hold waiting for the reseed of a write that did not happen waits
- * forever, with the editor read-only until the tab is closed. The outcome is
- * therefore reported, not inferred from `isPending` going false: a failure
- * releases the hold immediately, because a write the server refused moved
- * nothing and there is nothing to wait for.
+ * It does not own the hold and it does not decide when one starts - the hold
+ * lives in <c>sceneLinkHoldStore</c>, keyed by scene, and the link mutation
+ * opens and settles it. Three things were wrong while this hook held the state
+ * itself in `useState`:
+ * </p>
+ *
+ * <ul>
+ * <li><b>The editor unmounts.</b> The dock renders only the active tab, so
+ * glancing at another tab unmounts the editor - and took the hold with it. The
+ * remount found a component that believed nothing was in flight, over a draft
+ * seeded on a revision the server had already replaced.</li>
+ * <li><b>A transport failure is not a refusal.</b> The hold was released on any
+ * error. A network drop or a timeout means the write's outcome is UNKNOWN, and
+ * releasing on one hands the editor back over a scene that may have moved
+ * underneath it.</li>
+ * <li><b>The server's own revision was thrown away.</b> Release waited for "a
+ * refetch to have happened", which a stale or unrelated fetch could satisfy. The
+ * mutation reports the revision it produced, and that number is what the draft
+ * has to reach.</li>
+ * </ul>
+ *
+ * <p>
+ * What is left here is the release decision, which is deliberately made of
+ * comparisons against authoritative data and nothing else. No timers, no
+ * lifecycle events: a hold ends when the scene query has loaded data that
+ * settles the question and the editor's draft is sitting on it. That is also why
+ * a persistent hold cannot strand anybody - reopening the scene re-evaluates it
+ * against fresh data and it ends immediately if the situation is resolved.
  * </p>
  */
 export function useProjectLinkSerialization({
+  sceneId,
   loadedRevision,
   baseRevision,
   isFetching,
+  isError = false,
+  dataUpdatedAt = 0,
+  errorUpdatedAt = 0,
+  refetch,
 }: {
+  /** Which scene's hold this is. */
+  sceneId: number
   /** The revision the scene query currently reports, or undefined before it loads. */
   loadedRevision: number | undefined
   /** The revision the editor's draft is seeded on, or null before it opens. */
   baseRevision: number | null
   /**
-   * Whether the scene query is refetching. The link mutation invalidates without
-   * awaiting, so it settles BEFORE the new revision arrives - this is what tells
-   * the difference between "the refetch has landed" and "it has not started".
+   * Whether the scene query is fetching. A hold never ends mid-flight: the data
+   * on screen during a refetch is the data from before it.
    */
   isFetching: boolean
-}): ProjectLinkSerialization {
-  const [linkStatus, setLinkStatus] = useState<ProjectLinkStatus>('idle')
-  const linkPending = linkStatus === 'pending'
-
   /**
-   * What the hold is still waiting for, or null when nothing is.
-   *
-   * `startedAt` is the revision the draft was on when the link began - the hold
-   * is over once the draft has moved off it. `sawFetch` is the escape hatch for
-   * a link that legitimately does not move the revision (re-picking the project
-   * a scene already has): once a refetch has been seen to start and finish, the
-   * new state has arrived whether or not the number changed.
+   * Whether the scene query is currently in error. A failed refetch answers
+   * nothing, so the hold stays - this is the case where releasing would resume
+   * editing against whatever happened to be in the cache.
    */
-  const [awaiting, setAwaiting] = useState<{
-    startedAt: number | null
-    sawFetch: boolean
-  } | null>(null)
+  isError?: boolean
+  /** When the scene query's data was last successfully fetched. */
+  dataUpdatedAt?: number
+  /** When the scene query last failed. A new value means a new failure to retry. */
+  errorUpdatedAt?: number
+  /** Asks for the scene again. Used only to recover a hold from a failed fetch. */
+  refetch?: () => void
+}): ProjectLinkSerialization {
+  const hold = useSceneLinkHoldStore(state => state.holds[sceneId] ?? null)
+  const release = useSceneLinkHoldStore(state => state.release)
 
-  // Read through a ref so this callback keeps one identity for the life of the
-  // editor: it is a dependency of every guarded edit action, and a new identity
-  // per revision would rebuild all of them.
-  const baseRevisionRef = useRef(baseRevision)
-  baseRevisionRef.current = baseRevision
-
-  const onLinkStatusChange = useCallback((status: ProjectLinkStatus) => {
-    setLinkStatus(status)
-
-    if (status === 'pending') {
-      // Latched here rather than derived: the hold has to outlive the mutation,
-      // which settles before the refetch it queued has even started.
-      setAwaiting(
-        current =>
-          current ?? { startedAt: baseRevisionRef.current, sawFetch: false }
-      )
+  // A hold waits for authoritative data, so a fetch that failed has to be tried
+  // again or the hold never ends. Keyed on errorUpdatedAt so each fresh failure
+  // arms a fresh attempt rather than one timer covering all of them.
+  useEffect(() => {
+    if (hold === null || hold.phase === 'pending') {
+      return
+    }
+    if (!isError || refetch === undefined) {
       return
     }
 
-    if (status === 'error') {
-      // The one outcome that is KNOWN not to have moved anything. Nothing was
-      // invalidated, so no refetch is coming and no revision will change -
-      // waiting for the reseed would be waiting for an event that cannot
-      // happen, and the editor would stay read-only for the rest of the
-      // session. The user gets the error and their editor back.
-      setAwaiting(null)
-    }
-  }, [])
+    const timer = setTimeout(() => refetch(), LINK_RECONCILE_RETRY_MS)
+    return () => clearTimeout(timer)
+  }, [hold, isError, errorUpdatedAt, refetch])
 
   useEffect(() => {
-    if (awaiting === null) {
+    if (hold === null || hold.phase === 'pending') {
       return
     }
 
-    if (isFetching) {
-      if (!awaiting.sawFetch) {
-        setAwaiting({ ...awaiting, sawFetch: true })
-      }
+    // Never on data that is being replaced, and never on data that failed to
+    // arrive. Both would be reading the cache and calling it the server.
+    if (isFetching || isError) {
       return
     }
 
-    if (linkPending) {
+    // Authoritative data has to exist at all, and the draft has to be seeded on
+    // it. `undefined === null` would otherwise read as "they agree".
+    if (loadedRevision === undefined || baseRevision === null) {
+      return
+    }
+    if (loadedRevision !== baseRevision) {
       return
     }
 
-    // Settled, not refetching, and the draft is on the revision the query
-    // reports. The last clause is what stops the hold releasing in the gap
-    // between the mutation settling and its refetch starting - a window in which
-    // nothing has changed yet and everything still agrees.
-    const reseeded =
-      loadedRevision !== undefined && loadedRevision === baseRevision
-    const moved = loadedRevision !== awaiting.startedAt
-
-    if (reseeded && (moved || awaiting.sawFetch)) {
-      setAwaiting(null)
+    // Data fetched AFTER the write. What was in the cache when the write settled
+    // is a consistent, authoritative-looking picture of a scene that no longer
+    // exists - and when the link does not move the revision (re-picking the
+    // project a scene already has) it is indistinguishable from the answer by
+    // every other measure. This is the clause that tells them apart, and it is
+    // the same clause for a known outcome and an unknown one.
+    if (hold.seenAt !== null && dataUpdatedAt <= hold.seenAt) {
+      return
     }
-  }, [linkPending, isFetching, awaiting, loadedRevision, baseRevision])
+
+    // Plus, when the server got as far as naming one, the revision it produced.
+    // `>=` rather than `===` because something else may have written the scene
+    // since, and a later revision has necessarily seen this one.
+    if (
+      hold.phase === 'awaiting-revision' &&
+      hold.targetRevision !== null &&
+      loadedRevision < hold.targetRevision
+    ) {
+      return
+    }
+
+    release(sceneId)
+  }, [
+    hold,
+    isFetching,
+    isError,
+    loadedRevision,
+    baseRevision,
+    dataUpdatedAt,
+    release,
+    sceneId,
+  ])
 
   return {
     editsBlocked:
-      linkPending || awaiting !== null ? LINK_PENDING_MESSAGE : null,
-    onLinkStatusChange,
+      hold === null
+        ? null
+        : hold.phase === 'reconciling'
+          ? LINK_RECONCILING_MESSAGE
+          : LINK_PENDING_MESSAGE,
+    isReconciling: hold?.phase === 'reconciling',
   }
 }

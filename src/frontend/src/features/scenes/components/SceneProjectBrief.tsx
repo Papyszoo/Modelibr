@@ -3,14 +3,16 @@ import './SceneProjectBrief.css'
 import { Button } from 'primereact/button'
 import { Dropdown } from 'primereact/dropdown'
 import { OverlayPanel } from 'primereact/overlaypanel'
-import { type JSX, useEffect, useRef, useState } from 'react'
+import { type JSX, useRef, useState } from 'react'
 
 import { useProjectsQuery } from '@/features/project/api/queries'
 import { useProjectBriefQuery } from '@/features/project/api/queries'
 import { ApiClientError } from '@/lib/apiBase'
 
-import { useSetSceneProjectMutation } from '../api/queries'
-import { type ProjectLinkStatus } from '../hooks/useProjectLinkSerialization'
+import {
+  isDefiniteLinkRefusal,
+  useSetSceneProjectMutation,
+} from '../api/queries'
 
 /**
  * The project a scene belongs to, and - behind it - the brief the agent was
@@ -30,36 +32,28 @@ export function SceneProjectBrief({
   projectId,
   projectName,
   blocked = null,
-  onLinkStatusChange,
 }: {
   sceneId: number
   projectId: number | null
   projectName: string | null
   /**
    * Why linking is refused right now, or null when it is allowed. Set while the
-   * editor's draft is dirty: linking is a server write that moves the scene's
-   * revision, and the draft the user is holding was opened against the old one,
-   * so a save afterwards is refused as a conflict with nothing to reconcile it.
+   * editor's draft is dirty, while another direct scene write is in flight, and
+   * while a previous link is still being serialised: linking is a server write
+   * that moves the scene's revision, and anything else holding or carrying that
+   * revision cannot be raced against it.
+   *
+   * <p>
+   * The editor is NOT told about this write in return. It used to be - the
+   * mutation's status was reported up through a callback - and the hold that
+   * followed from it died with this component on every tab switch, could not
+   * tell a refusal from a dropped connection, and threw away the revision the
+   * server had just named. The hold is opened and settled by the mutation
+   * itself now (`useSetSceneProjectMutation`), keyed by scene, so it survives
+   * whatever happens to this panel.
+   * </p>
    */
   blocked?: string | null
-  /**
-   * Reports the link write's state to whoever owns the editor around this
-   * control.
-   *
-   * The block above is one direction of a two-way exclusion and on its own it is
-   * only half a fix. Linking moves the scene's revision, and the editor reseeds
-   * its draft from a new revision only while the draft is clean - so an edit made
-   * DURING the link leaves the draft dirty at the old revision, the reseed is
-   * skipped, and the next save is refused as a conflict over a revision the user
-   * never saw. The editor needs to know this is happening to hold edits until the
-   * refetch has landed.
-   *
-   * The full status, not just "in flight": a link that FAILED invalidates
-   * nothing, so the refetch the editor is holding for never comes. Reporting only
-   * the pending bit left the editor waiting for it forever, read-only until the
-   * tab was closed.
-   */
-  onLinkStatusChange?: (status: ProjectLinkStatus) => void
 }): JSX.Element {
   const panel = useRef<OverlayPanel>(null)
   // Only fetched once the user asks, and then kept. A scene editor that pulled
@@ -74,14 +68,6 @@ export function SceneProjectBrief({
     queryConfig: { enabled: requested },
   })
   const link = useSetSceneProjectMutation()
-
-  // Reported rather than lifted wholesale: the mutation and its options belong
-  // with the control that offers it, and the editor only needs to know how it is
-  // going. React Query's own status is passed straight through - reducing it to
-  // a boolean here is what lost the difference between "finished" and "failed".
-  useEffect(() => {
-    onLinkStatusChange?.(link.status)
-  }, [link.status, onLinkStatusChange])
 
   return (
     <>
@@ -132,9 +118,18 @@ export function SceneProjectBrief({
           disabled={link.isPending || blocked !== null}
           data-testid="scene-project-select"
           ariaLabel="Project this scene belongs to"
-          onChange={event =>
+          onChange={event => {
+            // Checked HERE, not only on the disabled attribute. A disabled
+            // PrimeReact control still has a keyboard path, and the reason this
+            // is refused is that the write would race another one - which is a
+            // rule about the write, not about the styling. The two directions of
+            // the exclusion have to be enforced in the same place or they are
+            // one guard, not two.
+            if (blocked !== null || link.isPending) {
+              return
+            }
             link.mutate({ sceneId, projectId: event.value ?? null })
-          }
+          }}
         />
 
         {blocked ? (
@@ -149,9 +144,14 @@ export function SceneProjectBrief({
         {/*
           A refused link used to be silent: the dropdown snapped back to the
           project the scene still has, and nothing said why. The server's own
-          reason is shown verbatim, and the control above is left enabled -
-          picking again IS the retry, and the write moved nothing, so there is
-          nothing to reconcile first.
+          reason is shown verbatim.
+
+          The advice that follows it depends on WHICH kind of failure it was, and
+          they are not interchangeable. A refusal moved nothing, so picking again
+          is the retry and the control stays live. A dropped connection may have
+          committed - "try again" there is an invitation to link twice, so it says
+          what is actually happening instead: the scene is being re-read, and the
+          editor is held until it is known what was saved.
         */}
         {link.isError ? (
           <p
@@ -162,7 +162,9 @@ export function SceneProjectBrief({
             {link.error instanceof ApiClientError
               ? link.error.message
               : 'The project could not be changed.'}{' '}
-            Pick a project again to retry.
+            {isDefiniteLinkRefusal(link.error)
+              ? 'Pick a project again to retry.'
+              : 'It is not known whether it was saved, so the scene is being re-read from the server.'}
           </p>
         ) : null}
 
