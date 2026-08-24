@@ -1116,3 +1116,46 @@ Then("linking should be refused while the draft is unsaved", async ({ page }) =>
     expect(reason).toContain("Save your edits");
     expect(await new ScenesPage(page).projectSelectIsEnabled()).toBe(false);
 });
+
+// The hold itself, watched while it is UP.
+//
+// Every assertion above this point looks at the editor once the link is over,
+// which a serialization that had stopped running entirely would also satisfy -
+// the old page object waited only for the hold to be HIDDEN, and "never
+// appeared" is hidden. The link response is delayed so the in-flight window is
+// long enough to look inside, and the write itself is passed through unchanged.
+
+Given("the project link write is slow to answer", async ({ page }) => {
+    await new ScenesPage(page).delayProjectLink();
+});
+
+When(
+    "I start linking the scene to the project {string}",
+    async ({ page }, projectName: string) => {
+        await new ScenesPage(page).startLinkToProject(projectName);
+    },
+);
+
+Then("editing should be held while the link is in flight", async ({ page }) => {
+    const scenes = new ScenesPage(page);
+
+    // Up, and doing something: the toolbar is dead and the link control will not
+    // take a second write while the first is outstanding.
+    await expect(scenes.linkHoldLocator()).toBeVisible();
+    expect(await scenes.undoIsEnabled()).toBe(false);
+    expect(await scenes.projectSelectIsEnabled()).toBe(false);
+
+    // And the draft genuinely does not move. A message that says editing is held
+    // over an editor that still accepts edits is the failure this is here for.
+    //
+    // The brief panel is closed first: it is an overlay, and leaving it up would
+    // make a click on the library tile miss for a reason that has nothing to do
+    // with the hold.
+    await scenes.closeProjectPanel();
+    const nodesBefore = await scenes.nodeRows().count();
+    await scenes.searchLibrary(testModel(page).name);
+    await scenes.placeModelWhileHeld(testModel(page).name);
+    await expect(scenes.nodeRows()).toHaveCount(nodesBefore);
+
+    await scenes.clearProjectLinkDelay();
+});

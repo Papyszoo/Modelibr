@@ -191,6 +191,24 @@ Feature: Scene authoring
     And the scene should belong to the project "Scene Link Edited"
 
   @scene-project-link
+  Scenario: The hold is up while the link is in flight, and editing is refused under it
+    # The half nothing watched. Every other assertion here looks at the editor
+    # once the link is over, which a serialization that had stopped running
+    # entirely satisfies just as well - the step used to wait only for the hold
+    # to be HIDDEN, and "never appeared" is hidden. The link response is held
+    # back so the in-flight window is long enough to look inside; the write
+    # itself is passed through unchanged.
+    Given the project "Scene Link In Flight" exists
+    And I reload the app
+    And I am on the scenes page
+    And a scene named "Held While Linking Scene" is open
+    And the project link write is slow to answer
+    When I start linking the scene to the project "Scene Link In Flight"
+    Then editing should be held while the link is in flight
+    And editing the scene should be allowed again
+    And the scene should belong to the project "Scene Link In Flight"
+
+  @scene-project-link
   Scenario: An unsaved draft refuses the link rather than racing it
     # The other direction of the same exclusion. Both are needed: this one stops
     # a link starting under a dirty draft, and the hold above stops an edit

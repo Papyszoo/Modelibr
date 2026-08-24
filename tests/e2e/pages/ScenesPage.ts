@@ -103,6 +103,23 @@ export class ScenesPage {
         ]);
     }
 
+    /**
+     * Clicks a library tile expecting the click to do NOTHING.
+     *
+     * Deliberately not `placeModel`: that one waits for the asset-facts request
+     * the placement issues, and the whole point here is that no request is made.
+     * The tile stays in the DOM while editing is held - it simply loses its
+     * handler - so the click is real and its absence of effect is the assertion.
+     */
+    async placeModelWhileHeld(modelName: string): Promise<void> {
+        const tile = this.page
+            .locator(this.pickerTile)
+            .filter({ hasText: modelName })
+            .first();
+        await expect(tile).toBeVisible();
+        await tile.click();
+    }
+
     async addBlockoutBox(): Promise<void> {
         await this.page.getByRole("button", { name: "Blockout box" }).click();
     }
@@ -232,17 +249,28 @@ export class ScenesPage {
     }
 
     /**
-     * Links the open scene to a project through the brief panel.
+     * Links the open scene to a project through the brief panel, and asserts the
+     * serialization hold both APPEARS and then goes.
      *
      * Linking is a direct server write that moves the scene's revision, so the
-     * editor holds every other edit until the refetch it queues has landed and
-     * the draft has been reseeded. Waiting for the hold to clear is what makes
-     * this step safe to follow with an edit - and it is the behaviour under
-     * test, not incidental synchronisation.
+     * editor holds every other edit until authoritative scene data has landed and
+     * the draft has been reseeded on it. Both halves of that are the behaviour
+     * under test, not incidental synchronisation.
+     *
+     * The comment here used to say "the hold appears and then goes; both halves
+     * matter" above an assertion that only waited for it to be HIDDEN - which a
+     * hold that never appeared satisfies just as well, and which is what a
+     * serialization that had stopped running entirely would look like. The waiter
+     * is armed BEFORE the click now, because the hold opens in the same tick the
+     * request is sent and would otherwise be a frame this step could miss.
      */
     async linkToProject(projectName: string): Promise<void> {
         await this.openProjectPanel();
         await this.page.locator(this.projectSelect).click();
+
+        const pending = this.page.locator(this.linkPending);
+        const appeared = pending.waitFor({ state: "visible", timeout: 15000 });
+
         // `.first()` because the projects API does not enforce unique names, so
         // a fixture database provisioned more than once can hold two of them.
         // Which one this links to is not what the test is about - that the scene
@@ -252,17 +280,67 @@ export class ScenesPage {
             .first()
             .click();
 
-        // The hold appears and then goes; both halves matter. A link that never
-        // held would mean the serialization is not running at all.
-        await expect(this.page.locator(this.linkPending)).toBeHidden({
-            timeout: 15000,
-        });
+        await appeared;
+        // ...and then goes, once the re-read has landed and the draft sits on the
+        // revision the link produced.
+        await expect(pending).toBeHidden({ timeout: 15000 });
         await expect(this.page.locator(this.projectError)).toHaveCount(0);
 
         // Closed on the way out, so the next reader opens it rather than
         // toggling it shut - the chip is a toggle, and a step that assumed the
         // panel was closed left it hidden with every later locator waiting.
         await this.closeProjectPanel();
+    }
+
+    /**
+     * Starts a link and returns once the hold is UP, without waiting for it to
+     * clear.
+     *
+     * The window between the two is where the serialization does its work, and a
+     * step that only ever looks after it is over cannot tell a hold that worked
+     * from one that never happened. Pair with `delayProjectLink` so the window is
+     * wide enough to act in.
+     */
+    async startLinkToProject(projectName: string): Promise<void> {
+        await this.openProjectPanel();
+        await this.page.locator(this.projectSelect).click();
+        await this.page
+            .getByRole("option", { name: projectName, exact: true })
+            .first()
+            .click();
+
+        await expect(this.page.locator(this.linkPending)).toBeVisible({
+            timeout: 15000,
+        });
+    }
+
+    /**
+     * Holds the project-link response back for `ms`, so the in-flight window is
+     * long enough for a scenario to try to edit inside it.
+     *
+     * The request is passed through unchanged - this slows the network, it does
+     * not fake the write. What is being tested is what the editor refuses while a
+     * real write is outstanding, which needs the write to actually be outstanding.
+     */
+    async delayProjectLink(ms = 3000): Promise<void> {
+        await this.page.route(/\/scenes\/\d+\/project$/, async route => {
+            if (route.request().method() !== "PUT") {
+                await route.fallback();
+                return;
+            }
+            await new Promise(resolve => setTimeout(resolve, ms));
+            await route.continue();
+        });
+    }
+
+    /** Stops delaying the link write, so the next one settles normally. */
+    async clearProjectLinkDelay(): Promise<void> {
+        await this.page.unroute(/\/scenes\/\d+\/project$/);
+    }
+
+    /** The message the editor shows while it is holding edits for a link. */
+    linkHoldLocator() {
+        return this.page.locator(this.linkPending);
     }
 
     /** The label on the project chip - the project the scene now belongs to. */
@@ -279,7 +357,8 @@ export class ScenesPage {
         await expect(select).toBeVisible({ timeout: 10000 });
     }
 
-    private async closeProjectPanel(): Promise<void> {
+    /** Closes the brief panel if it is open, so it stops overlaying the editor. */
+    async closeProjectPanel(): Promise<void> {
         if (await this.page.locator(this.projectSelect).isVisible()) {
             await this.page.keyboard.press("Escape");
             await expect(this.page.locator(this.projectSelect)).toBeHidden({
