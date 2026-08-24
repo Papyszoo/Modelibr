@@ -18,6 +18,18 @@ namespace WebApi.Mcp;
 /// exit path - returned failure, thrown exception, cancellation - releases the claim
 /// rather than leaving the key permanently burned on an operation that never ran.
 ///
+/// The one exit path that cannot release its own claim is the process dying, and that is
+/// why <c>interrupted</c> exists. The mutation commits before the entry is marked
+/// Completed, so a claim still Pending when its owner died may have applied everything
+/// and never recorded it. The lease moves such a claim to a <b>terminal</b> Interrupted
+/// state: every call on that key is told what happened, and none of them re-runs it. The
+/// alternative - report once, then let the next retry through - is a crashed
+/// <c>create_pack</c> quietly becoming two packs on the second press of the button.
+///
+/// Every settle also carries the claim <b>token</b> it was handed. A call whose lease
+/// lapsed while it was still running would otherwise complete or abandon its key on the
+/// way out and stamp its outcome onto whatever now owns that key.
+///
 /// Lives apart from any one tool class so the import tools for the other asset families
 /// inherit these guarantees rather than reimplementing them - the concurrency bug this
 /// prevents was found the hard way, and one copy is the only way it stays fixed.
@@ -86,34 +98,60 @@ internal static class McpWriteGuard
                 return AlreadyApplied(claim.Entry!);
             case AgentClaimOutcome.InProgress:
                 return InProgress(claim.Entry!);
+            case AgentClaimOutcome.Interrupted:
+                return Interrupted(claim.Entry!);
         }
 
+        var token = claim.ClaimToken!;
         try
         {
             var outcome = await body(cancellationToken);
             if (!outcome.Succeeded)
             {
-                await audit.AbandonAsync(write.IdempotencyKey, CancellationToken.None);
+                await audit.AbandonAsync(write.IdempotencyKey, token, CancellationToken.None);
                 return outcome.Response;
             }
 
-            await audit.CompleteAsync(
+            var recorded = await audit.CompleteAsync(
                 write.IdempotencyKey,
+                token,
                 outcome.AssetType,
                 outcome.AssetId,
                 outcome.Payload is null ? null : Json(outcome.Payload),
                 outcome.PayloadBefore is null ? null : Json(outcome.PayloadBefore),
                 CancellationToken.None);
-            return outcome.Response;
+
+            // The write landed but the claim had moved on - this call outlived its lease and
+            // somebody else now holds the key. Saying so is the only honest answer: the
+            // mutation is real, and the log no longer speaks for it.
+            return recorded ? outcome.Response : LostClaim(write, outcome.Response);
         }
         catch
         {
             // CancellationToken.None on purpose: the caller's token may already be
-            // cancelled, and releasing the claim is exactly what must still happen.
-            await audit.AbandonAsync(write.IdempotencyKey, CancellationToken.None);
+            // cancelled, and releasing the claim is exactly what must still happen. The
+            // token means a claim we no longer own is left alone rather than trampled.
+            await audit.AbandonAsync(write.IdempotencyKey, token, CancellationToken.None);
             throw;
         }
     }
+
+    /// <summary>
+    /// A write that succeeded on a claim its caller had already lost. Rare - it takes the
+    /// whole lease to elapse mid-call - but silently returning the normal response would
+    /// leave a real mutation with no entry describing it, which is the one thing the audit
+    /// log exists to prevent.
+    /// </summary>
+    private static object LostClaim(AgentWrite write, object response) => new
+    {
+        status = "applied-unrecorded",
+        operation = write.Operation,
+        message = "The operation was applied, but its idempotency claim had already lapsed and been taken " +
+                  "over, so the audit log does not record this call's outcome.",
+        remedy = "Do NOT retry with the same key - the write happened. Check the affected asset, and use a " +
+                 "new key for any further write.",
+        result = response,
+    };
 
     /// <summary>
     /// Reads a server-readable path into the same content-addressed pipeline a multipart
@@ -155,6 +193,28 @@ internal static class McpWriteGuard
         operation = prior.Operation,
         claimedAt = prior.ClaimedAt,
         message = "Another call is applying this idempotency key. It has NOT been applied yet - retry, and it will either complete or be retried for you once the claim lapses.",
+    };
+
+    /// <summary>
+    /// A key whose previous holder died mid-write.
+    ///
+    /// Deliberately NOT re-run on the caller's behalf, and deliberately not re-runnable by
+    /// a later call either. The mutation commits before the entry is marked Completed, so a
+    /// claim still Pending when its owner died may have applied everything and simply never
+    /// said so - and this surface creates packs, scenes and imports, where doing it twice is
+    /// not a no-op. Releasing the key after one report would only move the duplicate to the
+    /// following call; the key is terminal instead, and proceeding means a new key, which is
+    /// a decision somebody made rather than a retry nobody saw.
+    /// </summary>
+    internal static object Interrupted(Domain.Models.AgentOperationLog prior) => new
+    {
+        status = "interrupted",
+        operation = prior.Operation,
+        claimedAt = prior.ClaimedAt,
+        assetId = prior.AssetId,
+        assetType = prior.AssetType,
+        message = "A previous call with this idempotency key stopped before it could record its outcome, so whether it applied is unknown. This key is now permanently in that state and will answer the same to every call.",
+        remedy = "Check whether the operation's effect is already there (the recorded assetId, if any, is the one it was working on). If it is, there is nothing to do. If it is not, repeat the operation under a NEW idempotency key - retrying this one will not run it.",
     };
 
     /// <summary>

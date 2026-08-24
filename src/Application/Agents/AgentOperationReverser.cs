@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Repositories;
 using Application.EnvironmentMaps;
 using Application.Metadata;
 using Application.Models;
@@ -242,9 +243,78 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
                 continue;
             }
 
-            var applied = await ApplyInverse(entry, cancellationToken);
+            // Claim the entry BEFORE applying its inverse, and only proceed if this call is
+            // the one that claimed it.
+            //
+            // reverse_operation carries no idempotency key of its own, so two calls naming
+            // the same entry both reach this loop. Marking afterwards let both of them
+            // apply the inverse and merely reported the collision to the loser - which is
+            // harmless for the inverses that restore a recorded state, and is not harmless
+            // for the ones that create something: undoing a delete-scene twice recreates
+            // the scene twice, under two new ids.
+            //
+            // The claim is a lock and nothing more. Whether the inverse actually landed is
+            // recorded separately, afterwards, so a claim that never settles cannot be read
+            // as a reversal that never happened.
+            var claim = await _audit.TryBeginReversalAsync(step.IdempotencyKey, cancellationToken);
+            switch (claim.Outcome)
+            {
+                case ReversalClaimOutcome.Claimed:
+                    break;
+
+                case ReversalClaimOutcome.AlreadyReversed:
+                    results.Add(new ReversalStepResult(
+                        step.IdempotencyKey, step.Operation, Reversed: false, "Already reversed."));
+                    continue;
+
+                // Both of the remaining cases STOP the batch rather than skipping the step.
+                //
+                // The plan is newest-first because the older steps depend on the newer ones
+                // being undone first - a pack cannot be deleted before its members leave it.
+                // Skipping a step whose outcome is unknown and pressing on to its dependants
+                // is precisely the ordering violation the newest-first rule exists to
+                // prevent, and it would do it silently.
+                case ReversalClaimOutcome.InProgress:
+                    results.Add(new ReversalStepResult(
+                        step.IdempotencyKey, step.Operation, Reversed: false,
+                        "Another caller is reversing this operation right now. Nothing further was undone - " +
+                        "the steps behind it depend on this one, so they were not attempted."));
+                    return Result.Success<IReadOnlyList<ReversalStepResult>>(results);
+
+                case ReversalClaimOutcome.Interrupted:
+                    results.Add(new ReversalStepResult(
+                        step.IdempotencyKey, step.Operation, Reversed: false,
+                        "A previous reversal of this operation stopped before it could record its outcome, " +
+                        "so whether the inverse was applied is unknown. Check the operation's effect before " +
+                        "undoing it again. Nothing further was undone."));
+                    return Result.Success<IReadOnlyList<ReversalStepResult>>(results);
+
+                case ReversalClaimOutcome.NotReversible:
+                default:
+                    results.Add(new ReversalStepResult(
+                        step.IdempotencyKey, step.Operation, Reversed: false, "Already reversed."));
+                    continue;
+            }
+
+            var token = claim.Token!;
+            Result<string> applied;
+            try
+            {
+                applied = await ApplyInverse(entry, cancellationToken);
+            }
+            catch
+            {
+                // A throw - a cancellation included - means the inverse did not finish, so
+                // the claim goes back and the entry stays un-reversed. CancellationToken.None
+                // because the caller's token may be the very thing that fired.
+                await _audit.ReleaseReversalAsync(step.IdempotencyKey, token, CancellationToken.None);
+                throw;
+            }
+
             if (applied.IsFailure)
             {
+                await _audit.ReleaseReversalAsync(step.IdempotencyKey, token, cancellationToken);
+
                 // Stop at the first failure rather than pressing on: the remaining steps
                 // were planned against a state this failure means we are no longer in, and
                 // a partial undo the caller cannot see is worse than a reported one.
@@ -254,14 +324,24 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
                 return Result.Success<IReadOnlyList<ReversalStepResult>>(results);
             }
 
-            // Marked reversed only after its inverse landed, and only if this call is the
-            // one that marked it - a concurrent undo of the same batch stops here.
-            var marked = await _audit.TryMarkReversedAsync(step.IdempotencyKey, cancellationToken);
+            // Only now - the inverse landed. A false here means the claim moved on beneath
+            // this caller, which is not something to report as a successful undo.
+            var recorded = await _audit.CompleteReversalAsync(
+                step.IdempotencyKey, token, CancellationToken.None);
+
             results.Add(new ReversalStepResult(
                 step.IdempotencyKey,
                 step.Operation,
-                Reversed: marked,
-                marked ? applied.Value : "Inverse applied, but another caller had already marked it reversed."));
+                Reversed: recorded,
+                recorded
+                    ? applied.Value
+                    : "The inverse was applied, but this call no longer held the reversal claim, " +
+                      "so it was not recorded. Check the operation before undoing it again."));
+
+            if (!recorded)
+            {
+                return Result.Success<IReadOnlyList<ReversalStepResult>>(results);
+            }
         }
 
         return Result.Success<IReadOnlyList<ReversalStepResult>>(results);

@@ -20,6 +20,12 @@ namespace Infrastructure.Repositories;
 /// the state being left. That is what makes takeover of an abandoned claim safe under
 /// concurrency: two callers can both decide a claim looks abandoned, but only one
 /// UPDATE reports a matching row, and only that one proceeds.
+///
+/// Two of those WHERE clauses also name a <b>token</b>, which is the other half of the
+/// same idea. Naming only the state leaves a settle open to a caller that held the claim
+/// a generation ago: it wakes up late, writes "Completed" by key, and stamps its outcome
+/// onto somebody else's in-flight work. The token is the generation, so a stale owner's
+/// UPDATE matches nothing and the caller is told it lost.
 /// </summary>
 internal sealed class AgentOperationLogRepository : IAgentOperationLogRepository
 {
@@ -30,7 +36,7 @@ internal sealed class AgentOperationLogRepository : IAgentOperationLogRepository
         _context = context ?? throw new ArgumentNullException(nameof(context));
     }
 
-    public async Task<AgentOperationLog?> TryClaimAsync(
+    public async Task<ClaimTakeover> TryClaimAsync(
         AgentOperationLog claim,
         int leaseMinutes,
         DateTime now,
@@ -40,57 +46,110 @@ internal sealed class AgentOperationLogRepository : IAgentOperationLogRepository
         try
         {
             await _context.SaveChangesAsync(cancellationToken);
-            return null;
+            return new ClaimTakeover(Owned: true, ClaimToken: claim.ClaimToken);
         }
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
         {
-            // Another caller claimed this key first - the unique index on
-            // IdempotencyKey is what actually enforces "apply once", not the lookup.
             _context.Entry(claim).State = EntityState.Detached;
         }
 
-        var existing = await GetByIdempotencyKeyAsync(claim.IdempotencyKey, cancellationToken);
+        var existing = await _context.AgentOperationLogs
+            .AsNoTracking()
+            .FirstOrDefaultAsync(l => l.IdempotencyKey == claim.IdempotencyKey, cancellationToken);
+
         if (existing is null)
         {
             // Raced with a delete; let the caller retry rather than guess.
-            return null;
+            return new ClaimTakeover(Owned: true, ClaimToken: claim.ClaimToken);
         }
 
         if (existing.Status == AgentOperationStatus.Completed)
         {
-            return existing;
+            return new ClaimTakeover(Owned: false, Existing: existing);
         }
 
-        // Failed, or Pending past its lease: take the claim over atomically. The WHERE
-        // clause is the lock - a concurrent taker updates 0 rows and backs off.
+        // Terminal, and checked before anything else: whether this key's mutation landed is
+        // not recorded, and no number of retries will make it recorded. Every attempt gets
+        // the same answer, which is what stops the second press of the button being the one
+        // that quietly makes two packs.
+        if (existing.Status == AgentOperationStatus.Interrupted)
+        {
+            return new ClaimTakeover(Owned: false, Existing: existing, Interrupted: true);
+        }
+
+        // A Failed claim was released on a path that reported its own outcome, so taking
+        // it over is what a retry means. Done first and on its own so it never gets
+        // confused with the case below.
+        var taken = await TakeOverAsync(
+            claim, now, l => l.Status == AgentOperationStatus.Failed, cancellationToken);
+        if (taken == 1)
+        {
+            return new ClaimTakeover(Owned: true, ClaimToken: claim.ClaimToken);
+        }
+
+        // A Pending claim past its lease is the one that must NOT be taken over: its owner
+        // died somewhere between claiming and completing, and the mutation may well have
+        // committed in between. Move it to Interrupted - a state that outlives this call -
+        // and report it. The key is not wedged Pending forever, but neither does it decay
+        // into something a later retry re-runs.
         var abandonedBefore = now.AddMinutes(-leaseMinutes);
-        var taken = await _context.AgentOperationLogs
+        var interrupted = await _context.AgentOperationLogs
             .Where(l => l.IdempotencyKey == claim.IdempotencyKey &&
-                        (l.Status == AgentOperationStatus.Failed ||
-                         (l.Status == AgentOperationStatus.Pending && l.ClaimedAt <= abandonedBefore)))
+                        l.Status == AgentOperationStatus.Pending &&
+                        l.ClaimedAt <= abandonedBefore)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(l => l.Status, AgentOperationStatus.Interrupted)
+                    .SetProperty(l => l.CompletedAt, now)
+                    .SetProperty(l => l.ClaimedBy, (string?)null),
+                cancellationToken);
+
+        if (interrupted == 1)
+        {
+            return new ClaimTakeover(Owned: false, Existing: existing, Interrupted: true);
+        }
+
+        // The claim is genuinely in flight - report it.
+        return new ClaimTakeover(Owned: false, Existing: existing);
+    }
+
+    /// <summary>
+    /// Re-points an existing log row at this caller's claim, if it is in the state
+    /// <paramref name="state"/> names. The WHERE clause is the lock: a concurrent taker
+    /// updates 0 rows and backs off.
+    /// </summary>
+    private Task<int> TakeOverAsync(
+        AgentOperationLog claim,
+        DateTime now,
+        System.Linq.Expressions.Expression<Func<AgentOperationLog, bool>> state,
+        CancellationToken cancellationToken)
+    {
+        var key = claim.IdempotencyKey;
+        return _context.AgentOperationLogs
+            .Where(l => l.IdempotencyKey == key)
+            .Where(state)
             .ExecuteUpdateAsync(
                 setters => setters
                     .SetProperty(l => l.Status, AgentOperationStatus.Pending)
                     .SetProperty(l => l.ClaimedBy, claim.ClaimedBy)
-                    // Attribution follows the claim: the new owner performs the write, so
-                    // leaving the previous actor's name on it would misattribute the audit.
+                    // A fresh generation, so the previous owner cannot settle what it lost.
+                    .SetProperty(l => l.ClaimToken, claim.ClaimToken)
                     .SetProperty(l => l.Actor, claim.Actor)
                     .SetProperty(l => l.ClaimedAt, now)
                     .SetProperty(l => l.CompletedAt, (DateTime?)null)
-                    .SetProperty(l => l.PerformedAt, now)
                     .SetProperty(l => l.Operation, claim.Operation)
+                    .SetProperty(l => l.BatchId, claim.BatchId)
+                    .SetProperty(l => l.PerformedAt, claim.PerformedAt)
                     .SetProperty(l => l.AssetType, claim.AssetType)
                     .SetProperty(l => l.AssetId, claim.AssetId)
                     .SetProperty(l => l.PayloadBefore, claim.PayloadBefore)
                     .SetProperty(l => l.PayloadAfter, (string?)null),
                 cancellationToken);
-
-        // 1 row: we now own it. 0 rows: the claim is genuinely in flight - report it.
-        return taken == 1 ? null : existing;
     }
 
-    public Task CompleteClaimAsync(
+    public async Task<bool> CompleteClaimAsync(
         string idempotencyKey,
+        string claimToken,
         string? assetType,
         int? assetId,
         string? payloadAfter,
@@ -98,8 +157,12 @@ internal sealed class AgentOperationLogRepository : IAgentOperationLogRepository
         DateTime completedAt,
         CancellationToken cancellationToken = default)
     {
-        return _context.AgentOperationLogs
-            .Where(l => l.IdempotencyKey == idempotencyKey)
+        // Status AND token: only the caller that currently holds this generation of the
+        // claim may declare it applied.
+        var completed = await _context.AgentOperationLogs
+            .Where(l => l.IdempotencyKey == idempotencyKey &&
+                        l.ClaimToken == claimToken &&
+                        l.Status == AgentOperationStatus.Pending)
             .ExecuteUpdateAsync(
                 setters => setters
                     .SetProperty(l => l.Status, AgentOperationStatus.Completed)
@@ -112,22 +175,30 @@ internal sealed class AgentOperationLogRepository : IAgentOperationLogRepository
                     // claim time must not have it erased by this update.
                     .SetProperty(l => l.PayloadBefore, l => payloadBefore ?? l.PayloadBefore),
                 cancellationToken);
+
+        return completed == 1;
     }
 
-    public Task FailClaimAsync(
+    public async Task<bool> FailClaimAsync(
         string idempotencyKey,
+        string claimToken,
         DateTime failedAt,
         CancellationToken cancellationToken = default)
     {
-        // Only a Pending claim may be failed - never downgrade a Completed operation.
-        return _context.AgentOperationLogs
-            .Where(l => l.IdempotencyKey == idempotencyKey && l.Status == AgentOperationStatus.Pending)
+        // Only a Pending claim this caller still owns may be failed - never downgrade a
+        // Completed operation, and never release somebody else's in-flight claim.
+        var failed = await _context.AgentOperationLogs
+            .Where(l => l.IdempotencyKey == idempotencyKey &&
+                        l.ClaimToken == claimToken &&
+                        l.Status == AgentOperationStatus.Pending)
             .ExecuteUpdateAsync(
                 setters => setters
                     .SetProperty(l => l.Status, AgentOperationStatus.Failed)
                     .SetProperty(l => l.CompletedAt, failedAt)
                     .SetProperty(l => l.ClaimedBy, (string?)null),
                 cancellationToken);
+
+        return failed == 1;
     }
 
     public Task<AgentOperationLog?> GetByIdempotencyKeyAsync(string idempotencyKey, CancellationToken cancellationToken = default)
@@ -148,21 +219,92 @@ internal sealed class AgentOperationLogRepository : IAgentOperationLogRepository
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<bool> TryMarkReversedAsync(
+    public async Task<ReversalClaim> TryBeginReversalAsync(
         string idempotencyKey,
+        string reversalToken,
+        int leaseMinutes,
+        DateTime now,
+        CancellationToken cancellationToken = default)
+    {
+        // The claim itself: one conditional UPDATE, free of any read-then-write window.
+        // ReversalToken == null is the lock, and it is a lock only - it says nothing about
+        // whether an inverse ran, which is exactly the property ReversedAt could not have
+        // while it was doing both jobs.
+        var claimed = await _context.AgentOperationLogs
+            .Where(l => l.IdempotencyKey == idempotencyKey &&
+                        l.Status == AgentOperationStatus.Completed &&
+                        l.ReversedAt == null &&
+                        l.ReversalToken == null)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(l => l.ReversalToken, reversalToken)
+                    .SetProperty(l => l.ReversalClaimedAt, (DateTime?)now),
+                cancellationToken);
+
+        if (claimed == 1)
+        {
+            return new ReversalClaim(ReversalClaimOutcome.Claimed, reversalToken);
+        }
+
+        // Lost, already done, or never reversible - read the row to say which.
+        var entry = await _context.AgentOperationLogs
+            .AsNoTracking()
+            .FirstOrDefaultAsync(l => l.IdempotencyKey == idempotencyKey, cancellationToken);
+
+        if (entry is null || entry.Status != AgentOperationStatus.Completed)
+        {
+            return new ReversalClaim(ReversalClaimOutcome.NotReversible);
+        }
+
+        if (entry.ReversedAt is not null)
+        {
+            return new ReversalClaim(ReversalClaimOutcome.AlreadyReversed);
+        }
+
+        // Somebody holds the claim. Whether they are alive decides which of the two
+        // unhappy answers this is - and neither of them retakes it, because an inverse
+        // that half-ran is not a lock to steal.
+        return entry.IsReversalAbandoned(now, leaseMinutes)
+            ? new ReversalClaim(ReversalClaimOutcome.Interrupted)
+            : new ReversalClaim(ReversalClaimOutcome.InProgress);
+    }
+
+    public async Task<bool> CompleteReversalAsync(
+        string idempotencyKey,
+        string reversalToken,
         DateTime reversedAt,
         CancellationToken cancellationToken = default)
     {
-        // ReversedAt == null in the WHERE clause is the guard, not a read-then-write check:
-        // two concurrent reversals of one batch would otherwise both apply their inverse.
+        // The permanent marker, written only here and only by the caller that still holds
+        // the claim it was handed.
         var marked = await _context.AgentOperationLogs
             .Where(l => l.IdempotencyKey == idempotencyKey &&
-                        l.Status == AgentOperationStatus.Completed &&
+                        l.ReversalToken == reversalToken &&
                         l.ReversedAt == null)
             .ExecuteUpdateAsync(
-                setters => setters.SetProperty(l => l.ReversedAt, reversedAt),
+                setters => setters.SetProperty(l => l.ReversedAt, (DateTime?)reversedAt),
                 cancellationToken);
 
         return marked == 1;
+    }
+
+    public async Task<bool> ReleaseReversalAsync(
+        string idempotencyKey,
+        string reversalToken,
+        CancellationToken cancellationToken = default)
+    {
+        // Gives back a claim this caller owns, and only that. ReversedAt is untouched:
+        // nothing was reversed, so nothing may say it was.
+        var released = await _context.AgentOperationLogs
+            .Where(l => l.IdempotencyKey == idempotencyKey &&
+                        l.ReversalToken == reversalToken &&
+                        l.ReversedAt == null)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(l => l.ReversalToken, (string?)null)
+                    .SetProperty(l => l.ReversalClaimedAt, (DateTime?)null),
+                cancellationToken);
+
+        return released == 1;
     }
 }

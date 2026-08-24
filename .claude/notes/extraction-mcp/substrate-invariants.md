@@ -83,9 +83,36 @@ Two instances of the same mistake:
 - **MCP idempotency.** The key is (correctly) claimed *before* the mutation, but any
   existing row was then read as "already applied". A crash, exception or cancellation
   between claim and mutation therefore burned the key permanently: every retry was told
-  the write had landed when nothing had. Claims now carry Pending/Completed/Failed plus
-  an owner and a lease; only Completed replays as applied, a live claim answers
-  `in-progress`, and an abandoned claim is taken over by conditional UPDATE.
+  the write had landed when nothing had. Claims carry Pending/Completed/Failed plus an
+  owner and a lease; only Completed replays as applied, a live claim answers
+  `in-progress`, and a Failed claim is taken over by conditional UPDATE.
+
+### The half of that which was still wrong (0.6)
+
+Two follow-ups, both about the same thing: a claim row records who *started*, and the
+first version of the fix quietly assumed it also recorded what *happened*.
+
+- **An abandoned Pending claim is ambiguous, not free.** The mutation commits before the
+  entry is marked Completed. A claim still Pending when its owner died may sit on either
+  side of that, and nothing distinguishes "never ran" from "ran and was not recorded".
+  Taking it over silently is how one crash becomes two packs. The lease now moves such a
+  claim to a fourth status, `Interrupted`, which is **terminal**: every call on that key
+  gets the same explicit recovery answer, and proceeding means a new key. Reporting it
+  once and then releasing it to `Failed` is not a fix - it moves the duplicate to the next
+  call, which is the one nobody is watching.
+- **Settling by key alone is a lost update.** A caller whose lease lapsed, whose row was
+  then taken over, still completed "its" key on the way out and stamped its outcome onto
+  the new owner's in-flight work. Every claim now carries a generation (`ClaimToken`),
+  regenerated on takeover, and every settle matches on it.
+
+The same two mistakes were in **reversal**, in a sharper form: `ReversedAt` was stamped
+*before* the inverse ran, so it was serving as both the mutual exclusion and the record of
+fact. An inverse that was cancelled, threw, or died with its process therefore left an
+operation permanently marked as undone that was never undone - and nothing can undo it
+again. The lock is now `ReversalToken`/`ReversalClaimedAt` and the fact stays in
+`ReversedAt`, written only after the inverse lands. A reversal claim past its lease is
+`Interrupted` for exactly the reason above, and a batch that meets one **stops** rather
+than skipping to the older steps that depend on it.
 
 ## Multi-file glTF: identity includes what the file references
 

@@ -1896,6 +1896,17 @@ namespace Infrastructure.Persistence
                 entity.Property(e => e.Actor).IsRequired(false).HasMaxLength(100);
                 entity.Property(e => e.ClaimedAt).IsRequired();
                 entity.Property(e => e.CompletedAt).IsRequired(false);
+                // The claim generation. Every settle matches on it, so a caller whose lease
+                // lapsed cannot stamp its outcome onto the claim that replaced it.
+                entity.Property(e => e.ClaimToken)
+                    .IsRequired()
+                    .HasMaxLength(32)
+                    .HasDefaultValue(string.Empty);
+                // Reversal in progress, which is NOT the same fact as ReversedAt (reversal
+                // completed) - keeping them apart is what stops a crashed undo from being
+                // recorded as one that happened.
+                entity.Property(e => e.ReversalToken).IsRequired(false).HasMaxLength(32);
+                entity.Property(e => e.ReversalClaimedAt).IsRequired(false);
 
                 // A retried write with the same key must be a no-op - enforced here.
                 entity.HasIndex(e => e.IdempotencyKey).IsUnique();

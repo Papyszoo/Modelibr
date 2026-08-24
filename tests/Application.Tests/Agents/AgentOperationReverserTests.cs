@@ -1,4 +1,5 @@
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Repositories;
 using Application.Agents;
 using Application.EnvironmentMaps;
 using Application.Metadata;
@@ -65,7 +66,13 @@ public class AgentOperationReverserTests
             _applySceneMaterial.Object, _updateSceneDocument.Object, _setSceneStage.Object, _deleteScene.Object, _createScene.Object, _restoreSceneLights.Object, _restoreSceneSlot.Object,
             _restoreSceneRecommendations.Object, _setSceneProject.Object, _setAssetMetadata.Object);
 
-        _audit.Setup(a => a.TryMarkReversedAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        // The default: this caller wins the reversal claim, applies the inverse, and
+        // records it afterwards. The claim and the record are two calls now, because they
+        // are two different facts - "I am doing this" and "this happened".
+        _audit.Setup(a => a.TryBeginReversalAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ReversalClaim(ReversalClaimOutcome.Claimed, "rev-1"));
+        _audit.Setup(a => a.CompleteReversalAsync(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
     }
 
@@ -135,7 +142,57 @@ public class AgentOperationReverserTests
         Assert.False(result.Value.Single().Reversed);
         _updateTags.Verify(
             h => h.Handle(It.IsAny<UpdateModelTagsCommand>(), It.IsAny<CancellationToken>()), Times.Never);
-        _audit.Verify(a => a.TryMarkReversedAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        _audit.Verify(a => a.TryBeginReversalAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>
+    /// The concurrency this closes: reverse_operation carries no idempotency key of its
+    /// own, so two calls naming one entry both reach the apply loop. Claiming afterwards
+    /// let both apply the inverse and only told the loser it had lost - which for an
+    /// inverse that CREATES something (recreating a deleted scene) leaves two of it.
+    /// </summary>
+    [Fact]
+    public async Task A_Concurrent_Undo_That_Loses_The_Claim_Does_Not_Apply_The_Inverse()
+    {
+        var entry = Completed(
+            "key-20", "set-tags", "Model", 7,
+            before: "{\"tags\":[\"wood\"],\"description\":null,\"categoryId\":null}");
+        Records(entry);
+        // The other caller got there first and is still going.
+        _audit.Setup(a => a.TryBeginReversalAsync("key-20", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ReversalClaim(ReversalClaimOutcome.InProgress));
+
+        var plan = await _reverser.PlanAsync("key-20", null);
+        var result = await _reverser.ApplyAsync(plan.Value);
+
+        Assert.False(result.Value.Single().Reversed);
+        Assert.Contains("Another caller is reversing", result.Value.Single().Detail);
+        _updateTags.Verify(
+            h => h.Handle(It.IsAny<UpdateModelTagsCommand>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task A_Claim_Is_Released_Again_When_Its_Inverse_Could_Not_Be_Applied()
+    {
+        // Otherwise a failed undo leaves the entry stamped reversed for work that never
+        // happened, and nothing can ever undo it.
+        var entry = Completed(
+            "key-21", "set-tags", "Model", 7,
+            before: "{\"tags\":[\"wood\"],\"description\":null,\"categoryId\":null}");
+        Records(entry);
+        _updateTags.Setup(h => h.Handle(It.IsAny<UpdateModelTagsCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Failure<UpdateModelTagsResponse>(new Error("Nope", "the model is gone")));
+
+        var plan = await _reverser.PlanAsync("key-21", null);
+        var result = await _reverser.ApplyAsync(plan.Value);
+
+        Assert.False(result.Value.Single().Reversed);
+        _audit.Verify(
+            a => a.ReleaseReversalAsync("key-21", "rev-1", It.IsAny<CancellationToken>()), Times.Once);
+        // And nothing recorded a reversal that did not happen.
+        _audit.Verify(
+            a => a.CompleteReversalAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]
@@ -182,6 +239,135 @@ public class AgentOperationReverserTests
         await _reverser.ApplyAsync(plan.Value);
 
         Assert.Equal(["remove-member", "delete-pack"], order);
+    }
+
+    /// <summary>
+    /// The crash-safety property, from the outside: an inverse that throws leaves the entry
+    /// un-reversed and re-undoable. Before the split, <c>ReversedAt</c> was stamped first,
+    /// so a throw here permanently recorded a reversal that never happened.
+    /// </summary>
+    [Fact]
+    public async Task An_Inverse_That_Throws_Releases_The_Claim_And_Records_No_Reversal()
+    {
+        var entry = Completed(
+            "key-22", "set-tags", "Model", 7,
+            before: "{\"tags\":[\"wood\"],\"description\":null,\"categoryId\":null}");
+        Records(entry);
+        _updateTags.Setup(h => h.Handle(It.IsAny<UpdateModelTagsCommand>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("the database went away"));
+
+        var plan = await _reverser.PlanAsync("key-22", null);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _reverser.ApplyAsync(plan.Value));
+        _audit.Verify(
+            a => a.ReleaseReversalAsync("key-22", "rev-1", It.IsAny<CancellationToken>()), Times.Once);
+        _audit.Verify(
+            a => a.CompleteReversalAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task A_Cancelled_Inverse_Releases_The_Claim_And_Records_No_Reversal()
+    {
+        // Cancellation is the same shape as a throw and used to have the same consequence:
+        // the entry was already stamped reversed by the time the token fired.
+        var entry = Completed(
+            "key-23", "set-tags", "Model", 7,
+            before: "{\"tags\":[\"wood\"],\"description\":null,\"categoryId\":null}");
+        Records(entry);
+        using var cts = new CancellationTokenSource();
+        _updateTags.Setup(h => h.Handle(It.IsAny<UpdateModelTagsCommand>(), It.IsAny<CancellationToken>()))
+            .Callback(() => cts.Cancel())
+            .ThrowsAsync(new OperationCanceledException());
+
+        var plan = await _reverser.PlanAsync("key-23", null);
+
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            () => _reverser.ApplyAsync(plan.Value, cts.Token));
+        // Released on CancellationToken.None, so the cancellation cannot also cancel the
+        // release - which would leave the claim held by nobody.
+        _audit.Verify(
+            a => a.ReleaseReversalAsync("key-23", "rev-1", CancellationToken.None), Times.Once);
+        _audit.Verify(
+            a => a.CompleteReversalAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task A_Claim_Lost_While_The_Inverse_Ran_Is_Not_Reported_As_A_Reversal()
+    {
+        // The stale-owner case: this call's lease lapsed mid-inverse and somebody else took
+        // the claim. The work happened, but this call is not the one entitled to record it,
+        // and saying "reversed" would hide a second inverse that may also have run.
+        var entry = Completed(
+            "key-24", "set-tags", "Model", 7,
+            before: "{\"tags\":[\"wood\"],\"description\":null,\"categoryId\":null}");
+        Records(entry);
+        _updateTags.Setup(h => h.Handle(It.IsAny<UpdateModelTagsCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success(new UpdateModelTagsResponse(7, ["wood"], null, null)));
+        _audit.Setup(a => a.CompleteReversalAsync("key-24", "rev-1", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+
+        var plan = await _reverser.PlanAsync("key-24", null);
+        var result = await _reverser.ApplyAsync(plan.Value);
+
+        Assert.False(result.Value.Single().Reversed);
+        Assert.Contains("no longer held the reversal claim", result.Value.Single().Detail);
+    }
+
+    [Fact]
+    public async Task An_Interrupted_Reversal_Is_Reported_Rather_Than_Retaken()
+    {
+        // A reversal whose owner died mid-inverse. Whether the inverse committed is not
+        // recorded, so the entry is neither reversed nor free - and re-running an inverse
+        // that creates something would leave two of it.
+        var entry = Completed(
+            "key-25", "delete-scene", "Scene", 4, before: "{\"name\":\"Kitchen\"}");
+        Records(entry);
+        _audit.Setup(a => a.TryBeginReversalAsync("key-25", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ReversalClaim(ReversalClaimOutcome.Interrupted));
+
+        var plan = await _reverser.PlanAsync("key-25", null);
+        var result = await _reverser.ApplyAsync(plan.Value);
+
+        Assert.False(result.Value.Single().Reversed);
+        Assert.Contains("stopped before it could record its outcome", result.Value.Single().Detail);
+        _createScene.Verify(
+            h => h.Handle(It.IsAny<CreateSceneCommand>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>
+    /// The ordering half of the same fix. A batch is planned newest-first because the older
+    /// steps depend on the newer ones being undone first; skipping a newest step whose
+    /// outcome is unknown and pressing on to its dependants is exactly the violation that
+    /// rule exists to prevent.
+    /// </summary>
+    [Fact]
+    public async Task A_Batch_Stops_When_Its_Newest_Step_Is_Already_Being_Reversed()
+    {
+        var create = Completed("key-e", "create-pack", "Pack", 5, batchId: "batch-3");
+        var add = Completed(
+            "key-f", "add-to-pack", "Model", 7,
+            before: "{\"packId\":5,\"wasMember\":false}", after: "{\"packId\":5,\"modelId\":7}", batchId: "batch-3");
+        Records(create, add);
+        _audit.Setup(a => a.FindBatchAsync("batch-3", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<AgentOperationLog> { create, add });
+
+        // The newest step - removing the member - is held by another caller.
+        _audit.Setup(a => a.TryBeginReversalAsync("key-f", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ReversalClaim(ReversalClaimOutcome.InProgress));
+
+        var plan = await _reverser.PlanAsync(null, "batch-3");
+        var result = await _reverser.ApplyAsync(plan.Value);
+
+        // One reported step, and the pack delete behind it was never attempted.
+        Assert.Single(result.Value);
+        Assert.Equal("key-f", result.Value[0].IdempotencyKey);
+        Assert.False(result.Value[0].Reversed);
+        _deletePack.Verify(
+            h => h.Handle(It.IsAny<DeletePackCommand>(), It.IsAny<CancellationToken>()), Times.Never);
+        _audit.Verify(
+            a => a.TryBeginReversalAsync("key-a", It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

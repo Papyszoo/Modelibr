@@ -162,7 +162,27 @@ public sealed class AgentUploadTicketFilter : IEndpointFilter
                         message = "Another upload is applying this ticket's idempotency key. It has NOT been applied yet - retry once it settles.",
                     },
                     statusCode: StatusCodes.Status409Conflict);
+
+            case AgentClaimOutcome.Interrupted:
+                // The previous holder of this key died mid-upload and nothing recorded
+                // whether its import landed. Terminal on purpose - re-running it here is
+                // how one crash becomes two copies of the same asset.
+                await tickets.SettleAsync(ticket.TicketId, succeeded: false, null, CancellationToken.None);
+                return Results.Json(
+                    new
+                    {
+                        status = "interrupted",
+                        operation = claim.Entry!.Operation,
+                        assetId = claim.Entry.AssetId,
+                        message = "A previous upload with this idempotency key stopped before it could record its outcome, so whether it applied is unknown.",
+                        remedy = "Check whether the asset is already there. If it is not, request a new ticket with a NEW idempotency key - retrying this one will not run it.",
+                    },
+                    statusCode: StatusCodes.Status409Conflict);
         }
+
+        // The generation this call owns. Every settle below presents it, so a request that
+        // outlived its claim lease cannot stamp its outcome on whoever holds the key now.
+        var claimToken = claim.ClaimToken!;
 
         object? result;
         try
@@ -173,7 +193,7 @@ public sealed class AgentUploadTicketFilter : IEndpointFilter
         {
             // CancellationToken.None on purpose: the request may already be aborted, and
             // releasing the claim is exactly what must still happen.
-            await audit.AbandonAsync(ticket.IdempotencyKey, CancellationToken.None);
+            await audit.AbandonAsync(ticket.IdempotencyKey, claimToken, CancellationToken.None);
             await tickets.SettleAsync(ticket.TicketId, succeeded: false, null, CancellationToken.None);
             throw;
         }
@@ -183,6 +203,7 @@ public sealed class AgentUploadTicketFilter : IEndpointFilter
         {
             await audit.CompleteAsync(
                 ticket.IdempotencyKey,
+                claimToken,
                 ticket.AssetType,
                 ExtractAssetId(value, ticket.AssetType),
                 Describe(value),
@@ -193,7 +214,7 @@ public sealed class AgentUploadTicketFilter : IEndpointFilter
         }
         else
         {
-            await audit.AbandonAsync(ticket.IdempotencyKey, CancellationToken.None);
+            await audit.AbandonAsync(ticket.IdempotencyKey, claimToken, CancellationToken.None);
             await tickets.SettleAsync(ticket.TicketId, succeeded: false, null, CancellationToken.None);
         }
 

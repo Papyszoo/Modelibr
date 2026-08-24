@@ -36,7 +36,14 @@ public class AgentUploadTicketFilterTests
 
         var audit = new Mock<IAgentAudit>();
         audit.Setup(a => a.TryBeginAsync(It.IsAny<AgentWrite>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new AgentClaim(AgentClaimOutcome.Owned, null));
+            .ReturnsAsync(new AgentClaim(AgentClaimOutcome.Owned, null, "gen-1"));
+        audit.Setup(a => a.CompleteAsync(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int?>(),
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        audit.Setup(a => a.AbandonAsync(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
 
         var services = new ServiceCollection();
         services.AddSingleton(tickets.Object);

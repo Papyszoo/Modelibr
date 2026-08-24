@@ -27,7 +27,17 @@ public class StoreImportMcpToolsTests
     {
         var audit = new Mock<IAgentAudit>();
         audit.Setup(a => a.TryBeginAsync(It.IsAny<AgentWrite>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new AgentClaim(AgentClaimOutcome.Owned, null));
+            .ReturnsAsync(new AgentClaim(AgentClaimOutcome.Owned, null, "gen-1"));
+        // Settling reports whether this caller still owned the claim. True is the ordinary
+        // case; a false here means the lease lapsed mid-call and the response changes, which
+        // is its own test.
+        audit.Setup(a => a.CompleteAsync(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int?>(),
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        audit.Setup(a => a.AbandonAsync(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
         return audit;
     }
 
@@ -87,7 +97,7 @@ public class StoreImportMcpToolsTests
             It.IsAny<CancellationToken>()),
             Times.Once);
         audit.Verify(a => a.CompleteAsync(
-            "key-1", "Pack", null, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            "key-1", "gen-1", "Pack", null, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -106,7 +116,7 @@ public class StoreImportMcpToolsTests
             It.IsAny<CreateStoreImportCommand>(), It.IsAny<CancellationToken>()), Times.Never);
         // A refusal must give the idempotency key back, or accepting the same asset through
         // the UI later would replay as "already applied".
-        audit.Verify(a => a.AbandonAsync("key-1", It.IsAny<CancellationToken>()), Times.Once);
+        audit.Verify(a => a.AbandonAsync("key-1", "gen-1", It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
