@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Services;
 using Application.Agents;
@@ -382,6 +383,7 @@ public sealed class AssetImportMcpTools
         ICommandHandler<AssociateTextureSetWithAllModelVersionsCommand> associateHandler,
         ICommandHandler<SetDefaultTextureSetCommand, SetDefaultTextureSetResponse> defaultHandler,
         IQueryHandler<GetModelTextureBindingsQuery, ModelTextureBindingSnapshot> bindingsHandler,
+        IUnitOfWork unitOfWork,
         IAgentAudit audit,
         McpCallerContext caller,
         [Description("Texture set id to bind.")] int textureSetId,
@@ -415,31 +417,59 @@ public sealed class AssetImportMcpTools
                     return Failed(before.Error);
                 }
 
-                // Associating covers every version, so a model that gains a version later
-                // does not silently lose its material.
-                var associated = await associateHandler.Handle(
-                    new AssociateTextureSetWithAllModelVersionsCommand(textureSetId, modelId, materialName), ct);
-
-                if (associated.IsFailure)
+                // ONE transaction around both commands.
+                //
+                // This tool is two writes wearing one idempotency key. Each command commits
+                // through the unit-of-work decorator, so associating used to become durable
+                // and THEN setting the default could return a failure - a model with versions
+                // but no active one answers NoActiveVersion. The guard reads a returned
+                // failure as "the tool declined before it mutated" and hands the key back as
+                // retryable; the association was already on disk, unrecorded by any completed
+                // audit entry, and the retry re-ran it. A guarded write must not be able to
+                // reach that state, and the honest way to get there is for the first write to
+                // not be durable yet when the second one fails.
+                //
+                // A failure Result rolls the whole thing back, exactly like a throw, so the
+                // Failed() below is telling the truth: nothing was written and the key may
+                // legitimately be taken over by a corrected retry.
+                var bound = await unitOfWork.InTransactionAsync<bool>(async tx =>
                 {
-                    return Failed(associated.Error);
+                    // Associating covers every version, so a model that gains a version later
+                    // does not silently lose its material.
+                    var associated = await associateHandler.Handle(
+                        new AssociateTextureSetWithAllModelVersionsCommand(textureSetId, modelId, materialName), tx);
+
+                    if (associated.IsFailure)
+                    {
+                        return SharedKernel.Result.Failure<bool>(associated.Error);
+                    }
+
+                    if (!setAsDefault)
+                    {
+                        return SharedKernel.Result.Success(false);
+                    }
+
+                    var defaulted = await defaultHandler.Handle(
+                        new SetDefaultTextureSetCommand(modelId, textureSetId), tx);
+
+                    return defaulted.IsFailure
+                        ? SharedKernel.Result.Failure<bool>(defaulted.Error)
+                        : SharedKernel.Result.Success(true);
+                }, ct);
+
+                if (bound.IsFailure)
+                {
+                    return Failed(bound.Error);
                 }
 
-                if (!setAsDefault)
-                {
-                    return Applied(
-                        new { status = "ok", textureSetId, modelId, isDefault = false },
-                        AgentAssetFamilies.Model, modelId, new { textureSetId, modelId }, new { binding = before.Value });
-                }
-
-                var defaulted = await defaultHandler.Handle(
-                    new SetDefaultTextureSetCommand(modelId, textureSetId), ct);
-
-                return defaulted.IsFailure
-                    ? Failed(defaulted.Error)
-                    : Applied(
+                return bound.Value
+                    ? Applied(
                         new { status = "ok", textureSetId, modelId, isDefault = true },
                         AgentAssetFamilies.Model, modelId, new { textureSetId, modelId, isDefault = true },
+                        new { binding = before.Value })
+                    : Applied(
+                        new { status = "ok", textureSetId, modelId, isDefault = false },
+                        AgentAssetFamilies.Model, modelId, new { textureSetId, modelId },
                         new { binding = before.Value });
             },
             cancellationToken);

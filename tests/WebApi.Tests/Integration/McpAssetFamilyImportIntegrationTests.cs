@@ -239,6 +239,7 @@ public class McpAssetFamilyImportIntegrationTests : IClassFixture<ModelibrWebFac
             sp.GetRequiredService<ICommandHandler<AssociateTextureSetWithAllModelVersionsCommand>>(),
             sp.GetRequiredService<ICommandHandler<SetDefaultTextureSetCommand, SetDefaultTextureSetResponse>>(),
             sp.GetRequiredService<IQueryHandler<GetModelTextureBindingsQuery, ModelTextureBindingSnapshot>>(),
+            sp.GetRequiredService<Application.Abstractions.IUnitOfWork>(),
             sp.GetRequiredService<IAgentAudit>(),
             McpCallerContext.Unauthenticated(),
             set.Id,
@@ -250,6 +251,88 @@ public class McpAssetFamilyImportIntegrationTests : IClassFixture<ModelibrWebFac
         Assert.Contains("\"isDefault\":true", json);
     }
 
+
+    [Fact]
+    public async Task BindTextureSet_LeavesNothingBehindWhenTheDefaultCannotBeSet()
+    {
+        // The two halves of this tool commit separately, so associating used to land on disk
+        // and THEN setting the default could return a failure. The guard reads a returned
+        // failure as "nothing was mutated" and hands the idempotency key back as retryable -
+        // which, with the association already durable and no completed entry describing it,
+        // is how one bind became two.
+        //
+        // A model with versions but no ACTIVE version is the reachable way in: associating
+        // succeeds across every version, and SetDefaultTextureSet answers NoActiveVersion.
+        // Against real PostgreSQL, because the property being proved is that a transaction
+        // rolled back - which no mock can demonstrate.
+        await MigrateAsync();
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+
+        using var scope = _factory.Services.CreateScope();
+        var sp = scope.ServiceProvider;
+        var context = sp.GetRequiredService<ApplicationDbContext>();
+
+        var created = await AssetImportMcpTools.ImportTextureSet(
+            sp.GetRequiredService<ICommandHandler<CreateTextureSetWithFileCommand, CreateTextureSetWithFileResponse>>(),
+            sp.GetRequiredService<ICommandHandler<AddTextureToSetWithFileCommand, AddTextureToTextureSetResponse>>(),
+            sp.GetRequiredService<IAgentAudit>(),
+            McpCallerContext.Unauthenticated(),
+            $"partial-material-{suffix}",
+            [new AssetImportMcpTools.TextureChannelImport(WriteFile($"{suffix}-partial.png"), "Albedo")],
+            $"mcp-partial-set-{suffix}");
+        Assert.Contains("\"ok\"", Json(created));
+
+        var set = await context.TextureSets.SingleAsync(s => s.Name == $"partial-material-{suffix}");
+
+        var model = Domain.Models.Model.Create($"partial-model-{suffix}", DateTime.UtcNow);
+        context.Models.Add(model);
+        await context.SaveChangesAsync();
+        model.CreateVersion("v1", DateTime.UtcNow);
+        await context.SaveChangesAsync();
+
+        var versionIds = await context.ModelVersions
+            .Where(v => v.ModelId == model.Id)
+            .Select(v => v.Id)
+            .ToListAsync();
+        Assert.Single(versionIds);
+
+        // The state the finding names: versions exist, none is active. Written directly
+        // because nothing in the domain offers "unset the active version" - which is exactly
+        // why this was only reachable, not producible through the ordinary API.
+        await context.Database.ExecuteSqlRawAsync(
+            $"UPDATE \"Models\" SET \"ActiveVersionId\" = NULL WHERE \"Id\" = {model.Id}");
+        context.ChangeTracker.Clear();
+
+        var key = $"mcp-partial-bind-{suffix}";
+        var result = await AssetImportMcpTools.BindTextureSet(
+            sp.GetRequiredService<ICommandHandler<AssociateTextureSetWithAllModelVersionsCommand>>(),
+            sp.GetRequiredService<ICommandHandler<SetDefaultTextureSetCommand, SetDefaultTextureSetResponse>>(),
+            sp.GetRequiredService<IQueryHandler<GetModelTextureBindingsQuery, ModelTextureBindingSnapshot>>(),
+            sp.GetRequiredService<Application.Abstractions.IUnitOfWork>(),
+            sp.GetRequiredService<IAgentAudit>(),
+            McpCallerContext.Unauthenticated(),
+            set.Id,
+            model.Id,
+            key);
+
+        // Reported as a failure, as it should be - the bind did not happen.
+        Assert.Contains("NoActiveVersion", Json(result));
+
+        // And the association it got as far as is NOT on disk. This is the assertion the
+        // whole finding is about: the key is handed back as retryable below, and that answer
+        // is a lie unless this holds.
+        context.ChangeTracker.Clear();
+        Assert.Empty(await context.Set<Domain.Models.ModelVersionTextureSet>()
+            .Where(m => versionIds.Contains(m.ModelVersionId) && m.TextureSetId == set.Id)
+            .ToListAsync());
+
+        // The claim went back as Failed rather than Completed, so a corrected retry may take
+        // the key over - which is now safe, because nothing durable stands behind it.
+        var entry = await context.Set<Domain.Models.AgentOperationLog>()
+            .SingleAsync(e => e.IdempotencyKey == key);
+        Assert.Equal(Domain.Models.AgentOperationStatus.Failed, entry.Status);
+        Assert.Null(entry.PayloadAfter);
+    }
 
     [Fact]
     public async Task BindTextureSet_IsUndoneAcrossEveryVersionItTouched()
@@ -296,6 +379,7 @@ public class McpAssetFamilyImportIntegrationTests : IClassFixture<ModelibrWebFac
             sp.GetRequiredService<ICommandHandler<AssociateTextureSetWithAllModelVersionsCommand>>(),
             sp.GetRequiredService<ICommandHandler<SetDefaultTextureSetCommand, SetDefaultTextureSetResponse>>(),
             sp.GetRequiredService<IQueryHandler<GetModelTextureBindingsQuery, ModelTextureBindingSnapshot>>(),
+            sp.GetRequiredService<Application.Abstractions.IUnitOfWork>(),
             sp.GetRequiredService<IAgentAudit>(),
             McpCallerContext.Unauthenticated(),
             set.Id,
