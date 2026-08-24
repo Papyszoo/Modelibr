@@ -81,6 +81,20 @@ internal sealed class SetAssetMetadataCommandHandler
             return Result.Failure<AssetMetadataResponse>(entityState.Error);
         }
 
+        // Everything the write REFERENCES is checked before any of it is applied - and
+        // checked against the SAME rules the family's command applies, kind included, not
+        // merely for existence. Four of the six families spend two commands and two commits
+        // on one entity write, so a category rejected halfway through would return a
+        // failure with the tags and description already durable - and the agent surface,
+        // reading that failure, releases the idempotency key and lets a retry apply them a
+        // second time.
+        var valid = await _entity.ValidateWriteAsync(
+            family, command.AssetId, patch.EntityWrite, cancellationToken);
+        if (valid.IsFailure)
+        {
+            return Result.Failure<AssetMetadataResponse>(valid.Error);
+        }
+
         if (!patch.EntityWrite.IsEmpty)
         {
             var write = await _entity.WriteAsync(family, command.AssetId, patch.EntityWrite, cancellationToken);

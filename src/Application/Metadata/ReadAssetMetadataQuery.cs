@@ -73,7 +73,8 @@ internal sealed class ReadAssetMetadataQueryHandler
             stored?.SchemaVersion ?? 0,
             AssetMetadataSchema.Version,
             values,
-            Completeness(values)));
+            Completeness(values),
+            entityState.Value.CategoryKind?.ToString()));
     }
 
     private static object? ResolveValue(

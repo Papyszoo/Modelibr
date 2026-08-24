@@ -160,6 +160,98 @@ public class SetAssetMetadataCommandHandlerTests
             r => r.AddAsync(It.IsAny<AssetMetadata>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    /// <summary>
+    /// The half-applied patch this closes: four of the six families spend two commands and
+    /// two commits on one entity write, so a category the second command rejects used to
+    /// return a failure with the tags from the first already durable.
+    /// </summary>
+    [Fact]
+    public async Task RejectedCategory_WritesNothingAtAll()
+    {
+        var fixture = new Fixture();
+        fixture.Entity
+            .Setup(e => e.ValidateWriteAsync(
+                Family, It.IsAny<int>(),
+                It.IsAny<AssetEntityMetadataWrite>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Failure(new Error("CategoryNotFound", "no such category")));
+
+        var result = await fixture.Handle(new { category = 4321, license = "CC0" });
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("CategoryNotFound", result.Error.Code);
+        fixture.Entity.Verify(
+            e => e.WriteAsync(
+                It.IsAny<string>(), It.IsAny<int>(),
+                It.IsAny<AssetEntityMetadataWrite>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        fixture.Repository.Verify(
+            r => r.AddAsync(It.IsAny<AssetMetadata>(), It.IsAny<CancellationToken>()), Times.Never);
+        fixture.UnitOfWork.Verify(
+            u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>
+    /// The same guarantee for the OTHER thing prevalidation now refuses: a category that
+    /// exists but belongs to the wrong <c>TextureSetKind</c>. That one used to pass the
+    /// existence check and be rejected by the family's command, one commit too late.
+    /// </summary>
+    [Fact]
+    public async Task RejectedCategoryKind_WritesNothingAtAll()
+    {
+        var fixture = new Fixture();
+        fixture.Entity
+            .Setup(e => e.ValidateWriteAsync(
+                Family, It.IsAny<int>(),
+                It.IsAny<AssetEntityMetadataWrite>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Failure(new Error("CategoryKindMismatch", "wrong vocabulary")));
+
+        var result = await fixture.Handle(new { category = 4321, tags = new[] { "wood" }, license = "CC0" });
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("CategoryKindMismatch", result.Error.Code);
+
+        // Every field of the patch, not just the category: the tags and the schema-side
+        // values travel on separate commits, and a rejected patch may leave none of them.
+        fixture.Entity.Verify(
+            e => e.WriteAsync(
+                It.IsAny<string>(), It.IsAny<int>(),
+                It.IsAny<AssetEntityMetadataWrite>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        fixture.Repository.Verify(
+            r => r.AddAsync(It.IsAny<AssetMetadata>(), It.IsAny<CancellationToken>()), Times.Never);
+        fixture.UnitOfWork.Verify(
+            u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Null(fixture.Stored.License);
+        Assert.Empty(fixture.Stored.Tags);
+    }
+
+    /// <summary>
+    /// Prevalidation runs before the schema-side values are staged too, not only before the
+    /// entity write - otherwise a rejected patch would still have mutated the stored
+    /// <c>AssetMetadata</c> row in memory, and the next SaveChanges in the same scope would
+    /// have committed it.
+    /// </summary>
+    [Fact]
+    public async Task RejectedPatch_LeavesTheStoredSchemaRowUntouched()
+    {
+        var fixture = new Fixture();
+        var before = fixture.Stored.UpdatedAt;
+        fixture.Entity
+            .Setup(e => e.ValidateWriteAsync(
+                Family, It.IsAny<int>(),
+                It.IsAny<AssetEntityMetadataWrite>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Failure(new Error("CategoryNotFound", "no such category")));
+
+        var result = await fixture.Handle(new { category = 4321, license = "CC0", description = "new" });
+
+        Assert.True(result.IsFailure);
+        Assert.Null(fixture.Stored.License);
+        Assert.Null(fixture.Stored.Description);
+        Assert.Equal(before, fixture.Stored.UpdatedAt);
+        fixture.Repository.Verify(
+            r => r.UpdateAsync(It.IsAny<AssetMetadata>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     [Fact]
     public async Task UnknownFamily_IsRefused()
     {
@@ -194,6 +286,11 @@ public class SetAssetMetadataCommandHandlerTests
                     "Chair", null, Array.Empty<string>(), null, null)));
             Entity
                 .Setup(e => e.WriteAsync(
+                    It.IsAny<string>(), It.IsAny<int>(),
+                    It.IsAny<AssetEntityMetadataWrite>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(Result.Success());
+            Entity
+                .Setup(e => e.ValidateWriteAsync(
                     It.IsAny<string>(), It.IsAny<int>(),
                     It.IsAny<AssetEntityMetadataWrite>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(Result.Success());

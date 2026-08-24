@@ -44,6 +44,19 @@ public sealed record AssetMetadataCompleteness(
 
 /// <param name="SchemaVersion">The version the stored row was last written under; 0 when the asset has no row yet.</param>
 /// <param name="CurrentSchemaVersion">The version of the schema this response was built from.</param>
+/// <param name="CategoryKind">
+/// Which partition of the category tree this asset's <c>category</c> field may point at -
+/// <c>Universal</c> or <c>ModelSpecific</c> - or null for a family whose tree is not
+/// partitioned.
+///
+/// <para>
+/// On the response rather than in the schema because it is a fact about the ASSET. The
+/// schema is per family and says which TREE a categoryRef points at; a TextureSet's kind
+/// says which half of that tree, and it differs between two texture sets in the same family.
+/// Without it a picker shows one kind's categories to the other and the write is refused
+/// after the fact.
+/// </para>
+/// </param>
 public sealed record AssetMetadataResponse(
     string AssetType,
     int AssetId,
@@ -51,4 +64,5 @@ public sealed record AssetMetadataResponse(
     int SchemaVersion,
     int CurrentSchemaVersion,
     IReadOnlyList<AssetMetadataValue> Fields,
-    AssetMetadataCompleteness Completeness);
+    AssetMetadataCompleteness Completeness,
+    string? CategoryKind = null);

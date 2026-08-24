@@ -1,6 +1,7 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Domain.Models;
+using Domain.ValueObjects;
 using Application.EnvironmentMaps;
 using Application.Materials;
 using Application.Models;
@@ -31,14 +32,50 @@ public interface IAssetEntityMetadata
 
     /// <summary>Applies only the fields the write marks as set.</summary>
     Task<Result> WriteAsync(string family, int assetId, AssetEntityMetadataWrite write, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Refuses a write whose values cannot land, <b>before</b> any of it is applied.
+    ///
+    /// This is not belt-and-braces over the commands' own validation: for four of the six
+    /// families a write is two commands and two commits - tags and description in one,
+    /// category in the other - so a bad category id rejected by the second one returns a
+    /// failure with the first already durable. Checking here is what keeps a patch
+    /// all-or-nothing from the caller's point of view, which matters most for the agent
+    /// surface, where a returned failure also releases the idempotency key and invites a
+    /// retry over the half that did land.
+    ///
+    /// <para>
+    /// Existence is not the whole of it, which is the part that bit. Category trees are
+    /// partitioned by <see cref="TextureSetKind"/>, and the commands enforce that
+    /// partition: a Material takes only a Universal category, and a TextureSet only one of
+    /// its own kind. A cross-kind id EXISTS, so an existence check waves it through, and
+    /// the command then rejects it - one commit too late. Whatever the command would
+    /// refuse has to be refused here, which is why this takes the asset id: the kind a
+    /// TextureSet's category must match is the kind of that particular texture set.
+    /// </para>
+    /// </summary>
+    Task<Result> ValidateWriteAsync(string family, int assetId, AssetEntityMetadataWrite write, CancellationToken cancellationToken);
 }
 
+/// <param name="CategoryKind">
+/// Which partition of the family's category tree this asset's category must come from, or
+/// null for a family whose tree has no partitions.
+///
+/// <para>
+/// It is a property of the ASSET, not of the family, which is why it travels on the state
+/// rather than on the schema: a TextureSet's category must match that particular set's
+/// <see cref="TextureSetKind"/>, and only two of the six families have anything to say here
+/// at all. A picker that offered the whole tree would let a person choose a category the
+/// write is then obliged to refuse.
+/// </para>
+/// </param>
 public sealed record AssetEntityMetadataState(
     string Name,
     string? Description,
     IReadOnlyList<string> Tags,
     int? CategoryId,
-    string? CategoryName);
+    string? CategoryName,
+    TextureSetKind? CategoryKind = null);
 
 /// <summary>
 /// A patch. Each <c>Set*</c> flag distinguishes "leave this alone" from "set it to null",
@@ -156,7 +193,10 @@ internal sealed class AssetEntityMetadataGateway : IAssetEntityMetadata
                     null,
                     TagNames(set.Tags.Select(t => t.Name)),
                     set.TextureSetCategoryId,
-                    await CategoryNameAsync(_textureSetCategories, set.TextureSetCategoryId, cancellationToken)));
+                    await CategoryNameAsync(_textureSetCategories, set.TextureSetCategoryId, cancellationToken),
+                    // This set's own kind: its category must match it, and the two kinds are
+                    // separate asset types that never share a vocabulary.
+                    set.Kind));
             }
 
             case AssetMetadataSchema.Families.Material:
@@ -169,7 +209,8 @@ internal sealed class AssetEntityMetadataGateway : IAssetEntityMetadata
                     TagNames(material.Tags.Select(t => t.Name)),
                     material.CategoryId,
                     // A Material's category comes from the TextureSet tree (the Universal kind).
-                    await CategoryNameAsync(_textureSetCategories, material.CategoryId, cancellationToken)));
+                    await CategoryNameAsync(_textureSetCategories, material.CategoryId, cancellationToken),
+                    TextureSetKind.Universal));
             }
 
             case AssetMetadataSchema.Families.EnvironmentMap:
@@ -209,10 +250,107 @@ internal sealed class AssetEntityMetadataGateway : IAssetEntityMetadata
             }
 
             default:
-                return Result.Failure<AssetEntityMetadataState>(
-                    new Error("UnknownAssetFamily", $"'{family}' is not an asset family this schema covers."));
+                return Result.Failure<AssetEntityMetadataState>(UnknownFamilyError(family));
         }
     }
+
+    public async Task<Result> ValidateWriteAsync(
+        string family, int assetId, AssetEntityMetadataWrite write, CancellationToken cancellationToken)
+    {
+        // Only the category can name something that does not exist. Description and tags
+        // are values, not references, and the commands accept whatever they are given.
+        if (!write.SetCategory || write.CategoryId is not int categoryId)
+        {
+            return Result.Success();
+        }
+
+        switch (family)
+        {
+            case AssetMetadataSchema.Families.Model:
+                return await RequireCategoryAsync(
+                    _modelCategories, categoryId, family, cancellationToken);
+
+            case AssetMetadataSchema.Families.TextureSet:
+            {
+                // The kind is a property of THIS texture set, so the set has to be read to
+                // know what its category may be. UpdateTextureSetCommand makes exactly this
+                // check; making it here is what stops the tag half from committing first.
+                var set = await _textureSets.GetByIdAsync(assetId, cancellationToken);
+                if (set is null)
+                {
+                    return Result.Failure(NotFoundError(family, assetId));
+                }
+
+                return await RequireCategoryOfKindAsync(
+                    categoryId, set.Kind, family, cancellationToken);
+            }
+
+            case AssetMetadataSchema.Families.Material:
+                // A Material's category comes from the TextureSet tree, and only ever from
+                // its Universal half - the same rule UpdateMaterialCommand enforces, and
+                // the same exception ReadAsync makes.
+                return await RequireCategoryOfKindAsync(
+                    categoryId, TextureSetKind.Universal, family, cancellationToken);
+
+            case AssetMetadataSchema.Families.EnvironmentMap:
+                return await RequireCategoryAsync(
+                    _environmentMapCategories, categoryId, family, cancellationToken);
+
+            case AssetMetadataSchema.Families.Sound:
+                return await RequireCategoryAsync(
+                    _soundCategories, categoryId, family, cancellationToken);
+
+            case AssetMetadataSchema.Families.Sprite:
+                return await RequireCategoryAsync(
+                    _spriteCategories, categoryId, family, cancellationToken);
+
+            default:
+                return Result.Failure(UnknownFamilyError(family));
+        }
+    }
+
+    private static async Task<Result> RequireCategoryAsync<TCategory>(
+        IHierarchicalCategoryRepository<TCategory> repository,
+        int categoryId,
+        string family,
+        CancellationToken cancellationToken)
+        where TCategory : class, IHierarchicalCategory<TCategory>
+    {
+        var category = await repository.GetByIdAsync(categoryId, cancellationToken);
+        return category is null
+            ? Result.Failure(CategoryNotFoundError(family, categoryId))
+            : Result.Success();
+    }
+
+    private async Task<Result> RequireCategoryOfKindAsync(
+        int categoryId,
+        TextureSetKind required,
+        string family,
+        CancellationToken cancellationToken)
+    {
+        var category = await _textureSetCategories.GetByIdAsync(categoryId, cancellationToken);
+        if (category is null)
+        {
+            return Result.Failure(CategoryNotFoundError(family, categoryId));
+        }
+
+        return category.Kind == required
+            ? Result.Success()
+            : Result.Failure(new Error(
+                "CategoryKindMismatch",
+                $"Category '{category.Name}' belongs to the {category.Kind} vocabulary, " +
+                $"and this {family} needs a {required} one. Nothing was written."));
+    }
+
+    private static Error CategoryNotFoundError(string family, int categoryId) => new(
+        "CategoryNotFound",
+        $"No {family} category with ID {categoryId}. Nothing was written.");
+
+    private static Error NotFoundError(string family, int assetId) => new(
+        "AssetNotFound", $"{family} with ID {assetId} was not found.");
+
+    private static Error UnknownFamilyError(string family) => new(
+        "UnknownAssetFamily", $"'{family}' is not an asset family this schema covers.");
 
     public async Task<Result> WriteAsync(
         string family, int assetId, AssetEntityMetadataWrite write, CancellationToken cancellationToken)
@@ -341,14 +479,12 @@ internal sealed class AssetEntityMetadataGateway : IAssetEntityMetadata
             }
 
             default:
-                return Result.Failure(
-                    new Error("UnknownAssetFamily", $"'{family}' is not an asset family this schema covers."));
+                return Result.Failure(UnknownFamilyError(family));
         }
     }
 
     private static Result<AssetEntityMetadataState> NotFound(string family, int assetId)
-        => Result.Failure<AssetEntityMetadataState>(
-            new Error("AssetNotFound", $"{family} with ID {assetId} was not found."));
+        => Result.Failure<AssetEntityMetadataState>(NotFoundError(family, assetId));
 
     private static IReadOnlyList<string> TagNames(IEnumerable<string> names)
         => names.Where(n => !string.IsNullOrWhiteSpace(n)).OrderBy(n => n, StringComparer.Ordinal).ToList();
