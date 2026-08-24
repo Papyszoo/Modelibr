@@ -249,6 +249,66 @@ export class ScenesPage {
     }
 
     /**
+     * Records every appearance of one element from inside the page, so that a
+     * short-lived state can be asserted without a poller having to catch it.
+     *
+     * Playwright's `waitFor` polls, and the serialization hold is up for as long
+     * as one write plus one refetch takes - which on a warm local stack can be
+     * under a poll interval. Asserting it with `toBeVisible` therefore failed on
+     * a correct app roughly one run in two: the hold appeared, went, and the
+     * poller looked twice at an empty gap. A MutationObserver cannot miss it,
+     * because it is told about the insertion rather than asked afterwards.
+     */
+    private async watchForElement(testId: string): Promise<void> {
+        await this.page.evaluate(id => {
+            const selector = `[data-testid="${id}"]`;
+            const store = window as unknown as {
+                __modelibrSeen?: Record<string, boolean>;
+                __modelibrWatcher?: MutationObserver;
+            };
+            store.__modelibrSeen = { ...(store.__modelibrSeen ?? {}), [id]: false };
+            store.__modelibrWatcher?.disconnect();
+
+            // Already up when the watch started counts too.
+            if (document.querySelector(selector)) {
+                store.__modelibrSeen[id] = true;
+            }
+
+            // The ADDED NODES, not a re-query of the live DOM: the callback is
+            // batched, so by the time it runs the element may already be gone -
+            // which is exactly the case this exists to record.
+            const matches = (nodes: NodeList) =>
+                Array.from(nodes).some(
+                    node =>
+                        node instanceof Element &&
+                        (node.matches(selector) || node.querySelector(selector) !== null),
+                );
+
+            store.__modelibrWatcher = new MutationObserver(records => {
+                for (const record of records) {
+                    if (matches(record.addedNodes)) {
+                        store.__modelibrSeen![id] = true;
+                    }
+                }
+            });
+            store.__modelibrWatcher.observe(document.body, {
+                childList: true,
+                subtree: true,
+            });
+        }, testId);
+    }
+
+    /** Whether `watchForElement` has seen that element since the watch began. */
+    private async elementWasSeen(testId: string): Promise<boolean> {
+        return this.page.evaluate(id => {
+            const store = window as unknown as {
+                __modelibrSeen?: Record<string, boolean>;
+            };
+            return store.__modelibrSeen?.[id] === true;
+        }, testId);
+    }
+
+    /**
      * Links the open scene to a project through the brief panel, and asserts the
      * serialization hold both APPEARS and then goes.
      *
@@ -260,16 +320,17 @@ export class ScenesPage {
      * The comment here used to say "the hold appears and then goes; both halves
      * matter" above an assertion that only waited for it to be HIDDEN - which a
      * hold that never appeared satisfies just as well, and which is what a
-     * serialization that had stopped running entirely would look like. The waiter
-     * is armed BEFORE the click now, because the hold opens in the same tick the
-     * request is sent and would otherwise be a frame this step could miss.
+     * serialization that had stopped running entirely would look like. The
+     * appearance is now RECORDED by a mutation observer armed before the click
+     * rather than polled for afterwards; see `watchForElement` for why polling
+     * for it failed on a working app.
      */
     async linkToProject(projectName: string): Promise<void> {
         await this.openProjectPanel();
         await this.page.locator(this.projectSelect).click();
 
         const pending = this.page.locator(this.linkPending);
-        const appeared = pending.waitFor({ state: "visible", timeout: 15000 });
+        await this.watchForElement("scene-editor-link-pending");
 
         // `.first()` because the projects API does not enforce unique names, so
         // a fixture database provisioned more than once can hold two of them.
@@ -280,10 +341,12 @@ export class ScenesPage {
             .first()
             .click();
 
-        await appeared;
-        // ...and then goes, once the re-read has landed and the draft sits on the
-        // revision the link produced.
+        // Gone, once the re-read has landed and the draft sits on the revision
+        // the link produced...
         await expect(pending).toBeHidden({ timeout: 15000 });
+        // ...and it was genuinely up in between. A serialization that had stopped
+        // running entirely would satisfy the line above on its own.
+        expect(await this.elementWasSeen("scene-editor-link-pending")).toBe(true);
         await expect(this.page.locator(this.projectError)).toHaveCount(0);
 
         // Closed on the way out, so the next reader opens it rather than
