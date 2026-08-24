@@ -118,7 +118,12 @@ public static class StoreUrlSafety
     /// <para>
     /// Loopback is the single exception, and only when <paramref name="allowLoopback"/> says
     /// the store itself is loopback - the documented developer case of a store running on the
-    /// same machine.
+    /// same machine. It is answered INSIDE each family's classifier rather than ahead of the
+    /// dispatch, because the family classifiers are also what the translation prefixes call:
+    /// answering it first meant <c>64:ff9b::7f00:1</c> and <c>2002:7f00:1::</c> unwrapped to
+    /// 127.0.0.1 and were handed to a table that deliberately does not list 127/8. A wrapped
+    /// loopback address reached a public store's importer; the exception has to travel with
+    /// the policy it is an exception to.
     /// </para>
     /// </remarks>
     public static bool IsBlockedAddress(IPAddress ip, bool allowLoopback)
@@ -126,13 +131,10 @@ public static class StoreUrlSafety
         if (ip.IsIPv4MappedToIPv6)
             ip = ip.MapToIPv4();
 
-        if (IPAddress.IsLoopback(ip))
-            return !allowLoopback;
-
         return ip.AddressFamily switch
         {
-            AddressFamily.InterNetwork => IsBlockedV4(ip.GetAddressBytes()),
-            AddressFamily.InterNetworkV6 => IsBlockedV6(ip),
+            AddressFamily.InterNetwork => IsBlockedV4(ip.GetAddressBytes(), allowLoopback),
+            AddressFamily.InterNetworkV6 => IsBlockedV6(ip, allowLoopback),
             // Unknown address family - refuse.
             _ => true,
         };
@@ -157,6 +159,14 @@ public static class StoreUrlSafety
     /// anycast addresses) and they are refused too: none of them is a place a store's
     /// download lives, and an allow-list with holes in it is how this went wrong the first
     /// time.
+    /// </para>
+    /// <para>
+    /// For IPv6 the table is not the last word either. The IPv6 Address Space registry
+    /// delegates <c>2000::/3</c> as Global Unicast and marks the rest Reserved by IETF, so
+    /// <see cref="IsBlockedV6"/> ends by refusing anything outside that block. Otherwise the
+    /// space BETWEEN the named rows - the unallocated remainder of <c>64:ff9b::/32</c>, say -
+    /// would be reachable by omission, which is the same gap that left <c>3fff::/20</c> open
+    /// until somebody noticed the registry had grown.
     /// </para>
     /// </remarks>
     private readonly record struct Cidr(byte[] Prefix, int Bits)
@@ -193,9 +203,21 @@ public static class StoreUrlSafety
     private static Cidr Range(string prefix, int bits) => new(IPAddress.Parse(prefix).GetAddressBytes(), bits);
 
     /// <summary>
+    /// 127.0.0.0/8 - the one range with an exception, so it is a row of its own rather than
+    /// a member of <see cref="BlockedV4"/>: <see cref="IsBlockedV4"/> answers it against
+    /// <c>allowLoopback</c> before consulting the table. Being the first test in the IPv4
+    /// classifier - rather than a test the caller made before dispatching to it - is what
+    /// makes a NAT64- or 6to4-wrapped 127.0.0.1 get the same answer as a bare one.
+    /// </summary>
+    private static readonly Cidr LoopbackV4 = Range("127.0.0.0", 8);
+
+    /// <summary>::1/128, the IPv6 half of the same exception.</summary>
+    private static readonly Cidr LoopbackV6 = Range("::1", 128);
+
+    /// <summary>
     /// IANA IPv4 Special-Purpose Address Registry, plus the multicast and reserved blocks
     /// that live in their own registries. Loopback (127.0.0.0/8) is deliberately absent - it
-    /// is the one range with an exception, and the caller answers it first.
+    /// is the one range with an exception, and <see cref="LoopbackV4"/> above answers it.
     /// </summary>
     private static readonly Cidr[] BlockedV4 =
     [
@@ -221,17 +243,20 @@ public static class StoreUrlSafety
     /// <summary>
     /// IANA IPv6 Special-Purpose Address Registry, plus the multicast block.
     ///
-    /// The two translation prefixes that carry an IPv4 address inside them are NOT here -
-    /// they are unwrapped in <see cref="IsBlockedV6"/> and classified as the IPv4 addresses
-    /// they reach, because an address that is only reachable through the wrapper is exactly
-    /// what this refuses. <c>::1/128</c> is absent for the same reason as 127/8 above.
+    /// The two prefixes that carry an IPv4 address inside them - <c>64:ff9b::/96</c> and
+    /// <c>2002::/16</c> - are NOT here: they are unwrapped in <see cref="IsBlockedV6"/> and
+    /// classified as the IPv4 addresses they reach, because an address that is only
+    /// reachable through the wrapper is exactly what this refuses. <c>::1/128</c> is absent
+    /// for the same reason as 127/8 above.
     /// </summary>
     private static readonly Cidr[] BlockedV6 =
     [
         Range("::", 128),              // unspecified
         Range("::", 96),               // deprecated IPv4-compatible, and the reserved space around it
         Range("::ffff:0:0", 96),       // IPv4-mapped (the caller unwraps these; listed so the table is the whole registry)
+        Range("64:ff9b:1::", 48),      // IPv4/IPv6 translation, LOCAL-USE (RFC 8215) - see IsBlockedV6
         Range("100::", 64),            // discard-only
+        Range("100:0:0:1::", 64),      // dummy IPv6 prefix (RFC 9780), not globally reachable
         Range("2001::", 23),           // IETF protocol assignments: Teredo, benchmarking, AMT, AS112-v6, ORCHIDv2, DETs
         Range("2001:db8::", 32),       // documentation
         Range("2620:4f:8000::", 48),   // direct delegation AS112 service
@@ -243,26 +268,73 @@ public static class StoreUrlSafety
         Range("ff00::", 8),            // multicast
     ];
 
-    private static bool IsBlockedV4(byte[] address) => BlockedV4.Any(range => range.Contains(address));
+    /// <summary>
+    /// RFC 6052's Well-Known Prefix, at the length RFC 6052 actually gives it.
+    /// </summary>
+    /// <remarks>
+    /// The /96 is the only length at which the last 32 bits are an embedded IPv4 address.
+    /// Matching on the first four bytes instead treated all of <c>64:ff9b::/32</c> as
+    /// embedded-address syntax, which is wrong in both directions: it read the tail of
+    /// <c>64:ff9b:1::/48</c> - a distinct, non-globally-reachable RFC 8215 reservation with
+    /// no defined embedded address - as an IPv4 address and let <c>64:ff9b:1::808:808</c>
+    /// through on the strength of 8.8.8.8 being public, and it would have called unallocated
+    /// space elsewhere under the /32 NAT64 too. The /48 is now an ordinary row in
+    /// <see cref="BlockedV6"/>, refused whole and without pretending to read an address out
+    /// of it.
+    /// </remarks>
+    private static readonly Cidr Nat64WellKnown = Range("64:ff9b::", 96);
+
+    /// <summary>2002::/16 - 6to4, which embeds the IPv4 address it tunnels to in bytes 2-5.</summary>
+    private static readonly Cidr SixToFour = Range("2002::", 16);
 
     /// <summary>
-    /// The IPv6 half. Two registry entries carry an IPv4 address inside them, and an address
-    /// that is only reachable because of the wrapper is exactly what this is here to refuse -
-    /// so they are unwrapped and classified as the IPv4 addresses they are.
+    /// 2000::/3 - the only part of the IPv6 address space IANA has delegated as Global
+    /// Unicast. Everything outside it is "Reserved by IETF" in the IPv6 Address Space
+    /// registry, so nothing a store's download can legitimately live at, and refusing it is
+    /// what keeps the answer fail-closed for space no registry row names yet - including the
+    /// unallocated remainder of <c>64:ff9b::/32</c>.
     /// </summary>
-    private static bool IsBlockedV6(IPAddress ip)
+    private static readonly Cidr GlobalUnicastV6 = Range("2000::", 3);
+
+    /// <summary>
+    /// The IPv4 half, including the loopback exception. Every caller reaches the policy
+    /// through here - the bare IPv4 dispatch and both translation prefixes alike - so there
+    /// is one answer for 127.0.0.1 rather than one per route to it.
+    /// </summary>
+    private static bool IsBlockedV4(byte[] address, bool allowLoopback)
+    {
+        if (LoopbackV4.Contains(address))
+            return !allowLoopback;
+
+        return BlockedV4.Any(range => range.Contains(address));
+    }
+
+    /// <summary>
+    /// The IPv6 half. Two prefixes carry an IPv4 address inside them, and an address that is
+    /// only reachable because of the wrapper is exactly what this is here to refuse - so they
+    /// are unwrapped and classified as the IPv4 addresses they are, <b>by the full IPv4
+    /// policy</b>: the loopback row and the developer exception included.
+    /// </summary>
+    private static bool IsBlockedV6(IPAddress ip, bool allowLoopback)
     {
         var b = ip.GetAddressBytes();
 
-        // 64:ff9b::/96 and 64:ff9b:1::/48 - NAT64. The last four bytes are an IPv4 address,
-        // and reaching 169.254.169.254 through a translator is still reaching it.
-        if (b[0] == 0x00 && b[1] == 0x64 && b[2] == 0xFF && b[3] == 0x9B)
-            return IsBlockedV4(b[12..16]);
+        if (LoopbackV6.Contains(b))
+            return !allowLoopback;
 
-        // 2002::/16 - 6to4, which embeds the IPv4 address it tunnels to in the next 4 bytes.
-        if (b[0] == 0x20 && b[1] == 0x02)
-            return IsBlockedV4(b[2..6]);
+        // 64:ff9b::/96 - and only the /96. The last four bytes are an IPv4 address, and
+        // reaching 169.254.169.254 (or 127.0.0.1) through a translator is still reaching it.
+        if (Nat64WellKnown.Contains(b))
+            return IsBlockedV4(b[12..16], allowLoopback);
 
-        return BlockedV6.Any(range => range.Contains(b));
+        if (SixToFour.Contains(b))
+            return IsBlockedV4(b[2..6], allowLoopback);
+
+        if (BlockedV6.Any(range => range.Contains(b)))
+            return true;
+
+        // Nothing named it, so the question is whether IANA has delegated it for ordinary
+        // global use at all. Reserved space is refused rather than allowed by omission.
+        return !GlobalUnicastV6.Contains(b);
     }
 }

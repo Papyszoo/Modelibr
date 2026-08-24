@@ -488,6 +488,67 @@ public class StoreCatalogClientTests
         Assert.Equal(2, handler.Requests.Count);
     }
 
+    /// <summary>
+    /// The wrappers, as DNS answers rather than as URL literals.
+    /// </summary>
+    /// <remarks>
+    /// A hostname resolving to <c>64:ff9b::7f00:1</c> or <c>2002:7f00:1::</c> is a request at
+    /// this machine's own loopback interface, arrived at the long way round. The classifier
+    /// unwrapped both and then asked a table that deliberately omits 127/8 - because native
+    /// loopback was answered before the unwrap could happen - so both were allowed for a
+    /// PUBLIC store. <c>100:0:0:1::/64</c> (the RFC 9780 dummy prefix) was simply missing.
+    /// </remarks>
+    [Theory]
+    [InlineData("64:ff9b::7f00:1")]   // NAT64 /96 carrying 127.0.0.1
+    [InlineData("2002:7f00:1::")]     // 6to4 carrying 127.0.0.1
+    [InlineData("64:ff9b::a9fe:a9fe")] // NAT64 carrying the metadata endpoint
+    [InlineData("64:ff9b:1::808:808")] // the RFC 8215 local-use /48, which embeds nothing
+    [InlineData("100:0:0:1::1")]      // RFC 9780 dummy prefix
+    [InlineData("64:ff9b:2::808:808")] // 64:ff9b::/32 outside both reservations - reserved space
+    public async Task A_Redirect_To_A_Host_Resolving_Into_Wrapped_Or_Reserved_Space_Is_Refused(
+        string address)
+    {
+        var (client, handler) = Build(
+            request => request.RequestUri!.Host == "store.example.com"
+                ? RedirectTo("https://elsewhere.example.com/api/assets")
+                : Json(OnePage),
+            resolve: host => host == "elsewhere.example.com"
+                ? new[] { IPAddress.Parse(address) }
+                : new[] { IPAddress.Parse("93.184.216.34") });
+
+        var result = await client.SearchAsync(
+            new Application.StoreCatalog.StoreCatalogQuery("chair"), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        // The redirect target was never requested.
+        Assert.Single(handler.Requests);
+    }
+
+    /// <summary>
+    /// And the control: a wrapper around a PUBLIC address is still followed. Refusing the
+    /// tunnel itself would be a different rule, and a wrong one.
+    /// </summary>
+    [Theory]
+    [InlineData("64:ff9b::808:808")]   // NAT64 /96 carrying 8.8.8.8
+    [InlineData("2002:8c52:7903::1")]  // 6to4 carrying 140.82.121.3
+    public async Task A_Redirect_To_A_Host_Resolving_Into_A_Wrapped_Public_Address_Is_Followed(
+        string address)
+    {
+        var (client, handler) = Build(
+            request => request.RequestUri!.Host == "store.example.com"
+                ? RedirectTo("https://elsewhere.example.com/api/assets")
+                : Json(OnePage),
+            resolve: host => host == "elsewhere.example.com"
+                ? new[] { IPAddress.Parse(address) }
+                : new[] { IPAddress.Parse("93.184.216.34") });
+
+        var result = await client.SearchAsync(
+            new Application.StoreCatalog.StoreCatalogQuery("chair"), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(2, handler.Requests.Count);
+    }
+
     [Fact]
     public async Task A_Host_Answering_With_One_Public_And_One_Private_Address_Is_Refused()
     {

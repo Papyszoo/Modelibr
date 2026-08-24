@@ -246,6 +246,11 @@ public class StoreUrlSafetyTests
     // 100::/64 - discard-only
     [InlineData("100::")]
     [InlineData("100::ffff:ffff:ffff:ffff")]
+    // 100:0:0:1::/64 - the RFC 9780 dummy prefix, first and last address. IANA marks it
+    // NOT globally reachable; the table omitted it and a test asserted its first address
+    // was allowed, which is the finding rather than the behaviour.
+    [InlineData("100:0:0:1::")]
+    [InlineData("100:0:0:1:ffff:ffff:ffff:ffff")]
     // fc00::/7 - unique-local, both halves
     [InlineData("fc00::")]
     [InlineData("fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")]
@@ -261,9 +266,18 @@ public class StoreUrlSafetyTests
     // ::/96 - the deprecated IPv4-compatible form and the reserved space around it
     [InlineData("::2")]
     [InlineData("::ffff:ffff")]
-    // 64:ff9b::/96 and 64:ff9b:1::/48 - NAT64, unwrapped and judged as the IPv4 inside
+    // 64:ff9b::/96 - unwrapped and judged as the IPv4 inside
     [InlineData("64:ff9b::a9fe:a9fe")]
+    // 64:ff9b:1::/48 - a DIFFERENT reservation (RFC 8215, local-use), refused whole. Nothing
+    // in it is an embedded address, so what the last 32 bits happen to spell is not a reason
+    // to let it through - which is what reading the /32 as RFC 6052 syntax used to do.
     [InlineData("64:ff9b:1::c0a8:1")]
+    [InlineData("64:ff9b:1::808:808")]
+    [InlineData("64:ff9b:1::")]
+    [InlineData("64:ff9b:1:ffff:ffff:ffff:ffff:ffff")]
+    // One bit past the /96, carrying what would read as a public IPv4 if the prefix were
+    // /32. The whole point of the length is that this is not embedded-address syntax.
+    [InlineData("64:ff9b:0:0:0:1:8080:8080")]
     // The IPv4 special-purpose rows that had no coverage either
     [InlineData("192.31.196.0")]    // AS112-v4
     [InlineData("192.31.196.255")]
@@ -281,6 +295,70 @@ public class StoreUrlSafetyTests
     }
 
     /// <summary>
+    /// Space no registry row names, refused because IANA never delegated it for ordinary use.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The IPv6 Address Space registry delegates exactly one block as Global Unicast -
+    /// <c>2000::/3</c> - and marks everything else Reserved by IETF (the special-purpose
+    /// entries below <c>2000::</c>, and <c>fc00::/7</c>, <c>fe80::/10</c> and <c>ff00::/8</c>,
+    /// are carved out of that reserved space, not out of global unicast). A table of named
+    /// prefixes therefore cannot be the whole answer on its own: the addresses BETWEEN the
+    /// named rows are not ordinary internet destinations, and letting them through by
+    /// omission is the same shape of gap that left <c>3fff::/20</c> reachable.
+    /// </para>
+    /// <para>
+    /// This is what makes the NAT64 length fix safe to make. Narrowing the well-known prefix
+    /// from the first four bytes to the RFC 6052 <c>/96</c> means the rest of
+    /// <c>64:ff9b::/32</c> stops being read as an embedded IPv4 address - and it must stop
+    /// being read as global unicast in the same breath, or the fix would have opened what it
+    /// was tightening.
+    /// </para>
+    /// <para>
+    /// Three rows here were previously asserted as ALLOWED, as the addresses just outside
+    /// <c>5f00::/16</c> and <c>fc00::/7</c>. That expectation was wrong rather than merely
+    /// loose: <c>5eff::</c>, <c>5f01::</c> and <c>fbff::</c> are all outside <c>2000::/3</c>
+    /// and none of them is a place a store's download can live.
+    /// </para>
+    /// </remarks>
+    [Theory]
+    // Unallocated space under 64:ff9b::/32 that is NOT the RFC 6052 /96 and NOT the RFC 8215
+    // /48 - refused as reserved space, and never read as an embedded address.
+    [InlineData("64:ff9b:2::808:808")]
+    [InlineData("64:ff9b:ffff::808:808")]
+    // The rest of ::/8 around the prefixes listed in it.
+    [InlineData("::1:0:0")]
+    [InlineData("100:0:0:2::")]
+    // Either side of 5f00::/16, which IANA allocated out of reserved space.
+    [InlineData("5eff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")]
+    [InlineData("5f01::")]
+    // Just below fc00::/7.
+    [InlineData("fbff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")]
+    // The reserved blocks themselves, sampled at their first address.
+    [InlineData("4000::1")]
+    [InlineData("6000::1")]
+    [InlineData("8000::1")]
+    [InlineData("c000::1")]
+    [InlineData("e000::1")]
+    public void IsBlockedAddress_Refuses_SpaceOutsideGlobalUnicast(string ip)
+    {
+        Assert.True(StoreUrlSafety.IsBlockedAddress(IPAddress.Parse(ip), allowLoopback: false));
+        Assert.True(StoreUrlSafety.IsBlockedAddress(IPAddress.Parse(ip), allowLoopback: true));
+    }
+
+    /// <summary>
+    /// The other side of that rule: <c>2000::/3</c> itself is ordinary space, at both ends.
+    /// A guard that refuses everything is not a guard.
+    /// </summary>
+    [Theory]
+    [InlineData("2000::1")]
+    [InlineData("3fff:ffff:ffff:ffff:ffff:ffff:ffff:fffe")] // last of 2000::/3, outside 3fff::/20
+    public void IsBlockedAddress_Allows_TheEndsOfGlobalUnicast(string ip)
+    {
+        Assert.False(StoreUrlSafety.IsBlockedAddress(IPAddress.Parse(ip), allowLoopback: false));
+    }
+
+    /// <summary>
     /// The address immediately outside each prefix above. This is the half that fails when a
     /// mask is one bit too wide - and refusing real global unicast is an outage, not a
     /// tighter guard.
@@ -289,9 +367,6 @@ public class StoreUrlSafetyTests
     // Either side of 3fff::/20
     [InlineData("3ffe:ffff:ffff:ffff:ffff:ffff:ffff:ffff")]
     [InlineData("3fff:1000::")]
-    // Either side of 5f00::/16
-    [InlineData("5eff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")]
-    [InlineData("5f01::")]
     // Either side of 2620:4f:8000::/48
     [InlineData("2620:4f:7fff:ffff:ffff:ffff:ffff:ffff")]
     [InlineData("2620:4f:8001::")]
@@ -303,12 +378,9 @@ public class StoreUrlSafetyTests
     // Either side of 2001:db8::/32
     [InlineData("2001:db7:ffff:ffff:ffff:ffff:ffff:ffff")]
     [InlineData("2001:db9::")]
-    // Just past 100::/64
-    [InlineData("100:0:0:1::")]
-    // Either side of fc00::/7
-    [InlineData("fbff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")]
-    // Just past ::/96
-    [InlineData("::1:0:0")]
+    // Either side of 2002::/16, which is ordinary space once the tunnel prefix ends
+    [InlineData("2001:ffff:ffff:ffff:ffff:ffff:ffff:ffff")]
+    [InlineData("2003::1")]
     // NAT64 and 6to4 wrapping a PUBLIC IPv4 stay allowed - the wrapper is not the problem
     [InlineData("64:ff9b::8080:8080")]
     [InlineData("2002:0101:0101::1")]
@@ -339,6 +411,8 @@ public class StoreUrlSafetyTests
     [InlineData("https://[fe80::1]/f")]
     [InlineData("https://192.31.196.1/f")]
     [InlineData("https://192.175.48.1/f")]
+    [InlineData("https://[64:ff9b:1::]/f")]
+    [InlineData("https://[100:0:0:1:ffff:ffff:ffff:ffff]/f")]
     public void ValidateDownloadTarget_Blocks_EveryNewlyCoveredRange(string url)
     {
         var result = StoreUrlSafety.ValidateDownloadTarget(new Uri(url), PublicStore);
@@ -365,6 +439,115 @@ public class StoreUrlSafetyTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("StoreImport.BlockedDownloadUrl", result.Error.Code);
+    }
+
+    // ─── translated and tunnelled IPv4, which is IPv4 ─────────────────────────
+    //
+    // 64:ff9b::/96 (NAT64) and 2002::/16 (6to4) carry an IPv4 address inside them, and the
+    // classifier unwraps both. It used to hand the unwrapped bytes to the IPv4 TABLE, which
+    // deliberately does not list 127/8 because native loopback was answered one level up -
+    // so 64:ff9b::7f00:1 and 2002:7f00:1:: reached the loopback interface of a machine
+    // running against a PUBLIC store. The whole IPv4 policy travels with the unwrap now.
+
+    /// <summary>
+    /// The reported bypass, both wrappers, at both settings of the developer exception.
+    /// </summary>
+    [Theory]
+    // NAT64 /96 carrying 127.0.0.1
+    [InlineData("64:ff9b::7f00:1")]
+    // 6to4 carrying 127.0.0.1
+    [InlineData("2002:7f00:1::")]
+    // and the rest of 127/8, which is loopback just as much as .1 is
+    [InlineData("64:ff9b::7f2a:305")]
+    [InlineData("2002:7f2a:305::1")]
+    public void IsBlockedAddress_Refuses_TranslatedLoopback_ForAPublicStore(string ip)
+    {
+        Assert.True(StoreUrlSafety.IsBlockedAddress(IPAddress.Parse(ip), allowLoopback: false));
+    }
+
+    /// <summary>
+    /// The other half of the same rule: the dev exception is about loopback, so it reaches a
+    /// wrapped loopback address too - and nothing else.
+    /// </summary>
+    [Theory]
+    [InlineData("64:ff9b::7f00:1")]
+    [InlineData("2002:7f00:1::")]
+    public void IsBlockedAddress_Allows_TranslatedLoopback_ForALoopbackStore(string ip)
+    {
+        Assert.False(StoreUrlSafety.IsBlockedAddress(IPAddress.Parse(ip), allowLoopback: true));
+    }
+
+    /// <summary>
+    /// Every other category through both wrappers, at both settings. Loopback is the ONE row
+    /// the exception moves; a private, link-local or documentation address stays refused for
+    /// a developer running the store locally, and a public one stays reachable for everybody.
+    /// </summary>
+    [Theory]
+    // wrapper, embedded address, blocked with allowLoopback:false, blocked with allowLoopback:true
+    [InlineData("64:ff9b::a00:5", true, true)]          // 10.0.0.5 - private
+    [InlineData("2002:a00:5::", true, true)]
+    [InlineData("64:ff9b::ac10:404", true, true)]       // 172.16.4.4 - private
+    [InlineData("2002:ac10:404::", true, true)]
+    [InlineData("64:ff9b::c0a8:1", true, true)]         // 192.168.0.1 - private
+    [InlineData("2002:c0a8:1::", true, true)]
+    [InlineData("64:ff9b::a9fe:a9fe", true, true)]      // 169.254.169.254 - link-local
+    [InlineData("2002:a9fe:a9fe::", true, true)]
+    [InlineData("64:ff9b::c000:201", true, true)]       // 192.0.2.1 - TEST-NET-1
+    [InlineData("2002:c000:201::", true, true)]
+    [InlineData("64:ff9b::e000:1", true, true)]         // 224.0.0.1 - multicast
+    [InlineData("2002:e000:1::", true, true)]
+    [InlineData("64:ff9b::808:808", false, false)]      // 8.8.8.8 - public
+    [InlineData("2002:808:808::", false, false)]
+    [InlineData("64:ff9b::8c52:7903", false, false)]    // 140.82.121.3 - public
+    [InlineData("2002:8c52:7903::", false, false)]
+    public void IsBlockedAddress_Classifies_EveryTranslatedCategory(
+        string ip, bool blockedForPublicStore, bool blockedForLoopbackStore)
+    {
+        Assert.Equal(
+            blockedForPublicStore,
+            StoreUrlSafety.IsBlockedAddress(IPAddress.Parse(ip), allowLoopback: false));
+        Assert.Equal(
+            blockedForLoopbackStore,
+            StoreUrlSafety.IsBlockedAddress(IPAddress.Parse(ip), allowLoopback: true));
+    }
+
+    /// <summary>
+    /// And through the literal-URL gate, which is where a manifest or a 302 actually delivers
+    /// one. A classifier is only worth what the call sites ask it.
+    /// </summary>
+    [Theory]
+    [InlineData("https://[64:ff9b::7f00:1]/f")]
+    [InlineData("https://[2002:7f00:1::]/f")]
+    [InlineData("https://[64:ff9b:1::808:808]/f")]
+    [InlineData("https://[100:0:0:1::1]/f")]
+    [InlineData("https://[100:0:0:1::]/f")]
+    public void ValidateDownloadTarget_Blocks_TranslatedAndDummyPrefixLiterals(string url)
+    {
+        var result = StoreUrlSafety.ValidateDownloadTarget(new Uri(url), PublicStore);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("StoreImport.BlockedDownloadUrl", result.Error.Code);
+    }
+
+    /// <summary>
+    /// A loopback store may follow a redirect to a WRAPPED loopback address - it is the same
+    /// machine, reached the long way round - and still may not follow one anywhere else.
+    /// </summary>
+    [Fact]
+    public void ValidateDownloadTarget_FromALoopbackStore_AllowsWrappedLoopback_ButNothingElse()
+    {
+        var loopbackStore = new Uri("http://localhost:5000");
+
+        Assert.True(StoreUrlSafety
+            .ValidateDownloadTarget(new Uri("http://[64:ff9b::7f00:1]/f"), loopbackStore).IsSuccess);
+        Assert.True(StoreUrlSafety
+            .ValidateDownloadTarget(new Uri("http://[2002:7f00:1::]/f"), loopbackStore).IsSuccess);
+
+        // Same wrapper, a private address inside it. The exception did not widen.
+        Assert.True(StoreUrlSafety
+            .ValidateDownloadTarget(new Uri("http://[64:ff9b::a00:5]/f"), loopbackStore).IsFailure);
+        Assert.True(StoreUrlSafety
+            .ValidateDownloadTarget(new Uri("http://[2002:a9fe:a9fe::]/f"), loopbackStore).IsFailure);
     }
 
     /// <summary>
