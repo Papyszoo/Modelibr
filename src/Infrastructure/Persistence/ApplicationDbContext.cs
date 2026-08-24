@@ -3,6 +3,7 @@ using Domain.Models;
 using Domain.ValueObjects;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using SharedKernel;
 
 namespace Infrastructure.Persistence
 {
@@ -39,6 +40,57 @@ namespace Infrastructure.Persistence
 
         Task IUnitOfWork.SaveChangesAsync(CancellationToken cancellationToken) =>
             SaveChangesAsync(cancellationToken);
+
+        /// <summary>
+        /// One transaction around a handler that has to make several commits.
+        /// </summary>
+        /// <remarks>
+        /// EF joins every <see cref="SaveChangesAsync"/> made while this transaction is open
+        /// to it instead of opening its own, which is the property the metadata patch needs:
+        /// the family command handlers it calls each commit through the unit-of-work
+        /// decorator, and none of those commits may become durable on its own.
+        ///
+        /// A failure Result rolls back exactly like a throw does. The change tracker is
+        /// cleared on the way out of a rollback, because the entities it still holds were
+        /// written against a transaction that no longer exists, and leaving them staged would
+        /// let the next save in this scope re-apply the half-patch that was just undone.
+        ///
+        /// COORDINATION: if EnableRetryOnFailure ever lands on the Npgsql provider, this must
+        /// move inside Database.CreateExecutionStrategy().ExecuteAsync - user-initiated
+        /// transactions and a retrying execution strategy are incompatible.
+        /// </remarks>
+        async Task<Result<T>> IUnitOfWork.InTransactionAsync<T>(
+            Func<CancellationToken, Task<Result<T>>> work,
+            CancellationToken cancellationToken)
+        {
+            // Already inside one - joining is the whole point, so do not nest a second.
+            if (Database.CurrentTransaction is not null)
+            {
+                return await work(cancellationToken);
+            }
+
+            await using var transaction = await Database.BeginTransactionAsync(cancellationToken);
+            try
+            {
+                var result = await work(cancellationToken);
+                if (result.IsFailure)
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    ChangeTracker.Clear();
+                    return result;
+                }
+
+                await SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                return result;
+            }
+            catch
+            {
+                await transaction.RollbackAsync(CancellationToken.None);
+                ChangeTracker.Clear();
+                throw;
+            }
+        }
 
         private static bool IsDuplicatePackModelAssociation(DbUpdateException ex)
             => ex.InnerException is PostgresException

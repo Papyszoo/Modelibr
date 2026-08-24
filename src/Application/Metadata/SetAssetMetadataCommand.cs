@@ -81,36 +81,47 @@ internal sealed class SetAssetMetadataCommandHandler
             return Result.Failure<AssetMetadataResponse>(entityState.Error);
         }
 
-        // Everything the write REFERENCES is checked before any of it is applied - and
-        // checked against the SAME rules the family's command applies, kind included, not
-        // merely for existence. Four of the six families spend two commands and two commits
-        // on one entity write, so a category rejected halfway through would return a
-        // failure with the tags and description already durable - and the agent surface,
-        // reading that failure, releases the idempotency key and lets a retry apply them a
-        // second time.
-        var valid = await _entity.ValidateWriteAsync(
-            family, command.AssetId, patch.EntityWrite, cancellationToken);
-        if (valid.IsFailure)
+        // One patch, one transaction.
+        //
+        // Prevalidation below still runs, and still earns its place: it turns the errors we
+        // can name - a missing category, the wrong TextureSetKind, a value too long for its
+        // column - into a clean "nothing was written" that leaves the idempotency key
+        // retryable. What it cannot do is make the write atomic. Four of the six families
+        // spend two commands on one entity write, each committing through the unit-of-work
+        // decorator, and the side table is a third write after them; anything prevalidation
+        // did not foresee - a constraint, a concurrent delete of a category between the
+        // check and the reference, a concurrency token - landed with the earlier commits
+        // already durable and reported a failure saying nothing had been.
+        //
+        // Inside a transaction those nested saves stop being independently durable, so the
+        // failure path tells the truth whether or not it was one we could predict.
+        return await _unitOfWork.InTransactionAsync(async ct =>
         {
-            return Result.Failure<AssetMetadataResponse>(valid.Error);
-        }
-
-        if (!patch.EntityWrite.IsEmpty)
-        {
-            var write = await _entity.WriteAsync(family, command.AssetId, patch.EntityWrite, cancellationToken);
-            if (write.IsFailure)
+            // Checked against the SAME rules the family's command applies, kind included,
+            // not merely for existence.
+            var valid = await _entity.ValidateWriteAsync(family, command.AssetId, patch.EntityWrite, ct);
+            if (valid.IsFailure)
             {
-                return Result.Failure<AssetMetadataResponse>(write.Error);
+                return Result.Failure<AssetMetadataResponse>(valid.Error);
             }
-        }
 
-        if (patch.TouchesSideTable)
-        {
-            await ApplySideTableAsync(family, command.AssetId, patch, cancellationToken);
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
-        }
+            if (!patch.EntityWrite.IsEmpty)
+            {
+                var write = await _entity.WriteAsync(family, command.AssetId, patch.EntityWrite, ct);
+                if (write.IsFailure)
+                {
+                    return Result.Failure<AssetMetadataResponse>(write.Error);
+                }
+            }
 
-        return await _read.Handle(new ReadAssetMetadataQuery(family, command.AssetId), cancellationToken);
+            if (patch.TouchesSideTable)
+            {
+                await ApplySideTableAsync(family, command.AssetId, patch, ct);
+                await _unitOfWork.SaveChangesAsync(ct);
+            }
+
+            return await _read.Handle(new ReadAssetMetadataQuery(family, command.AssetId), ct);
+        }, cancellationToken);
     }
 
     private async Task ApplySideTableAsync(
@@ -357,7 +368,19 @@ internal sealed class SetAssetMetadataCommandHandler
             return Result.Success<string?>(null);
         }
 
-        return NormalizeEnum(field, text.Trim());
+        var trimmed = text.Trim();
+        if (field.MaxLength is { } limit && trimmed.Length > limit)
+        {
+            // Refused here rather than at the column. The write is several commits deep by
+            // the time the database sees it, so a length that only the column knows about
+            // used to surface as a mid-patch failure; naming the limit at the boundary keeps
+            // "nothing was written" honest and tells the caller what to shorten.
+            return Result.Failure<string?>(new Error(
+                "MetadataValueTooLong",
+                $"'{field.Key}' accepts at most {limit} characters and was given {trimmed.Length}. Nothing was written."));
+        }
+
+        return NormalizeEnum(field, trimmed);
     }
 
     private static Result<IReadOnlyList<string>?> ReadList(AssetMetadataField field, JsonElement value)

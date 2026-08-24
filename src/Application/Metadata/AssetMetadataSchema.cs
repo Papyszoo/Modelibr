@@ -288,7 +288,8 @@ public static class AssetMetadataSchema
             Storage: AssetMetadataStorage.Metadata,
             Description: "The recognized licence. Unrecognized spellings land as Custom with the original text in licenseName.",
             AllowedValues: Licenses,
-            StoreManifestPath: "license");
+            StoreManifestPath: "license",
+            MaxLength: 40);
 
         yield return new AssetMetadataField(
             Key: "licenseName",
@@ -298,7 +299,8 @@ public static class AssetMetadataSchema
             Provenance: FieldProvenance.Imported,
             Storage: AssetMetadataStorage.Metadata,
             Description: "The licence exactly as the source stated it, kept verbatim so nothing is lost to a spelling this schema does not recognize.",
-            StoreManifestPath: "license");
+            StoreManifestPath: "license",
+            MaxLength: 200);
 
         yield return new AssetMetadataField(
             Key: "licenseUrl",
@@ -307,7 +309,8 @@ public static class AssetMetadataSchema
             Type: FieldTypes.Url,
             Provenance: FieldProvenance.Imported,
             Storage: AssetMetadataStorage.Metadata,
-            Description: "Where the licence text lives.");
+            Description: "Where the licence text lives.",
+            MaxLength: 2048);
 
         yield return new AssetMetadataField(
             Key: "author",
@@ -317,7 +320,8 @@ public static class AssetMetadataSchema
             Provenance: FieldProvenance.Imported,
             Storage: AssetMetadataStorage.Metadata,
             Description: "Who made the asset.",
-            StoreManifestPath: "author");
+            StoreManifestPath: "author",
+            MaxLength: 200);
 
         yield return new AssetMetadataField(
             Key: "creditName",
@@ -327,7 +331,8 @@ public static class AssetMetadataSchema
             Provenance: FieldProvenance.Imported,
             Storage: AssetMetadataStorage.Metadata,
             Description: "The name attribution must use, which is not always the author's name.",
-            StoreManifestPath: "creditName");
+            StoreManifestPath: "creditName",
+            MaxLength: 200);
 
         yield return new AssetMetadataField(
             Key: "creditUrl",
@@ -337,7 +342,8 @@ public static class AssetMetadataSchema
             Provenance: FieldProvenance.Imported,
             Storage: AssetMetadataStorage.Metadata,
             Description: "The link attribution must point at.",
-            StoreManifestPath: "creditUrl");
+            StoreManifestPath: "creditUrl",
+            MaxLength: 2048);
 
         yield return new AssetMetadataField(
             Key: "attributionRequired",
@@ -359,7 +365,8 @@ public static class AssetMetadataSchema
             Provenance: FieldProvenance.Imported,
             Storage: AssetMetadataStorage.Metadata,
             Description: "Where the asset came from.",
-            AllowedValues: SourceKinds);
+            AllowedValues: SourceKinds,
+            MaxLength: 40);
 
         yield return new AssetMetadataField(
             Key: "sourceFolder",
@@ -378,7 +385,8 @@ public static class AssetMetadataSchema
             Type: FieldTypes.Url,
             Provenance: FieldProvenance.Imported,
             Storage: AssetMetadataStorage.Metadata,
-            Description: "The page the asset was obtained from.");
+            Description: "The page the asset was obtained from.",
+            MaxLength: 2048);
 
         yield return new AssetMetadataField(
             Key: "storeUrl",
@@ -387,7 +395,8 @@ public static class AssetMetadataSchema
             Type: FieldTypes.Url,
             Provenance: FieldProvenance.Imported,
             Storage: AssetMetadataStorage.Metadata,
-            Description: "The store instance this asset was imported from.");
+            Description: "The store instance this asset was imported from.",
+            MaxLength: 2048);
 
         yield return new AssetMetadataField(
             Key: "storeAssetId",
@@ -397,7 +406,8 @@ public static class AssetMetadataSchema
             Provenance: FieldProvenance.Imported,
             Storage: AssetMetadataStorage.Metadata,
             Description: "The store listing this asset came from.",
-            StoreManifestPath: "assetId");
+            StoreManifestPath: "assetId",
+            MaxLength: 100);
 
         yield return new AssetMetadataField(
             Key: "storeItemId",
@@ -407,7 +417,8 @@ public static class AssetMetadataSchema
             Provenance: FieldProvenance.Imported,
             Storage: AssetMetadataStorage.Metadata,
             Description: "The specific pack item this asset came from. What a later population pass keys on, and what prompt 08's dedupe needs.",
-            StoreManifestPath: "items[].id");
+            StoreManifestPath: "items[].id",
+            MaxLength: 100);
 
         yield return new AssetMetadataField(
             Key: "importedAt",
@@ -509,6 +520,12 @@ public static class AssetMetadataSchema
 /// The store manifest path that populates this field, so a population pass has the mapping
 /// in the contract rather than in someone's head. Null when nothing in a manifest fills it.
 /// </param>
+/// <param name="MaxLength">
+/// How long a value this field's column accepts, where the column bounds it. Stated here so
+/// a patch that would not fit is refused at the boundary with a readable error, instead of
+/// reaching the database and failing mid-write - which is the difference between "nothing
+/// was written" being true and being a guess. Null where the storage is unbounded text.
+/// </param>
 public sealed record AssetMetadataField(
     string Key,
     string Label,
@@ -521,4 +538,5 @@ public sealed record AssetMetadataField(
     string? Description = null,
     IReadOnlyList<string>? AllowedValues = null,
     string? CategoryFamily = null,
-    string? StoreManifestPath = null);
+    string? StoreManifestPath = null,
+    int? MaxLength = null);

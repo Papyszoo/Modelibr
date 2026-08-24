@@ -253,6 +253,66 @@ public class SetAssetMetadataCommandHandlerTests
     }
 
     [Fact]
+    public async Task AValueLongerThanItsColumn_IsRefusedWithTheLimitNamed()
+    {
+        // The deterministic repro behind the atomicity work: licenseName's column is
+        // varchar(200), and a patch carrying it alongside tags used to commit the tags,
+        // fail on the column, and report that nothing had been written.
+        //
+        // The patch is one transaction now, so that report is true either way - but a limit
+        // this side of the database turns an unreadable 22001 into an error naming the field
+        // and the number, before any of the work starts.
+        var fixture = new Fixture();
+
+        var result = await fixture.Handle(new { licenseName = new string('L', 201) });
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("MetadataValueTooLong", result.Error.Code);
+        Assert.Contains("licenseName", result.Error.Message);
+        Assert.Contains("200", result.Error.Message);
+        Assert.Contains("201", result.Error.Message);
+        // Refused during parsing, so the entity write is never even attempted.
+        fixture.Entity.Verify(e => e.WriteAsync(
+            It.IsAny<string>(), It.IsAny<int>(), It.IsAny<AssetEntityMetadataWrite>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Null(fixture.Stored.LicenseName);
+    }
+
+    [Fact]
+    public async Task AValueExactlyAtItsLimit_IsAccepted()
+    {
+        // The boundary is inclusive - an off-by-one here would refuse values the column
+        // holds perfectly well.
+        var fixture = new Fixture();
+        var atTheLimit = new string('L', 200);
+
+        var result = await fixture.Handle(new { licenseName = atTheLimit });
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(atTheLimit, fixture.Stored.LicenseName);
+    }
+
+    [Fact]
+    public void EveryStringFieldTheColumnBounds_CarriesItsLimit()
+    {
+        // A field added without its length is a field that fails at the database again. The
+        // check is on storage: everything the AssetMetadata side table holds in a bounded
+        // column has to say how long it can be.
+        var bounded = new[]
+        {
+            "license", "licenseName", "licenseUrl", "author", "creditName", "creditUrl",
+            "sourceKind", "sourceUrl", "storeUrl", "storeAssetId", "storeItemId",
+        };
+
+        foreach (var key in bounded)
+        {
+            var field = AssetMetadataSchema.Field(Family, key);
+            Assert.NotNull(field);
+            Assert.True(field!.MaxLength > 0, $"'{key}' has no MaxLength, so an over-long value reaches the column.");
+        }
+    }
+
+    [Fact]
     public async Task UnknownFamily_IsRefused()
     {
         var fixture = new Fixture();
@@ -309,6 +369,17 @@ public class SetAssetMetadataCommandHandlerTests
                     Family, AssetId, "Chair", AssetMetadataSchema.Version, AssetMetadataSchema.Version,
                     Array.Empty<AssetMetadataValue>(),
                     new AssetMetadataCompleteness(0, 0, Array.Empty<string>()))));
+
+            // The transaction boundary the handler now runs its whole patch inside. Here it
+            // only has to run the work and hand back its Result - what it MEANS (nested
+            // saves joining one transaction, a failure Result rolling the lot back) is a
+            // property of a real database, and is covered by the metadata integration tests.
+            UnitOfWork
+                .Setup(u => u.InTransactionAsync(
+                    It.IsAny<Func<CancellationToken, Task<Result<AssetMetadataResponse>>>>(),
+                    It.IsAny<CancellationToken>()))
+                .Returns<Func<CancellationToken, Task<Result<AssetMetadataResponse>>>, CancellationToken>(
+                    (work, token) => work(token));
 
             var clock = new Mock<IDateTimeProvider>();
             clock.SetupGet(c => c.UtcNow).Returns(new DateTime(2026, 8, 22, 0, 0, 0, DateTimeKind.Utc));
