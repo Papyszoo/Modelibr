@@ -38,14 +38,6 @@ import { useCategoryOptionsQuery } from '../queries'
 describe('category query cache shapes are shared, not overwritten', () => {
   const mockGet = client.get as jest.Mock
 
-  /** `useQuery` over a prebuilt options object - the texture-set call sites' shape. */
-  function useQueryFromOptions(options: {
-    queryKey: readonly unknown[]
-    queryFn: () => Promise<unknown>
-  }) {
-    return useQuery(options)
-  }
-
   const CATEGORIES = [
     { id: 3, name: 'Props', parentId: null, path: 'Props' },
     { id: 4, name: 'Furniture', parentId: 3, path: 'Props / Furniture' },
@@ -121,7 +113,7 @@ describe('category query cache shapes are shared, not overwritten', () => {
       renderEstablished: () =>
         renderHook(
           () =>
-            useQueryFromOptions(
+            useQuery(
               getTextureSetCategoriesQueryOptions(TextureSetKind.Universal)
             ),
           wrapper()
@@ -135,7 +127,7 @@ describe('category query cache shapes are shared, not overwritten', () => {
       renderEstablished: () =>
         renderHook(
           () =>
-            useQueryFromOptions(
+            useQuery(
               getTextureSetCategoriesQueryOptions(TextureSetKind.Universal)
             ),
           wrapper()
@@ -149,7 +141,7 @@ describe('category query cache shapes are shared, not overwritten', () => {
       renderEstablished: () =>
         renderHook(
           () =>
-            useQueryFromOptions(
+            useQuery(
               getTextureSetCategoriesQueryOptions(TextureSetKind.ModelSpecific)
             ),
           wrapper()

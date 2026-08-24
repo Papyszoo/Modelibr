@@ -2,6 +2,8 @@ import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { useSceneEditorStore } from '@/stores'
+
+import type { SceneDocument } from '../../types'
 import { renderWithProviders } from '@/test/renderWithProviders'
 
 import * as modelApi from '../../../models/api/modelApi'
@@ -85,7 +87,9 @@ describe('scene editing is serialised against the project link', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
-    useSceneEditorStore.getState().open(2, sceneView().document, REVISION)
+    useSceneEditorStore
+      .getState()
+      .open(2, sceneView().document as SceneDocument, REVISION)
 
     scenes.getSceneById.mockResolvedValue(sceneView() as never)
     scenes.getSceneSlots.mockResolvedValue({

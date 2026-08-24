@@ -13,26 +13,34 @@ import {
  * saw and cannot reconcile.
  */
 describe('project-link serialization', () => {
+  /** What one render of the hook is given: the two revisions, and whether the
+   *  scene query is refetching. Named, and passed as the INITIAL props, so
+   *  `rerender` accepts `fetching` - inferring the props from an initial object
+   *  that omitted it made every rerender that set it a type error. */
+  interface Props {
+    loaded: number | undefined
+    base: number | null
+    fetching?: boolean
+  }
+
   function setup(
     loadedRevision: number | undefined,
     baseRevision: number | null
   ) {
     return renderHook(
-      ({
-        loaded,
-        base,
-        fetching = false,
-      }: {
-        loaded: number | undefined
-        base: number | null
-        fetching?: boolean
-      }) =>
+      ({ loaded, base, fetching = false }: Props) =>
         useProjectLinkSerialization({
           loadedRevision: loaded,
           baseRevision: base,
           isFetching: fetching,
         }),
-      { initialProps: { loaded: loadedRevision, base: baseRevision } }
+      {
+        initialProps: {
+          loaded: loadedRevision,
+          base: baseRevision,
+          fetching: false,
+        } as Props,
+      }
     )
   }
 

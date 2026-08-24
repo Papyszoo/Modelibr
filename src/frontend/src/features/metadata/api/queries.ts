@@ -1,4 +1,5 @@
 import {
+  type QueryFunction,
   queryOptions,
   useMutation,
   useQuery,
@@ -248,14 +249,28 @@ export function getCategoryOptionsQueryOptions(
  */
 function borrow<TData>(
   options: {
+    // Loose on the key and precise on the data: `queryOptions()` brands its
+    // queryKey with the type it caches, and inferring from that brand drags the
+    // whole tagged tuple in. The key is only ever passed through.
     queryKey: readonly unknown[]
-    queryFn: () => Promise<TData>
+    // Optional because `queryOptions()` types it so, never because a family may
+    // omit it - see the guard below.
+    queryFn?: QueryFunction<TData, never>
   },
   select: (data: TData) => HierarchicalCategory[]
 ): CategoryOptionsQuery {
+  if (!options.queryFn) {
+    // Loudly, rather than as a picker that says "Loading…" forever: a family
+    // whose options carry no fetcher is a wiring mistake, and React Query's own
+    // answer to a missing queryFn is to sit there.
+    throw new Error('A category family was wired without a query function.')
+  }
+
+  const queryFn = options.queryFn as QueryFunction<unknown, readonly unknown[]>
+
   return {
     queryKey: options.queryKey,
-    queryFn: options.queryFn,
+    queryFn,
     select: data => select(data as TData),
   }
 }
@@ -274,7 +289,7 @@ function borrow<TData>(
  */
 interface CategoryOptionsQuery {
   queryKey: readonly unknown[]
-  queryFn: () => Promise<unknown>
+  queryFn: QueryFunction<unknown, readonly unknown[]>
   select: (data: unknown) => HierarchicalCategory[]
 }
 
