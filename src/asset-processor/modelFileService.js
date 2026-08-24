@@ -2,6 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import os from 'os'
 import { JobApiClient } from './jobApiClient.js'
+import { writeStreamToFile } from './streamFile.js'
 import logger from './logger.js'
 
 /**
@@ -485,51 +486,18 @@ export class ModelFileService {
   }
 
   /**
-   * Write stream to file
+   * Write a stream to a file, removing the partial file if it cannot be finished.
+   *
+   * The implementation is shared - see `streamFile.js` for why a hand-rolled
+   * `pipe` + `destroy()` + `unlinkSync()` could not be made correct. Kept as a
+   * method because callers stub it.
+   *
    * @param {ReadableStream} stream - Input stream
    * @param {string} filePath - Output file path
    * @returns {Promise<void>}
    */
   async writeStreamToFile(stream, filePath) {
-    return new Promise((resolve, reject) => {
-      const writeStream = fs.createWriteStream(filePath)
-      let settled = false
-
-      // Whatever went wrong, the file this function created is now a truncated
-      // copy of a model - and the caller is about to see an error, not a path,
-      // so nobody else will ever come back for it. Left behind it is a byte-for-
-      // byte plausible .glb that a later pass could pick up, and disk that only
-      // the periodic sweep reclaims.
-      const fail = (message, error) => {
-        if (settled) return
-        settled = true
-
-        // Close first: a stream still holding the descriptor is a stream that
-        // can write another chunk after the unlink and recreate the file.
-        writeStream.destroy()
-        try {
-          if (fs.existsSync(filePath)) fs.unlinkSync(filePath)
-        } catch (cleanupError) {
-          logger.warn('Failed to remove a partially written file', {
-            filePath,
-            error: cleanupError.message,
-          })
-        }
-
-        reject(new Error(`${message}: ${error.message}`))
-      }
-
-      stream.pipe(writeStream)
-
-      writeStream.on('finish', () => {
-        if (settled) return
-        settled = true
-        resolve()
-      })
-
-      writeStream.on('error', error => fail('Failed to write file', error))
-      stream.on('error', error => fail('Stream error', error))
-    })
+    return writeStreamToFile(stream, filePath)
   }
 
   /**

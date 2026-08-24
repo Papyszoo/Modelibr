@@ -3,6 +3,7 @@ import os from 'os'
 import path from 'path'
 import { JobApiClient } from './jobApiClient.js'
 import logger from './logger.js'
+import { writeStreamToFile } from './streamFile.js'
 
 const CUBE_FACE_ORDER = ['px', 'nx', 'py', 'ny', 'pz', 'nz']
 
@@ -126,18 +127,7 @@ export class EnvironmentMapFileService {
   }
 
   async writeStreamToFile(stream, filePath) {
-    return new Promise((resolve, reject) => {
-      const writeStream = fs.createWriteStream(filePath)
-      stream.pipe(writeStream)
-
-      writeStream.on('finish', resolve)
-      writeStream.on('error', error => {
-        reject(new Error(`Failed to write file: ${error.message}`))
-      })
-      stream.on('error', error => {
-        reject(new Error(`Stream error: ${error.message}`))
-      })
-    })
+    return writeStreamToFile(stream, filePath)
   }
 
   async cleanupSource(source) {

@@ -3,6 +3,7 @@ import path from 'path'
 import os from 'os'
 import { JobApiClient } from './jobApiClient.js'
 import logger from './logger.js'
+import { writeStreamToFile } from './streamFile.js'
 
 /**
  * Service for fetching and managing sound files
@@ -171,23 +172,16 @@ export class SoundFileService {
    * @returns {Promise<void>}
    */
   async writeStreamToFile(stream, outputPath) {
-    return new Promise((resolve, reject) => {
-      const writer = fs.createWriteStream(outputPath)
-      stream.pipe(writer)
-
-      writer.on('finish', () => {
-        logger.debug('Stream written to file successfully', { outputPath })
-        resolve()
+    try {
+      await writeStreamToFile(stream, outputPath)
+      logger.debug('Stream written to file successfully', { outputPath })
+    } catch (error) {
+      logger.error('Error writing stream to file', {
+        outputPath,
+        error: error.message,
       })
-
-      writer.on('error', err => {
-        logger.error('Error writing stream to file', {
-          outputPath,
-          error: err.message,
-        })
-        reject(err)
-      })
-    })
+      throw error
+    }
   }
 
   /**

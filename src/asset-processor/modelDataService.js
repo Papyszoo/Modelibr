@@ -5,6 +5,7 @@ import path from 'path'
 import os from 'os'
 import { config } from './config.js'
 import logger from './logger.js'
+import { writeStreamToFile } from './streamFile.js'
 
 /**
  * Service for fetching model and texture data from the API
@@ -253,23 +254,7 @@ export class ModelDataService {
    * @returns {Promise<void>}
    */
   async writeStreamToFile(stream, filePath) {
-    return new Promise((resolve, reject) => {
-      const writeStream = fs.createWriteStream(filePath)
-
-      stream.pipe(writeStream)
-
-      writeStream.on('finish', () => {
-        resolve()
-      })
-
-      writeStream.on('error', error => {
-        reject(new Error(`Failed to write file: ${error.message}`))
-      })
-
-      stream.on('error', error => {
-        reject(new Error(`Stream error: ${error.message}`))
-      })
-    })
+    return writeStreamToFile(stream, filePath)
   }
 
   /**
