@@ -201,6 +201,37 @@ internal sealed class AgentOperationLogRepository : IAgentOperationLogRepository
         return failed == 1;
     }
 
+    public async Task<bool> InterruptClaimAsync(
+        string idempotencyKey,
+        string claimToken,
+        string? assetType,
+        int? assetId,
+        DateTime noticedAt,
+        CancellationToken cancellationToken = default)
+    {
+        // Same ownership rule as failing a claim - Pending, and this generation of it - but
+        // the state it lands in is terminal rather than retryable. The caller reaches here
+        // when it cannot say whether the mutation committed, and a key nobody can answer for
+        // must not be handed to the next retry.
+        var interrupted = await _context.AgentOperationLogs
+            .Where(l => l.IdempotencyKey == idempotencyKey &&
+                        l.ClaimToken == claimToken &&
+                        l.Status == AgentOperationStatus.Pending)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(l => l.Status, AgentOperationStatus.Interrupted)
+                    .SetProperty(l => l.CompletedAt, noticedAt)
+                    .SetProperty(l => l.ClaimedBy, (string?)null)
+                    // Coalesced, so an interrupt that knows what it was working on records it
+                    // and one that does not leaves the claim-time value alone. This is what
+                    // the recovery answer points a person at.
+                    .SetProperty(l => l.AssetType, l => assetType ?? l.AssetType)
+                    .SetProperty(l => l.AssetId, l => assetId ?? l.AssetId),
+                cancellationToken);
+
+        return interrupted == 1;
+    }
+
     public Task<AgentOperationLog?> GetByIdempotencyKeyAsync(string idempotencyKey, CancellationToken cancellationToken = default)
     {
         return _context.AgentOperationLogs
@@ -286,6 +317,27 @@ internal sealed class AgentOperationLogRepository : IAgentOperationLogRepository
                 cancellationToken);
 
         return marked == 1;
+    }
+
+    public async Task<bool> ExpireReversalClaimAsync(
+        string idempotencyKey,
+        string reversalToken,
+        DateTime expiredAt,
+        CancellationToken cancellationToken = default)
+    {
+        // The token stays: the claim is held, not given back. Only its clock is moved, so
+        // the next attempt reads the entry as an inverse whose outcome nobody recorded and
+        // reports it instead of applying it again. ReversedAt is untouched, because nothing
+        // here knows whether anything was reversed - that is the entire point.
+        var expired = await _context.AgentOperationLogs
+            .Where(l => l.IdempotencyKey == idempotencyKey &&
+                        l.ReversalToken == reversalToken &&
+                        l.ReversedAt == null)
+            .ExecuteUpdateAsync(
+                setters => setters.SetProperty(l => l.ReversalClaimedAt, (DateTime?)expiredAt),
+                cancellationToken);
+
+        return expired == 1;
     }
 
     public async Task<bool> ReleaseReversalAsync(

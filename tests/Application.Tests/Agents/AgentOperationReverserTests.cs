@@ -10,6 +10,7 @@ using Application.Sounds;
 using Application.Sprites;
 using Application.TextureSets;
 using Domain.Models;
+using Domain.Scenes;
 using Moq;
 using SharedKernel;
 using Xunit;
@@ -85,6 +86,21 @@ public class AgentOperationReverserTests
         entry.MarkCompleted(Now, assetType, assetId, after);
         return entry;
     }
+
+    /// <summary>
+    /// What delete-scene records: the inverse recreates the scene from this document, so a
+    /// payload without one is not reversible at all.
+    /// </summary>
+    private const string DeletedSceneBefore =
+        """{"name":"Kitchen","description":null,"document":"{\"schemaVersion\":1,\"nodes\":[],\"lights\":[]}"}""";
+
+    /// <summary>The scene the inverse creates - a new id, which is the point of the case.</summary>
+    private static SceneView RecreatedScene() => new(
+        new SceneSummary(99, "Kitchen", null, 1, 1, 0, 0, Now, Now),
+        new SceneDocument(1, [], []),
+        [],
+        [],
+        []);
 
     private void Records(params AgentOperationLog[] entries)
     {
@@ -242,12 +258,20 @@ public class AgentOperationReverserTests
     }
 
     /// <summary>
-    /// The crash-safety property, from the outside: an inverse that throws leaves the entry
-    /// un-reversed and re-undoable. Before the split, <c>ReversedAt</c> was stamped first,
-    /// so a throw here permanently recorded a reversal that never happened.
+    /// The crash-safety property, from the outside: an inverse that throws must never leave
+    /// the entry looking freshly undoable.
+    ///
+    /// <para>
+    /// This assertion was inverted once already. Before the claim/marker split,
+    /// <c>ReversedAt</c> was stamped first, so a throw permanently recorded a reversal that
+    /// never happened - and the fix, releasing the claim on the way out, overshot in the
+    /// other direction. An inverse commits and <i>then</i> reports, so a throw arrives with
+    /// the write possibly already durable; releasing there hands the next call an inverse it
+    /// re-applies. The claim is kept, in the state that reads as interrupted.
+    /// </para>
     /// </summary>
     [Fact]
-    public async Task An_Inverse_That_Throws_Releases_The_Claim_And_Records_No_Reversal()
+    public async Task An_Inverse_That_Throws_Keeps_Its_Claim_Ambiguous_Rather_Than_Releasing_It()
     {
         var entry = Completed(
             "key-22", "set-tags", "Model", 7,
@@ -260,17 +284,69 @@ public class AgentOperationReverserTests
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => _reverser.ApplyAsync(plan.Value));
         _audit.Verify(
-            a => a.ReleaseReversalAsync("key-22", "rev-1", It.IsAny<CancellationToken>()), Times.Once);
+            a => a.InterruptReversalAsync("key-22", "rev-1", It.IsAny<CancellationToken>()), Times.Once);
+        _audit.Verify(
+            a => a.ReleaseReversalAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
         _audit.Verify(
             a => a.CompleteReversalAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
     [Fact]
-    public async Task A_Cancelled_Inverse_Releases_The_Claim_And_Records_No_Reversal()
+    public async Task An_Inverse_That_Commits_And_Then_Throws_Is_Never_Offered_For_Retry()
     {
-        // Cancellation is the same shape as a throw and used to have the same consequence:
-        // the entry was already stamped reversed by the time the token fired.
+        // The concrete shape of "unknown": the command applied and the failure came after it.
+        // Nothing downstream can tell this from a command that failed before writing, which
+        // is exactly why neither may release the claim.
+        var entry = Completed(
+            "key-22b", "delete-scene", "Scene", 4, before: DeletedSceneBefore);
+        Records(entry);
+        var created = 0;
+        _createScene.Setup(h => h.Handle(It.IsAny<CreateSceneCommand>(), It.IsAny<CancellationToken>()))
+            .Callback(() => created++)
+            .ThrowsAsync(new InvalidOperationException("committed, then the response blew up"));
+
+        var plan = await _reverser.PlanAsync("key-22b", null);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _reverser.ApplyAsync(plan.Value));
+        Assert.Equal(1, created);
+        _audit.Verify(
+            a => a.InterruptReversalAsync("key-22b", "rev-1", It.IsAny<CancellationToken>()), Times.Once);
+        _audit.Verify(
+            a => a.ReleaseReversalAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task A_Completion_Marker_That_Throws_After_The_Inverse_Landed_Interrupts_The_Claim()
+    {
+        // The inverse is durable and only the record of it is missing. Releasing the claim
+        // here would invite a second undo of an undo that already happened.
+        var entry = Completed(
+            "key-22c", "set-tags", "Model", 7,
+            before: "{\"tags\":[\"wood\"],\"description\":null,\"categoryId\":null}");
+        Records(entry);
+        _updateTags.Setup(h => h.Handle(It.IsAny<UpdateModelTagsCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success(new UpdateModelTagsResponse(7, ["wood"], null, null)));
+        _audit.Setup(a => a.CompleteReversalAsync("key-22c", "rev-1", It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("the connection dropped"));
+
+        var plan = await _reverser.PlanAsync("key-22c", null);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _reverser.ApplyAsync(plan.Value));
+        _audit.Verify(
+            a => a.InterruptReversalAsync("key-22c", "rev-1", It.IsAny<CancellationToken>()), Times.Once);
+        _audit.Verify(
+            a => a.ReleaseReversalAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task A_Cancelled_Inverse_Keeps_Its_Claim_Ambiguous_And_Records_No_Reversal()
+    {
+        // Cancelling the caller does not cancel a transaction that already committed, so
+        // cancellation is the same "unknown" as a throw and settles the same way.
         var entry = Completed(
             "key-23", "set-tags", "Model", 7,
             before: "{\"tags\":[\"wood\"],\"description\":null,\"categoryId\":null}");
@@ -284,10 +360,13 @@ public class AgentOperationReverserTests
 
         await Assert.ThrowsAsync<OperationCanceledException>(
             () => _reverser.ApplyAsync(plan.Value, cts.Token));
-        // Released on CancellationToken.None, so the cancellation cannot also cancel the
-        // release - which would leave the claim held by nobody.
+        // Settled on CancellationToken.None, so the cancellation cannot also cancel the
+        // settle - which would leave the claim held and its state unrecorded.
         _audit.Verify(
-            a => a.ReleaseReversalAsync("key-23", "rev-1", CancellationToken.None), Times.Once);
+            a => a.InterruptReversalAsync("key-23", "rev-1", CancellationToken.None), Times.Once);
+        _audit.Verify(
+            a => a.ReleaseReversalAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
         _audit.Verify(
             a => a.CompleteReversalAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Never);
@@ -334,6 +413,40 @@ public class AgentOperationReverserTests
         Assert.Contains("stopped before it could record its outcome", result.Value.Single().Detail);
         _createScene.Verify(
             h => h.Handle(It.IsAny<CreateSceneCommand>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Undoing_A_Delete_Scene_Whose_Outcome_Is_Unknown_Never_Creates_A_Second_Scene()
+    {
+        // The whole finding in one test. The inverse of delete-scene CREATES something, so
+        // applying it twice is not a no-op - it is two scenes under two ids, and only one of
+        // them is the one anybody was looking for.
+        var entry = Completed("key-26", "delete-scene", "Scene", 4, before: DeletedSceneBefore);
+        Records(entry);
+        var created = 0;
+        _createScene.Setup(h => h.Handle(It.IsAny<CreateSceneCommand>(), It.IsAny<CancellationToken>()))
+            .Callback(() => created++)
+            .ReturnsAsync(Result.Success(RecreatedScene()));
+        // The inverse lands and the marker for it does not - the ambiguous case.
+        _audit.Setup(a => a.CompleteReversalAsync("key-26", "rev-1", It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("the connection dropped"));
+
+        var plan = await _reverser.PlanAsync("key-26", null);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _reverser.ApplyAsync(plan.Value));
+
+        // Which is what the held, expired claim now answers - to this retry and every one
+        // after it.
+        _audit.Setup(a => a.TryBeginReversalAsync("key-26", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ReversalClaim(ReversalClaimOutcome.Interrupted));
+
+        foreach (var _ in Enumerable.Range(0, 3))
+        {
+            var retry = await _reverser.ApplyAsync(plan.Value);
+            Assert.False(retry.Value.Single().Reversed);
+            Assert.Contains("stopped before it could record its outcome", retry.Value.Single().Detail);
+        }
+
+        Assert.Equal(1, created);
     }
 
     /// <summary>

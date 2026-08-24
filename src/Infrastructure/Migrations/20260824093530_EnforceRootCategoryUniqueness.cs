@@ -41,6 +41,14 @@ namespace Infrastructure.Migrations
     /// collide under its new parent is suffixed rather than discarded, because losing a
     /// branch to a schema tightening is not a trade anyone agreed to.
     /// </para>
+    ///
+    /// <para>
+    /// The suffix is fitted <b>inside</b> <c>Name</c>'s 100 characters, not appended past
+    /// them. A library whose child names run to the limit - which is where duplicates
+    /// actually collect, since long names are the generated ones - would otherwise hit a
+    /// value-too-long error on the very update meant to preserve the branch, and take the
+    /// upgrade down with it.
+    /// </para>
     /// </summary>
     public partial class EnforceRootCategoryUniqueness : Migration
     {
@@ -104,6 +112,7 @@ namespace Infrastructure.Migrations
                 child       RECORD;
                 losers      int[];
                 candidate   text;
+                marker      text;
                 suffix      int;
                 taken       boolean;
             BEGIN
@@ -172,7 +181,16 @@ namespace Infrastructure.Migrations
                                     INTO taken;
                                 EXIT WHEN NOT taken;
                                 suffix := suffix + 1;
-                                candidate := child."Name" || ' (' || suffix || ')';
+                                marker := ' (' || suffix || ')';
+                                -- "Name" is varchar(100), so the suffix has to fit INSIDE
+                                -- the limit rather than past it. Appending to a name that
+                                -- is already at the limit produced a 104-character value,
+                                -- and the UPDATE meant to save that branch was the one that
+                                -- failed the whole migration. Truncating by exactly the
+                                -- marker's width keeps every generated name legal and each
+                                -- suffix distinct, so the loop still terminates and still
+                                -- resolves collisions in id order.
+                                candidate := left(child."Name", 100 - length(marker)) || marker;
                             END LOOP;
 
                             EXECUTE format(

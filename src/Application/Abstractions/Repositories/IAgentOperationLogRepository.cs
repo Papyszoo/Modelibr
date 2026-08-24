@@ -118,6 +118,31 @@ public interface IAgentOperationLogRepository
         DateTime failedAt,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Moves an owned claim to <c>Interrupted</c> - the terminal state for a mutation whose
+    /// commit status is unknown.
+    /// </summary>
+    /// <remarks>
+    /// This is the settle for every exit that is not an explicit, pre-mutation "no": a thrown
+    /// exception, a cancellation, or a completion that could not be recorded. The guarded body
+    /// commits before the entry is marked Completed, so an exception on the way out may be an
+    /// exception <i>after</i> the write already landed. <see cref="FailClaimAsync"/> would hand
+    /// that key to the next retry and apply it a second time; this keeps the key, and the
+    /// ambiguity, where a person can see them.
+    ///
+    /// <paramref name="assetType"/> and <paramref name="assetId"/> are recorded when known so
+    /// the interrupted answer can name what the lost call was working on. Null leaves whatever
+    /// the claim already carried.
+    /// </remarks>
+    /// <returns>False when this caller no longer owns the claim.</returns>
+    Task<bool> InterruptClaimAsync(
+        string idempotencyKey,
+        string claimToken,
+        string? assetType,
+        int? assetId,
+        DateTime noticedAt,
+        CancellationToken cancellationToken = default);
+
     /// <summary>The entry for an idempotency key, if one exists.</summary>
     Task<AgentOperationLog?> GetByIdempotencyKeyAsync(string idempotencyKey, CancellationToken cancellationToken = default);
 
@@ -161,6 +186,30 @@ public interface IAgentOperationLogRepository
         string idempotencyKey,
         string reversalToken,
         DateTime reversedAt,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Keeps a reversal claim and stamps it as already past its lease, so the entry reads as
+    /// <see cref="ReversalClaimOutcome.Interrupted"/> from the next attempt onwards.
+    /// </summary>
+    /// <remarks>
+    /// The settle for an inverse whose outcome is unknown - it threw, it was cancelled, or
+    /// its completion marker could not be written. <see cref="ReleaseReversalAsync"/> is the
+    /// wrong answer there: releasing a claim whose inverse may already be durable invites the
+    /// next call to apply it again, and undoing a delete-scene twice leaves two scenes.
+    ///
+    /// Expressed by expiring <see cref="AgentOperationLog.ReversalClaimedAt"/> rather than by
+    /// a status column of its own, because "the claim is still held and its lease has run
+    /// out" is *already* the state the model defines as interrupted - the same one a process
+    /// that died mid-inverse leaves behind. One state, reached from two directions, read by
+    /// one predicate.
+    /// </remarks>
+    /// <param name="expiredAt">A claim time far enough in the past to be outside any lease.</param>
+    /// <returns>False when this caller no longer owns the claim.</returns>
+    Task<bool> ExpireReversalClaimAsync(
+        string idempotencyKey,
+        string reversalToken,
+        DateTime expiredAt,
         CancellationToken cancellationToken = default);
 
     /// <summary>

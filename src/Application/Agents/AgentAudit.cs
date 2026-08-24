@@ -108,6 +108,27 @@ public interface IAgentAudit
     Task<bool> AbandonAsync(
         string idempotencyKey, string claimToken, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Marks an owned claim <see cref="AgentOperationStatus.Interrupted"/> - the settle for a
+    /// call that cannot say whether its mutation committed.
+    ///
+    /// <para>
+    /// The guarded body commits before its entry is marked Completed, so an exception, a
+    /// cancellation, or a completion that itself throws all leave the same question open:
+    /// did the write land? <see cref="AbandonAsync"/> answers "no" and frees the key, which
+    /// is right only for a path that knows. This answers "unknown", durably, and the key
+    /// keeps answering it - because the alternative is the retry that quietly applies a
+    /// create_pack twice.
+    /// </para>
+    /// </summary>
+    /// <returns>False when this caller no longer owns the claim.</returns>
+    Task<bool> InterruptAsync(
+        string idempotencyKey,
+        string claimToken,
+        string? assetType = null,
+        int? assetId = null,
+        CancellationToken cancellationToken = default);
+
     /// <summary>The recorded entry for one idempotency key, or null if never claimed.</summary>
     Task<AgentOperationLog?> FindAsync(string idempotencyKey, CancellationToken cancellationToken = default);
 
@@ -132,6 +153,21 @@ public interface IAgentAudit
     /// when it does not - in which case the caller must not report a reversal.
     /// </summary>
     Task<bool> CompleteReversalAsync(
+        string idempotencyKey, string reversalToken, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Holds on to a reversal claim whose inverse has an <b>unknown</b> outcome, leaving it
+    /// in the state every later attempt reports as
+    /// <see cref="ReversalClaimOutcome.Interrupted"/>.
+    ///
+    /// <para>
+    /// <see cref="ReleaseReversalAsync"/> is for an inverse that is known not to have
+    /// applied - it returned a failure before mutating. An inverse that threw, was
+    /// cancelled, or could not have its completion recorded may already be durable, and
+    /// releasing that claim is how one undo of a delete-scene becomes two scenes.
+    /// </para>
+    /// </summary>
+    Task<bool> InterruptReversalAsync(
         string idempotencyKey, string reversalToken, CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -230,6 +266,15 @@ internal sealed class AgentAudit : IAgentAudit
         string idempotencyKey, string claimToken, CancellationToken cancellationToken = default) =>
         _repository.FailClaimAsync(idempotencyKey, claimToken, _dateTimeProvider.UtcNow, cancellationToken);
 
+    public Task<bool> InterruptAsync(
+        string idempotencyKey,
+        string claimToken,
+        string? assetType = null,
+        int? assetId = null,
+        CancellationToken cancellationToken = default) =>
+        _repository.InterruptClaimAsync(
+            idempotencyKey, claimToken, assetType, assetId, _dateTimeProvider.UtcNow, cancellationToken);
+
     public Task<AgentOperationLog?> FindAsync(string idempotencyKey, CancellationToken cancellationToken = default) =>
         _repository.GetByIdempotencyKeyAsync(idempotencyKey, cancellationToken);
 
@@ -246,6 +291,16 @@ internal sealed class AgentAudit : IAgentAudit
         string idempotencyKey, string reversalToken, CancellationToken cancellationToken = default) =>
         _repository.CompleteReversalAsync(
             idempotencyKey, reversalToken, _dateTimeProvider.UtcNow, cancellationToken);
+
+    public Task<bool> InterruptReversalAsync(
+        string idempotencyKey, string reversalToken, CancellationToken cancellationToken = default) =>
+        // One lease behind "now" and a minute more, so the claim is unambiguously outside
+        // its own lease however the two clocks round.
+        _repository.ExpireReversalClaimAsync(
+            idempotencyKey,
+            reversalToken,
+            _dateTimeProvider.UtcNow.AddMinutes(-(ReversalLease + 1)),
+            cancellationToken);
 
     public Task ReleaseReversalAsync(
         string idempotencyKey, string reversalToken, CancellationToken cancellationToken = default) =>

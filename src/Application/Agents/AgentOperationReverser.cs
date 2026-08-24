@@ -304,15 +304,26 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
             }
             catch
             {
-                // A throw - a cancellation included - means the inverse did not finish, so
-                // the claim goes back and the entry stays un-reversed. CancellationToken.None
-                // because the caller's token may be the very thing that fired.
-                await _audit.ReleaseReversalAsync(step.IdempotencyKey, token, CancellationToken.None);
+                // A throw - a cancellation included - says nothing about whether the inverse
+                // landed. An inverse commits and only then reports; a command that timed out,
+                // a token that fired between the commit and the return, an after-commit
+                // dispatch that blew up all arrive here with the write already durable.
+                //
+                // So the claim is NOT given back. It is kept and stamped as already past its
+                // lease, which is exactly the state a process that died mid-inverse leaves
+                // behind - and every later attempt reports it instead of applying the inverse
+                // a second time. Releasing it here is how undoing one delete-scene became two
+                // scenes. CancellationToken.None because the caller's token may be the very
+                // thing that fired.
+                await _audit.InterruptReversalAsync(step.IdempotencyKey, token, CancellationToken.None);
                 throw;
             }
 
             if (applied.IsFailure)
             {
+                // The one path that knows: the inverse returned a failure, which the command
+                // handlers produce before mutating. That claim can go back, so the operation
+                // stays undoable once whatever blocked it is fixed.
                 await _audit.ReleaseReversalAsync(step.IdempotencyKey, token, cancellationToken);
 
                 // Stop at the first failure rather than pressing on: the remaining steps
@@ -326,8 +337,20 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
 
             // Only now - the inverse landed. A false here means the claim moved on beneath
             // this caller, which is not something to report as a successful undo.
-            var recorded = await _audit.CompleteReversalAsync(
-                step.IdempotencyKey, token, CancellationToken.None);
+            bool recorded;
+            try
+            {
+                recorded = await _audit.CompleteReversalAsync(
+                    step.IdempotencyKey, token, CancellationToken.None);
+            }
+            catch
+            {
+                // The inverse is durable and the marker for it is not. Same rule as above,
+                // and the same settle: hold the claim in the interrupted state rather than
+                // letting the next call redo an undo that already happened.
+                await _audit.InterruptReversalAsync(step.IdempotencyKey, token, CancellationToken.None);
+                throw;
+            }
 
             results.Add(new ReversalStepResult(
                 step.IdempotencyKey,

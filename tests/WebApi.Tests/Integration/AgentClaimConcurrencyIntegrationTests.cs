@@ -1,8 +1,11 @@
+using System.Text.Json;
 using Application.Abstractions.Repositories;
+using Application.Agents;
 using Domain.Models;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using WebApi.Mcp;
 using Xunit;
 
 namespace WebApi.Tests.Integration;
@@ -154,6 +157,84 @@ public class AgentClaimConcurrencyIntegrationTests : IClassFixture<ModelibrWebFa
         Assert.Equal(AgentOperationStatus.Pending, loser.Existing!.Status);
     }
 
+    [Fact]
+    public async Task An_Interrupted_Settle_Is_Terminal_And_Only_The_Owner_Can_Write_It()
+    {
+        // The settle a call makes for itself when it cannot say whether its mutation
+        // committed. Same ownership rule as failing a claim; the state it lands in is the
+        // one no retry gets out of.
+        var key = Key();
+        var now = DateTime.UtcNow;
+        var claim = await ClaimAsync(key, now);
+
+        // A caller holding some other generation cannot burn this key.
+        Assert.False(await InterruptAsync(key, "not-the-token", now));
+        Assert.Equal(AgentOperationStatus.Pending, (await FindAsync(key))!.Status);
+
+        Assert.True(await InterruptAsync(key, claim.ClaimToken!, now, assetType: "Pack", assetId: 42));
+
+        var stored = await FindAsync(key);
+        Assert.Equal(AgentOperationStatus.Interrupted, stored!.Status);
+        // What the lost call was working on is recorded, because it is all a person
+        // recovering by hand has to go on.
+        Assert.Equal("Pack", stored.AssetType);
+        Assert.Equal(42, stored.AssetId);
+
+        // And it stays that way, for this retry and every one after it.
+        var retry = await ClaimAsync(key, now.AddHours(2));
+        Assert.False(retry.Owned);
+        Assert.True(retry.Interrupted);
+    }
+
+    [Fact]
+    public async Task A_Guarded_Write_Whose_Completion_Was_Lost_Is_Never_Run_A_Second_Time()
+    {
+        // End to end, through the real audit and a real row: the body commits, the
+        // completion fails, and every later call on that key is told so rather than
+        // running the write again. This is the create_pack-becomes-two-packs case.
+        var key = Key();
+        var runs = 0;
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var audit = scope.ServiceProvider.GetRequiredService<IAgentAudit>();
+            await Assert.ThrowsAsync<InvalidOperationException>(() => McpWriteGuard.Guarded(
+                audit,
+                McpCallerContext.Unauthenticated(),
+                new AgentWrite(key, "create-pack"),
+                _ =>
+                {
+                    runs++;
+                    // Stands in for a command that committed and then blew up on the way out.
+                    throw new InvalidOperationException("after-commit dispatch failed");
+                },
+                CancellationToken.None));
+        }
+
+        Assert.Equal(AgentOperationStatus.Interrupted, (await FindAsync(key))!.Status);
+
+        // Three retries, exactly as an agent would make them.
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            using var scope = _factory.Services.CreateScope();
+            var audit = scope.ServiceProvider.GetRequiredService<IAgentAudit>();
+            var response = await McpWriteGuard.Guarded(
+                audit,
+                McpCallerContext.Unauthenticated(),
+                new AgentWrite(key, "create-pack"),
+                _ =>
+                {
+                    runs++;
+                    return Task.FromResult(McpWriteGuard.Applied(new { ok = true }, "Pack", 1, new { }));
+                },
+                CancellationToken.None);
+
+            Assert.Contains("\"interrupted\"", JsonSerializer.Serialize(response));
+        }
+
+        Assert.Equal(1, runs);
+    }
+
     // ─── Reversal claims ─────────────────────────────────────────────
 
     [Fact]
@@ -227,6 +308,36 @@ public class AgentClaimConcurrencyIntegrationTests : IClassFixture<ModelibrWebFa
     }
 
     [Fact]
+    public async Task A_Reversal_Whose_Outcome_Is_Unknown_Answers_Interrupted_To_Every_Retry()
+    {
+        // The settle a caller makes for itself when its inverse threw, was cancelled, or
+        // could not be recorded. It keeps the claim and expires it, which is the same state
+        // a process that died mid-inverse leaves - so it reads as interrupted immediately
+        // rather than pretending for a lease that somebody is still working on it.
+        var key = await CompletedEntryAsync();
+        var claim = await BeginReversalAsync(key);
+        Assert.True(claim.IsOwned);
+
+        // Only the caller holding the claim may do it.
+        Assert.False(await ExpireReversalAsync(key, "not-the-token"));
+
+        Assert.True(await ExpireReversalAsync(key, claim.Token!));
+
+        foreach (var _ in Enumerable.Range(0, 3))
+        {
+            var retry = await BeginReversalAsync(key);
+            Assert.Equal(ReversalClaimOutcome.Interrupted, retry.Outcome);
+            Assert.Null(retry.Token);
+        }
+
+        // Neither reversed nor free, which is the only honest reading of an inverse whose
+        // outcome nobody recorded.
+        var stored = await FindAsync(key);
+        Assert.Null(stored!.ReversedAt);
+        Assert.NotNull(stored.ReversalToken);
+    }
+
+    [Fact]
     public async Task A_Completed_Reversal_Cannot_Be_Claimed_Again()
     {
         var key = await CompletedEntryAsync();
@@ -269,6 +380,14 @@ public class AgentClaimConcurrencyIntegrationTests : IClassFixture<ModelibrWebFa
         return await repository.CompleteClaimAsync(key, token, "Pack", 1, "{}", null, now);
     }
 
+    private async Task<bool> InterruptAsync(
+        string key, string token, DateTime now, string? assetType = null, int? assetId = null)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var repository = scope.ServiceProvider.GetRequiredService<IAgentOperationLogRepository>();
+        return await repository.InterruptClaimAsync(key, token, assetType, assetId, now);
+    }
+
     private async Task<bool> FailAsync(string key, string token, DateTime now)
     {
         using var scope = _factory.Services.CreateScope();
@@ -296,6 +415,13 @@ public class AgentClaimConcurrencyIntegrationTests : IClassFixture<ModelibrWebFa
         using var scope = _factory.Services.CreateScope();
         var repository = scope.ServiceProvider.GetRequiredService<IAgentOperationLogRepository>();
         return await repository.ReleaseReversalAsync(key, token);
+    }
+
+    private async Task<bool> ExpireReversalAsync(string key, string token)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var repository = scope.ServiceProvider.GetRequiredService<IAgentOperationLogRepository>();
+        return await repository.ExpireReversalClaimAsync(key, token, DateTime.UtcNow.AddHours(-1));
     }
 
     private async Task<AgentOperationLog?> FindAsync(string key)

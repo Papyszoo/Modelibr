@@ -67,6 +67,10 @@ public class AssetWriteMcpToolsTests
         audit.Setup(a => a.AbandonAsync(
                 It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
+        audit.Setup(a => a.InterruptAsync(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
         return audit;
     }
 
@@ -299,11 +303,14 @@ public class AssetWriteMcpToolsTests
     }
 
     [Fact]
-    public async Task A_Thrown_Handler_Releases_The_Claim_Before_Propagating()
+    public async Task A_Thrown_Handler_Settles_The_Claim_As_Ambiguous_Before_Propagating()
     {
-        // Regression: only RETURNED failures released the claim. An exception (or a
-        // cancellation) left the key Pending forever, so every later retry of that key
-        // was refused as already-applied for a mutation that never ran.
+        // This assertion has moved twice, and where it landed is the point. First the claim
+        // was left Pending forever, so a retry was refused as already-applied for a mutation
+        // that never ran. Then every throw released the key - which is right only if a throw
+        // proves nothing was written, and it does not: the command commits before the tool
+        // returns. So a throw now settles the key as ambiguous, and only a returned failure
+        // releases it.
         var handler = new Mock<ICommandHandler<SetModelCategoryCommand, SetModelCategoryResponse>>();
         handler.Setup(h => h.Handle(It.IsAny<SetModelCategoryCommand>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("connection reset"));
@@ -313,7 +320,10 @@ public class AssetWriteMcpToolsTests
             () => AssetWriteMcpTools.SetCategory(
                 ModelRead().Object, handler.Object, audit.Object, Caller(), 1, "key-8", 5));
 
-        audit.Verify(a => a.AbandonAsync("key-8", "gen-1", It.IsAny<CancellationToken>()), Times.Once);
+        audit.Verify(a => a.InterruptAsync(
+            "key-8", "gen-1", It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()), Times.Once);
+        audit.Verify(a => a.AbandonAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
         audit.Verify(a => a.CompleteAsync(
             It.IsAny<string>(), "gen-1", It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<string>(), It.IsAny<string>(),
             It.IsAny<CancellationToken>()),
@@ -321,8 +331,10 @@ public class AssetWriteMcpToolsTests
     }
 
     [Fact]
-    public async Task A_Cancelled_Write_Releases_The_Claim()
+    public async Task A_Cancelled_Write_Settles_The_Claim_As_Ambiguous()
     {
+        // Cancelling the request does not roll back a transaction that already committed,
+        // so cancellation is the same "unknown" as a throw.
         var handler = new Mock<ICommandHandler<SetModelCategoryCommand, SetModelCategoryResponse>>();
         handler.Setup(h => h.Handle(It.IsAny<SetModelCategoryCommand>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new OperationCanceledException());
@@ -335,8 +347,12 @@ public class AssetWriteMcpToolsTests
                 ModelRead().Object, handler.Object, audit.Object, Caller(), 1, "key-10", 5,
                 cancellationToken: cts.Token));
 
-        // Released with an uncancelled token - the caller's token is already dead.
-        audit.Verify(a => a.AbandonAsync("key-10", "gen-1", CancellationToken.None), Times.Once);
+        // Settled with an uncancelled token - the caller's token is already dead, and the
+        // settle is exactly what must still happen.
+        audit.Verify(a => a.InterruptAsync(
+            "key-10", "gen-1", It.IsAny<string>(), It.IsAny<int?>(), CancellationToken.None), Times.Once);
+        audit.Verify(a => a.AbandonAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
