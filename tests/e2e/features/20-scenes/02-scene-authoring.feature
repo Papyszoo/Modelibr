@@ -150,3 +150,42 @@ Feature: Scene authoring
     And I save the scene
     And I reopen the scene "Blockout Scene"
     Then the scene should hold 1 node
+
+  # Linking a scene to a project is one of the few things this editor sends
+  # straight to the server, and it MOVES THE SCENE'S REVISION. The draft the
+  # editor is holding was opened against the old one and is only reseeded while
+  # it is clean, so every other edit has to be serialised against the link or
+  # the next save is refused over a conflict the user never made.
+
+  @scene-project-link
+  Scenario: Linking a scene to a project holds editing, then gives it back
+    Given the project "Scene Link Project" exists
+    And a scene named "Linked Scene" is open
+    When I link the scene to the project "Scene Link Project"
+    Then the scene should belong to the project "Scene Link Project"
+    And editing the scene should be allowed again
+
+  @scene-project-link
+  Scenario: A scene can still be edited and saved after being linked
+    # The half that proves the hold ends properly rather than merely looking
+    # like it did: the draft has to be sitting on the revision the link
+    # produced, or this save comes back as a conflict.
+    Given the project "Scene Link Project" exists
+    And a scene named "Linked Then Edited Scene" is open
+    And I have linked the scene to the project "Scene Link Project"
+    When I place the test model into the scene
+    And I save the scene
+    And I reopen the scene "Linked Then Edited Scene"
+    Then the scene should hold 1 node
+    And the scene should belong to the project "Scene Link Project"
+
+  @scene-project-link
+  Scenario: An unsaved draft refuses the link rather than racing it
+    # The other direction of the same exclusion. Both are needed: this one stops
+    # a link starting under a dirty draft, and the hold above stops an edit
+    # starting under a link.
+    Given the project "Scene Link Project" exists
+    And a scene named "Dirty Link Scene" is open
+    And I have placed the test model into the scene
+    When I open the project brief
+    Then linking should be refused while the draft is unsaved

@@ -102,6 +102,7 @@ export class ModelViewerPage {
             Hierarchy: "Hierarchy",
             "Thumbnail Details": "Thumbnail Details",
             "UV Map": "UV Map",
+            Metadata: "Metadata",
         };
 
         const menuLabel = tabToMenuLabel[tabName];

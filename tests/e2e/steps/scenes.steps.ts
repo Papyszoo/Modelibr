@@ -1065,3 +1065,54 @@ Then(
         expect(slot.reopenedReason).toBe(reason);
     },
 );
+
+// ---- project linking -----------------------------------------------------
+//
+// Linking moves the scene's revision, so the editor holds every other edit
+// until the refetch it queued has landed and the draft has been reseeded on
+// the new revision. These cover both directions of that exclusion, and the
+// release at the end of it - a hold that never lifted left the editor
+// permanently read-only.
+
+When(
+    "I link the scene to the project {string}",
+    async ({ page }, projectName: string) => {
+        await new ScenesPage(page).linkToProject(projectName);
+    },
+);
+
+Given(
+    "I have linked the scene to the project {string}",
+    async ({ page }, projectName: string) => {
+        await new ScenesPage(page).linkToProject(projectName);
+    },
+);
+
+When("I open the project brief", async ({ page }) => {
+    await new ScenesPage(page).projectLinkBlockedReason();
+});
+
+Then(
+    "the scene should belong to the project {string}",
+    async ({ page }, projectName: string) => {
+        const scenes = new ScenesPage(page);
+        expect(await scenes.linkedProjectName()).toBe(projectName);
+    },
+);
+
+Then("editing the scene should be allowed again", async ({ page }) => {
+    // The hold is over: the toolbar is live and the save gate is the ordinary
+    // "nothing to save" rather than the link's message.
+    const scenes = new ScenesPage(page);
+    await expect(scenes.editorLocator()).toBeVisible();
+    await expect(
+        page.locator('[data-testid="scene-editor-link-pending"]'),
+    ).toHaveCount(0);
+    expect(await scenes.projectSelectIsEnabled()).toBe(true);
+});
+
+Then("linking should be refused while the draft is unsaved", async ({ page }) => {
+    const reason = await new ScenesPage(page).projectLinkBlockedReason();
+    expect(reason).toContain("Save your edits");
+    expect(await new ScenesPage(page).projectSelectIsEnabled()).toBe(false);
+});

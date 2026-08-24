@@ -27,6 +27,12 @@ export class ScenesPage {
     private readonly pickerSearch =
         '[data-testid="scene-asset-picker"] input[type="text"]';
 
+    private readonly projectChip = '[data-testid="scene-project-chip"]';
+    private readonly projectSelect = '[data-testid="scene-project-select"]';
+    private readonly projectBlocked = '[data-testid="scene-project-blocked"]';
+    private readonly projectError = '[data-testid="scene-project-error"]';
+    private readonly linkPending = '[data-testid="scene-editor-link-pending"]';
+
     private readonly materials = '[data-testid="scene-node-materials"]';
     private readonly choices = '[data-testid="scene-choices"]';
     private readonly materialPicker = '[data-testid="scene-material-picker"]';
@@ -219,6 +225,53 @@ export class ScenesPage {
 
     async undo(): Promise<void> {
         await this.page.locator(this.undoButton).click();
+    }
+
+    async undoIsEnabled(): Promise<boolean> {
+        return this.page.locator(this.undoButton).isEnabled();
+    }
+
+    /**
+     * Links the open scene to a project through the brief panel.
+     *
+     * Linking is a direct server write that moves the scene's revision, so the
+     * editor holds every other edit until the refetch it queues has landed and
+     * the draft has been reseeded. Waiting for the hold to clear is what makes
+     * this step safe to follow with an edit - and it is the behaviour under
+     * test, not incidental synchronisation.
+     */
+    async linkToProject(projectName: string): Promise<void> {
+        await this.page.locator(this.projectChip).click();
+        await this.page.locator(this.projectSelect).click();
+        await this.page
+            .getByRole("option", { name: projectName, exact: true })
+            .click();
+
+        // The hold appears and then goes; both halves matter. A link that never
+        // held would mean the serialization is not running at all.
+        await expect(this.page.locator(this.linkPending)).toBeHidden({
+            timeout: 15000,
+        });
+        await expect(this.page.locator(this.projectError)).toHaveCount(0);
+    }
+
+    /** The label on the project chip - the project the scene now belongs to. */
+    async linkedProjectName(): Promise<string> {
+        return (await this.page.locator(this.projectChip).innerText()).trim();
+    }
+
+    /** Why linking is refused right now, or null when it is offered. */
+    async projectLinkBlockedReason(): Promise<string | null> {
+        await this.page.locator(this.projectChip).click();
+        const blocked = this.page.locator(this.projectBlocked);
+        if ((await blocked.count()) === 0) {
+            return null;
+        }
+        return (await blocked.innerText()).trim();
+    }
+
+    async projectSelectIsEnabled(): Promise<boolean> {
+        return this.page.locator(this.projectSelect).isEnabled();
     }
 
     /**

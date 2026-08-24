@@ -21,3 +21,27 @@ Feature: Model Categories
     When I assign model "cat-model" to category "mcat-assign"
     And I filter models by category "mcat-assign"
     Then model "cat-model" is visible in the model grid
+
+  # The metadata panel's category picker reads the SAME query key as the
+  # sidebar, so a category created in one is immediately offered by the other
+  # without any invalidation wiring of its own. Sharing a key means sharing what
+  # is stored under it, and whichever of the two mounted second used to
+  # overwrite the other's cached shape - so which one broke depended entirely on
+  # the order the user navigated in. Both orders are walked here.
+
+  Scenario: The metadata picker offers the sidebar's categories, sidebar first
+    Given I have a model category "mcat-nav-a"
+    And I have an uploaded model "nav-order-model"
+    And I am on the model list page
+    When I filter models by category "mcat-nav-a"
+    And I open the metadata panel for model "nav-order-model"
+    Then the metadata category picker should offer "mcat-nav-a"
+
+  Scenario: The sidebar still lists its categories after the metadata picker loaded them
+    Given I have a model category "mcat-nav-b"
+    And I have an uploaded model "nav-order-model-b"
+    And I am on the model list page
+    When I open the metadata panel for model "nav-order-model-b"
+    And the metadata category picker should offer "mcat-nav-b"
+    And I am on the model list page
+    Then the model category "mcat-nav-b" is visible in the sidebar
