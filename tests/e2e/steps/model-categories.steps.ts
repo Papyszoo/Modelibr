@@ -12,6 +12,7 @@ import {
 } from "../helpers/category-tree-helper";
 import { ModelListPage } from "../pages/ModelListPage";
 import { ModelViewerPage } from "../pages/ModelViewerPage";
+import { waitForModelViewerCanvas } from "../helpers/viewer-canvas";
 
 const { Given, When, Then } = createBdd();
 
@@ -142,7 +143,13 @@ When(
         const model = models[modelBase];
         const listPage = new ModelListPage(page);
         await listPage.goto();
-        await listPage.openModel(model.name);
+
+        // By id, not by name: the upload helper does not report a name, and the
+        // id is the handle every other step in this file uses.
+        const card = listPage.getModelCard(model.name, model.id);
+        await expect(card).toBeVisible({ timeout: 15000 });
+        await card.click();
+        await waitForModelViewerCanvas(page, { timeout: 20000 });
 
         const viewer = new ModelViewerPage(page);
         await viewer.openTab("Metadata", '[data-testid="asset-metadata"]');

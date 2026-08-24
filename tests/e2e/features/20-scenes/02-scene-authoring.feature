@@ -159,10 +159,10 @@ Feature: Scene authoring
 
   @scene-project-link
   Scenario: Linking a scene to a project holds editing, then gives it back
-    Given the project "Scene Link Project" exists
+    Given the project "Scene Link Held" exists
     And a scene named "Linked Scene" is open
-    When I link the scene to the project "Scene Link Project"
-    Then the scene should belong to the project "Scene Link Project"
+    When I link the scene to the project "Scene Link Held"
+    Then the scene should belong to the project "Scene Link Held"
     And editing the scene should be allowed again
 
   @scene-project-link
@@ -170,21 +170,21 @@ Feature: Scene authoring
     # The half that proves the hold ends properly rather than merely looking
     # like it did: the draft has to be sitting on the revision the link
     # produced, or this save comes back as a conflict.
-    Given the project "Scene Link Project" exists
+    Given the project "Scene Link Edited" exists
     And a scene named "Linked Then Edited Scene" is open
-    And I have linked the scene to the project "Scene Link Project"
+    And I have linked the scene to the project "Scene Link Edited"
     When I place the test model into the scene
     And I save the scene
     And I reopen the scene "Linked Then Edited Scene"
     Then the scene should hold 1 node
-    And the scene should belong to the project "Scene Link Project"
+    And the scene should belong to the project "Scene Link Edited"
 
   @scene-project-link
   Scenario: An unsaved draft refuses the link rather than racing it
     # The other direction of the same exclusion. Both are needed: this one stops
     # a link starting under a dirty draft, and the hold above stops an edit
     # starting under a link.
-    Given the project "Scene Link Project" exists
+    Given the project "Scene Link Refused" exists
     And a scene named "Dirty Link Scene" is open
     And I have placed the test model into the scene
     When I open the project brief

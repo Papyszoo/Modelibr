@@ -241,10 +241,15 @@ export class ScenesPage {
      * test, not incidental synchronisation.
      */
     async linkToProject(projectName: string): Promise<void> {
-        await this.page.locator(this.projectChip).click();
+        await this.openProjectPanel();
         await this.page.locator(this.projectSelect).click();
+        // `.first()` because the projects API does not enforce unique names, so
+        // a fixture database provisioned more than once can hold two of them.
+        // Which one this links to is not what the test is about - that the scene
+        // ends up on a project of that name is.
         await this.page
             .getByRole("option", { name: projectName, exact: true })
+            .first()
             .click();
 
         // The hold appears and then goes; both halves matter. A link that never
@@ -253,6 +258,11 @@ export class ScenesPage {
             timeout: 15000,
         });
         await expect(this.page.locator(this.projectError)).toHaveCount(0);
+
+        // Closed on the way out, so the next reader opens it rather than
+        // toggling it shut - the chip is a toggle, and a step that assumed the
+        // panel was closed left it hidden with every later locator waiting.
+        await this.closeProjectPanel();
     }
 
     /** The label on the project chip - the project the scene now belongs to. */
@@ -260,9 +270,27 @@ export class ScenesPage {
         return (await this.page.locator(this.projectChip).innerText()).trim();
     }
 
+    /** Opens the project brief panel, if it is not already open. */
+    async openProjectPanel(): Promise<void> {
+        const select = this.page.locator(this.projectSelect);
+        if (!(await select.isVisible())) {
+            await this.page.locator(this.projectChip).click();
+        }
+        await expect(select).toBeVisible({ timeout: 10000 });
+    }
+
+    private async closeProjectPanel(): Promise<void> {
+        if (await this.page.locator(this.projectSelect).isVisible()) {
+            await this.page.keyboard.press("Escape");
+            await expect(this.page.locator(this.projectSelect)).toBeHidden({
+                timeout: 10000,
+            });
+        }
+    }
+
     /** Why linking is refused right now, or null when it is offered. */
     async projectLinkBlockedReason(): Promise<string | null> {
-        await this.page.locator(this.projectChip).click();
+        await this.openProjectPanel();
         const blocked = this.page.locator(this.projectBlocked);
         if ((await blocked.count()) === 0) {
             return null;
@@ -270,8 +298,20 @@ export class ScenesPage {
         return (await blocked.innerText()).trim();
     }
 
+    /**
+     * Whether the project dropdown accepts a pick.
+     *
+     * Read from PrimeReact's own `p-disabled` class rather than Playwright's
+     * `isEnabled()`: the control is a div, not a native form element, so
+     * `isEnabled()` answers true for it however it is rendered.
+     */
     async projectSelectIsEnabled(): Promise<boolean> {
-        return this.page.locator(this.projectSelect).isEnabled();
+        await this.openProjectPanel();
+        const classes =
+            (await this.page
+                .locator(this.projectSelect)
+                .getAttribute("class")) ?? "";
+        return !classes.split(/\s+/).includes("p-disabled");
     }
 
     /**
