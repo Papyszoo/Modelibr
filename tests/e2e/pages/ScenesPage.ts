@@ -1,4 +1,4 @@
-import { Page, expect } from "@playwright/test";
+import { Page, Request, expect } from "@playwright/test";
 
 /**
  * Scenes tab: the list of scenes and the editor for one of them.
@@ -110,6 +110,11 @@ export class ScenesPage {
      * the placement issues, and the whole point here is that no request is made.
      * The tile stays in the DOM while editing is held - it simply loses its
      * handler - so the click is real and its absence of effect is the assertion.
+     *
+     * Pair it with {@link watchAssetFactsRequests}, armed before the click: a
+     * node count read straight afterwards is satisfied by an implementation that
+     * accepted the click and adds the node when its lookup comes back, and this
+     * is the whole class of bug the step exists to catch.
      */
     async placeModelWhileHeld(modelName: string): Promise<void> {
         const tile = this.page
@@ -118,6 +123,40 @@ export class ScenesPage {
             .first();
         await expect(tile).toBeVisible();
         await tile.click();
+    }
+
+    /**
+     * Counts asset-facts lookups from now until `stop()`.
+     *
+     * <p>
+     * A placement issues this before it adds anything - the server computes the
+     * node's resting height - so "no lookup was made" is a statement about
+     * whether the placement STARTED, which is what a refused click has to be
+     * judged on. A node count is a statement about whether it has finished yet,
+     * and an assertion read immediately after the click cannot tell "refused"
+     * from "not finished".
+     * </p>
+     *
+     * <p>
+     * Arm it before the click. Read it after something that could not have
+     * happened before the lookup would have been issued - the delayed link
+     * settling and the hold coming down is a real event of exactly that shape -
+     * so the read needs no timer of its own.
+     * </p>
+     */
+    watchAssetFactsRequests(): { count: () => number; stop: () => void } {
+        let seen = 0;
+        const onRequest = (request: Request) => {
+            if (request.url().includes("/scenes/asset-facts")) {
+                seen += 1;
+            }
+        };
+
+        this.page.on("request", onRequest);
+        return {
+            count: () => seen,
+            stop: () => this.page.off("request", onRequest),
+        };
     }
 
     async addBlockoutBox(): Promise<void> {

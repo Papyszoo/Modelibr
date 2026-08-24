@@ -198,6 +198,13 @@ Feature: Scene authoring
     # to be HIDDEN, and "never appeared" is hidden. The link response is held
     # back so the in-flight window is long enough to look inside; the write
     # itself is passed through unchanged.
+    #
+    # The refused placement is judged on whether it STARTED, not on whether it
+    # has finished: the asset-facts lookup a placement issues first is watched
+    # from before the click, and read after the link has settled and the hold has
+    # come down - a full round trip later. A count read straight after the click
+    # would have been satisfied by an implementation that took the click and
+    # added the node when its lookup came back.
     Given the project "Scene Link In Flight" exists
     And I reload the app
     And I am on the scenes page

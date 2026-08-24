@@ -1154,8 +1154,26 @@ Then("editing should be held while the link is in flight", async ({ page }) => {
     await scenes.closeProjectPanel();
     const nodesBefore = await scenes.nodeRows().count();
     await scenes.searchLibrary(testModel(page).name);
-    await scenes.placeModelWhileHeld(testModel(page).name);
-    await expect(scenes.nodeRows()).toHaveCount(nodesBefore);
 
+    // Armed BEFORE the click, because what is being proved is that the placement
+    // never STARTED. Reading a node count straight after the click proves only
+    // that it has not finished yet - an implementation that took the click,
+    // issued the asset-facts lookup and added the node when it came back would
+    // satisfy that assertion on its way to being wrong.
+    const facts = scenes.watchAssetFactsRequests();
+    await scenes.placeModelWhileHeld(testModel(page).name);
+
+    // The link is let go, and the hold coming down is the event that makes the
+    // read below safe: it is a full round trip after the click, so a lookup the
+    // click had issued would long since have been seen. No timer is involved.
     await scenes.clearProjectLinkDelay();
+    await expect(scenes.linkHoldLocator()).toBeHidden({ timeout: 20000 });
+
+    expect(facts.count()).toBe(0);
+    facts.stop();
+
+    // And nothing arrived late either. By now the write has landed, the scene has
+    // been refetched and the draft has been reseeded on it - every step a
+    // deferred placement could have been waiting for.
+    await expect(scenes.nodeRows()).toHaveCount(nodesBefore);
 });
