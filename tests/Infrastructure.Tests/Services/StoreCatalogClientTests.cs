@@ -37,7 +37,8 @@ public class StoreCatalogClientTests
 
     private static (StoreCatalogClient Client, RecordingHandler Handler) Build(
         Func<HttpRequestMessage, HttpResponseMessage> respond,
-        string? storeUrl = StoreUrl)
+        string? storeUrl = StoreUrl,
+        Func<string, IPAddress[]>? resolve = null)
     {
         var handler = new RecordingHandler(respond);
         var factory = new Mock<IHttpClientFactory>();
@@ -53,8 +54,15 @@ public class StoreCatalogClientTests
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
         var client = new StoreCatalogClient(
             factory.Object, configuration, NullLogger<StoreCatalogClient>.Instance);
+        // Public by default, so the ordinary tests are unaffected by the address check that
+        // now runs on every hop. A test that cares supplies its own answers.
+        resolve ??= _ => new[] { IPAddress.Parse("93.184.216.34") };
+        client.ResolveHostAsync = (host, _) => Task.FromResult(resolve(host));
         return (client, handler);
     }
+
+    private static HttpResponseMessage RedirectTo(string location) =>
+        new(HttpStatusCode.Found) { Headers = { Location = new Uri(location) } };
 
     private static HttpResponseMessage Json(string body, HttpStatusCode status = HttpStatusCode.OK)
         => new(status) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
@@ -324,5 +332,215 @@ public class StoreCatalogClientTests
             // Null, not 0 - a count of zero would read as "nothing inside matched".
             Assert.Null(a.MatchedItemCount);
         });
+    }
+
+    // ─── SSRF ────────────────────────────────────────────────────────
+    //
+    // The catalog client used to validate only the URL it typed and then let the handler
+    // resolve and connect on its own. Both halves of that were exploitable: a hostname
+    // resolving into private space passes every URL check ever written, and a redirect is a
+    // destination the store chooses after the check has happened.
+
+    [Fact]
+    public async Task A_Store_Configured_At_Localhost_Over_Https_Is_Allowed_As_The_Documented_Dev_Exception()
+    {
+        // The one exception that exists, and it is the operator's own: a developer running
+        // the store locally. It is the store's OWN origin, which the importer trusts too.
+        var (client, handler) = Build(
+            _ => Json(OnePage), storeUrl: "https://localhost:5001",
+            resolve: _ => new[] { IPAddress.Loopback });
+
+        var result = await client.SearchAsync(
+            new Application.StoreCatalog.StoreCatalogQuery("chair"), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Single(handler.Requests);
+    }
+
+    [Fact]
+    public async Task A_Store_Hostname_Resolving_Into_Loopback_Is_Not_Followed_Off_Its_Own_Origin()
+    {
+        // The store's own origin stays trusted - a self-hosted store may legitimately live
+        // on a LAN address the operator chose - but anywhere it sends the request afterwards
+        // is not, and "somewhere else" is decided by DNS, not by the URL.
+        var (client, handler) = Build(
+            request => request.RequestUri!.Host == "store.example.com"
+                ? RedirectTo("https://evil.example.com/api/assets")
+                : Json(OnePage),
+            resolve: host => host == "evil.example.com"
+                ? new[] { IPAddress.Loopback }
+                : new[] { IPAddress.Parse("93.184.216.34") });
+
+        var result = await client.SearchAsync(
+            new Application.StoreCatalog.StoreCatalogQuery("chair"), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("StoreCatalog.Unreachable", result.Error.Code);
+        // The redirect target was never requested.
+        Assert.Single(handler.Requests);
+    }
+
+    [Theory]
+    [InlineData("10.0.0.5")]        // RFC1918
+    [InlineData("172.16.4.9")]      // RFC1918
+    [InlineData("192.168.1.10")]    // RFC1918
+    [InlineData("169.254.169.254")] // link-local - the cloud metadata endpoint
+    [InlineData("100.64.0.1")]      // carrier-grade NAT
+    [InlineData("0.0.0.0")]         // unspecified
+    public async Task A_Redirect_To_A_Host_Resolving_Into_Private_Space_Is_Refused(string address)
+    {
+        var (client, handler) = Build(
+            request => request.RequestUri!.Host == "store.example.com"
+                ? RedirectTo("https://elsewhere.example.com/api/assets")
+                : Json(OnePage),
+            resolve: host => host == "elsewhere.example.com"
+                ? new[] { IPAddress.Parse(address) }
+                : new[] { IPAddress.Parse("93.184.216.34") });
+
+        var result = await client.SearchAsync(
+            new Application.StoreCatalog.StoreCatalogQuery("chair"), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Single(handler.Requests);
+    }
+
+    [Fact]
+    public async Task A_Redirect_To_An_Ipv6_Unique_Local_Address_Is_Refused()
+    {
+        var (client, handler) = Build(
+            request => request.RequestUri!.Host == "store.example.com"
+                ? RedirectTo("https://elsewhere.example.com/api/assets")
+                : Json(OnePage),
+            resolve: host => host == "elsewhere.example.com"
+                ? new[] { IPAddress.Parse("fd00::1") }
+                : new[] { IPAddress.Parse("93.184.216.34") });
+
+        var result = await client.SearchAsync(
+            new Application.StoreCatalog.StoreCatalogQuery("chair"), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Single(handler.Requests);
+    }
+
+    [Fact]
+    public async Task A_Redirect_To_A_Literal_Loopback_Address_Is_Refused()
+    {
+        // No DNS involved at all - classified from the URL, before any lookup.
+        var (client, handler) = Build(
+            request => request.RequestUri!.Host == "store.example.com"
+                ? RedirectTo("https://127.0.0.1:8080/api/assets")
+                : Json(OnePage));
+
+        var result = await client.SearchAsync(
+            new Application.StoreCatalog.StoreCatalogQuery("chair"), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Single(handler.Requests);
+    }
+
+    [Fact]
+    public async Task A_Redirect_Downgrading_To_Http_Is_Refused()
+    {
+        // Transport-downgrade protection, unchanged: an https store may not bounce the
+        // request onto plain http, not even on its own host.
+        var (client, handler) = Build(
+            request => request.RequestUri!.Scheme == "https"
+                ? RedirectTo("http://store.example.com/api/assets")
+                : Json(OnePage));
+
+        var result = await client.SearchAsync(
+            new Application.StoreCatalog.StoreCatalogQuery("chair"), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Single(handler.Requests);
+    }
+
+    [Fact]
+    public async Task A_Redirect_Loop_Stops_At_The_Hop_Cap()
+    {
+        // Also unchanged, and still needed - a public host that keeps redirecting is a
+        // denial of service, not an SSRF.
+        var (client, handler) = Build(_ => RedirectTo("https://store.example.com/api/assets?again"));
+
+        var result = await client.SearchAsync(
+            new Application.StoreCatalog.StoreCatalogQuery("chair"), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("StoreCatalog.Unreachable", result.Error.Code);
+        // The first request plus MaxRedirects follow-ups, and no more.
+        Assert.Equal(4, handler.Requests.Count);
+    }
+
+    [Fact]
+    public async Task A_Safe_Redirect_Is_Followed_And_Its_Payload_Read()
+    {
+        // The guard must not turn every redirect into a failure: an external-tier store
+        // legitimately 302s to a CDN.
+        var (client, handler) = Build(
+            request => request.RequestUri!.Host == "store.example.com"
+                ? RedirectTo("https://cdn.example.com/api/assets")
+                : Json(OnePage));
+
+        var result = await client.SearchAsync(
+            new Application.StoreCatalog.StoreCatalogQuery("chair", FreeOnly: false), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(2, handler.Requests.Count);
+    }
+
+    [Fact]
+    public async Task A_Host_Answering_With_One_Public_And_One_Private_Address_Is_Refused()
+    {
+        // Rebinding's cheaper cousin: answer with both and hope the check looks at one and
+        // the socket picks the other. Every address is classified, not just the pinned one.
+        var (client, handler) = Build(
+            request => request.RequestUri!.Host == "store.example.com"
+                ? RedirectTo("https://mixed.example.com/api/assets")
+                : Json(OnePage),
+            resolve: host => host == "mixed.example.com"
+                ? new[] { IPAddress.Parse("93.184.216.34"), IPAddress.Parse("10.1.2.3") }
+                : new[] { IPAddress.Parse("93.184.216.34") });
+
+        var result = await client.SearchAsync(
+            new Application.StoreCatalog.StoreCatalogQuery("chair"), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Single(handler.Requests);
+    }
+
+    [Fact]
+    public async Task A_Validated_Host_Is_Pinned_To_The_Address_That_Passed()
+    {
+        // The rebinding fix itself. Validating a hostname and then handing the hostname to
+        // the socket leaves a window in which a 0-TTL record answers differently; the
+        // address that passed travels with the request and is what gets dialled.
+        var calls = 0;
+        var (client, handler) = Build(
+            request => request.RequestUri!.Host == "store.example.com"
+                ? RedirectTo("https://cdn.example.com/api/assets")
+                : Json(OnePage),
+            resolve: host =>
+            {
+                if (host != "cdn.example.com")
+                {
+                    return new[] { IPAddress.Parse("93.184.216.34") };
+                }
+
+                // First answer public, every later one loopback - the rebinding move.
+                calls++;
+                return calls == 1
+                    ? new[] { IPAddress.Parse("93.184.216.34") }
+                    : new[] { IPAddress.Loopback };
+            });
+
+        var result = await client.SearchAsync(
+            new Application.StoreCatalog.StoreCatalogQuery("chair", FreeOnly: false), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var followed = handler.Requests[1];
+        Assert.True(
+            followed.Options.TryGetValue(StoreEndpointGuard.PinnedAddressKey, out var pinned),
+            "the follow-up request carried no pinned address, so the socket would re-resolve");
+        Assert.Equal(IPAddress.Parse("93.184.216.34"), pinned);
     }
 }

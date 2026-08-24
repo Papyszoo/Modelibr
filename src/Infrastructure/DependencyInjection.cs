@@ -144,9 +144,15 @@ namespace Infrastructure
             // unreachable store stall an agent's search instead of answering it.
             var storeCatalogTimeoutSeconds = configuration.GetValue<int?>("STORE_CATALOG_HTTP_TIMEOUT_SECONDS") ?? 10;
             services.AddHttpClient(Infrastructure.Services.StoreCatalogClient.HttpClientName, client =>
-            {
-                client.Timeout = TimeSpan.FromSeconds(storeCatalogTimeoutSeconds);
-            });
+                {
+                    client.Timeout = TimeSpan.FromSeconds(storeCatalogTimeoutSeconds);
+                })
+                // The importer's handler exactly: manual redirects so every hop is
+                // re-validated, and a ConnectCallback that dials the address which passed
+                // that validation. A default handler would follow redirects itself AND
+                // resolve the host itself, undoing both halves at once.
+                .ConfigurePrimaryHttpMessageHandler(
+                    Infrastructure.Services.StoreCatalogClient.CreatePrimaryHandler);
 
             services.AddScoped<Application.Abstractions.Services.IStoreCatalogClient, StoreCatalogClient>();
 

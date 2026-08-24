@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http;
 using System.Text.Json;
 using Application.Abstractions.Services;
 using Application.StoreCatalog;
@@ -12,11 +13,17 @@ namespace Infrastructure.Services;
 /// <summary>
 /// Reads the companion Asset Store's public catalog (v0.6 prompt 15, part A).
 ///
-/// Deliberately much thinner than <see cref="StoreImportClient"/>: it sends no credential,
-/// follows no redirect by hand, and writes no file, because every endpoint it touches is
-/// anonymous and returns small JSON. What it does share is the store URL validation - the
-/// configured store is operator-supplied and still must not be an arbitrary internal
-/// address, so it goes through the same <see cref="StoreUrlSafety"/> gate the importer uses.
+/// Deliberately much thinner than <see cref="StoreImportClient"/>: it sends no credential
+/// and writes no file, because every endpoint it touches is anonymous and returns small
+/// JSON. What it does <b>not</b> get to be thinner about is where its requests go.
+///
+/// It shares the importer's whole outbound path - <see cref="StoreUrlSafety"/> for the URL,
+/// <see cref="StoreEndpointGuard"/> for the address behind it. Both halves are needed and
+/// neither substitutes for the other: URL validation cannot see that <c>evil.example</c>
+/// resolves to 127.0.0.1, and address validation is worthless if the socket is then handed
+/// the hostname and re-resolves. Redirects are followed by hand for the same reason - an
+/// auto-following handler takes a hop nothing ever checked, which is all a public store
+/// needs to steer a catalog read at loopback.
 ///
 /// The store is optional infrastructure. Every failure here is reported as a Result the
 /// agent can act on, never as an exception, and nothing in the local library depends on it.
@@ -32,6 +39,21 @@ internal sealed class StoreCatalogClient : IStoreCatalogClient
 
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<StoreCatalogClient> _logger;
+    private readonly StoreEndpointGuard _endpoints;
+
+    /// <summary>Test seam for host lookups, so the guard is exercisable without network I/O.</summary>
+    internal Func<string, CancellationToken, Task<System.Net.IPAddress[]>> ResolveHostAsync
+    {
+        get => _endpoints.ResolveHostAsync;
+        set => _endpoints.ResolveHostAsync = value;
+    }
+
+    /// <summary>
+    /// Primary handler for the named client: manual redirects and pinned connects, the same
+    /// pair the importer uses. Registered rather than assumed - a default handler would
+    /// follow redirects itself and resolve the host itself, undoing both guarantees.
+    /// </summary>
+    public static SocketsHttpHandler CreatePrimaryHandler() => StoreEndpointGuard.CreatePrimaryHandler();
 
     public StoreCatalogClient(
         IHttpClientFactory httpClientFactory,
@@ -40,6 +62,7 @@ internal sealed class StoreCatalogClient : IStoreCatalogClient
     {
         _httpClientFactory = httpClientFactory;
         _logger = logger;
+        _endpoints = new StoreEndpointGuard(logger);
 
         var configured = configuration.GetValue<string?>("STORE_URL");
         StoreUrl = string.IsNullOrWhiteSpace(configured)
@@ -155,6 +178,16 @@ internal sealed class StoreCatalogClient : IStoreCatalogClient
         return Result.Success(uri);
     }
 
+    /// <summary>
+    /// How many redirect hops a catalog request may take. Redirects are followed by hand
+    /// rather than by the handler because the handler follows them <b>without</b> asking
+    /// <see cref="StoreUrlSafety"/> anything - so validating only the URL we typed would
+    /// leave a store free to bounce the request onto a loopback or private address the
+    /// gate exists to refuse. Small, because a catalog read is a store's own API and a
+    /// long redirect chain to reach it is not a shape worth supporting.
+    /// </summary>
+    private const int MaxRedirects = 3;
+
     private async Task<Result<T>> GetJsonAsync<T>(
         Uri baseUrl,
         string relativePath,
@@ -165,28 +198,59 @@ internal sealed class StoreCatalogClient : IStoreCatalogClient
         try
         {
             var client = _httpClientFactory.CreateClient(HttpClientName);
-            using var response = await client.GetAsync(requestUri, cancellationToken);
 
-            if (response.StatusCode == HttpStatusCode.NotFound)
+            var uri = requestUri;
+            HttpResponseMessage? response = null;
+            try
             {
-                return Result.Failure<T>(StoreCatalogErrors.AssetNotFound(requestUri.AbsolutePath));
-            }
+                for (var hop = 0; ; hop++)
+                {
+                    // Every hop, the first included, is validated the way the importer
+                    // validates a download target - URL classification AND the addresses the
+                    // host actually resolves to - and the connection is pinned to the address
+                    // that passed, so nothing can re-resolve in between.
+                    var allowed = await _endpoints.ValidateTargetAsync(uri, baseUrl, cancellationToken);
+                    if (allowed.IsFailure)
+                    {
+                        _logger.LogWarning(
+                            "Store catalog request refused {Host}: {Reason}",
+                            uri.Host, allowed.Error.Message);
+                        return Result.Failure<T>(StoreCatalogErrors.Unreachable(baseUrl.ToString()));
+                    }
 
-            if (!response.IsSuccessStatusCode)
+                    response?.Dispose();
+
+                    using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+                    if (allowed.Value is { } pinned)
+                    {
+                        request.Options.Set(StoreEndpointGuard.PinnedAddressKey, pinned);
+                    }
+
+                    response = await client.SendAsync(
+                        request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+
+                    if (!IsRedirect(response.StatusCode))
+                    {
+                        break;
+                    }
+
+                    if (hop >= MaxRedirects || response.Headers.Location is null)
+                    {
+                        _logger.LogWarning(
+                            "Store catalog request to {Path} redirected too many times or without a Location.",
+                            requestUri.AbsolutePath);
+                        return Result.Failure<T>(StoreCatalogErrors.Unreachable(baseUrl.ToString()));
+                    }
+
+                    uri = new Uri(uri, response.Headers.Location);
+                }
+
+                return await ReadPayloadAsync<T>(response, requestUri, baseUrl, cancellationToken);
+            }
+            finally
             {
-                _logger.LogWarning(
-                    "Store catalog request to {Path} returned {StatusCode}.",
-                    requestUri.AbsolutePath, (int)response.StatusCode);
-                return Result.Failure<T>(StoreCatalogErrors.Unreachable(baseUrl.ToString()));
+                response?.Dispose();
             }
-
-            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-            var payload = await JsonSerializer.DeserializeAsync<T>(
-                stream, CatalogJsonOptions, cancellationToken);
-
-            return payload is null
-                ? Result.Failure<T>(StoreCatalogErrors.Unreachable(baseUrl.ToString()))
-                : Result.Success(payload);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -199,6 +263,36 @@ internal sealed class StoreCatalogClient : IStoreCatalogClient
             _logger.LogWarning(ex, "Store catalog request to {Path} failed.", requestUri.AbsolutePath);
             return Result.Failure<T>(StoreCatalogErrors.Unreachable(baseUrl.ToString()));
         }
+    }
+
+    private static bool IsRedirect(HttpStatusCode status) => (int)status is 301 or 302 or 303 or 307 or 308;
+
+    private async Task<Result<T>> ReadPayloadAsync<T>(
+        HttpResponseMessage response,
+        Uri requestUri,
+        Uri baseUrl,
+        CancellationToken cancellationToken)
+    {
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return Result.Failure<T>(StoreCatalogErrors.AssetNotFound(requestUri.AbsolutePath));
+        }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            _logger.LogWarning(
+                "Store catalog request to {Path} returned {StatusCode}.",
+                requestUri.AbsolutePath, (int)response.StatusCode);
+            return Result.Failure<T>(StoreCatalogErrors.Unreachable(baseUrl.ToString()));
+        }
+
+        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        var payload = await JsonSerializer.DeserializeAsync<T>(
+            stream, CatalogJsonOptions, cancellationToken);
+
+        return payload is null
+            ? Result.Failure<T>(StoreCatalogErrors.Unreachable(baseUrl.ToString()))
+            : Result.Success(payload);
     }
 
     private static StoreCatalogAsset MapSummary(StoreAssetDto dto, Uri baseUrl) => new(
