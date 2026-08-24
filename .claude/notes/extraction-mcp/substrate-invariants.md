@@ -114,6 +114,29 @@ again. The lock is now `ReversalToken`/`ReversalClaimedAt` and the fact stays in
 `Interrupted` for exactly the reason above, and a batch that meets one **stops** rather
 than skipping to the older steps that depend on it.
 
+### The half of THAT which was still wrong: a claim covers one write, not two
+
+Both of the above are about a claim recording who started rather than what happened. The
+next layer down is a claim covering an operation that is **several separately-committing
+writes**, where "what happened" has no single answer:
+
+- `bind_texture_set` associated the set with every version (commit), then made it the
+  model's default (commit). A model with versions but no ACTIVE version answers
+  `NoActiveVersion` to the second one - so the tool returned a failure, and the guard
+  reads a returned failure as "declined before mutating" and hands the key back as
+  retryable. The association was already on disk, described by no completed entry, and
+  the retry ran it again.
+- The composite reversals (`distribute-assets`, `place-assets-batch`, `create-room`)
+  remove a row of nodes one command at a time. Three of forty gone and then a refusal
+  released the reversal claim, so the next attempt re-applied an inverse that had already
+  half happened.
+
+Rule: **a guarded operation must not be able to produce a retryable failure after a
+durable write.** Either the whole thing is one transaction (`IUnitOfWork.InTransactionAsync`
+- what both of these now use), or it reports applied-partial and keeps the claim, the way
+`import_texture_set` does for a set whose later channels failed. What it may never do is
+return a plain failure with something already committed behind it.
+
 ## Multi-file glTF: identity includes what the file references
 
 A loose `.gltf` is identity-incomplete. Dedup ran on the primary hash alone, and the

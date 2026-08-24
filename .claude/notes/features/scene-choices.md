@@ -100,3 +100,38 @@ outlives it.
 See also [[shared-render-lib.md]] for what the Choices panel's preview shares with the
 viewer - the preview is a client-side document swap, never a write, so looking at four
 options does not move the scene's revision four times.
+
+## Direct scene writes exclude each other - and the hold is the SCENE's
+
+Slot writes (choose / reject / reopen / accept-all) and the project link all go straight
+to the server carrying `baseRevision`, and each of them moves the revision when it lands.
+Two in flight at once means whichever loses comes back as a conflict the user could not
+have caused, so they are mutually exclusive in **both** directions - a link waits for a
+pending slot write, and a slot write waits for a pending link.
+
+Three things that were learned the hard way here:
+
+- **Guard inside the handler, not only on the control.** The rejection form also submits
+  on Enter, and that path never consulted `busy`. A disabled button is styling; the rule
+  belongs to the write, so `submitRejection`, `onChoose`, `onReopen`, the accept-all
+  confirm and `runSlotWrite` each check it themselves.
+- **The link hold is per-scene state, not component state.** The dock renders only the
+  active tab, so glancing at another tab unmounts the editor - which used to throw the
+  hold away. The remount believed nothing was in flight, over a draft seeded on a revision
+  the server had already replaced. It lives in `sceneLinkHoldStore`, keyed by scene id,
+  opened in the mutation's `onMutate` and settled by its own outcome.
+- **A transport failure is not a refusal.** Releasing the hold on any rejected promise
+  hands the editor back over a scene that may have moved: the server may have committed
+  and the answer never arrived. Only a request the server *answered* and declined (4xx,
+  excluding 408) releases; everything else - network error, timeout, 5xx, an unrecognised
+  error - keeps the hold and turns it into a reconciliation.
+
+The release condition is deliberately made of comparisons against authoritative data and
+nothing else: not fetching, not in error, the draft seeded on the loaded revision, the
+loaded revision at or past the one the server reported, and the data fetched **after** the
+write settled. The last clause is what a "did a refetch happen" flag could not express -
+it has to be observed by a mounted component, and a link that does not move the revision
+(re-picking the project a scene already has) is otherwise indistinguishable from a stale
+cache entry. Nothing releases on a timer or on a lifecycle event, which is also why a
+persistent hold cannot strand anybody: reopening the scene re-evaluates it against fresh
+data and it ends the moment that data agrees.
