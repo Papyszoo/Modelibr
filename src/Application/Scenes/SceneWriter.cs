@@ -42,6 +42,18 @@ public interface ISceneWriter
     Task<IReadOnlyDictionary<string, SceneAssetFacts>> FactsAsync(SceneDocument document, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Refuses a document that names assets which cannot be resolved.
+    ///
+    /// Every reference in the document is checked, not just the new ones - which is right
+    /// for the one caller that has no "before" to diff against: creation. An ordinary write
+    /// goes through <see cref="ApplyAsync"/>, which checks only what the write INTRODUCES,
+    /// because a reference that broke after it was placed must not block the edit that
+    /// removes it. On a create there is no such history: every reference is being
+    /// introduced, right now, by this call.
+    /// </summary>
+    Task<Result> VerifyReferencesAsync(SceneDocument document, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Applies <paramref name="mutate"/> to the scene's document and stores the result.
     ///
     /// <paramref name="expectedRevision"/>, when given, must match the scene's current
@@ -223,6 +235,22 @@ internal sealed class SceneWriter : ISceneWriter
         }
 
         return Result.Success(new SceneWriteResult(scene, document, facts, carried));
+    }
+
+    public async Task<Result> VerifyReferencesAsync(
+        SceneDocument document, CancellationToken cancellationToken = default)
+    {
+        var references = SceneViewBuilder.ReferencedAssets(document);
+        if (references.Count == 0)
+        {
+            return Result.Success();
+        }
+
+        var problems = await _facts.FindUnresolvableAsync(references, cancellationToken);
+        return problems.Count > 0
+            ? Result.Failure(new Error(
+                "Scene.AssetNotFound", string.Join(" ", problems.Select(p => p.Reason))))
+            : Result.Success();
     }
 
     /// <summary>Asset references present in the candidate document but not in the stored one.</summary>

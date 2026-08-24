@@ -130,7 +130,12 @@ services:
             - RENDER_HEIGHT=${RENDER_HEIGHT:-256}
             - RENDER_FORMAT=${RENDER_FORMAT:-png}
             - LOG_LEVEL=${LOG_LEVEL:-info}
-            - NODE_TLS_REJECT_UNAUTHORIZED=0 # Required for self-signed cert; do NOT use in production with external TLS
+            # Required for the self-signed API certificate; do NOT use in production
+            # with external TLS. It governs BOTH this process's requests and, through
+            # config.rejectUnauthorized, the headless browser the scene renderer drives -
+            # Chromium validates certificates itself and ignores Node's setting, so the
+            # scene render page could not reach the API over HTTPS without it.
+            - NODE_TLS_REJECT_UNAUTHORIZED=0
             - THUMBNAIL_STORAGE_PATH=/var/lib/modelibr/thumbnails
         ports:
             - "${WORKER_PORT:-3001}:3001"

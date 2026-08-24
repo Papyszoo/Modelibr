@@ -60,6 +60,18 @@ internal sealed class CreateSceneCommandHandler : ICommandHandler<CreateSceneCom
             document = parsed.Value;
         }
 
+        // Same reasoning as the stage gate below, and the same reason it is easy to miss:
+        // every OTHER write refuses a reference it cannot resolve, but it does so by
+        // diffing against the stored document, and creation has nothing to diff against.
+        // Without this, handing a whole document to create_scene is the one way to get
+        // nodes pointing at assets that were never there or have since been recycled -
+        // and the editor draws a hole where each of them should be.
+        var referencesOk = await _writer.VerifyReferencesAsync(document, cancellationToken);
+        if (referencesOk.IsFailure)
+        {
+            return Result.Failure<SceneView>(referencesOk.Error);
+        }
+
         // A supplied document may declare a stage, and creating is the one write that has no
         // "before" for the gate in SceneWriter to compare against - so it is run here against
         // the empty document a scene would otherwise start from. Without this, the whole gate

@@ -84,7 +84,10 @@ namespace Application.Models
             // Raise domain event for existing model upload - dispatched from the
                 // save pipeline once this aggregate is persisted (see
                 // DomainEventsInterceptor); no manual publish here.
-                existingModel.RaiseModelUploadedEvent(existingModel.ActiveVersion!.Id, fileEntity.Sha256Hash, false, command.GenerateThumbnail);
+                if (!command.DeferProcessing)
+                {
+                    existingModel.RaiseModelUploadedEvent(existingModel.ActiveVersion!.Id, fileEntity.Sha256Hash, false, command.GenerateThumbnail);
+                }
 
                 // Always track batch upload - generate batch ID if not provided
                 var batchId = command.BatchId ?? Guid.NewGuid().ToString();
@@ -98,7 +101,8 @@ namespace Application.Models
                 await _batchUploadRepository.AddAsync(batchUpload, cancellationToken);
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-                return Result.Success(new AddModelCommandResponse(existingModel.Id, true));
+                return Result.Success(new AddModelCommandResponse(
+                    existingModel.Id, true, fileEntity.Sha256Hash, existingModel.ActiveVersion!.Id));
             }
 
             // Create new model
@@ -144,7 +148,10 @@ namespace Application.Models
                 // Raise domain event for new model upload after both model and file are
                 // persisted - dispatched from the save pipeline (see DomainEventsInterceptor);
                 // no manual publish here.
-                savedModel.RaiseModelUploadedEvent(version1.Id, fileEntity.Sha256Hash, true, command.GenerateThumbnail);
+                if (!command.DeferProcessing)
+                {
+                    savedModel.RaiseModelUploadedEvent(version1.Id, fileEntity.Sha256Hash, true, command.GenerateThumbnail);
+                }
 
                 // Always track batch upload - generate batch ID if not provided
                 var batchId = command.BatchId ?? Guid.NewGuid().ToString();
@@ -185,7 +192,8 @@ namespace Application.Models
                     }
                 }
 
-                return Result.Success(new AddModelCommandResponse(savedModel.Id, false));
+                return Result.Success(new AddModelCommandResponse(
+                    savedModel.Id, false, fileEntity.Sha256Hash, version1.Id));
             }
             catch (ArgumentException ex)
             {
@@ -227,6 +235,13 @@ namespace Application.Models
         bool SkipDeduplication = false,
         string? SourceFolder = null,
         IReadOnlyList<string>? SiblingFileNames = null,
-        bool AutoAssignMetadata = true) : ICommand<AddModelCommandResponse>;
-    public record AddModelCommandResponse(int Id, bool AlreadyExists = false);
+        bool AutoAssignMetadata = true,
+        bool DeferProcessing = false) : ICommand<AddModelCommandResponse>;
+
+    /// <param name="FileSha256">
+    /// The stored primary's hash. Returned so a caller that deferred processing can raise
+    /// <c>ModelUploadedEvent</c> itself without re-hashing the upload.
+    /// </param>
+    public record AddModelCommandResponse(
+        int Id, bool AlreadyExists = false, string FileSha256 = "", int ModelVersionId = 0);
 }

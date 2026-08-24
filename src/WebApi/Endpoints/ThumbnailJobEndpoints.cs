@@ -1,9 +1,22 @@
 using Application.Abstractions.Messaging;
 using Application.ThumbnailJobs;
 using Microsoft.AspNetCore.Mvc;
+using WebApi.Infrastructure;
 
 namespace WebApi.Endpoints;
 
+/// <summary>
+/// The job lifecycle a worker drives: claim a job, report it finished, log what happened
+/// on the way.
+///
+/// <b>Every route here is worker-facing and carries <see cref="WorkerApiKeyFilter"/>.</b>
+/// These are not read endpoints - a caller that can reach them can claim work meant for a
+/// real worker, or declare an in-flight job complete or failed on its behalf, which lands
+/// an asset with a permanently missing thumbnail or a scene render that never happened.
+/// The upload half of the same conversation (render-upload, thumbnail upload) was already
+/// behind the filter; the finish half was not, which meant the cheap way to disrupt the
+/// pipeline was left open while the expensive one was shut.
+/// </summary>
 public static class ThumbnailJobEndpoints
 {
     public static void MapThumbnailJobEndpoints(this IEndpointRouteBuilder app)
@@ -56,7 +69,8 @@ public static class ThumbnailJobEndpoints
             });
         })
         .WithName("Dequeue Thumbnail Job")
-        .WithTags("ThumbnailJobs");
+        .WithTags("ThumbnailJobs")
+        .AddEndpointFilter<WorkerApiKeyFilter>();
 
         app.MapPost("/thumbnail-jobs/{jobId:int}/finish", async (
             int jobId,
@@ -87,7 +101,8 @@ public static class ThumbnailJobEndpoints
             });
         })
         .WithName("Finish Thumbnail Job")
-        .WithTags("ThumbnailJobs");
+        .WithTags("ThumbnailJobs")
+        .AddEndpointFilter<WorkerApiKeyFilter>();
 
         app.MapPost("/thumbnail-jobs/sounds/{jobId:int}/finish", async (
             int jobId,
@@ -119,7 +134,8 @@ public static class ThumbnailJobEndpoints
             });
         })
         .WithName("Finish Sound Waveform Job")
-        .WithTags("ThumbnailJobs");
+        .WithTags("ThumbnailJobs")
+        .AddEndpointFilter<WorkerApiKeyFilter>();
 
         app.MapPost("/thumbnail-jobs/texture-sets/{jobId:int}/finish", async (
             int jobId,
@@ -147,7 +163,8 @@ public static class ThumbnailJobEndpoints
             });
         })
         .WithName("Finish Texture Set Thumbnail Job")
-        .WithTags("ThumbnailJobs");
+        .WithTags("ThumbnailJobs")
+        .AddEndpointFilter<WorkerApiKeyFilter>();
 
         app.MapPost("/thumbnail-jobs/scenes/{jobId:int}/finish", async (
             int jobId,
@@ -174,7 +191,8 @@ public static class ThumbnailJobEndpoints
             });
         })
         .WithName("Finish Scene Render Job")
-        .WithTags("ThumbnailJobs");
+        .WithTags("ThumbnailJobs")
+        .AddEndpointFilter<WorkerApiKeyFilter>();
 
         app.MapPost("/thumbnail-jobs/environment-maps/{jobId:int}/finish", async (
             int jobId,
@@ -203,7 +221,8 @@ public static class ThumbnailJobEndpoints
             });
         })
         .WithName("Finish Environment Map Thumbnail Job")
-        .WithTags("ThumbnailJobs");
+        .WithTags("ThumbnailJobs")
+        .AddEndpointFilter<WorkerApiKeyFilter>();
 
         app.MapPost("/thumbnail-jobs/{jobId:int}/events", async (
             int jobId,
@@ -230,7 +249,8 @@ public static class ThumbnailJobEndpoints
             });
         })
         .WithName("Log Thumbnail Job Event")
-        .WithTags("ThumbnailJobs");
+        .WithTags("ThumbnailJobs")
+        .AddEndpointFilter<WorkerApiKeyFilter>();
 
         // Test endpoint to simulate thumbnail completion for testing SignalR
         app.MapPost("/test/thumbnail-complete/{modelId:int}", async (

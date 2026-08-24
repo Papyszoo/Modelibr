@@ -1372,6 +1372,50 @@ public class SceneCommandTests
         _scenes.Verify(s => s.AddAsync(It.IsAny<Scene>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    /// <summary>
+    /// Every OTHER write refuses a reference it cannot resolve - but it does so by diffing
+    /// the candidate against the stored document, and creation has nothing to diff against.
+    /// That made create_scene the one way to get a scene full of nodes pointing at assets
+    /// that were never there, or have since been recycled.
+    /// </summary>
+    [Fact]
+    public async Task CreateScene_Refuses_A_Document_Naming_An_Asset_That_Cannot_Be_Resolved()
+    {
+        var unitOfWork = new Mock<IUnitOfWork>();
+        var clock = new Mock<IDateTimeProvider>();
+        clock.SetupGet(c => c.UtcNow).Returns(Now);
+
+        _facts.Setup(f => f.FindUnresolvableAsync(It.IsAny<IEnumerable<SceneAssetRef>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[]
+            {
+                new SceneAssetReferenceProblem(
+                    new SceneAssetRef(SceneAssetTypes.Model, 999, 1),
+                    "Model 999 was not found."),
+            });
+
+        var handler = new CreateSceneCommandHandler(
+            _scenes.Object, _writer, unitOfWork.Object, clock.Object, _usage.Object);
+
+        var document = new SceneDocument(
+            SceneDocument.CurrentSchemaVersion,
+            new[]
+            {
+                new SceneNode(
+                    "ghost",
+                    new SceneTransform(Vec3.Zero, Vec3.Zero, Vec3.One),
+                    Asset: new SceneAssetRef(SceneAssetTypes.Model, 999, 1)),
+            },
+            Array.Empty<SceneLight>());
+
+        var result = await handler.Handle(
+            new CreateSceneCommand("Haunted", DocumentJson: SceneDocumentCodec.Serialize(document)),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.AssetNotFound", result.Error.Code);
+        _scenes.Verify(s => s.AddAsync(It.IsAny<Scene>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     [Fact]
     public async Task CreateScene_Accepts_The_Same_Document_Without_The_Claim()
     {
