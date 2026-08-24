@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.EnvironmentMaps;
@@ -87,6 +88,7 @@ public interface IAgentOperationReverser
 internal sealed class AgentOperationReverser : IAgentOperationReverser
 {
     private readonly IAgentAudit _audit;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly ICommandHandler<UpdateModelTagsCommand, UpdateModelTagsResponse> _updateTags;
     private readonly ICommandHandler<SetModelCategoryCommand, SetModelCategoryResponse> _setCategory;
     private readonly ICommandHandler<RemoveModelFromPackCommand> _removeFromPack;
@@ -116,6 +118,7 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
 
     public AgentOperationReverser(
         IAgentAudit audit,
+        IUnitOfWork unitOfWork,
         ICommandHandler<UpdateModelTagsCommand, UpdateModelTagsResponse> updateTags,
         ICommandHandler<SetModelCategoryCommand, SetModelCategoryResponse> setCategory,
         ICommandHandler<RemoveModelFromPackCommand> removeFromPack,
@@ -144,6 +147,7 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
         ICommandHandler<SetAssetMetadataCommand, AssetMetadataResponse> setAssetMetadata)
     {
         _audit = audit;
+        _unitOfWork = unitOfWork;
         _updateTags = updateTags;
         _setCategory = setCategory;
         _removeFromPack = removeFromPack;
@@ -992,23 +996,36 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
                     return Result.Failure<string>(new Error("NoNodesRecorded", "The placed nodes' ids were not recorded."));
                 }
 
-                // Reverse order, because a batch entry may rest on one placed before it and a
-                // node cannot be removed while something is anchored to it. A distributed row
-                // has no anchors, so reversing costs it nothing.
-                foreach (var nodeId in nodeIds.Reverse())
+                // ONE transaction around the whole row.
+                //
+                // This inverse is several writes under one reversal claim, and each removal
+                // commits through the unit-of-work decorator. Removing three of forty and
+                // then failing used to leave those three durably gone while the failure path
+                // handed the claim back as retryable - so the next attempt re-ran an inverse
+                // that had already half happened, against a scene it had already changed.
+                // A failure Result rolls the whole row back, which is what makes releasing
+                // the claim below an honest answer: the scene is exactly as it was.
+                //
+                // Reverse order inside it, because a batch entry may rest on one placed
+                // before it and a node cannot be removed while something is anchored to it.
+                // A distributed row has no anchors, so reversing costs it nothing.
+                return await _unitOfWork.InTransactionAsync<string>(async tx =>
                 {
-                    var removed = await _removeSceneNode.Handle(
-                        new RemoveSceneNodeCommand(entry.AssetId!.Value, nodeId), cancellationToken);
-
-                    // Already gone is the desired end state, not a failure - the user may
-                    // have deleted some of the row themselves before asking for the undo.
-                    if (removed.IsFailure && removed.Error.Code != "Scene.NodeNotFound")
+                    foreach (var nodeId in nodeIds.Reverse())
                     {
-                        return Result.Failure<string>(removed.Error);
-                    }
-                }
+                        var removed = await _removeSceneNode.Handle(
+                            new RemoveSceneNodeCommand(entry.AssetId!.Value, nodeId), tx);
 
-                return Result.Success($"Removed {nodeIds.Length} node(s) from scene {entry.AssetId}.");
+                        // Already gone is the desired end state, not a failure - the user may
+                        // have deleted some of the row themselves before asking for the undo.
+                        if (removed.IsFailure && removed.Error.Code != "Scene.NodeNotFound")
+                        {
+                            return Result.Failure<string>(removed.Error);
+                        }
+                    }
+
+                    return Result.Success($"Removed {nodeIds.Length} node(s) from scene {entry.AssetId}.");
+                }, cancellationToken);
             }
 
             case "move-asset":

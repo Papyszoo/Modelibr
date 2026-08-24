@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Agents;
@@ -54,12 +55,14 @@ public class AgentOperationReverserTests
     private readonly Mock<ICommandHandler<SetSceneProjectCommand, SetSceneProjectResponse>> _setSceneProject = new();
     private readonly Mock<ICommandHandler<SetAssetMetadataCommand, AssetMetadataResponse>> _setAssetMetadata = new();
 
+    private readonly FakeUnitOfWork _unitOfWork = new();
+
     private readonly AgentOperationReverser _reverser;
 
     public AgentOperationReverserTests()
     {
         _reverser = new AgentOperationReverser(
-            _audit.Object, _updateTags.Object, _setCategory.Object, _removeFromPack.Object, _deletePack.Object,
+            _audit.Object, _unitOfWork, _updateTags.Object, _setCategory.Object, _removeFromPack.Object, _deletePack.Object,
             _removeTexture.Object, _addTexture.Object, _restoreTextureBinding.Object,
             _deleteModel.Object, _deleteSound.Object,
             _deleteSprite.Object, _deleteEnvironmentMap.Object, _deleteTextureSet.Object,
@@ -743,6 +746,137 @@ public class AgentOperationReverserTests
         Assert.Equal(["lamp", "table"], removed);
     }
 
+    // ---- a composite inverse that fails partway ------------------------------
+    //
+    // `distribute-assets`, `place-assets-batch` and `create-room` are one reversal claim
+    // over SEVERAL node removals, and every removal commits through the unit-of-work
+    // decorator. Three of forty gone and then a failure used to leave those three durably
+    // removed while the failure path handed the claim back as retryable - so the next
+    // attempt re-ran an inverse that had already half happened, against a scene it had
+    // already changed. The row is one transaction now: it comes off whole or not at all,
+    // which is the only thing that makes releasing the claim an honest answer.
+
+    /// <summary>
+    /// Sets up a row whose removals succeed until <paramref name="failAt"/>, recording each
+    /// removal against the unit of work so the test can tell staged from durable.
+    /// </summary>
+    private List<string> RowThatFailsAt(string? failAt, out AgentOperationLog entry)
+    {
+        entry = Completed(
+            "key-row-partial", "distribute-assets", "Scene", 3,
+            before: "{\"removedNodeIds\":[\"lamp-1\",\"lamp-2\",\"lamp-3\"]}");
+        Records(entry);
+
+        var attempted = new List<string>();
+        _removeSceneNode.Setup(h => h.Handle(It.IsAny<RemoveSceneNodeCommand>(), It.IsAny<CancellationToken>()))
+            .Returns<RemoveSceneNodeCommand, CancellationToken>((command, _) =>
+            {
+                attempted.Add(command.NodeId);
+                if (command.NodeId == failAt)
+                {
+                    return Task.FromResult(Result.Failure<SceneNodeRemovalResponse>(
+                        new Error("Scene.NodeInUse", $"'{command.NodeId}' still has something anchored to it.")));
+                }
+
+                // What a committing command handler does: the effect is written through the
+                // unit of work, so an open transaction decides whether it becomes durable.
+                _unitOfWork.Write($"removed {command.NodeId}");
+                return Task.FromResult(Result.Success(new SceneNodeRemovalResponse(null!, null!)));
+            });
+
+        return attempted;
+    }
+
+    [Fact]
+    public async Task A_Row_Whose_Later_Removal_Fails_Leaves_The_Earlier_Ones_In_Place()
+    {
+        // Reverse order, so 'lamp-3' comes off first and 'lamp-2' is the one that refuses -
+        // an early success followed by a later failure, which is the shape of the bug.
+        var attempted = RowThatFailsAt("lamp-2", out _);
+
+        var plan = await _reverser.PlanAsync("key-row-partial", null);
+        var result = await _reverser.ApplyAsync(plan.Value);
+
+        Assert.False(result.Value.Single().Reversed);
+        Assert.Contains("anchored", result.Value.Single().Detail);
+
+        // It stopped where it failed rather than pressing on...
+        Assert.Equal(["lamp-3", "lamp-2"], attempted);
+        // ...and 'lamp-3' - which the command reported as removed - is not durable, because
+        // the whole row was one transaction and the transaction rolled back.
+        Assert.Equal(1, _unitOfWork.Transactions);
+        Assert.True(_unitOfWork.RolledBack);
+        Assert.Empty(_unitOfWork.Durable);
+    }
+
+    [Fact]
+    public async Task A_Row_That_Fails_Partway_Gives_Its_Reversal_Claim_Back()
+    {
+        // Releasing is correct ONLY because nothing survived the rollback. The claim going
+        // back is what lets the user fix whatever blocked the removal and undo it properly;
+        // it would be the bug if any of the row were still durably gone.
+        RowThatFailsAt("lamp-2", out _);
+
+        var plan = await _reverser.PlanAsync("key-row-partial", null);
+        await _reverser.ApplyAsync(plan.Value);
+
+        _audit.Verify(a => a.ReleaseReversalAsync(
+            "key-row-partial", "rev-1", It.IsAny<CancellationToken>()), Times.Once);
+        _audit.Verify(a => a.CompleteReversalAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        _audit.Verify(a => a.InterruptReversalAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task A_Row_That_Comes_Off_Whole_Commits_Every_Removal_In_One_Transaction()
+    {
+        // The positive control. Without it "nothing is durable" is equally consistent with a
+        // rollback and with the removals never reaching the unit of work at all.
+        RowThatFailsAt(failAt: null, out _);
+
+        var plan = await _reverser.PlanAsync("key-row-partial", null);
+        var result = await _reverser.ApplyAsync(plan.Value);
+
+        Assert.True(result.Value.Single().Reversed);
+        Assert.Equal(1, _unitOfWork.Transactions);
+        Assert.False(_unitOfWork.RolledBack);
+        Assert.Equal(["removed lamp-3", "removed lamp-2", "removed lamp-1"], _unitOfWork.Durable);
+    }
+
+    [Fact]
+    public async Task A_Row_Whose_Removal_Throws_Keeps_The_Claim_And_Rolls_The_Row_Back()
+    {
+        // A throw says nothing about whether the write landed, so the claim is kept in the
+        // interrupted state - and the transaction still unwinds what the row had staged.
+        var entry = Completed(
+            "key-row-throw", "place-assets-batch", "Scene", 3,
+            before: "{\"removedNodeIds\":[\"table\",\"lamp\"]}");
+        Records(entry);
+        _removeSceneNode.Setup(h => h.Handle(It.IsAny<RemoveSceneNodeCommand>(), It.IsAny<CancellationToken>()))
+            .Returns<RemoveSceneNodeCommand, CancellationToken>((command, _) =>
+            {
+                if (command.NodeId == "table")
+                {
+                    throw new InvalidOperationException("the connection went away");
+                }
+
+                _unitOfWork.Write($"removed {command.NodeId}");
+                return Task.FromResult(Result.Success(new SceneNodeRemovalResponse(null!, null!)));
+            });
+
+        var plan = await _reverser.PlanAsync("key-row-throw", null);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _reverser.ApplyAsync(plan.Value));
+
+        Assert.True(_unitOfWork.RolledBack);
+        Assert.Empty(_unitOfWork.Durable);
+        _audit.Verify(a => a.InterruptReversalAsync(
+            "key-row-throw", "rev-1", It.IsAny<CancellationToken>()), Times.Once);
+        _audit.Verify(a => a.ReleaseReversalAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     [Fact]
     public async Task Restoring_A_Light_Reproduces_It_Exactly_Rather_Than_Merging_Into_What_Is_There()
     {
@@ -932,5 +1066,72 @@ public class AgentOperationReverserTests
         Assert.False(applied.Value[0].Reversed);
         _setAssetMetadata.Verify(h => h.Handle(
             It.IsAny<SetAssetMetadataCommand>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>
+    /// A unit of work that models the one property these tests are about: work written
+    /// while a transaction is open becomes durable when it commits, and is discarded when
+    /// it rolls back. Enough to tell "the row came off whole" from "three nodes are gone
+    /// and the caller was told nothing happened".
+    /// </summary>
+    private sealed class FakeUnitOfWork : IUnitOfWork
+    {
+        private readonly List<string> _staged = [];
+        private bool _open;
+
+        /// <summary>What survived a committed transaction, in the order it was written.</summary>
+        public List<string> Durable { get; } = [];
+
+        /// <summary>How many transactions were opened - zero is the pre-fix behaviour.</summary>
+        public int Transactions { get; private set; }
+
+        public bool RolledBack { get; private set; }
+
+        /// <summary>Stands in for a command handler's commit.</summary>
+        public void Write(string effect)
+        {
+            if (_open)
+            {
+                _staged.Add(effect);
+            }
+            else
+            {
+                Durable.Add(effect);
+            }
+        }
+
+        public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public async Task<Result<T>> InTransactionAsync<T>(
+            Func<CancellationToken, Task<Result<T>>> work,
+            CancellationToken cancellationToken = default)
+        {
+            Transactions++;
+            _open = true;
+            try
+            {
+                var result = await work(cancellationToken);
+                if (result.IsFailure)
+                {
+                    RolledBack = true;
+                    _staged.Clear();
+                    return result;
+                }
+
+                Durable.AddRange(_staged);
+                _staged.Clear();
+                return result;
+            }
+            catch
+            {
+                RolledBack = true;
+                _staged.Clear();
+                throw;
+            }
+            finally
+            {
+                _open = false;
+            }
+        }
     }
 }
