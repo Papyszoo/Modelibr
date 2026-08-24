@@ -323,7 +323,13 @@ function SceneIntent({
             disabled={busy}
             data-testid="scene-choices-accept-confirm"
             onClick={() => {
+              // The dialog can outlive the state that opened it - a link or a
+              // slot write can start while it is on screen - so the decision to
+              // send is taken here, against what is true now.
               setConfirming(false)
+              if (busy) {
+                return
+              }
               onAcceptRecommendations?.(choices)
             }}
           />
@@ -367,6 +373,16 @@ function SlotBlock({
   const open = slot.candidates.filter(candidate => !candidate.rejected)
 
   function submitRejection(): void {
+    // `busy` is checked HERE, not only on the Reject button's disabled
+    // attribute. This form also submits on Enter, and that path went straight
+    // through: an open reason box plus a project link (or another slot write)
+    // starting behind it was two writes racing for one revision, and whichever
+    // lost came back as a conflict the user could not have caused. A disabled
+    // button is styling; the rule belongs to the write.
+    if (busy) {
+      return
+    }
+
     const trimmed = reason.trim()
     if (!trimmed || rejecting === null) {
       return
@@ -456,7 +472,12 @@ function SlotBlock({
             size="small"
             text
             disabled={busy}
-            onClick={() => onReopen(slot.slotId)}
+            onClick={() => {
+              if (busy) {
+                return
+              }
+              onReopen(slot.slotId)
+            }}
           />
         ) : null}
       </div>
@@ -626,7 +647,15 @@ function CandidateCard({
             }
             disabled={busy || candidate.chosen || !candidate.choosable}
             data-testid={`scene-choices-choose-${candidate.ref}`}
-            onClick={() => onChoose(slot.slotId, candidate.id)}
+            onClick={() => {
+              // Same rule as the reason box: the condition that makes this
+              // unsafe is about the write, so it is enforced where the write is
+              // started rather than only where the button is styled.
+              if (busy || candidate.chosen || !candidate.choosable) {
+                return
+              }
+              onChoose(slot.slotId, candidate.id)
+            }}
           />
           <Button
             icon="pi pi-times"

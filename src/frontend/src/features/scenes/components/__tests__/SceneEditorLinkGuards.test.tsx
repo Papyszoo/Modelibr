@@ -1,7 +1,8 @@
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
-import { useSceneEditorStore } from '@/stores'
+import { ApiClientError } from '@/lib/apiBase'
+import { useSceneEditorStore, useSceneLinkHoldStore } from '@/stores'
 
 import type { SceneDocument } from '../../types'
 import { renderWithProviders } from '@/test/renderWithProviders'
@@ -87,6 +88,7 @@ describe('scene editing is serialised against the project link', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
+    useSceneLinkHoldStore.setState({ holds: {} })
     useSceneEditorStore
       .getState()
       .open(2, sceneView().document as SceneDocument, REVISION)
@@ -183,6 +185,31 @@ describe('scene editing is serialised against the project link', () => {
     })
     const saved = useSceneEditorStore.getState().document!
     useSceneEditorStore.getState().markSaved(REVISION, saved)
+  }
+
+  /** One proposed slot with one choosable candidate, which is all these need. */
+  function slotsWithOneCandidate() {
+    return {
+      sceneId: 2,
+      revision: REVISION,
+      slots: [
+        {
+          slotId: 'sofa',
+          status: 'proposed',
+          role: 'seating',
+          candidates: [
+            {
+              id: 'a',
+              ref: 'sofa/a',
+              rejected: false,
+              choosable: true,
+              label: 'Sofa A',
+            },
+          ],
+          chosen: null,
+        },
+      ],
+    }
   }
 
   it('disables undo and redo while a link is in flight', async () => {
@@ -349,17 +376,28 @@ describe('scene editing is serialised against the project link', () => {
     expect(useSceneEditorStore.getState().baseRevision).toBe(REVISION + 1)
   })
 
-  it('leaves no permanent hold when the link FAILS', async () => {
+  it('leaves no permanent hold when the server REFUSES the link', async () => {
     // The other way out. A refused link invalidates nothing, so nothing arrives
     // to release a hold that waits for a refetch - the editor was read-only for
     // the rest of the session.
+    //
+    // A refusal is specifically a request the server ANSWERED and declined. It
+    // used to be any rejected promise at all, which is the bug the ambiguity
+    // test below covers.
     await open()
     editThenSave()
 
     const link = pendingLink()
     await startLink()
 
-    link.reject(new Error('nope'))
+    link.reject(
+      new ApiClientError('That project no longer exists.', {
+        status: 404,
+        isNetworkError: false,
+        isTimeout: false,
+        isOffline: false,
+      })
+    )
 
     await waitFor(() =>
       expect(
@@ -375,5 +413,217 @@ describe('scene editing is serialised against the project link', () => {
     await chord()
 
     expect(useSceneEditorStore.getState().document).not.toBe(moved)
+  })
+
+  it('KEEPS the hold when the link fails in a way that cannot say what happened', async () => {
+    // The finding. A dropped connection is not a refusal: the server may have
+    // committed and the answer never came back. The editor used to resume on any
+    // rejection at all, which hands it back over a scene that may have moved -
+    // and the next save is the conflict the whole mechanism exists to prevent.
+    await open()
+    editThenSave()
+
+    const link = pendingLink()
+    await startLink()
+
+    // The re-read this failure triggers is left in flight, so what the hold does
+    // in the meantime is observable rather than a frame that flickers past.
+    scenes.getSceneById.mockReturnValue(new Promise(() => {}) as never)
+    link.reject(
+      new ApiClientError('Network Error', {
+        isNetworkError: true,
+        isTimeout: false,
+        isOffline: false,
+      })
+    )
+
+    await waitFor(() =>
+      expect(useSceneLinkHoldStore.getState().holds[2]?.phase).toBe(
+        'reconciling'
+      )
+    )
+    expect(screen.getByTestId('scene-editor-link-pending')).toBeInTheDocument()
+
+    // And editing is genuinely still held, not merely labelled as held.
+    const held = useSceneEditorStore.getState().document
+    await chord()
+    expect(useSceneEditorStore.getState().document).toBe(held)
+  })
+
+  it('resumes only once the re-read after an ambiguous link has landed', async () => {
+    // The way out of the ambiguity is authoritative data, not a timer. The scene
+    // is refetched and the answer - whatever it is - releases the hold.
+    await open()
+    editThenSave()
+
+    const link = pendingLink()
+    await startLink()
+
+    // The write did land, as it happens; the client just never heard so.
+    scenes.getSceneById.mockResolvedValue(sceneView(REVISION + 1) as never)
+    link.reject(
+      new ApiClientError('timeout of 30000ms exceeded', {
+        isNetworkError: false,
+        isTimeout: true,
+        isOffline: false,
+      })
+    )
+
+    await waitFor(() =>
+      expect(
+        screen.queryByTestId('scene-editor-link-pending')
+      ).not.toBeInTheDocument()
+    )
+    expect(useSceneEditorStore.getState().baseRevision).toBe(REVISION + 1)
+  })
+
+  it('keeps holding when the refetch after a link cannot be completed', async () => {
+    // Releasing here would resume editing against whatever was left in the
+    // cache, which is the scene from BEFORE the write that just moved it. The
+    // editor shows the failure rather than a live editor over stale data, and
+    // the hold survives to cover the recovery.
+    await open()
+    editThenSave()
+
+    const link = pendingLink()
+    await startLink()
+
+    scenes.getSceneById.mockRejectedValue(
+      new ApiClientError('Network Error', {
+        isNetworkError: true,
+        isTimeout: false,
+        isOffline: false,
+      })
+    )
+    link.settle({ sceneId: 2, projectId: 4, revision: REVISION + 1 })
+
+    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument())
+    expect(useSceneLinkHoldStore.getState().holds[2]).toMatchObject({
+      phase: 'awaiting-revision',
+      targetRevision: REVISION + 1,
+    })
+
+    // The draft is still on the OLD revision, which is exactly why the hold has
+    // to outlive the failure: resuming now would edit against a number the
+    // server has replaced.
+    expect(useSceneEditorStore.getState().baseRevision).toBe(REVISION)
+  })
+
+  it('is still held after the editor is closed and reopened mid-link', async () => {
+    // The scene editor unmounts whenever the user glances at another tab - the
+    // dock renders only the active one. The hold lived in this component's state
+    // and died there, so the remount believed nothing was in flight over a draft
+    // seeded on a revision the server had already replaced.
+    const first = await open()
+    editThenSave()
+
+    pendingLink()
+    await startLink()
+    first.unmount()
+
+    await open()
+
+    expect(
+      await screen.findByTestId('scene-editor-link-pending')
+    ).toBeInTheDocument()
+    expect(screen.getByTestId('scene-editor-undo')).toBeDisabled()
+  })
+
+  // ---- slot writes and the link, in both directions -------------------------
+
+  it('refuses a rejection submitted with ENTER while a link is pending', async () => {
+    // The reason box submits on Enter, and that path never consulted `busy` - it
+    // went straight to the server carrying baseRevision, which is the number the
+    // link is in the middle of replacing. Disabling the Reject BUTTON did nothing
+    // about it.
+    scenes.getSceneSlots.mockResolvedValue(slotsWithOneCandidate() as never)
+    await open()
+
+    // Open the "none of these" form BEFORE the link starts, so the form is
+    // already on screen when the hold appears - which is the situation.
+    await userEvent.click(screen.getByTestId('scene-choices-none-sofa'))
+    const reason = screen.getByLabelText('Why none of these work')
+    await userEvent.type(reason, 'too modern')
+
+    pendingLink()
+    await startLink()
+
+    await userEvent.type(reason, '{Enter}')
+
+    expect(scenes.rejectSceneCandidates).not.toHaveBeenCalled()
+  })
+
+  it('refuses a rejection submitted with ENTER while another slot write is in flight', async () => {
+    // The same guard, without a link involved: two slot writes both carrying the
+    // same baseRevision means whichever lands second comes back as a conflict the
+    // user could not have caused. The reason box stays open across the other
+    // write, and Enter in it went straight to the server.
+    scenes.getSceneSlots.mockResolvedValue(slotsWithOneCandidate() as never)
+    scenes.resolveSceneSlot.mockReturnValue(new Promise(() => {}) as never)
+    await open()
+
+    await userEvent.click(screen.getByTestId('scene-choices-none-sofa'))
+    const reason = screen.getByLabelText('Why none of these work')
+    await userEvent.type(reason, 'too modern')
+
+    // A different write on the same slot starts and does not finish.
+    await userEvent.click(screen.getByTestId('scene-choices-choose-sofa/a'))
+    await waitFor(() => expect(scenes.resolveSceneSlot).toHaveBeenCalled())
+
+    await userEvent.type(reason, '{Enter}')
+
+    expect(scenes.rejectSceneCandidates).not.toHaveBeenCalled()
+  })
+
+  it('refuses a SAVE while a slot write is in flight', async () => {
+    // The save carries baseRevision too, and this overlap is reachable: choose a
+    // candidate (which needs a CLEAN draft), then edit while that write is still
+    // outstanding, then save. Two writes against the same revision, and whichever
+    // lands second comes back as a conflict the user could not have caused.
+    scenes.getSceneSlots.mockResolvedValue(slotsWithOneCandidate() as never)
+    scenes.resolveSceneSlot.mockReturnValue(new Promise(() => {}) as never)
+    await open()
+
+    await userEvent.click(screen.getByTestId('scene-choices-choose-sofa/a'))
+    await waitFor(() => expect(scenes.resolveSceneSlot).toHaveBeenCalled())
+
+    // Now dirty the draft, with the slot write still in flight.
+    useSceneEditorStore.getState().setNodeTransform('crate', {
+      position: { x: 5, y: 0, z: 0 },
+      rotationEuler: { x: 0, y: 0, z: 0 },
+      scale: { x: 1, y: 1, z: 1 },
+    })
+
+    await userEvent.click(screen.getByTestId('scene-editor-save'), {
+      pointerEventsCheck: 0,
+    })
+
+    expect(scenes.updateSceneDocument).not.toHaveBeenCalled()
+  })
+
+  it('refuses to start a link while a slot write is in flight', async () => {
+    // The other direction. Linking moves the revision the pending write is using,
+    // so it has to wait for it - previously only the reverse was covered.
+    scenes.getSceneSlots.mockResolvedValue(slotsWithOneCandidate() as never)
+    scenes.resolveSceneSlot.mockReturnValue(new Promise(() => {}) as never)
+    await open()
+
+    await userEvent.click(screen.getByTestId('scene-choices-choose-sofa/a'))
+    await waitFor(() => expect(scenes.resolveSceneSlot).toHaveBeenCalled())
+
+    await userEvent.click(screen.getByTestId('scene-project-chip'))
+    expect(screen.getByTestId('scene-project-blocked')).toHaveTextContent(
+      /Wait for the change being saved/i
+    )
+
+    await userEvent.click(screen.getByTestId('scene-project-select'), {
+      pointerEventsCheck: 0,
+    })
+    const option = screen.queryByText('Rooftop chase')
+    if (option) {
+      await userEvent.click(option, { pointerEventsCheck: 0 })
+    }
+
+    expect(scenes.setSceneProject).not.toHaveBeenCalled()
   })
 })

@@ -71,6 +71,10 @@ export function SceneEditor({
     data: view,
     isLoading,
     isFetching: sceneFetching,
+    isError: sceneErrored,
+    dataUpdatedAt: sceneUpdatedAt,
+    errorUpdatedAt: sceneErrorAt,
+    refetch: refetchScene,
     error,
   } = useSceneByIdQuery({ sceneId })
   const { data: slotsView, isLoading: slotsLoading } = useSceneSlotsQuery({
@@ -103,12 +107,18 @@ export function SceneEditor({
   } = useSceneEditorStore()
 
   // Editing is held while a project link is moving the scene's revision. The
-  // reasoning - and why the hold outlives the mutation, but not a link that
-  // failed - is in the hook.
-  const { editsBlocked, onLinkStatusChange } = useProjectLinkSerialization({
+  // hold belongs to the SCENE, not to this component - it survives a tab switch
+  // and a remount, and it ends only on authoritative data. The reasoning is in
+  // the hook and in `sceneLinkHoldStore`.
+  const { editsBlocked } = useProjectLinkSerialization({
+    sceneId,
     loadedRevision: view?.scene.revision,
     baseRevision,
     isFetching: sceneFetching,
+    isError: sceneErrored,
+    dataUpdatedAt: sceneUpdatedAt,
+    errorUpdatedAt: sceneErrorAt,
+    refetch: refetchScene,
   })
 
   // Every guard reads through this, so a callback built before the hold began
@@ -272,7 +282,45 @@ export function SceneEditor({
       ? 'Save your edits before choosing - a choice is written to the scene straight away.'
       : null)
 
+  // Every direct scene write that is in flight right now. Each of them carries
+  // baseRevision and moves the revision when it lands, so they exclude each
+  // other and they exclude the project link - in BOTH directions. Only the link
+  // side was covered before: an accept could start under a pending link, and a
+  // link could start under a pending accept.
+  const sceneWritePending =
+    resolveSlot.isPending ||
+    rejectCandidates.isPending ||
+    acceptRecommendations.isPending ||
+    save.isPending
+
+  // Read through a ref for the same reason the edit guard is: a handler built
+  // before a write started still has to see it when it finally runs.
+  const slotsBlockedRef = useRef(slotsBlocked)
+  slotsBlockedRef.current = slotsBlocked
+  const sceneWritePendingRef = useRef(sceneWritePending)
+  sceneWritePendingRef.current = sceneWritePending
+
+  /**
+   * Runs one slot write, refusing outright if anything says it must not happen.
+   *
+   * The check is HERE rather than only on the buttons. The panel disables its
+   * controls while a write is in flight, but the rejection form also submits on
+   * Enter, and that path went straight to the server: an open reason box plus a
+   * project link starting behind it was two writes racing for one revision, and
+   * whichever lost came back as a conflict the user could not have caused.
+   */
   const runSlotWrite = useCallback(async (write: () => Promise<unknown>) => {
+    if (slotsBlockedRef.current !== null) {
+      setSlotError(slotsBlockedRef.current)
+      return
+    }
+    if (sceneWritePendingRef.current) {
+      setSlotError(
+        'Another change to this scene is still being saved. Wait for it to finish - both would be written against the same revision.'
+      )
+      return
+    }
+
     setSlotError(null)
     try {
       await write()
@@ -451,6 +499,16 @@ export function SceneEditor({
       return
     }
 
+    // And held for the slot writes, which carry the same number. The save button
+    // is disabled while one is in flight, but the chord and any programmatic
+    // caller are not - and the exclusion is a rule about the write.
+    if (sceneWritePendingRef.current) {
+      setSaveError(
+        'Another change to this scene is still being saved. Wait for it to finish - both would be written against the same revision.'
+      )
+      return
+    }
+
     setSaveError(null)
     try {
       const saved = await save.mutateAsync({
@@ -573,11 +631,19 @@ export function SceneEditor({
               projectId={view.scene.projectId}
               projectName={view.scene.projectName}
               blocked={
-                isDirty
-                  ? 'Save your edits before changing the project - linking is written to the scene straight away, and your unsaved draft could not be saved afterwards.'
-                  : null
+                // The other direction of the exclusion, and it has three reasons
+                // rather than one. A dirty draft was the only one covered: a
+                // link starting while an accept/reject/resolve or a save is
+                // still in flight races the very revision that write carries,
+                // and a link starting while a previous link is still being
+                // reconciled would stack two unresolved writes on one scene.
+                editsBlocked ??
+                (sceneWritePending
+                  ? 'Wait for the change being saved to finish - linking moves the revision that write is using.'
+                  : isDirty
+                    ? 'Save your edits before changing the project - linking is written to the scene straight away, and your unsaved draft could not be saved afterwards.'
+                    : null)
               }
-              onLinkStatusChange={onLinkStatusChange}
             />
           </span>
         }
