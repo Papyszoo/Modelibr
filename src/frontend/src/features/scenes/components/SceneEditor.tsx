@@ -3,7 +3,14 @@ import './SceneEditor.css'
 import { Button } from 'primereact/button'
 import { Message } from 'primereact/message'
 import { SelectButton } from 'primereact/selectbutton'
-import { type JSX, useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  type JSX,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 
 import { ApiClientError } from '@/lib/apiBase'
 import { ErrorState, ListHeader, LoadingState } from '@/shared/components'
@@ -83,8 +90,8 @@ export function SceneEditor({
     open,
     markSaved,
     edit: editDraft,
-    undo,
-    redo,
+    undo: undoDraft,
+    redo: redoDraft,
     selectNode,
     setNodeTransform: setNodeTransformDraft,
     updateNode: updateNodeDraft,
@@ -96,23 +103,40 @@ export function SceneEditor({
   } = useSceneEditorStore()
 
   // Editing is held while a project link is moving the scene's revision. The
-  // reasoning - and why the hold outlives the mutation - is in the hook.
-  const { editsBlocked, onPendingChange: handleLinkPendingChange } =
-    useProjectLinkSerialization({
-      loadedRevision: view?.scene.revision,
-      baseRevision,
-      isFetching: sceneFetching,
-    })
+  // reasoning - and why the hold outlives the mutation, but not a link that
+  // failed - is in the hook.
+  const { editsBlocked, onLinkStatusChange } = useProjectLinkSerialization({
+    loadedRevision: view?.scene.revision,
+    baseRevision,
+    isFetching: sceneFetching,
+  })
+
+  // Every guard reads through this, so a callback built before the hold began
+  // still sees the hold when it finally runs. Assigned during render rather than
+  // in an effect: an effect would leave the ref a render behind, which is
+  // exactly the window a placement finishes in.
+  const editsBlockedRef = useRef(editsBlocked)
+  editsBlockedRef.current = editsBlocked
 
   // One guard, applied where the draft actions enter this component, so every
   // call site inherits it rather than each one remembering to ask. Wrapped with
   // useCallback because these identities are dependencies of the handlers below.
-  const setNodeTransform = useGuardedEdit(setNodeTransformDraft, editsBlocked)
-  const updateNode = useGuardedEdit(updateNodeDraft, editsBlocked)
-  const removeNode = useGuardedEdit(removeNodeDraft, editsBlocked)
-  const addNode = useGuardedEdit(addNodeDraft, editsBlocked)
-  const setLight = useGuardedEdit(setLightDraft, editsBlocked)
-  const edit = useGuardedEdit(editDraft, editsBlocked)
+  const setNodeTransform = useGuardedEdit(
+    setNodeTransformDraft,
+    editsBlockedRef
+  )
+  const updateNode = useGuardedEdit(updateNodeDraft, editsBlockedRef)
+  const removeNode = useGuardedEdit(removeNodeDraft, editsBlockedRef)
+  const addNode = useGuardedEdit(addNodeDraft, editsBlockedRef)
+  const setLight = useGuardedEdit(setLightDraft, editsBlockedRef)
+  const edit = useGuardedEdit(editDraft, editsBlockedRef)
+
+  // Undo and redo are draft writes like any other, and were reaching the store
+  // raw. Rolling the draft back mid-link leaves it dirty at the old revision -
+  // the same stale-revision conflict every other edit is held for, arrived at
+  // through the one pair of actions that skipped the gate.
+  const undo = useGuardedEdit(undoDraft, editsBlockedRef)
+  const redo = useGuardedEdit(redoDraft, editsBlockedRef)
 
   const [placeError, setPlaceError] = useState<string | null>(null)
 
@@ -238,9 +262,15 @@ export function SceneEditor({
    * a slot write moves the scene's revision, and merging it into an unsaved
    * draft would silently discard one of the two.
    */
-  const slotsBlocked = isDirty
-    ? 'Save your edits before choosing - a choice is written to the scene straight away.'
-    : null
+  //
+  // And held for a project link too, for the same reason the save is: a slot
+  // write carries baseRevision, and a link is in the middle of replacing it.
+  // Sending one into that window is the conflict, not a way around it.
+  const slotsBlocked =
+    editsBlocked ??
+    (isDirty
+      ? 'Save your edits before choosing - a choice is written to the scene straight away.'
+      : null)
 
   const runSlotWrite = useCallback(async (write: () => Promise<unknown>) => {
     setSlotError(null)
@@ -288,6 +318,11 @@ export function SceneEditor({
         return
       }
 
+      if (editsBlockedRef.current) {
+        setPlaceError(editsBlockedRef.current)
+        return
+      }
+
       const assetId = Number(model.id)
       setPlaceError(null)
       setIsPlacing(true)
@@ -313,6 +348,14 @@ export function SceneEditor({
         )
       } finally {
         setIsPlacing(false)
+      }
+
+      // The fetch above is a real round trip, and a link can begin during it.
+      // `addNode` would refuse on its own now, but silently - and a placement
+      // that vanishes without a word is worse than one that says why.
+      if (editsBlockedRef.current) {
+        setPlaceError(editsBlockedRef.current)
+        return
       }
 
       const nodeId = nextNodeId(current, `model-${assetId}`)
@@ -534,7 +577,7 @@ export function SceneEditor({
                   ? 'Save your edits before changing the project - linking is written to the scene straight away, and your unsaved draft could not be saved afterwards.'
                   : null
               }
-              onPendingChange={handleLinkPendingChange}
+              onLinkStatusChange={onLinkStatusChange}
             />
           </span>
         }
@@ -577,7 +620,7 @@ export function SceneEditor({
               aria-label="Undo"
               data-testid="scene-editor-undo"
               tooltip="Undo (Ctrl+Z)"
-              disabled={!canUndo}
+              disabled={!canUndo || editsBlocked !== null}
               onClick={undo}
             />
             <Button
@@ -586,7 +629,7 @@ export function SceneEditor({
               size="small"
               aria-label="Redo"
               tooltip="Redo (Ctrl+Shift+Z)"
-              disabled={!canRedo}
+              disabled={!canRedo || editsBlocked !== null}
               onClick={redo}
             />
             <Button
@@ -624,6 +667,7 @@ export function SceneEditor({
           severity="warn"
           text={placeError}
           className="scene-editor-message"
+          data-testid="scene-editor-place-error"
         />
       ) : null}
 
@@ -638,7 +682,7 @@ export function SceneEditor({
       <div className="scene-editor-body">
         <aside className="scene-editor-side">
           <SceneAssetPicker
-            disabled={isPlacing}
+            disabled={isPlacing || editsBlocked !== null}
             onPlace={(model, versionId) =>
               void handlePlaceModel(model, versionId)
             }
@@ -824,17 +868,36 @@ export function SceneEditor({
  * dependency of half the handlers in this component: a new identity every render
  * would rebuild all of them every render, and re-run every effect keyed on one.
  */
+/**
+ * Wraps a draft action so it refuses to run while editing is held.
+ *
+ * <p>
+ * The blocking state is read from a <b>ref</b>, at call time. Capturing the
+ * value instead left every asynchronous path holding whichever answer was true
+ * when its closure was built: a model placement that started before a link and
+ * finished during it called an `addNode` created back when nothing was blocked,
+ * and wrote into the draft the link was in the middle of invalidating. Reading
+ * the ref means the guard answers for the moment the write actually happens.
+ * </p>
+ *
+ * <p>
+ * It also gives these actions ONE identity for the life of the editor, which
+ * the handlers below depend on: they list the guarded actions in their own
+ * dependency arrays, and rebuilding all of them every time the hold flips would
+ * churn every callback in the component.
+ * </p>
+ */
 function useGuardedEdit<A extends unknown[]>(
   action: (...args: A) => void,
-  blocked: string | null
+  blockedRef: { current: string | null }
 ): (...args: A) => void {
   return useCallback(
     (...args: A) => {
-      if (blocked) {
+      if (blockedRef.current) {
         return
       }
       action(...args)
     },
-    [action, blocked]
+    [action, blockedRef]
   )
 }

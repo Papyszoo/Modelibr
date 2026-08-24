@@ -5,11 +5,11 @@ import {
   useQueryClient,
 } from '@tanstack/react-query'
 
-import { getEnvironmentMapCategories } from '@/features/environment-map/api/environmentMapCategoryApi'
-import { getModelCategories } from '@/features/models/api/modelApi'
-import { getAllSoundCategories } from '@/features/sounds/api/soundApi'
-import { getAllSpriteCategories } from '@/features/sprite/api/spriteApi'
-import { getAllTextureSetCategories } from '@/features/texture-set/api/textureSetApi'
+import { getEnvironmentMapCategoriesQueryOptions } from '@/features/environment-map/api/queries'
+import { getModelCategoriesQueryOptions } from '@/features/models/api/queries'
+import { getSoundCategoriesQueryOptions } from '@/features/sounds/api/queries'
+import { getSpriteCategoriesQueryOptions } from '@/features/sprite/api/queries'
+import { getTextureSetCategoriesQueryOptions } from '@/features/texture-set/api/queries'
 import { TextureSetKind } from '@/features/texture-set/types'
 import { type QueryConfig } from '@/lib/react-query'
 import type { HierarchicalCategory } from '@/shared/types/categories'
@@ -164,13 +164,23 @@ export function useReviewImportSuggestionsMutation() {
  * The category tree behind a `categoryRef` field.
  *
  * <p>
- * Deliberately built on each family's EXISTING query - same fetcher, same query
- * key - rather than on a fetcher of its own. A separate key would be a second
- * copy of the same list that nothing invalidates: creating, renaming, moving or
- * deleting a category invalidates the family's key, and a picker keyed
- * elsewhere would go on offering the tree as it was when the panel opened.
- * Reusing the key means the picker is already correct on the next render, with
- * no invalidation wiring of its own to remember.
+ * Deliberately built on each family's EXISTING query options - same fetcher,
+ * same key, same cached shape - rather than on a fetcher of its own. A separate
+ * key would be a second copy of the same list that nothing invalidates:
+ * creating, renaming, moving or deleting a category invalidates the family's
+ * key, and a picker keyed elsewhere would go on offering the tree as it was when
+ * the panel opened.
+ * </p>
+ *
+ * <p>
+ * Sharing a key means sharing what is stored under it, and that is the whole of
+ * why these are the real options objects and not a re-declaration of them. The
+ * Sound and Sprite queries cache <code>{ categories: [...] }</code>; the picker
+ * used to write a bare array under those same keys, so whichever mounted second
+ * overwrote the other's shape - the sidebar reading `.categories` of an array,
+ * or the picker mapping over an object, depending only on the order the user
+ * happened to navigate in. The projection to an array is a `select`, which
+ * transforms what this consumer READS and never what the cache HOLDS.
  * </p>
  *
  * <p>
@@ -188,46 +198,65 @@ export function getCategoryOptionsQueryOptions(
 ): CategoryOptionsQuery {
   switch (family) {
     case 'Model':
-      return {
-        queryKey: ['model-categories'],
-        queryFn: () => getModelCategories(),
-      }
+      return borrow(getModelCategoriesQueryOptions(), categories => categories)
 
     case 'Sound':
-      return {
-        queryKey: ['soundCategories'],
-        queryFn: async () => (await getAllSoundCategories()).categories,
-      }
+      // Cached as { categories: [...] } by the sounds sidebar. Read as an array
+      // here, stored as it always was.
+      return borrow(getSoundCategoriesQueryOptions(), data => data.categories)
 
     case 'Sprite':
-      return {
-        queryKey: ['spriteCategories'],
-        queryFn: async () => (await getAllSpriteCategories()).categories,
-      }
+      return borrow(getSpriteCategoriesQueryOptions(), data => data.categories)
 
     case 'EnvironmentMap':
-      return {
-        queryKey: ['environment-map-categories'],
-        queryFn: () => getEnvironmentMapCategories(),
-      }
+      return borrow(
+        getEnvironmentMapCategoriesQueryOptions(),
+        categories => categories
+      )
 
     case 'TextureSet':
-    case 'Material': {
+    case 'Material':
       // Universal is the fallback rather than the enum's zero value: a Material
       // only ever uses Universal, and a TextureSet whose kind has not loaded yet
       // is better shown the shared vocabulary than the model-specific one.
-      const resolved = kind ?? TextureSetKind.Universal
-      return {
-        queryKey: ['textureSetCategories', resolved],
-        queryFn: () => getAllTextureSetCategories(resolved),
-      }
-    }
+      return borrow(
+        getTextureSetCategoriesQueryOptions(kind ?? TextureSetKind.Universal),
+        categories => categories
+      )
 
     default:
       return {
         queryKey: ['metadata', 'categories', 'unsupported', family],
         queryFn: async () => [],
+        select: () => [],
       }
+  }
+}
+
+/**
+ * Wraps a family's own query options so this consumer can read a plain array out
+ * of whatever that family caches.
+ *
+ * <p>
+ * The key and the fetcher are passed through untouched - borrowed, not
+ * reimplemented - and the shape difference is absorbed by `select`, which runs
+ * on the way out of the cache and leaves the cached value alone. The one cast is
+ * here, where the five differently-typed option objects are erased into the
+ * single type `useQuery` can be called with; every call site above stays fully
+ * checked against its own family's response.
+ * </p>
+ */
+function borrow<TData>(
+  options: {
+    queryKey: readonly unknown[]
+    queryFn: () => Promise<TData>
+  },
+  select: (data: TData) => HierarchicalCategory[]
+): CategoryOptionsQuery {
+  return {
+    queryKey: options.queryKey,
+    queryFn: options.queryFn,
+    select: data => select(data as TData),
   }
 }
 
@@ -235,10 +264,18 @@ export function getCategoryOptionsQueryOptions(
  * One shape for all five, so the hook below has a single type to assign back.
  * `queryOptions()` would pin each branch's key as a literal tuple, and a union
  * of five of those cannot be handed to one `useQuery` call.
+ *
+ * <p>
+ * `queryFn` returns `unknown` because each family caches its own shape and this
+ * type must not flatten them into one - flattening them is exactly how a bare
+ * array came to be written under a key holding an object. `select` is where the
+ * difference is resolved, on read.
+ * </p>
  */
 interface CategoryOptionsQuery {
   queryKey: readonly unknown[]
-  queryFn: () => Promise<HierarchicalCategory[]>
+  queryFn: () => Promise<unknown>
+  select: (data: unknown) => HierarchicalCategory[]
 }
 
 /** Families whose `categoryRef` this picker can actually fill. */
@@ -264,7 +301,7 @@ export function useCategoryOptionsQuery({
   // Narrower than the usual `queryConfig` seam on purpose: the picker only ever
   // needs to switch itself off, and a config typed over five different query
   // keys cannot be assigned back to any one of them.
-  const { queryKey, queryFn } = getCategoryOptionsQueryOptions(
+  const { queryKey, queryFn, select } = getCategoryOptionsQueryOptions(
     family ?? '',
     kind
   )
@@ -272,6 +309,7 @@ export function useCategoryOptionsQuery({
   return useQuery({
     queryKey,
     queryFn,
+    select,
     enabled: enabled && Boolean(family) && CATEGORY_FAMILIES.has(family ?? ''),
   })
 }

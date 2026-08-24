@@ -17,6 +17,16 @@
   color: var(--mod-color-text-muted);
 }
 
+/*
+  A refused link, said out loud. Muted like the note above would read as an
+  aside; this is the reason a change the user asked for did not happen.
+*/
+.scene-project-brief-error {
+  margin: 0;
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-danger);
+}
+
 .scene-project-brief ul {
   margin: var(--mod-space-2xs) 0 0;
   padding-left: var(--mod-space-sm);

@@ -7,8 +7,10 @@ import { type JSX, useEffect, useRef, useState } from 'react'
 
 import { useProjectsQuery } from '@/features/project/api/queries'
 import { useProjectBriefQuery } from '@/features/project/api/queries'
+import { ApiClientError } from '@/lib/apiBase'
 
 import { useSetSceneProjectMutation } from '../api/queries'
+import { type ProjectLinkStatus } from '../hooks/useProjectLinkSerialization'
 
 /**
  * The project a scene belongs to, and - behind it - the brief the agent was
@@ -28,7 +30,7 @@ export function SceneProjectBrief({
   projectId,
   projectName,
   blocked = null,
-  onPendingChange,
+  onLinkStatusChange,
 }: {
   sceneId: number
   projectId: number | null
@@ -41,8 +43,8 @@ export function SceneProjectBrief({
    */
   blocked?: string | null
   /**
-   * Reports the link write's in-flight state to whoever owns the editor around
-   * this control.
+   * Reports the link write's state to whoever owns the editor around this
+   * control.
    *
    * The block above is one direction of a two-way exclusion and on its own it is
    * only half a fix. Linking moves the scene's revision, and the editor reseeds
@@ -51,8 +53,13 @@ export function SceneProjectBrief({
    * skipped, and the next save is refused as a conflict over a revision the user
    * never saw. The editor needs to know this is happening to hold edits until the
    * refetch has landed.
+   *
+   * The full status, not just "in flight": a link that FAILED invalidates
+   * nothing, so the refetch the editor is holding for never comes. Reporting only
+   * the pending bit left the editor waiting for it forever, read-only until the
+   * tab was closed.
    */
-  onPendingChange?: (pending: boolean) => void
+  onLinkStatusChange?: (status: ProjectLinkStatus) => void
 }): JSX.Element {
   const panel = useRef<OverlayPanel>(null)
   // Only fetched once the user asks, and then kept. A scene editor that pulled
@@ -69,10 +76,12 @@ export function SceneProjectBrief({
   const link = useSetSceneProjectMutation()
 
   // Reported rather than lifted wholesale: the mutation and its options belong
-  // with the control that offers it, and the editor only needs the one bit.
+  // with the control that offers it, and the editor only needs to know how it is
+  // going. React Query's own status is passed straight through - reducing it to
+  // a boolean here is what lost the difference between "finished" and "failed".
   useEffect(() => {
-    onPendingChange?.(link.isPending)
-  }, [link.isPending, onPendingChange])
+    onLinkStatusChange?.(link.status)
+  }, [link.status, onLinkStatusChange])
 
   return (
     <>
@@ -134,6 +143,26 @@ export function SceneProjectBrief({
             data-testid="scene-project-blocked"
           >
             {blocked}
+          </p>
+        ) : null}
+
+        {/*
+          A refused link used to be silent: the dropdown snapped back to the
+          project the scene still has, and nothing said why. The server's own
+          reason is shown verbatim, and the control above is left enabled -
+          picking again IS the retry, and the write moved nothing, so there is
+          nothing to reconcile first.
+        */}
+        {link.isError ? (
+          <p
+            className="scene-project-brief-error"
+            role="alert"
+            data-testid="scene-project-error"
+          >
+            {link.error instanceof ApiClientError
+              ? link.error.message
+              : 'The project could not be changed.'}{' '}
+            Pick a project again to retry.
           </p>
         ) : null}
 

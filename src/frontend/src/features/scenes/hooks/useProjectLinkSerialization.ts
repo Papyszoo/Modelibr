@@ -1,6 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 /**
+ * The link mutation's state, as React Query reports it. Passed through verbatim
+ * rather than reduced to a boolean - "not pending" is two different situations,
+ * and telling them apart is the whole of what this hook needs.
+ */
+export type ProjectLinkStatus = 'idle' | 'pending' | 'success' | 'error'
+
+export interface ProjectLinkSerialization {
+  /** Why editing is held, or null when it is not. */
+  editsBlocked: string | null
+  /** Pass to the control that owns the link mutation. */
+  onLinkStatusChange: (status: ProjectLinkStatus) => void
+}
+
+export const LINK_PENDING_MESSAGE =
+  'This scene is being linked to a project. Its revision is moving, so editing is held for a moment - nothing is lost.'
+
+/**
  * Serialises scene editing against the project-link write.
  *
  * <p>
@@ -22,17 +39,17 @@ import { useCallback, useEffect, useRef, useState } from 'react'
  * later - so the hold runs until the draft is actually sitting on the revision
  * the query now reports.
  * </p>
+ *
+ * <p>
+ * Which is correct only for a link that <b>succeeded</b>. A rejected link
+ * invalidates nothing, so the revision never moves and no refetch ever lands -
+ * and a hold waiting for the reseed of a write that did not happen waits
+ * forever, with the editor read-only until the tab is closed. The outcome is
+ * therefore reported, not inferred from `isPending` going false: a failure
+ * releases the hold immediately, because a write the server refused moved
+ * nothing and there is nothing to wait for.
+ * </p>
  */
-export interface ProjectLinkSerialization {
-  /** Why editing is held, or null when it is not. */
-  editsBlocked: string | null
-  /** Pass to the control that owns the link mutation. */
-  onPendingChange: (pending: boolean) => void
-}
-
-export const LINK_PENDING_MESSAGE =
-  'This scene is being linked to a project. Its revision is moving, so editing is held for a moment - nothing is lost.'
-
 export function useProjectLinkSerialization({
   loadedRevision,
   baseRevision,
@@ -49,7 +66,8 @@ export function useProjectLinkSerialization({
    */
   isFetching: boolean
 }): ProjectLinkSerialization {
-  const [linkPending, setLinkPending] = useState(false)
+  const [linkStatus, setLinkStatus] = useState<ProjectLinkStatus>('idle')
+  const linkPending = linkStatus === 'pending'
 
   /**
    * What the hold is still waiting for, or null when nothing is.
@@ -71,15 +89,26 @@ export function useProjectLinkSerialization({
   const baseRevisionRef = useRef(baseRevision)
   baseRevisionRef.current = baseRevision
 
-  const onPendingChange = useCallback((pending: boolean) => {
-    setLinkPending(pending)
-    if (pending) {
+  const onLinkStatusChange = useCallback((status: ProjectLinkStatus) => {
+    setLinkStatus(status)
+
+    if (status === 'pending') {
       // Latched here rather than derived: the hold has to outlive the mutation,
       // which settles before the refetch it queued has even started.
       setAwaiting(
         current =>
           current ?? { startedAt: baseRevisionRef.current, sawFetch: false }
       )
+      return
+    }
+
+    if (status === 'error') {
+      // The one outcome that is KNOWN not to have moved anything. Nothing was
+      // invalidated, so no refetch is coming and no revision will change -
+      // waiting for the reseed would be waiting for an event that cannot
+      // happen, and the editor would stay read-only for the rest of the
+      // session. The user gets the error and their editor back.
+      setAwaiting(null)
     }
   }, [])
 
@@ -115,6 +144,6 @@ export function useProjectLinkSerialization({
   return {
     editsBlocked:
       linkPending || awaiting !== null ? LINK_PENDING_MESSAGE : null,
-    onPendingChange,
+    onLinkStatusChange,
   }
 }

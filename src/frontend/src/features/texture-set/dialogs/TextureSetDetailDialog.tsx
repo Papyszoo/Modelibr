@@ -8,7 +8,7 @@ import { TabPanel, TabView } from 'primereact/tabview'
 import { Toast } from 'primereact/toast'
 import { useEffect, useRef, useState } from 'react'
 
-import { getAllTextureSetCategories } from '@/features/texture-set/api/textureSetApi'
+import { getTextureSetCategoriesQueryOptions } from '@/features/texture-set/api/queries'
 import { useTextureSets } from '@/features/texture-set/hooks/useTextureSets'
 import { CategorySinglePicker } from '@/shared/components/categories/CategorySinglePicker'
 import {
@@ -53,8 +53,7 @@ export function TextureSetDetailDialog({
     currentSet.kind === TextureSetKind.Universal ||
     currentSet.kind === TextureSetKind.ModelSpecific
   const { data: categories = [] } = useQuery({
-    queryKey: ['textureSetCategories', currentSet.kind],
-    queryFn: () => getAllTextureSetCategories(currentSet.kind),
+    ...getTextureSetCategoriesQueryOptions(currentSet.kind),
     enabled: categoriesEnabled,
   })
 

@@ -26,6 +26,13 @@ describe('SceneProjectBrief', () => {
     })
   })
 
+  /** Opens the panel and picks the one project on offer. */
+  async function pickProject() {
+    await userEvent.click(screen.getByTestId('scene-project-chip'))
+    await userEvent.click(screen.getByTestId('scene-project-select'))
+    await userEvent.click(await screen.findByText('Rooftop chase'))
+  }
+
   it('says plainly when a scene belongs to no project', async () => {
     // Not an empty panel: "no project" means the agent is given no budget, no
     // style and no world convention, which is worth stating rather than
@@ -96,7 +103,7 @@ describe('SceneProjectBrief', () => {
     expect(scenes.setSceneProject).not.toHaveBeenCalled()
   })
 
-  it('reports the link write as in flight, so the editor can hold edits', async () => {
+  it('reports the link write as in flight, then as succeeded', async () => {
     // The other direction of the same exclusion: the editor reseeds its draft
     // from a new revision only while the draft is clean, so an edit made DURING
     // the link leaves it dirty at the old revision and the next save is refused.
@@ -107,24 +114,79 @@ describe('SceneProjectBrief', () => {
         settle = resolve
       }) as never
     )
-    const pending: boolean[] = []
+    const statuses: string[] = []
 
     renderWithProviders(
       <SceneProjectBrief
         sceneId={2}
         projectId={null}
         projectName={null}
-        onPendingChange={value => pending.push(value)}
+        onLinkStatusChange={status => statuses.push(status)}
       />
     )
 
-    await userEvent.click(screen.getByTestId('scene-project-chip'))
-    await userEvent.click(screen.getByTestId('scene-project-select'))
-    await userEvent.click(await screen.findByText('Rooftop chase'))
+    await pickProject()
 
-    await waitFor(() => expect(pending).toContain(true))
+    await waitFor(() => expect(statuses).toContain('pending'))
 
     settle({ sceneId: 2, projectId: 4, revision: 9 })
-    await waitFor(() => expect(pending[pending.length - 1]).toBe(false))
+    await waitFor(() => expect(statuses[statuses.length - 1]).toBe('success'))
+  })
+
+  it('reports a refused link as failed, not merely as no longer pending', async () => {
+    // The bit that was missing. The editor holds edits until the refetch the
+    // link queued has landed - and a rejected link queues nothing, so "not
+    // pending any more" told it to keep waiting for an event that never comes.
+    // The editor stayed read-only until the tab was closed.
+    projects.getProjectBrief.mockResolvedValue({ guidance: [] } as never)
+    scenes.setSceneProject.mockRejectedValue(new Error('nope'))
+    const statuses: string[] = []
+
+    renderWithProviders(
+      <SceneProjectBrief
+        sceneId={2}
+        projectId={null}
+        projectName={null}
+        onLinkStatusChange={status => statuses.push(status)}
+      />
+    )
+
+    await pickProject()
+
+    await waitFor(() => expect(statuses).toContain('error'))
+    expect(statuses).not.toContain('success')
+  })
+
+  it('shows why a link was refused, and leaves the control ready to retry', async () => {
+    // It used to fail silently: the dropdown snapped back to the project the
+    // scene still had, and nothing said anything.
+    projects.getProjectBrief.mockResolvedValue({ guidance: [] } as never)
+    scenes.setSceneProject.mockRejectedValue(new Error('nope'))
+
+    renderWithProviders(
+      <SceneProjectBrief sceneId={2} projectId={null} projectName={null} />
+    )
+
+    await pickProject()
+
+    const error = await screen.findByTestId('scene-project-error')
+    expect(error).toHaveTextContent('Pick a project again to retry.')
+    // Announced, because the panel it appears in is not where the eye is.
+    expect(error).toHaveAttribute('role', 'alert')
+
+    // And the retry is available: the write moved nothing, so there is nothing
+    // to reconcile before trying again.
+    expect(screen.getByTestId('scene-project-select')).not.toHaveClass(
+      'p-disabled'
+    )
+
+    scenes.setSceneProject.mockResolvedValue({
+      sceneId: 2,
+      projectId: 4,
+      revision: 9,
+    })
+    await pickProject()
+
+    await waitFor(() => expect(scenes.setSceneProject).toHaveBeenCalledTimes(2))
   })
 })

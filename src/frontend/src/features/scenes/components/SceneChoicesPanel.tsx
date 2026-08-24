@@ -101,7 +101,14 @@ export function SceneChoicesPanel({
         />
       )}
 
-      {blocked ? <p className="scene-choices-blocked">{blocked}</p> : null}
+      {blocked ? (
+        <p
+          className="scene-choices-blocked"
+          data-testid="scene-choices-blocked"
+        >
+          {blocked}
+        </p>
+      ) : null}
 
       {isLoading ? (
         <p className="scene-choices-note">Loading…</p>
