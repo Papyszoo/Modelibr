@@ -10,7 +10,8 @@ import { useProjectBriefQuery } from '@/features/project/api/queries'
 import { ApiClientError } from '@/lib/apiBase'
 
 import {
-  isDefiniteLinkRefusal,
+  isDefiniteWriteRefusal,
+  SceneWriteHeldError,
   useSetSceneProjectMutation,
 } from '../api/queries'
 
@@ -151,7 +152,9 @@ export function SceneProjectBrief({
           is the retry and the control stays live. A dropped connection may have
           committed - "try again" there is an invitation to link twice, so it says
           what is actually happening instead: the scene is being re-read, and the
-          editor is held until it is known what was saved.
+          editor is held until it is known what was saved. And a write the client
+          itself refused, because this scene already has an unresolved one, says
+          so and offers nothing: its own message is the whole answer.
         */}
         {link.isError ? (
           <p
@@ -159,12 +162,15 @@ export function SceneProjectBrief({
             role="alert"
             data-testid="scene-project-error"
           >
-            {link.error instanceof ApiClientError
+            {link.error instanceof ApiClientError ||
+            link.error instanceof SceneWriteHeldError
               ? link.error.message
               : 'The project could not be changed.'}{' '}
-            {isDefiniteLinkRefusal(link.error)
-              ? 'Pick a project again to retry.'
-              : 'It is not known whether it was saved, so the scene is being re-read from the server.'}
+            {link.error instanceof SceneWriteHeldError
+              ? ''
+              : isDefiniteWriteRefusal(link.error)
+                ? 'Pick a project again to retry.'
+                : 'It is not known whether it was saved, so the scene is being re-read from the server.'}
           </p>
         ) : null}
 

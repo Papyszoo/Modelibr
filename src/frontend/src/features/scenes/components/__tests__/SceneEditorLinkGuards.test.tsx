@@ -1,15 +1,15 @@
-import { screen, waitFor } from '@testing-library/react'
+import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { ApiClientError } from '@/lib/apiBase'
 import { useSceneEditorStore, useSceneLinkHoldStore } from '@/stores'
-
-import type { SceneDocument } from '../../types'
 import { renderWithProviders } from '@/test/renderWithProviders'
 
 import * as modelApi from '../../../models/api/modelApi'
 import * as projectApi from '../../../project/api/projectApi'
 import * as scenesApi from '../../api/scenesApi'
+import { LINK_RECONCILE_RETRY_MS } from '../../hooks/useProjectLinkSerialization'
+import type { SceneDocument } from '../../types'
 import { SceneEditor } from '../SceneEditor'
 
 /*
@@ -30,21 +30,25 @@ const projects = projectApi as jest.Mocked<typeof projectApi>
 const models = modelApi as jest.Mocked<typeof modelApi>
 
 /**
- * Editing is serialised against the project link because linking moves the
- * scene's revision and the editor only reseeds a CLEAN draft - so an edit made
- * during the link leaves the draft dirty at a revision the server has replaced,
- * and the next save is refused over a conflict the user cannot reconcile.
+ * Editing is serialised against every DIRECT scene write - the project link and
+ * every slot write - because each of them moves the scene's revision and the
+ * editor only reseeds a CLEAN draft. An edit made during one leaves the draft
+ * dirty at a revision the server has replaced, the reseed is skipped BECAUSE it
+ * is dirty, and there is no revision left that the draft can be saved against.
  *
  * <p>
- * The gate existed; three ways through it did not go past it. Undo and redo
+ * The gate existed; four ways through it did not go past it. Undo and redo
  * called the store directly, on the button and on the chord. A model placement
  * awaits the asset's facts first, and the guard it had captured still said
- * "allowed" when that await resolved mid-link. And slot writes - which go
- * straight to the server carrying baseRevision - were held only for a dirty
- * draft, not for a link replacing the very revision they carry.
+ * "allowed" when that await resolved mid-link. Slot writes - which go straight
+ * to the server carrying baseRevision - were held only for a dirty draft, not
+ * for a link replacing the very revision they carry. And the slot writes did
+ * not hold the EDITOR at all: they were covered by `isPending`, which ends when
+ * the response arrives, a detail refetch and a reseed before the draft is
+ * actually on the new revision.
  * </p>
  */
-describe('scene editing is serialised against the project link', () => {
+describe('scene editing is serialised against every direct scene write', () => {
   const REVISION = 4
 
   function sceneView(revision = REVISION) {
@@ -124,6 +128,33 @@ describe('scene editing is serialised against the project link', () => {
     )
     await screen.findByTestId('scene-canvas')
     return rendered
+  }
+
+  /** A slot write that will not settle until `settle` or `reject` is called. */
+  function deferredSlotWrite() {
+    let settle!: (value: unknown) => void
+    let reject!: (reason: unknown) => void
+    scenes.resolveSceneSlot.mockReturnValue(
+      new Promise((resolve, rejectIt) => {
+        settle = resolve
+        reject = rejectIt
+      }) as never
+    )
+    return { settle, reject }
+  }
+
+  /** What a slot write answers with: the scene, at the revision it produced. */
+  function slotWriteResult(revision: number) {
+    return {
+      scene: sceneView(revision).scene,
+      slot: {
+        slotId: 'sofa',
+        status: 'chosen',
+        role: 'seating',
+        candidates: [],
+        chosen: { id: 'a', ref: 'sofa/a' },
+      },
+    }
   }
 
   /** Starts a project link that will not settle until `settle` is called. */
@@ -575,11 +606,277 @@ describe('scene editing is serialised against the project link', () => {
     expect(scenes.rejectSceneCandidates).not.toHaveBeenCalled()
   })
 
-  it('refuses a SAVE while a slot write is in flight', async () => {
-    // The save carries baseRevision too, and this overlap is reachable: choose a
-    // candidate (which needs a CLEAN draft), then edit while that write is still
-    // outstanding, then save. Two writes against the same revision, and whichever
-    // lands second comes back as a conflict the user could not have caused.
+  // ---- a slot write holds the scene, exactly as the link does -----------------
+  //
+  // The previous test here created the unsafe state and then checked that Save
+  // was refused: it dirtied the draft during a pending slot write and asserted
+  // the save did not go out. That leaves the editor exactly where the finding
+  // says it must never be - a dirty draft on revision N while the server is
+  // moving to N+1, which the reseed then skips BECAUSE the draft is dirty, so
+  // the draft can never get onto a revision it can save against. Refusing the
+  // save is not a fix for that; it is the symptom, permanently.
+  //
+  // The edit itself is refused now, for the whole window: request, response,
+  // detail refetch and reseed.
+
+  it('refuses the EDIT during a slot write, rather than refusing the save afterwards', async () => {
+    scenes.getSceneSlots.mockResolvedValue(slotsWithOneCandidate() as never)
+    scenes.resolveSceneSlot.mockReturnValue(new Promise(() => {}) as never)
+    await open()
+
+    const before = useSceneEditorStore.getState().document
+    await userEvent.click(screen.getByTestId('scene-choices-choose-sofa/a'))
+    await waitFor(() => expect(scenes.resolveSceneSlot).toHaveBeenCalled())
+
+    // The editor says so...
+    expect(screen.getByTestId('scene-editor-link-pending')).toHaveTextContent(
+      /change being saved/i
+    )
+
+    // ...and means it. Every route into the draft is refused: the toolbar, the
+    // chord, and the picker.
+    expect(screen.getByTestId('scene-editor-undo')).toBeDisabled()
+    await chord()
+    expect(useSceneEditorStore.getState().document).toBe(before)
+
+    // The picker is dead under the hold, so the click starts nothing at all -
+    // not even the asset-facts lookup a placement issues first.
+    await userEvent.click(await screen.findByTestId('scene-picker-tile'), {
+      pointerEventsCheck: 0,
+    })
+    expect(scenes.getSceneAssetFacts).not.toHaveBeenCalled()
+    expect(useSceneEditorStore.getState().document).toBe(before)
+
+    // The draft is CLEAN, which is the assertion that matters: the previous test
+    // here left it dirty on the old revision and only checked that Save refused.
+    expect(useSceneEditorStore.getState().isDirty).toBe(false)
+  })
+
+  it('keeps holding through the gap between the response and the reseed', async () => {
+    // The narrower half of the same finding. `isPending` goes false when the
+    // RESPONSE arrives - a refetch and a reseed before the draft is on the new
+    // revision - and an edit in that gap dirties the draft at the old one.
+    scenes.getSceneSlots.mockResolvedValue(slotsWithOneCandidate() as never)
+    const write = deferredSlotWrite()
+    await open()
+
+    const before = useSceneEditorStore.getState().document
+    await userEvent.click(screen.getByTestId('scene-choices-choose-sofa/a'))
+    await waitFor(() => expect(scenes.resolveSceneSlot).toHaveBeenCalled())
+
+    // The write answers, and the refetch it queues is left in flight - so the
+    // gap is observable rather than a frame that flickers past.
+    scenes.getSceneById.mockReturnValue(new Promise(() => {}) as never)
+    write.settle(slotWriteResult(REVISION + 1))
+
+    await waitFor(() =>
+      expect(useSceneLinkHoldStore.getState().holds[2]).toMatchObject({
+        phase: 'awaiting-revision',
+        kind: 'slot',
+        targetRevision: REVISION + 1,
+      })
+    )
+
+    await chord()
+    expect(useSceneEditorStore.getState().document).toBe(before)
+    expect(useSceneEditorStore.getState().baseRevision).toBe(REVISION)
+  })
+
+  it('refuses a SECOND slot write in the response-to-reseed gap', async () => {
+    // Same gap, the other consequence: the second write carries baseRevision,
+    // which is the number the first one has already replaced.
+    scenes.getSceneSlots.mockResolvedValue(slotsWithOneCandidate() as never)
+    const write = deferredSlotWrite()
+    await open()
+
+    await userEvent.click(screen.getByTestId('scene-choices-choose-sofa/a'))
+    await waitFor(() => expect(scenes.resolveSceneSlot).toHaveBeenCalled())
+
+    scenes.getSceneById.mockReturnValue(new Promise(() => {}) as never)
+    write.settle(slotWriteResult(REVISION + 1))
+    await waitFor(() =>
+      expect(useSceneLinkHoldStore.getState().holds[2]?.phase).toBe(
+        'awaiting-revision'
+      )
+    )
+
+    await userEvent.click(screen.getByTestId('scene-choices-choose-sofa/a'), {
+      pointerEventsCheck: 0,
+    })
+
+    expect(scenes.resolveSceneSlot).toHaveBeenCalledTimes(1)
+    // And the store refuses the claim underneath the UI, so a caller that got
+    // past the panel still cannot send it.
+    expect(useSceneLinkHoldStore.getState().tryBegin(2, 'slot')).toBe(false)
+  })
+
+  it('becomes usable again only once the reseed has happened', async () => {
+    // The hold has to END, and it ends on the one event that makes editing safe:
+    // authoritative data has arrived AND the draft is sitting on it.
+    scenes.getSceneSlots.mockResolvedValue(slotsWithOneCandidate() as never)
+    const write = deferredSlotWrite()
+    await open()
+
+    await userEvent.click(screen.getByTestId('scene-choices-choose-sofa/a'))
+    await waitFor(() => expect(scenes.resolveSceneSlot).toHaveBeenCalled())
+
+    scenes.getSceneById.mockResolvedValue(sceneView(REVISION + 1) as never)
+    write.settle(slotWriteResult(REVISION + 1))
+
+    await waitFor(() =>
+      expect(
+        screen.queryByTestId('scene-editor-link-pending')
+      ).not.toBeInTheDocument()
+    )
+    expect(useSceneEditorStore.getState().baseRevision).toBe(REVISION + 1)
+
+    // Editing genuinely works again, over a draft on the revision the server has.
+    const seeded = useSceneEditorStore.getState().document
+    act(() =>
+      useSceneEditorStore.getState().setNodeTransform('crate', {
+        position: { x: 5, y: 0, z: 0 },
+        rotationEuler: { x: 0, y: 0, z: 0 },
+        scale: { x: 1, y: 1, z: 1 },
+      })
+    )
+    expect(useSceneEditorStore.getState().document).not.toBe(seeded)
+  })
+
+  it('keeps holding when the refetch after a slot write cannot be completed, and recovers on the retry', async () => {
+    // Releasing on a failed refetch would resume editing against the cache, which
+    // is the scene from BEFORE the write that just moved it. The hold survives
+    // the failure and ends when a later attempt succeeds.
+    jest.useFakeTimers({ doNotFake: ['performance'] })
+    try {
+      scenes.getSceneSlots.mockResolvedValue(slotsWithOneCandidate() as never)
+      const write = deferredSlotWrite()
+      await open()
+
+      await userEvent.click(screen.getByTestId('scene-choices-choose-sofa/a'), {
+        advanceTimers: jest.advanceTimersByTime,
+      })
+      await waitFor(() => expect(scenes.resolveSceneSlot).toHaveBeenCalled())
+
+      scenes.getSceneById.mockRejectedValue(
+        new ApiClientError('Network Error', {
+          isNetworkError: true,
+          isTimeout: false,
+          isOffline: false,
+        })
+      )
+      write.settle(slotWriteResult(REVISION + 1))
+
+      await waitFor(() =>
+        expect(useSceneLinkHoldStore.getState().holds[2]).toMatchObject({
+          phase: 'awaiting-revision',
+          kind: 'slot',
+        })
+      )
+      expect(useSceneEditorStore.getState().baseRevision).toBe(REVISION)
+
+      // The retry the hook arms for exactly this - and this time it answers.
+      scenes.getSceneById.mockResolvedValue(sceneView(REVISION + 1) as never)
+      await act(async () => {
+        jest.advanceTimersByTime(LINK_RECONCILE_RETRY_MS * 3)
+      })
+
+      await waitFor(() =>
+        expect(useSceneEditorStore.getState().baseRevision).toBe(REVISION + 1)
+      )
+      await waitFor(() =>
+        expect(useSceneLinkHoldStore.getState().holds[2]).toBeUndefined()
+      )
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
+  it('KEEPS the hold when a slot write fails in a way that cannot say what happened', async () => {
+    // A dropped connection is not a refusal. The slot may be settled on the
+    // server, so the editor is held until a re-read says what is actually there.
+    scenes.getSceneSlots.mockResolvedValue(slotsWithOneCandidate() as never)
+    const write = deferredSlotWrite()
+    await open()
+
+    const before = useSceneEditorStore.getState().document
+    await userEvent.click(screen.getByTestId('scene-choices-choose-sofa/a'))
+    await waitFor(() => expect(scenes.resolveSceneSlot).toHaveBeenCalled())
+
+    scenes.getSceneById.mockReturnValue(new Promise(() => {}) as never)
+    write.reject(
+      new ApiClientError('Network Error', {
+        isNetworkError: true,
+        isTimeout: false,
+        isOffline: false,
+      })
+    )
+
+    await waitFor(() =>
+      expect(useSceneLinkHoldStore.getState().holds[2]).toMatchObject({
+        phase: 'reconciling',
+        kind: 'slot',
+      })
+    )
+
+    await chord()
+    expect(useSceneEditorStore.getState().document).toBe(before)
+  })
+
+  it('releases the hold when the server REFUSES a slot write', async () => {
+    // The other way out. A refusal moved nothing and queues no refetch, so a
+    // hold that waited for one would make the editor read-only for the session.
+    scenes.getSceneSlots.mockResolvedValue(slotsWithOneCandidate() as never)
+    const write = deferredSlotWrite()
+    await open()
+    // Undo history behind a CLEAN draft, so the chord below has something to do
+    // and the slot write is allowed to start at all.
+    editThenSave()
+
+    await userEvent.click(screen.getByTestId('scene-choices-choose-sofa/a'))
+    await waitFor(() => expect(scenes.resolveSceneSlot).toHaveBeenCalled())
+
+    write.reject(
+      new ApiClientError('That candidate is no longer on offer.', {
+        status: 409,
+        isNetworkError: false,
+        isTimeout: false,
+        isOffline: false,
+      })
+    )
+
+    await waitFor(() =>
+      expect(useSceneLinkHoldStore.getState().holds[2]).toBeUndefined()
+    )
+    expect(
+      screen.queryByTestId('scene-editor-link-pending')
+    ).not.toBeInTheDocument()
+
+    const moved = useSceneEditorStore.getState().document
+    await chord()
+    expect(useSceneEditorStore.getState().document).not.toBe(moved)
+  })
+
+  it('is still held after the editor is closed and reopened mid-slot-write', async () => {
+    // The dock renders only the active tab, so glancing away unmounts the editor.
+    // The hold belongs to the scene, not to this component.
+    scenes.getSceneSlots.mockResolvedValue(slotsWithOneCandidate() as never)
+    scenes.resolveSceneSlot.mockReturnValue(new Promise(() => {}) as never)
+    const first = await open()
+
+    await userEvent.click(screen.getByTestId('scene-choices-choose-sofa/a'))
+    await waitFor(() => expect(scenes.resolveSceneSlot).toHaveBeenCalled())
+    first.unmount()
+
+    await open()
+
+    expect(
+      await screen.findByTestId('scene-editor-link-pending')
+    ).toHaveTextContent(/change being saved/i)
+    expect(screen.getByTestId('scene-editor-undo')).toBeDisabled()
+  })
+
+  it('refuses a project link while a slot write is unresolved, and a slot write while a link is', async () => {
+    // Both directions of one exclusion, through the one hold that enforces it.
     scenes.getSceneSlots.mockResolvedValue(slotsWithOneCandidate() as never)
     scenes.resolveSceneSlot.mockReturnValue(new Promise(() => {}) as never)
     await open()
@@ -587,7 +884,55 @@ describe('scene editing is serialised against the project link', () => {
     await userEvent.click(screen.getByTestId('scene-choices-choose-sofa/a'))
     await waitFor(() => expect(scenes.resolveSceneSlot).toHaveBeenCalled())
 
-    // Now dirty the draft, with the slot write still in flight.
+    // A link cannot claim the scene...
+    expect(useSceneLinkHoldStore.getState().tryBegin(2, 'link')).toBe(false)
+    expect(useSceneLinkHoldStore.getState().holds[2]?.kind).toBe('slot')
+
+    // ...and the panel says so rather than offering the control.
+    await userEvent.click(screen.getByTestId('scene-project-chip'))
+    expect(screen.getByTestId('scene-project-blocked')).toHaveTextContent(
+      /change being saved/i
+    )
+    await userEvent.click(screen.getByTestId('scene-project-select'), {
+      pointerEventsCheck: 0,
+    })
+    const option = screen.queryByText('Rooftop chase')
+    if (option) {
+      await userEvent.click(option, { pointerEventsCheck: 0 })
+    }
+    expect(scenes.setSceneProject).not.toHaveBeenCalled()
+  })
+
+  it('refuses a slot write while a LINK is unresolved', async () => {
+    // The mirror image, at the store rather than only at the panel.
+    scenes.getSceneSlots.mockResolvedValue(slotsWithOneCandidate() as never)
+    await open()
+    editThenSave()
+
+    pendingLink()
+    await startLink()
+
+    expect(useSceneLinkHoldStore.getState().holds[2]?.kind).toBe('link')
+    expect(useSceneLinkHoldStore.getState().tryBegin(2, 'slot')).toBe(false)
+
+    await userEvent.click(screen.getByTestId('scene-choices-choose-sofa/a'), {
+      pointerEventsCheck: 0,
+    })
+    expect(scenes.resolveSceneSlot).not.toHaveBeenCalled()
+  })
+
+  it('still refuses a SAVE while a slot write is in flight', async () => {
+    // The save carries baseRevision too. It cannot be reached through the draft
+    // any more - the draft cannot be dirtied under the hold - so this drives the
+    // store directly to reconstruct the overlap and prove the gate is on the
+    // WRITE rather than on the button.
+    scenes.getSceneSlots.mockResolvedValue(slotsWithOneCandidate() as never)
+    scenes.resolveSceneSlot.mockReturnValue(new Promise(() => {}) as never)
+    await open()
+
+    await userEvent.click(screen.getByTestId('scene-choices-choose-sofa/a'))
+    await waitFor(() => expect(scenes.resolveSceneSlot).toHaveBeenCalled())
+
     useSceneEditorStore.getState().setNodeTransform('crate', {
       position: { x: 5, y: 0, z: 0 },
       rotationEuler: { x: 0, y: 0, z: 0 },

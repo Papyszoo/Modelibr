@@ -1,7 +1,15 @@
 import { create } from 'zustand'
 
 /**
- * What a scene's project-link hold is still waiting for.
+ * Which direct scene write a hold belongs to.
+ *
+ * Only used to word the message. The rule is the same for both: the write moves
+ * the scene's revision, and the editor's draft must not move underneath it.
+ */
+export type SceneWriteKind = 'link' | 'slot'
+
+/**
+ * What a scene's write hold is still waiting for.
  *
  * - `pending` - the write is in flight. Nothing is known.
  * - `awaiting-revision` - the server answered and told us which revision it
@@ -15,6 +23,8 @@ export type SceneLinkHoldPhase = 'pending' | 'awaiting-revision' | 'reconciling'
 
 export interface SceneLinkHold {
   phase: SceneLinkHoldPhase
+  /** Which write opened it - see {@link SceneWriteKind}. */
+  kind: SceneWriteKind
   /** The revision the server reported, when it got as far as reporting one. */
   targetRevision: number | null
   /**
@@ -34,8 +44,20 @@ interface SceneLinkHoldState {
   /** Live holds, by scene id. A scene with no entry is not held. */
   holds: Record<number, SceneLinkHold>
 
-  /** The write has been sent. Nothing is known about it yet. */
-  begin: (sceneId: number) => void
+  /**
+   * Opens a hold for a write that is about to be sent, and answers whether it
+   * may be sent at all.
+   *
+   * <p>
+   * Returns false - and changes nothing - when this scene already has an
+   * unresolved hold. That refusal is the point: a second write started while the
+   * first one's outcome is unknown would replace the record of the unknown thing
+   * with a record of the new one, and the reconciliation the first hold was
+   * waiting for would never happen. It is also what stops a "Retry" button from
+   * resending a write whose first attempt may already have committed.
+   * </p>
+   */
+  tryBegin: (sceneId: number, kind: SceneWriteKind) => boolean
   /**
    * The server answered and named the revision it produced. `seenAt` is the
    * scene query's current `dataUpdatedAt`, so the release condition can insist
@@ -53,24 +75,37 @@ interface SceneLinkHoldState {
 }
 
 /**
- * The project-link serialization hold, per scene.
+ * The scene serialization hold, per scene.
  *
  * <p>
- * Linking a scene to a project is one of the few things the scene editor sends
- * straight to the server, and it MOVES THE SCENE'S REVISION. The editor's draft
- * is reseeded from a new revision only while it is clean, so an edit made during
- * the link leaves the draft dirty at the old revision, the reseed is skipped, and
- * the next save is refused as a conflict over a revision the user never saw.
+ * A handful of things the scene editor offers go straight to the server rather
+ * than into the draft - linking the scene to a project, choosing a slot's
+ * candidate, rejecting candidates, accepting the recommendations - and every one
+ * of them MOVES THE SCENE'S REVISION. The editor's draft is reseeded from a new
+ * revision only while it is clean, so an edit made during one of those writes
+ * leaves the draft dirty at the old revision, the reseed is skipped, and the
+ * next save is refused as a conflict over a revision the user never saw.
  * Editing is therefore held for the window - and the window is not the mutation:
  * it runs until authoritative scene data has arrived and the draft is sitting on
  * it.
  * </p>
  *
  * <p>
+ * <b>Why every direct write and not only the link.</b> This started as the
+ * project link's hold, because that is where the conflict was first seen. The
+ * slot writes have exactly the same shape and were covered only by
+ * `isPending` - which goes false when the RESPONSE arrives, a refetch and a
+ * reseed before the draft is actually on the new revision. In that gap the draft
+ * could be dirtied at revision N while the server was already at N+1, which is
+ * the unsaveable state the whole mechanism exists to prevent, and a second slot
+ * write could start carrying the stale number.
+ * </p>
+ *
+ * <p>
  * <b>Why a store and not component state.</b> The first version of this lived in
  * a hook's `useState`, and unmounting the editor threw the hold away. The scene
  * editor unmounts constantly - the dock renders only the active tab, so glancing
- * at another tab is an unmount - and coming back mid-link found an editor that
+ * at another tab is an unmount - and coming back mid-write found an editor that
  * believed nothing was happening, over a draft seeded on a revision the server
  * had already replaced. The hold belongs to the SCENE, not to whichever component
  * happens to be mounted, and it has to outlive the mutation that started it.
@@ -90,47 +125,70 @@ interface SceneLinkHoldState {
  * currently refusing to do and why.
  * </p>
  */
-export const useSceneLinkHoldStore = create<SceneLinkHoldState>(set => ({
+export const useSceneLinkHoldStore = create<SceneLinkHoldState>((set, get) => ({
   holds: {},
 
-  begin: sceneId =>
+  tryBegin: (sceneId, kind) => {
+    if (get().holds[sceneId] !== undefined) {
+      return false
+    }
+
     set(state => ({
       holds: {
         ...state.holds,
         [sceneId]: {
           phase: 'pending',
+          kind,
           targetRevision: null,
           seenAt: null,
         },
       },
-    })),
+    }))
+    return true
+  },
 
   applied: (sceneId, revision, seenAt) =>
-    set(state => ({
-      holds: {
-        ...state.holds,
-        [sceneId]: {
-          phase: 'awaiting-revision',
-          targetRevision: revision,
-          seenAt,
+    set(state => {
+      const current = state.holds[sceneId]
+      if (current === undefined) {
+        return state
+      }
+
+      return {
+        holds: {
+          ...state.holds,
+          [sceneId]: {
+            ...current,
+            phase: 'awaiting-revision',
+            targetRevision: revision,
+            seenAt,
+          },
         },
-      },
-    })),
+      }
+    }),
 
   ambiguous: (sceneId, seenAt) =>
-    set(state => ({
-      holds: {
-        ...state.holds,
-        [sceneId]: {
-          phase: 'reconciling',
-          // Deliberately kept if a revision was somehow already known: a
-          // reconciliation that can also check a number is strictly better off
-          // for having it.
-          targetRevision: state.holds[sceneId]?.targetRevision ?? null,
-          seenAt,
+    set(state => {
+      const current = state.holds[sceneId]
+      if (current === undefined) {
+        return state
+      }
+
+      return {
+        holds: {
+          ...state.holds,
+          [sceneId]: {
+            ...current,
+            phase: 'reconciling',
+            // Deliberately kept if a revision was somehow already known: a
+            // reconciliation that can also check a number is strictly better off
+            // for having it.
+            targetRevision: current.targetRevision,
+            seenAt,
+          },
         },
-      },
-    })),
+      }
+    }),
 
   release: sceneId =>
     set(state => {
@@ -146,4 +204,13 @@ export const useSceneLinkHoldStore = create<SceneLinkHoldState>(set => ({
 /** Reads the hold for one scene, or null. For use outside React. */
 export function getSceneLinkHold(sceneId: number): SceneLinkHold | null {
   return useSceneLinkHoldStore.getState().holds[sceneId] ?? null
+}
+
+/**
+ * True when this scene has an unresolved write hold, so nothing may be sent for
+ * it. For callers outside the editor - scene creation's project link, notably -
+ * that need to ask before offering a retry.
+ */
+export function isSceneWriteHeld(sceneId: number): boolean {
+  return getSceneLinkHold(sceneId) !== null
 }

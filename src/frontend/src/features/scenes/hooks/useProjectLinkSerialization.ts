@@ -1,6 +1,10 @@
 import { useEffect } from 'react'
 
-import { useSceneLinkHoldStore } from '@/stores'
+import {
+  type SceneLinkHoldPhase,
+  type SceneWriteKind,
+  useSceneLinkHoldStore,
+} from '@/stores'
 
 export interface ProjectLinkSerialization {
   /** Why editing is held, or null when it is not. */
@@ -21,6 +25,22 @@ export const LINK_RECONCILING_MESSAGE =
   'The project link did not come back with an answer, so this scene is being re-read from the server. Editing is held until it is known what was saved - nothing is lost.'
 
 /**
+ * The same two messages for a slot write.
+ *
+ * <p>
+ * Worded around "the change being saved" because that is what the user just did
+ * - chose a candidate, rejected a round, accepted the recommendations - and
+ * because it is the phrase the link control already used when it refused to
+ * start under one. One vocabulary for one rule.
+ * </p>
+ */
+export const SLOT_WRITE_PENDING_MESSAGE =
+  'Wait for the change being saved to finish - it moves the revision your draft is on, so editing is held for a moment. Nothing is lost.'
+
+export const SLOT_WRITE_RECONCILING_MESSAGE =
+  'The change being saved did not come back with an answer, so this scene is being re-read from the server. Editing is held until it is known what was saved - nothing is lost.'
+
+/**
  * How long to wait before asking for the scene again after a fetch failed while
  * a hold is open.
  *
@@ -33,17 +53,18 @@ export const LINK_RECONCILING_MESSAGE =
 export const LINK_RECONCILE_RETRY_MS = 2000
 
 /**
- * Serialises scene editing against the project-link write.
+ * Serialises scene editing against every direct scene write.
  *
  * <p>
- * Linking is one of the few things the scene editor sends straight to the
- * server, and it moves the scene's revision. The editor's draft is reseeded from
- * a new revision only while it is <b>clean</b> - reseeding a dirty draft would
- * throw away the user's unsaved edits every time React Query refetched in the
+ * Linking to a project, choosing a slot's candidate, rejecting candidates and
+ * accepting the recommendations all go straight to the server, and every one of
+ * them moves the scene's revision. The editor's draft is reseeded from a new
+ * revision only while it is <b>clean</b> - reseeding a dirty draft would throw
+ * away the user's unsaved edits every time React Query refetched in the
  * background. Both halves of that are right on their own and wrong together: an
- * edit made DURING the link leaves the draft dirty at the old revision, the
- * reseed is skipped, and the next save is refused as a conflict over a revision
- * the user never saw and has no way to reconcile.
+ * edit made DURING one of those writes leaves the draft dirty at the old
+ * revision, the reseed is skipped, and the next save is refused as a conflict
+ * over a revision the user never saw and has no way to reconcile.
  * </p>
  *
  * <p>
@@ -58,9 +79,9 @@ export const LINK_RECONCILE_RETRY_MS = 2000
  *
  * <p>
  * It does not own the hold and it does not decide when one starts - the hold
- * lives in <c>sceneLinkHoldStore</c>, keyed by scene, and the link mutation
- * opens and settles it. Three things were wrong while this hook held the state
- * itself in `useState`:
+ * lives in <c>sceneLinkHoldStore</c>, keyed by scene, and the mutation that
+ * makes the write opens and settles it. Three things were wrong while this hook
+ * held the state itself in `useState`:
  * </p>
  *
  * <ul>
@@ -193,12 +214,19 @@ export function useProjectLinkSerialization({
   ])
 
   return {
-    editsBlocked:
-      hold === null
-        ? null
-        : hold.phase === 'reconciling'
-          ? LINK_RECONCILING_MESSAGE
-          : LINK_PENDING_MESSAGE,
+    editsBlocked: hold === null ? null : messageFor(hold.kind, hold.phase),
     isReconciling: hold?.phase === 'reconciling',
   }
+}
+
+function messageFor(kind: SceneWriteKind, phase: SceneLinkHoldPhase): string {
+  if (kind === 'slot') {
+    return phase === 'reconciling'
+      ? SLOT_WRITE_RECONCILING_MESSAGE
+      : SLOT_WRITE_PENDING_MESSAGE
+  }
+
+  return phase === 'reconciling'
+    ? LINK_RECONCILING_MESSAGE
+    : LINK_PENDING_MESSAGE
 }

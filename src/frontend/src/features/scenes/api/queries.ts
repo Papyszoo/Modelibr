@@ -170,21 +170,80 @@ export function useSceneSlotsQuery({
 }
 
 /**
- * Both slot writes invalidate the scene as well as the slots.
+ * The slot writes: they invalidate the scene as well as the slots, and they take
+ * the scene's serialization hold while they do it.
  *
+ * <p>
  * Choosing a candidate rewrites the slot's node, so the scene the canvas is
  * drawing is genuinely out of date afterwards - and its revision has moved,
  * which the editor's next save compares against. Refetching only the slots
  * would leave the user looking at the asset they just replaced.
+ * </p>
+ *
+ * <p>
+ * The hold is why this is a wrapper rather than a bare `useMutation`. Editing
+ * used to be held for these only by `isPending`, which is a narrower window than
+ * the problem: it goes false when the RESPONSE arrives, and the detail refetch
+ * and the draft reseed happen after that. An edit landing in the gap dirtied the
+ * draft at revision N while the server was already at N+1, the reseed was
+ * skipped because the draft was dirty, and the next save was a conflict the user
+ * could not have caused or resolved. A second slot write starting in the same
+ * gap carried the same stale number.
+ * </p>
+ *
+ * <p>
+ * So the window is the same one the project link uses, for the same reason, in
+ * the same store: opened before the request goes out, settled by the request's
+ * own outcome, and ended only when authoritative data has arrived and the draft
+ * is sitting on it (see `sceneLinkHoldStore` and `useProjectLinkSerialization`).
+ * </p>
  */
-function useSlotWriteMutation<TInput extends { sceneId: number }>(
-  mutationFn: (input: TInput) => Promise<unknown>
-) {
+function useSlotWriteMutation<
+  TInput extends { sceneId: number },
+  TResult extends { scene: { revision: number } },
+>(mutationFn: (input: TInput) => Promise<TResult>) {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn,
-    onSuccess: (_result, input) => {
+    // The claim is taken HERE, in front of the request, rather than in
+    // `onMutate`: onMutate runs first but cannot stop the request, and a write
+    // that must not be sent has to be refused before it is sent.
+    mutationFn: async (input: TInput) => {
+      if (!useSceneLinkHoldStore.getState().tryBegin(input.sceneId, 'slot')) {
+        throw new SceneWriteHeldError()
+      }
+
+      return mutationFn(input)
+    },
+
+    onSuccess: (result, input) => {
+      useSceneLinkHoldStore
+        .getState()
+        .applied(
+          input.sceneId,
+          result.scene.revision,
+          sceneFetchedAt(queryClient, input.sceneId)
+        )
+      invalidateSceneWrite(queryClient, input.sceneId)
+    },
+
+    onError: (error, input) => {
+      if (error instanceof SceneWriteHeldError) {
+        // This mutation never opened a hold - it was refused because one was
+        // already open. Settling here would settle somebody else's.
+        return
+      }
+
+      if (isDefiniteWriteRefusal(error)) {
+        useSceneLinkHoldStore.getState().release(input.sceneId)
+        return
+      }
+
+      // Unknown outcome: the write may be durable, so the hold turns into a
+      // reconciliation and the scene is re-read before anything else happens.
+      useSceneLinkHoldStore
+        .getState()
+        .ambiguous(input.sceneId, sceneFetchedAt(queryClient, input.sceneId))
       invalidateSceneWrite(queryClient, input.sceneId)
     },
   })
@@ -259,7 +318,24 @@ export function useAcceptSceneRecommendationsMutation() {
 }
 
 /**
- * True when a failed link write is KNOWN to have changed nothing on the server.
+ * A direct scene write that was refused before it was sent, because the scene
+ * already had an unresolved hold.
+ *
+ * Its own class rather than a generic Error so callers can tell it apart from a
+ * server answer: nothing was sent, so nothing changed - but the reason is that
+ * something ELSE is unresolved, which is not an invitation to retry.
+ */
+export class SceneWriteHeldError extends Error {
+  constructor() {
+    super(
+      'Another change to this scene has not settled yet. Open the scene so it can be re-read before writing to it again.'
+    )
+    this.name = 'SceneWriteHeldError'
+  }
+}
+
+/**
+ * True when a failed scene write is KNOWN to have changed nothing on the server.
  *
  * Only a request the server itself answered and refused qualifies: a validation
  * error, a missing scene, a conflict, a rejected token. Everything else - a
@@ -271,7 +347,7 @@ export function useAcceptSceneRecommendationsMutation() {
  * 408 is deliberately not in the refusal set: a request timeout says the server
  * gave up waiting, not that it declined to act.
  */
-export function isDefiniteLinkRefusal(error: unknown): boolean {
+export function isDefiniteWriteRefusal(error: unknown): boolean {
   if (!(error instanceof ApiClientError)) {
     return false
   }
@@ -316,13 +392,21 @@ export function useSetSceneProjectMutation() {
   const hold = () => useSceneLinkHoldStore.getState()
 
   return useMutation({
-    mutationFn: (input: { sceneId: number; projectId: number | null }) =>
-      setSceneProject(input.sceneId, input.projectId),
+    // The hold is claimed in front of the request, not in `onMutate`: onMutate
+    // runs first but cannot stop the request, and this claim's whole job is to
+    // stop one. A scene that already has an unresolved hold refuses the write
+    // rather than overwriting the record of what is unresolved about it - which
+    // is what a "Retry link" button used to do to a link whose first attempt may
+    // already have committed.
+    mutationFn: async (input: {
+      sceneId: number
+      projectId: number | null
+    }) => {
+      if (!hold().tryBegin(input.sceneId, 'link')) {
+        throw new SceneWriteHeldError()
+      }
 
-    // Before the request, not after: a hold opened on the response would leave
-    // the whole in-flight window unguarded.
-    onMutate: input => {
-      hold().begin(input.sceneId)
+      return setSceneProject(input.sceneId, input.projectId)
     },
 
     onSuccess: (result, input) => {
@@ -339,7 +423,14 @@ export function useSetSceneProjectMutation() {
     },
 
     onError: (error, input) => {
-      if (isDefiniteLinkRefusal(error)) {
+      if (error instanceof SceneWriteHeldError) {
+        // Refused before it was sent, over somebody else's unresolved hold.
+        // Settling that hold here would answer a question this request never
+        // asked.
+        return
+      }
+
+      if (isDefiniteWriteRefusal(error)) {
         // The server answered and said no. Nothing moved, nothing is coming, and
         // holding the editor for a refetch that will never be queued is how it
         // used to go read-only for the rest of the session.

@@ -89,7 +89,7 @@ describe('project-link serialization', () => {
   it('holds editing while the link write is in flight', () => {
     const { result } = setup(4, 4)
 
-    act(() => hold().begin(SCENE))
+    act(() => hold().tryBegin(SCENE, 'link'))
 
     expect(result.current.editsBlocked).toBe(LINK_PENDING_MESSAGE)
   })
@@ -101,7 +101,7 @@ describe('project-link serialization', () => {
     // later.
     const { result, rerender } = setup(4, 4)
 
-    act(() => hold().begin(SCENE))
+    act(() => hold().tryBegin(SCENE, 'link'))
     act(() => hold().applied(SCENE, 5, 100))
     rerender({ loaded: 4, base: 4, fetching: true, updatedAt: 100 })
 
@@ -115,7 +115,7 @@ describe('project-link serialization', () => {
   it('resumes editing once the draft is seeded on the revision the server reported', () => {
     const { result, rerender } = setup(4, 4)
 
-    act(() => hold().begin(SCENE))
+    act(() => hold().tryBegin(SCENE, 'link'))
     act(() => hold().applied(SCENE, 5, 100))
     rerender({ loaded: 5, base: 5, fetching: false, updatedAt: 101 })
 
@@ -127,7 +127,7 @@ describe('project-link serialization', () => {
     // undefined === null would otherwise read as "they agree".
     const { result, rerender } = setup(undefined, null)
 
-    act(() => hold().begin(SCENE))
+    act(() => hold().tryBegin(SCENE, 'link'))
     act(() => hold().applied(SCENE, 5, 100))
     rerender({ loaded: undefined, base: null, fetching: false, updatedAt: 101 })
 
@@ -140,7 +140,7 @@ describe('project-link serialization', () => {
     // which is exactly what "wait for a refetch" could not tell apart.
     const { result, rerender } = setup(4, 4)
 
-    act(() => hold().begin(SCENE))
+    act(() => hold().tryBegin(SCENE, 'link'))
     act(() => hold().applied(SCENE, 5, 100))
     rerender({ loaded: 4, base: 4, fetching: false, updatedAt: 101 })
 
@@ -152,7 +152,7 @@ describe('project-link serialization', () => {
     // necessarily seen this one, so insisting on equality would hold forever.
     const { result, rerender } = setup(4, 4)
 
-    act(() => hold().begin(SCENE))
+    act(() => hold().tryBegin(SCENE, 'link'))
     act(() => hold().applied(SCENE, 5, 100))
     rerender({ loaded: 7, base: 7, fetching: false, updatedAt: 101 })
 
@@ -165,7 +165,7 @@ describe('project-link serialization', () => {
     // the server's number, not a guess about whether one arrived.
     const { result, rerender } = setup(4, 4)
 
-    act(() => hold().begin(SCENE))
+    act(() => hold().tryBegin(SCENE, 'link'))
     act(() => hold().applied(SCENE, 4, 100))
 
     // Still held on the cache entry from BEFORE the write: same revision, same
@@ -182,7 +182,7 @@ describe('project-link serialization', () => {
   it('holds while the refetch the link queued is still in flight', () => {
     const { result, rerender } = setup(4, 4)
 
-    act(() => hold().begin(SCENE))
+    act(() => hold().tryBegin(SCENE, 'link'))
     act(() => hold().applied(SCENE, 4, 100))
     rerender({ loaded: 4, base: 4, fetching: true, updatedAt: 101 })
 
@@ -198,7 +198,7 @@ describe('project-link serialization', () => {
     // before the write.
     const { result, rerender } = setup(4, 4)
 
-    act(() => hold().begin(SCENE))
+    act(() => hold().tryBegin(SCENE, 'link'))
     act(() => hold().applied(SCENE, 5, 100))
     rerender({ loaded: 4, base: 4, fetching: false, errored: true, errorAt: 1 })
 
@@ -214,7 +214,7 @@ describe('project-link serialization', () => {
     try {
       const { rerender } = setup(4, 4, { refetch })
 
-      act(() => hold().begin(SCENE))
+      act(() => hold().tryBegin(SCENE, 'link'))
       act(() => hold().applied(SCENE, 5, 100))
       rerender({
         loaded: 4,
@@ -237,7 +237,7 @@ describe('project-link serialization', () => {
   it('releases once a retried fetch finally succeeds', () => {
     const { result, rerender } = setup(4, 4)
 
-    act(() => hold().begin(SCENE))
+    act(() => hold().tryBegin(SCENE, 'link'))
     act(() => hold().applied(SCENE, 5, 100))
     rerender({ loaded: 4, base: 4, errored: true, errorAt: 1 })
     expect(result.current.editsBlocked).toBe(LINK_PENDING_MESSAGE)
@@ -255,7 +255,7 @@ describe('project-link serialization', () => {
   it('holds and reconciles when the write outcome is unknown', () => {
     const { result } = setup(4, 4)
 
-    act(() => hold().begin(SCENE))
+    act(() => hold().tryBegin(SCENE, 'link'))
     act(() => hold().ambiguous(SCENE, 100))
 
     expect(result.current.editsBlocked).toBe(LINK_RECONCILING_MESSAGE)
@@ -267,7 +267,7 @@ describe('project-link serialization', () => {
     // that may or may not have happened. Agreeing revisions prove nothing here.
     const { result, rerender } = setup(4, 4, { updatedAt: 100 })
 
-    act(() => hold().begin(SCENE))
+    act(() => hold().tryBegin(SCENE, 'link'))
     act(() => hold().ambiguous(SCENE, 100))
     rerender({ loaded: 4, base: 4, updatedAt: 100 })
 
@@ -277,7 +277,7 @@ describe('project-link serialization', () => {
   it('resumes once a fetch made AFTER the ambiguous write has landed', () => {
     const { result, rerender } = setup(4, 4, { updatedAt: 100 })
 
-    act(() => hold().begin(SCENE))
+    act(() => hold().tryBegin(SCENE, 'link'))
     act(() => hold().ambiguous(SCENE, 100))
 
     // The re-read arrives. Whatever it says - the write landed and the revision
@@ -291,7 +291,7 @@ describe('project-link serialization', () => {
   it('keeps reconciling when the re-read itself fails', () => {
     const { result, rerender } = setup(4, 4, { updatedAt: 100 })
 
-    act(() => hold().begin(SCENE))
+    act(() => hold().tryBegin(SCENE, 'link'))
     act(() => hold().ambiguous(SCENE, 100))
     rerender({ loaded: 4, base: 4, updatedAt: 100, errored: true, errorAt: 5 })
 
@@ -307,7 +307,7 @@ describe('project-link serialization', () => {
     // hook agreeing.
     const { result } = setup(4, 4)
 
-    act(() => hold().begin(SCENE))
+    act(() => hold().tryBegin(SCENE, 'link'))
     expect(result.current.editsBlocked).toBe(LINK_PENDING_MESSAGE)
 
     act(() => hold().release(SCENE))
@@ -318,7 +318,7 @@ describe('project-link serialization', () => {
   it('does not re-hold on the renders that follow a release', () => {
     const { result, rerender } = setup(4, 4)
 
-    act(() => hold().begin(SCENE))
+    act(() => hold().tryBegin(SCENE, 'link'))
     act(() => hold().release(SCENE))
 
     rerender({ loaded: 4, base: 4, fetching: false })
@@ -337,7 +337,7 @@ describe('project-link serialization', () => {
     // revision the server had already replaced. This is the assertion that was
     // previously inverted.
     const first = setup(4, 4, { updatedAt: 100 })
-    act(() => hold().begin(SCENE))
+    act(() => hold().tryBegin(SCENE, 'link'))
     act(() => hold().applied(SCENE, 5, 100))
     expect(first.result.current.editsBlocked).toBe(LINK_PENDING_MESSAGE)
     first.unmount()
@@ -352,7 +352,7 @@ describe('project-link serialization', () => {
     // event, so a remount that loads data satisfying the release condition
     // releases immediately.
     const first = setup(4, 4, { updatedAt: 100 })
-    act(() => hold().begin(SCENE))
+    act(() => hold().tryBegin(SCENE, 'link'))
     act(() => hold().applied(SCENE, 5, 100))
     first.unmount()
 
@@ -365,7 +365,7 @@ describe('project-link serialization', () => {
     // The hold is the SCENE's, so linking one scene must not freeze another.
     const { result } = setup(4, 4)
 
-    act(() => hold().begin(99))
+    act(() => hold().tryBegin(99, 'link'))
 
     expect(result.current.editsBlocked).toBeNull()
   })

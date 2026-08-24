@@ -17,6 +17,7 @@ import { ErrorState, ListHeader, LoadingState } from '@/shared/components'
 import { useSceneEditorStore } from '@/stores'
 
 import {
+  SceneWriteHeldError,
   useAcceptSceneRecommendationsMutation,
   useRejectSceneCandidatesMutation,
   useResolveSceneSlotMutation,
@@ -106,10 +107,11 @@ export function SceneEditor({
     future,
   } = useSceneEditorStore()
 
-  // Editing is held while a project link is moving the scene's revision. The
-  // hold belongs to the SCENE, not to this component - it survives a tab switch
-  // and a remount, and it ends only on authoritative data. The reasoning is in
-  // the hook and in `sceneLinkHoldStore`.
+  // Editing is held while a direct scene write is moving the scene's revision -
+  // the project link and every slot write alike. The hold belongs to the SCENE,
+  // not to this component: it survives a tab switch and a remount, and it ends
+  // only on authoritative data that the draft is actually sitting on. The
+  // reasoning is in the hook and in `sceneLinkHoldStore`.
   const { editsBlocked } = useProjectLinkSerialization({
     sceneId,
     loadedRevision: view?.scene.revision,
@@ -273,20 +275,24 @@ export function SceneEditor({
    * draft would silently discard one of the two.
    */
   //
-  // And held for a project link too, for the same reason the save is: a slot
-  // write carries baseRevision, and a link is in the middle of replacing it.
-  // Sending one into that window is the conflict, not a way around it.
+  // And held for any OTHER direct write for the same reason the save is: a slot
+  // write carries baseRevision, and a link - or another slot write - is in the
+  // middle of replacing it. Sending one into that window is the conflict, not a
+  // way around it. `editsBlocked` covers both now, because the writes and the
+  // link share one hold.
   const slotsBlocked =
     editsBlocked ??
     (isDirty
       ? 'Save your edits before choosing - a choice is written to the scene straight away.'
       : null)
 
-  // Every direct scene write that is in flight right now. Each of them carries
-  // baseRevision and moves the revision when it lands, so they exclude each
-  // other and they exclude the project link - in BOTH directions. Only the link
-  // side was covered before: an accept could start under a pending link, and a
-  // link could start under a pending accept.
+  // The remaining `isPending` gate, which is now only about the SAVE.
+  //
+  // The slot writes hold the scene for their whole window, response through
+  // reseed, so `editsBlocked` already covers them - this used to be the only
+  // thing that did, and it went false a refetch too early. The save is a
+  // different shape: its response IS the new revision and it seeds the cache
+  // with it directly, so it needs no reconciliation, only an exclusion.
   const sceneWritePending =
     resolveSlot.isPending ||
     rejectCandidates.isPending ||
@@ -327,7 +333,8 @@ export function SceneEditor({
       setPreview(null)
     } catch (caught) {
       setSlotError(
-        caught instanceof ApiClientError
+        caught instanceof ApiClientError ||
+          caught instanceof SceneWriteHeldError
           ? caught.message
           : 'The choice could not be saved.'
       )
@@ -635,8 +642,10 @@ export function SceneEditor({
                 // rather than one. A dirty draft was the only one covered: a
                 // link starting while an accept/reject/resolve or a save is
                 // still in flight races the very revision that write carries,
-                // and a link starting while a previous link is still being
+                // and a link starting while any earlier write is still being
                 // reconciled would stack two unresolved writes on one scene.
+                // The last of those is `editsBlocked` - the shared hold - and
+                // the store refuses the second claim even if this misses it.
                 editsBlocked ??
                 (sceneWritePending
                   ? 'Wait for the change being saved to finish - linking moves the revision that write is using.'

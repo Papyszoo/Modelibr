@@ -18,6 +18,7 @@ import {
 import { AddTile, AssetGrid, AssetTile } from '@/shared/components/asset-tile'
 
 import {
+  isDefiniteWriteRefusal,
   useCreateSceneMutation,
   useDeleteSceneMutation,
   useScenesQuery,
@@ -46,15 +47,36 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
   /**
    * The scene that exists, and the project it still wants, after a link failed.
    *
+   * <p>
    * Creating is two writes - the scene, then the link, because linking is its
    * own audited scene write and folding it into creation would leave it no
    * revision of its own to undo. So a failure between them is real, and it must
-   * not lose what the user asked for: the scene id is kept so a retry links THAT
-   * scene rather than making a second one, and the dialog stays open saying so.
+   * not lose what the user asked for: the scene id is kept so any follow-up acts
+   * on THAT scene rather than making a second one, and the dialog stays open
+   * saying so.
+   * </p>
+   *
+   * <p>
+   * <b>What may be offered next depends on what the failure knows.</b> A server
+   * that ANSWERED and refused - a project that no longer exists, a validation
+   * error - moved nothing, so sending the same write again is an ordinary retry.
+   * A dropped connection, a timeout, a 5xx or an error this client cannot read
+   * reached an unknown point in the write and may have committed: resending it
+   * would link a scene that is already linked, and - worse - would overwrite a
+   * project somebody else may have set in the meantime, because the retry
+   * carries the value from before. There is exactly one safe move there, and it
+   * is to go and look: open the scene, which fetches it authoritatively and
+   * reconciles the hold the failed write left behind.
+   * </p>
    */
   const [linkFailure, setLinkFailure] = useState<{
     sceneId: number
     projectId: number
+    /**
+     * True only when the server itself refused. False means the outcome is
+     * unknown, and "Retry" is not on offer.
+     */
+    canRetry: boolean
   } | null>(null)
 
   /**
@@ -68,7 +90,10 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
    */
   const submitting = useRef(false)
 
-  const canSubmit = Boolean(name.trim()) || linkFailure !== null
+  // After an ambiguous link the dialog has nothing left to submit - the only
+  // move is to open the scene - so the confirm button is about creating, or
+  // about a retry the server has earned by answering.
+  const canSubmit = Boolean(name.trim()) || (linkFailure?.canRetry ?? false)
   const isBusy = createScene.isPending || linkProject.isPending
 
   /**
@@ -85,6 +110,14 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
     // A retry after a link failure links the scene that already exists. Creating
     // again here is exactly the duplicate this whole path is arranged to avoid.
     if (linkFailure) {
+      // ...and only when the server answered. An unknown outcome is not retried
+      // from here at all: the write may have landed, and this path holds the
+      // project the user picked BEFORE it, so resending it could overwrite a
+      // change made since. `openCreatedScene` is the way out.
+      if (!linkFailure.canRetry) {
+        return
+      }
+
       submitting.current = true
       try {
         await linkAndFinish(linkFailure.sceneId, linkFailure.projectId)
@@ -138,11 +171,19 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
     } catch (caught) {
       // Reported, not swallowed. The scene is real and the link is not, and a
       // user who asked for a project and silently got none has no way to know.
-      setLinkFailure({ sceneId, projectId: wantedProjectId })
+      //
+      // Whether a retry is offered is decided HERE, by the same test the editor
+      // uses to decide whether the hold may be released: only a request the
+      // server answered and refused is known to have changed nothing.
+      const canRetry = isDefiniteWriteRefusal(caught)
+      setLinkFailure({ sceneId, projectId: wantedProjectId, canRetry })
       setCreateError(
-        caught instanceof ApiClientError
+        (caught instanceof ApiClientError
           ? `The scene was created, but linking it to the project failed: ${caught.message}`
-          : 'The scene was created, but linking it to the project failed.'
+          : 'The scene was created, but linking it to the project failed.') +
+          (canRetry
+            ? ''
+            : ' It is not known whether the link was saved, so it cannot be sent again - open the scene to see what it says.')
       )
       return
     }
@@ -161,8 +202,19 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
     onOpenScene(sceneId)
   }
 
-  /** Give up on the link and open the scene that was created anyway. */
-  const openWithoutLink = () => {
+  /**
+   * Opens the scene that was created, whatever became of its link.
+   *
+   * <p>
+   * After a refusal this is "give up on the project". After an unknown outcome
+   * it is the reconciliation: opening the scene fetches it authoritatively, and
+   * the hold the failed write left on it (see `sceneLinkHoldStore`) ends when
+   * that data lands and the editor's draft is sitting on it. Either way the user
+   * ends up looking at what the server actually has, which is the only honest
+   * answer available.
+   * </p>
+   */
+  const openCreatedScene = () => {
     if (linkFailure) {
       finish(linkFailure.sceneId)
     }
@@ -266,29 +318,40 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
           <>
             {linkFailure ? (
               <Button
-                label="Open without a project"
-                text
+                label={
+                  linkFailure.canRetry
+                    ? 'Open without a project'
+                    : 'Open the scene'
+                }
+                text={linkFailure.canRetry}
                 size="small"
                 data-testid="scene-create-skip-link"
-                onClick={openWithoutLink}
+                onClick={openCreatedScene}
               />
             ) : (
               <Button label="Cancel" text size="small" onClick={closeCreate} />
             )}
-            <Button
-              label={linkFailure ? 'Retry link' : 'Create'}
-              icon={linkFailure ? 'pi pi-refresh' : 'pi pi-check'}
-              size="small"
-              data-testid="scene-create-confirm"
-              // Both pending flags, not just the first: the scene is already
-              // created while the project link is in flight, so a button that
-              // re-enabled there would make a second one on the next click.
-              // The real guard is inside handleCreate - this only stops the
-              // button LOOKING available.
-              disabled={!canSubmit || isBusy}
-              loading={isBusy}
-              onClick={() => void handleCreate()}
-            />
+            {/*
+              "Retry link" appears only for a link the server refused. After an
+              unknown outcome there is no second write to offer: the only button
+              left is the one that goes and looks.
+            */}
+            {linkFailure && !linkFailure.canRetry ? null : (
+              <Button
+                label={linkFailure ? 'Retry link' : 'Create'}
+                icon={linkFailure ? 'pi pi-refresh' : 'pi pi-check'}
+                size="small"
+                data-testid="scene-create-confirm"
+                // Both pending flags, not just the first: the scene is already
+                // created while the project link is in flight, so a button that
+                // re-enabled there would make a second one on the next click.
+                // The real guard is inside handleCreate - this only stops the
+                // button LOOKING available.
+                disabled={!canSubmit || isBusy}
+                loading={isBusy}
+                onClick={() => void handleCreate()}
+              />
+            )}
           </>
         }
       >
