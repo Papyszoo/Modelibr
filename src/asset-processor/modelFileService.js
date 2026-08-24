@@ -174,6 +174,206 @@ export class ModelFileService {
   }
 
   /**
+   * Fetch a model version onto disk **with its siblings next to it**, in a
+   * directory of its own.
+   *
+   * The data-URL map further down is for three.js, which resolves references
+   * through a LoadingManager and never touches a filesystem. Blender does the
+   * opposite: it opens the file and follows every reference the file itself
+   * contains, by relative path. Handed a lone .gltf its buffers are missing, and
+   * handed a lone .obj its .mtl is missing.
+   *
+   * **This throws rather than degrading, which is the difference between it and
+   * the render path.** A thumbnail rendered without a texture is a worse picture
+   * that a person looks at and re-queues. A bake or an unwrap run without the
+   * .mtl produces a NEW model version, published as the truth, whose materials
+   * are silently wrong - and the OBJ case is the quiet one, because the geometry
+   * still loads, so nothing looks broken. There is no version of "proceed with
+   * what we have" that is correct here: either every advertised sibling is on
+   * disk or the operation has not been set up and must not run.
+   *
+   * Returns the same shape as {@link fetchModelFile} plus `workDir`, which the
+   * caller must clean up instead of the file. On every failure path - including
+   * the ones before that object exists - the primary and the work directory are
+   * removed here, because the caller has nothing to clean up with.
+   *
+   * @param {number} modelId
+   * @param {number} modelVersionId
+   * @returns {Promise<{filePath: string, fileType: string, originalFileName: string, workDir: string, auxiliaryCount: number}>}
+   * @throws {Error} when the auxiliary manifest cannot be read, an advertised
+   *   auxiliary cannot be downloaded, or one names a path outside the work
+   *   directory.
+   */
+  async fetchModelFileWithAuxiliaries(modelId, modelVersionId = null) {
+    // Same shape as fetchModelFile's own retry: transient network trouble while
+    // staging is not a reason to fail an operation, but exhausting the attempts
+    // is - the alternative is publishing a result computed from half a model.
+    const maxRetries = 3
+    const retryDelay = 1000
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      let staged = null
+      try {
+        staged = await this.stageModelWithAuxiliaries(modelId, modelVersionId)
+        return staged
+      } catch (error) {
+        // Nothing partially staged survives an attempt, successful or not.
+        await this.cleanupDirectory(staged?.workDir ?? error.workDir)
+
+        const lastAttempt = attempt === maxRetries
+        logger.warn('Failed to stage a model with its auxiliary files', {
+          modelId,
+          modelVersionId,
+          attempt,
+          maxRetries,
+          error: error.message,
+        })
+
+        if (lastAttempt || this.isFileNotFoundError(error)) {
+          throw error
+        }
+
+        await this.sleep(retryDelay * attempt)
+      }
+    }
+  }
+
+  /**
+   * One staging attempt. Split out so the retry above has a single thing to call
+   * and a single thing to clean up: every path that creates the work directory
+   * either returns it on the result or attaches it to the thrown error.
+   *
+   * @param {number} modelId
+   * @param {number} modelVersionId
+   */
+  async stageModelWithAuxiliaries(modelId, modelVersionId) {
+    const source = await this.fetchModelFile(modelId, modelVersionId)
+
+    let workDir = null
+    try {
+      workDir = fs.mkdtempSync(path.join(this.tempDir, `model-${modelId}-`))
+
+      // The primary keeps its ORIGINAL name inside the work directory: a loose
+      // .gltf's references are relative to the file, and renaming it to a temp
+      // name is harmless, but a .mtl referenced by name from an .obj is not.
+      const primaryPath = path.join(
+        workDir,
+        path.basename(source.originalFileName)
+      )
+      fs.copyFileSync(source.filePath, primaryPath)
+
+      const auxiliaryCount = await this.stageAuxiliaries(
+        modelId,
+        modelVersionId,
+        workDir
+      )
+
+      logger.info('Model file staged with auxiliaries', {
+        modelId,
+        modelVersionId,
+        workDir,
+        auxiliaryCount,
+      })
+
+      return {
+        filePath: primaryPath,
+        fileType: source.fileType,
+        originalFileName: source.originalFileName,
+        workDir,
+        auxiliaryCount,
+      }
+    } catch (error) {
+      // The work directory may not be on any result yet, so the retry above
+      // cannot find it any other way.
+      error.workDir = workDir
+      throw error
+    } finally {
+      // The download landed outside the work directory and is copied, not moved,
+      // so it is this function's to remove either way.
+      await this.cleanupFile(source.filePath)
+    }
+  }
+
+  /**
+   * Download every auxiliary the version advertises into `workDir`.
+   *
+   * @param {number} modelId
+   * @param {number} modelVersionId
+   * @param {string} workDir
+   * @returns {Promise<number>} how many were staged
+   */
+  async stageAuxiliaries(modelId, modelVersionId, workDir) {
+    // No version id means there is nothing to ask about - a single-file upload
+    // reached here through a path that never had a version. That is genuinely
+    // primary-only, not a manifest that failed to load.
+    if (!modelVersionId) {
+      return 0
+    }
+
+    // NOT caught. An unreadable manifest is indistinguishable from an empty one
+    // once it has been swallowed, and those two mean opposite things: "this model
+    // has no siblings" and "this model may have siblings we did not fetch".
+    const list = await this.jobService.getVersionAuxiliaryFiles(
+      modelId,
+      modelVersionId
+    )
+
+    const auxiliaries = list?.auxiliaries || []
+    let staged = 0
+
+    for (const aux of auxiliaries) {
+      // The relative path is normalised server-side, but it arrives over HTTP
+      // and lands on a filesystem here, so it is checked again rather than
+      // trusted: a '../' in it would write outside the work directory. Refused
+      // rather than skipped - a path that tried to escape is not a sibling this
+      // operation should quietly do without, it is one somebody built wrong.
+      const target = path.resolve(workDir, aux.relativePath)
+      if (target === workDir || !target.startsWith(workDir + path.sep)) {
+        throw new Error(
+          `Auxiliary file '${aux.relativePath}' resolves outside the staging ` +
+            `directory. Refusing to run the operation on a partial model.`
+        )
+      }
+
+      try {
+        const response = await this.jobService.getFile(aux.fileId)
+        if (!response || !response.data) {
+          throw new Error('No file data received from API')
+        }
+        fs.mkdirSync(path.dirname(target), { recursive: true })
+        await this.writeStreamToFile(response.data, target)
+        staged++
+      } catch (error) {
+        throw new Error(
+          `Could not stage auxiliary file '${aux.relativePath}' ` +
+            `(file ${aux.fileId}): ${error.message}. Refusing to run the ` +
+            `operation on a partial model.`
+        )
+      }
+    }
+
+    return staged
+  }
+
+  /**
+   * Remove a staging directory created by {@link fetchModelFileWithAuxiliaries}.
+   * @param {string} workDir
+   */
+  async cleanupDirectory(workDir) {
+    try {
+      if (workDir && fs.existsSync(workDir)) {
+        fs.rmSync(workDir, { recursive: true, force: true })
+        logger.debug('Cleaned up staging directory', { workDir })
+      }
+    } catch (error) {
+      logger.warn('Failed to cleanup staging directory', {
+        workDir,
+        error: error.message,
+      })
+    }
+  }
+
+  /**
    * Fetch the auxiliary (external) glTF resources for a model version and return
    * them as a { relativePath: dataUrl } map for the page's LoadingManager to
    * resolve. Downloads each already-uploaded sibling (.bin/textures) and inlines

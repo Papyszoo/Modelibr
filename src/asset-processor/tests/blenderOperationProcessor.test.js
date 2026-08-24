@@ -49,12 +49,23 @@ describe('BlenderOperationProcessor', () => {
 
     processor = new BlenderOperationProcessor()
     processor.modelFileService = {
+      // The Blender operations stage the model in a directory WITH its siblings:
+      // Blender resolves a loose glTF's .bin and an OBJ's .mtl off the filesystem,
+      // so handing it the primary file alone loses geometry or materials.
+      fetchModelFileWithAuxiliaries: vi.fn().mockResolvedValue({
+        filePath: '/tmp/work-chair/chair.fbx',
+        fileType: 'fbx',
+        originalFileName: 'chair.fbx',
+        workDir: '/tmp/work-chair',
+        auxiliaryCount: 0,
+      }),
       fetchModelFile: vi.fn().mockResolvedValue({
         filePath: '/tmp/chair.fbx',
         fileType: 'fbx',
         originalFileName: 'chair.fbx',
       }),
       cleanupFile: vi.fn().mockResolvedValue(undefined),
+      cleanupDirectory: vi.fn().mockResolvedValue(undefined),
     }
     processor.jobApi = {
       dequeueExtractionJob: vi.fn().mockResolvedValue(null),
@@ -244,12 +255,23 @@ describe('BlenderOperationProcessor - bake-textures', () => {
 
     processor = new BlenderOperationProcessor()
     processor.modelFileService = {
+      // The Blender operations stage the model in a directory WITH its siblings:
+      // Blender resolves a loose glTF's .bin and an OBJ's .mtl off the filesystem,
+      // so handing it the primary file alone loses geometry or materials.
+      fetchModelFileWithAuxiliaries: vi.fn().mockResolvedValue({
+        filePath: '/tmp/work-chair/chair.fbx',
+        fileType: 'fbx',
+        originalFileName: 'chair.fbx',
+        workDir: '/tmp/work-chair',
+        auxiliaryCount: 0,
+      }),
       fetchModelFile: vi.fn().mockResolvedValue({
         filePath: '/tmp/chair.fbx',
         fileType: 'fbx',
         originalFileName: 'chair.fbx',
       }),
       cleanupFile: vi.fn().mockResolvedValue(undefined),
+      cleanupDirectory: vi.fn().mockResolvedValue(undefined),
     }
     processor.jobApi = {
       dequeueExtractionJob: vi.fn().mockResolvedValue(null),
@@ -268,6 +290,41 @@ describe('BlenderOperationProcessor - bake-textures', () => {
 
   afterEach(() => {
     config.blender.enabled = blenderEnabledBefore
+  })
+
+  /**
+   * The regression this closes: staging used to log a failed sibling download and
+   * carry on. An OBJ still loads without its .mtl - the geometry is all there and
+   * nothing looks broken - so the bake ran, produced textures for untextured
+   * surfaces, and PUBLISHED them as a texture set bound to the version. A
+   * thumbnail that comes out wrong is re-queued by whoever looks at it; this was
+   * written into the library as the truth.
+   */
+  it('cannot bake an OBJ whose advertised .mtl could not be staged', async () => {
+    processor.modelFileService.fetchModelFileWithAuxiliaries = vi
+      .fn()
+      .mockRejectedValue(
+        new Error(
+          "Could not stage auxiliary file 'chair.mtl' (file 10): connection " +
+            'reset. Refusing to run the operation on a partial model.'
+        )
+      )
+
+    await processor.process(job)
+
+    // The job is reported FAILED...
+    const [, , succeeded, message] =
+      processor.jobApi.finishExtractionJob.mock.calls[0]
+    expect(succeeded).toBe(false)
+    expect(message).toMatch(/chair\.mtl/)
+    // ...and nothing was published from a model that was never fully assembled.
+    expect(processor.runBlender).not.toHaveBeenCalled()
+    expect(processor.jobApi.createTextureSetWithFile).not.toHaveBeenCalled()
+    expect(processor.jobApi.addTextureToSetWithFile).not.toHaveBeenCalled()
+    expect(
+      processor.jobApi.associateTextureSetWithModelVersion
+    ).not.toHaveBeenCalled()
+    expect(processor.jobApi.createModelVersion).not.toHaveBeenCalled()
   })
 
   it('imports every baked map into ONE texture set', async () => {
@@ -425,7 +482,10 @@ describe('BlenderOperationProcessor - mesh-analysis', () => {
       object: 'Body',
       geometryHash: 'dff7e3502d16ec4b',
       geometryHashVersion: 1,
+      // World-space: the object's scale is in it, so it is NOT a function of the
+      // hashed geometry and must not be what gets cached.
       surfaceArea: 12.166688,
+      localSurfaceArea: 3.041672,
       triangleCount: 224,
       manifold: { isManifold: false, boundaryEdges: 480, nonManifoldEdges: 0 },
       uvOverlap: { overlappingFraction: 0, bakeable: true },
@@ -439,12 +499,15 @@ describe('BlenderOperationProcessor - mesh-analysis', () => {
 
     processor = new BlenderOperationProcessor()
     processor.modelFileService = {
-      fetchModelFile: vi.fn().mockResolvedValue({
-        filePath: '/tmp/chair.glb',
+      fetchModelFileWithAuxiliaries: vi.fn().mockResolvedValue({
+        filePath: '/tmp/work-chair/chair.glb',
         fileType: 'glb',
         originalFileName: 'chair.glb',
+        workDir: '/tmp/work-chair',
+        auxiliaryCount: 0,
       }),
       cleanupFile: vi.fn().mockResolvedValue(undefined),
+      cleanupDirectory: vi.fn().mockResolvedValue(undefined),
     }
     processor.jobApi = {
       finishExtractionJob: vi.fn().mockResolvedValue(undefined),
@@ -479,7 +542,23 @@ describe('BlenderOperationProcessor - mesh-analysis', () => {
     expect(hash).toBe('dff7e3502d16ec4b')
     expect(hashVersion).toBe(1)
     expect(metric).toBe('surface-area')
-    expect(payload).toEqual({ surfaceArea: 12.166688, triangleCount: 224 })
+    // The LOCAL area, not the reported world-space one. Two instances of one mesh at
+    // different scales share this hash, so caching the world figure would serve one
+    // instance's surface as the other's.
+    expect(payload).toEqual({
+      surfaceArea: 3.041672,
+      triangleCount: 224,
+      space: 'local',
+    })
+  })
+
+  it('keeps the world-space area on the job, where the transform it assumes is known', async () => {
+    await processor.process(job)
+
+    const [, , , , , resultJson] =
+      processor.jobApi.finishExtractionJob.mock.calls[0]
+    const result = JSON.parse(resultJson)
+    expect(result.parts[0].surfaceArea).toBe(12.166688)
   })
 
   it('returns the UV metrics on the job, where they are tied to the version measured', async () => {

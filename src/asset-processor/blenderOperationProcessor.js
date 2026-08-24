@@ -4,7 +4,11 @@ import os from 'os'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
-import { config, getBlenderPath } from './config.js'
+import {
+  config,
+  getBlenderPath,
+  refreshBlenderConfigFromApi,
+} from './config.js'
 import { JobApiClient } from './jobApiClient.js'
 import { ModelFileService } from './modelFileService.js'
 import logger from './logger.js'
@@ -54,6 +58,13 @@ export class BlenderOperationProcessor {
     if (this.isPolling || this.isShuttingDown) return
     this.isPolling = true
     try {
+      // Re-read the Blender settings before claiming anything. They are set in the
+      // app, not in this worker's environment, so the values captured at startup say
+      // "not installed" for the whole lifetime of a worker that was running when
+      // someone installed Blender - and every operation it then claims fails with a
+      // message telling the user to do what they already did.
+      await refreshBlenderConfigFromApi(this.jobApi)
+
       let processed = 0
       while (processed < 3 && !this.isShuttingDown) {
         const job = await this.jobApi.dequeueExtractionJob(
@@ -155,7 +166,10 @@ export class BlenderOperationProcessor {
    */
   async unwrap(job, jobLogger) {
     const parameters = this.parameters(job)
-    const source = await this.modelFileService.fetchModelFile(
+    // With its siblings, not alone: Blender follows the references inside the file
+    // itself, so a loose glTF without its .bin has no geometry and an OBJ without
+    // its .mtl has no materials.
+    const source = await this.modelFileService.fetchModelFileWithAuxiliaries(
       job.assetId,
       job.versionId
     )
@@ -221,7 +235,9 @@ export class BlenderOperationProcessor {
       }
     } finally {
       await fs.promises.unlink(outputPath).catch(() => {})
-      await this.modelFileService.cleanupFile(source.filePath).catch(() => {})
+      await this.modelFileService
+        .cleanupDirectory(source.workDir)
+        .catch(() => {})
     }
   }
 
@@ -242,7 +258,10 @@ export class BlenderOperationProcessor {
    */
   async bake(job, jobLogger) {
     const parameters = this.parameters(job)
-    const source = await this.modelFileService.fetchModelFile(
+    // With its siblings, not alone: Blender follows the references inside the file
+    // itself, so a loose glTF without its .bin has no geometry and an OBJ without
+    // its .mtl has no materials.
+    const source = await this.modelFileService.fetchModelFileWithAuxiliaries(
       job.assetId,
       job.versionId
     )
@@ -348,7 +367,9 @@ export class BlenderOperationProcessor {
       await fs.promises
         .rm(outputDir, { recursive: true, force: true })
         .catch(() => {})
-      await this.modelFileService.cleanupFile(source.filePath).catch(() => {})
+      await this.modelFileService
+        .cleanupDirectory(source.workDir)
+        .catch(() => {})
     }
   }
 
@@ -424,21 +445,29 @@ export class BlenderOperationProcessor {
   /**
    * Measure what only a real geometry pass can answer, and cache the half that is cacheable.
    *
-   * **Two of these four metrics belong in the shared cache and two do not**, which is the
-   * finding that shaped this method. The compute cache is keyed by geometry hash, and that
-   * hash is deliberately blind to UVs - it exists so every copy of the same mesh shares one
-   * answer. Surface area and manifoldness are functions of the geometry alone, so that
-   * sharing is exactly right for them.
+   * **What may be cached is what the geometry hash actually determines**, which is the
+   * finding that shaped this method. The compute cache is keyed by that hash, and the hash
+   * is computed from LOCAL vertex coordinates - it is blind to UVs and blind to the
+   * object's transform. It exists so every copy of the same mesh shares one answer.
    *
-   * UV overlap and texel density are not. A model and its re-baked version have identical
-   * geometry, identical hashes, and completely different UV layouts - measured on a real
-   * pair, 0.177 against 0.300 UV coverage under one hash. Writing those into a
-   * hash-keyed cache would serve one version's layout as the other's, silently and
-   * permanently. They come back on the job instead, tied to the version actually analysed.
+   * Manifoldness and the local-space surface area are functions of that geometry alone, so
+   * sharing them is exactly right.
+   *
+   * Three numbers here are not. UV overlap and texel density depend on the UV layout: a
+   * model and its re-baked version have identical geometry, identical hashes, and
+   * completely different layouts - measured on a real pair, 0.177 against 0.300 UV
+   * coverage under one hash. And the reported surface area is world-space, so it depends
+   * on the transform: the same mesh placed at 1x and at 100x hashes identically and has
+   * 10,000x the surface. Writing any of the three into a hash-keyed cache would serve one
+   * asset's number as another's, silently and permanently. They come back on the job
+   * instead, tied to the version actually analysed.
    */
   async analyse(job, jobLogger) {
     const parameters = this.parameters(job)
-    const source = await this.modelFileService.fetchModelFile(
+    // With its siblings, not alone: Blender follows the references inside the file
+    // itself, so a loose glTF without its .bin has no geometry and an OBJ without
+    // its .mtl has no materials.
+    const source = await this.modelFileService.fetchModelFileWithAuxiliaries(
       job.assetId,
       job.versionId
     )
@@ -467,13 +496,16 @@ export class BlenderOperationProcessor {
           parts: result.parts,
           cachedMetrics: cached,
           note:
-            'surface-area and manifold are cached by geometry hash and shared with every ' +
-            'asset having the same geometry. uvOverlap and texelDensity are reported here ' +
-            'only - they depend on the UV layout, which the geometry hash excludes.',
+            'manifold and the LOCAL-space surface area are cached by geometry hash and ' +
+            'shared with every asset having the same geometry. surfaceArea (world-space), ' +
+            'uvOverlap and texelDensity are reported here only - they depend on the ' +
+            'transform and the UV layout, which the geometry hash excludes.',
         },
       }
     } finally {
-      await this.modelFileService.cleanupFile(source.filePath).catch(() => {})
+      await this.modelFileService
+        .cleanupDirectory(source.workDir)
+        .catch(() => {})
     }
   }
 
@@ -494,7 +526,14 @@ export class BlenderOperationProcessor {
       const metrics = [
         [
           'surface-area',
-          { surfaceArea: part.surfaceArea, triangleCount: part.triangleCount },
+          {
+            // The LOCAL area, not the reported world-space one: this row is keyed
+            // by a hash of local coordinates and will be served to every asset
+            // sharing that geometry, whatever transform each of them carries.
+            surfaceArea: part.localSurfaceArea,
+            triangleCount: part.triangleCount,
+            space: 'local',
+          },
         ],
         ['manifold', part.manifold],
       ]

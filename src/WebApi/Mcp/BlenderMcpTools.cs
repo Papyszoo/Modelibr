@@ -198,8 +198,8 @@ public sealed class BlenderWriteMcpTools
     [Description("Measure a model's geometry with Blender: UV overlap (whether its layout can be baked onto at all), texel density " +
                  "(so two assets in one scene do not read at different resolutions), exact surface area, and whether each mesh is watertight. " +
                  "Nothing about the model changes - this only measures. " +
-                 "surface-area and manifold are cached by geometry hash and become answerable through compute_on_demand for every asset sharing that geometry; " +
-                 "the two UV metrics come back on the job only, because they depend on the UV layout and the geometry hash deliberately ignores it. " +
+                 "manifold and the LOCAL-space surface area are cached by geometry hash and become answerable through compute_on_demand for every asset sharing that geometry; " +
+                 "the world-space surface area and the two UV metrics come back on the job only, because they depend on the object's transform and on the UV layout, and the geometry hash deliberately ignores both. " +
                  "Returns a job id: collect the numbers with get_job_status. Requires Blender (Settings).")]
     public static Task<object> AnalyzeMeshes(
         ICommandHandler<RequestBlenderOperationCommand, BlenderOperationRequested> handler,

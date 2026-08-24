@@ -304,14 +304,17 @@ public sealed class AssetSearchMcpTools
     };
 
     [McpServerTool(Name = "compute_on_demand")]
-    [Description("Return a cached expensive-compute metric (exact surface area, manifold check, per-part render, ...) for a geometry hash, " +
+    [Description("Return a cached expensive-compute metric (LOCAL-space surface area, manifold check, per-part render, ...) for a geometry hash, " +
                  "or 'pending' if it has not been computed yet. Results are cached and shared across every asset with the same geometry. " +
-                 "Queue the computation with analyze_meshes. UV overlap and texel density are NOT available here - they depend on the UV layout, " +
-                 "which the geometry hash ignores; analyze_meshes returns those on the job itself.")]
+                 "surface-area here is measured in the mesh's OWN space and carries \"space\": \"local\" - it does NOT include the scale an " +
+                 "instance is placed at, because the geometry hash is blind to the transform and one row is shared by every instance. " +
+                 "For the world-space area of a particular object, run analyze_meshes and read surfaceArea off the job. " +
+                 "UV overlap and texel density are NOT available here either - they depend on the UV layout, " +
+                 "which the geometry hash also ignores; analyze_meshes returns those on the job itself.")]
     public static async Task<object> ComputeOnDemand(
         IQueryHandler<GetComputeResultQuery, ComputeResultResponse> handler,
         [Description("Order-invariant geometry hash of the target part.")] string geometryHash,
-        [Description("Metric name: surface-area | manifold | part-render.")] string metric,
+        [Description("Metric name: surface-area (local-space) | manifold | part-render.")] string metric,
         [Description("Geometry hash version (defaults to 1).")] int hashVersion = 1,
         CancellationToken cancellationToken = default)
     {

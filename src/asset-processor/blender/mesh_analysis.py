@@ -13,7 +13,11 @@ Answers, per mesh:
   * **texel-density** - UV area per unit of world surface area, plus what that comes to in
     pixels per metre at a few common map sizes. Two assets in one scene at wildly
     different densities is the thing that reads as "one of these looks cheap".
-  * **surface-area** - exact world-space area, which no bounding box can approximate.
+  * **surface-area** - exact area, reported twice and deliberately so. `surfaceArea` is
+    world-space (the object's scale applied) and travels on the JOB, because it depends on
+    the transform. `localSurfaceArea` is measured in the mesh's own space, is a function of
+    the hashed geometry alone, and is the one written to the geometry-hash cache under
+    `"space": "local"`. No bounding box approximates either.
   * **manifold** - whether the mesh is watertight and consistently wound.
 
 Protocol with the worker, matching uv_unwrap.py and bake_textures.py:
@@ -202,12 +206,26 @@ def analyse(obj, options):
     if geometry_hash is None:
         return None
 
-    # World-space area, with the object's scale applied - a mesh scaled 100x in the scene
-    # has 10,000x the surface, and texel density is meaningless without it.
+    # Two areas, because they answer two different questions and only one of them may
+    # be cached.
+    #
+    # World-space area has the object's scale applied - a mesh scaled 100x in the scene
+    # has 10,000x the surface, and texel density is meaningless without it. But that
+    # makes it a function of the TRANSFORM as well as the geometry, and the compute
+    # cache is keyed by a geometry hash computed from local coordinates: two instances
+    # of one mesh at different scales hash identically. Caching the world area would
+    # serve one instance's number as the other's - the same mistake the UV metrics are
+    # kept out of the cache to avoid.
+    #
+    # Local-space area is a function of the hashed geometry alone, so it is the one that
+    # is shareable, and it is what gets cached. The world figure travels on the job.
     matrix = obj.matrix_world
     world_area = 0.0
+    local_area = 0.0
     for triangle in mesh.loop_triangles:
-        a, b, c = (matrix @ mesh.vertices[i].co for i in triangle.vertices)
+        va, vb, vc = (mesh.vertices[i].co for i in triangle.vertices)
+        local_area += (vb - va).cross(vc - va).length * 0.5
+        a, b, c = (matrix @ v for v in (va, vb, vc))
         world_area += (b - a).cross(c - a).length * 0.5
 
     layer = mesh.uv_layers.active or (mesh.uv_layers[0] if mesh.uv_layers else None)
@@ -225,6 +243,9 @@ def analyse(obj, options):
         "geometryHash": geometry_hash,
         "geometryHashVersion": GEOMETRY_HASH_VERSION,
         "surfaceArea": round(world_area, 6),
+        # Transform-free, and therefore the only one that may be filed under the
+        # geometry hash. See the comment above analyse()'s area loop.
+        "localSurfaceArea": round(local_area, 6),
         "triangleCount": len(mesh.loop_triangles),
         "manifold": is_manifold(mesh),
     }
