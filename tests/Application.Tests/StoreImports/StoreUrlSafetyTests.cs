@@ -138,4 +138,105 @@ public class StoreUrlSafetyTests
     {
         Assert.Equal(expectedBlocked, StoreUrlSafety.IsBlockedAddress(IPAddress.Parse(ip), allowLoopback));
     }
+
+    /// <summary>
+    /// Every range the classifier used to let through. The old list enumerated "private"
+    /// blocks and treated everything else as fair game, so a manifest naming 224.0.0.1 or
+    /// 255.255.255.255 got the server to send a request there - a destination the caller had
+    /// no other way to reach, which is the whole of what SSRF is.
+    /// </summary>
+    [Theory]
+    // 198.18.0.0/15 - benchmarking
+    [InlineData("198.18.0.1")]
+    [InlineData("198.19.255.254")]
+    // 224.0.0.0/4 - multicast, including the all-hosts group
+    [InlineData("224.0.0.1")]
+    [InlineData("239.255.255.250")]
+    // 240.0.0.0/4 - reserved
+    [InlineData("240.0.0.1")]
+    [InlineData("255.255.255.254")]
+    // The limited broadcast address
+    [InlineData("255.255.255.255")]
+    // Documentation / protocol-assignment blocks
+    [InlineData("192.0.0.1")]
+    [InlineData("192.0.2.1")]
+    [InlineData("198.51.100.1")]
+    [InlineData("203.0.113.1")]
+    [InlineData("192.88.99.1")]
+    // IPv6 multicast, ff00::/8
+    [InlineData("ff00::1")]
+    [InlineData("ff02::1")]
+    [InlineData("ff05::1:3")]
+    // IPv6 documentation and protocol assignments
+    [InlineData("2001:db8::1")]
+    [InlineData("2001::1")]
+    // Wrappers around an IPv4 address that is itself refused - blocking the inner address and
+    // not the tunnel would be no blocking at all.
+    [InlineData("64:ff9b::a9fe:a9fe")]
+    [InlineData("2002:a9fe:a9fe::1")]
+    [InlineData("::ffff:169.254.169.254")]
+    [InlineData("100::1")]
+    public void IsBlockedAddress_Refuses_EveryNonGlobalRange(string ip)
+    {
+        // allowLoopback: true - the dev-store exception must widen loopback and nothing else.
+        Assert.True(StoreUrlSafety.IsBlockedAddress(IPAddress.Parse(ip), allowLoopback: false));
+        Assert.True(StoreUrlSafety.IsBlockedAddress(IPAddress.Parse(ip), allowLoopback: true));
+    }
+
+    /// <summary>
+    /// The other half: ordinary global unicast still passes, on both families. A guard that
+    /// refuses everything is not a guard, it is an outage.
+    /// </summary>
+    [Theory]
+    [InlineData("1.1.1.1")]
+    [InlineData("140.82.121.3")]
+    [InlineData("198.20.0.1")]      // just below the benchmarking block
+    [InlineData("198.17.255.255")]  // just above it
+    [InlineData("223.255.255.255")] // just below multicast
+    [InlineData("2606:4700:4700::1111")]
+    [InlineData("2a00:1450:4001:80f::200e")]
+    [InlineData("2002:8c52:7903::1")] // 6to4 wrapping a public IPv4
+    public void IsBlockedAddress_Allows_GlobalUnicast(string ip)
+    {
+        Assert.False(StoreUrlSafety.IsBlockedAddress(IPAddress.Parse(ip), allowLoopback: false));
+    }
+
+    /// <summary>
+    /// The same ranges as a download or redirect-hop target, which is how a manifest or a
+    /// 302 actually delivers one.
+    /// </summary>
+    [Theory]
+    [InlineData("https://198.18.0.1/f")]
+    [InlineData("https://224.0.0.1/f")]
+    [InlineData("https://240.0.0.1/f")]
+    [InlineData("https://255.255.255.255/f")]
+    [InlineData("https://203.0.113.1/f")]
+    [InlineData("https://[ff02::1]/f")]
+    [InlineData("https://[2001:db8::1]/f")]
+    public void ValidateDownloadTarget_Blocks_EveryNonGlobalRange(string url)
+    {
+        var result = StoreUrlSafety.ValidateDownloadTarget(new Uri(url), PublicStore);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("StoreImport.BlockedDownloadUrl", result.Error.Code);
+    }
+
+    /// <summary>
+    /// A loopback store widens loopback and only loopback. Somebody running the store on
+    /// their own machine does not thereby consent to it reaching the multicast group.
+    /// </summary>
+    [Theory]
+    [InlineData("http://224.0.0.1/f")]
+    [InlineData("http://255.255.255.255/f")]
+    [InlineData("http://198.18.0.1/f")]
+    [InlineData("http://169.254.169.254/f")]
+    public void ValidateDownloadTarget_FromALoopbackStore_StillBlocksNonGlobalRanges(string url)
+    {
+        var loopbackStore = new Uri("http://localhost:5000");
+
+        var result = StoreUrlSafety.ValidateDownloadTarget(new Uri(url), loopbackStore);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("StoreImport.BlockedDownloadUrl", result.Error.Code);
+    }
 }

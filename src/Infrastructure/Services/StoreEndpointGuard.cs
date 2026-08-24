@@ -144,8 +144,9 @@ internal sealed class StoreEndpointGuard
                 $"Host '{target.Host}' did not resolve to any address."));
 
         // Not the store's own host (returned early above), so loopback is only tolerated when
-        // the store itself is loopback (the documented dev exception); private, link-local,
-        // unique-local and other non-routable ranges are always blocked.
+        // the store itself is loopback (the documented dev exception); everything that is not
+        // a global unicast address is blocked - private, link-local, unique-local,
+        // benchmarking, multicast, reserved, documentation and broadcast alike.
         //
         // EVERY address is checked, not just the one that gets pinned: a host answering with
         // one public and one private address must not be reachable by retrying.
@@ -155,7 +156,7 @@ internal sealed class StoreEndpointGuard
             if (StoreUrlSafety.IsBlockedAddress(address, allowLoopback))
                 return Result.Failure<IPAddress?>(new Error(
                     "StoreImport.BlockedDownloadUrl",
-                    $"Refusing to reach '{target.Host}' - it resolves to a private or loopback address."));
+                    $"Refusing to reach '{target.Host}' - it resolves to a non-global address."));
         }
 
         return Result.Success<IPAddress?>(addresses[0]);
