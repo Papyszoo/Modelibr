@@ -36,7 +36,17 @@ namespace Infrastructure
                     .AddInterceptors(sp.GetRequiredService<DomainEventsInterceptor>());
             });
 
-            services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<ApplicationDbContext>());
+            // Side effects that must wait for the commit - see IPostCommitActions. Registered
+            // as the concrete type as well, because PostCommitUnitOfWork needs the drain and
+            // the interface deliberately does not expose it.
+            services.AddScoped<PostCommitActions>();
+            services.AddScoped<IPostCommitActions>(sp => sp.GetRequiredService<PostCommitActions>());
+
+            // The context is still the thing that commits; the decorator is what decides when
+            // the queued after-commit effects are allowed to happen.
+            services.AddScoped<IUnitOfWork>(sp => new PostCommitUnitOfWork(
+                sp.GetRequiredService<ApplicationDbContext>(),
+                sp.GetRequiredService<PostCommitActions>()));
             services.AddScoped<IChangeTrackerReset>(sp => sp.GetRequiredService<ApplicationDbContext>());
 
             services.AddScoped<IModelRepository, ModelRepository>();

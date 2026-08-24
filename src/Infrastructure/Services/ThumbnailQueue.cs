@@ -22,18 +22,48 @@ public class ThumbnailQueue : IThumbnailQueue
     private readonly IThumbnailJobRepository _thumbnailJobRepository;
     private readonly IThumbnailJobQueueNotificationService _queueNotificationService;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IPostCommitActions _postCommit;
     private readonly ILogger<ThumbnailQueue> _logger;
 
     public ThumbnailQueue(
         IThumbnailJobRepository thumbnailJobRepository,
         IThumbnailJobQueueNotificationService queueNotificationService,
         IUnitOfWork unitOfWork,
+        IPostCommitActions postCommit,
         ILogger<ThumbnailQueue> logger)
     {
         _thumbnailJobRepository = thumbnailJobRepository ?? throw new ArgumentNullException(nameof(thumbnailJobRepository));
         _queueNotificationService = queueNotificationService ?? throw new ArgumentNullException(nameof(queueNotificationService));
         _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
+        _postCommit = postCommit ?? throw new ArgumentNullException(nameof(postCommit));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    /// <summary>
+    /// Commits the staged job row and tells the workers a job is waiting - the notification
+    /// strictly after the row they are being sent to look for is visible to them.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Notifying used to be an <c>await</c> straight after this <c>SaveChangesAsync</c>,
+    /// which reads as "after the commit" and is not, once the caller has a transaction open:
+    /// EF joins this save to it, so nothing is durable until that outer boundary commits, and
+    /// the worker is a separate process opening its own connection. <c>bind_texture_set</c>
+    /// is exactly that caller.
+    /// </para>
+    /// <para>
+    /// Registering the notification BEFORE the save is what makes both cases right: with no
+    /// ambient transaction the unit of work drains immediately after committing (so the
+    /// timing is unchanged), and inside one it waits for the transaction that owns it.
+    /// </para>
+    /// </remarks>
+    private async Task SaveAndNotifyAsync(ThumbnailJob job, CancellationToken cancellationToken)
+    {
+        _postCommit.Enqueue(
+            "notify thumbnail workers of an enqueued job",
+            ct => _queueNotificationService.NotifyJobEnqueuedAsync(job, ct));
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<ThumbnailJob> EnqueueAsync(
@@ -58,13 +88,10 @@ public class ThumbnailQueue : IThumbnailQueue
                 var currentTime = DateTime.UtcNow;
                 existingJob.Reset(currentTime);
                 await _thumbnailJobRepository.UpdateAsync(existingJob, cancellationToken);
-                await _unitOfWork.SaveChangesAsync(cancellationToken);
-                
-                _logger.LogInformation("Reset existing thumbnail job {JobId} (status: {Status}) for model {ModelId} version {ModelVersionId} for regeneration (forceRegenerate: {ForceRegenerate})", 
+                await SaveAndNotifyAsync(existingJob, cancellationToken);
+
+                _logger.LogInformation("Reset existing thumbnail job {JobId} (status: {Status}) for model {ModelId} version {ModelVersionId} for regeneration (forceRegenerate: {ForceRegenerate})",
                     existingJob.Id, existingJob.Status, modelId, modelVersionId, forceRegenerate);
-                
-                // Send real-time notification to workers that a job is available for processing
-                await _queueNotificationService.NotifyJobEnqueuedAsync(existingJob, cancellationToken);
             }
             else
             {
@@ -77,13 +104,10 @@ public class ThumbnailQueue : IThumbnailQueue
 
         var job = ThumbnailJob.Create(modelId, modelVersionId, modelHash, DateTime.UtcNow, maxAttempts, lockTimeoutMinutes);
         var createdJob = await _thumbnailJobRepository.AddAsync(job, cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        await SaveAndNotifyAsync(createdJob, cancellationToken);
 
-        _logger.LogInformation("Enqueued thumbnail job {JobId} for model {ModelId} version {ModelVersionId} with hash {ModelHash}", 
+        _logger.LogInformation("Enqueued thumbnail job {JobId} for model {ModelId} version {ModelVersionId} with hash {ModelHash}",
             createdJob.Id, modelId, modelVersionId, modelHash);
-
-        // Send real-time notification to workers that a new job is available
-        await _queueNotificationService.NotifyJobEnqueuedAsync(createdJob, cancellationToken);
 
         return createdJob;
     }
@@ -106,12 +130,10 @@ public class ThumbnailQueue : IThumbnailQueue
                 var currentTime = DateTime.UtcNow;
                 existingJob.Reset(currentTime);
                 await _thumbnailJobRepository.UpdateAsync(existingJob, cancellationToken);
-                await _unitOfWork.SaveChangesAsync(cancellationToken);
+                await SaveAndNotifyAsync(existingJob, cancellationToken);
 
                 _logger.LogInformation("Reset existing waveform job {JobId} (status: {Status}) for sound {SoundId} for regeneration (forceRegenerate: {ForceRegenerate})",
                     existingJob.Id, existingJob.Status, soundId, forceRegenerate);
-
-                await _queueNotificationService.NotifyJobEnqueuedAsync(existingJob, cancellationToken);
             }
             else
             {
@@ -124,13 +146,10 @@ public class ThumbnailQueue : IThumbnailQueue
 
         var job = ThumbnailJob.CreateForSound(soundId, soundHash, DateTime.UtcNow, maxAttempts, lockTimeoutMinutes);
         var createdJob = await _thumbnailJobRepository.AddAsync(job, cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        await SaveAndNotifyAsync(createdJob, cancellationToken);
 
         _logger.LogInformation("Enqueued waveform thumbnail job {JobId} for sound {SoundId} with hash {SoundHash}",
             createdJob.Id, soundId, soundHash);
-
-        // Send real-time notification to workers
-        await _queueNotificationService.NotifyJobEnqueuedAsync(createdJob, cancellationToken);
 
         return createdJob;
     }
@@ -153,12 +172,10 @@ public class ThumbnailQueue : IThumbnailQueue
                 var currentTime = DateTime.UtcNow;
                 existingJob.Reset(currentTime);
                 await _thumbnailJobRepository.UpdateAsync(existingJob, cancellationToken);
-                await _unitOfWork.SaveChangesAsync(cancellationToken);
+                await SaveAndNotifyAsync(existingJob, cancellationToken);
 
                 _logger.LogInformation("Reset existing texture set thumbnail job {JobId} (status: {Status}) for texture set {TextureSetId} for regeneration (forceRegenerate: {ForceRegenerate})",
                     existingJob.Id, existingJob.Status, textureSetId, forceRegenerate);
-
-                await _queueNotificationService.NotifyJobEnqueuedAsync(existingJob, cancellationToken);
             }
             else
             {
@@ -171,12 +188,10 @@ public class ThumbnailQueue : IThumbnailQueue
 
         var job = ThumbnailJob.CreateForTextureSet(textureSetId, DateTime.UtcNow, maxAttempts, lockTimeoutMinutes, proxySize);
         var createdJob = await _thumbnailJobRepository.AddAsync(job, cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        await SaveAndNotifyAsync(createdJob, cancellationToken);
 
         _logger.LogInformation("Enqueued texture set thumbnail job {JobId} for texture set {TextureSetId}",
             createdJob.Id, textureSetId);
-
-        await _queueNotificationService.NotifyJobEnqueuedAsync(createdJob, cancellationToken);
 
         return createdJob;
     }
@@ -198,8 +213,7 @@ public class ThumbnailQueue : IThumbnailQueue
                 var currentTime = DateTime.UtcNow;
                 existingJob.Reset(currentTime);
                 await _thumbnailJobRepository.UpdateAsync(existingJob, cancellationToken);
-                await _unitOfWork.SaveChangesAsync(cancellationToken);
-                await _queueNotificationService.NotifyJobEnqueuedAsync(existingJob, cancellationToken);
+                await SaveAndNotifyAsync(existingJob, cancellationToken);
             }
 
             return existingJob;
@@ -207,8 +221,7 @@ public class ThumbnailQueue : IThumbnailQueue
 
         var job = ThumbnailJob.CreateForEnvironmentMap(environmentMapId, environmentMapVariantId, DateTime.UtcNow, maxAttempts, lockTimeoutMinutes);
         var createdJob = await _thumbnailJobRepository.AddAsync(job, cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
-        await _queueNotificationService.NotifyJobEnqueuedAsync(createdJob, cancellationToken);
+        await SaveAndNotifyAsync(createdJob, cancellationToken);
         return createdJob;
     }
 
@@ -224,8 +237,7 @@ public class ThumbnailQueue : IThumbnailQueue
         // scene render is its own question, so it gets its own job and its own picture.
         var job = ThumbnailJob.CreateForScene(sceneId, viewpoint, DateTime.UtcNow, maxAttempts, lockTimeoutMinutes, sceneRevision);
         var createdJob = await _thumbnailJobRepository.AddAsync(job, cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
-        await _queueNotificationService.NotifyJobEnqueuedAsync(createdJob, cancellationToken);
+        await SaveAndNotifyAsync(createdJob, cancellationToken);
         return createdJob;
     }
 
@@ -319,13 +331,10 @@ public class ThumbnailQueue : IThumbnailQueue
 
         job.Reset(DateTime.UtcNow);
         await _thumbnailJobRepository.UpdateAsync(job, cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        await SaveAndNotifyAsync(job, cancellationToken);
 
-        _logger.LogInformation("Reset thumbnail job {JobId} for manual retry for model {ModelId} version {ModelVersionId}", 
+        _logger.LogInformation("Reset thumbnail job {JobId} for manual retry for model {ModelId} version {ModelVersionId}",
             jobId, job.ModelId, job.ModelVersionId);
-
-        // Send real-time notification to workers that a job is available for processing
-        await _queueNotificationService.NotifyJobEnqueuedAsync(job, cancellationToken);
     }
 
     public async Task<ThumbnailJob?> GetJobAsync(int jobId, CancellationToken cancellationToken = default)

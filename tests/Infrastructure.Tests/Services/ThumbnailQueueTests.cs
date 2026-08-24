@@ -4,6 +4,7 @@ using Application.Abstractions.Services;
 using Domain.Models;
 using Domain.ValueObjects;
 using Infrastructure.Services;
+using Infrastructure.Tests.TestDoubles;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
@@ -16,6 +17,12 @@ public class ThumbnailQueueTests
     private readonly Mock<IThumbnailJobQueueNotificationService> _mockQueueNotificationService;
     private readonly Mock<ILogger<ThumbnailQueue>> _mockLogger;
     private readonly Mock<IUnitOfWork> _mockUnitOfWork = new();
+
+    /// <summary>
+    /// The worker notification is registered here and runs when the unit of work commits -
+    /// see <see cref="TestPostCommitActions"/>.
+    /// </summary>
+    private readonly TestPostCommitActions _postCommit = new();
     private readonly ThumbnailQueue _thumbnailQueue;
 
     public ThumbnailQueueTests()
@@ -23,7 +30,17 @@ public class ThumbnailQueueTests
         _mockRepository = new Mock<IThumbnailJobRepository>();
         _mockQueueNotificationService = new Mock<IThumbnailJobQueueNotificationService>();
         _mockLogger = new Mock<ILogger<ThumbnailQueue>>();
-        _thumbnailQueue = new ThumbnailQueue(_mockRepository.Object, _mockQueueNotificationService.Object, _mockUnitOfWork.Object, _mockLogger.Object);
+        _thumbnailQueue = new ThumbnailQueue(
+            _mockRepository.Object,
+            _mockQueueNotificationService.Object,
+            _mockUnitOfWork.Object,
+            _postCommit,
+            _mockLogger.Object);
+
+        // No ambient transaction here, so the commit is when the notification is allowed out.
+        _mockUnitOfWork
+            .Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .Returns(() => _postCommit.RunPendingAsync());
     }
 
     [Fact]
@@ -420,4 +437,46 @@ public class ThumbnailQueueTests
         _mockRepository.Verify(r => r.GetActiveJobsByModelIdAsync(modelId, It.IsAny<CancellationToken>()), Times.Once);
         _mockRepository.Verify(r => r.UpdateAsync(pendingJob, It.IsAny<CancellationToken>()), Times.Once);
     }
+    /// <summary>
+    /// The worker is told after the row is durable, not before.
+    /// </summary>
+    /// <remarks>
+    /// The notification used to be an <c>await</c> immediately after <c>SaveChangesAsync</c>,
+    /// which is only "after the commit" when nobody has a transaction open. A caller that has
+    /// one - <c>bind_texture_set</c> - had EF join this save to it, so the row was not durable
+    /// and the worker was already being sent to look for it. Registering the notification
+    /// before the save and letting the commit boundary release it makes both cases right, and
+    /// this is the half a mocked unit of work can prove: nothing goes out until the commit.
+    /// </remarks>
+    [Fact]
+    public async Task EnqueueAsync_DoesNotNotifyWorkers_UntilTheUnitOfWorkCommits()
+    {
+        var expectedJob = ThumbnailJob.Create(1, 10, new string('a', 64), DateTime.UtcNow);
+        _mockRepository.Setup(r => r.GetByModelVersionIdAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ThumbnailJob?)null);
+        _mockRepository.Setup(r => r.AddAsync(It.IsAny<ThumbnailJob>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(expectedJob);
+
+        // A commit that never happens - which is what a nested save inside an open
+        // transaction is, as far as anything outside this connection can tell.
+        _mockUnitOfWork
+            .Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        await _thumbnailQueue.EnqueueAsync(1, 10, new string('a', 64));
+
+        _mockQueueNotificationService.Verify(
+            s => s.NotifyJobEnqueuedAsync(It.IsAny<ThumbnailJob>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        // Registered, though - so the commit that eventually happens releases it.
+        Assert.Single(_postCommit.Enqueued);
+        Assert.Empty(_postCommit.Ran);
+
+        await _postCommit.RunPendingAsync();
+
+        _mockQueueNotificationService.Verify(
+            s => s.NotifyJobEnqueuedAsync(expectedJob, It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
 }

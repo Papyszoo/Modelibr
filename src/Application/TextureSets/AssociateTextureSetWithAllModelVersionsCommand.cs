@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
@@ -14,6 +15,7 @@ internal class AssociateTextureSetWithAllModelVersionsCommandHandler : ICommandH
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IBlendFileGenerator _blendFileGenerator;
     private readonly IBlendFileGenerationQueue _blendFileGenerationQueue;
+    private readonly IPostCommitActions _postCommit;
 
     public AssociateTextureSetWithAllModelVersionsCommandHandler(
         ITextureSetRepository textureSetRepository,
@@ -21,7 +23,8 @@ internal class AssociateTextureSetWithAllModelVersionsCommandHandler : ICommandH
         IModelVersionRepository modelVersionRepository,
         IDateTimeProvider dateTimeProvider,
         IBlendFileGenerator blendFileGenerator,
-        IBlendFileGenerationQueue blendFileGenerationQueue)
+        IBlendFileGenerationQueue blendFileGenerationQueue,
+        IPostCommitActions postCommit)
     {
         _textureSetRepository = textureSetRepository;
         _modelRepository = modelRepository;
@@ -29,6 +32,7 @@ internal class AssociateTextureSetWithAllModelVersionsCommandHandler : ICommandH
         _dateTimeProvider = dateTimeProvider;
         _blendFileGenerator = blendFileGenerator;
         _blendFileGenerationQueue = blendFileGenerationQueue;
+        _postCommit = postCommit;
     }
 
     public async Task<Result> Handle(AssociateTextureSetWithAllModelVersionsCommand command, CancellationToken cancellationToken)
@@ -78,10 +82,19 @@ internal class AssociateTextureSetWithAllModelVersionsCommandHandler : ICommandH
                 await _modelVersionRepository.AddTextureMappingAsync(
                     version.Id, command.TextureSetId, materialName, cancellationToken);
 
-                // Invalidate cached .blend so it regenerates with new textures, then
-                // schedule the regeneration in the background so it reappears without needing a client GET.
-                _blendFileGenerator.InvalidateCache(command.ModelId, version.Id);
-                _blendFileGenerationQueue.Enqueue(command.ModelId, version.Id);
+                // Invalidate the cached .blend so it regenerates with the new textures, then
+                // schedule the regeneration so it reappears without needing a client GET -
+                // both AFTER the commit. The generation consumer is a singleton that opens
+                // its own database scope: handed the entry now, it would read the bindings
+                // this transaction has not committed yet, cache a .blend built from the old
+                // ones, and leave the later duplicate entry finding that file already there.
+                var versionId = version.Id;
+                _postCommit.Enqueue(
+                    $"invalidate cached .blend for model {command.ModelId} version {versionId}",
+                    () => _blendFileGenerator.InvalidateCache(command.ModelId, versionId));
+                _postCommit.Enqueue(
+                    $"enqueue .blend generation for model {command.ModelId} version {versionId}",
+                    () => _blendFileGenerationQueue.Enqueue(command.ModelId, versionId));
             }
 
             return Result.Success();

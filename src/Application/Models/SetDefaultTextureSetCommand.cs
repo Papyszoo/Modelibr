@@ -21,6 +21,7 @@ namespace Application.Models
         private readonly IBlendFileGenerator _blendFileGenerator;
         private readonly IBlendFileGenerationQueue _blendFileGenerationQueue;
         private readonly IUnitOfWork _unitOfWork;
+        private readonly IPostCommitActions _postCommit;
 
         public SetDefaultTextureSetCommandHandler(
             IModelRepository modelRepository,
@@ -30,7 +31,8 @@ namespace Application.Models
             IDateTimeProvider dateTimeProvider,
             IBlendFileGenerator blendFileGenerator,
             IBlendFileGenerationQueue blendFileGenerationQueue,
-            IUnitOfWork unitOfWork)
+            IUnitOfWork unitOfWork,
+            IPostCommitActions postCommit)
         {
             _modelRepository = modelRepository;
             _modelVersionRepository = modelVersionRepository;
@@ -40,6 +42,7 @@ namespace Application.Models
             _blendFileGenerator = blendFileGenerator;
             _blendFileGenerationQueue = blendFileGenerationQueue;
             _unitOfWork = unitOfWork;
+            _postCommit = postCommit;
         }
 
         public async Task<Result<SetDefaultTextureSetResponse>> Handle(SetDefaultTextureSetCommand command, CancellationToken cancellationToken)
@@ -107,7 +110,9 @@ namespace Application.Models
                         await _thumbnailRepository.UpdateAsync(targetVersion.Thumbnail, cancellationToken);
                     }
 
-                    // Enqueue thumbnail job for this version
+                    // Enqueue thumbnail job for this version. The job ROW is part of this
+                    // write and commits with it; the worker notification about it is a
+                    // side effect and waits for the commit (see ThumbnailQueue).
                     // EnqueueAsync will check for existing jobs for this specific version and reuse them
                     await _thumbnailQueue.EnqueueAsync(
                         command.ModelId,
@@ -117,10 +122,19 @@ namespace Application.Models
                         cancellationToken: cancellationToken);
                 }
 
-                // Invalidate cached .blend so it regenerates with new textures, then
-                // schedule the regeneration in the background so it reappears without needing a client GET.
-                _blendFileGenerator.InvalidateCache(command.ModelId, targetVersion.Id);
-                _blendFileGenerationQueue.Enqueue(command.ModelId, targetVersion.Id);
+                // Invalidate the cached .blend so it regenerates with the new textures, then
+                // schedule the regeneration so it reappears without needing a client GET -
+                // both AFTER the commit. This command runs inside bind_texture_set's
+                // transaction, and the generation consumer opens its own database scope: a
+                // queue entry handed over now is read against the bindings this transaction
+                // has not committed, and caches a .blend built from the ones it replaces.
+                var blendVersionId = targetVersion.Id;
+                _postCommit.Enqueue(
+                    $"invalidate cached .blend for model {command.ModelId} version {blendVersionId}",
+                    () => _blendFileGenerator.InvalidateCache(command.ModelId, blendVersionId));
+                _postCommit.Enqueue(
+                    $"enqueue .blend generation for model {command.ModelId} version {blendVersionId}",
+                    () => _blendFileGenerationQueue.Enqueue(command.ModelId, blendVersionId));
 
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
 
