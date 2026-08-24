@@ -139,83 +139,130 @@ public static class StoreUrlSafety
     }
 
     /// <summary>
-    /// Every IPv4 block IANA lists as special-purpose. Loopback (127/8) is handled by the
-    /// caller, because it is the one range with an exception.
+    /// The IANA special-purpose registries, as prefix tables.
     /// </summary>
-    private static bool IsBlockedV4(byte[] b) =>
-        // 0.0.0.0/8 - "this network"
-        b[0] == 0 ||
-        // 10.0.0.0/8 - private
-        b[0] == 10 ||
-        // 100.64.0.0/10 - carrier-grade NAT
-        (b[0] == 100 && b[1] >= 64 && b[1] <= 127) ||
-        // 169.254.0.0/16 - link-local, and the cloud metadata endpoint
-        (b[0] == 169 && b[1] == 254) ||
-        // 172.16.0.0/12 - private
-        (b[0] == 172 && b[1] >= 16 && b[1] <= 31) ||
-        // 192.0.0.0/24 - IETF protocol assignments
-        (b[0] == 192 && b[1] == 0 && b[2] == 0) ||
-        // 192.0.2.0/24 - TEST-NET-1 (documentation)
-        (b[0] == 192 && b[1] == 0 && b[2] == 2) ||
-        // 192.88.99.0/24 - deprecated 6to4 relay anycast
-        (b[0] == 192 && b[1] == 88 && b[2] == 99) ||
-        // 192.168.0.0/16 - private
-        (b[0] == 192 && b[1] == 168) ||
-        // 198.18.0.0/15 - benchmarking
-        (b[0] == 198 && (b[1] == 18 || b[1] == 19)) ||
-        // 198.51.100.0/24 - TEST-NET-2 (documentation)
-        (b[0] == 198 && b[1] == 51 && b[2] == 100) ||
-        // 203.0.113.0/24 - TEST-NET-3 (documentation)
-        (b[0] == 203 && b[1] == 0 && b[2] == 113) ||
-        // 224.0.0.0/4 - multicast
-        (b[0] >= 224 && b[0] <= 239) ||
-        // 240.0.0.0/4 - reserved, and 255.255.255.255 (limited broadcast) inside it
-        b[0] >= 240;
+    /// <remarks>
+    /// <para>
+    /// Written as CIDR data rather than hand-rolled byte comparisons because that is the
+    /// shape the source is published in - <c>iana-ipv4-special-registry</c> and
+    /// <c>iana-ipv6-special-registry</c> are lists of prefixes, and keeping the same shape
+    /// here is what makes "did we miss one" a question somebody can answer by reading two
+    /// lists side by side. The hand-rolled form is how <c>3fff::/20</c>, <c>5f00::/16</c>
+    /// and <c>2620:4f:8000::/48</c> stayed reachable after IANA added them: nothing about
+    /// a nest of byte tests says which entries it is meant to cover.
+    /// </para>
+    /// <para>
+    /// The policy is "special-purpose", not "not globally reachable". A handful of registry
+    /// entries are marked globally reachable (the AS112 delegations, AMT, the PCP/TURN/SRP
+    /// anycast addresses) and they are refused too: none of them is a place a store's
+    /// download lives, and an allow-list with holes in it is how this went wrong the first
+    /// time.
+    /// </para>
+    /// </remarks>
+    private readonly record struct Cidr(byte[] Prefix, int Bits)
+    {
+        /// <summary>True when <paramref name="address"/> falls inside this prefix.</summary>
+        public bool Contains(byte[] address)
+        {
+            if (address.Length != Prefix.Length)
+            {
+                return false;
+            }
+
+            var wholeBytes = Bits / 8;
+            for (var i = 0; i < wholeBytes; i++)
+            {
+                if (address[i] != Prefix[i])
+                {
+                    return false;
+                }
+            }
+
+            var remainder = Bits % 8;
+            if (remainder == 0)
+            {
+                return true;
+            }
+
+            var mask = (byte)(0xFF << (8 - remainder));
+            return (address[wholeBytes] & mask) == (Prefix[wholeBytes] & mask);
+        }
+    }
+
+    /// <summary>One registry row, written the way the registry writes it.</summary>
+    private static Cidr Range(string prefix, int bits) => new(IPAddress.Parse(prefix).GetAddressBytes(), bits);
 
     /// <summary>
-    /// The IPv6 half. Two of these carry an IPv4 address inside them, and an address that is
-    /// only reachable because of the wrapper is exactly what this is here to refuse - so they
-    /// are unwrapped and classified as the IPv4 addresses they are.
+    /// IANA IPv4 Special-Purpose Address Registry, plus the multicast and reserved blocks
+    /// that live in their own registries. Loopback (127.0.0.0/8) is deliberately absent - it
+    /// is the one range with an exception, and the caller answers it first.
+    /// </summary>
+    private static readonly Cidr[] BlockedV4 =
+    [
+        Range("0.0.0.0", 8),           // "this network"
+        Range("10.0.0.0", 8),          // private
+        Range("100.64.0.0", 10),       // carrier-grade NAT
+        Range("169.254.0.0", 16),      // link-local, and the cloud metadata endpoint
+        Range("172.16.0.0", 12),       // private
+        Range("192.0.0.0", 24),        // IETF protocol assignments (incl. DS-Lite, NAT64 well-known)
+        Range("192.0.2.0", 24),        // TEST-NET-1 (documentation)
+        Range("192.31.196.0", 24),     // AS112-v4
+        Range("192.52.193.0", 24),     // AMT
+        Range("192.88.99.0", 24),      // deprecated 6to4 relay anycast
+        Range("192.168.0.0", 16),      // private
+        Range("192.175.48.0", 24),     // direct delegation AS112 service
+        Range("198.18.0.0", 15),       // benchmarking
+        Range("198.51.100.0", 24),     // TEST-NET-2 (documentation)
+        Range("203.0.113.0", 24),      // TEST-NET-3 (documentation)
+        Range("224.0.0.0", 4),         // multicast
+        Range("240.0.0.0", 4),         // reserved, and 255.255.255.255 (limited broadcast) inside it
+    ];
+
+    /// <summary>
+    /// IANA IPv6 Special-Purpose Address Registry, plus the multicast block.
+    ///
+    /// The two translation prefixes that carry an IPv4 address inside them are NOT here -
+    /// they are unwrapped in <see cref="IsBlockedV6"/> and classified as the IPv4 addresses
+    /// they reach, because an address that is only reachable through the wrapper is exactly
+    /// what this refuses. <c>::1/128</c> is absent for the same reason as 127/8 above.
+    /// </summary>
+    private static readonly Cidr[] BlockedV6 =
+    [
+        Range("::", 128),              // unspecified
+        Range("::", 96),               // deprecated IPv4-compatible, and the reserved space around it
+        Range("::ffff:0:0", 96),       // IPv4-mapped (the caller unwraps these; listed so the table is the whole registry)
+        Range("100::", 64),            // discard-only
+        Range("2001::", 23),           // IETF protocol assignments: Teredo, benchmarking, AMT, AS112-v6, ORCHIDv2, DETs
+        Range("2001:db8::", 32),       // documentation
+        Range("2620:4f:8000::", 48),   // direct delegation AS112 service
+        Range("3fff::", 20),           // documentation (RFC 9637)
+        Range("5f00::", 16),           // SRv6 SIDs (RFC 9602)
+        Range("fc00::", 7),            // unique-local
+        Range("fe80::", 10),           // link-local unicast
+        Range("fec0::", 10),           // deprecated site-local
+        Range("ff00::", 8),            // multicast
+    ];
+
+    private static bool IsBlockedV4(byte[] address) => BlockedV4.Any(range => range.Contains(address));
+
+    /// <summary>
+    /// The IPv6 half. Two registry entries carry an IPv4 address inside them, and an address
+    /// that is only reachable because of the wrapper is exactly what this is here to refuse -
+    /// so they are unwrapped and classified as the IPv4 addresses they are.
     /// </summary>
     private static bool IsBlockedV6(IPAddress ip)
     {
-        if (ip.IsIPv6LinkLocal || ip.IsIPv6SiteLocal || ip.IsIPv6Multicast)
-            return true;
-
         var b = ip.GetAddressBytes();
-
-        // ff00::/8 - multicast. IsIPv6Multicast already says so; stated because this list is
-        // read as the definition of what is refused.
-        if (b[0] == 0xFF) return true;
-
-        // fc00::/7 - unique-local
-        if ((b[0] & 0xFE) == 0xFC) return true;
-
-        // :: - unspecified
-        if (IPAddress.IPv6Any.Equals(ip)) return true;
 
         // 64:ff9b::/96 and 64:ff9b:1::/48 - NAT64. The last four bytes are an IPv4 address,
         // and reaching 169.254.169.254 through a translator is still reaching it.
         if (b[0] == 0x00 && b[1] == 0x64 && b[2] == 0xFF && b[3] == 0x9B)
             return IsBlockedV4(b[12..16]);
 
-        // 100::/64 - discard-only
-        if (b[0] == 0x01 && b[1] == 0x00 && b[2..8].All(x => x == 0)) return true;
-
-        // 2001::/23 - IETF protocol assignments, which includes Teredo (2001::/32) and the
-        // 2001:db8::/32 documentation block.
-        if (b[0] == 0x20 && b[1] == 0x01 && (b[2] & 0xFE) == 0x00) return true;
-        if (b[0] == 0x20 && b[1] == 0x01 && b[2] == 0x0D && b[3] == 0xB8) return true;
-
         // 2002::/16 - 6to4, which embeds the IPv4 address it tunnels to in the next 4 bytes.
         if (b[0] == 0x20 && b[1] == 0x02)
             return IsBlockedV4(b[2..6]);
 
-        // ::/96 - the deprecated IPv4-compatible form and the reserved space around it. ::1
-        // never reaches here (the caller answers loopback first), so nothing in this block is
-        // a destination worth keeping.
-        if (b[0..12].All(x => x == 0)) return true;
-
-        return false;
+        return BlockedV6.Any(range => range.Contains(b));
     }
 }

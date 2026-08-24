@@ -202,6 +202,152 @@ public class StoreUrlSafetyTests
     }
 
     /// <summary>
+    /// Boundary rows for every prefix in the IANA special-purpose registries, IPv6 first.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The classifier was a nest of hand-written byte comparisons, and it had fallen behind
+    /// the registry: <c>3fff::/20</c> (documentation, RFC 9637), <c>5f00::/16</c> (SRv6
+    /// SIDs, RFC 9602) and <c>2620:4f:8000::/48</c> (the direct AS112 delegation) were all
+    /// reachable. Nothing about that form said which entries it was meant to cover, so
+    /// nothing said when it stopped covering them.
+    /// </para>
+    /// <para>
+    /// Each row is the FIRST address inside a prefix or the LAST one inside it - the two
+    /// places an off-by-one in a mask shows up. The addresses immediately outside each
+    /// prefix are the theory below, and the pair is the point: a table that refuses
+    /// everything passes the first half on its own.
+    /// </para>
+    /// </remarks>
+    [Theory]
+    // 3fff::/20 - documentation (RFC 9637). First and last address in the prefix.
+    [InlineData("3fff::")]
+    [InlineData("3fff:0fff:ffff:ffff:ffff:ffff:ffff:ffff")]
+    // 5f00::/16 - SRv6 SIDs (RFC 9602)
+    [InlineData("5f00::")]
+    [InlineData("5f00:ffff:ffff:ffff:ffff:ffff:ffff:ffff")]
+    // 2620:4f:8000::/48 - direct delegation AS112 service
+    [InlineData("2620:4f:8000::")]
+    [InlineData("2620:4f:8000:ffff:ffff:ffff:ffff:ffff")]
+    // 2001::/23 - IETF protocol assignments, and the named entries inside it
+    [InlineData("2001::")]                  // Teredo
+    [InlineData("2001:1::1")]               // Port Control Protocol anycast
+    [InlineData("2001:1::2")]               // TURN anycast
+    [InlineData("2001:1::3")]               // DNS-SD service registration anycast
+    [InlineData("2001:2::1")]               // benchmarking
+    [InlineData("2001:3::1")]               // AMT
+    [InlineData("2001:4:112::1")]           // AS112-v6
+    [InlineData("2001:20::1")]              // ORCHIDv2
+    [InlineData("2001:30::1")]              // drone remote-ID entity tags
+    [InlineData("2001:1ff:ffff:ffff:ffff:ffff:ffff:ffff")] // last address in /23
+    // 2001:db8::/32 - documentation, which sits outside the /23
+    [InlineData("2001:db8::")]
+    [InlineData("2001:db8:ffff:ffff:ffff:ffff:ffff:ffff")]
+    // 100::/64 - discard-only
+    [InlineData("100::")]
+    [InlineData("100::ffff:ffff:ffff:ffff")]
+    // fc00::/7 - unique-local, both halves
+    [InlineData("fc00::")]
+    [InlineData("fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")]
+    // fe80::/10 - link-local unicast
+    [InlineData("fe80::")]
+    [InlineData("febf:ffff:ffff:ffff:ffff:ffff:ffff:ffff")]
+    // fec0::/10 - deprecated site-local
+    [InlineData("fec0::")]
+    [InlineData("feff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")]
+    // ff00::/8 - multicast
+    [InlineData("ff00::")]
+    [InlineData("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")]
+    // ::/96 - the deprecated IPv4-compatible form and the reserved space around it
+    [InlineData("::2")]
+    [InlineData("::ffff:ffff")]
+    // 64:ff9b::/96 and 64:ff9b:1::/48 - NAT64, unwrapped and judged as the IPv4 inside
+    [InlineData("64:ff9b::a9fe:a9fe")]
+    [InlineData("64:ff9b:1::c0a8:1")]
+    // The IPv4 special-purpose rows that had no coverage either
+    [InlineData("192.31.196.0")]    // AS112-v4
+    [InlineData("192.31.196.255")]
+    [InlineData("192.52.193.0")]    // AMT
+    [InlineData("192.52.193.255")]
+    [InlineData("192.175.48.0")]    // direct delegation AS112 service
+    [InlineData("192.175.48.255")]
+    [InlineData("100.64.0.0")]      // carrier-grade NAT, first and last
+    [InlineData("100.127.255.255")]
+    public void IsBlockedAddress_Refuses_EverySpecialPurposePrefix(string ip)
+    {
+        Assert.True(StoreUrlSafety.IsBlockedAddress(IPAddress.Parse(ip), allowLoopback: false));
+        // The dev-store exception widens loopback and nothing else.
+        Assert.True(StoreUrlSafety.IsBlockedAddress(IPAddress.Parse(ip), allowLoopback: true));
+    }
+
+    /// <summary>
+    /// The address immediately outside each prefix above. This is the half that fails when a
+    /// mask is one bit too wide - and refusing real global unicast is an outage, not a
+    /// tighter guard.
+    /// </summary>
+    [Theory]
+    // Either side of 3fff::/20
+    [InlineData("3ffe:ffff:ffff:ffff:ffff:ffff:ffff:ffff")]
+    [InlineData("3fff:1000::")]
+    // Either side of 5f00::/16
+    [InlineData("5eff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")]
+    [InlineData("5f01::")]
+    // Either side of 2620:4f:8000::/48
+    [InlineData("2620:4f:7fff:ffff:ffff:ffff:ffff:ffff")]
+    [InlineData("2620:4f:8001::")]
+    // 2620:4f::/32 is otherwise ordinary space - only the /48 is delegated
+    [InlineData("2620:4f::1")]
+    // Either side of 2001::/23
+    [InlineData("2000:ffff:ffff:ffff:ffff:ffff:ffff:ffff")]
+    [InlineData("2001:200::1")]
+    // Either side of 2001:db8::/32
+    [InlineData("2001:db7:ffff:ffff:ffff:ffff:ffff:ffff")]
+    [InlineData("2001:db9::")]
+    // Just past 100::/64
+    [InlineData("100:0:0:1::")]
+    // Either side of fc00::/7
+    [InlineData("fbff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")]
+    // Just past ::/96
+    [InlineData("::1:0:0")]
+    // NAT64 and 6to4 wrapping a PUBLIC IPv4 stay allowed - the wrapper is not the problem
+    [InlineData("64:ff9b::8080:8080")]
+    [InlineData("2002:0101:0101::1")]
+    // Either side of the IPv4 rows added above
+    [InlineData("192.31.195.255")]
+    [InlineData("192.31.197.0")]
+    [InlineData("192.52.192.255")]
+    [InlineData("192.52.194.0")]
+    [InlineData("192.175.47.255")]
+    [InlineData("192.175.49.0")]
+    [InlineData("100.63.255.255")]
+    [InlineData("100.128.0.0")]
+    public void IsBlockedAddress_Allows_TheAddressesJustOutsideEachPrefix(string ip)
+    {
+        Assert.False(StoreUrlSafety.IsBlockedAddress(IPAddress.Parse(ip), allowLoopback: false));
+    }
+
+    /// <summary>
+    /// The newly covered ranges as a download or redirect-hop target, because that is how a
+    /// manifest or a 302 actually delivers one - and the classifier is only useful where it
+    /// is consulted.
+    /// </summary>
+    [Theory]
+    [InlineData("https://[3fff::1]/f")]
+    [InlineData("https://[5f00::1]/f")]
+    [InlineData("https://[2620:4f:8000::1]/f")]
+    [InlineData("https://[2001:2::1]/f")]
+    [InlineData("https://[fe80::1]/f")]
+    [InlineData("https://192.31.196.1/f")]
+    [InlineData("https://192.175.48.1/f")]
+    public void ValidateDownloadTarget_Blocks_EveryNewlyCoveredRange(string url)
+    {
+        var result = StoreUrlSafety.ValidateDownloadTarget(new Uri(url), PublicStore);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("StoreImport.BlockedDownloadUrl", result.Error.Code);
+    }
+
+    /// <summary>
     /// The same ranges as a download or redirect-hop target, which is how a manifest or a
     /// 302 actually delivers one.
     /// </summary>
