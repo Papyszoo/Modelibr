@@ -157,9 +157,18 @@ Feature: Scene authoring
   # it is clean, so every other edit has to be serialised against the link or
   # the next save is refused over a conflict the user never made.
 
+  # A note on the reload in each of these: the Background loads the app before
+  # the scenario provisions its project through the API, and the projects list
+  # is cached for five minutes - so the dropdown would go on offering the list
+  # as it was at boot and never show the new project. Creating a project through
+  # the UI invalidates that cache; provisioning one behind the app's back cannot,
+  # and the reload is the test admitting that rather than the app being wrong.
+
   @scene-project-link
   Scenario: Linking a scene to a project holds editing, then gives it back
     Given the project "Scene Link Held" exists
+    And I reload the app
+    And I am on the scenes page
     And a scene named "Linked Scene" is open
     When I link the scene to the project "Scene Link Held"
     Then the scene should belong to the project "Scene Link Held"
@@ -171,6 +180,8 @@ Feature: Scene authoring
     # like it did: the draft has to be sitting on the revision the link
     # produced, or this save comes back as a conflict.
     Given the project "Scene Link Edited" exists
+    And I reload the app
+    And I am on the scenes page
     And a scene named "Linked Then Edited Scene" is open
     And I have linked the scene to the project "Scene Link Edited"
     When I place the test model into the scene
@@ -185,6 +196,8 @@ Feature: Scene authoring
     # a link starting under a dirty draft, and the hold above stops an edit
     # starting under a link.
     Given the project "Scene Link Refused" exists
+    And I reload the app
+    And I am on the scenes page
     And a scene named "Dirty Link Scene" is open
     And I have placed the test model into the scene
     When I open the project brief
