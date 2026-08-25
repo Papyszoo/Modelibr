@@ -163,6 +163,40 @@ public class DomainEventsInterceptorTests
         Assert.True(await context.Settings.AnyAsync(s => s.Key == "staged-during-dispatch"));
     }
 
+    [Fact]
+    public async Task SaveChanges_HandlerFails_DiscardsUnsavedChangesAndPostCommitTail()
+    {
+        ApplicationDbContext? capturedContext = null;
+        var actions = new PostCommitActions(NullLogger<PostCommitActions>.Instance);
+        var ranActions = new List<string>();
+
+        var mockDispatcher = new Mock<IDomainEventDispatcher>();
+        mockDispatcher
+            .Setup(x => x.PublishAsync(It.IsAny<IEnumerable<IDomainEvent>>(), It.IsAny<CancellationToken>()))
+            .Callback<IEnumerable<IDomainEvent>, CancellationToken>((_, _) =>
+            {
+                capturedContext!.Settings.Add(Setting.Create("failed-handler-setting", "value", DateTime.UtcNow));
+                actions.Enqueue("failed-handler-action", () => ranActions.Add("action-ran"));
+            })
+            .ReturnsAsync(Result.Failure(new Error("HandlerFailed", "Handler encountered an error")));
+
+        var interceptor = new DomainEventsInterceptor(mockDispatcher.Object, actions, NullLogger<DomainEventsInterceptor>.Instance);
+        await using var context = NewContext(interceptor);
+        capturedContext = context;
+
+        context.EnvironmentMaps.Add(EnvironmentMap.Create("Trigger", DateTime.UtcNow));
+
+        await context.SaveChangesAsync();
+
+        // The staged entity was discarded/detached and not persisted
+        Assert.False(await context.Settings.AnyAsync(s => s.Key == "failed-handler-setting"));
+        Assert.False(context.ChangeTracker.HasChanges());
+
+        // The post-commit tail was discarded
+        await actions.RunPendingAsync();
+        Assert.Empty(ranActions);
+    }
+
     private sealed class RecordingHandler : IDomainEventHandler<EnvironmentMapCreatedEvent>
     {
         public List<EnvironmentMapCreatedEvent> Handled { get; } = new();

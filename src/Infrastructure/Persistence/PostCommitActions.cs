@@ -35,9 +35,9 @@ internal sealed class PostCommitActions : IPostCommitActions
     /// </summary>
     private int _saved;
 
-    public PostCommitActions(ILogger<PostCommitActions> logger)
+    public PostCommitActions(ILogger<PostCommitActions>? logger = null)
     {
-        _logger = logger;
+        _logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<PostCommitActions>.Instance;
     }
 
     public void Enqueue(string description, Func<CancellationToken, Task> action)

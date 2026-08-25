@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace Infrastructure
 {
@@ -28,7 +29,10 @@ namespace Infrastructure
             // SaveDurabilityInterceptor's counters describe one scope's writes.
             // Built by hand rather than by reflection because its constructor is internal -
             // it takes the queue whose ownership boundary it moves.
-            services.AddScoped<DomainEventsInterceptor>();
+            services.AddScoped(sp => new DomainEventsInterceptor(
+                sp.GetRequiredService<IDomainEventDispatcher>(),
+                sp.GetRequiredService<PostCommitActions>(),
+                sp.GetRequiredService<ILogger<DomainEventsInterceptor>>()));
             services.AddScoped(sp => new SaveDurabilityInterceptor(sp.GetRequiredService<PostCommitActions>()));
 
             services.AddDbContext<ApplicationDbContext>((sp, optionsBuilder) =>

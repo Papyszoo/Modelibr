@@ -729,14 +729,7 @@ public class PostCommitBoundaryIntegrationTests
 
             nestedContext.Settings.Add(row);
             _failNextSave.Arm();
-            try
-            {
-                await nestedUnitOfWork.SaveChangesAsync(ct);
-            }
-            finally
-            {
-                nestedContext.Entry(row).State = EntityState.Detached;
-            }
+            await nestedUnitOfWork.SaveChangesAsync(ct);
         });
 
     private static EnvironmentMap NewEnvironmentMap()

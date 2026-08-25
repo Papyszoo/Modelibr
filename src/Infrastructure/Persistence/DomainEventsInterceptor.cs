@@ -43,13 +43,25 @@ public sealed class DomainEventsInterceptor : SaveChangesInterceptor
     private const int MaxDispatchRounds = 10;
 
     private readonly IDomainEventDispatcher _dispatcher;
+    private readonly PostCommitActions _actions;
     private readonly ILogger<DomainEventsInterceptor> _logger;
     private int _dispatchDepth;
 
-    public DomainEventsInterceptor(IDomainEventDispatcher dispatcher, ILogger<DomainEventsInterceptor> logger)
+    internal DomainEventsInterceptor(
+        IDomainEventDispatcher dispatcher,
+        PostCommitActions actions,
+        ILogger<DomainEventsInterceptor> logger)
     {
         _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
+        _actions = actions ?? throw new ArgumentNullException(nameof(actions));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    public DomainEventsInterceptor(
+        IDomainEventDispatcher dispatcher,
+        ILogger<DomainEventsInterceptor> logger)
+        : this(dispatcher, new PostCommitActions(), logger)
+    {
     }
 
     public override async ValueTask<int> SavedChangesAsync(
@@ -103,7 +115,18 @@ public sealed class DomainEventsInterceptor : SaveChangesInterceptor
             aggregate.ClearDomainEvents();
         }
 
-        await _dispatcher.PublishAsync(domainEvents, cancellationToken);
+        var publishResult = await _dispatcher.PublishAsync(domainEvents, cancellationToken);
+        if (publishResult.IsFailure)
+        {
+            _logger.LogWarning(
+                "Domain event dispatch failed: {ErrorCode} - {ErrorMessage}. Discarding unsaved change tracker entries and post-commit tail.",
+                publishResult.Error.Code,
+                publishResult.Error.Message);
+
+            ClearUnsavedEntries(context);
+            _actions.DiscardUnsaved();
+            return;
+        }
 
         // A handler may have staged further writes while reacting to the
         // event (e.g. ModelUploadedEventHandler enqueuing a ThumbnailJob).
@@ -114,6 +137,23 @@ public sealed class DomainEventsInterceptor : SaveChangesInterceptor
         if (context.ChangeTracker.HasChanges())
         {
             await context.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    private static void ClearUnsavedEntries(DbContext context)
+    {
+        foreach (var entry in context.ChangeTracker.Entries().ToList())
+        {
+            switch (entry.State)
+            {
+                case EntityState.Added:
+                    entry.State = EntityState.Detached;
+                    break;
+                case EntityState.Modified:
+                case EntityState.Deleted:
+                    entry.State = EntityState.Unchanged;
+                    break;
+            }
         }
     }
 }
