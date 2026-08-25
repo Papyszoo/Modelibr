@@ -102,16 +102,28 @@ internal sealed class RequestBlenderOperationCommandHandler
             // the glb job's id would silently give the caller a format it did not ask for.
             // The dedup key is (operation, version) and widening it is a schema change, so
             // the ambiguity is refused here instead of being answered wrongly.
-            var live = BlenderOperationSpecs.ConvertTarget(existing.ParametersJson);
-            var wanted = BlenderOperationSpecs.ConvertTarget(parameters.Value);
-            if (operation == BlenderOperations.ConvertFormat
-                && live is not null && wanted is not null
-                && !string.Equals(live, wanted, StringComparison.Ordinal))
+            if (operation == BlenderOperations.ConvertFormat)
             {
-                return Result.Failure<BlenderOperationRequested>(new Error(
-                    "Blender.ConversionInFlight",
-                    $"Version {version.Id} is already being converted to {live}. Wait for job {existing.Id} " +
-                    $"(get_job_status), then ask for {wanted}."));
+                var live = BlenderOperationSpecs.ConvertTarget(existing.ParametersJson);
+                var wanted = BlenderOperationSpecs.ConvertTarget(parameters.Value);
+
+                // `wanted` came out of the validator a line ago, so it is never null. A null
+                // `live` means the live job's parameters cannot be read at all - a row from
+                // before this operation was validated - and that is a reason to refuse, not
+                // to treat it as a match. Requiring both to be non-null before comparing sent
+                // exactly the unintelligible case down the AlreadyQueued path, handing the
+                // caller a job id for a format nobody can name.
+                if (!string.Equals(live, wanted, StringComparison.Ordinal))
+                {
+                    return Result.Failure<BlenderOperationRequested>(new Error(
+                        "Blender.ConversionInFlight",
+                        live is null
+                            ? $"Version {version.Id} already has conversion job {existing.Id} queued and its target " +
+                              $"format cannot be read, so it cannot be told apart from a request for {wanted}. " +
+                              "Wait for that job to finish (get_job_status), then ask again."
+                            : $"Version {version.Id} is already being converted to {live}. Wait for job {existing.Id} " +
+                              $"(get_job_status), then ask for {wanted}."));
+                }
             }
 
             return Result.Success(new BlenderOperationRequested(

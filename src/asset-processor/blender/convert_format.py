@@ -128,9 +128,12 @@ def main():
 
     import_model(options["input"], fail, verb="convert")
 
-    meshes = mesh_objects()
+    # with_faces, because a conversion whose only meshes are loose vertices exports a
+    # file with no surface in it - and to STL, which stores triangles and nothing else,
+    # an empty one. Reporting success for that is worse than refusing.
+    meshes = mesh_objects(with_faces=True)
     if not meshes:
-        fail("The input contains no mesh objects to convert.")
+        fail("The input contains no mesh with any faces to convert.")
 
     directory = os.path.dirname(options["output"])
     if directory:

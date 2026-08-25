@@ -472,6 +472,49 @@ public class RequestBlenderOperationCommandTests
     }
 
     [Fact]
+    public async Task A_Live_Conversion_Whose_Target_Cannot_Be_Read_Is_Refused_Not_Matched()
+    {
+        // `convert-format` had no validator case before it was implemented, so a request
+        // then fell through to "store the caller's JSON verbatim" and a live row can carry
+        // a format that is not even a string. Requiring a readable target on BOTH sides
+        // before comparing sent exactly that row down the already-queued path - the caller
+        // gets a job id for a format nobody can name, which is the outcome the comparison
+        // exists to prevent.
+        var live = ExtractionJob.CreateOperation(
+            "Model", 42, ExtractorFamilies.Blender, BlenderOperations.ConvertFormat, Now,
+            parametersJson: "{\"format\":5}", versionId: 7);
+        var jobs = Jobs();
+        jobs.Setup(r => r.GetLiveJobAsync(
+                "Model", 42, 7, ExtractorFamilies.Blender, BlenderOperations.ConvertFormat,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(live);
+        var handler = Handler(jobs: jobs);
+
+        var result = await handler.Handle(
+            new RequestBlenderOperationCommand(
+                42, BlenderOperations.ConvertFormat, ParametersJson: "{\"format\": \"glb\"}"),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Blender.ConversionInFlight", result.Error.Code);
+        jobs.Verify(r => r.AddAsync(It.IsAny<ExtractionJob>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData("{\"format\":5}")]
+    [InlineData("{\"format\":true}")]
+    [InlineData("{\"format\":null}")]
+    [InlineData("{\"format\":[\"glb\"]}")]
+    [InlineData("not json at all")]
+    public void An_Unreadable_Stored_Target_Reads_As_Nothing_Rather_Than_Throwing(string stored)
+    {
+        // Reading a stored blob must not be able to leave the handler. GetValue<string> on
+        // a JSON number throws InvalidOperationException, which the JsonException catch
+        // around it never covered.
+        Assert.Null(BlenderOperationSpecs.ConvertTarget(stored));
+    }
+
+    [Fact]
     public async Task Asking_For_The_SAME_Conversion_Twice_Still_Costs_One_Run()
     {
         var live = ExtractionJob.CreateOperation(

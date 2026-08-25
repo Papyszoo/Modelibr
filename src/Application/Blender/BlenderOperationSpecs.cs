@@ -373,13 +373,24 @@ public static class BlenderOperationSpecs
         return Result.Success(new JsonObject { ["format"] = format }.ToJsonString());
     }
 
-    /// <summary>The target format a normalised convert-format parameter blob asks for.</summary>
+    /// <summary>The target format a stored convert-format parameter blob asks for.</summary>
+    /// <remarks>
+    /// Reads a blob this validator did not necessarily write. Before <c>convert-format</c>
+    /// had a case above it fell through to "store the caller's JSON verbatim", so a row
+    /// carrying <c>{"format": 5}</c> is possible, and a job queued then can still be live.
+    /// The kind is therefore checked rather than the value being asked for: <c>GetValue</c>
+    /// on a number throws <c>InvalidOperationException</c>, which is not a
+    /// <c>JsonException</c> and would have left the handler instead of returning null.
+    /// </remarks>
     public static string? ConvertTarget(string? parametersJson)
     {
         if (string.IsNullOrWhiteSpace(parametersJson)) return null;
         try
         {
-            return (JsonNode.Parse(parametersJson) as JsonObject)?["format"]?.GetValue<string>();
+            var format = (JsonNode.Parse(parametersJson) as JsonObject)?["format"];
+            return format?.GetValueKind() == JsonValueKind.String
+                ? format.GetValue<string>()
+                : null;
         }
         catch (JsonException)
         {
