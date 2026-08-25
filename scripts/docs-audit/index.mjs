@@ -272,6 +272,110 @@ const manifestOutputs = [...read("docs/videos/video-manifest.js").matchAll(
     );
 }
 
+// ── Check 8: the MCP page lists every registered MCP tool ─────────────────
+// The tool tables on the MCP page are what an operator reads to decide whether
+// to turn writes on, and what an agent author reads to know what exists. They
+// had drifted by six tools - one read (get_store_import) and five writes
+// (create_room, place_primitive, set_lighting_preset, delete_scene,
+// convert_model) - and both prose counts were stale by more than the drift.
+// A tool is registered in C# and documented in Markdown by two different
+// hands, so nothing but a check keeps them together.
+//
+// Source of truth: the [McpServerTool(Name = "…")] attributes, split into read
+// and write by which classes Program.cs registers behind MCP_WRITE_ENABLED.
+{
+    const mcpDir = "src/WebApi/Mcp";
+    const toolFiles = fs
+        .readdirSync(path.join(repoRoot, mcpDir))
+        .filter((f) => f.endsWith(".cs"));
+
+    // Everything inside the `if (mcpWriteEnabled)` block is a write tool type;
+    // everything registered before it is a read.
+    const program = read("src/WebApi/Program.cs");
+    const writeBlock =
+        program.match(/if \(mcpWriteEnabled\)\s*\{([\s\S]*?)\n {16}\}/)?.[1] ?? "";
+    const writeTypes = new Set(
+        [...writeBlock.matchAll(/WithTools<WebApi\.Mcp\.(\w+)>/g)].map((m) => m[1]),
+    );
+
+    const readTools = new Set();
+    const writeTools = new Set();
+    for (const file of toolFiles) {
+        const source = read(path.join(mcpDir, file));
+        // Split the file at each tool-type class so a tool is attributed to the
+        // class it lives in, not to the first one in the file.
+        const classes = [
+            ...source.matchAll(/public sealed class (\w+)/g),
+        ].map((m) => ({ name: m[1], at: m.index }));
+        for (let i = 0; i < classes.length; i++) {
+            const body = source.slice(
+                classes[i].at,
+                i + 1 < classes.length ? classes[i + 1].at : source.length,
+            );
+            const names = [
+                ...body.matchAll(/McpServerTool\(Name = "([a-z_]+)"/g),
+            ].map((m) => m[1]);
+            const into = writeTypes.has(classes[i].name) ? writeTools : readTools;
+            for (const n of names) into.add(n);
+        }
+    }
+
+    check(
+        readTools.size > 0 && writeTools.size > 0,
+        "MCP tool registry parsed",
+        `found ${readTools.size} read and ${writeTools.size} write tools - Mcp/ or Program.cs layout changed? Update scripts/docs-audit.`,
+    );
+
+    const mcpPage = read("docs/docs/features/mcp-server.md");
+    const documented = new Set(
+        [...mcpPage.matchAll(/^\| `([a-z_]+)`/gm)].map((m) => m[1]),
+    );
+
+    const undocumentedReads = [...readTools].filter((t) => !documented.has(t));
+    check(
+        undocumentedReads.length === 0,
+        "mcp-server.md lists every read tool",
+        `registered but not in a table: ${undocumentedReads.join(", ")}`,
+    );
+
+    const undocumentedWrites = [...writeTools].filter((t) => !documented.has(t));
+    check(
+        undocumentedWrites.length === 0,
+        "mcp-server.md lists every write tool",
+        `registered but not in a table: ${undocumentedWrites.join(", ")}`,
+    );
+
+    // The counts in prose. Spelled out in words on the page, so the check reads
+    // them the same way rather than asking the page to carry a digit.
+    const words = [
+        "zero", "one", "two", "three", "four", "five", "six", "seven", "eight",
+        "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen",
+        "sixteen", "seventeen", "eighteen", "nineteen", "twenty",
+    ];
+    const spell = (n) => {
+        if (n <= 20) return words[n];
+        const tens = [
+            "", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy",
+            "eighty", "ninety",
+        ][Math.floor(n / 10)];
+        return n % 10 === 0 ? tens : `${tens}-${words[n % 10]}`;
+    };
+
+    const readClaim = mcpPage.match(/These ([a-z-]+) read tools are always available/)?.[1];
+    check(
+        readClaim === spell(readTools.size),
+        "mcp-server.md counts the read tools correctly",
+        `page says "${readClaim}", ${readTools.size} are registered (${spell(readTools.size)})`,
+    );
+
+    const writeClaim = mcpPage.match(/and ([a-z-]+) more tools appear/)?.[1];
+    check(
+        writeClaim === spell(writeTools.size),
+        "mcp-server.md counts the write tools correctly",
+        `page says "${writeClaim}", ${writeTools.size} are registered (${spell(writeTools.size)})`,
+    );
+}
+
 // ── Report ──────────────────────────────────────────────────────────────────
 for (const p of passes) console.log(`✓ ${p}`);
 for (const w of warnings) console.warn(`⚠ ${w}`);
