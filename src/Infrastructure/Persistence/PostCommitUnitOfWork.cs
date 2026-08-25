@@ -21,8 +21,20 @@ namespace Infrastructure.Persistence;
 /// with nothing to do with persistence configuration. Wrapping keeps the context's
 /// constructor as EF expects it and keeps "when do side effects fire" in one readable place.
 /// A caller that resolves <c>ApplicationDbContext</c> directly and saves through it bypasses
-/// the drain - which is harmless, because such a caller has no way to enqueue an action
-/// either; <see cref="IPostCommitActions"/> is only reachable from the handlers that inject it.
+/// the DRAIN - it cannot enqueue an action either, since <see cref="IPostCommitActions"/> is
+/// only reachable from the handlers that inject it. It does NOT bypass the CLAIM: since the
+/// claim moved into <see cref="SaveDurabilityInterceptor"/>, every save on this context
+/// advances the ownership boundary, including the ones the two permanently self-committing
+/// repositories make and the flush <see cref="DomainEventsInterceptor"/> performs after
+/// dispatch. That is correct rather than incidental - a save flushes the whole change
+/// tracker, so when it reports durability every staged row is down, including the ones the
+/// queued actions describe. The one shape it does not cover is a repository running its own
+/// <c>BeginTransactionAsync</c> and rolling it back
+/// (<c>ThumbnailJobRepository.GetNextPendingJobAsync</c>): its inner save claims, and the
+/// rollback undoes rows the boundary now says are safe. That is unreachable today, because
+/// the only scope that calls it is a worker claiming a job and it queues no actions - but a
+/// NEW self-committing repository that both rolls back and shares a scope with queued
+/// effects would make it reachable. Give a new repository <c>IUnitOfWork</c>.
 /// </para>
 /// <para>
 /// A THROW IS NOT A ROLLBACK. This used to assume it was, and discarded the queued effects for

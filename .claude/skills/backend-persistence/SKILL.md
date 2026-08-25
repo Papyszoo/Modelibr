@@ -91,7 +91,11 @@ description: Modelibr EF Core persistence rules - the IUnitOfWork contract (repo
   is also where the queue CHANGES HANDS. Domain events dispatch from `SavedChangesAsync` and
   their handlers save through the same scoped UoW, so a save claims its queue prefix at the
   durability instant, before anything can re-enter - a nested save that then fails takes back
-  only its own tail, never the outer save's effects for a row already on disk. Inside an
+  only its own tail, never the outer save's effects for a row already on disk. Note what that
+  widens: **every** save on the context now moves the boundary, including the two permanent
+  self-committers'. That is right - a save flushes the whole change tracker - but a NEW
+  repository that opens its own transaction AND rolls it back would break it, which is one
+  more reason to give a new repository `IUnitOfWork` instead. Inside an
   explicit transaction the COMMIT, not the save, is the durability point. The drain always runs on
   `CancellationToken.None`: once the write is durable the request's token governs nothing and
   a client hanging up must not silence the only notification a worker gets. A rollback
