@@ -66,6 +66,7 @@ public static class BlenderOperationSpecs
             BlenderOperations.UvUnwrap => NormalizeUvUnwrap(supplied),
             BlenderOperations.BakeTextures => NormalizeBakeTextures(supplied),
             BlenderOperations.MeshAnalysis => NormalizeMeshAnalysis(supplied),
+            BlenderOperations.ConvertFormat => NormalizeConvertFormat(supplied),
             _ => Result.Success(supplied.ToJsonString())
         };
     }
@@ -306,6 +307,84 @@ public static class BlenderOperationSpecs
         {
             ["overlapSamples"] = overlapSamples
         }.ToJsonString());
+    }
+
+    /// <summary>
+    /// The formats a conversion can write, and why the list is this short.
+    /// </summary>
+    /// <remarks>
+    /// The converted file is uploaded as a NEW MODEL VERSION, and a version is one file.
+    /// That rules out every format whose content lives partly in a sidecar: `.obj` keeps its
+    /// materials in a `.mtl`, and `.gltf` keeps its geometry in a `.bin`. Either would arrive
+    /// stripped of whatever the sidecar held, which is a silent, plausible-looking loss - a
+    /// model that imports fine and is grey.
+    ///
+    /// glTF's single-file form is GLB, which is here. `GLTF_EMBEDDED` is NOT an escape from
+    /// this: Blender deprecated it and 5.x removed it (`export_format` now offers only GLB
+    /// and GLTF_SEPARATE), so a `gltf` target would work against one user's Blender install
+    /// and fail against another's. Blender has no 3MF exporter at all.
+    /// </remarks>
+    private static readonly Dictionary<string, string> ConvertTargets = new(StringComparer.Ordinal)
+    {
+        ["glb"] = "glTF Binary",
+        ["fbx"] = "Autodesk FBX",
+        ["stl"] = "Stereolithography STL"
+    };
+
+    /// <summary>
+    /// A format we can read but deliberately will not write, and the reason, so the refusal
+    /// answers "why not" rather than only "no".
+    /// </summary>
+    private static readonly Dictionary<string, string> RefusedTargets = new(StringComparer.Ordinal)
+    {
+        ["gltf"] = "a .gltf keeps its geometry in a sidecar .bin, and a model version is one file. Convert to 'glb' - it is the same format in one file.",
+        ["obj"] = "an .obj keeps its materials in a sidecar .mtl, and a model version is one file, so the result would import grey. Convert to 'glb' or 'fbx'.",
+        ["3mf"] = "Blender has no 3MF exporter."
+    };
+
+    /// <summary>
+    /// The single target format a conversion writes.
+    /// </summary>
+    private static Result<string> NormalizeConvertFormat(JsonObject supplied)
+    {
+        var format = (supplied["format"]?.GetValue<string>() ?? string.Empty)
+            .Trim().TrimStart('.').ToLowerInvariant();
+
+        if (format.Length == 0)
+        {
+            return Result.Failure<string>(new Error(
+                "Blender.InvalidParameters",
+                $"format is required. Convertible to: {string.Join(", ", ConvertTargets.Keys.Order())}."));
+        }
+
+        if (RefusedTargets.TryGetValue(format, out var why))
+        {
+            return Result.Failure<string>(new Error(
+                "Blender.InvalidParameters", $"Cannot convert to '{format}': {why}"));
+        }
+
+        if (!ConvertTargets.ContainsKey(format))
+        {
+            return Result.Failure<string>(new Error(
+                "Blender.InvalidParameters",
+                $"Unknown target format '{format}'. Convertible to: {string.Join(", ", ConvertTargets.Keys.Order())}."));
+        }
+
+        return Result.Success(new JsonObject { ["format"] = format }.ToJsonString());
+    }
+
+    /// <summary>The target format a normalised convert-format parameter blob asks for.</summary>
+    public static string? ConvertTarget(string? parametersJson)
+    {
+        if (string.IsNullOrWhiteSpace(parametersJson)) return null;
+        try
+        {
+            return (JsonNode.Parse(parametersJson) as JsonObject)?["format"]?.GetValue<string>();
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 
     /// <summary>

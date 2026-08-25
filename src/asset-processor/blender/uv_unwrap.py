@@ -23,6 +23,9 @@ import sys
 
 import bpy
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from model_io import enable_addon, import_model, mesh_objects  # noqa: E402
+
 
 def fail(message):
     """Print a clearly-marked error line and exit non-zero."""
@@ -84,64 +87,6 @@ def parse_args():
         fail(f"Unknown --method {parsed['method']}; expected 'smart' or 'angle'.")
 
     return parsed
-
-
-def enable_addon(module, operator_owner, operator_name):
-    """Enable an importer/exporter addon if its operator is not already present."""
-    if hasattr(operator_owner, operator_name):
-        return
-    try:
-        import addon_utils
-
-        addon_utils.enable(module, default_set=True, persistent=True)
-    except Exception as exc:  # noqa: BLE001
-        fail(f"Could not enable the {module} addon: {exc}")
-    if not hasattr(operator_owner, operator_name):
-        fail(f"{module} is unavailable in this Blender build.")
-
-
-def import_model(path):
-    """Import the input file by extension into the current (empty) scene."""
-    if not os.path.exists(path):
-        fail(f"Input file does not exist: {path}")
-
-    extension = os.path.splitext(path)[1].lower()
-
-    if extension in (".glb", ".gltf"):
-        enable_addon("io_scene_gltf2", bpy.ops.import_scene, "gltf")
-        bpy.ops.import_scene.gltf(filepath=path)
-    elif extension == ".fbx":
-        enable_addon("io_scene_fbx", bpy.ops.import_scene, "fbx")
-        bpy.ops.import_scene.fbx(filepath=path)
-    elif extension == ".obj":
-        # Blender 4.x ships the fast C++ importer as wm.obj_import; 3.x has
-        # import_scene.obj. Prefer whichever this build actually has.
-        if hasattr(bpy.ops.wm, "obj_import"):
-            bpy.ops.wm.obj_import(filepath=path)
-        else:
-            enable_addon("io_scene_obj", bpy.ops.import_scene, "obj")
-            bpy.ops.import_scene.obj(filepath=path)
-    elif extension == ".stl":
-        if hasattr(bpy.ops.wm, "stl_import"):
-            bpy.ops.wm.stl_import(filepath=path)
-        else:
-            enable_addon("io_mesh_stl", bpy.ops.import_mesh, "stl")
-            bpy.ops.import_mesh.stl(filepath=path)
-    elif extension == ".dae":
-        bpy.ops.wm.collada_import(filepath=path)
-    elif extension == ".blend":
-        bpy.ops.wm.open_mainfile(filepath=path)
-        if not bpy.data.filepath:
-            fail("Input .blend did not load - Blender fell back to the startup scene.")
-    else:
-        fail(
-            f"Cannot unwrap a {extension or 'file with no extension'}: no importer for it. "
-            "Supported: .glb, .gltf, .fbx, .obj, .stl, .dae, .blend."
-        )
-
-
-def mesh_objects():
-    return [o for o in bpy.context.scene.objects if o.type == "MESH" and o.data is not None]
 
 
 def target_uv_layer(mesh, channel_name, lightmap):
@@ -226,7 +171,7 @@ def unwrap_object(obj, options):
 
 
 def export_glb(path):
-    enable_addon("io_scene_gltf2", bpy.ops.export_scene, "gltf")
+    enable_addon("io_scene_gltf2", bpy.ops.export_scene, "gltf", fail)
     directory = os.path.dirname(path)
     if directory:
         os.makedirs(directory, exist_ok=True)
@@ -248,7 +193,7 @@ def main():
     # Empty scene: no default cube to export alongside the model.
     bpy.ops.wm.read_factory_settings(use_empty=True)
 
-    import_model(options["input"])
+    import_model(options["input"], fail, verb="unwrap")
 
     meshes = mesh_objects()
     if not meshes:

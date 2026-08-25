@@ -167,15 +167,16 @@ describe('BlenderOperationProcessor', () => {
   })
 
   it('fails an operation it does not implement rather than reporting success', async () => {
-    // Was bake-textures until the bake shipped. convert-format is still queued-but-refused,
-    // which is what this guards: the queue accepts the whole family, the worker implements
-    // part of it, and the gap has to be reported rather than reported as success.
-    await processor.process({ ...job, operation: 'convert-format' })
+    // Was bake-textures, then convert-format; both have since shipped, so this now uses a
+    // name the family does not contain. The guard itself is what matters and has not
+    // changed: the queue can hand this worker an operation an older build does not know,
+    // and the gap has to be reported as a failure rather than as success.
+    await processor.process({ ...job, operation: 'decimate-mesh' })
 
     const [, , success, errorMessage] =
       processor.jobApi.finishExtractionJob.mock.calls[0]
     expect(success).toBe(false)
-    expect(errorMessage).toContain('convert-format')
+    expect(errorMessage).toContain('decimate-mesh')
   })
 
   it('survives parameters it cannot parse', async () => {
@@ -600,5 +601,168 @@ describe('BlenderOperationProcessor - mesh-analysis', () => {
     await processor.process(job)
 
     expect(processor.jobApi.storeComputeResult).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * The conversion. Blender is stubbed; what is under test is what becomes of its output -
+ * that it lands as a new INACTIVE version like an unwrap's, that the file is named for the
+ * format it now is, and that the format's known losses reach the job instead of being
+ * dropped between the script and the queue.
+ */
+describe('BlenderOperationProcessor - convert-format', () => {
+  let processor
+  let blenderEnabledBefore
+
+  const job = {
+    id: 9,
+    assetType: 'Model',
+    assetId: 42,
+    versionId: 7,
+    operation: 'convert-format',
+    parametersJson: JSON.stringify({ format: 'glb' }),
+  }
+
+  beforeEach(() => {
+    blenderEnabledBefore = config.blender.enabled
+    config.blender.enabled = true
+
+    processor = new BlenderOperationProcessor()
+    processor.modelFileService = {
+      fetchModelFileWithAuxiliaries: vi.fn().mockResolvedValue({
+        filePath: '/tmp/work-chair/chair.fbx',
+        fileType: 'fbx',
+        originalFileName: 'chair.fbx',
+        workDir: '/tmp/work-chair',
+        auxiliaryCount: 0,
+      }),
+      cleanupFile: vi.fn().mockResolvedValue(undefined),
+      cleanupDirectory: vi.fn().mockResolvedValue(undefined),
+    }
+    processor.jobApi = {
+      dequeueExtractionJob: vi.fn().mockResolvedValue(null),
+      finishExtractionJob: vi.fn().mockResolvedValue(undefined),
+      createModelVersion: vi
+        .fn()
+        .mockResolvedValue({ versionId: 21, versionNumber: 2, fileId: 8 }),
+    }
+    processor.runBlender = vi.fn().mockResolvedValue({
+      format: 'glb',
+      sourceFormat: 'fbx',
+      meshCount: 3,
+      blenderVersion: '5.1.1',
+      inputSizeBytes: 12188,
+      outputSizeBytes: 4096,
+    })
+  })
+
+  afterEach(() => {
+    config.blender.enabled = blenderEnabledBefore
+  })
+
+  it('stores the conversion as a new INACTIVE version', async () => {
+    // Same rule as an unwrap: promoting it would change what every scene referencing this
+    // model renders, on the strength of a conversion nobody has looked at.
+    await processor.process(job)
+
+    expect(processor.jobApi.createModelVersion).toHaveBeenCalledWith(
+      42,
+      expect.stringContaining('convert-format-9'),
+      'chair.glb',
+      expect.stringContaining('version 7'),
+      false
+    )
+  })
+
+  it('asks Blender for the target format the job carries', async () => {
+    await processor.process(job)
+
+    const [script, args, prefix] = processor.runBlender.mock.calls[0]
+    expect(script).toBe('convert_format.py')
+    expect(prefix).toBe('CONVERT_FORMAT')
+    expect(args).toContain('--format')
+    expect(args[args.indexOf('--format') + 1]).toBe('glb')
+    // With its siblings: a loose glTF without its .bin converts to a valid file of nothing.
+    expect(
+      processor.modelFileService.fetchModelFileWithAuxiliaries
+    ).toHaveBeenCalledWith(42, 7)
+  })
+
+  it('reports both formats and the new version id back on the job', async () => {
+    await processor.process(job)
+
+    const [, , success, error, warning, resultJson] =
+      processor.jobApi.finishExtractionJob.mock.calls[0]
+    expect(success).toBe(true)
+    expect(error).toBeNull()
+    expect(warning).toBeNull()
+
+    const result = JSON.parse(resultJson)
+    expect(result.operation).toBe('convert-format')
+    expect(result.versionId).toBe(21)
+    expect(result.sourceVersionId).toBe(7)
+    expect(result.format).toBe('glb')
+    expect(result.sourceFormat).toBe('fbx')
+    expect(result.fileName).toBe('chair.glb')
+    expect(result.setAsActive).toBe(false)
+  })
+
+  it("carries the format's known losses through to the job", async () => {
+    // An STL that arrives grey and unrigged is the expected result, not a bug - but only
+    // if the job said so. Swallowing the warning is what would make it look like one.
+    processor.runBlender = vi.fn().mockResolvedValue({
+      format: 'stl',
+      sourceFormat: 'fbx',
+      meshCount: 3,
+      inputSizeBytes: 12188,
+      outputSizeBytes: 900,
+      warning: 'STL carries geometry only',
+    })
+
+    await processor.process({
+      ...job,
+      parametersJson: JSON.stringify({ format: 'stl' }),
+    })
+
+    const [, , success, , warning] =
+      processor.jobApi.finishExtractionJob.mock.calls[0]
+    expect(success).toBe(true)
+    expect(warning).toBe('STL carries geometry only')
+  })
+
+  it('refuses a conversion job that carries no target format', async () => {
+    // The backend validator makes this unreachable; if it ever is reached, guessing a
+    // format would write a version the caller never asked for.
+    await processor.process({ ...job, parametersJson: '{}' })
+
+    const [, , success, errorMessage] =
+      processor.jobApi.finishExtractionJob.mock.calls[0]
+    expect(success).toBe(false)
+    expect(errorMessage).toContain('no target format')
+    expect(processor.jobApi.createModelVersion).not.toHaveBeenCalled()
+  })
+
+  it('reports a failed Blender run instead of writing a version', async () => {
+    processor.runBlender = vi
+      .fn()
+      .mockRejectedValue(
+        new Error('Blender convert_format.py failed (exit 1): no mesh objects')
+      )
+
+    await processor.process(job)
+
+    const [, , success, errorMessage] =
+      processor.jobApi.finishExtractionJob.mock.calls[0]
+    expect(success).toBe(false)
+    expect(errorMessage).toContain('no mesh objects')
+    expect(processor.jobApi.createModelVersion).not.toHaveBeenCalled()
+  })
+
+  it('names the converted file for the format it now is', () => {
+    // The extension IS the difference, so no suffix: chair.fbx becomes chair.glb, which
+    // reads correctly in the version list.
+    expect(processor.convertedFileName('chair.fbx', 'glb')).toBe('chair.glb')
+    expect(processor.convertedFileName('chair.glb', 'stl')).toBe('chair.stl')
+    expect(processor.convertedFileName('', 'glb')).toBe('model.glb')
   })
 })

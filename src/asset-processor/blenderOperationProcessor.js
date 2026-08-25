@@ -149,6 +149,8 @@ export class BlenderOperationProcessor {
         return await this.bake(job, jobLogger)
       case 'mesh-analysis':
         return await this.analyse(job, jobLogger)
+      case 'convert-format':
+        return await this.convert(job, jobLogger)
       default:
         throw new Error(
           `The '${job.operation}' operation is queued but not implemented yet in this worker.`
@@ -230,6 +232,94 @@ export class BlenderOperationProcessor {
           // binds a lightmap to. The name is Blender's own and does not survive export.
           uvChannelIndices: result.channelIndices,
           channelName: result.channelName,
+          note: 'Written as a new, inactive version. Review it, then set it active to use it.',
+        },
+      }
+    } finally {
+      await fs.promises.unlink(outputPath).catch(() => {})
+      await this.modelFileService
+        .cleanupDirectory(source.workDir)
+        .catch(() => {})
+    }
+  }
+
+  /**
+   * Convert a model version to another file format, stored as a NEW version.
+   *
+   * Same rule as an unwrap, for the same reason: the user's file is what they uploaded, and
+   * the new version is NOT made active - promoting it would change what every scene
+   * referencing this model renders, on the strength of a conversion nobody has looked at.
+   *
+   * The target is always a single-file format. The version this writes holds one file, so a
+   * `.gltf` (geometry in a sidecar .bin) or an `.obj` (materials in a sidecar .mtl) would
+   * arrive stripped; the backend validator refuses both and says which single-file format to
+   * ask for instead.
+   */
+  async convert(job, jobLogger) {
+    const parameters = this.parameters(job)
+    const format = parameters.format
+    if (!format) {
+      throw new Error(
+        'The conversion job carries no target format. It was queued without one, which the ' +
+          'backend validator should have refused.'
+      )
+    }
+
+    // With its siblings: Blender follows the references inside the file itself, so a loose
+    // glTF without its .bin has no geometry and an OBJ without its .mtl has no materials -
+    // and converting either of those would produce a valid file of nothing.
+    const source = await this.modelFileService.fetchModelFileWithAuxiliaries(
+      job.assetId,
+      job.versionId
+    )
+
+    const outputPath = path.join(
+      os.tmpdir(),
+      `convert-format-${job.id}-${Date.now()}.${format}`
+    )
+
+    try {
+      const result = await this.runBlender(
+        'convert_format.py',
+        [
+          '--input',
+          source.filePath,
+          '--output',
+          outputPath,
+          '--format',
+          format,
+        ],
+        'CONVERT_FORMAT',
+        jobLogger
+      )
+
+      const fileName = this.convertedFileName(source.originalFileName, format)
+      // Creating the version raises ModelUploadedEvent, so the converted file is
+      // thumbnailed and indexed by the ordinary upload pass - nothing here touches
+      // search or thumbnails directly.
+      const created = await this.jobApi.createModelVersion(
+        job.assetId,
+        outputPath,
+        fileName,
+        `Converted to ${format.toUpperCase()} with Blender from version ${job.versionId}.`,
+        false
+      )
+
+      return {
+        warning: result.warning || null,
+        payload: {
+          operation: 'convert-format',
+          modelId: job.assetId,
+          sourceVersionId: job.versionId,
+          versionId: created?.versionId ?? null,
+          versionNumber: created?.versionNumber ?? null,
+          setAsActive: false,
+          format: result.format,
+          sourceFormat: result.sourceFormat,
+          fileName,
+          meshCount: result.meshCount,
+          inputSizeBytes: result.inputSizeBytes,
+          outputSizeBytes: result.outputSizeBytes,
           note: 'Written as a new, inactive version. Review it, then set it active to use it.',
         },
       }
@@ -656,6 +746,23 @@ export class BlenderOperationProcessor {
       .trim()
     const suffix = parameters.lightmap ? 'lightmap-uvs' : 'uvs'
     return `${base || 'model'}-${suffix}.glb`
+  }
+
+  /**
+   * Names the converted file after the source, with the new extension.
+   *
+   * Deliberately keeps the base name rather than adding a suffix: the extension IS the
+   * difference here, and `chair.fbx` becoming `chair.glb` reads correctly in the version
+   * list. An unwrap needs a suffix because its output shares the source's extension.
+   */
+  convertedFileName(originalFileName, format) {
+    const base = path
+      .basename(
+        originalFileName || 'model',
+        path.extname(originalFileName || '')
+      )
+      .trim()
+    return `${base || 'model'}.${format}`
   }
 
   versionDescription(job, parameters) {

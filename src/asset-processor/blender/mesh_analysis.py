@@ -33,6 +33,7 @@ import bpy
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from geometry_hash import GEOMETRY_HASH_VERSION, hash_geometry  # noqa: E402
+from model_io import import_model  # noqa: E402
 
 
 def fail(message):
@@ -67,37 +68,6 @@ def parse_args():
     if not parsed["input"]:
         fail("No --input path provided.")
     return parsed
-
-
-def import_model(path):
-    """Import by extension into the current (empty) scene. Mirrors the other scripts."""
-    if not os.path.exists(path):
-        fail(f"Input file does not exist: {path}")
-
-    extension = os.path.splitext(path)[1].lower()
-    try:
-        if extension in (".glb", ".gltf"):
-            bpy.ops.import_scene.gltf(filepath=path)
-        elif extension == ".fbx":
-            bpy.ops.import_scene.fbx(filepath=path)
-        elif extension == ".obj":
-            if hasattr(bpy.ops.wm, "obj_import"):
-                bpy.ops.wm.obj_import(filepath=path)
-            else:
-                bpy.ops.import_scene.obj(filepath=path)
-        elif extension == ".stl":
-            if hasattr(bpy.ops.wm, "stl_import"):
-                bpy.ops.wm.stl_import(filepath=path)
-            else:
-                bpy.ops.import_mesh.stl(filepath=path)
-        elif extension == ".dae":
-            bpy.ops.wm.collada_import(filepath=path)
-        elif extension == ".blend":
-            bpy.ops.wm.open_mainfile(filepath=path)
-        else:
-            fail(f"Cannot analyse a {extension or 'file with no extension'}: no importer for it.")
-    except RuntimeError as exc:
-        fail(f"Import failed: {exc}")
 
 
 def gltf_positions(mesh):
@@ -313,7 +283,7 @@ def main():
     version = ".".join(str(v) for v in bpy.app.version)
 
     bpy.ops.wm.read_factory_settings(use_empty=True)
-    import_model(options["input"])
+    import_model(options["input"], fail, verb="analyse")
 
     meshes = [
         o for o in bpy.context.scene.objects

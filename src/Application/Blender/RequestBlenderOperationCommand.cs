@@ -95,6 +95,25 @@ internal sealed class RequestBlenderOperationCommandHandler
             "Model", model.Id, version.Id, ExtractorFamilies.Blender, operation, cancellationToken);
         if (existing is not null)
         {
+            // A conversion is the one operation whose parameters change WHAT is produced
+            // rather than how well. Two unwraps of a version differing in margin are two
+            // attempts at one result, and handing back the live job is a fair answer; a
+            // convert to glb and a convert to fbx are two different files, and handing back
+            // the glb job's id would silently give the caller a format it did not ask for.
+            // The dedup key is (operation, version) and widening it is a schema change, so
+            // the ambiguity is refused here instead of being answered wrongly.
+            var live = BlenderOperationSpecs.ConvertTarget(existing.ParametersJson);
+            var wanted = BlenderOperationSpecs.ConvertTarget(parameters.Value);
+            if (operation == BlenderOperations.ConvertFormat
+                && live is not null && wanted is not null
+                && !string.Equals(live, wanted, StringComparison.Ordinal))
+            {
+                return Result.Failure<BlenderOperationRequested>(new Error(
+                    "Blender.ConversionInFlight",
+                    $"Version {version.Id} is already being converted to {live}. Wait for job {existing.Id} " +
+                    $"(get_job_status), then ask for {wanted}."));
+            }
+
             return Result.Success(new BlenderOperationRequested(
                 existing.Id, operation, model.Id, version.Id, AlreadyQueued: true));
         }

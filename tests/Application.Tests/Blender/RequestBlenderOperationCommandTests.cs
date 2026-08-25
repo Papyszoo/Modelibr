@@ -364,6 +364,136 @@ public class RequestBlenderOperationCommandTests
         jobs.Verify(r => r.AddAsync(It.IsAny<ExtractionJob>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    // ---- convert-format ---------------------------------------------------------
+
+    [Fact]
+    public async Task Queues_A_Conversion_With_The_Target_It_Was_Given()
+    {
+        var jobs = Jobs();
+        var handler = Handler(jobs: jobs);
+
+        var result = await handler.Handle(
+            new RequestBlenderOperationCommand(
+                42, BlenderOperations.ConvertFormat, ParametersJson: "{\"format\": \"FBX\"}"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        jobs.Verify(r => r.AddAsync(
+            It.Is<ExtractionJob>(j => j.ParametersJson!.Contains("\"format\":\"fbx\"")),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task A_Conversion_Needs_To_Be_Told_What_To_Convert_To()
+    {
+        // There is no sensible default. Picking glb for a caller who forgot would write a
+        // version they never asked for, and the job is not free.
+        var jobs = Jobs();
+        var handler = Handler(jobs: jobs);
+
+        var result = await handler.Handle(
+            new RequestBlenderOperationCommand(42, BlenderOperations.ConvertFormat),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Blender.InvalidParameters", result.Error.Code);
+        Assert.Contains("format is required", result.Error.Message);
+        jobs.Verify(r => r.AddAsync(It.IsAny<ExtractionJob>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData("gltf", ".bin")]
+    [InlineData("obj", ".mtl")]
+    public async Task Refuses_A_Target_Whose_Content_Would_Not_Fit_In_One_File(
+        string format, string sidecar)
+    {
+        // Blender can write both, and both would import looking fine and be wrong: a model
+        // version holds ONE file, so whatever the sidecar carried is simply gone. The
+        // refusal names the sidecar and the single-file format to ask for instead, because
+        // "unsupported" would send the caller looking for a Blender limitation.
+        var jobs = Jobs();
+        var handler = Handler(jobs: jobs);
+
+        var result = await handler.Handle(
+            new RequestBlenderOperationCommand(
+                42, BlenderOperations.ConvertFormat, ParametersJson: $"{{\"format\": \"{format}\"}}"),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Blender.InvalidParameters", result.Error.Code);
+        Assert.Contains(sidecar, result.Error.Message);
+        Assert.Contains("glb", result.Error.Message);
+        jobs.Verify(r => r.AddAsync(It.IsAny<ExtractionJob>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Refuses_A_Target_Format_That_Is_Not_A_Format()
+    {
+        var jobs = Jobs();
+        var handler = Handler(jobs: jobs);
+
+        var result = await handler.Handle(
+            new RequestBlenderOperationCommand(
+                42, BlenderOperations.ConvertFormat, ParametersJson: "{\"format\": \"usdz\"}"),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Blender.InvalidParameters", result.Error.Code);
+        Assert.Contains("fbx, glb, stl", result.Error.Message);
+    }
+
+    [Fact]
+    public async Task A_Second_Conversion_To_A_DIFFERENT_Format_Is_Refused_Not_Deduped()
+    {
+        // The dedup key is (operation, version), so the live glb job would be handed back
+        // for an fbx request - and the caller would collect a glb it did not ask for. Two
+        // unwraps differing in margin are two attempts at one result; glb and fbx are two
+        // different files, so the ambiguity is refused instead of answered wrongly.
+        var live = ExtractionJob.CreateOperation(
+            "Model", 42, ExtractorFamilies.Blender, BlenderOperations.ConvertFormat, Now,
+            parametersJson: "{\"format\":\"glb\"}", versionId: 7);
+        var jobs = Jobs();
+        jobs.Setup(r => r.GetLiveJobAsync(
+                "Model", 42, 7, ExtractorFamilies.Blender, BlenderOperations.ConvertFormat,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(live);
+        var handler = Handler(jobs: jobs);
+
+        var result = await handler.Handle(
+            new RequestBlenderOperationCommand(
+                42, BlenderOperations.ConvertFormat, ParametersJson: "{\"format\": \"fbx\"}"),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Blender.ConversionInFlight", result.Error.Code);
+        Assert.Contains("glb", result.Error.Message);
+        Assert.Contains("fbx", result.Error.Message);
+        jobs.Verify(r => r.AddAsync(It.IsAny<ExtractionJob>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Asking_For_The_SAME_Conversion_Twice_Still_Costs_One_Run()
+    {
+        var live = ExtractionJob.CreateOperation(
+            "Model", 42, ExtractorFamilies.Blender, BlenderOperations.ConvertFormat, Now,
+            parametersJson: "{\"format\":\"glb\"}", versionId: 7);
+        var jobs = Jobs();
+        jobs.Setup(r => r.GetLiveJobAsync(
+                "Model", 42, 7, ExtractorFamilies.Blender, BlenderOperations.ConvertFormat,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(live);
+        var handler = Handler(jobs: jobs);
+
+        var result = await handler.Handle(
+            new RequestBlenderOperationCommand(
+                42, BlenderOperations.ConvertFormat, ParametersJson: "{\"format\": \"glb\"}"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value.AlreadyQueued);
+        jobs.Verify(r => r.AddAsync(It.IsAny<ExtractionJob>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     // ---- fixtures ---------------------------------------------------------------
 
     private static Mock<IExtractionJobRepository> Jobs() => new();

@@ -30,14 +30,14 @@ public sealed class OperationJobReadMcpTools
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(2);
 
     [McpServerTool(Name = "get_job_status")]
-    [Description("Check a queued job - a Blender operation (generate_uvs) or a re-derive. Returns its status, and once it has finished, " +
-                 "what it produced: the new version id an unwrap wrote, the texture set a bake imported. " +
+    [Description("Check a queued job - a Blender operation (generate_uvs, bake_textures, analyze_meshes, convert_model) or a re-derive. Returns its status, and once it has finished, " +
+                 "what it produced: the new version id an unwrap or a conversion wrote, the texture set a bake imported, the measurements an analysis took. " +
                  "Pass waitSeconds to block until it finishes instead of polling in a loop; you get the current status if the wait runs out, " +
                  "and the job keeps running either way.")]
     public static async Task<object> GetJobStatus(
         IQueryHandler<GetOperationJobQuery, OperationJobView> handler,
         McpCallerContext caller,
-        [Description("Job id, as returned by generate_uvs or trigger_rederive.")] int jobId,
+        [Description("Job id, as returned by generate_uvs, bake_textures, analyze_meshes, convert_model or trigger_rederive.")] int jobId,
         [Description("Seconds to wait for the job to finish before answering. 0 (the default) answers immediately. Capped at 120.")] int waitSeconds = 0,
         CancellationToken cancellationToken = default)
     {
@@ -243,6 +243,62 @@ public sealed class BlenderWriteMcpTools
                         note = queued.AlreadyQueued
                             ? "This analysis was already queued for this version; the same job id is returned."
                             : "Queued. Collect the measurements with get_job_status once it finishes.",
+                    },
+                    "Model", queued.ModelId, queued);
+            },
+            cancellationToken);
+    }
+
+    [McpServerTool(Name = "convert_model")]
+    [Description("Convert a model to another file format with Blender, written as a NEW inactive version - the original file is never touched. " +
+                 "Targets: glb (glTF Binary - the default choice, and what the viewer and scenes handle best), fbx, stl. " +
+                 "gltf and obj are refused on purpose: each keeps part of itself in a sidecar file (.bin, .mtl) and a model version is one file, " +
+                 "so the result would import stripped - ask for glb instead. stl carries geometry only, and the job says so. " +
+                 "Returns a job id: the work is queued, so collect the new version id with get_job_status. " +
+                 "Requires Blender to be installed (Settings); you get told so immediately if it is not.")]
+    public static Task<object> ConvertModel(
+        ICommandHandler<RequestBlenderOperationCommand, BlenderOperationRequested> handler,
+        IAgentAudit audit,
+        McpCallerContext caller,
+        [Description("Model id to convert.")] int modelId,
+        [Description("Target format: glb, fbx or stl.")] string format,
+        [Description("Unique key so a retried call does not queue the conversion twice.")] string idempotencyKey,
+        [Description("Version id to convert. Defaults to the model's active version.")] int? versionId = null,
+        [Description("Optional batch id. Writes sharing one can be undone together with reverse_operation.")] string? batchId = null,
+        CancellationToken cancellationToken = default)
+    {
+        return Guarded(
+            audit,
+            caller,
+            new AgentWrite(idempotencyKey, "convert-format", "Model", modelId, batchId),
+            async ct =>
+            {
+                // Sent verbatim; the validator owns the list of targets and the reasons the
+                // refused ones are refused, so this tool cannot drift from it.
+                var parameters = System.Text.Json.JsonSerializer.Serialize(
+                    new { format = format?.Trim() ?? string.Empty });
+
+                var result = await handler.Handle(
+                    new RequestBlenderOperationCommand(
+                        modelId, BlenderOperations.ConvertFormat, versionId, parameters),
+                    ct);
+
+                if (result.IsFailure)
+                {
+                    return Failed(result.Error);
+                }
+
+                var queued = result.Value;
+                return Applied(
+                    new
+                    {
+                        status = queued.AlreadyQueued ? "already-queued" : "queued",
+                        jobId = queued.JobId,
+                        modelId = queued.ModelId,
+                        versionId = queued.VersionId,
+                        note = queued.AlreadyQueued
+                            ? "This exact conversion was already queued for this version; the same job id is returned rather than running it twice."
+                            : "Queued. Collect the new version id with get_job_status once it finishes.",
                     },
                     "Model", queued.ModelId, queued);
             },
