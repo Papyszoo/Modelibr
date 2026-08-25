@@ -566,10 +566,89 @@ public class StoreImportProcessorTests
         h.Sink.Verify(s => s.AddModelToPackAsync(77, 101, It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    [Fact]
+    public async Task Process_ModelItem_WhenStoreItemIdMatches_ReusesModelEvenIfFilesDiffer()
+    {
+        var h = new Harness();
+        var mesh = h.MakeFile("u/mesh-new", RandomBytes(), "Mesh", "chair_v2.glb");
+        var item = ItemWithId("item-chair-1", "Model", "Chair", mesh);
+        h.SetManifest(item);
+
+        var existingMeta = ExistingMetadata("Model", 55, StoreUrl, AssetId, "item-chair-1", h.Now);
+        h.AssetMetadataRepo.Setup(r => r.GetByStoreProvenanceAsync(StoreUrl, AssetId, "item-chair-1", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existingMeta);
+        h.ModelRepo.Setup(r => r.GetByIdAsync(55, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ExistingModel(55));
+
+        await h.Run();
+
+        h.Sink.Verify(s => s.CreateModelAsync(It.IsAny<IFileUpload>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
+        h.Sink.Verify(s => s.AddModelToPackAsync(NewPackId, 55, It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Equal(1, h.Job.ItemsSkipped);
+        Assert.Equal(0, h.Job.ItemsCreated);
+        Assert.Contains("skipped-dedupe", h.Job.ResultJson);
+    }
+
+    [Fact]
+    public async Task Process_ModelItem_WhenSameFileHashButDifferentStoreItem_DoesNotDedupe()
+    {
+        var h = new Harness();
+        var sharedBytes = RandomBytes();
+        var meshA = h.MakeFile("u/mesh-a", sharedBytes, "Mesh", "shared.glb");
+        var meshB = h.MakeFile("u/mesh-b", sharedBytes, "Mesh", "shared.glb");
+
+        var itemA = ItemWithId("item-a", "Model", "Chair A", meshA);
+        var itemB = ItemWithId("item-b", "Model", "Chair B", meshB);
+        h.SetManifest(itemA, itemB);
+
+        h.Sink.Setup(s => s.CreateModelAsync(It.IsAny<IFileUpload>(), "Chair A", It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync(101);
+        h.Sink.Setup(s => s.CreateModelAsync(It.IsAny<IFileUpload>(), "Chair B", It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync(102);
+
+        await h.Run();
+
+        h.Sink.Verify(s => s.CreateModelAsync(It.IsAny<IFileUpload>(), "Chair A", It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Once);
+        h.Sink.Verify(s => s.CreateModelAsync(It.IsAny<IFileUpload>(), "Chair B", It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Equal(2, h.Job.ItemsCreated);
+        Assert.Equal(0, h.Job.ItemsSkipped);
+    }
+
+    [Fact]
+    public async Task Process_TextureSetItem_WhenStoreItemIdMatches_ReusesTextureSet()
+    {
+        var h = new Harness();
+        var tex = h.MakeFile("u/tex", RandomBytes(), "Image", "wood_albedo.png");
+        var item = ItemWithId("item-tex-1", "TextureSet", "Wood", tex);
+        h.SetManifest(item);
+
+        var existingMeta = ExistingMetadata("TextureSet", 77, StoreUrl, AssetId, "item-tex-1", h.Now);
+        h.AssetMetadataRepo.Setup(r => r.GetByStoreProvenanceAsync(StoreUrl, AssetId, "item-tex-1", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existingMeta);
+        h.TextureSetRepo.Setup(r => r.GetByIdAsync(77, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ExistingTextureSet(77));
+
+        await h.Run();
+
+        h.Sink.Verify(s => s.CreateTextureSetAsync(It.IsAny<IFileUpload>(), It.IsAny<string>(), It.IsAny<Domain.ValueObjects.TextureType>(), It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()), Times.Never);
+        h.Sink.Verify(s => s.AddTextureSetToPackAsync(NewPackId, 77, It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Equal(1, h.Job.ItemsSkipped);
+        Assert.Equal(0, h.Job.ItemsCreated);
+        Assert.Contains("skipped-dedupe", h.Job.ResultJson);
+    }
+
     // ---- helpers ----
 
     private static StoreManifestItem Item(string type, string name, params StoreManifestFile[] files)
         => new(type, name, files, null);
+
+    private static StoreManifestItem ItemWithId(string id, string type, string name, params StoreManifestFile[] files)
+        => new(type, name, files, null, Id: id);
+
+    private static AssetMetadata ExistingMetadata(string assetType, int assetId, string storeUrl, string storeAssetId, string storeItemId, DateTime now)
+    {
+        var meta = AssetMetadata.Create(assetType, assetId, 1, now);
+        meta.SetProvenance("Store Import", null, storeUrl, storeAssetId, storeItemId, now, now);
+        return meta;
+    }
 
     private static byte[] RandomBytes()
     {
@@ -588,6 +667,12 @@ public class StoreImportProcessorTests
             "existing.ogg", "existing.ogg", "uploads/existing.ogg", "audio/ogg",
             FileType.Unknown, 10, new string('a', 64), now).WithId(1);
         return Sound.Create("Existing Sound", file, 0, null, now, categoryId).WithId(id);
+    }
+
+    private static TextureSet ExistingTextureSet(int id)
+    {
+        var now = DateTime.UtcNow;
+        return TextureSet.Create("Existing Set", now).WithId(id);
     }
 
     /// <summary>
@@ -621,6 +706,7 @@ public class StoreImportProcessorTests
         public readonly Mock<ISoundRepository> SoundRepo = new();
         public readonly Mock<ISpriteRepository> SpriteRepo = new();
         public readonly Mock<IEnvironmentMapRepository> EnvMapRepo = new();
+        public readonly Mock<IAssetMetadataRepository> AssetMetadataRepo = new();
         public readonly Mock<IDateTimeProvider> Clock = new();
         public readonly Mock<IUnitOfWork> Uow = new();
         public readonly Mock<IChangeTrackerReset> TrackerReset = new();
@@ -638,6 +724,7 @@ public class StoreImportProcessorTests
 
             // Defaults: no existing pack, no dedupe hits.
             PackRepo.Setup(r => r.GetByStoreImportAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync((Pack?)null);
+            AssetMetadataRepo.Setup(r => r.GetByStoreProvenanceAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync((AssetMetadata?)null);
             ModelRepo.Setup(r => r.GetByFileHashAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync((Model?)null);
             TextureSetRepo.Setup(r => r.GetByFileHashAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync((TextureSet?)null);
             SoundRepo.Setup(r => r.GetByFileHashAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync((Sound?)null);
@@ -702,7 +789,7 @@ public class StoreImportProcessorTests
         {
             var processor = new StoreImportProcessor(
                 Client.Object, Sink.Object, CategoryResolver.Object, JobRepo.Object, PackRepo.Object, ModelRepo.Object,
-                TextureSetRepo.Object, SoundRepo.Object, SpriteRepo.Object, EnvMapRepo.Object,
+                TextureSetRepo.Object, SoundRepo.Object, SpriteRepo.Object, EnvMapRepo.Object, AssetMetadataRepo.Object,
                 Clock.Object, Uow.Object, TrackerReset.Object, Notifier.Object,
                 NullLogger<StoreImportProcessor>.Instance);
 

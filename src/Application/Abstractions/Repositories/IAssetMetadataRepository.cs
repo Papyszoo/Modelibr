@@ -12,6 +12,16 @@ public interface IAssetMetadataRepository
     Task<AssetMetadata?> GetAsync(string assetType, int assetId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Finds metadata by store provenance triplet (StoreUrl, StoreAssetId, StoreItemId).
+    /// Used by store imports to identify existing multi-file assets for deduplication.
+    /// </summary>
+    Task<AssetMetadata?> GetByStoreProvenanceAsync(
+        string storeUrl,
+        string storeAssetId,
+        string storeItemId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// The rows for a whole page of assets in one query. A list view that shows a licence
     /// badge must not put a round trip behind every card.
     /// </summary>

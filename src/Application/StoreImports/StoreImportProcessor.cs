@@ -54,6 +54,7 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
     private readonly ISoundRepository _soundRepository;
     private readonly ISpriteRepository _spriteRepository;
     private readonly IEnvironmentMapRepository _environmentMapRepository;
+    private readonly IAssetMetadataRepository _assetMetadataRepository;
     private readonly IDateTimeProvider _clock;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IChangeTrackerReset _trackerReset;
@@ -71,6 +72,7 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         ISoundRepository soundRepository,
         ISpriteRepository spriteRepository,
         IEnvironmentMapRepository environmentMapRepository,
+        IAssetMetadataRepository assetMetadataRepository,
         IDateTimeProvider clock,
         IUnitOfWork unitOfWork,
         IChangeTrackerReset trackerReset,
@@ -87,6 +89,7 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         _soundRepository = soundRepository;
         _spriteRepository = spriteRepository;
         _environmentMapRepository = environmentMapRepository;
+        _assetMetadataRepository = assetMetadataRepository;
         _clock = clock;
         _unitOfWork = unitOfWork;
         _trackerReset = trackerReset;
@@ -310,6 +313,7 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         try
         {
             var license = StoreManifestMapping.MapSchemaLicense(manifest.License);
+            var canonicalStoreUrl = StoreUrlCanonicalizer.Canonicalize(work.StoreUrl);
 
             await _sink.StampAssetMetadataAsync(
                 assetType,
@@ -324,7 +328,7 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
                     CreditUrl: manifest.CreditUrl,
                     AttributionRequired: StoreManifestMapping.RequiresAttribution(license),
                     SourceUrl: BuildListingUrl(work.StoreUrl, work.AssetId),
-                    StoreUrl: work.StoreUrl,
+                    StoreUrl: canonicalStoreUrl,
                     StoreAssetId: work.AssetId,
                     StoreItemId: item.Id,
                     ImportedAt: _clock.UtcNow,
@@ -466,10 +470,22 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
     {
         var primary = PickPrimary(files, StoreManifestMapping.RoleKind.Mesh);
 
-        // SHA dedupe: if a model already exists for the primary file hash, link it - and
-        // gap-fill any manifest files a previous partial run failed to attach, so re-running
-        // the import repairs the item instead of freezing its gaps forever.
-        var existing = await _modelRepository.GetByFileHashAsync(primary.Sha256, ct);
+        Model? existing = null;
+        var canonicalStoreUrl = StoreUrlCanonicalizer.Canonicalize(work.StoreUrl);
+
+        if (!string.IsNullOrWhiteSpace(item.Id))
+        {
+            var meta = await _assetMetadataRepository.GetByStoreProvenanceAsync(canonicalStoreUrl, work.AssetId, item.Id, ct);
+            if (meta != null && meta.AssetType == StoreManifestMapping.ItemTypeModel)
+            {
+                existing = await _modelRepository.GetByIdAsync(meta.AssetId, ct);
+            }
+        }
+        else
+        {
+            existing = await _modelRepository.GetByFileHashAsync(primary.Sha256, ct);
+        }
+
         if (existing != null)
         {
             var have = existing.Versions
@@ -489,8 +505,8 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
                 && await ResolveCategoryAsync(StoreManifestMapping.ImportTarget.Model, item, ct) is int gapFillCategoryId)
                 await _sink.SetModelCategoryAsync(existing.Id, gapFillCategoryId, ct);
             var reason = missing.Count > 0
-                ? $"Model already present (deduplicated by SHA-256); gap-filled {missing.Count} missing file(s)."
-                : "Model already present (deduplicated by SHA-256).";
+                ? $"Model already present (deduplicated by store item); gap-filled {missing.Count} missing file(s)."
+                : "Model already present (deduplicated by store item).";
             return Skipped(item, OutcomeSkippedDedupe, reason, StoreManifestMapping.ItemTypeModel, existing.Id);
         }
 
@@ -546,7 +562,22 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         var first = files[0];
         var firstRole = StoreManifestMapping.ParseRole(first.Role);
 
-        var existing = await _textureSetRepository.GetByFileHashAsync(first.Sha256, ct);
+        TextureSet? existing = null;
+        var canonicalStoreUrl = StoreUrlCanonicalizer.Canonicalize(work.StoreUrl);
+
+        if (!string.IsNullOrWhiteSpace(item.Id))
+        {
+            var meta = await _assetMetadataRepository.GetByStoreProvenanceAsync(canonicalStoreUrl, work.AssetId, item.Id, ct);
+            if (meta != null && meta.AssetType == StoreManifestMapping.ItemTypeTextureSet)
+            {
+                existing = await _textureSetRepository.GetByIdAsync(meta.AssetId, ct);
+            }
+        }
+        else
+        {
+            existing = await _textureSetRepository.GetByFileHashAsync(first.Sha256, ct);
+        }
+
         if (existing != null)
         {
             // Same gap-fill contract as models: attach manifest textures missing from the set.
@@ -569,8 +600,8 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
                 && await ResolveCategoryAsync(StoreManifestMapping.ImportTarget.TextureSet, item, ct) is int gapFillCategoryId)
                 await _sink.SetTextureSetCategoryAsync(existing.Id, existing.Name, gapFillCategoryId, ct);
             var reason = missing.Count > 0
-                ? $"Texture set already present (deduplicated by SHA-256); gap-filled {missing.Count} missing texture(s)."
-                : "Texture set already present (deduplicated by SHA-256).";
+                ? $"Texture set already present (deduplicated by store item); gap-filled {missing.Count} missing texture(s)."
+                : "Texture set already present (deduplicated by store item).";
             return Skipped(item, OutcomeSkippedDedupe, reason, StoreManifestMapping.ItemTypeTextureSet, existing.Id);
         }
 
@@ -606,14 +637,30 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         var primary = PickPrimary(files, StoreManifestMapping.RoleKind.Audio);
         var extraNote = ExtraFilesNote(files, "sounds");
 
-        var existing = await _soundRepository.GetByFileHashAsync(primary.Sha256, ct);
+        Sound? existing = null;
+        var canonicalStoreUrl = StoreUrlCanonicalizer.Canonicalize(work.StoreUrl);
+
+        if (!string.IsNullOrWhiteSpace(item.Id))
+        {
+            var meta = await _assetMetadataRepository.GetByStoreProvenanceAsync(canonicalStoreUrl, work.AssetId, item.Id, ct);
+            if (meta != null && meta.AssetType == StoreManifestMapping.ItemTypeSound)
+            {
+                existing = await _soundRepository.GetByIdAsync(meta.AssetId, ct);
+            }
+        }
+
+        if (existing == null)
+        {
+            existing = await _soundRepository.GetByFileHashAsync(primary.Sha256, ct);
+        }
+
         if (existing != null)
         {
             await _sink.AddSoundToPackAsync(packId, existing.Id, ct);
             if (existing.SoundCategoryId is null
                 && await ResolveCategoryAsync(StoreManifestMapping.ImportTarget.Sound, item, ct) is int gapFillCategoryId)
                 await _sink.SetSoundCategoryAsync(existing.Id, gapFillCategoryId, ct);
-            return Skipped(item, OutcomeSkippedDedupe, Append("Sound already present (deduplicated by SHA-256).", extraNote), StoreManifestMapping.ItemTypeSound, existing.Id);
+            return Skipped(item, OutcomeSkippedDedupe, Append("Sound already present (deduplicated by store item).", extraNote), StoreManifestMapping.ItemTypeSound, existing.Id);
         }
 
         var categoryId = await ResolveCategoryAsync(StoreManifestMapping.ImportTarget.Sound, item, ct);
@@ -634,14 +681,30 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         var primary = PickPrimary(files, StoreManifestMapping.RoleKind.Image);
         var extraNote = ExtraFilesNote(files, "sprites");
 
-        var existing = await _spriteRepository.GetByFileHashAsync(primary.Sha256, ct);
+        Sprite? existing = null;
+        var canonicalStoreUrl = StoreUrlCanonicalizer.Canonicalize(work.StoreUrl);
+
+        if (!string.IsNullOrWhiteSpace(item.Id))
+        {
+            var meta = await _assetMetadataRepository.GetByStoreProvenanceAsync(canonicalStoreUrl, work.AssetId, item.Id, ct);
+            if (meta != null && meta.AssetType == StoreManifestMapping.ItemTypeSprite)
+            {
+                existing = await _spriteRepository.GetByIdAsync(meta.AssetId, ct);
+            }
+        }
+
+        if (existing == null)
+        {
+            existing = await _spriteRepository.GetByFileHashAsync(primary.Sha256, ct);
+        }
+
         if (existing != null)
         {
             await _sink.AddSpriteToPackAsync(packId, existing.Id, ct);
             if (existing.SpriteCategoryId is null
                 && await ResolveCategoryAsync(StoreManifestMapping.ImportTarget.Sprite, item, ct) is int gapFillCategoryId)
                 await _sink.SetSpriteCategoryAsync(existing.Id, gapFillCategoryId, ct);
-            return Skipped(item, OutcomeSkippedDedupe, Append("Sprite already present (deduplicated by SHA-256).", extraNote), StoreManifestMapping.ItemTypeSprite, existing.Id);
+            return Skipped(item, OutcomeSkippedDedupe, Append("Sprite already present (deduplicated by store item).", extraNote), StoreManifestMapping.ItemTypeSprite, existing.Id);
         }
 
         var categoryId = await ResolveCategoryAsync(StoreManifestMapping.ImportTarget.Sprite, item, ct);
@@ -660,14 +723,30 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         var primary = PickPrimary(files, StoreManifestMapping.RoleKind.Panorama);
         var extraNote = ExtraFilesNote(files, "environment maps");
 
-        var existing = await _environmentMapRepository.GetByFileHashAsync(primary.Sha256, ct);
+        EnvironmentMap? existing = null;
+        var canonicalStoreUrl = StoreUrlCanonicalizer.Canonicalize(work.StoreUrl);
+
+        if (!string.IsNullOrWhiteSpace(item.Id))
+        {
+            var meta = await _assetMetadataRepository.GetByStoreProvenanceAsync(canonicalStoreUrl, work.AssetId, item.Id, ct);
+            if (meta != null && meta.AssetType == StoreManifestMapping.ItemTypeEnvironmentMap)
+            {
+                existing = await _environmentMapRepository.GetByIdAsync(meta.AssetId, ct);
+            }
+        }
+
+        if (existing == null)
+        {
+            existing = await _environmentMapRepository.GetByFileHashAsync(primary.Sha256, ct);
+        }
+
         if (existing != null)
         {
             await _sink.AddEnvironmentMapToPackAsync(packId, existing.Id, ct);
             if (existing.EnvironmentMapCategoryId is null
                 && await ResolveCategoryAsync(StoreManifestMapping.ImportTarget.EnvironmentMap, item, ct) is int gapFillCategoryId)
                 await _sink.SetEnvironmentMapCategoryAsync(existing.Id, gapFillCategoryId, ct);
-            return Skipped(item, OutcomeSkippedDedupe, Append("Environment map already present (deduplicated by SHA-256).", extraNote), StoreManifestMapping.ItemTypeEnvironmentMap, existing.Id);
+            return Skipped(item, OutcomeSkippedDedupe, Append("Environment map already present (deduplicated by store item).", extraNote), StoreManifestMapping.ItemTypeEnvironmentMap, existing.Id);
         }
 
         var categoryId = await ResolveCategoryAsync(StoreManifestMapping.ImportTarget.EnvironmentMap, item, ct);

@@ -23,6 +23,20 @@ public class AssetMetadataRepository : IAssetMetadataRepository
             .FirstOrDefaultAsync(m => m.AssetType == assetType && m.AssetId == assetId, cancellationToken);
     }
 
+    public Task<AssetMetadata?> GetByStoreProvenanceAsync(
+        string storeUrl,
+        string storeAssetId,
+        string storeItemId,
+        CancellationToken cancellationToken = default)
+    {
+        return _context.AssetMetadata
+            .FirstOrDefaultAsync(
+                m => m.StoreUrl == storeUrl &&
+                     m.StoreAssetId == storeAssetId &&
+                     m.StoreItemId == storeItemId,
+                cancellationToken);
+    }
+
     public async Task<IReadOnlyList<AssetMetadata>> GetManyAsync(
         string assetType,
         IReadOnlyCollection<int> assetIds,

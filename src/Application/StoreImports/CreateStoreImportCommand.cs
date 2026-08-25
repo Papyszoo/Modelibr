@@ -53,7 +53,7 @@ internal sealed class CreateStoreImportCommandHandler : ICommandHandler<CreateSt
         if (string.IsNullOrWhiteSpace(command.AssetId))
             return Result.Failure<CreateStoreImportResponse>(new Error("StoreImport.MissingAssetId", "Asset id is required."));
 
-        var storeUrl = command.StoreUrl.Trim().TrimEnd('/');
+        var storeUrl = StoreUrlCanonicalizer.Canonicalize(command.StoreUrl);
         var assetId = command.AssetId.Trim();
 
         StoreImportJob job;

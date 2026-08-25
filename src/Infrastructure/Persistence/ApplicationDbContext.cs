@@ -1742,7 +1742,13 @@ namespace Infrastructure.Persistence
                 // What a population pass scans: "which assets did this store import give
                 // us", and "which of them still have no licence".
                 entity.HasIndex(e => new { e.StoreUrl, e.StoreAssetId });
-                entity.HasIndex(e => e.StoreItemId);
+
+                // Multi-file asset deduplication keys on (StoreUrl, StoreAssetId, StoreItemId)
+                // rather than single-file SHA. Enforced by a filtered unique index when all
+                // three are present.
+                entity.HasIndex(e => new { e.StoreUrl, e.StoreAssetId, e.StoreItemId })
+                    .IsUnique()
+                    .HasFilter("\"StoreUrl\" IS NOT NULL AND \"StoreAssetId\" IS NOT NULL AND \"StoreItemId\" IS NOT NULL");
 
                 // What the review screen asks: which assets did the automation classify and
                 // has anyone looked at them yet. Filtered so the index covers only the rows

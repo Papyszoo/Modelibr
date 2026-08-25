@@ -265,6 +265,29 @@ public class AssetMetadataPatchAtomicityIntegrationTests : IClassFixture<Modelib
         Assert.Equal("CC0 1.0 Universal", (await StoredMetadataAsync("Model", modelId))!.LicenseName);
     }
 
+    [Fact]
+    public async Task Filtered_Unique_Index_Enforces_Store_Item_Provenance_Uniqueness()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var now = DateTime.UtcNow;
+
+        var (modelAId, _) = await SeedModelAsync();
+        var (modelBId, _) = await SeedModelAsync();
+
+        var metaA = AssetMetadata.Create("Model", modelAId, 1, now);
+        metaA.SetProvenance("Store Import", null, "https://store.example.com", "pack-1", "item-duplicate-1", now, now);
+        db.AssetMetadata.Add(metaA);
+        await db.SaveChangesAsync();
+
+        var metaB = AssetMetadata.Create("Model", modelBId, 1, now);
+        metaB.SetProvenance("Store Import", null, "https://store.example.com", "pack-1", "item-duplicate-1", now, now);
+        db.AssetMetadata.Add(metaB);
+
+        var ex = await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+        Assert.NotNull(ex.InnerException);
+    }
+
     // ─── Helpers ─────────────────────────────────────────────────────
 
     private static IReadOnlyDictionary<string, JsonElement> Fields(Dictionary<string, object?> fields)
