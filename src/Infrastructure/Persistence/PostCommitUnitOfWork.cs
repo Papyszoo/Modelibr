@@ -24,6 +24,15 @@ namespace Infrastructure.Persistence;
 /// the drain - which is harmless, because such a caller has no way to enqueue an action
 /// either; <see cref="IPostCommitActions"/> is only reachable from the handlers that inject it.
 /// </para>
+/// <para>
+/// CANCELLATION: the caller's token governs the write. Once the write is durable it governs
+/// nothing - the effects describe state another process can already read, and dropping them
+/// because the client hung up loses a notification whose durable job is still sitting in the
+/// table waiting to be told about. So the drain takes no token at all; see
+/// <see cref="PostCommitActions.RunPendingAsync"/>. It still cannot fail the request: that
+/// method logs and continues, because reporting an error here would describe a rollback that
+/// did not happen.
+/// </para>
 /// </remarks>
 internal sealed class PostCommitUnitOfWork : IUnitOfWork
 {
@@ -40,14 +49,32 @@ internal sealed class PostCommitUnitOfWork : IUnitOfWork
 
     public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        await Inner.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await Inner.SaveChangesAsync(cancellationToken);
+        }
+        catch
+        {
+            // Nothing this save staged exists, so neither may the effects registered for it.
+            // Callers enqueue BEFORE saving on purpose - the action describes the row the save
+            // is about to write - which is exactly why leaving the queue alone here was wrong:
+            // the next successful save in this scope would have drained a notification for a
+            // job that was never written. Only the unclaimed tail goes; an action an earlier
+            // save already carried belongs to a write this failure did not touch.
+            _actions.DiscardUnsaved();
+            throw;
+        }
 
         // Inside a transaction this save is not durable yet, and the boundary that owns the
-        // transaction will drain when it commits.
-        if (_context.Database.CurrentTransaction is null)
+        // transaction will drain when it commits - but the write IS in that transaction now,
+        // so a later failing save must no longer be able to discard what this one carried.
+        if (_context.Database.CurrentTransaction is not null)
         {
-            await _actions.RunPendingAsync(cancellationToken);
+            _actions.MarkSaved();
+            return;
         }
+
+        await _actions.RunPendingAsync();
     }
 
     public async Task<Result<T>> InTransactionAsync<T>(
@@ -87,7 +114,7 @@ internal sealed class PostCommitUnitOfWork : IUnitOfWork
             return result;
         }
 
-        await _actions.RunPendingAsync(cancellationToken);
+        await _actions.RunPendingAsync();
         return result;
     }
 }

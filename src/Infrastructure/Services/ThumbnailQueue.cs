@@ -56,6 +56,14 @@ public class ThumbnailQueue : IThumbnailQueue
     /// ambient transaction the unit of work drains immediately after committing (so the
     /// timing is unchanged), and inside one it waits for the transaction that owns it.
     /// </para>
+    /// <para>
+    /// Registering first also means the queue can hold an action for a row that never lands,
+    /// so the unit of work takes it back when the save throws - otherwise the next successful
+    /// save in this scope would send workers after a job that does not exist. And once the
+    /// save does commit, the drain no longer runs on the caller's token: a client that hangs
+    /// up the instant after the row is durable must not silence the only notification the
+    /// workers get about it.
+    /// </para>
     /// </remarks>
     private async Task SaveAndNotifyAsync(ThumbnailJob job, CancellationToken cancellationToken)
     {

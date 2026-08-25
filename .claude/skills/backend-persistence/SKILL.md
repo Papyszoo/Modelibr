@@ -80,7 +80,13 @@ description: Modelibr EF Core persistence rules - the IUnitOfWork contract (repo
   instead of acting; the decorator runs the queue after the outermost commit (immediately
   after the save when no transaction is open) and discards it on rollback. An action that
   throws is logged, never surfaced - the write it describes is already durable. Enqueue
-  BEFORE the save that commits, not after it.
+  BEFORE the save that commits, not after it - and the two consequences of enqueuing first:
+  a save that THROWS takes its own registrations back (everything no earlier save in the
+  scope claimed), so a later successful save cannot drain a notification for a row that was
+  never written; and the drain runs on `CancellationToken.None`, because once the write is
+  durable the request's token governs nothing and a client hanging up must not silence the
+  only notification a worker gets. A rollback still discards everything registered inside
+  the transaction, including what a nested save had already committed into it.
 - A hierarchical delete (categories, and similar branch/tree deletes) that used to
   issue one self-commit per row now lands in a single commit - a failure partway
   through leaves the whole branch untouched instead of a partial delete. That's
