@@ -1,3 +1,5 @@
+using System.Net.Http.Json;
+using System.Text.Json.Nodes;
 using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
@@ -135,6 +137,26 @@ public class BlenderOperationQueueIntegrationTests : IClassFixture<ModelibrWebFa
             // reads result.versionId rather than parsing a quoted blob.
             Assert.Equal(1904, view.Value.Result!["versionId"]!.GetValue<int>());
         }
+    }
+
+    [Theory]
+    [InlineData(BlenderOperations.ConvertFormat, "{\"format\": 5}")]
+    [InlineData(BlenderOperations.UvUnwrap, "{\"method\": 123}")]
+    [InlineData(BlenderOperations.BakeTextures, "{\"maps\": \"diffuse\"}")]
+    public async Task Malformed_Parameters_Return_BadRequest_With_InvalidParameters_Over_Http(
+        string operation, string parametersJson)
+    {
+        var (modelId, _) = await SeedModelAsync();
+        await SetBlenderEnabledAsync(true);
+
+        var client = _factory.CreateClient();
+        var response = await client.PostAsJsonAsync(
+            $"/models/{modelId}/blender/{operation}",
+            new { ParametersJson = parametersJson });
+
+        Assert.Equal(System.Net.HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonObject>();
+        Assert.Equal("Blender.InvalidParameters", body?["error"]?.GetValue<string>());
     }
 
     // ---- fixtures ---------------------------------------------------------------

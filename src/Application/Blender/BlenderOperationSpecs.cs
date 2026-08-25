@@ -86,7 +86,12 @@ public static class BlenderOperationSpecs
     /// </remarks>
     private static Result<string> NormalizeUvUnwrap(JsonObject supplied)
     {
-        var method = (supplied["method"]?.GetValue<string>() ?? "smart").Trim().ToLowerInvariant();
+        if (!TryReadString(supplied, "method", out var methodStr))
+        {
+            return Result.Failure<string>(new Error(
+                "Blender.InvalidParameters", "method must be a string."));
+        }
+        var method = (methodStr ?? "smart").Trim().ToLowerInvariant();
         if (method is not ("smart" or "angle"))
         {
             return Result.Failure<string>(new Error(
@@ -94,24 +99,30 @@ public static class BlenderOperationSpecs
                 $"Unknown unwrap method '{method}'. Use 'smart' for a model with no seams, or 'angle' for one whose author marked them."));
         }
 
-        var angleLimit = ReadDouble(supplied, "angleLimit", 66);
-        if (angleLimit is not (>= 1 and <= 89))
+        if (!TryReadDouble(supplied, "angleLimit", 66, out var angleLimit) || angleLimit is not (>= 1 and <= 89))
         {
             return Result.Failure<string>(new Error(
                 "Blender.InvalidParameters", "angleLimit must be a number between 1 and 89 degrees."));
         }
 
-        var islandMargin = ReadDouble(supplied, "islandMargin", 0.02);
-        if (islandMargin is not (>= 0 and <= 0.5))
+        if (!TryReadDouble(supplied, "islandMargin", 0.02, out var islandMargin) || islandMargin is not (>= 0 and <= 0.5))
         {
             return Result.Failure<string>(new Error(
                 "Blender.InvalidParameters", "islandMargin must be a number between 0 and 0.5."));
         }
 
-        var lightmap = supplied["lightmap"]?.GetValue<bool>() ?? false;
+        if (!TryReadBool(supplied, "lightmap", false, out var lightmap))
+        {
+            return Result.Failure<string>(new Error(
+                "Blender.InvalidParameters", "lightmap must be a boolean."));
+        }
 
-        var channelName = (supplied["channelName"]?.GetValue<string>()
-            ?? (lightmap ? "UVLightmap" : "UVMap")).Trim();
+        if (!TryReadString(supplied, "channelName", out var channelNameStr))
+        {
+            return Result.Failure<string>(new Error(
+                "Blender.InvalidParameters", "channelName must be a string."));
+        }
+        var channelName = (channelNameStr ?? (lightmap ? "UVLightmap" : "UVMap")).Trim();
         if (channelName.Length is 0 or > 63)
         {
             return Result.Failure<string>(new Error(
@@ -169,11 +180,22 @@ public static class BlenderOperationSpecs
     private static Result<string> NormalizeBakeTextures(JsonObject supplied)
     {
         var requested = new List<string>();
-        if (supplied["maps"] is JsonArray array)
+        if (supplied.TryGetPropertyValue("maps", out var mapsNode) && mapsNode is not null)
         {
+            if (mapsNode is not JsonArray array)
+            {
+                return Result.Failure<string>(new Error(
+                    "Blender.InvalidParameters", "maps must be an array of strings."));
+            }
+
             foreach (var node in array)
             {
-                var name = node?.GetValue<string>()?.Trim().ToLowerInvariant();
+                if (node is not JsonValue jVal || !jVal.TryGetValue<string>(out var nameStr))
+                {
+                    return Result.Failure<string>(new Error(
+                        "Blender.InvalidParameters", "maps elements must be strings."));
+                }
+                var name = nameStr.Trim().ToLowerInvariant();
                 if (!string.IsNullOrEmpty(name) && !requested.Contains(name))
                 {
                     requested.Add(name);
@@ -206,29 +228,41 @@ public static class BlenderOperationSpecs
                 $"{string.Join(" and ", clash)} both become the set's {clash.Key} texture, and a texture set holds one of each. Ask for one of them."));
         }
 
-        var resolution = (int)ReadDouble(supplied, "resolution", 1024);
-        if (resolution is not (>= 128 and <= 4096) || (resolution & (resolution - 1)) != 0)
+        if (!TryReadDouble(supplied, "resolution", 1024, out var resVal) ||
+            (int)resVal != resVal ||
+            (int)resVal is not (>= 128 and <= 4096) ||
+            ((int)resVal & ((int)resVal - 1)) != 0)
         {
             return Result.Failure<string>(new Error(
                 "Blender.InvalidParameters",
                 "resolution must be a power of two between 128 and 4096."));
         }
+        var resolution = (int)resVal;
 
-        var samples = (int)ReadDouble(supplied, "samples", 32);
-        if (samples is not (>= 1 and <= 512))
+        if (!TryReadDouble(supplied, "samples", 32, out var samplesVal) ||
+            (int)samplesVal != samplesVal ||
+            (int)samplesVal is not (>= 1 and <= 512))
         {
             return Result.Failure<string>(new Error(
                 "Blender.InvalidParameters", "samples must be a whole number between 1 and 512."));
         }
+        var samples = (int)samplesVal;
 
-        var margin = (int)ReadDouble(supplied, "margin", 16);
-        if (margin is not (>= 0 and <= 64))
+        if (!TryReadDouble(supplied, "margin", 16, out var marginVal) ||
+            (int)marginVal != marginVal ||
+            (int)marginVal is not (>= 0 and <= 64))
         {
             return Result.Failure<string>(new Error(
                 "Blender.InvalidParameters", "margin must be a whole number of pixels between 0 and 64."));
         }
+        var margin = (int)marginVal;
 
-        var unwrap = supplied["unwrap"]?.GetValue<bool>() ?? false;
+        if (!TryReadBool(supplied, "unwrap", false, out var unwrap))
+        {
+            return Result.Failure<string>(new Error(
+                "Blender.InvalidParameters", "unwrap must be a boolean."));
+        }
+
         if (unwrap && !requested.Any(ColorMaps.Contains))
         {
             return Result.Failure<string>(new Error(
@@ -238,21 +272,24 @@ public static class BlenderOperationSpecs
                 "Add 'diffuse' to maps, or leave unwrap off to bake onto the layout the model already has."));
         }
 
-        var islandMargin = ReadDouble(supplied, "islandMargin", 0.02);
-        if (islandMargin is not (>= 0 and <= 0.5))
+        if (!TryReadDouble(supplied, "islandMargin", 0.02, out var islandMargin) || islandMargin is not (>= 0 and <= 0.5))
         {
             return Result.Failure<string>(new Error(
                 "Blender.InvalidParameters", "islandMargin must be a number between 0 and 0.5."));
         }
 
-        var angleLimit = ReadDouble(supplied, "angleLimit", 66);
-        if (angleLimit is not (>= 1 and <= 89))
+        if (!TryReadDouble(supplied, "angleLimit", 66, out var angleLimit) || angleLimit is not (>= 1 and <= 89))
         {
             return Result.Failure<string>(new Error(
                 "Blender.InvalidParameters", "angleLimit must be a number between 1 and 89 degrees."));
         }
 
-        var setName = supplied["setName"]?.GetValue<string>()?.Trim();
+        if (!TryReadString(supplied, "setName", out var setNameStr))
+        {
+            return Result.Failure<string>(new Error(
+                "Blender.InvalidParameters", "setName must be a string."));
+        }
+        var setName = setNameStr?.Trim();
         if (setName is { Length: > 200 })
         {
             return Result.Failure<string>(new Error(
@@ -295,13 +332,15 @@ public static class BlenderOperationSpecs
     /// </remarks>
     private static Result<string> NormalizeMeshAnalysis(JsonObject supplied)
     {
-        var overlapSamples = (int)ReadDouble(supplied, "overlapSamples", 512);
-        if (overlapSamples is not (>= 64 and <= 2048))
+        if (!TryReadDouble(supplied, "overlapSamples", 512, out var osVal) ||
+            (int)osVal != osVal ||
+            (int)osVal is not (>= 64 and <= 2048))
         {
             return Result.Failure<string>(new Error(
                 "Blender.InvalidParameters",
                 "overlapSamples must be a whole number between 64 and 2048."));
         }
+        var overlapSamples = (int)osVal;
 
         return Result.Success(new JsonObject
         {
@@ -347,7 +386,14 @@ public static class BlenderOperationSpecs
     /// </summary>
     private static Result<string> NormalizeConvertFormat(JsonObject supplied)
     {
-        var format = (supplied["format"]?.GetValue<string>() ?? string.Empty)
+        if (!TryReadString(supplied, "format", out var formatStr))
+        {
+            return Result.Failure<string>(new Error(
+                "Blender.InvalidParameters",
+                $"format is required. Convertible to: {string.Join(", ", ConvertTargets.Keys.Order())}."));
+        }
+
+        var format = (formatStr ?? string.Empty)
             .Trim().TrimStart('.').ToLowerInvariant();
 
         if (format.Length == 0)
@@ -398,16 +444,42 @@ public static class BlenderOperationSpecs
         }
     }
 
-    /// <summary>
-    /// Reads a number, or NaN when the value is not one. NaN fails every range check
-    /// above - which is why those are written as "not within", never as "outside": NaN
-    /// compares false to both bounds, so an "outside" test would wave a string through.
-    /// </summary>
-    private static double ReadDouble(JsonObject o, string key, double fallback)
+    private static bool TryReadString(JsonObject o, string key, out string? value)
     {
-        var node = o[key];
-        if (node is null) return fallback;
-        try { return node.GetValue<double>(); }
-        catch (Exception) { return double.NaN; }
+        value = null;
+        if (!o.TryGetPropertyValue(key, out var node) || node is null)
+            return true;
+        if (node is JsonValue jVal && jVal.TryGetValue<string>(out var str))
+        {
+            value = str;
+            return true;
+        }
+        return false;
+    }
+
+    private static bool TryReadBool(JsonObject o, string key, bool fallback, out bool value)
+    {
+        value = fallback;
+        if (!o.TryGetPropertyValue(key, out var node) || node is null)
+            return true;
+        if (node is JsonValue jVal && jVal.TryGetValue<bool>(out var b))
+        {
+            value = b;
+            return true;
+        }
+        return false;
+    }
+
+    private static bool TryReadDouble(JsonObject o, string key, double fallback, out double value)
+    {
+        value = fallback;
+        if (!o.TryGetPropertyValue(key, out var node) || node is null)
+            return true;
+        if (node is JsonValue jVal && jVal.TryGetValue<double>(out var d))
+        {
+            value = d;
+            return true;
+        }
+        return false;
     }
 }

@@ -537,6 +537,39 @@ public class RequestBlenderOperationCommandTests
         jobs.Verify(r => r.AddAsync(It.IsAny<ExtractionJob>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    [Theory]
+    [InlineData(BlenderOperations.ConvertFormat, "{\"format\": 5}")]
+    [InlineData(BlenderOperations.ConvertFormat, "{\"format\": true}")]
+    [InlineData(BlenderOperations.ConvertFormat, "{\"format\": {}}")]
+    [InlineData(BlenderOperations.ConvertFormat, "{\"format\": []}")]
+    [InlineData(BlenderOperations.UvUnwrap, "{\"method\": 123}")]
+    [InlineData(BlenderOperations.UvUnwrap, "{\"method\": true}")]
+    [InlineData(BlenderOperations.UvUnwrap, "{\"lightmap\": \"true\"}")]
+    [InlineData(BlenderOperations.UvUnwrap, "{\"lightmap\": 1}")]
+    [InlineData(BlenderOperations.UvUnwrap, "{\"channelName\": 123}")]
+    [InlineData(BlenderOperations.UvUnwrap, "{\"channelName\": {}}")]
+    [InlineData(BlenderOperations.BakeTextures, "{\"maps\": \"diffuse\"}")]
+    [InlineData(BlenderOperations.BakeTextures, "{\"maps\": [123]}")]
+    [InlineData(BlenderOperations.BakeTextures, "{\"maps\": [{}]}")]
+    [InlineData(BlenderOperations.BakeTextures, "{\"unwrap\": \"yes\"}")]
+    [InlineData(BlenderOperations.BakeTextures, "{\"unwrap\": 1}")]
+    [InlineData(BlenderOperations.BakeTextures, "{\"setName\": 123}")]
+    [InlineData(BlenderOperations.BakeTextures, "{\"setName\": {}}")]
+    public async Task Malformed_Parameter_Types_Are_Rejected_With_InvalidParameters(
+        string operation, string parametersJson)
+    {
+        var jobs = Jobs();
+        var handler = Handler(jobs: jobs);
+
+        var result = await handler.Handle(
+            new RequestBlenderOperationCommand(42, operation, ParametersJson: parametersJson),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Blender.InvalidParameters", result.Error.Code);
+        jobs.Verify(r => r.AddAsync(It.IsAny<ExtractionJob>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     // ---- fixtures ---------------------------------------------------------------
 
     private static Mock<IExtractionJobRepository> Jobs() => new();
