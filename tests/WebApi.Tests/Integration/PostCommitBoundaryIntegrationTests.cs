@@ -27,12 +27,21 @@ namespace WebApi.Tests.Integration;
 /// is in <c>Infrastructure.Tests/Persistence/PostCommitUnitOfWorkTests</c>.
 /// </para>
 /// <para>
-/// Two interceptors give the test the interleavings it needs, and both are honest about what
-/// they stand for. <see cref="CancelWhenCommitted"/> cancels the request token from EF's
+/// Three interceptors give the test the interleavings it needs, and all three are honest about
+/// what they stand for. <see cref="CancelWhenCommitted"/> cancels the request token from EF's
 /// after-commit callback - the real "the client hung up between COMMIT and the notification".
 /// <see cref="FailNextSave"/> throws before anything reaches the server, which is what a save
 /// failure has to look like inside a transaction that then commits: a failure the DATABASE
 /// sees aborts the whole transaction, so it could never be followed by a successful commit.
+/// <see cref="FailAfterSave"/> throws from <c>SavedChangesAsync</c>, which EF reaches only
+/// once the rows are written - for a save with no explicit transaction that is after the
+/// implicit COMMIT, and it stands for what <c>DomainEventsInterceptor</c> really does there:
+/// cancellable asynchronous dispatch that can fail over a row nothing can take back.
+/// </para>
+/// <para>
+/// The interceptor order below matches production: <c>SaveDurabilityInterceptor</c> FIRST,
+/// because EF stops the <c>SavedChangesAsync</c> chain at the first interceptor that throws
+/// and the durability signal has to be taken before the throwing one gets its turn.
 /// </para>
 /// </remarks>
 [Trait("Category", "Integration")]
@@ -43,6 +52,8 @@ public class PostCommitBoundaryIntegrationTests
     private readonly ModelibrWebFactory _factory;
     private readonly CancelWhenCommitted _cancelOnCommit = new();
     private readonly FailNextSave _failNextSave = new();
+    private readonly FailAfterSave _failAfterSave = new();
+    private readonly FailAfterCommit _failAfterCommit = new();
     private WebApplicationFactory<Program> _host = null!;
 
     public PostCommitBoundaryIntegrationTests(ModelibrWebFactory factory)
@@ -66,9 +77,12 @@ public class PostCommitBoundaryIntegrationTests
             services.AddDbContext<ApplicationDbContext>((sp, options) => options
                 .UseNpgsql(connectionString)
                 .AddInterceptors(
+                    sp.GetRequiredService<SaveDurabilityInterceptor>(),
                     sp.GetRequiredService<DomainEventsInterceptor>(),
                     _cancelOnCommit,
-                    _failNextSave));
+                    _failNextSave,
+                    _failAfterSave,
+                    _failAfterCommit));
         }));
 
         using var scope = _host.Services.CreateScope();
@@ -190,10 +204,14 @@ public class PostCommitBoundaryIntegrationTests
         await Assert.ThrowsAsync<InvalidOperationException>(() => unitOfWork.SaveChangesAsync());
         context.Entry(refused).State = EntityState.Detached;
 
+        Assert.Empty(ran);
+        Assert.False(await RowExistsAsync(refused.Key), "the save was refused before anything reached the server");
+
         context.Settings.Add(NewSetting());
         await unitOfWork.SaveChangesAsync();
 
         Assert.Empty(ran);
+        Assert.False(await RowExistsAsync(refused.Key));
     }
 
     // ─── the transaction's own verdict ───────────────────────────────
@@ -292,9 +310,328 @@ public class PostCommitBoundaryIntegrationTests
         Assert.Equal(["first", "second", "third", "fourth"], ran);
     }
 
+    // ─── a save that threw AFTER the implicit COMMIT ─────────────────
+
+    [Fact]
+    public async Task A_Save_That_Throws_After_The_Implicit_Commit_Still_Runs_Its_Effects_Once()
+    {
+        // The interleaving the boundary was blind to, on the database that decides it. With no
+        // explicit transaction open, PostgreSQL has already committed by the time EF calls the
+        // SavedChangesAsync interceptors - which is where DomainEventsInterceptor does its
+        // work. A throw from there is a throw over a row nothing can take back, and treating
+        // it as a rollback discarded the only notification the worker was going to get.
+        using var scope = _host.Services.CreateScope();
+        var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+        var postCommit = scope.ServiceProvider.GetRequiredService<IPostCommitActions>();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var ran = new List<string>();
+        CancellationToken handed = default;
+
+        var durable = NewSetting();
+        context.Settings.Add(durable);
+        postCommit.Enqueue("notify", ct =>
+        {
+            handed = ct;
+            ran.Add("notify");
+            return Task.CompletedTask;
+        });
+
+        _failAfterSave.Arm(() => new InvalidOperationException("dispatch blew up"));
+
+        // The failure still belongs to the caller: settling the queue is not swallowing it.
+        await Assert.ThrowsAsync<InvalidOperationException>(() => unitOfWork.SaveChangesAsync());
+
+        Assert.True(
+            await RowExistsAsync(durable.Key),
+            "the implicit transaction committed before SavedChangesAsync was ever called");
+        Assert.Equal(["notify"], ran);
+        Assert.False(handed.CanBeCanceled, "a durable write's effects never take the request token");
+
+        // Exactly once - the next save in this scope has nothing left to replay.
+        context.Settings.Add(NewSetting());
+        await unitOfWork.SaveChangesAsync();
+        Assert.Equal(["notify"], ran);
+    }
+
+    [Fact]
+    public async Task A_Save_Cancelled_After_The_Implicit_Commit_Still_Runs_Its_Effects_Once()
+    {
+        // Same boundary, the cancellation flavour: the client hangs up once the rows are down
+        // and a post-save interceptor observes the token, so the save throws
+        // OperationCanceledException over a committed row. Still not a rollback.
+        using var scope = _host.Services.CreateScope();
+        var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+        var postCommit = scope.ServiceProvider.GetRequiredService<IPostCommitActions>();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        using var cts = new CancellationTokenSource();
+        var ran = new List<string>();
+        CancellationToken handed = default;
+
+        var durable = NewSetting();
+        context.Settings.Add(durable);
+        postCommit.Enqueue("notify", ct =>
+        {
+            handed = ct;
+            // What a real effect does first, and what SignalR does internally.
+            ct.ThrowIfCancellationRequested();
+            ran.Add("notify");
+            return Task.CompletedTask;
+        });
+
+        _failAfterSave.Arm(() => new OperationCanceledException(cts.Token), before: cts.Cancel);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => unitOfWork.SaveChangesAsync(cts.Token));
+
+        Assert.True(cts.IsCancellationRequested);
+        Assert.True(await RowExistsAsync(durable.Key), "the row committed before the token was observed");
+        Assert.Equal(["notify"], ran);
+        Assert.False(handed.CanBeCanceled, "the drain must not depend on the request token at all");
+    }
+
+    // ─── SavedChangesAsync is not the boundary inside a transaction ───
+
+    [Fact]
+    public async Task A_Post_Save_Failure_Inside_A_Transaction_Waits_For_The_Outer_Commit()
+    {
+        // The same post-save throw one level in. Here the INSERT is in an open transaction, so
+        // SavedChangesAsync is NOT durability - nothing may fire yet - but the write is in the
+        // transaction, so when the outer boundary commits the effect is owed exactly once.
+        using var scope = _host.Services.CreateScope();
+        var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+        var postCommit = scope.ServiceProvider.GetRequiredService<IPostCommitActions>();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var ran = new List<string>();
+        var row = NewSetting();
+
+        var result = await unitOfWork.InTransactionAsync<int>(async ct =>
+        {
+            context.Settings.Add(row);
+            postCommit.Enqueue("effect of the write inside the transaction", () => ran.Add("inside"));
+            _failAfterSave.Arm(() => new InvalidOperationException("dispatch blew up"));
+
+            // The INSERT reached the server inside the open transaction; only the dispatch
+            // after it failed, so the transaction is intact and the handler carries on.
+            await Assert.ThrowsAsync<InvalidOperationException>(() => unitOfWork.SaveChangesAsync(ct));
+
+            Assert.Empty(ran);
+            Assert.False(await RowExistsAsync(row.Key), "uncommitted - no other connection may see it");
+            return Result.Success(1);
+        });
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(["inside"], ran);
+        Assert.True(await RowExistsAsync(row.Key));
+
+        // Exactly once.
+        context.Settings.Add(NewSetting());
+        await unitOfWork.SaveChangesAsync();
+        Assert.Equal(["inside"], ran);
+    }
+
+    [Fact]
+    public async Task A_Post_Save_Failure_Inside_A_Transaction_That_Rolls_Back_Runs_Nothing()
+    {
+        // And the other ending: the post-save throw propagates, the transaction rolls back,
+        // and the write it claimed goes with it. "The rows are down" is not durability while a
+        // transaction can still undo them - the rollback rule outranks the save rule.
+        using var scope = _host.Services.CreateScope();
+        var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+        var postCommit = scope.ServiceProvider.GetRequiredService<IPostCommitActions>();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var ran = new List<string>();
+        var row = NewSetting();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => unitOfWork.InTransactionAsync<int>(async ct =>
+        {
+            context.Settings.Add(row);
+            postCommit.Enqueue("effect of a write the rollback undid", () => ran.Add("inside"));
+            _failAfterSave.Arm(() => new InvalidOperationException("dispatch blew up"));
+            await unitOfWork.SaveChangesAsync(ct);
+            return Result.Success(1);
+        }));
+
+        Assert.Empty(ran);
+        Assert.False(await RowExistsAsync(row.Key));
+
+        // A later commit in the same scope must not pick the discarded action up either.
+        context.Settings.Add(NewSetting());
+        await unitOfWork.SaveChangesAsync();
+        Assert.Empty(ran);
+    }
+
+    [Fact]
+    public async Task A_Transaction_That_Throws_After_Its_Commit_Returned_Still_Runs_Its_Effects_Once()
+    {
+        // The transaction boundary's version of "a throw is not a rollback". COMMIT went to
+        // the server and came back; whatever failed afterwards cannot un-write those rows, and
+        // the request failing is not permission to drop the notification about them.
+        using var scope = _host.Services.CreateScope();
+        var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+        var postCommit = scope.ServiceProvider.GetRequiredService<IPostCommitActions>();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var ran = new List<string>();
+        CancellationToken handed = default;
+        var row = NewSetting();
+
+        _failAfterCommit.Arm();
+
+        await Assert.ThrowsAnyAsync<Exception>(() => unitOfWork.InTransactionAsync<int>(async ct =>
+        {
+            context.Settings.Add(row);
+            postCommit.Enqueue("notify", token =>
+            {
+                handed = token;
+                ran.Add("notify");
+                return Task.CompletedTask;
+            });
+            await unitOfWork.SaveChangesAsync(ct);
+            return Result.Success(1);
+        }));
+
+        Assert.True(await RowExistsAsync(row.Key), "COMMIT returned - the rows are durable");
+        Assert.Equal(["notify"], ran);
+        Assert.False(handed.CanBeCanceled, "a durable write's effects never take the request token");
+
+        // Exactly once.
+        using var later = _host.Services.CreateScope();
+        var laterContext = later.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        laterContext.Settings.Add(NewSetting());
+        await later.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync();
+        Assert.Equal(["notify"], ran);
+    }
+
+    // ─── an action enqueued in the breath before the transaction ──────
+
+    [Fact]
+    public async Task An_Action_Enqueued_Just_Before_A_Failing_Transaction_Is_Discarded_With_It()
+    {
+        // The ordering every handler is entitled to use: stage the mutation, enqueue the
+        // effect that DESCRIBES it, then open the transaction that performs it. Baselining the
+        // rollback on the queue length called that action somebody else's already-committed
+        // work and preserved it - so the next unrelated save in the scope drained a
+        // notification for a bind that had been rolled back. Both endings roll back.
+        await AssertEnqueueBeforeTransactionIsDiscardedAsync(
+            _ => Task.FromResult(Result.Failure<int>(new Error("Nope", "no"))));
+        await AssertEnqueueBeforeTransactionIsDiscardedAsync(
+            _ => throw new InvalidOperationException("work blew up"));
+    }
+
+    private async Task AssertEnqueueBeforeTransactionIsDiscardedAsync(
+        Func<CancellationToken, Task<Result<int>>> ending)
+    {
+        using var scope = _host.Services.CreateScope();
+        var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+        var postCommit = scope.ServiceProvider.GetRequiredService<IPostCommitActions>();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var ran = new List<string>();
+        var row = NewSetting();
+
+        context.Settings.Add(row);
+        postCommit.Enqueue("effect of the write the transaction was going to make", () => ran.Add("stale"));
+
+        try
+        {
+            var result = await unitOfWork.InTransactionAsync(ending);
+            Assert.True(result.IsFailure);
+        }
+        catch (InvalidOperationException)
+        {
+            // the throwing ending
+        }
+
+        Assert.Empty(ran);
+        Assert.False(await RowExistsAsync(row.Key));
+
+        // The regression itself: an unrelated later save in the same scope used to drain it.
+        context.Settings.Add(NewSetting());
+        await unitOfWork.SaveChangesAsync();
+        Assert.Empty(ran);
+    }
+
+    [Fact]
+    public async Task An_Action_Enqueued_Just_Before_A_Committing_Transaction_Runs_Once_After_It()
+    {
+        // The other half of owning it: if the transaction commits, the action it was queued
+        // for is owed - once, after the commit, and not before.
+        using var scope = _host.Services.CreateScope();
+        var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+        var postCommit = scope.ServiceProvider.GetRequiredService<IPostCommitActions>();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var ran = new List<string>();
+        var row = NewSetting();
+
+        context.Settings.Add(row);
+        postCommit.Enqueue("effect of the write the transaction makes", () => ran.Add("committed"));
+
+        var result = await unitOfWork.InTransactionAsync<int>(async ct =>
+        {
+            Assert.Empty(ran);
+            await Task.Yield();
+            return Result.Success(1);
+        });
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(["committed"], ran);
+        Assert.True(await RowExistsAsync(row.Key));
+
+        // Exactly once.
+        context.Settings.Add(NewSetting());
+        await unitOfWork.SaveChangesAsync();
+        Assert.Equal(["committed"], ran);
+    }
+
     // ─── harness ─────────────────────────────────────────────────────
 
     private static Setting NewSetting() => Setting.Create($"post-commit-{Guid.NewGuid():N}", "v", DateTime.UtcNow);
+
+    /// <summary>Asks the database, on a scope and a connection that staged none of this.</summary>
+    private async Task<bool> RowExistsAsync(string key)
+    {
+        using var scope = _host.Services.CreateScope();
+        var read = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        return await read.Settings.AsNoTracking().AnyAsync(s => s.Key == key);
+    }
+
+    /// <summary>
+    /// Fails the next save from <c>SavedChangesAsync</c> - the stage EF reaches only after the
+    /// rows are written, and after the implicit COMMIT when no explicit transaction is open.
+    /// </summary>
+    private sealed class FailAfterSave : SaveChangesInterceptor
+    {
+        private Func<Exception>? _how;
+        private Action? _before;
+
+        public void Arm(Func<Exception> how, Action? before = null)
+        {
+            _how = how;
+            _before = before;
+        }
+
+        public override ValueTask<int> SavedChangesAsync(
+            SaveChangesCompletedEventData eventData, int result, CancellationToken cancellationToken = default)
+        {
+            var how = _how;
+            var before = _before;
+            _how = null;
+            _before = null;
+
+            if (how is null)
+            {
+                return ValueTask.FromResult(result);
+            }
+
+            before?.Invoke();
+            throw how();
+        }
+    }
 
     /// <summary>Cancels a request token from EF's after-commit callback, and only when armed.</summary>
     private sealed class CancelWhenCommitted : DbTransactionInterceptor
@@ -309,6 +646,31 @@ public class PostCommitBoundaryIntegrationTests
             var cts = _cts;
             _cts = null;
             cts?.Cancel();
+            return Task.CompletedTask;
+        }
+    }
+
+    /// <summary>
+    /// Throws once from EF's after-commit callback, so the COMMIT has been sent, acknowledged
+    /// and recorded by <c>SaveDurabilityInterceptor</c> (registered ahead of this) before the
+    /// failure happens. Stands for anything that can go wrong between a successful COMMIT and
+    /// the caller getting its result.
+    /// </summary>
+    private sealed class FailAfterCommit : DbTransactionInterceptor
+    {
+        private bool _armed;
+
+        public void Arm() => _armed = true;
+
+        public override Task TransactionCommittedAsync(
+            DbTransaction transaction, TransactionEndEventData eventData, CancellationToken cancellationToken = default)
+        {
+            if (_armed)
+            {
+                _armed = false;
+                throw new InvalidOperationException("everything after the commit blew up");
+            }
+
             return Task.CompletedTask;
         }
     }

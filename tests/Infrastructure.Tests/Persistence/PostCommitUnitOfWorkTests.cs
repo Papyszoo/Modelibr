@@ -10,16 +10,17 @@ namespace Infrastructure.Tests.Persistence;
 
 /// <summary>
 /// The commit boundary itself - the real <see cref="PostCommitUnitOfWork"/> over the real
-/// <see cref="PostCommitActions"/>, not the hand-driven test double - on the two paths a save
-/// can leave it in: the request is cancelled the instant the save commits, and the save
-/// throws.
+/// <see cref="PostCommitActions"/> and the real <see cref="SaveDurabilityInterceptor"/>, not
+/// the hand-driven test double - on the ways a save can leave it: cancelled the instant it
+/// commits, thrown out before it persists anything, and thrown out AFTER it persisted.
 /// </summary>
 /// <remarks>
 /// No ambient transaction is reachable here (the InMemory provider has no transactions, so
 /// <c>Database.CurrentTransaction</c> is always null), which is exactly the shape these cases
-/// need: the drain happens at this save. The transaction-scoped half of the same behaviour is
-/// in <c>WebApi.Tests/Integration/PostCommitBoundaryIntegrationTests</c>, against real
-/// PostgreSQL.
+/// need: the drain happens at this save. The transaction-scoped half of the same behaviour,
+/// and the same post-persistence cases against a database that really commits, are in
+/// <c>WebApi.Tests/Integration/PostCommitBoundaryIntegrationTests</c> - PostgreSQL is what
+/// decides commit timing, and this file only claims the state machine around it.
 /// </remarks>
 public class PostCommitUnitOfWorkTests
 {
@@ -56,21 +57,80 @@ public class PostCommitUnitOfWorkTests
         }
     }
 
-    private static ApplicationDbContext NewContext(params IInterceptor[] interceptors)
+    /// <summary>
+    /// Fails the next save from AFTER it persisted - the stage EF reaches only once the rows
+    /// are down, and the one <see cref="DomainEventsInterceptor"/> does its work in.
+    /// </summary>
+    private sealed class FailNextSaveAfterItPersisted : SaveChangesInterceptor
     {
-        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
-            .AddInterceptors(interceptors)
-            .Options;
-        var context = new ApplicationDbContext(options);
-        context.Database.EnsureCreated();
-        return context;
+        private readonly Func<Exception> _how;
+        private readonly Action? _before;
+
+        public FailNextSaveAfterItPersisted(Func<Exception> how, Action? before = null)
+        {
+            _how = how;
+            _before = before;
+        }
+
+        public bool Armed { get; set; }
+
+        public override ValueTask<int> SavedChangesAsync(
+            SaveChangesCompletedEventData eventData, int result, CancellationToken cancellationToken = default)
+        {
+            if (Armed)
+            {
+                Armed = false;
+                _before?.Invoke();
+                throw _how();
+            }
+
+            return ValueTask.FromResult(result);
+        }
     }
 
-    private static (PostCommitActions Actions, IUnitOfWork UnitOfWork) Boundary(ApplicationDbContext context)
+    /// <summary>
+    /// One scope's worth of the production boundary: a context, the queue, and the unit of
+    /// work over both. The durability interceptor goes in FIRST, as
+    /// <c>AddInfrastructure</c> registers it - a test interceptor that throws from
+    /// <c>SavedChangesAsync</c> ahead of it would suppress the signal it exists to take.
+    /// </summary>
+    private static Scope NewScope(params IInterceptor[] interceptors)
     {
+        var databaseName = Guid.NewGuid().ToString();
+        var durability = new SaveDurabilityInterceptor();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseInMemoryDatabase(databaseName)
+            .AddInterceptors([durability, .. interceptors])
+            .Options;
+
+        var context = new ApplicationDbContext(options);
+        context.Database.EnsureCreated();
+
         var actions = new PostCommitActions(NullLogger<PostCommitActions>.Instance);
-        return (actions, new PostCommitUnitOfWork(context, actions));
+        return new Scope(
+            databaseName,
+            context,
+            actions,
+            new PostCommitUnitOfWork(context, actions, durability));
+    }
+
+    private sealed record Scope(
+        string DatabaseName,
+        ApplicationDbContext Context,
+        PostCommitActions Actions,
+        IUnitOfWork UnitOfWork)
+    {
+        public IPostCommitActions PostCommit => Actions;
+
+        /// <summary>Reads the store through a context that never staged any of it.</summary>
+        public async Task<bool> RowExistsAsync(string key)
+        {
+            var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+                .UseInMemoryDatabase(DatabaseName)
+                .Options;
+            await using var reader = new ApplicationDbContext(options);
+            return await reader.Settings.AsNoTracking().AnyAsync(s => s.Key == key);
+        }
     }
 
     private static Setting NewSetting() => Setting.Create($"post-commit-{Guid.NewGuid():N}", "v", DateTime.UtcNow);
@@ -85,13 +145,13 @@ public class PostCommitUnitOfWorkTests
         // the drain the request's token meant the notification was attempted with a token
         // already cancelled, and swallowed. The job then sat in the table with nobody told.
         using var cts = new CancellationTokenSource();
-        await using var context = NewContext(new CancelOnceSaved(cts));
-        var (actions, unitOfWork) = Boundary(context);
+        var scope = NewScope(new CancelOnceSaved(cts));
+        await using var context = scope.Context;
 
         var delivered = false;
         CancellationToken handed = default;
 
-        ((IPostCommitActions)actions).Enqueue("notify", ct =>
+        scope.PostCommit.Enqueue("notify", ct =>
         {
             handed = ct;
             // What every real effect does first, and what SignalR does internally: honour the
@@ -102,11 +162,90 @@ public class PostCommitUnitOfWorkTests
         });
 
         context.Settings.Add(NewSetting());
-        await unitOfWork.SaveChangesAsync(cts.Token);
+        await scope.UnitOfWork.SaveChangesAsync(cts.Token);
 
         Assert.True(cts.IsCancellationRequested, "the interceptor must have cancelled during the save");
         Assert.True(delivered, "the effect must survive a request cancelled after the write is durable");
         Assert.False(handed.CanBeCanceled, "the drain must not depend on the request token at all");
+    }
+
+    // ─── a save that threw AFTER its rows went down ──────────────────
+
+    [Fact]
+    public async Task A_Save_That_Throws_After_It_Persisted_Still_Runs_Its_Effects_Once()
+    {
+        // The interleaving the boundary used to be blind to. EF runs the SavedChangesAsync
+        // interceptors after the write - after the COMMIT of the implicit transaction - and
+        // that is where domain-event dispatch happens. A throw from there is a throw over a
+        // row that EXISTS, and treating it like a rollback discarded the only notification
+        // the worker was ever going to get.
+        var failure = new FailNextSaveAfterItPersisted(() => new InvalidOperationException("dispatch blew up"));
+        var scope = NewScope(failure);
+        await using var context = scope.Context;
+
+        var ran = new List<string>();
+        CancellationToken handed = default;
+
+        scope.PostCommit.Enqueue("notify", ct =>
+        {
+            handed = ct;
+            ran.Add("notify");
+            return Task.CompletedTask;
+        });
+
+        var row = NewSetting();
+        context.Settings.Add(row);
+        failure.Armed = true;
+
+        // The exception still belongs to the caller - the fix settles the queue, it does not
+        // swallow the failure.
+        await Assert.ThrowsAsync<InvalidOperationException>(() => scope.UnitOfWork.SaveChangesAsync());
+
+        Assert.True(await scope.RowExistsAsync(row.Key), "the save persisted before the interceptor threw");
+        Assert.Equal(["notify"], ran);
+        Assert.False(handed.CanBeCanceled, "a durable write's effects never take the request token");
+
+        // Exactly once: the next save in the scope has nothing left to replay.
+        context.Settings.Add(NewSetting());
+        await scope.UnitOfWork.SaveChangesAsync();
+        Assert.Equal(["notify"], ran);
+    }
+
+    [Fact]
+    public async Task A_Save_Whose_Token_Is_Cancelled_After_It_Persisted_Still_Runs_Its_Effects_Once()
+    {
+        // Same boundary, the cancellation flavour: the request is cancelled once the rows are
+        // down and a post-save interceptor observes it, so the save throws
+        // OperationCanceledException over a durable row. That is not a rollback either.
+        using var cts = new CancellationTokenSource();
+        var failure = new FailNextSaveAfterItPersisted(
+            () => new OperationCanceledException(cts.Token),
+            before: cts.Cancel);
+        var scope = NewScope(failure);
+        await using var context = scope.Context;
+
+        var ran = new List<string>();
+        CancellationToken handed = default;
+
+        scope.PostCommit.Enqueue("notify", ct =>
+        {
+            handed = ct;
+            ct.ThrowIfCancellationRequested();
+            ran.Add("notify");
+            return Task.CompletedTask;
+        });
+
+        var row = NewSetting();
+        context.Settings.Add(row);
+        failure.Armed = true;
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => scope.UnitOfWork.SaveChangesAsync(cts.Token));
+
+        Assert.True(cts.IsCancellationRequested);
+        Assert.True(await scope.RowExistsAsync(row.Key), "the save persisted before the token was observed");
+        Assert.Equal(["notify"], ran);
+        Assert.False(handed.CanBeCanceled, "a durable write's effects never take the request token");
     }
 
     // ─── a save that never landed ────────────────────────────────────
@@ -119,21 +258,24 @@ public class PostCommitUnitOfWorkTests
         // action behind, and the next successful save in the same scope used to drain it:
         // workers sent after a job that was never written.
         var failure = new FailNextSave();
-        await using var context = NewContext(failure);
-        var (actions, unitOfWork) = Boundary(context);
+        var scope = NewScope(failure);
+        await using var context = scope.Context;
 
         var ran = new List<string>();
-        ((IPostCommitActions)actions).Enqueue("notify about the job that failed", () => ran.Add("stale"));
+        scope.PostCommit.Enqueue("notify about the job that failed", () => ran.Add("stale"));
 
         failure.Armed = true;
-        context.Settings.Add(NewSetting());
-        await Assert.ThrowsAsync<InvalidOperationException>(() => unitOfWork.SaveChangesAsync());
+        var refused = NewSetting();
+        context.Settings.Add(refused);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => scope.UnitOfWork.SaveChangesAsync());
 
         Assert.Empty(ran);
+        Assert.False(await scope.RowExistsAsync(refused.Key), "nothing reached the store");
+        context.Entry(refused).State = EntityState.Detached;
 
         // Any later work in the same scope - the same request retrying, a second queue write.
         context.Settings.Add(NewSetting());
-        await unitOfWork.SaveChangesAsync();
+        await scope.UnitOfWork.SaveChangesAsync();
 
         Assert.Empty(ran);
     }
@@ -145,23 +287,25 @@ public class PostCommitUnitOfWorkTests
         // has nothing of its own to confuse with it - and must not reach past its own
         // registrations for anything registered afterwards either.
         var failure = new FailNextSave();
-        await using var context = NewContext(failure);
-        var (actions, unitOfWork) = Boundary(context);
+        var scope = NewScope(failure);
+        await using var context = scope.Context;
 
         var ran = new List<string>();
-        ((IPostCommitActions)actions).Enqueue("first", () => ran.Add("first"));
+        scope.PostCommit.Enqueue("first", () => ran.Add("first"));
         context.Settings.Add(NewSetting());
-        await unitOfWork.SaveChangesAsync();
+        await scope.UnitOfWork.SaveChangesAsync();
         Assert.Equal(["first"], ran);
 
-        ((IPostCommitActions)actions).Enqueue("second", () => ran.Add("second"));
+        scope.PostCommit.Enqueue("second", () => ran.Add("second"));
         failure.Armed = true;
-        context.Settings.Add(NewSetting());
-        await Assert.ThrowsAsync<InvalidOperationException>(() => unitOfWork.SaveChangesAsync());
+        var refused = NewSetting();
+        context.Settings.Add(refused);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => scope.UnitOfWork.SaveChangesAsync());
+        context.Entry(refused).State = EntityState.Detached;
 
-        ((IPostCommitActions)actions).Enqueue("third", () => ran.Add("third"));
+        scope.PostCommit.Enqueue("third", () => ran.Add("third"));
         context.Settings.Add(NewSetting());
-        await unitOfWork.SaveChangesAsync();
+        await scope.UnitOfWork.SaveChangesAsync();
 
         // "second" belonged to the save that threw; "first" had already run once and must not
         // run again; "third" belongs to the save that succeeded.
@@ -173,41 +317,65 @@ public class PostCommitUnitOfWorkTests
     [Fact]
     public async Task Actions_Run_In_Order_And_Exactly_Once()
     {
-        await using var context = NewContext();
-        var (actions, unitOfWork) = Boundary(context);
+        var scope = NewScope();
+        await using var context = scope.Context;
 
         var ran = new List<string>();
-        ((IPostCommitActions)actions).Enqueue("a", () => ran.Add("a"));
-        ((IPostCommitActions)actions).Enqueue("b", () => ran.Add("b"));
-        ((IPostCommitActions)actions).Enqueue("c", () => ran.Add("c"));
+        scope.PostCommit.Enqueue("a", () => ran.Add("a"));
+        scope.PostCommit.Enqueue("b", () => ran.Add("b"));
+        scope.PostCommit.Enqueue("c", () => ran.Add("c"));
 
         context.Settings.Add(NewSetting());
-        await unitOfWork.SaveChangesAsync();
+        await scope.UnitOfWork.SaveChangesAsync();
         Assert.Equal(["a", "b", "c"], ran);
 
         // A second commit in the same scope has nothing left to say.
         context.Settings.Add(NewSetting());
-        await unitOfWork.SaveChangesAsync();
+        await scope.UnitOfWork.SaveChangesAsync();
         Assert.Equal(["a", "b", "c"], ran);
     }
 
     [Fact]
     public async Task An_Effect_That_Throws_Does_Not_Report_The_Commit_As_Failed()
     {
-        await using var context = NewContext();
-        var (actions, unitOfWork) = Boundary(context);
+        var scope = NewScope();
+        await using var context = scope.Context;
 
         var ran = new List<string>();
-        ((IPostCommitActions)actions).Enqueue("throws", () => throw new InvalidOperationException("notify failed"));
-        ((IPostCommitActions)actions).Enqueue("after", () => ran.Add("after"));
+        scope.PostCommit.Enqueue("throws", () => throw new InvalidOperationException("notify failed"));
+        scope.PostCommit.Enqueue("after", () => ran.Add("after"));
 
         var setting = NewSetting();
         context.Settings.Add(setting);
-        await unitOfWork.SaveChangesAsync();
+        await scope.UnitOfWork.SaveChangesAsync();
 
         // The write is durable, so the request must not be told otherwise - and the rest of
         // the queue still gets its turn.
         Assert.Equal(["after"], ran);
         Assert.NotNull(await context.Settings.AsNoTracking().SingleOrDefaultAsync(s => s.Key == setting.Key));
+    }
+
+    [Fact]
+    public async Task An_Effect_That_Throws_After_A_Post_Persistence_Failure_Still_Does_Not_Mask_The_Save()
+    {
+        // The two "an error here must not lie about the write" rules meeting: the save threw
+        // after persisting, and one of the effects it is owed throws too. The effect failure
+        // is logged and the rest of the queue still runs; the SAVE's exception is what the
+        // caller sees, unchanged.
+        var failure = new FailNextSaveAfterItPersisted(() => new InvalidOperationException("dispatch blew up"));
+        var scope = NewScope(failure);
+        await using var context = scope.Context;
+
+        var ran = new List<string>();
+        scope.PostCommit.Enqueue("throws", () => throw new NotSupportedException("notify failed"));
+        scope.PostCommit.Enqueue("after", () => ran.Add("after"));
+
+        context.Settings.Add(NewSetting());
+        failure.Armed = true;
+
+        var thrown = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => scope.UnitOfWork.SaveChangesAsync());
+        Assert.Equal("dispatch blew up", thrown.Message);
+        Assert.Equal(["after"], ran);
     }
 }

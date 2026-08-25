@@ -17,8 +17,10 @@ namespace Infrastructure
         public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
         {
             // Scoped, not Singleton: DomainEventsInterceptor keeps per-save
-            // recursion-guard state that must not leak across requests.
+            // recursion-guard state that must not leak across requests, and
+            // SaveDurabilityInterceptor's counters describe one scope's writes.
             services.AddScoped<DomainEventsInterceptor>();
+            services.AddScoped<SaveDurabilityInterceptor>();
 
             services.AddDbContext<ApplicationDbContext>((sp, optionsBuilder) =>
             {
@@ -33,7 +35,14 @@ namespace Infrastructure
 
                 optionsBuilder
                     .UseNpgsql(connectionString)
-                    .AddInterceptors(sp.GetRequiredService<DomainEventsInterceptor>());
+                    // ORDER IS LOAD-BEARING. EF runs the SavedChangesAsync interceptors in
+                    // registration order and stops at the first one that throws, so the
+                    // durability signal has to be taken before anything that can throw takes
+                    // it away - DomainEventsInterceptor dispatches domain events from there,
+                    // over the request's token. See SaveDurabilityInterceptor.
+                    .AddInterceptors(
+                        sp.GetRequiredService<SaveDurabilityInterceptor>(),
+                        sp.GetRequiredService<DomainEventsInterceptor>());
             });
 
             // Side effects that must wait for the commit - see IPostCommitActions. Registered
@@ -46,7 +55,8 @@ namespace Infrastructure
             // the queued after-commit effects are allowed to happen.
             services.AddScoped<IUnitOfWork>(sp => new PostCommitUnitOfWork(
                 sp.GetRequiredService<ApplicationDbContext>(),
-                sp.GetRequiredService<PostCommitActions>()));
+                sp.GetRequiredService<PostCommitActions>(),
+                sp.GetRequiredService<SaveDurabilityInterceptor>()));
             services.AddScoped<IChangeTrackerReset>(sp => sp.GetRequiredService<ApplicationDbContext>());
 
             services.AddScoped<IModelRepository, ModelRepository>();

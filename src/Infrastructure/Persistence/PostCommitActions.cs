@@ -15,12 +15,12 @@ namespace Infrastructure.Persistence;
 /// before reaching a commit. The drain is driven by <see cref="PostCommitUnitOfWork"/>.
 /// </para>
 /// <para>
-/// Two boundaries, not one, because they answer different questions. <see cref="Mark"/> is
-/// "where did this transaction start", used to undo a rollback's registrations.
-/// <see cref="MarkSaved"/>/<see cref="DiscardUnsaved"/> track "which of these has a save
-/// behind it", which is what a FAILED save needs: callers register before saving (they have
-/// to - the effect describes the row the save is about to write), so the only actions a
-/// failed save may take back are the ones no earlier save has claimed.
+/// One boundary answers both questions, and it is the CLAIMED boundary - how many of the
+/// queued actions a successful save is already carrying. A FAILED save needs it because
+/// callers register before saving (they have to - the effect describes the row the save is
+/// about to write), so the only actions it may take back are the ones no earlier save has
+/// claimed. A ROLLBACK needs the same number as the baseline it was handed on the way in:
+/// see <see cref="ClaimedBoundary"/> for why the raw queue length is the wrong one.
 /// </para>
 /// </remarks>
 internal sealed class PostCommitActions : IPostCommitActions
@@ -50,8 +50,22 @@ internal sealed class PostCommitActions : IPostCommitActions
             return Task.CompletedTask;
         }));
 
-    /// <summary>How many actions are registered, so a transaction can undo exactly its own.</summary>
-    public int Mark => _pending.Count;
+    /// <summary>
+    /// The baseline a transaction records on the way in, so a rollback can undo exactly what
+    /// that transaction is answerable for.
+    /// </summary>
+    /// <remarks>
+    /// The CLAIMED boundary, not the queue length. The queue length looks like the obvious
+    /// answer - "everything registered before this transaction began belongs to an earlier
+    /// write" - and it is wrong for this queue, because a successful save outside a
+    /// transaction DRAINS immediately: an action still sitting here unclaimed is not evidence
+    /// of an earlier durable write, it is evidence that its write has not happened yet. The
+    /// ordinary handler shape is stage the mutation, enqueue the effect that describes it,
+    /// THEN open the transaction that performs it - and the queue length baseline preserved
+    /// that effect through the rollback of the very transaction that was supposed to make it
+    /// true, for a later unrelated save in the scope to drain.
+    /// </remarks>
+    public int ClaimedBoundary => _saved;
 
     /// <summary>
     /// A save succeeded, so everything queued now belongs to a write that exists. Called for a
@@ -68,13 +82,13 @@ internal sealed class PostCommitActions : IPostCommitActions
     public void DiscardUnsaved() => TruncateTo(_saved);
 
     /// <summary>
-    /// Drops everything registered since <paramref name="mark"/>. A rollback must emit none of
-    /// the effects the work inside it asked for - and only those: an action registered earlier
-    /// in the scope belongs to a write that already committed. This ignores
-    /// <see cref="MarkSaved"/>, deliberately: the saves made inside a transaction are exactly
-    /// the ones the rollback throws away.
+    /// Drops everything registered since <paramref name="baseline"/>, which callers take from
+    /// <see cref="ClaimedBoundary"/>. A rollback must emit none of the effects the work it
+    /// undid asked for, and that includes the ones a nested save already claimed - the saves
+    /// made inside a transaction are exactly what the rollback throws away, so this
+    /// deliberately overrules <see cref="MarkSaved"/> rather than respecting it.
     /// </summary>
-    public void DiscardFrom(int mark) => TruncateTo(mark);
+    public void DiscardFrom(int baseline) => TruncateTo(baseline);
 
     /// <summary>
     /// Runs every registered action, in order, and clears the queue.
