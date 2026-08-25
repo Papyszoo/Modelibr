@@ -1,4 +1,4 @@
-import { act, screen, waitFor } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { client } from '@/lib/apiBase'
@@ -317,6 +317,27 @@ describe('AssetMetadataPanel - the category picker', () => {
     await screen.findByTestId('metadata-category-category')
 
     await waitFor(() => expect(requested).toContain('/model-categories'))
+  })
+
+  it('reads an EnvironmentMap category from the environment-map tree', async () => {
+    // The env-map viewer's Metadata panel depends on this family being wired at
+    // all - an unlisted family falls through to the empty picker, which offers
+    // nothing and reports no error. It also pins the SHAPE: this family's api
+    // module unwraps `.categories` itself, so its cached value is already an
+    // array, where Sound's and Sprite's are still `{ categories }`. Selecting
+    // the wrong one of the two gives an empty dropdown and no error either.
+    setup({ assetType: 'EnvironmentMap' })
+
+    const select = await screen.findByTestId('metadata-category-category')
+
+    await waitFor(() =>
+      expect(requested).toContain('/environment-map-categories')
+    )
+    await waitFor(() =>
+      expect(
+        within(select).getByRole('option', { name: 'Props / Furniture' })
+      ).toBeInTheDocument()
+    )
   })
 
   it('reads a Material category from the UNIVERSAL half of the texture-set tree', async () => {

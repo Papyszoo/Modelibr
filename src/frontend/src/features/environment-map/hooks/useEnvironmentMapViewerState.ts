@@ -12,7 +12,7 @@ import {
 } from '@/features/model-viewer/components/PanelWrapper'
 import { useTabUiState } from '@/hooks/useTabUiState'
 
-export type ViewerPanelContent = 'information' | 'thumbnail' | null
+export type ViewerPanelContent = 'information' | 'thumbnail' | 'metadata' | null
 
 export interface ViewerCornerState {
   topLeft: 'vertical' | 'horizontal'
@@ -67,6 +67,9 @@ export const PANEL_OPTIONS: Array<{
 }> = [
   { label: 'Informations', value: 'information', icon: 'pi pi-info-circle' },
   { label: 'Thumbnail', value: 'thumbnail', icon: 'pi pi-image' },
+  // The same schema-driven panel the model viewer offers. What an asset can say
+  // about itself is one contract, not one per family - see AssetMetadataPanel.
+  { label: 'Metadata', value: 'metadata', icon: 'pi pi-tags' },
 ]
 
 export function useEnvironmentMapViewerState(stableTabId: string) {

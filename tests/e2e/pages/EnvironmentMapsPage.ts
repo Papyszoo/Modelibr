@@ -884,11 +884,25 @@ export class EnvironmentMapsPage {
         return menuItem;
     }
 
+    /** What each viewer panel puts on the page once it is open. */
+    private static readonly VIEWER_PANEL_SELECTORS: Record<string, string> = {
+        Informations: ".environment-map-detail-list",
+        Thumbnail: ".environment-map-thumbnail-panel",
+        Metadata: '[data-testid="asset-metadata"]',
+    };
+
+    /** Opens the viewer's schema-driven metadata panel. */
+    async openViewerMetadataPanel(): Promise<void> {
+        await this.openViewerPanel("Left Panel", "Metadata");
+    }
+
     private async openViewerPanel(menuName: string, itemLabel: string): Promise<void> {
+        // A lookup, not a ternary: with a third panel a ternary silently waits
+        // for the wrong one, and then reports the panel open because the OLD one
+        // is.
         const panelSelector =
-            itemLabel === "Informations"
-                ? ".environment-map-detail-list"
-                : ".environment-map-thumbnail-panel";
+            EnvironmentMapsPage.VIEWER_PANEL_SELECTORS[itemLabel] ??
+            ".environment-map-thumbnail-panel";
 
         if (await this.page.locator(panelSelector).isVisible().catch(() => false)) {
             return;

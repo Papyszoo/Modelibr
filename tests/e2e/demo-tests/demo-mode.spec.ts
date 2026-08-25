@@ -243,6 +243,56 @@ test.describe("demo mode e2e", () => {
         ).toContainText("Basic Texture Set");
     });
 
+    test("opens the model viewer's metadata panel in demo mode", async ({
+        page,
+    }) => {
+        // Nothing covered the metadata panel here, and the demo is the only
+        // layer that can: every unit test of the panel mocks the api module, so
+        // none of them exercises the MSW handlers behind it. Those handlers
+        // (systemHandlers, `9bec1027`) exist precisely because an unmocked
+        // metadata route comes back as the SPA's own index.html - and a panel
+        // reading a field off a string throws during render and unmounts the
+        // viewer around it.
+        const modelListPage = new ModelListPage(page);
+        const modelViewerPage = new ModelViewerPage(page);
+
+        await modelListPage.openModel("Test Cylinder");
+        await modelViewerPage.waitForModelLoaded();
+        await modelViewerPage.openTab(
+            "Metadata",
+            '[data-testid="asset-metadata"]',
+        );
+
+        const panel = page.locator('[data-testid="asset-metadata"]');
+        // The viewer is still standing - the assertion the crash would fail -
+        // and the panel rendered fields rather than an empty form.
+        await expect(panel).toBeVisible();
+        await expect(panel.getByLabel("Description")).toBeVisible();
+        await expect(
+            panel.locator('[data-testid="metadata-category-category"]'),
+        ).toBeVisible();
+    });
+
+    test("opens the environment map viewer's metadata panel in demo mode", async ({
+        page,
+    }) => {
+        // The same panel on its second host. It reads its fields from the schema
+        // for the family it is given, so mounting it with the wrong assetType -
+        // or on a family the schema does not carry - is an empty form and no
+        // error anywhere.
+        const environmentMapsPage = new EnvironmentMapsPage(page);
+
+        await environmentMapsPage.goto();
+        await environmentMapsPage.openEnvironmentMapByName("City Night Lights");
+        await environmentMapsPage.openViewerMetadataPanel();
+
+        const panel = page.locator('[data-testid="asset-metadata"]');
+        await expect(panel).toBeVisible();
+        await expect(
+            panel.locator('[data-testid="metadata-category-category"]'),
+        ).toBeVisible();
+    });
+
     // @serial: asserts the model-viewer <canvas> is visible - GPU render flake.
     test("uploads a model and records it in upload history", { tag: "@serial" }, async ({
         page,
