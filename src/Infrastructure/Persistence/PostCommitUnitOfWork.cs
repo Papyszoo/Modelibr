@@ -171,9 +171,12 @@ internal sealed class PostCommitUnitOfWork : IUnitOfWork
     /// With no transaction open the save itself was the commit, so the effects run here.
     /// The claim itself has already happened by the time this runs:
     /// <see cref="SaveDurabilityInterceptor"/> makes it at the moment the rows land, because
-    /// domain-event dispatch can re-enter this unit of work before control gets back here.
-    /// Repeating it costs nothing and still answers the one case EF never reports a write for -
-    /// a save with nothing staged.
+    /// domain-event dispatch can re-enter this unit of work before control gets back here. So
+    /// the <c>MarkSaved</c> below is redundant on every path measured - EF raises
+    /// <c>SavedChangesAsync</c> even for a save with nothing staged, which was the one case
+    /// suspected of skipping it. It is kept because it costs nothing and the boundary stays
+    /// right if some future provider path ever does return without raising it; it must never
+    /// be the ONLY claim, which is the bug this file used to have.
     /// </remarks>
     private Task SettleAsync()
     {

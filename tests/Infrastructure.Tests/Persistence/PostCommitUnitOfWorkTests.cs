@@ -446,6 +446,31 @@ public class PostCommitUnitOfWorkTests
     }
 
     [Fact]
+    public async Task A_Save_With_Nothing_Staged_Still_Settles_Its_Queue_Once()
+    {
+        // The edge the claim's placement turns on. EF DOES raise SavedChangesAsync for a
+        // save with no entries - measured, not assumed - so the durability interceptor
+        // claims and the boundary drains, exactly as it would for a save that wrote a row.
+        // Worth pinning because the reasoning behind moving the claim into that callback
+        // rests on it: if a save could reach the boundary without EF having reported it,
+        // the claim would have to happen in two places, and the second one is the bug this
+        // file used to have.
+        var scope = NewScope();
+        await using var context = scope.Context;
+
+        var ran = new List<string>();
+        scope.PostCommit.Enqueue("notify", () => ran.Add("notify"));
+
+        await scope.UnitOfWork.SaveChangesAsync();
+        Assert.Equal(["notify"], ran);
+
+        // And nothing is left behind for the next save to replay.
+        context.Settings.Add(NewSetting());
+        await scope.UnitOfWork.SaveChangesAsync();
+        Assert.Equal(["notify"], ran);
+    }
+
+    [Fact]
     public async Task An_Effect_That_Throws_Does_Not_Report_The_Commit_As_Failed()
     {
         var scope = NewScope();
