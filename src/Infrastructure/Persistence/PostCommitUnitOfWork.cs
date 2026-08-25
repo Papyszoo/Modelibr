@@ -169,6 +169,11 @@ internal sealed class PostCommitUnitOfWork : IUnitOfWork
     /// that owns the transaction drains when it commits - but the write IS in that transaction
     /// now, so a later failing save must no longer be able to discard what this one carried.
     /// With no transaction open the save itself was the commit, so the effects run here.
+    /// The claim itself has already happened by the time this runs:
+    /// <see cref="SaveDurabilityInterceptor"/> makes it at the moment the rows land, because
+    /// domain-event dispatch can re-enter this unit of work before control gets back here.
+    /// Repeating it costs nothing and still answers the one case EF never reports a write for -
+    /// a save with nothing staged.
     /// </remarks>
     private Task SettleAsync()
     {

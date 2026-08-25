@@ -1,9 +1,15 @@
 using Application.Abstractions;
+using Application.Abstractions.Messaging;
+using Application.Abstractions.Services;
+using Domain.Events;
 using Domain.Models;
 using Infrastructure.Persistence;
+using Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using SharedKernel;
 using Xunit;
 
 namespace Infrastructure.Tests.Persistence;
@@ -95,18 +101,26 @@ public class PostCommitUnitOfWorkTests
     /// <c>SavedChangesAsync</c> ahead of it would suppress the signal it exists to take.
     /// </summary>
     private static Scope NewScope(params IInterceptor[] interceptors)
+        => NewScope(_ => interceptors);
+
+    /// <summary>
+    /// The same, for interceptors that need the queue this scope is built around -
+    /// <see cref="DomainEventsInterceptor"/>'s handlers save through the very unit of work
+    /// under test.
+    /// </summary>
+    private static Scope NewScope(Func<PostCommitActions, IInterceptor[]> interceptors)
     {
         var databaseName = Guid.NewGuid().ToString();
-        var durability = new SaveDurabilityInterceptor();
+        var actions = new PostCommitActions(NullLogger<PostCommitActions>.Instance);
+        var durability = new SaveDurabilityInterceptor(actions);
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(databaseName)
-            .AddInterceptors([durability, .. interceptors])
+            .AddInterceptors([durability, .. interceptors(actions)])
             .Options;
 
         var context = new ApplicationDbContext(options);
         context.Database.EnsureCreated();
 
-        var actions = new PostCommitActions(NullLogger<PostCommitActions>.Instance);
         return new Scope(
             databaseName,
             context,
@@ -312,6 +326,102 @@ public class PostCommitUnitOfWorkTests
         Assert.Equal(["first", "third"], ran);
     }
 
+    // ─── a nested save, made from inside domain-event dispatch ───────
+
+    [Fact]
+    public async Task A_Nested_Save_That_Fails_Does_Not_Take_The_Outer_Saves_Effects_With_It()
+    {
+        // The re-entrant interleaving, over the real dispatch path rather than a stand-in for
+        // it. EF reaches SavedChangesAsync once the outer save's rows are down;
+        // DomainEventsInterceptor dispatches from there; the handler saves through the same
+        // unit of work; that nested save is refused before it persists and asks the queue what
+        // it may take back. The outer save is still inside its own SavedChangesAsync chain at
+        // that moment - so if the queue does not already know which actions are the outer
+        // save's, the nested failure takes them, and the handler converting its own failure
+        // (ModelUploadedEventHandler converts every exception it can produce) lets the outer
+        // save return normally over an emptied queue. A durable row, and nobody told.
+        var refuse = new FailNextSave();
+        var handler = new SaveAgainWhileDispatching();
+        var scope = NewScope(_ =>
+        [
+            new DomainEventsInterceptor(DispatcherFor(handler), NullLogger<DomainEventsInterceptor>.Instance),
+            refuse,
+        ]);
+        await using var context = scope.Context;
+
+        var ran = new List<string>();
+        var refused = NewSetting();
+
+        handler.Behaviour = async ct =>
+        {
+            // What every caller does: register the effect that describes the row this save is
+            // about to write, then save.
+            scope.PostCommit.Enqueue("B", () => ran.Add("B"));
+            context.Settings.Add(refused);
+            refuse.Armed = true;
+            try
+            {
+                await scope.UnitOfWork.SaveChangesAsync(ct);
+            }
+            finally
+            {
+                // A failed nested operation abandons its own staged row - StoreImportProcessor
+                // clears the change tracker on exactly this path. Without it the interceptor's
+                // post-dispatch flush would adopt the refused row and write it.
+                context.Entry(refused).State = EntityState.Detached;
+            }
+        };
+
+        scope.PostCommit.Enqueue("A", () => ran.Add("A"));
+        context.EnvironmentMaps.Add(EnvironmentMap.Create($"post-commit-{Guid.NewGuid():N}", DateTime.UtcNow));
+
+        // Returns normally - the nested failure never reaches this caller.
+        await scope.UnitOfWork.SaveChangesAsync();
+
+        Assert.Equal(["A"], ran);
+        Assert.False(await scope.RowExistsAsync(refused.Key), "the nested save reached nothing");
+
+        // Neither one is left armed for the next write in this scope to drain.
+        context.Settings.Add(NewSetting());
+        await scope.UnitOfWork.SaveChangesAsync();
+        Assert.Equal(["A"], ran);
+    }
+
+    [Fact]
+    public async Task A_Nested_Save_That_Succeeds_Carries_Both_Saves_Effects_Once()
+    {
+        // The same route with the nested save allowed to land. Its own drain is the outermost
+        // one that happens - there is no transaction here - so it takes both effects, and the
+        // outer save must not replay them when it settles afterwards.
+        var handler = new SaveAgainWhileDispatching();
+        var scope = NewScope(_ =>
+        [
+            new DomainEventsInterceptor(DispatcherFor(handler), NullLogger<DomainEventsInterceptor>.Instance),
+        ]);
+        await using var context = scope.Context;
+
+        var ran = new List<string>();
+        var nested = NewSetting();
+
+        handler.Behaviour = async ct =>
+        {
+            scope.PostCommit.Enqueue("B", () => ran.Add("B"));
+            context.Settings.Add(nested);
+            await scope.UnitOfWork.SaveChangesAsync(ct);
+        };
+
+        scope.PostCommit.Enqueue("A", () => ran.Add("A"));
+        context.EnvironmentMaps.Add(EnvironmentMap.Create($"post-commit-{Guid.NewGuid():N}", DateTime.UtcNow));
+        await scope.UnitOfWork.SaveChangesAsync();
+
+        Assert.Equal(["A", "B"], ran);
+        Assert.True(await scope.RowExistsAsync(nested.Key), "the nested save landed");
+
+        context.Settings.Add(NewSetting());
+        await scope.UnitOfWork.SaveChangesAsync();
+        Assert.Equal(["A", "B"], ran);
+    }
+
     // ─── the guarantees the above must not have broken ───────────────
 
     [Fact]
@@ -377,5 +487,52 @@ public class PostCommitUnitOfWorkTests
             () => scope.UnitOfWork.SaveChangesAsync());
         Assert.Equal("dispatch blew up", thrown.Message);
         Assert.Equal(["after"], ran);
+    }
+
+    /// <summary>
+    /// A real <see cref="DomainEventDispatcher"/> over one handler, so the nested save above
+    /// travels the production route - interceptor, dispatcher, handler - rather than a
+    /// hand-made imitation of it. The dispatcher's own catch is part of what is under test:
+    /// it turns a handler that throws into a failure Result nobody upstream reads.
+    /// </summary>
+    private static IDomainEventDispatcher DispatcherFor<TEvent>(IDomainEventHandler<TEvent> handler)
+        where TEvent : IDomainEvent
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(handler);
+        return new DomainEventDispatcher(
+            services.BuildServiceProvider(),
+            NullLogger<DomainEventDispatcher>.Instance);
+    }
+
+    /// <summary>
+    /// Stands where <c>ModelUploadedEventHandler</c> stands: a handler that reacts to a
+    /// persisted event by writing more, and converts its own failure into a failure Result
+    /// instead of letting it out.
+    /// </summary>
+    private sealed class SaveAgainWhileDispatching : IDomainEventHandler<EnvironmentMapCreatedEvent>
+    {
+        public Func<CancellationToken, Task>? Behaviour { get; set; }
+
+        public async Task<Result> Handle(EnvironmentMapCreatedEvent domainEvent, CancellationToken cancellationToken)
+        {
+            var behaviour = Behaviour;
+            Behaviour = null;
+
+            if (behaviour is null)
+            {
+                return Result.Success();
+            }
+
+            try
+            {
+                await behaviour(cancellationToken);
+                return Result.Success();
+            }
+            catch (Exception ex)
+            {
+                return Result.Failure(new Error("NestedSaveFailed", ex.Message));
+            }
+        }
     }
 }

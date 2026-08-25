@@ -1,5 +1,7 @@
 using System.Data.Common;
 using Application.Abstractions;
+using Application.Abstractions.Messaging;
+using Domain.Events;
 using Domain.Models;
 using Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -54,6 +56,7 @@ public class PostCommitBoundaryIntegrationTests
     private readonly FailNextSave _failNextSave = new();
     private readonly FailAfterSave _failAfterSave = new();
     private readonly FailAfterCommit _failAfterCommit = new();
+    private readonly ReentrantHandler _reentrant = new();
     private WebApplicationFactory<Program> _host = null!;
 
     public PostCommitBoundaryIntegrationTests(ModelibrWebFactory factory)
@@ -83,6 +86,13 @@ public class PostCommitBoundaryIntegrationTests
                     _failNextSave,
                     _failAfterSave,
                     _failAfterCommit));
+
+            // A real IDomainEventHandler, alongside the production ones, so the re-entrant
+            // save below travels the production route: EF's SavedChangesAsync ->
+            // DomainEventsInterceptor -> DomainEventDispatcher -> a handler that saves
+            // through the same scoped unit of work. Nothing here reaches into the queue.
+            services.AddSingleton(_reentrant);
+            services.AddScoped<IDomainEventHandler<EnvironmentMapCreatedEvent>, ReentrantSaveHandler>();
         }));
 
         using var scope = _host.Services.CreateScope();
@@ -588,7 +598,214 @@ public class PostCommitBoundaryIntegrationTests
         Assert.Equal(["committed"], ran);
     }
 
+    // ─── a nested save, made from inside domain-event dispatch ───────
+
+    [Fact]
+    public async Task A_Nested_Save_That_Fails_Does_Not_Take_The_Outer_Saves_Effects_With_It()
+    {
+        // The re-entrant interleaving, on the production route. EF's SavedChangesAsync fires
+        // once the outer save's rows are down; DomainEventsInterceptor dispatches from there;
+        // a handler saves through the same scoped unit of work; that nested save is refused
+        // before it reaches the server. The nested boundary is then asked which of the queued
+        // effects it may take back - and the outer save, still inside its own SavedChangesAsync
+        // chain, has not been able to say which ones are already its own.
+        using var scope = _host.Services.CreateScope();
+        var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+        var postCommit = scope.ServiceProvider.GetRequiredService<IPostCommitActions>();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var ran = new List<string>();
+        var refused = NewSetting();
+        ArmNestedSaveThatFailsBeforePersisting(refused, () => ran.Add("B"));
+
+        postCommit.Enqueue("A", () => ran.Add("A"));
+        var map = NewEnvironmentMap();
+        context.EnvironmentMaps.Add(map);
+
+        // Returns normally: dispatch converted the nested failure into a failure Result, the
+        // way ModelUploadedEventHandler converts one and the way DomainEventDispatcher
+        // converts a handler that throws. Nothing about it reaches this caller.
+        await unitOfWork.SaveChangesAsync();
+
+        Assert.Equal(["A"], ran);
+        Assert.True(await EnvironmentMapExistsAsync(map.Name), "the outer save is durable");
+        Assert.False(await RowExistsAsync(refused.Key), "the nested save reached nothing");
+
+        // Neither effect is left armed for the next write in this scope to drain.
+        context.Settings.Add(NewSetting());
+        await unitOfWork.SaveChangesAsync();
+        Assert.Equal(["A"], ran);
+    }
+
+    [Fact]
+    public async Task A_Nested_Save_That_Fails_Inside_A_Transaction_Does_Not_Take_The_Committed_Effects_With_It()
+    {
+        // Same interleaving with an explicit transaction open, where the save is not the
+        // durability point and the COMMIT is. The nested failure still must not reach past
+        // what the outer save is carrying.
+        using var scope = _host.Services.CreateScope();
+        var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+        var postCommit = scope.ServiceProvider.GetRequiredService<IPostCommitActions>();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var ran = new List<string>();
+        var refused = NewSetting();
+        ArmNestedSaveThatFailsBeforePersisting(refused, () => ran.Add("B"));
+
+        var map = NewEnvironmentMap();
+        var result = await unitOfWork.InTransactionAsync<int>(async ct =>
+        {
+            postCommit.Enqueue("A", () => ran.Add("A"));
+            context.EnvironmentMaps.Add(map);
+            await unitOfWork.SaveChangesAsync(ct);
+            return Result.Success(1);
+        });
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(["A"], ran);
+        Assert.True(await EnvironmentMapExistsAsync(map.Name), "the transaction committed");
+        Assert.False(await RowExistsAsync(refused.Key), "the nested save reached nothing");
+
+        context.Settings.Add(NewSetting());
+        await unitOfWork.SaveChangesAsync();
+        Assert.Equal(["A"], ran);
+    }
+
+    [Fact]
+    public async Task A_Rollback_Still_Outranks_What_A_Nested_Save_Left_The_Queue()
+    {
+        // The other half of the transaction case: claiming the outer save's effects early
+        // must not make them survive the rollback of the transaction that was supposed to
+        // make them true. DiscardFrom outranks the claim, and still does.
+        using var scope = _host.Services.CreateScope();
+        var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+        var postCommit = scope.ServiceProvider.GetRequiredService<IPostCommitActions>();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var ran = new List<string>();
+        var refused = NewSetting();
+        ArmNestedSaveThatFailsBeforePersisting(refused, () => ran.Add("B"));
+
+        var map = NewEnvironmentMap();
+        var result = await unitOfWork.InTransactionAsync<int>(async ct =>
+        {
+            postCommit.Enqueue("A", () => ran.Add("A"));
+            context.EnvironmentMaps.Add(map);
+            await unitOfWork.SaveChangesAsync(ct);
+            return Result.Failure<int>(new Error("Nope", "the work decided against itself"));
+        });
+
+        Assert.True(result.IsFailure);
+        Assert.Empty(ran);
+        Assert.False(await EnvironmentMapExistsAsync(map.Name), "the transaction rolled back");
+        Assert.False(await RowExistsAsync(refused.Key));
+
+        // And a later commit in the same scope must not pick either of them up.
+        context.ChangeTracker.Clear();
+        context.Settings.Add(NewSetting());
+        await unitOfWork.SaveChangesAsync();
+        Assert.Empty(ran);
+    }
+
     // ─── harness ─────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Arms the domain-event handler to make exactly one nested decorated save: it registers
+    /// its own effect first (every caller does - the effect describes the row the save is
+    /// about to write), stages a row, and is refused before anything reaches the server.
+    /// </summary>
+    /// <remarks>
+    /// The staged row is abandoned afterwards, which is what a failed nested operation really
+    /// does here - <c>StoreImportProcessor</c> clears the change tracker on exactly this path.
+    /// Without it the interceptor's own post-dispatch flush would adopt the refused row and
+    /// write it, and the test would be asserting something else entirely.
+    /// </remarks>
+    private void ArmNestedSaveThatFailsBeforePersisting(Setting row, Action effect)
+        => _reentrant.Arm(async (sp, ct) =>
+        {
+            var nestedUnitOfWork = sp.GetRequiredService<IUnitOfWork>();
+            var nestedContext = sp.GetRequiredService<ApplicationDbContext>();
+            sp.GetRequiredService<IPostCommitActions>().Enqueue("B", effect);
+
+            nestedContext.Settings.Add(row);
+            _failNextSave.Arm();
+            try
+            {
+                await nestedUnitOfWork.SaveChangesAsync(ct);
+            }
+            finally
+            {
+                nestedContext.Entry(row).State = EntityState.Detached;
+            }
+        });
+
+    private static EnvironmentMap NewEnvironmentMap()
+        => EnvironmentMap.Create($"post-commit-{Guid.NewGuid():N}", DateTime.UtcNow);
+
+    private async Task<bool> EnvironmentMapExistsAsync(string name)
+    {
+        using var scope = _host.Services.CreateScope();
+        var read = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        return await read.EnvironmentMaps.AsNoTracking().AnyAsync(m => m.Name == name);
+    }
+
+    /// <summary>
+    /// What the handler below should do the next time the event reaches it, armed one
+    /// dispatch at a time. A singleton, because the test owns it and the handler is scoped.
+    /// </summary>
+    private sealed class ReentrantHandler
+    {
+        private Func<IServiceProvider, CancellationToken, Task>? _behaviour;
+
+        public void Arm(Func<IServiceProvider, CancellationToken, Task> behaviour)
+            => _behaviour = behaviour;
+
+        public Func<IServiceProvider, CancellationToken, Task>? Take()
+        {
+            var behaviour = _behaviour;
+            _behaviour = null;
+            return behaviour;
+        }
+    }
+
+    /// <summary>
+    /// A real domain-event handler, resolved and invoked by the real
+    /// <c>DomainEventDispatcher</c> from <c>DomainEventsInterceptor.SavedChangesAsync</c>.
+    /// It converts a failure into a failure <c>Result</c> rather than letting it out, which is
+    /// what <c>ModelUploadedEventHandler</c> does with every exception it can produce - and
+    /// what makes the outer save return normally over a queue the nested save has edited.
+    /// </summary>
+    private sealed class ReentrantSaveHandler : IDomainEventHandler<EnvironmentMapCreatedEvent>
+    {
+        private readonly ReentrantHandler _behaviour;
+        private readonly IServiceProvider _scope;
+
+        public ReentrantSaveHandler(ReentrantHandler behaviour, IServiceProvider scope)
+        {
+            _behaviour = behaviour;
+            _scope = scope;
+        }
+
+        public async Task<Result> Handle(EnvironmentMapCreatedEvent domainEvent, CancellationToken cancellationToken)
+        {
+            var behaviour = _behaviour.Take();
+            if (behaviour is null)
+            {
+                return Result.Success();
+            }
+
+            try
+            {
+                await behaviour(_scope, cancellationToken);
+                return Result.Success();
+            }
+            catch (Exception ex)
+            {
+                return Result.Failure(new Error("ReentrantSaveFailed", ex.Message));
+            }
+        }
+    }
+
 
     private static Setting NewSetting() => Setting.Create($"post-commit-{Guid.NewGuid():N}", "v", DateTime.UtcNow);
 

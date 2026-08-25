@@ -5,7 +5,8 @@ namespace Infrastructure.Persistence;
 
 /// <summary>
 /// The internal durability signal the commit boundary runs on: it counts the moments at which
-/// this scope's writes actually became state another connection can read.
+/// this scope's writes actually became state another connection can read, and hands the
+/// post-commit queue over to the save that just reached one.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -40,6 +41,25 @@ namespace Infrastructure.Persistence;
 /// ever fires for the case this class was written for.
 /// </para>
 /// <para>
+/// THE CLAIM HAPPENS HERE, NOT IN THE DECORATOR, and that is the whole reason this class owns
+/// a reference to the queue. <see cref="PostCommitUnitOfWork"/> only regains control after the
+/// ENTIRE <c>SavedChangesAsync</c> chain has run - and the next interceptor in that chain
+/// dispatches domain events, whose handlers save through the same scoped unit of work. A
+/// nested save that is then refused asks the queue what it may take back, and the answer used
+/// to be "everything", because the outer save had not yet been able to say which actions were
+/// already its own: the outer save's effect was discarded for a row that is on disk, and the
+/// handler converting its own failure (<c>ModelUploadedEventHandler</c> converts every
+/// exception it can produce) let the outer save return normally over the emptied queue.
+/// So the queue's boundary moves at the instant durability is known, which is this callback,
+/// before anything that could re-enter the unit of work gets its turn. What it claims is
+/// exactly the prefix this save is answerable for: every action queued at this moment was
+/// registered before this save's rows went down - callers enqueue before saving, because the
+/// action describes the row the save is about to write - and nothing else can have been
+/// registered since, because no application code runs between the decorator's call and here.
+/// A nested save reaching this point claims its own, longer prefix the same way, so the two
+/// never collide.
+/// </para>
+/// <para>
 /// Scoped (registered in <c>AddInfrastructure</c>), like the queue it informs: the counters
 /// describe one request's writes and must not leak across scopes. They only ever increase, so
 /// the boundary compares a value it captured before the call rather than reading a flag
@@ -49,8 +69,20 @@ namespace Infrastructure.Persistence;
 /// </remarks>
 public sealed class SaveDurabilityInterceptor : SaveChangesInterceptor, IDbTransactionInterceptor
 {
+    private readonly PostCommitActions _actions;
+
     private int _persisted;
     private int _committed;
+
+    /// <remarks>
+    /// Internal, so <c>AddInfrastructure</c> has to construct it through a factory rather than
+    /// by reflection - the queue is internal too, and this pairing is not something outside
+    /// this assembly has any business assembling.
+    /// </remarks>
+    internal SaveDurabilityInterceptor(PostCommitActions actions)
+    {
+        _actions = actions;
+    }
 
     /// <summary>
     /// How many saves in this scope have reached the point where their rows are written. With
@@ -65,6 +97,7 @@ public sealed class SaveDurabilityInterceptor : SaveChangesInterceptor, IDbTrans
     public override int SavedChanges(SaveChangesCompletedEventData eventData, int result)
     {
         _persisted++;
+        _actions.MarkSaved();
         return result;
     }
 
@@ -74,6 +107,7 @@ public sealed class SaveDurabilityInterceptor : SaveChangesInterceptor, IDbTrans
         CancellationToken cancellationToken = default)
     {
         _persisted++;
+        _actions.MarkSaved();
         return ValueTask.FromResult(result);
     }
 

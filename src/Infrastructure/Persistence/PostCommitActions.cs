@@ -68,10 +68,19 @@ internal sealed class PostCommitActions : IPostCommitActions
     public int ClaimedBoundary => _saved;
 
     /// <summary>
-    /// A save succeeded, so everything queued now belongs to a write that exists. Called for a
-    /// save that joined an open transaction: the write is not durable yet, but it IS in the
-    /// transaction, so a later failing save in the same scope must not take these back out.
+    /// A save's rows have gone down, so everything queued now belongs to a write that exists -
+    /// durably, or inside a transaction still open, in which case the write IS in that
+    /// transaction and a later failing save must not take these back out.
     /// </summary>
+    /// <remarks>
+    /// Called from <see cref="SaveDurabilityInterceptor"/>, at the instant EF says the write
+    /// landed, and NOT by the commit boundary once the save has returned. The boundary does
+    /// not regain control until the whole <c>SavedChangesAsync</c> chain has run, and the next
+    /// interceptor in that chain dispatches domain events to handlers that save through this
+    /// same scoped unit of work - so a nested save could fail and call
+    /// <see cref="DiscardUnsaved"/> while this boundary still read zero, taking the outer
+    /// save's effects for a durable row with it. See that class for the full sequence.
+    /// </remarks>
     public void MarkSaved() => _saved = _pending.Count;
 
     /// <summary>

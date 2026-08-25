@@ -16,11 +16,20 @@ namespace Infrastructure
     {
         public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
         {
+            // Side effects that must wait for the commit - see IPostCommitActions. Registered
+            // as the concrete type as well, because PostCommitUnitOfWork needs the drain and
+            // SaveDurabilityInterceptor needs the claim; the interface deliberately exposes
+            // neither. It has to come before the interceptors - the durability one takes it.
+            services.AddScoped<PostCommitActions>();
+            services.AddScoped<IPostCommitActions>(sp => sp.GetRequiredService<PostCommitActions>());
+
             // Scoped, not Singleton: DomainEventsInterceptor keeps per-save
             // recursion-guard state that must not leak across requests, and
             // SaveDurabilityInterceptor's counters describe one scope's writes.
+            // Built by hand rather than by reflection because its constructor is internal -
+            // it takes the queue whose ownership boundary it moves.
             services.AddScoped<DomainEventsInterceptor>();
-            services.AddScoped<SaveDurabilityInterceptor>();
+            services.AddScoped(sp => new SaveDurabilityInterceptor(sp.GetRequiredService<PostCommitActions>()));
 
             services.AddDbContext<ApplicationDbContext>((sp, optionsBuilder) =>
             {
@@ -35,21 +44,18 @@ namespace Infrastructure
 
                 optionsBuilder
                     .UseNpgsql(connectionString)
-                    // ORDER IS LOAD-BEARING. EF runs the SavedChangesAsync interceptors in
-                    // registration order and stops at the first one that throws, so the
-                    // durability signal has to be taken before anything that can throw takes
-                    // it away - DomainEventsInterceptor dispatches domain events from there,
-                    // over the request's token. See SaveDurabilityInterceptor.
+                    // ORDER IS LOAD-BEARING, for two reasons that both point the same way.
+                    // EF runs the SavedChangesAsync interceptors in registration order and
+                    // stops at the first one that throws, so the durability signal has to be
+                    // taken before anything that can throw takes it away. And that signal is
+                    // also where the post-commit queue changes hands, so it has to happen
+                    // before anything that can re-enter the unit of work - which is exactly
+                    // what DomainEventsInterceptor does from there, dispatching events to
+                    // handlers that save. See SaveDurabilityInterceptor.
                     .AddInterceptors(
                         sp.GetRequiredService<SaveDurabilityInterceptor>(),
                         sp.GetRequiredService<DomainEventsInterceptor>());
             });
-
-            // Side effects that must wait for the commit - see IPostCommitActions. Registered
-            // as the concrete type as well, because PostCommitUnitOfWork needs the drain and
-            // the interface deliberately does not expose it.
-            services.AddScoped<PostCommitActions>();
-            services.AddScoped<IPostCommitActions>(sp => sp.GetRequiredService<PostCommitActions>());
 
             // The context is still the thing that commits; the decorator is what decides when
             // the queued after-commit effects are allowed to happen.

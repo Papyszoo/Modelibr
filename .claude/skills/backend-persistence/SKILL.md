@@ -86,9 +86,13 @@ description: Modelibr EF Core persistence rules - the IUnitOfWork contract (repo
   Before the rows went down, the save takes back everything no earlier save claimed, so a
   later success cannot drain a notification for a row that was never written; after, the row
   is durable and its effects run anyway while the exception still reaches the caller. That
-  interceptor is registered FIRST, ahead of `DomainEventsInterceptor` - EF stops the
-  `SavedChangesAsync` chain at the first interceptor that throws. Inside an explicit
-  transaction the COMMIT, not the save, is the durability point. The drain always runs on
+  interceptor is registered FIRST, ahead of `DomainEventsInterceptor`, for two reasons: EF
+  stops the `SavedChangesAsync` chain at the first interceptor that throws, and that callback
+  is also where the queue CHANGES HANDS. Domain events dispatch from `SavedChangesAsync` and
+  their handlers save through the same scoped UoW, so a save claims its queue prefix at the
+  durability instant, before anything can re-enter - a nested save that then fails takes back
+  only its own tail, never the outer save's effects for a row already on disk. Inside an
+  explicit transaction the COMMIT, not the save, is the durability point. The drain always runs on
   `CancellationToken.None`: once the write is durable the request's token governs nothing and
   a client hanging up must not silence the only notification a worker gets. A rollback
   discards everything the transaction is answerable for - what a nested save committed into
