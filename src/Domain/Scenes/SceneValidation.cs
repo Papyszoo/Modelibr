@@ -393,7 +393,9 @@ public static class SceneValidator
     {
         foreach (var node in nodes.Where(n => n.Visible))
         {
-            if (boxes.TryGetValue(node.Id, out var box) && box.Min.Y < -ContactToleranceMetres)
+            if (boxes.TryGetValue(node.Id, out var box) &&
+                box.Min.Y < -ContactToleranceMetres &&
+                !IsFloorSlab(node, box))
             {
                 findings.Add(new SceneFinding(
                     SceneChecks.Containment,
@@ -430,6 +432,18 @@ public static class SceneValidator
             }
         }
     }
+
+    /// <summary>
+    /// A horizontal primitive whose top face defines y=0 is the floor, not geometry sunk
+    /// through it. <c>create_room</c> deliberately centres its floor thickness below the
+    /// requested floor plane so ground-snapped assets stand on the top face. Keep this
+    /// geometric rather than relying on the generated node id: custom prefixes and floors
+    /// placed with <c>place_primitive</c> have the same valid shape.
+    /// </summary>
+    private static bool IsFloorSlab(SceneNode node, Aabb box) =>
+        node.Primitive is not null &&
+        Math.Abs(box.Max.Y) <= ContactToleranceMetres &&
+        box.Size.Y <= Math.Min(box.Size.X, box.Size.Z);
 
     /// <summary>
     /// Assets that are not the single prop they were placed as: sample scenes carrying their

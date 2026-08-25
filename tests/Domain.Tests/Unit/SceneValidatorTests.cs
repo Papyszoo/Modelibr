@@ -178,6 +178,41 @@ public class SceneValidatorTests
     }
 
     [Fact]
+    public void A_Primitive_Floor_Slab_Ending_At_The_Floor_Plane_Is_Not_Reported_As_Below_It()
+    {
+        var floor = new SceneNode(
+            "room-floor",
+            new SceneTransform(new Vec3(0, -0.05, 0), Vec3.Zero, Vec3.One),
+            Primitive: new ScenePrimitive(ScenePrimitiveShapes.Box, new Vec3(5.2, 0.1, 4.2)),
+            Name: "Room floor");
+        var document = Document(new[] { floor });
+
+        var report = SceneValidator.Validate(
+            document,
+            new Dictionary<string, SceneAssetFacts>(StringComparer.Ordinal),
+            new Dictionary<string, SceneAssetProfile>(StringComparer.Ordinal));
+
+        Assert.DoesNotContain("Containment.BelowFloor", Codes(report));
+    }
+
+    [Fact]
+    public void A_Vertical_Primitive_Ending_At_The_Floor_Plane_Is_Still_Reported()
+    {
+        var wall = new SceneNode(
+            "sunken-wall",
+            new SceneTransform(new Vec3(0, -1.25, 0), Vec3.Zero, Vec3.One),
+            Primitive: new ScenePrimitive(ScenePrimitiveShapes.Box, new Vec3(4, 2.5, 0.2)));
+        var document = Document(new[] { wall });
+
+        var report = SceneValidator.Validate(
+            document,
+            new Dictionary<string, SceneAssetFacts>(StringComparer.Ordinal),
+            new Dictionary<string, SceneAssetProfile>(StringComparer.Ordinal));
+
+        Assert.Contains("Containment.BelowFloor", Codes(report));
+    }
+
+    [Fact]
     public void A_Node_At_A_Stray_Coordinate_Is_Reported()
     {
         var document = Document(new[]
