@@ -25,6 +25,13 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
  * down with it. One at a time, and the queue holds the rest.
  */
 export class BlenderOperationProcessor {
+  /**
+   * The single-file formats a conversion writes, mirroring the backend's validator.
+   * Restated here only as a bound on what may reach a path and an argv - the reasons the
+   * list is this short (a model version holds ONE file) live with the validator.
+   */
+  static CONVERT_TARGETS = ['glb', 'fbx', 'stl']
+
   constructor() {
     this.jobApi = new JobApiClient()
     this.modelFileService = new ModelFileService()
@@ -258,10 +265,14 @@ export class BlenderOperationProcessor {
   async convert(job, jobLogger) {
     const parameters = this.parameters(job)
     const format = parameters.format
-    if (!format) {
+    // Checked against the list rather than for presence, because this value goes into a
+    // filesystem path below. The backend validator is the only writer of a job's parameters
+    // and it normalises to exactly these three - but a path built out of queue data should
+    // not depend on that being true somewhere else.
+    if (!BlenderOperationProcessor.CONVERT_TARGETS.includes(format)) {
       throw new Error(
-        'The conversion job carries no target format. It was queued without one, which the ' +
-          'backend validator should have refused.'
+        `The conversion job asks for '${format ?? '(nothing)'}', which is not a format this ` +
+          `worker writes. Expected one of ${BlenderOperationProcessor.CONVERT_TARGETS.join(', ')}.`
       )
     }
 

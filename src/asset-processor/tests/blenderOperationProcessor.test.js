@@ -730,16 +730,27 @@ describe('BlenderOperationProcessor - convert-format', () => {
     expect(warning).toBe('STL carries geometry only')
   })
 
-  it('refuses a conversion job that carries no target format', async () => {
-    // The backend validator makes this unreachable; if it ever is reached, guessing a
-    // format would write a version the caller never asked for.
-    await processor.process({ ...job, parametersJson: '{}' })
+  it('refuses a conversion job whose target is not a format it writes', async () => {
+    // The backend validator makes both of these unreachable. They are refused here anyway
+    // because the value goes into a filesystem path: guessing would write a version the
+    // caller never asked for, and a path segment out of queue data should not be trusted
+    // just because today's only writer happens to normalise it.
+    for (const parametersJson of [
+      '{}',
+      JSON.stringify({ format: 'gltf' }),
+      JSON.stringify({ format: '../../escape' }),
+    ]) {
+      processor.jobApi.finishExtractionJob.mockClear()
+      processor.jobApi.createModelVersion.mockClear()
 
-    const [, , success, errorMessage] =
-      processor.jobApi.finishExtractionJob.mock.calls[0]
-    expect(success).toBe(false)
-    expect(errorMessage).toContain('no target format')
-    expect(processor.jobApi.createModelVersion).not.toHaveBeenCalled()
+      await processor.process({ ...job, parametersJson })
+
+      const [, , success, errorMessage] =
+        processor.jobApi.finishExtractionJob.mock.calls[0]
+      expect(success).toBe(false)
+      expect(errorMessage).toContain('not a format this worker writes')
+      expect(processor.jobApi.createModelVersion).not.toHaveBeenCalled()
+    }
   })
 
   it('reports a failed Blender run instead of writing a version', async () => {
