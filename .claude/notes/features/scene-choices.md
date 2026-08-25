@@ -115,16 +115,29 @@ Three things that were learned the hard way here:
   on Enter, and that path never consulted `busy`. A disabled button is styling; the rule
   belongs to the write, so `submitRejection`, `onChoose`, `onReopen`, the accept-all
   confirm and `runSlotWrite` each check it themselves.
-- **The link hold is per-scene state, not component state.** The dock renders only the
+- **The hold is per-scene state, not component state.** The dock renders only the
   active tab, so glancing at another tab unmounts the editor - which used to throw the
   hold away. The remount believed nothing was in flight, over a draft seeded on a revision
   the server had already replaced. It lives in `sceneLinkHoldStore`, keyed by scene id,
-  opened in the mutation's `onMutate` and settled by its own outcome.
+  claimed in front of the request and settled by its own outcome.
+- **`isPending` is a narrower window than the problem.** The slot writes were held only by
+  it, and it goes false when the RESPONSE arrives - a detail refetch and a draft reseed
+  before the draft is on the new revision. An edit in that gap dirtied the draft at N while
+  the server was at N+1; the reseed was then skipped BECAUSE it was dirty, so no revision
+  was left the draft could be saved against, and refusing the save afterwards is the
+  symptom, permanently. Every direct write takes the same hold now.
+- **An unresolved hold refuses the next claim rather than being overwritten.** `tryBegin`
+  returns false when one is already open. Overwriting it replaced the record of an unknown
+  outcome with a record of the new write, which is how "Retry link" after an ambiguous
+  failure lost the fact that anybody was waiting to find out - while also resending a write
+  that may have committed, carrying the project chosen before it.
 - **A transport failure is not a refusal.** Releasing the hold on any rejected promise
   hands the editor back over a scene that may have moved: the server may have committed
   and the answer never arrived. Only a request the server *answered* and declined (4xx,
   excluding 408) releases; everything else - network error, timeout, 5xx, an unrecognised
-  error - keeps the hold and turns it into a reconciliation.
+  error - keeps the hold and turns it into a reconciliation. The same test decides what a
+  UI may OFFER: scene creation's "Retry link" appears for a refusal and never for an
+  unknown outcome, where the only move is to open the scene and reconcile it.
 
 The release condition is deliberately made of comparisons against authoritative data and
 nothing else: not fetching, not in error, the draft seeded on the loaded revision, the

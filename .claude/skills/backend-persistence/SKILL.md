@@ -27,8 +27,10 @@ description: Modelibr EF Core persistence rules - the IUnitOfWork contract (repo
 
 ## Transactions - unit of work
 
-- `IUnitOfWork` (`Application/Abstractions/IUnitOfWork.cs`, one `SaveChangesAsync`
-  method) is implemented by `ApplicationDbContext`. Repositories stage mutations
+- `IUnitOfWork` (`Application/Abstractions/IUnitOfWork.cs`: `SaveChangesAsync` plus
+  `InTransactionAsync`) is implemented by `ApplicationDbContext` and **resolved through
+  `PostCommitUnitOfWork`**, a thin decorator that adds one thing - draining
+  `IPostCommitActions` at the outermost commit (see below). Repositories stage mutations
   (`Add`/`Update`/`Remove` on the context) and do **not** call `SaveChangesAsync`
   themselves; command handlers inject `IUnitOfWork` and call `SaveChangesAsync`
   exactly once, after every repo call - that's what makes a multi-repo handler
@@ -68,6 +70,17 @@ description: Modelibr EF Core persistence rules - the IUnitOfWork contract (repo
   `ApplicationDbContext.SaveChangesAsync` also swallows one specific known-benign
   race (concurrent "add model to pack" duplicating the `PackModels` join PK) -
   name the exact constraint in the `when` clause if you add another.
+- **Side effects wait for the commit: `IPostCommitActions`.** A handler that invalidates a
+  cache, enqueues background work or notifies a worker is telling another process to go and
+  read state - so doing it inside the transaction points it at state that is not there yet,
+  and a rollback emits the effect for a write that never existed. `bind_texture_set` hit
+  this: the blend consumer is a singleton with its own scope, so it could take the queue
+  entry, read the pre-commit bindings and cache a `.blend` built from them, which the later
+  duplicate entry then returned. Inject `IPostCommitActions` and `Enqueue(description, …)`
+  instead of acting; the decorator runs the queue after the outermost commit (immediately
+  after the save when no transaction is open) and discards it on rollback. An action that
+  throws is logged, never surfaced - the write it describes is already durable. Enqueue
+  BEFORE the save that commits, not after it.
 - A hierarchical delete (categories, and similar branch/tree deletes) that used to
   issue one self-commit per row now lands in a single commit - a failure partway
   through leaves the whole branch untouched instead of a partial delete. That's

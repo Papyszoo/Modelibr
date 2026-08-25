@@ -52,6 +52,21 @@ metadata, `Other`.
 - **SSRF defenses:** https-or-loopback only, manual redirect hops re-validated,
   size cap from manifest, SHA-256 verify per file, DNS-rebind pin via
   `SocketsHttpHandler.ConnectCallback`.
+- **The address classifier is the IANA registries, written as prefix tables**
+  (`StoreUrlSafety`). Three things it teaches:
+  - The loopback exception belongs INSIDE the IPv4 classifier, not in front of the
+    address-family dispatch. `127.0.0.0/8` is deliberately absent from the table because
+    it is the one range with an exception - and NAT64/6to4 unwrap an embedded IPv4 and
+    call that table directly, so `64:ff9b::7f00:1` and `2002:7f00:1::` reached loopback
+    from a public store.
+  - Only `64:ff9b::/96` is RFC 6052 embedded-address syntax. Matching the first four
+    bytes made all of `64:ff9b::/32` look like it, which let `64:ff9b:1::808:808` through
+    on the strength of 8.8.8.8 being public - `64:ff9b:1::/48` is a separate RFC 8215
+    local-use reservation that embeds nothing.
+  - A table of named prefixes cannot be the whole IPv6 answer. Global unicast is
+    `2000::/3` and everything else is Reserved by IETF, so the classifier ends by refusing
+    what is outside it; otherwise the space between the rows is reachable by omission,
+    which is how `3fff::/20` and `100:0:0:1::/64` stayed open.
 - Deliberate deviation from the CLI importer: source channels bind to the real
   `TextureChannel` enum (`R/G/B/A/RGB`), not the CLI's long names.
 - Partial import: `selectedItemIds` filters the manifest; empty = whole pack.
