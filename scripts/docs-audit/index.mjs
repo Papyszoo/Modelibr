@@ -304,8 +304,12 @@ const manifestOutputs = [...read("docs/videos/video-manifest.js").matchAll(
         const source = read(path.join(mcpDir, file));
         // Split the file at each tool-type class so a tool is attributed to the
         // class it lives in, not to the first one in the file.
+        // Deliberately loose on the modifiers: `internal sealed class` or
+        // `public sealed partial class` would fall out of a stricter pattern
+        // and take all of that class's tools with it - and the check would go
+        // green because nothing then requires them to be documented.
         const classes = [
-            ...source.matchAll(/public sealed class (\w+)/g),
+            ...source.matchAll(/(?:public|internal)\s+(?:sealed\s+)?(?:partial\s+)?class (\w+)/g),
         ].map((m) => ({ name: m[1], at: m.index }));
         for (let i = 0; i < classes.length; i++) {
             const body = source.slice(
@@ -313,7 +317,7 @@ const manifestOutputs = [...read("docs/videos/video-manifest.js").matchAll(
                 i + 1 < classes.length ? classes[i + 1].at : source.length,
             );
             const names = [
-                ...body.matchAll(/McpServerTool\(Name = "([a-z_]+)"/g),
+                ...body.matchAll(/McpServerTool\(\s*Name\s*=\s*"([^"]+)"/g),
             ].map((m) => m[1]);
             const into = writeTypes.has(classes[i].name) ? writeTools : readTools;
             for (const n of names) into.add(n);
@@ -326,23 +330,53 @@ const manifestOutputs = [...read("docs/videos/video-manifest.js").matchAll(
         `found ${readTools.size} read and ${writeTools.size} write tools - Mcp/ or Program.cs layout changed? Update scripts/docs-audit.`,
     );
 
+    // Each half of the page is read separately. One flat set of every table row
+    // on the page cannot tell the two apart, so a WRITE tool listed only in the
+    // always-available read table would satisfy "lists every write tool" - on
+    // the one page whose job is helping an operator decide whether to turn
+    // writes on.
     const mcpPage = read("docs/docs/features/mcp-server.md");
-    const documented = new Set(
-        [...mcpPage.matchAll(/^\| `([a-z_]+)`/gm)].map((m) => m[1]),
+    const readHeading = mcpPage.indexOf("\n## What the agent can read");
+    const writeHeading = mcpPage.indexOf("\n## What the agent can change");
+    check(
+        readHeading >= 0 && writeHeading > readHeading,
+        "mcp-server.md read and write sections found",
+        "the two section headings moved or were renamed - update scripts/docs-audit.",
     );
 
-    const undocumentedReads = [...readTools].filter((t) => !documented.has(t));
+    const rowsIn = (section) =>
+        new Set([...section.matchAll(/^\| `([a-z_]+)`/gm)].map((m) => m[1]));
+    const documentedReads = rowsIn(mcpPage.slice(readHeading, writeHeading));
+    const documentedWrites = rowsIn(mcpPage.slice(writeHeading));
+
+    const undocumentedReads = [...readTools].filter(
+        (t) => !documentedReads.has(t),
+    );
     check(
         undocumentedReads.length === 0,
         "mcp-server.md lists every read tool",
-        `registered but not in a table: ${undocumentedReads.join(", ")}`,
+        `registered but not in the read section: ${undocumentedReads.join(", ")}`,
     );
 
-    const undocumentedWrites = [...writeTools].filter((t) => !documented.has(t));
+    const undocumentedWrites = [...writeTools].filter(
+        (t) => !documentedWrites.has(t),
+    );
     check(
         undocumentedWrites.length === 0,
         "mcp-server.md lists every write tool",
-        `registered but not in a table: ${undocumentedWrites.join(", ")}`,
+        `registered but not in the write section: ${undocumentedWrites.join(", ")}`,
+    );
+
+    // And neither side may claim the other's tools: a read tool listed under
+    // "what the agent can change" tells an operator the opposite of the truth.
+    const misfiled = [
+        ...[...readTools].filter((t) => documentedWrites.has(t)),
+        ...[...writeTools].filter((t) => documentedReads.has(t)),
+    ];
+    check(
+        misfiled.length === 0,
+        "mcp-server.md files every tool on the right side",
+        `documented in the wrong section: ${misfiled.join(", ")}`,
     );
 
     // The counts in prose. Spelled out in words on the page, so the check reads
@@ -353,6 +387,10 @@ const manifestOutputs = [...read("docs/videos/video-manifest.js").matchAll(
         "sixteen", "seventeen", "eighteen", "nineteen", "twenty",
     ];
     const spell = (n) => {
+        // Past 99 the page should carry a digit rather than a phrase, and this
+        // returning "undefined-one" would fail the count check with a message
+        // that explains nothing.
+        if (n > 99) return String(n);
         if (n <= 20) return words[n];
         const tens = [
             "", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy",
