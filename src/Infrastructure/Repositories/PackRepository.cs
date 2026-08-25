@@ -131,15 +131,32 @@ internal sealed class PackRepository : IPackRepository
         return imported.ToHashSet();
     }
 
+    public async Task EnsureModelInPackAsync(
+        int packId,
+        int modelId,
+        DateTime updatedAt,
+        CancellationToken cancellationToken = default)
+    {
+        await _context.Database.ExecuteSqlInterpolatedAsync(
+            $"INSERT INTO \"PackModels\" (\"ModelsId\", \"PacksId\") VALUES ({modelId}, {packId}) ON CONFLICT (\"ModelsId\", \"PacksId\") DO NOTHING;",
+            cancellationToken);
+
+        var trackedPack = _context.Packs.Local.FirstOrDefault(p => p.Id == packId);
+        if (trackedPack != null)
+        {
+            _context.Entry(trackedPack).Property(p => p.UpdatedAt).CurrentValue = updatedAt;
+        }
+        else
+        {
+            await _context.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE \"Packs\" SET \"UpdatedAt\" = {updatedAt} WHERE \"Id\" = {packId};",
+                cancellationToken);
+        }
+    }
+
     public Task UpdateAsync(Pack pack, CancellationToken cancellationToken = default)
     {
         _context.UpdateIfDetached(pack);
-
-        // Note: this used to catch a DbUpdateException for a duplicate
-        // PackModels PK here (concurrent "add model to pack" requests racing
-        // on the join table) and swallow it as an idempotent no-op. That
-        // handling now lives in ApplicationDbContext's IUnitOfWork.SaveChangesAsync,
-        // the single place SaveChanges is actually called from (prompt 25).
         return Task.CompletedTask;
     }
 

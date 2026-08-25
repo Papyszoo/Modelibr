@@ -50,8 +50,7 @@ internal class AddModelToPackCommandHandler : ICommandHandler<AddModelToPackComm
 
         if (!pack.HasModel(model.Id))
         {
-            pack.AddModel(model, _dateTimeProvider.UtcNow);
-            await _packRepository.UpdateAsync(pack, cancellationToken);
+            await _packRepository.EnsureModelInPackAsync(pack.Id, model.Id, _dateTimeProvider.UtcNow, cancellationToken);
 
             // Search reads projection state only, so a membership change that never
             // reaches the projection is invisible until the next re-derive - which for a

@@ -1,4 +1,4 @@
-﻿using Application.Abstractions;
+using Application.Abstractions;
 using Domain.Models;
 using Domain.ValueObjects;
 using Microsoft.EntityFrameworkCore;
@@ -19,24 +19,8 @@ namespace Infrastructure.Persistence
         // area at a time) and call this directly. Domain-event dispatch is wired
         // separately via DomainEventsInterceptor (see
         // Infrastructure/DependencyInjection.cs) and runs regardless of path too.
-        public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
-        {
-            try
-            {
-                return await base.SaveChangesAsync(cancellationToken);
-            }
-            catch (DbUpdateException ex) when (IsDuplicatePackModelAssociation(ex))
-            {
-                // Concurrent identical "add model to pack" requests can race on
-                // the PackModels join table's composite PK. Treat the duplicate
-                // insert as an idempotent no-op - moved here from
-                // PackRepository.UpdateAsync when repositories stopped
-                // self-committing (prompt 25); this is the one known-benign
-                // race the app deliberately swallows at the commit boundary.
-                ChangeTracker.Clear();
-                return 0;
-            }
-        }
+        public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
+            base.SaveChangesAsync(cancellationToken);
 
         Task IUnitOfWork.SaveChangesAsync(CancellationToken cancellationToken) =>
             SaveChangesAsync(cancellationToken);
@@ -91,13 +75,6 @@ namespace Infrastructure.Persistence
                 throw;
             }
         }
-
-        private static bool IsDuplicatePackModelAssociation(DbUpdateException ex)
-            => ex.InnerException is PostgresException
-            {
-                SqlState: PostgresErrorCodes.UniqueViolation,
-                ConstraintName: "PK_PackModels"
-            };
 
         public DbSet<Model> Models => Set<Model>();
         public DbSet<ModelVersion> ModelVersions => Set<ModelVersion>();

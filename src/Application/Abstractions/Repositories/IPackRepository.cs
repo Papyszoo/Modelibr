@@ -41,6 +41,14 @@ public interface IPackRepository
         string storeUrl,
         IReadOnlyCollection<string> storeAssetIds,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Idempotently inserts the many-to-many link between a model and a pack with an exact
+    /// PostgreSQL conflict target, so concurrent additions cannot fail with a unique violation
+    /// or cause an entire multi-entity SaveChanges batch to roll back.
+    /// </summary>
+    Task EnsureModelInPackAsync(int packId, int modelId, DateTime updatedAt, CancellationToken cancellationToken = default);
+
     Task UpdateAsync(Pack pack, CancellationToken cancellationToken = default);
     Task DeleteAsync(Pack pack, CancellationToken cancellationToken = default);
 }
