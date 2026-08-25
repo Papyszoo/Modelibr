@@ -266,7 +266,7 @@ public class AssetMetadataPatchAtomicityIntegrationTests : IClassFixture<Modelib
     }
 
     [Fact]
-    public async Task Filtered_Unique_Index_Enforces_Store_Item_Provenance_Uniqueness()
+    public async Task Unique_Index_Enforces_Store_Item_Provenance_Uniqueness()
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -275,14 +275,12 @@ public class AssetMetadataPatchAtomicityIntegrationTests : IClassFixture<Modelib
         var (modelAId, _) = await SeedModelAsync();
         var (modelBId, _) = await SeedModelAsync();
 
-        var metaA = AssetMetadata.Create("Model", modelAId, 1, now);
-        metaA.SetProvenance("Store Import", null, "https://store.example.com", "pack-1", "item-duplicate-1", now, now);
-        db.AssetMetadata.Add(metaA);
+        var itemA = StoreImportedItem.Create("https://store.example.com", "pack-1", "item-duplicate-1", "Model", modelAId, now);
+        db.StoreImportedItems.Add(itemA);
         await db.SaveChangesAsync();
 
-        var metaB = AssetMetadata.Create("Model", modelBId, 1, now);
-        metaB.SetProvenance("Store Import", null, "https://store.example.com", "pack-1", "item-duplicate-1", now, now);
-        db.AssetMetadata.Add(metaB);
+        var itemB = StoreImportedItem.Create("https://store.example.com", "pack-1", "item-duplicate-1", "Model", modelBId, now);
+        db.StoreImportedItems.Add(itemB);
 
         var ex = await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
         Assert.NotNull(ex.InnerException);

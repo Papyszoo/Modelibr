@@ -36,7 +36,6 @@ public static class StoreMetadataStampFields
         Set("sourceKind", "Store Import");
         Set("storeUrl", stamp.StoreUrl);
         Set("storeAssetId", stamp.StoreAssetId);
-        if (!string.IsNullOrWhiteSpace(stamp.StoreItemId)) Set("storeItemId", stamp.StoreItemId!);
         Set("importedAt", stamp.ImportedAt.ToString("O"));
 
         AddFacets(assetType, stamp.FacetsJson, filled, fields);

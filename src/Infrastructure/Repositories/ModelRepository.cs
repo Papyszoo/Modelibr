@@ -371,6 +371,34 @@ internal sealed class ModelRepository : IModelRepository
             .FirstOrDefaultAsync(m => m.Versions.Any(v => v.Files.Any(f => f.Sha256Hash == sha256Hash)), cancellationToken);
     }
 
+    public async Task<Model?> GetDeletedByFileHashAsync(string sha256Hash, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(sha256Hash))
+            return null;
+
+        return await _context.Models
+            .IgnoreQueryFilters()
+            .Where(m => m.IsDeleted)
+            .Include(m => m.Packs)
+            .Include(m => m.Projects)
+            .Include(m => m.Tags)
+            .Include(m => m.ModelCategory)
+            .Include(m => m.ConceptImages)
+                .ThenInclude(ci => ci.File)
+            .Include(m => m.ActiveVersion)
+                .ThenInclude(v => v.Files)
+            .Include(m => m.ActiveVersion)
+                .ThenInclude(v => v.Thumbnail)
+            .Include(m => m.ActiveVersion)
+                .ThenInclude(v => v.TextureMappings)
+            .Include(m => m.Versions)
+                .ThenInclude(v => v.Files)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(
+                m => m.Versions.Any(v => v.Files.Any(f => f.Sha256Hash == sha256Hash)),
+                cancellationToken);
+    }
+
     public async Task<bool> ExistsByNameAsync(string name, CancellationToken cancellationToken = default)
     {
         return await _context.Models

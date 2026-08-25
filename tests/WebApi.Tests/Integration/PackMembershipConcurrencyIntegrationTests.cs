@@ -3,9 +3,11 @@ using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Packs;
 using Domain.Models;
+using Domain.Services;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Moq;
 using Xunit;
 
 namespace WebApi.Tests.Integration;
@@ -145,5 +147,75 @@ public class PackMembershipConcurrencyIntegrationTests : IClassFixture<ModelibrW
         context.Settings.Add(s2);
         // Must throw DbUpdateException, not swallowed
         await Assert.ThrowsAsync<DbUpdateException>(() => uow.SaveChangesAsync());
+    }
+
+    [Fact]
+    public async Task EnsureModelInPackAsync_Throws_When_No_Active_Transaction()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var packRepo = scope.ServiceProvider.GetRequiredService<IPackRepository>();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => packRepo.EnsureModelInPackAsync(1, 1, DateTime.UtcNow, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task AddModelToPackCommand_Rollback_On_LateFailure_RevertsMembershipAndProjection()
+    {
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var now = DateTime.UtcNow;
+        int packId;
+        int modelId;
+
+        using (var setupScope = _factory.Services.CreateScope())
+        {
+            var context = setupScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var pack = Pack.Create($"Pack-{suffix}", null, null, null, now);
+            var model = Model.Create($"Model-{suffix}", now);
+            context.Packs.Add(pack);
+            context.Models.Add(model);
+            await context.SaveChangesAsync();
+            packId = pack.Id;
+            modelId = model.Id;
+
+            context.AssetSearchDocuments.Add(AssetSearchDocument.Create(
+                "Model", modelId, null, null, true, "full", model.Name, model.Name, "", now));
+            await context.SaveChangesAsync();
+        }
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+            var packRepo = scope.ServiceProvider.GetRequiredService<IPackRepository>();
+            var modelRepo = scope.ServiceProvider.GetRequiredService<IModelRepository>();
+            var searchRepo = scope.ServiceProvider.GetRequiredService<IAssetSearchDocumentRepository>();
+            var clock = scope.ServiceProvider.GetRequiredService<IDateTimeProvider>();
+            var batchRepo = new Mock<IBatchUploadRepository>();
+            var batch = BatchUpload.Create($"batch-{suffix}", "model", 10, now, modelId: modelId);
+            batchRepo.Setup(r => r.GetByModelIdAsync(modelId, It.IsAny<CancellationToken>()))
+                .ReturnsAsync([batch]);
+            batchRepo.Setup(r => r.UpdateAsync(batch, It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new InvalidOperationException("Simulated late handler failure"));
+
+            var handler = new AddModelToPackCommandHandler(
+                packRepo, modelRepo, batchRepo.Object, searchRepo, clock, uow);
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() => handler.Handle(
+                new AddModelToPackCommand(packId, modelId), CancellationToken.None));
+        }
+
+        using (var verifyScope = _factory.Services.CreateScope())
+        {
+            var db = verifyScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var count = await db.Database
+                .SqlQuery<int>($"SELECT COUNT(*)::int as \"Value\" FROM \"PackModels\" WHERE \"PacksId\" = {packId} AND \"ModelsId\" = {modelId}")
+                .SingleAsync();
+            Assert.Equal(0, count);
+
+            var document = await db.AssetSearchDocuments
+                .AsNoTracking()
+                .SingleAsync(d => d.AssetType == "Model" && d.AssetId == modelId && d.PartPath == null);
+            Assert.Null(document.PackNames);
+        }
     }
 }

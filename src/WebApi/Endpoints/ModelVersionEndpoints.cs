@@ -71,10 +71,10 @@ public static class ModelVersionEndpoints
 
     private static async Task<IResult> CreateModelVersion(
         int modelId,
+        [FromServices] ICommandHandler<CreateModelVersionCommand, CreateModelVersionResponse> commandHandler,
         IFormFile file,
         [FromForm] string? description = null,
         [FromForm] bool setAsActive = false,
-        ICommandHandler<CreateModelVersionCommand, CreateModelVersionResponse> commandHandler = null!,
         CancellationToken cancellationToken = default)
     {
         if (file.Length <= 0)

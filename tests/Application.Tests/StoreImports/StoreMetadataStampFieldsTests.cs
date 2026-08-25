@@ -40,7 +40,7 @@ public class StoreMetadataStampFieldsTests
         Assert.Equal("Kenney.nl", Text(fields, "creditName"));
         Assert.True(fields["attributionRequired"].GetBoolean());
         Assert.Equal("Store Import", Text(fields, "sourceKind"));
-        Assert.Equal("item-1", Text(fields, "storeItemId"));
+        Assert.False(fields.ContainsKey("storeItemId"));
     }
 
     /// <summary>
@@ -63,11 +63,11 @@ public class StoreMetadataStampFieldsTests
     public void Provenance_IsAlwaysRestamped()
     {
         var fields = StoreMetadataStampFields.Build(
-            "Model", Stamp(), new[] { "storeUrl", "storeAssetId", "storeItemId", "sourceKind", "importedAt" });
+            "Model", Stamp(), new[] { "storeUrl", "storeAssetId", "sourceKind", "importedAt" });
 
         Assert.Equal("https://store.example", Text(fields, "storeUrl"));
         Assert.Equal("abc", Text(fields, "storeAssetId"));
-        Assert.Equal("item-1", Text(fields, "storeItemId"));
+        Assert.False(fields.ContainsKey("storeItemId"));
         Assert.Equal("Store Import", Text(fields, "sourceKind"));
     }
 

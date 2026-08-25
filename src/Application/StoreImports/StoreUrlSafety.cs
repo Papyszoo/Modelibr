@@ -29,6 +29,15 @@ public static class StoreUrlSafety
         if (!Uri.TryCreate(storeUrl, UriKind.Absolute, out var uri))
             return Result.Failure(new Error("StoreImport.InvalidStoreUrl", "Store URL must be a valid absolute URL."));
 
+        if (!string.IsNullOrWhiteSpace(uri.UserInfo))
+            return Result.Failure(new Error("StoreImport.InvalidStoreUrl", "Store URL must not contain user credentials."));
+
+        if (!string.IsNullOrWhiteSpace(uri.Query))
+            return Result.Failure(new Error("StoreImport.InvalidStoreUrl", "Store URL must not contain query parameters."));
+
+        if (!string.IsNullOrWhiteSpace(uri.Fragment))
+            return Result.Failure(new Error("StoreImport.InvalidStoreUrl", "Store URL must not contain URL fragments."));
+
         if (uri.Scheme == Uri.UriSchemeHttps)
             return Result.Success();
 

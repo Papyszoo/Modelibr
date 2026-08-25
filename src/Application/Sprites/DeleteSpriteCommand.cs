@@ -8,12 +8,16 @@ namespace Application.Sprites;
 internal class DeleteSpriteCommandHandler : ICommandHandler<DeleteSpriteCommand>
 {
     private readonly ISpriteRepository _spriteRepository;
+    private readonly IStoreImportedItemRepository _storeImportedItemRepository;
     private readonly IUnitOfWork _unitOfWork;
 
-    public DeleteSpriteCommandHandler(ISpriteRepository spriteRepository,
+    public DeleteSpriteCommandHandler(
+        ISpriteRepository spriteRepository,
+        IStoreImportedItemRepository storeImportedItemRepository,
         IUnitOfWork unitOfWork)
     {
         _spriteRepository = spriteRepository;
+        _storeImportedItemRepository = storeImportedItemRepository;
         _unitOfWork = unitOfWork;
     }
 
@@ -26,6 +30,7 @@ internal class DeleteSpriteCommandHandler : ICommandHandler<DeleteSpriteCommand>
                 new Error("SpriteNotFound", $"Sprite with ID {command.Id} not found."));
         }
 
+        await _storeImportedItemRepository.DeleteByAssetAsync("Sprite", command.Id, cancellationToken);
         await _spriteRepository.DeleteAsync(command.Id, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 

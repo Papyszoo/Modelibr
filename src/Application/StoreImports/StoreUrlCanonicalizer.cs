@@ -1,7 +1,8 @@
 namespace Application.StoreImports;
 
 /// <summary>
-/// Canonicalizes store base URLs (trims whitespace, lowercases scheme and host, strips trailing slash)
+/// Canonicalizes store base URLs (trims whitespace, lowercases scheme and host, formats IPv6 brackets,
+/// normalizes default ports, preserves path casing, and strips trailing slashes)
 /// so that provenance deduplication and lookups are invariant to casing and trailing slash variations.
 /// </summary>
 public static class StoreUrlCanonicalizer
@@ -15,8 +16,15 @@ public static class StoreUrlCanonicalizer
         if (Uri.TryCreate(trimmed, UriKind.Absolute, out var uri))
         {
             var scheme = uri.Scheme.ToLowerInvariant();
-            var host = uri.Host.ToLowerInvariant();
-            var portPart = uri.IsDefaultPort ? string.Empty : $":{uri.Port}";
+            var host = uri.HostNameType == UriHostNameType.IPv6
+                ? $"[{uri.Host.Trim('[', ']').ToLowerInvariant()}]"
+                : uri.Host.ToLowerInvariant();
+
+            var isDefaultPort = uri.IsDefaultPort ||
+                (scheme == "http" && uri.Port == 80) ||
+                (scheme == "https" && uri.Port == 443);
+
+            var portPart = isDefaultPort ? string.Empty : $":{uri.Port}";
             var path = uri.AbsolutePath.TrimEnd('/');
             return $"{scheme}://{host}{portPart}{path}";
         }

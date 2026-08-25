@@ -137,6 +137,11 @@ internal sealed class PackRepository : IPackRepository
         DateTime updatedAt,
         CancellationToken cancellationToken = default)
     {
+        if (_context.Database.CurrentTransaction is null)
+        {
+            throw new InvalidOperationException("EnsureModelInPackAsync requires an active database transaction.");
+        }
+
         await _context.Database.ExecuteSqlInterpolatedAsync(
             $"INSERT INTO \"PackModels\" (\"ModelsId\", \"PacksId\") VALUES ({modelId}, {packId}) ON CONFLICT (\"ModelsId\", \"PacksId\") DO NOTHING;",
             cancellationToken);

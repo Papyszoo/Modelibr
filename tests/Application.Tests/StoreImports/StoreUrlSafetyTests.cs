@@ -28,6 +28,28 @@ public class StoreUrlSafetyTests
         Assert.True(StoreUrlSafety.ValidateStoreBaseUrl(url).IsFailure);
     }
 
+    [Theory]
+    [InlineData("https://user:secret@store.example.com")]
+    [InlineData("https://store.example.com?channel=preview")]
+    [InlineData("https://store.example.com#preview")]
+    public void ValidateStoreBaseUrl_Rejects_AmbiguousAuthorityOrResourceComponents(string url)
+    {
+        var result = StoreUrlSafety.ValidateStoreBaseUrl(url);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("StoreImport.InvalidStoreUrl", result.Error.Code);
+    }
+
+    [Theory]
+    [InlineData(" HTTPS://STORE.Example.COM:443/Packs/ ", "https://store.example.com/Packs")]
+    [InlineData("http://LOCALHOST:80/Dev/", "http://localhost/Dev")]
+    [InlineData("https://STORE.Example.COM:8443/Mixed/Path/", "https://store.example.com:8443/Mixed/Path")]
+    [InlineData("https://[2001:DB8::1]:443/Assets/", "https://[2001:db8::1]/Assets")]
+    public void Canonicalize_NormalizesOriginWithoutChangingPathCase(string input, string expected)
+    {
+        Assert.Equal(expected, StoreUrlCanonicalizer.Canonicalize(input));
+    }
+
     private static readonly Uri PublicStore = new("https://store.example.com");
     private static readonly Uri LoopbackStore = new("http://127.0.0.1:5000");
 

@@ -98,6 +98,18 @@ internal sealed class EnvironmentMapRepository : IEnvironmentMapRepository
             .FirstOrDefaultAsync(e => e.Variants.Any(v => v.File != null && v.File.Sha256Hash == sha256Hash), cancellationToken);
     }
 
+    public async Task<EnvironmentMap?> GetDeletedByFileHashAsync(string sha256Hash, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(sha256Hash))
+            return null;
+
+        return await BaseQuery(includeDeleted: true)
+            .Where(e => e.IsDeleted)
+            .FirstOrDefaultAsync(
+                e => e.Variants.Any(v => v.File != null && v.File.Sha256Hash == sha256Hash),
+                cancellationToken);
+    }
+
     public async Task<bool> ExistsByNameAsync(string name, CancellationToken cancellationToken = default)
     {
         return await _context.EnvironmentMaps

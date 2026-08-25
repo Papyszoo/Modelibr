@@ -5,6 +5,7 @@ using Application.Abstractions.Services;
 using Domain.Models;
 using Domain.Services;
 using Microsoft.Extensions.Logging;
+using SharedKernel;
 
 namespace Application.StoreImports;
 
@@ -54,7 +55,8 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
     private readonly ISoundRepository _soundRepository;
     private readonly ISpriteRepository _spriteRepository;
     private readonly IEnvironmentMapRepository _environmentMapRepository;
-    private readonly IAssetMetadataRepository _assetMetadataRepository;
+    private readonly IStoreImportedItemRepository _storeImportedItemRepository;
+    private readonly IStoreImportLockService _lockService;
     private readonly IDateTimeProvider _clock;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IChangeTrackerReset _trackerReset;
@@ -72,7 +74,8 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         ISoundRepository soundRepository,
         ISpriteRepository spriteRepository,
         IEnvironmentMapRepository environmentMapRepository,
-        IAssetMetadataRepository assetMetadataRepository,
+        IStoreImportedItemRepository storeImportedItemRepository,
+        IStoreImportLockService lockService,
         IDateTimeProvider clock,
         IUnitOfWork unitOfWork,
         IChangeTrackerReset trackerReset,
@@ -89,7 +92,8 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         _soundRepository = soundRepository;
         _spriteRepository = spriteRepository;
         _environmentMapRepository = environmentMapRepository;
-        _assetMetadataRepository = assetMetadataRepository;
+        _storeImportedItemRepository = storeImportedItemRepository;
+        _lockService = lockService;
         _clock = clock;
         _unitOfWork = unitOfWork;
         _trackerReset = trackerReset;
@@ -209,12 +213,6 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            // Host shutdown / cancellation: leave the job as-is here - the queue's startup
-            // sweep marks interrupted jobs Failed on the next boot, and a new import
-            // gap-fills via provenance + SHA dedupe. The `when` guard matters: an HTTP
-            // timeout throws the same exception type, and swallowing it here left the job
-            // Running forever with the UI polling it indefinitely. Those fall through to the
-            // generic handler below and are persisted as Failed.
             _logger.LogInformation("Store import job {JobId} was cancelled", work.JobId);
         }
         catch (Exception ex)
@@ -222,8 +220,6 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
             _logger.LogError(ex, "Store import job {JobId} aborted", work.JobId);
             try
             {
-                // The abort may have left poisoned entities behind; reset so the failure
-                // state itself can still be persisted (UpdateIfDetached re-attaches the job).
                 _trackerReset.Clear();
                 job.Fail(ex.Message, _clock.UtcNow);
                 await SaveJobAsync(job, CancellationToken.None);
@@ -238,8 +234,6 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
 
     private async Task<int> ResolvePackAsync(StoreImportWorkItem work, StoreManifest manifest, CancellationToken ct)
     {
-        // Provenance idempotency: a re-import of the same store asset reuses its pack
-        // (no second pack) and re-stamps the manifest version/timestamp for this run.
         var existing = await _packRepository.GetByStoreImportAsync(work.StoreUrl, work.AssetId, ct);
         if (existing != null)
         {
@@ -253,16 +247,11 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
 
         try
         {
-            // Creation stamps provenance in the same transaction (see IStoreImportSink), so the
-            // pack is never visible without its idempotency key.
             return await CreatePackWithUniqueNameAsync(
                 baseName, manifest.Description, license, listingUrl, work, manifest.SchemaVersion, ct);
         }
         catch (Exception) when (!ct.IsCancellationRequested)
         {
-            // A concurrent import of the SAME store asset passed the lookup above too and won the
-            // race - the unique provenance index rejects this one. Adopt the winner's pack instead
-            // of failing the job; anything else is a real error and rethrows.
             _trackerReset.Clear();
             var winner = await _packRepository.GetByStoreImportAsync(work.StoreUrl, work.AssetId, ct);
             if (winner is null)
@@ -274,8 +263,6 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         }
     }
 
-    // A pack name collision with an UNRELATED existing pack must not dead-end the import
-    // (provenance already prevents re-import collisions). Disambiguate with a bounded suffix.
     private async Task<int> CreatePackWithUniqueNameAsync(
         string baseName, string? description, string? license, string url,
         StoreImportWorkItem work, int manifestVersion, CancellationToken ct)
@@ -297,11 +284,6 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         throw new StoreImportException($"Could not create a uniquely named pack for '{baseName}'.");
     }
 
-    /// <summary>
-    /// Writes what the manifest says about an asset's rights and where it came from onto the
-    /// asset itself (prompt 16-E). Best-effort by design: the files are already imported and
-    /// usable, so a metadata failure downgrades the asset's description rather than the item.
-    /// </summary>
     private async Task StampAssetMetadataBestEffortAsync(
         StoreImportWorkItem work,
         StoreManifest manifest,
@@ -320,8 +302,6 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
                 assetId,
                 new StoreAssetMetadataStamp(
                     License: license,
-                    // The raw string, even when it mapped cleanly - "CC BY 4.0" is what the
-                    // author wrote, and the mapped value has already thrown the version away.
                     LicenseName: string.IsNullOrWhiteSpace(manifest.License) ? null : manifest.License.Trim(),
                     Author: manifest.Author,
                     CreditName: manifest.CreditName,
@@ -365,23 +345,16 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         }
         catch (Exception ex)
         {
-            // Best-effort: a missing/failed pack thumbnail must not fail the import.
             _trackerReset.Clear();
             _logger.LogWarning(ex, "Store import: failed to attach pack thumbnail for pack {PackId}", packId);
         }
     }
 
-    // Content types UploadThumbnailCommand accepts - the store turntable is an animated WebP.
     private static readonly HashSet<string> ReusableThumbnailContentTypes = new(StringComparer.OrdinalIgnoreCase)
     {
         "image/png", "image/jpeg", "image/jpg", "image/webp"
     };
 
-    /// <summary>
-    /// The store preview to reuse as this model's thumbnail, or null. Prefers the animated
-    /// turntable, then a static thumbnail; requires a browser-renderable image content type
-    /// (Modelibr shows model thumbnails as &lt;img&gt;, and UploadThumbnailCommand rejects others).
-    /// </summary>
     private static StoreManifestPreview? PickReusableThumbnail(IReadOnlyList<StoreManifestPreview>? previews)
     {
         if (previews is null || previews.Count == 0)
@@ -413,7 +386,6 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         }
         catch (Exception ex)
         {
-            // Falling back to local generation is fine - log and move on.
             _logger.LogWarning(ex, "Store import: could not fetch the store thumbnail for '{Item}'; will generate one instead", itemName);
             return null;
         }
@@ -432,13 +404,66 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         }
         catch (Exception ex)
         {
-            // The model exists (generation was suppressed) - a failed attach leaves it without a
-            // thumbnail, recoverable via manual regenerate. Reset so a poisoned tracker doesn't
-            // cascade into later items.
             _trackerReset.Clear();
             _logger.LogWarning(ex, "Store import: failed to attach the store thumbnail to model {ModelId}", modelId);
         }
     }
+
+    private readonly record struct AssetTargetStatus(bool Exists, bool IsSoftDeleted, object? Asset);
+
+    private async Task<AssetTargetStatus> GetAssetStatusAsync(string assetType, int assetId, CancellationToken ct)
+    {
+        switch (assetType.ToLowerInvariant())
+        {
+            case "model":
+                var model = await _modelRepository.GetByIdAsync(assetId, ct);
+                if (model != null) return new AssetTargetStatus(true, false, model);
+                var delModel = await _modelRepository.GetDeletedByIdAsync(assetId, ct);
+                if (delModel != null) return new AssetTargetStatus(true, true, delModel);
+                return new AssetTargetStatus(false, false, null);
+
+            case "textureset":
+                var ts = await _textureSetRepository.GetByIdAsync(assetId, ct);
+                if (ts != null) return new AssetTargetStatus(true, false, ts);
+                var delTs = await _textureSetRepository.GetDeletedByIdAsync(assetId, ct);
+                if (delTs != null) return new AssetTargetStatus(true, true, delTs);
+                return new AssetTargetStatus(false, false, null);
+
+            case "sound":
+                var sound = await _soundRepository.GetByIdAsync(assetId, ct);
+                if (sound != null) return new AssetTargetStatus(true, false, sound);
+                var delSound = await _soundRepository.GetDeletedByIdAsync(assetId, ct);
+                if (delSound != null) return new AssetTargetStatus(true, true, delSound);
+                return new AssetTargetStatus(false, false, null);
+
+            case "sprite":
+                var sprite = await _spriteRepository.GetByIdAsync(assetId, ct);
+                if (sprite != null) return new AssetTargetStatus(true, false, sprite);
+                var delSprite = await _spriteRepository.GetDeletedByIdAsync(assetId, ct);
+                if (delSprite != null) return new AssetTargetStatus(true, true, delSprite);
+                return new AssetTargetStatus(false, false, null);
+
+            case "environmentmap":
+                var env = await _environmentMapRepository.GetByIdAsync(assetId, ct);
+                if (env != null) return new AssetTargetStatus(true, false, env);
+                var delEnv = await _environmentMapRepository.GetDeletedByIdAsync(assetId, ct);
+                if (delEnv != null) return new AssetTargetStatus(true, true, delEnv);
+                return new AssetTargetStatus(false, false, null);
+
+            default:
+                return new AssetTargetStatus(false, false, null);
+        }
+    }
+
+    private static string GetCanonicalFamilyName(StoreManifestMapping.ImportTarget target) => target switch
+    {
+        StoreManifestMapping.ImportTarget.Model => StoreManifestMapping.ItemTypeModel,
+        StoreManifestMapping.ImportTarget.TextureSet => StoreManifestMapping.ItemTypeTextureSet,
+        StoreManifestMapping.ImportTarget.Sound => StoreManifestMapping.ItemTypeSound,
+        StoreManifestMapping.ImportTarget.Sprite => StoreManifestMapping.ItemTypeSprite,
+        StoreManifestMapping.ImportTarget.EnvironmentMap => StoreManifestMapping.ItemTypeEnvironmentMap,
+        _ => string.Empty
+    };
 
     private async Task<StoreImportItemResult> ImportItemAsync(
         StoreImportWorkItem work, int packId, StoreManifestItem item, string[] tags, string? batchId, CancellationToken ct)
@@ -446,7 +471,6 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         var target = StoreManifestMapping.PlanForItem(item.ItemType);
         if (target == StoreManifestMapping.ImportTarget.Unsupported)
         {
-            // GAP (docs/VISION.md): PackItemType.Other has no Modelibr home - skip + report.
             return Skipped(item, OutcomeSkippedUnsupported, $"Unsupported item type '{item.ItemType}' - no Modelibr mapping.");
         }
 
@@ -454,316 +478,634 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         if (files.Count == 0)
             throw new StoreImportException("Item has no files.");
 
-        return target switch
-        {
-            StoreManifestMapping.ImportTarget.Model => await ImportModelAsync(work, packId, item, files, tags, batchId, ct),
-            StoreManifestMapping.ImportTarget.TextureSet => await ImportTextureSetAsync(work, packId, item, files, tags, batchId, ct),
-            StoreManifestMapping.ImportTarget.Sound => await ImportSoundAsync(work, packId, item, files, tags, batchId, ct),
-            StoreManifestMapping.ImportTarget.Sprite => await ImportSpriteAsync(work, packId, item, files, tags, batchId, ct),
-            StoreManifestMapping.ImportTarget.EnvironmentMap => await ImportEnvironmentMapAsync(work, packId, item, files, batchId, ct),
-            _ => Skipped(item, OutcomeSkippedUnsupported, $"Unsupported item type '{item.ItemType}'.")
-        };
-    }
-
-    private async Task<StoreImportItemResult> ImportModelAsync(
-        StoreImportWorkItem work, int packId, StoreManifestItem item, IReadOnlyList<StoreManifestFile> files, string[] tags, string? batchId, CancellationToken ct)
-    {
-        var primary = PickPrimary(files, StoreManifestMapping.RoleKind.Mesh);
-
-        Model? existing = null;
         var canonicalStoreUrl = StoreUrlCanonicalizer.Canonicalize(work.StoreUrl);
+        var canonicalFamily = GetCanonicalFamilyName(target);
 
+        // =======================================================================
+        // PHASE 1: Optimistic check and staged downloads OUTSIDE database transaction
+        // =======================================================================
+        StoreImportedItem? optimisticProv = null;
         if (!string.IsNullOrWhiteSpace(item.Id))
         {
-            var meta = await _assetMetadataRepository.GetByStoreProvenanceAsync(canonicalStoreUrl, work.AssetId, item.Id, ct);
-            if (meta != null && meta.AssetType == StoreManifestMapping.ItemTypeModel)
+            optimisticProv = await _storeImportedItemRepository.GetByProvenanceAsync(canonicalStoreUrl, work.AssetId, item.Id, ct);
+            if (optimisticProv != null)
             {
-                existing = await _modelRepository.GetByIdAsync(meta.AssetId, ct);
+                var targetStatus = await GetAssetStatusAsync(optimisticProv.AssetType, optimisticProv.AssetId, ct);
+                if (targetStatus.Exists && targetStatus.IsSoftDeleted)
+                {
+                    // Target is in recycle bin - return immediately with 0 downloads!
+                    return Skipped(item, OutcomeSkippedDedupe, "Asset is in the recycle bin. Restore it to use it.", optimisticProv.AssetType, optimisticProv.AssetId);
+                }
             }
         }
-        else
+
+        var primary = target switch
         {
-            existing = await _modelRepository.GetByFileHashAsync(primary.Sha256, ct);
-        }
+            StoreManifestMapping.ImportTarget.Model => PickPrimary(files, StoreManifestMapping.RoleKind.Mesh),
+            StoreManifestMapping.ImportTarget.Sound => PickPrimary(files, StoreManifestMapping.RoleKind.Audio),
+            StoreManifestMapping.ImportTarget.Sprite => PickPrimary(files, StoreManifestMapping.RoleKind.Image),
+            StoreManifestMapping.ImportTarget.EnvironmentMap => PickPrimary(files, StoreManifestMapping.RoleKind.Panorama),
+            _ => files[0]
+        };
 
-        if (existing != null)
-        {
-            var have = existing.Versions
-                .SelectMany(v => v.Files)
-                .Select(f => f.Sha256Hash)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var missing = files.Where(f => f.Sha256 is null || !have.Contains(f.Sha256)).ToList();
+        // Determine files to download for staging
+        var stagedDownloads = new Dictionary<StoreManifestFile, StoreDownloadedFile>();
+        StoreDownloadedFile? thumbnailDownload = null;
+        var reusablePreview = target == StoreManifestMapping.ImportTarget.Model ? PickReusableThumbnail(item.Previews) : null;
 
-            foreach (var file in missing)
-            {
-                using var download = await DownloadAndVerifyAsync(work, file, ct);
-                await _sink.AddFileToModelAsync(existing.Id, download.ToUpload(file.FileName), ct);
-            }
-
-            await _sink.AddModelToPackAsync(packId, existing.Id, ct);
-            if (existing.ModelCategoryId is null
-                && await ResolveCategoryAsync(StoreManifestMapping.ImportTarget.Model, item, ct) is int gapFillCategoryId)
-                await _sink.SetModelCategoryAsync(existing.Id, gapFillCategoryId, ct);
-            var reason = missing.Count > 0
-                ? $"Model already present (deduplicated by store item); gap-filled {missing.Count} missing file(s)."
-                : "Model already present (deduplicated by store item).";
-            return Skipped(item, OutcomeSkippedDedupe, reason, StoreManifestMapping.ItemTypeModel, existing.Id);
-        }
-
-        // Reuse the store's already-rendered thumbnail (turntable preferred, else static)
-        // instead of re-rendering it locally. Download it FIRST: a failed fetch simply falls
-        // back to normal generation, so the model never ends up with no thumbnail at all.
-        var reusablePreview = PickReusableThumbnail(item.Previews);
-        var thumbnailDownload = reusablePreview is null
-            ? null
-            : await TryDownloadThumbnailAsync(work, reusablePreview, item.Name, ct);
-
-        int modelId;
         try
         {
-            var categoryId = await ResolveCategoryAsync(StoreManifestMapping.ImportTarget.Model, item, ct);
-
-            using var primaryDownload = await DownloadAndVerifyAsync(work, primary, ct);
-            modelId = await _sink.CreateModelAsync(
-                primaryDownload.ToUpload(primary.FileName), item.Name, batchId,
-                generateThumbnail: thumbnailDownload is null, ct);
-
-            foreach (var file in files)
+            if (optimisticProv != null)
             {
-                if (ReferenceEquals(file, primary))
-                    continue;
-                using var download = await DownloadAndVerifyAsync(work, file, ct);
-                await _sink.AddFileToModelAsync(modelId, download.ToUpload(file.FileName), ct);
+                var targetStatus = await GetAssetStatusAsync(optimisticProv.AssetType, optimisticProv.AssetId, ct);
+                if (targetStatus.Exists && !targetStatus.IsSoftDeleted)
+                {
+                    // Gap-fill check: download only missing files
+                    var missingFiles = GetMissingFiles(target, targetStatus.Asset, files);
+                    foreach (var missingFile in missingFiles)
+                    {
+                        var dl = await DownloadAndVerifyAsync(work, missingFile, ct);
+                        stagedDownloads[missingFile] = dl;
+                    }
+                }
+                else
+                {
+                    // Stale provenance: target asset was permanently deleted / corrupted.
+                    // Staging download for full creation.
+                    foreach (var file in files)
+                    {
+                        var dl = await DownloadAndVerifyAsync(work, file, ct);
+                        stagedDownloads[file] = dl;
+                    }
+                    if (reusablePreview != null)
+                    {
+                        thumbnailDownload = await TryDownloadThumbnailAsync(work, reusablePreview, item.Name, ct);
+                    }
+                }
+            }
+            else
+            {
+                // A store item is the identity of a multi-file asset. Its primary hash may
+                // legitimately match another store item, so only single-file families and
+                // legacy manifests without an item id use SHA as their identity fallback.
+                var shouldCheckSha = string.IsNullOrWhiteSpace(item.Id) || IsSingleFileFamily(target);
+                var shaHit = shouldCheckSha
+                    ? await CheckOptimisticShaHitAsync(target, primary.Sha256, ct)
+                    : new ShaHitResult(false, false, 0, null);
+
+                if (shaHit.Exists && shaHit.IsSoftDeleted)
+                {
+                    return Skipped(item, OutcomeSkippedDedupe, "Asset is in the recycle bin. Restore it to use it.", canonicalFamily, shaHit.AssetId);
+                }
+
+                if (shaHit.Exists)
+                {
+                    foreach (var missingFile in GetMissingFiles(target, shaHit.Asset, files))
+                    {
+                        var dl = await DownloadAndVerifyAsync(work, missingFile, ct);
+                        stagedDownloads[missingFile] = dl;
+                    }
+                }
+                else
+                {
+                    // Download full item for creation
+                    foreach (var file in files)
+                    {
+                        var dl = await DownloadAndVerifyAsync(work, file, ct);
+                        stagedDownloads[file] = dl;
+                    }
+                    if (reusablePreview != null)
+                    {
+                        thumbnailDownload = await TryDownloadThumbnailAsync(work, reusablePreview, item.Name, ct);
+                    }
+                }
             }
 
-            // Tags (+ item name reused as description) mirror the CLI: applied only when the
-            // manifest carries tags. Models/texture sets are the only per-type tag vocabularies.
-            // The item category rides the same command (it's UpdateModelTags that assigns
-            // model categories throughout the app).
-            if (tags.Length > 0 || categoryId.HasValue)
-                await _sink.SetModelTagsAsync(modelId, tags, item.Name, categoryId, ct);
+            // =======================================================================
+            // PHASE 2: Atomic Transaction & Advisory Lock Serialization
+            // =======================================================================
+            var txResult = await _unitOfWork.InTransactionAsync<StoreImportItemResult>(async txCt =>
+            {
+                // 1. Provenance Lock & Re-check
+                if (!string.IsNullOrWhiteSpace(item.Id))
+                {
+                    var provLockKey = $"store-item:{canonicalStoreUrl}:{work.AssetId}:{item.Id}";
+                    await _lockService.AcquireLockAsync(provLockKey, txCt);
 
-            await _sink.AddModelToPackAsync(packId, modelId, ct);
+                    var prov = await _storeImportedItemRepository.GetByProvenanceAsync(canonicalStoreUrl, work.AssetId, item.Id, txCt);
+                    if (prov != null)
+                    {
+                        if (!string.Equals(prov.AssetType, item.ItemType, StringComparison.OrdinalIgnoreCase))
+                        {
+                            return Result.Failure<StoreImportItemResult>(new Error(
+                                "StoreImport.IntegrityError",
+                                $"Store item provenance integrity error: item '{item.Name}' ({item.Id}) is recorded as local {prov.AssetType} {prov.AssetId}, but manifest defines it as {item.ItemType}."));
+                        }
 
-            if (thumbnailDownload is not null && reusablePreview is not null)
-                await AttachStoreThumbnailBestEffortAsync(modelId, reusablePreview, thumbnailDownload, ct);
+                        var status = await GetAssetStatusAsync(prov.AssetType, prov.AssetId, txCt);
+                        if (status.Exists)
+                        {
+                            if (status.IsSoftDeleted)
+                            {
+                                return Result.Success(Skipped(item, OutcomeSkippedDedupe, "Asset is in the recycle bin. Restore it to use it.", prov.AssetType, prov.AssetId));
+                            }
+
+                            // Active asset dedupe hit! Link to pack, gap-fill category, and attach missing staged files
+                            var outcomeReason = await HandleExistingAssetDedupeAsync(packId, item, files, prov.AssetType, prov.AssetId, status.Asset!, stagedDownloads, txCt);
+                            return Result.Success(Skipped(item, OutcomeSkippedDedupe, outcomeReason, prov.AssetType, prov.AssetId));
+                        }
+
+                        // Target asset was permanently deleted -> delete stale provenance row and recreate
+                        _logger.LogWarning("Store import: provenance row pointed to missing {AssetType} {AssetId}; recreating asset", prov.AssetType, prov.AssetId);
+                        await _storeImportedItemRepository.DeleteAsync(prov, txCt);
+                    }
+                }
+
+                // 2. SHA Lock & Re-check for legacy manifests (no item.Id) or single-file families
+                if (string.IsNullOrWhiteSpace(item.Id) || IsSingleFileFamily(target))
+                {
+                    if (!string.IsNullOrWhiteSpace(primary.Sha256))
+                    {
+                        var shaLockKey = $"sha:{canonicalFamily}:{primary.Sha256}";
+                        await _lockService.AcquireLockAsync(shaLockKey, txCt);
+
+                        var existingAsset = await FindAssetByShaAsync(target, primary.Sha256, txCt);
+                        if (existingAsset != null)
+                        {
+                            var outcomeReason = await HandleExistingAssetDedupeAsync(packId, item, files, canonicalFamily, existingAsset.Id, existingAsset.Entity, stagedDownloads, txCt);
+
+                            if (!string.IsNullOrWhiteSpace(item.Id))
+                            {
+                                var provenance = StoreImportedItem.Create(canonicalStoreUrl, work.AssetId, item.Id, canonicalFamily, existingAsset.Id, _clock.UtcNow);
+                                await _storeImportedItemRepository.AddAsync(provenance, txCt);
+                            }
+
+                            return Result.Success(Skipped(item, OutcomeSkippedDedupe, outcomeReason, canonicalFamily, existingAsset.Id));
+                        }
+
+                        var deletedAsset = await FindDeletedAssetByShaAsync(target, primary.Sha256, txCt);
+                        if (deletedAsset != null)
+                        {
+                            return Result.Success(Skipped(
+                                item,
+                                OutcomeSkippedDedupe,
+                                "Asset is in the recycle bin. Restore it to use it.",
+                                canonicalFamily,
+                                deletedAsset.Id));
+                        }
+                    }
+                }
+
+                // 3. Asset Creation from Staged Downloads
+                int createdAssetId = target switch
+                {
+                    StoreManifestMapping.ImportTarget.Model => await CreateModelFromStagedAsync(packId, item, files, primary, tags, batchId, stagedDownloads, thumbnailDownload, reusablePreview, txCt),
+                    StoreManifestMapping.ImportTarget.TextureSet => await CreateTextureSetFromStagedAsync(packId, item, files, tags, batchId, stagedDownloads, txCt),
+                    StoreManifestMapping.ImportTarget.Sound => await CreateSoundFromStagedAsync(packId, item, primary, tags, batchId, stagedDownloads, txCt),
+                    StoreManifestMapping.ImportTarget.Sprite => await CreateSpriteFromStagedAsync(packId, item, primary, tags, batchId, stagedDownloads, txCt),
+                    StoreManifestMapping.ImportTarget.EnvironmentMap => await CreateEnvironmentMapFromStagedAsync(packId, item, primary, batchId, stagedDownloads, txCt),
+                    _ => throw new StoreImportException($"Unsupported target {target}")
+                };
+
+                if (!string.IsNullOrWhiteSpace(item.Id))
+                {
+                    var provenance = StoreImportedItem.Create(canonicalStoreUrl, work.AssetId, item.Id, canonicalFamily, createdAssetId, _clock.UtcNow);
+                    await _storeImportedItemRepository.AddAsync(provenance, txCt);
+                }
+
+                var extraNote = ExtraFilesNote(files, target switch
+                {
+                    StoreManifestMapping.ImportTarget.Sound => "sounds",
+                    StoreManifestMapping.ImportTarget.Sprite => "sprites",
+                    StoreManifestMapping.ImportTarget.EnvironmentMap => "environment maps",
+                    _ => string.Empty
+                });
+
+                return Result.Success(Created(item, canonicalFamily, createdAssetId, extraNote));
+            }, ct);
+
+            if (txResult.IsFailure)
+            {
+                throw new StoreImportException(txResult.Error.Message);
+            }
+
+            return txResult.Value;
         }
         finally
         {
+            foreach (var dl in stagedDownloads.Values)
+            {
+                dl.Dispose();
+            }
             thumbnailDownload?.Dispose();
         }
-
-        return Created(item, StoreManifestMapping.ItemTypeModel, modelId);
     }
 
-    private async Task<StoreImportItemResult> ImportTextureSetAsync(
-        StoreImportWorkItem work, int packId, StoreManifestItem item, IReadOnlyList<StoreManifestFile> files, string[] tags, string? batchId, CancellationToken ct)
+    private static bool IsSingleFileFamily(StoreManifestMapping.ImportTarget target)
+        => target is StoreManifestMapping.ImportTarget.Sound
+            or StoreManifestMapping.ImportTarget.Sprite
+            or StoreManifestMapping.ImportTarget.EnvironmentMap;
+
+    private static List<StoreManifestFile> GetMissingFiles(
+        StoreManifestMapping.ImportTarget target, object? asset, IReadOnlyList<StoreManifestFile> files)
     {
-        var first = files[0];
-        var firstRole = StoreManifestMapping.ParseRole(first.Role);
+        if (asset is null) return files.ToList();
 
-        TextureSet? existing = null;
-        var canonicalStoreUrl = StoreUrlCanonicalizer.Canonicalize(work.StoreUrl);
-
-        if (!string.IsNullOrWhiteSpace(item.Id))
+        if (target == StoreManifestMapping.ImportTarget.Model && asset is Model model)
         {
-            var meta = await _assetMetadataRepository.GetByStoreProvenanceAsync(canonicalStoreUrl, work.AssetId, item.Id, ct);
-            if (meta != null && meta.AssetType == StoreManifestMapping.ItemTypeTextureSet)
-            {
-                existing = await _textureSetRepository.GetByIdAsync(meta.AssetId, ct);
-            }
-        }
-        else
-        {
-            existing = await _textureSetRepository.GetByFileHashAsync(first.Sha256, ct);
+            var have = model.Versions
+                .SelectMany(v => v.Files)
+                .Select(f => f.Sha256Hash)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            return files.Where(f => f.Sha256 is null || !have.Contains(f.Sha256)).ToList();
         }
 
-        if (existing != null)
+        if (target == StoreManifestMapping.ImportTarget.TextureSet && asset is TextureSet textureSet)
         {
-            // Same gap-fill contract as models: attach manifest textures missing from the set.
-            var have = existing.Textures
+            var have = textureSet.Textures
                 .Where(t => t.File is not null)
                 .Select(t => t.File!.Sha256Hash)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var missing = files.Where(f => f.Sha256 is null || !have.Contains(f.Sha256)).ToList();
+            return files.Where(f => f.Sha256 is null || !have.Contains(f.Sha256)).ToList();
+        }
 
-            foreach (var file in missing)
+        return new List<StoreManifestFile>();
+    }
+
+    private readonly record struct ShaHitResult(bool Exists, bool IsSoftDeleted, int AssetId, object? Asset);
+
+    private async Task<ShaHitResult> CheckOptimisticShaHitAsync(
+        StoreManifestMapping.ImportTarget target, string? sha256, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(sha256))
+            return new ShaHitResult(false, false, 0, null);
+
+        var asset = await FindAssetByShaAsync(target, sha256, ct);
+        if (asset != null)
+            return new ShaHitResult(true, false, asset.Id, asset.Entity);
+
+        var deletedAsset = await FindDeletedAssetByShaAsync(target, sha256, ct);
+        return deletedAsset == null
+            ? new ShaHitResult(false, false, 0, null)
+            : new ShaHitResult(true, true, deletedAsset.Id, deletedAsset.Entity);
+    }
+
+    private async Task<AssetLookupResult?> FindAssetByShaAsync(
+        StoreManifestMapping.ImportTarget target, string sha256, CancellationToken ct)
+    {
+        switch (target)
+        {
+            case StoreManifestMapping.ImportTarget.Model:
+                var m = await _modelRepository.GetByFileHashAsync(sha256, ct);
+                return m == null ? null : new AssetLookupResult(m.Id, m);
+
+            case StoreManifestMapping.ImportTarget.TextureSet:
+                var ts = await _textureSetRepository.GetByFileHashAsync(sha256, ct);
+                return ts == null ? null : new AssetLookupResult(ts.Id, ts);
+
+            case StoreManifestMapping.ImportTarget.Sound:
+                var s = await _soundRepository.GetByFileHashAsync(sha256, ct);
+                return s == null ? null : new AssetLookupResult(s.Id, s);
+
+            case StoreManifestMapping.ImportTarget.Sprite:
+                var sp = await _spriteRepository.GetByFileHashAsync(sha256, ct);
+                return sp == null ? null : new AssetLookupResult(sp.Id, sp);
+
+            case StoreManifestMapping.ImportTarget.EnvironmentMap:
+                var em = await _environmentMapRepository.GetByFileHashAsync(sha256, ct);
+                return em == null ? null : new AssetLookupResult(em.Id, em);
+
+            default:
+                return null;
+        }
+    }
+
+    private sealed record AssetLookupResult(int Id, object Entity);
+
+    private async Task<AssetLookupResult?> FindDeletedAssetByShaAsync(
+        StoreManifestMapping.ImportTarget target, string sha256, CancellationToken ct)
+    {
+        switch (target)
+        {
+            case StoreManifestMapping.ImportTarget.Model:
+                var m = await _modelRepository.GetDeletedByFileHashAsync(sha256, ct);
+                return m == null ? null : new AssetLookupResult(m.Id, m);
+
+            case StoreManifestMapping.ImportTarget.TextureSet:
+                var ts = await _textureSetRepository.GetDeletedByFileHashAsync(sha256, ct);
+                return ts == null ? null : new AssetLookupResult(ts.Id, ts);
+
+            case StoreManifestMapping.ImportTarget.Sound:
+                var s = await _soundRepository.GetDeletedByFileHashAsync(sha256, ct);
+                return s == null ? null : new AssetLookupResult(s.Id, s);
+
+            case StoreManifestMapping.ImportTarget.Sprite:
+                var sp = await _spriteRepository.GetDeletedByFileHashAsync(sha256, ct);
+                return sp == null ? null : new AssetLookupResult(sp.Id, sp);
+
+            case StoreManifestMapping.ImportTarget.EnvironmentMap:
+                var em = await _environmentMapRepository.GetDeletedByFileHashAsync(sha256, ct);
+                return em == null ? null : new AssetLookupResult(em.Id, em);
+
+            default:
+                return null;
+        }
+    }
+
+    private async Task<string> HandleExistingAssetDedupeAsync(
+        int packId,
+        StoreManifestItem item,
+        IReadOnlyList<StoreManifestFile> files,
+        string assetType,
+        int assetId,
+        object asset,
+        Dictionary<StoreManifestFile, StoreDownloadedFile> stagedDownloads,
+        CancellationToken ct)
+    {
+        var target = StoreManifestMapping.PlanForItem(item.ItemType);
+        var extraNote = ExtraFilesNote(files, target switch
+        {
+            StoreManifestMapping.ImportTarget.Sound => "sounds",
+            StoreManifestMapping.ImportTarget.Sprite => "sprites",
+            StoreManifestMapping.ImportTarget.EnvironmentMap => "environment maps",
+            _ => string.Empty
+        });
+
+        switch (target)
+        {
+            case StoreManifestMapping.ImportTarget.Model when asset is Model model:
             {
-                var role = StoreManifestMapping.ParseRole(file.Role);
-                using var download = await DownloadAndVerifyAsync(work, file, ct);
-                var fileId = await _sink.UploadTextureFileAsync(existing.Id, download.ToUpload(file.FileName), ct);
-                await _sink.AddTextureAsync(existing.Id, fileId, role.TextureType, role.SourceChannel, ct);
+                var have = model.Versions
+                    .SelectMany(v => v.Files)
+                    .Select(f => f.Sha256Hash)
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var missing = files.Where(f => f.Sha256 is null || !have.Contains(f.Sha256)).ToList();
+
+                foreach (var file in missing)
+                {
+                    var download = RequireStagedDownload(stagedDownloads, file);
+                    await _sink.AddFileToModelAsync(model.Id, download.ToUpload(file.FileName), ct);
+                }
+
+                await _sink.AddModelToPackAsync(packId, model.Id, ct);
+                if (model.ModelCategoryId is null && await ResolveCategoryAsync(StoreManifestMapping.ImportTarget.Model, item, ct) is int gapFillCat)
+                {
+                    await _sink.SetModelCategoryAsync(model.Id, gapFillCat, ct);
+                }
+
+                return missing.Count > 0
+                    ? $"Model already present (deduplicated by store item); gap-filled {missing.Count} missing file(s)."
+                    : "Model already present (deduplicated by store item).";
             }
 
-            await _sink.AddTextureSetToPackAsync(packId, existing.Id, ct);
-            if (existing.TextureSetCategoryId is null
-                && await ResolveCategoryAsync(StoreManifestMapping.ImportTarget.TextureSet, item, ct) is int gapFillCategoryId)
-                await _sink.SetTextureSetCategoryAsync(existing.Id, existing.Name, gapFillCategoryId, ct);
-            var reason = missing.Count > 0
-                ? $"Texture set already present (deduplicated by store item); gap-filled {missing.Count} missing texture(s)."
-                : "Texture set already present (deduplicated by store item).";
-            return Skipped(item, OutcomeSkippedDedupe, reason, StoreManifestMapping.ItemTypeTextureSet, existing.Id);
+            case StoreManifestMapping.ImportTarget.TextureSet when asset is TextureSet textureSet:
+            {
+                var have = textureSet.Textures
+                    .Where(t => t.File is not null)
+                    .Select(t => t.File!.Sha256Hash)
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var missing = files.Where(f => f.Sha256 is null || !have.Contains(f.Sha256)).ToList();
+
+                foreach (var file in missing)
+                {
+                    var role = StoreManifestMapping.ParseRole(file.Role);
+                    var download = RequireStagedDownload(stagedDownloads, file);
+                    var fileId = await _sink.UploadTextureFileAsync(textureSet.Id, download.ToUpload(file.FileName), ct);
+                    await _sink.AddTextureAsync(textureSet.Id, fileId, role.TextureType, role.SourceChannel, ct);
+                }
+
+                await _sink.AddTextureSetToPackAsync(packId, textureSet.Id, ct);
+                if (textureSet.TextureSetCategoryId is null && await ResolveCategoryAsync(StoreManifestMapping.ImportTarget.TextureSet, item, ct) is int gapFillCat)
+                {
+                    await _sink.SetTextureSetCategoryAsync(textureSet.Id, textureSet.Name, gapFillCat, ct);
+                }
+
+                return missing.Count > 0
+                    ? $"Texture set already present (deduplicated by store item); gap-filled {missing.Count} missing texture(s)."
+                    : "Texture set already present (deduplicated by store item).";
+            }
+
+            case StoreManifestMapping.ImportTarget.Sound when asset is Sound sound:
+            {
+                await _sink.AddSoundToPackAsync(packId, sound.Id, ct);
+                if (sound.SoundCategoryId is null && await ResolveCategoryAsync(StoreManifestMapping.ImportTarget.Sound, item, ct) is int gapFillCat)
+                {
+                    await _sink.SetSoundCategoryAsync(sound.Id, gapFillCat, ct);
+                }
+                return Append("Sound already present (deduplicated by store item).", extraNote) ?? "Sound already present.";
+            }
+
+            case StoreManifestMapping.ImportTarget.Sprite when asset is Sprite sprite:
+            {
+                await _sink.AddSpriteToPackAsync(packId, sprite.Id, ct);
+                if (sprite.SpriteCategoryId is null && await ResolveCategoryAsync(StoreManifestMapping.ImportTarget.Sprite, item, ct) is int gapFillCat)
+                {
+                    await _sink.SetSpriteCategoryAsync(sprite.Id, gapFillCat, ct);
+                }
+                return Append("Sprite already present (deduplicated by store item).", extraNote) ?? "Sprite already present.";
+            }
+
+            case StoreManifestMapping.ImportTarget.EnvironmentMap when asset is EnvironmentMap env:
+            {
+                await _sink.AddEnvironmentMapToPackAsync(packId, env.Id, ct);
+                if (env.EnvironmentMapCategoryId is null && await ResolveCategoryAsync(StoreManifestMapping.ImportTarget.EnvironmentMap, item, ct) is int gapFillCat)
+                {
+                    await _sink.SetEnvironmentMapCategoryAsync(env.Id, gapFillCat, ct);
+                }
+                return Append("Environment map already present (deduplicated by store item).", extraNote) ?? "Environment map already present.";
+            }
+
+            default:
+                return $"{item.ItemType} already present.";
+        }
+    }
+
+    private async Task<int> CreateModelFromStagedAsync(
+        int packId,
+        StoreManifestItem item,
+        IReadOnlyList<StoreManifestFile> files,
+        StoreManifestFile primary,
+        string[] tags,
+        string? batchId,
+        Dictionary<StoreManifestFile, StoreDownloadedFile> stagedDownloads,
+        StoreDownloadedFile? thumbnailDownload,
+        StoreManifestPreview? reusablePreview,
+        CancellationToken ct)
+    {
+        var categoryId = await ResolveCategoryAsync(StoreManifestMapping.ImportTarget.Model, item, ct);
+        var primaryDownload = RequireStagedDownload(stagedDownloads, primary);
+
+        var modelId = await _sink.CreateModelAsync(
+            primaryDownload.ToUpload(primary.FileName),
+            item.Name,
+            batchId,
+            generateThumbnail: thumbnailDownload is null,
+            ct);
+
+        foreach (var file in files)
+        {
+            if (ReferenceEquals(file, primary))
+                continue;
+
+            var extraDl = RequireStagedDownload(stagedDownloads, file);
+            await _sink.AddFileToModelAsync(modelId, extraDl.ToUpload(file.FileName), ct);
         }
 
+        if (tags.Length > 0 || categoryId.HasValue)
+        {
+            await _sink.SetModelTagsAsync(modelId, tags, item.Name, categoryId, ct);
+        }
+
+        await _sink.AddModelToPackAsync(packId, modelId, ct);
+
+        if (thumbnailDownload is not null && reusablePreview is not null)
+        {
+            await AttachStoreThumbnailBestEffortAsync(modelId, reusablePreview, thumbnailDownload, ct);
+        }
+
+        return modelId;
+    }
+
+    private async Task<int> CreateTextureSetFromStagedAsync(
+        int packId,
+        StoreManifestItem item,
+        IReadOnlyList<StoreManifestFile> files,
+        string[] tags,
+        string? batchId,
+        Dictionary<StoreManifestFile, StoreDownloadedFile> stagedDownloads,
+        CancellationToken ct)
+    {
+        var first = files[0];
+        var firstRole = StoreManifestMapping.ParseRole(first.Role);
         if (firstRole.TextureTypeUnmapped)
+        {
             _logger.LogWarning("Store import: texture role '{Role}' not mapped; importing '{File}' as Albedo", first.Role, first.FileName);
+        }
 
         var categoryId = await ResolveCategoryAsync(StoreManifestMapping.ImportTarget.TextureSet, item, ct);
+        var firstDownload = RequireStagedDownload(stagedDownloads, first);
 
-        int setId;
-        using (var firstDownload = await DownloadAndVerifyAsync(work, first, ct))
-        {
-            setId = await _sink.CreateTextureSetAsync(firstDownload.ToUpload(first.FileName), item.Name, firstRole.TextureType, batchId, categoryId, ct);
-        }
+        var setId = await _sink.CreateTextureSetAsync(
+            firstDownload.ToUpload(first.FileName),
+            item.Name,
+            firstRole.TextureType,
+            batchId,
+            categoryId,
+            ct);
 
         foreach (var file in files.Skip(1))
         {
             var role = StoreManifestMapping.ParseRole(file.Role);
-            using var download = await DownloadAndVerifyAsync(work, file, ct);
-            var fileId = await _sink.UploadTextureFileAsync(setId, download.ToUpload(file.FileName), ct);
+            var dl = RequireStagedDownload(stagedDownloads, file);
+            var fileId = await _sink.UploadTextureFileAsync(setId, dl.ToUpload(file.FileName), ct);
             await _sink.AddTextureAsync(setId, fileId, role.TextureType, role.SourceChannel, ct);
         }
 
         if (tags.Length > 0)
+        {
             await _sink.SetTextureSetTagsAsync(setId, tags, ct);
+        }
 
         await _sink.AddTextureSetToPackAsync(packId, setId, ct);
-        return Created(item, StoreManifestMapping.ItemTypeTextureSet, setId);
+        return setId;
     }
 
-    private async Task<StoreImportItemResult> ImportSoundAsync(
-        StoreImportWorkItem work, int packId, StoreManifestItem item, IReadOnlyList<StoreManifestFile> files, string[] tags, string? batchId, CancellationToken ct)
+    private async Task<int> CreateSoundFromStagedAsync(
+        int packId,
+        StoreManifestItem item,
+        StoreManifestFile primary,
+        string[] tags,
+        string? batchId,
+        Dictionary<StoreManifestFile, StoreDownloadedFile> stagedDownloads,
+        CancellationToken ct)
     {
-        var primary = PickPrimary(files, StoreManifestMapping.RoleKind.Audio);
-        var extraNote = ExtraFilesNote(files, "sounds");
-
-        Sound? existing = null;
-        var canonicalStoreUrl = StoreUrlCanonicalizer.Canonicalize(work.StoreUrl);
-
-        if (!string.IsNullOrWhiteSpace(item.Id))
-        {
-            var meta = await _assetMetadataRepository.GetByStoreProvenanceAsync(canonicalStoreUrl, work.AssetId, item.Id, ct);
-            if (meta != null && meta.AssetType == StoreManifestMapping.ItemTypeSound)
-            {
-                existing = await _soundRepository.GetByIdAsync(meta.AssetId, ct);
-            }
-        }
-
-        if (existing == null)
-        {
-            existing = await _soundRepository.GetByFileHashAsync(primary.Sha256, ct);
-        }
-
-        if (existing != null)
-        {
-            await _sink.AddSoundToPackAsync(packId, existing.Id, ct);
-            if (existing.SoundCategoryId is null
-                && await ResolveCategoryAsync(StoreManifestMapping.ImportTarget.Sound, item, ct) is int gapFillCategoryId)
-                await _sink.SetSoundCategoryAsync(existing.Id, gapFillCategoryId, ct);
-            return Skipped(item, OutcomeSkippedDedupe, Append("Sound already present (deduplicated by store item).", extraNote), StoreManifestMapping.ItemTypeSound, existing.Id);
-        }
-
         var categoryId = await ResolveCategoryAsync(StoreManifestMapping.ImportTarget.Sound, item, ct);
+        var download = RequireStagedDownload(stagedDownloads, primary);
 
-        using var download = await DownloadAndVerifyAsync(work, primary, ct);
-        var soundId = await _sink.CreateSoundAsync(download.ToUpload(primary.FileName), item.Name, batchId, categoryId, ct);
-        // Tags + the item name as a description, the same contract models have had since
-        // the first import. Sounds could not carry either until prompt 16-D.
+        var soundId = await _sink.CreateSoundAsync(
+            download.ToUpload(primary.FileName),
+            item.Name,
+            batchId,
+            categoryId,
+            ct);
+
         if (tags.Length > 0)
+        {
             await _sink.SetSoundTagsAsync(soundId, tags, item.Name, ct);
+        }
+
         await _sink.AddSoundToPackAsync(packId, soundId, ct);
-        return Created(item, StoreManifestMapping.ItemTypeSound, soundId, extraNote);
+        return soundId;
     }
 
-    private async Task<StoreImportItemResult> ImportSpriteAsync(
-        StoreImportWorkItem work, int packId, StoreManifestItem item, IReadOnlyList<StoreManifestFile> files, string[] tags, string? batchId, CancellationToken ct)
+    private async Task<int> CreateSpriteFromStagedAsync(
+        int packId,
+        StoreManifestItem item,
+        StoreManifestFile primary,
+        string[] tags,
+        string? batchId,
+        Dictionary<StoreManifestFile, StoreDownloadedFile> stagedDownloads,
+        CancellationToken ct)
     {
-        var primary = PickPrimary(files, StoreManifestMapping.RoleKind.Image);
-        var extraNote = ExtraFilesNote(files, "sprites");
-
-        Sprite? existing = null;
-        var canonicalStoreUrl = StoreUrlCanonicalizer.Canonicalize(work.StoreUrl);
-
-        if (!string.IsNullOrWhiteSpace(item.Id))
-        {
-            var meta = await _assetMetadataRepository.GetByStoreProvenanceAsync(canonicalStoreUrl, work.AssetId, item.Id, ct);
-            if (meta != null && meta.AssetType == StoreManifestMapping.ItemTypeSprite)
-            {
-                existing = await _spriteRepository.GetByIdAsync(meta.AssetId, ct);
-            }
-        }
-
-        if (existing == null)
-        {
-            existing = await _spriteRepository.GetByFileHashAsync(primary.Sha256, ct);
-        }
-
-        if (existing != null)
-        {
-            await _sink.AddSpriteToPackAsync(packId, existing.Id, ct);
-            if (existing.SpriteCategoryId is null
-                && await ResolveCategoryAsync(StoreManifestMapping.ImportTarget.Sprite, item, ct) is int gapFillCategoryId)
-                await _sink.SetSpriteCategoryAsync(existing.Id, gapFillCategoryId, ct);
-            return Skipped(item, OutcomeSkippedDedupe, Append("Sprite already present (deduplicated by store item).", extraNote), StoreManifestMapping.ItemTypeSprite, existing.Id);
-        }
-
         var categoryId = await ResolveCategoryAsync(StoreManifestMapping.ImportTarget.Sprite, item, ct);
+        var download = RequireStagedDownload(stagedDownloads, primary);
 
-        using var download = await DownloadAndVerifyAsync(work, primary, ct);
-        var spriteId = await _sink.CreateSpriteAsync(download.ToUpload(primary.FileName), item.Name, batchId, categoryId, ct);
+        var spriteId = await _sink.CreateSpriteAsync(
+            download.ToUpload(primary.FileName),
+            item.Name,
+            batchId,
+            categoryId,
+            ct);
+
         if (tags.Length > 0)
+        {
             await _sink.SetSpriteTagsAsync(spriteId, tags, item.Name, ct);
+        }
+
         await _sink.AddSpriteToPackAsync(packId, spriteId, ct);
-        return Created(item, StoreManifestMapping.ItemTypeSprite, spriteId, extraNote);
+        return spriteId;
     }
 
-    private async Task<StoreImportItemResult> ImportEnvironmentMapAsync(
-        StoreImportWorkItem work, int packId, StoreManifestItem item, IReadOnlyList<StoreManifestFile> files, string? batchId, CancellationToken ct)
+    private async Task<int> CreateEnvironmentMapFromStagedAsync(
+        int packId,
+        StoreManifestItem item,
+        StoreManifestFile primary,
+        string? batchId,
+        Dictionary<StoreManifestFile, StoreDownloadedFile> stagedDownloads,
+        CancellationToken ct)
     {
-        var primary = PickPrimary(files, StoreManifestMapping.RoleKind.Panorama);
-        var extraNote = ExtraFilesNote(files, "environment maps");
-
-        EnvironmentMap? existing = null;
-        var canonicalStoreUrl = StoreUrlCanonicalizer.Canonicalize(work.StoreUrl);
-
-        if (!string.IsNullOrWhiteSpace(item.Id))
-        {
-            var meta = await _assetMetadataRepository.GetByStoreProvenanceAsync(canonicalStoreUrl, work.AssetId, item.Id, ct);
-            if (meta != null && meta.AssetType == StoreManifestMapping.ItemTypeEnvironmentMap)
-            {
-                existing = await _environmentMapRepository.GetByIdAsync(meta.AssetId, ct);
-            }
-        }
-
-        if (existing == null)
-        {
-            existing = await _environmentMapRepository.GetByFileHashAsync(primary.Sha256, ct);
-        }
-
-        if (existing != null)
-        {
-            await _sink.AddEnvironmentMapToPackAsync(packId, existing.Id, ct);
-            if (existing.EnvironmentMapCategoryId is null
-                && await ResolveCategoryAsync(StoreManifestMapping.ImportTarget.EnvironmentMap, item, ct) is int gapFillCategoryId)
-                await _sink.SetEnvironmentMapCategoryAsync(existing.Id, gapFillCategoryId, ct);
-            return Skipped(item, OutcomeSkippedDedupe, Append("Environment map already present (deduplicated by store item).", extraNote), StoreManifestMapping.ItemTypeEnvironmentMap, existing.Id);
-        }
-
         var categoryId = await ResolveCategoryAsync(StoreManifestMapping.ImportTarget.EnvironmentMap, item, ct);
+        var download = RequireStagedDownload(stagedDownloads, primary);
 
-        using var download = await DownloadAndVerifyAsync(work, primary, ct);
-        var envMapId = await _sink.CreateEnvironmentMapAsync(download.ToUpload(primary.FileName), item.Name, batchId, ct);
+        var envMapId = await _sink.CreateEnvironmentMapAsync(
+            download.ToUpload(primary.FileName),
+            item.Name,
+            batchId,
+            ct);
+
         if (categoryId.HasValue)
+        {
             await _sink.SetEnvironmentMapCategoryAsync(envMapId, categoryId.Value, ct);
+        }
+
         await _sink.AddEnvironmentMapToPackAsync(packId, envMapId, ct);
-        return Created(item, StoreManifestMapping.ItemTypeEnvironmentMap, envMapId, extraNote);
+        return envMapId;
     }
 
-    // Category policy: newly created assets receive the manifest category; dedupe hits are
-    // gap-filled ONLY when currently uncategorized - a category the user (or an earlier
-    // import) already assigned is never overwritten, so re-running an import categorizes
-    // assets that predate category support without clobbering manual organization.
-    // Resolution is best-effort (see IStoreImportCategoryResolver) and never fails an item.
+    private static StoreDownloadedFile RequireStagedDownload(
+        IReadOnlyDictionary<StoreManifestFile, StoreDownloadedFile> stagedDownloads,
+        StoreManifestFile file)
+    {
+        if (stagedDownloads.TryGetValue(file, out var download))
+            return download;
+
+        // The optimistic read and locked re-check observed different database state.
+        // Never repair that race by performing network I/O while holding the transaction
+        // and advisory lock: roll back this item and let a later import stage it cleanly.
+        throw new StoreImportException(
+            $"Store item state changed while '{file.FileName}' was being staged; retry the import.");
+    }
+
     private Task<int?> ResolveCategoryAsync(StoreManifestMapping.ImportTarget target, StoreManifestItem item, CancellationToken ct)
         => _categoryResolver.ResolveAsync(
             target,
@@ -811,17 +1153,11 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         return _notifier.NotifyAsync(progress, ct);
     }
 
-    /// <summary>The file whose role matches the item's expected primary kind, or the first file.</summary>
     private static StoreManifestFile PickPrimary(IReadOnlyList<StoreManifestFile> files, StoreManifestMapping.RoleKind preferred)
         => files.FirstOrDefault(f => StoreManifestMapping.ParseRole(f.Role).Kind == preferred) ?? files[0];
 
-    /// <summary>
-    /// Sounds/sprites/environment maps are single-file assets in Modelibr; when the manifest
-    /// item carries more files, the surplus is surfaced in the outcome reason instead of
-    /// being dropped silently.
-    /// </summary>
     private static string? ExtraFilesNote(IReadOnlyList<StoreManifestFile> files, string assetTypeName)
-        => files.Count > 1
+        => files.Count > 1 && !string.IsNullOrWhiteSpace(assetTypeName)
             ? $"{files.Count - 1} additional file(s) not imported - {assetTypeName} are single-file assets in Modelibr."
             : null;
 
@@ -836,8 +1172,6 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         StoreManifestItem item, string outcome, string reason, string? assetType = null, int? assetId = null)
         => new(item.ItemType, item.Name, outcome, reason, assetType, assetId);
 
-    // Must match the storefront's asset detail route (`/assets/:id` in the store frontend's
-    // App.tsx) - this URL is shown as the pack's source link and has to actually open.
     private static string BuildListingUrl(string storeUrl, string assetId)
         => $"{storeUrl.TrimEnd('/')}/assets/{assetId}";
 

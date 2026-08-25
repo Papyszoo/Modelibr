@@ -13,6 +13,7 @@ public interface IModelRepository
     Task<Model?> GetByIdForAssociationAsync(int id, CancellationToken cancellationToken = default);
     Task<Model?> GetDeletedByIdAsync(int id, CancellationToken cancellationToken = default);
     Task<Model?> GetByFileHashAsync(string sha256Hash, CancellationToken cancellationToken = default);
+    Task<Model?> GetDeletedByFileHashAsync(string sha256Hash, CancellationToken cancellationToken = default);
     Task<bool> ExistsByNameAsync(string name, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<string>> GetNamesByPrefixAsync(string prefix, CancellationToken cancellationToken = default);
     Task<(IEnumerable<Model> Items, int TotalCount)> GetPagedAsync(

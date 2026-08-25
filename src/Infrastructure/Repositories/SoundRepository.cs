@@ -159,6 +159,22 @@ internal sealed class SoundRepository : ISoundRepository
             .FirstOrDefaultAsync(s => s.File.Sha256Hash == sha256Hash, cancellationToken);
     }
 
+    public async Task<Sound?> GetDeletedByFileHashAsync(string sha256Hash, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(sha256Hash))
+            return null;
+
+        return await _context.Sounds
+            .IgnoreQueryFilters()
+            .Where(s => s.IsDeleted)
+            .Include(s => s.File)
+            .Include(s => s.Category)
+            .Include(s => s.Packs)
+            .Include(s => s.Projects)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(s => s.File.Sha256Hash == sha256Hash, cancellationToken);
+    }
+
     public async Task<bool> ExistsByNameAsync(string name, CancellationToken cancellationToken = default)
     {
         return await _context.Sounds

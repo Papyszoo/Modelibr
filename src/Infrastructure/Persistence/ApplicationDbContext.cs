@@ -124,6 +124,7 @@ namespace Infrastructure.Persistence
         public DbSet<AgentUploadTicket> AgentUploadTickets => Set<AgentUploadTicket>();
         public DbSet<ModelVersionAuxiliaryFile> ModelVersionAuxiliaryFiles => Set<ModelVersionAuxiliaryFile>();
         public DbSet<StoreImportJob> StoreImportJobs => Set<StoreImportJob>();
+        public DbSet<StoreImportedItem> StoreImportedItems => Set<StoreImportedItem>();
         public DbSet<AssetMetadata> AssetMetadata => Set<AssetMetadata>();
         public DbSet<ProjectProfileOption> ProjectProfileOptions => Set<ProjectProfileOption>();
         public DbSet<ProjectProfileValue> ProjectProfileValues => Set<ProjectProfileValue>();
@@ -1743,18 +1744,25 @@ namespace Infrastructure.Persistence
                 // us", and "which of them still have no licence".
                 entity.HasIndex(e => new { e.StoreUrl, e.StoreAssetId });
 
-                // Multi-file asset deduplication keys on (StoreUrl, StoreAssetId, StoreItemId)
-                // rather than single-file SHA. Enforced by a filtered unique index when all
-                // three are present.
-                entity.HasIndex(e => new { e.StoreUrl, e.StoreAssetId, e.StoreItemId })
-                    .IsUnique()
-                    .HasFilter("\"StoreUrl\" IS NOT NULL AND \"StoreAssetId\" IS NOT NULL AND \"StoreItemId\" IS NOT NULL");
-
                 // What the review screen asks: which assets did the automation classify and
                 // has anyone looked at them yet. Filtered so the index covers only the rows
                 // that can ever be in that queue, rather than every asset in the library.
                 entity.HasIndex(e => new { e.AssetType, e.AutoAppliedAt, e.AutoReviewedAt })
                     .HasFilter("\"AutoAppliedAt\" IS NOT NULL");
+            });
+
+            modelBuilder.Entity<StoreImportedItem>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.StoreUrl).IsRequired().HasMaxLength(2048);
+                entity.Property(e => e.StoreAssetId).IsRequired().HasMaxLength(200);
+                entity.Property(e => e.StoreItemId).IsRequired().HasMaxLength(200);
+                entity.Property(e => e.AssetType).IsRequired().HasMaxLength(50);
+                entity.Property(e => e.AssetId).IsRequired();
+                entity.Property(e => e.CreatedAt).IsRequired();
+
+                entity.HasIndex(e => new { e.StoreUrl, e.StoreAssetId, e.StoreItemId }).IsUnique();
+                entity.HasIndex(e => new { e.AssetType, e.AssetId });
             });
 
             modelBuilder.Entity<AssetSearchDocument>(entity =>

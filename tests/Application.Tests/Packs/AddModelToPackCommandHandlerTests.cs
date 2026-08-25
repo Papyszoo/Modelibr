@@ -18,6 +18,12 @@ public class AddModelToPackCommandHandlerTests
     private readonly Mock<IDateTimeProvider> _dateTimeProvider = new();
     private readonly Mock<IUnitOfWork> _unitOfWork = new();
 
+    public AddModelToPackCommandHandlerTests()
+    {
+        _unitOfWork.Setup(u => u.InTransactionAsync(It.IsAny<Func<CancellationToken, Task<SharedKernel.Result<bool>>>>(), It.IsAny<CancellationToken>()))
+            .Returns<Func<CancellationToken, Task<SharedKernel.Result<bool>>>, CancellationToken>((func, ct) => func(ct));
+    }
+
     private AddModelToPackCommandHandler CreateHandler() => new(
         _packRepository.Object,
         _modelRepository.Object,

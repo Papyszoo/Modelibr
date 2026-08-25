@@ -258,6 +258,25 @@ internal sealed class TextureSetRepository : ITextureSetRepository
             .FirstOrDefaultAsync(tp => tp.Textures.Any(t => t.File.Sha256Hash == sha256Hash), cancellationToken);
     }
 
+    public async Task<TextureSet?> GetDeletedByFileHashAsync(string sha256Hash, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(sha256Hash))
+            return null;
+
+        return await _context.TextureSets
+            .IgnoreQueryFilters()
+            .Where(tp => tp.IsDeleted)
+            .Include(tp => tp.Textures)
+                .ThenInclude(t => t.File)
+            .Include(tp => tp.ModelVersionMappings)
+                .ThenInclude(m => m.ModelVersion).ThenInclude(mv => mv.Model)
+            .Include(tp => tp.Category)
+            .Include(tp => tp.Packs)
+            .Include(tp => tp.Projects)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(tp => tp.Textures.Any(t => t.File.Sha256Hash == sha256Hash), cancellationToken);
+    }
+
     public async Task<bool> ExistsByNameAsync(string name, CancellationToken cancellationToken = default)
     {
         return await _context.TextureSets

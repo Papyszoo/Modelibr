@@ -34,53 +34,56 @@ internal class AddModelToPackCommandHandler : ICommandHandler<AddModelToPackComm
 
     public async Task<Result> Handle(AddModelToPackCommand command, CancellationToken cancellationToken)
     {
-        var pack = await _packRepository.GetByIdAsync(command.PackId, cancellationToken);
-        if (pack == null)
+        var txResult = await _unitOfWork.InTransactionAsync<bool>(async ct =>
         {
-            return Result.Failure(
-                new Error("PackNotFound", $"Pack with ID {command.PackId} was not found."));
-        }
-
-        var model = await _modelRepository.GetByIdForAssociationAsync(command.ModelId, cancellationToken);
-        if (model == null)
-        {
-            return Result.Failure(
-                new Error("ModelNotFound", $"Model with ID {command.ModelId} was not found."));
-        }
-
-        if (!pack.HasModel(model.Id))
-        {
-            await _packRepository.EnsureModelInPackAsync(pack.Id, model.Id, _dateTimeProvider.UtcNow, cancellationToken);
-
-            // Search reads projection state only, so a membership change that never
-            // reaches the projection is invisible until the next re-derive - which for a
-            // freshly imported-then-packed model may never come.
-            var names = await _packRepository.GetNamesByModelIdAsync(model.Id, cancellationToken);
-            await _searchDocumentRepository.SetPacksForAssetAsync(
-                ExtractionAssetTypes.Model,
-                model.Id,
-                names.Append(pack.Name).Distinct(StringComparer.OrdinalIgnoreCase),
-                cancellationToken);
-        }
-
-        // Update batch upload records for this model to include pack association
-        var batchUploads = await _batchUploadRepository.GetByModelIdAsync(model.Id, cancellationToken);
-        foreach (var batchUpload in batchUploads)
-        {
-            if (batchUpload.PackId == pack.Id &&
-                string.Equals(batchUpload.UploadType, "pack", StringComparison.OrdinalIgnoreCase))
+            var pack = await _packRepository.GetByIdAsync(command.PackId, ct);
+            if (pack == null)
             {
-                continue;
+                return Result.Failure<bool>(
+                    new Error("PackNotFound", $"Pack with ID {command.PackId} was not found."));
             }
 
-            batchUpload.UpdatePackAssociation(pack.Id);
-            batchUpload.UpdateUploadType("pack");
-            await _batchUploadRepository.UpdateAsync(batchUpload, cancellationToken);
-        }
+            var model = await _modelRepository.GetByIdForAssociationAsync(command.ModelId, ct);
+            if (model == null)
+            {
+                return Result.Failure<bool>(
+                    new Error("ModelNotFound", $"Model with ID {command.ModelId} was not found."));
+            }
 
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+            if (!pack.HasModel(model.Id))
+            {
+                await _packRepository.EnsureModelInPackAsync(pack.Id, model.Id, _dateTimeProvider.UtcNow, ct);
 
-        return Result.Success();
+                // Search reads projection state only, so a membership change that never
+                // reaches the projection is invisible until the next re-derive - which for a
+                // freshly imported-then-packed model may never come.
+                var names = await _packRepository.GetNamesByModelIdAsync(model.Id, ct);
+                await _searchDocumentRepository.SetPacksForAssetAsync(
+                    ExtractionAssetTypes.Model,
+                    model.Id,
+                    names.Append(pack.Name).Distinct(StringComparer.OrdinalIgnoreCase),
+                    ct);
+            }
+
+            // Update batch upload records for this model to include pack association
+            var batchUploads = await _batchUploadRepository.GetByModelIdAsync(model.Id, ct);
+            foreach (var batchUpload in batchUploads)
+            {
+                if (batchUpload.PackId == pack.Id &&
+                    string.Equals(batchUpload.UploadType, "pack", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                batchUpload.UpdatePackAssociation(pack.Id);
+                batchUpload.UpdateUploadType("pack");
+                await _batchUploadRepository.UpdateAsync(batchUpload, ct);
+            }
+
+            return Result.Success(true);
+        }, cancellationToken);
+
+        return txResult.IsFailure ? Result.Failure(txResult.Error) : Result.Success();
     }
 }
 

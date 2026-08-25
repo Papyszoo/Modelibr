@@ -44,8 +44,8 @@ public interface IPackRepository
 
     /// <summary>
     /// Idempotently inserts the many-to-many link between a model and a pack with an exact
-    /// PostgreSQL conflict target, so concurrent additions cannot fail with a unique violation
-    /// or cause an entire multi-entity SaveChanges batch to roll back.
+    /// PostgreSQL conflict target within the ambient transaction, so concurrent additions
+    /// cannot fail with a unique violation. Throws if no active transaction is open.
     /// </summary>
     Task EnsureModelInPackAsync(int packId, int modelId, DateTime updatedAt, CancellationToken cancellationToken = default);
 

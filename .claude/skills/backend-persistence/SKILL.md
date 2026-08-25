@@ -67,9 +67,8 @@ description: Modelibr EF Core persistence rules - the IUnitOfWork contract (repo
   via `IUnitOfWork` too - enqueue/complete/fail/retry are durable-queue primitives
   that must persist before workers are notified, and some callers (the
   domain-event pipeline) have no command handler to commit afterwards.
-  `ApplicationDbContext.SaveChangesAsync` also swallows one specific known-benign
-  race (concurrent "add model to pack" duplicating the `PackModels` join PK) -
-  name the exact constraint in the `when` clause if you add another.
+  Pack membership writes are handled atomically via `IPackRepository.EnsureModelInPackAsync`
+  (`INSERT ... ON CONFLICT DO NOTHING`) inside an active `InTransactionAsync` transaction.
 - **Side effects wait for the commit: `IPostCommitActions`.** A handler that invalidates a
   cache, enqueues background work or notifies a worker is telling another process to go and
   read state - so doing it inside the transaction points it at state that is not there yet,

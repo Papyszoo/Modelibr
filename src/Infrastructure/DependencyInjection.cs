@@ -124,6 +124,8 @@ namespace Infrastructure
             services.AddScoped<ITextureSetCategoryRepository, TextureSetCategoryRepository>();
             services.AddScoped<ISearchRepository, SearchRepository>();
             services.AddScoped<IStoreImportJobRepository, StoreImportJobRepository>();
+            services.AddScoped<IStoreImportedItemRepository, StoreImportedItemRepository>();
+            services.AddScoped<Application.Abstractions.Services.IStoreImportLockService, Services.StoreImportLockService>();
             services.AddScoped<IEnvironmentMapSizeLabelService, EnvironmentMapSizeLabelService>();
             services.AddScoped<ITextureImageMetadataReader, TextureImageMetadataReader>();
             services.AddScoped<IThumbnailQueue, ThumbnailQueue>();

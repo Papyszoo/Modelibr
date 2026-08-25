@@ -111,6 +111,7 @@ public class CommandHandlerUnitOfWorkDecoratorRegistrationTests
         var services = new ServiceCollection();
         services.AddApplication();
         services.AddScoped(_ => new Mock<ITextureSetRepository>().Object);
+        services.AddScoped(_ => new Mock<IStoreImportedItemRepository>().Object);
         services.AddScoped(_ => new Mock<IUnitOfWork>().Object);
 
         using var provider = services.BuildServiceProvider();
