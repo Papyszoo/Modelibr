@@ -122,6 +122,9 @@ public class ModelVersionEndpointsIntegrationTests : IClassFixture<ModelibrWebFa
             // v2 becomes active
             Assert.Equal(result!.VersionId, model.ActiveVersionId);
             Assert.NotEqual(v1Id, model.ActiveVersionId);
+            // Pins the multipart binding the asset-processor worker relies on: switching
+            // these to [FromQuery] leaves setAsActive/description silently unbound.
+            Assert.Equal("v2 version", model.Versions.Single(v => v.Id == result.VersionId).Description);
         }
     }
 }
