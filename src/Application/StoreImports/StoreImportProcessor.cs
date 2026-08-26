@@ -319,6 +319,25 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
             var license = StoreManifestMapping.MapSchemaLicense(manifest.License);
             var canonicalStoreUrl = StoreUrlCanonicalizer.Canonicalize(work.StoreUrl);
 
+            var facetsDict = new Dictionary<string, object>(StringComparer.Ordinal);
+            if (item.Styles is { Count: > 0 }) facetsDict["styles"] = item.Styles;
+            if (item.Themes is { Count: > 0 }) facetsDict["themes"] = item.Themes;
+
+            var existingFacets = StoreManifestMapping.GetItemFacets(item.MetadataJson);
+            if (!string.IsNullOrWhiteSpace(existingFacets))
+            {
+                using var doc = JsonDocument.Parse(existingFacets);
+                foreach (var prop in doc.RootElement.EnumerateObject())
+                {
+                    if (!facetsDict.ContainsKey(prop.Name))
+                    {
+                        facetsDict[prop.Name] = prop.Value.Clone();
+                    }
+                }
+            }
+
+            var facetsJson = facetsDict.Count > 0 ? JsonSerializer.Serialize(facetsDict) : null;
+
             await _sink.StampAssetMetadataAsync(
                 assetType,
                 assetId,
@@ -336,7 +355,7 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
                     StoreAssetId: work.AssetId,
                     StoreItemId: item.Id,
                     ImportedAt: _clock.UtcNow,
-                    FacetsJson: StoreManifestMapping.GetItemFacets(item.MetadataJson)),
+                    FacetsJson: facetsJson),
                 ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -987,13 +1006,13 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
             await _sink.AddFileToModelAsync(modelId, extraDl.ToUpload(file.FileName), ct);
         }
 
-        // Tags (+ item name reused as description) mirror the CLI: applied only when the
-        // manifest carries tags. Models/texture sets are the only per-type tag vocabularies.
-        // The item category rides the same command (it's UpdateModelTags that assigns
-        // model categories throughout the app).
-        if (tags.Length > 0 || categoryId.HasValue)
+        var description = !string.IsNullOrWhiteSpace(item.Description)
+            ? item.Description.Trim()
+            : item.Name;
+
+        if (tags.Length > 0 || categoryId.HasValue || !string.IsNullOrWhiteSpace(description))
         {
-            await _sink.SetModelTagsAsync(modelId, tags, item.Name, categoryId, ct);
+            await _sink.SetModelTagsAsync(modelId, tags, description, categoryId, ct);
         }
 
         await _sink.AddModelToPackAsync(packId, modelId, ct);
@@ -1149,8 +1168,8 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
     private Task<int?> ResolveCategoryAsync(StoreManifestMapping.ImportTarget target, StoreManifestItem item, CancellationToken ct)
         => _categoryResolver.ResolveAsync(
             target,
-            StoreManifestMapping.GetItemCategory(item.MetadataJson),
-            StoreManifestMapping.GetItemSubcategory(item.MetadataJson),
+            StoreManifestMapping.ResolveItemCategory(item),
+            StoreManifestMapping.ResolveItemSubcategory(item),
             ct);
 
     private async Task<StoreDownloadedFile> DownloadAndVerifyAsync(StoreImportWorkItem work, StoreManifestFile file, CancellationToken ct)

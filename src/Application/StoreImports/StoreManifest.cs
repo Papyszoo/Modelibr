@@ -30,9 +30,14 @@ public sealed record StoreManifestItem(
     // Store pack-item id (Guid string). Used to scope a partial import to selected items;
     // null on manifests that predate item ids (whole pack imports unaffected).
     string? Id = null,
-    // Item metadata JSON as stored by the store; today its only contract key is
-    // "category" (taxonomy v1 name), read via StoreManifestMapping.GetItemCategory.
-    string? MetadataJson = null);
+    // Item metadata JSON as stored by the store; fallback for older manifests.
+    string? MetadataJson = null,
+    string? Description = null,
+    IReadOnlyList<string>? Tags = null,
+    string? Category = null,
+    string? Subcategory = null,
+    IReadOnlyList<string>? Styles = null,
+    IReadOnlyList<string>? Themes = null);
 
 public sealed record StoreManifestFile(
     string FileName,
