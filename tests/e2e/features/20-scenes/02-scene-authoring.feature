@@ -190,7 +190,26 @@ Feature: Scene authoring
     Then the scene should hold 1 node
     And the scene should belong to the project "Scene Link Edited"
 
-  @scene-project-link
+  @scene-project-link @serial
+  # @serial: local-only lane. This scenario is load-flaky on the GitHub PR lane -
+  # the same commit produced one E2E pass and one E2E fail on re-run (runs
+  # 32974029874 vs 32973996325, 2026-08-26).
+  #
+  # Root cause, and what un-tags it: ScenesPage.openProjectPanel clicks the
+  # project chip exactly once and never re-tries, then waits for
+  # scene-project-select to appear. This scenario deliberately holds the link
+  # write open for 3s so it can prove editing is refused under it - and that is
+  # the same window the click lands in. When the chip is inert at that instant
+  # the panel never opens and the select never mounts, so the wait fails with
+  # "Received: undefined" rather than finding a visible-but-disabled control.
+  # The 3s hold is fixed wall-clock racing a variable render, so a loaded shared
+  # runner widens the gap. The "route.continue: Route is already handled!" noise
+  # in the same failure is teardown, not the cause.
+  #
+  # Fix it by making openProjectPanel wait for the panel to actually open and
+  # re-click if it did not (or by asserting the refusal without needing the panel
+  # open), then drop @serial and put it back on the PR lane. Do NOT just raise
+  # the timeout - the click is never re-issued, so a longer wait changes nothing.
   Scenario: The hold is up while the link is in flight, and editing is refused under it
     # The half nothing watched. Every other assertion here looks at the editor
     # once the link is over, which a serialization that had stopped running
