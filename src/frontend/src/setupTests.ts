@@ -52,6 +52,17 @@ jest.mock('@/lib/apiBase', () => {
     baseURL: 'http://localhost:8080',
     UPLOAD_TIMEOUT: 120000,
     ApiClientError: MockApiClientError,
+    // Every component that renders a thumbnail calls this, so leaving it off
+    // the mock made the module throw the moment such a component was rendered -
+    // a failure that looks like the component's, not the harness's. Absolute
+    // and blob URLs pass through, as they do for real; a relative path is
+    // resolved against the mocked base.
+    resolveApiAssetUrl: (url?: string | null) =>
+      !url
+        ? null
+        : /^(https?:|blob:|data:)/i.test(url)
+          ? url
+          : `http://localhost:8080${url.startsWith('/') ? url : `/${url}`}`,
   }
 })
 

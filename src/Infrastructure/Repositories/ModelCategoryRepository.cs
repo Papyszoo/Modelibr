@@ -53,4 +53,18 @@ internal sealed class ModelCategoryRepository : IModelCategoryRepository
         _context.ModelCategories.Remove(category);
         return Task.CompletedTask;
     }
+
+    public Task<CategoryRootInsert<ModelCategory>> AddRootAsync(
+        ModelCategory candidate, CancellationToken cancellationToken = default)
+    {
+        // Case-insensitive, matching the partial unique index the database now carries on
+        // roots - so the row this recovers is exactly the one the index refused to let in
+        // alongside the candidate.
+        return CategoryRootInserts.AddRootAsync(
+            _context,
+            _context.ModelCategories,
+            candidate,
+            c => c.ParentId == null && c.Name.ToLower() == candidate.Name.ToLower(),
+            cancellationToken);
+    }
 }

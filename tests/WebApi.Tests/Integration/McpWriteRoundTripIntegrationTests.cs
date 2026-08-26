@@ -51,6 +51,7 @@ public class McpWriteRoundTripIntegrationTests : IClassFixture<ModelibrWebFactor
             var result = await AssetWriteMcpTools.CreatePack(
                 sp.GetRequiredService<ICommandHandler<CreatePackCommand, CreatePackResponse>>(),
                 sp.GetRequiredService<IAgentAudit>(),
+                McpCallerContext.Unauthenticated(),
                 packName,
                 key);
 
@@ -80,6 +81,7 @@ public class McpWriteRoundTripIntegrationTests : IClassFixture<ModelibrWebFactor
             var retry = await AssetWriteMcpTools.CreatePack(
                 sp.GetRequiredService<ICommandHandler<CreatePackCommand, CreatePackResponse>>(),
                 sp.GetRequiredService<IAgentAudit>(),
+                McpCallerContext.Unauthenticated(),
                 packName,
                 key);
 
@@ -110,6 +112,7 @@ public class McpWriteRoundTripIntegrationTests : IClassFixture<ModelibrWebFactor
             var result = await AssetWriteMcpTools.CreatePack(
                 sp.GetRequiredService<ICommandHandler<CreatePackCommand, CreatePackResponse>>(),
                 sp.GetRequiredService<IAgentAudit>(),
+                McpCallerContext.Unauthenticated(),
                 packName,
                 key);
             return System.Text.Json.JsonSerializer.Serialize(result);
@@ -146,6 +149,7 @@ public class McpWriteRoundTripIntegrationTests : IClassFixture<ModelibrWebFactor
             var result = await AssetWriteMcpTools.TriggerRederive(
                 sp.GetRequiredService<ICommandHandler<EnqueueExtractionJobCommand, EnqueueExtractionJobResponse>>(),
                 sp.GetRequiredService<IAgentAudit>(),
+                McpCallerContext.Unauthenticated(),
                 "Model",
                 assetId,
                 key,
@@ -171,6 +175,7 @@ public class McpWriteRoundTripIntegrationTests : IClassFixture<ModelibrWebFactor
             var retry = await AssetWriteMcpTools.TriggerRederive(
                 sp.GetRequiredService<ICommandHandler<EnqueueExtractionJobCommand, EnqueueExtractionJobResponse>>(),
                 sp.GetRequiredService<IAgentAudit>(),
+                McpCallerContext.Unauthenticated(),
                 "Model",
                 assetId,
                 key,

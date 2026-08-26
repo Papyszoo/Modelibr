@@ -1,0 +1,51 @@
+.scene-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-sm);
+  padding: var(--mod-space-md);
+  height: 100%;
+  overflow-y: auto;
+}
+
+.scene-list-grid {
+  align-content: start;
+}
+
+/* Placeholder art until the scene render-back lands and supplies a real image. */
+.scene-list-tile-media {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--mod-color-surface);
+  color: var(--mod-color-text-muted);
+  font-size: var(--mod-text-2xl);
+}
+
+.scene-list-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-2xs);
+}
+
+.scene-list-form label {
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+}
+
+.scene-list-form label + * {
+  margin-bottom: var(--mod-space-xs);
+}
+
+.scene-list-confirm {
+  margin: 0;
+  font-size: var(--mod-text-sm);
+  color: var(--mod-color-text);
+}
+
+.scene-list-form-error {
+  margin: 0 0 var(--mod-space-xs);
+  font-size: var(--mod-text-sm);
+  color: var(--mod-color-danger);
+}

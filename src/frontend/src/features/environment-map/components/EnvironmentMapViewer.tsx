@@ -33,6 +33,7 @@ import {
   getEnvironmentMapPreviewOptions,
   getEnvironmentMapPrimaryPreviewUrl,
 } from '@/features/environment-map/utils/environmentMapUtils'
+import { AssetMetadataPanel } from '@/features/metadata'
 import { PanelWrapper } from '@/features/model-viewer/components/PanelWrapper'
 import { uploadFile } from '@/features/models/api/modelApi'
 
@@ -287,22 +288,28 @@ export function EnvironmentMapViewer({
       return null
     }
 
+    // The title comes from PANEL_OPTIONS rather than from a ternary here: with a
+    // third panel a ternary silently labels the new one after the old one.
+    const title =
+      PANEL_OPTIONS.find(option => option.value === panel)?.label ?? ''
+
     return (
       <div
         className={`environment-map-viewer-panel-slot environment-map-viewer-panel-slot-${side}`}
       >
         <PanelWrapper
-          title={panel === 'information' ? 'Informations' : 'Thumbnail'}
+          title={title}
           side={side}
           onClose={() => handlePanelChange(side, null)}
           expandActions={getExpandActions(side)}
         >
-          {panel === 'information' ? (
+          {panel === 'information' && (
             <EnvironmentMapInformationPanel
               selectedPreview={selectedPreview}
               environmentMap={environmentMap}
             />
-          ) : (
+          )}
+          {panel === 'thumbnail' && (
             <EnvironmentMapThumbnailPanel
               thumbnailUrl={thumbnailUrl}
               environmentMapName={environmentMap.name}
@@ -310,6 +317,12 @@ export function EnvironmentMapViewer({
               isRegenerating={regenerateThumbnailMutation.isPending}
               onUpload={file => void handleThumbnailUpload(file)}
               onRegenerate={() => void handleThumbnailRegenerate()}
+            />
+          )}
+          {panel === 'metadata' && (
+            <AssetMetadataPanel
+              assetType="EnvironmentMap"
+              assetId={parsedEnvironmentMapId}
             />
           )}
         </PanelWrapper>

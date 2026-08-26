@@ -23,7 +23,13 @@ export default defineConfig({
         baseURL: process.env.FRONTEND_URL || "http://localhost:3002",
         // No blue Playwright border - use a plain viewport, no highlights
         screenshot: "off",
-        trace: "off",
+        // Off by default, and deliberately: tracing instruments every action, and
+        // these specs are recording to a duration cap that one clip has already
+        // come within three seconds of. But a failure here leaves only an aria
+        // snapshot to triage from - no screenshot, no video, no retry - so
+        // PW_VIDEO_TRACE=1 buys a trace for a diagnostic re-run. Don't set it for
+        // a run whose clips you intend to publish.
+        trace: process.env.PW_VIDEO_TRACE ? "retain-on-failure" : "off",
         // Viewport matches video size exactly - no blue border
         viewport: { width: 1280, height: 720 },
         // Disable action highlights (blue borders)

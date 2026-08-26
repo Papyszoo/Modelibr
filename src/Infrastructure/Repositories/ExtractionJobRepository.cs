@@ -44,6 +44,7 @@ internal sealed class ExtractionJobRepository : IExtractionJobRepository
         int assetId,
         int? versionId,
         string extractorFamily,
+        string? operation = null,
         CancellationToken cancellationToken = default)
     {
         return await _context.ExtractionJobs
@@ -52,6 +53,7 @@ internal sealed class ExtractionJobRepository : IExtractionJobRepository
                      e.AssetId == assetId &&
                      e.VersionId == versionId &&
                      e.ExtractorFamily == extractorFamily &&
+                     e.Operation == operation &&
                      (e.Status == ExtractionJobStatus.Pending || e.Status == ExtractionJobStatus.Processing),
                 cancellationToken);
     }

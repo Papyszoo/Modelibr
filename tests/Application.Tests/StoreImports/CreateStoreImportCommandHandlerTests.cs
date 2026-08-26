@@ -92,15 +92,27 @@ public class CreateStoreImportCommandHandlerTests
         _jobRepository.Verify(r => r.AddAsync(It.IsAny<StoreImportJob>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    /// <summary>
+    /// No token is a legitimate request, not a malformed one: the store serves an approved
+    /// free asset anonymously, so a signed-out user can import CC0 content. A blank string
+    /// normalizes to null so the client sends no header rather than an empty credential.
+    /// </summary>
     [Theory]
+    [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public async Task Handle_When_MissingToken_Fails(string token)
+    public async Task Handle_With_NoToken_Enqueues_An_Anonymous_Import(string? token)
     {
+        StoreImportWorkItem? enqueued = null;
+        _queue.Setup(q => q.Enqueue(It.IsAny<StoreImportWorkItem>()))
+            .Callback<StoreImportWorkItem>(item => enqueued = item)
+            .Returns(true);
+
         var result = await CreateHandler().Handle(
             new CreateStoreImportCommand("https://store.example.com", "asset-1", token), CancellationToken.None);
 
-        Assert.True(result.IsFailure);
-        Assert.Equal("StoreImport.MissingToken", result.Error.Code);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(enqueued);
+        Assert.Null(enqueued!.ImportToken);
     }
 }

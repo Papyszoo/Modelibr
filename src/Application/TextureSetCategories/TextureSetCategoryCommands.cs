@@ -40,10 +40,29 @@ internal sealed class CreateTextureSetCategoryCommandHandler : ICommandHandler<C
         {
             category = TextureSetCategory.Create(
                 command.Name, command.Description, command.ParentId, command.Kind, _dateTimeProvider.UtcNow);
-            await _categoryRepository.AddAsync(category, cancellationToken);
-            // Commit immediately: category.Id is database-assigned and is needed
-            // below for the response DTO.
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+            if (command.ParentId is null)
+            {
+                // Roots are unique per (Kind, name-ignoring-case) and the database enforces
+                // it, so the insert can lose a race it passed the check for. AddRootAsync
+                // commits it and reports which row won.
+                var inserted = await _categoryRepository.AddRootAsync(category, cancellationToken);
+                if (!inserted.Created)
+                {
+                    return Result.Failure<TextureSetCategorySummaryDto>(new Error(
+                        "CategoryAlreadyExists",
+                        $"A top-level texture set category named '{command.Name}' already exists for this kind."));
+                }
+
+                category = inserted.Category;
+            }
+            else
+            {
+                await _categoryRepository.AddAsync(category, cancellationToken);
+                // Commit immediately: category.Id is database-assigned and is needed
+                // below for the response DTO.
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
+            }
         }
         catch (ArgumentException ex)
         {

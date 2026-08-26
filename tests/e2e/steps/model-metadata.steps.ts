@@ -8,6 +8,7 @@ import { getScenarioState } from "../fixtures/shared-state";
 import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
 import { ModelListPage } from "../pages/ModelListPage";
 import { ModelViewerPage } from "../pages/ModelViewerPage";
+import { waitForModelViewerCanvas } from "../helpers/viewer-canvas";
 
 const { Given, When, Then } = createBdd();
 
@@ -74,9 +75,9 @@ Given("I open a model in the viewer", async ({ page }) => {
         `[Action] Clicked first model card (model ID: ${openedModelId})`,
     );
 
-    // Wait for the viewer canvas to appear
-    const canvas = page.locator("canvas");
-    await expect(canvas).toBeVisible({ timeout: 15000 });
+    // Wait for the viewer's own canvas to appear - a bare `canvas` locator
+    // binds to whichever three.js canvas is first in the DOM instead.
+    await waitForModelViewerCanvas(page, { timeout: 15000 });
     console.log("[UI] Viewer canvas is visible ✓");
 });
 
@@ -296,9 +297,8 @@ Then(
         await expect(targetCard).toBeVisible({ timeout: 10000 });
         await targetCard.click();
 
-        // Wait for viewer canvas
-        const canvas = page.locator("canvas");
-        await expect(canvas).toBeVisible({ timeout: 15000 });
+        // Wait for the viewer's own canvas
+        await waitForModelViewerCanvas(page, { timeout: 15000 });
 
         // Re-open the info panel
         const viewerPage = new ModelViewerPage(page);
@@ -352,8 +352,7 @@ Then("the tag count should have decreased", async ({ page }) => {
     await expect(targetCard).toBeVisible({ timeout: 10000 });
     await targetCard.click();
 
-    const canvas = page.locator("canvas");
-    await expect(canvas).toBeVisible({ timeout: 15000 });
+    await waitForModelViewerCanvas(page, { timeout: 15000 });
 
     // Re-open the info panel
     const viewerPage = new ModelViewerPage(page);
@@ -396,8 +395,7 @@ Then(
         await expect(targetCard).toBeVisible({ timeout: 10000 });
         await targetCard.click();
 
-        const canvas = page.locator("canvas");
-        await expect(canvas).toBeVisible({ timeout: 15000 });
+        await waitForModelViewerCanvas(page, { timeout: 15000 });
 
         // Re-open the info panel
         const viewerPage = new ModelViewerPage(page);

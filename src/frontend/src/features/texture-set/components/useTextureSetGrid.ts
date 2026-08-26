@@ -9,10 +9,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { usePacksQuery } from '@/features/pack/api/queries'
 import { useProjectsQuery } from '@/features/project/api/queries'
+import { getTextureSetCategoriesQueryOptions } from '@/features/texture-set/api/queries'
 import {
   createTextureSet,
   createTextureSetWithFile,
-  getAllTextureSetCategories,
   getTextureSetCategoryCounts,
   getTextureSetsPaginated,
 } from '@/features/texture-set/api/textureSetApi'
@@ -95,10 +95,9 @@ export function useTextureSetGrid({
   // Categories are scoped per kind. The generic "Texture Sets" tab (no locked
   // kind) falls back to the Universal (Global Materials) pool.
   const categoriesKind = kind ?? TextureSetKind.Universal
-  const { data: categories = [] } = useQuery({
-    queryKey: ['textureSetCategories', categoriesKind],
-    queryFn: () => getAllTextureSetCategories(categoriesKind),
-  })
+  const { data: categories = [] } = useQuery(
+    getTextureSetCategoriesQueryOptions(categoriesKind)
+  )
   // Server-computed true totals for the sidebar badges. Keyed UNDER
   // ['textureSets'] so any invalidateQueries(['textureSets']) also refreshes
   // the counts (per kind).

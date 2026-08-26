@@ -132,6 +132,7 @@ const manifestOutputs = [...read("docs/videos/video-manifest.js").matchAll(
         modelViewer: "Model Viewer",
         textureSets: "Texture Sets",
         globalMaterials: "Global Materials",
+        pbrMaterials: "PBR Materials",
         modelTextures: "Multi-Model Textures",
         textureSetViewer: "Texture Set Viewer",
         environmentMaps: "Environment Maps",
@@ -144,6 +145,7 @@ const manifestOutputs = [...read("docs/videos/video-manifest.js").matchAll(
         sounds: "Sounds",
         scripts: "Scripts",
         scriptViewer: "Script Viewer",
+        scenes: "Scenes",
         assetStore: "Asset Store",
         settings: "Settings",
         history: "History",
@@ -235,6 +237,180 @@ const manifestOutputs = [...read("docs/videos/video-manifest.js").matchAll(
         "README lists all model upload formats",
         `missing: ${missing.join(", ")}`,
         { warnOnly: true }, // TODO: flip to error once the README refresh (PR #557) merges
+    );
+}
+
+// ── Check 7: every MCP_* setting reaches the container ─────────────────────
+// The webapi container sees only the variables docker-compose names, so a
+// setting documented in .env.example but missing from that list runs at its
+// default no matter what the operator wrote. This shipped once already: the
+// MCP flags never reached the container, so writes could not be turned on and
+// MCP_ENABLED=false did not turn the endpoint off. The reprise is worse -
+// MCP_TOKENS is what authenticates /mcp, and its default is "unauthenticated".
+{
+    const declared = [...read(".env.example").matchAll(/^#?\s*(MCP_\w+)=/gm)]
+        .map((m) => m[1]);
+    const composeWebapiEnv =
+        read("docker-compose.yml").match(
+            /\n {4}webapi:[\s\S]*?\n {8}environment:\n([\s\S]*?)\n {8}\w/,
+        )?.[1] ?? "";
+    const forwarded = new Set(
+        [...composeWebapiEnv.matchAll(/^\s*-\s*(MCP_\w+)=/gm)].map((m) => m[1]),
+    );
+
+    check(
+        declared.length >= 4,
+        ".env.example MCP settings parsed",
+        `only found ${declared.length} MCP_* settings - .env.example layout changed? Update scripts/docs-audit.`,
+    );
+
+    const missing = declared.filter((name) => !forwarded.has(name));
+    check(
+        missing.length === 0,
+        "docker-compose forwards every MCP_* setting to webapi",
+        `not passed to the container, so setting it in .env does nothing: ${missing.join(", ")}`,
+    );
+}
+
+// ── Check 8: the MCP page lists every registered MCP tool ─────────────────
+// The tool tables on the MCP page are what an operator reads to decide whether
+// to turn writes on, and what an agent author reads to know what exists. They
+// had drifted by six tools - one read (get_store_import) and five writes
+// (create_room, place_primitive, set_lighting_preset, delete_scene,
+// convert_model) - and both prose counts were stale by more than the drift.
+// A tool is registered in C# and documented in Markdown by two different
+// hands, so nothing but a check keeps them together.
+//
+// Source of truth: the [McpServerTool(Name = "…")] attributes, split into read
+// and write by which classes Program.cs registers behind MCP_WRITE_ENABLED.
+{
+    const mcpDir = "src/WebApi/Mcp";
+    const toolFiles = fs
+        .readdirSync(path.join(repoRoot, mcpDir))
+        .filter((f) => f.endsWith(".cs"));
+
+    // Everything inside the `if (mcpWriteEnabled)` block is a write tool type;
+    // everything registered before it is a read.
+    const program = read("src/WebApi/Program.cs");
+    const writeBlock =
+        program.match(/if \(mcpWriteEnabled\)\s*\{([\s\S]*?)\n {16}\}/)?.[1] ?? "";
+    const writeTypes = new Set(
+        [...writeBlock.matchAll(/WithTools<WebApi\.Mcp\.(\w+)>/g)].map((m) => m[1]),
+    );
+
+    const readTools = new Set();
+    const writeTools = new Set();
+    for (const file of toolFiles) {
+        const source = read(path.join(mcpDir, file));
+        // Split the file at each tool-type class so a tool is attributed to the
+        // class it lives in, not to the first one in the file.
+        // Deliberately loose on the modifiers: `internal sealed class` or
+        // `public sealed partial class` would fall out of a stricter pattern
+        // and take all of that class's tools with it - and the check would go
+        // green because nothing then requires them to be documented.
+        const classes = [
+            ...source.matchAll(/(?:public|internal)\s+(?:sealed\s+)?(?:partial\s+)?class (\w+)/g),
+        ].map((m) => ({ name: m[1], at: m.index }));
+        for (let i = 0; i < classes.length; i++) {
+            const body = source.slice(
+                classes[i].at,
+                i + 1 < classes.length ? classes[i + 1].at : source.length,
+            );
+            const names = [
+                ...body.matchAll(/McpServerTool\(\s*Name\s*=\s*"([^"]+)"/g),
+            ].map((m) => m[1]);
+            const into = writeTypes.has(classes[i].name) ? writeTools : readTools;
+            for (const n of names) into.add(n);
+        }
+    }
+
+    check(
+        readTools.size > 0 && writeTools.size > 0,
+        "MCP tool registry parsed",
+        `found ${readTools.size} read and ${writeTools.size} write tools - Mcp/ or Program.cs layout changed? Update scripts/docs-audit.`,
+    );
+
+    // Each half of the page is read separately. One flat set of every table row
+    // on the page cannot tell the two apart, so a WRITE tool listed only in the
+    // always-available read table would satisfy "lists every write tool" - on
+    // the one page whose job is helping an operator decide whether to turn
+    // writes on.
+    const mcpPage = read("docs/docs/features/mcp-server.md");
+    const readHeading = mcpPage.indexOf("\n## What the agent can read");
+    const writeHeading = mcpPage.indexOf("\n## What the agent can change");
+    check(
+        readHeading >= 0 && writeHeading > readHeading,
+        "mcp-server.md read and write sections found",
+        "the two section headings moved or were renamed - update scripts/docs-audit.",
+    );
+
+    const rowsIn = (section) =>
+        new Set([...section.matchAll(/^\| `([a-z_]+)`/gm)].map((m) => m[1]));
+    const documentedReads = rowsIn(mcpPage.slice(readHeading, writeHeading));
+    const documentedWrites = rowsIn(mcpPage.slice(writeHeading));
+
+    const undocumentedReads = [...readTools].filter(
+        (t) => !documentedReads.has(t),
+    );
+    check(
+        undocumentedReads.length === 0,
+        "mcp-server.md lists every read tool",
+        `registered but not in the read section: ${undocumentedReads.join(", ")}`,
+    );
+
+    const undocumentedWrites = [...writeTools].filter(
+        (t) => !documentedWrites.has(t),
+    );
+    check(
+        undocumentedWrites.length === 0,
+        "mcp-server.md lists every write tool",
+        `registered but not in the write section: ${undocumentedWrites.join(", ")}`,
+    );
+
+    // And neither side may claim the other's tools: a read tool listed under
+    // "what the agent can change" tells an operator the opposite of the truth.
+    const misfiled = [
+        ...[...readTools].filter((t) => documentedWrites.has(t)),
+        ...[...writeTools].filter((t) => documentedReads.has(t)),
+    ];
+    check(
+        misfiled.length === 0,
+        "mcp-server.md files every tool on the right side",
+        `documented in the wrong section: ${misfiled.join(", ")}`,
+    );
+
+    // The counts in prose. Spelled out in words on the page, so the check reads
+    // them the same way rather than asking the page to carry a digit.
+    const words = [
+        "zero", "one", "two", "three", "four", "five", "six", "seven", "eight",
+        "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen",
+        "sixteen", "seventeen", "eighteen", "nineteen", "twenty",
+    ];
+    const spell = (n) => {
+        // Past 99 the page should carry a digit rather than a phrase, and this
+        // returning "undefined-one" would fail the count check with a message
+        // that explains nothing.
+        if (n > 99) return String(n);
+        if (n <= 20) return words[n];
+        const tens = [
+            "", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy",
+            "eighty", "ninety",
+        ][Math.floor(n / 10)];
+        return n % 10 === 0 ? tens : `${tens}-${words[n % 10]}`;
+    };
+
+    const readClaim = mcpPage.match(/These ([a-z-]+) read tools are always available/)?.[1];
+    check(
+        readClaim === spell(readTools.size),
+        "mcp-server.md counts the read tools correctly",
+        `page says "${readClaim}", ${readTools.size} are registered (${spell(readTools.size)})`,
+    );
+
+    const writeClaim = mcpPage.match(/and ([a-z-]+) more tools appear/)?.[1];
+    check(
+        writeClaim === spell(writeTools.size),
+        "mcp-server.md counts the write tools correctly",
+        `page says "${writeClaim}", ${writeTools.size} are registered (${spell(writeTools.size)})`,
     );
 }
 

@@ -67,7 +67,7 @@ internal sealed class EnqueueExtractionJobCommandHandler
         }
 
         var existing = await _repository.GetLiveJobAsync(
-            assetType, command.AssetId, versionId, family, cancellationToken);
+            assetType, command.AssetId, versionId, family, operation: null, cancellationToken);
         if (existing is not null)
         {
             return Result.Success(new EnqueueExtractionJobResponse(existing.Id, AlreadyQueued: true));

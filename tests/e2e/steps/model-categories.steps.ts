@@ -11,6 +11,8 @@ import {
     renameCategoryViaTree,
 } from "../helpers/category-tree-helper";
 import { ModelListPage } from "../pages/ModelListPage";
+import { ModelViewerPage } from "../pages/ModelViewerPage";
+import { waitForModelViewerCanvas } from "../helpers/viewer-canvas";
 
 const { Given, When, Then } = createBdd();
 
@@ -123,5 +125,52 @@ Then(
         const model = models[modelBase];
         const card = new ModelListPage(page).getModelCard(model.name, model.id);
         await expect(card).toBeVisible({ timeout: 10000 });
+    },
+);
+
+// ---- the metadata panel's category picker --------------------------------
+//
+// The picker reads each family's tree from that family's OWN query key, so a
+// category created in the sidebar is offered by the picker with no invalidation
+// wiring of its own. Sharing a key means sharing what is stored under it: the
+// picker used to write a different shape there, and whichever of the two
+// mounted second overwrote the first. These walk both navigation orders,
+// because that is the only thing that decided which one broke.
+
+When(
+    "I open the metadata panel for model {string}",
+    async ({ page }, modelBase: string) => {
+        const model = models[modelBase];
+        const listPage = new ModelListPage(page);
+        await listPage.goto();
+
+        // By id, not by name: the upload helper does not report a name, and the
+        // id is the handle every other step in this file uses.
+        const card = listPage.getModelCard(model.name, model.id);
+        await expect(card).toBeVisible({ timeout: 15000 });
+        await card.click();
+        await waitForModelViewerCanvas(page, { timeout: 20000 });
+
+        const viewer = new ModelViewerPage(page);
+        await viewer.openTab("Metadata", '[data-testid="asset-metadata"]');
+        await expect(page.locator('[data-testid="asset-metadata"]')).toBeVisible({
+            timeout: 15000,
+        });
+    },
+);
+
+Then(
+    "the metadata category picker should offer {string}",
+    async ({ page }, categoryBase: string) => {
+        const picker = page.locator(
+            '[data-testid="metadata-category-category"]',
+        );
+        await expect(picker).toBeVisible({ timeout: 15000 });
+
+        // An option, not merely a rendered string: the picker maps over the
+        // cached list, and a wrong shape there is an empty select or a crash.
+        await expect(
+            picker.locator("option", { hasText: resolve(categoryBase) }),
+        ).toHaveCount(1, { timeout: 15000 });
     },
 );

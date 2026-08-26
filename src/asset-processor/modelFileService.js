@@ -2,6 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import os from 'os'
 import { JobApiClient } from './jobApiClient.js'
+import { writeStreamToFile } from './streamFile.js'
 import logger from './logger.js'
 
 /**
@@ -116,14 +117,24 @@ export class ModelFileService {
     // Write stream to temporary file
     await this.writeStreamToFile(response.data, tempFilePath)
 
-    logger.info('Model file fetched successfully', {
-      modelId,
-      modelVersionId,
-      originalFileName,
-      fileType,
-      tempFilePath,
-      fileSize: fs.statSync(tempFilePath).size,
-    })
+    // Everything after the write is still this function's responsibility for the
+    // file: it returns a path or it throws, and a throw means nobody downstream
+    // has the path to clean up with. Inspecting the result is the case that
+    // actually happens - a stat on a file the filesystem filled to capacity
+    // mid-write.
+    try {
+      logger.info('Model file fetched successfully', {
+        modelId,
+        modelVersionId,
+        originalFileName,
+        fileType,
+        tempFilePath,
+        fileSize: fs.statSync(tempFilePath).size,
+      })
+    } catch (error) {
+      await this.cleanupFile(tempFilePath)
+      throw error
+    }
 
     return {
       filePath: tempFilePath,
@@ -165,11 +176,215 @@ export class ModelFileService {
         fs.unlinkSync(filePath)
         logger.debug('Cleaned up temporary file', { filePath })
       }
+      return true
     } catch (error) {
       logger.warn('Failed to cleanup temporary file', {
         filePath,
         error: error.message,
       })
+      return false
+    }
+  }
+
+  /**
+   * Fetch a model version onto disk **with its siblings next to it**, in a
+   * directory of its own.
+   *
+   * The data-URL map further down is for three.js, which resolves references
+   * through a LoadingManager and never touches a filesystem. Blender does the
+   * opposite: it opens the file and follows every reference the file itself
+   * contains, by relative path. Handed a lone .gltf its buffers are missing, and
+   * handed a lone .obj its .mtl is missing.
+   *
+   * **This throws rather than degrading, which is the difference between it and
+   * the render path.** A thumbnail rendered without a texture is a worse picture
+   * that a person looks at and re-queues. A bake or an unwrap run without the
+   * .mtl produces a NEW model version, published as the truth, whose materials
+   * are silently wrong - and the OBJ case is the quiet one, because the geometry
+   * still loads, so nothing looks broken. There is no version of "proceed with
+   * what we have" that is correct here: either every advertised sibling is on
+   * disk or the operation has not been set up and must not run.
+   *
+   * Returns the same shape as {@link fetchModelFile} plus `workDir`, which the
+   * caller must clean up instead of the file. On every failure path - including
+   * the ones before that object exists - the primary and the work directory are
+   * removed here, because the caller has nothing to clean up with.
+   *
+   * @param {number} modelId
+   * @param {number} modelVersionId
+   * @returns {Promise<{filePath: string, fileType: string, originalFileName: string, workDir: string, auxiliaryCount: number}>}
+   * @throws {Error} when the auxiliary manifest cannot be read, an advertised
+   *   auxiliary cannot be downloaded, or one names a path outside the work
+   *   directory.
+   */
+  async fetchModelFileWithAuxiliaries(modelId, modelVersionId = null) {
+    // Same shape as fetchModelFile's own retry: transient network trouble while
+    // staging is not a reason to fail an operation, but exhausting the attempts
+    // is - the alternative is publishing a result computed from half a model.
+    const maxRetries = 3
+    const retryDelay = 1000
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      let staged = null
+      try {
+        staged = await this.stageModelWithAuxiliaries(modelId, modelVersionId)
+        return staged
+      } catch (error) {
+        // Nothing partially staged survives an attempt, successful or not.
+        await this.cleanupDirectory(staged?.workDir ?? error.workDir)
+
+        const lastAttempt = attempt === maxRetries
+        logger.warn('Failed to stage a model with its auxiliary files', {
+          modelId,
+          modelVersionId,
+          attempt,
+          maxRetries,
+          error: error.message,
+        })
+
+        if (lastAttempt || this.isFileNotFoundError(error)) {
+          throw error
+        }
+
+        await this.sleep(retryDelay * attempt)
+      }
+    }
+  }
+
+  /**
+   * One staging attempt. Split out so the retry above has a single thing to call
+   * and a single thing to clean up: every path that creates the work directory
+   * either returns it on the result or attaches it to the thrown error.
+   *
+   * @param {number} modelId
+   * @param {number} modelVersionId
+   */
+  async stageModelWithAuxiliaries(modelId, modelVersionId) {
+    const source = await this.fetchModelFile(modelId, modelVersionId)
+
+    let workDir = null
+    try {
+      workDir = fs.mkdtempSync(path.join(this.tempDir, `model-${modelId}-`))
+
+      // The primary keeps its ORIGINAL name inside the work directory: a loose
+      // .gltf's references are relative to the file, and renaming it to a temp
+      // name is harmless, but a .mtl referenced by name from an .obj is not.
+      const primaryPath = path.join(
+        workDir,
+        path.basename(source.originalFileName)
+      )
+      fs.copyFileSync(source.filePath, primaryPath)
+
+      const auxiliaryCount = await this.stageAuxiliaries(
+        modelId,
+        modelVersionId,
+        workDir
+      )
+
+      logger.info('Model file staged with auxiliaries', {
+        modelId,
+        modelVersionId,
+        workDir,
+        auxiliaryCount,
+      })
+
+      return {
+        filePath: primaryPath,
+        fileType: source.fileType,
+        originalFileName: source.originalFileName,
+        workDir,
+        auxiliaryCount,
+      }
+    } catch (error) {
+      // The work directory may not be on any result yet, so the retry above
+      // cannot find it any other way.
+      error.workDir = workDir
+      throw error
+    } finally {
+      // The download landed outside the work directory and is copied, not moved,
+      // so it is this function's to remove either way.
+      await this.cleanupFile(source.filePath)
+    }
+  }
+
+  /**
+   * Download every auxiliary the version advertises into `workDir`.
+   *
+   * @param {number} modelId
+   * @param {number} modelVersionId
+   * @param {string} workDir
+   * @returns {Promise<number>} how many were staged
+   */
+  async stageAuxiliaries(modelId, modelVersionId, workDir) {
+    // No version id means there is nothing to ask about - a single-file upload
+    // reached here through a path that never had a version. That is genuinely
+    // primary-only, not a manifest that failed to load.
+    if (!modelVersionId) {
+      return 0
+    }
+
+    // NOT caught. An unreadable manifest is indistinguishable from an empty one
+    // once it has been swallowed, and those two mean opposite things: "this model
+    // has no siblings" and "this model may have siblings we did not fetch".
+    const list = await this.jobService.getVersionAuxiliaryFiles(
+      modelId,
+      modelVersionId
+    )
+
+    const auxiliaries = list?.auxiliaries || []
+    let staged = 0
+
+    for (const aux of auxiliaries) {
+      // The relative path is normalised server-side, but it arrives over HTTP
+      // and lands on a filesystem here, so it is checked again rather than
+      // trusted: a '../' in it would write outside the work directory. Refused
+      // rather than skipped - a path that tried to escape is not a sibling this
+      // operation should quietly do without, it is one somebody built wrong.
+      const target = path.resolve(workDir, aux.relativePath)
+      if (target === workDir || !target.startsWith(workDir + path.sep)) {
+        throw new Error(
+          `Auxiliary file '${aux.relativePath}' resolves outside the staging ` +
+            `directory. Refusing to run the operation on a partial model.`
+        )
+      }
+
+      try {
+        const response = await this.jobService.getFile(aux.fileId)
+        if (!response || !response.data) {
+          throw new Error('No file data received from API')
+        }
+        fs.mkdirSync(path.dirname(target), { recursive: true })
+        await this.writeStreamToFile(response.data, target)
+        staged++
+      } catch (error) {
+        throw new Error(
+          `Could not stage auxiliary file '${aux.relativePath}' ` +
+            `(file ${aux.fileId}): ${error.message}. Refusing to run the ` +
+            `operation on a partial model.`
+        )
+      }
+    }
+
+    return staged
+  }
+
+  /**
+   * Remove a staging directory created by {@link fetchModelFileWithAuxiliaries}.
+   * @param {string} workDir
+   */
+  async cleanupDirectory(workDir) {
+    try {
+      if (workDir && fs.existsSync(workDir)) {
+        fs.rmSync(workDir, { recursive: true, force: true })
+        logger.debug('Cleaned up staging directory', { workDir })
+      }
+      return true
+    } catch (error) {
+      logger.warn('Failed to cleanup staging directory', {
+        workDir,
+        error: error.message,
+      })
+      return false
     }
   }
 
@@ -271,29 +486,18 @@ export class ModelFileService {
   }
 
   /**
-   * Write stream to file
+   * Write a stream to a file, removing the partial file if it cannot be finished.
+   *
+   * The implementation is shared - see `streamFile.js` for why a hand-rolled
+   * `pipe` + `destroy()` + `unlinkSync()` could not be made correct. Kept as a
+   * method because callers stub it.
+   *
    * @param {ReadableStream} stream - Input stream
    * @param {string} filePath - Output file path
    * @returns {Promise<void>}
    */
   async writeStreamToFile(stream, filePath) {
-    return new Promise((resolve, reject) => {
-      const writeStream = fs.createWriteStream(filePath)
-
-      stream.pipe(writeStream)
-
-      writeStream.on('finish', () => {
-        resolve()
-      })
-
-      writeStream.on('error', error => {
-        reject(new Error(`Failed to write file: ${error.message}`))
-      })
-
-      stream.on('error', error => {
-        reject(new Error(`Stream error: ${error.message}`))
-      })
-    })
+    return writeStreamToFile(stream, filePath)
   }
 
   /**
@@ -348,30 +552,65 @@ export class ModelFileService {
   }
 
   /**
-   * Clean up all temporary files older than specified age
+   * Remove everything in the temp directory older than `maxAgeMs` - files and
+   * staging directories alike.
+   *
+   * The directories are the reason this is not a one-liner. A crash between
+   * `mkdtemp` and the operation's own cleanup leaves a `model-<id>-XXXXXX/`
+   * behind, and this sweep used to call `unlinkSync` on every entry - which
+   * fails with EPERM/EISDIR on a directory, threw out of the loop, and so left
+   * not only that directory but every entry after it, forever. On a worker that
+   * stages a model per job, "forever" fills the disk.
+   *
+   * One broken entry no longer ends the sweep either: each is removed on its
+   * own, and what could not be removed is counted and reported rather than
+   * silently taking the rest with it.
+   *
    * @param {number} maxAgeMs - Maximum age in milliseconds (default: 1 hour)
+   * @returns {Promise<{cleanedCount: number, failedCount: number}>}
    */
   async cleanupOldFiles(maxAgeMs = 60 * 60 * 1000) {
+    const summary = { cleanedCount: 0, failedCount: 0 }
+
     try {
-      if (!fs.existsSync(this.tempDir)) return
+      if (!fs.existsSync(this.tempDir)) return summary
 
-      const files = fs.readdirSync(this.tempDir)
+      const entries = fs.readdirSync(this.tempDir)
       const now = Date.now()
-      let cleanedCount = 0
 
-      for (const file of files) {
-        const filePath = path.join(this.tempDir, file)
-        const stats = fs.statSync(filePath)
+      for (const entry of entries) {
+        const entryPath = path.join(this.tempDir, entry)
 
-        if (now - stats.mtime.getTime() > maxAgeMs) {
-          await this.cleanupFile(filePath)
-          cleanedCount++
+        try {
+          // lstat, not stat: a dangling symlink is exactly the kind of entry
+          // that used to abort the whole sweep, and it is still stale rubbish
+          // that should go.
+          const stats = fs.lstatSync(entryPath)
+          if (now - stats.mtime.getTime() <= maxAgeMs) continue
+
+          const removed = stats.isDirectory()
+            ? await this.cleanupDirectory(entryPath)
+            : await this.cleanupFile(entryPath)
+
+          if (removed) {
+            summary.cleanedCount++
+          } else {
+            summary.failedCount++
+          }
+        } catch (error) {
+          // Reading one entry failed - it vanished under us, or its permissions
+          // changed. Note it and carry on to the rest.
+          summary.failedCount++
+          logger.warn('Skipped an unreadable temporary entry', {
+            entryPath,
+            error: error.message,
+          })
         }
       }
 
-      if (cleanedCount > 0) {
-        logger.info('Cleaned up old temporary files', {
-          cleanedCount,
+      if (summary.cleanedCount > 0 || summary.failedCount > 0) {
+        logger.info('Cleaned up old temporary entries', {
+          ...summary,
           tempDir: this.tempDir,
         })
       }
@@ -381,5 +620,7 @@ export class ModelFileService {
         tempDir: this.tempDir,
       })
     }
+
+    return summary
   }
 }

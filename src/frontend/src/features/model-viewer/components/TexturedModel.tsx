@@ -7,30 +7,20 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader'
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader'
 
-import {
-  type TextureConfig,
-  useChannelExtractedTextures,
-} from '@/features/model-viewer/hooks/useChannelExtractedTextures'
 import { useModelObject } from '@/features/model-viewer/hooks/useModelObject'
-import { getFileUrl } from '@/features/models/api/modelApi'
 import {
-  createGltfResourceManager,
+  createResourceManager,
   safeLoadingManager,
 } from '@/shared/three/safeLoadingManager'
-import { TextureChannel, TextureType } from '@/types'
-
-import { buildStlModel } from '../../../../../asset-processor/lib/stlMesh.js'
-import {
-  MATERIAL_SLOT_BY_TEXTURE_TYPE,
-  textureTypeNeedsInvert,
-} from '../../../../../asset-processor/lib/textureChannels.js'
 import {
   applyMaterialTextures,
-  KEY_SEP,
   type MaterialTextureSets,
-} from './materialTextures'
+  usePerMaterialTextures,
+} from '@/shared/three/textureSetMaterial'
 
-export type { MaterialTextureSets } from './materialTextures'
+import { buildStlModel } from '../../../../../asset-processor/lib/stlMesh.js'
+
+export type { MaterialTextureSets } from '@/shared/three/textureSetMaterial'
 
 interface TexturedModelProps {
   modelUrl: string
@@ -38,71 +28,7 @@ interface TexturedModelProps {
   rotationSpeed: number
   materialTextureSets: MaterialTextureSets
   /** Relative-path -> URL map for a multi-file glTF's external resources. */
-  gltfResources?: Record<string, string>
-}
-
-// Texture types in apply order, each with its fallback when the primary is
-// absent (mutually-exclusive groups: Roughness←Glossiness, Displacement←Height).
-// The MeshPhysicalMaterial slot each type feeds and whether it must be inverted
-// at load come from the shared cross-runtime map
-// (asset-processor/lib/textureChannels.js) - the same source the worker
-// thumbnail uses, so the viewer and the thumbnail route textures identically.
-const TEXTURE_SLOTS: Array<{
-  type: TextureType
-  fallback?: TextureType
-}> = [
-  { type: TextureType.Albedo },
-  { type: TextureType.Normal },
-  { type: TextureType.Roughness, fallback: TextureType.Glossiness },
-  { type: TextureType.Metallic },
-  { type: TextureType.Specular },
-  { type: TextureType.AO },
-  { type: TextureType.Emissive },
-  { type: TextureType.Bump },
-  { type: TextureType.Alpha },
-  { type: TextureType.Displacement, fallback: TextureType.Height },
-]
-
-/**
- * Build a combined texture config map for all material→textureSet mappings.
- * Keys are namespaced as "materialName::slotName" so the hook loads everything in one pass.
- * Also returns the set of material names that have textures.
- */
-function buildCombinedTextureConfigs(
-  materialTextureSets: MaterialTextureSets
-): Record<string, TextureConfig> {
-  const configs: Record<string, TextureConfig> = {}
-
-  for (const [materialName, textureSet] of Object.entries(
-    materialTextureSets
-  )) {
-    if (!textureSet?.textures) continue
-    for (const { type, fallback } of TEXTURE_SLOTS) {
-      const slot = MATERIAL_SLOT_BY_TEXTURE_TYPE[type]
-      let tex = textureSet.textures.find(t => t.textureType === type)
-      let chosenType = type
-      if (!tex && fallback) {
-        const fallbackTex = textureSet.textures.find(
-          t => t.textureType === fallback
-        )
-        if (fallbackTex) {
-          tex = fallbackTex
-          chosenType = fallback
-        }
-      }
-      if (tex) {
-        configs[`${materialName}${KEY_SEP}${slot}`] = {
-          url: getFileUrl(tex.fileId.toString()),
-          sourceChannel: tex.sourceChannel ?? TextureChannel.RGB,
-          fileName: tex.fileName,
-          // Glossiness feeds roughnessMap inverted (shared rule).
-          invert: textureTypeNeedsInvert(chosenType),
-        }
-      }
-    }
-  }
-
-  return configs
+  resources?: Record<string, string>
 }
 
 // Shared props for per-format components
@@ -110,27 +36,7 @@ interface FormatComponentProps {
   modelUrl: string
   rotationSpeed: number
   materialTextureSets: MaterialTextureSets
-  gltfResources?: Record<string, string>
-}
-
-/** Shared hook: build combined configs, load textures, return ready state */
-function usePerMaterialTextures(
-  materialTextureSets: MaterialTextureSets,
-  renderer: THREE.WebGLRenderer,
-  flipY: boolean
-) {
-  const textureConfigs = useMemo(
-    () => buildCombinedTextureConfigs(materialTextureSets),
-    [materialTextureSets]
-  )
-  const hasTextures = Object.keys(textureConfigs).length > 0
-  const loadedTextures = useChannelExtractedTextures(
-    textureConfigs,
-    renderer,
-    flipY
-  )
-  const texturesReady = hasTextures && Object.keys(loadedTextures).length > 0
-  return { loadedTextures, texturesReady }
+  resources?: Record<string, string>
 }
 
 /**
@@ -259,7 +165,7 @@ function GLTFModelWithTextures({
   modelUrl,
   rotationSpeed,
   materialTextureSets,
-  gltfResources,
+  resources,
 }: FormatComponentProps) {
   const meshRef = useRef<THREE.Group>(null)
   const { setModelObject } = useModelObject()
@@ -274,10 +180,7 @@ function GLTFModelWithTextures({
 
   // See Model.tsx: a loose .gltf's relative buffer/texture URIs must resolve to the
   // version's auxiliary files, otherwise it loads as an empty scene.
-  const manager = useMemo(
-    () => createGltfResourceManager(gltfResources),
-    [gltfResources]
-  )
+  const manager = useMemo(() => createResourceManager(resources), [resources])
   const gltf = useLoader(GLTFLoader, modelUrl, loader => {
     loader.manager = manager
   })
@@ -467,7 +370,7 @@ export function TexturedModel({
   fileExtension,
   rotationSpeed,
   materialTextureSets,
-  gltfResources,
+  resources,
 }: TexturedModelProps) {
   if (fileExtension === 'obj') {
     return (
@@ -493,7 +396,7 @@ export function TexturedModel({
         modelUrl={modelUrl}
         rotationSpeed={rotationSpeed}
         materialTextureSets={materialTextureSets}
-        gltfResources={gltfResources}
+        resources={resources}
       />
     )
   }

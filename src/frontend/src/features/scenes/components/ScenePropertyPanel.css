@@ -1,0 +1,145 @@
+.scene-properties {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.scene-properties-header {
+  padding: var(--mod-space-xs);
+  border-bottom: 1px solid var(--mod-color-border);
+}
+
+.scene-properties-header h3 {
+  margin: 0;
+  font-size: var(--mod-text-sm);
+  font-weight: var(--mod-font-weight-semibold);
+  color: var(--mod-color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scene-properties-id {
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+  font-family: monospace;
+}
+
+.scene-properties-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-sm);
+  padding: var(--mod-space-xs);
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.scene-properties-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-2xs);
+}
+
+.scene-properties-field > span {
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+}
+
+.scene-properties-field > span em {
+  font-style: normal;
+  opacity: 0.7;
+}
+
+.scene-properties-field .p-inputtext {
+  width: 100%;
+  font-size: var(--mod-text-sm);
+}
+
+.scene-properties-vector {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--mod-space-2xs);
+}
+
+.scene-properties-axis {
+  display: flex;
+  align-items: center;
+  gap: var(--mod-space-2xs);
+  min-width: 0;
+}
+
+.scene-properties-axis > label {
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+  text-transform: uppercase;
+  width: 0.75rem;
+}
+
+.scene-properties-axis .p-inputnumber {
+  min-width: 0;
+  flex: 1;
+}
+
+.scene-properties-axis .p-inputnumber-input {
+  width: 100%;
+  min-width: 0;
+  font-size: var(--mod-text-sm);
+  padding: var(--mod-space-2xs) var(--mod-space-2xs);
+}
+
+/* Stacked steppers, sized down so three axes still fit the side panel. */
+.scene-properties-axis .p-inputnumber-button-group {
+  width: 1.1rem;
+}
+
+.scene-properties-axis .p-inputnumber-button {
+  width: 1.1rem;
+  padding: 0;
+}
+
+.scene-properties-axis .p-inputnumber-button .p-icon,
+.scene-properties-axis .p-inputnumber-button .pi {
+  font-size: 0.625rem;
+}
+
+.scene-properties-derived {
+  border-top: 1px solid var(--mod-color-border);
+  padding-top: var(--mod-space-sm);
+}
+
+.scene-properties-derived h4 {
+  margin: 0 0 var(--mod-space-xs);
+  font-size: var(--mod-text-xs);
+  font-weight: var(--mod-font-weight-semibold);
+  color: var(--mod-color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.scene-properties-derived dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--mod-space-2xs) var(--mod-space-xs);
+  margin: 0 0 var(--mod-space-xs);
+}
+
+.scene-properties-derived dt {
+  color: var(--mod-color-text-muted);
+  font-size: var(--mod-text-xs);
+}
+
+.scene-properties-derived dd {
+  margin: 0;
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text);
+}
+
+.scene-properties-action {
+  width: 100%;
+}
+
+.scene-properties-warning {
+  justify-content: flex-start;
+  font-size: var(--mod-text-xs);
+}

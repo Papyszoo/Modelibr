@@ -53,7 +53,15 @@ public record SceneGraphRollupsDto(
     int? AnimationCount,
     List<string>? AnimationNames);
 
-public record SceneGraphWorldBoundsDto(List<double>? Dimensions);
+/// <summary>
+/// The asset's world bounding box. <paramref name="Min"/> and <paramref name="Max"/> are
+/// what say where the origin sits inside it; sending only the dimensions is why placement
+/// had to assume a centred origin.
+/// </summary>
+public record SceneGraphWorldBoundsDto(
+    List<double>? Dimensions,
+    List<double>? Min = null,
+    List<double>? Max = null);
 
 internal sealed class ImportModelSceneGraphCommandHandler : ICommandHandler<ImportModelSceneGraphCommand>
 {
@@ -62,6 +70,7 @@ internal sealed class ImportModelSceneGraphCommandHandler : ICommandHandler<Impo
     private readonly IAssetExtractionRepository _assetExtractionRepository;
     private readonly IAssetDerivationRepository _assetDerivationRepository;
     private readonly IAssetSearchDocumentRepository _searchDocumentRepository;
+    private readonly IAssetMetadataRepository _assetMetadataRepository;
     private readonly DerivationOptions _derivationOptions;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IUnitOfWork _unitOfWork;
@@ -72,6 +81,7 @@ internal sealed class ImportModelSceneGraphCommandHandler : ICommandHandler<Impo
         IAssetExtractionRepository assetExtractionRepository,
         IAssetDerivationRepository assetDerivationRepository,
         IAssetSearchDocumentRepository searchDocumentRepository,
+        IAssetMetadataRepository assetMetadataRepository,
         DerivationOptions derivationOptions,
         IDateTimeProvider dateTimeProvider,
         IUnitOfWork unitOfWork)
@@ -81,6 +91,7 @@ internal sealed class ImportModelSceneGraphCommandHandler : ICommandHandler<Impo
         _assetExtractionRepository = assetExtractionRepository;
         _assetDerivationRepository = assetDerivationRepository;
         _searchDocumentRepository = searchDocumentRepository;
+        _assetMetadataRepository = assetMetadataRepository;
         _derivationOptions = derivationOptions;
         _dateTimeProvider = dateTimeProvider;
         _unitOfWork = unitOfWork;
@@ -200,6 +211,9 @@ internal sealed class ImportModelSceneGraphCommandHandler : ICommandHandler<Impo
             ? true
             : version.Model.ActiveVersionId == version.Id;
 
+        var schemaMetadata = await _assetMetadataRepository.GetAsync(
+            ExtractionAssetTypes.Model, version.ModelId, cancellationToken);
+
         await _searchDocumentRepository.RemoveForAssetAsync(
             ExtractionAssetTypes.Model, version.ModelId, version.Id, cancellationToken);
 
@@ -209,7 +223,30 @@ internal sealed class ImportModelSceneGraphCommandHandler : ICommandHandler<Impo
             categoryId: version.Model?.ModelCategoryId,
             categoryName: version.Model?.ModelCategory?.Name,
             // A recycled model must stay out of search after a re-extraction too.
-            isActive: version.Model?.IsDeleted != true && !version.IsDeleted);
+            isActive: version.Model?.IsDeleted != true && !version.IsDeleted,
+            // Pack membership is author-written grouping. It is also patched in place by
+            // the pack commands, so this only seeds it - a re-derive must not blank out
+            // packs the asset joined since the last extraction.
+            packNames: version.Model?.Packs?.Select(p => p.Name),
+            // The version's own bounding box, not the rollups': it is written from the
+            // pre-normalization size, so it is real metres for extractions on both sides of
+            // `7f0c7c77`. Indexing the rollups made all 1762 models report a longest axis of
+            // exactly 2 and left the size filters matching nothing.
+            assetDimensions: BoundingBoxOf(version),
+            // Carried through for the same reason as packs: tags and description are edited
+            // long after import, and a re-derive that rebuilt documents without them would
+            // silently un-find every asset the user had taken the trouble to label.
+            authoredTags: version.Model?.Tags?.Select(t => t.Name),
+            description: version.Model?.Description,
+            // A re-derive rebuilds the projection wholesale, so the metadata-schema facets
+            // have to be re-read and carried in - a style someone set would otherwise be
+            // blanked from search by the next extraction (prompt 16-F).
+            styles: schemaMetadata?.Styles,
+            themes: schemaMetadata?.Themes,
+            license: schemaMetadata?.License,
+            // Captured once at import and carried through every re-derive from here, so the
+            // weak folder tier survives a projection rebuild the way tags and packs do.
+            sourceFolder: schemaMetadata?.SourceFolder);
         foreach (var doc in searchDocs)
         {
             await _searchDocumentRepository.AddAsync(doc, cancellationToken);
@@ -230,4 +267,14 @@ internal sealed class ImportModelSceneGraphCommandHandler : ICommandHandler<Impo
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }
+
+    /// <summary>
+    /// The version's flat bounding box as a dimension triple, or null when it was never
+    /// measured. This runs after <c>UpdateTechnicalMetadata</c> above, so a fresh extraction
+    /// reads back the size it just wrote and an older row keeps the real one it already had.
+    /// </summary>
+    private static IReadOnlyList<double>? BoundingBoxOf(ModelVersion version) =>
+        version.BoundingBoxX is { } x && version.BoundingBoxY is { } y && version.BoundingBoxZ is { } z
+            ? new[] { x, y, z }
+            : null;
 }

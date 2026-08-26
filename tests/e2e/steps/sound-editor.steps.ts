@@ -10,9 +10,13 @@ const { Given, When, Then } = createBdd();
 // and handles name lookup via shared state (avoiding issues with renamed sounds)
 
 Then("the waveform should be rendered", async ({ page }) => {
-    // Look for a canvas element (used by waveform libraries like wavesurfer.js)
-    // or a waveform container
-    const waveform = page.locator("canvas, .waveform, [data-waveform]").first();
+    // WaveSurfer renders its canvases inside the editor's waveform container.
+    // The previous locator (`canvas, .waveform, [data-waveform]`) could be
+    // satisfied by any other feature's three.js canvas, so it did not assert
+    // that a waveform was rendered at all.
+    const waveform = page
+        .locator('[data-testid="sound-waveform"] canvas')
+        .first();
 
     await expect(waveform).toBeVisible({ timeout: 15000 });
     console.log("[Verify] Waveform is rendered ✓");

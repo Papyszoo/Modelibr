@@ -34,10 +34,28 @@ internal sealed class CreateModelCategoryCommandHandler : ICommandHandler<Create
         }
 
         var category = ModelCategory.Create(command.Name, command.Description, command.ParentId, _dateTimeProvider.UtcNow);
-        await _categoryRepository.AddAsync(category, cancellationToken);
-        // Commit immediately: category.Id is database-assigned and is needed
-        // below for the response DTO.
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        if (command.ParentId is null)
+        {
+            // Roots are unique case-insensitively and the database says so, so the insert
+            // can lose a race it passed the check for. AddRootAsync commits it and reports
+            // which row won; a loss here is a duplicate, not something to take over.
+            var inserted = await _categoryRepository.AddRootAsync(category, cancellationToken);
+            if (!inserted.Created)
+            {
+                return Result.Failure<ModelCategorySummaryDto>(new Error(
+                    "CategoryAlreadyExists", $"A top-level model category named '{command.Name}' already exists."));
+            }
+
+            category = inserted.Category;
+        }
+        else
+        {
+            await _categoryRepository.AddAsync(category, cancellationToken);
+            // Commit immediately: category.Id is database-assigned and is needed
+            // below for the response DTO.
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+        }
 
         return Result.Success(new ModelCategorySummaryDto
         {

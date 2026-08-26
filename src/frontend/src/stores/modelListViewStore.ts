@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
 import { ALL_CATEGORIES_ID } from '@/shared/types/categories'
+import { type UvStatus } from '@/shared/types/uvStatus'
 
 export interface ModelListViewState {
   isSearchOpen: boolean
@@ -16,6 +17,8 @@ export interface ModelListViewState {
   animatedOnly: boolean
   minTriangleCount: number | null
   maxTriangleCount: number | null
+  /** UV layout filter; null = no UV filter applied. */
+  uvStatus: UvStatus | null
   selectedModelIds: string[]
 }
 
@@ -37,6 +40,7 @@ export const DEFAULT_MODEL_LIST_VIEW_STATE: ModelListViewState = {
   animatedOnly: false,
   minTriangleCount: null,
   maxTriangleCount: null,
+  uvStatus: null,
   selectedModelIds: [],
 }
 

@@ -1,0 +1,506 @@
+import './SceneCanvas.css'
+
+import { Environment, Grid, OrbitControls } from '@react-three/drei'
+import { Canvas, useLoader, useThree } from '@react-three/fiber'
+import { type JSX, useCallback, useEffect, useMemo, useState } from 'react'
+import * as THREE from 'three'
+import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader'
+import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader'
+
+import { RendererPerfSampler } from '@/shared/three/RendererPerfSampler'
+
+import {
+  sceneAssetSourceKey,
+  useSceneAssetSources,
+} from '../hooks/useSceneAssetSources'
+import { useSceneMaterials } from '../hooks/useSceneMaterials'
+import { useSceneResourceAdmission } from '../hooks/useSceneResourceAdmission'
+import { useSceneViewportMeasurements } from '../hooks/useSceneViewportMeasurements'
+import { useSceneViewportQuality } from '../hooks/useSceneViewportQuality'
+import { buildSceneResourceCandidates } from '../lib/sceneResourcePriority'
+import type {
+  SceneDocument,
+  SceneEnvironment,
+  SceneLight,
+  SceneNodeView,
+} from '../types'
+import { SceneNodeObject } from './SceneNodeObject'
+import { SceneResourcePriorityProbe } from './SceneResourcePriorityProbe'
+
+interface SceneCanvasProps {
+  /** The draft being edited - the source of truth for what is drawn. */
+  document: SceneDocument
+  /**
+   * The server's derived facts for each node, from the last read. Kept separate
+   * from the draft because moving a node does not change how big its asset is,
+   * so the editor should not have to wait for a round trip to keep drawing it
+   * correctly.
+   */
+  nodeFacts: Map<string, SceneNodeView>
+  selectedNodeId: string | null
+  onSelectNode: (nodeId: string | null) => void
+  /** Reports an asset that could not be loaded, so the editor can flag the node. */
+  onNodeLoadError: (nodeId: string, message: string) => void
+  /**
+   * Reports each node settling, loaded or failed. Only the headless render view
+   * needs it, to know when the scene is finished before it screenshots.
+   */
+  onNodeLoadSettled?: (nodeId: string, loaded: boolean) => void
+  /**
+   * Where to look from. The editor leaves this off and gets the default
+   * three-quarter view with orbit controls; a render is framed by its caller.
+   */
+  camera?: SceneCameraSpec
+  /** Off for a render - the grid is an editing aid, not part of the scene. */
+  showGrid?: boolean
+  /** Off for a render: no orbit controls, no click-to-select. */
+  interactive?: boolean
+  /**
+   * Draw every node as its bounding volume instead of its mesh.
+   *
+   * How a composition is judged before it is dressed: an object floating half
+   * its height is glaring among grey volumes and easy to miss in a lit,
+   * textured render. No geometry is loaded in this mode either, which is what
+   * makes a large scene navigable while it is still being laid out.
+   */
+  blockout?: boolean
+  /**
+   * Nodes filling a slot nobody has decided yet, drawn with an amber outline.
+   *
+   * The requirement this answers: an unresolved choice has to be visible in the
+   * scene itself, not only in the panel beside it. A viewport that looks
+   * finished is how an agent's proposal quietly becomes the final answer.
+   */
+  undecidedNodeIds?: ReadonlySet<string>
+}
+
+/** A camera placement. `target` defaults to the origin, `fov` to the editor's 50. */
+export interface SceneCameraSpec {
+  position: [number, number, number]
+  target?: [number, number, number]
+  fov?: number
+}
+
+const DEFAULT_CAMERA: SceneCameraSpec = {
+  position: [12, 9, 12],
+  target: [0, 0, 0],
+  fov: 50,
+}
+
+export function SceneCanvas({
+  document,
+  nodeFacts,
+  selectedNodeId,
+  onSelectNode,
+  onNodeLoadError,
+  onNodeLoadSettled,
+  camera = DEFAULT_CAMERA,
+  showGrid = true,
+  interactive = true,
+  blockout = false,
+  undecidedNodeIds,
+}: SceneCanvasProps): JSX.Element {
+  // Resolved out here on purpose: react-three-fiber renders the canvas subtree
+  // through its own reconciler root, so the app's React context - the
+  // QueryClient included - is not reachable from inside <Canvas>. Fetching in
+  // there fails at the first hook and the node simply never appears.
+  const sources = useSceneAssetSources(document)
+  const materials = useSceneMaterials(document)
+  const viewportQuality = useSceneViewportQuality(interactive)
+
+  // What the camera can see decides what loads next, so the ranking is produced inside the
+  // Canvas - the only place a camera exists - and applied by the queue out here. Held as a
+  // string rather than an array so an unchanged order costs no re-render.
+  const [rankedResourceKeys, setRankedResourceKeys] = useState('')
+  const onRankResources = useCallback((orderedKeys: string[]) => {
+    const ranking = orderedKeys.join('|')
+    setRankedResourceKeys(previous =>
+      previous === ranking ? previous : ranking
+    )
+  }, [])
+  const rankedKeys = useMemo(
+    () => (rankedResourceKeys ? rankedResourceKeys.split('|') : []),
+    [rankedResourceKeys]
+  )
+  const resourceCandidates = useMemo(
+    () => buildSceneResourceCandidates(document, nodeFacts, sources),
+    [document, nodeFacts, sources]
+  )
+
+  const resourceAdmission = useSceneResourceAdmission(
+    document,
+    !blockout,
+    viewportQuality.state === 'moving',
+    selectedNodeId,
+    rankedKeys
+  )
+  const viewportMeasurements = useSceneViewportMeasurements({
+    enabled: interactive && !blockout,
+    resourceSignature: resourceAdmission.resourceSignature,
+    resourceCount: resourceAdmission.resourceCount,
+    completedResourceCount: resourceAdmission.completedResourceCount,
+    qualityState: viewportQuality.state,
+  })
+
+  // Resolved out here with everything else - the environment map is a library
+  // asset, so its URL comes from a query the canvas subtree cannot run.
+  const environmentMap = document.environment?.environmentMap
+  const environmentMapUrl = environmentMap
+    ? (sources.get(sceneAssetSourceKey(environmentMap))?.url ?? null)
+    : null
+
+  return (
+    <div className="scene-canvas" data-testid="scene-canvas">
+      <Canvas
+        shadows={viewportQuality.shadowsEnabled}
+        camera={{
+          position: camera.position,
+          fov: camera.fov ?? DEFAULT_CAMERA.fov,
+        }}
+        gl={{ antialias: true, powerPreference: 'high-performance' }}
+        dpr={viewportQuality.dpr}
+        onPointerMissed={interactive ? () => onSelectNode(null) : undefined}
+      >
+        <SceneCameraAim target={camera.target ?? [0, 0, 0]} />
+        {interactive && !blockout ? (
+          <>
+            <RendererPerfSampler
+              onSample={viewportMeasurements.onRendererSample}
+            />
+            <SceneResourcePriorityProbe
+              candidates={resourceCandidates}
+              qualityState={viewportQuality.state}
+              onRank={onRankResources}
+            />
+          </>
+        ) : null}
+
+        {showGrid ? (
+          <Grid
+            args={[40, 40]}
+            cellSize={1}
+            cellThickness={0.5}
+            cellColor="#4b5563"
+            sectionSize={5}
+            sectionThickness={1}
+            sectionColor="#6b7280"
+            fadeDistance={80}
+            followCamera={false}
+            infiniteGrid
+          />
+        ) : null}
+
+        <SceneEnvironmentRig
+          environment={document.environment ?? null}
+          mapUrl={environmentMapUrl}
+        />
+
+        <SceneDocumentLights
+          lights={document.lights}
+          shadowsEnabled={viewportQuality.shadowsEnabled}
+        />
+
+        {document.nodes.map(node => {
+          const facts = nodeFacts.get(node.id)
+          return (
+            <SceneNodeObject
+              key={node.id}
+              node={node}
+              selected={node.id === selectedNodeId}
+              onSelect={onSelectNode}
+              source={
+                node.asset && resourceAdmission.isAdmitted(node.asset)
+                  ? sources.get(sceneAssetSourceKey(node.asset))
+                  : undefined
+              }
+              dressing={materials.get(node.id)}
+              sourceDimensions={facts?.sourceDimensions ?? null}
+              originConvention={facts?.originConvention ?? null}
+              originInBounds={facts?.originInBounds ?? null}
+              blockout={blockout}
+              undecided={undecidedNodeIds?.has(node.id) ?? false}
+              onLoadError={onNodeLoadError}
+              onLoadSettled={(nodeId, loaded) => {
+                resourceAdmission.onNodeSettled(nodeId, loaded)
+                onNodeLoadSettled?.(nodeId, loaded)
+              }}
+            />
+          )
+        })}
+
+        {interactive ? (
+          <OrbitControls
+            makeDefault
+            enableDamping
+            dampingFactor={0.1}
+            onStart={viewportQuality.onControlsStart}
+            onChange={viewportQuality.onControlsChange}
+            onEnd={viewportQuality.onControlsEnd}
+          />
+        ) : null}
+      </Canvas>
+      {interactive &&
+      !blockout &&
+      resourceAdmission.resourceCount > 0 &&
+      (resourceAdmission.completedResourceCount <
+        resourceAdmission.resourceCount ||
+        resourceAdmission.failedResourceCount > 0) ? (
+        <SceneResourceProgress
+          completed={resourceAdmission.completedResourceCount}
+          total={resourceAdmission.resourceCount}
+          loading={resourceAdmission.activeResourceKey !== null}
+          failed={resourceAdmission.failedResourceCount}
+        />
+      ) : null}
+    </div>
+  )
+}
+
+function SceneResourceProgress({
+  completed,
+  total,
+  loading,
+  failed,
+}: {
+  completed: number
+  total: number
+  loading: boolean
+  failed: number
+}): JSX.Element {
+  const parts = [`${completed}/${total} resources`]
+  if (loading) {
+    parts.push('1 loading')
+  }
+  if (failed > 0) {
+    parts.push(`${failed} failed`)
+  }
+
+  return (
+    <output
+      className={
+        failed > 0
+          ? 'scene-canvas__resource-progress scene-canvas__resource-progress--failed'
+          : 'scene-canvas__resource-progress'
+      }
+      data-testid="scene-resource-progress"
+      aria-live="polite"
+    >
+      {parts.join(' · ')}
+    </output>
+  )
+}
+
+/**
+ * Points the camera at a target.
+ *
+ * A no-op in the editor, where `OrbitControls` owns the camera and its own
+ * target already defaults to the origin. It matters for a render, which has no
+ * controls: without this the camera keeps the orientation the Canvas gave it, so
+ * moving it to frame a scene would just look at the same direction from a
+ * different place.
+ */
+function SceneCameraAim({
+  target,
+}: {
+  target: [number, number, number]
+}): null {
+  const camera = useThree(state => state.camera)
+  const [x, y, z] = target
+
+  useEffect(() => {
+    camera.lookAt(x, y, z)
+    camera.updateProjectionMatrix()
+  }, [camera, x, y, z])
+
+  return null
+}
+
+/**
+ * The document's lights, plus a minimal fill when it has none.
+ *
+ * The fill is not written into the document: an unlit scene should look unlit
+ * once the user adds their first light, and silently seeding lights would make
+ * "why is my scene brighter than my lighting says" the first question asked.
+ */
+function SceneDocumentLights({
+  lights,
+  shadowsEnabled,
+}: {
+  lights: SceneLight[]
+  shadowsEnabled: boolean
+}): JSX.Element {
+  if (lights.length === 0) {
+    return (
+      <>
+        <ambientLight intensity={0.6} />
+        <directionalLight
+          position={[8, 12, 6]}
+          intensity={1.1}
+          castShadow={shadowsEnabled}
+        />
+      </>
+    )
+  }
+
+  return (
+    <>
+      {lights.map(light => {
+        const position: [number, number, number] = [
+          light.position.x,
+          light.position.y,
+          light.position.z,
+        ]
+
+        switch (light.type) {
+          case 'ambient':
+            return (
+              <ambientLight
+                key={light.id}
+                intensity={light.intensity}
+                color={light.color}
+              />
+            )
+          case 'hemisphere':
+            return (
+              <hemisphereLight
+                key={light.id}
+                intensity={light.intensity}
+                color={light.color}
+              />
+            )
+          case 'directional':
+          case 'spot':
+            return (
+              <AimedLight
+                key={light.id}
+                light={light}
+                shadowsEnabled={shadowsEnabled}
+              />
+            )
+          default:
+            return (
+              <pointLight
+                key={light.id}
+                position={position}
+                intensity={light.intensity}
+                color={light.color}
+                castShadow={shadowsEnabled}
+              />
+            )
+        }
+      })}
+    </>
+  )
+}
+
+/**
+ * A directional or spot light, aimed where the document says.
+ *
+ * three.js aims these at a `target` Object3D that defaults to the origin, and
+ * nothing read `light.target` - so a scene that carefully aimed its key light
+ * at a doorway rendered with every light pointing at 0,0,0. The target object
+ * has to be part of the scene graph for its world matrix to update, hence the
+ * `<primitive>` rather than a bare `new Object3D()`.
+ */
+function AimedLight({
+  light,
+  shadowsEnabled,
+}: {
+  light: SceneLight
+  shadowsEnabled: boolean
+}): JSX.Element {
+  const target = useMemo(() => new THREE.Object3D(), [])
+  const aim = light.target ?? { x: 0, y: 0, z: 0 }
+  const position: [number, number, number] = [
+    light.position.x,
+    light.position.y,
+    light.position.z,
+  ]
+
+  return (
+    <>
+      <primitive object={target} position={[aim.x, aim.y, aim.z]} />
+      {light.type === 'spot' ? (
+        <spotLight
+          position={position}
+          target={target}
+          intensity={light.intensity}
+          color={light.color}
+          angle={0.5}
+          penumbra={0.4}
+          castShadow={shadowsEnabled}
+        />
+      ) : (
+        <directionalLight
+          position={position}
+          target={target}
+          intensity={light.intensity}
+          color={light.color}
+          castShadow={shadowsEnabled}
+        />
+      )}
+    </>
+  )
+}
+
+/**
+ * The scene's environment: image-based lighting, background and exposure.
+ *
+ * The document has carried `environment` since scenes shipped and the viewport
+ * ignored all three fields - a scene authored with an HDRI rendered under the
+ * default lights, and its background colour and exposure did nothing. An agent
+ * could set them, save them, read them back, and never see them.
+ *
+ * The loader is picked by extension because these files are not ordinary
+ * images: an .hdr or .exr put through TextureLoader decodes to nothing usable,
+ * which is the failure that looks like "the environment silently did not
+ * apply".
+ */
+function SceneEnvironmentRig({
+  environment,
+  mapUrl,
+}: {
+  environment: SceneEnvironment | null
+  mapUrl: string | null
+}): JSX.Element | null {
+  const { gl } = useThree()
+
+  // Exposure is in EV stops, so each step doubles the light. Reset to neutral
+  // when the document does not set it, or a scene that once had exposure would
+  // keep it after the field was cleared.
+  const exposureEv = environment?.exposureEv ?? null
+  useEffect(() => {
+    gl.toneMappingExposure = exposureEv === null ? 1 : Math.pow(2, exposureEv)
+    return () => {
+      gl.toneMappingExposure = 1
+    }
+  }, [gl, exposureEv])
+
+  return (
+    <>
+      {environment?.background ? (
+        <color attach="background" args={[environment.background]} />
+      ) : null}
+      {mapUrl ? <SceneEnvironmentMap url={mapUrl} /> : null}
+    </>
+  )
+}
+
+/** Loads one equirectangular environment map and lights the scene with it. */
+function SceneEnvironmentMap({ url }: { url: string }): JSX.Element {
+  const extension = url.split('.').pop()?.toLowerCase() ?? ''
+  const loader =
+    extension === 'exr'
+      ? EXRLoader
+      : extension === 'hdr'
+        ? RGBELoader
+        : THREE.TextureLoader
+
+  const texture = useLoader(loader, url) as THREE.Texture
+  texture.mapping = THREE.EquirectangularReflectionMapping
+
+  // background: the map is what the camera sees as well as what lights the
+  // scene. A scene that lit from an HDRI but showed grey behind it would read
+  // as a half-applied environment.
+  return <Environment map={texture} background />
+}

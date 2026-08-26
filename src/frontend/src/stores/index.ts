@@ -24,6 +24,17 @@ export {
   useNavigationStore,
 } from './navigationStore'
 export { usePanelStore } from './panelStore'
+export { SCENE_HISTORY_LIMIT, useSceneEditorStore } from './sceneEditorStore'
+export type {
+  SceneLinkHold,
+  SceneLinkHoldPhase,
+  SceneWriteKind,
+} from './sceneLinkHoldStore'
+export {
+  getSceneLinkHold,
+  isSceneWriteHeld,
+  useSceneLinkHoldStore,
+} from './sceneLinkHoldStore'
 export type { Theme } from './themeStore'
 export { useThemeStore } from './themeStore'
 export type { ThumbnailAnimationMode } from './thumbnailAnimationStore'

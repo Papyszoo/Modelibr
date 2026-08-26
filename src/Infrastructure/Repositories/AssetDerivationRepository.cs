@@ -1,4 +1,5 @@
 using Application.Abstractions.Repositories;
+using Application.Extraction;
 using Domain.Models;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -50,6 +51,99 @@ internal sealed class AssetDerivationRepository : IAssetDerivationRepository
             .Where(e => e.AssetType == assetType && e.AssetId == assetId)
             .OrderByDescending(e => e.VersionId)
             .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<AssetDerivation>> GetForAssetsAsync(
+        string assetType,
+        IReadOnlyCollection<int> assetIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (assetIds.Count == 0)
+        {
+            return [];
+        }
+
+        return await _context.AssetDerivations
+            .AsNoTracking()
+            .Where(e => e.AssetType == assetType && assetIds.Contains(e.AssetId))
+            .OrderBy(e => e.AssetId)
+            .ThenByDescending(e => e.VersionId)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<AssetDerivation?> GetForActiveVersionAsync(
+        string assetType,
+        int assetId,
+        CancellationToken cancellationToken = default)
+    {
+        // Only models carry versions, so only models can have an active one that differs
+        // from the newest. Everything else has a single (null-versioned) derivation and the
+        // "latest" answer is the only answer.
+        if (assetType == ExtractionAssetTypes.Model)
+        {
+            var activeVersionId = await _context.Models
+                .AsNoTracking()
+                .Where(m => m.Id == assetId)
+                .Select(m => m.ActiveVersionId)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (activeVersionId is not null)
+            {
+                var forActive = await _context.AssetDerivations
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(
+                        e => e.AssetType == assetType &&
+                             e.AssetId == assetId &&
+                             e.VersionId == activeVersionId,
+                        cancellationToken);
+
+                // Falling through on null is deliberate: a model whose active version has
+                // not been derived yet should still answer with the facts that exist rather
+                // than report "no metadata" for an asset search can see.
+                if (forActive is not null)
+                {
+                    return forActive;
+                }
+            }
+        }
+
+        return await GetLatestForAssetAsync(assetType, assetId, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<(int AssetId, int? VersionId)>> GetDerivedKeysAsync(
+        string assetType,
+        CancellationToken cancellationToken = default)
+    {
+        var keys = await _context.AssetDerivations
+            .AsNoTracking()
+            .Where(e => e.AssetType == assetType)
+            .OrderBy(e => e.AssetId)
+            .ThenBy(e => e.VersionId)
+            .Select(e => new { e.AssetId, e.VersionId })
+            .ToListAsync(cancellationToken);
+
+        return keys.Select(k => (k.AssetId, k.VersionId)).ToList();
+    }
+
+    public async Task<IReadOnlyList<(string AssetType, int Derived, int Stale)>> CountDerivedByTypeAsync(
+        int currentDeriveVersion,
+        CancellationToken cancellationToken = default)
+    {
+        var counts = await _context.AssetDerivations
+            .AsNoTracking()
+            .GroupBy(e => e.AssetType)
+            .Select(g => new
+            {
+                AssetType = g.Key,
+                Derived = g.Count(),
+                Stale = g.Count(e => e.DeriveVersion < currentDeriveVersion),
+            })
+            .ToListAsync(cancellationToken);
+
+        return counts
+            .Select(c => (c.AssetType, c.Derived, c.Stale))
+            .OrderBy(c => c.AssetType, StringComparer.Ordinal)
+            .ToList();
     }
 
     public async Task<IReadOnlyList<AssetDerivation>> GetStaleAsync(

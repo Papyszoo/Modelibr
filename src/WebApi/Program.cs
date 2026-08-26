@@ -123,9 +123,46 @@ namespace WebApi
             var mcpEnabled = builder.Configuration["MCP_ENABLED"] != "false";
             if (mcpEnabled)
             {
+                // Access tokens are parsed once, at startup, and a malformed MCP_TOKENS
+                // throws here rather than being skipped: a typo that silently disabled
+                // enforcement would leave an endpoint the operator believes is guarded.
+                builder.Services.AddSingleton(WebApi.Mcp.McpTokenRegistry.FromConfiguration(builder.Configuration));
+                builder.Services.AddScoped<WebApi.Mcp.McpCallerContext>();
+
                 var mcpServer = builder.Services.AddMcpServer()
                     .WithHttpTransport()
-                    .WithTools<WebApi.Mcp.AssetSearchMcpTools>();
+                    .WithTools<WebApi.Mcp.AssetSearchMcpTools>()
+                    // Browsing the companion Asset Store's PUBLIC catalog is a read, and a
+                    // credential-free one - these tools acquire nothing. They are here so an
+                    // agent that cannot fill a slot from the library can say what would fill
+                    // it, rather than silently settling for the closest wrong asset.
+                    .WithTools<WebApi.Mcp.StoreCatalogMcpTools>()
+                    // Reading a scene is a read: an agent that can search the library can
+                    // look at what it has already built there.
+                    .WithTools<WebApi.Mcp.SceneReadMcpTools>()
+                    // Looking at a scene is the same read, in pixels. It is on the read
+                    // side despite queueing a job and writing an image, because the
+                    // alternative denies the agent that can already inspect a scene the
+                    // one view that shows facing, framing and whether an asset loaded -
+                    // and with writes off it can only render scenes the user made. The
+                    // cost is that a reader can queue render work; if that becomes the
+                    // objection, this moves behind MCP_WRITE_ENABLED.
+                    .WithTools<WebApi.Mcp.SceneRenderMcpTools>()
+                    // Browsing the material library is a read like any other search.
+                    .WithTools<WebApi.Mcp.MaterialReadMcpTools>()
+                    // Asking what a queued job did. A read about work someone else asked
+                    // for - and the only way an agent can collect the result of anything
+                    // that hands back a job id instead of an answer.
+                    .WithTools<WebApi.Mcp.OperationJobReadMcpTools>()
+                    .WithTools<WebApi.Mcp.StoreImportReadMcpTools>()
+                    // What the library knows about an asset, and the schema that says what
+                    // it could know. A read, and the one an agent needs before it can
+                    // usefully fill anything in.
+                    .WithTools<WebApi.Mcp.AssetMetadataReadMcpTools>()
+                    // What is being made. Reading a project's brief is what turns "build a
+                    // scene" into "build a scene for THIS", and there were no project tools
+                    // at all before it.
+                    .WithTools<WebApi.Mcp.ProjectReadMcpTools>();
 
                 // Write tools (prompt 30) are opt-in: OFF by default keeps a stock server
                 // read-only so enabling agent writes on a LAN-reachable endpoint is a
@@ -135,7 +172,39 @@ namespace WebApi
                 {
                     mcpServer
                         .WithTools<WebApi.Mcp.AssetWriteMcpTools>()
-                        .WithPrompts<WebApi.Mcp.ImportLibraryPrompts>();
+                        // Sounds, sprites, environment maps and texture sets. Gated by the
+                        // same flag: they are writes, and splitting the gate would mean a
+                        // server that is read-only for models but not for materials.
+                        .WithTools<WebApi.Mcp.AssetImportMcpTools>()
+                        // Undo. Registered with the write tools because reversing a write is
+                        // only reachable for someone who could perform one; the destructive
+                        // half of it carries its own flag and scope on top.
+                        .WithTools<WebApi.Mcp.AgentUndoMcpTools>()
+                        // Scene authoring. Same gate as every other write - composing a
+                        // scene creates and destroys state like any other mutation.
+                        .WithTools<WebApi.Mcp.SceneWriteMcpTools>()
+                        // Inventing a material mid-scene. A write, and the cheapest one
+                        // there is: it creates no files at all.
+                        .WithTools<WebApi.Mcp.MaterialWriteMcpTools>()
+                        // Running Blender on an asset. A write: it adds a version to a
+                        // model, even though what it hands back is a job id.
+                        .WithTools<WebApi.Mcp.BlenderWriteMcpTools>()
+                        // Pulling a free asset out of the companion store. A write - it
+                        // downloads files and creates a pack - and the one tool here that
+                        // reaches outside the machine to do it.
+                        .WithTools<WebApi.Mcp.StoreImportMcpTools>()
+                        // Filling in what an asset says about itself - licence, credit,
+                        // style, where it came from. A write like any other tagging call.
+                        .WithTools<WebApi.Mcp.AssetMetadataWriteMcpTools>()
+                        // Telling a scene which project it belongs to. A scene write, and
+                        // the only project-shaped one an agent gets - the profile itself is
+                        // the user's statement of intent, not something to infer.
+                        .WithTools<WebApi.Mcp.ProjectWriteMcpTools>()
+                        .WithPrompts<WebApi.Mcp.ImportLibraryPrompts>()
+                        // The playbook for building a scene. Registered with the write
+                        // tools because it is a guide to writing: every stage it describes
+                        // is a call that is not there without the gate.
+                        .WithPrompts<WebApi.Mcp.ComposeScenePrompts>();
                 }
             }
             builder.Services.AddHostedService<BlenderRetentionSweepHostedService>();
@@ -173,15 +242,19 @@ namespace WebApi
             app.MapModelEndpoints();
             app.MapModelVersionEndpoints();
             app.MapExtractionEndpoints();
+            app.MapAssetMetadataEndpoints();
+            app.MapProjectProfileEndpoints();
             app.MapFilesEndpoints();
             app.MapThumbnailEndpoints();
             app.MapThumbnailJobEndpoints();
             app.MapTextureSetEndpoints();
+            app.MapMaterialEndpoints();
             app.MapTextureSetCategoryEndpoints();
             app.MapPackEndpoints();
             app.MapProjectEndpoints();
             app.MapModelCategoryEndpoints();
             app.MapStageEndpoints();
+            app.MapSceneEndpoints();
             app.MapSettingsEndpoints();
             app.MapBatchUploadEndpoints();
             app.MapRecycledFilesEndpoints();
@@ -202,7 +275,14 @@ namespace WebApi
             if (mcpEnabled)
             {
                 // Exposes the MCP endpoint (SSE) at /mcp for a local agent to connect to.
-                app.MapMcp("/mcp");
+                // The token filter sits at the transport so a newly added tool inherits
+                // authentication instead of having to remember it; per-scope checks then
+                // happen where writes and destructive work are performed.
+                // Both type arguments are spelled out because MapMcp returns the general
+                // IEndpointConventionBuilder, not the RouteHandlerBuilder the one-argument
+                // overload of AddEndpointFilter is written against.
+                app.MapMcp("/mcp")
+                    .AddEndpointFilter<IEndpointConventionBuilder, WebApi.Mcp.McpTokenEndpointFilter>();
             }
 
             // Map SignalR hubs

@@ -68,7 +68,9 @@ internal class ImportModelZipCommandHandler
         foreach (var group in groups)
         {
             var result = await _importHandler.Handle(
-                new ImportModelWithAuxiliaryFilesCommand(group.Primary, group.Auxiliaries, batchId),
+                new ImportModelWithAuxiliaryFilesCommand(
+                    group.Primary, group.Auxiliaries, batchId,
+                    group.SourceFolder, group.SiblingNames),
                 cancellationToken);
 
             if (result.IsFailure)

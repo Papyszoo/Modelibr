@@ -1,0 +1,107 @@
+/*
+ * Sits inside the project page's rich-details column as an ordinary block, like
+ * the concept board above it. No height of its own and no nested scroll box -
+ * the column already scrolls.
+ */
+.project-profile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-sm);
+}
+
+.project-profile-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-2xs);
+}
+
+.project-profile-row > label {
+  font-size: var(--mod-text-sm);
+  font-weight: var(--mod-font-weight-semibold);
+}
+
+.project-profile-hint,
+.project-profile-note {
+  margin: 0;
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+}
+
+.project-profile-suggestion {
+  display: flex;
+  align-items: center;
+  gap: var(--mod-space-2xs);
+  margin: 0;
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+}
+
+.project-profile-budgets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--mod-space-sm);
+}
+
+.project-profile-budget-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 12rem;
+}
+
+.project-profile-budget-field label {
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+}
+
+.project-profile-brief {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-2xs);
+  padding: var(--mod-space-xs);
+  border: 1px solid var(--mod-color-border);
+  border-radius: var(--mod-radius-sm);
+  background: var(--mod-color-surface-raised);
+}
+
+.project-profile-brief-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--mod-space-2xs);
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  font-size: var(--mod-text-sm);
+  font-weight: var(--mod-font-weight-semibold);
+}
+
+.project-profile-brief-body ul,
+.project-profile-brief-body dl {
+  margin: var(--mod-space-2xs) 0 0;
+  padding: 0 0 0 var(--mod-space-sm);
+  font-size: var(--mod-text-xs);
+}
+
+.project-profile-brief-body dl {
+  padding-left: 0;
+}
+
+.project-profile-brief-body dt {
+  margin-top: var(--mod-space-2xs);
+  font-weight: var(--mod-font-weight-semibold);
+  color: var(--mod-color-text-muted);
+}
+
+.project-profile-brief-body dd {
+  margin: 0;
+}
+
+/* Stated, never resolved - so it reads as something to decide, not a warning
+   the app is about to clear up on its own. */
+.project-profile-conflict {
+  color: var(--mod-color-warning);
+}

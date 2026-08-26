@@ -25,12 +25,14 @@ The interface is split into **two panels** (left and right), each containing mul
 | ------------------------ | ------------------------------------------------------------------ |
 | **Models**               | Your model library grid with versions and tags                     |
 | **Texture Sets**         | Browse and manage all texture sets                                 |
-| **Global Materials**     | Reusable PBR materials shared across many models                   |
+| **Global Materials**     | Reusable texture sets shared across many models                    |
+| **PBR Materials**        | Materials defined by parameters rather than images - no UVs needed |
 | **Multi-Model Textures** | Texture sets created for specific models                           |
 | **Environment Maps**     | HDR panoramas and six-face cube maps used for lighting             |
 | **Sprites**              | 2D sprite sheets, atlases, and UI iconography                      |
 | **Sounds**               | Audio assets - SFX, dialogue, ambient loops                        |
 | **Scripts**              | Source code and shaders with live previews                         |
+| **Scenes**               | Compose library assets into a scene, by hand or through an agent   |
 
 **Organize and system:**
 

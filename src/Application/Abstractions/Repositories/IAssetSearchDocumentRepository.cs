@@ -33,6 +33,41 @@ public interface IAssetSearchDocumentRepository
     /// Clears the current-version flag on every document of an asset EXCEPT the
     /// given version - so exactly one version is searchable by default.
     /// </summary>
+    /// <summary>
+    /// The asset-level document (null PartPath) for the asset's current version, or null when
+    /// nothing has been indexed yet. Read-only - it is the cheapest place the already-measured
+    /// technical facts are denormalised, so the metadata surface reports them from here rather
+    /// than re-deriving them.
+    /// </summary>
+    /// <summary>
+    /// Re-points the denormalised metadata-schema facets (styles, themes, licence) after a
+    /// metadata write. The same in-place patch contract as
+    /// <see cref="SetCategoryForAssetAsync"/> and <see cref="SetMetadataForAssetAsync"/>:
+    /// setting a style has to reach search in the same transaction, or the facet exists but
+    /// nothing can be found by it until the asset next happens to be re-derived.
+    /// </summary>
+    Task SetSchemaFacetsForAssetAsync(
+        string assetType,
+        int assetId,
+        IEnumerable<string>? styles,
+        IEnumerable<string>? themes,
+        string? license,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// How many assets have a current-version document, per family.
+    ///
+    /// One aggregate query, not a read of the projection: an agent asking "is the library
+    /// indexed yet" must not pull 23,000 rows to count them.
+    /// </summary>
+    Task<IReadOnlyDictionary<string, int>> CountIndexedAssetsByTypeAsync(
+        CancellationToken cancellationToken = default);
+
+    Task<AssetSearchDocument?> GetCurrentAssetDocumentAsync(
+        string assetType,
+        int assetId,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<AssetSearchDocument>> GetForOtherVersionsAsync(
         string assetType,
         int assetId,
@@ -73,5 +108,72 @@ public interface IAssetSearchDocumentRepository
         string? categoryName,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Re-points the denormalised pack names after a membership-only mutation: add to
+    /// pack, remove from pack, pack rename, pack delete. None of those re-derive the
+    /// asset, so without this the projection keeps the membership it had at extraction
+    /// time - which for a freshly imported-then-packed asset is none at all.
+    /// </summary>
+    Task SetPacksForAssetAsync(
+        string assetType,
+        int assetId,
+        IEnumerable<string> packNames,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Bulk form of <see cref="SetPacksForAssetAsync"/>, for mutations that change every
+    /// member of a pack at once: rename and delete. Those touch the whole membership, and
+    /// packs are large - `The Base Mesh` has 1,360 members - so the per-asset call in a
+    /// loop is thousands of round trips inside one request. One query in, one query out.
+    /// </summary>
+    Task SetPacksForAssetsAsync(
+        string assetType,
+        IReadOnlyDictionary<int, IReadOnlyList<string>> packNamesByAssetId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Re-points the denormalised tags and description after a metadata-only mutation
+    /// (<c>set_tags</c>, the tag editor).
+    /// </summary>
+    /// <remarks>
+    /// The learning loop this projection exists to serve: a user corrects what an asset is
+    /// called, and search can find it by that immediately rather than at the next
+    /// re-derive - which for most assets never comes.
+    /// </remarks>
+    Task SetMetadataForAssetAsync(
+        string assetType,
+        int assetId,
+        IEnumerable<string> tags,
+        string? description,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Groups of assets whose current version carries the same geometry fingerprint - the
+    /// same meshes under two ids - newest fingerprint first, paged.
+    /// </summary>
+    /// <remarks>
+    /// Read off the projection rather than the parts table because the fingerprint is only
+    /// computed there, and because the projection already knows which version is current and
+    /// which assets are recycled. Asset-level documents only: a part is not an asset.
+    /// </remarks>
+    Task<DuplicateGeometryPage> GetDuplicateGeometryGroupsAsync(
+        string assetType,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default);
+
     Task UpdateAsync(AssetSearchDocument document, CancellationToken cancellationToken = default);
 }
+
+/// <param name="TotalGroups">Groups in the library, not on this page.</param>
+/// <param name="TotalRedundant">How many assets are the second-or-later copy of something.</param>
+public sealed record DuplicateGeometryPage(
+    int TotalGroups,
+    int TotalRedundant,
+    IReadOnlyList<DuplicateGeometryGroup> Groups);
+
+public sealed record DuplicateGeometryGroup(
+    string GeometryKey,
+    IReadOnlyList<DuplicateGeometryMember> Members);
+
+public sealed record DuplicateGeometryMember(int AssetId, int? TriangleCount);

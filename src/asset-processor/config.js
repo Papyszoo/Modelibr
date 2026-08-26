@@ -17,6 +17,31 @@ export const config = {
   // Poll interval for the decoupled extraction queue (prompt 20 executor).
   extractionPollIntervalMs:
     parseInt(process.env.EXTRACTION_POLL_INTERVAL_MS, 10) || 5000,
+  // How many extraction jobs run at once. Its own budget, separate from
+  // MAX_CONCURRENT_JOBS: that setting governs thumbnail rendering, and extraction used to
+  // have no knob at all - one job at a time behind a 10-per-tick cap, which is a hard
+  // ceiling of 120 jobs/min no matter what the machine can do. Re-deriving a 1,700-model
+  // library after a vocabulary change therefore took 20-40 minutes of pure waiting.
+  //
+  // Each concurrent job holds a renderer from the pool, so the pool is sized to match.
+  extractionConcurrency: Math.max(
+    1,
+    parseInt(process.env.EXTRACTION_CONCURRENCY, 10) || 3
+  ),
+  // Per-tick claim cap, scaled by the concurrency budget. The interval picks up whatever
+  // is left, so this bounds one tick rather than the queue.
+  extractionBatchSize:
+    parseInt(process.env.EXTRACTION_BATCH_SIZE, 10) ||
+    Math.max(1, parseInt(process.env.EXTRACTION_CONCURRENCY, 10) || 3) * 10,
+  // Poll interval for the Blender operation family. Slower than the extraction queue on
+  // purpose: these jobs are minutes long and rare, so a tighter loop only adds requests.
+  blenderPollIntervalMs:
+    parseInt(process.env.BLENDER_POLL_INTERVAL_MS, 10) || 10000,
+  // How long one Blender run may take before it is killed. Comfortably under the queue's
+  // lease for the operation, so a run that overshoots is reported as a failure by the
+  // worker that owns it rather than being silently re-claimed by another.
+  blenderOperationTimeoutMs:
+    parseInt(process.env.BLENDER_OPERATION_TIMEOUT_MS, 10) || 900000,
 
   // Logging
   logLevel: process.env.LOG_LEVEL || 'info',
@@ -44,6 +69,20 @@ export const config = {
     endAngle: parseFloat(process.env.ORBIT_END_ANGLE) || 360, // ending angle in degrees
     cameraHeight: parseFloat(process.env.ORBIT_CAMERA_HEIGHT) || 0, // elevation angle in degrees (vertical tilt)
     enabled: process.env.ORBIT_ENABLED !== 'false', // enable orbit rendering
+  },
+
+  // Scene render-back (03-D / 11-M). Unlike every other render here, this one
+  // photographs the running frontend rather than assembling geometry itself -
+  // see sceneRenderer.js for why - so it needs the app's address, not just the
+  // API's.
+  sceneRender: {
+    frontendUrl: process.env.FRONTEND_URL || '',
+    width: parseInt(process.env.SCENE_RENDER_WIDTH, 10) || 768,
+    height: parseInt(process.env.SCENE_RENDER_HEIGHT, 10) || 768,
+    // Generous: a scene is many assets, and on a GPU-less host each one decodes
+    // and uploads through software WebGL. The page reports partial progress, so
+    // a render that overruns still returns a picture rather than nothing.
+    timeoutMs: parseInt(process.env.SCENE_RENDER_TIMEOUT_MS, 10) || 60000,
   },
 
   // Environment map rendering settings

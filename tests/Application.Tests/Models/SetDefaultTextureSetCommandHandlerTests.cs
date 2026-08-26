@@ -2,6 +2,7 @@ using Application.Abstractions;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
 using Application.Models;
+using Application.Tests.TestDoubles;
 using Domain.Models;
 using Domain.Services;
 using Domain.ValueObjects;
@@ -21,6 +22,13 @@ public class SetDefaultTextureSetCommandHandlerTests
     private readonly Mock<IBlendFileGenerator> _mockBlendFileGenerator;
     private readonly Mock<IBlendFileGenerationQueue> _mockBlendFileGenerationQueue;
     private readonly Mock<IUnitOfWork> _mockUnitOfWork = new();
+
+    /// <summary>
+    /// The blend invalidation and the regeneration enqueue are registered here rather than
+    /// performed inline, and this double is what runs them - driven from the mocked unit of
+    /// work's commit, which is where the real one drains.
+    /// </summary>
+    private readonly TestPostCommitActions _postCommit = new();
     private readonly SetDefaultTextureSetCommandHandler _handler;
 
     public SetDefaultTextureSetCommandHandlerTests()
@@ -41,7 +49,14 @@ public class SetDefaultTextureSetCommandHandlerTests
             _mockDateTimeProvider.Object,
             _mockBlendFileGenerator.Object,
             _mockBlendFileGenerationQueue.Object,
-            _mockUnitOfWork.Object);
+            _mockUnitOfWork.Object,
+            _postCommit);
+
+        // No ambient transaction in these tests, so committing is the moment the effects are
+        // allowed to happen - exactly what PostCommitUnitOfWork does for such a caller.
+        _mockUnitOfWork
+            .Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .Returns(() => _postCommit.RunPendingAsync());
     }
 
     [Fact]
@@ -311,4 +326,59 @@ public class SetDefaultTextureSetCommandHandlerTests
         var idProperty = typeof(T).GetProperty("Id");
         idProperty!.SetValue(entity, id);
     }
+    /// <summary>
+    /// Neither blend effect happens before the write commits.
+    /// </summary>
+    /// <remarks>
+    /// The generation consumer is a singleton that opens its own database scope. Handed the
+    /// entry while this handler's write is still inside <c>bind_texture_set</c>'s
+    /// transaction, it reads the bindings the transaction is replacing and caches a
+    /// <c>.blend</c> built from them - which the duplicate entry that follows then finds
+    /// already present and returns. Both effects are registered for after the commit now, and
+    /// with the commit withheld neither one runs.
+    /// </remarks>
+    [Fact]
+    public async Task Handle_DoesNotInvalidateOrEnqueueBlendWork_UntilTheWriteCommits()
+    {
+        var now = DateTime.UtcNow;
+        _mockDateTimeProvider.Setup(x => x.UtcNow).Returns(now);
+
+        var model = CreateModelWithActiveVersion(1, 1);
+        model.ActiveVersion!.AddTextureMapping(1, "", now);
+
+        _mockModelRepository.Setup(x => x.GetByIdAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(model);
+        _mockModelVersionRepository.Setup(x => x.UpdateAsync(It.IsAny<ModelVersion>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ModelVersion mv, CancellationToken _) => mv);
+        _mockThumbnailQueue.Setup(x => x.EnqueueAsync(
+                It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<bool>(),
+                It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ThumbnailJob.Create(1, 1, "a" + new string('0', 63), now));
+
+        // A commit that never lands - a nested save inside somebody else's open transaction
+        // looks exactly like this from outside the connection.
+        _mockUnitOfWork
+            .Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var result = await _handler.Handle(new SetDefaultTextureSetCommand(1, 1), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        _mockBlendFileGenerator.Verify(
+            g => g.InvalidateCache(It.IsAny<int>(), It.IsAny<int>()), Times.Never);
+        _mockBlendFileGenerationQueue.Verify(
+            q => q.Enqueue(It.IsAny<int>(), It.IsAny<int>()), Times.Never);
+
+        // Registered rather than dropped: the commit is what releases them.
+        Assert.Equal(2, _postCommit.Enqueued.Count);
+        Assert.Empty(_postCommit.Ran);
+
+        await _postCommit.RunPendingAsync();
+
+        _mockBlendFileGenerator.Verify(
+            g => g.InvalidateCache(1, model.ActiveVersion!.Id), Times.Once);
+        _mockBlendFileGenerationQueue.Verify(
+            q => q.Enqueue(1, model.ActiveVersion!.Id), Times.Once);
+    }
+
 }

@@ -223,6 +223,8 @@ export function getTabLabel(
       return modelId ? `Model ${modelId}` : 'Model Viewer'
     case 'globalMaterials':
       return 'Global Materials'
+    case 'pbrMaterials':
+      return 'PBR Materials'
     case 'modelTextures':
       return 'Multi-Model Textures'
     case 'textureSetViewer':
@@ -259,6 +261,8 @@ export function getTabLabel(
     case 'stageEditor':
       if (stageName) return stageName
       return stageId ? `Stage ${stageId}` : 'Stage Editor'
+    case 'scenes':
+      return 'Scenes'
     case 'assetStore':
       return 'Asset Store'
     case 'history':

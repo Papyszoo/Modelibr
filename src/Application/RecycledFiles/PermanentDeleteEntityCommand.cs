@@ -191,6 +191,7 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
     private readonly IFileStorage _fileStorage;
     private readonly IThumbnailQueue _thumbnailQueue;
     private readonly IAssetSearchDocumentRepository _searchDocumentRepository;
+    private readonly IStoreImportedItemRepository _storeImportedItemRepository;
     private readonly IUnitOfWork _unitOfWork;
 
     public PermanentDeleteEntityCommandHandler(
@@ -205,6 +206,7 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
         IFileStorage fileStorage,
         IThumbnailQueue thumbnailQueue,
         IAssetSearchDocumentRepository searchDocumentRepository,
+        IStoreImportedItemRepository storeImportedItemRepository,
         IUnitOfWork unitOfWork)
     {
         _modelRepository = modelRepository;
@@ -218,6 +220,7 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
         _fileStorage = fileStorage;
         _thumbnailQueue = thumbnailQueue;
         _searchDocumentRepository = searchDocumentRepository;
+        _storeImportedItemRepository = storeImportedItemRepository;
         _unitOfWork = unitOfWork;
     }
 
@@ -256,6 +259,8 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
                 // stays searchable after the row it describes is gone.
                 await _searchDocumentRepository.RemoveAllForAssetAsync(
                     ExtractionAssetTypes.Model, request.EntityId, cancellationToken);
+
+                await _storeImportedItemRepository.DeleteByAssetAsync("Model", request.EntityId, cancellationToken);
 
                 // Delete model and related entities from database
                 await _modelRepository.DeleteAsync(request.EntityId, cancellationToken);
@@ -310,6 +315,8 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
                     .Select(t => new { t.File.Id, t.File.FilePath, t.File.OriginalFileName, t.File.SizeBytes })
                     .ToList();
                 
+                await _storeImportedItemRepository.DeleteByAssetAsync("TextureSet", request.EntityId, cancellationToken);
+
                 // Delete the texture set and its textures from database first
                 await _textureSetRepository.DeleteAsync(textureSet.Id, cancellationToken);
                 
@@ -342,6 +349,8 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
                 var spriteFileName = spriteToDelete.File.OriginalFileName;
                 var spriteFileSize = spriteToDelete.File.SizeBytes;
                 
+                await _storeImportedItemRepository.DeleteByAssetAsync("Sprite", request.EntityId, cancellationToken);
+
                 // Delete sprite entity from database
                 await _spriteRepository.DeleteAsync(spriteToDelete.Id, cancellationToken);
                 
@@ -368,6 +377,8 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
                 var soundFileName = soundToDelete.File.OriginalFileName;
                 var soundFileSize = soundToDelete.File.SizeBytes;
                 
+                await _storeImportedItemRepository.DeleteByAssetAsync("Sound", request.EntityId, cancellationToken);
+
                 // Delete sound entity from database
                 await _soundRepository.DeleteAsync(soundToDelete.Id, cancellationToken);
                 
@@ -417,6 +428,8 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
                 var variantFiles = EnvironmentMapDeletionHelpers.GetEnvironmentMapFiles(environmentMap)
                     .Select(file => new { file.Id, file.FilePath, file.OriginalFileName, file.SizeBytes })
                     .ToList();
+
+                await _storeImportedItemRepository.DeleteByAssetAsync("EnvironmentMap", request.EntityId, cancellationToken);
 
                 await _environmentMapRepository.DeleteAsync(environmentMap.Id, cancellationToken);
 

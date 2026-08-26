@@ -21,6 +21,148 @@ import {
   toProjectDto,
 } from './shared'
 
+/**
+ * A small closed vocabulary for the demo. Not the server's 48 seeded options -
+ * enough to show what the five dimensions are for, without turning the walkthrough
+ * into a data-entry exercise.
+ */
+const demoProfileOptions: {
+  id: number
+  dimension: string
+  name: string
+  isBuiltIn: boolean
+  isHidden: boolean
+  sortOrder: number
+}[] = [
+  { dimension: 'engine', name: 'Unity' },
+  { dimension: 'engine', name: 'Godot' },
+  { dimension: 'engine', name: 'Blender' },
+  { dimension: 'platform', name: 'PC' },
+  { dimension: 'platform', name: 'Web' },
+  { dimension: 'platform', name: 'Quest' },
+  { dimension: 'genre', name: 'Adventure' },
+  { dimension: 'genre', name: 'Simulation' },
+  { dimension: 'style', name: 'Low Poly' },
+  { dimension: 'style', name: 'Realistic' },
+  { dimension: 'style', name: 'Stylized' },
+  { dimension: 'perspective', name: 'Third Person' },
+  { dimension: 'perspective', name: 'Top Down' },
+].map((option, index) => ({
+  ...option,
+  id: 100 + index,
+  isBuiltIn: true,
+  isHidden: false,
+  sortOrder: index,
+}))
+
+/**
+ * The brief, assembled the way the server assembles it: a reading of the stored
+ * profile rather than a stored answer.
+ *
+ * The guidance lines are what the panel shows verbatim, so the demo has to
+ * produce real ones - an empty brief would demonstrate the opposite of the
+ * feature, which is that the user can read exactly what the agent was told.
+ */
+function demoProjectBrief(project: DemoProject) {
+  const stored = project.profile ?? { dimensions: {}, settings: {} }
+
+  const values = (dimension: string) =>
+    (stored.dimensions?.[dimension] ?? []).flatMap(assignment => {
+      const option = demoProfileOptions.find(o => o.id === assignment.optionId)
+      return option
+        ? [
+            {
+              optionId: option.id,
+              name: option.name,
+              role: assignment.role ?? null,
+            },
+          ]
+        : []
+    })
+
+  const styles = values('style')
+  const platforms = values('platform')
+  const engines = values('engine')
+  const budget = {
+    maxTrianglesPerAsset: stored.settings?.maxTrianglesPerAsset ?? null,
+    maxTextureSize: stored.settings?.maxTextureSize ?? null,
+    targetSceneTriangles: stored.settings?.targetSceneTriangles ?? null,
+    pixelsPerUnit: null,
+  }
+
+  const guidance: string[] = []
+  if (styles.length > 0) {
+    guidance.push(
+      `Prefer assets that read as ${styles.map(s => s.name).join(' or ')}.`
+    )
+  }
+  if (budget.maxTrianglesPerAsset !== null) {
+    guidance.push(
+      `Keep every asset under ${budget.maxTrianglesPerAsset.toLocaleString()} triangles.`
+    )
+  }
+  if (platforms.length > 0) {
+    guidance.push(`This ships on ${platforms.map(p => p.name).join(', ')}.`)
+  }
+
+  return {
+    id: project.id,
+    name: project.name,
+    description: project.description ?? null,
+    notes: project.notes ?? null,
+    engines,
+    platforms,
+    genres: values('genre'),
+    styles,
+    perspectives: values('perspective'),
+    budget,
+    // The tightest selected platform decides. A hint beside an empty field,
+    // never a value - the user accepts it or does not.
+    budgetSuggestion: platforms.some(p => p.name === 'Quest')
+      ? {
+          maxTrianglesPerAsset: 5000,
+          maxTextureSize: 1024,
+          platform: 'Quest',
+          note: 'Quest is the tightest platform here: 5,000 triangles per asset.',
+        }
+      : null,
+    worldConvention: {
+      unitsPerMetre: 1,
+      upAxis: 'Y',
+      handedness: 'right',
+      isDefault: true,
+      engineConversions: engines.map(
+        e => `${e.name}: 1 unit = 1 m, Y up, right-handed`
+      ),
+      conflicts: [],
+    },
+    styleSignals: {
+      maxTriangles: null,
+      maxTextureSize: null,
+      maxMaterials: null,
+      preferredUvStatus: null,
+      boostTokens: styles.map(s => s.name.toLowerCase()),
+      penaltyTokens: [],
+      familyHint: null,
+      unmappedStyles: [],
+    },
+    paletteHex: [],
+    conceptImages: [],
+    environmentMaps: [],
+    scenes: [],
+    assetCounts: {
+      models: project.modelCount ?? 0,
+      textureSets: 0,
+      sprites: project.spriteCount ?? 0,
+      sounds: project.soundCount ?? 0,
+      scripts: project.scriptCount ?? 0,
+      environmentMaps: project.environmentMapCount ?? 0,
+      scenes: 0,
+    },
+    guidance,
+  }
+}
+
 export const containerHandlers = [
   // ════════════════════════════════════════════════════════════════════════
   //  PACKS
@@ -378,6 +520,58 @@ export const containerHandlers = [
   // ════════════════════════════════════════════════════════════════════════
   //  PROJECTS
   // ════════════════════════════════════════════════════════════════════════
+
+  // ════════════════════════════════════════════════════════════════════════
+  //  PROJECT PROFILE (v0.6 prompt 13)
+  // ════════════════════════════════════════════════════════════════════════
+  //
+  //  Ordered BEFORE `*/projects/:id`: MSW matches in order, and that route would
+  //  otherwise swallow `/projects/profile-options` with id="profile-options".
+
+  http.get('*/projects/profile-options', () =>
+    HttpResponse.json({ options: demoProfileOptions })
+  ),
+
+  http.post('*/projects/profile-options', async ({ request }) => {
+    const body = (await request.json()) as { dimension: string; name: string }
+    const option = {
+      id: 900 + demoProfileOptions.length,
+      dimension: body.dimension,
+      name: body.name,
+      isBuiltIn: false,
+      isHidden: false,
+      sortOrder: 900 + demoProfileOptions.length,
+    }
+    demoProfileOptions.push(option)
+    return HttpResponse.json(option)
+  }),
+
+  http.get('*/projects/:id/profile', async ({ params }) => {
+    const project = await getById('projects', Number(params.id))
+    if (!project) return new HttpResponse(null, { status: 404 })
+    return HttpResponse.json(demoProjectBrief(project))
+  }),
+
+  http.put('*/projects/:id/profile', async ({ params, request }) => {
+    const project = await getById('projects', Number(params.id))
+    if (!project) return new HttpResponse(null, { status: 404 })
+
+    const body = (await request.json()) as {
+      dimensions?: Record<string, { optionId: number; role?: string | null }[]>
+      settings?: Record<string, number | null>
+    }
+
+    // Kept on the demo project so a save survives a reload, the way the real
+    // one does. The demo is a walkthrough, and a form that forgot what was
+    // typed would misrepresent the feature rather than simplify it.
+    project.profile = {
+      dimensions: body.dimensions ?? {},
+      settings: body.settings ?? {},
+    }
+    await put('projects', project)
+
+    return HttpResponse.json(demoProjectBrief(project))
+  }),
 
   http.get('*/projects', async () => {
     const projects = await getAll('projects')

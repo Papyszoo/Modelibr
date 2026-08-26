@@ -20,11 +20,69 @@ internal sealed class ModelVersionRepository : IModelVersionRepository
         return await _context.ModelVersions
             .Include(v => v.Model)
                 .ThenInclude(m => m.ModelCategory)
+            // Pack names are denormalised onto the search projection, so the rebuild in
+            // ImportModelSceneGraphCommand needs them loaded. Cheap: a model sits in a
+            // handful of packs at most.
+            .Include(v => v.Model)
+                .ThenInclude(m => m.Packs)
+            // Authored tags are denormalised onto the search projection too, and unlike
+            // packs nothing else reloads them: the rebuild reads version.Model.Tags, so
+            // leaving them off here made every re-derive silently blank the tags a user
+            // had typed - the projection kept the name and lost the vocabulary.
+            .Include(v => v.Model)
+                .ThenInclude(m => m.Tags)
             .Include(v => v.Files)
             .Include(v => v.Thumbnail)
             .Include(v => v.TextureMappings)
                 .ThenInclude(m => m.TextureSet)
             .FirstOrDefaultAsync(v => v.Id == id, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ModelVersion>> GetByIdsAsync(
+        IReadOnlyCollection<int> ids,
+        CancellationToken cancellationToken = default)
+    {
+        if (ids.Count == 0)
+        {
+            return [];
+        }
+
+        return await _context.ModelVersions
+            .AsNoTracking()
+            .Where(v => ids.Contains(v.Id))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ModelVersion>> GetWithThumbnailsByIdsAsync(
+        IReadOnlyCollection<int> ids,
+        CancellationToken cancellationToken = default)
+    {
+        if (ids.Count == 0)
+        {
+            return [];
+        }
+
+        return await _context.ModelVersions
+            .AsNoTracking()
+            .Include(v => v.Thumbnail)
+            .Where(v => ids.Contains(v.Id))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ModelVersion>> GetWithFilesByIdsAsync(
+        IReadOnlyCollection<int> ids,
+        CancellationToken cancellationToken = default)
+    {
+        if (ids.Count == 0)
+        {
+            return [];
+        }
+
+        return await _context.ModelVersions
+            .AsNoTracking()
+            .Include(version => version.Files)
+            .Where(version => ids.Contains(version.Id))
+            .ToListAsync(cancellationToken);
     }
 
     public async Task<ModelVersion?> GetByModelIdAndVersionNumberAsync(
@@ -183,6 +241,19 @@ internal sealed class ModelVersionRepository : IModelVersionRepository
         if (mapping != null)
         {
             _context.Set<ModelVersionTextureSet>().Remove(mapping);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    public async Task RemoveAllTextureMappingsByMaterialAsync(int modelVersionId, string materialName, CancellationToken cancellationToken = default)
+    {
+        var mappings = await _context.Set<ModelVersionTextureSet>()
+            .Where(m => m.ModelVersionId == modelVersionId && m.MaterialName == materialName)
+            .ToListAsync(cancellationToken);
+
+        if (mappings.Count > 0)
+        {
+            _context.Set<ModelVersionTextureSet>().RemoveRange(mappings);
             await _context.SaveChangesAsync(cancellationToken);
         }
     }

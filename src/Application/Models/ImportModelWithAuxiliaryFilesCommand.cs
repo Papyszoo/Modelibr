@@ -65,8 +65,16 @@ internal class ImportModelWithAuxiliaryFilesCommandHandler
 
         // Reuse the model-creation path (dedup, batch tracking, domain events, save
         // ordering) for the primary; it commits before we read the version id below.
+        // DeferProcessing: the extraction job this upload raises is queued the moment the
+        // model commits, and a worker that claims it before the loop below has linked the
+        // auxiliaries asks for them and is told there are none - so it indexes a loose
+        // glTF without its buffers and files the result as the truth. The event is raised
+        // at the end instead, once the links are staged in the same save.
         var modelResult = await _addModelHandler.Handle(
-            new AddModelCommand(command.Primary, BatchId: command.BatchId),
+            new AddModelCommand(
+                command.Primary, BatchId: command.BatchId,
+                SourceFolder: command.SourceFolder, SiblingFileNames: command.SiblingNames,
+                DeferProcessing: true),
             cancellationToken);
         if (modelResult.IsFailure)
             return Result.Failure<ImportModelWithAuxiliaryFilesResponse>(modelResult.Error);
@@ -80,6 +88,7 @@ internal class ImportModelWithAuxiliaryFilesCommandHandler
 
         var versionId = model.ActiveVersion.Id;
         var alreadyExists = modelResult.Value.AlreadyExists;
+        var fileSha256 = modelResult.Value.FileSha256;
 
         // A loose .gltf's identity is its JSON *plus* the resources it references. If the
         // primary hash matched an existing model but that model's auxiliaries differ, the
@@ -93,7 +102,10 @@ internal class ImportModelWithAuxiliaryFilesCommandHandler
                 model.Id);
 
             var distinctResult = await _addModelHandler.Handle(
-                new AddModelCommand(command.Primary, BatchId: command.BatchId, SkipDeduplication: true),
+                new AddModelCommand(
+                    command.Primary, BatchId: command.BatchId, SkipDeduplication: true,
+                    SourceFolder: command.SourceFolder, SiblingFileNames: command.SiblingNames,
+                    DeferProcessing: true),
                 cancellationToken);
             if (distinctResult.IsFailure)
                 return Result.Failure<ImportModelWithAuxiliaryFilesResponse>(distinctResult.Error);
@@ -107,6 +119,7 @@ internal class ImportModelWithAuxiliaryFilesCommandHandler
 
             versionId = model.ActiveVersion.Id;
             alreadyExists = false;
+            fileSha256 = distinctResult.Value.FileSha256;
         }
 
         var linked = 0;
@@ -123,6 +136,17 @@ internal class ImportModelWithAuxiliaryFilesCommandHandler
             await _auxiliaryRepository.AddAsync(join, cancellationToken);
             linked++;
         }
+
+        // Now that the auxiliaries are staged, hand the upload to the pipeline. Raised on
+        // the aggregate rather than published by hand so it dispatches from the save
+        // pipeline like every other one (see DomainEventsInterceptor) - and in the SAME
+        // save as the links, so no worker can observe the model without them.
+        model.RaiseModelUploadedEvent(
+            versionId,
+            fileSha256,
+            isNewModel: !alreadyExists,
+            generateThumbnail: true);
+        await _modelRepository.UpdateAsync(model, cancellationToken);
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -224,10 +248,14 @@ internal class ImportModelWithAuxiliaryFilesCommandHandler
     }
 }
 
+/// <param name="SourceFolder">The directory the primary came out of, when the route knew one.</param>
+/// <param name="SiblingNames">The other importable file names in that directory.</param>
 public record ImportModelWithAuxiliaryFilesCommand(
     IFileUpload Primary,
     IReadOnlyList<AuxiliaryUpload> Auxiliaries,
-    string? BatchId = null) : ICommand<ImportModelWithAuxiliaryFilesResponse>;
+    string? BatchId = null,
+    string? SourceFolder = null,
+    IReadOnlyList<string>? SiblingNames = null) : ICommand<ImportModelWithAuxiliaryFilesResponse>;
 
 public record ImportModelWithAuxiliaryFilesResponse(
     int Id,

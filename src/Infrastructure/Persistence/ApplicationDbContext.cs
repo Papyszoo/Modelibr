@@ -1,8 +1,9 @@
-﻿using Application.Abstractions;
+using Application.Abstractions;
 using Domain.Models;
 using Domain.ValueObjects;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using SharedKernel;
 
 namespace Infrastructure.Persistence
 {
@@ -18,40 +19,69 @@ namespace Infrastructure.Persistence
         // area at a time) and call this directly. Domain-event dispatch is wired
         // separately via DomainEventsInterceptor (see
         // Infrastructure/DependencyInjection.cs) and runs regardless of path too.
-        public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
-        {
-            try
-            {
-                return await base.SaveChangesAsync(cancellationToken);
-            }
-            catch (DbUpdateException ex) when (IsDuplicatePackModelAssociation(ex))
-            {
-                // Concurrent identical "add model to pack" requests can race on
-                // the PackModels join table's composite PK. Treat the duplicate
-                // insert as an idempotent no-op - moved here from
-                // PackRepository.UpdateAsync when repositories stopped
-                // self-committing (prompt 25); this is the one known-benign
-                // race the app deliberately swallows at the commit boundary.
-                ChangeTracker.Clear();
-                return 0;
-            }
-        }
+        public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
+            base.SaveChangesAsync(cancellationToken);
 
         Task IUnitOfWork.SaveChangesAsync(CancellationToken cancellationToken) =>
             SaveChangesAsync(cancellationToken);
 
-        private static bool IsDuplicatePackModelAssociation(DbUpdateException ex)
-            => ex.InnerException is PostgresException
+        /// <summary>
+        /// One transaction around a handler that has to make several commits.
+        /// </summary>
+        /// <remarks>
+        /// EF joins every <see cref="SaveChangesAsync"/> made while this transaction is open
+        /// to it instead of opening its own, which is the property the metadata patch needs:
+        /// the family command handlers it calls each commit through the unit-of-work
+        /// decorator, and none of those commits may become durable on its own.
+        ///
+        /// A failure Result rolls back exactly like a throw does. The change tracker is
+        /// cleared on the way out of a rollback, because the entities it still holds were
+        /// written against a transaction that no longer exists, and leaving them staged would
+        /// let the next save in this scope re-apply the half-patch that was just undone.
+        ///
+        /// COORDINATION: if EnableRetryOnFailure ever lands on the Npgsql provider, this must
+        /// move inside Database.CreateExecutionStrategy().ExecuteAsync - user-initiated
+        /// transactions and a retrying execution strategy are incompatible.
+        /// </remarks>
+        async Task<Result<T>> IUnitOfWork.InTransactionAsync<T>(
+            Func<CancellationToken, Task<Result<T>>> work,
+            CancellationToken cancellationToken)
+        {
+            // Already inside one - joining is the whole point, so do not nest a second.
+            if (Database.CurrentTransaction is not null)
             {
-                SqlState: PostgresErrorCodes.UniqueViolation,
-                ConstraintName: "PK_PackModels"
-            };
+                return await work(cancellationToken);
+            }
+
+            await using var transaction = await Database.BeginTransactionAsync(cancellationToken);
+            try
+            {
+                var result = await work(cancellationToken);
+                if (result.IsFailure)
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    ChangeTracker.Clear();
+                    return result;
+                }
+
+                await SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                return result;
+            }
+            catch
+            {
+                await transaction.RollbackAsync(CancellationToken.None);
+                ChangeTracker.Clear();
+                throw;
+            }
+        }
 
         public DbSet<Model> Models => Set<Model>();
         public DbSet<ModelVersion> ModelVersions => Set<ModelVersion>();
         public DbSet<Domain.Models.File> Files => Set<Domain.Models.File>();
         public DbSet<Texture> Textures => Set<Texture>();
         public DbSet<TextureSet> TextureSets => Set<TextureSet>();
+        public DbSet<Material> Materials => Set<Material>();
         public DbSet<Pack> Packs => Set<Pack>();
         public DbSet<Project> Projects => Set<Project>();
         public DbSet<ModelCategory> ModelCategories => Set<ModelCategory>();
@@ -60,6 +90,9 @@ namespace Infrastructure.Persistence
         public DbSet<ModelConceptImage> ModelConceptImages => Set<ModelConceptImage>();
         public DbSet<ProjectConceptImage> ProjectConceptImages => Set<ProjectConceptImage>();
         public DbSet<Stage> Stages => Set<Stage>();
+        public DbSet<Scene> Scenes => Set<Scene>();
+        public DbSet<SceneRender> SceneRenders => Set<SceneRender>();
+        public DbSet<SceneAssetUsage> SceneAssetUsages => Set<SceneAssetUsage>();
         public DbSet<Thumbnail> Thumbnails => Set<Thumbnail>();
         public DbSet<ThumbnailJob> ThumbnailJobs => Set<ThumbnailJob>();
         public DbSet<ThumbnailJobEvent> ThumbnailJobEvents => Set<ThumbnailJobEvent>();
@@ -88,8 +121,13 @@ namespace Infrastructure.Persistence
         public DbSet<ComputeCacheEntry> ComputeCacheEntries => Set<ComputeCacheEntry>();
         public DbSet<AssetDerivationLineage> AssetDerivationLineages => Set<AssetDerivationLineage>();
         public DbSet<AgentOperationLog> AgentOperationLogs => Set<AgentOperationLog>();
+        public DbSet<AgentUploadTicket> AgentUploadTickets => Set<AgentUploadTicket>();
         public DbSet<ModelVersionAuxiliaryFile> ModelVersionAuxiliaryFiles => Set<ModelVersionAuxiliaryFile>();
         public DbSet<StoreImportJob> StoreImportJobs => Set<StoreImportJob>();
+        public DbSet<StoreImportedItem> StoreImportedItems => Set<StoreImportedItem>();
+        public DbSet<AssetMetadata> AssetMetadata => Set<AssetMetadata>();
+        public DbSet<ProjectProfileOption> ProjectProfileOptions => Set<ProjectProfileOption>();
+        public DbSet<ProjectProfileValue> ProjectProfileValues => Set<ProjectProfileValue>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -557,6 +595,85 @@ namespace Infrastructure.Persistence
                 entity.HasQueryFilter(tp => !tp.IsDeleted);
             });
 
+            // Configure Material entity - the parameters-only half of the material
+            // library. Browsed together with Universal texture sets, stored apart.
+            modelBuilder.Entity<Material>(entity =>
+            {
+                entity.HasKey(m => m.Id);
+                entity.Property(m => m.Name).IsRequired().HasMaxLength(200);
+                entity.Property(m => m.Description).HasMaxLength(1000);
+                entity.Property(m => m.CategoryId).IsRequired(false);
+                entity.Property(m => m.PreviewGeometryType).IsRequired()
+                    .HasMaxLength(20)
+                    .HasDefaultValue("sphere");
+                entity.Property(m => m.ThumbnailPath).HasMaxLength(500);
+                entity.Property(m => m.PngThumbnailPath).HasMaxLength(500);
+                entity.Property(m => m.CreatedAt).IsRequired();
+                entity.Property(m => m.UpdatedAt).IsRequired();
+                entity.Property(m => m.IsDeleted).IsRequired();
+                entity.Property(m => m.DeletedAt);
+
+                // Flattened rather than a JSON column: the merged browse surface
+                // filters and sorts on these (metallic materials, dark materials),
+                // and a JSON blob cannot be indexed for that without extra work.
+                entity.OwnsOne(m => m.Parameters, parameters =>
+                {
+                    parameters.Property(p => p.BaseColorR).HasColumnName("BaseColorR").IsRequired();
+                    parameters.Property(p => p.BaseColorG).HasColumnName("BaseColorG").IsRequired();
+                    parameters.Property(p => p.BaseColorB).HasColumnName("BaseColorB").IsRequired();
+                    parameters.Property(p => p.BaseColorA).HasColumnName("BaseColorA").IsRequired();
+                    parameters.Property(p => p.Roughness).HasColumnName("Roughness").IsRequired();
+                    parameters.Property(p => p.Metallic).HasColumnName("Metallic").IsRequired();
+                    parameters.Property(p => p.EmissiveR).HasColumnName("EmissiveR").IsRequired();
+                    parameters.Property(p => p.EmissiveG).HasColumnName("EmissiveG").IsRequired();
+                    parameters.Property(p => p.EmissiveB).HasColumnName("EmissiveB").IsRequired();
+                    parameters.Property(p => p.NormalScale).HasColumnName("NormalScale").IsRequired();
+                    parameters.Property(p => p.OcclusionStrength).HasColumnName("OcclusionStrength").IsRequired();
+                    parameters.Property(p => p.Ior).HasColumnName("Ior").IsRequired();
+                    parameters.Property(p => p.AlphaMode).HasColumnName("AlphaMode")
+                        .HasConversion<string>().HasMaxLength(16).IsRequired();
+                    parameters.Property(p => p.AlphaCutoff).HasColumnName("AlphaCutoff").IsRequired();
+                    parameters.Property(p => p.DoubleSided).HasColumnName("DoubleSided").IsRequired();
+                });
+
+                // The shared category vocabulary: the same TextureSetCategory rows
+                // Universal texture sets use. Two pools behind one grid could not be
+                // filtered coherently.
+                entity.HasOne(m => m.Category)
+                    .WithMany()
+                    .HasForeignKey(m => m.CategoryId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                // Shared tag vocabulary - the same ModelTag pool as models,
+                // environment maps and texture sets.
+                entity.HasMany(m => m.Tags)
+                    .WithMany()
+                    .UsingEntity<Dictionary<string, object>>(
+                        "MaterialTagAssignment",
+                        right => right
+                            .HasOne<ModelTag>()
+                            .WithMany()
+                            .HasForeignKey("ModelTagId")
+                            .OnDelete(DeleteBehavior.Cascade),
+                        left => left
+                            .HasOne<Material>()
+                            .WithMany()
+                            .HasForeignKey("MaterialId")
+                            .OnDelete(DeleteBehavior.Cascade),
+                        join =>
+                        {
+                            join.ToTable("MaterialTagAssignments");
+                            join.HasKey("MaterialId", "ModelTagId");
+                            join.HasIndex("ModelTagId");
+                        });
+
+                entity.HasIndex(m => m.Name);
+                entity.HasIndex(m => m.CategoryId);
+                entity.HasIndex(m => m.IsDeleted);
+
+                entity.HasQueryFilter(m => !m.IsDeleted);
+            });
+
             // Configure Pack entity
             modelBuilder.Entity<Pack>(entity =>
             {
@@ -615,6 +732,25 @@ namespace Infrastructure.Persistence
                 entity.Property(p => p.Notes).HasMaxLength(4000);
                 entity.Property(p => p.CreatedAt).IsRequired();
                 entity.Property(p => p.UpdatedAt).IsRequired();
+
+                // The fidelity budget and world convention (prompt 13-A). All nullable, and
+                // NULL means unconstrained - never a default. An agent silently held to a
+                // budget nobody set is worse than one held to none.
+                entity.Property(p => p.MaxTrianglesPerAsset).IsRequired(false);
+                entity.Property(p => p.MaxTextureSize).IsRequired(false);
+                entity.Property(p => p.TargetSceneTriangles).IsRequired(false);
+                entity.Property(p => p.PixelsPerUnit).IsRequired(false);
+                entity.Property(p => p.UnitsPerMetre).IsRequired(false);
+                entity.Property(p => p.UpAxis).IsRequired(false).HasMaxLength(1);
+                entity.Property(p => p.Handedness).IsRequired(false).HasMaxLength(5);
+                entity.Property(p => p.PaletteHex)
+                    .HasColumnType("text[]")
+                    .HasDefaultValueSql("'{}'::text[]");
+
+                entity.HasMany(p => p.ProfileValues)
+                    .WithOne()
+                    .HasForeignKey(v => v.ProjectId)
+                    .OnDelete(DeleteBehavior.Cascade);
 
                 entity.HasOne(p => p.CustomThumbnailFile)
                     .WithMany()
@@ -711,6 +847,102 @@ namespace Infrastructure.Persistence
                 entity.HasIndex(s => s.Name);
             });
 
+            // Configure Scene entity - an agent-authorable composition of library assets.
+            // The document is stored as validated JSON rather than shredded into node rows:
+            // it is read and written whole, the editor's undo works on whole documents, and
+            // a relational node table would buy nothing but joins. SchemaVersion is a column
+            // so a future migration can find documents by version without parsing every row.
+            modelBuilder.Entity<Scene>(entity =>
+            {
+                entity.HasKey(s => s.Id);
+                entity.Property(s => s.Name).IsRequired().HasMaxLength(200);
+                entity.Property(s => s.Description).HasMaxLength(2000);
+                entity.Property(s => s.SchemaVersion).IsRequired();
+                entity.Property(s => s.DocumentJson).IsRequired();
+                // Concurrency token, not just a counter: every accepted write bumps it, so
+                // the UPDATE carries the revision its writer read and matches no row once
+                // someone else has committed. Without this, an in-memory revision check
+                // passes for both of two concurrent writers - they both read N, both write
+                // N+1, and the first edit is lost with nothing reported anywhere.
+                entity.Property(s => s.Revision).IsRequired().IsConcurrencyToken();
+                entity.Property(s => s.CreatedAt).IsRequired();
+                entity.Property(s => s.UpdatedAt).IsRequired();
+
+                entity.HasIndex(s => s.Name);
+                entity.HasIndex(s => s.UpdatedAt);
+
+                // The project this scene is built for (prompt 13-C). SetNull, not Cascade:
+                // deleting a project must not delete the scenes made for it - they are
+                // still scenes, and re-linking one is a single write.
+                entity.HasOne(s => s.Project)
+                    .WithMany(p => p.Scenes)
+                    .HasForeignKey(s => s.ProjectId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasIndex(s => s.ProjectId);
+            });
+
+            // What each scene's nodes point at, so a project's derived asset list is a join
+            // rather than a scan over every scene document (prompt 13-C).
+            modelBuilder.Entity<SceneAssetUsage>(entity =>
+            {
+                // The node, not the asset: twelve chairs are twelve rows sharing one asset id,
+                // and keying on the asset would collapse them and undercount "used in".
+                entity.HasKey(u => new { u.SceneId, u.NodeId });
+                // 200 against the document validator's 128-character id limit: the column is
+                // the looser of the two on purpose, so the validator stays the single place
+                // the rule is stated and a future relaxation is not also a migration.
+                entity.Property(u => u.NodeId).IsRequired().HasMaxLength(200);
+                entity.Property(u => u.AssetType).IsRequired().HasMaxLength(50);
+                entity.Property(u => u.AssetId).IsRequired();
+
+                entity.HasOne(u => u.Scene)
+                    .WithMany()
+                    .HasForeignKey(u => u.SceneId)
+                    // Cascade, unlike the scene's own project link: these rows describe a
+                    // document that no longer exists, so keeping them would be keeping a lie.
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                // The index GetScenesUsingAsset reads - "which scenes stand on this model",
+                // asked the first time someone tries to delete one.
+                entity.HasIndex(u => new { u.AssetType, u.AssetId });
+            });
+
+            // Configure SceneRender entity
+            modelBuilder.Entity<SceneRender>(entity =>
+            {
+                entity.HasKey(sr => sr.Id);
+                entity.Property(sr => sr.SceneId).IsRequired();
+                entity.Property(sr => sr.ThumbnailJobId).IsRequired();
+                entity.Property(sr => sr.Viewpoint).IsRequired().HasMaxLength(20);
+                entity.Property(sr => sr.FilePath).IsRequired();
+                entity.Property(sr => sr.SizeBytes).IsRequired();
+                entity.Property(sr => sr.Width).IsRequired();
+                entity.Property(sr => sr.Height).IsRequired();
+                entity.Property(sr => sr.NodesLoaded).IsRequired();
+                entity.Property(sr => sr.NodesFailed).IsRequired();
+                entity.Property(sr => sr.TimedOut).IsRequired();
+                // Nullable rather than defaulted: renders taken before revisions were
+                // recorded genuinely do not know which revision they show, and a zero would
+                // claim they do.
+                entity.Property(sr => sr.RequestedRevision).IsRequired(false);
+                entity.Property(sr => sr.RenderedRevision).IsRequired(false);
+                entity.Ignore(sr => sr.SceneChangedDuringRender);
+                entity.Property(sr => sr.CreatedAt).IsRequired();
+
+                entity.HasOne(sr => sr.Scene)
+                    .WithMany()
+                    .HasForeignKey(sr => sr.SceneId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                // One render per job - a job produces exactly one picture, and a retry
+                // replaces the attempt rather than adding a second row.
+                entity.HasIndex(sr => sr.ThumbnailJobId).IsUnique();
+
+                // The polling path: newest render for a scene.
+                entity.HasIndex(sr => new { sr.SceneId, sr.CreatedAt });
+            });
+
             // Configure Thumbnail entity
             modelBuilder.Entity<Thumbnail>(entity =>
             {
@@ -744,6 +976,9 @@ namespace Infrastructure.Persistence
                 entity.Property(tj => tj.TextureSetId).IsRequired(false);
                 entity.Property(tj => tj.EnvironmentMapId).IsRequired(false);
                 entity.Property(tj => tj.EnvironmentMapVariantId).IsRequired(false);
+                entity.Property(tj => tj.SceneId).IsRequired(false);
+                entity.Property(tj => tj.SceneViewpoint).IsRequired(false).HasMaxLength(20);
+                entity.Property(tj => tj.SceneRevision).IsRequired(false);
                 entity.Property(tj => tj.Status).IsRequired();
                 entity.Property(tj => tj.AttemptCount).IsRequired();
                 entity.Property(tj => tj.MaxAttempts).IsRequired();
@@ -811,6 +1046,16 @@ namespace Infrastructure.Persistence
                 entity.HasIndex(tj => tj.EnvironmentMapVariantId)
                     .IsUnique()
                     .HasFilter("\"EnvironmentMapVariantId\" IS NOT NULL");
+
+                entity.HasOne(tj => tj.Scene)
+                    .WithMany()
+                    .HasForeignKey(tj => tj.SceneId)
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired(false);
+
+                // Deliberately not unique, unlike the hash indexes above. A scene render
+                // asks what the scene looks like now, and the scene moves - so a second
+                // request for the same scene is a new question, not a duplicate.
             });
 
             // Configure ThumbnailJobEvent entity
@@ -936,6 +1181,7 @@ namespace Infrastructure.Persistence
                 entity.Property(s => s.Name).IsRequired().HasMaxLength(200);
                 entity.Property(s => s.FileId).IsRequired();
                 entity.Property(s => s.SpriteType).IsRequired();
+                entity.Property(s => s.Description).IsRequired(false);
                 entity.Property(s => s.CreatedAt).IsRequired();
                 entity.Property(s => s.UpdatedAt).IsRequired();
                 entity.Property(s => s.IsDeleted).IsRequired();
@@ -946,6 +1192,31 @@ namespace Infrastructure.Persistence
                     .WithMany()
                     .HasForeignKey(s => s.FileId)
                     .OnDelete(DeleteBehavior.Cascade);
+
+
+                // Shared tag vocabulary - the same ModelTag pool as every other taggable
+                // family (prompt 16-D). Sprites were the last two families with no tags
+                // at all, which made "tag what you imported" a per-family question.
+                entity.HasMany(s => s.Tags)
+                    .WithMany()
+                    .UsingEntity<Dictionary<string, object>>(
+                        "SpriteTagAssignment",
+                        right => right
+                            .HasOne<ModelTag>()
+                            .WithMany()
+                            .HasForeignKey("ModelTagId")
+                            .OnDelete(DeleteBehavior.Cascade),
+                        left => left
+                            .HasOne<Sprite>()
+                            .WithMany()
+                            .HasForeignKey("SpriteId")
+                            .OnDelete(DeleteBehavior.Cascade),
+                        join =>
+                        {
+                            join.ToTable("SpriteTagAssignments");
+                            join.HasKey("SpriteId", "ModelTagId");
+                            join.HasIndex("ModelTagId");
+                        });
 
                 // Configure optional relationship with SpriteCategory
                 entity.HasOne(s => s.Category)
@@ -991,6 +1262,7 @@ namespace Infrastructure.Persistence
                 entity.Property(s => s.SampleRate).IsRequired(false);
                 entity.Property(s => s.Channels).IsRequired(false);
                 entity.Property(s => s.Format).IsRequired(false).HasMaxLength(20);
+                entity.Property(s => s.Description).IsRequired(false);
                 entity.Property(s => s.CreatedAt).IsRequired();
                 entity.Property(s => s.UpdatedAt).IsRequired();
                 entity.Property(s => s.IsDeleted).IsRequired();
@@ -1001,6 +1273,31 @@ namespace Infrastructure.Persistence
                     .WithMany()
                     .HasForeignKey(s => s.FileId)
                     .OnDelete(DeleteBehavior.Cascade);
+
+                // Shared tag vocabulary - the same ModelTag pool as every other taggable
+                // family (prompt 16-D). Sounds were the last two families with no tags
+                // at all, which made "tag what you imported" a per-family question.
+                entity.HasMany(s => s.Tags)
+                    .WithMany()
+                    .UsingEntity<Dictionary<string, object>>(
+                        "SoundTagAssignment",
+                        right => right
+                            .HasOne<ModelTag>()
+                            .WithMany()
+                            .HasForeignKey("ModelTagId")
+                            .OnDelete(DeleteBehavior.Cascade),
+                        left => left
+                            .HasOne<Sound>()
+                            .WithMany()
+                            .HasForeignKey("SoundId")
+                            .OnDelete(DeleteBehavior.Cascade),
+                        join =>
+                        {
+                            join.ToTable("SoundTagAssignments");
+                            join.HasKey("SoundId", "ModelTagId");
+                            join.HasIndex("ModelTagId");
+                        });
+
 
                 // Configure optional relationship with SoundCategory
                 entity.HasOne(s => s.Category)
@@ -1286,6 +1583,9 @@ namespace Infrastructure.Persistence
                 entity.Property(e => e.VersionId).IsRequired(false);
                 entity.Property(e => e.FileSha256).IsRequired(false).HasMaxLength(64);
                 entity.Property(e => e.ExtractorFamily).IsRequired().HasMaxLength(30);
+                entity.Property(e => e.Operation).IsRequired(false).HasMaxLength(50);
+                entity.Property(e => e.ParametersJson).IsRequired(false).HasMaxLength(4000);
+                entity.Property(e => e.ResultJson).IsRequired(false).HasMaxLength(4000);
                 entity.Property(e => e.Status).IsRequired();
                 entity.Property(e => e.AttemptCount).IsRequired();
                 entity.Property(e => e.MaxAttempts).IsRequired();
@@ -1297,9 +1597,15 @@ namespace Infrastructure.Persistence
                 entity.Property(e => e.UpdatedAt).IsRequired();
                 entity.Property(e => e.CompletedAt).IsRequired(false);
 
-                // Dedup: at most one live job per (asset, version, family). Filtered so
-                // completed/dead rows don't block re-queuing (Pending=0, Processing=1).
-                entity.HasIndex(e => new { e.AssetType, e.AssetId, e.VersionId, e.ExtractorFamily })
+                // Dedup: at most one live job per (asset, version, family, operation).
+                // Filtered so completed/dead rows don't block re-queuing (Pending=0,
+                // Processing=1). Operation is part of the key because two operations on one
+                // version are two pieces of work - without it, asking to bake a model that
+                // is still being unwrapped would collide with the unwrap and be rejected.
+                // Nulls stay distinct, as before: adding NULLS NOT DISTINCT here would
+                // change dedup for existing re-derive rows during the migration, and the
+                // handler-level check already covers that path.
+                entity.HasIndex(e => new { e.AssetType, e.AssetId, e.VersionId, e.ExtractorFamily, e.Operation })
                     .IsUnique()
                     .HasFilter("\"Status\" IN (0, 1)");
 
@@ -1334,6 +1640,131 @@ namespace Infrastructure.Persistence
             modelBuilder.HasPostgresExtension("pg_trgm");
 
             // Configure AssetSearchDocument - the derived-layer search projection.
+            // The asset metadata schema's side table (prompt 16-B). One row per
+            // (AssetType, AssetId), shared by every family - the fields here are universal
+            // and arrive from a different source than the asset's bytes, so they do not
+            // belong as six near-identical column sets on six aggregates.
+            // The project profile's shared vocabulary (prompt 13-B). One table, five
+            // dimensions - five tables would mean a sixth dimension costs a schema change
+            // plus five copies of the same endpoint, query, DTO and picker.
+            modelBuilder.Entity<ProjectProfileOption>(entity =>
+            {
+                entity.ToTable("ProjectProfileOptions");
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Dimension).IsRequired().HasMaxLength(30);
+                entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.NormalizedName).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.IsBuiltIn).IsRequired();
+                entity.Property(e => e.IsHidden).IsRequired();
+                entity.Property(e => e.SortOrder).IsRequired();
+                entity.Property(e => e.CreatedAt).IsRequired();
+                entity.Property(e => e.UpdatedAt).IsRequired();
+
+                // Unique WITHIN a dimension: "Fantasy" is a legitimate genre and a
+                // legitimate style, and they are different options.
+                entity.HasIndex(e => new { e.Dimension, e.NormalizedName }).IsUnique();
+                entity.HasIndex(e => e.Dimension);
+            });
+
+            modelBuilder.Entity<ProjectProfileValue>(entity =>
+            {
+                entity.ToTable("ProjectProfileValues");
+                entity.HasKey(e => new { e.ProjectId, e.OptionId });
+                // Free text, and only the engine dimension uses it today - "authoring" /
+                // "runtime" / "preview" is a convention worth suggesting in a picker and not
+                // worth a sixth vocabulary table.
+                entity.Property(e => e.Role).IsRequired(false).HasMaxLength(50);
+
+                entity.HasOne(e => e.Option)
+                    .WithMany()
+                    .HasForeignKey(e => e.OptionId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(e => e.OptionId);
+            });
+
+            modelBuilder.Entity<AssetMetadata>(entity =>
+            {
+                entity.ToTable("AssetMetadata");
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.AssetType).IsRequired().HasMaxLength(30);
+                entity.Property(e => e.AssetId).IsRequired();
+                entity.Property(e => e.SchemaVersion).IsRequired();
+
+                entity.Property(e => e.Description).IsRequired(false);
+                // text[] rather than a join table: these are values, not a shared
+                // vocabulary. Tags here exist only for the families whose entity has no
+                // ModelTag relation (Sound, Sprite) - part D moves them to the shared pool,
+                // and the schema states which home is current so nothing reads both.
+                entity.Property(e => e.Tags)
+                    .HasColumnType("text[]")
+                    .HasDefaultValueSql("'{}'::text[]");
+                entity.Property(e => e.Styles)
+                    .HasColumnType("text[]")
+                    .HasDefaultValueSql("'{}'::text[]");
+                entity.Property(e => e.Themes)
+                    .HasColumnType("text[]")
+                    .HasDefaultValueSql("'{}'::text[]");
+
+                entity.Property(e => e.License).IsRequired(false).HasMaxLength(40);
+                entity.Property(e => e.LicenseName).IsRequired(false).HasMaxLength(200);
+                entity.Property(e => e.LicenseUrl).IsRequired(false).HasMaxLength(2048);
+                entity.Property(e => e.Author).IsRequired(false).HasMaxLength(200);
+                entity.Property(e => e.CreditName).IsRequired(false).HasMaxLength(200);
+                entity.Property(e => e.CreditUrl).IsRequired(false).HasMaxLength(2048);
+                entity.Property(e => e.AttributionRequired).IsRequired(false);
+
+                entity.Property(e => e.SourceKind).IsRequired(false).HasMaxLength(40);
+                entity.Property(e => e.SourceUrl).IsRequired(false).HasMaxLength(2048);
+                entity.Property(e => e.StoreUrl).IsRequired(false).HasMaxLength(2048);
+                entity.Property(e => e.StoreAssetId).IsRequired(false).HasMaxLength(100);
+                entity.Property(e => e.StoreItemId).IsRequired(false).HasMaxLength(100);
+                entity.Property(e => e.ImportedAt).IsRequired(false);
+                entity.Property(e => e.SourceFolder).IsRequired(false).HasMaxLength(1024);
+
+                // Import automation (prompt 06-C). The tags themselves live in the family's
+                // own vocabulary; this is only the record of which of them were guessed.
+                entity.Property(e => e.AutoTags)
+                    .HasColumnType("text[]")
+                    .HasDefaultValueSql("'{}'::text[]");
+                entity.Property(e => e.AutoCategoryId).IsRequired(false);
+                entity.Property(e => e.AutoAppliedAt).IsRequired(false);
+                entity.Property(e => e.AutoReviewedAt).IsRequired(false);
+
+                entity.Property(e => e.FacetsJson).IsRequired(false).HasColumnType("jsonb");
+
+                entity.Property(e => e.CreatedAt).IsRequired();
+                entity.Property(e => e.UpdatedAt).IsRequired();
+
+                // One row per asset - the read path looks a row up by this pair and the
+                // write path upserts on it.
+                entity.HasIndex(e => new { e.AssetType, e.AssetId }).IsUnique();
+
+                // What a population pass scans: "which assets did this store import give
+                // us", and "which of them still have no licence".
+                entity.HasIndex(e => new { e.StoreUrl, e.StoreAssetId });
+
+                // What the review screen asks: which assets did the automation classify and
+                // has anyone looked at them yet. Filtered so the index covers only the rows
+                // that can ever be in that queue, rather than every asset in the library.
+                entity.HasIndex(e => new { e.AssetType, e.AutoAppliedAt, e.AutoReviewedAt })
+                    .HasFilter("\"AutoAppliedAt\" IS NOT NULL");
+            });
+
+            modelBuilder.Entity<StoreImportedItem>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.StoreUrl).IsRequired().HasMaxLength(2048);
+                entity.Property(e => e.StoreAssetId).IsRequired().HasMaxLength(200);
+                entity.Property(e => e.StoreItemId).IsRequired().HasMaxLength(200);
+                entity.Property(e => e.AssetType).IsRequired().HasMaxLength(50);
+                entity.Property(e => e.AssetId).IsRequired();
+                entity.Property(e => e.CreatedAt).IsRequired();
+
+                entity.HasIndex(e => new { e.StoreUrl, e.StoreAssetId, e.StoreItemId }).IsUnique();
+                entity.HasIndex(e => new { e.AssetType, e.AssetId });
+            });
+
             modelBuilder.Entity<AssetSearchDocument>(entity =>
             {
                 entity.HasKey(e => e.Id);
@@ -1349,6 +1780,11 @@ namespace Infrastructure.Persistence
                 entity.Property(e => e.Symbols).IsRequired();
                 entity.Property(e => e.ConceptLabels).IsRequired().HasDefaultValue(string.Empty);
                 entity.Property(e => e.BrowseSummary).IsRequired();
+                // Authored metadata. Non-null with an empty default, like ConceptLabels:
+                // the match clauses concatenate these columns directly, and a NULL would
+                // make the whole expression NULL and drop the document from its tier.
+                entity.Property(e => e.AuthoredTags).IsRequired().HasDefaultValue(string.Empty);
+                entity.Property(e => e.Description).IsRequired().HasDefaultValue(string.Empty);
                 entity.Property(e => e.TriangleCount).IsRequired(false);
                 entity.Property(e => e.HasAnimations).IsRequired(false);
                 entity.Property(e => e.BoneCount).IsRequired(false);
@@ -1364,11 +1800,37 @@ namespace Infrastructure.Persistence
                 entity.Property(e => e.VertexCount).IsRequired(false);
                 entity.Property(e => e.MaterialCount).IsRequired(false);
                 entity.Property(e => e.HasUvs).IsRequired(false);
+                entity.Property(e => e.UvStatus).IsRequired(false).HasMaxLength(16);
                 entity.Property(e => e.PartCount).IsRequired(false);
                 entity.Property(e => e.AnimationCount).IsRequired(false);
                 entity.Property(e => e.MaxDimension).IsRequired(false);
+                // Real-world size per axis, plus whether it can be trusted as one.
+                entity.Property(e => e.DimensionX).IsRequired(false);
+                entity.Property(e => e.DimensionY).IsRequired(false);
+                entity.Property(e => e.DimensionZ).IsRequired(false);
+                entity.Property(e => e.ScaleConvention).IsRequired(false).HasMaxLength(16);
                 entity.Property(e => e.CategoryId).IsRequired(false);
                 entity.Property(e => e.CategoryName).IsRequired(false).HasMaxLength(200);
+                // Space-joined pack names. Generous length because an asset can sit in
+                // several packs; no GIN index, matching ConceptLabels - this is a weak
+                // tie-breaking signal, not a primary retrieval path.
+                entity.Property(e => e.PackNames).IsRequired(false).HasMaxLength(1000);
+                // Bounded like PackNames: three folder levels, widened, is tens of tokens -
+                // an unbounded text column here would be an invitation to index a path.
+                entity.Property(e => e.FolderTokens).IsRequired(false).HasMaxLength(1000);
+                // SHA-256 of the asset's sorted part hashes, hex - fixed width by construction.
+                entity.Property(e => e.GeometryKey).IsRequired(false).HasMaxLength(64);
+                // Asset metadata schema facets, denormalised so a profile-driven search can
+                // filter on them (prompt 16-F). Arrays, not space-joined text: the question
+                // is containment ("is this asset Low Poly"), and a substring match over
+                // joined text would answer it wrongly.
+                entity.Property(e => e.Styles)
+                    .HasColumnType("text[]")
+                    .HasDefaultValueSql("'{}'::text[]");
+                entity.Property(e => e.Themes)
+                    .HasColumnType("text[]")
+                    .HasDefaultValueSql("'{}'::text[]");
+                entity.Property(e => e.License).IsRequired(false).HasMaxLength(40);
                 entity.Property(e => e.UpdatedAt).IsRequired();
 
                 // One document per (asset, version, part). NULLS NOT DISTINCT so the
@@ -1379,6 +1841,12 @@ namespace Infrastructure.Persistence
 
                 // Default result gate: active + current version + prominence.
                 entity.HasIndex(e => new { e.AssetType, e.IsActive, e.IsCurrentVersion, e.Prominence });
+
+                // GIN over the facet arrays: a style filter is an array containment test,
+                // which a btree cannot serve.
+                entity.HasIndex(e => e.Styles).HasMethod("gin");
+                entity.HasIndex(e => e.Themes).HasMethod("gin");
+                entity.HasIndex(e => e.License);
 
                 // Trigram GIN over authored identifiers - literal, multilingual, fuzzy.
                 entity.HasIndex(e => e.Tokens).HasMethod("gin").HasOperators("gin_trgm_ops");
@@ -1391,6 +1859,14 @@ namespace Infrastructure.Persistence
                 entity.HasIndex(e => e.Engine);
                 entity.HasIndex(e => e.MaxDimension);
                 entity.HasIndex(e => e.CategoryId);
+                // "Which assets still need unwrapping before a bake" is a whole-library
+                // sweep, not a term search - it runs with no discriminating text to narrow
+                // the scan first, so this one carries the query on its own.
+                entity.HasIndex(e => e.UvStatus);
+                // Duplicate collapsing groups the ranked page by this, and it is also how
+                // "is this prop already in the library" is asked. Never a lone predicate on
+                // its own, but always an equality one, so a plain btree carries it.
+                entity.HasIndex(e => e.GeometryKey);
             });
 
             // Configure SearchLog - one row per deliberate search (from day one).
@@ -1460,14 +1936,49 @@ namespace Infrastructure.Persistence
                     .HasMaxLength(16)
                     .HasDefaultValue(Domain.Models.AgentOperationStatus.Completed);
                 entity.Property(e => e.ClaimedBy).IsRequired(false).HasMaxLength(200);
+                entity.Property(e => e.Actor).IsRequired(false).HasMaxLength(100);
                 entity.Property(e => e.ClaimedAt).IsRequired();
                 entity.Property(e => e.CompletedAt).IsRequired(false);
+                // The claim generation. Every settle matches on it, so a caller whose lease
+                // lapsed cannot stamp its outcome onto the claim that replaced it.
+                entity.Property(e => e.ClaimToken)
+                    .IsRequired()
+                    .HasMaxLength(32)
+                    .HasDefaultValue(string.Empty);
+                // Reversal in progress, which is NOT the same fact as ReversedAt (reversal
+                // completed) - keeping them apart is what stops a crashed undo from being
+                // recorded as one that happened.
+                entity.Property(e => e.ReversalToken).IsRequired(false).HasMaxLength(32);
+                entity.Property(e => e.ReversalClaimedAt).IsRequired(false);
 
                 // A retried write with the same key must be a no-op - enforced here.
                 entity.HasIndex(e => e.IdempotencyKey).IsUnique();
                 entity.HasIndex(e => e.BatchId);
                 // Sweeping abandoned Pending claims.
                 entity.HasIndex(e => new { e.Status, e.ClaimedAt });
+            });
+
+            // Configure AgentUploadTicket - single-use authorisation for one remote upload.
+            modelBuilder.Entity<AgentUploadTicket>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                // Hex SHA-256; the secret itself is never stored.
+                entity.Property(e => e.SecretHash).IsRequired().HasMaxLength(64);
+                entity.Property(e => e.IdempotencyKey).IsRequired().HasMaxLength(200);
+                entity.Property(e => e.Operation).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.AssetType).IsRequired().HasMaxLength(30);
+                entity.Property(e => e.Actor).IsRequired(false).HasMaxLength(100);
+                entity.Property(e => e.BatchId).IsRequired(false).HasMaxLength(200);
+                entity.Property(e => e.IssuedAt).IsRequired();
+                entity.Property(e => e.ExpiresAt).IsRequired();
+                entity.Property(e => e.RedeemedAt).IsRequired(false);
+                entity.Property(e => e.IsSpent).IsRequired().HasDefaultValue(false);
+                entity.Property(e => e.AssetId).IsRequired(false);
+
+                // Redemption looks a ticket up by hash on every remote upload.
+                entity.HasIndex(e => e.SecretHash).IsUnique();
+                // Sweeping expired tickets.
+                entity.HasIndex(e => e.ExpiresAt);
             });
 
             base.OnModelCreating(modelBuilder);

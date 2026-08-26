@@ -1,0 +1,109 @@
+.import-suggestions-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-sm);
+}
+
+.import-suggestions-dialog-lead,
+.import-suggestions-dialog-more {
+  margin: 0;
+  color: var(--text-color-secondary);
+  font-size: var(--mod-text-xs);
+}
+
+.import-suggestions-dialog-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 55vh;
+  overflow-y: auto;
+  border-top: 1px solid var(--surface-border);
+}
+
+.import-suggestion-row {
+  display: flex;
+  align-items: center;
+  gap: var(--mod-space-sm);
+  padding: var(--mod-space-xs) var(--mod-space-2xs);
+  border-bottom: 1px solid var(--surface-border);
+}
+
+.import-suggestion-row:hover {
+  background: var(--surface-hover);
+}
+
+.import-suggestion-thumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--mod-radius-sm);
+  background: var(--surface-ground);
+  color: var(--text-color-secondary);
+  overflow: hidden;
+}
+
+.import-suggestion-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.import-suggestion-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.import-suggestion-name {
+  font-size: var(--mod-text-sm);
+  font-weight: var(--mod-font-weight-medium);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.import-suggestion-values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--mod-space-2xs);
+}
+
+.import-suggestion-chip {
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--mod-radius-sm);
+  font-size: var(--mod-text-xs);
+  color: var(--text-color-secondary);
+}
+
+/* The category is the stronger claim of the two, so it reads as one. */
+.import-suggestion-chip-category {
+  border-color: rgba(var(--primary-color-rgb), 0.32);
+  background: rgba(var(--primary-color-rgb), 0.12);
+  color: var(--text-color);
+}
+
+.import-suggestion-source {
+  font-size: var(--mod-text-xs);
+  color: var(--text-color-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+
+.import-suggestions-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--mod-space-xs);
+  padding-top: var(--mod-space-xs);
+}

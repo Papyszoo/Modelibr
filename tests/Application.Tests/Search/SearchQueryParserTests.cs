@@ -94,4 +94,42 @@ public class SearchQueryParserTests
         Assert.Contains("car", parsed.Terms.Select(t => t.Word));
         Assert.DoesNotContain(parsed.Terms, t => t.Word.Contains('(') || t.Word.Contains(','));
     }
+
+    [Fact]
+    public void Parse_Records_Why_Each_Dropped_Word_Was_Dropped()
+    {
+        // The search reports these back. A caller writing a prose brief otherwise cannot
+        // tell which of its words the search actually ran on.
+        var parsed = SearchQueryParser.Parse("looking for a sofa for the sofa room");
+
+        Assert.Contains(
+            parsed.IgnoredWords,
+            w => w.Word == "looking" && w.Reason == SearchQueryParser.IgnoredReasons.StopWord);
+        Assert.Contains(
+            parsed.IgnoredWords,
+            w => w.Word == "sofa" && w.Reason == SearchQueryParser.IgnoredReasons.Duplicate);
+    }
+
+    [Fact]
+    public void Parse_Names_The_Words_It_Stopped_Scoring_At()
+    {
+        var parsed = SearchQueryParser.Parse("one two three four five six seven eight");
+
+        Assert.Equal(
+            ["seven", "eight"],
+            parsed.IgnoredWords
+                .Where(w => w.Reason == SearchQueryParser.IgnoredReasons.BeyondWordLimit)
+                .Select(w => w.Word));
+    }
+
+    [Fact]
+    public void A_Query_Of_Nothing_But_Stopwords_Keeps_Its_Words_Rather_Than_Calling_Them_Ignored()
+    {
+        // The parser already falls back to the literal words in this case. Reporting them as
+        // ignored too would say they were dropped while they are exactly what was searched.
+        var parsed = SearchQueryParser.Parse("the it");
+
+        Assert.Equal(2, parsed.Terms.Count);
+        Assert.Empty(parsed.IgnoredWords);
+    }
 }

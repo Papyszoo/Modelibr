@@ -7,6 +7,10 @@ coverage/
 package-lock.json
 # Auto-generated MSW service worker - do not format
 public/mockServiceWorker.js
+# Auto-generated scene contract, emitted from the C# schema by SceneContractTypeScript.
+# Formatting it here would make the committed file differ from what the generator emits,
+# and the drift test compares them byte for byte.
+src/features/scenes/api/sceneContract.generated.ts
 # Playwright run artifacts (gitignored, but Prettier reads .prettierignore only,
 # never .gitignore - an untracked .last-run.json otherwise fails format:check)
 test-results/

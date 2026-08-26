@@ -16,6 +16,8 @@ const getTabIcon = (tabType: Tab['type']): string => {
       return 'pi pi-box'
     case 'globalMaterials':
       return 'pi pi-palette'
+    case 'pbrMaterials':
+      return 'pi pi-circle-fill'
     case 'modelTextures':
       return 'pi pi-images'
     case 'textureSetViewer':
@@ -52,6 +54,8 @@ const getTabIcon = (tabType: Tab['type']): string => {
       return 'pi pi-th-large'
     case 'stageEditor':
       return 'pi pi-th-large'
+    case 'scenes':
+      return 'pi pi-box'
     default:
       return 'pi pi-file'
   }
@@ -67,6 +71,8 @@ const getTabTooltip = (tab: Tab): string => {
       return `Model: ${tab.label || tab.modelId || 'Unknown'}`
     case 'globalMaterials':
       return 'Global Materials'
+    case 'pbrMaterials':
+      return 'PBR Materials'
     case 'modelTextures':
       return 'Multi-Model Textures'
     case 'textureSetViewer': {
@@ -103,6 +109,8 @@ const getTabTooltip = (tab: Tab): string => {
       return 'Stage Editor'
     case 'stageList':
       return 'Stages List'
+    case 'scenes':
+      return 'Scenes'
     default:
       return tab.label || 'Unknown Tab'
   }

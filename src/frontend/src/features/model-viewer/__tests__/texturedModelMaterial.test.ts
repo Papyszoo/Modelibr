@@ -5,7 +5,7 @@ import type { TextureSetDto } from '@/types'
 import {
   applyMaterialTextures,
   buildMaterialFromTextures,
-} from '../components/materialTextures'
+} from '@/shared/three/textureSetMaterial'
 
 /**
  * Integration tests for the viewer's REAL texture → material apply path

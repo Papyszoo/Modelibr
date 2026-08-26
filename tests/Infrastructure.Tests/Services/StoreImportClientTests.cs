@@ -169,6 +169,59 @@ public class StoreImportClientTests
         Assert.Contains("BlockedDownloadUrl", ex.Message);
     }
 
+    /// <summary>
+    /// The literal form of every range the classifier used to allow, arriving as a redirect -
+    /// which is how an SSRF payload gets in without ever appearing in the manifest.
+    /// </summary>
+    [Theory]
+    [InlineData("https://198.18.0.1/secret")]      // benchmarking
+    [InlineData("https://224.0.0.1/secret")]       // multicast
+    [InlineData("https://240.0.0.1/secret")]       // reserved
+    [InlineData("https://255.255.255.255/secret")] // limited broadcast
+    [InlineData("https://203.0.113.9/secret")]     // documentation
+    [InlineData("https://[ff02::1]/secret")]       // IPv6 multicast
+    public async Task Download_BlocksARedirectToANonGlobalAddress(string location)
+    {
+        var (client, _) = Build(request =>
+            request.RequestUri!.Host == "store.example.com"
+                ? RedirectTo(location)
+                : Bytes(new byte[] { 1 }));
+
+        var ex = await Assert.ThrowsAsync<StoreImportException>(() => client.DownloadFileAsync(
+            StoreUrl, $"{StoreUrl}/api/files/1/download", Token, 1, null, CancellationToken.None));
+
+        Assert.Contains("BlockedDownloadUrl", ex.Message);
+    }
+
+    /// <summary>
+    /// The same ranges behind a hostname, which is the case an IP-literal check cannot see.
+    /// The resolver is what has to catch these, and it has to catch every answer - a host
+    /// returning one public and one multicast address must not be reachable by retrying.
+    /// </summary>
+    [Theory]
+    [InlineData("198.18.0.1")]
+    [InlineData("224.0.0.1")]
+    [InlineData("240.0.0.1")]
+    [InlineData("255.255.255.255")]
+    [InlineData("192.0.2.1")]
+    [InlineData("ff02::1")]
+    public async Task Download_BlocksAHostThatResolvesToANonGlobalAddress(string resolved)
+    {
+        var (client, _) = Build(request =>
+            request.RequestUri!.Host == "store.example.com"
+                ? RedirectTo("https://cdn.example.net/secret")
+                : Bytes(new byte[] { 1 }));
+
+        client.ResolveHostAsync = (host, _) => Task.FromResult(host == "cdn.example.net"
+            ? new[] { IPAddress.Parse("140.82.121.3"), IPAddress.Parse(resolved) }
+            : new[] { IPAddress.Parse("140.82.121.4") });
+
+        var ex = await Assert.ThrowsAsync<StoreImportException>(() => client.DownloadFileAsync(
+            StoreUrl, $"{StoreUrl}/api/files/1/download", Token, 1, null, CancellationToken.None));
+
+        Assert.Contains("BlockedDownloadUrl", ex.Message);
+    }
+
     [Fact]
     public async Task Download_StopsAfterTheRedirectHopCap()
     {

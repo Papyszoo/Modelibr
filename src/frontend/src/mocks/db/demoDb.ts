@@ -10,6 +10,7 @@
 import { type DBSchema, type IDBPDatabase, openDB } from 'idb'
 
 import { buildBaseMeshSeed } from './baseMeshesSeed'
+import { type UvStatus } from '@/shared/types/uvStatus'
 
 // ─── Schema ─────────────────────────────────────────────────────────────
 
@@ -70,6 +71,8 @@ export interface DemoModelVersion {
   animationCount?: number | null
   animationNames?: string[]
   boneCount?: number | null
+  /** UV layout, as the search projection classifies it. See `@/shared/types/uvStatus`. */
+  uvStatus?: UvStatus | null
   technicalDetailsUpdatedAt?: string | null
   thumbnailUrl: string | null
   pngThumbnailUrl: string | null
@@ -309,6 +312,15 @@ export interface DemoProject {
   sounds: { id: number; name: string }[]
   scripts: { id: number; name: string }[]
   environmentMaps?: { id: number; name: string }[]
+  /**
+   * The project profile as the demo stores it (v0.6 prompt 13). Optional, because
+   * every seeded project predates it and a project with no profile is a real and
+   * ordinary state - it means the agent is given nothing to go on.
+   */
+  profile?: {
+    dimensions: Record<string, { optionId: number; role?: string | null }[]>
+    settings: Record<string, number | null>
+  }
 }
 
 export interface DemoCategory {
@@ -812,6 +824,7 @@ export async function seedIfEmpty(): Promise<void> {
       versionNumber: 1,
       description: 'Initial version',
       createdAt: now,
+      uvStatus: 'unwrapped',
       defaultTextureSetId: null,
       triangleCount: 12,
       vertexCount: 8,
@@ -842,6 +855,7 @@ export async function seedIfEmpty(): Promise<void> {
       versionNumber: 1,
       description: 'Initial version',
       createdAt: now,
+      uvStatus: 'atlas_packed',
       defaultTextureSetId: null,
       triangleCount: 96,
       vertexCount: 64,
@@ -878,6 +892,7 @@ export async function seedIfEmpty(): Promise<void> {
       versionNumber: 1,
       description: 'Initial version',
       createdAt: now,
+      uvStatus: 'tiled',
       defaultTextureSetId: null,
       triangleCount: 128,
       vertexCount: 88,
@@ -910,6 +925,7 @@ export async function seedIfEmpty(): Promise<void> {
       versionNumber: 1,
       description: 'Initial version',
       createdAt: now,
+      uvStatus: 'partial',
       defaultTextureSetId: null,
       triangleCount: 320,
       vertexCount: 162,
@@ -940,6 +956,7 @@ export async function seedIfEmpty(): Promise<void> {
       versionNumber: 1,
       description: 'Initial version',
       createdAt: now,
+      uvStatus: 'no_uvs',
       defaultTextureSetId: 2,
       triangleCount: 256,
       vertexCount: 144,

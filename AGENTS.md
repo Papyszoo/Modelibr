@@ -107,7 +107,7 @@ Full conventions in the `release-workflow` skill. The hard rules:
   React Query = server state, Zustand = UI state, `useState` = ephemeral only.
 - PostgreSQL behavior is the baseline for app and test decisions.
 - **Tag vocabularies are strictly per asset type** - and Global Materials
-  (Universal) vs Multi-Model Textures (ModelSpecific) are *separate types* despite
+  (Universal) vs Multi-Model Textures (ModelSpecific) are _separate types_ despite
   sharing a grid. Never merge or share vocabularies "to simplify".
 - **Don't commit large generated binaries.** Docs videos, visual-test baselines and
   similar artifacts are generated in CI or locally and git-ignored - everyone who
@@ -142,6 +142,11 @@ explicitly instead of claiming verified.
 
 - **Backend API/DTO shape** → frontend feature `api/` modules, demo MSW handlers
   (`src/frontend/src/mocks/`), worker `JobApiClient` (if thumbnail-job related).
+- **A new endpoint the frontend calls** → a demo MSW handler, in the same change.
+  `onUnhandledRequest` is `bypass`, so an unmocked call reaches the static demo
+  server and returns HTML; a component that reads a field off it throws during
+  render and unmounts the page around it. No unit test can see this - they all
+  mock the `api/` module - and the demo E2E project is what catches it.
 - **User-visible UI behavior** → E2E scenarios + page objects, demo mode
   (`build:demo`), feature docs (`docs/docs/features/*.md`), video scripts under
   `docs/videos/`, and the orphaned suites (rule 10 below).
@@ -190,6 +195,6 @@ history.jsonl) - full map in the `test-triage` skill.
 11. **Isolated e2e runs are not sufficient.** `--no-deps` single-worker runs hide
     failures that only the full parallel suite produces (accumulated state, upload
     panel overlaying cards, viewer starvation). **Run `run-e2e.js` before claiming
-    e2e green.** For backend-wide refactors, run the fast e2e lane locally *before*
+    e2e green.** For backend-wide refactors, run the fast e2e lane locally _before_
     opening the PR - mocked unit tests cannot see the regression classes those
     produce.

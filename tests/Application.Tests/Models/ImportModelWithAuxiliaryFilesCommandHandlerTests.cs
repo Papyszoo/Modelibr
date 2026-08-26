@@ -73,13 +73,18 @@ public class ImportModelWithAuxiliaryFilesCommandHandlerTests
         return model;
     }
 
+    private const string PrimarySha256 = "primary-sha-256";
+
     private void SetupAddModel(int modelId, int versionId, bool alreadyExists, bool skipDedup = false)
     {
         _addModel
             .Setup(h => h.Handle(
                 It.Is<AddModelCommand>(c => c.SkipDeduplication == skipDedup),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result.Success(new AddModelCommandResponse(modelId, alreadyExists)));
+            // The hash comes back on the response so the caller can raise
+            // ModelUploadedEvent itself once the auxiliaries are linked.
+            .ReturnsAsync(Result.Success(new AddModelCommandResponse(
+                modelId, alreadyExists, PrimarySha256, versionId)));
         _models
             .Setup(r => r.GetByIdAsync(modelId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(ModelWithActiveVersion(modelId, versionId));
@@ -96,6 +101,34 @@ public class ImportModelWithAuxiliaryFilesCommandHandlerTests
     private static ImportModelWithAuxiliaryFilesCommand Command() => new(
         new FakeUpload("scene.gltf"),
         new[] { new AuxiliaryUpload("scene.bin", new FakeUpload("scene.bin")) });
+
+    /// <summary>
+    /// The race this closes: the upload's extraction job is queued the moment the model
+    /// commits, and a worker that claims it before the auxiliaries are linked is told
+    /// there are none - so it indexes a loose glTF without its buffers and files that as
+    /// the truth. The event has to be raised in the same save as the links.
+    /// </summary>
+    [Fact]
+    public async Task Defers_The_Upload_Event_Until_The_Auxiliaries_Are_Linked()
+    {
+        SetupAddModel(modelId: 7, versionId: 70, alreadyExists: false);
+        SetupAuxiliaryFile("scene.bin", fileId: 100, hash: new string('a', 64));
+
+        var result = await _handler.Handle(Command(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        // The inner command must NOT announce the upload itself.
+        _addModel.Verify(
+            h => h.Handle(It.Is<AddModelCommand>(c => c.DeferProcessing), It.IsAny<CancellationToken>()),
+            Times.Once);
+        // ...and this handler announces it, carrying the hash the response returned.
+        var model = await _models.Object.GetByIdAsync(7, CancellationToken.None);
+        Assert.NotNull(model);
+        var raised = Assert.Single(
+            model!.DomainEvents.OfType<Domain.Events.ModelUploadedEvent>());
+        Assert.Equal(70, raised.ModelVersionId);
+        Assert.Equal(PrimarySha256, raised.ModelHash);
+    }
 
     [Fact]
     public async Task Links_Auxiliaries_To_A_Newly_Created_Model()

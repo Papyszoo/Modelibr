@@ -6,6 +6,7 @@ using Application.Services;
 using Domain.Models;
 using Domain.Services;
 using Domain.ValueObjects;
+using Microsoft.Extensions.Logging;
 using SharedKernel;
 
 namespace Application.Models
@@ -18,6 +19,8 @@ namespace Application.Models
         private readonly IDateTimeProvider _dateTimeProvider;
         private readonly IBatchUploadRepository _batchUploadRepository;
         private readonly ISettingRepository _settingRepository;
+        private readonly ICommandHandler<ApplyImportAutomationCommand, ImportAutomationResponse> _importAutomation;
+        private readonly ILogger<AddModelCommandHandler> _logger;
         private readonly IUnitOfWork _unitOfWork;
 
         public AddModelCommandHandler(
@@ -27,6 +30,8 @@ namespace Application.Models
             IDateTimeProvider dateTimeProvider,
             IBatchUploadRepository batchUploadRepository,
             ISettingRepository settingRepository,
+            ICommandHandler<ApplyImportAutomationCommand, ImportAutomationResponse> importAutomation,
+            ILogger<AddModelCommandHandler> logger,
             IUnitOfWork unitOfWork)
         {
             _modelRepository = modelRepository;
@@ -35,6 +40,8 @@ namespace Application.Models
             _dateTimeProvider = dateTimeProvider;
             _batchUploadRepository = batchUploadRepository;
             _settingRepository = settingRepository;
+            _importAutomation = importAutomation;
+            _logger = logger;
             _unitOfWork = unitOfWork;
         }
 
@@ -77,7 +84,10 @@ namespace Application.Models
             // Raise domain event for existing model upload - dispatched from the
                 // save pipeline once this aggregate is persisted (see
                 // DomainEventsInterceptor); no manual publish here.
-                existingModel.RaiseModelUploadedEvent(existingModel.ActiveVersion!.Id, fileEntity.Sha256Hash, false, command.GenerateThumbnail);
+                if (!command.DeferProcessing)
+                {
+                    existingModel.RaiseModelUploadedEvent(existingModel.ActiveVersion!.Id, fileEntity.Sha256Hash, false, command.GenerateThumbnail);
+                }
 
                 // Always track batch upload - generate batch ID if not provided
                 var batchId = command.BatchId ?? Guid.NewGuid().ToString();
@@ -91,7 +101,8 @@ namespace Application.Models
                 await _batchUploadRepository.AddAsync(batchUpload, cancellationToken);
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-                return Result.Success(new AddModelCommandResponse(existingModel.Id, true));
+                return Result.Success(new AddModelCommandResponse(
+                    existingModel.Id, true, fileEntity.Sha256Hash, existingModel.ActiveVersion!.Id));
             }
 
             // Create new model
@@ -137,7 +148,10 @@ namespace Application.Models
                 // Raise domain event for new model upload after both model and file are
                 // persisted - dispatched from the save pipeline (see DomainEventsInterceptor);
                 // no manual publish here.
-                savedModel.RaiseModelUploadedEvent(version1.Id, fileEntity.Sha256Hash, true, command.GenerateThumbnail);
+                if (!command.DeferProcessing)
+                {
+                    savedModel.RaiseModelUploadedEvent(version1.Id, fileEntity.Sha256Hash, true, command.GenerateThumbnail);
+                }
 
                 // Always track batch upload - generate batch ID if not provided
                 var batchId = command.BatchId ?? Guid.NewGuid().ToString();
@@ -151,7 +165,35 @@ namespace Application.Models
                 await _batchUploadRepository.AddAsync(batchUpload, cancellationToken);
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-                return Result.Success(new AddModelCommandResponse(savedModel.Id, false));
+                // Classify what just landed, from the file name plus whatever the importing
+                // route knew about where it came from. New models only: a re-import that
+                // resolved to an existing asset returned above, and re-deciding an asset a
+                // person has since curated is exactly what this must not do.
+                //
+                // After the commit above on purpose - the automation reads the model back
+                // and needs its real id and its (empty) tag set to be durable first.
+                if (command.AutoAssignMetadata)
+                {
+                    // Never fatal. The model is already committed and is perfectly usable
+                    // uncategorised; turning a guess that could not be made into a failed
+                    // import would be the worst possible trade.
+                    try
+                    {
+                        await _importAutomation.Handle(
+                            new ApplyImportAutomationCommand(
+                                savedModel.Id, command.SourceFolder, command.SiblingFileNames),
+                            cancellationToken);
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        _logger.LogError(ex,
+                            "Import automation failed for model {ModelId}; it was imported without a suggested category or tags.",
+                            savedModel.Id);
+                    }
+                }
+
+                return Result.Success(new AddModelCommandResponse(
+                    savedModel.Id, false, fileEntity.Sha256Hash, version1.Id));
             }
             catch (ArgumentException ex)
             {
@@ -169,11 +211,37 @@ namespace Application.Models
     /// by callers that own a broader identity than the primary file - today the multi-file
     /// glTF import, whose referenced .bin/textures are part of what the asset IS.
     /// </param>
+    /// <param name="SourceFolder">
+    /// The directory the primary file came out of, as the importing route saw it: an
+    /// absolute server path for a path import, the archive-relative directory for a zip.
+    /// Null for a plain HTTP upload, which carries a filename and nothing else. Recorded as
+    /// provenance and read as a weak taxonomy signal - see <see cref="Search.ImportFolderSignal"/>.
+    /// </param>
+    /// <param name="SiblingFileNames">
+    /// The names of the other importable files in that same folder. The naming convention a
+    /// folder follows is what classifies the assets whose own name does not - <c>SM_Veh_Wheel_03</c>
+    /// is a vehicle part only because everything beside it is <c>SM_Veh_*</c>.
+    /// </param>
+    /// <param name="AutoAssignMetadata">
+    /// Whether to let the import classify itself. False for callers that arrive with real
+    /// metadata of their own - a store import carries the manifest's category and tags, and
+    /// guessing over them would be strictly worse.
+    /// </param>
     public record AddModelCommand(
         IFileUpload File,
         string? ModelName = null,
         string? BatchId = null,
         bool GenerateThumbnail = true,
-        bool SkipDeduplication = false) : ICommand<AddModelCommandResponse>;
-    public record AddModelCommandResponse(int Id, bool AlreadyExists = false);
+        bool SkipDeduplication = false,
+        string? SourceFolder = null,
+        IReadOnlyList<string>? SiblingFileNames = null,
+        bool AutoAssignMetadata = true,
+        bool DeferProcessing = false) : ICommand<AddModelCommandResponse>;
+
+    /// <param name="FileSha256">
+    /// The stored primary's hash. Returned so a caller that deferred processing can raise
+    /// <c>ModelUploadedEvent</c> itself without re-hashing the upload.
+    /// </param>
+    public record AddModelCommandResponse(
+        int Id, bool AlreadyExists = false, string FileSha256 = "", int ModelVersionId = 0);
 }

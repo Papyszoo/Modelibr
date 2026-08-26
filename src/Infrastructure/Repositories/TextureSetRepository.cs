@@ -188,6 +188,25 @@ internal sealed class TextureSetRepository : ITextureSetRepository
             .FirstOrDefaultAsync(tp => tp.Id == id, cancellationToken);
     }
 
+    /// <summary>
+    /// Deliberately bare - none of the texture, mapping, pack or tag graph the single-set
+    /// read pulls. A choice card needs the id and whether there is a thumbnail.
+    /// </summary>
+    public async Task<IReadOnlyList<TextureSet>> GetByIdsAsync(
+        IReadOnlyCollection<int> ids,
+        CancellationToken cancellationToken = default)
+    {
+        if (ids.Count == 0)
+        {
+            return [];
+        }
+
+        return await _context.TextureSets
+            .AsNoTracking()
+            .Where(t => ids.Contains(t.Id))
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<TextureSet?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         return await _context.TextureSets
@@ -228,6 +247,25 @@ internal sealed class TextureSetRepository : ITextureSetRepository
             return null;
 
         return await _context.TextureSets
+            .Include(tp => tp.Textures)
+                .ThenInclude(t => t.File)
+            .Include(tp => tp.ModelVersionMappings)
+                .ThenInclude(m => m.ModelVersion).ThenInclude(mv => mv.Model)
+            .Include(tp => tp.Category)
+            .Include(tp => tp.Packs)
+            .Include(tp => tp.Projects)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(tp => tp.Textures.Any(t => t.File.Sha256Hash == sha256Hash), cancellationToken);
+    }
+
+    public async Task<TextureSet?> GetDeletedByFileHashAsync(string sha256Hash, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(sha256Hash))
+            return null;
+
+        return await _context.TextureSets
+            .IgnoreQueryFilters()
+            .Where(tp => tp.IsDeleted)
             .Include(tp => tp.Textures)
                 .ThenInclude(t => t.File)
             .Include(tp => tp.ModelVersionMappings)

@@ -16,6 +16,7 @@ export type PanelContent =
   | 'hierarchy'
   | 'materials'
   | 'modelInfo'
+  | 'metadata'
   | 'uvMap'
   | 'thumbnail'
   | null
@@ -36,6 +37,7 @@ const PANEL_OPTIONS: { label: string; value: PanelContent; icon: string }[] = [
   { label: 'Hierarchy', value: 'hierarchy', icon: 'pi pi-sitemap' },
   { label: 'Materials', value: 'materials', icon: 'pi pi-palette' },
   { label: 'Model Info', value: 'modelInfo', icon: 'pi pi-info-circle' },
+  { label: 'Metadata', value: 'metadata', icon: 'pi pi-tags' },
   { label: 'UV Map', value: 'uvMap', icon: 'pi pi-map' },
   { label: 'Thumbnail Details', value: 'thumbnail', icon: 'pi pi-image' },
 ]

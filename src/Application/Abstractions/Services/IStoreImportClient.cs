@@ -9,6 +9,10 @@ namespace Application.Abstractions.Services;
 /// The import token is passed per call and used only for the store's own host (see the
 /// implementation) - it is never persisted or logged. SSRF guards, timeouts, redirect
 /// limits and download size limits live in the implementation.
+///
+/// A null token means no credential is sent at all. The store answers that only for an
+/// approved free asset, which is what lets a Modelibr with no store account import CC0
+/// content; anything else comes back 401 and the job fails with it.
 /// </summary>
 public interface IStoreImportClient
 {
@@ -19,7 +23,7 @@ public interface IStoreImportClient
     Task<StoreManifest> FetchManifestAsync(
         string storeUrl,
         string assetId,
-        string importToken,
+        string? importToken,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -34,7 +38,7 @@ public interface IStoreImportClient
     Task<StoreDownloadedFile> DownloadFileAsync(
         string storeUrl,
         string absoluteUrl,
-        string importToken,
+        string? importToken,
         long expectedSizeBytes,
         long? maxBytes = null,
         CancellationToken cancellationToken = default);

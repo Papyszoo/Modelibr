@@ -8,12 +8,16 @@ namespace Application.Sounds;
 internal class DeleteSoundCommandHandler : ICommandHandler<DeleteSoundCommand>
 {
     private readonly ISoundRepository _soundRepository;
+    private readonly IStoreImportedItemRepository _storeImportedItemRepository;
     private readonly IUnitOfWork _unitOfWork;
 
-    public DeleteSoundCommandHandler(ISoundRepository soundRepository,
+    public DeleteSoundCommandHandler(
+        ISoundRepository soundRepository,
+        IStoreImportedItemRepository storeImportedItemRepository,
         IUnitOfWork unitOfWork)
     {
         _soundRepository = soundRepository;
+        _storeImportedItemRepository = storeImportedItemRepository;
         _unitOfWork = unitOfWork;
     }
 
@@ -26,6 +30,7 @@ internal class DeleteSoundCommandHandler : ICommandHandler<DeleteSoundCommand>
                 new Error("SoundNotFound", $"Sound with ID {command.Id} not found."));
         }
 
+        await _storeImportedItemRepository.DeleteByAssetAsync("Sound", command.Id, cancellationToken);
         await _soundRepository.DeleteAsync(command.Id, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 

@@ -1,0 +1,1446 @@
+using Application.Abstractions;
+using Application.Abstractions.Repositories;
+using Application.Abstractions.Services;
+using Application.Extraction;
+using SharedKernel;
+using Application.Scenes;
+using Domain.Models;
+using Domain.Scenes;
+using Domain.Services;
+using Domain.ValueObjects;
+using Moq;
+using Xunit;
+
+namespace Application.Tests.Scenes;
+
+/// <summary>
+/// The scene edits an agent actually makes, driven through the real
+/// <see cref="SceneWriter"/> over a mocked repository - the handlers are thin, and what is
+/// worth asserting is the behaviour they compose: grounding, overlap reporting, and the
+/// "before" state each write records so it can be undone.
+/// </summary>
+public class SceneCommandTests
+{
+    private static readonly DateTime Now = new(2026, 8, 16, 12, 0, 0, DateTimeKind.Utc);
+
+    private const int SceneId = 1;
+    private const int ModelId = 42;
+    private const int VersionId = 7;
+
+    private readonly Mock<ISceneRepository> _scenes = new();
+    private readonly Mock<ISceneAssetUsageRepository> _usage = new();
+    private readonly Mock<ISceneAssetFacts> _facts = new();
+
+    // Resting surfaces are resolved only for a call that names one, so the default is an
+    // empty library: every existing placement test anchors on a whole-asset top face.
+    private readonly Mock<ISceneAssetSurfaces> _surfaces = new();
+
+    // Profiles decide the identity and appearance findings that ride along with a write.
+    // These tests are about placement, so the default is "nothing profiled", which is also
+    // what a library with nothing extracted yet looks like.
+    private readonly Mock<ISceneAssetProfiles> _profiles = new();
+    private readonly Mock<ISceneDocumentCommit> _commit = new();
+
+    // apply_material resolves what it was asked to bind before it writes. These tests are
+    // about the binding behaviour, so the default library says "yes, that exists" and
+    // records no slots at all - the state an asset extracted before slots were captured is
+    // in, and the one case slot validation deliberately waves through.
+    private readonly Mock<IMaterialRepository> _materials = new();
+    private readonly Mock<ITextureSetRepository> _textureSets = new();
+    private readonly Mock<IAssetPartRepository> _parts = new();
+
+    private readonly SceneWriter _writer;
+    private Scene _scene = null!;
+
+    public SceneCommandTests()
+    {
+        var clock = new Mock<IDateTimeProvider>();
+        clock.SetupGet(c => c.UtcNow).Returns(Now);
+
+        _facts.Setup(f => f.FindUnresolvableAsync(It.IsAny<IEnumerable<SceneAssetRef>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<SceneAssetReferenceProblem>());
+        _commit.Setup(c => c.SaveAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Result.Success());
+        _profiles.Setup(p => p.ResolveAsync(It.IsAny<IEnumerable<SceneAssetRef>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, SceneAssetProfile>(StringComparer.Ordinal));
+        _surfaces.Setup(s => s.ResolveAsync(It.IsAny<IEnumerable<SceneAssetRef>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, IReadOnlyList<AssetSurface>>(StringComparer.Ordinal));
+
+        _materials.Setup(m => m.GetByIdAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((int _, CancellationToken _) =>
+                Material.Create("brass", MaterialParameters.Default, Now));
+        _textureSets.Setup(t => t.GetByIdAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((int _, CancellationToken _) => TextureSet.Create("oak", Now));
+        _parts.Setup(p => p.GetForAssetAsync(
+                It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<AssetPart>());
+
+        _writer = new SceneWriter(_scenes.Object, _facts.Object, _commit.Object, clock.Object, _usage.Object);
+
+        GivenFacts(new Vec3(2, 4, 2), "centered");
+        GivenScene(SceneDocument.Empty());
+    }
+
+    private ApplySceneMaterialCommandHandler Dress => new(
+        _writer, _materials.Object, _textureSets.Object, _parts.Object, _scenes.Object);
+
+    /// <summary>Gives the placed model a set of authored material slots.</summary>
+    private void GivenMaterialSlots(params string[] slots)
+    {
+        var part = AssetPart.Create(
+            SceneAssetTypes.Model, ModelId, VersionId, "root/mesh", "mesh", 0, "mesh", Now,
+            detail: $$"""{"materialSlots":[{{string.Join(",", slots.Select(s => $"\"{s}\""))}}]}""");
+
+        _parts.Setup(p => p.GetForAssetAsync(
+                It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { part });
+    }
+
+    /// <summary>The asset is 2×4×2 m with a centered origin unless a test says otherwise.</summary>
+    private void GivenFacts(Vec3? dimensions, string? origin, double? gridSize = null)
+    {
+        var reference = new SceneAssetRef(SceneAssetTypes.Model, ModelId, VersionId);
+        var resolved = new Dictionary<string, SceneAssetFacts>(StringComparer.Ordinal);
+
+        if (dimensions is not null || origin is not null || gridSize is not null)
+        {
+            resolved[SceneSpatial.FactsKey(reference)] =
+                new(SceneAssetTypes.Model, ModelId, VersionId, dimensions, origin, gridSize);
+        }
+
+        _facts.Setup(f => f.ResolveAsync(It.IsAny<IEnumerable<SceneAssetRef>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(resolved);
+    }
+
+    private void GivenScene(SceneDocument document)
+    {
+        _scene = Scene.Create(
+            "Street", SceneDocumentCodec.Serialize(document), SceneDocument.CurrentSchemaVersion, Now).Value;
+        typeof(Scene).GetProperty(nameof(Scene.Id))!.SetValue(_scene, SceneId);
+        _scenes.Setup(s => s.GetByIdAsync(SceneId, It.IsAny<CancellationToken>())).ReturnsAsync(_scene);
+    }
+
+    private PlaceSceneAssetCommandHandler Place => new(_writer, _facts.Object, _profiles.Object, _surfaces.Object);
+
+    private static PlaceSceneAssetCommand PlaceCommand(
+        string? nodeId = null, Vec3? position = null, bool groundSnap = false, double? snapToGrid = null) =>
+        new(SceneId, SceneAssetTypes.Model, ModelId, VersionId, nodeId,
+            Position: position, GroundSnap: groundSnap, SnapToGrid: snapToGrid);
+
+    [Fact]
+    public async Task PlaceAsset_When_No_NodeId_Is_Given_Generates_A_Readable_One()
+    {
+        var result = await Place.Handle(PlaceCommand(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("model-42-1", result.Value.Node.NodeId);
+    }
+
+    [Fact]
+    public async Task PlaceAsset_Twice_Generates_Distinct_Node_Ids()
+    {
+        await Place.Handle(PlaceCommand(), CancellationToken.None);
+        var second = await Place.Handle(PlaceCommand(), CancellationToken.None);
+
+        Assert.Equal("model-42-2", second.Value.Node.NodeId);
+    }
+
+    [Fact]
+    public async Task PlaceAsset_When_GroundSnap_Is_Set_Rests_A_Centered_Asset_On_The_Ground()
+    {
+        // The whole point of the flag: an asset with a centered origin placed at y=0 is
+        // buried to its middle, and an agent has no way to see that.
+        var result = await Place.Handle(PlaceCommand(groundSnap: true), CancellationToken.None);
+
+        Assert.Equal(2, result.Value.Node.Transform.Position.Y, 6);
+        Assert.Equal(0, result.Value.Node.Footprint!.Value.Min.Y, 6);
+    }
+
+    [Fact]
+    public async Task PlaceAsset_When_Bounds_Are_Unknown_Leaves_The_Position_Alone()
+    {
+        GivenFacts(dimensions: null, origin: null);
+
+        var result = await Place.Handle(PlaceCommand(groundSnap: true), CancellationToken.None);
+
+        Assert.Equal(0, result.Value.Node.Transform.Position.Y, 6);
+        Assert.Null(result.Value.Node.Footprint);
+    }
+
+    [Fact]
+    public async Task PlaceAsset_When_SnapToGrid_Is_Zero_Uses_The_Assets_Own_Derived_Grid()
+    {
+        GivenFacts(new Vec3(2, 4, 2), "centered", gridSize: 4);
+
+        var result = await Place.Handle(
+            PlaceCommand(position: new Vec3(3.2, 0, -5.1), snapToGrid: 0), CancellationToken.None);
+
+        Assert.Equal(4, result.Value.Node.Transform.Position.X, 6);
+        Assert.Equal(-4, result.Value.Node.Transform.Position.Z, 6);
+    }
+
+    [Fact]
+    public async Task PlaceAsset_Reports_The_Node_It_Now_Overlaps()
+    {
+        await Place.Handle(PlaceCommand(nodeId: "first"), CancellationToken.None);
+
+        var result = await Place.Handle(
+            PlaceCommand(nodeId: "second", position: new Vec3(1, 0, 0)), CancellationToken.None);
+
+        var overlap = Assert.Single(result.Value.Overlaps);
+        Assert.Contains("second", new[] { overlap.NodeIdA, overlap.NodeIdB });
+    }
+
+    [Fact]
+    public async Task PlaceAsset_Only_Reports_Overlaps_Involving_The_Node_It_Placed()
+    {
+        // Two nodes that already overlapped stay the agent's problem to find with get_scene;
+        // re-reporting them on every write buries the one this call just caused.
+        await Place.Handle(PlaceCommand(nodeId: "a"), CancellationToken.None);
+        await Place.Handle(PlaceCommand(nodeId: "b"), CancellationToken.None);
+
+        var result = await Place.Handle(
+            PlaceCommand(nodeId: "far", position: new Vec3(100, 0, 0)), CancellationToken.None);
+
+        Assert.Empty(result.Value.Overlaps);
+    }
+
+    [Fact]
+    public async Task PlaceAsset_When_The_NodeId_Is_Taken_Fails()
+    {
+        await Place.Handle(PlaceCommand(nodeId: "lamp"), CancellationToken.None);
+
+        var result = await Place.Handle(PlaceCommand(nodeId: "lamp"), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.DuplicateNodeId", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task MoveNode_Returns_The_Transform_It_Replaced()
+    {
+        await Place.Handle(PlaceCommand(nodeId: "lamp", position: new Vec3(1, 2, 3)), CancellationToken.None);
+
+        var result = await new MoveSceneNodeCommandHandler(_writer, _facts.Object, _profiles.Object, _surfaces.Object).Handle(
+            new MoveSceneNodeCommand(SceneId, "lamp", Position: new Vec3(9, 9, 9)), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(new Vec3(1, 2, 3), result.Value.PreviousTransform.Position);
+        Assert.Equal(new Vec3(9, 9, 9), result.Value.Node.Transform.Position);
+    }
+
+    [Fact]
+    public async Task MoveNode_Leaves_Omitted_Components_Alone()
+    {
+        await Place.Handle(PlaceCommand(nodeId: "lamp", position: new Vec3(1, 2, 3)), CancellationToken.None);
+
+        var result = await new MoveSceneNodeCommandHandler(_writer, _facts.Object, _profiles.Object, _surfaces.Object).Handle(
+            new MoveSceneNodeCommand(SceneId, "lamp", Scale: new Vec3(2, 2, 2)), CancellationToken.None);
+
+        Assert.Equal(new Vec3(1, 2, 3), result.Value.Node.Transform.Position);
+        Assert.Equal(new Vec3(2, 2, 2), result.Value.Node.Transform.Scale);
+    }
+
+    [Fact]
+    public async Task MoveNode_When_The_Node_Does_Not_Exist_Returns_NodeNotFound()
+    {
+        var result = await new MoveSceneNodeCommandHandler(_writer, _facts.Object, _profiles.Object, _surfaces.Object).Handle(
+            new MoveSceneNodeCommand(SceneId, "ghost", Position: Vec3.One), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.NodeNotFound", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task RemoveNode_Returns_The_Whole_Node_So_It_Can_Be_Restored()
+    {
+        await Place.Handle(PlaceCommand(nodeId: "lamp", position: new Vec3(1, 2, 3)), CancellationToken.None);
+
+        var removed = await new RemoveSceneNodeCommandHandler(_writer).Handle(
+            new RemoveSceneNodeCommand(SceneId, "lamp"), CancellationToken.None);
+
+        Assert.True(removed.IsSuccess);
+        Assert.Equal("lamp", removed.Value.RemovedNode.Id);
+        Assert.Equal(new Vec3(1, 2, 3), removed.Value.RemovedNode.Transform.Position);
+        Assert.Equal(0, removed.Value.Scene.NodeCount);
+
+        var restored = await new RestoreSceneNodeCommandHandler(_writer).Handle(
+            new RestoreSceneNodeCommand(SceneId, removed.Value.RemovedNode), CancellationToken.None);
+
+        Assert.Equal(1, restored.Value.NodeCount);
+    }
+
+    [Fact]
+    public async Task RestoreNode_Twice_Does_Not_Duplicate_It()
+    {
+        await Place.Handle(PlaceCommand(nodeId: "lamp"), CancellationToken.None);
+        var removed = await new RemoveSceneNodeCommandHandler(_writer).Handle(
+            new RemoveSceneNodeCommand(SceneId, "lamp"), CancellationToken.None);
+
+        var handler = new RestoreSceneNodeCommandHandler(_writer);
+        await handler.Handle(new RestoreSceneNodeCommand(SceneId, removed.Value.RemovedNode), CancellationToken.None);
+        var second = await handler.Handle(new RestoreSceneNodeCommand(SceneId, removed.Value.RemovedNode), CancellationToken.None);
+
+        Assert.Equal(1, second.Value.NodeCount);
+    }
+
+    [Fact]
+    public async Task SetLight_Upserts_By_Id_Rather_Than_Stacking()
+    {
+        var handler = new SetSceneLightCommandHandler(_writer);
+
+        await handler.Handle(
+            new SetSceneLightCommand(SceneId, "key", SceneLightTypes.Directional, new Vec3(5, 10, 5), 1.0), CancellationToken.None);
+        var second = await handler.Handle(
+            new SetSceneLightCommand(SceneId, "key", Intensity: 2.5), CancellationToken.None);
+
+        Assert.Equal(1, second.Value.Scene.LightCount);
+        Assert.Equal(2.5, second.Value.Light!.Intensity);
+        // The type survives an update that did not mention it - "make it brighter" must not
+        // turn a directional light into something else.
+        Assert.Equal(SceneLightTypes.Directional, second.Value.Light.Type);
+        Assert.Equal(1.0, second.Value.PreviousLight!.Intensity);
+    }
+
+    [Fact]
+    public async Task SetLight_When_Creating_Without_A_Type_Fails()
+    {
+        var result = await new SetSceneLightCommandHandler(_writer).Handle(
+            new SetSceneLightCommand(SceneId, "key", Intensity: 2), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.LightTypeRequired", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task SetLight_Can_Remove_And_Reports_What_It_Removed()
+    {
+        var handler = new SetSceneLightCommandHandler(_writer);
+        await handler.Handle(
+            new SetSceneLightCommand(SceneId, "key", SceneLightTypes.Point, Vec3.Zero), CancellationToken.None);
+
+        var removed = await handler.Handle(new SetSceneLightCommand(SceneId, "key", Remove: true), CancellationToken.None);
+
+        Assert.Equal(0, removed.Value.Scene.LightCount);
+        Assert.Null(removed.Value.Light);
+        Assert.Equal(SceneLightTypes.Point, removed.Value.PreviousLight!.Type);
+    }
+
+    [Fact]
+    public async Task ApplyMaterial_Records_The_Binding_It_Replaced()
+    {
+        await Place.Handle(PlaceCommand(nodeId: "lamp"), CancellationToken.None);
+        var handler = Dress;
+
+        await handler.Handle(new ApplySceneMaterialCommand(SceneId, "lamp", TextureSetId: 3), CancellationToken.None);
+        var second = await handler.Handle(
+            new ApplySceneMaterialCommand(SceneId, "lamp", TextureSetId: 9), CancellationToken.None);
+
+        Assert.Equal(9, second.Value.Node.Material!.TextureSetId);
+        Assert.Equal(3, second.Value.PreviousMaterial!.TextureSetId);
+    }
+
+    [Fact]
+    public async Task ApplyMaterial_With_Nothing_To_Apply_Is_Rejected_As_Ambiguous()
+    {
+        await Place.Handle(PlaceCommand(nodeId: "lamp"), CancellationToken.None);
+
+        var result = await Dress.Handle(
+            new ApplySceneMaterialCommand(SceneId, "lamp"), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.MaterialEmpty", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task ApplyMaterial_Can_Bind_A_Parameter_Material_Instead_Of_A_Texture_Set()
+    {
+        await Place.Handle(PlaceCommand(nodeId: "sofa"), CancellationToken.None);
+
+        var result = await Dress.Handle(
+            new ApplySceneMaterialCommand(SceneId, "sofa", MaterialId: 12), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(12, result.Value.Node.Material!.MaterialId);
+        Assert.Null(result.Value.Node.Material.TextureSetId);
+    }
+
+    [Fact]
+    public async Task ApplyMaterial_With_Both_Sources_Is_Rejected_Rather_Than_Resolved()
+    {
+        await Place.Handle(PlaceCommand(nodeId: "sofa"), CancellationToken.None);
+
+        var result = await Dress.Handle(
+            new ApplySceneMaterialCommand(SceneId, "sofa", TextureSetId: 3, MaterialId: 12),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.MaterialAmbiguous", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task ApplyMaterial_When_The_Material_Does_Not_Exist_Refuses_The_Write()
+    {
+        // The whole failure this closes: the id saved, the node looked dressed, and the
+        // render came back grey with nothing anywhere saying why.
+        await Place.Handle(PlaceCommand(nodeId: "lamp"), CancellationToken.None);
+        _materials.Setup(m => m.GetByIdAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Material?)null);
+
+        var result = await Dress.Handle(
+            new ApplySceneMaterialCommand(SceneId, "lamp", MaterialId: 91), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.MaterialNotFound", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task ApplyMaterial_When_The_TextureSet_Does_Not_Exist_Refuses_The_Write()
+    {
+        await Place.Handle(PlaceCommand(nodeId: "lamp"), CancellationToken.None);
+        _textureSets.Setup(t => t.GetByIdAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((TextureSet?)null);
+
+        var result = await Dress.Handle(
+            new ApplySceneMaterialCommand(SceneId, "lamp", TextureSetId: 91), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.TextureSetNotFound", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task ApplyMaterial_When_The_Slot_Is_Not_One_The_Asset_Declares_Lists_The_Ones_It_Does()
+    {
+        await Place.Handle(PlaceCommand(nodeId: "sofa"), CancellationToken.None);
+        GivenMaterialSlots("cushions", "frame");
+
+        var result = await Dress.Handle(
+            new ApplySceneMaterialCommand(SceneId, "sofa", MaterialId: 7, Slot: "cushion"),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.SlotNotFound", result.Error.Code);
+        // Naming the alternatives is the point - a rejection an agent cannot act on costs
+        // it the same turn the silent write did.
+        Assert.Contains("cushions", result.Error.Message);
+        Assert.Contains("frame", result.Error.Message);
+    }
+
+    [Fact]
+    public async Task ApplyMaterial_When_The_Asset_Records_No_Slots_Accepts_The_Slot_Anyway()
+    {
+        // Assets extracted before slots were captured have none recorded. Refusing them
+        // would block dressing that works, so an absent list is not evidence of a typo.
+        await Place.Handle(PlaceCommand(nodeId: "sofa"), CancellationToken.None);
+
+        var result = await Dress.Handle(
+            new ApplySceneMaterialCommand(SceneId, "sofa", MaterialId: 7, Slot: "cushions"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task ApplyMaterial_Matches_A_Declared_Slot_Regardless_Of_Case()
+    {
+        await Place.Handle(PlaceCommand(nodeId: "sofa"), CancellationToken.None);
+        GivenMaterialSlots("Cushions");
+
+        var result = await Dress.Handle(
+            new ApplySceneMaterialCommand(SceneId, "sofa", MaterialId: 7, Slot: "cushions"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task ApplyMaterial_Dresses_One_Slot_Without_Disturbing_The_Rest_Of_The_Node()
+    {
+        // "The cushions of this sofa", which is the thing a scene could not say at all
+        // while the only binding was per-node.
+        await Place.Handle(PlaceCommand(nodeId: "sofa"), CancellationToken.None);
+        var handler = Dress;
+
+        await handler.Handle(
+            new ApplySceneMaterialCommand(SceneId, "sofa", MaterialId: 4), CancellationToken.None);
+        var result = await handler.Handle(
+            new ApplySceneMaterialCommand(SceneId, "sofa", MaterialId: 7, Slot: "cushions"),
+            CancellationToken.None);
+
+        Assert.Equal(4, result.Value.Node.Material!.MaterialId);
+        var slot = Assert.Single(result.Value.Node.MaterialSlots!);
+        Assert.Equal("cushions", slot.Slot);
+        Assert.Equal(7, slot.MaterialId);
+    }
+
+    [Fact]
+    public async Task ApplyMaterial_Replaces_A_Slots_Binding_Rather_Than_Adding_A_Second_One()
+    {
+        await Place.Handle(PlaceCommand(nodeId: "sofa"), CancellationToken.None);
+        var handler = Dress;
+
+        await handler.Handle(
+            new ApplySceneMaterialCommand(SceneId, "sofa", MaterialId: 7, Slot: "cushions"), CancellationToken.None);
+        var second = await handler.Handle(
+            new ApplySceneMaterialCommand(SceneId, "sofa", MaterialId: 9, Slot: "cushions"), CancellationToken.None);
+
+        var slot = Assert.Single(second.Value.Node.MaterialSlots!);
+        Assert.Equal(9, slot.MaterialId);
+        Assert.Equal(7, second.Value.PreviousMaterial!.MaterialId);
+    }
+
+    [Fact]
+    public async Task ApplyMaterial_Clearing_A_Slot_Leaves_The_Nodes_Default_Binding_Alone()
+    {
+        await Place.Handle(PlaceCommand(nodeId: "sofa"), CancellationToken.None);
+        var handler = Dress;
+
+        await handler.Handle(
+            new ApplySceneMaterialCommand(SceneId, "sofa", MaterialId: 4), CancellationToken.None);
+        await handler.Handle(
+            new ApplySceneMaterialCommand(SceneId, "sofa", MaterialId: 7, Slot: "cushions"), CancellationToken.None);
+
+        var cleared = await handler.Handle(
+            new ApplySceneMaterialCommand(SceneId, "sofa", Clear: true, Slot: "cushions"), CancellationToken.None);
+
+        Assert.Equal(4, cleared.Value.Node.Material!.MaterialId);
+        Assert.Null(cleared.Value.Node.MaterialSlots);
+    }
+
+    [Fact]
+    public async Task ApplyMaterial_Naming_A_Material_Drops_The_Texture_Set_It_Replaces()
+    {
+        // A partial update keeps what it does not mention, but not here: the two ids are
+        // alternatives, so keeping the old one would leave a binding that names both and
+        // the document validator rejects that.
+        await Place.Handle(PlaceCommand(nodeId: "sofa"), CancellationToken.None);
+        var handler = Dress;
+
+        await handler.Handle(
+            new ApplySceneMaterialCommand(SceneId, "sofa", TextureSetId: 3), CancellationToken.None);
+        var result = await handler.Handle(
+            new ApplySceneMaterialCommand(SceneId, "sofa", MaterialId: 12), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(12, result.Value.Node.Material!.MaterialId);
+        Assert.Null(result.Value.Node.Material.TextureSetId);
+    }
+
+    [Fact]
+    public async Task UpdateSceneDocument_Rejects_An_Invalid_Document_Without_Touching_The_Scene()
+    {
+        await Place.Handle(PlaceCommand(nodeId: "lamp"), CancellationToken.None);
+        var before = _scene.DocumentJson;
+
+        var result = await new UpdateSceneDocumentCommandHandler(_writer).Handle(
+            new UpdateSceneDocumentCommand(SceneId, """{"schemaVersion":1,"nodes":[],"lights":[],"bogus":true}"""),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(before, _scene.DocumentJson);
+    }
+
+
+    [Fact]
+    public async Task SetLight_With_Exact_Restores_A_Light_That_Had_No_Target_Or_Name()
+    {
+        // Partial updates ("make it warmer") are what an agent wants, but they make some prior
+        // states unreachable: nulls read as "keep what is there". Undo is the one caller that
+        // holds the whole previous light and has to reproduce it, target and name included.
+        var handler = new SetSceneLightCommandHandler(_writer);
+        await handler.Handle(
+            new SetSceneLightCommand(
+                SceneId, "key", SceneLightTypes.Spot, new Vec3(5, 10, 5), 1.0, "#ffffff",
+                Target: new Vec3(1, 0, 1), Name: "Key light"),
+            CancellationToken.None);
+
+        var restored = await handler.Handle(
+            new SetSceneLightCommand(
+                SceneId, "key", SceneLightTypes.Spot, new Vec3(5, 10, 5), 1.0, "#ffffff", Exact: true),
+            CancellationToken.None);
+
+        Assert.True(restored.IsSuccess);
+        Assert.Null(restored.Value.Light!.Target);
+        Assert.Null(restored.Value.Light.Name);
+    }
+
+    [Fact]
+    public async Task SetLight_Without_Exact_Still_Leaves_Omitted_Fields_Alone()
+    {
+        var handler = new SetSceneLightCommandHandler(_writer);
+        await handler.Handle(
+            new SetSceneLightCommand(
+                SceneId, "key", SceneLightTypes.Spot, new Vec3(5, 10, 5), 1.0, "#ffffff",
+                Target: new Vec3(1, 0, 1), Name: "Key light"),
+            CancellationToken.None);
+
+        var updated = await handler.Handle(
+            new SetSceneLightCommand(SceneId, "key", Intensity: 2.5), CancellationToken.None);
+
+        Assert.Equal(new Vec3(1, 0, 1), updated.Value.Light!.Target);
+        Assert.Equal("Key light", updated.Value.Light.Name);
+    }
+
+    [Fact]
+    public async Task ApplyMaterial_With_Exact_Restores_A_Binding_That_Had_No_Variant()
+    {
+        await Place.Handle(PlaceCommand(nodeId: "lamp"), CancellationToken.None);
+        var handler = Dress;
+        await handler.Handle(
+            new ApplySceneMaterialCommand(SceneId, "lamp", TextureSetId: 3, Variant: "battle-damaged"),
+            CancellationToken.None);
+
+        var restored = await handler.Handle(
+            new ApplySceneMaterialCommand(SceneId, "lamp", TextureSetId: 3, Variant: null, Exact: true),
+            CancellationToken.None);
+
+        Assert.True(restored.IsSuccess);
+        Assert.Equal(3, restored.Value.Node.Material!.TextureSetId);
+        Assert.Null(restored.Value.Node.Material.Variant);
+    }
+
+    [Fact]
+    public async Task MoveNode_Keeps_A_Node_On_The_Ground_When_The_Move_Does_Not_Mention_Grounding()
+    {
+        // The defect this closes: four nodes dropped to half-buried in one call, because a
+        // move that supplied only a position re-centred them on their origin and reported it
+        // as nothing more than a changed footprint.
+        await Place.Handle(PlaceCommand(nodeId: "lamp", groundSnap: true), CancellationToken.None);
+
+        var result = await new MoveSceneNodeCommandHandler(_writer, _facts.Object, _profiles.Object, _surfaces.Object).Handle(
+            new MoveSceneNodeCommand(SceneId, "lamp", Position: new Vec3(9, 0, 9)), CancellationToken.None);
+
+        Assert.Equal(2, result.Value.Node.Transform.Position.Y, 6);
+        Assert.Equal(0, result.Value.Node.Footprint!.Value.Min.Y, 6);
+        Assert.True(result.Value.Node.GroundSnap);
+    }
+
+    [Fact]
+    public async Task MoveNode_Can_Stop_A_Node_Being_Held_On_The_Ground()
+    {
+        await Place.Handle(PlaceCommand(nodeId: "lamp", groundSnap: true), CancellationToken.None);
+
+        var result = await new MoveSceneNodeCommandHandler(_writer, _facts.Object, _profiles.Object, _surfaces.Object).Handle(
+            new MoveSceneNodeCommand(SceneId, "lamp", Position: new Vec3(0, 6, 0), GroundSnap: false),
+            CancellationToken.None);
+
+        Assert.Equal(6, result.Value.Node.Transform.Position.Y, 6);
+        Assert.False(result.Value.Node.GroundSnap);
+    }
+
+    [Fact]
+    public async Task PlaceAsset_On_Another_Node_Rests_It_On_That_Nodes_Top_Face()
+    {
+        await Place.Handle(PlaceCommand(nodeId: "table", groundSnap: true), CancellationToken.None);
+
+        var result = await Place.Handle(
+            new PlaceSceneAssetCommand(SceneId, SceneAssetTypes.Model, ModelId, VersionId, "vase", AnchorTo: "table"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        // The table is 4 m tall resting on the floor, so its top face is at y=4 and a centered
+        // 4 m asset sitting on it has its own centre at 6.
+        Assert.Equal(6, result.Value.Node.Transform.Position.Y, 6);
+        Assert.Equal(4, result.Value.Node.Footprint!.Value.Min.Y, 6);
+        Assert.Equal("table", result.Value.Node.Anchor!.OnNodeId);
+    }
+
+    [Fact]
+    public async Task MoveNode_Carries_Everything_Anchored_To_It()
+    {
+        await Place.Handle(PlaceCommand(nodeId: "table", groundSnap: true), CancellationToken.None);
+        await Place.Handle(
+            new PlaceSceneAssetCommand(SceneId, SceneAssetTypes.Model, ModelId, VersionId, "vase", AnchorTo: "table"),
+            CancellationToken.None);
+
+        var moved = await new MoveSceneNodeCommandHandler(_writer, _facts.Object, _profiles.Object, _surfaces.Object).Handle(
+            new MoveSceneNodeCommand(SceneId, "table", Position: new Vec3(12, 0, -3)), CancellationToken.None);
+
+        Assert.True(moved.IsSuccess);
+
+        var scene = await new GetSceneByIdQueryHandler(_writer).Handle(new GetSceneByIdQuery(SceneId), CancellationToken.None);
+        var vase = scene.Value.Nodes.Single(n => n.NodeId == "vase");
+
+        Assert.Equal(12, vase.Transform.Position.X, 6);
+        Assert.Equal(-3, vase.Transform.Position.Z, 6);
+        Assert.Equal(6, vase.Transform.Position.Y, 6);
+    }
+
+    [Fact]
+    public async Task MoveNode_Can_Detach_A_Node_From_What_It_Rests_On()
+    {
+        await Place.Handle(PlaceCommand(nodeId: "table", groundSnap: true), CancellationToken.None);
+        await Place.Handle(
+            new PlaceSceneAssetCommand(SceneId, SceneAssetTypes.Model, ModelId, VersionId, "vase", AnchorTo: "table"),
+            CancellationToken.None);
+
+        var handler = new MoveSceneNodeCommandHandler(_writer, _facts.Object, _profiles.Object, _surfaces.Object);
+        var detached = await handler.Handle(
+            new MoveSceneNodeCommand(SceneId, "vase", DetachAnchor: true), CancellationToken.None);
+
+        Assert.Null(detached.Value.Node.Anchor);
+        // Detaching leaves it where it is rather than dropping it.
+        Assert.Equal(6, detached.Value.Node.Transform.Position.Y, 6);
+
+        await handler.Handle(
+            new MoveSceneNodeCommand(SceneId, "table", Position: new Vec3(30, 0, 0)), CancellationToken.None);
+
+        var scene = await new GetSceneByIdQueryHandler(_writer).Handle(new GetSceneByIdQuery(SceneId), CancellationToken.None);
+        Assert.Equal(0, scene.Value.Nodes.Single(n => n.NodeId == "vase").Transform.Position.X, 6);
+    }
+
+    [Fact]
+    public async Task RemoveNode_Refuses_While_Something_Rests_On_It()
+    {
+        // Cascading would delete furniture nobody asked to delete; detaching silently would
+        // leave an undo that cannot put the arrangement back. Both are worse than saying so.
+        await Place.Handle(PlaceCommand(nodeId: "table", groundSnap: true), CancellationToken.None);
+        await Place.Handle(
+            new PlaceSceneAssetCommand(SceneId, SceneAssetTypes.Model, ModelId, VersionId, "vase", AnchorTo: "table"),
+            CancellationToken.None);
+
+        var result = await new RemoveSceneNodeCommandHandler(_writer).Handle(
+            new RemoveSceneNodeCommand(SceneId, "table"), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.NodeHasDependents", result.Error.Code);
+        Assert.Contains("vase", result.Error.Message);
+    }
+
+    [Fact]
+    public async Task PlaceAsset_Facing_A_Point_Turns_The_Node_Towards_It()
+    {
+        var result = await Place.Handle(
+            new PlaceSceneAssetCommand(
+                SceneId, SceneAssetTypes.Model, ModelId, VersionId, "sofa",
+                Position: new Vec3(0, 0, -5), FaceToward: Vec3.Zero),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        // Standing at z=-5 looking at the origin is looking along +Z, which is the assumed front.
+        Assert.Equal(0, result.Value.Node.Transform.RotationEuler.Y, 6);
+        Assert.Equal(SceneFrontAxes.Default, result.Value.Node.FrontAxis);
+    }
+
+    [Fact]
+    public async Task PlaceAsset_Facing_A_Point_Honours_A_Declared_Front_Axis()
+    {
+        var result = await Place.Handle(
+            new PlaceSceneAssetCommand(
+                SceneId, SceneAssetTypes.Model, ModelId, VersionId, "sofa",
+                Position: new Vec3(0, 0, -5), FaceToward: Vec3.Zero, FrontAxis: SceneFrontAxes.MinusZ),
+            CancellationToken.None);
+
+        Assert.Equal(180, result.Value.Node.Transform.RotationEuler.Y, 6);
+    }
+
+    [Fact]
+    public async Task PlaceAsset_With_A_Front_Axis_That_Is_Not_One_Is_Refused()
+    {
+        var result = await Place.Handle(
+            new PlaceSceneAssetCommand(SceneId, SceneAssetTypes.Model, ModelId, VersionId, FrontAxis: "north"),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.UnknownFrontAxis", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task MoveNode_With_An_Explicit_Rotation_Stops_The_Node_Tracking_What_It_Faced()
+    {
+        await Place.Handle(
+            new PlaceSceneAssetCommand(
+                SceneId, SceneAssetTypes.Model, ModelId, VersionId, "sofa",
+                Position: new Vec3(0, 0, -5), FaceToward: Vec3.Zero),
+            CancellationToken.None);
+
+        var result = await new MoveSceneNodeCommandHandler(_writer, _facts.Object, _profiles.Object, _surfaces.Object).Handle(
+            new MoveSceneNodeCommand(SceneId, "sofa", RotationEuler: new Vec3(0, 33, 0)), CancellationToken.None);
+
+        Assert.Equal(33, result.Value.Node.Transform.RotationEuler.Y, 6);
+        Assert.Null(result.Value.Node.FaceToward);
+    }
+
+    [Fact]
+    public async Task MoveNode_Records_The_Whole_Placement_It_Replaced_So_Undo_Can_Restore_It()
+    {
+        await Place.Handle(PlaceCommand(nodeId: "table", groundSnap: true), CancellationToken.None);
+        await Place.Handle(
+            new PlaceSceneAssetCommand(
+                SceneId, SceneAssetTypes.Model, ModelId, VersionId, "vase",
+                AnchorTo: "table", FaceToward: new Vec3(10, 0, 0), FrontAxis: SceneFrontAxes.MinusZ),
+            CancellationToken.None);
+
+        var handler = new MoveSceneNodeCommandHandler(_writer, _facts.Object, _profiles.Object, _surfaces.Object);
+        var detached = await handler.Handle(
+            new MoveSceneNodeCommand(SceneId, "vase", Position: Vec3.Zero, DetachAnchor: true), CancellationToken.None);
+
+        Assert.Equal("table", detached.Value.PreviousAnchor!.OnNodeId);
+        Assert.Equal(new Vec3(10, 0, 0), detached.Value.PreviousFaceToward);
+        Assert.Equal(SceneFrontAxes.MinusZ, detached.Value.PreviousFrontAxis);
+
+        // Putting that state back is what reverse_operation issues.
+        var restored = await handler.Handle(
+            new MoveSceneNodeCommand(
+                SceneId, "vase",
+                detached.Value.PreviousTransform.Position,
+                detached.Value.PreviousTransform.RotationEuler,
+                detached.Value.PreviousTransform.Scale,
+                GroundSnap: detached.Value.PreviousGroundSnap,
+                FaceToward: detached.Value.PreviousFaceToward,
+                FrontAxis: detached.Value.PreviousFrontAxis,
+                AnchorTo: detached.Value.PreviousAnchor.OnNodeId,
+                AnchorOffset: detached.Value.PreviousAnchor.Offset,
+                Exact: true),
+            CancellationToken.None);
+
+        Assert.Equal("table", restored.Value.Node.Anchor!.OnNodeId);
+        Assert.Equal(4, restored.Value.Node.Footprint!.Value.Min.Y, 6);
+    }
+
+    [Fact]
+    public async Task DistributeAssets_Spaces_Every_Copy_Between_The_Endpoints_Inclusively()
+    {
+        var handler = new DistributeSceneAssetsCommandHandler(_writer, _facts.Object, _profiles.Object);
+
+        var result = await handler.Handle(
+            new DistributeSceneAssetsCommand(
+                SceneId, SceneAssetTypes.Model, ModelId,
+                new Vec3(0, 0, 0), new Vec3(10, 0, 0), 3, VersionId, NodeIdPrefix: "lamp"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(["lamp-1", "lamp-2", "lamp-3"], result.Value.Nodes.Select(n => n.NodeId));
+        Assert.Equal([0, 5, 10], result.Value.Nodes.Select(n => n.Transform.Position.X));
+        // One write, so the row lands together and the revision moves once.
+        Assert.Equal(2, _scene.Revision);
+    }
+
+    [Fact]
+    public async Task DistributeAssets_Rejects_A_Count_Beyond_What_One_Call_May_Place()
+    {
+        var handler = new DistributeSceneAssetsCommandHandler(_writer, _facts.Object, _profiles.Object);
+
+        var result = await handler.Handle(
+            new DistributeSceneAssetsCommand(
+                SceneId, SceneAssetTypes.Model, ModelId, Vec3.Zero, new Vec3(10, 0, 0), 5_000, VersionId),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.TooManyCopies", result.Error.Code);
+        Assert.Equal(1, _scene.Revision);
+    }
+
+
+    /// <summary>
+    /// Gives the placed model resting surfaces at these heights above its own base, in the
+    /// order get_asset reports them. Extents are nominal - only the height and the centre
+    /// reach placement.
+    /// </summary>
+    private void GivenSurfaces(params double[] heights)
+    {
+        var reference = new SceneAssetRef(SceneAssetTypes.Model, ModelId, VersionId);
+        _surfaces.Setup(s => s.ResolveAsync(It.IsAny<IEnumerable<SceneAssetRef>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, IReadOnlyList<AssetSurface>>(StringComparer.Ordinal)
+            {
+                [SceneSpatial.FactsKey(reference)] = heights
+                    .Select((h, i) => new AssetSurface(h, 1, [1.0, 1.0], [0.0, h, 0.0], [$"/part{i}"], i))
+                    .ToList(),
+            });
+    }
+
+    [Fact]
+    public async Task PlaceAsset_OnSurface_Rests_It_On_That_Surface_Rather_Than_The_Box_Top()
+    {
+        // The 4 m "table" stands on the floor, so its box top is y=4. Surface 1 is 1.5 up
+        // from its base - the seat, the shelf board, the sink basin. Anchoring without
+        // naming it would put the vase at 4; this is the whole of 11-E.
+        GivenSurfaces(3.0, 1.5);
+        await Place.Handle(PlaceCommand(nodeId: "table", groundSnap: true), CancellationToken.None);
+
+        var result = await Place.Handle(
+            new PlaceSceneAssetCommand(
+                SceneId, SceneAssetTypes.Model, ModelId, VersionId, "vase",
+                AnchorTo: "table", OnSurface: 1),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1.5, result.Value.Node.Footprint!.Value.Min.Y, 6);
+        Assert.Equal(1, result.Value.Node.Anchor!.Surface);
+    }
+
+    [Fact]
+    public async Task A_Node_Seated_On_A_Surface_Still_Follows_The_Node_It_Rests_On()
+    {
+        // The surface is stored as an ordinary anchor offset, so nothing downstream had to
+        // learn a new concept. If this ever regresses, a book on a shelf stops moving with
+        // the shelf and the whole point of anchoring is gone for surface placements.
+        GivenSurfaces(1.5);
+        await Place.Handle(PlaceCommand(nodeId: "shelf", groundSnap: true), CancellationToken.None);
+        await Place.Handle(
+            new PlaceSceneAssetCommand(
+                SceneId, SceneAssetTypes.Model, ModelId, VersionId, "book",
+                AnchorTo: "shelf", OnSurface: 0),
+            CancellationToken.None);
+
+        await new MoveSceneNodeCommandHandler(_writer, _facts.Object, _profiles.Object, _surfaces.Object).Handle(
+            new MoveSceneNodeCommand(SceneId, "shelf", Position: new Vec3(9, 0, 4)), CancellationToken.None);
+
+        var scene = await new GetSceneByIdQueryHandler(_writer).Handle(new GetSceneByIdQuery(SceneId), CancellationToken.None);
+        var book = scene.Value.Nodes.Single(n => n.NodeId == "book");
+
+        Assert.Equal(9, book.Transform.Position.X, 6);
+        Assert.Equal(4, book.Transform.Position.Z, 6);
+        Assert.Equal(1.5, book.Footprint!.Value.Min.Y, 6);
+    }
+
+    [Fact]
+    public async Task Dragging_A_Node_Off_Its_Surface_Drops_The_Surface_Label()
+    {
+        // The label says which face the stored offset was measured from. Re-arranging the
+        // node overwrites that offset, so keeping the label would leave a vase that is now
+        // on the floor still claiming to be on the seat.
+        GivenSurfaces(3.0, 1.5);
+        await Place.Handle(PlaceCommand(nodeId: "table", groundSnap: true), CancellationToken.None);
+        await Place.Handle(
+            new PlaceSceneAssetCommand(
+                SceneId, SceneAssetTypes.Model, ModelId, VersionId, "vase",
+                AnchorTo: "table", OnSurface: 1),
+            CancellationToken.None);
+
+        var moved = await new MoveSceneNodeCommandHandler(_writer, _facts.Object, _profiles.Object, _surfaces.Object).Handle(
+            new MoveSceneNodeCommand(SceneId, "vase", Position: new Vec3(1, 5, 1)), CancellationToken.None);
+
+        Assert.True(moved.IsSuccess);
+        Assert.Equal("table", moved.Value.Node.Anchor!.OnNodeId);
+        Assert.Null(moved.Value.Node.Anchor!.Surface);
+    }
+
+    [Fact]
+    public async Task PlaceAsset_OnSurface_Lists_What_There_Is_When_The_Index_Is_Wrong()
+    {
+        // An agent that gets "no surface 4" and nothing else calls get_asset again, or
+        // guesses. Naming the heights makes the retry the right one.
+        GivenSurfaces(3.0, 1.5);
+        await Place.Handle(PlaceCommand(nodeId: "table", groundSnap: true), CancellationToken.None);
+
+        var result = await Place.Handle(
+            new PlaceSceneAssetCommand(
+                SceneId, SceneAssetTypes.Model, ModelId, VersionId, "vase",
+                AnchorTo: "table", OnSurface: 4),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.UnknownSurface", result.Error.Code);
+        Assert.Contains("1.5", result.Error.Message);
+    }
+
+    [Fact]
+    public async Task PlaceAsset_OnSurface_Says_So_When_The_Asset_Was_Never_Measured_Into_Parts()
+    {
+        // "This library has not been re-extracted" is a different problem from "this asset
+        // has no flat top", and only the first one is fixed by running the derive step.
+        await Place.Handle(PlaceCommand(nodeId: "table", groundSnap: true), CancellationToken.None);
+
+        var result = await Place.Handle(
+            new PlaceSceneAssetCommand(
+                SceneId, SceneAssetTypes.Model, ModelId, VersionId, "vase",
+                AnchorTo: "table", OnSurface: 0),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.SurfacesUnknown", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task PlaceAsset_OnSurface_Without_An_Anchor_Is_Refused()
+    {
+        GivenSurfaces(1.5);
+
+        var result = await Place.Handle(
+            new PlaceSceneAssetCommand(
+                SceneId, SceneAssetTypes.Model, ModelId, VersionId, "vase", OnSurface: 0),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.SurfaceWithoutAnchor", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task MoveNode_Can_Reseat_A_Node_On_A_Surface_Without_Restating_What_It_Rests_On()
+    {
+        GivenSurfaces(3.0, 1.5);
+        await Place.Handle(PlaceCommand(nodeId: "shelf", groundSnap: true), CancellationToken.None);
+        await Place.Handle(
+            new PlaceSceneAssetCommand(
+                SceneId, SceneAssetTypes.Model, ModelId, VersionId, "book", AnchorTo: "shelf"),
+            CancellationToken.None);
+
+        var moved = await new MoveSceneNodeCommandHandler(_writer, _facts.Object, _profiles.Object, _surfaces.Object).Handle(
+            new MoveSceneNodeCommand(SceneId, "book", OnSurface: 1), CancellationToken.None);
+
+        Assert.True(moved.IsSuccess);
+        Assert.Equal(1.5, moved.Value.Node.Footprint!.Value.Min.Y, 6);
+        Assert.Equal("shelf", moved.Value.Node.Anchor!.OnNodeId);
+    }
+
+    private PlaceSceneAssetsBatchCommandHandler Batch => new(_writer, _facts.Object, _profiles.Object, _surfaces.Object);
+
+    private static ScenePlacementRequest BatchEntry(
+        string? nodeId = null,
+        Vec3? position = null,
+        bool groundSnap = false,
+        string? anchorTo = null,
+        string? frontAxis = null,
+        string? anchorAlign = null,
+        int? onSurface = null) =>
+        new(SceneAssetTypes.Model, ModelId, VersionId, nodeId,
+            Position: position, GroundSnap: groundSnap, AnchorTo: anchorTo, FrontAxis: frontAxis,
+            AnchorAlign: anchorAlign, OnSurface: onSurface);
+
+    [Fact]
+    public async Task PlaceAssetsBatch_Can_Seat_An_Entry_On_A_Surface_Of_One_The_Same_Batch_Creates()
+    {
+        // The table is not grounded until the writer's resolution pass runs, which is after
+        // every entry is built - so this only works because the surface becomes a difference
+        // between two points on the table itself, and that difference does not move when the
+        // table does.
+        GivenSurfaces(3.0, 1.5);
+
+        var result = await Batch.Handle(
+            new PlaceSceneAssetsBatchCommand(SceneId, [
+                BatchEntry("table", new Vec3(0, 0, 0), groundSnap: true),
+                BatchEntry("vase", anchorTo: "table", onSurface: 1),
+            ]),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1.5, result.Value.Nodes.Single(n => n.NodeId == "vase").Footprint!.Value.Min.Y, 6);
+    }
+
+    [Fact]
+    public async Task PlaceAssetsBatch_Refuses_Keep_Alignment_On_A_Surface_Of_Its_Own_Entry()
+    {
+        // 'keep' measures this node's X/Z against the target's, and the target has not been
+        // grounded or anchored yet - so both numbers are provisional. Refused with the fix
+        // named rather than silently seated somewhere near.
+        GivenSurfaces(1.5);
+
+        var result = await Batch.Handle(
+            new PlaceSceneAssetsBatchCommand(SceneId, [
+                BatchEntry("table", new Vec3(0, 0, 0), groundSnap: true),
+                BatchEntry("vase", anchorTo: "table", anchorAlign: SceneAnchorAlignments.Keep, onSurface: 0),
+            ]),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.SurfaceKeepInBatch", result.Error.Code);
+        Assert.Equal(1, _scene.Revision);
+    }
+
+    [Fact]
+    public async Task PlaceAssetsBatch_Places_Every_Entry_In_One_Revision()
+    {
+        var result = await Batch.Handle(
+            new PlaceSceneAssetsBatchCommand(SceneId, [
+                BatchEntry("sofa", new Vec3(0, 0, 0)),
+                BatchEntry("table", new Vec3(4, 0, 0)),
+                BatchEntry("lamp", new Vec3(8, 0, 0)),
+            ]),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(["sofa", "table", "lamp"], result.Value.Nodes.Select(n => n.NodeId));
+        // The whole point of the verb: three assets, one revision.
+        Assert.Equal(2, _scene.Revision);
+    }
+
+    [Fact]
+    public async Task PlaceAssetsBatch_Generates_Distinct_Ids_For_Entries_That_Ask_For_None()
+    {
+        var result = await Batch.Handle(
+            new PlaceSceneAssetsBatchCommand(SceneId, [BatchEntry(), BatchEntry(), BatchEntry()]),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(3, result.Value.Nodes.Select(n => n.NodeId).Distinct().Count());
+    }
+
+    [Fact]
+    public async Task PlaceAssetsBatch_Can_Rest_An_Entry_On_One_Placed_Earlier_In_The_Same_Call()
+    {
+        // 2x4x2 with a centered origin: grounding puts the table's centre at y=2 and its top
+        // at y=4, so the lamp resting on it has its own centre at y=6. This is the case that
+        // makes array order a contract rather than a detail - neither node exists until this
+        // write, so nothing outside the batch could have anchored them.
+        var result = await Batch.Handle(
+            new PlaceSceneAssetsBatchCommand(SceneId, [
+                BatchEntry("table", groundSnap: true),
+                BatchEntry("lamp", anchorTo: "table"),
+            ]),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(6, result.Value.Nodes.Single(n => n.NodeId == "lamp").Transform.Position.Y, 6);
+    }
+
+    [Fact]
+    public async Task PlaceAssetsBatch_Refuses_An_Entry_Resting_On_A_Later_One()
+    {
+        var result = await Batch.Handle(
+            new PlaceSceneAssetsBatchCommand(SceneId, [
+                BatchEntry("lamp", anchorTo: "table"),
+                BatchEntry("table"),
+            ]),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.AnchorNotFound", result.Error.Code);
+        // Names the entry, so the agent knows which one to move.
+        Assert.Contains("placement 0", result.Error.Message);
+        Assert.Equal(1, _scene.Revision);
+    }
+
+    [Fact]
+    public async Task PlaceAssetsBatch_Writes_Nothing_When_One_Entry_Is_Invalid()
+    {
+        var result = await Batch.Handle(
+            new PlaceSceneAssetsBatchCommand(SceneId, [
+                BatchEntry("sofa"),
+                BatchEntry("table", frontAxis: "sideways"),
+                BatchEntry("lamp"),
+            ]),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.UnknownFrontAxis", result.Error.Code);
+        Assert.Contains("placement 1", result.Error.Message);
+        // All or nothing: the two valid entries did not land either.
+        Assert.Equal(1, _scene.Revision);
+        Assert.DoesNotContain("sofa", _scene.DocumentJson);
+    }
+
+    [Fact]
+    public async Task PlaceAssetsBatch_Refuses_Two_Entries_Asking_For_The_Same_Node_Id()
+    {
+        var result = await Batch.Handle(
+            new PlaceSceneAssetsBatchCommand(SceneId, [BatchEntry("lamp"), BatchEntry("lamp")]),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.DuplicateNodeId", result.Error.Code);
+        Assert.Equal(1, _scene.Revision);
+    }
+
+    [Fact]
+    public async Task PlaceAssetsBatch_Refuses_An_Entry_Reusing_A_Node_Id_Already_In_The_Scene()
+    {
+        await Place.Handle(PlaceCommand(nodeId: "lamp"), CancellationToken.None);
+
+        var result = await Batch.Handle(
+            new PlaceSceneAssetsBatchCommand(SceneId, [BatchEntry("lamp")]),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.DuplicateNodeId", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task PlaceAssetsBatch_Rejects_An_Empty_Request_Rather_Than_Moving_The_Revision()
+    {
+        var result = await Batch.Handle(
+            new PlaceSceneAssetsBatchCommand(SceneId, []), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.EmptyBatch", result.Error.Code);
+        Assert.Equal(1, _scene.Revision);
+    }
+
+    [Fact]
+    public async Task PlaceAssetsBatch_Rejects_More_Entries_Than_One_Call_May_Place()
+    {
+        var placements = Enumerable.Range(0, 501).Select(_ => BatchEntry()).ToList();
+
+        var result = await Batch.Handle(
+            new PlaceSceneAssetsBatchCommand(SceneId, placements), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.TooManyPlacements", result.Error.Code);
+        Assert.Equal(1, _scene.Revision);
+    }
+
+    [Fact]
+    public async Task PlaceAssetsBatch_Asks_About_Each_Distinct_Asset_Once_Not_Once_Per_Entry()
+    {
+        _facts.Invocations.Clear();
+
+        await Batch.Handle(
+            new PlaceSceneAssetsBatchCommand(SceneId, [BatchEntry(), BatchEntry(), BatchEntry()]),
+            CancellationToken.None);
+
+        // The handler's own up-front read is the first one; the writer then reads the whole
+        // document for its resolution pass. What must not happen is a read per entry - twelve
+        // identical chairs is one asset, and this verb exists to stop asking twelve times.
+        var upFront = (IEnumerable<SceneAssetRef>)_facts.Invocations
+            .First(i => i.Method.Name == nameof(ISceneAssetFacts.ResolveAsync))
+            .Arguments[0];
+
+        Assert.Single(upFront);
+    }
+
+    private PlaceScenePrimitiveCommandHandler Primitive => new(_writer);
+
+    private CreateSceneRoomCommandHandler Room => new(_writer);
+
+    private SetSceneLightingPresetCommandHandler Lighting => new(_writer);
+
+    [Fact]
+    public async Task PlacePrimitive_Puts_A_Coloured_Box_In_The_Scene()
+    {
+        var result = await Primitive.Handle(
+            new PlaceScenePrimitiveCommand(
+                SceneId, ScenePrimitiveShapes.Box, new Vec3(4, 0.1, 3), "#c9c2b6", "floor"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Message : null);
+        var node = SceneDocumentCodec.Parse(_scene.DocumentJson).Value.Nodes.Single(n => n.Id == "floor");
+        Assert.Equal("#c9c2b6", node.Primitive!.Color);
+        Assert.Null(node.Asset);
+    }
+
+    [Fact]
+    public async Task PlacePrimitive_With_A_Colour_That_Is_Not_A_Hex_String_Is_Refused()
+    {
+        var result = await Primitive.Handle(
+            new PlaceScenePrimitiveCommand(SceneId, ScenePrimitiveShapes.Box, Color: "beige"),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Contains("InvalidColor", result.Error.Message);
+        Assert.Equal(1, _scene.Revision);
+    }
+
+    [Fact]
+    public async Task CreateRoom_Puts_The_Floors_Top_Face_At_The_Given_Height()
+    {
+        // The convention a person means by "a 5 by 4 room": furniture ground-snapped to y=0
+        // stands ON the floor, not inside it. A floor centred on y=0 would bury half of it.
+        var result = await Room.Handle(
+            new CreateSceneRoomCommand(SceneId, 5, 4, 2.6, WallThickness: 0.2),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Message : null);
+        var floor = result.Value.Nodes.Single(n => n.NodeId == "room-floor");
+        Assert.Equal(-0.1, floor.Transform.Position.Y, 6);
+        Assert.Equal(0, floor.Footprint!.Value.Max.Y, 6);
+    }
+
+    [Fact]
+    public async Task CreateRoom_Leaves_The_Internal_Space_That_Was_Asked_For()
+    {
+        // The walls sit OUTSIDE the stated width and depth. A wall centred on the room's
+        // edge would be half inside it, and the clear floor would be short by a thickness
+        // on each side - the arithmetic this verb exists to stop an agent doing by hand.
+        var result = await Room.Handle(
+            new CreateSceneRoomCommand(SceneId, 5, 4, 2.6, WallThickness: 0.2),
+            CancellationToken.None);
+
+        var west = result.Value.Nodes.Single(n => n.NodeId == "room-wall-west");
+        var east = result.Value.Nodes.Single(n => n.NodeId == "room-wall-east");
+
+        Assert.Equal(-2.5, west.Footprint!.Value.Max.X, 6);
+        Assert.Equal(2.5, east.Footprint!.Value.Min.X, 6);
+    }
+
+    [Fact]
+    public async Task CreateRoom_Emits_The_Shell_In_One_Revision_And_Skips_The_Ceiling_By_Default()
+    {
+        var result = await Room.Handle(
+            new CreateSceneRoomCommand(SceneId, 5, 4, 2.6), CancellationToken.None);
+
+        Assert.Equal(
+            ["room-floor", "room-wall-north", "room-wall-south", "room-wall-west", "room-wall-east"],
+            result.Value.Nodes.Select(n => n.NodeId));
+        Assert.Equal(2, _scene.Revision);
+    }
+
+    [Fact]
+    public async Task CreateRoom_Does_Not_Report_Its_Own_Corners_As_Overlaps()
+    {
+        // The shell touches itself by construction. Reporting four correct overlaps would
+        // bury the one that matters - a sofa halfway through a wall.
+        var result = await Room.Handle(
+            new CreateSceneRoomCommand(SceneId, 5, 4, 2.6, IncludeCeiling: true),
+            CancellationToken.None);
+
+        Assert.Empty(result.Value.Overlaps);
+    }
+
+    [Fact]
+    public async Task CreateRoom_Refuses_A_Wall_Thicker_Than_The_Room()
+    {
+        var result = await Room.Handle(
+            new CreateSceneRoomCommand(SceneId, 2, 2, 2.6, WallThickness: 5),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.InvalidRoom", result.Error.Code);
+        Assert.Equal(1, _scene.Revision);
+    }
+
+    [Fact]
+    public async Task CreateRoom_Twice_With_The_Same_Prefix_Is_Refused_Rather_Than_Silently_Doubled()
+    {
+        await Room.Handle(new CreateSceneRoomCommand(SceneId, 5, 4, 2.6), CancellationToken.None);
+
+        var second = await Room.Handle(
+            new CreateSceneRoomCommand(SceneId, 5, 4, 2.6), CancellationToken.None);
+
+        Assert.True(second.IsFailure);
+        Assert.Equal("Scene.DuplicateNodeId", second.Error.Code);
+    }
+
+    [Fact]
+    public async Task LightingPreset_Replaces_The_Rig_With_Ambient_Fill_Plus_A_Key()
+    {
+        // The rule an agent cannot discover from a render: ambient is fill, never key.
+        var result = await Lighting.Handle(
+            new SetSceneLightingPresetCommand(SceneId, SceneLightingPresets.InteriorDaylight),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Message : null);
+        Assert.Contains(result.Value.Lights, l => l.Type == SceneLightTypes.Ambient);
+        Assert.Contains(result.Value.Lights, l => l.Type == SceneLightTypes.Directional && l.Intensity > 0);
+    }
+
+    [Fact]
+    public async Task LightingPreset_Applied_Twice_Does_Not_Stack_A_Second_Rig()
+    {
+        await Lighting.Handle(
+            new SetSceneLightingPresetCommand(SceneId, SceneLightingPresets.Studio), CancellationToken.None);
+
+        var second = await Lighting.Handle(
+            new SetSceneLightingPresetCommand(SceneId, SceneLightingPresets.Studio), CancellationToken.None);
+
+        Assert.Equal(3, second.Value.Lights.Count);
+        // And it hands back what it replaced, so the write can be reversed whole.
+        Assert.Equal(3, second.Value.Previous.Count);
+    }
+
+    [Fact]
+    public async Task LightingPreset_With_A_Name_That_Is_Not_One_Lists_The_Ones_That_Are()
+    {
+        var result = await Lighting.Handle(
+            new SetSceneLightingPresetCommand(SceneId, "cinematic"), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.UnknownLightingPreset", result.Error.Code);
+        Assert.Contains("interior-daylight", result.Error.Message);
+    }
+
+    [Fact]
+    public async Task CreateScene_Refuses_A_Document_That_Claims_A_Stage_It_Does_Not_Hold()
+    {
+        // Creating is the one write with no "before" for SceneWriter's gate to compare
+        // against, so the gate runs in the create handler too. Without it the whole staged
+        // workflow is one call away from optional: hand in a room full of floating furniture
+        // that calls itself dressed, and nothing asks.
+        var unitOfWork = new Mock<IUnitOfWork>();
+        var clock = new Mock<IDateTimeProvider>();
+        clock.SetupGet(c => c.UtcNow).Returns(Now);
+
+        var handler = new CreateSceneCommandHandler(
+            _scenes.Object, _writer, unitOfWork.Object, clock.Object, _usage.Object);
+
+        var floating = new SceneDocument(
+            SceneDocument.CurrentSchemaVersion,
+            new[]
+            {
+                new SceneNode(
+                    "sofa",
+                    new SceneTransform(new Vec3(0, 9, 0), Vec3.Zero, Vec3.One),
+                    Asset: new SceneAssetRef(SceneAssetTypes.Model, ModelId, VersionId)),
+            },
+            Array.Empty<SceneLight>(),
+            Stage: SceneStages.Dressed);
+
+        var result = await handler.Handle(
+            new CreateSceneCommand("Levitating Room", DocumentJson: SceneDocumentCodec.Serialize(floating)),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.StageBlocked", result.Error.Code);
+        _scenes.Verify(s => s.AddAsync(It.IsAny<Scene>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>
+    /// Every OTHER write refuses a reference it cannot resolve - but it does so by diffing
+    /// the candidate against the stored document, and creation has nothing to diff against.
+    /// That made create_scene the one way to get a scene full of nodes pointing at assets
+    /// that were never there, or have since been recycled.
+    /// </summary>
+    [Fact]
+    public async Task CreateScene_Refuses_A_Document_Naming_An_Asset_That_Cannot_Be_Resolved()
+    {
+        var unitOfWork = new Mock<IUnitOfWork>();
+        var clock = new Mock<IDateTimeProvider>();
+        clock.SetupGet(c => c.UtcNow).Returns(Now);
+
+        _facts.Setup(f => f.FindUnresolvableAsync(It.IsAny<IEnumerable<SceneAssetRef>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[]
+            {
+                new SceneAssetReferenceProblem(
+                    new SceneAssetRef(SceneAssetTypes.Model, 999, 1),
+                    "Model 999 was not found."),
+            });
+
+        var handler = new CreateSceneCommandHandler(
+            _scenes.Object, _writer, unitOfWork.Object, clock.Object, _usage.Object);
+
+        var document = new SceneDocument(
+            SceneDocument.CurrentSchemaVersion,
+            new[]
+            {
+                new SceneNode(
+                    "ghost",
+                    new SceneTransform(Vec3.Zero, Vec3.Zero, Vec3.One),
+                    Asset: new SceneAssetRef(SceneAssetTypes.Model, 999, 1)),
+            },
+            Array.Empty<SceneLight>());
+
+        var result = await handler.Handle(
+            new CreateSceneCommand("Haunted", DocumentJson: SceneDocumentCodec.Serialize(document)),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.AssetNotFound", result.Error.Code);
+        _scenes.Verify(s => s.AddAsync(It.IsAny<Scene>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task CreateScene_Accepts_The_Same_Document_Without_The_Claim()
+    {
+        var unitOfWork = new Mock<IUnitOfWork>();
+        var clock = new Mock<IDateTimeProvider>();
+        clock.SetupGet(c => c.UtcNow).Returns(Now);
+
+        var handler = new CreateSceneCommandHandler(
+            _scenes.Object, _writer, unitOfWork.Object, clock.Object, _usage.Object);
+
+        var floating = new SceneDocument(
+            SceneDocument.CurrentSchemaVersion,
+            new[]
+            {
+                new SceneNode(
+                    "sofa",
+                    new SceneTransform(new Vec3(0, 9, 0), Vec3.Zero, Vec3.One),
+                    Asset: new SceneAssetRef(SceneAssetTypes.Model, ModelId, VersionId)),
+            },
+            Array.Empty<SceneLight>());
+
+        var result = await handler.Handle(
+            new CreateSceneCommand("Work In Progress", DocumentJson: SceneDocumentCodec.Serialize(floating)),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+    }
+}

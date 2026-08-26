@@ -26,11 +26,32 @@ public class AssetSearchIntegrationTests : IClassFixture<ModelibrWebFactory>
         _factory = factory;
     }
 
+    /// <summary>
+    /// Seeds documents, replacing any row already holding the same key.
+    ///
+    /// The Postgres container outlives a single <c>dotnet test</c> invocation, and nothing
+    /// here cleans up after itself, so a second run of the same test re-inserts ids the first
+    /// run already wrote and dies on the unique index - a failure that has nothing to do with
+    /// the behaviour under test and only appears on the second run. Deleting the same keys
+    /// first makes every test in this class re-runnable without weakening what it asserts:
+    /// each still seeds exactly the documents it names and searches over them.
+    /// </summary>
     private async Task SeedAsync(params AssetSearchDocument[] docs)
     {
         using var scope = _factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         await context.Database.MigrateAsync();
+
+        var assetIds = docs.Select(d => d.AssetId).Distinct().ToList();
+        var stale = await context.AssetSearchDocuments
+            .Where(d => d.AssetType == "Model" && assetIds.Contains(d.AssetId))
+            .ToListAsync();
+        if (stale.Count > 0)
+        {
+            context.AssetSearchDocuments.RemoveRange(stale);
+            await context.SaveChangesAsync();
+        }
+
         context.AssetSearchDocuments.AddRange(docs);
         await context.SaveChangesAsync();
     }
@@ -48,19 +69,23 @@ public class AssetSearchIntegrationTests : IClassFixture<ModelibrWebFactory>
         int? vertexCount = null,
         int? materialCount = null,
         bool? hasUvs = null,
+        string? uvStatus = null,
         int? partCount = null,
         int? boneCount = null,
         double? maxDimension = null,
         int? categoryId = null,
-        string? categoryName = null) =>
+        string? categoryName = null,
+        IEnumerable<string>? packNames = null) =>
         AssetSearchDocument.Create(
             "Model", assetId, versionId, partPath, current, prominence,
             displayName, tokens, browseSummary, DateTime.UtcNow,
+            packNames: packNames,
             triangleCount: triangleCount,
             boneCount: boneCount,
             vertexCount: vertexCount,
             materialCount: materialCount,
             hasUvs: hasUvs,
+            uvStatus: uvStatus,
             partCount: partCount,
             maxDimension: maxDimension,
             categoryId: categoryId,
@@ -89,6 +114,40 @@ public class AssetSearchIntegrationTests : IClassFixture<ModelibrWebFactory>
         // The tokenised-name hit outranks the prose/substring hit.
         Assert.Equal(90101, result.Hits[0].AssetId);
         Assert.Equal("token", result.Hits[0].MatchedOn);
+    }
+
+    [Fact]
+    public async Task PackName_FindsItsMembers()
+    {
+        // Author-written grouping: the library already knows this asset ships in
+        // "Polygonopolis", so "polygonopolis" should reach it even though nothing in the
+        // asset's own name or tokens says so.
+        await SeedAsync(
+            Doc(91101, tokens: "bench wooden", displayName: "Bench",
+                packNames: new[] { "Polygonopolis" }));
+
+        var result = await SearchAsync(Request("polygonopolis"));
+
+        Assert.Contains(result.Hits, h => h.AssetId == 91101);
+    }
+
+    [Fact]
+    public async Task PackName_RanksBelowTheAssetsOwnName()
+    {
+        // A pack is a container, not a description. "The Base Mesh" has 1,360 members, so
+        // a pack-name match admits a huge undifferentiated set and must never displace a
+        // document that matched on what the asset actually is.
+        await SeedAsync(
+            // Matches only because it lives in a pack of that name.
+            Doc(91111, tokens: "bench wooden", displayName: "Bench",
+                packNames: new[] { "Streetlamp" }),
+            // Matches on its own authored name.
+            Doc(91112, tokens: "streetlamp metal", displayName: "Streetlamp"));
+
+        var result = await SearchAsync(Request("streetlamp"));
+
+        Assert.True(result.Hits.Count >= 2);
+        Assert.Equal(91112, result.Hits[0].AssetId);
     }
 
     [Fact]
@@ -171,6 +230,43 @@ public class AssetSearchIntegrationTests : IClassFixture<ModelibrWebFactory>
         var byUvs = await SearchAsync(Request("matfilter") with { HasUvs = false });
         Assert.Single(byUvs.Hits.Where(h => h.AssetId is 90801 or 90802));
         Assert.Equal(90801, byUvs.Hits.First(h => h.AssetId is 90801 or 90802).AssetId);
+    }
+
+    /// <summary>
+    /// The pair the whole classification exists for. Both assets report <c>hasUvs: true</c>,
+    /// and only one of them can receive a baked texture set - so a filter that could only ask
+    /// "does it have UVs" returned both and an agent picked the wrong one.
+    /// </summary>
+    [Fact]
+    public async Task UvStatusFilter_Separates_A_Bakeable_Asset_From_An_Atlas_Packed_One()
+    {
+        await SeedAsync(
+            Doc(91001, tokens: "uvfilter", hasUvs: true, uvStatus: "unwrapped"),
+            Doc(91002, tokens: "uvfilter", hasUvs: true, uvStatus: "atlas_packed"));
+
+        var byHasUvs = await SearchAsync(Request("uvfilter") with { HasUvs = true });
+        Assert.Equal(2, byHasUvs.Hits.Count(h => h.AssetId is 91001 or 91002));
+
+        var packed = await SearchAsync(Request("uvfilter") with { UvStatus = "atlas_packed" });
+        var packedHits = packed.Hits.Where(h => h.AssetId is 91001 or 91002).ToList();
+        Assert.Single(packedHits);
+        Assert.Equal(91002, packedHits[0].AssetId);
+        Assert.Equal("atlas_packed", packedHits[0].Facts?.UvStatus);
+    }
+
+    /// <summary>
+    /// Exact match on a closed vocabulary, unlike the category filter's partial match - the
+    /// caller picks from five fixed values, so a substring match would only be a way to
+    /// select the wrong one.
+    /// </summary>
+    [Fact]
+    public async Task UvStatusFilter_Does_Not_Match_On_A_Substring()
+    {
+        await SeedAsync(Doc(91003, tokens: "uvsubstring", uvStatus: "atlas_packed"));
+
+        var response = await SearchAsync(Request("uvsubstring") with { UvStatus = "atlas" });
+
+        Assert.DoesNotContain(response.Hits, h => h.AssetId == 91003);
     }
 
     [Fact]

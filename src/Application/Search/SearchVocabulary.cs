@@ -54,7 +54,7 @@ public static class SearchVocabulary
     {
         new[] { "streetlight", "lamppost", "streetlamp" },
         new[] { "sofa", "couch", "settee" },
-        new[] { "trashcan", "garbagecan", "dustbin", "wastebin" },
+        new[] { "trashcan", "garbagecan", "dustbin", "wastebin", "wastebasket" },
         new[] { "car", "automobile" },
         new[] { "truck", "lorry" },
         new[] { "sidewalk", "pavement" },
@@ -65,6 +65,21 @@ public static class SearchVocabulary
         new[] { "rubbish", "trash", "garbage" },
         new[] { "apartment", "flat" },
         new[] { "shop", "store" },
+
+        // Interiors. A scene brief is written in furniture words, and the library is named
+        // in a different dialect of them: "rug" returned nothing while "carpet" returned
+        // one asset, and "bookshelf" nothing while "shelf" returned sixteen. Both are the
+        // same object under two names, and an agent that has to guess which one this
+        // library prefers spends its turns on vocabulary instead of on the scene.
+        new[] { "rug", "carpet" },
+        new[] { "bookshelf", "bookcase", "shelf", "shelving" },
+        new[] { "television", "tv" },
+        new[] { "curtain", "drape", "drapery" },
+        new[] { "sideboard", "dresser", "credenza" },
+        new[] { "wardrobe", "closet", "armoire" },
+        new[] { "refrigerator", "fridge" },
+        new[] { "nightstand", "bedsidetable" },
+        new[] { "cushion", "pillow" },
     };
 
     private static readonly Dictionary<string, string[]> SynonymLookup = BuildSynonymLookup();

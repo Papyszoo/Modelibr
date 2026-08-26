@@ -12,9 +12,15 @@ namespace Application.StoreImports;
 /// Starts a background import of a store asset pack. Validates the (untrusted) store URL,
 /// persists a <see cref="StoreImportJob"/> WITHOUT the token, then hands the token to the
 /// in-memory queue only. Returns the job id immediately; progress surfaces over SignalR.
+///
+/// <paramref name="ImportToken"/> is optional. Blank means "send no credential", which the
+/// store answers only for an approved free asset - that is how a Modelibr with no store
+/// account imports CC0 content. This handler deliberately does not try to decide locally
+/// whether the asset qualifies: the store owns that rule, and guessing at it here would be a
+/// second copy of an entitlement check that can only ever drift.
 /// </summary>
 public record CreateStoreImportCommand(
-    string StoreUrl, string AssetId, string ImportToken, IReadOnlyList<string>? SelectedItemIds = null)
+    string StoreUrl, string AssetId, string? ImportToken, IReadOnlyList<string>? SelectedItemIds = null)
     : ICommand<CreateStoreImportResponse>;
 
 public record CreateStoreImportResponse(int JobId);
@@ -47,10 +53,7 @@ internal sealed class CreateStoreImportCommandHandler : ICommandHandler<CreateSt
         if (string.IsNullOrWhiteSpace(command.AssetId))
             return Result.Failure<CreateStoreImportResponse>(new Error("StoreImport.MissingAssetId", "Asset id is required."));
 
-        if (string.IsNullOrWhiteSpace(command.ImportToken))
-            return Result.Failure<CreateStoreImportResponse>(new Error("StoreImport.MissingToken", "Import token is required."));
-
-        var storeUrl = command.StoreUrl.Trim().TrimEnd('/');
+        var storeUrl = StoreUrlCanonicalizer.Canonicalize(command.StoreUrl);
         var assetId = command.AssetId.Trim();
 
         StoreImportJob job;
@@ -77,7 +80,8 @@ internal sealed class CreateStoreImportCommandHandler : ICommandHandler<CreateSt
             selectedItemIds = null;
 
         // The token lives ONLY in this in-memory work item - never persisted, never logged.
-        var enqueued = _queue.Enqueue(new StoreImportWorkItem(job.Id, storeUrl, assetId, command.ImportToken.Trim(), selectedItemIds));
+        var importToken = string.IsNullOrWhiteSpace(command.ImportToken) ? null : command.ImportToken.Trim();
+        var enqueued = _queue.Enqueue(new StoreImportWorkItem(job.Id, storeUrl, assetId, importToken, selectedItemIds));
         if (!enqueued)
         {
             job.Fail("Import queue is saturated; try again shortly.", _dateTimeProvider.UtcNow);

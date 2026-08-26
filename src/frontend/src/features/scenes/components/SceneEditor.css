@@ -1,0 +1,137 @@
+/*
+ * The editor lives inside a splitter panel, so its available width has nothing
+ * to do with the window's. A container query is the only thing that can see
+ * that - a @media breakpoint measures the viewport and would keep three fixed
+ * columns in a 600px panel, squeezing the viewport to zero width. That is not
+ * cosmetic: react-three-fiber does not render its children into a zero-size
+ * container, so the scene silently shows nothing at all.
+ */
+.scene-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--mod-color-bg);
+  container-type: inline-size;
+  container-name: scene-editor;
+}
+
+.scene-editor-header {
+  padding: var(--mod-space-xs) var(--mod-space-sm);
+  border-bottom: 1px solid var(--mod-color-border);
+}
+
+.scene-editor-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mod-space-2xs);
+}
+
+.scene-editor-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--mod-space-2xs);
+}
+
+/*
+ * The stage picker sits in the header's action row beside the undo/save
+ * buttons, so it is sized down to match them rather than carrying PrimeReact's
+ * default form-control height, which would make the row a third taller.
+ */
+.scene-editor-stage .p-button {
+  padding: var(--mod-space-2xs) var(--mod-space-xs);
+  font-size: var(--mod-text-xs);
+}
+
+.scene-editor-message {
+  border-radius: 0;
+  justify-content: flex-start;
+  font-size: var(--mod-text-xs);
+}
+
+.scene-editor-add-row {
+  display: flex;
+  gap: var(--mod-space-2xs);
+  padding: var(--mod-space-xs);
+  border-bottom: 1px solid var(--mod-color-border);
+}
+
+.scene-editor-add-row .p-button {
+  flex: 1;
+  font-size: var(--mod-text-xs);
+}
+
+/*
+ * Narrow by default: one column, viewport first, panels stacked under it. The
+ * viewport keeps an explicit height because a grid row can otherwise resolve to
+ * zero, which is the state that makes the canvas render nothing.
+ */
+.scene-editor-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(280px, 1fr) auto auto;
+  overflow-y: auto;
+}
+
+.scene-editor-body > .scene-canvas {
+  order: -1;
+  min-width: 0;
+}
+
+/* A 1px separator rather than a framed panel - content sits flat on the ground surface. */
+.scene-editor-side {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--mod-color-border);
+  background: var(--mod-color-surface);
+}
+
+.scene-editor-side--right {
+  border-right: none;
+  border-left: 1px solid var(--mod-color-border);
+}
+
+/* Narrow: panels sit under the viewport and are capped so it keeps the room. */
+.scene-editor-side {
+  border-right: none;
+  border-top: 1px solid var(--mod-color-border);
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.scene-editor-side--right {
+  border-left: none;
+}
+
+/*
+ * Wide enough for three columns. 900px is the point at which the two 240px
+ * panels still leave the viewport a workable share rather than a sliver.
+ */
+@container scene-editor (min-width: 900px) {
+  .scene-editor-body {
+    grid-template-columns:
+      minmax(200px, 240px)
+      minmax(280px, 1fr)
+      minmax(220px, 280px);
+    grid-template-rows: minmax(0, 1fr);
+    overflow-y: hidden;
+  }
+
+  .scene-editor-body > .scene-canvas {
+    order: 0;
+  }
+
+  .scene-editor-side {
+    border-top: none;
+    border-right: 1px solid var(--mod-color-border);
+    max-height: none;
+  }
+
+  .scene-editor-side--right {
+    border-right: none;
+    border-left: 1px solid var(--mod-color-border);
+  }
+}

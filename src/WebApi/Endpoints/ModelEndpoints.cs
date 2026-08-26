@@ -3,6 +3,7 @@ using Application.Models;
 using Microsoft.AspNetCore.Mvc;
 using SharedKernel;
 using WebApi.Files;
+using WebApi.Infrastructure;
 using WebApi.Services;
 
 namespace WebApi.Endpoints;
@@ -13,7 +14,10 @@ public static class ModelEndpoints
     {
         app.MapPost("/models", CreateModel)
         .WithName("Create Model")
-        .DisableAntiforgery();
+        .DisableAntiforgery()
+        // Audits + de-duplicates the upload when a remote agent presents an upload ticket;
+        // a request without one is untouched (see AgentUploadTicketFilter).
+        .AcceptsAgentUploadTicket(AgentAssetFamilies.Model);
 
         app.MapPost("/models/{modelId}/files", AddFileToModel)
         .WithName("Add File to Model")
@@ -22,12 +26,14 @@ public static class ModelEndpoints
         app.MapPost("/models/multifile", ImportMultiFileModel)
         .WithName("Import Multi-File Model")
         .WithSummary("Imports a loose primary model (.gltf) plus its external .bin/textures")
-        .DisableAntiforgery();
+        .DisableAntiforgery()
+        .AcceptsAgentUploadTicket(AgentAssetFamilies.Model);
 
         app.MapPost("/models/zip", ImportModelZip)
         .WithName("Import Model Zip")
         .WithSummary("Imports every model group in a .zip (multi-file glTF resolved by directory)")
-        .DisableAntiforgery();
+        .DisableAntiforgery()
+        .AcceptsAgentUploadTicket(AgentAssetFamilies.Model);
 
         app.MapPost("/models/{modelId}/tags", UpdateModelTags)
         .WithName("Update Model Tags")
@@ -65,6 +71,7 @@ public static class ModelEndpoints
             int? minTriangleCount,
             int? maxTriangleCount,
             bool? hasAnimations,
+            string? uvStatus,
             bool? uncategorized,
             IQueryHandler<GetAllModelsQuery, GetAllModelsQueryResponse> queryHandler,
             CancellationToken cancellationToken) =>
@@ -83,6 +90,7 @@ public static class ModelEndpoints
                     MinTriangleCount: minTriangleCount,
                     MaxTriangleCount: maxTriangleCount,
                     HasAnimations: hasAnimations,
+                    UvStatus: string.IsNullOrWhiteSpace(uvStatus) ? null : uvStatus,
                     Uncategorized: uncategorized),
                 cancellationToken);
             
@@ -303,8 +311,14 @@ public static class ModelEndpoints
             auxiliaries.Add(new AuxiliaryUpload(paths[i] ?? string.Empty, new FormFileUpload(auxFiles[i])));
         }
 
+        // Optional: the directory the group came from, which a folder upload knows and a
+        // single-file drop does not. Weak taxonomy plus provenance, never required - an
+        // absent folder is one less signal, not a bad request.
+        var folder = form["folder"].FirstOrDefault();
+
         var result = await commandHandler.Handle(
-            new ImportModelWithAuxiliaryFilesCommand(new FormFileUpload(primary), auxiliaries, batchId),
+            new ImportModelWithAuxiliaryFilesCommand(
+                new FormFileUpload(primary), auxiliaries, batchId, folder),
             cancellationToken);
 
         if (result.IsFailure)

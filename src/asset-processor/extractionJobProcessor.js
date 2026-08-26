@@ -25,6 +25,7 @@ export class ExtractionJobProcessor {
     this.modelFileService = new ModelFileService()
     this.modelDataService = new ModelDataService()
     this.rendererPool = null
+    this.rendererPoolReady = null
     this.pollHandle = null
     this.isPolling = false
     this.isShuttingDown = false
@@ -32,7 +33,11 @@ export class ExtractionJobProcessor {
 
   start() {
     const pollIntervalMs = config.extractionPollIntervalMs
-    logger.info('Starting extraction-job polling', { pollIntervalMs })
+    logger.info('Starting extraction-job polling', {
+      pollIntervalMs,
+      concurrency: config.extractionConcurrency,
+      batchSize: config.extractionBatchSize,
+    })
     this.pollHandle = setInterval(() => this.drain(), pollIntervalMs)
   }
 
@@ -46,29 +51,74 @@ export class ExtractionJobProcessor {
       await this.rendererPool.shutdown?.()
       this.rendererPool = null
     }
+    this.rendererPoolReady = null
   }
 
-  /** Claim and process jobs until the queue is empty (bounded per tick). */
+  /**
+   * Claim and process jobs until the queue is empty, `extractionConcurrency` at a time
+   * and bounded at `extractionBatchSize` per tick.
+   *
+   * Concurrent rather than sequential because extraction is I/O-shaped - fetch the file,
+   * load it, walk the graph, POST the result - and one-at-a-time behind a 10-per-tick cap
+   * put a hard 120 jobs/min ceiling on re-deriving a library, which is 20-40 minutes of
+   * waiting for a 1,700-model re-projection. Each lane holds one renderer, and the pool is
+   * sized to the same budget, so the lanes never queue on each other for one.
+   */
   async drain() {
     if (this.isPolling || this.isShuttingDown) return
     this.isPolling = true
     try {
-      let processed = 0
-      // Bounded so one worker tick can't monopolise; the interval picks up the rest.
-      while (processed < 10 && !this.isShuttingDown) {
-        const job = await this.jobApi.dequeueExtractionJob(
-          config.workerId,
-          'Geometry'
-        )
-        if (!job) break
-        await this.process(job)
-        processed++
+      const budget = config.extractionConcurrency
+      const batchSize = config.extractionBatchSize
+      let claimed = 0
+      // Set once a lane finds the queue empty, so the other lanes stop asking for work
+      // that is not there instead of each paying its own empty round trip.
+      let drained = false
+
+      const lane = async () => {
+        while (!drained && !this.isShuttingDown && claimed < batchSize) {
+          claimed++
+          const job = await this.jobApi.dequeueExtractionJob(
+            config.workerId,
+            'Geometry'
+          )
+          if (!job) {
+            // Give the slot back - it was counted before we knew there was nothing in it.
+            claimed--
+            drained = true
+            break
+          }
+          // process() never throws: it reports its own failures to the queue. A lane that
+          // died on one bad job would take the rest of the tick's parallelism with it.
+          await this.process(job)
+        }
       }
+
+      await Promise.all(Array.from({ length: budget }, () => lane()))
     } catch (error) {
       logger.error('Extraction-job polling error', { error: error.message })
     } finally {
       this.isPolling = false
     }
+  }
+
+  /**
+   * The renderer pool, created on first use and sized to the concurrency budget - a smaller
+   * pool would serialise the lanes on acquire() and quietly undo the parallelism.
+   *
+   * The in-flight promise is memoised, not just the pool: several lanes reach this at the
+   * same moment on the first tick, and each would otherwise build a pool of its own and
+   * leave all but the last orphaned with live browser instances.
+   */
+  async ensureRendererPool() {
+    if (this.rendererPool) return this.rendererPool
+    this.rendererPoolReady ??= (async () => {
+      const pool = new RendererPool(config.extractionConcurrency)
+      await pool.initialize()
+      this.rendererPool = pool
+      return pool
+    })()
+    return this.rendererPoolReady
   }
 
   async process(job) {
@@ -119,11 +169,8 @@ export class ExtractionJobProcessor {
         )
       }
 
-      if (!this.rendererPool) {
-        this.rendererPool = new RendererPool()
-        await this.rendererPool.initialize()
-      }
-      renderer = await this.rendererPool.acquire()
+      const pool = await this.ensureRendererPool()
+      renderer = await pool.acquire()
 
       await renderer.loadModel(fileInfo.filePath, fileInfo.fileType, {
         gltfResources,

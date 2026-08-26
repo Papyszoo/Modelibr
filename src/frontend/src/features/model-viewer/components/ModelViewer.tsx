@@ -24,11 +24,16 @@ import {
   useModelVersionsQuery,
 } from '@/features/model-viewer/api/queries'
 import { useFileUploadHandlers } from '@/features/model-viewer/hooks/useFileUploadHandlers'
-import { useGltfResources } from '@/features/model-viewer/hooks/useGltfResources'
+import { useExternalResources } from '@/features/model-viewer/hooks/useExternalResources'
 import { useVersionSelection } from '@/features/model-viewer/hooks/useVersionSelection'
 import { useTextureSetByIdQuery } from '@/features/texture-set/api/queries'
 import { useTextureSetsByModelVersionQuery } from '@/features/texture-set/api/queries'
 import { useTabUiState } from '@/hooks/useTabUiState'
+import {
+  EMPTY_RENDERER_PERF_STATS,
+  type RendererPerfStats,
+} from '@/shared/three/rendererPerformance'
+import { RendererPerfSampler } from '@/shared/three/RendererPerfSampler'
 import { useModelThumbnailUpdates } from '@/shared/thumbnail'
 import { regenerateThumbnail } from '@/shared/thumbnail/api/thumbnailApi'
 import { useBlenderEnabledStore } from '@/stores/blenderEnabledStore'
@@ -46,8 +51,7 @@ import { type ExpandAction, PanelWrapper } from './PanelWrapper'
 import { type MaterialTextureSets } from './TexturedModel'
 import { VersionStrip } from './VersionStrip'
 import { type PanelContent, ViewerMenubar } from './ViewerMenubar'
-import { PerfDisplay, PerfSampler } from './ViewerPerfPanel'
-import { EMPTY_PERF_STATS, type PerfStats } from './viewerPerfStats'
+import { PerfDisplay } from './ViewerPerfPanel'
 import { ViewerSidePanel } from './ViewerSidePanel'
 
 interface ModelViewerProps {
@@ -134,7 +138,7 @@ export function ModelViewer({
   const blenderEnabled = useBlenderEnabledStore(s => s.blenderEnabled)
   const toast = useRef<Toast>(null)
   const statsContainerRef = useRef<HTMLDivElement>(null)
-  const perfStatsRef = useRef<PerfStats>(EMPTY_PERF_STATS)
+  const perfStatsRef = useRef<RendererPerfStats>(EMPTY_RENDERER_PERF_STATS)
   const queryClient = useQueryClient()
   const stableTabId =
     tabId ?? (modelId ? `model-viewer-${modelId}` : 'model-viewer-standalone')
@@ -364,23 +368,44 @@ export function ModelViewer({
     setSelectedVariant(variantName)
   }, [])
 
-  // External glTF resources (a loose .gltf's .bin/textures) for this version.
+  // The sibling files this version references - a loose .gltf's .bin and textures,
+  // an FBX's or OBJ's texture files.
   // Fetched HERE, outside <Canvas>: R3F renders the scene into its own reconciler
   // root, so a React Query hook called inside it would be reaching for a provider
   // that isn't reliably in scope. The scene receives a plain map as a prop.
   //
-  // Only a loose .gltf can have external resources - a cheap over-approximation that
-  // keeps every .glb/.fbx/.obj open from costing an extra request.
+  // Which formats can reference a sibling file: a loose .gltf (its .bin and
+  // textures) and FBX/OBJ (their texture files). Restricting this to .gltf was
+  // the second half of "an FBX can never show a texture" - the map the loader
+  // needed was never even fetched. A packed .glb, an .stl and a .3mf carry
+  // everything inside them and still cost no extra request.
   //
   // `model` is null until its query resolves (see the `if (!model)` guard further
   // down), and hooks must run before that guard - so every access here is optional.
-  const mayHaveGltfResources = (versionModel || model)?.files?.some(f =>
-    f.originalFileName?.toLowerCase().endsWith('.gltf')
-  )
-  const { resources: gltfResources } = useGltfResources(
+  const mayHaveExternalResources = (versionModel || model)?.files?.some(f => {
+    const name = f.originalFileName?.toLowerCase() ?? ''
+    return (
+      name.endsWith('.gltf') || name.endsWith('.fbx') || name.endsWith('.obj')
+    )
+  })
+  // Versions are a second round trip, and `selectedVersion` is set from an effect
+  // once they land - so between the model resolving and that effect there are many
+  // renders with a `.gltf` on screen and no version to ask about. The gate has to
+  // know that, or it opens for the whole window and the loader starts against an
+  // empty map. `isPending` stays true through the effect tick (data present,
+  // selection not made yet) and goes false only when the list settles with nothing
+  // to select, which is the one case where no version is ever coming.
+  const gltfVersionState = {
+    isKnown: currentVersionId !== undefined,
+    isPending:
+      !(versionsQuery.isSuccess || versionsQuery.isError) ||
+      versions.length > 0,
+  }
+  const { resources: resources, isAwaitingResources } = useExternalResources(
     model?.id,
     currentVersionId,
-    mayHaveGltfResources
+    mayHaveExternalResources,
+    gltfVersionState
   )
 
   // Fetch all texture sets for this version so we can build the material map
@@ -634,6 +659,7 @@ export function ModelViewer({
     hierarchy: 'Hierarchy',
     materials: 'Materials',
     modelInfo: 'Model Info',
+    metadata: 'Metadata',
     uvMap: 'UV Map',
     thumbnail: 'Thumbnail Details',
   }
@@ -913,21 +939,31 @@ export function ModelViewer({
                         }
                       }}
                     >
-                      <ModelPreviewScene
-                        key={`scene-${model.id}-${side}-${selectedVariant}-${selectedVersion?.id || 'original'}-${defaultFileId || 'auto'}`}
-                        model={versionModel || model}
-                        gltfResources={gltfResources}
-                        settings={viewerSettings}
-                        materialTextureSets={
-                          useEmbeddedMaterials ? {} : materialTextureSets
-                        }
-                        defaultFileId={defaultFileId}
-                        preserveMaterials={useEmbeddedMaterials}
-                        cameraState={cameraState}
-                        onCameraChange={handleCameraStateChange}
-                      />
+                      {/*
+                        Held back until the loose-glTF resource map has arrived.
+                        Mounting the scene with an empty map hands the loader a
+                        `.bin` the safe loading manager has rewritten to a
+                        transparent PNG, and `useLoader` caches that failure - so
+                        the model opens as a mesh with zero vertices and never
+                        recovers. See `useExternalResources`.
+                      */}
+                      {isAwaitingResources ? null : (
+                        <ModelPreviewScene
+                          key={`scene-${model.id}-${side}-${selectedVariant}-${selectedVersion?.id || 'original'}-${defaultFileId || 'auto'}`}
+                          model={versionModel || model}
+                          resources={resources}
+                          settings={viewerSettings}
+                          materialTextureSets={
+                            useEmbeddedMaterials ? {} : materialTextureSets
+                          }
+                          defaultFileId={defaultFileId}
+                          preserveMaterials={useEmbeddedMaterials}
+                          cameraState={cameraState}
+                          onCameraChange={handleCameraStateChange}
+                        />
+                      )}
                       {viewerSettings.showPerf && (
-                        <PerfSampler statsRef={perfStatsRef} />
+                        <RendererPerfSampler statsRef={perfStatsRef} />
                       )}
                     </Canvas>
                   </CanvasErrorBoundary>

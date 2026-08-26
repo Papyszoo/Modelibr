@@ -64,6 +64,19 @@ export class PuppeteerRenderer {
         ]
       : softwareGpuArgs
 
+    // Chromium does its OWN certificate validation, and nothing Node is told about
+    // TLS reaches it: NODE_TLS_REJECT_UNAUTHORIZED governs this process's own requests,
+    // not the browser's. Under compose the scene render page is handed an API address
+    // whose certificate is self-signed, so without this every request the page makes
+    // fails at the handshake and the render comes back empty.
+    //
+    // Gated on the operator having ALREADY declared this stack's TLS untrusted for Node
+    // rather than being unconditional: on a deployment with a real certificate no flag is
+    // added and the browser validates normally.
+    const tlsArgs = config.rejectUnauthorized
+      ? []
+      : ['--ignore-certificate-errors']
+
     const launchOptions = {
       headless: true,
       args: [
@@ -72,6 +85,7 @@ export class PuppeteerRenderer {
         '--disable-dev-shm-usage',
         '--js-flags=--max-old-space-size=4096',
         ...gpuArgs,
+        ...tlsArgs,
         '--enable-webgl',
         '--disable-extensions',
         '--disable-web-security',

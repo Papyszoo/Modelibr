@@ -1,0 +1,125 @@
+.scene-hierarchy {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.scene-hierarchy-header {
+  display: flex;
+  align-items: center;
+  gap: var(--mod-space-2xs);
+  padding: var(--mod-space-xs);
+}
+
+.scene-hierarchy-header h3 {
+  margin: 0;
+  font-size: var(--mod-text-sm);
+  font-weight: var(--mod-font-weight-semibold);
+  color: var(--mod-color-text);
+}
+
+.scene-hierarchy-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 var(--mod-space-2xs) var(--mod-space-2xs);
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* Selection is a primary tint, never solid primary - the categories standard. */
+.scene-hierarchy-row {
+  display: flex;
+  align-items: center;
+  gap: var(--mod-space-2xs);
+  border-radius: var(--mod-radius-sm);
+  border: 1px solid transparent;
+  padding: 0.3rem;
+  transition: background var(--mod-transition-fast);
+}
+
+.scene-hierarchy-row:hover {
+  background: var(--mod-color-surface-hover);
+}
+
+.scene-hierarchy-row--selected {
+  background: rgba(var(--primary-color-rgb), 0.12);
+  border-color: rgba(var(--primary-color-rgb), 0.24);
+}
+
+.scene-hierarchy-label {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--mod-color-text);
+  text-align: left;
+  padding: 0;
+  min-width: 0;
+}
+
+.scene-hierarchy-name {
+  display: flex;
+  align-items: center;
+  gap: var(--mod-space-2xs);
+  font-size: var(--mod-text-sm);
+  font-weight: var(--mod-font-weight-medium);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.scene-hierarchy-name i {
+  color: var(--mod-color-text-muted);
+  font-size: var(--mod-text-xs);
+}
+
+.scene-hierarchy-meta {
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+}
+
+.scene-hierarchy-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--mod-space-2xs);
+  margin-top: 2px;
+}
+
+.scene-hierarchy-flag {
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+  border: 1px solid var(--mod-color-border);
+  border-radius: var(--mod-radius-pill);
+  padding: 0 var(--mod-space-2xs);
+}
+
+.scene-hierarchy-flag--error {
+  color: var(--mod-color-danger);
+  border-color: var(--mod-color-danger);
+  background: var(--mod-color-danger-bg);
+}
+
+.scene-hierarchy-flag--warn {
+  color: var(--mod-color-warning);
+  border-color: var(--mod-color-warning);
+  background: var(--mod-color-warning-bg);
+}
+
+.scene-hierarchy-actions {
+  display: flex;
+  align-items: center;
+  opacity: 0;
+  transition: opacity var(--mod-transition-fast);
+}
+
+.scene-hierarchy-row:hover .scene-hierarchy-actions,
+.scene-hierarchy-row--selected .scene-hierarchy-actions,
+.scene-hierarchy-actions:focus-within {
+  opacity: 1;
+}

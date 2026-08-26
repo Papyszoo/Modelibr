@@ -52,6 +52,27 @@ internal sealed class EnvironmentMapRepository : IEnvironmentMapRepository
             .FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<EnvironmentMap>> GetByIdsAsync(
+        IReadOnlyCollection<int> ids,
+        CancellationToken cancellationToken = default)
+    {
+        if (ids.Count == 0)
+        {
+            return [];
+        }
+
+        return await _context.EnvironmentMaps
+            .AsNoTracking()
+            .Include(map => map.Variants)
+                .ThenInclude(variant => variant.File)
+            .Include(map => map.Variants)
+                .ThenInclude(variant => variant.FaceFiles)
+                    .ThenInclude(faceFile => faceFile.File)
+            .Where(map => ids.Contains(map.Id))
+            .AsSplitQuery()
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<EnvironmentMap?> GetDeletedByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         return await BaseQuery(includeDeleted: true)
@@ -75,6 +96,18 @@ internal sealed class EnvironmentMapRepository : IEnvironmentMapRepository
 
         return await BaseQuery()
             .FirstOrDefaultAsync(e => e.Variants.Any(v => v.File != null && v.File.Sha256Hash == sha256Hash), cancellationToken);
+    }
+
+    public async Task<EnvironmentMap?> GetDeletedByFileHashAsync(string sha256Hash, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(sha256Hash))
+            return null;
+
+        return await BaseQuery(includeDeleted: true)
+            .Where(e => e.IsDeleted)
+            .FirstOrDefaultAsync(
+                e => e.Variants.Any(v => v.File != null && v.File.Sha256Hash == sha256Hash),
+                cancellationToken);
     }
 
     public async Task<bool> ExistsByNameAsync(string name, CancellationToken cancellationToken = default)

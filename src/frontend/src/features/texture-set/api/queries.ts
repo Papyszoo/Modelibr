@@ -2,7 +2,9 @@ import { queryOptions, useQuery } from '@tanstack/react-query'
 
 import { type QueryConfig } from '@/lib/react-query'
 
+import { type TextureSetKind } from '../types'
 import {
+  getAllTextureSetCategories,
   getAllTextureSets,
   getTextureSetById,
   getTextureSetsPaginated,
@@ -23,6 +25,29 @@ export function getAllTextureSetsQueryOptions() {
   return queryOptions({
     queryKey: ['textureSets', 'all'] as const,
     queryFn: () => getAllTextureSets(),
+  })
+}
+
+/**
+ * The texture-set category tree for one kind.
+ *
+ * <p>
+ * Shared rather than inlined per call site, and that is the point: two consumers
+ * writing the same key from their own `useQuery` is how one of them ends up
+ * caching a different shape under it. Every reader of
+ * `['textureSetCategories', kind]` goes through here.
+ * </p>
+ *
+ * <p>
+ * The kind is part of the key because it is part of the identity: Universal
+ * (Global Materials) and ModelSpecific (Multi-Model Textures) are separate asset
+ * types whose vocabularies never mix.
+ * </p>
+ */
+export function getTextureSetCategoriesQueryOptions(kind: TextureSetKind) {
+  return queryOptions({
+    queryKey: ['textureSetCategories', kind] as const,
+    queryFn: () => getAllTextureSetCategories(kind),
   })
 }
 

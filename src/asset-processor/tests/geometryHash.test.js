@@ -177,4 +177,35 @@ describe('hashGeometry', () => {
   it('exposes a version constant', () => {
     expect(GEOMETRY_HASH_VERSION).toBe(1)
   })
+
+  /**
+   * Golden vectors, shared with the Python port in `blender/geometry_hash.py`.
+   *
+   * Every other test here checks a property - invariance to ordering, sensitivity to
+   * scale - and a rewrite could satisfy all of them while producing different bytes. The
+   * hash is the compute cache's key and is now computed in two languages, so "different
+   * bytes" means a bpy pass filing results under hashes nothing will ever look up.
+   *
+   * **If either value below changes, the Python port must change with it in the same
+   * commit, and GEOMETRY_HASH_VERSION must be bumped.**
+   */
+  describe('golden vectors (must match blender/geometry_hash.py byte for byte)', () => {
+    it('hashes the unit cube to its pinned value', () => {
+      expect(
+        hashGeometry({ positions: CUBE_POSITIONS, indices: CUBE_INDICES })
+      ).toBe('31049c968847ac14')
+    })
+
+    it('hashes coordinates sitting exactly on the quantisation half-grid', () => {
+      // The one place a port goes wrong silently. JS Math.round breaks halves towards
+      // +Infinity; Python's round() breaks them towards even, and disagrees on two of the
+      // four coordinates below. The port uses floor(x + 0.5) because of this case.
+      const positions = [
+        -0.000025, 0, 0, 0.000015, 0, 0, 0, 0.000025, 0, -0.000015, 0, 0, 0,
+        -0.000025, 0, 0, 0, 0.000015,
+      ]
+      const indices = [0, 1, 2, 3, 4, 5]
+      expect(hashGeometry({ positions, indices })).toBe('d7691a8cfc1c1e9a')
+    })
+  })
 })

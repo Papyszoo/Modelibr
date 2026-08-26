@@ -2,6 +2,15 @@ import { defineConfig, devices } from "@playwright/test";
 
 const useBlobReporter = !!process.env.PW_MERGE_BLOB;
 
+// The demo phase runs inside e2e-fast and e2e-full, so it inherits the per-suite
+// directories the runner sets (see playwright.config.ts) rather than writing its
+// traces into whichever suite happened to run last. Standalone `npm run
+// test:demo` keeps the historical names.
+const htmlReportDir = process.env.PW_HTML_REPORT
+    ? `${process.env.PW_HTML_REPORT}-demo`
+    : "playwright-report-demo";
+const artifactDir = process.env.PW_OUTPUT_DIR || "test-results";
+
 export default defineConfig({
     testDir: "./demo-tests",
     // Headroom for the drained CI runner. These specs run LAST in the e2e job,
@@ -16,6 +25,7 @@ export default defineConfig({
     // fails - just after 15s instead of 5s.
     expect: { timeout: 15000 },
     fullyParallel: false,
+    outputDir: artifactDir,
     forbidOnly: !!process.env.CI,
     // Retries only re-run failures, so they weaken nothing; 2 covers the
     // timing tail on the drained runner (1 wasn't always enough).
@@ -26,8 +36,8 @@ export default defineConfig({
     reporter: useBlobReporter
         ? [["blob", { outputDir: "blob-report" }]]
         : [
-              ["html", { open: "never", outputFolder: "playwright-report-demo" }],
-              ["json", { outputFile: "test-results/demo-results.json" }],
+              ["html", { open: "never", outputFolder: htmlReportDir }],
+              ["json", { outputFile: `${artifactDir}/demo-results.json` }],
           ],
     use: {
         baseURL:

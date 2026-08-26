@@ -1,7 +1,9 @@
+using System.Text.Json;
 using Application.Abstractions.Files;
 using Application.Abstractions.Messaging;
 using Application.EnvironmentMaps;
 using Application.Files;
+using Application.Metadata;
 using Application.Models;
 using Application.Packs;
 using Application.Sounds;
@@ -46,6 +48,10 @@ internal sealed class StoreImportSink : IStoreImportSink
     private readonly ICommandHandler<UpdateSpriteCommand, UpdateSpriteResponse> _updateSprite;
     private readonly ICommandHandler<UpdateTextureSetCommand, UpdateTextureSetResponse> _updateTextureSet;
     private readonly IQueryHandler<GetEnvironmentMapByIdQuery, GetEnvironmentMapByIdResponse> _getEnvironmentMap;
+    private readonly ICommandHandler<UpdateSoundMetadataCommand, UpdateSoundMetadataResponse> _updateSoundMetadata;
+    private readonly ICommandHandler<UpdateSpriteMetadataCommand, UpdateSpriteMetadataResponse> _updateSpriteMetadata;
+    private readonly IQueryHandler<ReadAssetMetadataQuery, AssetMetadataResponse> _readAssetMetadata;
+    private readonly ICommandHandler<SetAssetMetadataCommand, AssetMetadataResponse> _setAssetMetadata;
 
     public StoreImportSink(
         ICommandHandler<CreatePackCommand, CreatePackResponse> createPack,
@@ -72,7 +78,11 @@ internal sealed class StoreImportSink : IStoreImportSink
         ICommandHandler<UpdateSoundCommand, UpdateSoundResponse> updateSound,
         ICommandHandler<UpdateSpriteCommand, UpdateSpriteResponse> updateSprite,
         ICommandHandler<UpdateTextureSetCommand, UpdateTextureSetResponse> updateTextureSet,
-        IQueryHandler<GetEnvironmentMapByIdQuery, GetEnvironmentMapByIdResponse> getEnvironmentMap)
+        IQueryHandler<GetEnvironmentMapByIdQuery, GetEnvironmentMapByIdResponse> getEnvironmentMap,
+        ICommandHandler<UpdateSoundMetadataCommand, UpdateSoundMetadataResponse> updateSoundMetadata,
+        ICommandHandler<UpdateSpriteMetadataCommand, UpdateSpriteMetadataResponse> updateSpriteMetadata,
+        IQueryHandler<ReadAssetMetadataQuery, AssetMetadataResponse> readAssetMetadata,
+        ICommandHandler<SetAssetMetadataCommand, AssetMetadataResponse> setAssetMetadata)
     {
         _createPack = createPack;
         _setProvenance = setProvenance;
@@ -99,6 +109,10 @@ internal sealed class StoreImportSink : IStoreImportSink
         _updateSprite = updateSprite;
         _updateTextureSet = updateTextureSet;
         _getEnvironmentMap = getEnvironmentMap;
+        _updateSoundMetadata = updateSoundMetadata;
+        _updateSpriteMetadata = updateSpriteMetadata;
+        _readAssetMetadata = readAssetMetadata;
+        _setAssetMetadata = setAssetMetadata;
     }
 
     public async Task<int> CreatePackAsync(
@@ -121,7 +135,12 @@ internal sealed class StoreImportSink : IStoreImportSink
 
     public async Task<int> CreateModelAsync(IFileUpload primaryFile, string name, string? batchId, bool generateThumbnail, CancellationToken ct)
         => Unwrap(await _addModel.Handle(
-            new AddModelCommand(primaryFile, name, batchId, GenerateThumbnail: generateThumbnail), ct)).Id;
+            new AddModelCommand(
+                primaryFile, name, batchId,
+                GenerateThumbnail: generateThumbnail,
+                // The manifest already says what this is - category, tags, licence, author.
+                // Guessing a category from the file name over that would be strictly worse.
+                AutoAssignMetadata: false), ct)).Id;
 
     public Task AddFileToModelAsync(int modelId, IFileUpload file, CancellationToken ct)
         => RunAsync<AddFileToModelCommandResponse>(_addFileToModel.Handle(new AddFileToModelCommand(modelId, file), ct));
@@ -229,4 +248,31 @@ internal sealed class StoreImportSink : IStoreImportSink
 
     private static async Task RunAsync<T>(Task<Result<T>> resultTask)
         => Unwrap(await resultTask);
+
+    public async Task StampAssetMetadataAsync(
+        string assetType, int assetId, StoreAssetMetadataStamp stamp, CancellationToken ct)
+    {
+        var current = await _readAssetMetadata.Handle(new ReadAssetMetadataQuery(assetType, assetId), ct);
+        var filled = current.IsSuccess
+            ? current.Value.Fields.Where(f => f.Value is not null).Select(f => f.Key)
+            : Enumerable.Empty<string>();
+
+        var fields = StoreMetadataStampFields.Build(assetType, stamp, filled);
+        if (fields.Count == 0)
+        {
+            return;
+        }
+
+        await _setAssetMetadata.Handle(new SetAssetMetadataCommand(assetType, assetId, fields), ct);
+    }
+
+
+    public Task SetSoundTagsAsync(
+        int soundId, IReadOnlyCollection<string> tags, string? description, CancellationToken ct)
+        => RunAsync(_updateSoundMetadata.Handle(new UpdateSoundMetadataCommand(soundId, tags, description), ct));
+
+    public Task SetSpriteTagsAsync(
+        int spriteId, IReadOnlyCollection<string> tags, string? description, CancellationToken ct)
+        => RunAsync(_updateSpriteMetadata.Handle(new UpdateSpriteMetadataCommand(spriteId, tags, description), ct));
+
 }

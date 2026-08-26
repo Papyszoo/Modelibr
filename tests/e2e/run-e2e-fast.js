@@ -246,9 +246,12 @@ async function main() {
 }
 
 function printReportHint(e2eDir) {
-  if (!fs.existsSync(path.join(e2eDir, "playwright-report"))) return;
+  // The mega-runner gives each e2e suite its own report dir, so name the one
+  // this run actually wrote instead of the default.
+  const reportDir = process.env.PW_HTML_REPORT || "playwright-report";
+  if (!fs.existsSync(path.join(e2eDir, reportDir))) return;
   console.log("📊 HTML report is ready. Open with:");
-  console.log("   cd tests/e2e && npx playwright show-report\n");
+  console.log(`   cd tests/e2e && npx playwright show-report ${reportDir}\n`);
 }
 
 main().catch((error) => {

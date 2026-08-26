@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 
 import { ALL_CATEGORIES_ID } from '@/shared/types/categories'
+import { type UvStatus } from '@/shared/types/uvStatus'
 import { type PageType, useCardWidthStore } from '@/stores/cardWidthStore'
 import { type ModelListViewState } from '@/stores/modelListViewStore'
 import { type Model } from '@/utils/fileUtils'
@@ -35,6 +36,7 @@ export function useModelFilters({
   const [localMaxTriangleCount, setLocalMaxTriangleCount] = useState<
     number | null
   >(null)
+  const [localUvStatus, setLocalUvStatus] = useState<UvStatus | null>(null)
   const [selectedPackIds, setSelectedPackIds] = useState<number[]>(
     packId ? [packId] : []
   )
@@ -69,6 +71,7 @@ export function useModelFilters({
     persistedViewState?.minTriangleCount ?? localMinTriangleCount
   const maxTriangleCount =
     persistedViewState?.maxTriangleCount ?? localMaxTriangleCount
+  const uvStatus = persistedViewState?.uvStatus ?? localUvStatus
 
   const effectivePackIds = packId ? [packId] : currentSelectedPackIds
   const effectiveProjectIds = projectId
@@ -214,6 +217,18 @@ export function useModelFilters({
     [onPersistedViewStateChange, persistedViewState]
   )
 
+  const setUvStatus = useCallback(
+    (value: UvStatus | null) => {
+      if (persistedViewState && onPersistedViewStateChange) {
+        onPersistedViewStateChange({ uvStatus: value })
+        return
+      }
+
+      setLocalUvStatus(value)
+    },
+    [onPersistedViewStateChange, persistedViewState]
+  )
+
   const handleCardWidthChange = useCallback(
     (width: number) => {
       setCardWidth(storeKey, width)
@@ -262,6 +277,8 @@ export function useModelFilters({
     setMinTriangleCount,
     maxTriangleCount,
     setMaxTriangleCount,
+    uvStatus,
+    setUvStatus,
     effectivePackIds,
     effectiveProjectIds,
     handlePackFilterChange,

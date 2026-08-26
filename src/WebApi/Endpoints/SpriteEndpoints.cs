@@ -2,6 +2,7 @@ using Application.Abstractions.Messaging;
 using Application.Sprites;
 using Domain.ValueObjects;
 using Microsoft.AspNetCore.Mvc;
+using WebApi.Infrastructure;
 
 namespace WebApi.Endpoints;
 
@@ -29,6 +30,7 @@ public static class SpriteEndpoints
             .WithName("Create Sprite With File")
             .WithSummary("Creates a new sprite and uploads a file in one operation")
             .DisableAntiforgery()
+            .AcceptsAgentUploadTicket(AgentAssetFamilies.Sprite)
             .WithOpenApi();
 
         app.MapPut("/sprites/{id}", UpdateSprite)

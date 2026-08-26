@@ -1,8 +1,8 @@
 import { ThumbnailProcessor } from './thumbnailProcessor.js'
 import { SoundProcessor } from './soundProcessor.js'
-import { MeshAnalysisProcessor } from './meshProcessor.js'
 import { TextureSetProcessor } from './textureSetProcessor.js'
 import { EnvironmentMapProcessor } from './environmentMapProcessor.js'
+import { SceneRenderProcessor } from './sceneRenderProcessor.js'
 import { config } from '../config.js'
 import logger from '../logger.js'
 
@@ -26,8 +26,12 @@ export class ProcessorRegistry {
     this.register('Sound', new SoundProcessor())
     this.register('TextureSet', new TextureSetProcessor())
     this.register('EnvironmentMap', new EnvironmentMapProcessor())
-    // MeshAnalysis is registered but not yet functional
-    this.register('MeshAnalysis', new MeshAnalysisProcessor())
+    this.register('Scene', new SceneRenderProcessor())
+    // No MeshAnalysis entry. It was a placeholder here that only ever threw
+    // "not yet implemented"; Blender work now runs off the extraction queue's Blender
+    // family (blenderOperationProcessor.js), which is a queue that can carry an
+    // operation's parameters and hand back what it produced - neither of which this
+    // thumbnail-shaped registry can express.
 
     logger.info('Processor registry initialized', {
       registeredTypes: Array.from(this.processors.keys()),

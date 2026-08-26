@@ -42,7 +42,7 @@ public class ExtractionJobCommandsTests
     public async Task Enqueue_When_NoLiveJob_Creates_And_Persists()
     {
         var repo = new Mock<IExtractionJobRepository>();
-        repo.Setup(r => r.GetLiveJobAsync("Model", 42, 1, ExtractorFamilies.Geometry, It.IsAny<CancellationToken>()))
+        repo.Setup(r => r.GetLiveJobAsync("Model", 42, 1, ExtractorFamilies.Geometry, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync((ExtractionJob?)null);
         var uow = new Mock<IUnitOfWork>();
 
@@ -61,7 +61,7 @@ public class ExtractionJobCommandsTests
     {
         var existing = ExtractionJob.Create("Model", 42, ExtractorFamilies.Geometry, Now, versionId: 1);
         var repo = new Mock<IExtractionJobRepository>();
-        repo.Setup(r => r.GetLiveJobAsync("Model", 42, 1, ExtractorFamilies.Geometry, It.IsAny<CancellationToken>()))
+        repo.Setup(r => r.GetLiveJobAsync("Model", 42, 1, ExtractorFamilies.Geometry, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);
         var uow = new Mock<IUnitOfWork>();
 
@@ -84,7 +84,7 @@ public class ExtractionJobCommandsTests
         // the job completed - so re-deriving 1,717 models reported success while not one
         // search document changed.
         var repo = new Mock<IExtractionJobRepository>();
-        repo.Setup(r => r.GetLiveJobAsync("Model", 42, 1, ExtractorFamilies.Geometry, It.IsAny<CancellationToken>()))
+        repo.Setup(r => r.GetLiveJobAsync("Model", 42, 1, ExtractorFamilies.Geometry, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync((ExtractionJob?)null);
         var uow = new Mock<IUnitOfWork>();
 

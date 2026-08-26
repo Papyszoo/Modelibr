@@ -89,4 +89,21 @@ public class CategorySuggesterTests
         Assert.Empty(CategorySuggester.Suggest(null));
         Assert.Empty(CategorySuggester.Suggest(Array.Empty<string>()));
     }
+
+    [Fact]
+    public void SuggestBest_Prefers_The_Sharper_Claim_Over_The_Catch_All()
+    {
+        // A sword rack matches both. Alphabetical order - which is right for a list - would
+        // have picked "furniture", and the whole point of a single choice is that the
+        // sharper of the two is the one worth acting on.
+        Assert.Equal("weapon", CategorySuggester.SuggestBest(new[] { "sword", "rack", "shelf" }));
+        Assert.Equal("vehicle", CategorySuggester.SuggestBest(new[] { "car", "crate" }));
+    }
+
+    [Fact]
+    public void SuggestBest_Is_Null_When_Nothing_Matched()
+    {
+        Assert.Null(CategorySuggester.SuggestBest(new[] { "xyzzy" }));
+        Assert.Null(CategorySuggester.SuggestBest(null));
+    }
 }

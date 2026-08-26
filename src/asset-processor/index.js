@@ -4,6 +4,7 @@ import logger from './logger.js'
 // eslint-disable-next-line no-restricted-imports
 import { JobProcessor } from './jobProcessor.js'
 import { ExtractionJobProcessor } from './extractionJobProcessor.js'
+import { BlenderOperationProcessor } from './blenderOperationProcessor.js'
 import { HealthServer } from './healthServer.js'
 
 // Load environment variables
@@ -63,6 +64,11 @@ class AssetProcessorApp {
       this.extractionJobProcessor = new ExtractionJobProcessor()
       this.extractionJobProcessor.start()
 
+      // Start the Blender operation poller. Its own loop, because these jobs run one at
+      // a time and for minutes - sharing the extraction poller would stall re-derives.
+      this.blenderOperationProcessor = new BlenderOperationProcessor()
+      this.blenderOperationProcessor.start()
+
       logger.info('Asset processor service started successfully')
     } catch (error) {
       logger.error('Failed to start asset processor service', {
@@ -93,6 +99,10 @@ class AssetProcessorApp {
 
       if (this.extractionJobProcessor) {
         await this.extractionJobProcessor.shutdown()
+      }
+
+      if (this.blenderOperationProcessor) {
+        await this.blenderOperationProcessor.shutdown()
       }
 
       // Stop health server

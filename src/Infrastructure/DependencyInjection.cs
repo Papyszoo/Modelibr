@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace Infrastructure
 {
@@ -16,9 +17,23 @@ namespace Infrastructure
     {
         public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
         {
+            // Side effects that must wait for the commit - see IPostCommitActions. Registered
+            // as the concrete type as well, because PostCommitUnitOfWork needs the drain and
+            // SaveDurabilityInterceptor needs the claim; the interface deliberately exposes
+            // neither. It has to come before the interceptors - the durability one takes it.
+            services.AddScoped<PostCommitActions>();
+            services.AddScoped<IPostCommitActions>(sp => sp.GetRequiredService<PostCommitActions>());
+
             // Scoped, not Singleton: DomainEventsInterceptor keeps per-save
-            // recursion-guard state that must not leak across requests.
-            services.AddScoped<DomainEventsInterceptor>();
+            // recursion-guard state that must not leak across requests, and
+            // SaveDurabilityInterceptor's counters describe one scope's writes.
+            // Built by hand rather than by reflection because its constructor is internal -
+            // it takes the queue whose ownership boundary it moves.
+            services.AddScoped(sp => new DomainEventsInterceptor(
+                sp.GetRequiredService<IDomainEventDispatcher>(),
+                sp.GetRequiredService<PostCommitActions>(),
+                sp.GetRequiredService<ILogger<DomainEventsInterceptor>>()));
+            services.AddScoped(sp => new SaveDurabilityInterceptor(sp.GetRequiredService<PostCommitActions>()));
 
             services.AddDbContext<ApplicationDbContext>((sp, optionsBuilder) =>
             {
@@ -33,10 +48,25 @@ namespace Infrastructure
 
                 optionsBuilder
                     .UseNpgsql(connectionString)
-                    .AddInterceptors(sp.GetRequiredService<DomainEventsInterceptor>());
+                    // ORDER IS LOAD-BEARING, for two reasons that both point the same way.
+                    // EF runs the SavedChangesAsync interceptors in registration order and
+                    // stops at the first one that throws, so the durability signal has to be
+                    // taken before anything that can throw takes it away. And that signal is
+                    // also where the post-commit queue changes hands, so it has to happen
+                    // before anything that can re-enter the unit of work - which is exactly
+                    // what DomainEventsInterceptor does from there, dispatching events to
+                    // handlers that save. See SaveDurabilityInterceptor.
+                    .AddInterceptors(
+                        sp.GetRequiredService<SaveDurabilityInterceptor>(),
+                        sp.GetRequiredService<DomainEventsInterceptor>());
             });
 
-            services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<ApplicationDbContext>());
+            // The context is still the thing that commits; the decorator is what decides when
+            // the queued after-commit effects are allowed to happen.
+            services.AddScoped<IUnitOfWork>(sp => new PostCommitUnitOfWork(
+                sp.GetRequiredService<ApplicationDbContext>(),
+                sp.GetRequiredService<PostCommitActions>(),
+                sp.GetRequiredService<SaveDurabilityInterceptor>()));
             services.AddScoped<IChangeTrackerReset>(sp => sp.GetRequiredService<ApplicationDbContext>());
 
             services.AddScoped<IModelRepository, ModelRepository>();
@@ -51,8 +81,13 @@ namespace Infrastructure
             services.AddScoped<IAssetPartRepository, AssetPartRepository>();
             services.AddScoped<IModelVersionAuxiliaryFileRepository, ModelVersionAuxiliaryFileRepository>();
             services.AddScoped<IAgentOperationLogRepository, AgentOperationLogRepository>();
+            services.AddScoped<IAgentUploadTicketRepository, AgentUploadTicketRepository>();
+            services.AddScoped<Application.Abstractions.Services.IAgentUploadTickets, Services.AgentUploadTickets>();
+            services.AddScoped<Application.Abstractions.Services.ISceneDocumentCommit, Services.SceneDocumentCommit>();
             services.AddScoped<IAssetDerivationRepository, AssetDerivationRepository>();
             services.AddScoped<IAssetSearchDocumentRepository, AssetSearchDocumentRepository>();
+            services.AddScoped<IAssetMetadataRepository, AssetMetadataRepository>();
+            services.AddScoped<IProjectProfileOptionRepository, ProjectProfileOptionRepository>();
             services.AddScoped<ISearchLogRepository, SearchLogRepository>();
             services.AddScoped<IComputeCacheRepository, ComputeCacheRepository>();
             services.AddScoped<Application.Extraction.Compute.ComputeCacheService>();
@@ -64,12 +99,16 @@ namespace Infrastructure
                 ?? new Application.Extraction.Derivation.DerivationOptions();
             services.AddSingleton(derivationOptions);
             services.AddScoped<ITextureSetRepository, TextureSetRepository>();
+            services.AddScoped<IMaterialRepository, MaterialRepository>();
             services.AddScoped<ITextureProxyRepository, TextureProxyRepository>();
             services.AddScoped<IPackRepository, PackRepository>();
             services.AddScoped<IProjectRepository, ProjectRepository>();
             services.AddScoped<IModelCategoryRepository, ModelCategoryRepository>();
             services.AddScoped<IModelTagRepository, ModelTagRepository>();
             services.AddScoped<IStageRepository, StageRepository>();
+            services.AddScoped<ISceneRepository, SceneRepository>();
+            services.AddScoped<ISceneAssetUsageRepository, SceneAssetUsageRepository>();
+            services.AddScoped<ISceneRenderRepository, SceneRenderRepository>();
             services.AddScoped<IApplicationSettingsRepository, ApplicationSettingsRepository>();
             services.AddScoped<ISettingRepository, SettingRepository>();
             services.AddScoped<IBatchUploadRepository, BatchUploadRepository>();
@@ -85,6 +124,8 @@ namespace Infrastructure
             services.AddScoped<ITextureSetCategoryRepository, TextureSetCategoryRepository>();
             services.AddScoped<ISearchRepository, SearchRepository>();
             services.AddScoped<IStoreImportJobRepository, StoreImportJobRepository>();
+            services.AddScoped<IStoreImportedItemRepository, StoreImportedItemRepository>();
+            services.AddScoped<Application.Abstractions.Services.IStoreImportLockService, Services.StoreImportLockService>();
             services.AddScoped<IEnvironmentMapSizeLabelService, EnvironmentMapSizeLabelService>();
             services.AddScoped<ITextureImageMetadataReader, TextureImageMetadataReader>();
             services.AddScoped<IThumbnailQueue, ThumbnailQueue>();
@@ -128,6 +169,24 @@ namespace Infrastructure
                 .ConfigurePrimaryHttpMessageHandler(Infrastructure.Services.StoreImportClient.CreatePrimaryHandler);
 
             services.AddScoped<Application.Abstractions.Services.IStoreImportClient, StoreImportClient>();
+
+            // Store catalog reader (v0.6 prompt 15): anonymous, small JSON, short timeout.
+            // Deliberately NOT the importer's client - that one is sized for multi-gigabyte
+            // file transfer, and a catalog query behind a two-minute timeout would let an
+            // unreachable store stall an agent's search instead of answering it.
+            var storeCatalogTimeoutSeconds = configuration.GetValue<int?>("STORE_CATALOG_HTTP_TIMEOUT_SECONDS") ?? 10;
+            services.AddHttpClient(Infrastructure.Services.StoreCatalogClient.HttpClientName, client =>
+                {
+                    client.Timeout = TimeSpan.FromSeconds(storeCatalogTimeoutSeconds);
+                })
+                // The importer's handler exactly: manual redirects so every hop is
+                // re-validated, and a ConnectCallback that dials the address which passed
+                // that validation. A default handler would follow redirects itself AND
+                // resolve the host itself, undoing both halves at once.
+                .ConfigurePrimaryHttpMessageHandler(
+                    Infrastructure.Services.StoreCatalogClient.CreatePrimaryHandler);
+
+            services.AddScoped<Application.Abstractions.Services.IStoreCatalogClient, StoreCatalogClient>();
 
             // Registered once as a singleton, exposed through both the producer interface and
             // IHostedService so enqueue (request handlers) and consume (background loop) share

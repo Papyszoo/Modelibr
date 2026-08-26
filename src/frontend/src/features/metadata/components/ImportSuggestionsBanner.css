@@ -1,0 +1,32 @@
+/* Prefixed with the component name: feature CSS is global scope here. */
+
+.import-suggestions-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--mod-space-sm);
+  padding: var(--mod-space-xs) var(--mod-space-sm);
+  border-bottom: 1px solid var(--surface-border);
+  /* A tint, not a solid fill: this is a notice the user will see for a few days
+     after an import, not a permanent piece of chrome demanding attention. */
+  background: rgba(var(--primary-color-rgb), 0.08);
+  font-size: var(--mod-text-sm);
+}
+
+.import-suggestions-banner-icon {
+  color: var(--primary-color);
+}
+
+.import-suggestions-banner-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.import-suggestions-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--mod-space-xs);
+  flex-shrink: 0;
+}

@@ -53,6 +53,13 @@ public sealed record DerivedAsset(
     int DeriveVersion,
     IReadOnlyList<string> Tokens,
     string? OriginConvention,
+    /// <summary>
+    /// The measurement <see cref="OriginConvention"/> labels: the root origin as a 0..1
+    /// fraction of world bounds per axis. Carried alongside the label because placement
+    /// needs the number - an origin at the base but off-centre in X matches no convention,
+    /// and a null label was being read downstream as "centred".
+    /// </summary>
+    IReadOnlyList<double>? OriginInBounds,
     double? GridSize,
     bool ModularKit,
     string? ShapeClass,

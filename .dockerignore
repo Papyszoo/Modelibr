@@ -29,3 +29,13 @@ README.md
 !.git/config
 !.git/packed-refs
 !.git/refs/heads/**
+
+# Runtime state, not build input. Every one of these is a bind mount in
+# docker-compose - uploads, thumbnails, backups, the Postgres volume, the dev
+# certs - and no Dockerfile reads any of them. Left out of the ignore list they
+# were still SENT: on a machine holding the real library that is ~10 GB of build
+# context transferred before a one-line C# change compiles, every time.
+data/
+test-results/
+test-report/
+**/playwright-report

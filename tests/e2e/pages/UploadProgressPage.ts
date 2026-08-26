@@ -148,25 +148,29 @@ export class UploadProgressPage {
         await button.click();
     }
 
+    /**
+     * Dismiss the floating window if it is up, and prove it went.
+     *
+     * The button is addressed through the FloatingWindow header rather than by
+     * icon. Every COMPLETED upload row carries its own `pi-times` "Remove" button,
+     * so a `.pi-times` inside `#upload-progress-window` is only the close control
+     * by accident of DOM order - one batch rendered above the header, or a header
+     * restyle, and the old selector would have started removing an upload row and
+     * reporting the window closed. `aria-label` was in that selector too and never
+     * matched anything: the control carries `title="Close"`.
+     */
     async closeWindowIfVisible(): Promise<void> {
-        const window = this.page.locator(
-            "#upload-progress-window, .upload-progress-window",
-        );
-        const closeButton = this.page
-            .locator(
-                '#upload-progress-window button[aria-label="Close"], #upload-progress-window .pi-times, .upload-progress-window button[aria-label="Close"], .upload-progress-window .pi-times',
-            )
-            .first();
-
-        const isVisible = await window.first().isVisible().catch(() => false);
-        if (!isVisible) {
+        const window = this.page.locator("#upload-progress-window");
+        if (!(await window.isVisible().catch(() => false))) {
             return;
         }
 
-        if (await closeButton.isVisible().catch(() => false)) {
-            await closeButton.click();
-            await expect(window.first()).not.toBeVisible({ timeout: 10000 });
-        }
+        const closeButton = window.locator(
+            '.floating-window-header button[title="Close"]',
+        );
+        await expect(closeButton).toBeVisible({ timeout: 5000 });
+        await closeButton.click();
+        await expect(window).not.toBeVisible({ timeout: 10000 });
     }
 
     /**

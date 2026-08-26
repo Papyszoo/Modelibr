@@ -178,4 +178,72 @@ public class ExtractionJobDomainTests
         Assert.Null(job.WarningDetail);
         Assert.Null(job.CompletedAt);
     }
+
+    [Fact]
+    public void CreateOperation_CarriesTheOperationAndItsParameters()
+    {
+        var job = ExtractionJob.CreateOperation(
+            "Model", 7, "Blender", "uv-unwrap", DateTime.UtcNow,
+            parametersJson: "{\"method\":\"smart\"}", versionId: 12);
+
+        Assert.Equal("uv-unwrap", job.Operation);
+        Assert.Equal("{\"method\":\"smart\"}", job.ParametersJson);
+        Assert.Equal("Blender", job.ExtractorFamily);
+        Assert.Equal(12, job.VersionId);
+        Assert.Null(job.ResultJson);
+    }
+
+    [Fact]
+    public void Create_LeavesTheOperationFieldsUnset()
+    {
+        // A re-derive is not an operation, and nothing downstream should have to
+        // distinguish "no operation" from "an operation named nothing".
+        var job = ExtractionJob.Create("Model", 7, Family, DateTime.UtcNow);
+
+        Assert.Null(job.Operation);
+        Assert.Null(job.ParametersJson);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void CreateOperation_RejectsAnEmptyOperation(string operation)
+    {
+        Assert.Throws<ArgumentException>(() => ExtractionJob.CreateOperation(
+            "Model", 7, "Blender", operation, DateTime.UtcNow));
+    }
+
+    [Fact]
+    public void CreateOperation_RejectsParametersTooLargeToStore()
+    {
+        Assert.Throws<ArgumentException>(() => ExtractionJob.CreateOperation(
+            "Model", 7, "Blender", "uv-unwrap", DateTime.UtcNow,
+            parametersJson: new string('x', 4001)));
+    }
+
+    [Fact]
+    public void MarkAsCompleted_RecordsWhatTheOperationProduced()
+    {
+        var job = ExtractionJob.CreateOperation("Model", 7, "Blender", "uv-unwrap", DateTime.UtcNow);
+        job.TryClaim("worker-a", DateTime.UtcNow);
+
+        job.MarkAsCompleted(DateTime.UtcNow, resultJson: "{\"versionId\":13}");
+
+        Assert.Equal(ExtractionJobStatus.Done, job.Status);
+        Assert.Equal("{\"versionId\":13}", job.ResultJson);
+    }
+
+    [Fact]
+    public void MarkAsCompleted_WithoutAResult_LeavesAnEarlierOneAlone()
+    {
+        // A re-derive finishing normally passes no result, and must not blank the field
+        // for the operation path that shares this entity.
+        var job = ExtractionJob.CreateOperation("Model", 7, "Blender", "uv-unwrap", DateTime.UtcNow);
+        job.TryClaim("worker-a", DateTime.UtcNow);
+        job.MarkAsCompleted(DateTime.UtcNow, resultJson: "{\"versionId\":13}");
+
+        job.MarkAsCompleted(DateTime.UtcNow);
+
+        Assert.Equal("{\"versionId\":13}", job.ResultJson);
+    }
 }

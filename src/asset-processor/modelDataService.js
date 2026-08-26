@@ -5,6 +5,7 @@ import path from 'path'
 import os from 'os'
 import { config } from './config.js'
 import logger from './logger.js'
+import { writeStreamToFile } from './streamFile.js'
 
 /**
  * Service for fetching model and texture data from the API
@@ -253,23 +254,7 @@ export class ModelDataService {
    * @returns {Promise<void>}
    */
   async writeStreamToFile(stream, filePath) {
-    return new Promise((resolve, reject) => {
-      const writeStream = fs.createWriteStream(filePath)
-
-      stream.pipe(writeStream)
-
-      writeStream.on('finish', () => {
-        resolve()
-      })
-
-      writeStream.on('error', error => {
-        reject(new Error(`Failed to write file: ${error.message}`))
-      })
-
-      stream.on('error', error => {
-        reject(new Error(`Stream error: ${error.message}`))
-      })
-    })
+    return writeStreamToFile(stream, filePath)
   }
 
   /**
@@ -432,8 +417,16 @@ export class ModelDataService {
           materialCount: sceneGraph.rollups.materialCount ?? null,
           materialNames: sceneGraph.rollups.materialNames ?? [],
           boneCount: sceneGraph.rollups.boneCount ?? null,
+          // min/max travel alongside the dimensions: they are what place where the
+          // asset's origin sits inside its own bounds. Sending the size alone left the
+          // server assuming every origin was centred, which floated base-at-origin
+          // geometry - most of the library - by half its height.
           worldBounds: sceneGraph.rollups.worldBounds
-            ? { dimensions: sceneGraph.rollups.worldBounds.dimensions }
+            ? {
+                dimensions: sceneGraph.rollups.worldBounds.dimensions,
+                min: sceneGraph.rollups.worldBounds.min ?? null,
+                max: sceneGraph.rollups.worldBounds.max ?? null,
+              }
             : null,
           animationCount: sceneGraph.rollups.animationCount ?? null,
           animationNames: sceneGraph.rollups.animationNames ?? [],

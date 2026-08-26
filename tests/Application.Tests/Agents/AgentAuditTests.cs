@@ -28,7 +28,7 @@ public class AgentAuditTests
         _repo.Setup(r => r.TryClaimAsync(
                 It.IsAny<AgentOperationLog>(), It.IsAny<int>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
             .Callback<AgentOperationLog, int, DateTime, CancellationToken>((log, _, _, _) => claimed = log)
-            .ReturnsAsync((AgentOperationLog?)null);
+            .ReturnsAsync(new ClaimTakeover(Owned: true, ClaimToken: "gen-1"));
 
         var claim = await _audit.TryBeginAsync(new AgentWrite("key-2", "set-tags", "Model", 7));
 
@@ -53,7 +53,7 @@ public class AgentAuditTests
         winner.MarkCompleted(Now, "Model", 3, "{}");
         _repo.Setup(r => r.TryClaimAsync(
                 It.IsAny<AgentOperationLog>(), It.IsAny<int>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(winner);
+            .ReturnsAsync(new ClaimTakeover(Owned: false, Existing: winner));
 
         var claim = await _audit.TryBeginAsync(new AgentWrite("key-1", "set-category", "Model", 3));
 
@@ -70,7 +70,7 @@ public class AgentAuditTests
         var inFlight = AgentOperationLog.Create("key-9", "create-pack", Now, assetType: "Pack");
         _repo.Setup(r => r.TryClaimAsync(
                 It.IsAny<AgentOperationLog>(), It.IsAny<int>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(inFlight);
+            .ReturnsAsync(new ClaimTakeover(Owned: false, Existing: inFlight));
 
         var claim = await _audit.TryBeginAsync(new AgentWrite("key-9", "create-pack", "Pack"));
 
@@ -79,22 +79,113 @@ public class AgentAuditTests
     }
 
     [Fact]
+    public async Task TryBeginAsync_Reports_Interrupted_When_A_Claim_Died_Mid_Write()
+    {
+        // The mutation commits before the entry is marked Completed, so a claim whose
+        // owner died in that window may have applied everything and recorded nothing.
+        // Handing the key to a retry as though it were fresh is how one crash becomes two
+        // packs, so the call that finds it is told instead.
+        var abandoned = AgentOperationLog.Create("key-10", "create-pack", Now, assetType: "Pack");
+        _repo.Setup(r => r.TryClaimAsync(
+                It.IsAny<AgentOperationLog>(), It.IsAny<int>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ClaimTakeover(Owned: false, Existing: abandoned, Interrupted: true));
+
+        var claim = await _audit.TryBeginAsync(new AgentWrite("key-10", "create-pack", "Pack"));
+
+        Assert.Equal(AgentClaimOutcome.Interrupted, claim.Outcome);
+        Assert.False(claim.IsOwned);
+        Assert.Same(abandoned, claim.Entry);
+    }
+
+    [Fact]
+    public async Task TryBeginAsync_Hands_The_Owner_The_Generation_It_Must_Settle_With()
+    {
+        _repo.Setup(r => r.TryClaimAsync(
+                It.IsAny<AgentOperationLog>(), It.IsAny<int>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ClaimTakeover(Owned: true, ClaimToken: "gen-7"));
+
+        var claim = await _audit.TryBeginAsync(new AgentWrite("key-12", "create-pack", "Pack"));
+
+        Assert.True(claim.IsOwned);
+        Assert.Equal("gen-7", claim.ClaimToken);
+    }
+
+    [Fact]
+    public async Task ReleaseReversalAsync_Gives_Back_A_Claim_Whose_Inverse_Failed()
+    {
+        await _audit.ReleaseReversalAsync("key-11", "rev-1");
+
+        _repo.Verify(
+            r => r.ReleaseReversalAsync("key-11", "rev-1", It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task CompleteAsync_Records_The_Outcome_On_The_Claim()
     {
-        await _audit.CompleteAsync("key-3", "Model", 9, "{\"tags\":[\"pbr\"]}");
+        await _audit.CompleteAsync("key-3", "gen-1", "Model", 9, "{\"tags\":[\"pbr\"]}", "{\"tags\":[\"wood\"]}");
 
         _repo.Verify(
             r => r.CompleteClaimAsync(
-                "key-3", "Model", 9, "{\"tags\":[\"pbr\"]}", Now, It.IsAny<CancellationToken>()),
+                "key-3", "gen-1", "Model", 9, "{\"tags\":[\"pbr\"]}", "{\"tags\":[\"wood\"]}", Now,
+                It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
     [Fact]
     public async Task AbandonAsync_Fails_The_Claim_So_A_Failed_Write_Can_Be_Retried()
     {
-        await _audit.AbandonAsync("key-4");
+        await _audit.AbandonAsync("key-4", "gen-1");
 
-        _repo.Verify(r => r.FailClaimAsync("key-4", Now, It.IsAny<CancellationToken>()), Times.Once);
+        _repo.Verify(
+            r => r.FailClaimAsync("key-4", "gen-1", Now, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public void Reclaiming_A_Row_Moves_It_To_A_New_Generation()
+    {
+        // What stops the previous owner from settling the claim that replaced its own: the
+        // token it is holding is no longer the one on the row.
+        var claim = AgentOperationLog.Create("key-13", "create-pack", Now);
+        var first = claim.ClaimToken;
+
+        claim.MarkFailed(Now.AddMinutes(1));
+        claim.Reclaim("other-host", Now.AddMinutes(2), actor: "someone-else");
+
+        Assert.NotEqual(first, claim.ClaimToken);
+        Assert.NotEmpty(claim.ClaimToken);
+    }
+
+    [Fact]
+    public void An_Interrupted_Claim_Is_Terminal_And_Not_The_Same_As_Failed()
+    {
+        // Failed is written by a path that knows nothing landed. Interrupted is written by
+        // the lease sweep, which knows nothing at all - so it must not be retryable.
+        var claim = AgentOperationLog.Create("key-14", "create-pack", Now);
+
+        claim.MarkInterrupted(Now.AddMinutes(20));
+
+        Assert.Equal(AgentOperationStatus.Interrupted, claim.Status);
+        Assert.NotEqual(AgentOperationStatus.Failed, claim.Status);
+        Assert.Null(claim.ClaimedBy);
+        // And it no longer looks like an abandoned Pending claim to anybody sweeping.
+        Assert.False(claim.IsClaimAbandoned(Now.AddHours(24), leaseMinutes: 15));
+    }
+
+    [Fact]
+    public void A_Reversal_Claim_Is_Abandoned_Only_Once_Its_Own_Lease_Expires()
+    {
+        var claim = AgentOperationLog.Create("key-15", "delete-scene", Now);
+        claim.MarkCompleted(Now, "Scene", 4, "{}");
+
+        Assert.False(claim.IsReversalAbandoned(Now.AddHours(1), leaseMinutes: 5));
+
+        claim.BeginReversal("rev-1", Now);
+        Assert.False(claim.IsReversalAbandoned(Now.AddMinutes(1), leaseMinutes: 5));
+        Assert.True(claim.IsReversalAbandoned(Now.AddMinutes(5), leaseMinutes: 5));
+
+        // Once the inverse actually landed there is nothing left to be ambiguous about.
+        claim.MarkReversed(Now.AddMinutes(1));
+        Assert.False(claim.IsReversalAbandoned(Now.AddHours(24), leaseMinutes: 5));
     }
 
     [Fact]

@@ -1,0 +1,1445 @@
+using System.Text.Json;
+using Application.Abstractions;
+using Application.Abstractions.Messaging;
+using Application.Abstractions.Repositories;
+using Application.EnvironmentMaps;
+using Application.Metadata;
+using Application.Models;
+using Application.Packs;
+using Application.Scenes;
+using Application.Sounds;
+using Application.Sprites;
+using Application.TextureSets;
+using Domain.Models;
+using Domain.Scenes;
+using Domain.ValueObjects;
+using SharedKernel;
+
+namespace Application.Agents;
+
+/// <summary>One entry's inverse: what undoing it would do, and whether that is possible at all.</summary>
+public sealed record ReversalStep(
+    string IdempotencyKey,
+    string Operation,
+    string? AssetType,
+    int? AssetId,
+    string Description,
+    bool IsDestructive,
+    bool IsSupported,
+    string? Blocker = null);
+
+/// <summary>
+/// What reversing an operation or a batch would do, in the order it would be applied.
+/// A plan is produced before anything is touched so a dry run and a real run answer from
+/// the same code - a preview that is computed differently from the action it previews is
+/// a preview that can lie.
+/// </summary>
+public sealed record ReversalPlan(IReadOnlyList<ReversalStep> Steps)
+{
+    public bool IsEmpty => Steps.Count == 0;
+
+    /// <summary>True when any step destroys work (deletes an asset) rather than restoring a prior value.</summary>
+    public bool IsDestructive => Steps.Any(s => s.IsDestructive);
+
+    public IReadOnlyList<ReversalStep> Unsupported => Steps.Where(s => !s.IsSupported).ToList();
+}
+
+/// <summary>The result of one applied step.</summary>
+public sealed record ReversalStepResult(string IdempotencyKey, string Operation, bool Reversed, string Detail);
+
+public interface IAgentOperationReverser
+{
+    /// <summary>
+    /// Works out what undoing <paramref name="idempotencyKey"/> (one write) or
+    /// <paramref name="batchId"/> (every write in a batch) would take. Exactly one of the
+    /// two must be supplied.
+    /// </summary>
+    Task<Result<ReversalPlan>> PlanAsync(
+        string? idempotencyKey,
+        string? batchId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Applies a plan, marking each entry reversed as its inverse lands.</summary>
+    Task<Result<IReadOnlyList<ReversalStepResult>>> ApplyAsync(
+        ReversalPlan plan,
+        CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// Undo for agent writes.
+///
+/// The audit log has carried <c>PayloadBefore</c>, <c>BatchId</c> and <c>ReversedAt</c>
+/// since it was introduced and nothing ever used them. This is what uses them: an agent
+/// that mis-assigns forty texture channels, or tags a hundred models from a bad guess about
+/// what they are, gets one call that puts the library back.
+///
+/// Two rules keep this honest:
+///
+/// <list type="bullet">
+/// <item>An inverse is applied only where one genuinely exists. Re-deriving an asset cannot
+/// be un-derived, and a plan says so rather than reporting a success it did not achieve.</item>
+/// <item>A batch reverses <b>newest first</b>. Creating a pack and then filling it must be
+/// undone in the opposite order, or deleting the pack fights its own members.</item>
+/// </list>
+///
+/// Reversing an import is a soft delete, so undo itself is undoable: the asset lands in the
+/// recycle bin the UI already exposes rather than being destroyed.
+/// </summary>
+internal sealed class AgentOperationReverser : IAgentOperationReverser
+{
+    private readonly IAgentAudit _audit;
+    private readonly IUnitOfWork _unitOfWork;
+    private readonly ICommandHandler<UpdateModelTagsCommand, UpdateModelTagsResponse> _updateTags;
+    private readonly ICommandHandler<SetModelCategoryCommand, SetModelCategoryResponse> _setCategory;
+    private readonly ICommandHandler<RemoveModelFromPackCommand> _removeFromPack;
+    private readonly ICommandHandler<DeletePackCommand> _deletePack;
+    private readonly ICommandHandler<RemoveTextureFromPackCommand> _removeTexture;
+    private readonly ICommandHandler<AddTextureToTextureSetCommand, AddTextureToTextureSetResponse> _addTexture;
+    private readonly ICommandHandler<RestoreModelTextureBindingCommand> _restoreTextureBinding;
+    private readonly ICommandHandler<SoftDeleteModelCommand, SoftDeleteModelResponse> _deleteModel;
+    private readonly ICommandHandler<SoftDeleteSoundCommand> _deleteSound;
+    private readonly ICommandHandler<SoftDeleteSpriteCommand> _deleteSprite;
+    private readonly ICommandHandler<SoftDeleteEnvironmentMapCommand> _deleteEnvironmentMap;
+    private readonly ICommandHandler<SoftDeleteTextureSetCommand, SoftDeleteTextureSetResponse> _deleteTextureSet;
+    private readonly ICommandHandler<RemoveSceneNodeCommand, SceneNodeRemovalResponse> _removeSceneNode;
+    private readonly ICommandHandler<RestoreSceneNodeCommand, SceneSummary> _restoreSceneNode;
+    private readonly ICommandHandler<MoveSceneNodeCommand, SceneNodeMoveResponse> _moveSceneNode;
+    private readonly ICommandHandler<SetSceneLightCommand, SceneLightResponse> _setSceneLight;
+    private readonly ICommandHandler<ApplySceneMaterialCommand, SceneMaterialResponse> _applySceneMaterial;
+    private readonly ICommandHandler<UpdateSceneDocumentCommand, SceneView> _updateSceneDocument;
+    private readonly ICommandHandler<SetSceneStageCommand, SceneStageResponse> _setSceneStage;
+    private readonly ICommandHandler<DeleteSceneCommand> _deleteScene;
+    private readonly ICommandHandler<CreateSceneCommand, SceneView> _createScene;
+    private readonly ICommandHandler<RestoreSceneLightsCommand, SceneSummary> _restoreSceneLights;
+    private readonly ICommandHandler<RestoreSceneSlotCommand, SceneSummary> _restoreSceneSlot;
+    private readonly ICommandHandler<RestoreSceneRecommendationsCommand, SceneRecommendationsResponse> _restoreSceneRecommendations;
+    private readonly ICommandHandler<SetSceneProjectCommand, SetSceneProjectResponse> _setSceneProject;
+    private readonly ICommandHandler<SetAssetMetadataCommand, AssetMetadataResponse> _setAssetMetadata;
+
+    public AgentOperationReverser(
+        IAgentAudit audit,
+        IUnitOfWork unitOfWork,
+        ICommandHandler<UpdateModelTagsCommand, UpdateModelTagsResponse> updateTags,
+        ICommandHandler<SetModelCategoryCommand, SetModelCategoryResponse> setCategory,
+        ICommandHandler<RemoveModelFromPackCommand> removeFromPack,
+        ICommandHandler<DeletePackCommand> deletePack,
+        ICommandHandler<RemoveTextureFromPackCommand> removeTexture,
+        ICommandHandler<AddTextureToTextureSetCommand, AddTextureToTextureSetResponse> addTexture,
+        ICommandHandler<RestoreModelTextureBindingCommand> restoreTextureBinding,
+        ICommandHandler<SoftDeleteModelCommand, SoftDeleteModelResponse> deleteModel,
+        ICommandHandler<SoftDeleteSoundCommand> deleteSound,
+        ICommandHandler<SoftDeleteSpriteCommand> deleteSprite,
+        ICommandHandler<SoftDeleteEnvironmentMapCommand> deleteEnvironmentMap,
+        ICommandHandler<SoftDeleteTextureSetCommand, SoftDeleteTextureSetResponse> deleteTextureSet,
+        ICommandHandler<RemoveSceneNodeCommand, SceneNodeRemovalResponse> removeSceneNode,
+        ICommandHandler<RestoreSceneNodeCommand, SceneSummary> restoreSceneNode,
+        ICommandHandler<MoveSceneNodeCommand, SceneNodeMoveResponse> moveSceneNode,
+        ICommandHandler<SetSceneLightCommand, SceneLightResponse> setSceneLight,
+        ICommandHandler<ApplySceneMaterialCommand, SceneMaterialResponse> applySceneMaterial,
+        ICommandHandler<UpdateSceneDocumentCommand, SceneView> updateSceneDocument,
+        ICommandHandler<SetSceneStageCommand, SceneStageResponse> setSceneStage,
+        ICommandHandler<DeleteSceneCommand> deleteScene,
+        ICommandHandler<CreateSceneCommand, SceneView> createScene,
+        ICommandHandler<RestoreSceneLightsCommand, SceneSummary> restoreSceneLights,
+        ICommandHandler<RestoreSceneSlotCommand, SceneSummary> restoreSceneSlot,
+        ICommandHandler<RestoreSceneRecommendationsCommand, SceneRecommendationsResponse> restoreSceneRecommendations,
+        ICommandHandler<SetSceneProjectCommand, SetSceneProjectResponse> setSceneProject,
+        ICommandHandler<SetAssetMetadataCommand, AssetMetadataResponse> setAssetMetadata)
+    {
+        _audit = audit;
+        _unitOfWork = unitOfWork;
+        _updateTags = updateTags;
+        _setCategory = setCategory;
+        _removeFromPack = removeFromPack;
+        _deletePack = deletePack;
+        _removeTexture = removeTexture;
+        _addTexture = addTexture;
+        _restoreTextureBinding = restoreTextureBinding;
+        _deleteModel = deleteModel;
+        _deleteSound = deleteSound;
+        _deleteSprite = deleteSprite;
+        _deleteEnvironmentMap = deleteEnvironmentMap;
+        _deleteTextureSet = deleteTextureSet;
+        _removeSceneNode = removeSceneNode;
+        _restoreSceneNode = restoreSceneNode;
+        _moveSceneNode = moveSceneNode;
+        _setSceneLight = setSceneLight;
+        _applySceneMaterial = applySceneMaterial;
+        _updateSceneDocument = updateSceneDocument;
+        _setSceneStage = setSceneStage;
+        _deleteScene = deleteScene;
+        _createScene = createScene;
+        _restoreSceneLights = restoreSceneLights;
+        _restoreSceneSlot = restoreSceneSlot;
+        _restoreSceneRecommendations = restoreSceneRecommendations;
+        _setSceneProject = setSceneProject;
+        _setAssetMetadata = setAssetMetadata;
+    }
+
+    public async Task<Result<ReversalPlan>> PlanAsync(
+        string? idempotencyKey,
+        string? batchId,
+        CancellationToken cancellationToken = default)
+    {
+        var hasKey = !string.IsNullOrWhiteSpace(idempotencyKey);
+        var hasBatch = !string.IsNullOrWhiteSpace(batchId);
+
+        if (hasKey == hasBatch)
+        {
+            return Result.Failure<ReversalPlan>(new Error(
+                "AmbiguousTarget",
+                "Supply exactly one of idempotencyKey or batchId - one names a single write, the other every write in a batch."));
+        }
+
+        IReadOnlyList<AgentOperationLog> entries;
+        if (hasKey)
+        {
+            var entry = await _audit.FindAsync(idempotencyKey!, cancellationToken);
+            if (entry is null)
+            {
+                return Result.Failure<ReversalPlan>(new Error(
+                    "OperationNotFound", $"No agent operation was recorded under the key '{idempotencyKey}'."));
+            }
+
+            entries = new[] { entry };
+        }
+        else
+        {
+            entries = await _audit.FindBatchAsync(batchId!, cancellationToken);
+            if (entries.Count == 0)
+            {
+                return Result.Failure<ReversalPlan>(new Error(
+                    "BatchNotFound", $"No agent operations were recorded under the batch '{batchId}'."));
+            }
+        }
+
+        // Newest first: a batch that created a pack and then filled it has to shed its
+        // members before the pack itself can go.
+        var steps = entries
+            .Where(e => e.Status == AgentOperationStatus.Completed && e.ReversedAt is null)
+            .Reverse()
+            .Select(Describe)
+            .ToList();
+
+        return Result.Success(new ReversalPlan(steps));
+    }
+
+    public async Task<Result<IReadOnlyList<ReversalStepResult>>> ApplyAsync(
+        ReversalPlan plan,
+        CancellationToken cancellationToken = default)
+    {
+        var results = new List<ReversalStepResult>();
+
+        foreach (var step in plan.Steps)
+        {
+            if (!step.IsSupported)
+            {
+                results.Add(new ReversalStepResult(
+                    step.IdempotencyKey, step.Operation, Reversed: false, step.Blocker ?? "No inverse exists."));
+                continue;
+            }
+
+            var entry = await _audit.FindAsync(step.IdempotencyKey, cancellationToken);
+            if (entry is null || entry.ReversedAt is not null)
+            {
+                results.Add(new ReversalStepResult(
+                    step.IdempotencyKey, step.Operation, Reversed: false, "Already reversed."));
+                continue;
+            }
+
+            // Claim the entry BEFORE applying its inverse, and only proceed if this call is
+            // the one that claimed it.
+            //
+            // reverse_operation carries no idempotency key of its own, so two calls naming
+            // the same entry both reach this loop. Marking afterwards let both of them
+            // apply the inverse and merely reported the collision to the loser - which is
+            // harmless for the inverses that restore a recorded state, and is not harmless
+            // for the ones that create something: undoing a delete-scene twice recreates
+            // the scene twice, under two new ids.
+            //
+            // The claim is a lock and nothing more. Whether the inverse actually landed is
+            // recorded separately, afterwards, so a claim that never settles cannot be read
+            // as a reversal that never happened.
+            var claim = await _audit.TryBeginReversalAsync(step.IdempotencyKey, cancellationToken);
+            switch (claim.Outcome)
+            {
+                case ReversalClaimOutcome.Claimed:
+                    break;
+
+                case ReversalClaimOutcome.AlreadyReversed:
+                    results.Add(new ReversalStepResult(
+                        step.IdempotencyKey, step.Operation, Reversed: false, "Already reversed."));
+                    continue;
+
+                // Both of the remaining cases STOP the batch rather than skipping the step.
+                //
+                // The plan is newest-first because the older steps depend on the newer ones
+                // being undone first - a pack cannot be deleted before its members leave it.
+                // Skipping a step whose outcome is unknown and pressing on to its dependants
+                // is precisely the ordering violation the newest-first rule exists to
+                // prevent, and it would do it silently.
+                case ReversalClaimOutcome.InProgress:
+                    results.Add(new ReversalStepResult(
+                        step.IdempotencyKey, step.Operation, Reversed: false,
+                        "Another caller is reversing this operation right now. Nothing further was undone - " +
+                        "the steps behind it depend on this one, so they were not attempted."));
+                    return Result.Success<IReadOnlyList<ReversalStepResult>>(results);
+
+                case ReversalClaimOutcome.Interrupted:
+                    results.Add(new ReversalStepResult(
+                        step.IdempotencyKey, step.Operation, Reversed: false,
+                        "A previous reversal of this operation stopped before it could record its outcome, " +
+                        "so whether the inverse was applied is unknown. Check the operation's effect before " +
+                        "undoing it again. Nothing further was undone."));
+                    return Result.Success<IReadOnlyList<ReversalStepResult>>(results);
+
+                case ReversalClaimOutcome.NotReversible:
+                default:
+                    results.Add(new ReversalStepResult(
+                        step.IdempotencyKey, step.Operation, Reversed: false, "Already reversed."));
+                    continue;
+            }
+
+            var token = claim.Token!;
+            Result<string> applied;
+            try
+            {
+                applied = await ApplyInverse(entry, cancellationToken);
+            }
+            catch
+            {
+                // A throw - a cancellation included - says nothing about whether the inverse
+                // landed. An inverse commits and only then reports; a command that timed out,
+                // a token that fired between the commit and the return, an after-commit
+                // dispatch that blew up all arrive here with the write already durable.
+                //
+                // So the claim is NOT given back. It is kept and stamped as already past its
+                // lease, which is exactly the state a process that died mid-inverse leaves
+                // behind - and every later attempt reports it instead of applying the inverse
+                // a second time. Releasing it here is how undoing one delete-scene became two
+                // scenes. CancellationToken.None because the caller's token may be the very
+                // thing that fired.
+                await _audit.InterruptReversalAsync(step.IdempotencyKey, token, CancellationToken.None);
+                throw;
+            }
+
+            if (applied.IsFailure)
+            {
+                // The one path that knows: the inverse returned a failure, which the command
+                // handlers produce before mutating. That claim can go back, so the operation
+                // stays undoable once whatever blocked it is fixed.
+                await _audit.ReleaseReversalAsync(step.IdempotencyKey, token, cancellationToken);
+
+                // Stop at the first failure rather than pressing on: the remaining steps
+                // were planned against a state this failure means we are no longer in, and
+                // a partial undo the caller cannot see is worse than a reported one.
+                results.Add(new ReversalStepResult(
+                    step.IdempotencyKey, step.Operation, Reversed: false, applied.Error.Message));
+
+                return Result.Success<IReadOnlyList<ReversalStepResult>>(results);
+            }
+
+            // Only now - the inverse landed. A false here means the claim moved on beneath
+            // this caller, which is not something to report as a successful undo.
+            bool recorded;
+            try
+            {
+                recorded = await _audit.CompleteReversalAsync(
+                    step.IdempotencyKey, token, CancellationToken.None);
+            }
+            catch
+            {
+                // The inverse is durable and the marker for it is not. Same rule as above,
+                // and the same settle: hold the claim in the interrupted state rather than
+                // letting the next call redo an undo that already happened.
+                await _audit.InterruptReversalAsync(step.IdempotencyKey, token, CancellationToken.None);
+                throw;
+            }
+
+            results.Add(new ReversalStepResult(
+                step.IdempotencyKey,
+                step.Operation,
+                Reversed: recorded,
+                recorded
+                    ? applied.Value
+                    : "The inverse was applied, but this call no longer held the reversal claim, " +
+                      "so it was not recorded. Check the operation before undoing it again."));
+
+            if (!recorded)
+            {
+                return Result.Success<IReadOnlyList<ReversalStepResult>>(results);
+            }
+        }
+
+        return Result.Success<IReadOnlyList<ReversalStepResult>>(results);
+    }
+
+    /// <summary>
+    /// What one entry's inverse is. Kept separate from applying it so that a dry run and a
+    /// real run cannot disagree about what will happen.
+    /// </summary>
+    private static ReversalStep Describe(AgentOperationLog entry) => entry.Operation switch
+    {
+        "set-scene-project" => Step(entry, $"Link scene {entry.AssetId} back to the project it belonged to before.", destructive: false,
+            supported: entry.PayloadBefore is not null,
+            blocker: "The previous project link was not recorded, so there is nothing to restore."),
+
+        "set-asset-metadata" => Step(entry, $"Restore the metadata fields this write changed on {entry.AssetType} {entry.AssetId}.", destructive: false,
+            supported: entry.PayloadBefore is not null,
+            blocker: "The prior metadata was not recorded, so there is nothing to restore."),
+
+        "set-tags" => Step(entry, $"Restore the tags, description and category model {entry.AssetId} had before.", destructive: false,
+            supported: entry.PayloadBefore is not null,
+            blocker: "The prior tags were not recorded, so there is nothing to restore."),
+
+        "set-category" => Step(entry, $"Restore model {entry.AssetId}'s previous category.", destructive: false,
+            supported: entry.PayloadBefore is not null,
+            blocker: "The prior category was not recorded, so there is nothing to restore."),
+
+        "add-to-pack" => Step(entry, $"Remove model {entry.AssetId} from the pack it was added to.", destructive: false,
+            supported: entry.PayloadAfter is not null,
+            blocker: "The pack this model was added to was not recorded."),
+
+        "create-pack" => Step(entry, $"Delete pack {entry.AssetId}.", destructive: true,
+            supported: entry.AssetId is > 0,
+            blocker: "The created pack's id was not recorded."),
+
+        "bind-texture-set" => Step(
+            entry,
+            $"Restore model {entry.AssetId}'s texture bindings - every version's mappings for this material and the default set each one rendered with.",
+            destructive: false,
+            supported: BindingBefore(entry) is not null,
+            blocker: "The bindings this write replaced were not recorded, so there is nothing to restore. " +
+                     "Entries written before the bind snapshot existed recorded only the active version's default and cannot be reversed correctly."),
+
+        "add-texture-channel" => Step(
+            entry,
+            ReadDisplacedChannel(entry) is null
+                ? "Remove the texture channel that was added to the set."
+                : "Put back the texture channel this add replaced, displacing the one it added.",
+            destructive: true,
+            supported: entry.PayloadAfter is not null,
+            blocker: "The added texture's id was not recorded."),
+
+        "import-model" or "import-sound" or "import-sprite" or "import-environment-map" or "import-texture-set" =>
+            DeduplicatedImport(entry)
+                ? Step(entry, "Nothing to undo.", destructive: false, supported: false,
+                    blocker: $"This import matched {entry.AssetType?.ToLowerInvariant() ?? "an asset"} {entry.AssetId}, which was already in the library, so it created nothing. Recycling it would delete work the agent never added.")
+                : Step(entry, $"Recycle the imported {entry.AssetType} {entry.AssetId} (soft delete - restorable from the recycle bin).",
+                    destructive: true,
+                    supported: entry.AssetId is > 0,
+                    blocker: "The imported asset's id was not recorded."),
+
+        // Scene authoring. Each of these records the exact inverse in PayloadBefore at write
+        // time, which is why undoing twenty placements is twenty removals rather than a
+        // best-effort reconstruction of what the scene used to look like.
+        "place-asset" => Step(entry, $"Remove the node this call placed in scene {entry.AssetId}.", destructive: false,
+            supported: entry.PayloadBefore is not null,
+            blocker: "The placed node's id was not recorded."),
+
+        "distribute-assets" => Step(entry, $"Remove the row of nodes this call placed in scene {entry.AssetId}.", destructive: false,
+            supported: entry.PayloadBefore is not null,
+            blocker: "The placed nodes' ids were not recorded."),
+
+        "set-lighting-preset" => Step(entry, $"Put scene {entry.AssetId}'s previous lighting rig back.", destructive: false,
+            supported: entry.PayloadBefore is not null,
+            blocker: "The rig this preset replaced was not recorded."),
+
+        "place-primitive" => Step(entry, $"Remove the blockout shape this call placed in scene {entry.AssetId}.", destructive: false,
+            supported: entry.PayloadBefore is not null,
+            blocker: "The placed node's id was not recorded."),
+
+        "create-room" => Step(entry, $"Remove the room shell this call built in scene {entry.AssetId}.", destructive: false,
+            supported: entry.PayloadBefore is not null,
+            blocker: "The shell's node ids were not recorded."),
+
+        // A scene has no recycle bin, so the honest description says what the inverse can and
+        // cannot do: the content comes back, the id does not.
+        "delete-scene" => Step(entry, $"Recreate deleted scene {entry.AssetId} from its recorded document, under a NEW id.", destructive: false,
+            supported: entry.PayloadBefore is not null,
+            blocker: "The deleted scene's document was not recorded, so there is nothing to recreate it from."),
+
+        "set-scene-recommendations" => Step(entry, $"Put scene {entry.AssetId}'s recommendations back as they were.", destructive: false,
+            supported: entry.PayloadBefore is not null,
+            blocker: "The previous recommendation set was not recorded."),
+
+        "place-assets-batch" => Step(entry, $"Remove the whole layout this call placed in scene {entry.AssetId}.", destructive: false,
+            supported: entry.PayloadBefore is not null,
+            blocker: "The placed nodes' ids were not recorded."),
+
+        "move-asset" => Step(entry, $"Put the node back where it was in scene {entry.AssetId}.", destructive: false,
+            supported: entry.PayloadBefore is not null,
+            blocker: "The node's previous transform was not recorded."),
+
+        "remove-asset" => Step(entry, $"Restore the node that was removed from scene {entry.AssetId}.", destructive: false,
+            supported: entry.PayloadBefore is not null,
+            blocker: "The removed node was not recorded, so there is nothing to restore."),
+
+        "set-light" => Step(entry, $"Restore scene {entry.AssetId}'s light to its previous state.", destructive: false,
+            supported: entry.PayloadBefore is not null,
+            blocker: "The light's previous state was not recorded."),
+
+        "apply-material" => Step(entry, $"Restore the node's previous material binding in scene {entry.AssetId}.", destructive: false,
+            supported: entry.PayloadBefore is not null,
+            blocker: "The previous material binding was not recorded."),
+
+        "update-scene-document" => Step(entry, $"Restore scene {entry.AssetId}'s previous document.", destructive: false,
+            supported: entry.PayloadBefore is not null,
+            blocker: "The previous document was not recorded."),
+
+        "set-scene-stage" => Step(entry, $"Put scene {entry.AssetId} back to the stage it declared before.", destructive: false,
+            supported: entry.PayloadBefore is not null,
+            blocker: "The scene's previous stage was not recorded."),
+
+        // All three slot writes share one inverse - the slot as it stood, and what its node
+        // was wearing - so they share one description shape too.
+        "propose-candidates" => Step(entry, $"Take back the candidates this call proposed in scene {entry.AssetId}.", destructive: false,
+            supported: entry.PayloadBefore is not null,
+            blocker: "The slot's previous state was not recorded."),
+
+        "resolve-slot" => Step(entry, $"Put the slot in scene {entry.AssetId} back to the choice it held before, and its node back to what it was wearing.", destructive: false,
+            supported: entry.PayloadBefore is not null,
+            blocker: "The slot's previous state was not recorded."),
+
+        "reject-candidates" => Step(entry, $"Withdraw the rejections this call recorded in scene {entry.AssetId}.", destructive: false,
+            supported: entry.PayloadBefore is not null,
+            blocker: "The slot's previous state was not recorded."),
+
+        "create-scene" => Step(entry, $"Delete scene {entry.AssetId}.", destructive: true,
+            supported: entry.AssetId is > 0,
+            blocker: "The created scene's id was not recorded."),
+
+        "trigger-rederive" => Step(entry, "Re-derivation cannot be undone.", destructive: false,
+            supported: false,
+            blocker: "Re-deriving an asset replaces computed data with freshly computed data - there is no prior state to restore, and nothing was lost."),
+
+        "reindex-search" => Step(entry, "A projection rebuild cannot be undone.", destructive: false,
+            supported: false,
+            blocker: "reindex_search rewrites the search index from data already stored elsewhere. " +
+                     "Nothing authored was touched, and running it again reproduces the same rows - " +
+                     "there is no prior state worth restoring."),
+
+        "generate-uvs" => Step(entry, "The queued unwrap cannot be called back.", destructive: false,
+            supported: false,
+            blocker: "generate_uvs queues work and returns before it has produced anything, so the " +
+                     "audit entry records a job id and not a version. Nothing was overwritten either - " +
+                     "the unwrap writes a NEW, inactive version. To discard it, delete that version."),
+
+        "bake-textures" => Step(entry, "The queued bake cannot be called back.", destructive: false,
+            supported: false,
+            blocker: "bake_textures queues work and returns before it has produced anything, so the " +
+                     "audit entry records a job id and not what was created. Nothing was overwritten - " +
+                     "the bake adds a texture set, and with unwrap on a NEW, inactive version as well. " +
+                     "get_job_status names both; delete them to discard the bake."),
+
+        _ => Step(entry, $"No inverse is defined for '{entry.Operation}'.", destructive: false,
+            supported: false,
+            blocker: $"'{entry.Operation}' is not a reversible operation."),
+    };
+
+    /// <summary>A JSON null, which is how <c>set_asset_metadata</c> is told to clear a field.</summary>
+    private static readonly JsonElement NullJson = JsonDocument.Parse("null").RootElement.Clone();
+
+    /// <summary>
+    /// Looks a property up without caring about its case.
+    ///
+    /// Audit payloads are serialized with default options, so a payload built from an
+    /// anonymous object keeps the lowercase names it was written with, while one built from
+    /// a typed record arrives PascalCased. Every other reader here reads the former; the
+    /// metadata payloads are the latter, and rows already written carry both shapes.
+    /// </summary>
+    private static bool TryGetPropertyInsensitive(JsonElement element, string name, out JsonElement value)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            if (element.TryGetProperty(name, out value))
+            {
+                return true;
+            }
+
+            foreach (var property in element.EnumerateObject())
+            {
+                if (string.Equals(property.Name, name, StringComparison.OrdinalIgnoreCase))
+                {
+                    value = property.Value;
+                    return true;
+                }
+            }
+        }
+
+        value = default;
+        return false;
+    }
+
+    /// <summary>
+    /// The writable schema fields in a recorded <c>AssetMetadataResponse</c>, keyed by field key,
+    /// with a null entry for a field that held no value. Returns null when the payload carries no
+    /// field list at all - which means the inverse cannot be computed, not that nothing changed.
+    ///
+    /// Read-only fields are skipped deliberately: triangle counts and the rest are derived, so
+    /// restoring one is neither possible nor meaningful, and <c>set_asset_metadata</c> refuses
+    /// them anyway.
+    /// </summary>
+    private static Dictionary<string, JsonElement?>? WritableFieldValues(JsonElement payload)
+    {
+        if (!TryGetPropertyInsensitive(payload, "fields", out var fields)
+            || fields.ValueKind != JsonValueKind.Array)
+        {
+            return null;
+        }
+
+        var values = new Dictionary<string, JsonElement?>(StringComparer.Ordinal);
+
+        foreach (var field in fields.EnumerateArray())
+        {
+            if (!TryGetPropertyInsensitive(field, "key", out var key) || key.ValueKind != JsonValueKind.String)
+            {
+                continue;
+            }
+
+            if (TryGetPropertyInsensitive(field, "readOnly", out var readOnly)
+                && readOnly.ValueKind == JsonValueKind.True)
+            {
+                continue;
+            }
+
+            values[key.GetString()!] = TryGetPropertyInsensitive(field, "value", out var value)
+                ? value.Clone()
+                : null;
+        }
+
+        return values;
+    }
+
+    /// <summary>
+    /// Whether two recorded field values are the same. Compared by raw text rather than by
+    /// value so that a repeating field (styles, themes) is compared as a whole rather than
+    /// element by element - reordering one is still a change worth undoing.
+    /// </summary>
+    private static bool SameJson(JsonElement? left, JsonElement? right)
+    {
+        if (left is null && right is null)
+        {
+            return true;
+        }
+
+        if (left is null || right is null)
+        {
+            return false;
+        }
+
+        return string.Equals(left.Value.GetRawText(), right.Value.GetRawText(), StringComparison.Ordinal);
+    }
+
+    /// <summary>The binding snapshot a <c>bind-texture-set</c> recorded, or null when it has none.</summary>
+    private static ModelTextureBindingSnapshot? BindingBefore(AgentOperationLog entry)
+    {
+        var before = Read(entry.PayloadBefore);
+        return before is null ? null : ReadBinding(before.Value);
+    }
+
+    private static ModelTextureBindingSnapshot? ReadBinding(JsonElement before) =>
+        ReadPayload<ModelTextureBindingSnapshot>(before, "binding");
+
+    /// <summary>The channel an <c>add-texture-channel</c> displaced, as recorded before the write.</summary>
+    private sealed record DisplacedChannel(int FileId, TextureType TextureType, TextureChannel? SourceChannel);
+
+    /// <summary>
+    /// Reads the displaced channel out of an entry's <c>PayloadBefore</c>. Null means the add
+    /// filled an empty slot, so its inverse is a plain removal. An unreadable or unparseable
+    /// record is also null: undoing by removal is the pre-existing behaviour, and it is
+    /// strictly safer than re-adding a file id that did not parse.
+    /// </summary>
+    private static DisplacedChannel? ReadDisplacedChannel(AgentOperationLog entry)
+    {
+        // Before, then after: the MCP tool records it as this write's "before", while an
+        // audited HTTP upload records the endpoint's whole response, which carries the same
+        // field. Reading both is what makes a remote add-channel as reversible as a local one.
+        return FindReplaced(entry.PayloadBefore) ?? FindReplaced(entry.PayloadAfter);
+    }
+
+    private static DisplacedChannel? FindReplaced(string? payload)
+    {
+        var root = Read(payload);
+        if (root is null || !TryGetPropertyAnyCase(root.Value, "replacedTexture", out var replaced) ||
+            replaced.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        var fileId = ReadIntAnyCase(replaced, "fileId");
+        var typeName = ReadStringAnyCase(replaced, "textureType");
+        if (fileId is null || typeName is null || !Enum.TryParse<TextureType>(typeName, ignoreCase: true, out var type))
+        {
+            return null;
+        }
+
+        var channelName = ReadStringAnyCase(replaced, "sourceChannel");
+        TextureChannel? channel = channelName is not null &&
+            Enum.TryParse<TextureChannel>(channelName, ignoreCase: true, out var parsedChannel)
+            ? parsedChannel
+            : null;
+
+        return new DisplacedChannel(fileId.Value, type, channel);
+    }
+
+    /// <summary>
+    /// Whether an import entry recorded a deduplicated hit rather than a new asset.
+    ///
+    /// Import is content-addressed: re-importing bytes the library already holds returns the
+    /// existing asset and creates nothing. The audit row still names that asset, so undoing
+    /// it naively recycles an asset the agent never added - the user's original. Both writers
+    /// record the flag (the MCP tool as <c>alreadyExisted</c>, the HTTP data plane as the
+    /// endpoint DTO's <c>AlreadyExists</c>), so both spellings are read here.
+    /// </summary>
+    private static bool DeduplicatedImport(AgentOperationLog entry)
+    {
+        var after = Read(entry.PayloadAfter);
+        return after is not null &&
+               (ReadBoolAnyCase(after.Value, "alreadyExisted") == true ||
+                ReadBoolAnyCase(after.Value, "alreadyExists") == true);
+    }
+
+    private static ReversalStep Step(
+        AgentOperationLog entry, string description, bool destructive, bool supported, string blocker) =>
+        new(entry.IdempotencyKey, entry.Operation, entry.AssetType, entry.AssetId,
+            supported ? description : blocker, destructive, supported, supported ? null : blocker);
+
+    private async Task<Result<string>> ApplyInverse(AgentOperationLog entry, CancellationToken cancellationToken)
+    {
+        // Checked again here, not only while planning: every import inverse is a delete, and
+        // a deduplicated import would delete an asset that predates the agent entirely.
+        if (entry.Operation.StartsWith("import-", StringComparison.Ordinal) && DeduplicatedImport(entry))
+        {
+            return Result.Failure<string>(new Error(
+                "NothingImported",
+                $"This import matched an asset already in the library ({entry.AssetType} {entry.AssetId}), so it created nothing to undo."));
+        }
+
+        switch (entry.Operation)
+        {
+            case "set-scene-project":
+            {
+                var before = Read(entry.PayloadBefore);
+                if (before is null)
+                {
+                    return Result.Failure<string>(new Error(
+                        "NoPriorState", "The previous project link was not recorded."));
+                }
+
+                // Absent means the scene belonged to no project, which is a state worth
+                // restoring, not a missing value - so a null projectId is the payload here.
+                var projectId = ReadInt(before.Value, "projectId");
+                var relink = await _setSceneProject.Handle(
+                    new SetSceneProjectCommand(entry.AssetId!.Value, projectId), cancellationToken);
+
+                return relink.IsFailure
+                    ? Result.Failure<string>(relink.Error)
+                    : Result.Success(projectId is null
+                        ? $"Unlinked scene {entry.AssetId} from its project, as it was before."
+                        : $"Linked scene {entry.AssetId} back to project {projectId}.");
+            }
+
+            case "set-asset-metadata":
+            {
+                var before = Read(entry.PayloadBefore);
+                var priorValues = before is null ? null : WritableFieldValues(before.Value);
+                if (priorValues is null)
+                {
+                    return Result.Failure<string>(new Error(
+                        "NoPriorState", "The prior metadata was not recorded."));
+                }
+
+                var after = Read(entry.PayloadAfter);
+                var newValues = after is null ? null : WritableFieldValues(after.Value);
+                if (newValues is null)
+                {
+                    // Without the resulting state there is no way to know which keys this
+                    // write touched, and a merge cannot be inverted by guessing. Reporting
+                    // success here would mark the entry reversed while leaving the values in
+                    // place - the one outcome an undo must never produce.
+                    return Result.Failure<string>(new Error(
+                        "NoResultingState",
+                        "The metadata this write produced was not recorded, so the fields it "
+                        + "changed cannot be identified."));
+                }
+
+                // Only the keys this write actually changed. A metadata write is a merge, so
+                // restoring every writable field would also overwrite ones it never touched -
+                // including anything a later write set.
+                var patch = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+                foreach (var (key, newValue) in newValues)
+                {
+                    priorValues.TryGetValue(key, out var priorValue);
+                    if (!SameJson(priorValue, newValue))
+                    {
+                        patch[key] = priorValue ?? NullJson;
+                    }
+                }
+
+                if (patch.Count == 0)
+                {
+                    return Result.Success(
+                        $"{entry.AssetType} {entry.AssetId}'s metadata already holds what it did before.");
+                }
+
+                var restored = await _setAssetMetadata.Handle(
+                    new SetAssetMetadataCommand(entry.AssetType!, entry.AssetId!.Value, patch),
+                    cancellationToken);
+
+                return restored.IsFailure
+                    ? Result.Failure<string>(restored.Error)
+                    : Result.Success(
+                        $"Restored {patch.Count} metadata field(s) on {entry.AssetType} {entry.AssetId}.");
+            }
+
+            case "set-tags":
+            {
+                var before = Read(entry.PayloadBefore);
+                if (before is null)
+                {
+                    return Result.Failure<string>(new Error("NoPriorState", "The prior tags were not recorded."));
+                }
+
+                var tags = ReadStringArray(before.Value, "tags");
+                var description = ReadString(before.Value, "description");
+                var categoryId = ReadInt(before.Value, "categoryId");
+
+                var result = await _updateTags.Handle(
+                    new UpdateModelTagsCommand(entry.AssetId!.Value, tags, description, categoryId), cancellationToken);
+
+                return result.IsFailure
+                    ? Result.Failure<string>(result.Error)
+                    : Result.Success($"Restored {tags.Count} tag(s) on model {entry.AssetId}.");
+            }
+
+            case "set-category":
+            {
+                var before = Read(entry.PayloadBefore);
+                if (before is null)
+                {
+                    return Result.Failure<string>(new Error("NoPriorState", "The prior category was not recorded."));
+                }
+
+                var categoryId = ReadInt(before.Value, "categoryId");
+                var result = await _setCategory.Handle(
+                    new SetModelCategoryCommand(entry.AssetId!.Value, categoryId), cancellationToken);
+
+                return result.IsFailure
+                    ? Result.Failure<string>(result.Error)
+                    : Result.Success(categoryId is null
+                        ? $"Cleared model {entry.AssetId}'s category, as it was before."
+                        : $"Restored model {entry.AssetId} to category {categoryId}.");
+            }
+
+            case "add-to-pack":
+            {
+                var after = Read(entry.PayloadAfter);
+                var packId = after is null ? null : ReadInt(after.Value, "packId");
+                if (packId is null)
+                {
+                    return Result.Failure<string>(new Error("NoPackRecorded", "The pack this model was added to was not recorded."));
+                }
+
+                // A model that was already in the pack before the agent touched it stays:
+                // the write added nothing, so its inverse removes nothing.
+                var before = Read(entry.PayloadBefore);
+                if (before is not null && ReadBool(before.Value, "wasMember") == true)
+                {
+                    return Result.Success($"Model {entry.AssetId} was already in pack {packId} beforehand - left in place.");
+                }
+
+                var result = await _removeFromPack.Handle(
+                    new RemoveModelFromPackCommand(packId.Value, entry.AssetId!.Value), cancellationToken);
+
+                return result.IsFailure
+                    ? Result.Failure<string>(result.Error)
+                    : Result.Success($"Removed model {entry.AssetId} from pack {packId}.");
+            }
+
+            case "create-pack":
+            {
+                var result = await _deletePack.Handle(new DeletePackCommand(entry.AssetId!.Value), cancellationToken);
+                return result.IsFailure
+                    ? Result.Failure<string>(result.Error)
+                    : Result.Success($"Deleted pack {entry.AssetId}.");
+            }
+
+            case "bind-texture-set":
+            {
+                var before = Read(entry.PayloadBefore);
+                var binding = before is null ? null : ReadBinding(before.Value);
+                if (binding is null)
+                {
+                    return Result.Failure<string>(new Error(
+                        "NoPriorState", "The bindings this write replaced were not recorded."));
+                }
+
+                // The whole slot across every version, not just the active version's default:
+                // the write mapped the set into all of them and displaced what was there.
+                var result = await _restoreTextureBinding.Handle(
+                    new RestoreModelTextureBindingCommand(binding), cancellationToken);
+
+                return result.IsFailure
+                    ? Result.Failure<string>(result.Error)
+                    : Result.Success(
+                        $"Restored model {entry.AssetId}'s texture bindings across {binding.Versions.Count} version(s).");
+            }
+
+            case "add-texture-channel":
+            {
+                var after = Read(entry.PayloadAfter);
+                var textureId = after is null ? null : ReadIntAnyCase(after.Value, "textureId");
+                if (textureId is null)
+                {
+                    return Result.Failure<string>(new Error("NoTextureRecorded", "The added texture's id was not recorded."));
+                }
+
+                // Re-adding the displaced file is the whole inverse: adding a channel removes
+                // the same-typed one first, so putting the original back evicts the one this
+                // write added. Removing the new texture on its own would leave the set short
+                // the map it displaced - reported as reversed, but not restored.
+                var displaced = ReadDisplacedChannel(entry);
+                if (displaced is not null)
+                {
+                    var restored = await _addTexture.Handle(
+                        new AddTextureToTextureSetCommand(
+                            entry.AssetId!.Value, displaced.FileId, displaced.TextureType, displaced.SourceChannel),
+                        cancellationToken);
+
+                    return restored.IsFailure
+                        ? Result.Failure<string>(restored.Error)
+                        : Result.Success(
+                            $"Restored the previous {displaced.TextureType} channel in set {entry.AssetId}, replacing texture {textureId}.");
+                }
+
+                var result = await _removeTexture.Handle(
+                    new RemoveTextureFromPackCommand(entry.AssetId!.Value, textureId.Value), cancellationToken);
+
+                return result.IsFailure
+                    ? Result.Failure<string>(result.Error)
+                    : Result.Success($"Removed texture {textureId} from set {entry.AssetId}.");
+            }
+
+            case "import-model":
+            {
+                var result = await _deleteModel.Handle(new SoftDeleteModelCommand(entry.AssetId!.Value), cancellationToken);
+                return result.IsFailure
+                    ? Result.Failure<string>(result.Error)
+                    : Result.Success($"Recycled model {entry.AssetId}.");
+            }
+
+            case "import-sound":
+            {
+                var result = await _deleteSound.Handle(new SoftDeleteSoundCommand(entry.AssetId!.Value), cancellationToken);
+                return result.IsFailure
+                    ? Result.Failure<string>(result.Error)
+                    : Result.Success($"Recycled sound {entry.AssetId}.");
+            }
+
+            case "import-sprite":
+            {
+                var result = await _deleteSprite.Handle(new SoftDeleteSpriteCommand(entry.AssetId!.Value), cancellationToken);
+                return result.IsFailure
+                    ? Result.Failure<string>(result.Error)
+                    : Result.Success($"Recycled sprite {entry.AssetId}.");
+            }
+
+            case "import-environment-map":
+            {
+                var result = await _deleteEnvironmentMap.Handle(
+                    new SoftDeleteEnvironmentMapCommand(entry.AssetId!.Value), cancellationToken);
+                return result.IsFailure
+                    ? Result.Failure<string>(result.Error)
+                    : Result.Success($"Recycled environment map {entry.AssetId}.");
+            }
+
+            case "import-texture-set":
+            {
+                var result = await _deleteTextureSet.Handle(
+                    new SoftDeleteTextureSetCommand(entry.AssetId!.Value), cancellationToken);
+                return result.IsFailure
+                    ? Result.Failure<string>(result.Error)
+                    : Result.Success($"Recycled texture set {entry.AssetId}.");
+            }
+
+            case "place-primitive":
+            case "place-asset":
+            {
+                var before = Read(entry.PayloadBefore);
+                var nodeId = before is null ? null : ReadString(before.Value, "removedNodeId");
+                if (nodeId is null)
+                {
+                    return Result.Failure<string>(new Error("NoNodeRecorded", "The placed node's id was not recorded."));
+                }
+
+                var result = await _removeSceneNode.Handle(
+                    new RemoveSceneNodeCommand(entry.AssetId!.Value, nodeId), cancellationToken);
+
+                // Already gone is the desired end state, not a failure - the user may have
+                // deleted the node themselves before asking for the undo.
+                return result.IsFailure && result.Error.Code != "Scene.NodeNotFound"
+                    ? Result.Failure<string>(result.Error)
+                    : Result.Success($"Removed node '{nodeId}' from scene {entry.AssetId}.");
+            }
+
+            case "distribute-assets":
+            case "place-assets-batch":
+            case "create-room":
+            {
+                var before = Read(entry.PayloadBefore);
+                var nodeIds = before is null
+                    ? Array.Empty<string>()
+                    : ReadStringArray(before.Value, "removedNodeIds").ToArray();
+                if (nodeIds.Length == 0)
+                {
+                    return Result.Failure<string>(new Error("NoNodesRecorded", "The placed nodes' ids were not recorded."));
+                }
+
+                // ONE transaction around the whole row.
+                //
+                // This inverse is several writes under one reversal claim, and each removal
+                // commits through the unit-of-work decorator. Removing three of forty and
+                // then failing used to leave those three durably gone while the failure path
+                // handed the claim back as retryable - so the next attempt re-ran an inverse
+                // that had already half happened, against a scene it had already changed.
+                // A failure Result rolls the whole row back, which is what makes releasing
+                // the claim below an honest answer: the scene is exactly as it was.
+                //
+                // Reverse order inside it, because a batch entry may rest on one placed
+                // before it and a node cannot be removed while something is anchored to it.
+                // A distributed row has no anchors, so reversing costs it nothing.
+                return await _unitOfWork.InTransactionAsync<string>(async tx =>
+                {
+                    foreach (var nodeId in nodeIds.Reverse())
+                    {
+                        var removed = await _removeSceneNode.Handle(
+                            new RemoveSceneNodeCommand(entry.AssetId!.Value, nodeId), tx);
+
+                        // Already gone is the desired end state, not a failure - the user may
+                        // have deleted some of the row themselves before asking for the undo.
+                        if (removed.IsFailure && removed.Error.Code != "Scene.NodeNotFound")
+                        {
+                            return Result.Failure<string>(removed.Error);
+                        }
+                    }
+
+                    return Result.Success($"Removed {nodeIds.Length} node(s) from scene {entry.AssetId}.");
+                }, cancellationToken);
+            }
+
+            case "move-asset":
+            {
+                var before = Read(entry.PayloadBefore);
+                var nodeId = before is null ? null : ReadString(before.Value, "nodeId");
+                var transform = before is null ? null : ReadPayload<SceneTransform>(before.Value, "transform");
+                if (nodeId is null || transform is null)
+                {
+                    return Result.Failure<string>(new Error("NoPriorState", "The node's previous transform was not recorded."));
+                }
+
+                // Exact: the recorded placement is the whole prior state. A merging undo would
+                // keep whatever the write attached the node to, or left it facing, and report
+                // success anyway. Entries logged before placement rules existed carry none of
+                // these keys, which reads as "nothing set" - which is what was true then.
+                var anchor = ReadPayload<SceneAnchor>(before!.Value, "anchor");
+                var result = await _moveSceneNode.Handle(
+                    new MoveSceneNodeCommand(
+                        entry.AssetId!.Value, nodeId, transform.Position, transform.RotationEuler, transform.Scale,
+                        GroundSnap: ReadBool(before.Value, "groundSnap"),
+                        Suspended: ReadBool(before.Value, "suspended"),
+                        FaceToward: ReadVector(before.Value, "faceToward"),
+                        FrontAxis: ReadString(before.Value, "frontAxis"),
+                        AnchorTo: anchor?.OnNodeId,
+                        // "Keep" when the offset was never captured, so the node is re-seated
+                        // where it stands rather than yanked to the centre of its anchor.
+                        AnchorAlign: anchor is { Offset: null } ? SceneAnchorAlignments.Keep : null,
+                        AnchorOffset: anchor?.Offset,
+                        // Restored, not re-measured: the offset above is what the node
+                        // actually had, and re-reading the surface would undo to a position
+                        // the scene never held if the derive step has since changed.
+                        AnchorSurface: anchor?.Surface,
+                        Exact: true),
+                    cancellationToken);
+
+                return result.IsFailure
+                    ? Result.Failure<string>(result.Error)
+                    : Result.Success($"Restored node '{nodeId}' to its previous transform in scene {entry.AssetId}.");
+            }
+
+            case "remove-asset":
+            {
+                var before = Read(entry.PayloadBefore);
+                var node = before is null ? null : ReadPayload<SceneNode>(before.Value, "restoredNode");
+                if (node is null)
+                {
+                    return Result.Failure<string>(new Error("NoPriorState", "The removed node was not recorded."));
+                }
+
+                // Null unless the node was the subject of an open decision, which the
+                // removal took with it.
+                var slot = ReadPayload<SceneSlot>(before!.Value, "restoredSlot");
+
+                var result = await _restoreSceneNode.Handle(
+                    new RestoreSceneNodeCommand(entry.AssetId!.Value, node, slot), cancellationToken);
+
+                return result.IsFailure
+                    ? Result.Failure<string>(result.Error)
+                    : Result.Success(slot is null
+                        ? $"Restored node '{node.Id}' to scene {entry.AssetId}."
+                        : $"Restored node '{node.Id}' and the '{slot.Id}' decision to scene {entry.AssetId}.");
+            }
+
+            case "set-light":
+            {
+                var before = Read(entry.PayloadBefore);
+                var lightId = before is null ? null : ReadString(before.Value, "lightId");
+                if (lightId is null)
+                {
+                    return Result.Failure<string>(new Error("NoPriorState", "The light's previous state was not recorded."));
+                }
+
+                // No previous light means the write created one, so its inverse deletes it.
+                var previous = ReadPayload<SceneLight>(before!.Value, "light");
+                // Exact: the recorded light is the whole prior state, so a light that had no
+                // target or no name is restored without one. Merge semantics would keep
+                // whatever the write put there and report the undo as successful anyway.
+                var command = previous is null
+                    ? new SetSceneLightCommand(entry.AssetId!.Value, lightId, Remove: true)
+                    : new SetSceneLightCommand(
+                        entry.AssetId!.Value, lightId, previous.Type, previous.Position,
+                        previous.Intensity, previous.Color, previous.Target, previous.Name,
+                        Exact: true);
+
+                var result = await _setSceneLight.Handle(command, cancellationToken);
+
+                return result.IsFailure && result.Error.Code != "Scene.LightNotFound"
+                    ? Result.Failure<string>(result.Error)
+                    : Result.Success(previous is null
+                        ? $"Removed light '{lightId}' from scene {entry.AssetId}, which is how it was before."
+                        : $"Restored light '{lightId}' in scene {entry.AssetId}.");
+            }
+
+            case "apply-material":
+            {
+                var before = Read(entry.PayloadBefore);
+                var nodeId = before is null ? null : ReadString(before.Value, "nodeId");
+                if (nodeId is null)
+                {
+                    return Result.Failure<string>(new Error("NoPriorState", "The previous material binding was not recorded."));
+                }
+
+                var previous = ReadPayload<SceneMaterialBinding>(before!.Value, "material");
+                // Which slot the write touched. Recorded separately because clearing a slot
+                // that held nothing records a null binding, and the slot name is then the
+                // only thing saying "that one slot" rather than "the whole node".
+                var slot = ReadString(before!.Value, "slot") ?? previous?.Slot;
+                var where = slot is null ? $"node '{nodeId}'s material" : $"node '{nodeId}'s '{slot}' slot";
+
+                // Exact, for the same reason as the light above: a binding that carried no
+                // variant is restorable only when null means null.
+                var result = await _applySceneMaterial.Handle(
+                    previous is null
+                        ? new ApplySceneMaterialCommand(entry.AssetId!.Value, nodeId, Clear: true, Slot: slot)
+                        : new ApplySceneMaterialCommand(
+                            entry.AssetId!.Value, nodeId, previous.TextureSetId, previous.Variant, Exact: true,
+                            MaterialId: previous.MaterialId, Slot: slot),
+                    cancellationToken);
+
+                return result.IsFailure
+                    ? Result.Failure<string>(result.Error)
+                    : Result.Success(previous is null
+                        ? $"Cleared {where} in scene {entry.AssetId}, as it was before."
+                        : $"Restored {where}'s previous binding in scene {entry.AssetId}.");
+            }
+
+            case "update-scene-document":
+            {
+                var before = Read(entry.PayloadBefore);
+                var document = before is null ? null : ReadPayload<SceneDocument>(before.Value, "document");
+                if (document is null)
+                {
+                    return Result.Failure<string>(new Error("NoPriorState", "The previous document was not recorded."));
+                }
+
+                var result = await _updateSceneDocument.Handle(
+                    new UpdateSceneDocumentCommand(entry.AssetId!.Value, SceneDocumentCodec.Serialize(document)),
+                    cancellationToken);
+
+                return result.IsFailure
+                    ? Result.Failure<string>(result.Error)
+                    : Result.Success($"Restored scene {entry.AssetId}'s previous document ({document.Nodes.Count} node(s)).");
+            }
+
+            case "set-scene-stage":
+            {
+                var before = Read(entry.PayloadBefore);
+                if (before is null)
+                {
+                    return Result.Failure<string>(new Error("NoPriorState", "The scene's previous stage was not recorded."));
+                }
+
+                // A recorded null stage means the scene was not being authored in stages, and
+                // that is what the undo restores - the same "null means null" rule the light
+                // and material inverses follow. Undoing a *retreat* re-advances the stage and
+                // so goes through the gate: the scene has to still hold together to reclaim
+                // the stage it claimed before, which is the whole point of the gate.
+                var previous = ReadString(before.Value, "stage");
+                var result = await _setSceneStage.Handle(
+                    new SetSceneStageCommand(entry.AssetId!.Value, previous), cancellationToken);
+
+                return result.IsFailure
+                    ? Result.Failure<string>(result.Error)
+                    : Result.Success(previous is null
+                        ? $"Scene {entry.AssetId} is no longer being authored in stages, as it was before."
+                        : $"Put scene {entry.AssetId} back to the '{previous}' stage.");
+            }
+
+            case "propose-candidates":
+            case "resolve-slot":
+            case "reject-candidates":
+            {
+                var before = Read(entry.PayloadBefore);
+                var slotId = before is null ? null : ReadString(before.Value, "slotId");
+                if (slotId is null)
+                {
+                    return Result.Failure<string>(new Error("NoPriorState", "The slot's previous state was not recorded."));
+                }
+
+                // A recorded null slot means the write created it, and the inverse of creating
+                // it is removing it - the same "null means null" rule the light, material and
+                // stage inverses follow. Restoring an empty slot instead would leave the scene
+                // claiming a decision nobody ever opened.
+                var slot = ReadPayload<SceneSlot>(before.Value, "slot");
+                var node = ReadPayload<SceneSlotNodeState>(before.Value, "node");
+
+                var result = await _restoreSceneSlot.Handle(
+                    new RestoreSceneSlotCommand(entry.AssetId!.Value, slotId, slot, node), cancellationToken);
+
+                return result.IsFailure
+                    ? Result.Failure<string>(result.Error)
+                    : Result.Success(slot is null
+                        ? $"Removed slot '{slotId}' from scene {entry.AssetId}, which is how it was before."
+                        : $"Restored slot '{slotId}' in scene {entry.AssetId} to its previous state.");
+            }
+
+            case "set-scene-recommendations":
+            {
+                var before = Read(entry.PayloadBefore);
+                if (before is null)
+                {
+                    return Result.Failure<string>(new Error(
+                        "NoPriorState", "The previous recommendation set was not recorded."));
+                }
+
+                // The whole set at once, because that is what the forward write states. An
+                // undo that restored one slot would leave the scene advising a combination
+                // nobody ever recommended.
+                var recommendations =
+                    ReadPayload<List<SceneRecommendation>>(before.Value, "recommendations") ?? [];
+                var summary = ReadString(before.Value, "summary");
+
+                var result = await _restoreSceneRecommendations.Handle(
+                    new RestoreSceneRecommendationsCommand(entry.AssetId!.Value, recommendations, summary),
+                    cancellationToken);
+
+                return result.IsFailure
+                    ? Result.Failure<string>(result.Error)
+                    : Result.Success(recommendations.Count == 0
+                        ? $"Scene {entry.AssetId} recommends nothing again, as it did before."
+                        : $"Restored scene {entry.AssetId}'s previous {recommendations.Count} recommendation(s).");
+            }
+
+            case "set-lighting-preset":
+            {
+                var before = Read(entry.PayloadBefore);
+                if (before is null)
+                {
+                    return Result.Failure<string>(new Error(
+                        "NoPriorState", "The rig this preset replaced was not recorded."));
+                }
+
+                // The whole rig at once, through the same preset command's replace path -
+                // restoring light by light would leave behind whichever preset lights the
+                // old rig had no counterpart for.
+                var lights = ReadPayload<List<SceneLight>>(before.Value, "lights") ?? [];
+
+                var result = await _restoreSceneLights.Handle(
+                    new RestoreSceneLightsCommand(entry.AssetId!.Value, lights), cancellationToken);
+
+                return result.IsFailure
+                    ? Result.Failure<string>(result.Error)
+                    : Result.Success(lights.Count == 0
+                        ? $"Scene {entry.AssetId} has no lights again, as it did before."
+                        : $"Restored scene {entry.AssetId}'s previous {lights.Count} light(s).");
+            }
+
+            case "delete-scene":
+            {
+                var before = Read(entry.PayloadBefore);
+                var document = before is null ? null : ReadString(before.Value, "document");
+                if (document is null)
+                {
+                    return Result.Failure<string>(new Error(
+                        "NoPriorState",
+                        "The deleted scene's document was not recorded, so there is nothing to recreate it from."));
+                }
+
+                var name = (before is null ? null : ReadString(before.Value, "name")) ?? $"Scene {entry.AssetId}";
+                var description = before is null ? null : ReadString(before.Value, "description");
+
+                var result = await _createScene.Handle(
+                    new CreateSceneCommand(name, description, document), cancellationToken);
+
+                // The new id is said out loud rather than glossed over. A scene comes back
+                // with its content intact and its identity changed, and a caller that assumed
+                // otherwise would go on addressing a scene that no longer exists.
+                return result.IsFailure
+                    ? Result.Failure<string>(result.Error)
+                    : Result.Success(
+                        $"Recreated deleted scene {entry.AssetId} as '{name}' with id {result.Value.Scene.Id}. " +
+                        "Its content is restored; its id is new, because a deleted scene cannot be given its old one back.");
+            }
+
+            case "create-scene":
+            {
+                var result = await _deleteScene.Handle(new DeleteSceneCommand(entry.AssetId!.Value), cancellationToken);
+                return result.IsFailure
+                    ? Result.Failure<string>(result.Error)
+                    : Result.Success($"Deleted scene {entry.AssetId}.");
+            }
+
+            default:
+                return Result.Failure<string>(new Error(
+                    "NotReversible", $"'{entry.Operation}' is not a reversible operation."));
+        }
+    }
+
+    private static JsonElement? Read(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return null;
+        }
+
+        try
+        {
+            // Cloned because the document is disposed with the using block; the element
+            // would otherwise be read after its backing buffer is returned.
+            using var document = JsonDocument.Parse(json);
+            return document.RootElement.Clone();
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static IReadOnlyCollection<string> ReadStringArray(JsonElement element, string property) =>
+        element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.Array
+            ? value.EnumerateArray().Where(v => v.ValueKind == JsonValueKind.String).Select(v => v.GetString()!).ToList()
+            : Array.Empty<string>();
+
+    private static string? ReadString(JsonElement element, string property) =>
+        element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String
+            ? value.GetString()
+            : null;
+
+    private static int? ReadInt(JsonElement element, string property) =>
+        element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.Number
+            ? value.GetInt32()
+            : null;
+
+    /// <summary>
+    /// Reads a recorded contract type out of a payload property.
+    ///
+    /// Case-insensitive on purpose: the audit log serializes an anonymous wrapper with the
+    /// default options (so the contract types inside come out PascalCase) while a scene
+    /// document is stored camelCase. Reading either shape here is what stops undo from
+    /// depending on which writer produced the row.
+    /// </summary>
+    private static T? ReadPayload<T>(JsonElement element, string property) where T : class
+    {
+        if (!element.TryGetProperty(property, out var value) || value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+        {
+            return null;
+        }
+
+        try
+        {
+            return value.Deserialize<T>(PayloadReadOptions);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static readonly JsonSerializerOptions PayloadReadOptions = new() { PropertyNameCaseInsensitive = true };
+
+    /// <summary>
+    /// The struct twin of <see cref="ReadPayload{T}"/>: <see cref="Vec3"/> is a value type, so
+    /// it cannot go through the class-constrained reader, and a recorded point still has to
+    /// come back as "absent" rather than as the origin when the property is not there.
+    /// </summary>
+    private static Vec3? ReadVector(JsonElement element, string property)
+    {
+        if (!element.TryGetProperty(property, out var value) || value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+        {
+            return null;
+        }
+
+        try
+        {
+            return value.Deserialize<Vec3>(PayloadReadOptions);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static bool? ReadBool(JsonElement element, string property) =>
+        element.TryGetProperty(property, out var value) && value.ValueKind is JsonValueKind.True or JsonValueKind.False
+            ? value.GetBoolean()
+            : null;
+
+    /// <summary>
+    /// A boolean property regardless of casing. Payloads reach the log from two writers with
+    /// two casings - an anonymous type serialized as written by a tool, and an endpoint DTO
+    /// serialized PascalCase - and a case-sensitive read would silently miss one of them.
+    /// </summary>
+    private static bool? ReadBoolAnyCase(JsonElement element, string property) =>
+        TryGetPropertyAnyCase(element, property, out var value) &&
+        value.ValueKind is JsonValueKind.True or JsonValueKind.False
+            ? value.GetBoolean()
+            : null;
+
+    private static int? ReadIntAnyCase(JsonElement element, string property) =>
+        TryGetPropertyAnyCase(element, property, out var value) && value.ValueKind == JsonValueKind.Number
+            ? value.GetInt32()
+            : null;
+
+    private static string? ReadStringAnyCase(JsonElement element, string property) =>
+        TryGetPropertyAnyCase(element, property, out var value) && value.ValueKind == JsonValueKind.String
+            ? value.GetString()
+            : null;
+
+    private static bool TryGetPropertyAnyCase(JsonElement element, string property, out JsonElement value)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var candidate in element.EnumerateObject())
+            {
+                if (string.Equals(candidate.Name, property, StringComparison.OrdinalIgnoreCase))
+                {
+                    value = candidate.Value;
+                    return true;
+                }
+            }
+        }
+
+        value = default;
+        return false;
+    }
+}

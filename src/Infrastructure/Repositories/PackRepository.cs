@@ -37,6 +37,41 @@ internal sealed class PackRepository : IPackRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<string>> GetNamesByModelIdAsync(
+        int modelId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.Packs
+            .Where(p => p.Models.Any(m => m.Id == modelId))
+            .Select(p => p.Name)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyDictionary<int, IReadOnlyList<string>>> GetNamesByModelIdsAsync(
+        IEnumerable<int> modelIds,
+        CancellationToken cancellationToken = default)
+    {
+        var ids = modelIds.Distinct().ToList();
+        if (ids.Count == 0)
+        {
+            return new Dictionary<int, IReadOnlyList<string>>();
+        }
+
+        // Flatten the join to (modelId, packName) pairs in one round trip, then group in
+        // memory - grouping server-side would need a second pass to materialise anyway.
+        var pairs = await _context.Packs
+            .SelectMany(
+                p => p.Models.Where(m => ids.Contains(m.Id)),
+                (p, m) => new { ModelId = m.Id, PackName = p.Name })
+            .ToListAsync(cancellationToken);
+
+        return pairs
+            .GroupBy(x => x.ModelId)
+            .ToDictionary(
+                g => g.Key,
+                g => (IReadOnlyList<string>)g.Select(x => x.PackName).ToList());
+    }
+
     public async Task<Pack?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         return await _context.Packs
@@ -75,15 +110,58 @@ internal sealed class PackRepository : IPackRepository
                 cancellationToken);
     }
 
+    public async Task<IReadOnlySet<string>> GetImportedStoreAssetIdsAsync(
+        string storeUrl,
+        IReadOnlyCollection<string> storeAssetIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (storeAssetIds.Count == 0)
+        {
+            return new HashSet<string>();
+        }
+
+        var ids = storeAssetIds.Distinct().ToList();
+        var imported = await _context.Packs
+            .Where(p => p.StoreImportUrl == storeUrl
+                        && p.StoreImportAssetId != null
+                        && ids.Contains(p.StoreImportAssetId))
+            .Select(p => p.StoreImportAssetId!)
+            .ToListAsync(cancellationToken);
+
+        return imported.ToHashSet();
+    }
+
+    public async Task EnsureModelInPackAsync(
+        int packId,
+        int modelId,
+        DateTime updatedAt,
+        CancellationToken cancellationToken = default)
+    {
+        if (_context.Database.CurrentTransaction is null)
+        {
+            throw new InvalidOperationException("EnsureModelInPackAsync requires an active database transaction.");
+        }
+
+        await _context.Database.ExecuteSqlInterpolatedAsync(
+            $"INSERT INTO \"PackModels\" (\"ModelsId\", \"PacksId\") VALUES ({modelId}, {packId}) ON CONFLICT (\"ModelsId\", \"PacksId\") DO NOTHING;",
+            cancellationToken);
+
+        var trackedPack = _context.Packs.Local.FirstOrDefault(p => p.Id == packId);
+        if (trackedPack != null)
+        {
+            _context.Entry(trackedPack).Property(p => p.UpdatedAt).CurrentValue = updatedAt;
+        }
+        else
+        {
+            await _context.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE \"Packs\" SET \"UpdatedAt\" = {updatedAt} WHERE \"Id\" = {packId};",
+                cancellationToken);
+        }
+    }
+
     public Task UpdateAsync(Pack pack, CancellationToken cancellationToken = default)
     {
         _context.UpdateIfDetached(pack);
-
-        // Note: this used to catch a DbUpdateException for a duplicate
-        // PackModels PK here (concurrent "add model to pack" requests racing
-        // on the join table) and swallow it as an idempotent no-op. That
-        // handling now lives in ApplicationDbContext's IUnitOfWork.SaveChangesAsync,
-        // the single place SaveChanges is actually called from (prompt 25).
         return Task.CompletedTask;
     }
 

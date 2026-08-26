@@ -38,10 +38,10 @@ export const safeLoadingManager = new THREE.LoadingManager()
 safeLoadingManager.setURLModifier(rewriteTextureUrl)
 
 /**
- * A LoadingManager for a **multi-file glTF**: resolves the relative URIs the file
- * references (`scene.bin`, `textures/wood.png`) to the `/files/<id>` URLs its
- * auxiliary resources are served from, then falls back to the same safe rewrite as
- * {@link safeLoadingManager} for anything unmapped.
+ * A LoadingManager for **any format that references sibling files**: resolves the
+ * paths inside the file (`scene.bin`, `textures/wood.png`, `chest_Specular.tga`) to
+ * the `/files/<id>` URLs its auxiliary resources are served from, then falls back to
+ * the same safe rewrite as {@link safeLoadingManager} for anything unmapped.
  *
  * Without this the viewer could not open an imported loose `.gltf` at all: the
  * relative URIs resolve against the file route, 404, and the shared manager replaces
@@ -49,11 +49,18 @@ safeLoadingManager.setURLModifier(rewriteTextureUrl)
  * geometry. The worker's thumbnail renderer already resolves them (via the shared
  * `lib/gltfResources` helper); this is the browser half of the same idea.
  *
+ * FBX and OBJ go through it for the same reason and one more. An FBX stores the
+ * texture path the artist's machine had, so the transparent-pixel fallback used to be
+ * unconditional for them: **an FBX rendered untextured in a scene, always**, and the
+ * only way to give one colour was to bind a material by hand. The matching rules end
+ * with a stem match for that case - the recorded `.tga` and the shipped `.png` are
+ * the same texture.
+ *
  * Build one per resource map and hand it to a loader as `loader.manager = …`. Returns
  * the shared safe manager when there is nothing to resolve, so packed `.glb` and
- * single-file formats keep exactly their current behaviour.
+ * self-contained files keep exactly their current behaviour.
  */
-export function createGltfResourceManager(
+export function createResourceManager(
   resources: Record<string, string> | null | undefined
 ): THREE.LoadingManager {
   const entries = Object.entries(resources ?? {}).filter(
@@ -92,10 +99,29 @@ export function createGltfResourceManager(
       if (key.slice(key.lastIndexOf('/') + 1) === base) return byPath.get(key)!
     }
 
+    // Last resort: the same name with a different extension. An FBX records the
+    // texture the artist's machine had - "chest_Specular.tga" - and the file the
+    // pack actually ships is "chest_Specular.png". Nothing above can bridge that,
+    // and the alternative is an untextured model. Deliberately last, and only on
+    // an exact stem match, so it can never displace a real path.
+    const stem = stemOf(base)
+    if (stem.length > 0) {
+      for (const key of keys) {
+        const keyBase = key.slice(key.lastIndexOf('/') + 1)
+        if (stemOf(keyBase) === stem) return byPath.get(key)!
+      }
+    }
+
     // Unmapped: same safety net as the shared manager - never a live request.
     return TRANSPARENT_PIXEL
   })
   return manager
+}
+
+/** A file name without its extension, lowercased. "" when there is nothing left. */
+function stemOf(base: string): string {
+  const dot = base.lastIndexOf('.')
+  return (dot > 0 ? base.slice(0, dot) : base).toLowerCase()
 }
 
 function normalizeKey(value: string): string {

@@ -23,7 +23,12 @@ namespace Infrastructure.Migrations
                 UPDATE "Thumbnails" t
                 SET "ModelId" = mv."ModelId"
                 FROM "ModelVersions" mv
-                WHERE t."ModelVersionId" = mv."Id"
+                -- Terminated, which matters only outside the app: EF runs each Sql() call
+                -- as its own command, so an unterminated statement is invisible at runtime
+                -- and merges into the next one when the migrations are rendered to a .sql
+                -- script - which made `dotnet ef migrations script` unusable for this
+                -- database entirely, in both plain and idempotent form.
+                WHERE t."ModelVersionId" = mv."Id";
                 """);
         }
 

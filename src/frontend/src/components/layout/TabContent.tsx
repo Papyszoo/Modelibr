@@ -24,6 +24,11 @@ const TextureSetViewer = lazy(() =>
     default: module.TextureSetViewer,
   }))
 )
+const MaterialList = lazy(() =>
+  import('@/features/materials').then(module => ({
+    default: module.MaterialList,
+  }))
+)
 const EnvironmentMapList = lazy(() =>
   import('@/features/environment-map').then(module => ({
     default: module.EnvironmentMapList,
@@ -84,6 +89,11 @@ const StageEditor = lazy(() =>
     default: module.StageEditor,
   }))
 )
+const ScenesTab = lazy(() =>
+  import('@/features/scenes').then(module => ({
+    default: module.ScenesTab,
+  }))
+)
 const RecycledFilesList = lazy(() =>
   import('@/features/recycled-files').then(module => ({
     default: module.RecycledFilesList,
@@ -138,6 +148,9 @@ export function TabContent({ tab }: TabContentProps): JSX.Element {
             tabId={tab.id}
           />
         )
+
+      case 'pbrMaterials':
+        return <MaterialList />
 
       case 'modelTextures':
         return (
@@ -223,6 +236,9 @@ export function TabContent({ tab }: TabContentProps): JSX.Element {
 
       case 'stageEditor':
         return <StageEditor stageId={tab.stageId} />
+
+      case 'scenes':
+        return <ScenesTab />
 
       case 'assetStore':
         return <AssetStorePage />

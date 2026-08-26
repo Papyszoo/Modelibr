@@ -27,8 +27,10 @@ description: Modelibr EF Core persistence rules - the IUnitOfWork contract (repo
 
 ## Transactions - unit of work
 
-- `IUnitOfWork` (`Application/Abstractions/IUnitOfWork.cs`, one `SaveChangesAsync`
-  method) is implemented by `ApplicationDbContext`. Repositories stage mutations
+- `IUnitOfWork` (`Application/Abstractions/IUnitOfWork.cs`: `SaveChangesAsync` plus
+  `InTransactionAsync`) is implemented by `ApplicationDbContext` and **resolved through
+  `PostCommitUnitOfWork`**, a thin decorator that adds one thing - draining
+  `IPostCommitActions` at the outermost commit (see below). Repositories stage mutations
   (`Add`/`Update`/`Remove` on the context) and do **not** call `SaveChangesAsync`
   themselves; command handlers inject `IUnitOfWork` and call `SaveChangesAsync`
   exactly once, after every repo call - that's what makes a multi-repo handler
@@ -65,9 +67,40 @@ description: Modelibr EF Core persistence rules - the IUnitOfWork contract (repo
   via `IUnitOfWork` too - enqueue/complete/fail/retry are durable-queue primitives
   that must persist before workers are notified, and some callers (the
   domain-event pipeline) have no command handler to commit afterwards.
-  `ApplicationDbContext.SaveChangesAsync` also swallows one specific known-benign
-  race (concurrent "add model to pack" duplicating the `PackModels` join PK) -
-  name the exact constraint in the `when` clause if you add another.
+  Pack membership writes are handled atomically via `IPackRepository.EnsureModelInPackAsync`
+  (`INSERT ... ON CONFLICT DO NOTHING`) inside an active `InTransactionAsync` transaction.
+- **Side effects wait for the commit: `IPostCommitActions`.** A handler that invalidates a
+  cache, enqueues background work or notifies a worker is telling another process to go and
+  read state - so doing it inside the transaction points it at state that is not there yet,
+  and a rollback emits the effect for a write that never existed. `bind_texture_set` hit
+  this: the blend consumer is a singleton with its own scope, so it could take the queue
+  entry, read the pre-commit bindings and cache a `.blend` built from them, which the later
+  duplicate entry then returned. Inject `IPostCommitActions` and `Enqueue(description, …)`
+  instead of acting; the decorator runs the queue after the outermost commit (immediately
+  after the save when no transaction is open) and discards it on rollback. An action that
+  throws is logged, never surfaced - the write it describes is already durable. Enqueue
+  BEFORE the save that commits, and note **a throw is not a rollback**: EF runs
+  `SavedChangesAsync` (where domain events dispatch) AFTER the implicit COMMIT, so the
+  boundary asks `SaveDurabilityInterceptor` which side of persistence a failure landed on.
+  Before the rows went down, the save takes back everything no earlier save claimed, so a
+  later success cannot drain a notification for a row that was never written; after, the row
+  is durable and its effects run anyway while the exception still reaches the caller. That
+  interceptor is registered FIRST, ahead of `DomainEventsInterceptor`, for two reasons: EF
+  stops the `SavedChangesAsync` chain at the first interceptor that throws, and that callback
+  is also where the queue CHANGES HANDS. Domain events dispatch from `SavedChangesAsync` and
+  their handlers save through the same scoped UoW, so a save claims its queue prefix at the
+  durability instant, before anything can re-enter - a nested save that then fails takes back
+  only its own tail, never the outer save's effects for a row already on disk. Note what that
+  widens: **every** save on the context now moves the boundary, including the two permanent
+  self-committers'. That is right - a save flushes the whole change tracker - but a NEW
+  repository that opens its own transaction AND rolls it back would break it, which is one
+  more reason to give a new repository `IUnitOfWork` instead. Inside an
+  explicit transaction the COMMIT, not the save, is the durability point. The drain always runs on
+  `CancellationToken.None`: once the write is durable the request's token governs nothing and
+  a client hanging up must not silence the only notification a worker gets. A rollback
+  discards everything the transaction is answerable for - what a nested save committed into
+  it, AND anything still unclaimed when it began, since the normal shape is stage, enqueue,
+  then open the transaction that performs the write.
 - A hierarchical delete (categories, and similar branch/tree deletes) that used to
   issue one self-commit per row now lands in a single commit - a failure partway
   through leaves the whole branch untouched instead of a partial delete. That's

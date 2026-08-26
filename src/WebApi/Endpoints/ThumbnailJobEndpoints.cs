@@ -1,9 +1,22 @@
 using Application.Abstractions.Messaging;
 using Application.ThumbnailJobs;
 using Microsoft.AspNetCore.Mvc;
+using WebApi.Infrastructure;
 
 namespace WebApi.Endpoints;
 
+/// <summary>
+/// The job lifecycle a worker drives: claim a job, report it finished, log what happened
+/// on the way.
+///
+/// <b>Every route here is worker-facing and carries <see cref="WorkerApiKeyFilter"/>.</b>
+/// These are not read endpoints - a caller that can reach them can claim work meant for a
+/// real worker, or declare an in-flight job complete or failed on its behalf, which lands
+/// an asset with a permanently missing thumbnail or a scene render that never happened.
+/// The upload half of the same conversation (render-upload, thumbnail upload) was already
+/// behind the filter; the finish half was not, which meant the cheap way to disrupt the
+/// pipeline was left open while the expensive one was shut.
+/// </summary>
 public static class ThumbnailJobEndpoints
 {
     public static void MapThumbnailJobEndpoints(this IEndpointRouteBuilder app)
@@ -39,6 +52,8 @@ public static class ThumbnailJobEndpoints
                 TextureSetId = response.Job.TextureSetId,
                 EnvironmentMapId = response.Job.EnvironmentMapId,
                 EnvironmentMapVariantId = response.Job.EnvironmentMapVariantId,
+                SceneId = response.Job.SceneId,
+                SceneViewpoint = response.Job.SceneViewpoint,
                 DefaultTextureSetId = response.Job.ModelVersion?.DefaultTextureSetId,
                 MainVariantName = response.Job.ModelVersion?.MainVariantName ?? "",
                 TextureMappings = response.Job.ModelVersion?.TextureMappings?.Select(tm => new
@@ -54,7 +69,8 @@ public static class ThumbnailJobEndpoints
             });
         })
         .WithName("Dequeue Thumbnail Job")
-        .WithTags("ThumbnailJobs");
+        .WithTags("ThumbnailJobs")
+        .AddEndpointFilter<WorkerApiKeyFilter>();
 
         app.MapPost("/thumbnail-jobs/{jobId:int}/finish", async (
             int jobId,
@@ -85,7 +101,8 @@ public static class ThumbnailJobEndpoints
             });
         })
         .WithName("Finish Thumbnail Job")
-        .WithTags("ThumbnailJobs");
+        .WithTags("ThumbnailJobs")
+        .AddEndpointFilter<WorkerApiKeyFilter>();
 
         app.MapPost("/thumbnail-jobs/sounds/{jobId:int}/finish", async (
             int jobId,
@@ -117,7 +134,8 @@ public static class ThumbnailJobEndpoints
             });
         })
         .WithName("Finish Sound Waveform Job")
-        .WithTags("ThumbnailJobs");
+        .WithTags("ThumbnailJobs")
+        .AddEndpointFilter<WorkerApiKeyFilter>();
 
         app.MapPost("/thumbnail-jobs/texture-sets/{jobId:int}/finish", async (
             int jobId,
@@ -145,7 +163,36 @@ public static class ThumbnailJobEndpoints
             });
         })
         .WithName("Finish Texture Set Thumbnail Job")
-        .WithTags("ThumbnailJobs");
+        .WithTags("ThumbnailJobs")
+        .AddEndpointFilter<WorkerApiKeyFilter>();
+
+        app.MapPost("/thumbnail-jobs/scenes/{jobId:int}/finish", async (
+            int jobId,
+            [FromBody] FinishSceneRenderJobRequest request,
+            ICommandHandler<FinishSceneRenderJobCommand, FinishSceneRenderJobResponse> commandHandler,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await commandHandler.Handle(new FinishSceneRenderJobCommand(
+                jobId,
+                request.Success,
+                request.ErrorMessage), cancellationToken);
+
+            if (result.IsFailure)
+            {
+                return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+            }
+
+            return Results.Ok(new
+            {
+                result.Value.JobId,
+                result.Value.SceneId,
+                result.Value.Status,
+                Message = request.Success ? "Scene render job completed successfully" : "Scene render job marked as failed"
+            });
+        })
+        .WithName("Finish Scene Render Job")
+        .WithTags("ThumbnailJobs")
+        .AddEndpointFilter<WorkerApiKeyFilter>();
 
         app.MapPost("/thumbnail-jobs/environment-maps/{jobId:int}/finish", async (
             int jobId,
@@ -174,7 +221,8 @@ public static class ThumbnailJobEndpoints
             });
         })
         .WithName("Finish Environment Map Thumbnail Job")
-        .WithTags("ThumbnailJobs");
+        .WithTags("ThumbnailJobs")
+        .AddEndpointFilter<WorkerApiKeyFilter>();
 
         app.MapPost("/thumbnail-jobs/{jobId:int}/events", async (
             int jobId,
@@ -201,7 +249,8 @@ public static class ThumbnailJobEndpoints
             });
         })
         .WithName("Log Thumbnail Job Event")
-        .WithTags("ThumbnailJobs");
+        .WithTags("ThumbnailJobs")
+        .AddEndpointFilter<WorkerApiKeyFilter>();
 
         // Test endpoint to simulate thumbnail completion for testing SignalR
         app.MapPost("/test/thumbnail-complete/{modelId:int}", async (
@@ -271,6 +320,15 @@ public record FinishTextureSetJobRequest(
 public record FinishEnvironmentMapJobRequest(
     bool Success,
     string? ThumbnailPath = null,
+    string? ErrorMessage = null);
+
+/// <summary>
+/// No path or size here, unlike its neighbours: the render's bytes and dimensions were
+/// already recorded by the upload that preceded this call, so repeating them would give
+/// the worker a second chance to disagree with itself.
+/// </summary>
+public record FinishSceneRenderJobRequest(
+    bool Success,
     string? ErrorMessage = null);
 
 /// <summary>

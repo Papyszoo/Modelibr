@@ -1,3 +1,4 @@
+import { AssetMetadataPanel } from '@/features/metadata'
 import { useModelHierarchy } from '@/features/model-viewer/hooks/useModelHierarchy'
 import { useModelObject } from '@/features/model-viewer/hooks/useModelObject'
 import { type Model } from '@/utils/fileUtils'
@@ -66,6 +67,12 @@ export function ViewerSidePanel({
     case 'modelInfo':
       return model ? (
         <ModelInfoSidebar model={model} onModelUpdated={onModelUpdated} />
+      ) : null
+    case 'metadata':
+      // The same schema-driven panel every family gets. What a model can say
+      // about itself is one contract, not one per asset page.
+      return model ? (
+        <AssetMetadataPanel assetType="Model" assetId={Number(model.id)} />
       ) : null
     case 'uvMap':
       return <UVMapScene />

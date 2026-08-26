@@ -181,12 +181,10 @@ export class EnvironmentMapsPage {
         mapName: string,
         categoryName: string,
     ): Promise<void> {
-        // The floating "File Uploads" progress window overlays the (narrower,
-        // sidebar-open) grid and swallows pointer events, so a right-click on a
-        // card behind it hangs until the test times out. Dismiss it, then
-        // reveal the card - in the narrower grid it may be virtualised out of
-        // the DOM, and a right-click on a non-rendered card also hangs.
-        await new UploadProgressPage(this.page).closeWindowIfVisible();
+        // The overlay first (see clearTheGrid), then reveal the card - in the
+        // narrower grid it may be virtualised out of the DOM, and a right-click
+        // on a non-rendered card also hangs.
+        await this.clearTheGrid();
         await this.waitForEnvironmentMapByName(mapName, 15000);
         await this.getEnvironmentMapCardByName(mapName)
             .first()
@@ -374,15 +372,11 @@ export class EnvironmentMapsPage {
     }
 
     async openEnvironmentMapByName(name: string): Promise<void> {
+        // The overlay first - see clearTheGrid. This step is the one the nightly
+        // failed on for nine nights straight.
+        await this.clearTheGrid();
         await this.waitForEnvironmentMapByName(name, 15000);
         const card = this.getEnvironmentMapCardByName(name);
-        // waitForEnvironmentMapByName returns the moment the card becomes
-        // visible mid-scroll, but VirtuosoGrid is still recycling rows around
-        // it, so the card's box keeps moving. Playwright's actionability check
-        // then never sees it "stable" - the nightly logged `locator resolved to
-        // <article class="environment-map-card">` followed by dozens of
-        // `waiting for element to be visible, enabled and stable`.
-        //
         // Park the scroll on the card so the grid settles, then bound the
         // click. The bound is the important half: an unbounded click inherits
         // the *test* timeout, and one stuck click burned 36 minutes of a
@@ -391,6 +385,28 @@ export class EnvironmentMapsPage {
         await expect(card).toBeVisible({ timeout: 15000 });
         await card.click({ timeout: 15000 });
         await this.waitForViewer(name);
+    }
+
+    /**
+     * Take the floating "File Uploads" window off the grid before touching a card.
+     *
+     * Every scenario here uploads before it clicks, and the window does not go away
+     * on its own - the auto-hide in UploadProgressWindow is deliberately commented
+     * out ("keep window open as per requirements"). It floats over the CENTRE of the
+     * page, which at the 1280x720 viewport with the categories sidebar open is
+     * exactly where the first card's click point is. Playwright then resolves the
+     * card, finds it visible, and retries the actionability loop until the timeout
+     * because the hit test lands on the window - which it reports as "waiting for
+     * element to be visible, enabled and stable", the same words a moving element
+     * produces.
+     *
+     * That wording is why this was read as a VirtuosoGrid recycling problem and
+     * answered with a scroll-and-settle for nine nightlies. The failure screenshot
+     * from run 32804725455 settles it: five maps, no scrolling, the card present and
+     * still, and the File Uploads window sitting on top of it.
+     */
+    private async clearTheGrid(): Promise<void> {
+        await new UploadProgressPage(this.page).closeWindowIfVisible();
     }
 
     async waitForViewer(name: string): Promise<void> {
@@ -764,6 +780,7 @@ export class EnvironmentMapsPage {
     }
 
     async recycleEnvironmentMapByName(name: string): Promise<void> {
+        await this.clearTheGrid();
         const card = this.getEnvironmentMapCardByName(name);
         await expect(card).toBeVisible({ timeout: 15000 });
         await card.hover();
@@ -867,11 +884,25 @@ export class EnvironmentMapsPage {
         return menuItem;
     }
 
+    /** What each viewer panel puts on the page once it is open. */
+    private static readonly VIEWER_PANEL_SELECTORS: Record<string, string> = {
+        Informations: ".environment-map-detail-list",
+        Thumbnail: ".environment-map-thumbnail-panel",
+        Metadata: '[data-testid="asset-metadata"]',
+    };
+
+    /** Opens the viewer's schema-driven metadata panel. */
+    async openViewerMetadataPanel(): Promise<void> {
+        await this.openViewerPanel("Left Panel", "Metadata");
+    }
+
     private async openViewerPanel(menuName: string, itemLabel: string): Promise<void> {
+        // A lookup, not a ternary: with a third panel a ternary silently waits
+        // for the wrong one, and then reports the panel open because the OLD one
+        // is.
         const panelSelector =
-            itemLabel === "Informations"
-                ? ".environment-map-detail-list"
-                : ".environment-map-thumbnail-panel";
+            EnvironmentMapsPage.VIEWER_PANEL_SELECTORS[itemLabel] ??
+            ".environment-map-thumbnail-panel";
 
         if (await this.page.locator(panelSelector).isVisible().catch(() => false)) {
             return;

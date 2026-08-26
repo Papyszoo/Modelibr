@@ -32,6 +32,7 @@ public static class SoundEndpoints
             .WithName("Create Sound With File")
             .WithSummary("Creates a new sound and uploads a file in one operation")
             .DisableAntiforgery()
+            .AcceptsAgentUploadTicket(AgentAssetFamilies.Sound)
             .WithOpenApi();
 
         app.MapPut("/sounds/{id}", UpdateSound)

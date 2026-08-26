@@ -83,9 +83,59 @@ Two instances of the same mistake:
 - **MCP idempotency.** The key is (correctly) claimed *before* the mutation, but any
   existing row was then read as "already applied". A crash, exception or cancellation
   between claim and mutation therefore burned the key permanently: every retry was told
-  the write had landed when nothing had. Claims now carry Pending/Completed/Failed plus
-  an owner and a lease; only Completed replays as applied, a live claim answers
-  `in-progress`, and an abandoned claim is taken over by conditional UPDATE.
+  the write had landed when nothing had. Claims carry Pending/Completed/Failed plus an
+  owner and a lease; only Completed replays as applied, a live claim answers
+  `in-progress`, and a Failed claim is taken over by conditional UPDATE.
+
+### The half of that which was still wrong (0.6)
+
+Two follow-ups, both about the same thing: a claim row records who *started*, and the
+first version of the fix quietly assumed it also recorded what *happened*.
+
+- **An abandoned Pending claim is ambiguous, not free.** The mutation commits before the
+  entry is marked Completed. A claim still Pending when its owner died may sit on either
+  side of that, and nothing distinguishes "never ran" from "ran and was not recorded".
+  Taking it over silently is how one crash becomes two packs. The lease now moves such a
+  claim to a fourth status, `Interrupted`, which is **terminal**: every call on that key
+  gets the same explicit recovery answer, and proceeding means a new key. Reporting it
+  once and then releasing it to `Failed` is not a fix - it moves the duplicate to the next
+  call, which is the one nobody is watching.
+- **Settling by key alone is a lost update.** A caller whose lease lapsed, whose row was
+  then taken over, still completed "its" key on the way out and stamped its outcome onto
+  the new owner's in-flight work. Every claim now carries a generation (`ClaimToken`),
+  regenerated on takeover, and every settle matches on it.
+
+The same two mistakes were in **reversal**, in a sharper form: `ReversedAt` was stamped
+*before* the inverse ran, so it was serving as both the mutual exclusion and the record of
+fact. An inverse that was cancelled, threw, or died with its process therefore left an
+operation permanently marked as undone that was never undone - and nothing can undo it
+again. The lock is now `ReversalToken`/`ReversalClaimedAt` and the fact stays in
+`ReversedAt`, written only after the inverse lands. A reversal claim past its lease is
+`Interrupted` for exactly the reason above, and a batch that meets one **stops** rather
+than skipping to the older steps that depend on it.
+
+### The half of THAT which was still wrong: a claim covers one write, not two
+
+Both of the above are about a claim recording who started rather than what happened. The
+next layer down is a claim covering an operation that is **several separately-committing
+writes**, where "what happened" has no single answer:
+
+- `bind_texture_set` associated the set with every version (commit), then made it the
+  model's default (commit). A model with versions but no ACTIVE version answers
+  `NoActiveVersion` to the second one - so the tool returned a failure, and the guard
+  reads a returned failure as "declined before mutating" and hands the key back as
+  retryable. The association was already on disk, described by no completed entry, and
+  the retry ran it again.
+- The composite reversals (`distribute-assets`, `place-assets-batch`, `create-room`)
+  remove a row of nodes one command at a time. Three of forty gone and then a refusal
+  released the reversal claim, so the next attempt re-applied an inverse that had already
+  half happened.
+
+Rule: **a guarded operation must not be able to produce a retryable failure after a
+durable write.** Either the whole thing is one transaction (`IUnitOfWork.InTransactionAsync`
+- what both of these now use), or it reports applied-partial and keeps the claim, the way
+`import_texture_set` does for a set whose later channels failed. What it may never do is
+return a plain failure with something already committed behind it.
 
 ## Multi-file glTF: identity includes what the file references
 

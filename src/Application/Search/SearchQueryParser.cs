@@ -37,12 +37,39 @@ public static class SearchQueryParser
     /// its singular, so <c>chairs</c> finds <c>chair</c>.</param>
     public sealed record QueryTerm(string Word, IReadOnlyList<string> Variants);
 
+    /// <summary>Why a word the caller sent was not searched on.</summary>
+    public static class IgnoredReasons
+    {
+        /// <summary>Grammar, not content: "a", "the", "looking for".</summary>
+        public const string StopWord = "stopword";
+
+        /// <summary>Past <see cref="MaxTerms"/>. A brief's first words carry its intent.</summary>
+        public const string BeyondWordLimit = "beyond-word-limit";
+
+        /// <summary>The same word, or the same word after abbreviation expansion.</summary>
+        public const string Duplicate = "duplicate";
+    }
+
+    /// <summary>One word the caller sent that the search did not run on, and why.</summary>
+    public sealed record IgnoredWord(string Word, string Reason);
+
     /// <summary>
     /// Parsed query. <see cref="Terms"/> is empty for a blank query, which callers treat as
     /// "match everything" so structural filters can be used on their own.
     /// </summary>
-    public sealed record ParsedQuery(string Original, IReadOnlyList<QueryTerm> Terms)
+    /// <param name="Ignored">
+    /// The words that were dropped, with the reason. Reported because a caller writing a
+    /// prose brief cannot otherwise tell which of its words the search actually ran on -
+    /// and a query whose meaning was in the seventh word gets a plausible, wrong answer
+    /// with nothing to suggest why.
+    /// </param>
+    public sealed record ParsedQuery(
+        string Original,
+        IReadOnlyList<QueryTerm> Terms,
+        IReadOnlyList<IgnoredWord>? Ignored = null)
     {
+        public IReadOnlyList<IgnoredWord> IgnoredWords => Ignored ?? Array.Empty<IgnoredWord>();
+
         public bool IsEmpty => Terms.Count == 0;
 
         /// <summary>True when the query is a single word - the only case where fuzzy
@@ -64,11 +91,20 @@ public static class SearchQueryParser
             .Where(w => w.Length > 0)
             .ToList();
 
+        var ignored = new List<IgnoredWord>();
+
         var kept = rawWords.Where(w => !StopWords.Contains(w)).ToList();
         // A query made entirely of stopwords still deserves an attempt at its literal words.
         if (kept.Count == 0)
         {
             kept = rawWords;
+        }
+        else
+        {
+            ignored.AddRange(rawWords
+                .Where(StopWords.Contains)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Select(w => new IgnoredWord(w, IgnoredReasons.StopWord)));
         }
 
         var terms = new List<QueryTerm>();
@@ -78,12 +114,14 @@ public static class SearchQueryParser
         {
             if (terms.Count == MaxTerms)
             {
-                break;
+                ignored.Add(new IgnoredWord(word, IgnoredReasons.BeyondWordLimit));
+                continue;
             }
 
             var normalized = SearchVocabulary.ExpandWord(word);
             if (!seen.Add(normalized))
             {
+                ignored.Add(new IgnoredWord(word, IgnoredReasons.Duplicate));
                 continue;
             }
 
@@ -97,6 +135,6 @@ public static class SearchQueryParser
             terms.Add(new QueryTerm(normalized, variants));
         }
 
-        return new ParsedQuery(original, terms);
+        return new ParsedQuery(original, terms, ignored);
     }
 }

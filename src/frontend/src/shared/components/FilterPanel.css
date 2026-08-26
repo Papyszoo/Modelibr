@@ -71,6 +71,24 @@
   width: 6rem;
 }
 
+.models-filter-uv {
+  min-width: 11rem;
+}
+
+.models-filter-uv-option {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+/* The coverage band, not decoration - "Shared atlas" is unreadable without it,
+   so it must stay legible rather than fade into the panel background. */
+.models-filter-uv-option-description {
+  color: var(--text-color-secondary);
+  font-size: 0.75rem;
+  line-height: 1.3;
+}
+
 .list-filters-empty {
   color: var(--text-color-secondary);
   font-size: 0.875rem;

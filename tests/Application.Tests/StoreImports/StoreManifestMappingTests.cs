@@ -124,6 +124,15 @@ public class StoreManifestMappingTests
     }
 
     [Theory]
+    [InlineData("""{"subcategory": "Buttons & Controls"}""", "Buttons & Controls")]
+    [InlineData("""{"category": "UI", "subcategory": "  Buttons & Controls  "}""", "Buttons & Controls")]
+    [InlineData("""{"category": "Effects", "subcategory": "Noise & Overlays", "other": 1}""", "Noise & Overlays")]
+    public void GetItemSubcategory_ReadsSubcategoryFromMetadata(string metadataJson, string expected)
+    {
+        Assert.Equal(expected, StoreManifestMapping.GetItemSubcategory(metadataJson));
+    }
+
+    [Theory]
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
@@ -137,5 +146,100 @@ public class StoreManifestMappingTests
     {
         // Metadata is enrichment - anything unreadable must yield null, never throw.
         Assert.Null(StoreManifestMapping.GetItemCategory(metadataJson));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("{}")]
+    [InlineData("""{"subcategory": null}""")]
+    [InlineData("""{"subcategory": ""}""")]
+    [InlineData("""{"subcategory": 42}""")]
+    [InlineData("""["subcategory"]""")]
+    [InlineData("not json at all")]
+    public void GetItemSubcategory_ToleratesMissingOrMalformedMetadata(string? metadataJson)
+    {
+        Assert.Null(StoreManifestMapping.GetItemSubcategory(metadataJson));
+    }
+
+    // ---- prompt 16-E: the rights the importer used to throw away ----------------------
+
+    [Theory]
+    [InlineData("CC0", "CC0")]
+    [InlineData("cc0", "CC0")]
+    [InlineData("CC0 1.0", "CC0")]
+    [InlineData("Public Domain", "CC0")]
+    [InlineData("CC BY 4.0", "CC-BY")]
+    [InlineData("cc-by-sa", "CC-BY-SA")]
+    [InlineData("MIT", "MIT")]
+    [InlineData("Apache 2.0", "Apache-2.0")]
+    [InlineData("Royalty Free", "Royalty-Free")]
+    public void MapSchemaLicense_FoldsSpellingsOntoTheSchemaVocabulary(string raw, string expected)
+    {
+        Assert.Equal(expected, StoreManifestMapping.MapSchemaLicense(raw));
+    }
+
+    [Fact]
+    public void MapSchemaLicense_AnythingUnrecognized_IsCustomRatherThanGuessed()
+    {
+        Assert.Equal("Custom", StoreManifestMapping.MapSchemaLicense("Bob's Own Terms v2"));
+    }
+
+    [Fact]
+    public void MapSchemaLicense_IsSeparateFromThePackLicenceCodes()
+    {
+        // The two vocabularies genuinely differ - collapsing them would mislabel every
+        // imported pack, so this pins that they are not the same function.
+        Assert.Equal("CC_BY", StoreManifestMapping.MapLicense("CC-BY"));
+        Assert.Equal("CC-BY", StoreManifestMapping.MapSchemaLicense("CC-BY"));
+    }
+
+    [Theory]
+    [InlineData("CC0", false)]
+    [InlineData("Royalty-Free", false)]
+    [InlineData("CC-BY", true)]
+    [InlineData("MIT", true)]
+    public void RequiresAttribution_AnswersOnlyForLicencesItKnows(string license, bool expected)
+    {
+        Assert.Equal(expected, StoreManifestMapping.RequiresAttribution(license));
+    }
+
+    [Theory]
+    [InlineData("Custom")]
+    [InlineData(null)]
+    public void RequiresAttribution_UnknownLicence_IsNullNotNo(string? license)
+    {
+        // "No credit needed" is the one wrong answer with consequences, so an unknown
+        // licence declines to answer instead of guessing it.
+        Assert.Null(StoreManifestMapping.RequiresAttribution(license));
+    }
+
+    [Fact]
+    public void GetItemFacets_FlattensTheSpritesheetBlockOntoSchemaKeys()
+    {
+        var json = """{"category":"Characters","spritesheet":{"frameWidth":58,"frameHeight":58,"frameCount":26,"fps":7,"type":"animation"}}""";
+
+        var facets = StoreManifestMapping.GetItemFacets(json);
+
+        Assert.NotNull(facets);
+        using var parsed = System.Text.Json.JsonDocument.Parse(facets!);
+        Assert.Equal(58, parsed.RootElement.GetProperty("frameWidth").GetInt32());
+        Assert.Equal(26, parsed.RootElement.GetProperty("frameCount").GetInt32());
+        Assert.Equal("animation", parsed.RootElement.GetProperty("spritesheetType").GetString());
+        // The category is the category resolver's business, not a facet.
+        Assert.False(parsed.RootElement.TryGetProperty("category", out _));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("{\"category\":\"Characters\"}")]
+    [InlineData("not json")]
+    public void GetItemFacets_NoSpritesheetBlock_IsNull(string? metadataJson)
+    {
+        // The common case: the store parses frame sizes out of filenames today, so most
+        // items carry no block at all. Absent must read as absent, not as zeros.
+        Assert.Null(StoreManifestMapping.GetItemFacets(metadataJson));
     }
 }

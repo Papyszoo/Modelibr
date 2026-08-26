@@ -9,8 +9,13 @@ namespace Application.Extraction.Derivation;
 /// </summary>
 public sealed class DerivationOptions
 {
-    /// <summary>Version of the derive logic. Bump when a rule changes so stored derivations can be re-run as a set difference.</summary>
-    public int DeriveVersion { get; set; } = 1;
+    /// <summary>
+    /// Version of the derive logic. Bump when a rule changes so stored derivations can be
+    /// re-run as a set difference.
+    ///
+    /// v2: the root origin is measured (<c>OriginInBounds</c>) rather than only labelled.
+    /// </summary>
+    public int DeriveVersion { get; set; } = 2;
 
     /// <summary>Prefixes stripped from names before tokenising (case-insensitive), e.g. "SM_" for static meshes.</summary>
     public string[] StripPrefixes { get; set; } =

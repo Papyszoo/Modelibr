@@ -106,6 +106,38 @@ public static class CategorySuggester
         };
 
     /// <summary>
+    /// Preference order when an asset's tokens match several labels at once. Specific kinds
+    /// first, catch-all buckets last: a "sword rack" is a weapon before it is furniture, and
+    /// <c>prop</c>/<c>environment</c> are where things land when nothing sharper fits.
+    /// </summary>
+    /// <remarks>
+    /// Only <see cref="SuggestBest"/> uses this. <see cref="Suggest"/> stays alphabetical -
+    /// it feeds the search index and a suggestion list, where every label is kept and order
+    /// carries no meaning.
+    /// </remarks>
+    private static readonly string[] Specificity =
+    {
+        "weapon", "vehicle", "character", "animal", "furniture", "food",
+        "building", "nature", "environment", "prop",
+    };
+
+    /// <summary>
+    /// The single label to act on, or null when nothing matched. Used where a decision has to
+    /// be made rather than a list shown - assigning a category on import.
+    /// </summary>
+    public static string? SuggestBest(IEnumerable<string>? tokens)
+    {
+        var labels = Suggest(tokens);
+        if (labels.Count == 0) return null;
+        if (labels.Count == 1) return labels[0];
+
+        return labels
+            .OrderBy(l => Array.IndexOf(Specificity, l) is var i && i >= 0 ? i : int.MaxValue)
+            .ThenBy(l => l, StringComparer.Ordinal)
+            .First();
+    }
+
+    /// <summary>
     /// Suggest concept labels for an asset from its tokens. Deterministic and order-stable
     /// (labels returned alphabetically). Empty when nothing matches.
     /// </summary>

@@ -1,0 +1,18 @@
+.material-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-sm);
+  height: 100%;
+  padding: var(--mod-space-md);
+  overflow-y: auto;
+}
+
+.material-list-grid {
+  padding-bottom: var(--mod-space-md);
+}
+
+.material-list-confirm {
+  margin: 0;
+  font-size: var(--mod-text-sm);
+  color: var(--text-color-secondary);
+}

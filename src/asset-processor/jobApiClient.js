@@ -318,13 +318,16 @@ export class JobApiClient {
    * @param {boolean} success
    * @param {string|null} errorMessage
    * @param {string|null} warningDetail
+   * @param {string|null} resultJson - What an operation produced, as JSON. Extraction
+   *   jobs have no outcome to name and pass null.
    */
   async finishExtractionJob(
     jobId,
     workerId,
     success,
     errorMessage = null,
-    warningDetail = null
+    warningDetail = null,
+    resultJson = null
   ) {
     try {
       // workerId proves we still hold the claim; the API rejects a result from a
@@ -334,6 +337,7 @@ export class JobApiClient {
         success,
         errorMessage,
         warningDetail,
+        resultJson,
       })
     } catch (error) {
       logger.error('Failed to finish extraction job', {
@@ -438,6 +442,64 @@ export class JobApiClient {
    * @param {string} fileName - Original filename for the upload
    * @returns {Promise<Object>} Upload result
    */
+  /**
+   * Create a NEW version of a model from a file this worker produced.
+   *
+   * setAsActive defaults to false and the callers keep it that way: an operation's output
+   * is a proposal, and promoting it would change what every scene referencing the model
+   * renders before anyone had looked at it.
+   *
+   * @param {number} modelId
+   * @param {string} filePath - Local path to the produced file.
+   * @param {string} fileName - Name to store it under.
+   * @param {string} description - What produced it, for the version list.
+   * @param {boolean} setAsActive
+   * @returns {Promise<Object>} The created version.
+   */
+  async createModelVersion(
+    modelId,
+    filePath,
+    fileName,
+    description,
+    setAsActive = false
+  ) {
+    if (!fs.existsSync(filePath)) {
+      throw new Error(`File not found: ${filePath}`)
+    }
+
+    const formData = new FormData()
+    formData.append('file', fs.createReadStream(filePath), fileName)
+    formData.append('description', description ?? '')
+    formData.append('setAsActive', String(Boolean(setAsActive)))
+
+    try {
+      const response = await this.apiClient.post(
+        `/models/${modelId}/versions`,
+        formData,
+        {
+          headers: formData.getHeaders(),
+          timeout: 300000,
+        }
+      )
+
+      logger.info('Model version created', {
+        modelId,
+        fileName,
+        setAsActive,
+        responseData: response.data,
+      })
+
+      return response.data
+    } catch (error) {
+      logger.error('Failed to create model version', {
+        modelId,
+        fileName,
+        error: error.message,
+      })
+      throw error
+    }
+  }
+
   async uploadRenderableFile(modelId, versionId, filePath, fileName) {
     try {
       if (!fs.existsSync(filePath)) {
@@ -469,6 +531,149 @@ export class JobApiClient {
         modelId,
         versionId,
         fileName,
+        error: error.message,
+      })
+      throw error
+    }
+  }
+
+  /**
+   * Create a texture set from the first map a bake produced.
+   *
+   * The set is the library's unit for "these images belong to one surface", so a bake
+   * lands as one set with a channel per map rather than as N loose textures nobody can
+   * bind together.
+   *
+   * @param {string} filePath - Local path to the image.
+   * @param {string} fileName - Name to store it under.
+   * @param {string} name - Name for the set.
+   * @param {string} textureType - Albedo, Normal, AO, Roughness, Emissive, ...
+   * @returns {Promise<{textureSetId: number, textureId: number}>}
+   */
+  async createTextureSetWithFile(filePath, fileName, name, textureType) {
+    if (!fs.existsSync(filePath)) {
+      throw new Error(`File not found: ${filePath}`)
+    }
+
+    const formData = new FormData()
+    formData.append('file', fs.createReadStream(filePath), fileName)
+    formData.append('name', name)
+    formData.append('textureType', textureType)
+
+    try {
+      const response = await this.apiClient.post(
+        '/texture-sets/with-file',
+        formData,
+        {
+          headers: formData.getHeaders(),
+          timeout: 300000,
+        }
+      )
+      logger.info('Texture set created', { name, textureType, fileName })
+      return response.data
+    } catch (error) {
+      logger.error('Failed to create texture set', {
+        name,
+        textureType,
+        error: error.message,
+      })
+      throw error
+    }
+  }
+
+  /**
+   * Add one more map to a texture set this worker created.
+   *
+   * @param {number} textureSetId
+   * @param {string} filePath
+   * @param {string} fileName
+   * @param {string} textureType
+   */
+  async addTextureToSetWithFile(textureSetId, filePath, fileName, textureType) {
+    if (!fs.existsSync(filePath)) {
+      throw new Error(`File not found: ${filePath}`)
+    }
+
+    const formData = new FormData()
+    formData.append('file', fs.createReadStream(filePath), fileName)
+    formData.append('textureType', textureType)
+
+    try {
+      const response = await this.apiClient.post(
+        `/texture-sets/${textureSetId}/textures/with-file`,
+        formData,
+        { headers: formData.getHeaders(), timeout: 300000 }
+      )
+      logger.info('Texture added to set', {
+        textureSetId,
+        textureType,
+        fileName,
+      })
+      return response.data
+    } catch (error) {
+      logger.error('Failed to add texture to set', {
+        textureSetId,
+        textureType,
+        error: error.message,
+      })
+      throw error
+    }
+  }
+
+  /**
+   * Bind a texture set to ONE model version.
+   *
+   * Deliberately not the all-versions form. A baked set is laid out for the UV set of the
+   * version it was baked from; mapping it onto every version would point it at layouts it
+   * does not match. Making it the model's default is a separate decision, and a human's.
+   *
+   * @param {number} textureSetId
+   * @param {number} modelVersionId
+   */
+  async associateTextureSetWithModelVersion(textureSetId, modelVersionId) {
+    try {
+      await this.apiClient.post(
+        `/texture-sets/${textureSetId}/model-versions/${modelVersionId}`
+      )
+      logger.info('Texture set associated with model version', {
+        textureSetId,
+        modelVersionId,
+      })
+    } catch (error) {
+      logger.error('Failed to associate texture set with model version', {
+        textureSetId,
+        modelVersionId,
+        error: error.message,
+      })
+      throw error
+    }
+  }
+
+  /**
+   * Store an expensive-compute metric under its geometry hash.
+   *
+   * Only for metrics that are a function of the geometry ALONE. The cache is shared by
+   * every asset with the same hash, so a metric that also depends on something the hash
+   * excludes - the UV layout, most of all - would be served to a mesh it was never
+   * measured on.
+   *
+   * @param {string} geometryHash
+   * @param {number} geometryHashVersion
+   * @param {string} metric - "surface-area", "manifold", ...
+   * @param {object} payload
+   */
+  async storeComputeResult(geometryHash, geometryHashVersion, metric, payload) {
+    try {
+      await this.apiClient.put('/compute-cache', {
+        geometryHash,
+        geometryHashVersion,
+        metric,
+        payload,
+      })
+    } catch (error) {
+      logger.error('Failed to store compute result', {
+        geometryHash,
+        metric,
         error: error.message,
       })
       throw error

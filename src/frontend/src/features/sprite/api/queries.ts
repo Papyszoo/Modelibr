@@ -2,7 +2,11 @@ import { queryOptions, useQuery } from '@tanstack/react-query'
 
 import { type QueryConfig } from '@/lib/react-query'
 
-import { getAllSpriteCategories, getSpritesPaginated } from './spriteApi'
+import {
+  getAllSpriteCategories,
+  getSpriteById,
+  getSpritesPaginated,
+} from './spriteApi'
 
 // --- Sprites (paginated) ---
 
@@ -13,6 +17,13 @@ export function getSpritesQueryOptions(params: {
   return queryOptions({
     queryKey: ['sprites', params] as const,
     queryFn: () => getSpritesPaginated(params),
+  })
+}
+
+export function getSpriteByIdQueryOptions(spriteId: number) {
+  return queryOptions({
+    queryKey: ['sprites', 'detail', spriteId] as const,
+    queryFn: () => getSpriteById(spriteId),
   })
 }
 

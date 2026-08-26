@@ -8,11 +8,16 @@ namespace Application.EnvironmentMaps;
 internal sealed class DeleteEnvironmentMapCommandHandler : ICommandHandler<DeleteEnvironmentMapCommand>
 {
     private readonly IEnvironmentMapRepository _environmentMapRepository;
+    private readonly IStoreImportedItemRepository _storeImportedItemRepository;
     private readonly IUnitOfWork _unitOfWork;
 
-    public DeleteEnvironmentMapCommandHandler(IEnvironmentMapRepository environmentMapRepository, IUnitOfWork unitOfWork)
+    public DeleteEnvironmentMapCommandHandler(
+        IEnvironmentMapRepository environmentMapRepository,
+        IStoreImportedItemRepository storeImportedItemRepository,
+        IUnitOfWork unitOfWork)
     {
         _environmentMapRepository = environmentMapRepository;
+        _storeImportedItemRepository = storeImportedItemRepository;
         _unitOfWork = unitOfWork;
     }
 
@@ -24,6 +29,7 @@ internal sealed class DeleteEnvironmentMapCommandHandler : ICommandHandler<Delet
             return Result.Failure(new Error("EnvironmentMapNotFound", $"Environment map with ID {command.Id} was not found."));
         }
 
+        await _storeImportedItemRepository.DeleteByAssetAsync("EnvironmentMap", command.Id, cancellationToken);
         await _environmentMapRepository.DeleteAsync(command.Id, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         return Result.Success();

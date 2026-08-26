@@ -1,0 +1,449 @@
+/*
+ * Sits at the top of the editor's right column, above the property panel, as an
+ * ordinary block in that flow. Like SceneNodeMaterials it must not introduce a
+ * height or a second scroll box of its own - the column already scrolls, and a
+ * nested one strands the lower cards.
+ */
+.scene-choices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-xs);
+  padding-bottom: var(--mod-space-sm);
+  border-bottom: 1px solid var(--mod-color-border);
+  flex: 0 0 auto;
+}
+
+.scene-choices h4 {
+  margin: 0;
+  font-size: var(--mod-text-xs);
+  font-weight: var(--mod-font-weight-semibold);
+  color: var(--mod-color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.scene-choices-blocked {
+  margin: 0;
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-warning);
+}
+
+.scene-choices-note {
+  margin: 0;
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+}
+
+.scene-choices-slot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-2xs);
+}
+
+.scene-choices-slot-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--mod-space-2xs);
+}
+
+/* The name the user says out loud. Shown verbatim, never prettified. */
+.scene-choices-slot-id {
+  font-size: var(--mod-text-sm);
+  font-weight: var(--mod-font-weight-semibold);
+  font-family: monospace;
+}
+
+.scene-choices-status {
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+}
+
+.scene-choices-status--proposed {
+  color: var(--mod-color-warning);
+}
+
+.scene-choices-status--chosen {
+  color: var(--mod-color-success);
+}
+
+.scene-choices-status--rejected {
+  color: var(--mod-color-danger);
+}
+
+.scene-choices-brief,
+.scene-choices-reopened {
+  margin: 0;
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+}
+
+.scene-choices-reopened {
+  color: var(--mod-color-danger);
+}
+
+.scene-choices-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-2xs);
+}
+
+.scene-choices-card {
+  display: flex;
+  align-items: stretch;
+  gap: var(--mod-space-2xs);
+  border: 1px solid var(--mod-color-border);
+  border-radius: var(--mod-radius-md);
+  background: var(--mod-color-surface);
+  min-width: 0;
+}
+
+.scene-choices-card--chosen {
+  border-color: var(--mod-color-success);
+  background: var(--mod-color-success-bg);
+}
+
+/*
+ * Rejections are feedback, not deletions - the card stays legible enough to
+ * read its reason, and plainly out of the running.
+ */
+.scene-choices-card--rejected {
+  opacity: 0.55;
+  background: transparent;
+  border-style: dashed;
+}
+
+.scene-choices-card--previewing {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 1px rgba(var(--primary-color-rgb), 0.24);
+}
+
+.scene-choices-card-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--mod-space-2xs);
+  background: none;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.scene-choices-card-body:disabled {
+  cursor: default;
+}
+
+.scene-choices-card-body:hover:not(:disabled) {
+  background: var(--mod-color-surface-hover);
+}
+
+.scene-choices-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--mod-space-2xs);
+  min-width: 0;
+}
+
+/* The identifier and the name stack beside the picture rather than beneath it:
+   the ref is the handle the user speaks and must stay on the first line. */
+.scene-choices-card-heading {
+  display: flex;
+  align-items: baseline;
+  gap: var(--mod-space-2xs);
+  min-width: 0;
+}
+
+/* Fixed square so a row of cards keeps one left edge whether or not each
+   candidate has a picture - a ragged column reads as a loading state. */
+.scene-choices-card-media {
+  position: relative;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--mod-radius-sm);
+  overflow: hidden;
+  background: var(--mod-color-surface-hover);
+}
+
+.scene-choices-card-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* The surface beside the asset, not instead of it: a candidate can be a thing
+   and the finish on it. */
+.scene-choices-card-media-material {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--mod-radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--mod-color-surface);
+}
+
+.scene-choices-card-media-material img {
+  width: 100%;
+  height: 100%;
+}
+
+.scene-choices-card-media-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: var(--mod-color-text-muted);
+  font-size: var(--mod-text-sm);
+}
+
+/* A store candidate must never read as something already owned - the badge is
+   the difference between "pick this" and "this would have to be downloaded". */
+.scene-choices-card-store {
+  display: flex;
+  align-items: center;
+  gap: var(--mod-space-2xs);
+  font-size: var(--mod-text-xs);
+}
+
+.scene-choices-card-store-badge {
+  padding: 0 var(--mod-space-2xs);
+  border-radius: var(--mod-radius-sm);
+  border: 1px dashed var(--mod-color-border);
+  color: var(--mod-color-text-muted);
+}
+
+.scene-choices-card-store-price {
+  color: var(--mod-color-text-muted);
+  font-weight: var(--mod-font-weight-semibold);
+}
+
+/* The handle. Monospace so `streetlight/B` reads as an identifier, not prose. */
+.scene-choices-card-ref {
+  font-family: monospace;
+  font-size: var(--mod-text-xs);
+  font-weight: var(--mod-font-weight-semibold);
+  flex: 0 0 auto;
+}
+
+.scene-choices-card-name {
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scene-choices-card-rationale {
+  font-size: var(--mod-text-xs);
+  line-height: 1.35;
+}
+
+.scene-choices-card-facts {
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.scene-choices-card-facts--unknown {
+  color: var(--mod-color-warning);
+}
+
+.scene-choices-card-flags {
+  margin-left: var(--mod-space-2xs);
+  color: var(--mod-color-warning);
+}
+
+.scene-choices-card-rejected {
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-danger);
+}
+
+.scene-choices-card-actions {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  flex: 0 0 auto;
+  padding-right: 2px;
+}
+
+.scene-choices-slot-actions {
+  display: flex;
+  gap: var(--mod-space-2xs);
+}
+
+.scene-choices-reason {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-2xs);
+  padding: var(--mod-space-2xs);
+  border: 1px solid var(--mod-color-border);
+  border-radius: var(--mod-radius-md);
+  background: var(--mod-color-surface-raised);
+}
+
+.scene-choices-reason label {
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+}
+
+.scene-choices-reason-input {
+  width: 100%;
+  padding: var(--mod-space-2xs);
+  font-size: var(--mod-text-xs);
+  font-family: inherit;
+  color: var(--text-color);
+  background: var(--mod-color-surface);
+  border: 1px solid var(--mod-color-border);
+  border-radius: var(--mod-radius-sm);
+}
+
+.scene-choices-reason-actions {
+  display: flex;
+  gap: var(--mod-space-2xs);
+}
+
+/*
+ * Scene intent & recommendations (prompt 14-D).
+ *
+ * A collapsible header row that arranges facts already in the scene. With
+ * nothing recommended it is one line, so it costs the column almost nothing on
+ * the scenes that never get advice.
+ */
+.scene-choices-intent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-2xs);
+  padding: var(--mod-space-2xs);
+  border: 1px solid var(--mod-color-border);
+  border-radius: var(--mod-radius-sm);
+  background: var(--mod-color-surface-raised);
+}
+
+.scene-choices-intent-head {
+  display: flex;
+  align-items: center;
+  gap: var(--mod-space-2xs);
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.scene-choices-intent-title {
+  font-size: var(--mod-text-xs);
+  font-weight: var(--mod-font-weight-semibold);
+}
+
+.scene-choices-intent-counts {
+  margin-left: auto;
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+}
+
+.scene-choices-intent-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-2xs);
+}
+
+.scene-choices-intent-description,
+.scene-choices-intent-summary {
+  margin: 0;
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text);
+}
+
+.scene-choices-intent-summary {
+  color: var(--mod-color-text-muted);
+  font-style: italic;
+}
+
+.scene-choices-intent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.scene-choices-intent-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--mod-space-2xs);
+  font-size: var(--mod-text-xs);
+}
+
+.scene-choices-intent-ref {
+  font-family: monospace;
+  font-weight: var(--mod-font-weight-semibold);
+}
+
+.scene-choices-intent-label {
+  color: var(--mod-color-text-muted);
+}
+
+.scene-choices-intent-rationale {
+  flex: 1 1 100%;
+  color: var(--mod-color-text-muted);
+}
+
+/* Whether the human followed the advice or overruled it - the point of keeping
+   a recommendation on a resolved slot. */
+.scene-choices-intent-outcome {
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+}
+
+.scene-choices-confirm-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 0 var(--mod-space-xs);
+  padding: 0;
+  list-style: none;
+  font-family: monospace;
+  font-size: var(--mod-text-xs);
+}
+
+.scene-choices-confirm-actions {
+  display: flex;
+  gap: var(--mod-space-2xs);
+  justify-content: flex-end;
+  margin-top: var(--mod-space-xs);
+}
+
+/*
+ * Recommended is an outline, not a fill. --chosen owns the filled treatment,
+ * and a recommended card that read as selected would tell the user a decision
+ * had been made for them.
+ */
+.scene-choices-card--recommended:not(.scene-choices-card--chosen) {
+  border-color: var(--mod-color-primary);
+}
+
+.scene-choices-card-recommended {
+  flex: 0 0 auto;
+  padding: 0 4px;
+  border: 1px solid var(--mod-color-primary);
+  border-radius: var(--mod-radius-sm);
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}

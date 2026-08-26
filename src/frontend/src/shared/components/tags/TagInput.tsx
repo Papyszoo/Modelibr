@@ -25,6 +25,30 @@ export interface TagInputProps {
   placeholder?: string
   maxSuggestions?: number
   inputTestId?: string
+  /**
+   * A closed-ish vocabulary. When given, only these values may be added unless
+   * `allowCustom` says otherwise, and every one of them is offered rather than
+   * the first `maxSuggestions` - a vocabulary the user cannot see all of is one
+   * they will type a near-miss into.
+   *
+   * Distinct from `suggestions`, which is an open list of what other people have
+   * typed. Both can be present; `options` is the one that constrains.
+   */
+  options?: string[]
+  /**
+   * Whether a value outside `options` may be added. True when no options are
+   * given, because that is the free-text tag editor this component has always
+   * been. False makes the picker closed.
+   */
+  allowCustom?: boolean
+  /**
+   * Called instead of `onChange` when a value outside `options` is added, so the
+   * caller can persist it to the vocabulary first and come back with a real
+   * option. Only reached when `allowCustom` is true.
+   */
+  onCreateOption?: (name: string) => void
+  /** Heading over the suggestion list. Defaults to the tag wording. */
+  suggestionsLabel?: string
 }
 
 /**
@@ -39,17 +63,26 @@ export function TagInput({
   placeholder = 'Type a tag and press Enter',
   maxSuggestions = 8,
   inputTestId,
+  options,
+  allowCustom = options === undefined,
+  onCreateOption,
+  suggestionsLabel,
 }: TagInputProps) {
   const [inputValue, setInputValue] = useState('')
 
   const availableSuggestions = useMemo(() => {
     const selectedKeys = new Set(value.map(normalizeTagKey))
     const query = normalizeTagKey(inputValue)
-    return suggestions
+    // A closed vocabulary shows all of itself. Truncating it to eight would leave
+    // the user typing a near-miss for an option that exists three rows down.
+    const pool = options ?? suggestions
+    const limit = options ? pool.length : maxSuggestions
+
+    return pool
       .filter(name => !selectedKeys.has(normalizeTagKey(name)))
       .filter(name => !query || normalizeTagKey(name).includes(query))
-      .slice(0, maxSuggestions)
-  }, [suggestions, inputValue, value, maxSuggestions])
+      .slice(0, limit)
+  }, [options, suggestions, inputValue, value, maxSuggestions])
 
   const addTags = (rawValue: string) => {
     const candidates = splitTagInput(rawValue)
@@ -57,16 +90,36 @@ export function TagInput({
       return
     }
 
+    const known = options
+      ? new Map(options.map(name => [normalizeTagKey(name), name]))
+      : null
     const seen = new Set(value.map(normalizeTagKey))
     const next = [...value]
+
     for (const candidate of candidates) {
       const normalized = normalizeTagKey(candidate)
       if (!normalized || seen.has(normalized)) {
         continue
       }
+
+      const match = known?.get(normalized)
+
+      if (known && match === undefined) {
+        // Outside the vocabulary. The caller either creates it - and comes back
+        // with a real option - or the value is refused. Silently accepting it
+        // would put a value in the field that the server has no id for.
+        if (allowCustom) {
+          onCreateOption?.(candidate)
+        }
+        continue
+      }
+
       seen.add(normalized)
-      next.push(candidate)
+      // Stored under the vocabulary's own spelling, so "low poly" and "Low Poly"
+      // do not become two different answers to one question.
+      next.push(match ?? candidate)
     }
+
     onChange(next)
     setInputValue('')
   }
@@ -115,7 +168,9 @@ export function TagInput({
 
       {availableSuggestions.length > 0 ? (
         <div className="tag-input-suggestions">
-          <span className="tag-input-suggestions-label">Existing tags</span>
+          <span className="tag-input-suggestions-label">
+            {suggestionsLabel ?? 'Existing tags'}
+          </span>
           <div className="tag-input-suggestions-list">
             {availableSuggestions.map(tag => (
               <Button

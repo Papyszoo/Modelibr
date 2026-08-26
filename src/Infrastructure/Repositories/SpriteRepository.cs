@@ -102,10 +102,27 @@ internal sealed class SpriteRepository : ISpriteRepository
         return await _context.Sprites
             .Include(s => s.File)
             .Include(s => s.Category)
+            .Include(s => s.Tags)
             .Include(s => s.Packs)
             .Include(s => s.Projects)
             .AsSplitQuery()
             .FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Sprite>> GetByIdsAsync(
+        IReadOnlyCollection<int> ids,
+        CancellationToken cancellationToken = default)
+    {
+        if (ids.Count == 0)
+        {
+            return [];
+        }
+
+        return await _context.Sprites
+            .AsNoTracking()
+            .Include(sprite => sprite.File)
+            .Where(sprite => ids.Contains(sprite.Id))
+            .ToListAsync(cancellationToken);
     }
 
     public async Task<Sprite?> GetDeletedByIdAsync(int id, CancellationToken cancellationToken = default)
@@ -141,6 +158,22 @@ internal sealed class SpriteRepository : ISpriteRepository
             return null;
 
         return await _context.Sprites
+            .Include(s => s.File)
+            .Include(s => s.Category)
+            .Include(s => s.Packs)
+            .Include(s => s.Projects)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(s => s.File.Sha256Hash == sha256Hash, cancellationToken);
+    }
+
+    public async Task<Sprite?> GetDeletedByFileHashAsync(string sha256Hash, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(sha256Hash))
+            return null;
+
+        return await _context.Sprites
+            .IgnoreQueryFilters()
+            .Where(s => s.IsDeleted)
             .Include(s => s.File)
             .Include(s => s.Category)
             .Include(s => s.Packs)

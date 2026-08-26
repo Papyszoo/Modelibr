@@ -1,0 +1,39 @@
+/*
+ * min-width/min-height matter: react-three-fiber renders nothing into a
+ * zero-size container, so a grid or flex parent that collapses this element
+ * produces an empty viewport with no error anywhere.
+ */
+.scene-canvas {
+  position: relative;
+  min-width: 0;
+  min-height: 280px;
+  height: 100%;
+  background: var(--mod-color-bg);
+}
+
+.scene-canvas canvas {
+  display: block;
+  outline: none;
+}
+
+.scene-canvas__resource-progress {
+  position: absolute;
+  right: var(--mod-space-sm);
+  bottom: var(--mod-space-sm);
+  z-index: var(--mod-z-base);
+  padding: var(--mod-space-2xs) var(--mod-space-xs);
+  border: 1px solid var(--mod-color-border);
+  border-radius: var(--mod-radius-md);
+  background: var(--mod-color-surface-raised);
+  box-shadow: var(--mod-shadow-sm);
+  color: var(--mod-color-text-muted);
+  font-size: var(--mod-text-xs);
+  font-weight: var(--mod-font-weight-medium);
+  pointer-events: none;
+}
+
+.scene-canvas__resource-progress--failed {
+  border-color: var(--mod-color-danger);
+  background: var(--mod-color-danger-bg);
+  color: var(--mod-color-danger);
+}
