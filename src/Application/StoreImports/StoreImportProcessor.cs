@@ -213,6 +213,12 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            // Host shutdown / cancellation: leave the job as-is here - the queue's startup
+            // sweep marks interrupted jobs Failed on the next boot, and a new import
+            // gap-fills via provenance + SHA dedupe. The `when` guard matters: an HTTP
+            // timeout throws the same exception type, and swallowing it here left the job
+            // Running forever with the UI polling it indefinitely. Those fall through to the
+            // generic handler below and are persisted as Failed.
             _logger.LogInformation("Store import job {JobId} was cancelled", work.JobId);
         }
         catch (Exception ex)
@@ -220,6 +226,8 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
             _logger.LogError(ex, "Store import job {JobId} aborted", work.JobId);
             try
             {
+                // The abort may have left poisoned entities behind; reset so the failure
+                // state itself can still be persisted (UpdateIfDetached re-attaches the job).
                 _trackerReset.Clear();
                 job.Fail(ex.Message, _clock.UtcNow);
                 await SaveJobAsync(job, CancellationToken.None);
@@ -234,6 +242,8 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
 
     private async Task<int> ResolvePackAsync(StoreImportWorkItem work, StoreManifest manifest, CancellationToken ct)
     {
+        // Provenance idempotency: a re-import of the same store asset reuses its pack
+        // (no second pack) and re-stamps the manifest version/timestamp for this run.
         var existing = await _packRepository.GetByStoreImportAsync(work.StoreUrl, work.AssetId, ct);
         if (existing != null)
         {
@@ -247,11 +257,16 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
 
         try
         {
+            // Creation stamps provenance in the same transaction (see IStoreImportSink), so the
+            // pack is never visible without its idempotency key.
             return await CreatePackWithUniqueNameAsync(
                 baseName, manifest.Description, license, listingUrl, work, manifest.SchemaVersion, ct);
         }
         catch (Exception) when (!ct.IsCancellationRequested)
         {
+            // A concurrent import of the SAME store asset passed the lookup above too and won the
+            // race - the unique provenance index rejects this one. Adopt the winner's pack instead
+            // of failing the job; anything else is a real error and rethrows.
             _trackerReset.Clear();
             var winner = await _packRepository.GetByStoreImportAsync(work.StoreUrl, work.AssetId, ct);
             if (winner is null)
@@ -263,6 +278,8 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         }
     }
 
+    // A pack name collision with an UNRELATED existing pack must not dead-end the import
+    // (provenance already prevents re-import collisions). Disambiguate with a bounded suffix.
     private async Task<int> CreatePackWithUniqueNameAsync(
         string baseName, string? description, string? license, string url,
         StoreImportWorkItem work, int manifestVersion, CancellationToken ct)
@@ -284,6 +301,11 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         throw new StoreImportException($"Could not create a uniquely named pack for '{baseName}'.");
     }
 
+    /// <summary>
+    /// Writes what the manifest says about an asset's rights and where it came from onto the
+    /// asset itself (prompt 16-E). Best-effort by design: the files are already imported and
+    /// usable, so a metadata failure downgrades the asset's description rather than the item.
+    /// </summary>
     private async Task StampAssetMetadataBestEffortAsync(
         StoreImportWorkItem work,
         StoreManifest manifest,
@@ -302,6 +324,8 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
                 assetId,
                 new StoreAssetMetadataStamp(
                     License: license,
+                    // The raw string, even when it mapped cleanly - "CC BY 4.0" is what the
+                    // author wrote, and the mapped value has already thrown the version away.
                     LicenseName: string.IsNullOrWhiteSpace(manifest.License) ? null : manifest.License.Trim(),
                     Author: manifest.Author,
                     CreditName: manifest.CreditName,
@@ -345,16 +369,23 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         }
         catch (Exception ex)
         {
+            // Best-effort: a missing/failed pack thumbnail must not fail the import.
             _trackerReset.Clear();
             _logger.LogWarning(ex, "Store import: failed to attach pack thumbnail for pack {PackId}", packId);
         }
     }
 
+    // Content types UploadThumbnailCommand accepts - the store turntable is an animated WebP.
     private static readonly HashSet<string> ReusableThumbnailContentTypes = new(StringComparer.OrdinalIgnoreCase)
     {
         "image/png", "image/jpeg", "image/jpg", "image/webp"
     };
 
+    /// <summary>
+    /// The store preview to reuse as this model's thumbnail, or null. Prefers the animated
+    /// turntable, then a static thumbnail; requires a browser-renderable image content type
+    /// (Modelibr shows model thumbnails as &lt;img&gt;, and UploadThumbnailCommand rejects others).
+    /// </summary>
     private static StoreManifestPreview? PickReusableThumbnail(IReadOnlyList<StoreManifestPreview>? previews)
     {
         if (previews is null || previews.Count == 0)
@@ -386,6 +417,7 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         }
         catch (Exception ex)
         {
+            // Falling back to local generation is fine - log and move on.
             _logger.LogWarning(ex, "Store import: could not fetch the store thumbnail for '{Item}'; will generate one instead", itemName);
             return null;
         }
@@ -404,6 +436,9 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         }
         catch (Exception ex)
         {
+            // The model exists (generation was suppressed) - a failed attach leaves it without a
+            // thumbnail, recoverable via manual regenerate. Reset so a poisoned tracker doesn't
+            // cascade into later items.
             _trackerReset.Clear();
             _logger.LogWarning(ex, "Store import: failed to attach the store thumbnail to model {ModelId}", modelId);
         }
@@ -471,6 +506,7 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         var target = StoreManifestMapping.PlanForItem(item.ItemType);
         if (target == StoreManifestMapping.ImportTarget.Unsupported)
         {
+            // GAP (docs/VISION.md): PackItemType.Other has no Modelibr home - skip + report.
             return Skipped(item, OutcomeSkippedUnsupported, $"Unsupported item type '{item.ItemType}' - no Modelibr mapping.");
         }
 
@@ -951,6 +987,10 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
             await _sink.AddFileToModelAsync(modelId, extraDl.ToUpload(file.FileName), ct);
         }
 
+        // Tags (+ item name reused as description) mirror the CLI: applied only when the
+        // manifest carries tags. Models/texture sets are the only per-type tag vocabularies.
+        // The item category rides the same command (it's UpdateModelTags that assigns
+        // model categories throughout the app).
         if (tags.Length > 0 || categoryId.HasValue)
         {
             await _sink.SetModelTagsAsync(modelId, tags, item.Name, categoryId, ct);
