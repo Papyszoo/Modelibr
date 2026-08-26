@@ -40,7 +40,7 @@ public class StoreMetadataStampFieldsTests
         Assert.Equal("Kenney.nl", Text(fields, "creditName"));
         Assert.True(fields["attributionRequired"].GetBoolean());
         Assert.Equal("Store Import", Text(fields, "sourceKind"));
-        Assert.False(fields.ContainsKey("storeItemId"));
+        Assert.Equal("item-1", Text(fields, "storeItemId"));
     }
 
     /// <summary>
@@ -67,7 +67,7 @@ public class StoreMetadataStampFieldsTests
 
         Assert.Equal("https://store.example", Text(fields, "storeUrl"));
         Assert.Equal("abc", Text(fields, "storeAssetId"));
-        Assert.False(fields.ContainsKey("storeItemId"));
+        Assert.Equal("item-1", Text(fields, "storeItemId"));
         Assert.Equal("Store Import", Text(fields, "sourceKind"));
     }
 

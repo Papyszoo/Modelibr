@@ -29,9 +29,6 @@ public static class StoreManifestMapping
         TextureChannel? SourceChannel = null);
 
     // Store file Role → Modelibr TextureType.
-    // GAP (docs/VISION.md): the store collapses height/displacement into "Height", so a
-    // displacement map imports as Height. GAP: the store emits "Opacity" where Modelibr's
-    // enum member is "Alpha" - remapped here.
     private static readonly IReadOnlyDictionary<string, TextureType> TextureTypeMap =
         new Dictionary<string, TextureType>(StringComparer.Ordinal)
         {
@@ -46,12 +43,6 @@ public static class StoreManifestMapping
             ["Opacity"] = TextureType.Alpha,
         };
 
-    // Store source-channel suffix (e.g. "Texture:Roughness:R") → Modelibr TextureChannel.
-    // DEVIATION FROM mapping.mjs: the JS SOURCE_CHANNEL_MAP maps the suffix to long names
-    // ("Red"/"Green"/…) it POSTs as strings. Modelibr's TextureChannel enum members are the
-    // short forms (R/G/B/A/RGB) and there is no RGBA member, so this native port binds the
-    // raw suffix straight to the enum. "RGBA" (which the store lists but Modelibr lacks)
-    // falls back to RGB.
     private static readonly IReadOnlyDictionary<string, TextureChannel> SourceChannelMap =
         new Dictionary<string, TextureChannel>(StringComparer.Ordinal)
         {
@@ -63,7 +54,6 @@ public static class StoreManifestMapping
             ["RGBA"] = TextureChannel.RGB,
         };
 
-    /// <summary>Parses a store file Role into a structured descriptor (port of parseRole).</summary>
     public static ParsedRole ParseRole(string? role)
     {
         if (string.IsNullOrEmpty(role))
@@ -103,10 +93,6 @@ public static class StoreManifestMapping
         return new ParsedRole(RoleKind.Unknown, role);
     }
 
-    /// <summary>
-    /// Maps a store license string onto Modelibr's pack LicenseType string (port of mapLicense).
-    /// Modelibr's pack LicenseType is a free string column, so unknown values pass through.
-    /// </summary>
     public static string? MapLicense(string? license)
     {
         if (string.IsNullOrWhiteSpace(license))
@@ -127,16 +113,6 @@ public static class StoreManifestMapping
         };
     }
 
-    /// <summary>
-    /// The store's free-text licence mapped onto the asset metadata schema's vocabulary
-    /// (<see cref="Metadata.AssetMetadataSchema.Licenses"/>), or "Custom" when it is
-    /// something the schema does not know. Separate from <see cref="MapLicense"/>, which
-    /// produces the Pack entity's older licence codes ("CC_BY") - the two vocabularies
-    /// differ and collapsing them would silently mislabel every imported pack.
-    ///
-    /// The raw string is kept alongside as licenseName regardless, so an unrecognized
-    /// spelling loses nothing.
-    /// </summary>
     public static string? MapSchemaLicense(string? license)
     {
         if (string.IsNullOrWhiteSpace(license))
@@ -145,8 +121,6 @@ public static class StoreManifestMapping
         var normalized = System.Text.RegularExpressions.Regex
             .Replace(license.Trim().ToUpperInvariant(), "[\\s_]+", "-");
 
-        // Version suffixes are noise for classification: CC-BY-4.0 and CC-BY are the same
-        // licence family as far as "may I use this, and must I credit" goes.
         normalized = System.Text.RegularExpressions.Regex.Replace(normalized, "-[0-9]+(\\.[0-9]+)*$", "");
 
         return normalized switch
@@ -165,11 +139,6 @@ public static class StoreManifestMapping
         };
     }
 
-    /// <summary>
-    /// Whether a licence obliges a credit. Only the licences the schema recognizes can be
-    /// answered; anything else returns null rather than guessing, because guessing "no"
-    /// on an unrecognized licence is the one wrong answer with consequences.
-    /// </summary>
     public static bool? RequiresAttribution(string? schemaLicense) => schemaLicense switch
     {
         "CC0" or "Royalty-Free" => false,
@@ -177,16 +146,6 @@ public static class StoreManifestMapping
         _ => null
     };
 
-    /// <summary>
-    /// The per-family extras an item's metadata carries, as a JSON object - today the
-    /// sprite frame grid the categorization standard specifies
-    /// (<c>spritesheet: { frameWidth, frameHeight, frameCount, type, fps }</c>), flattened
-    /// so its keys match the schema's field keys.
-    ///
-    /// Returns null when the item has none, which is the common case: the store parses
-    /// frame dimensions out of filenames today and only packs built with the annotations
-    /// carry the block. The importer copies what is there and invents nothing.
-    /// </summary>
     public static string? GetItemFacets(string? metadataJson)
     {
         if (string.IsNullOrWhiteSpace(metadataJson))
@@ -235,7 +194,6 @@ public static class StoreManifestMapping
         ("type", "spritesheetType"),
     };
 
-    /// <summary>The Modelibr import target for a manifest item, given its type (port of planForItem).</summary>
     public static ImportTarget PlanForItem(string? itemType) => itemType switch
     {
         ItemTypeModel => ImportTarget.Model,
@@ -243,16 +201,9 @@ public static class StoreManifestMapping
         ItemTypeSound => ImportTarget.Sound,
         ItemTypeEnvironmentMap => ImportTarget.EnvironmentMap,
         ItemTypeSprite => ImportTarget.Sprite,
-        // GAP (docs/VISION.md): PackItemType.Other has no Modelibr home; skipped and reported.
         _ => ImportTarget.Unsupported
     };
 
-    /// <summary>
-    /// Reads the optional "category" name from an item's metadataJson - the read side of the
-    /// store's CategoryTaxonomy.ValidateItemCategory (taxonomy v1: categories travel as
-    /// <c>{"category": "Name"}</c>). Tolerant by design: missing, blank, non-object or
-    /// malformed metadata yields null; metadata must never fail an import.
-    /// </summary>
     public static string? GetItemCategory(string? metadataJson)
     {
         if (string.IsNullOrWhiteSpace(metadataJson))
@@ -277,12 +228,6 @@ public static class StoreManifestMapping
         }
     }
 
-    /// <summary>
-    /// Reads the optional "subcategory" name from an item's metadataJson - the read side of the
-    /// store's CategoryTaxonomy.ValidateItemCategory (taxonomy v1: subcategories travel as
-    /// <c>{"category": "Parent", "subcategory": "Child"}</c>). Tolerant by design: missing, blank,
-    /// non-object or malformed metadata yields null; metadata must never fail an import.
-    /// </summary>
     public static string? GetItemSubcategory(string? metadataJson)
     {
         if (string.IsNullOrWhiteSpace(metadataJson))
@@ -305,5 +250,27 @@ public static class StoreManifestMapping
         {
             return null;
         }
+    }
+
+    public static string? ResolveItemCategory(StoreManifestItem item)
+        => !string.IsNullOrWhiteSpace(item.Category) ? item.Category.Trim() : GetItemCategory(item.MetadataJson);
+
+    public static string? ResolveItemSubcategory(StoreManifestItem item)
+        => !string.IsNullOrWhiteSpace(item.Subcategory) ? item.Subcategory.Trim() : GetItemSubcategory(item.MetadataJson);
+
+    public static string ResolveItemDescription(StoreManifestItem item, StoreManifest manifest)
+    {
+        if (!string.IsNullOrWhiteSpace(item.Description))
+            return item.Description.Trim();
+        if (!string.IsNullOrWhiteSpace(manifest.Description))
+            return manifest.Description.Trim();
+        return item.Name;
+    }
+
+    public static IReadOnlyList<string>? ResolveItemTags(StoreManifestItem item, StoreManifest manifest)
+    {
+        if (item.Tags is { Count: > 0 })
+            return item.Tags;
+        return manifest.Tags;
     }
 }
