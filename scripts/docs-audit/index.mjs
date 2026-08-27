@@ -240,7 +240,24 @@ const manifestOutputs = [...read("docs/videos/video-manifest.js").matchAll(
     );
 }
 
-// ── Check 7: every MCP_* setting reaches the container ─────────────────────
+// ── Check 7: the hosted Asset Store is not presented as configurable ───────
+{
+    const assetStorePage = read("docs/docs/features/asset-store.md");
+    const forbiddenGuidance = [
+        "VITE_STORE_URL",
+        "self-host",
+        "store address you configured",
+    ].filter((phrase) => assetStorePage.toLowerCase().includes(phrase.toLowerCase()));
+    check(
+        assetStorePage.includes("hosted Asset Store") && forbiddenGuidance.length === 0,
+        "asset-store.md treats the hosted Store endpoint as fixed",
+        forbiddenGuidance.length > 0
+            ? `found user-facing endpoint configuration guidance: ${forbiddenGuidance.join(", ")}`
+            : "missing the fixed hosted Asset Store statement",
+    );
+}
+
+// ── Check 8: every MCP_* setting reaches the container ─────────────────────
 // The webapi container sees only the variables docker-compose names, so a
 // setting documented in .env.example but missing from that list runs at its
 // default no matter what the operator wrote. This shipped once already: the
@@ -272,7 +289,7 @@ const manifestOutputs = [...read("docs/videos/video-manifest.js").matchAll(
     );
 }
 
-// ── Check 8: the MCP page lists every registered MCP tool ─────────────────
+// ── Check 9: the MCP page lists every registered MCP tool ─────────────────
 // The tool tables on the MCP page are what an operator reads to decide whether
 // to turn writes on, and what an agent author reads to know what exists. They
 // had drifted by six tools - one read (get_store_import) and five writes
