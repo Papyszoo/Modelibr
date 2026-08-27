@@ -37,7 +37,7 @@ public class StoreImportProcessorTests
 
         h.Sink.Verify(s => s.CreateModelAsync(It.IsAny<IFileUpload>(), "Chair", It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Once);
         h.Sink.Verify(s => s.AddFileToModelAsync(101, It.IsAny<IFileUpload>(), It.IsAny<CancellationToken>()), Times.Once);
-        h.Sink.Verify(s => s.SetModelTagsAsync(101, It.Is<IReadOnlyCollection<string>>(t => t.Contains("furniture")), "Chair", It.IsAny<int?>(), It.IsAny<CancellationToken>()), Times.Once);
+        h.Sink.Verify(s => s.SetModelTagsAsync(101, It.Is<IReadOnlyCollection<string>>(t => t.Contains("furniture")), "A pack", It.IsAny<int?>(), It.IsAny<CancellationToken>()), Times.Once);
         h.Sink.Verify(s => s.AddModelToPackAsync(NewPackId, 101, It.IsAny<CancellationToken>()), Times.Once);
         Assert.Equal(1, h.Job.ItemsCreated);
         Assert.Equal(0, h.Job.ItemsFailed);
@@ -421,7 +421,7 @@ public class StoreImportProcessorTests
 
         await h.Run();
 
-        h.Sink.Verify(s => s.SetModelTagsAsync(101, It.Is<IReadOnlyCollection<string>>(t => t.Count == 0), "Chair", 88, It.IsAny<CancellationToken>()), Times.Once);
+        h.Sink.Verify(s => s.SetModelTagsAsync(101, It.Is<IReadOnlyCollection<string>>(t => t.Count == 0), "A pack", 88, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

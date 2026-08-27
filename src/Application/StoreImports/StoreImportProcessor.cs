@@ -167,7 +167,7 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
                 StoreImportItemResult outcome;
                 try
                 {
-                    outcome = await ImportItemAsync(work, packId, item, itemTags, batchId, cancellationToken);
+                    outcome = await ImportItemAsync(work, manifest, packId, item, itemTags, batchId, cancellationToken);
                 }
                 // Only a real host-shutdown cancellation aborts the run. HttpClient.Timeout also
                 // surfaces as (Task)OperationCanceledException, and treating that as shutdown
@@ -524,7 +524,7 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
     };
 
     private async Task<StoreImportItemResult> ImportItemAsync(
-        StoreImportWorkItem work, int packId, StoreManifestItem item, string[] tags, string? batchId, CancellationToken ct)
+        StoreImportWorkItem work, StoreManifest manifest, int packId, StoreManifestItem item, string[] tags, string? batchId, CancellationToken ct)
     {
         var target = StoreManifestMapping.PlanForItem(item.ItemType);
         if (target == StoreManifestMapping.ImportTarget.Unsupported)
@@ -670,7 +670,7 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
                             }
 
                             // Active asset dedupe hit! Link to pack, gap-fill category, and attach missing staged files
-                            var outcomeReason = await HandleExistingAssetDedupeAsync(packId, item, files, prov.AssetType, prov.AssetId, status.Asset!, stagedDownloads, txCt);
+                            var outcomeReason = await HandleExistingAssetDedupeAsync(packId, item, files, prov.AssetType, prov.AssetId, status.Asset!, stagedDownloads, manifest, tags, txCt);
                             return Result.Success(Skipped(item, OutcomeSkippedDedupe, outcomeReason, prov.AssetType, prov.AssetId));
                         }
 
@@ -691,7 +691,7 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
                         var existingAsset = await FindAssetByShaAsync(target, primary.Sha256, txCt);
                         if (existingAsset != null)
                         {
-                            var outcomeReason = await HandleExistingAssetDedupeAsync(packId, item, files, canonicalFamily, existingAsset.Id, existingAsset.Entity, stagedDownloads, txCt);
+                            var outcomeReason = await HandleExistingAssetDedupeAsync(packId, item, files, canonicalFamily, existingAsset.Id, existingAsset.Entity, stagedDownloads, manifest, tags, txCt);
 
                             if (!string.IsNullOrWhiteSpace(item.Id))
                             {
@@ -718,7 +718,7 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
                 // 3. Asset Creation from Staged Downloads
                 int createdAssetId = target switch
                 {
-                    StoreManifestMapping.ImportTarget.Model => await CreateModelFromStagedAsync(packId, item, files, primary, tags, batchId, stagedDownloads, thumbnailDownload, reusablePreview, txCt),
+                    StoreManifestMapping.ImportTarget.Model => await CreateModelFromStagedAsync(packId, item, files, primary, tags, batchId, stagedDownloads, thumbnailDownload, reusablePreview, manifest, txCt),
                     StoreManifestMapping.ImportTarget.TextureSet => await CreateTextureSetFromStagedAsync(packId, item, files, tags, batchId, stagedDownloads, txCt),
                     StoreManifestMapping.ImportTarget.Sound => await CreateSoundFromStagedAsync(packId, item, primary, tags, batchId, stagedDownloads, txCt),
                     StoreManifestMapping.ImportTarget.Sprite => await CreateSpriteFromStagedAsync(packId, item, primary, tags, batchId, stagedDownloads, txCt),
@@ -879,6 +879,8 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         int assetId,
         object asset,
         Dictionary<StoreManifestFile, StoreDownloadedFile> stagedDownloads,
+        StoreManifest manifest,
+        string[] tags,
         CancellationToken ct)
     {
         var target = StoreManifestMapping.PlanForItem(item.ItemType);
@@ -912,10 +914,17 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
                     await _sink.SetModelCategoryAsync(model.Id, gapFillCat, ct);
                 }
 
-                if (string.IsNullOrWhiteSpace(model.Description) && !string.IsNullOrWhiteSpace(item.Description))
+                var newDescription = string.IsNullOrWhiteSpace(model.Description)
+                    ? StoreManifestMapping.ResolveItemDescription(item, manifest)
+                    : model.Description;
+                var currentTagNames = model.Tags.Select(t => t.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var hasNewTags = tags.Any(t => !currentTagNames.Contains(t));
+                var hasNewDesc = string.IsNullOrWhiteSpace(model.Description) && !string.IsNullOrWhiteSpace(newDescription);
+
+                if (hasNewTags || hasNewDesc)
                 {
-                    var currentTags = model.Tags.Select(t => t.Name).ToArray();
-                    await _sink.SetModelTagsAsync(model.Id, currentTags, item.Description.Trim(), model.ModelCategoryId, ct);
+                    var combinedTags = model.Tags.Select(t => t.Name).Union(tags, StringComparer.OrdinalIgnoreCase).ToArray();
+                    await _sink.SetModelTagsAsync(model.Id, combinedTags, newDescription, model.ModelCategoryId, ct);
                 }
 
                 return missing.Count > 0
@@ -995,6 +1004,7 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
         Dictionary<StoreManifestFile, StoreDownloadedFile> stagedDownloads,
         StoreDownloadedFile? thumbnailDownload,
         StoreManifestPreview? reusablePreview,
+        StoreManifest manifest,
         CancellationToken ct)
     {
         var categoryId = await ResolveCategoryAsync(StoreManifestMapping.ImportTarget.Model, item, ct);
@@ -1016,9 +1026,7 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
             await _sink.AddFileToModelAsync(modelId, extraDl.ToUpload(file.FileName), ct);
         }
 
-        var description = !string.IsNullOrWhiteSpace(item.Description)
-            ? item.Description.Trim()
-            : item.Name;
+        var description = StoreManifestMapping.ResolveItemDescription(item, manifest);
 
         if (tags.Length > 0 || categoryId.HasValue || !string.IsNullOrWhiteSpace(description))
         {
