@@ -267,10 +267,10 @@ public static class StoreManifestMapping
         return item.Name;
     }
 
-    public static IReadOnlyList<string>? ResolveItemTags(StoreManifestItem item, StoreManifest manifest)
+    public static IReadOnlyList<string> ResolveItemTags(StoreManifestItem item, StoreManifest manifest)
     {
         if (item.Tags is { Count: > 0 })
             return item.Tags;
-        return manifest.Tags;
+        return manifest.Tags ?? Array.Empty<string>();
     }
 }

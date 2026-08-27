@@ -160,10 +160,14 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
                 cancellationToken.ThrowIfCancellationRequested();
                 await NotifyAsync(job, processed, item.Name, $"Importing {item.ItemType}", cancellationToken, created, skipped, failed);
 
+                var itemTags = (StoreManifestMapping.ResolveItemTags(item, manifest) ?? Array.Empty<string>())
+                    .Where(t => !string.IsNullOrWhiteSpace(t))
+                    .ToArray();
+
                 StoreImportItemResult outcome;
                 try
                 {
-                    outcome = await ImportItemAsync(work, packId, item, tags, batchId, cancellationToken);
+                    outcome = await ImportItemAsync(work, packId, item, itemTags, batchId, cancellationToken);
                 }
                 // Only a real host-shutdown cancellation aborts the run. HttpClient.Timeout also
                 // surfaces as (Task)OperationCanceledException, and treating that as shutdown
@@ -906,6 +910,12 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
                 if (model.ModelCategoryId is null && await ResolveCategoryAsync(StoreManifestMapping.ImportTarget.Model, item, ct) is int gapFillCat)
                 {
                     await _sink.SetModelCategoryAsync(model.Id, gapFillCat, ct);
+                }
+
+                if (string.IsNullOrWhiteSpace(model.Description) && !string.IsNullOrWhiteSpace(item.Description))
+                {
+                    var currentTags = model.Tags.Select(t => t.Name).ToArray();
+                    await _sink.SetModelTagsAsync(model.Id, currentTags, item.Description.Trim(), model.ModelCategoryId, ct);
                 }
 
                 return missing.Count > 0
