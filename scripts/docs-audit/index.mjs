@@ -344,6 +344,30 @@ const manifestOutputs = [...read("docs/videos/video-manifest.js").matchAll(
         "the two section headings moved or were renamed - update scripts/docs-audit.",
     );
 
+    // A Markdown table with one accidental extra cell still looks plausible in
+    // source and Docusaurus builds it without an error, but renders the entire
+    // block as raw pipe-delimited text. Keep every row aligned with its header.
+    const malformedTableRows = [];
+    for (const block of mcpPage.split(/\n\s*\n/)) {
+        const rows = block.split("\n");
+        if (rows.length < 2 || !rows.every((row) => row.startsWith("|"))) continue;
+
+        const expectedPipes = (rows[0].match(/\|/g) ?? []).length;
+        for (let i = 1; i < rows.length; i++) {
+            const actualPipes = (rows[i].match(/\|/g) ?? []).length;
+            if (actualPipes !== expectedPipes) {
+                malformedTableRows.push(
+                    `line ${mcpPage.slice(0, mcpPage.indexOf(block)).split("\n").length + i}: expected ${expectedPipes} pipes, found ${actualPipes}`,
+                );
+            }
+        }
+    }
+    check(
+        malformedTableRows.length === 0,
+        "mcp-server.md Markdown tables have consistent columns",
+        malformedTableRows.join("; "),
+    );
+
     const rowsIn = (section) =>
         new Set([...section.matchAll(/^\| `([a-z_]+)`/gm)].map((m) => m[1]));
     const documentedReads = rowsIn(mcpPage.slice(readHeading, writeHeading));
