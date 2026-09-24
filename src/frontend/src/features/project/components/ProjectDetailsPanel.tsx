@@ -17,6 +17,7 @@ import {
   setProjectCustomThumbnail,
   updateProject,
 } from '@/features/project/api/projectApi'
+import { useTabUiState } from '@/hooks/useTabUiState'
 import { resolveApiAssetUrl } from '@/lib/apiBase'
 import { ImageLightboxDialog } from '@/shared/components/ImageLightboxDialog'
 import { projectDetailsFormSchema } from '@/shared/validation/formSchemas'
@@ -27,8 +28,19 @@ import { ProjectProfileSection } from './ProjectProfileSection'
 type ProjectDetailsInput = z.input<typeof projectDetailsFormSchema>
 type ProjectDetailsOutput = z.output<typeof projectDetailsFormSchema>
 
+type OverviewDraft = {
+  description: string
+  notes: string
+}
+
+type StoredOverviewState = {
+  dirty: boolean
+  draft: OverviewDraft
+}
+
 interface ProjectDetailsPanelProps {
   project: ProjectDetailDto
+  tabId?: string
   refetchContainer: () => Promise<void>
   showToast: (opts: {
     severity: string
@@ -40,6 +52,7 @@ interface ProjectDetailsPanelProps {
 
 export function ProjectDetailsPanel({
   project,
+  tabId,
   refetchContainer,
   showToast,
 }: ProjectDetailsPanelProps) {
@@ -49,17 +62,44 @@ export function ProjectDetailsPanel({
   const [activeConceptImageIndex, setActiveConceptImageIndex] = useState<
     number | null
   >(null)
+  const tabStateKey = tabId ?? `project-${project.id}`
+  const [storedOverviewState, setStoredOverviewState] =
+    useTabUiState<StoredOverviewState | null>(
+      tabStateKey,
+      'projectOverviewState',
+      null
+    )
+  const storedOverviewDraft = storedOverviewState?.draft ?? null
+  const storedOverviewDirty = storedOverviewState?.dirty ?? false
+  const [storedProfileDirty] = useTabUiState<boolean>(
+    tabStateKey,
+    'projectProfileDirty',
+    false
+  )
+  const [, setHasUnsavedChanges] = useTabUiState<boolean>(
+    tabStateKey,
+    'hasUnsavedChanges',
+    false
+  )
+  const [overviewDirty, setOverviewDirty] = useState(storedOverviewDirty)
+  const [profileDirty, setProfileDirty] = useState(storedProfileDirty)
 
-  const defaultValues = useMemo(
+  const serverOverview = useMemo<OverviewDraft>(
     () => ({
-      name: project.name,
       description: project.description ?? '',
       notes: project.notes ?? '',
     }),
-    [project]
+    [project.description, project.notes]
+  )
+  const defaultValues = useMemo(
+    () => ({
+      name: project.name,
+      ...(storedOverviewDraft ?? serverOverview),
+    }),
+    [project.name, serverOverview, storedOverviewDraft]
   )
 
-  const { register, handleSubmit, reset } = useForm<
+  const { register, handleSubmit, reset, watch } = useForm<
     ProjectDetailsInput,
     unknown,
     ProjectDetailsOutput
@@ -68,10 +108,58 @@ export function ProjectDetailsPanel({
     mode: 'onChange',
     defaultValues,
   })
+  const description = watch('description')
+  const notes = watch('notes')
+  const currentOverview = {
+    description: description ?? '',
+    notes: notes ?? '',
+  }
+  const currentOverviewRef = useRef(currentOverview)
+  currentOverviewRef.current = currentOverview
+  const hydratedOverview = useRef<string | null>(null)
+  const storedOverviewDraftRef = useRef(storedOverviewDraft)
+  const storedOverviewDirtyRef = useRef(storedOverviewDirty)
+  storedOverviewDraftRef.current = storedOverviewDraft
+  storedOverviewDirtyRef.current = storedOverviewDirty
+
+  // Cover and reference-board writes refetch the containing Project. Re-seed a
+  // clean Overview from a changed server response, but never reset because an
+  // unrelated Project field changed (or because the draft itself was persisted).
+  useEffect(() => {
+    const signature = overviewServerSignature(project.id, serverOverview)
+    if (hydratedOverview.current === signature) return
+    hydratedOverview.current = signature
+
+    if (!storedOverviewDirtyRef.current) {
+      reset({ name: project.name, ...serverOverview })
+      return
+    }
+
+    const draft = storedOverviewDraftRef.current
+    if (draft && overviewDraftsEqual(draft, serverOverview)) {
+      reset({ name: project.name, ...serverOverview })
+      setStoredOverviewState(null)
+      setOverviewDirty(false)
+    }
+  }, [project.id, project.name, reset, serverOverview, setStoredOverviewState])
 
   useEffect(() => {
-    reset(defaultValues)
-  }, [defaultValues, reset])
+    const current = {
+      description: description ?? '',
+      notes: notes ?? '',
+    }
+    const dirty = !overviewDraftsEqual(current, serverOverview)
+    setOverviewDirty(dirty)
+    setStoredOverviewState(dirty ? { dirty: true, draft: current } : null)
+  }, [description, notes, serverOverview, setStoredOverviewState])
+
+  useEffect(() => {
+    setProfileDirty(storedProfileDirty)
+  }, [storedProfileDirty])
+
+  useEffect(() => {
+    setHasUnsavedChanges(overviewDirty || profileDirty)
+  }, [overviewDirty, profileDirty, setHasUnsavedChanges])
 
   const invalidate = async () => {
     await Promise.all([
@@ -86,7 +174,21 @@ export function ProjectDetailsPanel({
   const updateMutation = useMutation({
     mutationFn: (payload: ProjectDetailsOutput) =>
       updateProject(project.id, payload),
-    onSuccess: async () => {
+    onSuccess: async (_result, values) => {
+      const savedDraft = {
+        description: values.description ?? '',
+        notes: values.notes ?? '',
+      }
+
+      // Preserve edits made while the request was in flight. Only the submitted
+      // snapshot is allowed to become clean; a newer draft remains dirty and is
+      // re-stored after the containing Project refetch completes.
+      if (overviewDraftsEqual(currentOverviewRef.current, savedDraft)) {
+        reset({ name: project.name, ...savedDraft })
+        setStoredOverviewState(null)
+        setOverviewDirty(false)
+      }
+
       await invalidate()
       showToast({
         severity: 'success',
@@ -199,6 +301,8 @@ export function ProjectDetailsPanel({
           <div className="container-rich-block">
             <ProjectProfileSection
               projectId={project.id}
+              tabId={tabStateKey}
+              onDirtyChange={setProfileDirty}
               showToast={showToast}
             />
           </div>
@@ -353,4 +457,18 @@ export function ProjectDetailsPanel({
       </div>
     </div>
   )
+}
+
+function overviewServerSignature(
+  projectId: number,
+  overview: OverviewDraft
+): string {
+  return `${projectId}:${JSON.stringify(overview)}`
+}
+
+function overviewDraftsEqual(
+  left: OverviewDraft,
+  right: OverviewDraft
+): boolean {
+  return left.description === right.description && left.notes === right.notes
 }

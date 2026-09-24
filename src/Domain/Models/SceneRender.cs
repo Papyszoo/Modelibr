@@ -48,8 +48,8 @@ public class SceneRender
     public int NodesFailed { get; private set; }
 
     /// <summary>
-    /// True when the page never reported itself ready and was photographed anyway.
-    /// The image is still usable; it may just be mid-load.
+    /// Legacy marker for renders captured after a readiness timeout. New uploads reject
+    /// this value because a page that was not ready is not a finished scene render.
     /// </summary>
     public bool TimedOut { get; private set; }
 

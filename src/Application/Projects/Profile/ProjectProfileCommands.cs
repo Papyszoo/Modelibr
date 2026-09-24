@@ -14,7 +14,10 @@ namespace Application.Projects.Profile;
 /// wholesale because the UI edits one row at a time, and a wholesale write makes "I only
 /// touched Style" indistinguishable from "I cleared Genre".
 /// </param>
-/// <param name="Settings">The budget and world convention, or null to leave all of them alone.</param>
+/// <param name="Settings">
+/// A partial settings patch, or null to leave every setting alone. Null scalar values also mean
+/// unchanged; <see cref="ProjectProfileSettings.Clear"/> is the explicit operation that clears a field.
+/// </param>
 public sealed record SetProjectProfileCommand(
     int ProjectId,
     IReadOnlyDictionary<string, IReadOnlyList<ProjectProfileAssignment>>? Dimensions = null,
@@ -30,11 +33,24 @@ public sealed record ProjectProfileSettings(
     double? UnitsPerMetre = null,
     string? UpAxis = null,
     string? Handedness = null,
-    IReadOnlyList<string>? PaletteHex = null);
+    IReadOnlyList<string>? PaletteHex = null,
+    IReadOnlySet<string>? Clear = null);
 
 internal sealed class SetProjectProfileCommandHandler
     : ICommandHandler<SetProjectProfileCommand, ProjectBriefDto>
 {
+    private static readonly HashSet<string> SettableFields = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "maxTrianglesPerAsset",
+        "maxTextureSize",
+        "targetSceneTriangles",
+        "pixelsPerUnit",
+        "unitsPerMetre",
+        "upAxis",
+        "handedness",
+        "paletteHex",
+    };
+
     private readonly IProjectRepository _projects;
     private readonly IProjectProfileOptionRepository _options;
     private readonly IDateTimeProvider _clock;
@@ -104,17 +120,46 @@ internal sealed class SetProjectProfileCommandHandler
 
         if (command.Settings is { } settings)
         {
+            var clear = settings.Clear?.ToHashSet(StringComparer.OrdinalIgnoreCase)
+                ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var unknown = clear.Except(SettableFields, StringComparer.OrdinalIgnoreCase).ToArray();
+            if (unknown.Length > 0)
+            {
+                return Result.Failure<ProjectBriefDto>(new Error(
+                    "UnknownProfileSetting",
+                    $"Unknown profile settings: {string.Join(", ", unknown)}."));
+            }
+
+            var supplied = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["maxTrianglesPerAsset"] = settings.MaxTrianglesPerAsset,
+                ["maxTextureSize"] = settings.MaxTextureSize,
+                ["targetSceneTriangles"] = settings.TargetSceneTriangles,
+                ["pixelsPerUnit"] = settings.PixelsPerUnit,
+                ["unitsPerMetre"] = settings.UnitsPerMetre,
+                ["upAxis"] = settings.UpAxis,
+                ["handedness"] = settings.Handedness,
+                ["paletteHex"] = settings.PaletteHex,
+            };
+            var conflict = clear.FirstOrDefault(field => supplied[field] is not null);
+            if (conflict is not null)
+            {
+                return Result.Failure<ProjectBriefDto>(new Error(
+                    "ConflictingProfileSetting",
+                    $"Profile setting '{conflict}' cannot be supplied and cleared in the same request."));
+            }
+
             try
             {
                 project.SetProfileSettings(
-                    settings.MaxTrianglesPerAsset,
-                    settings.MaxTextureSize,
-                    settings.TargetSceneTriangles,
-                    settings.PixelsPerUnit,
-                    settings.UnitsPerMetre,
-                    settings.UpAxis,
-                    settings.Handedness,
-                    settings.PaletteHex,
+                    Resolve("maxTrianglesPerAsset", settings.MaxTrianglesPerAsset, project.MaxTrianglesPerAsset, clear),
+                    Resolve("maxTextureSize", settings.MaxTextureSize, project.MaxTextureSize, clear),
+                    Resolve("targetSceneTriangles", settings.TargetSceneTriangles, project.TargetSceneTriangles, clear),
+                    Resolve("pixelsPerUnit", settings.PixelsPerUnit, project.PixelsPerUnit, clear),
+                    Resolve("unitsPerMetre", settings.UnitsPerMetre, project.UnitsPerMetre, clear),
+                    Resolve("upAxis", settings.UpAxis, project.UpAxis, clear),
+                    Resolve("handedness", settings.Handedness, project.Handedness, clear),
+                    Resolve("paletteHex", settings.PaletteHex, project.PaletteHex, clear),
                     now);
             }
             catch (ArgumentException ex)
@@ -129,6 +174,16 @@ internal sealed class SetProjectProfileCommandHandler
         // Re-read so the brief reports the options' names, which the write only had ids for.
         var saved = await _projects.GetByIdAsync(command.ProjectId, cancellationToken);
         return Result.Success(ProjectBriefBuilder.Build(saved ?? project));
+    }
+
+    private static T? Resolve<T>(
+        string field,
+        T? supplied,
+        T? current,
+        IReadOnlySet<string> clear)
+    {
+        if (clear.Contains(field)) return default;
+        return supplied ?? current;
     }
 }
 

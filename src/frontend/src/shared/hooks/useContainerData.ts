@@ -1,10 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
 
-import {
-  type ContainerAdapter,
-  type ContainerDto,
-} from '@/shared/types/ContainerTypes'
+import { type ContainerAdapter } from '@/shared/types/ContainerTypes'
 
 interface ShowToast {
   (opts: {
@@ -22,7 +19,13 @@ export function useContainerData(
   const queryClient = useQueryClient()
   const containerQueryKey = adapter.type === 'pack' ? 'packs' : 'projects'
 
-  const { data: container, isLoading } = useQuery({
+  const {
+    data: container,
+    error,
+    isError,
+    isLoading,
+    refetch,
+  } = useQuery({
     queryKey: ['container', adapter.type, adapter.containerId],
     queryFn: () => adapter.loadContainer(adapter.containerId),
   })
@@ -37,8 +40,11 @@ export function useContainerData(
   }, [queryClient, adapter.type, adapter.containerId, containerQueryKey])
 
   return {
-    container: container ?? (null as ContainerDto | null),
+    container: container ?? null,
+    error,
+    isError,
     isLoading,
+    refetch,
     containerQueryKey,
     refetchContainer,
     showToast,

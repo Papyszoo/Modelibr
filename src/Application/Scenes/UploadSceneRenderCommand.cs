@@ -71,6 +71,16 @@ internal class UploadSceneRenderCommandHandler : ICommandHandler<UploadSceneRend
                 new Error("SceneRenderAlreadyStored", $"Thumbnail job {command.JobId} already stored a render."));
         }
 
+        // Readiness is the render's truth boundary. A worker using an older build may
+        // still send a screenshot taken after its readiness timeout; reject it here as
+        // well as in the worker so no normal storage path or query can publish it as the
+        // finished scene the caller asked for.
+        if (command.TimedOut)
+        {
+            return Result.Failure<UploadSceneRenderCommandResponse>(
+                new Error("SceneRenderNotReady", $"Scene render job {command.JobId} timed out before the page was ready; no image was stored."));
+        }
+
         try
         {
             // FileType.Texture, as the texture-set thumbnail path also does: the enum

@@ -20,7 +20,10 @@ public class HashBasedFileStorageTests
     {
         var root = CreateTempRoot();
         var provider = new FakeUploadPathProvider(root);
-        var storage = new HashBasedFileStorage(provider, NullLogger<HashBasedFileStorage>.Instance);
+        var storage = new HashBasedFileStorage(
+            provider,
+            NullLogger<HashBasedFileStorage>.Instance,
+            new Infrastructure.Services.BackupConsistencyGate());
 
         var data = new byte[] { 1, 2, 3, 4, 5 };
         var upload = new FakeFileUpload("cube.obj", data);
@@ -42,7 +45,10 @@ public class HashBasedFileStorageTests
     {
         var root = CreateTempRoot();
         var provider = new FakeUploadPathProvider(root);
-        var storage = new HashBasedFileStorage(provider, NullLogger<HashBasedFileStorage>.Instance);
+        var storage = new HashBasedFileStorage(
+            provider,
+            NullLogger<HashBasedFileStorage>.Instance,
+            new Infrastructure.Services.BackupConsistencyGate());
 
         var data = Enumerable.Range(0, 1024).Select(i => (byte)(i % 256)).ToArray();
 
@@ -69,11 +75,36 @@ public class HashBasedFileStorageTests
     }
 
     [Fact]
+    public async Task Save_PublishesOnlyAfterSnapshotLeaseIsReleased()
+    {
+        var root = CreateTempRoot();
+        var provider = new FakeUploadPathProvider(root);
+        var gate = new Infrastructure.Services.BackupConsistencyGate();
+        var storage = new HashBasedFileStorage(provider, NullLogger<HashBasedFileStorage>.Instance, gate);
+        var snapshot = await gate.EnterSnapshotAsync();
+
+        var save = storage.SaveAsync(
+            new FakeFileUpload("cube.obj", new byte[] { 1, 2, 3 }),
+            FileType.Model3D,
+            CancellationToken.None);
+
+        Assert.False(save.IsCompleted);
+
+        await snapshot.DisposeAsync();
+        var result = await save;
+
+        Assert.True(File.Exists(Path.Combine(root, result.RelativePath)));
+    }
+
+    [Fact]
     public async Task Concurrent_Saves_Do_Not_Corrupt()
     {
         var root = CreateTempRoot();
         var provider = new FakeUploadPathProvider(root);
-        var storage = new HashBasedFileStorage(provider, NullLogger<HashBasedFileStorage>.Instance);
+        var storage = new HashBasedFileStorage(
+            provider,
+            NullLogger<HashBasedFileStorage>.Instance,
+            new Infrastructure.Services.BackupConsistencyGate());
 
         var data = new byte[32 * 1024];
         new System.Random(42).NextBytes(data);

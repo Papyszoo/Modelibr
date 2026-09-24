@@ -196,3 +196,27 @@ test('clearStalePostgresLock is a no-op when there is no lock file', async () =>
     await fs.rm(base, { recursive: true, force: true })
   }
 })
+
+test('web api environment uses bundled PostgreSQL tools and keeps pre-migration backup enabled', () => {
+  const pm = makePM({ postgresPort: 35432 })
+  pm.markRunning()
+
+  const env = pm.buildWebApiEnvironment()
+  const postgresBinDir = path.join(pm.runtimeDir, 'postgres', 'bin')
+  const executable = name =>
+    path.join(
+      postgresBinDir,
+      process.platform === 'win32' ? `${name}.exe` : name
+    )
+
+  assert.equal(env.PG_DUMP_PATH, executable('pg_dump'))
+  assert.equal(env.PSQL_PATH, executable('psql'))
+  assert.equal(path.isAbsolute(env.PG_DUMP_PATH), true)
+  assert.equal(path.isAbsolute(env.PSQL_PATH), true)
+  assert.equal(env.POSTGRES_HOST, '127.0.0.1')
+  assert.equal(env.POSTGRES_PORT, '35432')
+  assert.equal(env.POSTGRES_DB, 'Modelibr')
+  assert.equal(env.POSTGRES_USER, 'modelibr')
+  assert.equal(env.POSTGRES_PASSWORD, 'modelibr')
+  assert.equal(env.MODELIBR_SKIP_PREMIGRATION_BACKUP, 'false')
+})
