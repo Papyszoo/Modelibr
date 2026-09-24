@@ -23,17 +23,24 @@ public sealed class BackupService : IBackupService
     private readonly ILogger<BackupService> _logger;
     private readonly BackupPaths _paths;
     private readonly PostgresConnectionInfo _postgres;
+    private readonly PostgresToolPaths _postgresTools;
+    private readonly IBackupConsistencyGate _consistencyGate;
     private readonly SemaphoreSlim _runLock = new(1, 1);
     private readonly SemaphoreSlim _stageLock = new(1, 1);
 
     private readonly object _stateLock = new();
     private BackupSummary? _inProgress;
 
-    public BackupService(IConfiguration configuration, ILogger<BackupService> logger)
+    public BackupService(
+        IConfiguration configuration,
+        ILogger<BackupService> logger,
+        IBackupConsistencyGate consistencyGate)
     {
         _logger = logger;
         _paths = BackupPaths.FromConfiguration(configuration);
         _postgres = PostgresConnectionInfo.FromConfiguration(configuration);
+        _postgresTools = PostgresToolPaths.FromConfiguration(configuration);
+        _consistencyGate = consistencyGate;
 
         Directory.CreateDirectory(_paths.BackupRoot);
         Directory.CreateDirectory(_paths.BackupTmp);
@@ -303,6 +310,11 @@ public sealed class BackupService : IBackupService
 
     private async Task RunBackupAsync(BackupScope scope, string tmpPath, string finalPath, DateTime createdAt)
     {
+        // Keep the file tree stable from the database dump through archive
+        // enumeration. This is intentionally scoped to the existing physical
+        // file-storage boundary rather than a new database-wide lock.
+        await using var snapshotLease = await _consistencyGate.EnterSnapshotAsync(CancellationToken.None);
+
         var dumpPath = tmpPath + ".dump";
         long uploadsBytes = 0;
         int uploadsCount = 0;
@@ -311,11 +323,28 @@ public sealed class BackupService : IBackupService
 
         try
         {
+            // Query the authoritative File table before the dump. This catches
+            // the delete-before-commit ordering in PermanentDeleteEntityCommand:
+            // if the row is still visible while its physical file is already
+            // gone, fail rather than publishing a database/file mismatch.
+            var referencedBeforeDump = await GetReferencedUploadPathsAsync();
+            EnsureReferencedUploadFilesExist(referencedBeforeDump);
+
             // Pre-flight: query the running Postgres for its actual major version
             // so the manifest reports the truth, not a baked-in literal.
             var pgMajor = await GetPostgresMajorVersionAsync();
 
             await RunPgDumpAsync(dumpPath);
+
+            // A second read closes the other side of the race: a row committed
+            // while the dump was running must be checked too. The physical-file
+            // gate prevents the matching file from disappearing during this
+            // window, but the database reference is still authoritative here.
+            var referencedAfterDump = await GetReferencedUploadPathsAsync();
+            var referencedUploadPaths = referencedBeforeDump
+                .Concat(referencedAfterDump)
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
             var dumpInfo = new FileInfo(dumpPath);
             var dumpSha = await ComputeSha256Async(dumpPath);
 
@@ -345,6 +374,11 @@ public sealed class BackupService : IBackupService
                     (thumbsCount, thumbsBytes) = await WriteDirectoryEntriesAsync(
                         tar, _paths.ThumbnailRoot, ThumbnailsPrefix);
                 }
+
+                // Validate after enumeration as well as before the dump. The
+                // archive is still only a staging file at this point, so a
+                // mismatch cannot be published.
+                EnsureReferencedUploadFilesExist(referencedUploadPaths);
 
                 var manifest = new BackupManifest(
                     ManifestVersion: BackupManifestConstants.CurrentManifestVersion,
@@ -384,11 +418,123 @@ public sealed class BackupService : IBackupService
         }
     }
 
+    private async Task<IReadOnlyCollection<string>> GetReferencedUploadPathsAsync()
+    {
+        // The first-boot pre-migration backup runs before the schema exists.
+        // Avoid treating an absent Files table as a database failure; once the
+        // table exists, any query failure is still fatal to the backup.
+        var tableExists = await RunPsqlQueryAsync(
+            "SELECT to_regclass('public.\"Files\"') IS NOT NULL;");
+        if (!string.Equals(tableExists.Trim(), "t", StringComparison.OrdinalIgnoreCase))
+        {
+            return Array.Empty<string>();
+        }
+
+        var output = await RunPsqlQueryAsync(
+            "SELECT DISTINCT \"FilePath\" FROM \"Files\";");
+        return output
+            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(path => path.Length > 0)
+            .ToList();
+    }
+
+    private void EnsureReferencedUploadFilesExist(IEnumerable<string> referencedPaths)
+    {
+        var missing = FindMissingReferencedUploadPaths(referencedPaths, _paths.UploadRoot);
+        if (missing.Count == 0) return;
+
+        throw new InvalidOperationException(
+            "Backup consistency check failed: referenced upload files are missing: " +
+            string.Join(", ", missing));
+    }
+
+    /// <summary>
+    /// Returns only authoritative File paths that cannot be represented in the
+    /// upload tree. Unreferenced extra files are intentionally ignored.
+    /// </summary>
+    internal static IReadOnlyList<string> FindMissingReferencedUploadPaths(
+        IEnumerable<string> referencedPaths,
+        string uploadRoot)
+    {
+        var rootFullPath = Path.GetFullPath(uploadRoot);
+        var rootPrefix = rootFullPath.EndsWith(Path.DirectorySeparatorChar)
+            ? rootFullPath
+            : rootFullPath + Path.DirectorySeparatorChar;
+        var comparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+        var missing = new List<string>();
+
+        foreach (var referencedPath in referencedPaths)
+        {
+            if (string.IsNullOrWhiteSpace(referencedPath))
+            {
+                missing.Add(referencedPath);
+                continue;
+            }
+
+            string fullPath;
+            try
+            {
+                fullPath = Path.GetFullPath(Path.Combine(rootFullPath, referencedPath));
+            }
+            catch (Exception ex) when (ex is ArgumentException or IOException or NotSupportedException)
+            {
+                missing.Add(referencedPath);
+                continue;
+            }
+
+            var isWithinUploadRoot = fullPath.Equals(rootFullPath, comparison)
+                || fullPath.StartsWith(rootPrefix, comparison);
+            if (!isWithinUploadRoot || !File.Exists(fullPath))
+            {
+                missing.Add(referencedPath);
+            }
+        }
+
+        return missing.Distinct(StringComparer.Ordinal).ToList();
+    }
+
+    private async Task<string> RunPsqlQueryAsync(string query)
+    {
+        var psi = new ProcessStartInfo
+        {
+            FileName = _postgresTools.PsqlPath,
+            ArgumentList =
+            {
+                "-v", "ON_ERROR_STOP=1",
+                "-h", _postgres.Host,
+                "-p", _postgres.Port.ToString(),
+                "-U", _postgres.User,
+                "-d", _postgres.Database,
+                "-t", "-A",
+                "-c", query,
+            },
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+        };
+        psi.Environment["PGPASSWORD"] = _postgres.Password;
+
+        using var p = Process.Start(psi)
+            ?? throw new InvalidOperationException("Failed to launch psql for backup consistency query.");
+        var output = await p.StandardOutput.ReadToEndAsync();
+        var stderr = await p.StandardError.ReadToEndAsync();
+        await p.WaitForExitAsync();
+        if (p.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                $"Backup consistency query failed with psql exit code {p.ExitCode}: {stderr.Trim()}");
+        }
+
+        return output;
+    }
+
     private async Task RunPgDumpAsync(string outputPath)
     {
         var psi = new ProcessStartInfo
         {
-            FileName = "pg_dump",
+            FileName = _postgresTools.PgDumpPath,
             ArgumentList =
             {
                 "-Fc",                               // custom format (compressed)
@@ -418,7 +564,7 @@ public sealed class BackupService : IBackupService
     {
         var psi = new ProcessStartInfo
         {
-            FileName = "psql",
+            FileName = _postgresTools.PsqlPath,
             ArgumentList =
             {
                 "-h", _postgres.Host,
@@ -542,7 +688,7 @@ public sealed class BackupService : IBackupService
     {
         var psi = new ProcessStartInfo
         {
-            FileName = "psql",
+            FileName = _postgresTools.PsqlPath,
             ArgumentList =
             {
                 "-h", _postgres.Host,
@@ -634,6 +780,26 @@ public sealed class BackupService : IBackupService
                 UploadRoot = uploadRoot,
                 ThumbnailRoot = thumbRoot,
                 HostBackupRoot = hostBackupRoot,
+            };
+        }
+    }
+
+    internal sealed class PostgresToolPaths
+    {
+        public required string PgDumpPath { get; init; }
+        public required string PsqlPath { get; init; }
+
+        public static PostgresToolPaths FromConfiguration(IConfiguration cfg)
+        {
+            // Empty/unset values intentionally fall back to bare executable
+            // names. That preserves Docker/source-mode PATH resolution; managed
+            // desktop installs pass absolute paths for their bundled runtime.
+            var pgDumpPath = cfg["PG_DUMP_PATH"];
+            var psqlPath = cfg["PSQL_PATH"];
+            return new PostgresToolPaths
+            {
+                PgDumpPath = string.IsNullOrWhiteSpace(pgDumpPath) ? "pg_dump" : pgDumpPath,
+                PsqlPath = string.IsNullOrWhiteSpace(psqlPath) ? "psql" : psqlPath,
             };
         }
     }

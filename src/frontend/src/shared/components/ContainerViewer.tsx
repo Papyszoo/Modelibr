@@ -16,6 +16,7 @@ import { ContainerScriptsTab } from '@/shared/components/container-tabs/Containe
 import { ContainerSoundsTab } from '@/shared/components/container-tabs/ContainerSoundsTab'
 import { ContainerSpritesTab } from '@/shared/components/container-tabs/ContainerSpritesTab'
 import { ContainerTextureSetsTab } from '@/shared/components/container-tabs/ContainerTextureSetsTab'
+import { ErrorState, LoadingState } from '@/shared/components/feedback'
 import { useContainerData } from '@/shared/hooks/useContainerData'
 import { type ContainerAdapter } from '@/shared/types/ContainerTypes'
 import { TextureSetKind } from '@/types'
@@ -80,7 +81,8 @@ export function ContainerViewer({ adapter, tabId }: ContainerViewerProps) {
     0
   )
 
-  const { container, refetchContainer } = useContainerData(adapter, showToast)
+  const { container, error, isError, isLoading, refetch, refetchContainer } =
+    useContainerData(adapter, showToast)
   const label = adapter.label
   const scopeKey = tabId ?? `${adapter.type}-${adapter.containerId}`
 
@@ -97,8 +99,42 @@ export function ContainerViewer({ adapter, tabId }: ContainerViewerProps) {
     }
   }, [container])
 
+  if (isLoading) {
+    return <LoadingState message={`Loading ${label.toLowerCase()}…`} />
+  }
+
+  if (isError) {
+    const notFound =
+      typeof error === 'object' &&
+      error !== null &&
+      (('status' in error && error.status === 404) ||
+        ('code' in error && error.code === 'ProjectNotFound'))
+
+    return (
+      <ErrorState
+        title={notFound ? `${label} not found` : `Could not load ${label}`}
+        message={
+          error instanceof Error
+            ? error.message
+            : `The ${label.toLowerCase()} request failed.`
+        }
+        onRetry={() => {
+          void refetch()
+        }}
+      />
+    )
+  }
+
   if (!container) {
-    return <div>Loading...</div>
+    return (
+      <ErrorState
+        title={`${label} data is unavailable`}
+        message={`The server returned no ${label.toLowerCase()} data for this tab.`}
+        onRetry={() => {
+          void refetch()
+        }}
+      />
+    )
   }
 
   return (
@@ -128,6 +164,7 @@ export function ContainerViewer({ adapter, tabId }: ContainerViewerProps) {
             {adapter.renderDetails ? (
               adapter.renderDetails({
                 container,
+                tabId: scopeKey,
                 refetchContainer,
                 showToast,
               })

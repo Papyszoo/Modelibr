@@ -69,9 +69,10 @@ export function ProjectViewer({ projectId, tabId }: ProjectViewerProps) {
       containerId: projectId,
       label: 'Project',
       cssPrefix: 'container',
-      renderDetails: ({ container, refetchContainer, showToast }) => (
+      renderDetails: ({ container, tabId, refetchContainer, showToast }) => (
         <ProjectDetailsPanel
           project={container as ProjectDetailDto}
+          tabId={tabId}
           refetchContainer={refetchContainer}
           showToast={showToast}
         />

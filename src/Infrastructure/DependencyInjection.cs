@@ -134,7 +134,11 @@ namespace Infrastructure
             // Add audio selection service for trimmed audio snippets
             services.AddSingleton<IAudioSelectionService, AudioSelectionService>();
 
-            // Backup / restore service
+            // Backup / restore service. The gate is shared with the central
+            // physical file storage so a backup cannot enumerate files while
+            // an upload save/delete is changing the tree.
+            services.AddSingleton<BackupConsistencyGate>();
+            services.AddSingleton<IBackupConsistencyGate>(sp => sp.GetRequiredService<BackupConsistencyGate>());
             services.AddSingleton<IBackupService, BackupService>();
 
             // Add Blender installation management service

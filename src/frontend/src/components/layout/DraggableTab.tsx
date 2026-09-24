@@ -121,7 +121,7 @@ interface DraggableTabProps {
   isActive: boolean
   onSelect: () => void
   onClose: () => void
-  onDragStart: (tab: Tab) => void
+  onDragStart: (tab: Tab) => boolean
   onDragEnd: () => void
   /** Where the tooltip should appear relative to the tab. */
   tooltipPosition?: 'left' | 'right' | 'top' | 'bottom'
@@ -148,6 +148,11 @@ export function DraggableTab({
   }
 
   const handleDragStart = (e: React.DragEvent): void => {
+    if (onDragStart(tab) === false) {
+      e.preventDefault()
+      return
+    }
+
     e.dataTransfer.effectAllowed = 'move'
     // Legacy plain text for intra-window drags
     e.dataTransfer.setData('text/plain', tab.id)
@@ -159,7 +164,6 @@ export function DraggableTab({
         sourceWindowId: getWindowId(),
       })
     )
-    onDragStart(tab)
   }
 
   const handleDragEnd = (): void => {

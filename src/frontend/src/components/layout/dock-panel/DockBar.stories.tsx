@@ -15,7 +15,7 @@ const mockActions: DockPanelActions = {
   addTab: noop,
   reopenTab: noop,
   closeTab: noop,
-  onTabDragStart: noop,
+  onTabDragStart: () => true,
   onTabDragEnd: noop,
   onDrop: e => e.preventDefault(),
   onDragOver: e => e.preventDefault(),

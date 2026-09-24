@@ -41,6 +41,12 @@ Feature: Project CRUD Operations
     When I delete the project "Minimal Project"
     Then the project "Minimal Project" should not be visible
 
+  Scenario: Cancelling project deletion makes no request
+    Given I am on the project list page
+    When I create a project named "Protected Project" with description "Keep this project"
+    And I cancel deleting the project "Protected Project"
+    Then the project "Protected Project" should be visible
+
   Scenario: Open project viewer shows project details
     Given the project "Test Project" exists
     When I navigate to the project list

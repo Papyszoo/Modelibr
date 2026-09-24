@@ -22,6 +22,18 @@ public sealed class PreMigrationBackupFailedException : Exception
     }
 }
 
+/// <summary>
+/// Thrown when the database is reachable but applying migrations fails. A
+/// stale schema must not be served as though startup succeeded.
+/// </summary>
+public sealed class DatabaseMigrationFailedException : Exception
+{
+    public DatabaseMigrationFailedException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+}
+
 public static class DatabaseExtensions
 {
     /// <summary>Env var that opts out of the automatic pre-migration backup (not recommended).</summary>
@@ -40,7 +52,17 @@ public static class DatabaseExtensions
     /// exercised against a bare <see cref="IServiceProvider"/> in tests without spinning
     /// up Kestrel/hosting - see Infrastructure.Tests/Extensions/DatabaseExtensionsTests.cs.
     /// </summary>
-    internal static async Task InitializeDatabaseAsync(IServiceProvider rootServices)
+    internal static Task InitializeDatabaseAsync(IServiceProvider rootServices)
+        => InitializeDatabaseAsync(rootServices, static context => context.Database.MigrateAsync());
+
+    /// <summary>
+    /// Testable core. The migration callback is separate from the pending-
+    /// migration query so a reachable database can be verified independently
+    /// from the operation whose failure must abort startup.
+    /// </summary>
+    internal static async Task InitializeDatabaseAsync(
+        IServiceProvider rootServices,
+        Func<ApplicationDbContext, Task> migrateAsync)
     {
         using var scope = rootServices.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -80,16 +102,27 @@ public static class DatabaseExtensions
             await TakePreMigrationBackupAsync(scope.ServiceProvider, logger, configuration);
         }
 
+        await RunMigrationAsync(() => migrateAsync(context), logger);
+    }
+
+    /// <summary>
+    /// Runs the migration operation after the pending-migration query has
+    /// established that the database is reachable. Kept separate so this
+    /// startup-safety boundary has a fast unit test without a live database.
+    /// </summary>
+    internal static async Task RunMigrationAsync(Func<Task> migrateAsync, ILogger logger)
+    {
         try
         {
-            await context.Database.MigrateAsync();
-
+            await migrateAsync();
             logger.LogInformation("Database initialization completed successfully");
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Database initialization failed. Application will start without database connectivity.");
-            // Don't throw - allow application to start even if database is not available
+            logger.LogCritical(ex, "Database migration failed. Aborting startup without serving a stale schema.");
+            throw new DatabaseMigrationFailedException(
+                "Database migration failed; aborting startup without serving a stale schema.",
+                ex);
         }
     }
 

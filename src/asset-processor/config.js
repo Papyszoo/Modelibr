@@ -80,8 +80,9 @@ export const config = {
     width: parseInt(process.env.SCENE_RENDER_WIDTH, 10) || 768,
     height: parseInt(process.env.SCENE_RENDER_HEIGHT, 10) || 768,
     // Generous: a scene is many assets, and on a GPU-less host each one decodes
-    // and uploads through software WebGL. The page reports partial progress, so
-    // a render that overruns still returns a picture rather than nothing.
+    // and uploads through software WebGL. The page reports partial progress,
+    // but crossing this deadline is a failed render rather than permission to
+    // photograph and publish a page that is still loading.
     timeoutMs: parseInt(process.env.SCENE_RENDER_TIMEOUT_MS, 10) || 60000,
   },
 

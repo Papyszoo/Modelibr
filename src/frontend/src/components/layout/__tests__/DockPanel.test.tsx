@@ -200,6 +200,44 @@ describe('DockPanelContent', () => {
   })
 
   describe('Tab Closing Behavior', () => {
+    it('guards a dirty Project tab before closing it', () => {
+      const dirtyProject: Tab = {
+        id: 'project-9',
+        type: 'projectViewer',
+        label: 'Draft Meridian',
+        projectId: '9',
+        params: { projectId: '9' },
+        internalUiState: { hasUnsavedChanges: true },
+      }
+      const setTabs = jest.fn()
+      const setActiveTab = jest.fn()
+      const confirmSpy = jest
+        .spyOn(window, 'confirm')
+        .mockReturnValueOnce(false)
+        .mockReturnValueOnce(true)
+
+      render(
+        <DockPanelContent
+          {...mockProps}
+          tabs={[dirtyProject]}
+          activeTab={dirtyProject.id}
+          setActiveTab={setActiveTab}
+          setTabs={setTabs}
+        />,
+        { wrapper: TestWrapper }
+      )
+
+      fireEvent.click(screen.getByTestId(`close-${dirtyProject.id}`))
+      expect(setTabs).not.toHaveBeenCalled()
+
+      fireEvent.click(screen.getByTestId(`close-${dirtyProject.id}`))
+      expect(setTabs).toHaveBeenCalledWith([])
+      expect(setActiveTab).toHaveBeenCalledWith('')
+      expect(confirmSpy).toHaveBeenCalledTimes(2)
+
+      confirmSpy.mockRestore()
+    })
+
     it('should activate previous tab when closing the middle active tab', () => {
       const tabs: Tab[] = [
         {

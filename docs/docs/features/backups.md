@@ -65,17 +65,18 @@ migrations on every startup and, if there are any, takes an automatic backup
 
 Set these in your `.env` file:
 
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `MODELIBR_SKIP_PREMIGRATION_BACKUP` | `false` | Set to `true` to skip the automatic backup and apply migrations unconditionally. Not recommended outside throwaway/CI databases - there's no rollback point if the migration goes wrong. |
-| `MODELIBR_PREMIGRATION_BACKUP_RETENTION` | `3` | How many `pre-migration-*` snapshots to keep before older ones are pruned. |
+| Variable                                 | Default   | Purpose                                                                                                                                                                                  |
+| ---------------------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MODELIBR_SKIP_PREMIGRATION_BACKUP`      | `false`   | Set to `true` to skip the automatic backup and apply migrations unconditionally. Not recommended outside throwaway/CI databases - there's no rollback point if the migration goes wrong. |
+| `MODELIBR_PREMIGRATION_BACKUP_RETENTION` | `3`       | How many `pre-migration-*` snapshots to keep before older ones are pruned.                                                                                                               |
+| `PG_DUMP_PATH`                           | `pg_dump` | Optional absolute path to `pg_dump`. Leave unset for Docker/source PATH lookup; managed desktop installs provide the bundled path.                                                       |
+| `PSQL_PATH`                              | `psql`    | Optional absolute path to `psql` for the backup version/size probes. Leave unset for PATH lookup.                                                                                        |
 
 ## Notes
 
 - Docker deployments store backups under `./data/backups` on the host.
-- Native (desktop) installs don't yet support backups - the automatic
-  pre-migration safety net is disabled there for now and will be enabled once
-  desktop backup support ships.
+- Native (desktop) installs use the bundled PostgreSQL `pg_dump` and `psql`
+  binaries for both manual and automatic pre-migration backups.
 - Only one backup can run at a time; starting a second while one is in
   progress is rejected.
 

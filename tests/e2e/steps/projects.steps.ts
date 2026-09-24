@@ -214,6 +214,16 @@ When("I delete the project {string}", async ({ page }, projectName: string) => {
 });
 
 When(
+    "I cancel deleting the project {string}",
+    async ({ page }, projectName: string) => {
+        const projectsPage = new ProjectsPage(page);
+        const project = getScenarioState(page).getProject(projectName);
+        await projectsPage.cancelProjectDeletion(projectName, project?.id);
+        console.log(`[Action] Cancelled project deletion for "${projectName}"`);
+    },
+);
+
+When(
     "I upload the image {string} as the custom thumbnail for project {string}",
     async ({ page }, fileName: string, projectName: string) => {
         const project = getScenarioState(page).getProject(projectName);

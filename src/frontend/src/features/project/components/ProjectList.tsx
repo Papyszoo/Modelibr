@@ -2,6 +2,7 @@ import './ProjectList.css'
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from 'primereact/button'
+import { confirmDialog } from 'primereact/confirmdialog'
 import { InputSwitch } from 'primereact/inputswitch'
 import { Toast } from 'primereact/toast'
 import { useState } from 'react'
@@ -11,7 +12,11 @@ import { deleteProject } from '@/features/project/api/projectApi'
 import { useProjectsQuery } from '@/features/project/api/queries'
 import { useTabContext } from '@/hooks/useTabContext'
 import { resolveApiAssetUrl } from '@/lib/apiBase'
-import { EmptyState, LoadingState } from '@/shared/components/feedback'
+import {
+  EmptyState,
+  ErrorState,
+  LoadingState,
+} from '@/shared/components/feedback'
 import {
   ListToolbar,
   ListToolbarActions,
@@ -32,6 +37,7 @@ export function ProjectList() {
   const projectsQuery = useProjectsQuery()
   const projects = projectsQuery.data ?? []
   const loading = projectsQuery.isLoading
+  const loadError = projectsQuery.error
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [onlyWithConceptArt, setOnlyWithConceptArt] = useState(false)
@@ -84,8 +90,26 @@ export function ProjectList() {
     },
   })
 
-  const handleDeleteProject = async (projectId: number) => {
-    await deleteProjectMutation.mutateAsync(projectId)
+  const confirmDeleteProject = (project: ProjectDto): void => {
+    confirmDialog({
+      message: (
+        <>
+          <p>
+            Delete <strong>{project.name}</strong>? The project container will
+            be removed.
+          </p>
+          <p>Assets in the project will remain in your library.</p>
+        </>
+      ),
+      header: `Delete ${project.name}`,
+      icon: 'pi pi-exclamation-triangle',
+      acceptLabel: 'Delete Project',
+      rejectLabel: 'Cancel',
+      acceptClassName: 'p-button-danger',
+      accept: () => {
+        deleteProjectMutation.mutate(project.id)
+      },
+    })
   }
 
   const filteredProjects = projects.filter(project => {
@@ -188,6 +212,18 @@ export function ProjectList() {
 
       {loading ? (
         <LoadingState message="Loading projects…" />
+      ) : projectsQuery.isError ? (
+        <ErrorState
+          title="Could not load projects"
+          message={
+            loadError instanceof Error
+              ? loadError.message
+              : 'The project request failed. Try again.'
+          }
+          onRetry={() => {
+            void projectsQuery.refetch()
+          }}
+        />
       ) : filteredProjects.length === 0 ? (
         <EmptyState
           icon="pi-folder"
@@ -269,13 +305,15 @@ export function ProjectList() {
                 </div>
                 <div className="project-grid-card-actions">
                   <Button
-                    icon="pi pi-trash"
-                    className="p-button-text p-button-rounded p-button-danger p-button-sm"
-                    tooltip="Delete Project"
+                    icon="pi pi-ellipsis-v"
+                    className="p-button-text p-button-rounded p-button-sm"
+                    aria-label={`Project actions for ${project.name}`}
+                    aria-haspopup="dialog"
+                    title="Project actions"
                     disabled={deleteProjectMutation.isPending}
                     onClick={e => {
                       e.stopPropagation()
-                      handleDeleteProject(project.id)
+                      confirmDeleteProject(project)
                     }}
                   />
                 </div>

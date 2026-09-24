@@ -9,8 +9,8 @@ export interface DockPanelActions {
   reopenTab: (tab: Tab) => void
   /** Close a tab by ID */
   closeTab: (tabId: string) => void
-  /** Begin dragging a tab */
-  onTabDragStart: (tab: Tab) => void
+  /** Begin dragging a tab; false means a dirty-tab guard refused the move. */
+  onTabDragStart: (tab: Tab) => boolean
   /** End tab drag */
   onTabDragEnd: () => void
   /** Handle drop on this panel (cross-panel / cross-window) */

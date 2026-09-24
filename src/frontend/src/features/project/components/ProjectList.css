@@ -119,12 +119,7 @@
   position: absolute;
   top: 0.5rem;
   right: 0.5rem;
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-
-.project-grid-card:hover .project-grid-card-actions {
-  opacity: 1;
+  z-index: var(--mod-z-dropdown);
 }
 
 @media (max-width: 768px) {
@@ -145,10 +140,6 @@
 
   .project-grid-card:hover {
     transform: none;
-  }
-
-  .project-grid-card-actions {
-    opacity: 1;
   }
 }
 

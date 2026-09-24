@@ -24,7 +24,8 @@ import { PuppeteerRenderer } from './puppeteerRenderer.js'
  *
  * The page publishes `window.__SCENE_RENDER__` and flips `ready` once every
  * visible node has stopped loading - failures included, because a node that did
- * not load is part of what the scene currently looks like.
+ * not load is part of what the scene currently looks like. A page that does not
+ * reach that state is a failed render, not a render of its current loading state.
  */
 export class SceneRenderer {
   /**
@@ -56,7 +57,7 @@ export class SceneRenderer {
    * @param {number} [request.width]
    * @param {number} [request.height]
    * @param {object} [jobLogger]
-   * @returns {Promise<{image: Buffer, status: object, timedOut: boolean}>}
+   * @returns {Promise<{image: Buffer, status: object, width: number, height: number}>}
    */
   async render(request, jobLogger = logger) {
     const {
@@ -96,21 +97,24 @@ export class SceneRenderer {
         timeout: config.sceneRender.timeoutMs,
       })
 
-      let timedOut = false
       try {
         await page.waitForFunction(
           () => window.__SCENE_RENDER__ && window.__SCENE_RENDER__.ready,
           { timeout: config.sceneRender.timeoutMs, polling: 250 }
         )
-      } catch {
-        // Photograph it anyway. A scene where one asset never resolves is
-        // exactly the situation an agent needs to see, and a render that
-        // refuses to come back teaches it less than a picture with a hole in it.
-        timedOut = true
-        jobLogger.warn('Scene did not report ready; capturing anyway', {
+      } catch (error) {
+        // Readiness is the truth boundary for this image. Photographing a page that is
+        // still loading would turn a failed render into a plausible-looking answer to a
+        // question the page has not finished answering. Do not even take diagnostic
+        // screenshots here: there is no separately addressed diagnostic store to receive
+        // them, and the bytes must never become a normal render artifact by accident.
+        const message = `Scene ${sceneId} did not become render-ready within ${config.sceneRender.timeoutMs}ms; no image was captured`
+        jobLogger.warn(message, {
           sceneId,
           timeoutMs: config.sceneRender.timeoutMs,
+          cause: boundRendererDiagnostic(error?.message ?? error),
         })
+        throw new Error(message, { cause: error })
       }
 
       const status = (await page.evaluate(
@@ -120,11 +124,17 @@ export class SceneRenderer {
         nodesExpected: 0,
         nodesLoaded: 0,
         nodesFailed: 0,
-        error: 'the render page never published a status',
+      }
+
+      if (!status.ready) {
+        throw new Error(
+          `Scene ${sceneId} published a render status that was not ready; no image was captured`
+        )
       }
 
       if (status.error) {
-        throw new Error(`Scene ${sceneId} could not be drawn: ${status.error}`)
+        const diagnostic = boundRendererDiagnostic(status.error)
+        throw new Error(`Scene ${sceneId} could not be drawn: ${diagnostic}`)
       }
 
       const image = await page.screenshot({ type: 'png' })
@@ -136,7 +146,6 @@ export class SceneRenderer {
         height,
         nodesLoaded: status.nodesLoaded,
         nodesFailed: status.nodesFailed,
-        timedOut,
         bytes: image.length,
       })
 
@@ -150,7 +159,7 @@ export class SceneRenderer {
       // width/height come back with the picture rather than being re-derived by the
       // caller: they are the viewport this was actually shot at, and a caller reading
       // them from config would be guessing right only while nothing overrides them.
-      return { image, status, timedOut, width, height }
+      return { image, status, width, height }
     } finally {
       await page.close().catch(() => {})
     }
@@ -162,6 +171,20 @@ export class SceneRenderer {
     }
     this.browser = null
   }
+}
+
+// ThumbnailJob's domain error limit is 2,000 characters. Leave room for the scene id and
+// message prefix so a verbose browser/network diagnostic can be reported as the render
+// failure without making the backend reject the job update that records it.
+export const MAX_SCENE_RENDER_DIAGNOSTIC_LENGTH = 1900
+
+function boundRendererDiagnostic(value) {
+  const diagnostic = String(value ?? 'no diagnostic').trim()
+  if (diagnostic.length <= MAX_SCENE_RENDER_DIAGNOSTIC_LENGTH) {
+    return diagnostic
+  }
+
+  return `${diagnostic.slice(0, MAX_SCENE_RENDER_DIAGNOSTIC_LENGTH - 3)}...`
 }
 
 /**

@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using Application.Abstractions.Files;
+using Application.Abstractions.Services;
 using Application.Abstractions.Storage;
 using Domain.Files;
 using Microsoft.Extensions.Logging;
@@ -10,11 +11,16 @@ public sealed class HashBasedFileStorage : IFileStorage
 {
     private readonly IUploadPathProvider _pathProvider;
     private readonly ILogger<HashBasedFileStorage> _logger;
+    private readonly IBackupConsistencyGate _consistencyGate;
 
-    public HashBasedFileStorage(IUploadPathProvider pathProvider, ILogger<HashBasedFileStorage> logger)
+    public HashBasedFileStorage(
+        IUploadPathProvider pathProvider,
+        ILogger<HashBasedFileStorage> logger,
+        IBackupConsistencyGate consistencyGate)
     {
         _pathProvider = pathProvider;
         _logger = logger;
+        _consistencyGate = consistencyGate;
     }
 
     public async Task<StoredFileResult> SaveAsync(IFileUpload upload, FileType fileType, CancellationToken ct)
@@ -45,6 +51,12 @@ public sealed class HashBasedFileStorage : IFileStorage
         var finalPath = Path.Combine(finalDir, storedName);
 
         Directory.CreateDirectory(finalDir);
+
+        // Hashing happens in the excluded uploads/tmp/ staging directory. Only
+        // the final publish/dedupe step needs to be serialized with a backup's
+        // file enumeration, so concurrent large uploads do not queue behind a
+        // backup while they are still being hashed.
+        await using var mutationLease = await _consistencyGate.EnterFileMutationAsync(ct);
 
         if (File.Exists(finalPath))
         {
@@ -83,17 +95,17 @@ public sealed class HashBasedFileStorage : IFileStorage
         return new StoredFileResult(relativePath, storedName, hashHex, size);
     }
 
-    public Task DeleteFileAsync(string filePath, CancellationToken ct)
+    public async Task DeleteFileAsync(string filePath, CancellationToken ct)
     {
+        await using var mutationLease = await _consistencyGate.EnterFileMutationAsync(ct);
+
         var root = _pathProvider.UploadRootPath;
         var fullPath = Path.Combine(root, filePath);
-        
+
         if (File.Exists(fullPath))
         {
             File.Delete(fullPath);
         }
-        
-        return Task.CompletedTask;
     }
 
     public bool FileExists(string filePath)

@@ -30,7 +30,10 @@ type Story = StoryObj<typeof meta>
 const defaultHandlers = {
   onSelect: () => console.log('Tab selected'),
   onClose: () => console.log('Tab closed'),
-  onDragStart: (tab: Tab) => console.log('Drag started', tab),
+  onDragStart: (tab: Tab) => {
+    console.log('Drag started', tab)
+    return true
+  },
   onDragEnd: () => console.log('Drag ended'),
 }
 

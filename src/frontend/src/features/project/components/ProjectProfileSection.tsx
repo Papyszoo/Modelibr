@@ -3,7 +3,7 @@ import './ProjectProfileSection.css'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from 'primereact/button'
 import { InputNumber } from 'primereact/inputnumber'
-import { type JSX, useEffect, useMemo, useState } from 'react'
+import { type JSX, useEffect, useMemo, useRef, useState } from 'react'
 
 import {
   createProjectProfileOption,
@@ -13,12 +13,15 @@ import {
   useProjectBriefQuery,
   useProjectProfileOptionsQuery,
 } from '@/features/project/api/queries'
+import {
+  buildProjectProfilePatch,
+  type ProjectProfileBudgetDraft,
+  type ProjectProfileDraft,
+} from '@/features/project/projectProfilePatch'
+import { useTabUiState } from '@/hooks/useTabUiState'
+import { ErrorState } from '@/shared/components/feedback'
 import { TagInput } from '@/shared/components/tags/TagInput'
-import type {
-  ProjectBriefDto,
-  ProjectProfileOptionDto,
-  ProjectProfileValueDto,
-} from '@/types'
+import type { ProjectBriefDto, ProjectProfileOptionDto } from '@/types'
 
 /**
  * What a project is: which engines and platforms it targets, what genre and look
@@ -60,6 +63,8 @@ const DIMENSIONS: { key: string; label: string; hint: string }[] = [
 
 interface ProjectProfileSectionProps {
   projectId: number
+  tabId?: string
+  onDirtyChange?: (dirty: boolean) => void
   showToast: (opts: {
     severity: string
     summary: string
@@ -68,36 +73,121 @@ interface ProjectProfileSectionProps {
   }) => void
 }
 
-type Draft = Record<string, ProjectProfileValueDto[]>
+type SaveVariables = {
+  request: ReturnType<typeof buildProjectProfilePatch>
+  draft: ProjectProfileDraft
+  budget: ProjectProfileBudgetDraft
+}
 
 export function ProjectProfileSection({
   projectId,
+  tabId,
+  onDirtyChange,
   showToast,
 }: ProjectProfileSectionProps): JSX.Element {
   const queryClient = useQueryClient()
-  const { data: brief, isLoading } = useProjectBriefQuery({ projectId })
+  const {
+    data: brief,
+    error: briefError,
+    isError: briefIsError,
+    isLoading,
+    refetch,
+  } = useProjectBriefQuery({ projectId })
   const { data: options = [] } = useProjectProfileOptionsQuery()
+  const tabStateKey = tabId ?? `project-${projectId}`
+  const [storedDraft, setStoredDraft] =
+    useTabUiState<ProjectProfileDraft | null>(
+      tabStateKey,
+      'projectProfileDraft',
+      null
+    )
+  const [storedBudget, setStoredBudget] =
+    useTabUiState<ProjectProfileBudgetDraft | null>(
+      tabStateKey,
+      'projectProfileBudgetDraft',
+      null
+    )
+  const [storedDirty, setStoredDirty] = useTabUiState<boolean>(
+    tabStateKey,
+    'projectProfileDirty',
+    false
+  )
 
-  const [draft, setDraft] = useState<Draft | null>(null)
-  const [budget, setBudget] = useState<{
-    maxTrianglesPerAsset: number | null
-    maxTextureSize: number | null
-    targetSceneTriangles: number | null
-  } | null>(null)
+  const [draft, setDraft] = useState<ProjectProfileDraft | null>(null)
+  const [budget, setBudget] = useState<ProjectProfileBudgetDraft | null>(null)
+  const hydratedBrief = useRef<string | null>(null)
+  const storedDraftRef = useRef(storedDraft)
+  const storedBudgetRef = useRef(storedBudget)
+  const storedDirtyRef = useRef(storedDirty)
+  storedDraftRef.current = storedDraft
+  storedBudgetRef.current = storedBudget
+  storedDirtyRef.current = storedDirty
 
-  // Server state is the source of truth; the draft only exists between an edit
-  // and a save. Re-seeding on every brief change is what makes "Discard" free.
+  // A tab switch unmounts this component, and cover/reference updates refetch the
+  // containing Project. Seed once, then keep a dirty draft; a clean draft follows
+  // a changed server brief. Persisting the draft must not itself look like a
+  // refetch and reset what the user just typed.
   useEffect(() => {
-    if (!isBrief(brief)) {
+    if (!isBrief(brief)) return
+
+    const signature = briefServerSignature(brief)
+    if (hydratedBrief.current === null) {
+      hydratedBrief.current = signature
+      setDraft(storedDraftRef.current ?? seed(brief))
+      setBudget(storedBudgetRef.current ?? budgetFrom(brief))
       return
     }
-    setDraft(seed(brief))
-    setBudget({
-      maxTrianglesPerAsset: brief.budget.maxTrianglesPerAsset,
-      maxTextureSize: brief.budget.maxTextureSize,
-      targetSceneTriangles: brief.budget.targetSceneTriangles,
-    })
-  }, [brief])
+    if (hydratedBrief.current === signature) return
+    hydratedBrief.current = signature
+
+    if (!storedDirtyRef.current) {
+      setDraft(seed(brief))
+      setBudget(budgetFrom(brief))
+      setStoredDraft(null)
+      setStoredBudget(null)
+      return
+    }
+
+    const storedMatchesServer =
+      storedDraftRef.current !== null &&
+      storedBudgetRef.current !== null &&
+      draftsEqual(storedDraftRef.current, seed(brief)) &&
+      budgetsEqual(storedBudgetRef.current, budgetFrom(brief))
+
+    if (storedMatchesServer) {
+      setDraft(seed(brief))
+      setBudget(budgetFrom(brief))
+      setStoredDraft(null)
+      setStoredBudget(null)
+      setStoredDirty(false)
+    }
+  }, [brief, setStoredBudget, setStoredDirty, setStoredDraft])
+
+  useEffect(() => {
+    if (!isBrief(brief) || !draft || !budget) return
+
+    const dirty =
+      !draftsEqual(draft, seed(brief)) ||
+      !budgetsEqual(budget, budgetFrom(brief))
+    setStoredDirty(dirty)
+    onDirtyChange?.(dirty)
+
+    if (!dirty) {
+      setStoredDraft(null)
+      setStoredBudget(null)
+    } else {
+      setStoredDraft(draft)
+      setStoredBudget(budget)
+    }
+  }, [
+    brief,
+    budget,
+    draft,
+    onDirtyChange,
+    setStoredBudget,
+    setStoredDirty,
+    setStoredDraft,
+  ])
 
   const byDimension = useMemo(() => {
     const grouped = new Map<string, ProjectProfileOptionDto[]>()
@@ -111,36 +201,34 @@ export function ProjectProfileSection({
     return grouped
   }, [options])
 
-  const invalidate = () =>
-    Promise.all([
-      queryClient.invalidateQueries({
-        queryKey: ['projects', 'brief', projectId],
-      }),
-      queryClient.invalidateQueries({
-        queryKey: ['projects', 'profile-options'],
-      }),
-    ])
+  const invalidateOptions = () =>
+    queryClient.invalidateQueries({
+      queryKey: ['projects', 'profile-options'],
+    })
 
   const save = useMutation({
-    mutationFn: () =>
-      setProjectProfile(projectId, {
-        dimensions: Object.fromEntries(
-          DIMENSIONS.map(({ key }) => [
-            key,
-            (draft?.[key] ?? []).map(value => ({
-              optionId: value.optionId,
-              role: value.role ?? null,
-            })),
-          ])
-        ),
-        settings: {
-          maxTrianglesPerAsset: budget?.maxTrianglesPerAsset ?? null,
-          maxTextureSize: budget?.maxTextureSize ?? null,
-          targetSceneTriangles: budget?.targetSceneTriangles ?? null,
-        },
-      }),
-    onSuccess: async () => {
-      await invalidate()
+    mutationFn: (variables: SaveVariables) =>
+      setProjectProfile(projectId, variables.request),
+    onSuccess: async (savedBrief, variables) => {
+      queryClient.setQueryData(['projects', 'brief', projectId], savedBrief)
+      await invalidateOptions()
+
+      // Do not clear edits made after this request started. The saved snapshot
+      // is the new server baseline, while the newer local draft remains dirty.
+      if (
+        draft &&
+        budget &&
+        draftsEqual(draft, variables.draft) &&
+        budgetsEqual(budget, variables.budget)
+      ) {
+        setDraft(seed(savedBrief))
+        setBudget(budgetFrom(savedBrief))
+        setStoredDraft(null)
+        setStoredBudget(null)
+        setStoredDirty(false)
+        onDirtyChange?.(false)
+      }
+
       showToast({
         severity: 'success',
         summary: 'Profile saved',
@@ -164,7 +252,7 @@ export function ProjectProfileSection({
     mutationFn: ({ dimension, name }: { dimension: string; name: string }) =>
       createProjectProfileOption(dimension, name),
     onSuccess: async (option, { dimension }) => {
-      await invalidate()
+      await invalidateOptions()
       setDraft(current => ({
         ...(current ?? {}),
         [dimension]: [
@@ -182,17 +270,24 @@ export function ProjectProfileSection({
       }),
   })
 
-  // Shape-checked, not just truthy. This panel sits inside the project page, and a
-  // malformed response - a proxy returning HTML for a 404, say - would otherwise throw
-  // during render and unmount the page around it, taking the description and notes with
-  // it. A section that cannot draw itself must fail alone.
-  if (isLoading || !isBrief(brief) || !draft || !budget) {
+  if (isLoading || (isBrief(brief) && (!draft || !budget))) {
+    return <p className="project-profile-note">Loading profile…</p>
+  }
+
+  if (briefIsError || !isBrief(brief) || !draft || !budget) {
     return (
-      <p className="project-profile-note">
-        {isLoading
-          ? 'Loading profile…'
-          : 'This project has no profile to show.'}
-      </p>
+      <ErrorState
+        variant="inline"
+        title="Could not load project profile"
+        message={
+          briefIsError && briefError instanceof Error
+            ? briefError.message
+            : 'The profile response was incomplete. Try again.'
+        }
+        onRetry={() => {
+          void refetch()
+        }}
+      />
     )
   }
 
@@ -208,9 +303,16 @@ export function ProjectProfileSection({
         <Button
           label={save.isPending ? 'Saving…' : 'Save profile'}
           icon="pi pi-save"
-          disabled={save.isPending}
+          disabled={save.isPending || !draft || !budget}
           data-testid="project-profile-save"
-          onClick={() => save.mutate()}
+          onClick={() => {
+            if (!draft || !budget) return
+            save.mutate({
+              request: buildProjectProfilePatch(brief, draft, budget),
+              draft,
+              budget,
+            })
+          }}
         />
       </div>
 
@@ -483,7 +585,7 @@ function isBrief(brief: unknown): brief is ProjectBriefDto {
   )
 }
 
-function seed(brief: ProjectBriefDto): Draft {
+function seed(brief: ProjectBriefDto): ProjectProfileDraft {
   return {
     engine: brief.engines,
     platform: brief.platforms,
@@ -491,4 +593,46 @@ function seed(brief: ProjectBriefDto): Draft {
     style: brief.styles,
     perspective: brief.perspectives,
   }
+}
+
+function briefServerSignature(brief: ProjectBriefDto): string {
+  return JSON.stringify({
+    engines: brief.engines,
+    platforms: brief.platforms,
+    genres: brief.genres,
+    styles: brief.styles,
+    perspectives: brief.perspectives,
+    budget: brief.budget,
+    worldConvention: brief.worldConvention,
+    paletteHex: brief.paletteHex,
+  })
+}
+
+function budgetFrom(brief: ProjectBriefDto): ProjectProfileBudgetDraft {
+  return {
+    maxTrianglesPerAsset: brief.budget.maxTrianglesPerAsset,
+    maxTextureSize: brief.budget.maxTextureSize,
+    targetSceneTriangles: brief.budget.targetSceneTriangles,
+  }
+}
+
+function draftsEqual(
+  left: ProjectProfileDraft,
+  right: ProjectProfileDraft
+): boolean {
+  return DIMENSIONS.every(
+    ({ key }) =>
+      JSON.stringify(left[key] ?? []) === JSON.stringify(right[key] ?? [])
+  )
+}
+
+function budgetsEqual(
+  left: ProjectProfileBudgetDraft,
+  right: ProjectProfileBudgetDraft
+): boolean {
+  return (
+    left.maxTrianglesPerAsset === right.maxTrianglesPerAsset &&
+    left.maxTextureSize === right.maxTextureSize &&
+    left.targetSceneTriangles === right.targetSceneTriangles
+  )
 }

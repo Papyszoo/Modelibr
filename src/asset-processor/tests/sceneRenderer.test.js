@@ -1,6 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { buildSceneRenderUrl } from '../sceneRenderer.js'
+import { config } from '../config.js'
+import {
+  buildSceneRenderUrl,
+  MAX_SCENE_RENDER_DIAGNOSTIC_LENGTH,
+  SceneRenderer,
+} from '../sceneRenderer.js'
 
 /**
  * The render URL is worth asserting on its own because getting it wrong does not
@@ -72,5 +77,101 @@ describe('buildSceneRenderUrl', () => {
     const url = new URL(buildSceneRenderUrl('http://frontend', { sceneId: 12 }))
 
     expect(url.searchParams.has('api')).toBe(false)
+  })
+})
+
+describe('SceneRenderer', () => {
+  const originalFrontendUrl = config.sceneRender.frontendUrl
+  const originalTimeoutMs = config.sceneRender.timeoutMs
+
+  let page
+  let renderer
+  let jobLogger
+
+  beforeEach(() => {
+    config.sceneRender.frontendUrl = 'http://frontend'
+    config.sceneRender.timeoutMs = 125
+
+    page = {
+      setViewport: vi.fn().mockResolvedValue(undefined),
+      on: vi.fn(),
+      goto: vi.fn().mockResolvedValue(undefined),
+      waitForFunction: vi.fn().mockResolvedValue(undefined),
+      evaluate: vi.fn().mockResolvedValue({
+        ready: true,
+        nodesExpected: 2,
+        nodesLoaded: 2,
+        nodesFailed: 0,
+      }),
+      screenshot: vi.fn().mockResolvedValue(Buffer.from('rendered-scene')),
+      close: vi.fn().mockResolvedValue(undefined),
+    }
+    renderer = new SceneRenderer({ newPage: vi.fn().mockResolvedValue(page) })
+    jobLogger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+  })
+
+  afterAll(() => {
+    config.sceneRender.frontendUrl = originalFrontendUrl
+    config.sceneRender.timeoutMs = originalTimeoutMs
+  })
+
+  it('photographs a page only after it reports render-ready', async () => {
+    const result = await renderer.render({ sceneId: 12 }, jobLogger)
+
+    expect(page.waitForFunction).toHaveBeenCalledWith(expect.any(Function), {
+      timeout: 125,
+      polling: 250,
+    })
+    expect(page.screenshot).toHaveBeenCalledOnce()
+    expect(result).toMatchObject({
+      image: Buffer.from('rendered-scene'),
+      status: { ready: true, nodesLoaded: 2, nodesFailed: 0 },
+      width: 768,
+      height: 768,
+    })
+    expect(result).not.toHaveProperty('timedOut')
+  })
+
+  it('fails a readiness timeout without evaluating or photographing the page', async () => {
+    page.waitForFunction.mockRejectedValueOnce(
+      new Error('Waiting failed: 125ms exceeded')
+    )
+
+    await expect(renderer.render({ sceneId: 12 }, jobLogger)).rejects.toThrow(
+      'Scene 12 did not become render-ready within 125ms; no image was captured'
+    )
+
+    expect(page.evaluate).not.toHaveBeenCalled()
+    expect(page.screenshot).not.toHaveBeenCalled()
+    expect(page.close).toHaveBeenCalledOnce()
+    expect(jobLogger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('no image was captured'),
+      expect.objectContaining({ cause: 'Waiting failed: 125ms exceeded' })
+    )
+  })
+
+  it('fails a published renderer error with bounded diagnostics and no image', async () => {
+    page.evaluate.mockResolvedValueOnce({
+      ready: true,
+      nodesExpected: 0,
+      nodesLoaded: 0,
+      nodesFailed: 0,
+      error: 'x'.repeat(5000),
+    })
+
+    let failure
+    try {
+      await renderer.render({ sceneId: 12 }, jobLogger)
+    } catch (error) {
+      failure = error
+    }
+
+    expect(failure).toBeInstanceOf(Error)
+    expect(failure.message).toContain('Scene 12 could not be drawn: xxx')
+    expect(failure.message.length).toBeLessThan(2000)
+    expect(failure.message.length).toBeLessThan(
+      MAX_SCENE_RENDER_DIAGNOSTIC_LENGTH + 100
+    )
+    expect(page.screenshot).not.toHaveBeenCalled()
   })
 })

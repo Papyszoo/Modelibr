@@ -1,19 +1,24 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import fs from 'fs'
+
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { SceneRenderProcessor } from '../processors/sceneRenderProcessor.js'
 
 /**
  * The processor's job is small but every step of it is a place where a render can be
- * stored against the wrong thing, or a job can be left open. These assert the four that
- * matter: the angle the queue asked for is the angle rendered, the picture reaches the
- * upload, an upload that fails does not report success, and a job the queue already gave
- * up on never stores anything.
+ * stored against the wrong thing, or a job can be left open. These cover the requested
+ * viewpoint, successful and failed storage, readiness-timeout truth, and both timeout
+ * layers that must prevent a late image from being published.
  */
 describe('SceneRenderProcessor', () => {
   let processor
   let jobLogger
 
   const image = Buffer.from('fake-png-bytes')
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
 
   beforeEach(() => {
     processor = new SceneRenderProcessor()
@@ -36,6 +41,11 @@ describe('SceneRenderProcessor', () => {
         data: { renderId: 7 },
       }),
       finishJob: vi.fn().mockResolvedValue(undefined),
+    }
+    processor.jobEventService = {
+      logJobStarted: vi.fn().mockResolvedValue(undefined),
+      logJobCompleted: vi.fn().mockResolvedValue(undefined),
+      logJobFailed: vi.fn().mockResolvedValue(undefined),
     }
   })
 
@@ -88,6 +98,58 @@ describe('SceneRenderProcessor', () => {
     await expect(
       processor.process({ id: 5, sceneId: 12 }, jobLogger)
     ).rejects.toThrow(/disk full/)
+  })
+
+  it('marks a readiness timeout failed without writing or uploading an image', async () => {
+    const message =
+      'Scene 12 did not become render-ready within 125ms; no image was captured'
+    const writeFile = vi.spyOn(fs.promises, 'writeFile')
+    processor.sceneRenderer.render.mockRejectedValueOnce(new Error(message))
+
+    await expect(
+      processor.execute({ id: 5, sceneId: 12, sceneViewpoint: 'front' })
+    ).rejects.toThrow(message)
+
+    expect(writeFile).not.toHaveBeenCalled()
+    expect(processor.sceneRenderApiService.uploadRender).not.toHaveBeenCalled()
+    expect(processor.sceneRenderApiService.finishJob).toHaveBeenCalledWith(
+      5,
+      false,
+      message
+    )
+  })
+
+  it('rejects a legacy timed-out renderer result before creating an output path', async () => {
+    const writeFile = vi.spyOn(fs.promises, 'writeFile')
+    processor.sceneRenderer.render.mockResolvedValueOnce({
+      image,
+      status: { ready: false, nodesLoaded: 1, nodesFailed: 1 },
+      timedOut: true,
+      width: 768,
+      height: 768,
+    })
+
+    await expect(processor.execute({ id: 5, sceneId: 12 })).rejects.toThrow(
+      /readiness timeout.*no image was captured/
+    )
+
+    expect(writeFile).not.toHaveBeenCalled()
+    expect(processor.sceneRenderApiService.uploadRender).not.toHaveBeenCalled()
+    expect(processor.sceneRenderApiService.finishJob).toHaveBeenCalledWith(
+      5,
+      false,
+      expect.stringMatching(/readiness timeout.*no image was captured/)
+    )
+  })
+
+  it('completes a ready render after its image is stored', async () => {
+    await processor.execute({ id: 5, sceneId: 12 })
+
+    expect(processor.sceneRenderApiService.uploadRender).toHaveBeenCalledOnce()
+    expect(processor.sceneRenderApiService.finishJob).toHaveBeenCalledWith(
+      5,
+      true
+    )
   })
 
   it('stores nothing for a job the queue has already timed out', async () => {

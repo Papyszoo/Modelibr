@@ -465,6 +465,18 @@ export class ProcessManager {
         'bin',
         platformExecutable('initdb')
       ),
+      path.join(
+        this.runtimeDir,
+        'postgres',
+        'bin',
+        platformExecutable('pg_dump')
+      ),
+      path.join(
+        this.runtimeDir,
+        'postgres',
+        'bin',
+        platformExecutable('psql')
+      ),
     ]
 
     for (const requiredPath of requiredPaths) {
@@ -678,6 +690,39 @@ export class ProcessManager {
     }
   }
 
+  buildWebApiEnvironment() {
+    const postgresBinDir = path.join(this.runtimeDir, 'postgres', 'bin')
+
+    return {
+      // pg_dump/psql are launched by the WebApi. Reuse the embedded Postgres
+      // environment so the absolute tool paths also get bundled shared libraries.
+      ...this.getPostgresEnvironment(),
+      ASPNETCORE_ENVIRONMENT: 'Production',
+      DisableHttpsRedirection: 'true',
+      DISABLE_HTTPS_LISTENER: 'true',
+      HTTP_PORT: String(this.runningConfig.internalApiPort),
+      EXPOSE_443_PORT: 'false',
+      WEBDAV_HTTP_PORT: String(this.runningConfig.appPort),
+      WEBDAV_PROBE_BASE_URL: `http://127.0.0.1:${this.runningConfig.appPort}`,
+      WORKER_API_KEY: this.workerApiKey,
+      UPLOAD_STORAGE_PATH: this.paths.uploads,
+      THUMBNAIL_STORAGE_PATH: this.paths.thumbnails,
+      RESTORE_STORAGE_PATH: this.paths.restore,
+      BACKUP_STORAGE_PATH: this.paths.backups,
+      BLENDER_INSTALL_PATH: this.paths.blender,
+      ConnectionStrings__Default: `Host=127.0.0.1;Port=${this.runningConfig.postgresPort};Database=${POSTGRES_DATABASE};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};`,
+      POSTGRES_HOST: '127.0.0.1',
+      POSTGRES_PORT: String(this.runningConfig.postgresPort),
+      POSTGRES_DB: POSTGRES_DATABASE,
+      POSTGRES_USER,
+      POSTGRES_PASSWORD,
+      PG_DUMP_PATH: path.join(postgresBinDir, platformExecutable('pg_dump')),
+      PSQL_PATH: path.join(postgresBinDir, platformExecutable('psql')),
+      // Do not inherit a developer's skip switch into the installed app.
+      MODELIBR_SKIP_PREMIGRATION_BACKUP: 'false',
+    }
+  }
+
   async startWebApi() {
     const webApiExecutable = path.join(
       this.runtimeDir,
@@ -687,36 +732,7 @@ export class ProcessManager {
 
     this.webApiProcess = spawn(webApiExecutable, [], {
       cwd: path.dirname(webApiExecutable),
-      env: {
-        ...process.env,
-        ASPNETCORE_ENVIRONMENT: 'Production',
-        DisableHttpsRedirection: 'true',
-        DISABLE_HTTPS_LISTENER: 'true',
-        // Bind/connect to the ports we actually resolved at start (which may be
-        // a free fallback if the configured one was taken), not the raw config.
-        HTTP_PORT: String(this.runningConfig.internalApiPort),
-        EXPOSE_443_PORT: 'false',
-        WEBDAV_HTTP_PORT: String(this.runningConfig.appPort),
-        WEBDAV_PROBE_BASE_URL: `http://127.0.0.1:${this.runningConfig.appPort}`,
-        WORKER_API_KEY: this.workerApiKey,
-        UPLOAD_STORAGE_PATH: this.paths.uploads,
-        THUMBNAIL_STORAGE_PATH: this.paths.thumbnails,
-        RESTORE_STORAGE_PATH: this.paths.restore,
-        BACKUP_STORAGE_PATH: this.paths.backups,
-        BLENDER_INSTALL_PATH: this.paths.blender,
-        ConnectionStrings__Default: `Host=127.0.0.1;Port=${this.runningConfig.postgresPort};Database=${POSTGRES_DATABASE};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};`,
-        // TODO(backup on desktop): BackupService shells out to `pg_dump`/`psql` by
-        // bare name (relies on PATH). The bundled Postgres runtime ships those
-        // binaries under runtimeDir/postgres/bin (see prepare-bundle.mjs), but
-        // nothing here adds that directory to PATH, unlike pg_ctl which this file
-        // always invokes by absolute path. Until that's wired up, the automatic
-        // pre-migration backup would fail here (as would the manual "Backup now"
-        // button in Settings) and, per its abort-on-failure policy, would prevent
-        // the app from starting after any future migration ships. Opting out here
-        // - rather than shipping a startup-blocking regression on desktop - until
-        // a follow-up resolves pg_dump/psql to an absolute path.
-        MODELIBR_SKIP_PREMIGRATION_BACKUP: 'true',
-      },
+      env: this.buildWebApiEnvironment(),
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
     })
