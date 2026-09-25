@@ -2,18 +2,29 @@ namespace Domain.Models;
 
 public class ProjectConceptImage
 {
+    private readonly List<ProjectReferenceLink> _links = new();
+
     public int Id { get; private set; }
     public int ProjectId { get; private set; }
-    public int? ProjectLevelId { get; private set; }
     public int FileId { get; private set; }
     public string Title { get; private set; } = string.Empty;
     public int SortOrder { get; private set; }
     public DateTime CreatedAt { get; private set; }
 
     public Project Project { get; private set; } = null!;
-    public ProjectLevel? ProjectLevel { get; private set; }
     public File File { get; private set; } = null!;
     public ICollection<ProductionNote> Notes { get; } = new List<ProductionNote>();
+
+    public ICollection<ProjectReferenceLink> Links
+    {
+        get => _links;
+        set
+        {
+            _links.Clear();
+            if (value != null)
+                _links.AddRange(value);
+        }
+    }
 
     public static ProjectConceptImage Create(int projectId, int fileId, int sortOrder, DateTime createdAt)
     {
@@ -35,17 +46,13 @@ public class ProjectConceptImage
         };
     }
 
-    public void UpdateDetails(string? title, int? projectLevelId)
+    public void UpdateDetails(string? title)
     {
-        if (projectLevelId is <= 0)
-            throw new ArgumentException("Project level ID must be greater than 0 when supplied.", nameof(projectLevelId));
-
         var normalizedTitle = title?.Trim() ?? string.Empty;
         if (normalizedTitle.Length > 200)
             throw new ArgumentException("Reference title cannot exceed 200 characters.", nameof(title));
 
         Title = normalizedTitle;
-        ProjectLevelId = projectLevelId;
     }
 
     public void UpdateSortOrder(int sortOrder)
@@ -55,4 +62,30 @@ public class ProjectConceptImage
 
         SortOrder = sortOrder;
     }
+
+    /// <summary>Adds a target link, rejecting a duplicate link to the same target.</summary>
+    public ProjectReferenceLink AddLink(int? projectLevelId, int? projectCharacterId, DateTime createdAt)
+    {
+        var link = ProjectReferenceLink.Create(
+            ProjectId,
+            Id,
+            projectLevelId,
+            projectCharacterId,
+            createdAt);
+
+        if (projectLevelId.HasValue && _links.Any(existing => existing.TargetsLevel(projectLevelId.Value)))
+            throw new ArgumentException("This reference is already linked to that level.", nameof(projectLevelId));
+
+        if (projectCharacterId.HasValue && _links.Any(existing => existing.TargetsCharacter(projectCharacterId.Value)))
+            throw new ArgumentException("This reference is already linked to that character.", nameof(projectCharacterId));
+
+        _links.Add(link);
+        return link;
+    }
+
+    public bool RemoveLink(int linkId) => _links.RemoveAll(link => link.Id == linkId) > 0;
+
+    public bool IsLinkedToLevel(int levelId) => _links.Any(link => link.TargetsLevel(levelId));
+
+    public bool IsLinkedToCharacter(int characterId) => _links.Any(link => link.TargetsCharacter(characterId));
 }

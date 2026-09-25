@@ -442,6 +442,14 @@ export const handlers = [
     `${BASE_URL}/projects/:id/references/:referenceId`,
     () => new HttpResponse(null, { status: 404 })
   ),
+  http.post(
+    `${BASE_URL}/projects/:id/references/:referenceId/links`,
+    () => new HttpResponse(null, { status: 404 })
+  ),
+  http.delete(
+    `${BASE_URL}/projects/:id/references/:referenceId/links/:linkId`,
+    () => new HttpResponse(null, { status: 204 })
+  ),
 
   // Sounds (paginated)
   http.get(`${BASE_URL}/sounds`, ({ request }) => {

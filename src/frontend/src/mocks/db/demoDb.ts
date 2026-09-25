@@ -360,6 +360,16 @@ export interface DemoProjectCharacter {
   updatedAt: string
 }
 
+export interface DemoProjectReferenceLink {
+  id: number
+  projectId: number
+  /** `ProjectConceptImage.id` - the seeded id falls back to the file id. */
+  referenceImageId: number
+  projectLevelId: number | null
+  projectCharacterId: number | null
+  createdAt: string
+}
+
 export interface DemoProject {
   id: number
   name: string
@@ -381,6 +391,7 @@ export interface DemoProject {
   levels?: DemoProjectLevel[]
   productionNotes?: DemoProductionNote[]
   characters?: DemoProjectCharacter[]
+  referenceLinks?: DemoProjectReferenceLink[]
   models: { id: number; name: string }[]
   textureSets: { id: number; name: string }[]
   sprites: { id: number; name: string }[]

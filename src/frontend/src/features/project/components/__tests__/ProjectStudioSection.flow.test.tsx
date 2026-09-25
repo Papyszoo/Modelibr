@@ -29,7 +29,16 @@ describe('ProjectStudioSection flow', () => {
     queries.useProjectCharactersQuery.mockReturnValue(query([]) as never)
     queries.useProductionNotesQuery.mockReturnValue(query([]) as never)
     queries.useProjectReferencesQuery.mockReturnValue(
-      query([{ id: 9, title: 'Misty forest', fileName: 'forest.png' }]) as never
+      query([
+        {
+          id: 9,
+          title: 'Misty forest',
+          fileName: 'forest.png',
+          links: [],
+          levelNames: [],
+          characterNames: [],
+        },
+      ]) as never
     )
     api.createProjectLevel.mockResolvedValue({ id: 4 } as never)
     api.createProductionNote.mockResolvedValue({ id: 5 } as never)

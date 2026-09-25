@@ -63,7 +63,7 @@ public class ProjectStudioCommandTests
     }
 
     [Fact]
-    public async Task UpdateReference_ReturnsAssociationIdTitleAndLevel()
+    public async Task UpdateReference_ReturnsAssociationIdAndTitle()
     {
         var reference = ProjectConceptImage.Create(1, 10, 3, Now);
         typeof(ProjectConceptImage).GetProperty(nameof(ProjectConceptImage.Id))!
@@ -74,44 +74,104 @@ public class ProjectStudioCommandTests
         typeof(ProjectConceptImage).GetProperty(nameof(ProjectConceptImage.File))!
             .SetValue(reference, file);
         var references = new Mock<IProjectReferenceRepository>();
-        var levels = new Mock<IProjectLevelRepository>();
         references.Setup(r => r.GetByIdAsync(1, 8, It.IsAny<CancellationToken>()))
             .ReturnsAsync(reference);
-        levels.Setup(r => r.GetByIdAsync(1, 2, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(ProjectLevel.Create(1, "Forest Crossing", null, ProjectLevelStatuses.Planned, 0, Now));
         var handler = new UpdateProjectReferenceCommandHandler(
-            levels.Object,
             references.Object,
             new Mock<IUnitOfWork>().Object);
 
         var result = await handler.Handle(
-            new UpdateProjectReferenceCommand(1, 8, "Misty crossing", 2),
+            new UpdateProjectReferenceCommand(1, 8, "Misty crossing"),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(8, result.Value.Id);
         Assert.Equal("Misty crossing", result.Value.Title);
-        Assert.Equal(2, result.Value.ProjectLevelId);
+        Assert.Empty(result.Value.Links);
     }
 
     [Fact]
-    public async Task UpdateReference_WhenLevelIsNotInRouteProject_IsRefused()
+    public async Task AddReferenceLink_LinksImageToLevelAndCharacterAndRefusesDuplicates()
     {
+        var reference = ProjectConceptImage.Create(1, 10, 0, Now);
+        typeof(ProjectConceptImage).GetProperty(nameof(ProjectConceptImage.Id))!
+            .SetValue(reference, 8);
         var references = new Mock<IProjectReferenceRepository>();
         var levels = new Mock<IProjectLevelRepository>();
+        var characters = new Mock<IProjectCharacterRepository>();
         references.Setup(r => r.GetByIdAsync(1, 8, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(ProjectConceptImage.Create(1, 10, 0, Now));
-        var handler = new UpdateProjectReferenceCommandHandler(
+            .ReturnsAsync(reference);
+        levels.Setup(r => r.GetByIdAsync(1, 2, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ProjectLevel.Create(1, "Forest Crossing", null, ProjectLevelStatuses.Planned, 0, Now));
+        var handler = new AddProjectReferenceLinkCommandHandler(
             levels.Object,
+            characters.Object,
             references.Object,
-            new Mock<IUnitOfWork>().Object);
+            new Mock<IUnitOfWork>().Object,
+            Clock());
+
+        var levelLink = await handler.Handle(
+            new AddProjectReferenceLinkCommand(1, 8, 2, null),
+            CancellationToken.None);
+
+        Assert.True(levelLink.IsSuccess);
+        Assert.Equal(ProjectReferenceLink.LevelTarget, levelLink.Value.TargetType);
+        Assert.Equal(2, levelLink.Value.ProjectLevelId);
+
+        var duplicate = await handler.Handle(
+            new AddProjectReferenceLinkCommand(1, 8, 2, null),
+            CancellationToken.None);
+
+        Assert.True(duplicate.IsFailure);
+        Assert.Equal("InvalidProjectReferenceLink", duplicate.Error.Code);
+    }
+
+    [Fact]
+    public async Task AddReferenceLink_WhenTargetIsNotInRouteProject_IsRefused()
+    {
+        var reference = ProjectConceptImage.Create(1, 10, 0, Now);
+        typeof(ProjectConceptImage).GetProperty(nameof(ProjectConceptImage.Id))!
+            .SetValue(reference, 8);
+        var references = new Mock<IProjectReferenceRepository>();
+        references.Setup(r => r.GetByIdAsync(1, 8, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(reference);
+        var handler = new AddProjectReferenceLinkCommandHandler(
+            new Mock<IProjectLevelRepository>().Object,
+            new Mock<IProjectCharacterRepository>().Object,
+            references.Object,
+            new Mock<IUnitOfWork>().Object,
+            Clock());
 
         var result = await handler.Handle(
-            new UpdateProjectReferenceCommand(1, 8, "Misty crossing", 99),
+            new AddProjectReferenceLinkCommand(1, 8, 99, null),
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("ProjectReferenceLevelNotFound", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task AddReferenceLink_WhenBothTargetsAreSupplied_IsRefused()
+    {
+        var reference = ProjectConceptImage.Create(1, 10, 0, Now);
+        typeof(ProjectConceptImage).GetProperty(nameof(ProjectConceptImage.Id))!
+            .SetValue(reference, 8);
+        var references = new Mock<IProjectReferenceRepository>();
+        references.Setup(r => r.GetByIdAsync(1, 8, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(reference);
+        var handler = new AddProjectReferenceLinkCommandHandler(
+            new Mock<IProjectLevelRepository>().Object,
+            new Mock<IProjectCharacterRepository>().Object,
+            references.Object,
+            new Mock<IUnitOfWork>().Object,
+            Clock());
+
+        var result = await handler.Handle(
+            new AddProjectReferenceLinkCommand(1, 8, 2, 4),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("InvalidProjectReferenceLink", result.Error.Code);
     }
 
     private static CreateProductionNoteCommandHandler CreateNoteHandler(

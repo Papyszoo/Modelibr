@@ -4,7 +4,10 @@ using SharedKernel;
 
 namespace Application.Projects;
 
-public sealed record GetProjectReferencesQuery(int ProjectId, int? LevelId = null)
+public sealed record GetProjectReferencesQuery(
+    int ProjectId,
+    int? LevelId = null,
+    int? CharacterId = null)
     : IQuery<IReadOnlyList<ProjectReferenceDto>>;
 
 internal sealed class GetProjectReferencesQueryHandler
@@ -24,6 +27,7 @@ internal sealed class GetProjectReferencesQueryHandler
         var references = await _references.GetForProjectAsync(
             query.ProjectId,
             query.LevelId,
+            query.CharacterId,
             cancellationToken);
         return Result.Success<IReadOnlyList<ProjectReferenceDto>>(references
             .Select(ProjectReferenceView.From)

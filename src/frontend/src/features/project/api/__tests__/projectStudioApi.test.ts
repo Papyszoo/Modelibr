@@ -3,12 +3,14 @@ import { client } from '@/lib/apiBase'
 import {
   addCharacterAbility,
   addCharacterVariant,
+  addProjectReferenceLink,
   createProductionNote,
   createProjectCharacter,
   createProjectLevel,
   getProductionNotes,
   getProjectCharacters,
   getProjectReferences,
+  removeProjectReferenceLink,
   updateCharacterVariant,
   updateProjectReference,
 } from '../projectStudioApi'
@@ -16,12 +18,14 @@ import {
 const mockGet = client.get as jest.Mock
 const mockPost = client.post as jest.Mock
 const mockPut = client.put as jest.Mock
+const mockDelete = client.delete as jest.Mock
 
 beforeEach(() => {
   jest.clearAllMocks()
   mockGet.mockResolvedValue({ data: [] })
   mockPost.mockResolvedValue({ data: { id: 1 } })
   mockPut.mockResolvedValue({ data: { id: 1 } })
+  mockDelete.mockResolvedValue({ data: undefined })
 })
 
 describe('Project Studio API', () => {
@@ -51,19 +55,32 @@ describe('Project Studio API', () => {
     )
 
     mockGet.mockResolvedValueOnce({ data: [{ id: 9 }] })
-    await getProjectReferences(7, 3)
+    await getProjectReferences(7, { levelId: 3 })
     expect(mockGet).toHaveBeenCalledWith('/projects/7/references?levelId=3')
+
+    mockGet.mockResolvedValueOnce({ data: [{ id: 11 }] })
+    await getProjectReferences(7, { characterId: 4 })
+    expect(mockGet).toHaveBeenCalledWith('/projects/7/references?characterId=4')
   })
 
-  it('updates a reference association without using the file id as the route id', async () => {
-    await updateProjectReference(7, 9, {
-      title: 'Lighting reference',
-      projectLevelId: 3,
-    })
+  it('titles a reference and manages target links through the reference route', async () => {
+    await updateProjectReference(7, 9, { title: 'Lighting reference' })
     expect(mockPut).toHaveBeenCalledWith('/projects/7/references/9', {
       title: 'Lighting reference',
+    })
+
+    await addProjectReferenceLink(7, 9, { projectLevelId: 3 })
+    expect(mockPost).toHaveBeenCalledWith('/projects/7/references/9/links', {
       projectLevelId: 3,
     })
+
+    await addProjectReferenceLink(7, 9, { projectCharacterId: 4 })
+    expect(mockPost).toHaveBeenCalledWith('/projects/7/references/9/links', {
+      projectCharacterId: 4,
+    })
+
+    await removeProjectReferenceLink(7, 9, 21)
+    expect(mockDelete).toHaveBeenCalledWith('/projects/7/references/9/links/21')
   })
 
   it('uses project-scoped character routes for the cast and its children', async () => {

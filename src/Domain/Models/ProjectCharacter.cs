@@ -8,6 +8,7 @@ public class ProjectCharacter : AggregateRoot
     private readonly List<CharacterAbility> _abilities = new();
     private readonly List<CharacterVariant> _variants = new();
     private readonly List<ProjectCharacterTag> _tags = new();
+    private readonly List<ProjectReferenceLink> _referenceLinks = new();
 
     public int Id { get; private set; }
     public int ProjectId { get; private set; }
@@ -74,6 +75,18 @@ public class ProjectCharacter : AggregateRoot
     }
 
     public ICollection<ProductionNote> Notes { get; } = new List<ProductionNote>();
+
+    /// <summary>Project reference images linked to this character.</summary>
+    public ICollection<ProjectReferenceLink> ReferenceLinks
+    {
+        get => _referenceLinks;
+        set
+        {
+            _referenceLinks.Clear();
+            if (value != null)
+                _referenceLinks.AddRange(value);
+        }
+    }
 
     public bool IsEnemy => Tags.Any(tag =>
         string.Equals(tag.NormalizedName, "enemy", StringComparison.Ordinal));

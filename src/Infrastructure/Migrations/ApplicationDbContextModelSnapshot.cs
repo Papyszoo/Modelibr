@@ -2049,9 +2049,6 @@ namespace Infrastructure.Migrations
                     b.Property<int>("ProjectId")
                         .HasColumnType("integer");
 
-                    b.Property<int?>("ProjectLevelId")
-                        .HasColumnType("integer");
-
                     b.Property<int>("SortOrder")
                         .HasColumnType("integer");
 
@@ -2068,8 +2065,6 @@ namespace Infrastructure.Migrations
                         .IsUnique();
 
                     b.HasIndex("ProjectId", "SortOrder");
-
-                    b.HasIndex("ProjectLevelId", "SortOrder");
 
                     b.ToTable("ProjectConceptImages");
                 });
@@ -2186,6 +2181,53 @@ namespace Infrastructure.Migrations
                     b.HasIndex("OptionId");
 
                     b.ToTable("ProjectProfileValues", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Models.ProjectReferenceLink", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("ProjectCharacterId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ProjectConceptImageId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ProjectId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("ProjectLevelId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectCharacterId");
+
+                    b.HasIndex("ProjectLevelId");
+
+                    b.HasIndex("ProjectConceptImageId", "ProjectCharacterId")
+                        .IsUnique()
+                        .HasFilter("\"ProjectCharacterId\" IS NOT NULL");
+
+                    b.HasIndex("ProjectConceptImageId", "ProjectLevelId")
+                        .IsUnique()
+                        .HasFilter("\"ProjectLevelId\" IS NOT NULL");
+
+                    b.HasIndex("ProjectId", "ProjectCharacterId");
+
+                    b.HasIndex("ProjectId", "ProjectLevelId");
+
+                    b.ToTable("ProjectReferenceLinks", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ProjectReferenceLinks_OneTarget", "(CASE WHEN \"ProjectLevelId\" IS NOT NULL THEN 1 ELSE 0 END) + (CASE WHEN \"ProjectCharacterId\" IS NOT NULL THEN 1 ELSE 0 END) = 1");
+                        });
                 });
 
             modelBuilder.Entity("Domain.Models.Scene", b =>
@@ -4110,16 +4152,9 @@ namespace Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Domain.Models.ProjectLevel", "ProjectLevel")
-                        .WithMany("ConceptImages")
-                        .HasForeignKey("ProjectLevelId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.Navigation("File");
 
                     b.Navigation("Project");
-
-                    b.Navigation("ProjectLevel");
                 });
 
             modelBuilder.Entity("Domain.Models.ProjectLevel", b =>
@@ -4148,6 +4183,31 @@ namespace Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Option");
+                });
+
+            modelBuilder.Entity("Domain.Models.ProjectReferenceLink", b =>
+                {
+                    b.HasOne("Domain.Models.ProjectCharacter", "ProjectCharacter")
+                        .WithMany("ReferenceLinks")
+                        .HasForeignKey("ProjectCharacterId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Domain.Models.ProjectConceptImage", "ReferenceImage")
+                        .WithMany("Links")
+                        .HasForeignKey("ProjectConceptImageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Models.ProjectLevel", "ProjectLevel")
+                        .WithMany("ReferenceLinks")
+                        .HasForeignKey("ProjectLevelId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("ProjectCharacter");
+
+                    b.Navigation("ProjectLevel");
+
+                    b.Navigation("ReferenceImage");
                 });
 
             modelBuilder.Entity("Domain.Models.Scene", b =>
@@ -4763,11 +4823,15 @@ namespace Infrastructure.Migrations
 
                     b.Navigation("Notes");
 
+                    b.Navigation("ReferenceLinks");
+
                     b.Navigation("Variants");
                 });
 
             modelBuilder.Entity("Domain.Models.ProjectConceptImage", b =>
                 {
+                    b.Navigation("Links");
+
                     b.Navigation("Notes");
                 });
 
@@ -4775,9 +4839,9 @@ namespace Infrastructure.Migrations
                 {
                     b.Navigation("CharacterVariants");
 
-                    b.Navigation("ConceptImages");
-
                     b.Navigation("Notes");
+
+                    b.Navigation("ReferenceLinks");
 
                     b.Navigation("Scenes");
                 });

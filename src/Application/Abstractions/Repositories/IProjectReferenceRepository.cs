@@ -8,6 +8,7 @@ public interface IProjectReferenceRepository
     Task<IEnumerable<ProjectConceptImage>> GetForProjectAsync(
         int projectId,
         int? levelId = null,
+        int? characterId = null,
         CancellationToken cancellationToken = default);
     Task UpdateAsync(ProjectConceptImage reference, CancellationToken cancellationToken = default);
 }

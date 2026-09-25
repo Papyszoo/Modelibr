@@ -46,10 +46,18 @@ public static class ProjectStudioEndpoints
 
         app.MapGet("/projects/{projectId:int}/references", GetProjectReferences)
             .WithName("Get Project References")
-            .WithSummary("List project reference images, optionally filtered by level");
+            .WithSummary("List project reference images, optionally filtered by level or character");
         app.MapPut("/projects/{projectId:int}/references/{referenceId:int}", UpdateProjectReference)
             .WithName("Update Project Reference")
-            .WithSummary("Title a reference image or move it between project and level scope");
+            .WithSummary("Title a reference image");
+        app.MapPost("/projects/{projectId:int}/references/{referenceId:int}/links", AddProjectReferenceLink)
+            .WithName("Add Project Reference Link")
+            .WithSummary("Link a reference image to a same-project level or character");
+        app.MapDelete(
+            "/projects/{projectId:int}/references/{referenceId:int}/links/{linkId:int}",
+            RemoveProjectReferenceLink)
+            .WithName("Remove Project Reference Link")
+            .WithSummary("Unlink a reference image from a level or character");
 
         app.MapPut("/scenes/{sceneId:int}/level", SetSceneLevel)
             .WithName("Set Scene Level")
@@ -179,9 +187,11 @@ public static class ProjectStudioEndpoints
     private static async Task<IResult> GetProjectReferences(
         int projectId,
         int? levelId,
+        int? characterId,
         IQueryHandler<GetProjectReferencesQuery, IReadOnlyList<ProjectReferenceDto>> handler,
         CancellationToken cancellationToken)
-        => Respond(await handler.Handle(new GetProjectReferencesQuery(projectId, levelId), cancellationToken));
+        => Respond(await handler.Handle(
+            new GetProjectReferencesQuery(projectId, levelId, characterId), cancellationToken));
 
     private static async Task<IResult> UpdateProjectReference(
         int projectId,
@@ -190,7 +200,35 @@ public static class ProjectStudioEndpoints
         ICommandHandler<UpdateProjectReferenceCommand, ProjectReferenceDto> handler,
         CancellationToken cancellationToken)
         => Respond(await handler.Handle(new UpdateProjectReferenceCommand(
-            projectId, referenceId, request.Title, request.ProjectLevelId), cancellationToken));
+            projectId, referenceId, request.Title), cancellationToken));
+
+    private static async Task<IResult> AddProjectReferenceLink(
+        int projectId,
+        int referenceId,
+        [FromBody] ProjectReferenceLinkRequest request,
+        ICommandHandler<AddProjectReferenceLinkCommand, ProjectReferenceLinkDto> handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.Handle(new AddProjectReferenceLinkCommand(
+            projectId, referenceId, request.ProjectLevelId, request.ProjectCharacterId), cancellationToken);
+        return result.IsSuccess
+            ? Results.Created(
+                $"/projects/{projectId}/references/{referenceId}/links",
+                result.Value)
+            : Respond(result.Error);
+    }
+
+    private static async Task<IResult> RemoveProjectReferenceLink(
+        int projectId,
+        int referenceId,
+        int linkId,
+        ICommandHandler<RemoveProjectReferenceLinkCommand> handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.Handle(
+            new RemoveProjectReferenceLinkCommand(projectId, referenceId, linkId), cancellationToken);
+        return result.IsSuccess ? Results.NoContent() : Respond(result.Error);
+    }
 
     private static async Task<IResult> SetSceneLevel(
         int sceneId,
@@ -216,6 +254,8 @@ public static class ProjectStudioEndpoints
             or "ProjectLevelNotFound"
             or "ProductionNoteNotFound"
             or "ProjectReferenceNotFound"
+            or "ProjectReferenceLinkNotFound"
+            or "ProjectCharacterNotFound"
             or "SceneNotFound"
             ? Results.NotFound(body)
             : Results.BadRequest(body);
@@ -236,7 +276,9 @@ public sealed record ProductionNoteRequest(
     string Body,
     bool IsPinned);
 
-public sealed record ProjectReferenceRequest(string? Title, int? ProjectLevelId);
+public sealed record ProjectReferenceRequest(string? Title);
+
+public sealed record ProjectReferenceLinkRequest(int? ProjectLevelId, int? ProjectCharacterId);
 
 public sealed record SetSceneLevelRequest(
     int? ProjectLevelId,

@@ -1069,20 +1069,48 @@ export async function ensureDemoDataShape(): Promise<void> {
         changed = true
       }
     }
+    if (!Array.isArray(project.referenceLinks)) {
+      project.referenceLinks = []
+      changed = true
+    }
     for (const image of project.conceptImages) {
       if (typeof image.id !== 'number') {
         image.id = image.fileId
-        changed = true
-      }
-      if (typeof image.projectLevelId === 'undefined') {
-        image.projectLevelId = null
         changed = true
       }
       if (typeof image.title !== 'string') {
         image.title = ''
         changed = true
       }
+      // Same backfill the real migration performs: the old single scope column
+      // becomes one link row, and the column stops being meaningful.
+      if (image.projectLevelId != null) {
+        project.referenceLinks.push({
+          id: await nextId('projectReferenceLinks'),
+          projectId: project.id,
+          referenceImageId: image.id,
+          projectLevelId: image.projectLevelId,
+          projectCharacterId: null,
+          createdAt: now(),
+        })
+        image.projectLevelId = null
+        changed = true
+      }
     }
+    project.referenceLinks = project.referenceLinks.filter(link => {
+      const image = project.conceptImages.find(
+        candidate => candidate.id === link.referenceImageId
+      )
+      const levelExists =
+        link.projectLevelId == null ||
+        (project.levels ?? []).some(level => level.id === link.projectLevelId)
+      const characterExists =
+        link.projectCharacterId == null ||
+        (project.characters ?? []).some(
+          character => character.id === link.projectCharacterId
+        )
+      return Boolean(image) && levelExists && characterExists
+    })
     if (!Array.isArray(project.models)) {
       project.models = []
       changed = true

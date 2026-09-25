@@ -97,6 +97,7 @@ namespace Infrastructure.Persistence
         public DbSet<ModelTag> ModelTags => Set<ModelTag>();
         public DbSet<ModelConceptImage> ModelConceptImages => Set<ModelConceptImage>();
         public DbSet<ProjectConceptImage> ProjectConceptImages => Set<ProjectConceptImage>();
+        public DbSet<ProjectReferenceLink> ProjectReferenceLinks => Set<ProjectReferenceLink>();
         public DbSet<Stage> Stages => Set<Stage>();
         public DbSet<Scene> Scenes => Set<Scene>();
         public DbSet<SceneRender> SceneRenders => Set<SceneRender>();
@@ -1057,7 +1058,6 @@ namespace Infrastructure.Persistence
             modelBuilder.Entity<ProjectConceptImage>(entity =>
             {
                 entity.HasKey(ci => ci.Id);
-                entity.Property(ci => ci.ProjectLevelId).IsRequired(false);
                 entity.Property(ci => ci.Title).IsRequired().HasMaxLength(200);
                 entity.Property(ci => ci.SortOrder).IsRequired();
                 entity.Property(ci => ci.CreatedAt).IsRequired();
@@ -1067,14 +1067,49 @@ namespace Infrastructure.Persistence
                     .HasForeignKey(ci => ci.FileId)
                     .OnDelete(DeleteBehavior.Cascade);
 
-                entity.HasOne(ci => ci.ProjectLevel)
-                    .WithMany(level => level.ConceptImages)
-                    .HasForeignKey(ci => ci.ProjectLevelId)
-                    .OnDelete(DeleteBehavior.SetNull);
-
                 entity.HasIndex(ci => new { ci.ProjectId, ci.FileId }).IsUnique();
                 entity.HasIndex(ci => new { ci.ProjectId, ci.SortOrder });
-                entity.HasIndex(ci => new { ci.ProjectLevelId, ci.SortOrder });
+            });
+
+            modelBuilder.Entity<ProjectReferenceLink>(entity =>
+            {
+                entity.ToTable("ProjectReferenceLinks", table =>
+                    table.HasCheckConstraint(
+                        "CK_ProjectReferenceLinks_OneTarget",
+                        "(CASE WHEN \"ProjectLevelId\" IS NOT NULL THEN 1 ELSE 0 END) + (CASE WHEN \"ProjectCharacterId\" IS NOT NULL THEN 1 ELSE 0 END) = 1"));
+
+                entity.HasKey(link => link.Id);
+                entity.Property(link => link.ProjectId).IsRequired();
+                entity.Property(link => link.ProjectConceptImageId).IsRequired();
+                entity.Property(link => link.ProjectLevelId).IsRequired(false);
+                entity.Property(link => link.ProjectCharacterId).IsRequired(false);
+                entity.Property(link => link.CreatedAt).IsRequired();
+
+                entity.HasOne(link => link.ReferenceImage)
+                    .WithMany(reference => reference.Links)
+                    .HasForeignKey(link => link.ProjectConceptImageId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(link => link.ProjectLevel)
+                    .WithMany(level => level.ReferenceLinks)
+                    .HasForeignKey(link => link.ProjectLevelId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasOne(link => link.ProjectCharacter)
+                    .WithMany(character => character.ReferenceLinks)
+                    .HasForeignKey(link => link.ProjectCharacterId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                // Filtered indexes: a level link and a character link are separate
+                // namespaces, and NULLs are distinct in a plain composite index.
+                entity.HasIndex(link => new { link.ProjectConceptImageId, link.ProjectLevelId })
+                    .IsUnique()
+                    .HasFilter("\"ProjectLevelId\" IS NOT NULL");
+                entity.HasIndex(link => new { link.ProjectConceptImageId, link.ProjectCharacterId })
+                    .IsUnique()
+                    .HasFilter("\"ProjectCharacterId\" IS NOT NULL");
+                entity.HasIndex(link => new { link.ProjectId, link.ProjectLevelId });
+                entity.HasIndex(link => new { link.ProjectId, link.ProjectCharacterId });
             });
 
             // Configure Stage entity

@@ -56,7 +56,6 @@ internal class GetProjectByIdQueryHandler : IQueryHandler<GetProjectByIdQuery, P
                 .Select(ci => new ProjectConceptImageDto
                 {
                     Id = ci.Id,
-                    ProjectLevelId = ci.ProjectLevelId,
                     Title = ci.Title,
                     FileId = ci.FileId,
                     FileName = ci.File.OriginalFileName,
@@ -198,7 +197,6 @@ public record ProjectDetailDto
 public record ProjectConceptImageDto
 {
     public int Id { get; init; }
-    public int? ProjectLevelId { get; init; }
     public string Title { get; init; } = string.Empty;
     public int FileId { get; init; }
     public string FileName { get; init; } = string.Empty;

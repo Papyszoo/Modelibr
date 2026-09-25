@@ -1166,21 +1166,59 @@ export const containerHandlers = [
     if (!project) return new HttpResponse(null, { status: 404 })
     const url = new URL(request.url)
     const levelId = url.searchParams.get('levelId')
+    const characterId = url.searchParams.get('characterId')
+    const links = project.referenceLinks ?? []
     const references = (project.conceptImages ?? [])
-      .filter(
-        image => levelId === null || image.projectLevelId === Number(levelId)
-      )
-      .map(image => ({
-        id: image.id ?? image.fileId,
-        projectId: project.id,
-        projectLevelId: image.projectLevelId ?? null,
-        title: image.title ?? '',
-        fileId: image.fileId,
-        fileName: image.fileName,
-        previewUrl: image.previewUrl,
-        fileUrl: image.fileUrl,
-        sortOrder: image.sortOrder,
-      }))
+      .filter(image => {
+        const imageLinks = links.filter(
+          link => link.referenceImageId === (image.id ?? image.fileId)
+        )
+        if (levelId !== null) {
+          return imageLinks.some(
+            link => link.projectLevelId === Number(levelId)
+          )
+        }
+        if (characterId !== null) {
+          return imageLinks.some(
+            link => link.projectCharacterId === Number(characterId)
+          )
+        }
+        return true
+      })
+      .map(image => {
+        const imageLinks = links
+          .filter(link => link.referenceImageId === (image.id ?? image.fileId))
+          .map(link => ({
+            id: link.id,
+            targetType: link.projectLevelId != null ? 'level' : 'character',
+            projectLevelId: link.projectLevelId,
+            projectLevelName:
+              project.levels?.find(level => level.id === link.projectLevelId)
+                ?.name ?? null,
+            projectCharacterId: link.projectCharacterId,
+            projectCharacterName:
+              project.characters?.find(
+                character => character.id === link.projectCharacterId
+              )?.name ?? null,
+          }))
+        return {
+          id: image.id ?? image.fileId,
+          projectId: project.id,
+          title: image.title ?? '',
+          fileId: image.fileId,
+          fileName: image.fileName,
+          previewUrl: image.previewUrl,
+          fileUrl: image.fileUrl,
+          sortOrder: image.sortOrder,
+          links: imageLinks,
+          levelNames: imageLinks
+            .map(link => link.projectLevelName)
+            .filter((name): name is string => Boolean(name)),
+          characterNames: imageLinks
+            .map(link => link.projectCharacterName)
+            .filter((name): name is string => Boolean(name)),
+        }
+      })
     return HttpResponse.json(references)
   }),
 
@@ -1192,24 +1230,126 @@ export const containerHandlers = [
         image => (image.id ?? image.fileId) === Number(params.referenceId)
       )
       if (!project || !reference) return new HttpResponse(null, { status: 404 })
-      const body = (await request.json()) as {
-        title?: string | null
-        projectLevelId?: number | null
-      }
+      const body = (await request.json()) as { title?: string | null }
       reference.title = body.title ?? ''
-      reference.projectLevelId = body.projectLevelId ?? null
       await put('projects', project)
       return HttpResponse.json({
         id: reference.id ?? reference.fileId,
         projectId: project.id,
-        projectLevelId: reference.projectLevelId,
         title: reference.title,
         fileId: reference.fileId,
         fileName: reference.fileName,
         previewUrl: reference.previewUrl,
         fileUrl: reference.fileUrl,
         sortOrder: reference.sortOrder,
+        links: [],
+        levelNames: [],
+        characterNames: [],
       })
+    }
+  ),
+
+  http.post(
+    '*/projects/:id/references/:referenceId/links',
+    async ({ params, request }) => {
+      const project = await getById('projects', Number(params.id))
+      const reference = project?.conceptImages?.find(
+        image => (image.id ?? image.fileId) === Number(params.referenceId)
+      )
+      if (!project || !reference) return new HttpResponse(null, { status: 404 })
+      const body = (await request.json()) as {
+        projectLevelId?: number | null
+        projectCharacterId?: number | null
+      }
+      const targets = [body.projectLevelId, body.projectCharacterId].filter(
+        value => value != null
+      )
+      if (targets.length !== 1) {
+        return HttpResponse.json(
+          { error: 'InvalidProjectReferenceLink' },
+          { status: 400 }
+        )
+      }
+      if (
+        body.projectLevelId != null &&
+        !(project.levels ?? []).some(level => level.id === body.projectLevelId)
+      ) {
+        return HttpResponse.json(
+          { error: 'ProjectReferenceLevelNotFound' },
+          { status: 404 }
+        )
+      }
+      if (
+        body.projectCharacterId != null &&
+        !(project.characters ?? []).some(
+          character => character.id === body.projectCharacterId
+        )
+      ) {
+        return HttpResponse.json(
+          { error: 'ProjectReferenceCharacterNotFound' },
+          { status: 404 }
+        )
+      }
+      const referenceImageId = reference.id ?? reference.fileId
+      const links = project.referenceLinks ?? []
+      const duplicate = links.some(
+        link =>
+          link.referenceImageId === referenceImageId &&
+          link.projectLevelId === (body.projectLevelId ?? null) &&
+          link.projectCharacterId === (body.projectCharacterId ?? null)
+      )
+      if (duplicate) {
+        return HttpResponse.json(
+          { error: 'InvalidProjectReferenceLink' },
+          { status: 400 }
+        )
+      }
+      const link = {
+        id: await nextId('projectReferenceLinks'),
+        projectId: project.id,
+        referenceImageId,
+        projectLevelId: body.projectLevelId ?? null,
+        projectCharacterId: body.projectCharacterId ?? null,
+        createdAt: now(),
+      }
+      project.referenceLinks = [...links, link]
+      await put('projects', project)
+      return HttpResponse.json(
+        {
+          id: link.id,
+          targetType: link.projectLevelId != null ? 'level' : 'character',
+          projectLevelId: link.projectLevelId,
+          projectLevelName:
+            project.levels?.find(level => level.id === link.projectLevelId)
+              ?.name ?? null,
+          projectCharacterId: link.projectCharacterId,
+          projectCharacterName:
+            project.characters?.find(
+              character => character.id === link.projectCharacterId
+            )?.name ?? null,
+        },
+        { status: 201 }
+      )
+    }
+  ),
+
+  http.delete(
+    '*/projects/:id/references/:referenceId/links/:linkId',
+    async ({ params }) => {
+      const project = await getById('projects', Number(params.id))
+      if (!project) return new HttpResponse(null, { status: 404 })
+      const before = project.referenceLinks?.length ?? 0
+      project.referenceLinks = (project.referenceLinks ?? []).filter(
+        link => link.id !== Number(params.linkId)
+      )
+      if (project.referenceLinks.length === before) {
+        return HttpResponse.json(
+          { error: 'ProjectReferenceLinkNotFound' },
+          { status: 404 }
+        )
+      }
+      await put('projects', project)
+      return new HttpResponse(null, { status: 204 })
     }
   ),
 

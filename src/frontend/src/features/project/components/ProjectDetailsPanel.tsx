@@ -6,22 +6,13 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { type z } from 'zod'
 
+import { uploadFile } from '@/features/models/api/modelApi'
 import {
-  getFilePreviewUrl,
-  getFileUrl,
-  uploadFile,
-} from '@/features/models/api/modelApi'
-import {
-  addProjectConceptImage,
-  removeProjectConceptImage,
   setProjectCustomThumbnail,
   updateProject,
 } from '@/features/project/api/projectApi'
-import { updateProjectReference } from '@/features/project/api/projectStudioApi'
-import { useProjectLevelsQuery } from '@/features/project/api/projectStudioQueries'
 import { useTabUiState } from '@/hooks/useTabUiState'
 import { resolveApiAssetUrl } from '@/lib/apiBase'
-import { ImageLightboxDialog } from '@/shared/components/ImageLightboxDialog'
 import { projectDetailsFormSchema } from '@/shared/validation/formSchemas'
 import { type ProjectDetailDto } from '@/types'
 
@@ -61,11 +52,6 @@ export function ProjectDetailsPanel({
 }: ProjectDetailsPanelProps) {
   const queryClient = useQueryClient()
   const thumbnailInputRef = useRef<HTMLInputElement | null>(null)
-  const conceptInputRef = useRef<HTMLInputElement | null>(null)
-  const levelsQuery = useProjectLevelsQuery(project.id)
-  const [activeConceptImageIndex, setActiveConceptImageIndex] = useState<
-    number | null
-  >(null)
   const tabStateKey = tabId ?? `project-${project.id}`
   const [storedOverviewState, setStoredOverviewState] =
     useTabUiState<StoredOverviewState | null>(
@@ -224,53 +210,8 @@ export function ProjectDetailsPanel({
     },
   })
 
-  const conceptMutation = useMutation({
-    mutationFn: async (files: File[]) => {
-      for (const file of files) {
-        const upload = await uploadFile(file, { uploadType: 'file' })
-        await addProjectConceptImage(project.id, upload.fileId)
-      }
-    },
-    onSuccess: async () => {
-      await invalidate()
-      showToast({
-        severity: 'success',
-        summary: 'Uploaded',
-        detail: 'Project concept images updated.',
-        life: 2500,
-      })
-    },
-  })
-
-  const referenceMutation = useMutation({
-    mutationFn: (input: { referenceId: number; levelId: number | null }) =>
-      updateProjectReference(project.id, input.referenceId, {
-        projectLevelId: input.levelId,
-      }),
-    onSuccess: async () => {
-      await invalidate()
-    },
-  })
-
-  const removeConceptMutation = useMutation({
-    mutationFn: (fileId: number) =>
-      removeProjectConceptImage(project.id, fileId),
-    onSuccess: async () => {
-      await invalidate()
-    },
-  })
-
   const onSave = handleSubmit(values => updateMutation.mutate(values))
   const thumbnailUrl = resolveApiAssetUrl(project.customThumbnailUrl)
-  const lightboxImages = project.conceptImages.map(image => ({
-    id: image.fileId,
-    name: image.fileName,
-    previewUrl:
-      resolveApiAssetUrl(image.previewUrl) ||
-      getFilePreviewUrl(String(image.fileId)),
-    fullUrl:
-      resolveApiAssetUrl(image.fileUrl) || getFileUrl(String(image.fileId)),
-  }))
 
   return (
     <div className="container-rich-details">
@@ -327,108 +268,6 @@ export function ProjectDetailsPanel({
               />
             </div>
           </details>
-
-          <div className="container-rich-block">
-            <div className="container-rich-header-row">
-              <div>
-                <span className="container-rich-kicker">Concept Art</span>
-                <h3>Reference Board</h3>
-              </div>
-              <Button
-                label="Add Images"
-                icon="pi pi-images"
-                className="p-button-outlined"
-                onClick={() => conceptInputRef.current?.click()}
-                disabled={conceptMutation.isPending}
-              />
-            </div>
-
-            <input
-              ref={conceptInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              hidden
-              onChange={async event => {
-                const files = Array.from(event.target.files ?? [])
-                if (files.length > 0) {
-                  conceptMutation.mutate(files)
-                }
-                event.target.value = ''
-              }}
-            />
-
-            <ImageLightboxDialog
-              visible={activeConceptImageIndex !== null}
-              title="Project concept image"
-              images={lightboxImages}
-              activeIndex={activeConceptImageIndex ?? 0}
-              onIndexChange={setActiveConceptImageIndex}
-              onHide={() => setActiveConceptImageIndex(null)}
-            />
-
-            {project.conceptImages.length === 0 ? (
-              <div className="container-empty-media">
-                <i className="pi pi-images" />
-                <p>No concept images yet.</p>
-              </div>
-            ) : (
-              <div className="container-media-grid">
-                {project.conceptImages.map((image, index) => (
-                  <div key={image.fileId} className="container-media-card">
-                    <button
-                      type="button"
-                      className="container-media-preview"
-                      aria-label={`Open concept image ${image.fileName}`}
-                      onClick={() => setActiveConceptImageIndex(index)}
-                    >
-                      <img
-                        src={
-                          resolveApiAssetUrl(image.previewUrl) ||
-                          getFilePreviewUrl(String(image.fileId))
-                        }
-                        alt={image.fileName}
-                      />
-                    </button>
-                    <div className="container-media-card-footer">
-                      <span title={image.fileName}>{image.fileName}</span>
-                      {image.id && (levelsQuery.data?.length ?? 0) > 0 ? (
-                        <select
-                          aria-label={`Level for ${image.fileName}`}
-                          value={image.projectLevelId ?? ''}
-                          onChange={event =>
-                            referenceMutation.mutate({
-                              referenceId: image.id!,
-                              levelId: event.target.value
-                                ? Number(event.target.value)
-                                : null,
-                            })
-                          }
-                        >
-                          <option value="">Project-wide</option>
-                          {(levelsQuery.data ?? []).map(level => (
-                            <option key={level.id} value={level.id}>
-                              {level.name}
-                            </option>
-                          ))}
-                        </select>
-                      ) : null}
-                      <Button
-                        icon="pi pi-times"
-                        text
-                        rounded
-                        severity="danger"
-                        onClick={event => {
-                          event.stopPropagation()
-                          removeConceptMutation.mutate(image.fileId)
-                        }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
 
         <aside className="container-rich-side">

@@ -36,9 +36,12 @@ export function useProductionNotesQuery(
   })
 }
 
-export function useProjectReferencesQuery(projectId: number, levelId?: number) {
+export function useProjectReferencesQuery(
+  projectId: number,
+  options: { levelId?: number; characterId?: number } = {}
+) {
   return useQuery({
-    queryKey: ['projects', projectId, 'references', levelId ?? null],
-    queryFn: () => getProjectReferences(projectId, levelId),
+    queryKey: ['projects', projectId, 'references', options],
+    queryFn: () => getProjectReferences(projectId, options),
   })
 }

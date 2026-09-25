@@ -25,6 +25,7 @@ import {
 } from '@/shared/components/feedback'
 
 import { ProjectCharactersSection } from './ProjectCharactersSection'
+import { ProjectReferenceBoard } from './ProjectReferenceBoard'
 
 interface ProjectStudioSectionProps {
   projectId: number
@@ -386,6 +387,7 @@ export function ProjectStudioSection({
         </section>
       </div>
       <ProjectCharactersSection projectId={projectId} onChanged={onChanged} />
+      <ProjectReferenceBoard projectId={projectId} onChanged={onChanged} />
     </div>
   )
 }

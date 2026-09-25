@@ -6,9 +6,9 @@ namespace Domain.Models;
 public class ProjectLevel : AggregateRoot
 {
     private readonly List<Scene> _scenes = new();
-    private readonly List<ProjectConceptImage> _conceptImages = new();
     private readonly List<ProductionNote> _notes = new();
     private readonly List<CharacterVariant> _characterVariants = new();
+    private readonly List<ProjectReferenceLink> _referenceLinks = new();
 
     public int Id { get; private set; }
     public int ProjectId { get; private set; }
@@ -31,13 +31,14 @@ public class ProjectLevel : AggregateRoot
         }
     }
 
-    public ICollection<ProjectConceptImage> ConceptImages
+    /// <summary>Reference images linked to this level through <see cref="ProjectReferenceLink"/>.</summary>
+    public ICollection<ProjectReferenceLink> ReferenceLinks
     {
-        get => _conceptImages;
+        get => _referenceLinks;
         set
         {
-            _conceptImages.Clear();
-            if (value is not null) _conceptImages.AddRange(value);
+            _referenceLinks.Clear();
+            if (value is not null) _referenceLinks.AddRange(value);
         }
     }
 

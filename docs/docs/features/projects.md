@@ -69,14 +69,27 @@ production context above the asset sections:
 - **Notes & ideas** are plain-text notes. Pinning a note marks it as an idea;
   a note can target the Project, one Level, one reference image, or one
   Character.
-- **References** are the existing concept images, now addressable by their
-  association ID so titles and Level scope can be updated without replacing the
-  underlying library file.
+- **References** are the project's concept images, gathered on one Reference
+  Board. Every image can be titled, linked to any number of Levels and
+  Characters, annotated with its own notes, and removed from the project while
+  the underlying file stays in your library. The old single "level scope" per
+  image is now a set of links, so one mood board can serve several levels and
+  several characters at once.
 
 Character editors open one section at a time - identity, notes, media, abilities,
 variants - and each create action sits behind a `+`, so the default view stays a
 scannable list of the cast. Deleting a character removes its production links
 and notes; the linked files, models, and levels stay in the library.
+
+### Reference links
+
+The Reference Board links images to targets through
+`POST /projects/{projectId}/references/{referenceId}/links` with exactly one of
+`projectLevelId` or `projectCharacterId`. Both targets in one request is a
+`400 InvalidProjectReferenceLink`; an unknown target is a `404`. Deleting a Level
+or a Character unlinks the image instead of removing it
+(`SetNull` on the link), and removing a level link that a rollback cannot express
+is reported rather than silently dropped.
 
 The first slice keeps the existing asset sections intact while making the
 Project-level context visible in the same place. Level assets are derived from

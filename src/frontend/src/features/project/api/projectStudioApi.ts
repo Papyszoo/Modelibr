@@ -144,9 +144,36 @@ export interface CharacterVariantRequest {
   sortOrder?: number
 }
 
+export interface ProjectReferenceLinkDto {
+  id: number
+  targetType: 'level' | 'character'
+  projectLevelId: number | null
+  projectLevelName: string | null
+  projectCharacterId: number | null
+  projectCharacterName: string | null
+}
+
+export interface ProjectReferenceDto {
+  id: number
+  projectId: number
+  title: string
+  fileId: number
+  fileName: string
+  previewUrl: string
+  fileUrl: string
+  sortOrder: number
+  links: ProjectReferenceLinkDto[]
+  levelNames: string[]
+  characterNames: string[]
+}
+
 export interface ProjectReferenceRequest {
   title?: string | null
+}
+
+export interface ProjectReferenceLinkRequest {
   projectLevelId?: number | null
+  projectCharacterId?: number | null
 }
 
 export async function getProjectLevels(
@@ -201,6 +228,9 @@ export async function getProductionNotes(
   if (options.levelId !== undefined) {
     params.set('levelId', String(options.levelId))
   }
+  if (options.referenceImageId !== undefined) {
+    params.set('referenceImageId', String(options.referenceImageId))
+  }
   if (options.characterId !== undefined) {
     params.set('characterId', String(options.characterId))
   }
@@ -246,10 +276,13 @@ export async function deleteProductionNote(
 
 export async function getProjectReferences(
   projectId: number,
-  levelId?: number
+  options: { levelId?: number; characterId?: number } = {}
 ): Promise<ProjectReferenceDto[]> {
   const params = new URLSearchParams()
-  if (levelId !== undefined) params.set('levelId', String(levelId))
+  if (options.levelId !== undefined)
+    params.set('levelId', String(options.levelId))
+  if (options.characterId !== undefined)
+    params.set('characterId', String(options.characterId))
   const query = params.toString()
   const response = await client.get<ProjectReferenceDto[]>(
     `/projects/${projectId}/references${query ? `?${query}` : ''}`
@@ -267,6 +300,28 @@ export async function updateProjectReference(
     request
   )
   return response.data
+}
+
+export async function addProjectReferenceLink(
+  projectId: number,
+  referenceId: number,
+  request: ProjectReferenceLinkRequest
+): Promise<ProjectReferenceLinkDto> {
+  const response = await client.post<ProjectReferenceLinkDto>(
+    `/projects/${projectId}/references/${referenceId}/links`,
+    request
+  )
+  return response.data
+}
+
+export async function removeProjectReferenceLink(
+  projectId: number,
+  referenceId: number,
+  linkId: number
+): Promise<void> {
+  await client.delete(
+    `/projects/${projectId}/references/${referenceId}/links/${linkId}`
+  )
 }
 
 export async function getProjectCharacters(
