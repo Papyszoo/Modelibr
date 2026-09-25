@@ -276,6 +276,26 @@ public sealed class BackupService : IBackupService
             Error: null);
     }
 
+    public BackupToolAvailability GetToolAvailability()
+    {
+        foreach (var tool in new[] { _postgresTools.PgDumpPath, _postgresTools.PsqlPath })
+        {
+            // A bare executable name (the Docker/PATH fallback) is resolved by the OS at
+            // launch; we deliberately do not probe PATH here so a missing system install
+            // still surfaces as a real backup failure. Only an explicitly configured
+            // absolute path can be checked cheaply and without side effects.
+            if (Path.IsPathRooted(tool) && !File.Exists(tool))
+            {
+                return new BackupToolAvailability(
+                    false,
+                    $"'{tool}' is configured but does not exist. The packaged PostgreSQL " +
+                    "runtime is missing its client tools, so no backup can be produced.");
+            }
+        }
+
+        return new BackupToolAvailability(true, null);
+    }
+
     public void CleanupSnapshots(string fileNamePrefix, int keepCount)
     {
         if (string.IsNullOrWhiteSpace(fileNamePrefix))

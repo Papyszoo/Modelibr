@@ -126,7 +126,11 @@ public static class DatabaseExtensions
         }
     }
 
-    private static async Task TakePreMigrationBackupAsync(
+    /// <summary>
+    /// Internal (not private) so the orchestration contract can be unit-tested without a
+    /// live database - the integration suite covers the full migration path.
+    /// </summary>
+    internal static async Task TakePreMigrationBackupAsync(
         IServiceProvider services,
         ILogger logger,
         IConfiguration configuration)
@@ -142,6 +146,22 @@ public static class DatabaseExtensions
         }
 
         var backupService = services.GetRequiredService<IBackupService>();
+
+        // A packaging gap is not a backup failure. If the deployment was never shipped
+        // the client tools, refusing to start would leave the app permanently unusable,
+        // which is strictly worse than proceeding without an automatic snapshot - so we
+        // say so loudly and continue. A backup that actually runs and then fails still
+        // aborts below: that is a real loss of the safety net.
+        var availability = backupService.GetToolAvailability();
+        if (!availability.Available)
+        {
+            logger.LogCritical(
+                "{Reason} Skipping the automatic pre-migration backup and applying pending " +
+                "migrations without one. Take a manual backup before upgrading, or install " +
+                "the PostgreSQL client tools, to restore this protection.",
+                availability.Reason);
+            return;
+        }
 
         try
         {

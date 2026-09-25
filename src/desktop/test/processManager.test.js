@@ -220,3 +220,57 @@ test('web api environment uses bundled PostgreSQL tools and keeps pre-migration 
   assert.equal(env.POSTGRES_PASSWORD, 'modelibr')
   assert.equal(env.MODELIBR_SKIP_PREMIGRATION_BACKUP, 'false')
 })
+
+test('web api environment omits client-tool paths the runtime does not ship', () => {
+  // The packaged runtime is a trimmed embedded PostgreSQL: bin/ holds only
+  // initdb, pg_ctl and postgres. Advertising PG_DUMP_PATH for a file that does
+  // not exist turns "this build has no client tools" into a bogus backup
+  // failure, so the vars must be absent instead.
+  const pm = makePM({ postgresPort: 35432 })
+  pm.markRunning()
+  pm.postgresToolsAvailable = false
+
+  const env = pm.buildWebApiEnvironment()
+
+  assert.equal('PG_DUMP_PATH' in env, false)
+  assert.equal('PSQL_PATH' in env, false)
+  // Everything else the WebApi needs is unaffected.
+  assert.equal(env.POSTGRES_HOST, '127.0.0.1')
+  assert.equal(env.MODELIBR_SKIP_PREMIGRATION_BACKUP, 'false')
+})
+
+test('a runtime without the client tools still passes the asset check', async () => {
+  // Regression guard for the 0.6.1 desktop break: pg_dump/psql were listed as
+  // required assets, so every packaged build threw "Missing runtime asset" and
+  // the app refused to start.
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'mlbr-runtime-'))
+  const runtimeDir = path.join(root, 'runtime')
+  const exe = name => (process.platform === 'win32' ? `${name}.exe` : name)
+  const touch = async relative => {
+    const target = path.join(runtimeDir, relative)
+    await fs.mkdir(path.dirname(target), { recursive: true })
+    await fs.writeFile(target, '')
+  }
+
+  try {
+    await touch('frontend/index.html')
+    await touch(`webapi/${exe('WebApi')}`)
+    await touch(`node/${exe('node')}`)
+    await touch('asset-processor/index.js')
+    await touch(`postgres/bin/${exe('pg_ctl')}`)
+    await touch(`postgres/bin/${exe('initdb')}`)
+
+    const pm = new ProcessManager({
+      runtimeDir,
+      userDataDir: path.join(root, 'userdata'),
+      config: sanitizeRuntimeConfig({}),
+      log: () => {},
+    })
+
+    await pm.ensureRuntimeAssets()
+
+    assert.equal(pm.postgresToolsAvailable, false)
+  } finally {
+    await fs.rm(root, { recursive: true, force: true })
+  }
+})

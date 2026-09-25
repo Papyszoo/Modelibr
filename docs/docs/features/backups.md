@@ -60,6 +60,15 @@ migrations on every startup and, if there are any, takes an automatic backup
   unprotected migration. The application log explains why. This is
   intentional - a failed pre-migration backup usually means something (disk
   space, permissions) needs attention before it's safe to proceed.
+- **If the tooling is missing**: a different case, handled separately. If
+  `pg_dump`/`psql` were never shipped in this build's PostgreSQL runtime, the
+  snapshot is skipped with a loud `CRITICAL` log line and migrations still
+  apply. Aborting startup on a packaging gap would leave the app permanently
+  unable to launch, which is worse than proceeding without an automatic
+  snapshot - but you lose that protection, so take a manual backup before
+  upgrading. This is the current state of the packaged desktop build, whose
+  embedded PostgreSQL ships only the server binaries; manual backups in that
+  build are affected the same way.
 
 ### Configuration
 

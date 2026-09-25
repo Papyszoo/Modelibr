@@ -50,6 +50,54 @@ public sealed class BackupServiceTests
     }
 
     [Fact]
+    public void GetToolAvailability_MissingConfiguredPath_ReportsUnavailable()
+    {
+        // The packaged desktop runtime is a trimmed embedded PostgreSQL whose bin/
+        // holds only initdb, pg_ctl and postgres. Pointing PG_DUMP_PATH at the bin
+        // that does not exist must be reported as "tooling not shipped" so startup
+        // can degrade instead of aborting.
+        var (service, _) = NewService(new Dictionary<string, string?>
+        {
+            ["PG_DUMP_PATH"] = Path.Combine(Path.GetTempPath(), "definitely", "absent", "pg_dump"),
+        });
+
+        var availability = service.GetToolAvailability();
+
+        Assert.False(availability.Available);
+        Assert.Contains("pg_dump", availability.Reason);
+    }
+
+    [Fact]
+    public void GetToolAvailability_BareNamesOnPath_AssumesAvailable()
+    {
+        // Docker/source mode resolves bare names through PATH; probing PATH here
+        // would turn an ordinary missing system install into a silent skip.
+        var (service, _) = NewService();
+
+        Assert.True(service.GetToolAvailability().Available);
+    }
+
+    [Fact]
+    public void GetToolAvailability_ExistingConfiguredPath_ReportsAvailable()
+    {
+        var tool = Path.Combine(Path.GetTempPath(), $"pg_dump_{Guid.NewGuid():N}");
+        File.WriteAllText(tool, string.Empty);
+        try
+        {
+            var (service, _) = NewService(new Dictionary<string, string?>
+            {
+                ["PG_DUMP_PATH"] = tool,
+            });
+
+            Assert.True(service.GetToolAvailability().Available);
+        }
+        finally
+        {
+            File.Delete(tool);
+        }
+    }
+
+    [Fact]
     public void CleanupSnapshots_KeepsNewestWithinPrefix_DeletesOlderOnes()
     {
         var (service, root) = NewService();

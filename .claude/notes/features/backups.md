@@ -55,7 +55,34 @@ Two lessons:
 2. Neither the unit suites nor the backup/restore drill can see this. The drill
    runs the API against a full PostgreSQL **image**; the defect is in the
    desktop `ProcessManager` against a trimmed runtime. The gate that caught it
-   was the installer job's integration step - which runs *after* the tag, so a
+   was the installer job's integration step - which runs _after_ the tag, so a
    green unit run is not release evidence for the desktop app.
+
+## Fixed in 0.6.2 (verified locally, not just in CI)
+
+`pg_dump`/`psql` are optional again, and the two failure modes are separated:
+
+- `ProcessManager.ensureRuntimeAssets` only requires the server binaries
+  (`initdb`/`pg_ctl`); it probes the client tools and records
+  `postgresToolsAvailable` instead of throwing.
+- `PG_DUMP_PATH`/`PSQL_PATH` are exported only when the tools exist, so the API
+  never sees a path to a file that isn't there.
+- `BackupService.GetToolAvailability()` reports "configured but missing" for an
+  absolute path that doesn't exist, leaving bare-name/PATH deployments alone.
+- `DatabaseExtensions.TakePreMigrationBackupAsync` **skips with a CRITICAL log**
+  when the tooling was never shipped, and still **aborts** when a backup that ran
+  actually failed.
+
+Verified by staging the real zonky runtime locally (`bin/` = the same three
+binaries) and running `npm run test:integration` in `src/desktop` - the exact
+step that failed in CI now passes. The unit lane also gained
+`PreMigrationBackupGateTests` (database-free) and desktop tests for both
+env-var states, so this specific regression can no longer hide behind Docker
+suites.
+
+The remaining gap is deliberate and documented: automatic pre-migration backups
+do not work in the packaged desktop build until the client tools are bundled.
+Bundling them (a separate client artifact, not the server package) is the
+follow-up.
 
 Related: [[desktop-installer.md]]

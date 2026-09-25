@@ -87,7 +87,27 @@ public interface IBackupService
     /// user-initiated backups.
     /// </summary>
     void CleanupSnapshots(string fileNamePrefix, int keepCount);
+
+    /// <summary>
+    /// Reports whether the PostgreSQL client tooling (<c>pg_dump</c>/<c>psql</c>) this
+    /// deployment would actually invoke exists.
+    ///
+    /// This exists to separate two very different failures. A backup that runs and
+    /// fails is a safety problem and must abort startup. Tooling that was never shipped
+    /// - e.g. a trimmed embedded PostgreSQL distribution that carries only
+    /// <c>initdb</c>/<c>pg_ctl</c>/<c>postgres</c> - is a packaging gap, and aborting
+    /// startup on it would leave the app permanently unable to start. Callers that
+    /// need to degrade gracefully should consult this first.
+    /// </summary>
+    BackupToolAvailability GetToolAvailability();
 }
+
+/// <summary>
+/// Outcome of probing the configured PostgreSQL client tooling. <see cref="Reason"/>
+/// is operator-facing: it names the missing path so the warning in the log says which
+/// file to install rather than failing with a bare "file not found".
+/// </summary>
+public sealed record BackupToolAvailability(bool Available, string? Reason);
 
 /// <summary>
 /// Canonical backup manifest written into every archive as <c>manifest.json</c>.
