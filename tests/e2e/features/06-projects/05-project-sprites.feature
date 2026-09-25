@@ -12,7 +12,7 @@ Feature: Project Sprite Associations
     
     # Verify: UI shows the sprite in the project
     When I open the project "Project Sprite Test"
-    Then the project has at least 1 sprite
+    Then the project "Project Sprite Test" has at least 1 sprite
     And I take a screenshot of project with sprite
 
   @remove
@@ -25,7 +25,7 @@ Feature: Project Sprite Associations
     
     # Test: Remove sprite via UI
     When I open the project "Project Sprite Remove Test"
-    And the project has at least 1 sprite
+    And the project "Project Sprite Remove Test" has at least 1 sprite
     When I remove the first sprite from the project
-    Then the project sprite count should be 0
+    Then the project "Project Sprite Remove Test" sprite count should be 0
     And I take a screenshot of project after sprite removed

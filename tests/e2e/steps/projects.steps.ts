@@ -11,14 +11,14 @@ const API_BASE = process.env.API_BASE_URL || "http://localhost:8090";
 const apiHelper = new ApiHelper(API_BASE);
 
 function getProjectThumbnailFileId(
-    page: Page,
-    projectName: string,
+  page: Page,
+  projectName: string,
 ): number | null {
-    return (
-        getScenarioState(page).getCustom<number>(
-            `projectThumbnailFileId:${projectName}`,
-        ) ?? null
-    );
+  return (
+    getScenarioState(page).getCustom<number>(
+      `projectThumbnailFileId:${projectName}`,
+    ) ?? null
+  );
 }
 
 /**
@@ -27,595 +27,560 @@ function getProjectThumbnailFileId(
  * but ScenarioState doesn't persist across Playwright projects.
  */
 async function resolveModel(page: Page, modelStateName: string) {
-    let model = getScenarioState(page).getModel(modelStateName);
-    if (model) return model;
+  let model = getScenarioState(page).getModel(modelStateName);
+  if (model) return model;
 
-    console.log(
-        `[AutoProvision] Model "${modelStateName}" not in shared state, looking up in DB...`,
-    );
-    const { DbHelper } = await import("../fixtures/db-helper");
-    const db = new DbHelper();
-    try {
-        const result = await db.query(
-            `SELECT m."Id", m."Name", mv."Id" as "VersionId"
+  console.log(
+    `[AutoProvision] Model "${modelStateName}" not in shared state, looking up in DB...`,
+  );
+  const { DbHelper } = await import("../fixtures/db-helper");
+  const db = new DbHelper();
+  try {
+    const result = await db.query(
+      `SELECT m."Id", m."Name", mv."Id" as "VersionId"
              FROM "Models" m
              JOIN "ModelVersions" mv ON mv."ModelId" = m."Id"
              WHERE m."DeletedAt" IS NULL
              ORDER BY m."CreatedAt" DESC
              LIMIT 1`,
-        );
-        if (result.rows.length > 0) {
-            model = {
-                id: result.rows[0].Id,
-                name: result.rows[0].Name,
-                versionId: result.rows[0].VersionId,
-            };
-            getScenarioState(page).saveModel(modelStateName, model);
-            console.log(
-                `[AutoProvision] Found model "${model.name}" (ID: ${model.id}) in DB for "${modelStateName}"`,
-            );
-            return model;
-        }
-    } finally {
-        await db.close();
+    );
+    if (result.rows.length > 0) {
+      model = {
+        id: result.rows[0].Id,
+        name: result.rows[0].Name,
+        versionId: result.rows[0].VersionId,
+      };
+      getScenarioState(page).saveModel(modelStateName, model);
+      console.log(
+        `[AutoProvision] Found model "${model.name}" (ID: ${model.id}) in DB for "${modelStateName}"`,
+      );
+      return model;
     }
-    return null;
+  } finally {
+    await db.close();
+  }
+  return null;
 }
 
 // Navigation steps
 Given("I am on the project list page", async ({ page }) => {
-    const projectsPage = new ProjectsPage(page);
-    await projectsPage.navigateToProjectList();
-    console.log("[Navigation] On project list page");
+  const projectsPage = new ProjectsPage(page);
+  await projectsPage.navigateToProjectList();
+  console.log("[Navigation] On project list page");
 });
 
 Given("I navigate to the project list", async ({ page }) => {
-    const projectsPage = new ProjectsPage(page);
-    await projectsPage.navigateToProjectList();
-    console.log("[Navigation] Navigated to Project List");
+  const projectsPage = new ProjectsPage(page);
+  await projectsPage.navigateToProjectList();
+  console.log("[Navigation] Navigated to Project List");
 });
 
 Given(
-    "I am on the project viewer for {string}",
-    async ({ page }, projectName: string) => {
-        const project = getScenarioState(page).getProject(projectName);
+  "I am on the project viewer for {string}",
+  async ({ page }, projectName: string) => {
+    const project = getScenarioState(page).getProject(projectName);
 
-        if (!project) {
-            throw new Error(
-                `Project "${projectName}" not found in shared state`,
-            );
-        }
+    if (!project) {
+      throw new Error(`Project "${projectName}" not found in shared state`);
+    }
 
-        // Navigate to project list with retry logic for lazy chunk loading
-        const projectsPage = new ProjectsPage(page);
-        await projectsPage.navigateToProjectList();
+    // Navigate to project list with retry logic for lazy chunk loading
+    const projectsPage = new ProjectsPage(page);
+    await projectsPage.navigateToProjectList();
 
-        // Find and double-click the project card to open viewer
-        const projectCard = page.locator(
-            `.project-grid-card[data-project-id="${project.id}"]`,
-        );
-        await projectCard.waitFor({ state: "visible", timeout: 30000 });
-        await projectCard.dblclick();
+    // Find and double-click the project card to open viewer
+    const projectCard = page.locator(
+      `.project-grid-card[data-project-id="${project.id}"]`,
+    );
+    await projectCard.waitFor({ state: "visible", timeout: 30000 });
+    await projectCard.dblclick();
 
-        // Wait for project viewer content to fully load
-        await page
-            .locator(".container-viewer")
-            .first()
-            .waitFor({ state: "visible", timeout: 15000 });
+    // Wait for project viewer content to fully load
+    await page
+      .locator(".container-viewer")
+      .first()
+      .waitFor({ state: "visible", timeout: 15000 });
 
-        console.log(
-            `[Navigation] Opened project viewer for "${projectName}" (ID: ${project.id})`,
-        );
-    },
+    console.log(
+      `[Navigation] Opened project viewer for "${projectName}" (ID: ${project.id})`,
+    );
+  },
 );
 
 // Project existence checks
 Given("the project {string} exists", async ({ page }, projectName: string) => {
-    if (!getScenarioState(page).hasProject(projectName)) {
-        // Self-provision: create or find the project via API
-        console.log(
-            `[AutoProvision] Project "${projectName}" not in shared state, creating via API...`,
+  if (!getScenarioState(page).hasProject(projectName)) {
+    // Self-provision: create or find the project via API
+    console.log(
+      `[AutoProvision] Project "${projectName}" not in shared state, creating via API...`,
+    );
+    const API = process.env.API_BASE_URL || "http://localhost:8090";
+    const response = await page.request.post(`${API}/projects`, {
+      data: { name: projectName, description: "" },
+    });
+    if (response.ok()) {
+      const data = await response.json();
+      getScenarioState(page).saveProject(projectName, {
+        id: data.id,
+        name: projectName,
+      });
+      console.log(
+        `[AutoProvision] Created project "${projectName}" (ID: ${data.id})`,
+      );
+    } else {
+      // Project likely already exists (created by setup or another worker)
+      const listResp = await page.request.get(`${API}/projects`);
+      const projectsResp = await listResp.json();
+      const projectList = Array.isArray(projectsResp)
+        ? projectsResp
+        : projectsResp.projects || projectsResp.items || [];
+      const existing = projectList.find((p: any) => p.name === projectName);
+      if (!existing) {
+        throw new Error(
+          `Failed to auto-provision project "${projectName}": ${response.status()} and not found via GET`,
         );
-        const API = process.env.API_BASE_URL || "http://localhost:8090";
-        const response = await page.request.post(`${API}/projects`, {
-            data: { name: projectName, description: "" },
-        });
-        if (response.ok()) {
-            const data = await response.json();
-            getScenarioState(page).saveProject(projectName, {
-                id: data.id,
-                name: projectName,
-            });
-            console.log(
-                `[AutoProvision] Created project "${projectName}" (ID: ${data.id})`,
-            );
-        } else {
-            // Project likely already exists (created by setup or another worker)
-            const listResp = await page.request.get(`${API}/projects`);
-            const projectsResp = await listResp.json();
-            const projectList = Array.isArray(projectsResp)
-                ? projectsResp
-                : projectsResp.projects || projectsResp.items || [];
-            const existing = projectList.find(
-                (p: any) => p.name === projectName,
-            );
-            if (!existing) {
-                throw new Error(
-                    `Failed to auto-provision project "${projectName}": ${response.status()} and not found via GET`,
-                );
-            }
-            getScenarioState(page).saveProject(projectName, {
-                id: existing.id,
-                name: projectName,
-            });
-            console.log(
-                `[AutoProvision] Found existing project "${projectName}" (ID: ${existing.id})`,
-            );
-        }
+      }
+      getScenarioState(page).saveProject(projectName, {
+        id: existing.id,
+        name: projectName,
+      });
+      console.log(
+        `[AutoProvision] Found existing project "${projectName}" (ID: ${existing.id})`,
+      );
     }
-    console.log(`[SharedState] Verified project exists: ${projectName}`);
+  }
+  console.log(`[SharedState] Verified project exists: ${projectName}`);
 });
 
 // Create project steps
 When(
-    "I create a project named {string} with description {string}",
-    async ({ page }, name: string, description: string) => {
-        const projectsPage = new ProjectsPage(page);
-        const projectInfo = await projectsPage.createProject(name, description);
-        getScenarioState(page).saveProject(name, projectInfo);
-        console.log(`[Action] Created and stored project "${name}"`);
-    },
+  "I create a project named {string} with description {string}",
+  async ({ page }, name: string, description: string) => {
+    const projectsPage = new ProjectsPage(page);
+    const projectInfo = await projectsPage.createProject(name, description);
+    getScenarioState(page).saveProject(name, projectInfo);
+    console.log(`[Action] Created and stored project "${name}"`);
+  },
 );
 
 When(
-    "I create a project named {string} without description",
-    async ({ page }, name: string) => {
-        const projectsPage = new ProjectsPage(page);
-        const projectInfo = await projectsPage.createProject(name);
-        getScenarioState(page).saveProject(name, projectInfo);
-        console.log(
-            `[Action] Created and stored project "${name}" (no description)`,
-        );
-    },
+  "I create a project named {string} without description",
+  async ({ page }, name: string) => {
+    const projectsPage = new ProjectsPage(page);
+    const projectInfo = await projectsPage.createProject(name);
+    getScenarioState(page).saveProject(name, projectInfo);
+    console.log(
+      `[Action] Created and stored project "${name}" (no description)`,
+    );
+  },
 );
 
 When(
-    "I create a project named {string} with description {string} and notes {string}",
-    async ({ page }, name: string, description: string, notes: string) => {
-        const projectsPage = new ProjectsPage(page);
-        const projectInfo = await projectsPage.createProject(
-            name,
-            description,
-            {
-                notes,
-            },
-        );
-        getScenarioState(page).saveProject(name, projectInfo);
-        console.log(`[Action] Created and stored project "${name}" with notes`);
-    },
+  "I create a project named {string} with description {string} and notes {string}",
+  async ({ page }, name: string, description: string, notes: string) => {
+    const projectsPage = new ProjectsPage(page);
+    const projectInfo = await projectsPage.createProject(name, description, {
+      notes,
+    });
+    getScenarioState(page).saveProject(name, projectInfo);
+    console.log(`[Action] Created and stored project "${name}" with notes`);
+  },
 );
 
 // Open project
 When("I open the project {string}", async ({ page }, projectName: string) => {
-    const projectsPage = new ProjectsPage(page);
-    const project = getScenarioState(page).getProject(projectName);
-    await projectsPage.openProject(projectName, project?.id);
-    console.log(
-        `[Action] Opened project "${projectName}"${project?.id ? ` (id=${project.id})` : ""}`,
-    );
+  const projectsPage = new ProjectsPage(page);
+  const project = getScenarioState(page).getProject(projectName);
+  await projectsPage.openProject(projectName, project?.id);
+  console.log(
+    `[Action] Opened project "${projectName}"${project?.id ? ` (id=${project.id})` : ""}`,
+  );
 });
 
 // Delete project
 When("I delete the project {string}", async ({ page }, projectName: string) => {
-    const projectsPage = new ProjectsPage(page);
-    const project = getScenarioState(page).getProject(projectName);
-    await projectsPage.deleteProject(projectName, project?.id);
-    console.log(`[Action] Deleted project "${projectName}"`);
+  const projectsPage = new ProjectsPage(page);
+  const project = getScenarioState(page).getProject(projectName);
+  await projectsPage.deleteProject(projectName, project?.id);
+  console.log(`[Action] Deleted project "${projectName}"`);
 });
 
 When(
-    "I cancel deleting the project {string}",
-    async ({ page }, projectName: string) => {
-        const projectsPage = new ProjectsPage(page);
-        const project = getScenarioState(page).getProject(projectName);
-        await projectsPage.cancelProjectDeletion(projectName, project?.id);
-        console.log(`[Action] Cancelled project deletion for "${projectName}"`);
-    },
+  "I cancel deleting the project {string}",
+  async ({ page }, projectName: string) => {
+    const projectsPage = new ProjectsPage(page);
+    const project = getScenarioState(page).getProject(projectName);
+    await projectsPage.cancelProjectDeletion(projectName, project?.id);
+    console.log(`[Action] Cancelled project deletion for "${projectName}"`);
+  },
 );
 
 When(
-    "I upload the image {string} as the custom thumbnail for project {string}",
-    async ({ page }, fileName: string, projectName: string) => {
-        const project = getScenarioState(page).getProject(projectName);
-        if (!project) {
-            throw new Error(
-                `Project "${projectName}" not found in shared state`,
-            );
-        }
+  "I upload the image {string} as the custom thumbnail for project {string}",
+  async ({ page }, fileName: string, projectName: string) => {
+    const project = getScenarioState(page).getProject(projectName);
+    if (!project) {
+      throw new Error(`Project "${projectName}" not found in shared state`);
+    }
 
-        const filePath = await UniqueFileGenerator.generate(fileName);
-        const { fileId } = await apiHelper.uploadFile(filePath);
-        await apiHelper.setProjectCustomThumbnail(project.id, fileId);
-        getScenarioState(page).setCustom(
-            `projectThumbnailFileId:${projectName}`,
-            fileId,
-        );
+    const filePath = await UniqueFileGenerator.generate(fileName);
+    const { fileId } = await apiHelper.uploadFile(filePath);
+    await apiHelper.setProjectCustomThumbnail(project.id, fileId);
+    getScenarioState(page).setCustom(
+      `projectThumbnailFileId:${projectName}`,
+      fileId,
+    );
 
-        await expect
-            .poll(
-                async () => {
-                    const response = await page.request.get(
-                        `${API_BASE}/projects/${project.id}`,
-                    );
-                    if (!response.ok()) {
-                        return "";
-                    }
-                    const data = await response.json();
-                    return data.customThumbnailUrl ?? "";
-                },
-                {
-                    message: `Waiting for project \"${projectName}\" thumbnail URL to update`,
-                    timeout: 15000,
-                    intervals: [500, 1000, 2000],
-                },
-            )
-            .toContain(`/files/${fileId}`);
+    await expect
+      .poll(
+        async () => {
+          const response = await page.request.get(
+            `${API_BASE}/projects/${project.id}`,
+          );
+          if (!response.ok()) {
+            return "";
+          }
+          const data = await response.json();
+          return data.customThumbnailUrl ?? "";
+        },
+        {
+          message: `Waiting for project \"${projectName}\" thumbnail URL to update`,
+          timeout: 15000,
+          intervals: [500, 1000, 2000],
+        },
+      )
+      .toContain(`/files/${fileId}`);
 
-        console.log(
-            `[Action] Uploaded custom thumbnail for project "${projectName}" (fileId: ${fileId})`,
-        );
-    },
+    console.log(
+      `[Action] Uploaded custom thumbnail for project "${projectName}" (fileId: ${fileId})`,
+    );
+  },
 );
 
 // Add model to project
 When(
-    "I add model {string} to the project",
-    async ({ page }, modelStateName: string) => {
-        const model = await resolveModel(page, modelStateName);
+  "I add model {string} to the project",
+  async ({ page }, modelStateName: string) => {
+    const model = await resolveModel(page, modelStateName);
 
-        if (!model) {
-            throw new Error(
-                `Model "${modelStateName}" not found in shared state or DB`,
-            );
-        }
+    if (!model) {
+      throw new Error(
+        `Model "${modelStateName}" not found in shared state or DB`,
+      );
+    }
 
-        // Click Models tab first, then find Add Model card
-        await page
-            .locator('[data-testid="container-tab-models"]')
-            .click();
+    // Click Models tab first, then find Add Model card
+    await page.locator('[data-testid="container-tab-models"]').click();
 
-        const addModelCard = page.locator(".model-card-add").first();
-        await addModelCard.waitFor({ state: "visible", timeout: 10000 });
-        await addModelCard.click();
-        console.log("[Action] Clicked Add Model card");
+    const addModelCard = page.locator(".model-card-add").first();
+    await addModelCard.waitFor({ state: "visible", timeout: 10000 });
+    await addModelCard.click();
+    console.log("[Action] Clicked Add Model card");
 
-        // Wait for dialog  - could be "Add Models to Project" or "Add Models to Pack"
-        await page.waitForSelector('.p-dialog:has-text("Add Models")', {
-            state: "visible",
-            timeout: 5000,
-        });
-        console.log("[Action] Add Models dialog opened");
+    // Wait for dialog  - could be "Add Models to Project" or "Add Models to Pack"
+    await page.waitForSelector('.p-dialog:has-text("Add Models")', {
+      state: "visible",
+      timeout: 5000,
+    });
+    console.log("[Action] Add Models dialog opened");
 
-        const modelName = model.name;
+    const modelName = model.name;
 
-        // Click directly on model name text, then click its grandparent (the clickable container)
-        // Use .first() because multiple models may share the same name (e.g. "test-cube")
-        const modelText = page
-            .locator(".p-dialog")
-            .getByText(modelName, { exact: true })
-            .first();
-        await modelText.waitFor({ state: "visible", timeout: 5000 });
+    // Click directly on model name text, then click its grandparent (the clickable container)
+    // Use .first() because multiple models may share the same name (e.g. "test-cube")
+    const modelText = page
+      .locator(".p-dialog")
+      .getByText(modelName, { exact: true })
+      .first();
+    await modelText.waitFor({ state: "visible", timeout: 5000 });
 
-        try {
-            // Click the text element's grandparent (the clickable container)
-            await modelText.locator("..").locator("..").click();
-            console.log(`[Action] Clicked container for model: ${modelName}`);
-        } catch (e) {
-            // Fallback: Click directly on the text
-            await modelText.click();
-            console.log(`[Action] Clicked model text: ${modelName}`);
-        }
+    try {
+      // Click the text element's grandparent (the clickable container)
+      await modelText.locator("..").locator("..").click();
+      console.log(`[Action] Clicked container for model: ${modelName}`);
+    } catch (e) {
+      // Fallback: Click directly on the text
+      await modelText.click();
+      console.log(`[Action] Clicked model text: ${modelName}`);
+    }
 
-        // Wait for selection to register in the Add button
-        const addButton = page
-            .locator('.p-dialog-footer button:has-text("Add Selected")')
-            .first();
-        await expect(addButton).not.toContainText("(0)", { timeout: 5000 });
+    // Wait for selection to register in the Add button
+    const addButton = page
+      .locator('.p-dialog-footer button:has-text("Add Selected")')
+      .first();
+    await expect(addButton).not.toContainText("(0)", { timeout: 5000 });
 
-        const buttonText = await addButton.textContent();
-        console.log(`[Action] Add button text: ${buttonText}`);
+    const buttonText = await addButton.textContent();
+    console.log(`[Action] Add button text: ${buttonText}`);
 
-        await addButton.click();
-        console.log("[Action] Clicked Add button");
+    await addButton.click();
+    console.log("[Action] Clicked Add button");
 
-        await page.waitForSelector('.p-dialog:has-text("Add Models")', {
-            state: "hidden",
-            timeout: 10000,
-        });
-        console.log("[Action] Dialog closed");
+    await page.waitForSelector('.p-dialog:has-text("Add Models")', {
+      state: "hidden",
+      timeout: 10000,
+    });
+    console.log("[Action] Dialog closed");
 
-        // Wait for model card to appear in project after adding
-        await expect(
-            page.locator(`.model-card[data-model-id="${model.id}"]`),
-        ).toBeVisible({ timeout: 10000 });
-        console.log(`[Action] Added model "${model.name}" to project`);
-    },
+    // Wait for model card to appear in project after adding
+    await expect(
+      page.locator(`.model-card[data-model-id="${model.id}"]`),
+    ).toBeVisible({ timeout: 10000 });
+    console.log(`[Action] Added model "${model.name}" to project`);
+  },
 );
 
 // Remove model from project
 When(
-    "I remove model {string} from the project",
-    async ({ page }, modelStateName: string) => {
-        const model = await resolveModel(page, modelStateName);
+  "I remove model {string} from the project",
+  async ({ page }, modelStateName: string) => {
+    const model = await resolveModel(page, modelStateName);
 
-        if (!model) {
-            throw new Error(
-                `Model "${modelStateName}" not found in shared state or DB`,
-            );
-        }
+    if (!model) {
+      throw new Error(
+        `Model "${modelStateName}" not found in shared state or DB`,
+      );
+    }
 
-        // Click Models tab first, then find and right-click model card
-        await page
-            .locator('[data-testid="container-tab-models"]')
-            .click();
+    // Click Models tab first, then find and right-click model card
+    await page.locator('[data-testid="container-tab-models"]').click();
 
-        const modelCard = page.locator(
-            `.model-card[data-model-id="${model.id}"]`,
-        );
-        await modelCard.waitFor({ state: "visible", timeout: 5000 });
-        await modelCard.click({ button: "right" });
-        console.log("[Action] Right-clicked on model card");
+    const modelCard = page.locator(`.model-card[data-model-id="${model.id}"]`);
+    await modelCard.waitFor({ state: "visible", timeout: 5000 });
+    await modelCard.click({ button: "right" });
+    console.log("[Action] Right-clicked on model card");
 
-        // Click remove option
-        const removeOption = page
-            .locator(
-                '.p-contextmenu-item:has-text("Remove from project"), .p-menuitem:has-text("Remove")',
-            )
-            .first();
-        await removeOption.waitFor({ state: "visible", timeout: 3000 });
-        await removeOption.click();
-        console.log("[Action] Clicked Remove from project");
+    // Click remove option
+    const removeOption = page
+      .locator(
+        '.p-contextmenu-item:has-text("Remove from project"), .p-menuitem:has-text("Remove")',
+      )
+      .first();
+    await removeOption.waitFor({ state: "visible", timeout: 3000 });
+    await removeOption.click();
+    console.log("[Action] Clicked Remove from project");
 
-        // Wait for model card to disappear after removal
-        await expect(modelCard).not.toBeVisible({ timeout: 5000 });
-        console.log(`[Action] Removed model "${model.name}" from project`);
-    },
+    // Wait for model card to disappear after removal
+    await expect(modelCard).not.toBeVisible({ timeout: 5000 });
+    console.log(`[Action] Removed model "${model.name}" from project`);
+  },
 );
 
 // Visibility assertions
 Then(
-    "the project {string} should be visible",
-    async ({ page }, projectName: string) => {
-        const projectsPage = new ProjectsPage(page);
-        const isVisible = await projectsPage.isProjectVisible(projectName);
-        expect(isVisible).toBe(true);
-        console.log(`[UI] Project "${projectName}" is visible ✓`);
-    },
+  "the project {string} should be visible",
+  async ({ page }, projectName: string) => {
+    const projectsPage = new ProjectsPage(page);
+    const isVisible = await projectsPage.isProjectVisible(projectName);
+    expect(isVisible).toBe(true);
+    console.log(`[UI] Project "${projectName}" is visible ✓`);
+  },
 );
 
 Then(
-    "the project {string} should not be visible",
-    async ({ page }, projectName: string) => {
-        const projectsPage = new ProjectsPage(page);
-        // Poll for visibility since deletion may take time to propagate
-        await expect
-            .poll(
-                async () => await projectsPage.isProjectVisible(projectName),
-                {
-                    message: `Waiting for project "${projectName}" to disappear`,
-                    timeout: 15000,
-                    intervals: [500, 1000, 2000],
-                },
-            )
-            .toBe(false);
-        console.log(`[UI] Project "${projectName}" is not visible ✓`);
-    },
+  "the project {string} should not be visible",
+  async ({ page }, projectName: string) => {
+    const projectsPage = new ProjectsPage(page);
+    // Poll for visibility since deletion may take time to propagate
+    await expect
+      .poll(async () => await projectsPage.isProjectVisible(projectName), {
+        message: `Waiting for project "${projectName}" to disappear`,
+        timeout: 15000,
+        intervals: [500, 1000, 2000],
+      })
+      .toBe(false);
+    console.log(`[UI] Project "${projectName}" is not visible ✓`);
+  },
 );
 
 Then(
-    "the project {string} should be stored in shared state",
-    async ({ page }, projectName: string) => {
-        expect(getScenarioState(page).hasProject(projectName)).toBe(true);
-        console.log(`[SharedState] Project "${projectName}" stored ✓`);
-    },
+  "the project {string} should be stored in shared state",
+  async ({ page }, projectName: string) => {
+    expect(getScenarioState(page).hasProject(projectName)).toBe(true);
+    console.log(`[SharedState] Project "${projectName}" stored ✓`);
+  },
 );
 
 Then("the project viewer should be visible", async ({ page }) => {
-    const projectViewer = page.locator(".container-viewer").first();
-    await expect(projectViewer).toBeVisible({ timeout: 10000 });
-    console.log("[UI] Project viewer is visible ✓");
+  const projectViewer = page.locator(".container-viewer").first();
+  await expect(projectViewer).toBeVisible({ timeout: 10000 });
+  console.log("[UI] Project viewer is visible ✓");
 });
 
 Then(
-    "I should see the project name {string}",
-    async ({ page }, projectName: string) => {
-        const nameElement = page
-            .locator(
-                `h2:has-text("${projectName}"), .project-title:has-text("${projectName}")`,
-            )
-            .first();
-        await expect(nameElement).toBeVisible({ timeout: 5000 });
-        console.log(`[UI] Project name "${projectName}" is displayed ✓`);
-    },
+  "I should see the project name {string}",
+  async ({ page }, projectName: string) => {
+    const nameElement = page
+      .locator(
+        `h2:has-text("${projectName}"), .project-title:has-text("${projectName}")`,
+      )
+      .first();
+    await expect(nameElement).toBeVisible({ timeout: 5000 });
+    console.log(`[UI] Project name "${projectName}" is displayed ✓`);
+  },
 );
 
 Then(
-    "the project {string} card should show notes {string}",
-    async ({ page }, projectName: string, notes: string) => {
-        const project = getScenarioState(page).getProject(projectName);
-        const projectCard = new ProjectsPage(page).getProjectCard(
-            projectName,
-            project?.id,
-        );
-        await expect(projectCard).toContainText(notes, { timeout: 10000 });
-        console.log(
-            `[UI] Project card "${projectName}" shows notes "${notes}" ✓`,
-        );
-    },
+  "the project {string} card should show notes {string}",
+  async ({ page }, projectName: string, notes: string) => {
+    const project = getScenarioState(page).getProject(projectName);
+    const projectCard = new ProjectsPage(page).getProjectCard(
+      projectName,
+      project?.id,
+    );
+    await expect(projectCard).toContainText(notes, { timeout: 10000 });
+    console.log(`[UI] Project card "${projectName}" shows notes "${notes}" ✓`);
+  },
 );
 
 Then(
-    "the project details should show notes {string}",
-    async ({ page }, notes: string) => {
-        const viewer = page.locator(".container-viewer").first();
-        await expect(viewer).toBeVisible({ timeout: 10000 });
-        await expect(viewer.locator("#project-notes")).toHaveValue(notes, {
-            timeout: 10000,
-        });
-        console.log(`[UI] Project details show notes "${notes}" ✓`);
-    },
+  "the project details should show notes {string}",
+  async ({ page }, notes: string) => {
+    const viewer = page.locator(".container-viewer").first();
+    await expect(viewer).toBeVisible({ timeout: 10000 });
+    await expect(viewer.locator("#project-notes")).toHaveValue(notes, {
+      timeout: 10000,
+    });
+    console.log(`[UI] Project details show notes "${notes}" ✓`);
+  },
 );
 
 Then(
-    "the project {string} card should render the uploaded custom thumbnail",
-    async ({ page }, projectName: string) => {
-        const project = getScenarioState(page).getProject(projectName);
-        const fileId = getProjectThumbnailFileId(page, projectName);
-        if (!project || fileId === null) {
-            throw new Error(
-                `Missing project or uploaded thumbnail state for "${projectName}"`,
-            );
-        }
+  "the project {string} card should render the uploaded custom thumbnail",
+  async ({ page }, projectName: string) => {
+    const project = getScenarioState(page).getProject(projectName);
+    const fileId = getProjectThumbnailFileId(page, projectName);
+    if (!project || fileId === null) {
+      throw new Error(
+        `Missing project or uploaded thumbnail state for "${projectName}"`,
+      );
+    }
 
-        const projectsPage = new ProjectsPage(page);
-        await projectsPage.navigateToProjectList();
-        await projectsPage.assertProjectCardCustomThumbnailLoaded(
-            projectName,
-            fileId,
-            project.id,
-        );
-    },
+    const projectsPage = new ProjectsPage(page);
+    await projectsPage.navigateToProjectList();
+    await projectsPage.assertProjectCardCustomThumbnailLoaded(
+      projectName,
+      fileId,
+      project.id,
+    );
+  },
 );
 
 Then(
-    "the project {string} details should render the uploaded custom thumbnail",
-    async ({ page }, projectName: string) => {
-        const fileId = getProjectThumbnailFileId(page, projectName);
-        if (fileId === null) {
-            throw new Error(
-                `Missing uploaded thumbnail state for project "${projectName}"`,
-            );
-        }
+  "the project {string} details should render the uploaded custom thumbnail",
+  async ({ page }, projectName: string) => {
+    const fileId = getProjectThumbnailFileId(page, projectName);
+    if (fileId === null) {
+      throw new Error(
+        `Missing uploaded thumbnail state for project "${projectName}"`,
+      );
+    }
 
-        const projectsPage = new ProjectsPage(page);
-        await projectsPage.assertProjectDetailCustomThumbnailLoaded(
-            projectName,
-            fileId,
-        );
-    },
+    const projectsPage = new ProjectsPage(page);
+    await projectsPage.assertProjectDetailCustomThumbnailLoaded(
+      projectName,
+      fileId,
+    );
+  },
 );
 
 // Model in project assertions
 Then(
-    "the project should contain model {string}",
-    async ({ page }, modelStateName: string) => {
-        const model = await resolveModel(page, modelStateName);
+  "the project should contain model {string}",
+  async ({ page }, modelStateName: string) => {
+    const model = await resolveModel(page, modelStateName);
 
-        if (!model) {
-            throw new Error(
-                `Model "${modelStateName}" not found in shared state or DB`,
-            );
-        }
+    if (!model) {
+      throw new Error(
+        `Model "${modelStateName}" not found in shared state or DB`,
+      );
+    }
 
-        // Click Models tab first
-        await page
-            .locator('[data-testid="container-tab-models"]')
-            .click();
+    // Click Models tab first
+    await page.locator('[data-testid="container-tab-models"]').click();
 
-        const modelCard = page.locator(
-            `.model-card[data-model-id="${model.id}"]`,
-        );
-        await expect(modelCard).toBeVisible({ timeout: 5000 });
-        console.log(`[UI] Project contains model "${model.name}" ✓`);
-    },
+    const modelCard = page.locator(`.model-card[data-model-id="${model.id}"]`);
+    await expect(modelCard).toBeVisible({ timeout: 5000 });
+    console.log(`[UI] Project contains model "${model.name}" ✓`);
+  },
 );
 
 Then(
-    "the project should not contain model {string}",
-    async ({ page }, modelStateName: string) => {
-        const model = await resolveModel(page, modelStateName);
+  "the project should not contain model {string}",
+  async ({ page }, modelStateName: string) => {
+    const model = await resolveModel(page, modelStateName);
 
-        if (!model) {
-            throw new Error(
-                `Model "${modelStateName}" not found in shared state or DB`,
-            );
-        }
+    if (!model) {
+      throw new Error(
+        `Model "${modelStateName}" not found in shared state or DB`,
+      );
+    }
 
-        // Click Models tab first
-        await page
-            .locator('[data-testid="container-tab-models"]')
-            .click();
+    // Click Models tab first
+    await page.locator('[data-testid="container-tab-models"]').click();
 
-        const modelCard = page.locator(
-            `.model-card[data-model-id="${model.id}"]`,
-        );
-        await expect(modelCard).not.toBeVisible({ timeout: 5000 });
-        console.log(`[UI] Project does not contain model "${model.name}" ✓`);
-    },
+    const modelCard = page.locator(`.model-card[data-model-id="${model.id}"]`);
+    await expect(modelCard).not.toBeVisible({ timeout: 5000 });
+    console.log(`[UI] Project does not contain model "${model.name}" ✓`);
+  },
 );
 
 // Precondition: project contains model
 Given(
-    "the project contains model {string}",
-    async ({ page }, modelStateName: string) => {
-        const model = await resolveModel(page, modelStateName);
+  "the project contains model {string}",
+  async ({ page }, modelStateName: string) => {
+    const model = await resolveModel(page, modelStateName);
 
-        if (!model) {
-            throw new Error(
-                `Model "${modelStateName}" not found in shared state or DB`,
-            );
-        }
+    if (!model) {
+      throw new Error(
+        `Model "${modelStateName}" not found in shared state or DB`,
+      );
+    }
 
-        // Click Models tab first
-        await page
-            .locator('[data-testid="container-tab-models"]')
-            .click();
+    // Click Models tab first
+    await page.locator('[data-testid="container-tab-models"]').click();
 
-        const modelCard = page.locator(
-            `.model-card[data-model-id="${model.id}"]`,
+    const modelCard = page.locator(`.model-card[data-model-id="${model.id}"]`);
+    // Wait for tab content to render, then check presence
+    const isPresent = await modelCard
+      .waitFor({ state: "visible", timeout: 5000 })
+      .then(() => true)
+      .catch(() => false);
+
+    if (!isPresent) {
+      // Auto-provision: add the model to the project via API
+      const project = getScenarioState(page).getProject("Test Project");
+      if (!project) {
+        throw new Error(
+          `Project "Test Project" not found in shared state. Cannot auto-add model.`,
         );
-        // Wait for tab content to render, then check presence
-        const isPresent = await modelCard
-            .waitFor({ state: "visible", timeout: 5000 })
-            .then(() => true)
-            .catch(() => false);
+      }
+      console.log(
+        `[AutoProvision] Model "${model.name}" not in project, adding via API...`,
+      );
+      const addResp = await page.request.post(
+        `${API_BASE}/projects/${project.id}/models/${model.id}`,
+      );
+      if (!addResp.ok()) {
+        throw new Error(
+          `Failed to add model ${model.id} to project ${project.id}: ${addResp.status()}`,
+        );
+      }
+      console.log(
+        `[AutoProvision] Added model "${model.name}" (ID: ${model.id}) to project (ID: ${project.id}) via API`,
+      );
 
-        if (!isPresent) {
-            // Auto-provision: add the model to the project via API
-            const project = getScenarioState(page).getProject("Test Project");
-            if (!project) {
-                throw new Error(
-                    `Project "Test Project" not found in shared state. Cannot auto-add model.`,
-                );
-            }
-            console.log(
-                `[AutoProvision] Model "${model.name}" not in project, adding via API...`,
-            );
-            const addResp = await page.request.post(
-                `${API_BASE}/projects/${project.id}/models/${model.id}`,
-            );
-            if (!addResp.ok()) {
-                throw new Error(
-                    `Failed to add model ${model.id} to project ${project.id}: ${addResp.status()}`,
-                );
-            }
-            console.log(
-                `[AutoProvision] Added model "${model.name}" (ID: ${model.id}) to project (ID: ${project.id}) via API`,
-            );
-
-            // Reload the project viewer to see the newly added model
-            await page.reload();
-            await page
-                .locator(".container-viewer")
-                .first()
-                .waitFor({ state: "visible", timeout: 15000 });
-            await page
-                .locator('[data-testid="container-tab-models"]')
-                .click();
-            await modelCard.waitFor({ state: "visible", timeout: 10000 });
-        }
-        console.log(`[Precondition] Project contains model "${model.name}" ✓`);
-    },
+      // Reload the project viewer to see the newly added model
+      await page.reload();
+      await page
+        .locator(".container-viewer")
+        .first()
+        .waitFor({ state: "visible", timeout: 15000 });
+      await page.locator('[data-testid="container-tab-models"]').click();
+      await modelCard.waitFor({ state: "visible", timeout: 10000 });
+    }
+    console.log(`[Precondition] Project contains model "${model.name}" ✓`);
+  },
 );
 
 // ============= Texture Set / Global Material Association Steps =============
@@ -627,663 +592,657 @@ Given(
 // (backend default) and parallel "global material" step names target Global
 // Materials.
 type TextureSetKindLabel = {
-    tabTestId: string; // data-testid on the container tab anchor
-    dialogHeader: string; // dialog header substring
-    label: string; // logging label
+  tabTestId: string; // data-testid on the container tab anchor
+  dialogHeader: string; // dialog header substring
+  label: string; // logging label
 };
 
 const MULTI_MODEL_LABEL: TextureSetKindLabel = {
-    tabTestId: "container-tab-multi-model-textures",
-    dialogHeader: "Add Multi-Model Textures",
-    label: "texture set",
+  tabTestId: "container-tab-multi-model-textures",
+  dialogHeader: "Add Multi-Model Textures",
+  label: "texture set",
 };
 
 const GLOBAL_MATERIAL_LABEL: TextureSetKindLabel = {
-    tabTestId: "container-tab-global-materials",
-    dialogHeader: "Add Global Materials",
-    label: "global material",
+  tabTestId: "container-tab-global-materials",
+  dialogHeader: "Add Global Materials",
+  label: "global material",
 };
 
 async function addTextureSetOfKindToProject(
-    page: Page,
-    textureSetName: string,
-    labels: TextureSetKindLabel,
+  page: Page,
+  textureSetName: string,
+  labels: TextureSetKindLabel,
 ) {
-    const textureSet = getScenarioState(page).getTextureSet(textureSetName);
+  const textureSet = getScenarioState(page).getTextureSet(textureSetName);
 
-    if (!textureSet) {
-        throw new Error(
-            `${labels.label} "${textureSetName}" not found in shared state`,
-        );
-    }
-
-    // Clean up: remove this texture set from the project if already present
-    const project = getScenarioState(page).getProject("Test Project");
-    if (project) {
-        const projRes = await page.request.get(
-            `${API_BASE}/projects/${project.id}`,
-        );
-        if (projRes.ok()) {
-            const projData = await projRes.json();
-            const existing = (projData.textureSets || []).filter(
-                (ts: any) => ts.name === textureSet.name,
-            );
-            for (const ts of existing) {
-                await page.request
-                    .delete(
-                        `${API_BASE}/projects/${project.id}/texture-sets/${ts.id}`,
-                    )
-                    .catch(() => {});
-                console.log(
-                    `[Cleanup] Removed stale ${labels.label} "${ts.name}" (ID: ${ts.id}) from project`,
-                );
-            }
-            if (existing.length > 0) {
-                // Reload the project viewer to reflect changes
-                await page.reload({ waitUntil: "domcontentloaded" });
-                await page
-                    .locator(".container-viewer")
-                    .first()
-                    .waitFor({ state: "visible", timeout: 15000 });
-            }
-        }
-    }
-
-    // Click the appropriate kind tab, then find Add card
-    await page
-        .locator(`[data-testid="${labels.tabTestId}"]`)
-        .click();
-
-    const addCard = page.locator(".asset-tile-add").first();
-    await addCard.waitFor({ state: "visible", timeout: 10000 });
-    await addCard.click();
-    console.log(`[Action] Clicked Add ${labels.label} card`);
-
-    // Wait for dialog
-    await page.waitForSelector(`.p-dialog:has-text("${labels.dialogHeader}")`, {
-        state: "visible",
-        timeout: 5000,
-    });
-    console.log(`[Action] ${labels.dialogHeader} dialog opened`);
-
-    // Find and click texture set item in the dialog grid
-    const textureItems = page.locator(".p-dialog .asset-tile").filter({
-        hasText: textureSet.name,
-    });
-
-    const firstItem = textureItems.first();
-    await firstItem.waitFor({ state: "visible", timeout: 5000 });
-    await firstItem.click();
-    console.log(`[Action] Clicked ${labels.label} item: ${textureSet.name}`);
-
-    // Wait for selection to register in the Add button
-    const addButton = page
-        .locator('.p-dialog-footer button:has-text("Add Selected")')
-        .first();
-    await addButton.waitFor({ state: "visible", timeout: 5000 });
-
-    const buttonText = await addButton.textContent();
-    console.log(`[Action] Add button text: ${buttonText}`);
-
-    if (buttonText?.includes("(0)")) {
-        const checkbox = firstItem
-            .locator('input[type="checkbox"], .p-checkbox-box')
-            .first();
-        await checkbox.click({ force: true });
-        console.log("[Action] Clicked checkbox directly");
-        // Wait for selection count to update
-        await expect(addButton).not.toContainText("(0)", { timeout: 5000 });
-    }
-
-    // Set up response interceptor before clicking Add
-    const responsePromise = page.waitForResponse(
-        (resp) =>
-            resp.url().includes("/projects/") &&
-            resp.url().includes("/texture-sets/") &&
-            resp.request().method() === "POST",
-        { timeout: 15000 },
+  if (!textureSet) {
+    throw new Error(
+      `${labels.label} "${textureSetName}" not found in shared state`,
     );
+  }
 
-    await addButton.click();
-    console.log("[Action] Clicked Add button");
-
-    // Wait for the API response from the add operation
-    try {
-        const response = await responsePromise;
+  // Clean up: remove this texture set from the project if already present
+  const project = getScenarioState(page).getProject("Test Project");
+  if (project) {
+    const projRes = await page.request.get(
+      `${API_BASE}/projects/${project.id}`,
+    );
+    if (projRes.ok()) {
+      const projData = await projRes.json();
+      const existing = (projData.textureSets || []).filter(
+        (ts: any) => ts.name === textureSet.name,
+      );
+      for (const ts of existing) {
+        await page.request
+          .delete(`${API_BASE}/projects/${project.id}/texture-sets/${ts.id}`)
+          .catch(() => {});
         console.log(
-            `[API] Add ${labels.label} response: ${response.status()} ${response.url()}`,
+          `[Cleanup] Removed stale ${labels.label} "${ts.name}" (ID: ${ts.id}) from project`,
         );
-    } catch {
-        console.log(
-            `[API] No POST /projects/*/texture-sets/* response detected - add ${labels.label} may have failed silently`,
-        );
+      }
+      if (existing.length > 0) {
+        // Reload the project viewer to reflect changes
+        await page.reload({ waitUntil: "domcontentloaded" });
+        await page
+          .locator(".container-viewer")
+          .first()
+          .waitFor({ state: "visible", timeout: 15000 });
+      }
     }
+  }
 
-    await page.waitForSelector(`.p-dialog:has-text("${labels.dialogHeader}")`, {
-        state: "hidden",
-        timeout: 10000,
-    });
-    console.log("[Action] Dialog closed");
+  // Click the appropriate kind tab, then find Add card
+  await page.locator(`[data-testid="${labels.tabTestId}"]`).click();
 
-    // Switch to the kind tab to see the newly added card
-    const kindTab = page
-        .locator(`[data-testid="${labels.tabTestId}"]`);
-    await kindTab.click();
+  const addCard = page.locator(".asset-tile-add").first();
+  await addCard.waitFor({ state: "visible", timeout: 10000 });
+  await addCard.click();
+  console.log(`[Action] Clicked Add ${labels.label} card`);
 
-    // Wait for the texture set card to appear (React Query refetch + render)
-    const textureSetCard = page
-        .locator(".asset-tile")
-        .filter({ hasText: textureSet.name })
-        .first();
-    await expect(textureSetCard).toBeVisible({
-        timeout: 15000,
-    });
+  // Wait for dialog
+  await page.waitForSelector(`.p-dialog:has-text("${labels.dialogHeader}")`, {
+    state: "visible",
+    timeout: 5000,
+  });
+  console.log(`[Action] ${labels.dialogHeader} dialog opened`);
+
+  // Find and click texture set item in the dialog grid
+  const textureItems = page.locator(".p-dialog .asset-tile").filter({
+    hasText: textureSet.name,
+  });
+
+  const firstItem = textureItems.first();
+  await firstItem.waitFor({ state: "visible", timeout: 5000 });
+  await firstItem.click();
+  console.log(`[Action] Clicked ${labels.label} item: ${textureSet.name}`);
+
+  // Wait for selection to register in the Add button
+  const addButton = page
+    .locator('.p-dialog-footer button:has-text("Add Selected")')
+    .first();
+  await addButton.waitFor({ state: "visible", timeout: 5000 });
+
+  const buttonText = await addButton.textContent();
+  console.log(`[Action] Add button text: ${buttonText}`);
+
+  if (buttonText?.includes("(0)")) {
+    const checkbox = firstItem
+      .locator('input[type="checkbox"], .p-checkbox-box')
+      .first();
+    await checkbox.click({ force: true });
+    console.log("[Action] Clicked checkbox directly");
+    // Wait for selection count to update
+    await expect(addButton).not.toContainText("(0)", { timeout: 5000 });
+  }
+
+  // Set up response interceptor before clicking Add
+  const responsePromise = page.waitForResponse(
+    (resp) =>
+      resp.url().includes("/projects/") &&
+      resp.url().includes("/texture-sets/") &&
+      resp.request().method() === "POST",
+    { timeout: 15000 },
+  );
+
+  await addButton.click();
+  console.log("[Action] Clicked Add button");
+
+  // Wait for the API response from the add operation
+  try {
+    const response = await responsePromise;
     console.log(
-        `[Action] Added ${labels.label} "${textureSet.name}" to project`,
+      `[API] Add ${labels.label} response: ${response.status()} ${response.url()}`,
     );
+  } catch {
+    console.log(
+      `[API] No POST /projects/*/texture-sets/* response detected - add ${labels.label} may have failed silently`,
+    );
+  }
+
+  await page.waitForSelector(`.p-dialog:has-text("${labels.dialogHeader}")`, {
+    state: "hidden",
+    timeout: 10000,
+  });
+  console.log("[Action] Dialog closed");
+
+  // Switch to the kind tab to see the newly added card
+  const kindTab = page.locator(`[data-testid="${labels.tabTestId}"]`);
+  await kindTab.click();
+
+  // Wait for the texture set card to appear (React Query refetch + render)
+  const textureSetCard = page
+    .locator(".asset-tile")
+    .filter({ hasText: textureSet.name })
+    .first();
+  await expect(textureSetCard).toBeVisible({
+    timeout: 15000,
+  });
+  console.log(`[Action] Added ${labels.label} "${textureSet.name}" to project`);
 }
 
 When(
-    "I add texture set {string} to the project",
-    async ({ page }, textureSetName: string) => {
-        await addTextureSetOfKindToProject(
-            page,
-            textureSetName,
-            MULTI_MODEL_LABEL,
-        );
-    },
+  "I add texture set {string} to the project",
+  async ({ page }, textureSetName: string) => {
+    await addTextureSetOfKindToProject(page, textureSetName, MULTI_MODEL_LABEL);
+  },
 );
 
 When(
-    "I add global material {string} to the project",
-    async ({ page }, textureSetName: string) => {
-        await addTextureSetOfKindToProject(
-            page,
-            textureSetName,
-            GLOBAL_MATERIAL_LABEL,
-        );
-    },
+  "I add global material {string} to the project",
+  async ({ page }, textureSetName: string) => {
+    await addTextureSetOfKindToProject(
+      page,
+      textureSetName,
+      GLOBAL_MATERIAL_LABEL,
+    );
+  },
 );
 
 async function removeTextureSetOfKindFromProject(
-    page: Page,
-    textureSetName: string,
-    labels: TextureSetKindLabel,
+  page: Page,
+  textureSetName: string,
+  labels: TextureSetKindLabel,
 ) {
-    const textureSet = getScenarioState(page).getTextureSet(textureSetName);
+  const textureSet = getScenarioState(page).getTextureSet(textureSetName);
 
-    if (!textureSet) {
-        throw new Error(
-            `${labels.label} "${textureSetName}" not found in shared state`,
-        );
-    }
-
-    // Click the kind tab first, then find and right-click texture set card
-    await page
-        .locator(`[data-testid="${labels.tabTestId}"]`)
-        .click();
-
-    const textureCard = page.locator(
-        `.asset-tile[data-texture-set-id="${textureSet.id}"]`,
+  if (!textureSet) {
+    throw new Error(
+      `${labels.label} "${textureSetName}" not found in shared state`,
     );
-    await textureCard.waitFor({ state: "visible", timeout: 5000 });
-    await textureCard.click({ button: "right" });
-    console.log(`[Action] Right-clicked on ${labels.label} card`);
+  }
 
-    // Click remove option
-    const removeOption = page
-        .locator(
-            '.p-contextmenu-item:has-text("Remove from project"), .p-menuitem:has-text("Remove")',
-        )
-        .first();
-    await removeOption.waitFor({ state: "visible", timeout: 3000 });
-    await removeOption.click();
-    console.log("[Action] Clicked Remove from project");
+  // Click the kind tab first, then find and right-click texture set card
+  await page.locator(`[data-testid="${labels.tabTestId}"]`).click();
 
-    // Wait for texture set card to disappear after removal
-    await expect(textureCard).not.toBeVisible({ timeout: 5000 });
-    console.log(
-        `[Action] Removed ${labels.label} "${textureSet.name}" from project`,
-    );
+  const textureCard = page.locator(
+    `.asset-tile[data-texture-set-id="${textureSet.id}"]`,
+  );
+  await textureCard.waitFor({ state: "visible", timeout: 5000 });
+  await textureCard.click({ button: "right" });
+  console.log(`[Action] Right-clicked on ${labels.label} card`);
+
+  // Click remove option
+  const removeOption = page
+    .locator(
+      '.p-contextmenu-item:has-text("Remove from project"), .p-menuitem:has-text("Remove")',
+    )
+    .first();
+  await removeOption.waitFor({ state: "visible", timeout: 3000 });
+  await removeOption.click();
+  console.log("[Action] Clicked Remove from project");
+
+  // Wait for texture set card to disappear after removal
+  await expect(textureCard).not.toBeVisible({ timeout: 5000 });
+  console.log(
+    `[Action] Removed ${labels.label} "${textureSet.name}" from project`,
+  );
 }
 
 When(
-    "I remove texture set {string} from the project",
-    async ({ page }, textureSetName: string) => {
-        await removeTextureSetOfKindFromProject(
-            page,
-            textureSetName,
-            MULTI_MODEL_LABEL,
-        );
-    },
+  "I remove texture set {string} from the project",
+  async ({ page }, textureSetName: string) => {
+    await removeTextureSetOfKindFromProject(
+      page,
+      textureSetName,
+      MULTI_MODEL_LABEL,
+    );
+  },
 );
 
 When(
-    "I remove global material {string} from the project",
-    async ({ page }, textureSetName: string) => {
-        await removeTextureSetOfKindFromProject(
-            page,
-            textureSetName,
-            GLOBAL_MATERIAL_LABEL,
-        );
-    },
+  "I remove global material {string} from the project",
+  async ({ page }, textureSetName: string) => {
+    await removeTextureSetOfKindFromProject(
+      page,
+      textureSetName,
+      GLOBAL_MATERIAL_LABEL,
+    );
+  },
 );
 
 // Texture set / global material in project assertions
 async function assertProjectContainsTextureSetOfKind(
-    page: Page,
-    textureSetName: string,
-    labels: TextureSetKindLabel,
+  page: Page,
+  textureSetName: string,
+  labels: TextureSetKindLabel,
 ) {
-    const textureSet = getScenarioState(page).getTextureSet(textureSetName);
+  const textureSet = getScenarioState(page).getTextureSet(textureSetName);
 
-    if (!textureSet) {
-        throw new Error(
-            `${labels.label} "${textureSetName}" not found in shared state`,
-        );
-    }
-
-    // Click the kind tab first, then poll with reload until the card appears
-    await page
-        .locator(`[data-testid="${labels.tabTestId}"]`)
-        .click();
-
-    await expect
-        .poll(
-            async () => {
-                const textureCard = page.locator(
-                    `.asset-tile[data-texture-set-id="${textureSet.id}"]`,
-                );
-                return await textureCard.isVisible().catch(() => false);
-            },
-            {
-                message: `Waiting for ${labels.label} "${textureSet.name}" to appear in project`,
-                timeout: 10000,
-                intervals: [500, 1000, 2000],
-            },
-        )
-        .toBe(true);
-    console.log(
-        `[UI] Project contains ${labels.label} "${textureSet.name}" ✓`,
+  if (!textureSet) {
+    throw new Error(
+      `${labels.label} "${textureSetName}" not found in shared state`,
     );
+  }
+
+  // Click the kind tab first, then poll with reload until the card appears
+  await page.locator(`[data-testid="${labels.tabTestId}"]`).click();
+
+  await expect
+    .poll(
+      async () => {
+        const textureCard = page.locator(
+          `.asset-tile[data-texture-set-id="${textureSet.id}"]`,
+        );
+        return await textureCard.isVisible().catch(() => false);
+      },
+      {
+        message: `Waiting for ${labels.label} "${textureSet.name}" to appear in project`,
+        timeout: 10000,
+        intervals: [500, 1000, 2000],
+      },
+    )
+    .toBe(true);
+  console.log(`[UI] Project contains ${labels.label} "${textureSet.name}" ✓`);
 }
 
 async function assertProjectDoesNotContainTextureSetOfKind(
-    page: Page,
-    textureSetName: string,
-    labels: TextureSetKindLabel,
+  page: Page,
+  textureSetName: string,
+  labels: TextureSetKindLabel,
 ) {
-    const textureSet = getScenarioState(page).getTextureSet(textureSetName);
+  const textureSet = getScenarioState(page).getTextureSet(textureSetName);
 
-    if (!textureSet) {
-        throw new Error(
-            `${labels.label} "${textureSetName}" not found in shared state`,
-        );
-    }
-
-    // Click the kind tab first
-    await page
-        .locator(`[data-testid="${labels.tabTestId}"]`)
-        .click();
-
-    const textureCard = page.locator(
-        `.asset-tile[data-texture-set-id="${textureSet.id}"]`,
+  if (!textureSet) {
+    throw new Error(
+      `${labels.label} "${textureSetName}" not found in shared state`,
     );
-    await expect(textureCard).not.toBeVisible({ timeout: 5000 });
-    console.log(
-        `[UI] Project does not contain ${labels.label} "${textureSet.name}" ✓`,
-    );
+  }
+
+  // Click the kind tab first
+  await page.locator(`[data-testid="${labels.tabTestId}"]`).click();
+
+  const textureCard = page.locator(
+    `.asset-tile[data-texture-set-id="${textureSet.id}"]`,
+  );
+  await expect(textureCard).not.toBeVisible({ timeout: 5000 });
+  console.log(
+    `[UI] Project does not contain ${labels.label} "${textureSet.name}" ✓`,
+  );
 }
 
 Then(
-    "the project should contain texture set {string}",
-    async ({ page }, textureSetName: string) => {
-        await assertProjectContainsTextureSetOfKind(
-            page,
-            textureSetName,
-            MULTI_MODEL_LABEL,
-        );
-    },
+  "the project should contain texture set {string}",
+  async ({ page }, textureSetName: string) => {
+    await assertProjectContainsTextureSetOfKind(
+      page,
+      textureSetName,
+      MULTI_MODEL_LABEL,
+    );
+  },
 );
 
 Then(
-    "the project should contain global material {string}",
-    async ({ page }, textureSetName: string) => {
-        await assertProjectContainsTextureSetOfKind(
-            page,
-            textureSetName,
-            GLOBAL_MATERIAL_LABEL,
-        );
-    },
+  "the project should contain global material {string}",
+  async ({ page }, textureSetName: string) => {
+    await assertProjectContainsTextureSetOfKind(
+      page,
+      textureSetName,
+      GLOBAL_MATERIAL_LABEL,
+    );
+  },
 );
 
 Then(
-    "the project should not contain texture set {string}",
-    async ({ page }, textureSetName: string) => {
-        await assertProjectDoesNotContainTextureSetOfKind(
-            page,
-            textureSetName,
-            MULTI_MODEL_LABEL,
-        );
-    },
+  "the project should not contain texture set {string}",
+  async ({ page }, textureSetName: string) => {
+    await assertProjectDoesNotContainTextureSetOfKind(
+      page,
+      textureSetName,
+      MULTI_MODEL_LABEL,
+    );
+  },
 );
 
 Then(
-    "the project should not contain global material {string}",
-    async ({ page }, textureSetName: string) => {
-        await assertProjectDoesNotContainTextureSetOfKind(
-            page,
-            textureSetName,
-            GLOBAL_MATERIAL_LABEL,
-        );
-    },
+  "the project should not contain global material {string}",
+  async ({ page }, textureSetName: string) => {
+    await assertProjectDoesNotContainTextureSetOfKind(
+      page,
+      textureSetName,
+      GLOBAL_MATERIAL_LABEL,
+    );
+  },
 );
 
 // Precondition: project contains texture set / global material
 async function ensureProjectContainsTextureSetOfKind(
-    page: Page,
-    textureSetName: string,
-    labels: TextureSetKindLabel,
+  page: Page,
+  textureSetName: string,
+  labels: TextureSetKindLabel,
 ) {
-    const textureSet = getScenarioState(page).getTextureSet(textureSetName);
+  const textureSet = getScenarioState(page).getTextureSet(textureSetName);
 
-    if (!textureSet) {
-        throw new Error(
-            `${labels.label} "${textureSetName}" not found in shared state`,
-        );
-    }
-
-    // Click the kind tab first
-    await page
-        .locator(`[data-testid="${labels.tabTestId}"]`)
-        .click();
-
-    const textureCard = page.locator(
-        `.asset-tile[data-texture-set-id="${textureSet.id}"]`,
+  if (!textureSet) {
+    throw new Error(
+      `${labels.label} "${textureSetName}" not found in shared state`,
     );
-    // Wait for tab content to render, then check presence
-    const isPresent = await textureCard
-        .waitFor({ state: "visible", timeout: 5000 })
-        .then(() => true)
-        .catch(() => false);
+  }
 
-    if (!isPresent) {
-        // Self-provision: add texture set to project via API
-        console.log(
-            `[AutoProvision] ${labels.label} "${textureSet.name}" not in project, adding via API...`,
-        );
-        const currentUrl = page.url();
-        // Extract project ID from shared state
-        const projectMatch = currentUrl.match(/project[=/](\d+)/);
-        const projectState = getScenarioState(page).getProject("Test Project");
-        const projectId = projectState?.id || projectMatch?.[1];
+  // Click the kind tab first
+  await page.locator(`[data-testid="${labels.tabTestId}"]`).click();
 
-        if (projectId && textureSet.id) {
-            const API = process.env.API_BASE_URL || "http://localhost:8090";
-            const response = await page.request.post(
-                `${API}/projects/${projectId}/texture-sets/${textureSet.id}`,
-            );
-            if (response.ok()) {
-                console.log(
-                    `[AutoProvision] Added ${labels.label} via API ✓`,
-                );
-                await page.reload({ waitUntil: "domcontentloaded" });
-                // Wait for page content to render after reload
-                await page
-                    .locator(".container-viewer")
-                    .first()
-                    .waitFor({ state: "visible", timeout: 10000 });
-            } else {
-                throw new Error(
-                    `Failed to auto-provision ${labels.label} association: ${response.status()}`,
-                );
-            }
-        } else {
-            throw new Error(
-                `Project does not contain ${labels.label} "${textureSet.name}". Add it first.`,
-            );
-        }
-    }
+  const textureCard = page.locator(
+    `.asset-tile[data-texture-set-id="${textureSet.id}"]`,
+  );
+  // Wait for tab content to render, then check presence
+  const isPresent = await textureCard
+    .waitFor({ state: "visible", timeout: 5000 })
+    .then(() => true)
+    .catch(() => false);
+
+  if (!isPresent) {
+    // Self-provision: add texture set to project via API
     console.log(
-        `[Precondition] Project contains ${labels.label} "${textureSet.name}" ✓`,
+      `[AutoProvision] ${labels.label} "${textureSet.name}" not in project, adding via API...`,
     );
+    const currentUrl = page.url();
+    // Extract project ID from shared state
+    const projectMatch = currentUrl.match(/project[=/](\d+)/);
+    const projectState = getScenarioState(page).getProject("Test Project");
+    const projectId = projectState?.id || projectMatch?.[1];
+
+    if (projectId && textureSet.id) {
+      const API = process.env.API_BASE_URL || "http://localhost:8090";
+      const response = await page.request.post(
+        `${API}/projects/${projectId}/texture-sets/${textureSet.id}`,
+      );
+      if (response.ok()) {
+        console.log(`[AutoProvision] Added ${labels.label} via API ✓`);
+        await page.reload({ waitUntil: "domcontentloaded" });
+        // Wait for page content to render after reload
+        await page
+          .locator(".container-viewer")
+          .first()
+          .waitFor({ state: "visible", timeout: 10000 });
+      } else {
+        throw new Error(
+          `Failed to auto-provision ${labels.label} association: ${response.status()}`,
+        );
+      }
+    } else {
+      throw new Error(
+        `Project does not contain ${labels.label} "${textureSet.name}". Add it first.`,
+      );
+    }
+  }
+  console.log(
+    `[Precondition] Project contains ${labels.label} "${textureSet.name}" ✓`,
+  );
 }
 
 Given(
-    "the project contains texture set {string}",
-    async ({ page }, textureSetName: string) => {
-        await ensureProjectContainsTextureSetOfKind(
-            page,
-            textureSetName,
-            MULTI_MODEL_LABEL,
-        );
-    },
+  "the project contains texture set {string}",
+  async ({ page }, textureSetName: string) => {
+    await ensureProjectContainsTextureSetOfKind(
+      page,
+      textureSetName,
+      MULTI_MODEL_LABEL,
+    );
+  },
 );
 
 Given(
-    "the project contains global material {string}",
-    async ({ page }, textureSetName: string) => {
-        await ensureProjectContainsTextureSetOfKind(
-            page,
-            textureSetName,
-            GLOBAL_MATERIAL_LABEL,
-        );
-    },
+  "the project contains global material {string}",
+  async ({ page }, textureSetName: string) => {
+    await ensureProjectContainsTextureSetOfKind(
+      page,
+      textureSetName,
+      GLOBAL_MATERIAL_LABEL,
+    );
+  },
 );
 
 // Texture set existence check - `kind` corresponds to TextureSetKind:
 // 0 = ModelSpecific (Multi-Model Textures), 1 = Universal (Global Materials).
 async function ensureTextureSetExists(
-    page: Page,
-    textureSetName: string,
-    kind: 0 | 1,
-    logLabel: string,
+  page: Page,
+  textureSetName: string,
+  kind: 0 | 1,
+  logLabel: string,
 ) {
-    if (getScenarioState(page).hasTextureSet(textureSetName)) {
-        const existing = getScenarioState(page).getTextureSet(textureSetName);
-        // If the cached entry has the wrong kind, refresh kind via API. This
-        // matters when a previous scenario created the same-named set with
-        // the other kind - the backend rejects duplicate names but the kind
-        // lookup is per-id.
-        if (existing?.id) {
-            const detail = await page.request.get(
-                `${API_BASE}/texture-sets/${existing.id}`,
-            );
-            if (!detail.ok()) {
-                // Cached in shared state but the backend can't find it -
-                // throw rather than proceeding with the wrong kind, which
-                // would surface later as a confusing "card not visible on
-                // the wrong tab" failure.
-                throw new Error(
-                    `Failed to look up cached ${logLabel} "${textureSetName}" (ID: ${existing.id}): ${detail.status()}`,
-                );
-            }
-            const data = await detail.json();
-            if (data.kind !== kind) {
-                await page.request.put(
-                    `${API_BASE}/texture-sets/${existing.id}/kind`,
-                    { data: { kind } },
-                );
-                console.log(
-                    `[AutoProvision] Switched ${logLabel} "${textureSetName}" kind to ${kind}`,
-                );
-            }
-        }
-        console.log(
-            `[SharedState] Verified ${logLabel} exists: ${textureSetName}`,
+  if (getScenarioState(page).hasTextureSet(textureSetName)) {
+    const existing = getScenarioState(page).getTextureSet(textureSetName);
+    // If the cached entry has the wrong kind, refresh kind via API. This
+    // matters when a previous scenario created the same-named set with
+    // the other kind - the backend rejects duplicate names but the kind
+    // lookup is per-id.
+    if (existing?.id) {
+      const detail = await page.request.get(
+        `${API_BASE}/texture-sets/${existing.id}`,
+      );
+      if (!detail.ok()) {
+        // Cached in shared state but the backend can't find it -
+        // throw rather than proceeding with the wrong kind, which
+        // would surface later as a confusing "card not visible on
+        // the wrong tab" failure.
+        throw new Error(
+          `Failed to look up cached ${logLabel} "${textureSetName}" (ID: ${existing.id}): ${detail.status()}`,
         );
-        return;
+      }
+      const data = await detail.json();
+      if (data.kind !== kind) {
+        await page.request.put(`${API_BASE}/texture-sets/${existing.id}/kind`, {
+          data: { kind },
+        });
+        console.log(
+          `[AutoProvision] Switched ${logLabel} "${textureSetName}" kind to ${kind}`,
+        );
+      }
     }
+    console.log(`[SharedState] Verified ${logLabel} exists: ${textureSetName}`);
+    return;
+  }
 
-    // Self-provision: create or find the texture set via API
-    console.log(
-        `[AutoProvision] ${logLabel} "${textureSetName}" not in shared state, creating via API...`,
-    );
-    const response = await page.request.post(`${API_BASE}/texture-sets`, {
-        data: { name: textureSetName, kind },
+  // Self-provision: create or find the texture set via API
+  console.log(
+    `[AutoProvision] ${logLabel} "${textureSetName}" not in shared state, creating via API...`,
+  );
+  const response = await page.request.post(`${API_BASE}/texture-sets`, {
+    data: { name: textureSetName, kind },
+  });
+  if (response.ok()) {
+    const data = await response.json();
+    getScenarioState(page).saveTextureSet(textureSetName, {
+      id: data.id,
+      name: textureSetName,
     });
-    if (response.ok()) {
-        const data = await response.json();
-        getScenarioState(page).saveTextureSet(textureSetName, {
-            id: data.id,
-            name: textureSetName,
-        });
-        console.log(
-            `[AutoProvision] Created ${logLabel} "${textureSetName}" (ID: ${data.id}, kind: ${kind})`,
-        );
-    } else {
-        // Texture set likely already exists - look up via GET, then enforce
-        // the requested kind.
-        const listResp = await page.request.get(`${API_BASE}/texture-sets`);
-        const textureSetsResp = await listResp.json();
-        const tsList = Array.isArray(textureSetsResp)
-            ? textureSetsResp
-            : textureSetsResp.textureSets || textureSetsResp.items || [];
-        const existing = tsList.find(
-            (ts: any) => ts.name === textureSetName,
-        );
-        if (!existing) {
-            throw new Error(
-                `Failed to auto-provision ${logLabel} "${textureSetName}": ${response.status()} and not found via GET`,
-            );
-        }
-        if (existing.kind !== kind) {
-            await page.request.put(
-                `${API_BASE}/texture-sets/${existing.id}/kind`,
-                { data: { kind } },
-            );
-            console.log(
-                `[AutoProvision] Switched existing "${textureSetName}" kind to ${kind}`,
-            );
-        }
-        getScenarioState(page).saveTextureSet(textureSetName, {
-            id: existing.id,
-            name: textureSetName,
-        });
-        console.log(
-            `[AutoProvision] Found existing ${logLabel} "${textureSetName}" (ID: ${existing.id})`,
-        );
-    }
     console.log(
-        `[SharedState] Verified ${logLabel} exists: ${textureSetName}`,
+      `[AutoProvision] Created ${logLabel} "${textureSetName}" (ID: ${data.id}, kind: ${kind})`,
     );
+  } else {
+    // Texture set likely already exists - look up via GET, then enforce
+    // the requested kind.
+    const listResp = await page.request.get(`${API_BASE}/texture-sets`);
+    const textureSetsResp = await listResp.json();
+    const tsList = Array.isArray(textureSetsResp)
+      ? textureSetsResp
+      : textureSetsResp.textureSets || textureSetsResp.items || [];
+    const existing = tsList.find((ts: any) => ts.name === textureSetName);
+    if (!existing) {
+      throw new Error(
+        `Failed to auto-provision ${logLabel} "${textureSetName}": ${response.status()} and not found via GET`,
+      );
+    }
+    if (existing.kind !== kind) {
+      await page.request.put(`${API_BASE}/texture-sets/${existing.id}/kind`, {
+        data: { kind },
+      });
+      console.log(
+        `[AutoProvision] Switched existing "${textureSetName}" kind to ${kind}`,
+      );
+    }
+    getScenarioState(page).saveTextureSet(textureSetName, {
+      id: existing.id,
+      name: textureSetName,
+    });
+    console.log(
+      `[AutoProvision] Found existing ${logLabel} "${textureSetName}" (ID: ${existing.id})`,
+    );
+  }
+  console.log(`[SharedState] Verified ${logLabel} exists: ${textureSetName}`);
 }
 
 Given(
-    "the texture set {string} exists",
-    async ({ page }, textureSetName: string) => {
-        await ensureTextureSetExists(page, textureSetName, 0, "texture set");
-    },
+  "the texture set {string} exists",
+  async ({ page }, textureSetName: string) => {
+    await ensureTextureSetExists(page, textureSetName, 0, "texture set");
+  },
 );
 
 Given(
-    "the global material {string} exists",
-    async ({ page }, textureSetName: string) => {
-        await ensureTextureSetExists(
-            page,
-            textureSetName,
-            1,
-            "global material",
-        );
-    },
+  "the global material {string} exists",
+  async ({ page }, textureSetName: string) => {
+    await ensureTextureSetExists(page, textureSetName, 1, "global material");
+  },
 );
 
 // ============= Project Sprite Association Steps =============
 
 Then("I take a screenshot of project with sprite", async ({ page }) => {
-    await page.screenshot({
-        path: "test-results/screenshots/project-with-sprite.png",
-    });
-    console.log("[Screenshot] Captured project with sprite");
+  await page.screenshot({
+    path: "test-results/screenshots/project-with-sprite.png",
+  });
+  console.log("[Screenshot] Captured project with sprite");
 });
 
 Then(
-    "I take a screenshot of project after sprite removed",
-    async ({ page }) => {
-        await page.screenshot({
-            path: "test-results/screenshots/project-sprite-removed.png",
-        });
-        console.log("[Screenshot] Captured project after sprite removed");
-    },
+  "I take a screenshot of project after sprite removed",
+  async ({ page }) => {
+    await page.screenshot({
+      path: "test-results/screenshots/project-sprite-removed.png",
+    });
+    console.log("[Screenshot] Captured project after sprite removed");
+  },
 );
 
 Then(
-    "the project sprite count should be {int}",
-    async ({ page }, expectedCount: number) => {
-        // Click Details tab to see stats
-        await page
-            .locator('[data-testid="container-tab-details"]')
-            .click();
+  "the project {string} sprite count should be {int}",
+  async ({ page }, projectName: string, expectedCount: number) => {
+    // The project Snapshot block was removed as clutter, so the sprites tab
+    // badge is the UI surface and the project detail is the source of truth.
+    const spritesTab = page.locator('[data-testid="container-tab-sprites"]');
+    await spritesTab.click();
 
-        // Use retrying assertion - the count may take a moment to update
-        // after a sprite is removed (React Query cache invalidation)
-        const statSpan = page.locator(
-            '.container-detail-assets span:has-text("sprite")',
-        );
-        await expect(async () => {
-            await statSpan.waitFor({ state: "visible", timeout: 5000 });
-            const text = (await statSpan.textContent()) || "0";
-            const count = parseInt(text.match(/\d+/)?.[0] || "0", 10);
-            expect(count).toBe(expectedCount);
-        }).toPass({ timeout: 15000, intervals: [500, 1000, 2000] });
-        console.log(`[UI] Project sprite count is ${expectedCount} ✓`);
-    },
+    const project = getScenarioState(page).getProject(projectName);
+    if (!project) {
+      throw new Error(`Project "${projectName}" not found in shared state`);
+    }
+
+    await expect
+      .poll(
+        async () => {
+          const response = await page.request.get(
+            `${API_BASE}/projects/${project.id}`,
+          );
+          if (!response.ok()) return -1;
+          const data = await response.json();
+          return data.spriteCount ?? 0;
+        },
+        {
+          // The count follows React Query invalidation after a removal.
+          message: `Waiting for project "${projectName}" sprite count to be ${expectedCount}`,
+          timeout: 15000,
+          intervals: [500, 1000, 2000],
+        },
+      )
+      .toBe(expectedCount);
+
+    // The tab badge renders the same count the API reports.
+    await expect
+      .poll(
+        async () => {
+          const text =
+            (await spritesTab.locator(".container-tab-count").textContent()) ||
+            "0";
+          return parseInt(text, 10);
+        },
+        {
+          message: `Waiting for the sprites tab badge to show ${expectedCount}`,
+          timeout: 15000,
+          intervals: [500, 1000, 2000],
+        },
+      )
+      .toBe(expectedCount);
+
+    console.log(
+      `[UI] Project "${projectName}" sprite count is ${expectedCount} ✓`,
+    );
+  },
 );
 
 Given(
-    "the project has at least {int} sprite",
-    async ({ page }, minCount: number) => {
-        // Click Details tab to see stats
-        await page
-            .locator('[data-testid="container-tab-details"]')
-            .click();
-
-        // Wait for Details tab content to render
-        const statSpan = page.locator(
-            '.container-detail-assets span:has-text("sprite")',
-        );
-        await statSpan.waitFor({ state: "visible", timeout: 5000 });
-        const text = (await statSpan.textContent()) || "0";
-        const count = parseInt(text.match(/\d+/)?.[0] || "0", 10);
-        if (count < minCount) {
-            throw new Error(
-                `Project has only ${count} sprites, but at least ${minCount} required`,
-            );
-        }
-        console.log(`[Precondition] Project has ${count} sprite(s) ✓`);
-    },
+  "the project {string} has at least {int} sprite",
+  async ({ page }, projectName: string, minCount: number) => {
+    const project = getScenarioState(page).getProject(projectName);
+    if (!project) {
+      throw new Error(`Project "${projectName}" not found in shared state`);
+    }
+    const response = await page.request.get(
+      `${API_BASE}/projects/${project.id}`,
+    );
+    expect(response.ok()).toBeTruthy();
+    const data = await response.json();
+    const count = data.spriteCount ?? 0;
+    if (count < minCount) {
+      throw new Error(
+        `Project has only ${count} sprites, but at least ${minCount} required`,
+      );
+    }
+    await page.locator('[data-testid="container-tab-sprites"]').click();
+    await expect(
+      page.locator(".container-grid-wrapper .asset-tile").first(),
+    ).toBeVisible({ timeout: 15000 });
+    console.log(`[Precondition] Project has ${count} sprite(s) ✓`);
+  },
 );
 
 When("I remove the first sprite from the project", async ({ page }) => {
-    // Click Sprites tab first, then right-click on first sprite card
-    await page
-        .locator('[data-testid="container-tab-sprites"]')
-        .click();
+  // Click Sprites tab first, then right-click on first sprite card
+  await page.locator('[data-testid="container-tab-sprites"]').click();
 
-    const spriteCard = page
-        .locator(".container-section .asset-tile")
-        .first();
-    await spriteCard.waitFor({ state: "visible", timeout: 5000 });
-    await spriteCard.click({ button: "right" });
+  const spriteCard = page.locator(".container-section .asset-tile").first();
+  await spriteCard.waitFor({ state: "visible", timeout: 5000 });
+  await spriteCard.click({ button: "right" });
 
-    // Click Remove from project option
-    const removeOption = page.locator(
-        '.p-contextmenu .p-menuitem:has-text("Remove")',
-    );
-    await removeOption.waitFor({ state: "visible", timeout: 5000 });
+  // Click Remove from project option
+  const removeOption = page.locator(
+    '.p-contextmenu .p-menuitem:has-text("Remove")',
+  );
+  await removeOption.waitFor({ state: "visible", timeout: 5000 });
 
-    // Wait for the removal API response after clicking
-    const removeResponsePromise = page.waitForResponse(
-        (resp) =>
-            resp.url().includes("/sprites") &&
-            (resp.request().method() === "DELETE" ||
-                resp.request().method() === "PUT"),
-        { timeout: 15000 },
-    );
-    await removeOption.click();
-    await removeResponsePromise;
+  // Wait for the removal API response after clicking
+  const removeResponsePromise = page.waitForResponse(
+    (resp) =>
+      resp.url().includes("/sprites") &&
+      (resp.request().method() === "DELETE" ||
+        resp.request().method() === "PUT"),
+    { timeout: 15000 },
+  );
+  await removeOption.click();
+  await removeResponsePromise;
 
-    // Wait for sprite card to disappear after removal
-    await expect(spriteCard).not.toBeVisible({ timeout: 15000 });
-    console.log("[Action] Removed first sprite from project");
+  // Wait for sprite card to disappear after removal
+  await expect(spriteCard).not.toBeVisible({ timeout: 15000 });
+  console.log("[Action] Removed first sprite from project");
 });
