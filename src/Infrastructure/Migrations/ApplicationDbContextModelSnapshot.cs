@@ -879,6 +879,93 @@ namespace Infrastructure.Migrations
                     b.ToTable("BatchUploads");
                 });
 
+            modelBuilder.Entity("Domain.Models.CharacterAbility", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("ProjectCharacterId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ProjectId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId");
+
+                    b.HasIndex("ProjectCharacterId", "SortOrder");
+
+                    b.ToTable("CharacterAbilities", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_CharacterAbilities_SortOrder", "\"SortOrder\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("Domain.Models.CharacterVariant", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("ProjectCharacterId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ProjectId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("ProjectLevelId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId");
+
+                    b.HasIndex("ProjectLevelId");
+
+                    b.HasIndex("ProjectCharacterId", "SortOrder");
+
+                    b.ToTable("CharacterVariants", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_CharacterVariants_SortOrder", "\"SortOrder\" >= 0");
+                        });
+                });
+
             modelBuilder.Entity("Domain.Models.ComputeCacheEntry", b =>
                 {
                     b.Property<int>("Id")
@@ -1664,6 +1751,9 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(10000)
                         .HasColumnType("character varying(10000)");
 
+                    b.Property<int?>("CharacterId")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1689,9 +1779,13 @@ namespace Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CharacterId");
+
                     b.HasIndex("LevelId");
 
                     b.HasIndex("ReferenceImageId");
+
+                    b.HasIndex("ProjectId", "CharacterId");
 
                     b.HasIndex("ProjectId", "IsPinned");
 
@@ -1703,7 +1797,7 @@ namespace Infrastructure.Migrations
 
                     b.ToTable("ProductionNotes", null, t =>
                         {
-                            t.HasCheckConstraint("CK_ProductionNotes_OneTarget", "\"LevelId\" IS NULL OR \"ReferenceImageId\" IS NULL");
+                            t.HasCheckConstraint("CK_ProductionNotes_OneTarget", "(CASE WHEN \"LevelId\" IS NOT NULL THEN 1 ELSE 0 END) + (CASE WHEN \"ReferenceImageId\" IS NOT NULL THEN 1 ELSE 0 END) + (CASE WHEN \"CharacterId\" IS NOT NULL THEN 1 ELSE 0 END) <= 1");
                         });
                 });
 
@@ -1773,6 +1867,169 @@ namespace Infrastructure.Migrations
                     b.HasIndex("Name");
 
                     b.ToTable("Projects");
+                });
+
+            modelBuilder.Entity("Domain.Models.ProjectCharacter", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("ProjectId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId", "Name")
+                        .IsUnique();
+
+                    b.HasIndex("ProjectId", "UpdatedAt");
+
+                    b.ToTable("ProjectCharacters");
+                });
+
+            modelBuilder.Entity("Domain.Models.ProjectCharacterImage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Caption")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("FileId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ProjectCharacterId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ProjectId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Title")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FileId");
+
+                    b.HasIndex("ProjectId");
+
+                    b.HasIndex("ProjectCharacterId", "FileId")
+                        .IsUnique();
+
+                    b.HasIndex("ProjectCharacterId", "SortOrder");
+
+                    b.ToTable("ProjectCharacterImages", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ProjectCharacterImages_SortOrder", "\"SortOrder\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("Domain.Models.ProjectCharacterModel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Label")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int?>("ModelId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ProjectCharacterId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ProjectId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ModelId");
+
+                    b.HasIndex("ProjectId");
+
+                    b.HasIndex("ProjectCharacterId", "ModelId")
+                        .IsUnique();
+
+                    b.HasIndex("ProjectCharacterId", "SortOrder");
+
+                    b.ToTable("ProjectCharacterModels", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ProjectCharacterModels_SortOrder", "\"SortOrder\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("Domain.Models.ProjectCharacterTag", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("NormalizedName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("ProjectId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId", "NormalizedName")
+                        .IsUnique();
+
+                    b.ToTable("ProjectCharacterTags");
                 });
 
             modelBuilder.Entity("Domain.Models.ProjectConceptImage", b =>
@@ -3219,6 +3476,21 @@ namespace Infrastructure.Migrations
                     b.ToTable("PackTextureSets", (string)null);
                 });
 
+            modelBuilder.Entity("ProjectCharacterTagAssignment", b =>
+                {
+                    b.Property<int>("ProjectCharacterId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ProjectCharacterTagId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("ProjectCharacterId", "ProjectCharacterTagId");
+
+                    b.HasIndex("ProjectCharacterTagId");
+
+                    b.ToTable("ProjectCharacterTagAssignments", (string)null);
+                });
+
             modelBuilder.Entity("ProjectScript", b =>
                 {
                     b.Property<int>("ProjectsId")
@@ -3382,6 +3654,51 @@ namespace Infrastructure.Migrations
                     b.Navigation("Sprite");
 
                     b.Navigation("TextureSet");
+                });
+
+            modelBuilder.Entity("Domain.Models.CharacterAbility", b =>
+                {
+                    b.HasOne("Domain.Models.ProjectCharacter", "ProjectCharacter")
+                        .WithMany("Abilities")
+                        .HasForeignKey("ProjectCharacterId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Models.Project", "Project")
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Project");
+
+                    b.Navigation("ProjectCharacter");
+                });
+
+            modelBuilder.Entity("Domain.Models.CharacterVariant", b =>
+                {
+                    b.HasOne("Domain.Models.ProjectCharacter", "ProjectCharacter")
+                        .WithMany("Variants")
+                        .HasForeignKey("ProjectCharacterId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Models.Project", "Project")
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Models.ProjectLevel", "ProjectLevel")
+                        .WithMany("CharacterVariants")
+                        .HasForeignKey("ProjectLevelId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Project");
+
+                    b.Navigation("ProjectCharacter");
+
+                    b.Navigation("ProjectLevel");
                 });
 
             modelBuilder.Entity("Domain.Models.EnvironmentMap", b =>
@@ -3665,6 +3982,11 @@ namespace Infrastructure.Migrations
 
             modelBuilder.Entity("Domain.Models.ProductionNote", b =>
                 {
+                    b.HasOne("Domain.Models.ProjectCharacter", "Character")
+                        .WithMany("Notes")
+                        .HasForeignKey("CharacterId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Domain.Models.ProjectLevel", "Level")
                         .WithMany("Notes")
                         .HasForeignKey("LevelId")
@@ -3681,6 +4003,8 @@ namespace Infrastructure.Migrations
                         .HasForeignKey("ReferenceImageId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.Navigation("Character");
+
                     b.Navigation("Level");
 
                     b.Navigation("Project");
@@ -3696,6 +4020,80 @@ namespace Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("CustomThumbnailFile");
+                });
+
+            modelBuilder.Entity("Domain.Models.ProjectCharacter", b =>
+                {
+                    b.HasOne("Domain.Models.Project", "Project")
+                        .WithMany("Characters")
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Project");
+                });
+
+            modelBuilder.Entity("Domain.Models.ProjectCharacterImage", b =>
+                {
+                    b.HasOne("Domain.Models.File", "File")
+                        .WithMany()
+                        .HasForeignKey("FileId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Domain.Models.ProjectCharacter", "ProjectCharacter")
+                        .WithMany("Images")
+                        .HasForeignKey("ProjectCharacterId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Models.Project", "Project")
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("File");
+
+                    b.Navigation("Project");
+
+                    b.Navigation("ProjectCharacter");
+                });
+
+            modelBuilder.Entity("Domain.Models.ProjectCharacterModel", b =>
+                {
+                    b.HasOne("Domain.Models.Model", "Model")
+                        .WithMany()
+                        .HasForeignKey("ModelId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Domain.Models.ProjectCharacter", "ProjectCharacter")
+                        .WithMany("Models")
+                        .HasForeignKey("ProjectCharacterId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Models.Project", "Project")
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Model");
+
+                    b.Navigation("Project");
+
+                    b.Navigation("ProjectCharacter");
+                });
+
+            modelBuilder.Entity("Domain.Models.ProjectCharacterTag", b =>
+                {
+                    b.HasOne("Domain.Models.Project", "Project")
+                        .WithMany("CharacterTags")
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Project");
                 });
 
             modelBuilder.Entity("Domain.Models.ProjectConceptImage", b =>
@@ -4179,6 +4577,21 @@ namespace Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("ProjectCharacterTagAssignment", b =>
+                {
+                    b.HasOne("Domain.Models.ProjectCharacter", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectCharacterId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Models.ProjectCharacterTag", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectCharacterTagId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("ProjectScript", b =>
                 {
                     b.HasOne("Domain.Models.Project", null)
@@ -4325,6 +4738,10 @@ namespace Infrastructure.Migrations
 
             modelBuilder.Entity("Domain.Models.Project", b =>
                 {
+                    b.Navigation("CharacterTags");
+
+                    b.Navigation("Characters");
+
                     b.Navigation("ConceptImages");
 
                     b.Navigation("Levels");
@@ -4336,6 +4753,19 @@ namespace Infrastructure.Migrations
                     b.Navigation("Scenes");
                 });
 
+            modelBuilder.Entity("Domain.Models.ProjectCharacter", b =>
+                {
+                    b.Navigation("Abilities");
+
+                    b.Navigation("Images");
+
+                    b.Navigation("Models");
+
+                    b.Navigation("Notes");
+
+                    b.Navigation("Variants");
+                });
+
             modelBuilder.Entity("Domain.Models.ProjectConceptImage", b =>
                 {
                     b.Navigation("Notes");
@@ -4343,6 +4773,8 @@ namespace Infrastructure.Migrations
 
             modelBuilder.Entity("Domain.Models.ProjectLevel", b =>
                 {
+                    b.Navigation("CharacterVariants");
+
                     b.Navigation("ConceptImages");
 
                     b.Navigation("Notes");

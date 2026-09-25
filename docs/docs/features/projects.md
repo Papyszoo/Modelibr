@@ -54,16 +54,29 @@ Removing an asset from a project does NOT delete the asset itself - it only remo
 
 ## Project studio - production context
 
-The Project details page includes a focused **Project studio** section for the first
-production slice:
+The Project details page opens with a **Project studio** section that holds the
+production context above the asset sections:
 
-- **Levels** are ordered units such as `Forest Crossing`, with a small fixed
-  production status vocabulary.
+- **Levels** are ordered units such as `Forest Crossing`, with a description, a
+  small fixed production status vocabulary, and reference images of their own.
+  A level row is a summary of that level, not just its name.
+- **Characters** are first-class production entities. Each one has a name, a
+  description, tags such as `player`, `enemy`, `npc` or `boss`, linked reference
+  images, linked library models, production notes, abilities, and variants that
+  can be scoped to a Level. A character tagged `enemy` shows an
+  **Enemy notes and weaknesses** area instead of the generic notes area, so
+  weaknesses, behaviour, and threat are written where they are read.
 - **Notes & ideas** are plain-text notes. Pinning a note marks it as an idea;
-  a note can target the Project, one Level, or one reference image.
+  a note can target the Project, one Level, one reference image, or one
+  Character.
 - **References** are the existing concept images, now addressable by their
   association ID so titles and Level scope can be updated without replacing the
   underlying library file.
+
+Character editors open one section at a time - identity, notes, media, abilities,
+variants - and each create action sits behind a `+`, so the default view stays a
+scannable list of the cast. Deleting a character removes its production links
+and notes; the linked files, models, and levels stay in the library.
 
 The first slice keeps the existing asset sections intact while making the
 Project-level context visible in the same place. Level assets are derived from
@@ -73,7 +86,9 @@ maintain.
 ## Profile - what is being made
 
 A project's **Profile** section says what the project is targeting, and it is the input an
-agent works from. Five dimensions, each a closed-ish vocabulary you can add to:
+agent works from. It is collapsed under **Project setup** by default, so it never competes
+with the production context above it. Five dimensions, each a closed-ish vocabulary you can
+add to:
 
 | Dimension     | What it decides                                                                    |
 | ------------- | ---------------------------------------------------------------------------------- |

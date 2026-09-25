@@ -30,13 +30,13 @@ public static class ProjectStudioEndpoints
 
         app.MapGet("/projects/{projectId:int}/production-notes", GetProductionNotes)
             .WithName("Get Production Notes")
-            .WithSummary("List project notes, optionally filtered by level, reference image, or pinned state");
+            .WithSummary("List project notes, optionally filtered by level, reference image, character, or pinned state");
         app.MapGet("/projects/{projectId:int}/production-notes/{noteId:int}", GetProductionNote)
             .WithName("Get Production Note")
             .WithSummary("Get one production note owned by the route project");
         app.MapPost("/projects/{projectId:int}/production-notes", CreateProductionNote)
             .WithName("Create Production Note")
-            .WithSummary("Create a project, level, or reference-image note");
+            .WithSummary("Create a project, level, reference-image, or character note");
         app.MapPut("/projects/{projectId:int}/production-notes/{noteId:int}", UpdateProductionNote)
             .WithName("Update Production Note")
             .WithSummary("Update a production note and its optional target");
@@ -117,11 +117,12 @@ public static class ProjectStudioEndpoints
         int projectId,
         int? levelId,
         int? referenceImageId,
+        int? characterId,
         bool? isPinned,
         IQueryHandler<GetProductionNotesQuery, IReadOnlyList<ProductionNoteDto>> handler,
         CancellationToken cancellationToken)
         => Respond(await handler.Handle(
-            new GetProductionNotesQuery(projectId, levelId, referenceImageId, isPinned), cancellationToken));
+            new GetProductionNotesQuery(projectId, levelId, referenceImageId, characterId, isPinned), cancellationToken));
 
     private static async Task<IResult> GetProductionNote(
         int projectId,
@@ -140,6 +141,7 @@ public static class ProjectStudioEndpoints
             projectId,
             request.LevelId,
             request.ReferenceImageId,
+            request.CharacterId,
             request.Title,
             request.Body,
             request.IsPinned), cancellationToken);
@@ -159,6 +161,7 @@ public static class ProjectStudioEndpoints
             noteId,
             request.LevelId,
             request.ReferenceImageId,
+            request.CharacterId,
             request.Title,
             request.Body,
             request.IsPinned), cancellationToken));
@@ -228,6 +231,7 @@ public sealed record ProjectLevelRequest(
 public sealed record ProductionNoteRequest(
     int? LevelId,
     int? ReferenceImageId,
+    int? CharacterId,
     string Title,
     string Body,
     bool IsPinned);

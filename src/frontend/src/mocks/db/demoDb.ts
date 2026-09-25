@@ -307,9 +307,55 @@ export interface DemoProductionNote {
   projectId: number
   levelId: number | null
   referenceImageId: number | null
+  characterId?: number | null
   title: string
   body: string
   isPinned: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface DemoProjectCharacter {
+  id: number
+  projectId: number
+  name: string
+  description: string | null
+  tags: string[]
+  images: {
+    id: number
+    fileId: number | null
+    fileName: string | null
+    title: string | null
+    caption: string | null
+    previewUrl: string | null
+    fileUrl: string | null
+    sortOrder: number
+  }[]
+  models: {
+    id: number
+    modelId: number | null
+    modelName: string | null
+    label: string | null
+    sortOrder: number
+  }[]
+  abilities: {
+    id: number
+    name: string
+    description: string | null
+    sortOrder: number
+  }[]
+  variants: {
+    id: number
+    name: string
+    description: string | null
+    projectLevelId: number | null
+    projectLevelName: string | null
+    sortOrder: number
+  }[]
+  imageCount: number
+  modelCount: number
+  abilityCount: number
+  variantCount: number
   createdAt: string
   updatedAt: string
 }
@@ -334,6 +380,7 @@ export interface DemoProject {
   conceptImages: DemoConceptImage[]
   levels?: DemoProjectLevel[]
   productionNotes?: DemoProductionNote[]
+  characters?: DemoProjectCharacter[]
   models: { id: number; name: string }[]
   textureSets: { id: number; name: string }[]
   sprites: { id: number; name: string }[]

@@ -584,6 +584,289 @@ export const containerHandlers = [
     return HttpResponse.json(toProjectDto(project))
   }),
 
+  http.get('*/projects/:id/characters', async ({ params }) => {
+    const project = await getById('projects', Number(params.id))
+    if (!project) return new HttpResponse(null, { status: 404 })
+    return HttpResponse.json(project.characters ?? [])
+  }),
+
+  http.get('*/projects/:id/characters/:characterId', async ({ params }) => {
+    const project = await getById('projects', Number(params.id))
+    const character = project?.characters?.find(
+      item => item.id === Number(params.characterId)
+    )
+    if (!character) return new HttpResponse(null, { status: 404 })
+    return HttpResponse.json(character)
+  }),
+
+  http.post('*/projects/:id/characters', async ({ params, request }) => {
+    const project = await getById('projects', Number(params.id))
+    if (!project) return new HttpResponse(null, { status: 404 })
+    const body = (await request.json()) as {
+      name: string
+      description?: string | null
+      tags?: string[]
+    }
+    const timestamp = now()
+    const character: NonNullable<DemoProject['characters']>[number] = {
+      id: await nextId('projectCharacters'),
+      projectId: project.id,
+      name: body.name,
+      description: body.description ?? null,
+      tags: [
+        ...new Set((body.tags ?? []).map(tag => tag.trim()).filter(Boolean)),
+      ],
+      images: [],
+      models: [],
+      abilities: [],
+      variants: [],
+      imageCount: 0,
+      modelCount: 0,
+      abilityCount: 0,
+      variantCount: 0,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    }
+    project.characters = [...(project.characters ?? []), character]
+    await put('projects', project)
+    return HttpResponse.json(character, { status: 201 })
+  }),
+
+  http.put(
+    '*/projects/:id/characters/:characterId',
+    async ({ params, request }) => {
+      const project = await getById('projects', Number(params.id))
+      const character = project?.characters?.find(
+        item => item.id === Number(params.characterId)
+      )
+      if (!character) return new HttpResponse(null, { status: 404 })
+      const body = (await request.json()) as {
+        name: string
+        description?: string | null
+        tags?: string[]
+      }
+      character.name = body.name
+      character.description = body.description ?? null
+      character.tags = [
+        ...new Set((body.tags ?? []).map(tag => tag.trim()).filter(Boolean)),
+      ]
+      character.updatedAt = now()
+      await put('projects', project)
+      return HttpResponse.json(character)
+    }
+  ),
+
+  http.delete('*/projects/:id/characters/:characterId', async ({ params }) => {
+    const project = await getById('projects', Number(params.id))
+    if (!project) return new HttpResponse(null, { status: 404 })
+    project.characters = (project.characters ?? []).filter(
+      character => character.id !== Number(params.characterId)
+    )
+    project.productionNotes = (project.productionNotes ?? [])
+      .filter(note => note.characterId !== Number(params.characterId))
+      .map(note => ({ ...note, characterId: null }))
+    await put('projects', project)
+    return new HttpResponse(null, { status: 204 })
+  }),
+
+  http.post(
+    '*/projects/:id/characters/:characterId/images',
+    async ({ params, request }) => {
+      const project = await getById('projects', Number(params.id))
+      const character = project?.characters?.find(
+        item => item.id === Number(params.characterId)
+      )
+      if (!character) return new HttpResponse(null, { status: 404 })
+      const body = (await request.json()) as {
+        fileId: number
+        title?: string | null
+        caption?: string | null
+      }
+      const file = await getFileBlob(body.fileId)
+      if (!file) return new HttpResponse(null, { status: 404 })
+      const image = {
+        id: await nextId('projectCharacterImages'),
+        fileId: body.fileId,
+        fileName: file.fileName,
+        title: body.title ?? null,
+        caption: body.caption ?? null,
+        previewUrl: `/files/${body.fileId}/preview?channel=rgb`,
+        fileUrl: `/files/${body.fileId}`,
+        sortOrder: character.images.length,
+      }
+      character.images = [...character.images, image]
+      character.imageCount = character.images.length
+      character.updatedAt = now()
+      await put('projects', project)
+      return HttpResponse.json(image, { status: 201 })
+    }
+  ),
+
+  http.delete(
+    '*/projects/:id/characters/:characterId/images/:imageId',
+    async ({ params }) => {
+      const project = await getById('projects', Number(params.id))
+      const character = project?.characters?.find(
+        item => item.id === Number(params.characterId)
+      )
+      if (!character) return new HttpResponse(null, { status: 404 })
+      character.images = character.images.filter(
+        image => image.id !== Number(params.imageId)
+      )
+      character.imageCount = character.images.length
+      character.updatedAt = now()
+      await put('projects', project)
+      return new HttpResponse(null, { status: 204 })
+    }
+  ),
+
+  http.post(
+    '*/projects/:id/characters/:characterId/models',
+    async ({ params, request }) => {
+      const project = await getById('projects', Number(params.id))
+      const character = project?.characters?.find(
+        item => item.id === Number(params.characterId)
+      )
+      if (!character) return new HttpResponse(null, { status: 404 })
+      const body = (await request.json()) as {
+        modelId: number
+        label?: string | null
+      }
+      const model = project.models.find(item => item.id === body.modelId)
+      if (!model) return new HttpResponse(null, { status: 404 })
+      const link = {
+        id: await nextId('projectCharacterModels'),
+        modelId: model.id,
+        modelName: model.name,
+        label: body.label ?? null,
+        sortOrder: character.models.length,
+      }
+      character.models = [...character.models, link]
+      character.modelCount = character.models.length
+      character.updatedAt = now()
+      await put('projects', project)
+      return HttpResponse.json(link, { status: 201 })
+    }
+  ),
+
+  http.delete(
+    '*/projects/:id/characters/:characterId/models/:modelLinkId',
+    async ({ params }) => {
+      const project = await getById('projects', Number(params.id))
+      const character = project?.characters?.find(
+        item => item.id === Number(params.characterId)
+      )
+      if (!character) return new HttpResponse(null, { status: 404 })
+      character.models = character.models.filter(
+        model => model.id !== Number(params.modelLinkId)
+      )
+      character.modelCount = character.models.length
+      character.updatedAt = now()
+      await put('projects', project)
+      return new HttpResponse(null, { status: 204 })
+    }
+  ),
+
+  http.post(
+    '*/projects/:id/characters/:characterId/abilities',
+    async ({ params, request }) => {
+      const project = await getById('projects', Number(params.id))
+      const character = project?.characters?.find(
+        item => item.id === Number(params.characterId)
+      )
+      if (!character) return new HttpResponse(null, { status: 404 })
+      const body = (await request.json()) as {
+        name: string
+        description?: string | null
+      }
+      const ability = {
+        id: await nextId('characterAbilities'),
+        name: body.name,
+        description: body.description ?? null,
+        sortOrder: character.abilities.length,
+      }
+      character.abilities = [...character.abilities, ability]
+      character.abilityCount = character.abilities.length
+      character.updatedAt = now()
+      await put('projects', project)
+      return HttpResponse.json(ability, { status: 201 })
+    }
+  ),
+
+  http.delete(
+    '*/projects/:id/characters/:characterId/abilities/:abilityId',
+    async ({ params }) => {
+      const project = await getById('projects', Number(params.id))
+      const character = project?.characters?.find(
+        item => item.id === Number(params.characterId)
+      )
+      if (!character) return new HttpResponse(null, { status: 404 })
+      character.abilities = character.abilities.filter(
+        ability => ability.id !== Number(params.abilityId)
+      )
+      character.abilityCount = character.abilities.length
+      character.updatedAt = now()
+      await put('projects', project)
+      return new HttpResponse(null, { status: 204 })
+    }
+  ),
+
+  http.post(
+    '*/projects/:id/characters/:characterId/variants',
+    async ({ params, request }) => {
+      const project = await getById('projects', Number(params.id))
+      const character = project?.characters?.find(
+        item => item.id === Number(params.characterId)
+      )
+      if (!character) return new HttpResponse(null, { status: 404 })
+      const body = (await request.json()) as {
+        name: string
+        description?: string | null
+        projectLevelId?: number | null
+      }
+      const level = project.levels?.find(
+        item => item.id === body.projectLevelId
+      )
+      if (body.projectLevelId != null && !level) {
+        return HttpResponse.json(
+          { error: 'ProjectLevelNotFound' },
+          { status: 404 }
+        )
+      }
+      const variant = {
+        id: await nextId('characterVariants'),
+        name: body.name,
+        description: body.description ?? null,
+        projectLevelId: level?.id ?? null,
+        projectLevelName: level?.name ?? null,
+        sortOrder: character.variants.length,
+      }
+      character.variants = [...character.variants, variant]
+      character.variantCount = character.variants.length
+      character.updatedAt = now()
+      await put('projects', project)
+      return HttpResponse.json(variant, { status: 201 })
+    }
+  ),
+
+  http.delete(
+    '*/projects/:id/characters/:characterId/variants/:variantId',
+    async ({ params }) => {
+      const project = await getById('projects', Number(params.id))
+      const character = project?.characters?.find(
+        item => item.id === Number(params.characterId)
+      )
+      if (!character) return new HttpResponse(null, { status: 404 })
+      character.variants = character.variants.filter(
+        variant => variant.id !== Number(params.variantId)
+      )
+      character.variantCount = character.variants.length
+      character.updatedAt = now()
+      await put('projects', project)
+      return new HttpResponse(null, { status: 204 })
+    }
+  ),
+
   http.post('*/projects', async ({ request }) => {
     const body = (await request.json()) as {
       name: string
@@ -764,10 +1047,18 @@ export const containerHandlers = [
     if (!project) return new HttpResponse(null, { status: 404 })
     const url = new URL(request.url)
     const levelId = url.searchParams.get('levelId')
+    const referenceImageId = url.searchParams.get('referenceImageId')
+    const characterId = url.searchParams.get('characterId')
     const isPinned = url.searchParams.get('isPinned')
     let notes = project.productionNotes ?? []
     if (levelId !== null)
       notes = notes.filter(note => note.levelId === Number(levelId))
+    if (referenceImageId !== null)
+      notes = notes.filter(
+        note => note.referenceImageId === Number(referenceImageId)
+      )
+    if (characterId !== null)
+      notes = notes.filter(note => note.characterId === Number(characterId))
     if (isPinned !== null)
       notes = notes.filter(note => (note.isPinned === isPinned) === 'true')
     return HttpResponse.json(notes)
@@ -779,11 +1070,17 @@ export const containerHandlers = [
     const body = (await request.json()) as {
       levelId?: number | null
       referenceImageId?: number | null
+      characterId?: number | null
       title: string
       body: string
       isPinned: boolean
     }
-    if (body.levelId != null && body.referenceImageId != null) {
+    const targetCount = [
+      body.levelId,
+      body.referenceImageId,
+      body.characterId,
+    ].filter(value => value != null).length
+    if (targetCount > 1) {
       return HttpResponse.json(
         { error: 'ProductionNoteTargetConflict' },
         { status: 400 }
@@ -794,6 +1091,7 @@ export const containerHandlers = [
       projectId: project.id,
       levelId: body.levelId ?? null,
       referenceImageId: body.referenceImageId ?? null,
+      characterId: body.characterId ?? null,
       title: body.title,
       body: body.body,
       isPinned: body.isPinned,
@@ -825,12 +1123,25 @@ export const containerHandlers = [
       const body = (await request.json()) as {
         levelId?: number | null
         referenceImageId?: number | null
+        characterId?: number | null
         title: string
         body: string
         isPinned: boolean
       }
+      const targetCount = [
+        body.levelId,
+        body.referenceImageId,
+        body.characterId,
+      ].filter(value => value != null).length
+      if (targetCount > 1) {
+        return HttpResponse.json(
+          { error: 'ProductionNoteTargetConflict' },
+          { status: 400 }
+        )
+      }
       note.levelId = body.levelId ?? null
       note.referenceImageId = body.referenceImageId ?? null
+      note.characterId = body.characterId ?? null
       note.title = body.title
       note.body = body.body
       note.isPinned = body.isPinned

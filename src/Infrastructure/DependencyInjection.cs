@@ -104,6 +104,8 @@ namespace Infrastructure
             services.AddScoped<IPackRepository, PackRepository>();
             services.AddScoped<IProjectRepository, ProjectRepository>();
             services.AddScoped<IProjectLevelRepository, ProjectLevelRepository>();
+            services.AddScoped<IProjectCharacterRepository, ProjectCharacterRepository>();
+            services.AddScoped<IProjectCharacterTagRepository, ProjectCharacterTagRepository>();
             services.AddScoped<IProductionNoteRepository, ProductionNoteRepository>();
             services.AddScoped<IProjectReferenceRepository, ProjectReferenceRepository>();
             services.AddScoped<IModelCategoryRepository, ModelCategoryRepository>();

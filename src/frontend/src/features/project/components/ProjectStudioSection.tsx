@@ -14,6 +14,7 @@ import {
 } from '@/features/project/api/projectStudioApi'
 import {
   useProductionNotesQuery,
+  useProjectCharactersQuery,
   useProjectLevelsQuery,
   useProjectReferencesQuery,
 } from '@/features/project/api/projectStudioQueries'
@@ -22,6 +23,8 @@ import {
   ErrorState,
   LoadingState,
 } from '@/shared/components/feedback'
+
+import { ProjectCharactersSection } from './ProjectCharactersSection'
 
 interface ProjectStudioSectionProps {
   projectId: number
@@ -42,6 +45,7 @@ export function ProjectStudioSection({
 }: ProjectStudioSectionProps) {
   const queryClient = useQueryClient()
   const levelsQuery = useProjectLevelsQuery(projectId)
+  const charactersQuery = useProjectCharactersQuery(projectId)
   const notesQuery = useProductionNotesQuery(projectId)
   const referencesQuery = useProjectReferencesQuery(projectId)
   const [levelName, setLevelName] = useState('')
@@ -58,6 +62,9 @@ export function ProjectStudioSection({
     await Promise.all([
       queryClient.invalidateQueries({
         queryKey: ['projects', projectId, 'levels'],
+      }),
+      queryClient.invalidateQueries({
+        queryKey: ['projects', projectId, 'characters'],
       }),
       queryClient.invalidateQueries({
         queryKey: ['projects', projectId, 'production-notes'],
@@ -98,6 +105,8 @@ export function ProjectStudioSection({
         request.levelId = Number(noteTarget.slice('level:'.length))
       } else if (noteTarget.startsWith('reference:')) {
         request.referenceImageId = Number(noteTarget.slice('reference:'.length))
+      } else if (noteTarget.startsWith('character:')) {
+        request.characterId = Number(noteTarget.slice('character:'.length))
       }
       return createProductionNote(projectId, request)
     },
@@ -111,7 +120,10 @@ export function ProjectStudioSection({
   })
 
   const queryError =
-    levelsQuery.error ?? notesQuery.error ?? referencesQuery.error
+    levelsQuery.error ??
+    charactersQuery.error ??
+    notesQuery.error ??
+    referencesQuery.error
   if (queryError) {
     return (
       <ErrorState
@@ -134,6 +146,7 @@ export function ProjectStudioSection({
 
   if (
     levelsQuery.isLoading ||
+    charactersQuery.isLoading ||
     notesQuery.isLoading ||
     referencesQuery.isLoading
   ) {
@@ -141,6 +154,7 @@ export function ProjectStudioSection({
   }
 
   const levels = levelsQuery.data ?? []
+  const characters = charactersQuery.data ?? []
   const notes = notesQuery.data ?? []
   const references = referencesQuery.data ?? []
 
@@ -289,7 +303,9 @@ export function ProjectStudioSection({
                       ? `Level #${note.levelId}`
                       : note.referenceImageId
                         ? `Reference #${note.referenceImageId}`
-                        : 'Project'}
+                        : note.characterId
+                          ? `Character #${note.characterId}`
+                          : 'Project'}
                   </small>
                 </article>
               ))}
@@ -329,6 +345,14 @@ export function ProjectStudioSection({
                       Level: {level.name}
                     </option>
                   ))}
+                  {characters.map(character => (
+                    <option
+                      key={character.id}
+                      value={`character:${character.id}`}
+                    >
+                      Character: {character.name}
+                    </option>
+                  ))}
                   {references.map(reference => (
                     <option
                       key={reference.id}
@@ -361,6 +385,7 @@ export function ProjectStudioSection({
           ) : null}
         </section>
       </div>
+      <ProjectCharactersSection projectId={projectId} onChanged={onChanged} />
     </div>
   )
 }

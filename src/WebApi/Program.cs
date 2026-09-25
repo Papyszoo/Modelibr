@@ -253,6 +253,7 @@ namespace WebApi
             app.MapPackEndpoints();
             app.MapProjectEndpoints();
             app.MapProjectStudioEndpoints();
+            app.MapProjectCharacterEndpoints();
             app.MapModelCategoryEndpoints();
             app.MapStageEndpoints();
             app.MapSceneEndpoints();

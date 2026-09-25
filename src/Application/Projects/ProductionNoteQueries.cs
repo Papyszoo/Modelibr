@@ -8,7 +8,14 @@ public sealed record GetProductionNotesQuery(
     int ProjectId,
     int? LevelId = null,
     int? ReferenceImageId = null,
-    bool? IsPinned = null) : IQuery<IReadOnlyList<ProductionNoteDto>>;
+    int? CharacterId = null,
+    bool? IsPinned = null) : IQuery<IReadOnlyList<ProductionNoteDto>>
+{
+    public GetProductionNotesQuery(int projectId, int? levelId, int? referenceImageId, bool? isPinned)
+        : this(projectId, levelId, referenceImageId, null, isPinned)
+    {
+    }
+}
 
 internal sealed class GetProductionNotesQueryHandler
     : IQueryHandler<GetProductionNotesQuery, IReadOnlyList<ProductionNoteDto>>
@@ -28,6 +35,7 @@ internal sealed class GetProductionNotesQueryHandler
             query.ProjectId,
             query.LevelId,
             query.ReferenceImageId,
+            query.CharacterId,
             query.IsPinned,
             cancellationToken);
         return Result.Success<IReadOnlyList<ProductionNoteDto>>(notes

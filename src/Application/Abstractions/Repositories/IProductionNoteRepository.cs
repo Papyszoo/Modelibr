@@ -10,6 +10,7 @@ public interface IProductionNoteRepository
         int projectId,
         int? levelId = null,
         int? referenceImageId = null,
+        int? characterId = null,
         bool? isPinned = null,
         CancellationToken cancellationToken = default);
     Task UpdateAsync(ProductionNote note, CancellationToken cancellationToken = default);

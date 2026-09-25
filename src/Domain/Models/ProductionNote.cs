@@ -1,12 +1,13 @@
 namespace Domain.Models;
 
-/// <summary>A short piece of production context targeted at the project, one level, or one reference image.</summary>
+/// <summary>A short piece of production context targeted at the project, one level, one reference image, or one character.</summary>
 public class ProductionNote : AggregateRoot
 {
     public int Id { get; private set; }
     public int ProjectId { get; private set; }
     public int? LevelId { get; private set; }
     public int? ReferenceImageId { get; private set; }
+    public int? CharacterId { get; private set; }
     public string Title { get; private set; } = string.Empty;
     public string Body { get; private set; } = string.Empty;
     public bool IsPinned { get; private set; }
@@ -16,11 +17,13 @@ public class ProductionNote : AggregateRoot
     public Project Project { get; private set; } = null!;
     public ProjectLevel? Level { get; private set; }
     public ProjectConceptImage? ReferenceImage { get; private set; }
+    public ProjectCharacter? Character { get; private set; }
 
     public static ProductionNote Create(
         int projectId,
         int? levelId,
         int? referenceImageId,
+        int? characterId,
         string title,
         string body,
         bool isPinned,
@@ -36,13 +39,14 @@ public class ProductionNote : AggregateRoot
             CreatedAt = now,
             UpdatedAt = now
         };
-        note.Update(levelId, referenceImageId, title, body, isPinned, now);
+        note.Update(levelId, referenceImageId, characterId, title, body, isPinned, now);
         return note;
     }
 
     public void Update(
         int? levelId,
         int? referenceImageId,
+        int? characterId,
         string title,
         string body,
         bool isPinned,
@@ -52,8 +56,10 @@ public class ProductionNote : AggregateRoot
             throw new ArgumentException("Level ID must be greater than 0 when supplied.", nameof(levelId));
         if (referenceImageId is <= 0)
             throw new ArgumentException("Reference image ID must be greater than 0 when supplied.", nameof(referenceImageId));
-        if (levelId.HasValue && referenceImageId.HasValue)
-            throw new ArgumentException("A production note can target either a level or a reference image, not both.", nameof(referenceImageId));
+        if (characterId is <= 0)
+            throw new ArgumentException("Character ID must be greater than 0 when supplied.", nameof(characterId));
+        if (new[] { levelId, referenceImageId, characterId }.Count(id => id.HasValue) > 1)
+            throw new ArgumentException("A production note can target only one of a level, reference image, or character.", nameof(characterId));
         if (string.IsNullOrWhiteSpace(title))
             throw new ArgumentException("Production note title is required.", nameof(title));
         if (title.Trim().Length > 200)
@@ -65,6 +71,7 @@ public class ProductionNote : AggregateRoot
 
         LevelId = levelId;
         ReferenceImageId = referenceImageId;
+        CharacterId = characterId;
         Title = title.Trim();
         Body = body.Trim();
         IsPinned = isPinned;

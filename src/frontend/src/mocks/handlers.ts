@@ -156,6 +156,9 @@ export const handlers = [
   // Models (paginated)
   http.get(`${BASE_URL}/models`, ({ request }) => {
     const url = new URL(request.url)
+    if (url.searchParams.has('projectIds')) {
+      return HttpResponse.json(mockModels)
+    }
     const page = Number(url.searchParams.get('page') || '1')
     const pageSize = Number(url.searchParams.get('pageSize') || '50')
     const start = (page - 1) * pageSize
@@ -250,6 +253,101 @@ export const handlers = [
       : new HttpResponse(null, { status: 404 })
   }),
 
+  http.get(`${BASE_URL}/projects/:id/characters`, () => HttpResponse.json([])),
+
+  http.get(
+    `${BASE_URL}/projects/:id/characters/:characterId`,
+    () => new HttpResponse(null, { status: 404 })
+  ),
+
+  http.post(
+    `${BASE_URL}/projects/:id/characters`,
+    async ({ request, params }) => {
+      const body = (await request.json()) as {
+        name: string
+        description?: string | null
+        tags?: string[]
+      }
+      return HttpResponse.json(
+        {
+          id: 1,
+          projectId: Number(params.id),
+          name: body.name,
+          description: body.description ?? null,
+          tags: body.tags ?? [],
+          images: [],
+          models: [],
+          abilities: [],
+          variants: [],
+          imageCount: 0,
+          modelCount: 0,
+          abilityCount: 0,
+          variantCount: 0,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+        { status: 201 }
+      )
+    }
+  ),
+
+  http.put(
+    `${BASE_URL}/projects/:id/characters/:characterId`,
+    () => new HttpResponse(null, { status: 404 })
+  ),
+  http.delete(
+    `${BASE_URL}/projects/:id/characters/:characterId`,
+    () => new HttpResponse(null, { status: 204 })
+  ),
+  http.post(
+    `${BASE_URL}/projects/:id/characters/:characterId/images`,
+    () => new HttpResponse(null, { status: 404 })
+  ),
+  http.put(
+    `${BASE_URL}/projects/:id/characters/:characterId/images/:imageId`,
+    () => new HttpResponse(null, { status: 404 })
+  ),
+  http.delete(
+    `${BASE_URL}/projects/:id/characters/:characterId/images/:imageId`,
+    () => new HttpResponse(null, { status: 204 })
+  ),
+  http.post(
+    `${BASE_URL}/projects/:id/characters/:characterId/models`,
+    () => new HttpResponse(null, { status: 404 })
+  ),
+  http.put(
+    `${BASE_URL}/projects/:id/characters/:characterId/models/:modelLinkId`,
+    () => new HttpResponse(null, { status: 404 })
+  ),
+  http.delete(
+    `${BASE_URL}/projects/:id/characters/:characterId/models/:modelLinkId`,
+    () => new HttpResponse(null, { status: 204 })
+  ),
+  http.post(
+    `${BASE_URL}/projects/:id/characters/:characterId/abilities`,
+    () => new HttpResponse(null, { status: 404 })
+  ),
+  http.put(
+    `${BASE_URL}/projects/:id/characters/:characterId/abilities/:abilityId`,
+    () => new HttpResponse(null, { status: 404 })
+  ),
+  http.delete(
+    `${BASE_URL}/projects/:id/characters/:characterId/abilities/:abilityId`,
+    () => new HttpResponse(null, { status: 204 })
+  ),
+  http.post(
+    `${BASE_URL}/projects/:id/characters/:characterId/variants`,
+    () => new HttpResponse(null, { status: 404 })
+  ),
+  http.put(
+    `${BASE_URL}/projects/:id/characters/:characterId/variants/:variantId`,
+    () => new HttpResponse(null, { status: 404 })
+  ),
+  http.delete(
+    `${BASE_URL}/projects/:id/characters/:characterId/variants/:variantId`,
+    () => new HttpResponse(null, { status: 204 })
+  ),
+
   http.put(`${BASE_URL}/projects/:id/thumbnail`, () => {
     return new HttpResponse(null, { status: 204 })
   }),
@@ -309,6 +407,7 @@ export const handlers = [
       const body = (await request.json()) as {
         levelId?: number | null
         referenceImageId?: number | null
+        characterId?: number | null
         title: string
         body: string
         isPinned: boolean
@@ -319,6 +418,7 @@ export const handlers = [
           projectId: Number(params.id),
           levelId: body.levelId ?? null,
           referenceImageId: body.referenceImageId ?? null,
+          characterId: body.characterId ?? null,
           title: body.title,
           body: body.body,
           isPinned: body.isPinned,

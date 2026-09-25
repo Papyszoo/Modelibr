@@ -41,7 +41,7 @@ public class ProjectStudioCommandTests
         var handler = CreateNoteHandler(out _, out _, out _);
 
         var result = await handler.Handle(new CreateProductionNoteCommand(
-            1, 2, 3, "Conflicting target", "A note can only have one target.", false), CancellationToken.None);
+            1, 2, 3, null, "Conflicting target", "A note can only have one target.", false), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("ProductionNoteTargetConflict", result.Error.Code);
@@ -53,7 +53,7 @@ public class ProjectStudioCommandTests
         var handler = CreateNoteHandler(out _, out var levels, out _);
 
         var result = await handler.Handle(new CreateProductionNoteCommand(
-            1, 2, null, "Crossing beat", "Keep the path readable.", false), CancellationToken.None);
+            1, 2, null, null, "Crossing beat", "Keep the path readable.", false), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("ProductionNoteLevelNotFound", result.Error.Code);
@@ -128,6 +128,7 @@ public class ProjectStudioCommandTests
             projects.Object,
             levels.Object,
             new Mock<IProjectReferenceRepository>().Object,
+            new Mock<IProjectCharacterRepository>().Object,
             notes.Object,
             Clock(),
             new Mock<IUnitOfWork>().Object);

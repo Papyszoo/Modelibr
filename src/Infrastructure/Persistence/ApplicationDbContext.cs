@@ -85,6 +85,12 @@ namespace Infrastructure.Persistence
         public DbSet<Pack> Packs => Set<Pack>();
         public DbSet<Project> Projects => Set<Project>();
         public DbSet<ProjectLevel> ProjectLevels => Set<ProjectLevel>();
+        public DbSet<ProjectCharacter> ProjectCharacters => Set<ProjectCharacter>();
+        public DbSet<ProjectCharacterTag> ProjectCharacterTags => Set<ProjectCharacterTag>();
+        public DbSet<ProjectCharacterImage> ProjectCharacterImages => Set<ProjectCharacterImage>();
+        public DbSet<ProjectCharacterModel> ProjectCharacterModels => Set<ProjectCharacterModel>();
+        public DbSet<CharacterAbility> CharacterAbilities => Set<CharacterAbility>();
+        public DbSet<CharacterVariant> CharacterVariants => Set<CharacterVariant>();
         public DbSet<ProductionNote> ProductionNotes => Set<ProductionNote>();
         public DbSet<ModelCategory> ModelCategories => Set<ModelCategory>();
         public DbSet<TextureSetCategory> TextureSetCategories => Set<TextureSetCategory>();
@@ -769,6 +775,16 @@ namespace Infrastructure.Persistence
                     .HasForeignKey(level => level.ProjectId)
                     .OnDelete(DeleteBehavior.Cascade);
 
+                entity.HasMany(p => p.Characters)
+                    .WithOne(character => character.Project)
+                    .HasForeignKey(character => character.ProjectId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasMany(p => p.CharacterTags)
+                    .WithOne(tag => tag.Project)
+                    .HasForeignKey(tag => tag.ProjectId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
                 entity.HasMany(p => p.ProductionNotes)
                     .WithOne(note => note.Project)
                     .HasForeignKey(note => note.ProjectId)
@@ -802,7 +818,7 @@ namespace Infrastructure.Persistence
                 entity.ToTable("ProductionNotes", table =>
                     table.HasCheckConstraint(
                         "CK_ProductionNotes_OneTarget",
-                        "\"LevelId\" IS NULL OR \"ReferenceImageId\" IS NULL"));
+                        "(CASE WHEN \"LevelId\" IS NOT NULL THEN 1 ELSE 0 END) + (CASE WHEN \"ReferenceImageId\" IS NOT NULL THEN 1 ELSE 0 END) + (CASE WHEN \"CharacterId\" IS NOT NULL THEN 1 ELSE 0 END) <= 1"));
 
                 entity.HasKey(note => note.Id);
                 entity.Property(note => note.Title).IsRequired().HasMaxLength(200);
@@ -814,6 +830,7 @@ namespace Infrastructure.Persistence
                 entity.HasIndex(note => new { note.ProjectId, note.UpdatedAt });
                 entity.HasIndex(note => new { note.ProjectId, note.LevelId });
                 entity.HasIndex(note => new { note.ProjectId, note.ReferenceImageId });
+                entity.HasIndex(note => new { note.ProjectId, note.CharacterId });
                 entity.HasIndex(note => new { note.ProjectId, note.IsPinned });
 
                 entity.HasOne(note => note.Level)
@@ -825,6 +842,163 @@ namespace Infrastructure.Persistence
                     .WithMany(reference => reference.Notes)
                     .HasForeignKey(note => note.ReferenceImageId)
                     .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasOne(note => note.Character)
+                    .WithMany(character => character.Notes)
+                    .HasForeignKey(note => note.CharacterId)
+                    .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            modelBuilder.Entity<ProjectCharacter>(entity =>
+            {
+                entity.HasKey(character => character.Id);
+                entity.Property(character => character.Name).IsRequired().HasMaxLength(200);
+                entity.Property(character => character.Description).HasMaxLength(2000);
+                entity.Property(character => character.CreatedAt).IsRequired();
+                entity.Property(character => character.UpdatedAt).IsRequired();
+
+                entity.HasIndex(character => new { character.ProjectId, character.Name }).IsUnique();
+                entity.HasIndex(character => new { character.ProjectId, character.UpdatedAt });
+            });
+
+            modelBuilder.Entity<ProjectCharacterTag>(entity =>
+            {
+                entity.HasKey(tag => tag.Id);
+                entity.Property(tag => tag.Name).IsRequired().HasMaxLength(100);
+                entity.Property(tag => tag.NormalizedName).IsRequired().HasMaxLength(100);
+                entity.Property(tag => tag.CreatedAt).IsRequired();
+                entity.Property(tag => tag.UpdatedAt).IsRequired();
+                entity.HasIndex(tag => new { tag.ProjectId, tag.NormalizedName }).IsUnique();
+
+                entity.HasMany(tag => tag.Characters)
+                    .WithMany(character => character.Tags)
+                    .UsingEntity<Dictionary<string, object>>(
+                        "ProjectCharacterTagAssignment",
+                        right => right
+                            .HasOne<ProjectCharacter>()
+                            .WithMany()
+                            .HasForeignKey("ProjectCharacterId")
+                            .OnDelete(DeleteBehavior.Cascade),
+                        left => left
+                            .HasOne<ProjectCharacterTag>()
+                            .WithMany()
+                            .HasForeignKey("ProjectCharacterTagId")
+                            .OnDelete(DeleteBehavior.Cascade),
+                        join =>
+                        {
+                            join.ToTable("ProjectCharacterTagAssignments");
+                            join.HasKey("ProjectCharacterId", "ProjectCharacterTagId");
+                            join.HasIndex("ProjectCharacterTagId");
+                        });
+            });
+
+            modelBuilder.Entity<ProjectCharacterImage>(entity =>
+            {
+                entity.ToTable("ProjectCharacterImages", table =>
+                    table.HasCheckConstraint(
+                        "CK_ProjectCharacterImages_SortOrder",
+                        "\"SortOrder\" >= 0"));
+                entity.HasKey(image => image.Id);
+                entity.Property(image => image.FileId).IsRequired(false);
+                entity.Property(image => image.Title).HasMaxLength(200);
+                entity.Property(image => image.Caption).HasMaxLength(2000);
+                entity.Property(image => image.SortOrder).IsRequired();
+                entity.Property(image => image.CreatedAt).IsRequired();
+
+                entity.HasOne(image => image.Project)
+                    .WithMany()
+                    .HasForeignKey(image => image.ProjectId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(image => image.ProjectCharacter)
+                    .WithMany(character => character.Images)
+                    .HasForeignKey(image => image.ProjectCharacterId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(image => image.File)
+                    .WithMany()
+                    .HasForeignKey(image => image.FileId)
+                    .OnDelete(DeleteBehavior.SetNull);
+                entity.HasIndex(image => new { image.ProjectCharacterId, image.FileId }).IsUnique();
+                entity.HasIndex(image => new { image.ProjectCharacterId, image.SortOrder });
+            });
+
+            modelBuilder.Entity<ProjectCharacterModel>(entity =>
+            {
+                entity.ToTable("ProjectCharacterModels", table =>
+                    table.HasCheckConstraint(
+                        "CK_ProjectCharacterModels_SortOrder",
+                        "\"SortOrder\" >= 0"));
+                entity.HasKey(link => link.Id);
+                entity.Property(link => link.ModelId).IsRequired(false);
+                entity.Property(link => link.Label).HasMaxLength(200);
+                entity.Property(link => link.SortOrder).IsRequired();
+                entity.Property(link => link.CreatedAt).IsRequired();
+
+                entity.HasOne(link => link.Project)
+                    .WithMany()
+                    .HasForeignKey(link => link.ProjectId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(link => link.ProjectCharacter)
+                    .WithMany(character => character.Models)
+                    .HasForeignKey(link => link.ProjectCharacterId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(link => link.Model)
+                    .WithMany()
+                    .HasForeignKey(link => link.ModelId)
+                    .OnDelete(DeleteBehavior.SetNull);
+                entity.HasIndex(link => new { link.ProjectCharacterId, link.ModelId }).IsUnique();
+                entity.HasIndex(link => new { link.ProjectCharacterId, link.SortOrder });
+            });
+
+            modelBuilder.Entity<CharacterAbility>(entity =>
+            {
+                entity.ToTable("CharacterAbilities", table =>
+                    table.HasCheckConstraint(
+                        "CK_CharacterAbilities_SortOrder",
+                        "\"SortOrder\" >= 0"));
+                entity.HasKey(ability => ability.Id);
+                entity.Property(ability => ability.Name).IsRequired().HasMaxLength(200);
+                entity.Property(ability => ability.Description).HasMaxLength(2000);
+                entity.Property(ability => ability.SortOrder).IsRequired();
+                entity.Property(ability => ability.CreatedAt).IsRequired();
+
+                entity.HasOne(ability => ability.Project)
+                    .WithMany()
+                    .HasForeignKey(ability => ability.ProjectId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(ability => ability.ProjectCharacter)
+                    .WithMany(character => character.Abilities)
+                    .HasForeignKey(ability => ability.ProjectCharacterId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasIndex(ability => new { ability.ProjectCharacterId, ability.SortOrder });
+            });
+
+            modelBuilder.Entity<CharacterVariant>(entity =>
+            {
+                entity.ToTable("CharacterVariants", table =>
+                    table.HasCheckConstraint(
+                        "CK_CharacterVariants_SortOrder",
+                        "\"SortOrder\" >= 0"));
+                entity.HasKey(variant => variant.Id);
+                entity.Property(variant => variant.Name).IsRequired().HasMaxLength(200);
+                entity.Property(variant => variant.Description).HasMaxLength(2000);
+                entity.Property(variant => variant.ProjectLevelId).IsRequired(false);
+                entity.Property(variant => variant.SortOrder).IsRequired();
+                entity.Property(variant => variant.CreatedAt).IsRequired();
+
+                entity.HasOne(variant => variant.Project)
+                    .WithMany()
+                    .HasForeignKey(variant => variant.ProjectId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(variant => variant.ProjectCharacter)
+                    .WithMany(character => character.Variants)
+                    .HasForeignKey(variant => variant.ProjectCharacterId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(variant => variant.ProjectLevel)
+                    .WithMany(level => level.CharacterVariants)
+                    .HasForeignKey(variant => variant.ProjectLevelId)
+                    .OnDelete(DeleteBehavior.SetNull);
+                entity.HasIndex(variant => new { variant.ProjectCharacterId, variant.SortOrder });
+                entity.HasIndex(variant => variant.ProjectLevelId);
             });
 
             modelBuilder.Entity<ModelCategory>(entity =>

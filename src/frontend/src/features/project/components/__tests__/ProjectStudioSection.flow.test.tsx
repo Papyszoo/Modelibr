@@ -26,6 +26,7 @@ describe('ProjectStudioSection flow', () => {
     queries.useProjectLevelsQuery.mockReturnValue(
       query([{ id: 3, name: 'Forest Crossing' }]) as never
     )
+    queries.useProjectCharactersQuery.mockReturnValue(query([]) as never)
     queries.useProductionNotesQuery.mockReturnValue(query([]) as never)
     queries.useProjectReferencesQuery.mockReturnValue(
       query([{ id: 9, title: 'Misty forest', fileName: 'forest.png' }]) as never

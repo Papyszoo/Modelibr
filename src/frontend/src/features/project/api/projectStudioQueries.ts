@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 
 import {
   getProductionNotes,
+  getProjectCharacters,
   getProjectLevels,
   getProjectReferences,
 } from './projectStudioApi'
@@ -13,9 +14,21 @@ export function useProjectLevelsQuery(projectId: number) {
   })
 }
 
+export function useProjectCharactersQuery(projectId: number) {
+  return useQuery({
+    queryKey: ['projects', projectId, 'characters'],
+    queryFn: () => getProjectCharacters(projectId),
+  })
+}
+
 export function useProductionNotesQuery(
   projectId: number,
-  options: { levelId?: number; isPinned?: boolean } = {}
+  options: {
+    levelId?: number
+    referenceImageId?: number
+    characterId?: number
+    isPinned?: boolean
+  } = {}
 ) {
   return useQuery({
     queryKey: ['projects', projectId, 'production-notes', options],

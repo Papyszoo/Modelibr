@@ -8,6 +8,7 @@ public class ProjectLevel : AggregateRoot
     private readonly List<Scene> _scenes = new();
     private readonly List<ProjectConceptImage> _conceptImages = new();
     private readonly List<ProductionNote> _notes = new();
+    private readonly List<CharacterVariant> _characterVariants = new();
 
     public int Id { get; private set; }
     public int ProjectId { get; private set; }
@@ -47,6 +48,16 @@ public class ProjectLevel : AggregateRoot
         {
             _notes.Clear();
             if (value is not null) _notes.AddRange(value);
+        }
+    }
+
+    public ICollection<CharacterVariant> CharacterVariants
+    {
+        get => _characterVariants;
+        set
+        {
+            _characterVariants.Clear();
+            if (value is not null) _characterVariants.AddRange(value);
         }
     }
 

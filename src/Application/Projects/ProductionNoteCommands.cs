@@ -12,6 +12,7 @@ public sealed record ProductionNoteDto(
     int ProjectId,
     int? LevelId,
     int? ReferenceImageId,
+    int? CharacterId,
     string Title,
     string Body,
     bool IsPinned,
@@ -22,6 +23,7 @@ public sealed record CreateProductionNoteCommand(
     int ProjectId,
     int? LevelId,
     int? ReferenceImageId,
+    int? CharacterId,
     string Title,
     string Body,
     bool IsPinned) : ICommand<ProductionNoteDto>;
@@ -31,6 +33,7 @@ public sealed record UpdateProductionNoteCommand(
     int NoteId,
     int? LevelId,
     int? ReferenceImageId,
+    int? CharacterId,
     string Title,
     string Body,
     bool IsPinned) : ICommand<ProductionNoteDto>;
@@ -43,6 +46,7 @@ internal sealed class CreateProductionNoteCommandHandler
     private readonly IProjectRepository _projects;
     private readonly IProjectLevelRepository _levels;
     private readonly IProjectReferenceRepository _references;
+    private readonly IProjectCharacterRepository _characters;
     private readonly IProductionNoteRepository _notes;
     private readonly IDateTimeProvider _clock;
     private readonly IUnitOfWork _unitOfWork;
@@ -51,6 +55,7 @@ internal sealed class CreateProductionNoteCommandHandler
         IProjectRepository projects,
         IProjectLevelRepository levels,
         IProjectReferenceRepository references,
+        IProjectCharacterRepository characters,
         IProductionNoteRepository notes,
         IDateTimeProvider clock,
         IUnitOfWork unitOfWork)
@@ -58,6 +63,7 @@ internal sealed class CreateProductionNoteCommandHandler
         _projects = projects;
         _levels = levels;
         _references = references;
+        _characters = characters;
         _notes = notes;
         _clock = clock;
         _unitOfWork = unitOfWork;
@@ -75,8 +81,10 @@ internal sealed class CreateProductionNoteCommandHandler
             command.ProjectId,
             command.LevelId,
             command.ReferenceImageId,
+            command.CharacterId,
             _levels,
             _references,
+            _characters,
             cancellationToken);
         if (targetError is not null)
             return Result.Failure<ProductionNoteDto>(targetError);
@@ -87,6 +95,7 @@ internal sealed class CreateProductionNoteCommandHandler
                 command.ProjectId,
                 command.LevelId,
                 command.ReferenceImageId,
+                command.CharacterId,
                 command.Title,
                 command.Body,
                 command.IsPinned,
@@ -108,6 +117,7 @@ internal sealed class UpdateProductionNoteCommandHandler
 {
     private readonly IProjectLevelRepository _levels;
     private readonly IProjectReferenceRepository _references;
+    private readonly IProjectCharacterRepository _characters;
     private readonly IProductionNoteRepository _notes;
     private readonly IDateTimeProvider _clock;
     private readonly IUnitOfWork _unitOfWork;
@@ -115,12 +125,14 @@ internal sealed class UpdateProductionNoteCommandHandler
     public UpdateProductionNoteCommandHandler(
         IProjectLevelRepository levels,
         IProjectReferenceRepository references,
+        IProjectCharacterRepository characters,
         IProductionNoteRepository notes,
         IDateTimeProvider clock,
         IUnitOfWork unitOfWork)
     {
         _levels = levels;
         _references = references;
+        _characters = characters;
         _notes = notes;
         _clock = clock;
         _unitOfWork = unitOfWork;
@@ -140,8 +152,10 @@ internal sealed class UpdateProductionNoteCommandHandler
             command.ProjectId,
             command.LevelId,
             command.ReferenceImageId,
+            command.CharacterId,
             _levels,
             _references,
+            _characters,
             cancellationToken);
         if (targetError is not null)
             return Result.Failure<ProductionNoteDto>(targetError);
@@ -151,6 +165,7 @@ internal sealed class UpdateProductionNoteCommandHandler
             note.Update(
                 command.LevelId,
                 command.ReferenceImageId,
+                command.CharacterId,
                 command.Title,
                 command.Body,
                 command.IsPinned,
@@ -204,6 +219,7 @@ internal static class ProductionNoteView
         note.ProjectId,
         note.LevelId,
         note.ReferenceImageId,
+        note.CharacterId,
         note.Title,
         note.Body,
         note.IsPinned,
@@ -217,14 +233,16 @@ internal static class ProductionNoteTargetGuard
         int projectId,
         int? levelId,
         int? referenceImageId,
+        int? characterId,
         IProjectLevelRepository levels,
         IProjectReferenceRepository references,
+        IProjectCharacterRepository characters,
         CancellationToken cancellationToken)
     {
-        if (levelId.HasValue && referenceImageId.HasValue)
+        if (new[] { levelId, referenceImageId, characterId }.Count(id => id.HasValue) > 1)
             return new Error(
                 "ProductionNoteTargetConflict",
-                "A production note can target either a level or a reference image, not both.");
+                "A production note can target only one of a level, reference image, or character.");
 
         if (levelId is { } level && await levels.GetByIdAsync(projectId, level, cancellationToken) is null)
             return new Error(
@@ -236,6 +254,12 @@ internal static class ProductionNoteTargetGuard
             return new Error(
                 "ProductionNoteReferenceNotFound",
                 $"Reference image {reference} was not found in project {projectId}.");
+
+        if (characterId is { } character
+            && await characters.GetByIdAsync(projectId, character, cancellationToken) is null)
+            return new Error(
+                "ProductionNoteCharacterNotFound",
+                $"Character {character} was not found in project {projectId}.");
 
         return null;
     }

@@ -33,6 +33,7 @@ internal sealed class ProductionNoteRepository : IProductionNoteRepository
         int projectId,
         int? levelId = null,
         int? referenceImageId = null,
+        int? characterId = null,
         bool? isPinned = null,
         CancellationToken cancellationToken = default)
     {
@@ -44,6 +45,8 @@ internal sealed class ProductionNoteRepository : IProductionNoteRepository
             query = query.Where(note => note.LevelId == levelId.Value);
         if (referenceImageId.HasValue)
             query = query.Where(note => note.ReferenceImageId == referenceImageId.Value);
+        if (characterId.HasValue)
+            query = query.Where(note => note.CharacterId == characterId.Value);
         if (isPinned.HasValue)
             query = query.Where(note => note.IsPinned == isPinned.Value);
 

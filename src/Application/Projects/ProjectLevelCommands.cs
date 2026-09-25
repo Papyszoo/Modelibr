@@ -15,6 +15,8 @@ public sealed record ProjectLevelDto(
     string? Description,
     string ProductionStatus,
     int SortOrder,
+    IReadOnlyList<string> CharacterVariantNames,
+    int CharacterVariantCount,
     DateTime CreatedAt,
     DateTime UpdatedAt);
 
@@ -186,6 +188,12 @@ internal static class ProjectLevelView
         level.Description,
         level.ProductionStatus,
         level.SortOrder,
+        level.CharacterVariants
+            .OrderBy(variant => variant.SortOrder)
+            .ThenBy(variant => variant.Id)
+            .Select(variant => variant.Name)
+            .ToList(),
+        level.CharacterVariants.Count,
         level.CreatedAt,
         level.UpdatedAt);
 }

@@ -1,10 +1,15 @@
 import { client } from '@/lib/apiBase'
 
 import {
+  addCharacterAbility,
+  addCharacterVariant,
   createProductionNote,
+  createProjectCharacter,
   createProjectLevel,
   getProductionNotes,
+  getProjectCharacters,
   getProjectReferences,
+  updateCharacterVariant,
   updateProjectReference,
 } from '../projectStudioApi'
 
@@ -58,6 +63,61 @@ describe('Project Studio API', () => {
     expect(mockPut).toHaveBeenCalledWith('/projects/7/references/9', {
       title: 'Lighting reference',
       projectLevelId: 3,
+    })
+  })
+
+  it('uses project-scoped character routes for the cast and its children', async () => {
+    mockGet.mockResolvedValueOnce({ data: [{ id: 3 }] })
+    await getProjectCharacters(7)
+    expect(mockGet).toHaveBeenCalledWith('/projects/7/characters')
+
+    await createProjectCharacter(7, {
+      name: 'Ashen Warden',
+      description: 'A firebound guardian.',
+      tags: ['enemy', 'boss'],
+    })
+    expect(mockPost).toHaveBeenCalledWith('/projects/7/characters', {
+      name: 'Ashen Warden',
+      description: 'A firebound guardian.',
+      tags: ['enemy', 'boss'],
+    })
+
+    await addCharacterAbility(7, 3, { name: 'Ember lash' })
+    expect(mockPost).toHaveBeenCalledWith(
+      '/projects/7/characters/3/abilities',
+      {
+        name: 'Ember lash',
+      }
+    )
+
+    await updateCharacterVariant(7, 3, 8, {
+      name: 'Frozen',
+      projectLevelId: 5,
+    })
+    expect(mockPut).toHaveBeenCalledWith(
+      '/projects/7/characters/3/variants/8',
+      { name: 'Frozen', projectLevelId: 5 }
+    )
+  })
+
+  it('sends the character note target in production-note routes', async () => {
+    mockGet.mockResolvedValueOnce({ data: [] })
+    await getProductionNotes(7, { characterId: 3 })
+    expect(mockGet).toHaveBeenCalledWith(
+      '/projects/7/production-notes?characterId=3'
+    )
+
+    await createProductionNote(7, {
+      characterId: 3,
+      title: 'Weakness',
+      body: 'Quenches under water.',
+      isPinned: false,
+    })
+    expect(mockPost).toHaveBeenCalledWith('/projects/7/production-notes', {
+      characterId: 3,
+      title: 'Weakness',
+      body: 'Quenches under water.',
+      isPinned: false,
     })
   })
 })

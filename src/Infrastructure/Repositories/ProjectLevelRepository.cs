@@ -25,6 +25,7 @@ internal sealed class ProjectLevelRepository : IProjectLevelRepository
         int levelId,
         CancellationToken cancellationToken = default)
         => await _context.ProjectLevels
+            .Include(level => level.CharacterVariants)
             .FirstOrDefaultAsync(
                 level => level.Id == levelId && level.ProjectId == projectId,
                 cancellationToken);
@@ -34,6 +35,7 @@ internal sealed class ProjectLevelRepository : IProjectLevelRepository
         CancellationToken cancellationToken = default)
         => await _context.ProjectLevels
             .AsNoTracking()
+            .Include(level => level.CharacterVariants)
             .Where(level => level.ProjectId == projectId)
             .OrderBy(level => level.SortOrder)
             .ThenBy(level => level.Name)

@@ -30,6 +30,7 @@ export interface ProductionNoteDto {
   projectId: number
   levelId: number | null
   referenceImageId: number | null
+  characterId: number | null
   title: string
   body: string
   isPinned: boolean
@@ -40,6 +41,7 @@ export interface ProductionNoteDto {
 export interface ProductionNoteRequest {
   levelId?: number | null
   referenceImageId?: number | null
+  characterId?: number | null
   title: string
   body: string
   isPinned: boolean
@@ -55,6 +57,91 @@ export interface ProjectReferenceDto {
   previewUrl: string
   fileUrl: string
   sortOrder: number
+}
+
+export interface ProjectCharacterImageDto {
+  id: number
+  fileId: number | null
+  fileName: string | null
+  title: string | null
+  caption: string | null
+  previewUrl: string | null
+  fileUrl: string | null
+  sortOrder: number
+}
+
+export interface ProjectCharacterModelDto {
+  id: number
+  modelId: number | null
+  modelName: string | null
+  label: string | null
+  sortOrder: number
+}
+
+export interface CharacterAbilityDto {
+  id: number
+  name: string
+  description: string | null
+  sortOrder: number
+}
+
+export interface CharacterVariantDto {
+  id: number
+  name: string
+  description: string | null
+  projectLevelId: number | null
+  projectLevelName: string | null
+  sortOrder: number
+}
+
+export interface ProjectCharacterDto {
+  id: number
+  projectId: number
+  name: string
+  description: string | null
+  tags: string[]
+  images: ProjectCharacterImageDto[]
+  models: ProjectCharacterModelDto[]
+  abilities: CharacterAbilityDto[]
+  variants: CharacterVariantDto[]
+  imageCount: number
+  modelCount: number
+  abilityCount: number
+  variantCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ProjectCharacterRequest {
+  name: string
+  description?: string | null
+  tags?: string[]
+}
+
+export interface ProjectCharacterImageRequest {
+  fileId: number
+  title?: string | null
+  caption?: string | null
+  sortOrder?: number
+}
+
+export interface ProjectCharacterModelRequest {
+  modelId: number
+  label?: string | null
+  sortOrder?: number
+}
+
+export interface CharacterAbilityRequest {
+  name: string
+  description?: string | null
+  sortOrder?: number
+}
+
+export interface CharacterVariantRequest {
+  name: string
+  description?: string | null
+  projectLevelId?: number | null
+  sortOrder?: number
 }
 
 export interface ProjectReferenceRequest {
@@ -103,11 +190,19 @@ export async function deleteProjectLevel(
 
 export async function getProductionNotes(
   projectId: number,
-  options: { levelId?: number; isPinned?: boolean } = {}
+  options: {
+    levelId?: number
+    referenceImageId?: number
+    characterId?: number
+    isPinned?: boolean
+  } = {}
 ): Promise<ProductionNoteDto[]> {
   const params = new URLSearchParams()
   if (options.levelId !== undefined) {
     params.set('levelId', String(options.levelId))
+  }
+  if (options.characterId !== undefined) {
+    params.set('characterId', String(options.characterId))
   }
   if (options.isPinned !== undefined) {
     params.set('isPinned', String(options.isPinned))
@@ -172,4 +267,183 @@ export async function updateProjectReference(
     request
   )
   return response.data
+}
+
+export async function getProjectCharacters(
+  projectId: number
+): Promise<ProjectCharacterDto[]> {
+  const response = await client.get<ProjectCharacterDto[]>(
+    `/projects/${projectId}/characters`
+  )
+  return response.data
+}
+
+export async function createProjectCharacter(
+  projectId: number,
+  request: ProjectCharacterRequest
+): Promise<ProjectCharacterDto> {
+  const response = await client.post<ProjectCharacterDto>(
+    `/projects/${projectId}/characters`,
+    request
+  )
+  return response.data
+}
+
+export async function updateProjectCharacter(
+  projectId: number,
+  characterId: number,
+  request: ProjectCharacterRequest
+): Promise<ProjectCharacterDto> {
+  const response = await client.put<ProjectCharacterDto>(
+    `/projects/${projectId}/characters/${characterId}`,
+    request
+  )
+  return response.data
+}
+
+export async function deleteProjectCharacter(
+  projectId: number,
+  characterId: number
+): Promise<void> {
+  await client.delete(`/projects/${projectId}/characters/${characterId}`)
+}
+
+export async function addProjectCharacterImage(
+  projectId: number,
+  characterId: number,
+  request: ProjectCharacterImageRequest
+): Promise<ProjectCharacterImageDto> {
+  const response = await client.post<ProjectCharacterImageDto>(
+    `/projects/${projectId}/characters/${characterId}/images`,
+    request
+  )
+  return response.data
+}
+
+export async function updateProjectCharacterImage(
+  projectId: number,
+  characterId: number,
+  imageId: number,
+  request: ProjectCharacterImageRequest
+): Promise<ProjectCharacterImageDto> {
+  const response = await client.put<ProjectCharacterImageDto>(
+    `/projects/${projectId}/characters/${characterId}/images/${imageId}`,
+    request
+  )
+  return response.data
+}
+
+export async function removeProjectCharacterImage(
+  projectId: number,
+  characterId: number,
+  imageId: number
+): Promise<void> {
+  await client.delete(
+    `/projects/${projectId}/characters/${characterId}/images/${imageId}`
+  )
+}
+
+export async function addProjectCharacterModel(
+  projectId: number,
+  characterId: number,
+  request: ProjectCharacterModelRequest
+): Promise<ProjectCharacterModelDto> {
+  const response = await client.post<ProjectCharacterModelDto>(
+    `/projects/${projectId}/characters/${characterId}/models`,
+    request
+  )
+  return response.data
+}
+
+export async function updateProjectCharacterModel(
+  projectId: number,
+  characterId: number,
+  modelLinkId: number,
+  request: ProjectCharacterModelRequest
+): Promise<ProjectCharacterModelDto> {
+  const response = await client.put<ProjectCharacterModelDto>(
+    `/projects/${projectId}/characters/${characterId}/models/${modelLinkId}`,
+    request
+  )
+  return response.data
+}
+
+export async function removeProjectCharacterModel(
+  projectId: number,
+  characterId: number,
+  modelLinkId: number
+): Promise<void> {
+  await client.delete(
+    `/projects/${projectId}/characters/${characterId}/models/${modelLinkId}`
+  )
+}
+
+export async function addCharacterAbility(
+  projectId: number,
+  characterId: number,
+  request: CharacterAbilityRequest
+): Promise<CharacterAbilityDto> {
+  const response = await client.post<CharacterAbilityDto>(
+    `/projects/${projectId}/characters/${characterId}/abilities`,
+    request
+  )
+  return response.data
+}
+
+export async function updateCharacterAbility(
+  projectId: number,
+  characterId: number,
+  abilityId: number,
+  request: CharacterAbilityRequest
+): Promise<CharacterAbilityDto> {
+  const response = await client.put<CharacterAbilityDto>(
+    `/projects/${projectId}/characters/${characterId}/abilities/${abilityId}`,
+    request
+  )
+  return response.data
+}
+
+export async function removeCharacterAbility(
+  projectId: number,
+  characterId: number,
+  abilityId: number
+): Promise<void> {
+  await client.delete(
+    `/projects/${projectId}/characters/${characterId}/abilities/${abilityId}`
+  )
+}
+
+export async function addCharacterVariant(
+  projectId: number,
+  characterId: number,
+  request: CharacterVariantRequest
+): Promise<CharacterVariantDto> {
+  const response = await client.post<CharacterVariantDto>(
+    `/projects/${projectId}/characters/${characterId}/variants`,
+    request
+  )
+  return response.data
+}
+
+export async function updateCharacterVariant(
+  projectId: number,
+  characterId: number,
+  variantId: number,
+  request: CharacterVariantRequest
+): Promise<CharacterVariantDto> {
+  const response = await client.put<CharacterVariantDto>(
+    `/projects/${projectId}/characters/${characterId}/variants/${variantId}`,
+    request
+  )
+  return response.data
+}
+
+export async function removeCharacterVariant(
+  projectId: number,
+  characterId: number,
+  variantId: number
+): Promise<void> {
+  await client.delete(
+    `/projects/${projectId}/characters/${characterId}/variants/${variantId}`
+  )
 }

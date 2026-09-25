@@ -28,7 +28,7 @@ public class ProjectStudioDomainTests
     [Fact]
     public void ProductionNote_Create_AllowsNoTargetForAProjectNote()
     {
-        var note = ProductionNote.Create(1, null, null, "North star", "Keep the opening readable.", true, Now);
+        var note = ProductionNote.Create(1, null, null, null, "North star", "Keep the opening readable.", true, Now);
 
         Assert.Null(note.LevelId);
         Assert.Null(note.ReferenceImageId);
@@ -36,10 +36,42 @@ public class ProjectStudioDomainTests
     }
 
     [Fact]
-    public void ProductionNote_Create_WhenBothTargetsArePresent_Throws()
+    public void ProjectCharacter_Create_ValidatesIdentityAndNormalizesEnemyTagContext()
+    {
+        var enemy = ProjectCharacterTag.Create(1, " Enemy ", Now);
+        var duplicateEnemy = ProjectCharacterTag.Create(1, "ENEMY", Now);
+
+        var character = ProjectCharacter.Create(1, " Ashen Warden ", "A firebound guardian.", Now, new[] { enemy, duplicateEnemy });
+
+        Assert.Equal("Ashen Warden", character.Name);
+        Assert.Single(character.Tags);
+        Assert.True(character.IsEnemy);
+        Assert.Throws<ArgumentException>(() => ProjectCharacter.Create(1, " ", null, Now));
+        Assert.Throws<ArgumentException>(() => ProjectCharacter.Create(1, "Ashen Warden", new string('x', 2001), Now));
+    }
+
+    [Fact]
+    public void ProductionNote_Create_CanTargetACharacter()
+    {
+        var note = ProductionNote.Create(1, null, null, 7, "Weakness", "Fire breaks its guard.", false, Now);
+
+        Assert.Equal(7, note.CharacterId);
+        Assert.Null(note.LevelId);
+        Assert.Null(note.ReferenceImageId);
+    }
+
+    [Fact]
+    public void ProductionNote_Create_WhenCharacterAndAnotherTargetArePresent_Throws()
     {
         Assert.Throws<ArgumentException>(() =>
-            ProductionNote.Create(1, 2, 3, "Conflict", "A note has one target.", false, Now));
+            ProductionNote.Create(1, 2, null, 3, "Conflict", "A note has one target.", false, Now));
+    }
+
+    [Fact]
+    public void ProductionNote_Create_WhenLevelAndReferenceAreBothTargets_Throws()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            ProductionNote.Create(1, 2, 3, null, "Conflict", "A note has one target.", false, Now));
     }
 
     [Fact]

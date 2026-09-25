@@ -1038,9 +1038,36 @@ export async function ensureDemoDataShape(): Promise<void> {
       project.levels = []
       changed = true
     }
+    if (!Array.isArray(project.characters)) {
+      project.characters = []
+      changed = true
+    }
+    for (const character of project.characters) {
+      for (const key of [
+        'images',
+        'models',
+        'abilities',
+        'variants',
+      ] as const) {
+        if (!Array.isArray(character[key])) {
+          character[key] = []
+          changed = true
+        }
+      }
+      character.imageCount = character.images.length
+      character.modelCount = character.models.length
+      character.abilityCount = character.abilities.length
+      character.variantCount = character.variants.length
+    }
     if (!Array.isArray(project.productionNotes)) {
       project.productionNotes = []
       changed = true
+    }
+    for (const note of project.productionNotes) {
+      if (typeof note.characterId === 'undefined') {
+        note.characterId = null
+        changed = true
+      }
     }
     for (const image of project.conceptImages) {
       if (typeof image.id !== 'number') {
