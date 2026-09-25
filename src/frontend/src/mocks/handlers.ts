@@ -262,6 +262,87 @@ export const handlers = [
     return new HttpResponse(null, { status: 204 })
   }),
 
+  http.get(`${BASE_URL}/projects/:id/levels`, () => HttpResponse.json([])),
+  http.get(
+    `${BASE_URL}/projects/:id/levels/:levelId`,
+    () => new HttpResponse(null, { status: 404 })
+  ),
+  http.post(`${BASE_URL}/projects/:id/levels`, async ({ request, params }) => {
+    const body = (await request.json()) as {
+      name: string
+      description?: string | null
+      productionStatus?: string
+      sortOrder?: number
+    }
+    return HttpResponse.json(
+      {
+        id: 1,
+        projectId: Number(params.id),
+        name: body.name,
+        description: body.description ?? null,
+        productionStatus: body.productionStatus ?? 'planned',
+        sortOrder: body.sortOrder ?? 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      { status: 201 }
+    )
+  }),
+  http.put(
+    `${BASE_URL}/projects/:id/levels/:levelId`,
+    () => new HttpResponse(null, { status: 404 })
+  ),
+  http.delete(
+    `${BASE_URL}/projects/:id/levels/:levelId`,
+    () => new HttpResponse(null, { status: 204 })
+  ),
+  http.get(`${BASE_URL}/projects/:id/production-notes`, () =>
+    HttpResponse.json([])
+  ),
+  http.get(
+    `${BASE_URL}/projects/:id/production-notes/:noteId`,
+    () => new HttpResponse(null, { status: 404 })
+  ),
+  http.post(
+    `${BASE_URL}/projects/:id/production-notes`,
+    async ({ request, params }) => {
+      const body = (await request.json()) as {
+        levelId?: number | null
+        referenceImageId?: number | null
+        title: string
+        body: string
+        isPinned: boolean
+      }
+      return HttpResponse.json(
+        {
+          id: 1,
+          projectId: Number(params.id),
+          levelId: body.levelId ?? null,
+          referenceImageId: body.referenceImageId ?? null,
+          title: body.title,
+          body: body.body,
+          isPinned: body.isPinned,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+        { status: 201 }
+      )
+    }
+  ),
+  http.put(
+    `${BASE_URL}/projects/:id/production-notes/:noteId`,
+    () => new HttpResponse(null, { status: 404 })
+  ),
+  http.delete(
+    `${BASE_URL}/projects/:id/production-notes/:noteId`,
+    () => new HttpResponse(null, { status: 204 })
+  ),
+  http.get(`${BASE_URL}/projects/:id/references`, () => HttpResponse.json([])),
+  http.put(
+    `${BASE_URL}/projects/:id/references/:referenceId`,
+    () => new HttpResponse(null, { status: 404 })
+  ),
+
   // Sounds (paginated)
   http.get(`${BASE_URL}/sounds`, ({ request }) => {
     const url = new URL(request.url)

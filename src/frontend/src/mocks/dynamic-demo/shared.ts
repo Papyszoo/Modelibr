@@ -732,6 +732,9 @@ export function buildConceptImage(
   mimeType?: string
 ) {
   return {
+    id: fileId,
+    projectLevelId: null,
+    title: '',
     fileId,
     fileName,
     previewUrl: `/files/${fileId}/preview?channel=rgb`,
@@ -1030,6 +1033,28 @@ export async function ensureDemoDataShape(): Promise<void> {
     if (!Array.isArray(project.conceptImages)) {
       project.conceptImages = []
       changed = true
+    }
+    if (!Array.isArray(project.levels)) {
+      project.levels = []
+      changed = true
+    }
+    if (!Array.isArray(project.productionNotes)) {
+      project.productionNotes = []
+      changed = true
+    }
+    for (const image of project.conceptImages) {
+      if (typeof image.id !== 'number') {
+        image.id = image.fileId
+        changed = true
+      }
+      if (typeof image.projectLevelId === 'undefined') {
+        image.projectLevelId = null
+        changed = true
+      }
+      if (typeof image.title !== 'string') {
+        image.title = ''
+        changed = true
+      }
     }
     if (!Array.isArray(project.models)) {
       project.models = []

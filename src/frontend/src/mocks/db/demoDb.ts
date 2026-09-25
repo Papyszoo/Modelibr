@@ -46,6 +46,9 @@ export interface DemoModel {
 }
 
 export interface DemoConceptImage {
+  id?: number
+  projectLevelId?: number | null
+  title?: string
   fileId: number
   fileName: string
   previewUrl: string
@@ -288,6 +291,29 @@ export interface DemoPack {
   environmentMaps?: { id: number; name: string }[]
 }
 
+export interface DemoProjectLevel {
+  id: number
+  projectId: number
+  name: string
+  description: string | null
+  productionStatus: 'planned' | 'in_progress' | 'review' | 'blocked' | 'done'
+  sortOrder: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface DemoProductionNote {
+  id: number
+  projectId: number
+  levelId: number | null
+  referenceImageId: number | null
+  title: string
+  body: string
+  isPinned: boolean
+  createdAt: string
+  updatedAt: string
+}
+
 export interface DemoProject {
   id: number
   name: string
@@ -306,6 +332,8 @@ export interface DemoProject {
   customThumbnailFileId?: number | null
   customThumbnailUrl?: string | null
   conceptImages: DemoConceptImage[]
+  levels?: DemoProjectLevel[]
+  productionNotes?: DemoProductionNote[]
   models: { id: number; name: string }[]
   textureSets: { id: number; name: string }[]
   sprites: { id: number; name: string }[]

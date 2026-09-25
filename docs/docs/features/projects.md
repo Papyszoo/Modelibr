@@ -52,6 +52,24 @@ Right-click an asset within the project and select **Remove from Project**.
 Removing an asset from a project does NOT delete the asset itself - it only removes the association.
 :::
 
+## Project studio - production context
+
+The Project details page includes a focused **Project studio** section for the first
+production slice:
+
+- **Levels** are ordered units such as `Forest Crossing`, with a small fixed
+  production status vocabulary.
+- **Notes & ideas** are plain-text notes. Pinning a note marks it as an idea;
+  a note can target the Project, one Level, or one reference image.
+- **References** are the existing concept images, now addressable by their
+  association ID so titles and Level scope can be updated without replacing the
+  underlying library file.
+
+The first slice keeps the existing asset sections intact while making the
+Project-level context visible in the same place. Level assets are derived from
+linked Scenes in the next slice; there is no second asset relationship to
+maintain.
+
 ## Profile - what is being made
 
 A project's **Profile** section says what the project is targeting, and it is the input an

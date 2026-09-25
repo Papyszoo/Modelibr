@@ -63,7 +63,12 @@ internal sealed class GetAllScenesQueryHandler : IQueryHandler<GetAllScenesQuery
                 ? SceneViewBuilder.Summarize(scene, parsed.Value)
                 : new SceneSummary(
                     scene.Id, scene.Name, scene.Description, scene.SchemaVersion, scene.Revision,
-                    NodeCount: -1, LightCount: -1, scene.CreatedAt, scene.UpdatedAt));
+                    NodeCount: -1, LightCount: -1, scene.CreatedAt, scene.UpdatedAt,
+                    ProjectId: scene.ProjectId,
+                    ProjectName: scene.Project?.Name,
+                    ProjectLevelId: scene.ProjectLevelId,
+                    IsPrimaryLevelScene: scene.IsPrimaryLevelScene,
+                    ProjectLevelName: scene.ProjectLevel?.Name));
         }
 
         return Result.Success(new GetAllScenesResponse(summaries));

@@ -84,6 +84,8 @@ namespace Infrastructure.Persistence
         public DbSet<Material> Materials => Set<Material>();
         public DbSet<Pack> Packs => Set<Pack>();
         public DbSet<Project> Projects => Set<Project>();
+        public DbSet<ProjectLevel> ProjectLevels => Set<ProjectLevel>();
+        public DbSet<ProductionNote> ProductionNotes => Set<ProductionNote>();
         public DbSet<ModelCategory> ModelCategories => Set<ModelCategory>();
         public DbSet<TextureSetCategory> TextureSetCategories => Set<TextureSetCategory>();
         public DbSet<ModelTag> ModelTags => Set<ModelTag>();
@@ -762,8 +764,67 @@ namespace Infrastructure.Persistence
                     .HasForeignKey(ci => ci.ProjectId)
                     .OnDelete(DeleteBehavior.Cascade);
 
+                entity.HasMany(p => p.Levels)
+                    .WithOne(level => level.Project)
+                    .HasForeignKey(level => level.ProjectId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasMany(p => p.ProductionNotes)
+                    .WithOne(note => note.Project)
+                    .HasForeignKey(note => note.ProjectId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
                 // Create index for efficient querying by name
                 entity.HasIndex(p => p.Name);
+            });
+
+            modelBuilder.Entity<ProjectLevel>(entity =>
+            {
+                entity.ToTable("ProjectLevels", table =>
+                    table.HasCheckConstraint(
+                        "CK_ProjectLevels_ProductionStatus",
+                        "\"ProductionStatus\" IN ('planned', 'in_progress', 'review', 'blocked', 'done')"));
+
+                entity.HasKey(level => level.Id);
+                entity.Property(level => level.Name).IsRequired().HasMaxLength(200);
+                entity.Property(level => level.Description).HasMaxLength(2000);
+                entity.Property(level => level.ProductionStatus).IsRequired().HasMaxLength(20);
+                entity.Property(level => level.SortOrder).IsRequired();
+                entity.Property(level => level.CreatedAt).IsRequired();
+                entity.Property(level => level.UpdatedAt).IsRequired();
+
+                entity.HasIndex(level => new { level.ProjectId, level.Name }).IsUnique();
+                entity.HasIndex(level => new { level.ProjectId, level.SortOrder });
+            });
+
+            modelBuilder.Entity<ProductionNote>(entity =>
+            {
+                entity.ToTable("ProductionNotes", table =>
+                    table.HasCheckConstraint(
+                        "CK_ProductionNotes_OneTarget",
+                        "\"LevelId\" IS NULL OR \"ReferenceImageId\" IS NULL"));
+
+                entity.HasKey(note => note.Id);
+                entity.Property(note => note.Title).IsRequired().HasMaxLength(200);
+                entity.Property(note => note.Body).IsRequired().HasMaxLength(10_000);
+                entity.Property(note => note.IsPinned).IsRequired();
+                entity.Property(note => note.CreatedAt).IsRequired();
+                entity.Property(note => note.UpdatedAt).IsRequired();
+
+                entity.HasIndex(note => new { note.ProjectId, note.UpdatedAt });
+                entity.HasIndex(note => new { note.ProjectId, note.LevelId });
+                entity.HasIndex(note => new { note.ProjectId, note.ReferenceImageId });
+                entity.HasIndex(note => new { note.ProjectId, note.IsPinned });
+
+                entity.HasOne(note => note.Level)
+                    .WithMany(level => level.Notes)
+                    .HasForeignKey(note => note.LevelId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasOne(note => note.ReferenceImage)
+                    .WithMany(reference => reference.Notes)
+                    .HasForeignKey(note => note.ReferenceImageId)
+                    .OnDelete(DeleteBehavior.SetNull);
             });
 
             modelBuilder.Entity<ModelCategory>(entity =>
@@ -822,6 +883,8 @@ namespace Infrastructure.Persistence
             modelBuilder.Entity<ProjectConceptImage>(entity =>
             {
                 entity.HasKey(ci => ci.Id);
+                entity.Property(ci => ci.ProjectLevelId).IsRequired(false);
+                entity.Property(ci => ci.Title).IsRequired().HasMaxLength(200);
                 entity.Property(ci => ci.SortOrder).IsRequired();
                 entity.Property(ci => ci.CreatedAt).IsRequired();
 
@@ -830,8 +893,14 @@ namespace Infrastructure.Persistence
                     .HasForeignKey(ci => ci.FileId)
                     .OnDelete(DeleteBehavior.Cascade);
 
+                entity.HasOne(ci => ci.ProjectLevel)
+                    .WithMany(level => level.ConceptImages)
+                    .HasForeignKey(ci => ci.ProjectLevelId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
                 entity.HasIndex(ci => new { ci.ProjectId, ci.FileId }).IsUnique();
                 entity.HasIndex(ci => new { ci.ProjectId, ci.SortOrder });
+                entity.HasIndex(ci => new { ci.ProjectLevelId, ci.SortOrder });
             });
 
             // Configure Stage entity
@@ -879,7 +948,22 @@ namespace Infrastructure.Persistence
                     .HasForeignKey(s => s.ProjectId)
                     .OnDelete(DeleteBehavior.SetNull);
 
+                entity.HasOne(s => s.ProjectLevel)
+                    .WithMany(level => level.Scenes)
+                    .HasForeignKey(s => s.ProjectLevelId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.ToTable("Scenes", table =>
+                    table.HasCheckConstraint(
+                        "CK_Scenes_PrimaryLevelRequiresLevel",
+                        "\"IsPrimaryLevelScene\" = false OR \"ProjectLevelId\" IS NOT NULL"));
+
                 entity.HasIndex(s => s.ProjectId);
+                entity.HasIndex(s => s.ProjectLevelId);
+                entity.HasIndex(s => s.ProjectLevelId)
+                    .IsUnique()
+                    .HasFilter("\"ProjectLevelId\" IS NOT NULL AND \"IsPrimaryLevelScene\" = true")
+                    .HasDatabaseName("IX_Scenes_PrimaryLevel");
             });
 
             // What each scene's nodes point at, so a project's derived asset list is a join

@@ -21,7 +21,10 @@ public sealed record SceneSummary(
     DateTime UpdatedAt,
     string? Stage = null,
     int? ProjectId = null,
-    string? ProjectName = null);
+    string? ProjectName = null,
+    int? ProjectLevelId = null,
+    bool IsPrimaryLevelScene = false,
+    string? ProjectLevelName = null);
 
 /// <summary>
 /// One node with the spatial truth an agent needs to reason about it without a viewport:
@@ -94,7 +97,10 @@ public static class SceneViewBuilder
         scene.UpdatedAt,
         document.Stage,
         scene.ProjectId,
-        scene.Project?.Name);
+        scene.Project?.Name,
+        scene.ProjectLevelId,
+        scene.IsPrimaryLevelScene,
+        scene.ProjectLevel?.Name);
 
     public static SceneView Build(
         Scene scene,

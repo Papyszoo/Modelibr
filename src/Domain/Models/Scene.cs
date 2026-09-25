@@ -52,7 +52,14 @@ public class Scene : AggregateRoot
     /// </remarks>
     public int? ProjectId { get; private set; }
 
+    /// <summary>The level this scene implements, when it is part of level production.</summary>
+    public int? ProjectLevelId { get; private set; }
+
+    /// <summary>Whether this is the level's primary implementation scene.</summary>
+    public bool IsPrimaryLevelScene { get; private set; }
+
     public Project? Project { get; private set; }
+    public ProjectLevel? ProjectLevel { get; private set; }
 
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
@@ -108,6 +115,20 @@ public class Scene : AggregateRoot
     public void SetProject(int? projectId, DateTime now)
     {
         ProjectId = projectId;
+        Revision++;
+        UpdatedAt = now;
+    }
+
+    /// <summary>Links the scene to a level, or clears the level link with null.</summary>
+    public void SetLevel(int? projectLevelId, bool isPrimary, DateTime now)
+    {
+        if (projectLevelId is <= 0)
+            throw new ArgumentException("Project level ID must be greater than 0 when supplied.", nameof(projectLevelId));
+        if (projectLevelId is null && isPrimary)
+            throw new ArgumentException("A primary level scene must have a project level.", nameof(isPrimary));
+
+        ProjectLevelId = projectLevelId;
+        IsPrimaryLevelScene = projectLevelId.HasValue && isPrimary;
         Revision++;
         UpdatedAt = now;
     }

@@ -5,6 +5,7 @@ namespace Application.Abstractions.Repositories;
 public interface ISceneRepository
 {
     Task<Scene?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
+    Task<Scene?> GetPrimaryByLevelAsync(int levelId, CancellationToken cancellationToken = default);
     Task<IEnumerable<Scene>> GetAllAsync(CancellationToken cancellationToken = default);
     Task AddAsync(Scene scene, CancellationToken cancellationToken = default);
     Task UpdateAsync(Scene scene, CancellationToken cancellationToken = default);

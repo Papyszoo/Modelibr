@@ -103,6 +103,9 @@ namespace Infrastructure
             services.AddScoped<ITextureProxyRepository, TextureProxyRepository>();
             services.AddScoped<IPackRepository, PackRepository>();
             services.AddScoped<IProjectRepository, ProjectRepository>();
+            services.AddScoped<IProjectLevelRepository, ProjectLevelRepository>();
+            services.AddScoped<IProductionNoteRepository, ProductionNoteRepository>();
+            services.AddScoped<IProjectReferenceRepository, ProjectReferenceRepository>();
             services.AddScoped<IModelCategoryRepository, ModelCategoryRepository>();
             services.AddScoped<IModelTagRepository, ModelTagRepository>();
             services.AddScoped<IStageRepository, StageRepository>();

@@ -678,6 +678,230 @@ export const containerHandlers = [
     return new HttpResponse(null, { status: 204 })
   }),
 
+  http.get('*/projects/:id/levels', async ({ params }) => {
+    const project = await getById('projects', Number(params.id))
+    if (!project) return new HttpResponse(null, { status: 404 })
+    return HttpResponse.json(project.levels ?? [])
+  }),
+
+  http.get('*/projects/:id/levels/:levelId', async ({ params }) => {
+    const project = await getById('projects', Number(params.id))
+    const level = project?.levels?.find(
+      item => item.id === Number(params.levelId)
+    )
+    if (!level) return new HttpResponse(null, { status: 404 })
+    return HttpResponse.json(level)
+  }),
+
+  http.post('*/projects/:id/levels', async ({ params, request }) => {
+    const project = await getById('projects', Number(params.id))
+    if (!project) return new HttpResponse(null, { status: 404 })
+    const body = (await request.json()) as {
+      name: string
+      description?: string | null
+      productionStatus?:
+        | 'planned'
+        | 'in_progress'
+        | 'review'
+        | 'blocked'
+        | 'done'
+      sortOrder?: number
+    }
+    const level = {
+      id: await nextId('projectLevels'),
+      projectId: project.id,
+      name: body.name,
+      description: body.description ?? null,
+      productionStatus: body.productionStatus ?? 'planned',
+      sortOrder: body.sortOrder ?? project.levels?.length ?? 0,
+      createdAt: now(),
+      updatedAt: now(),
+    } as NonNullable<DemoProject['levels']>[number]
+    project.levels = [...(project.levels ?? []), level]
+    await put('projects', project)
+    return HttpResponse.json(level, { status: 201 })
+  }),
+
+  http.put('*/projects/:id/levels/:levelId', async ({ params, request }) => {
+    const project = await getById('projects', Number(params.id))
+    const level = project?.levels?.find(
+      item => item.id === Number(params.levelId)
+    )
+    if (!level) return new HttpResponse(null, { status: 404 })
+    const body = (await request.json()) as {
+      name: string
+      description?: string | null
+      productionStatus?:
+        | 'planned'
+        | 'in_progress'
+        | 'review'
+        | 'blocked'
+        | 'done'
+      sortOrder?: number
+    }
+    level.name = body.name
+    if (body.description !== undefined) level.description = body.description
+    if (body.productionStatus !== undefined)
+      level.productionStatus = body.productionStatus
+    if (body.sortOrder !== undefined) level.sortOrder = body.sortOrder
+    level.updatedAt = now()
+    await put('projects', project)
+    return HttpResponse.json(level)
+  }),
+
+  http.delete('*/projects/:id/levels/:levelId', async ({ params }) => {
+    const project = await getById('projects', Number(params.id))
+    if (!project) return new HttpResponse(null, { status: 404 })
+    project.levels = (project.levels ?? []).filter(
+      level => level.id !== Number(params.levelId)
+    )
+    await put('projects', project)
+    return new HttpResponse(null, { status: 204 })
+  }),
+
+  http.get('*/projects/:id/production-notes', async ({ params, request }) => {
+    const project = await getById('projects', Number(params.id))
+    if (!project) return new HttpResponse(null, { status: 404 })
+    const url = new URL(request.url)
+    const levelId = url.searchParams.get('levelId')
+    const isPinned = url.searchParams.get('isPinned')
+    let notes = project.productionNotes ?? []
+    if (levelId !== null)
+      notes = notes.filter(note => note.levelId === Number(levelId))
+    if (isPinned !== null)
+      notes = notes.filter(note => (note.isPinned === isPinned) === 'true')
+    return HttpResponse.json(notes)
+  }),
+
+  http.post('*/projects/:id/production-notes', async ({ params, request }) => {
+    const project = await getById('projects', Number(params.id))
+    if (!project) return new HttpResponse(null, { status: 404 })
+    const body = (await request.json()) as {
+      levelId?: number | null
+      referenceImageId?: number | null
+      title: string
+      body: string
+      isPinned: boolean
+    }
+    if (body.levelId != null && body.referenceImageId != null) {
+      return HttpResponse.json(
+        { error: 'ProductionNoteTargetConflict' },
+        { status: 400 }
+      )
+    }
+    const note = {
+      id: await nextId('productionNotes'),
+      projectId: project.id,
+      levelId: body.levelId ?? null,
+      referenceImageId: body.referenceImageId ?? null,
+      title: body.title,
+      body: body.body,
+      isPinned: body.isPinned,
+      createdAt: now(),
+      updatedAt: now(),
+    }
+    project.productionNotes = [...(project.productionNotes ?? []), note]
+    await put('projects', project)
+    return HttpResponse.json(note, { status: 201 })
+  }),
+
+  http.get('*/projects/:id/production-notes/:noteId', async ({ params }) => {
+    const project = await getById('projects', Number(params.id))
+    const note = project?.productionNotes?.find(
+      item => item.id === Number(params.noteId)
+    )
+    if (!note) return new HttpResponse(null, { status: 404 })
+    return HttpResponse.json(note)
+  }),
+
+  http.put(
+    '*/projects/:id/production-notes/:noteId',
+    async ({ params, request }) => {
+      const project = await getById('projects', Number(params.id))
+      const note = project?.productionNotes?.find(
+        item => item.id === Number(params.noteId)
+      )
+      if (!note) return new HttpResponse(null, { status: 404 })
+      const body = (await request.json()) as {
+        levelId?: number | null
+        referenceImageId?: number | null
+        title: string
+        body: string
+        isPinned: boolean
+      }
+      note.levelId = body.levelId ?? null
+      note.referenceImageId = body.referenceImageId ?? null
+      note.title = body.title
+      note.body = body.body
+      note.isPinned = body.isPinned
+      note.updatedAt = now()
+      await put('projects', project)
+      return HttpResponse.json(note)
+    }
+  ),
+
+  http.delete('*/projects/:id/production-notes/:noteId', async ({ params }) => {
+    const project = await getById('projects', Number(params.id))
+    if (!project) return new HttpResponse(null, { status: 404 })
+    project.productionNotes = (project.productionNotes ?? []).filter(
+      note => note.id !== Number(params.noteId)
+    )
+    await put('projects', project)
+    return new HttpResponse(null, { status: 204 })
+  }),
+
+  http.get('*/projects/:id/references', async ({ params, request }) => {
+    const project = await getById('projects', Number(params.id))
+    if (!project) return new HttpResponse(null, { status: 404 })
+    const url = new URL(request.url)
+    const levelId = url.searchParams.get('levelId')
+    const references = (project.conceptImages ?? [])
+      .filter(
+        image => levelId === null || image.projectLevelId === Number(levelId)
+      )
+      .map(image => ({
+        id: image.id ?? image.fileId,
+        projectId: project.id,
+        projectLevelId: image.projectLevelId ?? null,
+        title: image.title ?? '',
+        fileId: image.fileId,
+        fileName: image.fileName,
+        previewUrl: image.previewUrl,
+        fileUrl: image.fileUrl,
+        sortOrder: image.sortOrder,
+      }))
+    return HttpResponse.json(references)
+  }),
+
+  http.put(
+    '*/projects/:id/references/:referenceId',
+    async ({ params, request }) => {
+      const project = await getById('projects', Number(params.id))
+      const reference = project?.conceptImages?.find(
+        image => (image.id ?? image.fileId) === Number(params.referenceId)
+      )
+      if (!project || !reference) return new HttpResponse(null, { status: 404 })
+      const body = (await request.json()) as {
+        title?: string | null
+        projectLevelId?: number | null
+      }
+      reference.title = body.title ?? ''
+      reference.projectLevelId = body.projectLevelId ?? null
+      await put('projects', project)
+      return HttpResponse.json({
+        id: reference.id ?? reference.fileId,
+        projectId: project.id,
+        projectLevelId: reference.projectLevelId,
+        title: reference.title,
+        fileId: reference.fileId,
+        fileName: reference.fileName,
+        previewUrl: reference.previewUrl,
+        fileUrl: reference.fileUrl,
+        sortOrder: reference.sortOrder,
+      })
+    }
+  ),
+
   http.delete('*/projects/:id', async ({ params }) => {
     await remove('projects', Number(params.id))
     return new HttpResponse(null, { status: 204 })

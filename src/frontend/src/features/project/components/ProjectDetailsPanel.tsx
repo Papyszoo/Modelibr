@@ -24,6 +24,7 @@ import { projectDetailsFormSchema } from '@/shared/validation/formSchemas'
 import { type ProjectDetailDto } from '@/types'
 
 import { ProjectProfileSection } from './ProjectProfileSection'
+import { ProjectStudioSection } from './ProjectStudioSection'
 
 type ProjectDetailsInput = z.input<typeof projectDetailsFormSchema>
 type ProjectDetailsOutput = z.output<typeof projectDetailsFormSchema>
@@ -304,6 +305,13 @@ export function ProjectDetailsPanel({
               tabId={tabStateKey}
               onDirtyChange={setProfileDirty}
               showToast={showToast}
+            />
+          </div>
+
+          <div className="container-rich-block">
+            <ProjectStudioSection
+              projectId={project.id}
+              onChanged={refetchContainer}
             />
           </div>
 

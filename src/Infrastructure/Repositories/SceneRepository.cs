@@ -22,14 +22,26 @@ internal sealed class SceneRepository : ISceneRepository
         // the write paths take this same read.
         return await _context.Scenes
             .Include(s => s.Project)
+            .Include(s => s.ProjectLevel)
             .FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
     }
+
+    public async Task<Scene?> GetPrimaryByLevelAsync(
+        int levelId,
+        CancellationToken cancellationToken = default)
+        => await _context.Scenes
+            .Include(s => s.Project)
+            .Include(s => s.ProjectLevel)
+            .FirstOrDefaultAsync(
+                s => s.ProjectLevelId == levelId && s.IsPrimaryLevelScene,
+                cancellationToken);
 
     public async Task<IEnumerable<Scene>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return await _context.Scenes
             .AsNoTracking()
             .Include(s => s.Project)
+            .Include(s => s.ProjectLevel)
             .OrderByDescending(s => s.UpdatedAt)
             .ToListAsync(cancellationToken);
     }

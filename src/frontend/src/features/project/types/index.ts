@@ -42,6 +42,10 @@ export interface ProjectDto {
 }
 
 export interface ProjectConceptImageDto {
+  /** Association id used by level-scoped reference updates and image notes. */
+  id?: number
+  projectLevelId?: number | null
+  title?: string | null
   fileId: number
   fileName: string
   previewUrl: string

@@ -16,6 +16,8 @@ public class Project : AggregateRoot
     private readonly List<Script> _scripts = new();
     private readonly List<EnvironmentMap> _environmentMaps = new();
     private readonly List<ProjectConceptImage> _conceptImages = new();
+    private readonly List<ProjectLevel> _levels = new();
+    private readonly List<ProductionNote> _productionNotes = new();
     private readonly List<ProjectProfileValue> _profileValues = new();
     private readonly List<Scene> _scenes = new();
 
@@ -176,6 +178,28 @@ public class Project : AggregateRoot
             _conceptImages.Clear();
             if (value != null)
                 _conceptImages.AddRange(value);
+        }
+    }
+
+    public ICollection<ProjectLevel> Levels
+    {
+        get => _levels;
+        set
+        {
+            _levels.Clear();
+            if (value != null)
+                _levels.AddRange(value);
+        }
+    }
+
+    public ICollection<ProductionNote> ProductionNotes
+    {
+        get => _productionNotes;
+        set
+        {
+            _productionNotes.Clear();
+            if (value != null)
+                _productionNotes.AddRange(value);
         }
     }
 

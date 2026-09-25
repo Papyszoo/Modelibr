@@ -77,6 +77,13 @@ internal sealed class SetSceneProjectCommandHandler
                 scene.Id, scene.ProjectId, projectName, previous, scene.Revision));
         }
 
+        if (scene.ProjectLevelId.HasValue)
+        {
+            return Result.Failure<SetSceneProjectResponse>(new Error(
+                "SceneLevelProjectMismatch",
+                $"Scene {scene.Id} belongs to level {scene.ProjectLevelId}; unlink the level before changing its project."));
+        }
+
         scene.SetProject(command.ProjectId, _clock.UtcNow);
         await _scenes.UpdateAsync(scene, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);

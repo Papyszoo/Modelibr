@@ -1,0 +1,191 @@
+using Application.Abstractions;
+using Application.Abstractions.Messaging;
+using Application.Abstractions.Repositories;
+using Domain.Models;
+using Domain.Projects;
+using Domain.Services;
+using SharedKernel;
+
+namespace Application.Projects;
+
+public sealed record ProjectLevelDto(
+    int Id,
+    int ProjectId,
+    string Name,
+    string? Description,
+    string ProductionStatus,
+    int SortOrder,
+    DateTime CreatedAt,
+    DateTime UpdatedAt);
+
+public sealed record CreateProjectLevelCommand(
+    int ProjectId,
+    string Name,
+    string? Description,
+    string? ProductionStatus,
+    int? SortOrder) : ICommand<ProjectLevelDto>;
+
+public sealed record UpdateProjectLevelCommand(
+    int ProjectId,
+    int LevelId,
+    string Name,
+    string? Description,
+    string? ProductionStatus,
+    int? SortOrder) : ICommand<ProjectLevelDto>;
+
+public sealed record DeleteProjectLevelCommand(int ProjectId, int LevelId) : ICommand;
+
+internal sealed class CreateProjectLevelCommandHandler
+    : ICommandHandler<CreateProjectLevelCommand, ProjectLevelDto>
+{
+    private readonly IProjectRepository _projects;
+    private readonly IProjectLevelRepository _levels;
+    private readonly IDateTimeProvider _clock;
+    private readonly IUnitOfWork _unitOfWork;
+
+    public CreateProjectLevelCommandHandler(
+        IProjectRepository projects,
+        IProjectLevelRepository levels,
+        IDateTimeProvider clock,
+        IUnitOfWork unitOfWork)
+    {
+        _projects = projects;
+        _levels = levels;
+        _clock = clock;
+        _unitOfWork = unitOfWork;
+    }
+
+    public async Task<Result<ProjectLevelDto>> Handle(
+        CreateProjectLevelCommand command,
+        CancellationToken cancellationToken)
+    {
+        if (await _projects.GetByIdAsync(command.ProjectId, cancellationToken) is null)
+            return Result.Failure<ProjectLevelDto>(new Error(
+                "ProjectNotFound", $"Project with ID {command.ProjectId} was not found."));
+
+        if (await _levels.NameExistsAsync(command.ProjectId, command.Name, cancellationToken: cancellationToken))
+            return Result.Failure<ProjectLevelDto>(new Error(
+                "ProjectLevelNameAlreadyExists",
+                $"A level named '{command.Name.Trim()}' already exists in this project."));
+
+        try
+        {
+            var level = ProjectLevel.Create(
+                command.ProjectId,
+                command.Name,
+                command.Description,
+                command.ProductionStatus ?? ProjectLevelStatuses.Planned,
+                command.SortOrder ?? await _levels.GetNextSortOrderAsync(
+                    command.ProjectId,
+                    cancellationToken),
+                _clock.UtcNow);
+            await _levels.AddAsync(level, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            return Result.Success(ProjectLevelView.From(level));
+        }
+        catch (ArgumentException exception)
+        {
+            return Result.Failure<ProjectLevelDto>(
+                new Error("InvalidProjectLevel", exception.Message));
+        }
+    }
+}
+
+internal sealed class UpdateProjectLevelCommandHandler
+    : ICommandHandler<UpdateProjectLevelCommand, ProjectLevelDto>
+{
+    private readonly IProjectLevelRepository _levels;
+    private readonly IDateTimeProvider _clock;
+    private readonly IUnitOfWork _unitOfWork;
+
+    public UpdateProjectLevelCommandHandler(
+        IProjectLevelRepository levels,
+        IDateTimeProvider clock,
+        IUnitOfWork unitOfWork)
+    {
+        _levels = levels;
+        _clock = clock;
+        _unitOfWork = unitOfWork;
+    }
+
+    public async Task<Result<ProjectLevelDto>> Handle(
+        UpdateProjectLevelCommand command,
+        CancellationToken cancellationToken)
+    {
+        var level = await _levels.GetByIdAsync(command.ProjectId, command.LevelId, cancellationToken);
+        if (level is null)
+            return Result.Failure<ProjectLevelDto>(new Error(
+                "ProjectLevelNotFound",
+                $"Level {command.LevelId} was not found in project {command.ProjectId}."));
+
+        if (await _levels.NameExistsAsync(
+                command.ProjectId,
+                command.Name,
+                command.LevelId,
+                cancellationToken))
+            return Result.Failure<ProjectLevelDto>(new Error(
+                "ProjectLevelNameAlreadyExists",
+                $"A level named '{command.Name.Trim()}' already exists in this project."));
+
+        try
+        {
+            level.Update(
+                command.Name,
+                command.Description,
+                command.ProductionStatus ?? level.ProductionStatus,
+                command.SortOrder ?? level.SortOrder,
+                _clock.UtcNow);
+            await _levels.UpdateAsync(level, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            return Result.Success(ProjectLevelView.From(level));
+        }
+        catch (ArgumentException exception)
+        {
+            return Result.Failure<ProjectLevelDto>(
+                new Error("InvalidProjectLevel", exception.Message));
+        }
+    }
+}
+
+internal sealed class DeleteProjectLevelCommandHandler
+    : ICommandHandler<DeleteProjectLevelCommand>
+{
+    private readonly IProjectLevelRepository _levels;
+    private readonly IUnitOfWork _unitOfWork;
+
+    public DeleteProjectLevelCommandHandler(
+        IProjectLevelRepository levels,
+        IUnitOfWork unitOfWork)
+    {
+        _levels = levels;
+        _unitOfWork = unitOfWork;
+    }
+
+    public async Task<Result> Handle(
+        DeleteProjectLevelCommand command,
+        CancellationToken cancellationToken)
+    {
+        var level = await _levels.GetByIdAsync(command.ProjectId, command.LevelId, cancellationToken);
+        if (level is null)
+            return Result.Failure(new Error(
+                "ProjectLevelNotFound",
+                $"Level {command.LevelId} was not found in project {command.ProjectId}."));
+
+        await _levels.DeleteAsync(level, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        return Result.Success();
+    }
+}
+
+internal static class ProjectLevelView
+{
+    public static ProjectLevelDto From(ProjectLevel level) => new(
+        level.Id,
+        level.ProjectId,
+        level.Name,
+        level.Description,
+        level.ProductionStatus,
+        level.SortOrder,
+        level.CreatedAt,
+        level.UpdatedAt);
+}
