@@ -144,7 +144,7 @@ describe('ProjectReferenceBoard', () => {
       screen.getByLabelText('Note body for forest.png'),
       'Read the trees at a glance.'
     )
-    await userEvent.click(screen.getByRole('button', { name: 'Add note' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Save note' }))
 
     expect(api.createProductionNote).toHaveBeenCalledWith(7, {
       referenceImageId: 9,

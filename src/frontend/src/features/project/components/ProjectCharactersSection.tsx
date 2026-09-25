@@ -648,7 +648,8 @@ function CharacterNotes({
           />
           <Button
             type="submit"
-            label="Add note"
+            label="Save note"
+            aria-label="Save note"
             disabled={!title.trim() || !body.trim()}
           />
         </form>
@@ -821,7 +822,12 @@ function CharacterAbilities({
             onChange={event => setDescription(event.target.value)}
             placeholder="What does it do?"
           />
-          <Button type="submit" label="Add ability" disabled={!name.trim()} />
+          <Button
+            type="submit"
+            label="Save ability"
+            aria-label="Save ability"
+            disabled={!name.trim()}
+          />
         </form>
       ) : null}
     </div>
@@ -917,7 +923,12 @@ function CharacterVariants({
               </option>
             ))}
           </select>
-          <Button type="submit" label="Add variant" disabled={!name.trim()} />
+          <Button
+            type="submit"
+            label="Save variant"
+            aria-label="Save variant"
+            disabled={!name.trim()}
+          />
         </form>
       ) : null}
     </div>

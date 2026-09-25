@@ -1,5 +1,5 @@
 import { createBdd } from "playwright-bdd";
-import { expect } from "@playwright/test";
+import { expect, Page, TestInfo } from "@playwright/test";
 import { getScenarioState } from "../fixtures/shared-state";
 import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
 import { ApiHelper } from "../helpers/api-helper";
@@ -11,27 +11,42 @@ const { Given, When, Then } = createBdd();
 const API_BASE = process.env.API_BASE_URL || "http://localhost:8090";
 const apiHelper = new ApiHelper(API_BASE);
 
-/** Project name per scenario keeps the parallel chromium workers from colliding. */
-const PROJECT_NAME = "Studio E2E Project";
+/**
+ * One project per Playwright worker. Scenarios inside a worker share it on
+ * purpose - the studio is a shared surface and its chip/count assertions read
+ * better against a single project - while parallel workers must not delete each
+ * other's project mid-scenario.
+ */
+function projectNameFor(testInfo: TestInfo): string {
+  return `Studio E2E Project W${testInfo.workerIndex}`;
+}
 
-async function openStudio(page: import("@playwright/test").Page) {
+function requireProject(page: Page, name: string) {
+  const project = getScenarioState(page).getProject(name);
+  if (!project) {
+    throw new Error(`Studio project "${name}" was not provisioned`);
+  }
+  return project;
+}
+
+async function openStudio(page: Page, name: string) {
+  const project = requireProject(page, name);
   const projectsPage = new ProjectsPage(page);
   const studio = new ProjectStudioPage(page);
-  await projectsPage.navigateToProjectViewer(
-    getScenarioState(page).getProject(PROJECT_NAME)!.id,
-  );
+  await projectsPage.navigateToProjectViewer(project.id);
   await studio.waitForStudio();
   return studio;
 }
 
 Given(
   "a studio project exists for the production workspace",
-  async ({ page }) => {
+  async ({ page, $testInfo }) => {
+    const name = projectNameFor($testInfo);
     const listResponse = await page.request.get(`${API_BASE}/projects`);
     expect(listResponse.ok()).toBeTruthy();
     const listData = await listResponse.json();
     const existing = (listData.projects || []).find(
-      (p: any) => p.name === PROJECT_NAME,
+      (p: any) => p.name === name,
     );
     if (existing) {
       // A previous run's leftovers would make counts and link chips
@@ -40,62 +55,27 @@ Given(
     }
     const created = await page.request.post(`${API_BASE}/projects`, {
       data: {
-        name: PROJECT_NAME,
+        name,
         description: "Project studio end-to-end coverage",
       },
     });
     expect(created.ok()).toBeTruthy();
     const data = await created.json();
-    getScenarioState(page).saveProject(PROJECT_NAME, {
-      id: data.id,
-      name: PROJECT_NAME,
-    });
+    getScenarioState(page).saveProject(name, { id: data.id, name });
   },
 );
 
-Given("I am on the studio project", async ({ page }) => {
-  await openStudio(page);
+Given("I am on the studio project", async ({ page, $testInfo }) => {
+  await openStudio(page, projectNameFor($testInfo));
 });
 
 When(
   "I create the level {string} described as {string}",
   async ({ page }, name: string, description: string) => {
-    const studio = await openStudio(page);
+    const studio = new ProjectStudioPage(page);
     await studio.createLevel(name, description, "Planned");
   },
 );
-
-Given("a level named {string} exists", async ({ page }, name: string) => {
-  const project = getScenarioState(page).getProject(PROJECT_NAME);
-  const response = await page.request.get(
-    `${API_BASE}/projects/${project!.id}/levels`,
-  );
-  expect(response.ok()).toBeTruthy();
-  const levels = await response.json();
-  if (!levels.some((level: any) => level.name === name)) {
-    const created = await page.request.post(
-      `${API_BASE}/projects/${project!.id}/levels`,
-      { data: { name, description: `${name} description` } },
-    );
-    expect(created.ok()).toBeTruthy();
-  }
-  // Re-open the studio so the freshly provisioned level is in the query cache.
-  await openStudio(page);
-});
-
-Given("a character named {string} exists", async ({ page }, name: string) => {
-  const project = getScenarioState(page).getProject(PROJECT_NAME);
-  const characters = await apiHelper.getProjectCharacters(project!.id);
-  if (!characters.some((character) => character.name === name)) {
-    await apiHelper.createProjectCharacter(
-      project!.id,
-      name,
-      `${name} production description`,
-      ["enemy", "boss"],
-    );
-  }
-  await openStudio(page);
-});
 
 Then(
   "the level {string} should show its description",
@@ -107,10 +87,45 @@ Then(
   },
 );
 
+Given(
+  "a level named {string} exists",
+  async ({ page, $testInfo }, name: string) => {
+    const project = requireProject(page, projectNameFor($testInfo));
+    const response = await page.request.get(
+      `${API_BASE}/projects/${project.id}/levels`,
+    );
+    expect(response.ok()).toBeTruthy();
+    const levels = await response.json();
+    if (!levels.some((level: any) => level.name === name)) {
+      const created = await page.request.post(
+        `${API_BASE}/projects/${project.id}/levels`,
+        { data: { name, description: `${name} description` } },
+      );
+      expect(created.ok()).toBeTruthy();
+    }
+  },
+);
+
+Given(
+  "a character named {string} exists",
+  async ({ page, $testInfo }, name: string) => {
+    const project = requireProject(page, projectNameFor($testInfo));
+    const characters = await apiHelper.getProjectCharacters(project.id);
+    if (!characters.some((character) => character.name === name)) {
+      await apiHelper.createProjectCharacter(
+        project.id,
+        name,
+        `${name} production description`,
+        ["enemy", "boss"],
+      );
+    }
+  },
+);
+
 When(
   "I create the character {string} tagged {string}",
   async ({ page }, name: string, tags: string) => {
-    const studio = await openStudio(page);
+    const studio = new ProjectStudioPage(page);
     await studio.createCharacter(
       name,
       `${name} production description`,
@@ -133,9 +148,9 @@ Then(
 
 Then(
   "the character {string} should be stored with its tags",
-  async ({ page }, name: string) => {
-    const project = getScenarioState(page).getProject(PROJECT_NAME);
-    const characters = await apiHelper.getProjectCharacters(project!.id);
+  async ({ page, $testInfo }, name: string) => {
+    const project = requireProject(page, projectNameFor($testInfo));
+    const characters = await apiHelper.getProjectCharacters(project.id);
     const character = characters.find((c) => c.name === name);
     expect(character, `Character "${name}" missing from the API`).toBeTruthy();
     expect(character!.tags).toEqual(expect.arrayContaining(["enemy", "boss"]));
@@ -146,7 +161,6 @@ When(
   "I add the ability {string} to character {string}",
   async ({ page }, ability: string, character: string) => {
     const studio = new ProjectStudioPage(page);
-    await openStudio(page);
     await studio.addAbility(character, ability, `${ability} description`);
   },
 );
@@ -166,9 +180,9 @@ Then(
 
 Then(
   "the API should record the ability {string} on character {string}",
-  async ({ page }, ability: string, characterName: string) => {
-    const project = getScenarioState(page).getProject(PROJECT_NAME);
-    const characters = await apiHelper.getProjectCharacters(project!.id);
+  async ({ page, $testInfo }, ability: string, characterName: string) => {
+    const project = requireProject(page, projectNameFor($testInfo));
+    const characters = await apiHelper.getProjectCharacters(project.id);
     const character = characters.find((c) => c.name === characterName);
     expect(
       character?.abilities.map((a) => a.name),
@@ -181,7 +195,6 @@ When(
   "I add the variant {string} to character {string} for level {string}",
   async ({ page }, variant: string, character: string, level: string) => {
     const studio = new ProjectStudioPage(page);
-    await openStudio(page);
     await studio.addVariant(
       character,
       variant,
@@ -206,9 +219,14 @@ Then(
 
 Then(
   "the API should scope variant {string} on character {string} to level {string}",
-  async ({ page }, variant: string, characterName: string, level: string) => {
-    const project = getScenarioState(page).getProject(PROJECT_NAME);
-    const characters = await apiHelper.getProjectCharacters(project!.id);
+  async (
+    { page, $testInfo },
+    variant: string,
+    characterName: string,
+    level: string,
+  ) => {
+    const project = requireProject(page, projectNameFor($testInfo));
+    const characters = await apiHelper.getProjectCharacters(project.id);
     const character = characters.find((c) => c.name === characterName);
     const stored = character?.variants.find((v) => v.name === variant);
     expect(stored, `Variant "${variant}" missing from the API`).toBeTruthy();
@@ -220,19 +238,7 @@ When(
   "I add the note {string} to character {string}",
   async ({ page }, noteTitle: string, character: string) => {
     const studio = new ProjectStudioPage(page);
-    await openStudio(page);
     await studio.addCharacterNote(character, noteTitle, `${noteTitle} body`);
-  },
-);
-
-Then(
-  "character {string} should show the note {string}",
-  async ({ page }, character: string, noteTitle: string) => {
-    const studio = new ProjectStudioPage(page);
-    const card = await studio.openCharacterSection(character, "notes");
-    await expect(
-      card.getByTestId("project-character-note").filter({ hasText: noteTitle }),
-    ).toBeVisible({ timeout: 15000 });
   },
 );
 
@@ -247,15 +253,26 @@ Then(
   },
 );
 
-When("I add a reference image to the board", async ({ page }) => {
-  const studio = await openStudio(page);
+Then(
+  "character {string} should show the note {string}",
+  async ({ page }, character: string, noteTitle: string) => {
+    const studio = new ProjectStudioPage(page);
+    const card = await studio.openCharacterSection(character, "notes");
+    await expect(
+      card.getByTestId("project-character-note").filter({ hasText: noteTitle }),
+    ).toBeVisible({ timeout: 15000 });
+  },
+);
+
+When("I add a reference image to the board", async ({ page, $testInfo }) => {
+  const studio = new ProjectStudioPage(page);
   const filePath = await UniqueFileGenerator.generate("red_color.png");
   await studio.uploadReferenceImage(filePath);
 
-  // Capture the stored file id so the removal scenario can prove the
-  // library file outlives the project association.
-  const project = getScenarioState(page).getProject(PROJECT_NAME);
-  const references = await apiHelper.getProjectReferences(project!.id);
+  // Capture the stored file id so the removal scenario can prove the library
+  // file outlives the project association.
+  const project = requireProject(page, projectNameFor($testInfo));
+  const references = await apiHelper.getProjectReferences(project.id);
   expect(references).toHaveLength(1);
   getScenarioState(page).setCustom(
     "studio:referenceFileId",
@@ -268,7 +285,6 @@ When(
   "I title the reference image {string}",
   async ({ page }, title: string) => {
     const studio = new ProjectStudioPage(page);
-    getScenarioState(page).setCustom("studio:referenceTitle", title);
     await studio.titleFirstReference(title);
   },
 );
@@ -287,8 +303,7 @@ When(
   "I link the reference image to level {string}",
   async ({ page }, level: string) => {
     const studio = new ProjectStudioPage(page);
-    const card = studio.referenceCards().first();
-    await studio.linkReference(card, "level", level);
+    await studio.linkReference(studio.referenceCards().first(), "level", level);
   },
 );
 
@@ -296,8 +311,11 @@ When(
   "I link the reference image to character {string}",
   async ({ page }, character: string) => {
     const studio = new ProjectStudioPage(page);
-    const card = studio.referenceCards().first();
-    await studio.linkReference(card, "character", character);
+    await studio.linkReference(
+      studio.referenceCards().first(),
+      "character",
+      character,
+    );
   },
 );
 
@@ -317,9 +335,9 @@ Then(
 
 Then(
   "the API should link the reference image to {string}",
-  async ({ page }, target: string) => {
-    const project = getScenarioState(page).getProject(PROJECT_NAME);
-    const references = await apiHelper.getProjectReferences(project!.id);
+  async ({ page, $testInfo }, target: string) => {
+    const project = requireProject(page, projectNameFor($testInfo));
+    const references = await apiHelper.getProjectReferences(project.id);
     const linked = references.some((reference) =>
       reference.links.some(
         (link) =>
@@ -388,12 +406,12 @@ When("I remove the reference image from the project", async ({ page }) => {
 
 Then(
   "the reference board should be empty and the file should still exist",
-  async ({ page }) => {
+  async ({ page, $testInfo }) => {
     const studio = new ProjectStudioPage(page);
     await expect(studio.referenceCards()).toHaveCount(0, { timeout: 15000 });
 
-    const project = getScenarioState(page).getProject(PROJECT_NAME);
-    const references = await apiHelper.getProjectReferences(project!.id);
+    const project = requireProject(page, projectNameFor($testInfo));
+    const references = await apiHelper.getProjectReferences(project.id);
     expect(references).toHaveLength(0);
 
     // The project no longer holds the image; the library file is untouched,

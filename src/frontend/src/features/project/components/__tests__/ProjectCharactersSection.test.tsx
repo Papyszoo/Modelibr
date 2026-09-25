@@ -130,7 +130,7 @@ describe('ProjectCharactersSection', () => {
       screen.getByLabelText('New ability for Ashen Warden'),
       'Ember lash'
     )
-    await userEvent.click(screen.getByRole('button', { name: 'Add ability' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Save ability' }))
 
     expect(api.addCharacterAbility).toHaveBeenCalledWith(7, 3, {
       name: 'Ember lash',

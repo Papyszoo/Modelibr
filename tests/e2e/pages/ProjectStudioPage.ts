@@ -85,19 +85,35 @@ export class ProjectStudioPage {
     await expect(this.levelRow(name)).toBeVisible({ timeout: 15000 });
   }
 
-  async openCharacter(name: string): Promise<Locator> {
+  /**
+   * Named idempotent helper, not a test-path branch: the editor is a
+   * disclosure, so an assertion running after an action may find it already
+   * open. Only the tab bar decides whether to click - never project data.
+   */
+  private async ensureCharacterEditorOpen(name: string): Promise<Locator> {
     const card = this.characterCard(name);
     await expect(card).toBeVisible({ timeout: 15000 });
-    await card.getByRole("button", { name: `Edit ${name}` }).click();
-    await expect(card.getByRole("tab")).toHaveCount(5);
+    if (
+      (await card.getByTestId("project-character-section-tab").count()) === 0
+    ) {
+      await card.getByRole("button", { name: `Edit ${name}` }).click();
+    }
+    await expect(card.getByTestId("project-character-section-tab")).toHaveCount(
+      5,
+      { timeout: 15000 },
+    );
     return card;
+  }
+
+  async openCharacter(name: string): Promise<Locator> {
+    return this.ensureCharacterEditorOpen(name);
   }
 
   async openCharacterSection(
     name: string,
     section: "identity" | "notes" | "media" | "abilities" | "variants",
   ): Promise<Locator> {
-    const card = this.characterCard(name);
+    const card = await this.ensureCharacterEditorOpen(name);
     await card
       .locator(
         `[data-testid="project-character-section-tab"][data-section="${section}"]`,
@@ -152,7 +168,7 @@ export class ProjectStudioPage {
         response.request().method() === "POST",
       { timeout: 15000 },
     );
-    await card.getByRole("button", { name: "Add ability" }).click();
+    await card.getByRole("button", { name: "Save ability" }).click();
     const response = await responsePromise;
     expect(response.ok()).toBeTruthy();
     await expect(
@@ -188,7 +204,7 @@ export class ProjectStudioPage {
         response.request().method() === "POST",
       { timeout: 15000 },
     );
-    await card.getByRole("button", { name: "Add variant" }).click();
+    await card.getByRole("button", { name: "Save variant" }).click();
     const response = await responsePromise;
     expect(response.ok()).toBeTruthy();
     await expect(
@@ -216,7 +232,7 @@ export class ProjectStudioPage {
         response.request().method() === "POST",
       { timeout: 15000 },
     );
-    await card.getByRole("button", { name: "Add note" }).click();
+    await card.getByRole("button", { name: "Save note" }).click();
     const response = await responsePromise;
     expect(response.ok()).toBeTruthy();
     await expect(
@@ -323,7 +339,7 @@ export class ProjectStudioPage {
         response.request().method() === "POST",
       { timeout: 15000 },
     );
-    await form.getByRole("button", { name: "Add note" }).click();
+    await form.getByRole("button", { name: "Save note" }).click();
     const response = await responsePromise;
     expect(response.ok()).toBeTruthy();
     await expect(

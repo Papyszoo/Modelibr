@@ -544,7 +544,8 @@ function NoteForm({
         <Button label="Cancel" text type="button" onClick={onCancel} />
         <Button
           type="submit"
-          label="Add note"
+          label="Save note"
+          aria-label="Save note"
           disabled={!title.trim() || !body.trim()}
         />
       </div>
