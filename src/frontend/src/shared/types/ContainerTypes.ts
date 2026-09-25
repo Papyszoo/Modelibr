@@ -44,6 +44,7 @@ export interface ContainerDto {
 
 export interface ContainerDetailsRenderProps {
   container: ContainerDto
+  tabId?: string
   refetchContainer: () => Promise<void>
   showToast: (opts: {
     severity: string

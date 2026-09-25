@@ -207,27 +207,42 @@ export class ProjectsPage {
         projectId?: number,
     ): Promise<void> {
         const projectCard = this.getProjectCard(projectName, projectId);
-        const deleteBtn = projectCard.locator(
-            ".delete-button, button:has(.pi-trash)",
-        );
-        await deleteBtn.click();
+        const actionsBtn = projectCard.getByRole("button", {
+            name: `Project actions for ${projectName}`,
+        });
+        await expect(actionsBtn).toBeVisible();
+        await actionsBtn.focus();
+        await this.page.keyboard.press("Enter");
 
-        // Confirm deletion if dialog appears
-        const confirmBtn = this.page.locator(
-            '.p-dialog button:has-text("Delete"), .p-dialog button:has-text("Yes")',
-        );
-        if (
-            await confirmBtn
-                .waitFor({ state: "visible", timeout: 5000 })
-                .then(() => true)
-                .catch(() => false)
-        ) {
-            await confirmBtn.click();
-        }
+        const confirmation = this.page
+            .locator(".p-confirm-dialog")
+            .filter({ hasText: projectName });
+        await expect(confirmation).toBeVisible();
+        await confirmation
+            .getByRole("button", { name: "Delete Project" })
+            .click();
 
-        // Wait for project card to be hidden after deletion
         await projectCard.waitFor({ state: "hidden", timeout: 25000 });
         console.log(`[Action] Deleted project: ${projectName}`);
+    }
+
+    async cancelProjectDeletion(
+        projectName: string,
+        projectId?: number,
+    ): Promise<void> {
+        const projectCard = this.getProjectCard(projectName, projectId);
+        const actionsBtn = projectCard.getByRole("button", {
+            name: `Project actions for ${projectName}`,
+        });
+        await actionsBtn.click();
+
+        const confirmation = this.page
+            .locator(".p-confirm-dialog")
+            .filter({ hasText: projectName });
+        await expect(confirmation).toBeVisible();
+        await confirmation.getByRole("button", { name: "Cancel" }).click();
+        await expect(confirmation).toBeHidden();
+        await expect(projectCard).toBeVisible();
     }
 
     getProjectCard(projectName: string, projectId?: number): Locator {

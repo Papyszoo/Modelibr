@@ -18,6 +18,10 @@ import {
   DockPanelActionsContext,
 } from './dock-panel/DockPanelActionsContext'
 
+function hasUnsavedChanges(tab: Tab | undefined): boolean {
+  return tab?.internalUiState.hasUnsavedChanges === true
+}
+
 interface DockPanelContentProps {
   /** Logical panel identity - drives cross-panel drag routing. */
   side: 'left' | 'right'
@@ -80,7 +84,7 @@ export function DockPanelContent({
     removeRecentlyClosedTab(tab.id)
   }
 
-  const closeTab = (tabId: string): void => {
+  const performClose = (tabId: string): void => {
     const closedTab = tabs.find(tab => tab.id === tabId)
     const closedTabIndex = tabs.findIndex(tab => tab.id === tabId)
     const newTabs = tabs.filter(tab => tab.id !== tabId)
@@ -107,8 +111,28 @@ export function DockPanelContent({
     }
   }
 
-  const handleTabDragStart = (tab: Tab): void => {
+  const closeTab = (tabId: string): void => {
+    const tab = tabs.find(candidate => candidate.id === tabId)
+    if (hasUnsavedChanges(tab)) {
+      const accepted = window.confirm(
+        `${tab?.label ?? 'This tab'} has unsaved changes. Close it without saving?`
+      )
+      if (!accepted) return
+    }
+    performClose(tabId)
+  }
+
+  const handleTabDragStart = (tab: Tab): boolean => {
+    if (
+      hasUnsavedChanges(tab) &&
+      !window.confirm(
+        `${tab.label ?? 'This tab'} has unsaved changes. Move it to the other panel?`
+      )
+    ) {
+      return false
+    }
     setDraggedTab(tab)
+    return true
   }
 
   const handleTabDragEnd = (): void => {

@@ -237,4 +237,27 @@ public sealed class DatabaseExtensionsTests : IAsyncLifetime
         // strict mock throws on any invocation if it does.
         await DatabaseExtensions.InitializeDatabaseAsync((IServiceProvider)provider);
     }
+
+    [Fact]
+    public async Task InitializeDatabaseAsync_MigrationFailsAfterSuccessfulConnection_AbortsStartup()
+    {
+        var mockBackup = new Mock<IBackupService>(MockBehavior.Strict);
+        await using var provider = BuildProvider(mockBackup.Object);
+
+        // GetPendingMigrationsAsync succeeds, proving the connection is healthy;
+        // the migration operation is then made to fail independently.
+        await using (var seed = NewVerificationContext())
+        {
+            await seed.Database.MigrateAsync();
+            Assert.Empty(await seed.Database.GetPendingMigrationsAsync());
+        }
+
+        var exception = await Assert.ThrowsAsync<DatabaseMigrationFailedException>(
+            () => DatabaseExtensions.InitializeDatabaseAsync(
+                (IServiceProvider)provider,
+                _ => throw new InvalidOperationException("simulated migration failure")));
+
+        Assert.Contains("migration failed", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("simulated migration failure", exception.InnerException?.Message);
+    }
 }

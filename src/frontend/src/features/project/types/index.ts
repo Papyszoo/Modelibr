@@ -208,5 +208,7 @@ export interface SetProjectProfileRequest {
     upAxis?: string | null
     handedness?: string | null
     paletteHex?: string[] | null
+    /** Explicitly clear these fields; null scalar values mean unchanged. */
+    clear?: string[]
   }
 }

@@ -46,6 +46,15 @@ export class SceneRenderProcessor extends BaseProcessor {
         jobLogger
       )
 
+    if (timedOut) {
+      // Defense in depth for a renderer that still returns the old timeout shape. The
+      // current renderer throws before it can photograph anything, but no timed-out image
+      // should ever reach either the temp path or the upload endpoint.
+      throw new Error(
+        'Scene render reached its readiness timeout; no image was captured'
+      )
+    }
+
     if (signal?.aborted) {
       // The queue gave up on this job while the page was still loading. Returning
       // early skips the upload: storing a render against a job another worker may

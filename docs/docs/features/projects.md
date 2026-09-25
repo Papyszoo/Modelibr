@@ -93,10 +93,9 @@ Linking is a scene write: the revision moves, it is audited, and it can be rever
 
 ## Deleting a Project
 
-1. Right-click a project card
-2. Select **Delete**
-3. Confirm the deletion
+1. Open the visible **Project actions** button on the project card
+2. Read the confirmation, which names the project
+3. Choose **Delete Project** or **Cancel**
 
-:::tip
-Deleting a project removes the project container only. All assets within it remain in your library.
-:::
+The confirmation is deliberately required. **Cancel** makes no request. Deleting a project
+removes the project container only; all assets within it remain in your library.

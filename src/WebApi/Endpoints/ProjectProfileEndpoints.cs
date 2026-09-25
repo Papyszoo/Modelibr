@@ -108,7 +108,8 @@ public static class ProjectProfileEndpoints
                 request.Settings.UnitsPerMetre,
                 request.Settings.UpAxis,
                 request.Settings.Handedness,
-                request.Settings.PaletteHex);
+                request.Settings.PaletteHex,
+                request.Settings.Clear?.ToHashSet(StringComparer.OrdinalIgnoreCase));
 
         var result = await handler.Handle(
             new SetProjectProfileCommand(id, dimensions, settings), cancellationToken);
@@ -153,7 +154,8 @@ public static class ProjectProfileEndpoints
         double? UnitsPerMetre,
         string? UpAxis,
         string? Handedness,
-        List<string>? PaletteHex);
+        List<string>? PaletteHex,
+        List<string>? Clear);
 
     /// <param name="Dimensions">
     /// Dimension name → its assignments. A dimension you omit is left alone; a dimension with

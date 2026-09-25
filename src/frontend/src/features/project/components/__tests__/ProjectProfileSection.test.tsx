@@ -122,6 +122,11 @@ describe('ProjectProfileSection', () => {
     await waitFor(() => expect(api.setProjectProfile).toHaveBeenCalled())
     expect(api.setProjectProfile.mock.calls[0][1].settings).toMatchObject({
       maxTrianglesPerAsset: null,
+      clear: expect.arrayContaining([
+        'maxTrianglesPerAsset',
+        'maxTextureSize',
+        'targetSceneTriangles',
+      ]),
     })
   })
 
@@ -160,6 +165,60 @@ describe('ProjectProfileSection', () => {
     expect(api.setProjectProfile.mock.calls[0][1].dimensions?.style).toEqual([
       { optionId: 20, role: null },
     ])
+  })
+
+  it('round-trips hidden production settings while saving dimensions and budgets', async () => {
+    // A v0.6 save carries production constraints the form does not edit, while
+    // the API patch semantics ensure unrelated omitted fields stay unchanged.
+    api.getProjectBrief.mockResolvedValue(
+      brief({
+        budget: {
+          maxTrianglesPerAsset: 5000,
+          maxTextureSize: 1024,
+          targetSceneTriangles: 50000,
+          pixelsPerUnit: 128,
+        },
+        budgetSuggestion: {
+          maxTrianglesPerAsset: 7000,
+          maxTextureSize: 2048,
+          platform: 'Quest',
+          note: 'Quest is the tightest platform here.',
+        },
+        worldConvention: {
+          unitsPerMetre: 100,
+          upAxis: 'Z',
+          handedness: 'left',
+          isDefault: false,
+          engineConversions: [],
+          conflicts: [],
+        },
+        paletteHex: ['#123456', '#ABCDEF'],
+      })
+    )
+
+    render()
+
+    await userEvent.click(
+      await screen.findByTestId('project-profile-accept-suggestion')
+    )
+    await userEvent.click(screen.getByTestId('project-profile-save'))
+
+    await waitFor(() => expect(api.setProjectProfile).toHaveBeenCalled())
+    expect(api.setProjectProfile.mock.calls[0][1]).toMatchObject({
+      dimensions: expect.objectContaining({
+        style: [{ optionId: 20, role: null }],
+      }),
+      settings: {
+        maxTrianglesPerAsset: 7000,
+        maxTextureSize: 2048,
+        targetSceneTriangles: 50000,
+        pixelsPerUnit: 128,
+        unitsPerMetre: 100,
+        upAxis: 'Z',
+        handedness: 'left',
+        paletteHex: ['#123456', '#ABCDEF'],
+      },
+    })
   })
 
   it('creates a vocabulary option before selecting it', async () => {
