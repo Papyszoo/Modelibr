@@ -455,12 +455,14 @@ test.describe("demo mode e2e", () => {
                 page.locator(".container-cover-card img").first(),
             ).toBeVisible({ timeout: 15000 });
 
+            // Concept art lives on the studio's Reference Board, above the
+            // left/right details layout, and is uploaded from there.
             await page
-                .locator('.container-rich-main input[type="file"][multiple]')
+                .locator('[data-testid="project-reference-upload"]')
                 .first()
                 .setInputFiles(concept.filePath);
             await expect(
-                page.locator(".container-media-card").first(),
+                page.locator(".project-reference-card").first(),
             ).toBeVisible({
                 timeout: 15000,
             });
