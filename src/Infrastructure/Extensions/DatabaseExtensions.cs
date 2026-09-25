@@ -95,11 +95,37 @@ public static class DatabaseExtensions
                 pendingMigrations.Count,
                 string.Join(", ", pendingMigrations));
 
-            // Intentionally NOT inside the try/catch below - a failure here must
-            // propagate out of InitializeDatabaseAsync and abort startup (unless the
-            // operator explicitly opted out), never be swallowed like a connectivity
-            // failure.
-            await TakePreMigrationBackupAsync(scope.ServiceProvider, logger, configuration);
+            // Only back up a database we can actually reach. Two cases land here:
+            //
+            //  - A fresh install has pending migrations and no database yet - the
+            //    migration is what creates it. There is nothing to protect, and asking
+            //    pg_dump/psql to dump it can only fail ("database does not exist"),
+            //    which would abort startup of a perfectly healthy first run.
+            //  - The server is unreachable, in which case the migration below fails
+            //    anyway and RunMigrationAsync aborts startup, so skipping the backup
+            //    here changes nothing.
+            //
+            // This deliberately does NOT gate the migration on connectivity - the
+            // migration is what creates a missing database. Only the backup is gated.
+            //
+            // No unit test covers this branch: it needs a real cluster. The coverage
+            // is src/desktop's "data survives a data-folder change" integration test,
+            // which boots a brand-new data folder end to end and is the same step that
+            // caught this in the installed-app CI test.
+            if (await context.Database.CanConnectAsync())
+            {
+                // Intentionally NOT inside the try/catch below - a failure here must
+                // propagate out of InitializeDatabaseAsync and abort startup (unless the
+                // operator explicitly opted out), never be swallowed like a connectivity
+                // failure.
+                await TakePreMigrationBackupAsync(scope.ServiceProvider, logger, configuration);
+            }
+            else
+            {
+                logger.LogInformation(
+                    "No database exists yet; the pending migration(s) will create it, so " +
+                    "there is nothing to back up. Skipping the automatic pre-migration backup.");
+            }
         }
 
         await RunMigrationAsync(() => migrateAsync(context), logger);
