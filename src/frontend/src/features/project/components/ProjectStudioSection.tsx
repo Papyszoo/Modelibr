@@ -17,7 +17,6 @@ import {
   useProjectLevelsQuery,
   useProjectReferencesQuery,
 } from '@/features/project/api/projectStudioQueries'
-import { resolveApiAssetUrl } from '@/lib/apiBase'
 import {
   EmptyState,
   ErrorState,
@@ -47,6 +46,8 @@ export function ProjectStudioSection({
   const referencesQuery = useProjectReferencesQuery(projectId)
   const [levelName, setLevelName] = useState('')
   const [levelStatus, setLevelStatus] = useState<ProjectLevelStatus>('planned')
+  const [showLevelForm, setShowLevelForm] = useState(false)
+  const [showNoteForm, setShowNoteForm] = useState(false)
   const [noteTitle, setNoteTitle] = useState('')
   const [noteBody, setNoteBody] = useState('')
   const [noteTarget, setNoteTarget] = useState('project')
@@ -157,8 +158,18 @@ export function ProjectStudioSection({
           aria-labelledby="project-levels-title"
         >
           <div className="project-studio-card-header">
-            <h4 id="project-levels-title">Levels</h4>
-            <span className="project-studio-count">{levels.length}</span>
+            <div className="project-studio-card-title">
+              <h4 id="project-levels-title">Levels</h4>
+              <span className="project-studio-count">{levels.length}</span>
+            </div>
+            <Button
+              icon="pi pi-plus"
+              text
+              rounded
+              aria-label="Add level"
+              title="Add level"
+              onClick={() => setShowLevelForm(current => !current)}
+            />
           </div>
           {levels.length === 0 ? (
             <EmptyState
@@ -183,42 +194,44 @@ export function ProjectStudioSection({
               ))}
             </div>
           )}
-          <form
-            className="project-studio-form"
-            onSubmit={event => {
-              event.preventDefault()
-              if (levelName.trim()) createLevel.mutate()
-            }}
-          >
-            <label htmlFor="new-project-level">New level</label>
-            <div className="project-studio-form-row">
-              <InputText
-                id="new-project-level"
-                value={levelName}
-                onChange={event => setLevelName(event.target.value)}
-                placeholder="Forest Crossing"
-              />
-              <select
-                aria-label="New level status"
-                value={levelStatus}
-                onChange={event =>
-                  setLevelStatus(event.target.value as ProjectLevelStatus)
-                }
-              >
-                {LEVEL_STATUSES.map(status => (
-                  <option key={status.value} value={status.value}>
-                    {status.label}
-                  </option>
-                ))}
-              </select>
-              <Button
-                type="submit"
-                icon="pi pi-plus"
-                aria-label="Create level"
-                disabled={!levelName.trim() || createLevel.isPending}
-              />
-            </div>
-          </form>
+          {showLevelForm ? (
+            <form
+              className="project-studio-form"
+              onSubmit={event => {
+                event.preventDefault()
+                if (levelName.trim()) createLevel.mutate()
+              }}
+            >
+              <label htmlFor="new-project-level">New level</label>
+              <div className="project-studio-form-row">
+                <InputText
+                  id="new-project-level"
+                  value={levelName}
+                  onChange={event => setLevelName(event.target.value)}
+                  placeholder="Forest Crossing"
+                />
+                <select
+                  aria-label="New level status"
+                  value={levelStatus}
+                  onChange={event =>
+                    setLevelStatus(event.target.value as ProjectLevelStatus)
+                  }
+                >
+                  {LEVEL_STATUSES.map(status => (
+                    <option key={status.value} value={status.value}>
+                      {status.label}
+                    </option>
+                  ))}
+                </select>
+                <Button
+                  type="submit"
+                  icon="pi pi-plus"
+                  aria-label="Create level"
+                  disabled={!levelName.trim() || createLevel.isPending}
+                />
+              </div>
+            </form>
+          ) : null}
         </section>
 
         <section
@@ -226,8 +239,18 @@ export function ProjectStudioSection({
           aria-labelledby="project-notes-title"
         >
           <div className="project-studio-card-header">
-            <h4 id="project-notes-title">Notes & ideas</h4>
-            <span className="project-studio-count">{notes.length}</span>
+            <div className="project-studio-card-title">
+              <h4 id="project-notes-title">Notes & ideas</h4>
+              <span className="project-studio-count">{notes.length}</span>
+            </div>
+            <Button
+              icon="pi pi-plus"
+              text
+              rounded
+              aria-label="Add note"
+              title="Add note"
+              onClick={() => setShowNoteForm(current => !current)}
+            />
           </div>
           {notes.length === 0 ? (
             <EmptyState
@@ -260,102 +283,70 @@ export function ProjectStudioSection({
               ))}
             </div>
           )}
-          <form
-            className="project-studio-form"
-            onSubmit={event => {
-              event.preventDefault()
-              if (noteTitle.trim() && noteBody.trim()) createNote.mutate()
-            }}
-          >
-            <label htmlFor="new-project-note">New note or idea</label>
-            <InputText
-              id="new-project-note"
-              value={noteTitle}
-              onChange={event => setNoteTitle(event.target.value)}
-              placeholder="Lighting mood"
-            />
-            <InputTextarea
-              aria-label="Note body"
-              value={noteBody}
-              onChange={event => setNoteBody(event.target.value)}
-              rows={2}
-              placeholder="What should the team remember?"
-            />
-            <div className="project-studio-form-row">
-              <select
-                aria-label="Note target"
-                value={noteTarget}
-                onChange={event => setNoteTarget(event.target.value)}
-              >
-                <option value="project">Project</option>
-                {levels.map(level => (
-                  <option key={level.id} value={`level:${level.id}`}>
-                    Level: {level.name}
-                  </option>
-                ))}
-                {references.map(reference => (
-                  <option
-                    key={reference.id}
-                    value={`reference:${reference.id}`}
-                  >
-                    Reference: {reference.title || reference.fileName}
-                  </option>
-                ))}
-              </select>
-              <label className="project-studio-checkbox">
-                <input
-                  type="checkbox"
-                  checked={notePinned}
-                  onChange={event => setNotePinned(event.target.checked)}
-                />
-                Pin as idea
-              </label>
-              <Button
-                type="submit"
-                icon="pi pi-arrow-up"
-                aria-label="Create note"
-                disabled={
-                  !noteTitle.trim() || !noteBody.trim() || createNote.isPending
-                }
+          {showNoteForm ? (
+            <form
+              className="project-studio-form"
+              onSubmit={event => {
+                event.preventDefault()
+                if (noteTitle.trim() && noteBody.trim()) createNote.mutate()
+              }}
+            >
+              <label htmlFor="new-project-note">New note or idea</label>
+              <InputText
+                id="new-project-note"
+                value={noteTitle}
+                onChange={event => setNoteTitle(event.target.value)}
+                placeholder="Lighting mood"
               />
-            </div>
-          </form>
-        </section>
-
-        <section
-          className="project-studio-card"
-          aria-labelledby="project-references-title"
-        >
-          <div className="project-studio-card-header">
-            <h4 id="project-references-title">References</h4>
-            <span className="project-studio-count">{references.length}</span>
-          </div>
-          {references.length === 0 ? (
-            <EmptyState
-              icon="pi pi-images"
-              title="No references"
-              message="Add reference images from the Project reference board."
-            />
-          ) : (
-            <div className="project-reference-grid">
-              {references.map(reference => (
-                <figure className="project-reference-card" key={reference.id}>
-                  <img
-                    src={resolveApiAssetUrl(reference.previewUrl)}
-                    alt={reference.title || reference.fileName}
+              <InputTextarea
+                aria-label="Note body"
+                value={noteBody}
+                onChange={event => setNoteBody(event.target.value)}
+                rows={2}
+                placeholder="What should the team remember?"
+              />
+              <div className="project-studio-form-row">
+                <select
+                  aria-label="Note target"
+                  value={noteTarget}
+                  onChange={event => setNoteTarget(event.target.value)}
+                >
+                  <option value="project">Project</option>
+                  {levels.map(level => (
+                    <option key={level.id} value={`level:${level.id}`}>
+                      Level: {level.name}
+                    </option>
+                  ))}
+                  {references.map(reference => (
+                    <option
+                      key={reference.id}
+                      value={`reference:${reference.id}`}
+                    >
+                      Reference: {reference.title || reference.fileName}
+                    </option>
+                  ))}
+                </select>
+                <label className="project-studio-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={notePinned}
+                    onChange={event => setNotePinned(event.target.checked)}
                   />
-                  <figcaption>
-                    <strong>{reference.title || reference.fileName}</strong>
-                    <small>
-                      {reference.projectLevelId
-                        ? `Level #${reference.projectLevelId}`
-                        : 'Project-wide'}
-                    </small>
-                  </figcaption>
-                </figure>
-              ))}
-            </div>
-          )}
+                  Pin as idea
+                </label>
+                <Button
+                  type="submit"
+                  icon="pi pi-arrow-up"
+                  aria-label="Create note"
+                  disabled={
+                    !noteTitle.trim() ||
+                    !noteBody.trim() ||
+                    createNote.isPending
+                  }
+                />
+              </div>
+            </form>
+          ) : null}
         </section>
       </div>
     </div>

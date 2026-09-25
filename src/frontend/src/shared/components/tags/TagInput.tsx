@@ -49,6 +49,8 @@ export interface TagInputProps {
   onCreateOption?: (name: string) => void
   /** Heading over the suggestion list. Defaults to the tag wording. */
   suggestionsLabel?: string
+  /** Hide the full option list behind a compact browse button. */
+  collapsibleSuggestions?: boolean
 }
 
 /**
@@ -67,8 +69,12 @@ export function TagInput({
   allowCustom = options === undefined,
   onCreateOption,
   suggestionsLabel,
+  collapsibleSuggestions = false,
 }: TagInputProps) {
   const [inputValue, setInputValue] = useState('')
+  const [showSuggestions, setShowSuggestions] = useState(
+    !collapsibleSuggestions
+  )
 
   const availableSuggestions = useMemo(() => {
     const selectedKeys = new Set(value.map(normalizeTagKey))
@@ -145,12 +151,27 @@ export function TagInput({
           className="tag-input-field"
           data-testid={inputTestId}
         />
-        <Button
-          label="Add"
-          icon="pi pi-plus"
-          onClick={() => addTags(inputValue)}
-          disabled={!inputValue.trim()}
-        />
+        {!collapsibleSuggestions || inputValue.trim() ? (
+          <Button
+            label="Add"
+            icon="pi pi-plus"
+            onClick={() => addTags(inputValue)}
+            disabled={!inputValue.trim()}
+          />
+        ) : null}
+        {collapsibleSuggestions &&
+        availableSuggestions.length > 0 &&
+        !inputValue.trim() ? (
+          <Button
+            icon="pi pi-plus"
+            text
+            rounded
+            aria-label={`Show ${suggestionsLabel ?? 'library options'}`}
+            title={`Show ${suggestionsLabel ?? 'library options'}`}
+            aria-expanded={showSuggestions}
+            onClick={() => setShowSuggestions(current => !current)}
+          />
+        ) : null}
       </div>
 
       {value.length > 0 ? (
@@ -166,11 +187,25 @@ export function TagInput({
         </div>
       ) : null}
 
-      {availableSuggestions.length > 0 ? (
+      {availableSuggestions.length > 0 &&
+      (!collapsibleSuggestions || showSuggestions) ? (
         <div className="tag-input-suggestions">
-          <span className="tag-input-suggestions-label">
-            {suggestionsLabel ?? 'Existing tags'}
-          </span>
+          <div className="tag-input-suggestions-header">
+            <span className="tag-input-suggestions-label">
+              {suggestionsLabel ?? 'Existing tags'}
+            </span>
+            {collapsibleSuggestions ? (
+              <Button
+                icon="pi pi-minus"
+                text
+                rounded
+                size="small"
+                aria-label={`Hide ${suggestionsLabel ?? 'library options'}`}
+                title={`Hide ${suggestionsLabel ?? 'library options'}`}
+                onClick={() => setShowSuggestions(false)}
+              />
+            ) : null}
+          </div>
           <div className="tag-input-suggestions-list">
             {availableSuggestions.map(tag => (
               <Button

@@ -114,6 +114,31 @@ describe('TagInput', () => {
     expect(onChange).toHaveBeenCalledWith(['Low Poly'])
   })
 
+  it('keeps a closed vocabulary behind a compact browse button when requested', () => {
+    const onChange = jest.fn()
+    render(
+      <TagInput
+        value={[]}
+        onChange={onChange}
+        options={['Low Poly', 'Realistic']}
+        suggestionsLabel="Available styles"
+        collapsibleSuggestions
+        inputTestId="tag-in"
+      />
+    )
+
+    expect(
+      screen.queryByRole('button', { name: 'Low Poly' })
+    ).not.toBeInTheDocument()
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Show Available styles' })
+    )
+    expect(screen.getByRole('button', { name: 'Low Poly' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Realistic' })
+    ).toBeInTheDocument()
+  })
+
   it('offers the whole closed vocabulary rather than the first few', () => {
     // A vocabulary the user cannot see all of is one they will type a near-miss
     // into.

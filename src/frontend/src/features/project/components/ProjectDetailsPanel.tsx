@@ -261,6 +261,10 @@ export function ProjectDetailsPanel({
 
   return (
     <div className="container-rich-details">
+      <ProjectStudioSection
+        projectId={project.id}
+        onChanged={refetchContainer}
+      />
       <div className="container-rich-layout">
         <div className="container-rich-main">
           <div className="container-rich-block">
@@ -305,13 +309,6 @@ export function ProjectDetailsPanel({
               tabId={tabStateKey}
               onDirtyChange={setProfileDirty}
               showToast={showToast}
-            />
-          </div>
-
-          <div className="container-rich-block">
-            <ProjectStudioSection
-              projectId={project.id}
-              onChanged={refetchContainer}
             />
           </div>
 

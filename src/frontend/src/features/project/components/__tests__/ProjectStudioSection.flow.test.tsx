@@ -42,6 +42,7 @@ describe('ProjectStudioSection flow', () => {
 
     expect(screen.getByText('Forest Crossing')).toBeVisible()
 
+    await userEvent.click(screen.getByRole('button', { name: 'Add level' }))
     await userEvent.type(screen.getByLabelText('New level'), 'Ruined Keep')
     await userEvent.click(screen.getByRole('button', { name: 'Create level' }))
     await waitFor(() =>
@@ -51,6 +52,7 @@ describe('ProjectStudioSection flow', () => {
       })
     )
 
+    await userEvent.click(screen.getByRole('button', { name: 'Add note' }))
     await userEvent.type(screen.getByLabelText('New note or idea'), 'Fog idea')
     await userEvent.type(
       screen.getByLabelText('Note body'),

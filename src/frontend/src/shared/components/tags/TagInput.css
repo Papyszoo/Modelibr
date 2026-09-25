@@ -25,6 +25,13 @@
   gap: 0.5rem;
 }
 
+.tag-input-suggestions-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mod-space-xs);
+}
+
 .tag-input-suggestions-label {
   font-size: 0.875rem;
   font-weight: 600;

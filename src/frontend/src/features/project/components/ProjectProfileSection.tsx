@@ -329,7 +329,8 @@ export function ProjectProfileSection({
               value={selected.map(value => value.name)}
               options={dimensionOptions.map(option => option.name)}
               allowCustom
-              suggestionsLabel={`${label} in this library`}
+              suggestionsLabel={`Available ${label.toLowerCase()}`}
+              collapsibleSuggestions
               placeholder={`Add ${label.toLowerCase()}…`}
               onCreateOption={name =>
                 createOption.mutate({ dimension: key, name })
