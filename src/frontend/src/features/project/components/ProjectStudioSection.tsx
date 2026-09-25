@@ -160,7 +160,7 @@ export function ProjectStudioSection({
   const references = referencesQuery.data ?? []
 
   return (
-    <div className="project-studio-section">
+    <div className="project-studio-section" data-testid="project-studio">
       <div className="project-studio-header">
         <div>
           <span className="container-rich-kicker">Production</span>
@@ -200,7 +200,12 @@ export function ProjectStudioSection({
           ) : (
             <div className="project-level-list">
               {levels.map(level => (
-                <div className="project-level-row" key={level.id}>
+                <div
+                  className="project-level-row"
+                  key={level.id}
+                  data-testid="project-level-row"
+                  data-level-name={level.name}
+                >
                   <div>
                     <strong>{level.name}</strong>
                     {level.description && <p>{level.description}</p>}
@@ -291,6 +296,8 @@ export function ProjectStudioSection({
                 <article
                   className={`project-note-row${note.isPinned ? ' is-pinned' : ''}`}
                   key={note.id}
+                  data-testid="project-note-row"
+                  data-note-title={note.title}
                 >
                   <div className="project-note-heading">
                     <strong>{note.title}</strong>

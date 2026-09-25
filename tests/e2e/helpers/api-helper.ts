@@ -456,6 +456,82 @@ export class ApiHelper {
     return response.data;
   }
 
+  /**
+   * Create a project character (Project studio cast).
+   */
+  async createProjectCharacter(
+    projectId: number,
+    name: string,
+    description?: string,
+    tags?: string[],
+  ): Promise<{ id: number; name: string; tags: string[] }> {
+    const response = await this.client.post(
+      `/projects/${projectId}/characters`,
+      {
+        name,
+        description: description ?? "",
+        tags: tags ?? [],
+      },
+    );
+    if (response.status !== 200 && response.status !== 201) {
+      throw new Error(
+        `Failed to create character "${name}": ${response.status} ${response.statusText}`,
+      );
+    }
+    return response.data;
+  }
+
+  /** Read a project's character list straight from the API. */
+  async getProjectCharacters(projectId: number): Promise<
+    Array<{
+      id: number;
+      name: string;
+      tags: string[];
+      abilities: Array<{
+        id: number;
+        name: string;
+        description: string | null;
+      }>;
+      variants: Array<{
+        id: number;
+        name: string;
+        projectLevelId: number | null;
+        projectLevelName: string | null;
+      }>;
+    }>
+  > {
+    const response = await this.client.get(`/projects/${projectId}/characters`);
+    if (response.status !== 200) {
+      throw new Error(
+        `Failed to read characters of project ${projectId}: ${response.status}`,
+      );
+    }
+    return response.data;
+  }
+
+  /** Read a project's reference board, including target links. */
+  async getProjectReferences(projectId: number): Promise<
+    Array<{
+      id: number;
+      fileId: number;
+      title: string;
+      links: Array<{
+        id: number;
+        targetType: string;
+        projectLevelName: string | null;
+        projectCharacterName: string | null;
+      }>;
+    }>
+  > {
+    const response = await this.client.get(`/projects/${projectId}/references`);
+    if (response.status !== 200) {
+      throw new Error(
+        `Failed to read references of project ${projectId}: ${response.status}`,
+      );
+    }
+    return response.data;
+  }
+
   async setProjectCustomThumbnail(
     projectId: number,
     fileId: number | null,

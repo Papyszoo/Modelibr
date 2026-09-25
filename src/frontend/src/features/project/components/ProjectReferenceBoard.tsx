@@ -159,7 +159,10 @@ export function ProjectReferenceBoard({
   }))
 
   return (
-    <section className="project-reference-board">
+    <section
+      className="project-reference-board"
+      data-testid="project-reference-board"
+    >
       <div className="project-reference-header">
         <div>
           <span className="container-rich-kicker">Visual direction</span>
@@ -183,6 +186,7 @@ export function ProjectReferenceBoard({
           accept="image/*"
           multiple
           hidden
+          data-testid="project-reference-upload"
           aria-label="Reference images to upload"
           onChange={event => {
             const files = Array.from(event.target.files ?? [])
@@ -298,7 +302,11 @@ function ReferenceCard({
   )
 
   return (
-    <article className="project-reference-card">
+    <article
+      className="project-reference-card"
+      data-testid="project-reference-card"
+      data-file-id={reference.fileId}
+    >
       <div className="project-reference-preview-wrap">
         <button
           type="button"
@@ -327,6 +335,7 @@ function ReferenceCard({
         <InputText
           aria-label={`Title for ${reference.fileName}`}
           className="project-reference-title"
+          data-testid="project-reference-title"
           value={title}
           placeholder={reference.fileName}
           onChange={event => setTitle(event.target.value)}
@@ -374,7 +383,11 @@ function ReferenceCard({
 
         <div className="project-reference-notes">
           {notes.map(note => (
-            <div className="project-reference-note" key={note.id}>
+            <div
+              className="project-reference-note"
+              key={note.id}
+              data-testid="project-reference-note"
+            >
               <strong>{note.title}</strong>
               <p>{note.body}</p>
             </div>
@@ -448,7 +461,14 @@ function LinkRow({
       {links.length > 0 ? (
         <div className="project-reference-chips">
           {links.map(link => (
-            <span className="project-reference-chip" key={link.id}>
+            <span
+              className="project-reference-chip"
+              key={link.id}
+              data-testid="project-reference-chip"
+              data-target-type={
+                link.projectLevelId != null ? 'level' : 'character'
+              }
+            >
               {nameFor(link)}
               <button
                 type="button"
@@ -462,7 +482,10 @@ function LinkRow({
         </div>
       ) : null}
       {open ? (
-        <div className="project-reference-picker">
+        <div
+          className="project-reference-picker"
+          data-testid="project-reference-picker"
+        >
           {options.length === 0 ? (
             <span className="project-reference-picker-empty">{emptyText}</span>
           ) : (

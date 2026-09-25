@@ -225,7 +225,10 @@ export function ProjectCharactersSection({
   const models = modelsQuery.data ?? []
 
   return (
-    <section className="project-characters-section">
+    <section
+      className="project-characters-section"
+      data-testid="project-characters"
+    >
       <div className="project-characters-header">
         <div>
           <span className="container-rich-kicker">Production cast</span>
@@ -363,6 +366,8 @@ function CharacterCard({
   return (
     <article
       className={`project-character-card${expanded ? ' is-expanded' : ''}`}
+      data-testid="project-character-card"
+      data-character-name={character.name}
     >
       <div className="project-character-card-header">
         <div>
@@ -372,7 +377,11 @@ function CharacterCard({
               <span className="project-character-muted">Untagged</span>
             ) : (
               character.tags.map(tag => (
-                <span key={tag} className="project-character-tag">
+                <span
+                  key={tag}
+                  className="project-character-tag"
+                  data-testid="project-character-tag"
+                >
                   {tag}
                 </span>
               ))
@@ -417,6 +426,8 @@ function CharacterCard({
                   type="button"
                   role="tab"
                   aria-selected={section === value}
+                  data-testid="project-character-section-tab"
+                  data-section={value}
                   className={
                     section === value
                       ? 'project-character-section-tab is-active'
@@ -598,7 +609,11 @@ function CharacterNotes({
         />
       </div>
       {notes.map(note => (
-        <div className="project-character-note" key={note.id}>
+        <div
+          className="project-character-note"
+          key={note.id}
+          data-testid="project-character-note"
+        >
           <strong>{note.title}</strong>
           <p>{note.body}</p>
         </div>
@@ -774,6 +789,8 @@ function CharacterAbilities({
       {character.abilities.map(ability => (
         <CharacterChildRow
           key={ability.id}
+          testId="project-character-ability"
+          dataName={ability.name}
           title={ability.name}
           description={ability.description}
           onRemove={() => onRemove('ability', ability.id)}
@@ -849,6 +866,8 @@ function CharacterVariants({
       {character.variants.map(variant => (
         <CharacterChildRow
           key={variant.id}
+          testId="project-character-variant"
+          dataName={variant.name}
           title={variant.name}
           description={[variant.projectLevelName, variant.description]
             .filter(Boolean)
@@ -906,16 +925,24 @@ function CharacterVariants({
 }
 
 function CharacterChildRow({
+  testId,
+  dataName,
   title,
   description,
   onRemove,
 }: {
+  testId: string
+  dataName: string
   title: string
   description?: string | null
   onRemove: () => void
 }) {
   return (
-    <div className="project-character-link-row">
+    <div
+      className="project-character-link-row"
+      data-testid={testId}
+      data-name={dataName}
+    >
       <div>
         <strong>{title}</strong>
         {description ? <small>{description}</small> : null}
