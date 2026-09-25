@@ -45,6 +45,7 @@ export function ProjectStudioSection({
   const notesQuery = useProductionNotesQuery(projectId)
   const referencesQuery = useProjectReferencesQuery(projectId)
   const [levelName, setLevelName] = useState('')
+  const [levelDescription, setLevelDescription] = useState('')
   const [levelStatus, setLevelStatus] = useState<ProjectLevelStatus>('planned')
   const [showLevelForm, setShowLevelForm] = useState(false)
   const [showNoteForm, setShowNoteForm] = useState(false)
@@ -73,10 +74,14 @@ export function ProjectStudioSection({
     mutationFn: () =>
       createProjectLevel(projectId, {
         name: levelName.trim(),
+        ...(levelDescription.trim()
+          ? { description: levelDescription.trim() }
+          : {}),
         productionStatus: levelStatus,
       }),
     onSuccess: async () => {
       setLevelName('')
+      setLevelDescription('')
       setLevelStatus('planned')
       await invalidateStudio()
     },
@@ -203,6 +208,13 @@ export function ProjectStudioSection({
               }}
             >
               <label htmlFor="new-project-level">New level</label>
+              <InputTextarea
+                aria-label="Level description"
+                value={levelDescription}
+                onChange={event => setLevelDescription(event.target.value)}
+                rows={2}
+                placeholder="What happens in this level?"
+              />
               <div className="project-studio-form-row">
                 <InputText
                   id="new-project-level"

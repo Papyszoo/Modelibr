@@ -297,8 +297,8 @@ export function ProjectProfileSection({
     <div className="project-profile" data-testid="project-profile">
       <div className="container-rich-header-row">
         <div>
-          <span className="container-rich-kicker">Profile</span>
-          <h3>What is being made</h3>
+          <span className="container-rich-kicker">Project setup</span>
+          <h3>Profile and budgets</h3>
         </div>
         <Button
           label={save.isPending ? 'Saving…' : 'Save profile'}

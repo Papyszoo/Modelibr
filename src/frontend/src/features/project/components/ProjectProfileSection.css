@@ -3,6 +3,27 @@
  * the concept board above it. No height of its own and no nested scroll box -
  * the column already scrolls.
  */
+.project-profile-disclosure {
+  border-top: 1px solid var(--mod-color-border);
+  border-bottom: 1px solid var(--mod-color-border);
+}
+
+.project-profile-disclosure > summary {
+  padding: var(--mod-space-sm) 0;
+  color: var(--mod-color-text-muted);
+  cursor: pointer;
+  font-size: var(--mod-text-sm);
+  font-weight: var(--mod-font-weight-semibold);
+}
+
+.project-profile-disclosure[open] > summary {
+  color: var(--text-color);
+}
+
+.project-profile-disclosure > .container-rich-block {
+  padding-top: 0;
+}
+
 .project-profile {
   display: flex;
   flex-direction: column;

@@ -14,7 +14,8 @@ This file is the single instruction set for every agent working in this repo.
   `frontend-patterns`, `design-tokens`, `ui-primitives`, `primereact-traps`,
   `storybook-stories`, `frontend-test-authoring`. Elsewhere:
   `asset-processor-patterns`, `webdav-patterns`, `e2e-authoring`, `test-triage`,
-  `video-authoring`, `release-workflow`, `skill-authoring`.
+  `video-authoring`, `release-workflow`, `skill-authoring`,
+  `project-production-ux`.
   Skills are canonical agent docs - there is no parallel "AI documentation" set.
   **If a skill claim contradicts the code, trust the code and fix the skill in the
   same session.** Keep each skill near one screen (~90 lines); when one outgrows

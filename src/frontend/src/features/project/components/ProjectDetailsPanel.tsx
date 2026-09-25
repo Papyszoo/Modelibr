@@ -17,6 +17,8 @@ import {
   setProjectCustomThumbnail,
   updateProject,
 } from '@/features/project/api/projectApi'
+import { updateProjectReference } from '@/features/project/api/projectStudioApi'
+import { useProjectLevelsQuery } from '@/features/project/api/projectStudioQueries'
 import { useTabUiState } from '@/hooks/useTabUiState'
 import { resolveApiAssetUrl } from '@/lib/apiBase'
 import { ImageLightboxDialog } from '@/shared/components/ImageLightboxDialog'
@@ -60,6 +62,7 @@ export function ProjectDetailsPanel({
   const queryClient = useQueryClient()
   const thumbnailInputRef = useRef<HTMLInputElement | null>(null)
   const conceptInputRef = useRef<HTMLInputElement | null>(null)
+  const levelsQuery = useProjectLevelsQuery(project.id)
   const [activeConceptImageIndex, setActiveConceptImageIndex] = useState<
     number | null
   >(null)
@@ -239,6 +242,16 @@ export function ProjectDetailsPanel({
     },
   })
 
+  const referenceMutation = useMutation({
+    mutationFn: (input: { referenceId: number; levelId: number | null }) =>
+      updateProjectReference(project.id, input.referenceId, {
+        projectLevelId: input.levelId,
+      }),
+    onSuccess: async () => {
+      await invalidate()
+    },
+  })
+
   const removeConceptMutation = useMutation({
     mutationFn: (fileId: number) =>
       removeProjectConceptImage(project.id, fileId),
@@ -303,14 +316,17 @@ export function ProjectDetailsPanel({
             </div>
           </div>
 
-          <div className="container-rich-block">
-            <ProjectProfileSection
-              projectId={project.id}
-              tabId={tabStateKey}
-              onDirtyChange={setProfileDirty}
-              showToast={showToast}
-            />
-          </div>
+          <details className="project-profile-disclosure">
+            <summary>Project setup</summary>
+            <div className="container-rich-block">
+              <ProjectProfileSection
+                projectId={project.id}
+                tabId={tabStateKey}
+                onDirtyChange={setProfileDirty}
+                showToast={showToast}
+              />
+            </div>
+          </details>
 
           <div className="container-rich-block">
             <div className="container-rich-header-row">
@@ -376,6 +392,27 @@ export function ProjectDetailsPanel({
                     </button>
                     <div className="container-media-card-footer">
                       <span title={image.fileName}>{image.fileName}</span>
+                      {image.id && (levelsQuery.data?.length ?? 0) > 0 ? (
+                        <select
+                          aria-label={`Level for ${image.fileName}`}
+                          value={image.projectLevelId ?? ''}
+                          onChange={event =>
+                            referenceMutation.mutate({
+                              referenceId: image.id!,
+                              levelId: event.target.value
+                                ? Number(event.target.value)
+                                : null,
+                            })
+                          }
+                        >
+                          <option value="">Project-wide</option>
+                          {(levelsQuery.data ?? []).map(level => (
+                            <option key={level.id} value={level.id}>
+                              {level.name}
+                            </option>
+                          ))}
+                        </select>
+                      ) : null}
                       <Button
                         icon="pi pi-times"
                         text
@@ -444,18 +481,6 @@ export function ProjectDetailsPanel({
                 onClick={() => thumbnailMutation.mutate(null)}
                 disabled={!thumbnailUrl || thumbnailMutation.isPending}
               />
-            </div>
-          </div>
-
-          <div className="container-rich-block">
-            <span className="container-rich-kicker">Snapshot</span>
-            <div className="container-detail-assets">
-              <span>{project.modelCount} models</span>
-              <span>{project.globalMaterialCount} global materials</span>
-              <span>{project.multiModelTextureCount} multi-model textures</span>
-              <span>{project.spriteCount} sprites</span>
-              <span>{project.soundCount} sounds</span>
-              <span>{project.environmentMapCount ?? 0} environment maps</span>
             </div>
           </div>
         </aside>
