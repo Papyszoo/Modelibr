@@ -570,15 +570,29 @@ export function SceneEditor({
     return !useSceneEditorStore.getState().saveError
   }, [handleSave])
 
+  /*
+   * Both publishers go through refs on purpose.
+   *
+   * The tab passes these as inline arrows, so their identity changes on every
+   * render. An effect that depended on that identity would re-run every render,
+   * and since relabelling the tab writes to the navigation store, the tab would
+   * re-render, the arrow would be new again, and the loop would take the whole
+   * app down with it. The refs make the effect depend on the VALUE that matters
+   * instead: the name, and the save function.
+   */
+  const registerSaveRef = useRef(registerSave)
+  registerSaveRef.current = registerSave
   useEffect(() => {
-    registerSave(saveAndReport)
-  }, [registerSave, saveAndReport])
+    registerSaveRef.current(saveAndReport)
+  }, [saveAndReport])
 
+  const onSceneNameChangeRef = useRef(onSceneNameChange)
+  onSceneNameChangeRef.current = onSceneNameChange
   useEffect(() => {
     if (view?.scene.name) {
-      onSceneNameChange?.(view.scene.name)
+      onSceneNameChangeRef.current?.(view.scene.name)
     }
-  }, [view?.scene.name, onSceneNameChange])
+  }, [view?.scene.name])
 
   // Undo/redo on the usual chord. Scoped to the editor being mounted, and
   // ignored while a text field has focus so typing in the name box does not

@@ -1,4 +1,4 @@
-import { Page, Request, expect } from "@playwright/test";
+import { type Locator, Page, Request, expect } from "@playwright/test";
 
 /**
  * Scenes tab: the list of scenes and the editor for one of them.
@@ -61,10 +61,11 @@ export class ScenesPage {
   }
 
   async backToList(): Promise<void> {
-    // Back closes the scene's own tab, which lands the user back on the list
-    // tab it was opened from - so "back" is still one gesture.
-    await this.page.getByRole("button", { name: "Back to scenes" }).click();
-    await expect(this.page.locator(this.list)).toBeVisible();
+    // The editor's own way back, which is the "Scenes" action. It focuses the
+    // list tab and leaves the editor tab open with its draft - the old Back
+    // button closed the tab and threw the draft away, which is why this scenario
+    // helper is now a navigation and not a close.
+    await this.showScenesListFromEditor();
   }
 
   async openScene(name: string): Promise<void> {
@@ -88,6 +89,71 @@ export class ScenesPage {
     await clickTab(this.page, "scenes", "left");
     await expect(this.page.locator(this.list)).toBeVisible();
     await this.openScene(name);
+  }
+
+  /**
+   * Shows the Scenes list from inside an editor tab, without closing it.
+   *
+   * The regression this exists for: that action used to close the tab and throw
+   * away the draft, so picking a different scene lost the one you were in.
+   */
+  async showScenesListFromEditor(): Promise<void> {
+    await this.page.getByRole("button", { name: "Scenes" }).first().click();
+    await expect(this.page.locator(this.list)).toBeVisible();
+  }
+
+  /** The scene list page, as the editor's own "Scenes" action leaves it. */
+  get sceneList(): Locator {
+    return this.page.locator(this.list);
+  }
+
+  /** The tab bar entry for a scene's editor, addressed by its tooltip prefix. */
+  sceneEditorTabs(): Locator {
+    return this.page.locator('.draggable-tab[data-pr-tooltip^="Scene:"]');
+  }
+
+  get closeDecisionHeading(): Locator {
+    return this.page.getByText("Unsaved scene changes");
+  }
+
+  get missingSceneNotice(): Locator {
+    return this.page.getByText("This scene no longer exists");
+  }
+
+  /** True while the editor's unsaved-changes decision is on screen. */
+  async isCloseDecisionOpen(): Promise<boolean> {
+    return this.page
+      .getByText("Unsaved scene changes")
+      .isVisible()
+      .catch(() => false);
+  }
+
+  /**
+   * Closes this scene's editor tab through the dock's own close button.
+   *
+   * Through the dock rather than an in-editor control on purpose: the dock's X
+   * is what has to honour the close guard, and a test that used a different path
+   * would pass while the real one still discarded silently.
+   */
+  async closeEditorTab(sceneName: string): Promise<void> {
+    const { closeTabByTooltip } = await import("../helpers/navigation-helper");
+    // Not expecting the tab to close: whether it does is exactly what the
+    // decision is about, so the scenarios assert that themselves.
+    await closeTabByTooltip(this.page, `Scene: ${sceneName}`, {
+      expectClosed: false,
+    });
+  }
+
+  /**
+   * Restores the persisted layout, so "what happens when the app comes back" is
+   * asked of the app rather than of a mocked rehydration.
+   */
+  async reloadWorkspace(): Promise<void> {
+    await this.page.reload({ waitUntil: "domcontentloaded" });
+    await this.page.waitForSelector(".p-splitter", {
+      state: "visible",
+      timeout: 30000,
+    });
   }
 
   sceneTileByName(name: string) {

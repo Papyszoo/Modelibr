@@ -114,6 +114,80 @@ When(
   },
 );
 
+Then("the scene list should be visible", async ({ page }) => {
+  await expect(new ScenesPage(page).sceneList).toBeVisible();
+});
+
+When("I show the scenes list from the editor", async ({ page }) => {
+  await new ScenesPage(page).showScenesListFromEditor();
+});
+
+When("I close the editor tab of {string}", async ({ page }, name: string) => {
+  await new ScenesPage(page).closeEditorTab(name);
+});
+
+Then("the unsaved-changes decision should be offered", async ({ page }) => {
+  await expect(new ScenesPage(page).closeDecisionHeading).toBeVisible({
+    timeout: 15000,
+  });
+});
+
+Then("the scene editor tab should still be open", async ({ page }) => {
+  // The editor CONTENT is not visible while the list is the active tab - the dock
+  // renders one tab at a time. What must survive is the tab itself, which is
+  // where the editor's draft lives.
+  await expect(new ScenesPage(page).sceneEditorTabs()).toHaveCount(1);
+});
+
+Then(
+  "the saved scene {string} should hold {int} node(s) on the server",
+  async ({ page }, name: string, count: number) => {
+    // Asserted through the API, not the editor: the tab is gone by now, and the
+    // claim "it closed with its work" is about what the server stored, not about
+    // a button's label having changed.
+    const view = await fetchSceneByName(page, name);
+    expect(view.document?.nodes ?? []).toHaveLength(count);
+  },
+);
+
+When("I choose to cancel closing", async ({ page }) => {
+  await page.getByRole("button", { name: "Cancel" }).click();
+});
+
+When("I choose to discard", async ({ page }) => {
+  await page.getByRole("button", { name: "Discard" }).click();
+});
+
+When("I choose to save and close", async ({ page }) => {
+  await page
+    .getByRole("button", { name: /Save and close|Saving\.\.\./ })
+    .click();
+});
+
+When("I reload the workspace", async ({ page }) => {
+  await new ScenesPage(page).reloadWorkspace();
+});
+
+Then("there should be no scene editor tabs open", async ({ page }) => {
+  await expect(new ScenesPage(page).sceneEditorTabs()).toHaveCount(0, {
+    timeout: 15000,
+  });
+});
+
+Then("the missing-scene notice should be shown", async ({ page }) => {
+  await expect(new ScenesPage(page).missingSceneNotice).toBeVisible({
+    timeout: 15000,
+  });
+});
+
+When("the scene {string} is deleted", async ({ page }, name: string) => {
+  const view = await fetchSceneByName(page, name);
+  const deleted = await page.request.delete(
+    `${apiBase()}/scenes/${view.scene.id}`,
+  );
+  expect(deleted.ok()).toBeTruthy();
+});
+
 Then("the scene should hold no nodes", async ({ page }) => {
   await expect(new ScenesPage(page).nodeRows()).toHaveCount(0);
 });
