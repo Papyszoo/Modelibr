@@ -162,3 +162,57 @@
     padding-top: var(--mod-space-sm);
   }
 }
+
+/*
+ * A level row is a button around its text, so the whole row opens the level and
+ * the two controls beside it stay separate targets. Without this the row was a
+ * div and the only way in was the small scene icon, which hides the level's
+ * brief behind a control about scenes.
+ */
+.project-level-open {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--mod-space-3xs);
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--mod-radius-sm);
+}
+
+.project-level-open:hover .project-level-open-name strong {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.project-level-open:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+.project-level-open-name {
+  min-width: 0;
+}
+
+.project-level-open p {
+  margin: 0;
+}
+
+.project-level-row-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--mod-space-xs);
+  font-size: var(--mod-text-xs);
+  color: var(--text-color-secondary);
+}
+
+.project-level-row-counts > span + span::before {
+  content: '·';
+  margin-right: var(--mod-space-xs);
+}

@@ -27,6 +27,14 @@ import {
 
 interface ProjectLevelAssetsSectionProps {
   projectId: number
+  /**
+   * Scopes the section to one Level and drops the picker.
+   *
+   * The Level workspace's Assets view *is* the filter, so offering a picker there
+   * would let the user navigate away from the level they opened. Null keeps the
+   * Project tab's behaviour: a picker over every level.
+   */
+  levelId?: number | null
 }
 
 const ASSET_TYPE_ICONS: Record<SceneAssetType, string> = {
@@ -51,6 +59,7 @@ const ASSET_TYPE_LABELS: Record<SceneAssetType, string> = {
  */
 export function ProjectLevelAssetsSection({
   projectId,
+  levelId: scopedLevelId = null,
 }: ProjectLevelAssetsSectionProps) {
   const levelsQuery = useProjectLevelsQuery(projectId)
   const scenesQuery = useScenesQuery()
@@ -66,7 +75,8 @@ export function ProjectLevelAssetsSection({
   )
   // Defaults to the first level in production order, so the section is useful
   // before anything is picked, and follows the project when levels are added.
-  const levelId = selectedLevelId ?? levels[0]?.id ?? null
+  // A scoped `levelId` wins: it is the level the workspace was opened on.
+  const levelId = scopedLevelId ?? selectedLevelId ?? levels[0]?.id ?? null
   const level = levels.find(candidate => candidate.id === levelId) ?? null
 
   const levelScenes = useMemo(
@@ -192,19 +202,21 @@ export function ProjectLevelAssetsSection({
           <h3 id="project-level-assets-title">Level assets</h3>
         </div>
         <div className="project-level-assets-header-actions">
-          <select
-            className="project-level-assets-level"
-            data-testid="level-assets-level"
-            aria-label="Level for assets"
-            value={levelId ?? ''}
-            onChange={event => setSelectedLevelId(Number(event.target.value))}
-          >
-            {levels.map(candidate => (
-              <option key={candidate.id} value={candidate.id}>
-                {candidate.name}
-              </option>
-            ))}
-          </select>
+          {scopedLevelId === null && (
+            <select
+              className="project-level-assets-level"
+              data-testid="level-assets-level"
+              aria-label="Level for assets"
+              value={levelId ?? ''}
+              onChange={event => setSelectedLevelId(Number(event.target.value))}
+            >
+              {levels.map(candidate => (
+                <option key={candidate.id} value={candidate.id}>
+                  {candidate.name}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       </div>
 

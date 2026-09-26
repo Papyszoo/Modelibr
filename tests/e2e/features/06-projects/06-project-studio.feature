@@ -124,3 +124,84 @@ Feature: Project Studio
     When I press the scene control of the level "Ruined Keep"
     Then the scene editor for "Ruined Keep" should be in its own tab
     And the scene "Ruined Keep" should be filed under that level
+
+  @project-level-workspace
+  Scenario: A level is a workspace of its own, reached from the project
+    # The release intent is "open a Project, work one Level at a time". A level
+    # row that only answered "what is this project" left the level itself with
+    # nowhere to go, so the row opens one and the breadcrumb is the way back. The
+    # two assertions that matter: the level's own four surfaces replace the
+    # project's, and going back leaves the project where it was.
+    Given a level named "Workspace Crossing" exists
+    When I am on the studio project
+    And I open the level "Workspace Crossing"
+    Then the level workspace should be showing "Workspace Crossing"
+    And the level workspace should offer its own four surfaces
+    When I go back to the project from the level
+    Then the project workspace should be showing its own four surfaces
+
+  @project-level-brief
+  Scenario: A level's brief and counts answer without opening anything
+    # The variant count came back from the API the whole time and the row never
+    # showed it. A level card is a summary, so what a level already has on it -
+    # its description, its cast, how much is built - is the summary.
+    Given a level named "Brief Forest" exists
+    And a level named "Brief Keep" exists
+    When I am on the studio project
+    Then the level row "Brief Forest" should show its description
+    And the level row "Brief Keep" should offer to open a workspace
+
+  @project-level-brief-cast
+  Scenario: A level's workspace names the cast that changes in it
+    # A variant is how a character is different in this level than another, so
+    # "which variants does this level use" is a question the level answers. The
+    # count came from the level DTO all along; nothing displayed it.
+    Given a level named "Cast Crossing" exists
+    And a character named "Cast Warden" exists
+    And a variant "Frozen" of character "Cast Warden" is scoped to level "Cast Crossing"
+    When I am on the studio project
+    And I open the level "Cast Crossing"
+    Then the level workspace should list 1 character variant
+    And the level workspace should name the variant "Frozen"
+
+  @project-level-scenes-view
+  Scenario: A level's scenes are listed, with the primary one marked
+    # A level may hold several scenes: one primary shot plus alternates. Which is
+    # which is the information needed before opening either, so the primary is
+    # marked rather than sorted to the top and left anonymous. The first scene
+    # filed claims primary; a later one must not steal it.
+    Given a level named "Scenes Crossing" exists
+    And a scene "Scenes Layout" is linked to level "Scenes Crossing" placing "Scenes Cube"
+    And a scene "Scenes Alternate" is linked to level "Scenes Crossing" placing "Scenes Barrel"
+    When I am on the studio project
+    And I open the level "Scenes Crossing"
+    And I show the scenes of the level
+    Then the level should list 2 scenes
+    And the level scene "Scenes Layout" should be marked primary
+    And the level scene "Scenes Alternate" should not be marked primary
+
+  @project-level-assets-view
+  Scenario: A level's assets view is scoped to that level
+    # The project view offers a picker over every level; the level's own Assets
+    # view must not, or the user could filter their way out of the level they
+    # opened. Same derivation either way, so the two cannot disagree.
+    Given a level named "Assets Crossing" exists
+    And a scene "Assets Layout" is linked to level "Assets Crossing" placing "Assets Cube"
+    When I am on the studio project
+    And I open the level "Assets Crossing"
+    And I show the assets of the level
+    Then the level should place "Assets Cube"
+    And the level assets should offer no level picker
+
+  @project-level-missing
+  Scenario: A level deleted while its workspace is open says so and leaves a way out
+    # A workspace reached by drill-down can outlive the thing it drills into. The
+    # level is gone; the project, its other levels and the open scenes are not, so
+    # the honest answer is to say it and offer the way back.
+    Given a level named "Vanishing Level" exists
+    When I am on the studio project
+    And I open the level "Vanishing Level"
+    And the level "Vanishing Level" is deleted
+    Then the missing-level notice should be shown
+    When I go back to the project from the level
+    Then the project workspace should be showing its own four surfaces

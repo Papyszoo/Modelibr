@@ -196,6 +196,69 @@ export class ProjectStudioPage {
   }
 
   /**
+   * Opens a level's own workspace from its row in the Levels view.
+   *
+   * Through the row's own button rather than the small scene control beside it:
+   * the scene control is about scenes, and the row is how a person says "let me
+   * work on this level".
+   */
+  async openLevelWorkspace(levelName: string): Promise<void> {
+    await this.ensureView("levels");
+    const row = this.page.locator(
+      `[data-testid="project-level-row"][data-level-name="${levelName}"]`,
+    );
+    await expect(row).toBeVisible({ timeout: 30000 });
+    await row.getByTestId("project-level-open").click();
+    await expect(this.page.getByTestId("project-level-crumb-level")).toHaveText(
+      levelName,
+      { timeout: 15000 },
+    );
+  }
+
+  /** The level workspace's own view bar, once a level is open. */
+  get levelWorkspaceSurfaces(): Locator {
+    return this.page.getByRole("tablist", { name: "Level workspace" });
+  }
+
+  get projectWorkspaceSurfaces(): Locator {
+    return this.page.getByRole("tablist", { name: "Project workspace" });
+  }
+
+  /** Switches the level workspace to one of its four surfaces. */
+  async showLevelSurface(
+    view: "overview" | "assets" | "scenes" | "references",
+  ): Promise<void> {
+    const tab = this.page.getByTestId(`project-workspace-tab-${view}`);
+    await expect(tab).toBeVisible({ timeout: 15000 });
+    if ((await tab.getAttribute("aria-selected")) !== "true") {
+      await tab.click();
+    }
+    await expect(tab).toHaveAttribute("aria-selected", "true", {
+      timeout: 15000,
+    });
+  }
+
+  /** Leaves the level through the breadcrumb and lands back on the project. */
+  async leaveLevelWorkspace(): Promise<void> {
+    await this.page.getByTestId("project-level-crumb-project").click();
+    await expect(this.projectWorkspaceSurfaces).toBeVisible({ timeout: 15000 });
+  }
+
+  /**
+   * One row of a level's scene list.
+   *
+   * Matched by prefix, not equality: a provisioned scene's real name carries a
+   * per-worker suffix so parallel workers cannot collide on it, and the scenario
+   * only knows the alias it asked for. The same reason the asset rows match
+   * loosely.
+   */
+  levelSceneRow(sceneName: string): Locator {
+    return this.page.locator(
+      `[data-testid="project-level-scene-row"][data-scene-name^="${sceneName}"]`,
+    );
+  }
+
+  /**
    * Brings a workspace view into view if it is not already the selected one.
    *
    * Idempotent, like `ensureCharacterEditorOpen` and for the same reason: the

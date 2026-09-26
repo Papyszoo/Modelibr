@@ -14,6 +14,16 @@ export interface ProjectLevelDto {
   description: string | null
   productionStatus: ProjectLevelStatus
   sortOrder: number
+  /**
+   * Character variants scoped to this level, by name.
+   *
+   * Returned by the API but previously undeclared here, so the level row could
+   * not show a count it already had. A variant is how a character changes
+   * between levels, and "which variants does this level use" is a question a
+   * level card should answer without opening anything.
+   */
+  characterVariantNames: string[]
+  characterVariantCount: number
   createdAt: string
   updatedAt: string
 }

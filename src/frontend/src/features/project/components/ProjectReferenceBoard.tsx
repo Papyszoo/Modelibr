@@ -36,6 +36,15 @@ import { ImageLightboxDialog } from '@/shared/components/ImageLightboxDialog'
 interface ProjectReferenceBoardProps {
   projectId: number
   onChanged?: () => void
+  /**
+   * Pins the board to one Level or Character and drops the filter control.
+   *
+   * The Level workspace's References view *is* "this level's references", so
+   * offering a picker there would let the user filter their way out of the level
+   * they opened. The server-side filter is reused, so the view and the API can
+   * never disagree about what a link means.
+   */
+  fixedTarget?: string
 }
 
 type LinkTarget = 'level' | 'character'
@@ -46,23 +55,29 @@ const CHARACTER_PREFIX = 'character:'
 
 export function ProjectReferenceBoard({
   projectId,
+  fixedTarget,
   onChanged,
 }: ProjectReferenceBoardProps) {
   const queryClient = useQueryClient()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [target, setTarget] = useState(ALL_TARGETS)
+  // A pinned target wins over the local one: the workspace opened on a level, so
+  // that is the only target its References view is about.
+  const effectiveTarget = fixedTarget ?? target
   // Server-side filtering, not a client-side pass over every image: the board
   // and the endpoint can never disagree about what a link means.
   const filterOptions = useMemo(() => {
-    if (target.startsWith(LEVEL_PREFIX)) {
-      return { levelId: Number(target.slice(LEVEL_PREFIX.length)) }
+    if (effectiveTarget.startsWith(LEVEL_PREFIX)) {
+      return { levelId: Number(effectiveTarget.slice(LEVEL_PREFIX.length)) }
     }
-    if (target.startsWith(CHARACTER_PREFIX)) {
-      return { characterId: Number(target.slice(CHARACTER_PREFIX.length)) }
+    if (effectiveTarget.startsWith(CHARACTER_PREFIX)) {
+      return {
+        characterId: Number(effectiveTarget.slice(CHARACTER_PREFIX.length)),
+      }
     }
     return {}
-  }, [target])
-  const filtering = target !== ALL_TARGETS
+  }, [effectiveTarget])
+  const filtering = effectiveTarget !== ALL_TARGETS
   const referencesQuery = useProjectReferencesQuery(projectId, filterOptions)
   // The unfiltered count is what the "n of m" header needs, and it is only
   // worth the second request while a filter is on.
@@ -211,7 +226,7 @@ export function ProjectReferenceBoard({
           <h3>Reference Board</h3>
         </div>
         <div className="project-reference-header-actions">
-          {filterOptionsList.length > 0 ? (
+          {fixedTarget === undefined && filterOptionsList.length > 0 ? (
             <select
               className="project-reference-filter"
               data-testid="project-reference-filter"

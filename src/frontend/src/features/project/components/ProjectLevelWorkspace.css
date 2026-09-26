@@ -1,0 +1,126 @@
+/*
+ * The Level workspace: a breadcrumb above the shared view bar, and a brief that
+ * answers "what is this level for" before any of its four surfaces.
+ *
+ * Deliberately thin. The view bar, the assets section, the reference board and the
+ * scene control are all shared with the Project workspace, so this file only
+ * covers what is genuinely new - the way in, the way out, and the brief.
+ */
+
+.project-level-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: var(--mod-space-3xs);
+  padding-bottom: var(--mod-space-2xs);
+  font-size: var(--mod-text-sm);
+  color: var(--text-color-secondary);
+}
+
+.project-level-crumb {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  color: var(--text-color-secondary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.project-level-crumb:hover {
+  color: var(--text-color);
+}
+
+.project-level-crumb.is-current {
+  color: var(--text-color);
+  font-weight: 600;
+  text-decoration: none;
+  cursor: default;
+}
+
+.project-level-status {
+  margin-left: auto;
+  font-size: var(--mod-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-color-secondary);
+}
+
+.project-level-overview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-sm);
+  align-items: flex-start;
+}
+
+.project-level-overview-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--mod-space-sm);
+  width: 100%;
+}
+
+.project-level-description {
+  margin: 0;
+  max-width: 68ch;
+  color: var(--text-color);
+  line-height: 1.5;
+}
+
+.project-level-description.is-empty {
+  color: var(--text-color-secondary);
+  font-style: italic;
+}
+
+/* Production facts read as a definition list, not as a table of numbers: three
+   small pairs, each one thing a level has, so the row stays scannable. */
+.project-level-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--mod-space-md);
+  margin: 0;
+  padding: var(--mod-space-xs) 0;
+}
+
+.project-level-facts > div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-3xs);
+}
+
+.project-level-facts dt {
+  font-size: var(--mod-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-color-secondary);
+}
+
+.project-level-facts dd {
+  margin: 0;
+  font-size: var(--mod-text-sm);
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.project-level-variants {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-3xs);
+  width: 100%;
+}
+
+.project-level-variant-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--mod-space-3xs);
+}
+
+.project-level-variant-chip {
+  padding: var(--mod-space-3xs) var(--mod-space-xs);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--mod-radius-sm);
+  background: var(--surface-ground);
+  font-size: var(--mod-text-xs);
+  color: var(--text-color);
+}

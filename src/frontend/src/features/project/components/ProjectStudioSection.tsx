@@ -27,11 +27,16 @@ import {
   ErrorState,
   LoadingState,
 } from '@/shared/components/feedback'
+import { useScenesQuery } from '@/features/scenes/api/queries'
+
 import { useTabUiState } from '@/hooks/useTabUiState'
+
+import { LEVEL_STATUSES, levelStatusLabel } from '../levelStatus'
 
 import { ProjectCharactersSection } from './ProjectCharactersSection'
 import { ProjectLevelAssetsSection } from './ProjectLevelAssetsSection'
 import { ProjectLevelSceneButton } from './ProjectLevelSceneButton'
+import { ProjectLevelWorkspace } from './ProjectLevelWorkspace'
 import { ProjectReferenceBoard } from './ProjectReferenceBoard'
 import {
   ProjectWorkspaceShell,
@@ -43,14 +48,6 @@ interface ProjectStudioSectionProps {
   tabId?: string
   onChanged?: () => void
 }
-
-const LEVEL_STATUSES: Array<{ value: ProjectLevelStatus; label: string }> = [
-  { value: 'planned', label: 'Planned' },
-  { value: 'in_progress', label: 'In progress' },
-  { value: 'review', label: 'Review' },
-  { value: 'blocked', label: 'Blocked' },
-  { value: 'done', label: 'Done' },
-]
 
 /**
  * What a note is attached to, in words rather than ids.
@@ -88,6 +85,7 @@ export function ProjectStudioSection({
   const charactersQuery = useProjectCharactersQuery(projectId)
   const notesQuery = useProductionNotesQuery(projectId)
   const referencesQuery = useProjectReferencesQuery(projectId)
+  const scenesQuery = useScenesQuery()
 
   // Which surface of the workspace this tab is showing, kept in the tab's own UI
   // state so a reload or a trip to another tab comes back to the same view. The
@@ -104,6 +102,15 @@ export function ProjectStudioSection({
   const [levelDescription, setLevelDescription] = useState('')
   const [levelStatus, setLevelStatus] = useState<ProjectLevelStatus>('planned')
   const [showLevelForm, setShowLevelForm] = useState(false)
+
+  // Which Level the workspace is drilled into, in the tab's own state so a reload
+  // or a trip to another tab returns to the level the user was reading. Null is
+  // the project's own four views.
+  const [openLevelId, setOpenLevelId] = useTabUiState<number | null>(
+    stateKey,
+    'projectOpenLevelId',
+    null
+  )
   const [showNoteForm, setShowNoteForm] = useState(false)
   const [noteTitle, setNoteTitle] = useState('')
   const [noteBody, setNoteBody] = useState('')
@@ -212,6 +219,18 @@ export function ProjectStudioSection({
   const pinnedNotes = notes.filter(note => note.isPinned)
 
   /*
+   * Two of the three counts on a level row, derived from data the studio already
+   * has rather than from three more requests: the workspace loads the notes and
+   * the scene list anyway, so a level's note and scene counts are a filter over
+   * what is in hand. The variant count comes from the level DTO itself.
+   */
+  const sceneCountForLevel = (levelId: number): number =>
+    (scenesQuery.data ?? []).filter(scene => scene.projectLevelId === levelId)
+      .length
+  const noteCountForLevel = (levelId: number): number =>
+    notes.filter(note => note.levelId === levelId).length
+
+  /*
    * Hoisted out of the JSX because the note form is reachable from two views and
    * duplicated markup drifts. Not a component: it closes over five pieces of
    * local draft state, and lifting that out would be a bigger change than the
@@ -316,19 +335,53 @@ export function ProjectStudioSection({
               data-testid="project-level-row"
               data-level-name={level.name}
             >
-              <div>
-                <strong>{level.name}</strong>
+              <button
+                type="button"
+                className="project-level-open"
+                data-testid="project-level-open"
+                aria-label={`Open the level ${level.name}`}
+                onClick={() => setOpenLevelId(level.id)}
+              >
+                <span className="project-level-open-name">
+                  <strong>{level.name}</strong>
+                </span>
                 {level.description && <p>{level.description}</p>}
-              </div>
+                {/* The counts the API already returns, and the two a level's
+                    own surfaces answer. "Which variants does this level use"
+                    is a question the row can answer without opening it. */}
+                <span className="project-level-row-counts">
+                  {level.characterVariantCount > 0 && (
+                    <span data-testid="project-level-row-variants">
+                      {level.characterVariantCount}{' '}
+                      {level.characterVariantCount === 1
+                        ? 'variant'
+                        : 'variants'}
+                    </span>
+                  )}
+                  {!scenesQuery.isLoading &&
+                    sceneCountForLevel(level.id) > 0 && (
+                      <span data-testid="project-level-row-scenes">
+                        {sceneCountForLevel(level.id)}{' '}
+                        {sceneCountForLevel(level.id) === 1
+                          ? 'scene'
+                          : 'scenes'}
+                      </span>
+                    )}
+                  {noteCountForLevel(level.id) > 0 && (
+                    <span data-testid="project-level-row-notes">
+                      {noteCountForLevel(level.id)}{' '}
+                      {noteCountForLevel(level.id) === 1 ? 'note' : 'notes'}
+                    </span>
+                  )}
+                </span>
+              </button>
               <ProjectLevelSceneButton
                 projectId={projectId}
                 levelId={level.id}
                 levelName={level.name}
               />
               <span className="project-status-pill">
-                {LEVEL_STATUSES.find(
-                  status => status.value === level.productionStatus
-                )?.label ?? level.productionStatus}
+                {levelStatusLabel(level.productionStatus)}
               </span>
             </div>
           ))}
@@ -395,91 +448,116 @@ export function ProjectStudioSection({
         </span>
       </div>
 
-      <ProjectWorkspaceShell
-        view={view}
-        onViewChange={setView}
-        counts={{
-          levels: levels.length,
-          cast: characters.length,
-          references: references.length,
-        }}
-      >
-        {view === 'overview' ? (
-          <div className="project-studio-grid">
-            {levelCard}
-            <section
-              className="project-studio-card"
-              aria-labelledby="project-notes-title"
-            >
-              <div className="project-studio-card-header">
-                <div className="project-studio-card-title">
-                  <h4 id="project-notes-title">Notes & ideas</h4>
-                  <span className="project-studio-count">{notes.length}</span>
+      {/*
+       * A Level is reached through the Project tab, not a tab of its own: it is
+       * part of Project design rather than an asset, and a second tab type for it
+       * would give the dock a second kind of "thing you can have open" for
+       * something that is really one section of the project. The breadcrumb is
+       * the way back, and the level's own four surfaces replace the project's
+       * four while it is open.
+       */}
+      {openLevelId !== null ? (
+        <ProjectLevelWorkspace
+          projectId={projectId}
+          levelId={openLevelId}
+          tabId={tabId}
+          onExit={() => setOpenLevelId(null)}
+        />
+      ) : (
+        <ProjectWorkspaceShell
+          view={view}
+          onViewChange={setView}
+          counts={{
+            levels: levels.length,
+            cast: characters.length,
+            references: references.length,
+          }}
+        >
+          {view === 'overview' ? (
+            <div className="project-studio-grid">
+              {levelCard}
+              <section
+                className="project-studio-card"
+                aria-labelledby="project-notes-title"
+              >
+                <div className="project-studio-card-header">
+                  <div className="project-studio-card-title">
+                    <h4 id="project-notes-title">Notes & ideas</h4>
+                    <span className="project-studio-count">{notes.length}</span>
+                  </div>
+                  <Button
+                    icon="pi pi-plus"
+                    text
+                    rounded
+                    aria-label="Add note"
+                    title="Add note"
+                    onClick={() => setShowNoteForm(current => !current)}
+                  />
                 </div>
-                <Button
-                  icon="pi pi-plus"
-                  text
-                  rounded
-                  aria-label="Add note"
-                  title="Add note"
-                  onClick={() => setShowNoteForm(current => !current)}
-                />
-              </div>
-              {notes.length === 0 ? (
-                <EmptyState
-                  icon="pi pi-file-edit"
-                  title="No notes yet"
-                  message="Record what the team should remember, or pin an idea."
-                />
-              ) : (
-                <div className="project-note-list">
-                  {notes.map(note => (
-                    <article
-                      className={`project-note-row${note.isPinned ? ' is-pinned' : ''}`}
-                      key={note.id}
-                      data-testid="project-note-row"
-                      data-note-title={note.title}
-                    >
-                      <div className="project-note-heading">
-                        <strong>{note.title}</strong>
-                        {note.isPinned && (
-                          <i
-                            className="pi pi-bookmark-fill"
-                            aria-label="Pinned"
-                          />
-                        )}
-                      </div>
-                      <p>{note.body}</p>
-                      <small>
-                        {noteTargetLabel(note, levels, characters, references)}
-                      </small>
-                    </article>
-                  ))}
-                </div>
-              )}
-              {showNoteForm ? noteForm : null}
-            </section>
-          </div>
-        ) : null}
+                {notes.length === 0 ? (
+                  <EmptyState
+                    icon="pi pi-file-edit"
+                    title="No notes yet"
+                    message="Record what the team should remember, or pin an idea."
+                  />
+                ) : (
+                  <div className="project-note-list">
+                    {notes.map(note => (
+                      <article
+                        className={`project-note-row${note.isPinned ? ' is-pinned' : ''}`}
+                        key={note.id}
+                        data-testid="project-note-row"
+                        data-note-title={note.title}
+                      >
+                        <div className="project-note-heading">
+                          <strong>{note.title}</strong>
+                          {note.isPinned && (
+                            <i
+                              className="pi pi-bookmark-fill"
+                              aria-label="Pinned"
+                            />
+                          )}
+                        </div>
+                        <p>{note.body}</p>
+                        <small>
+                          {noteTargetLabel(
+                            note,
+                            levels,
+                            characters,
+                            references
+                          )}
+                        </small>
+                      </article>
+                    ))}
+                  </div>
+                )}
+                {showNoteForm ? noteForm : null}
+              </section>
+            </div>
+          ) : null}
 
-        {view === 'levels' ? (
-          <>
-            {levelCard}
-            <ProjectLevelAssetsSection projectId={projectId} />
-          </>
-        ) : null}
+          {view === 'levels' ? (
+            <>
+              {levelCard}
+              <ProjectLevelAssetsSection projectId={projectId} />
+            </>
+          ) : null}
 
-        {view === 'cast' ? (
-          <ProjectCharactersSection
-            projectId={projectId}
-            onChanged={onChanged}
-          />
-        ) : null}
+          {view === 'cast' ? (
+            <ProjectCharactersSection
+              projectId={projectId}
+              onChanged={onChanged}
+            />
+          ) : null}
 
-        {view === 'references' ? (
-          <ProjectReferenceBoard projectId={projectId} onChanged={onChanged} />
-        ) : null}
-      </ProjectWorkspaceShell>
+          {view === 'references' ? (
+            <ProjectReferenceBoard
+              projectId={projectId}
+              onChanged={onChanged}
+            />
+          ) : null}
+        </ProjectWorkspaceShell>
+      )}
     </div>
   )
 }

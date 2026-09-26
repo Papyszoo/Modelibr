@@ -736,6 +736,212 @@ Given(
 );
 
 When(
+  "the level {string} is deleted",
+  async ({ page, $testInfo }, name: string) => {
+    const project = requireProject(page, projectNameFor($testInfo));
+    const levels = await page.request.get(
+      `${API_BASE}/projects/${project.id}/levels`,
+    );
+    expect(levels.ok()).toBeTruthy();
+    const level = (await levels.json()).find(
+      (candidate: { name: string }) => candidate.name === name,
+    );
+    expect(level, `no level named ${name}`).toBeTruthy();
+    const deleted = await page.request.delete(
+      `${API_BASE}/projects/${project.id}/levels/${level.id}`,
+    );
+    expect(deleted.ok()).toBeTruthy();
+  },
+);
+
+When("I open the level {string}", async ({ page }, levelName: string) => {
+  const studio = new ProjectStudioPage(page);
+  await studio.openLevelWorkspace(levelName);
+});
+
+When("I go back to the project from the level", async ({ page }) => {
+  await new ProjectStudioPage(page).leaveLevelWorkspace();
+});
+
+When("I show the scenes of the level", async ({ page }) => {
+  await new ProjectStudioPage(page).showLevelSurface("scenes");
+});
+
+When("I show the assets of the level", async ({ page }) => {
+  await new ProjectStudioPage(page).showLevelSurface("assets");
+});
+
+Then(
+  "the level workspace should be showing {string}",
+  async ({ page }, name: string) => {
+    await expect(
+      new ProjectStudioPage(page).page.getByTestId("project-level-crumb-level"),
+    ).toHaveText(name, { timeout: 15000 });
+  },
+);
+
+Then(
+  "the level workspace should offer its own four surfaces",
+  async ({ page }) => {
+    const studio = new ProjectStudioPage(page);
+    await expect(studio.levelWorkspaceSurfaces).toBeVisible();
+    await expect(studio.levelWorkspaceSurfaces.getByRole("tab")).toHaveCount(4);
+    // The project's Cast has no meaning inside one level, so its absence is part
+    // of the claim that the level has its own vocabulary.
+    await expect(
+      studio.levelWorkspaceSurfaces.getByRole("tab", { name: /Assets/ }),
+    ).toBeVisible();
+    await expect(
+      studio.levelWorkspaceSurfaces.getByRole("tab", { name: /Scenes/ }),
+    ).toBeVisible();
+    await expect(
+      studio.levelWorkspaceSurfaces.getByRole("tab", { name: /Cast/ }),
+    ).toHaveCount(0);
+  },
+);
+
+Then(
+  "the project workspace should be showing its own four surfaces",
+  async ({ page }) => {
+    const studio = new ProjectStudioPage(page);
+    await expect(studio.projectWorkspaceSurfaces).toBeVisible();
+    await expect(studio.projectWorkspaceSurfaces.getByRole("tab")).toHaveCount(
+      4,
+    );
+    await expect(
+      studio.projectWorkspaceSurfaces.getByRole("tab", { name: /Cast/ }),
+    ).toBeVisible();
+  },
+);
+
+Then(
+  "the level row {string} should show its description",
+  async ({ page }, name: string) => {
+    // A level card is a summary, so its description belongs on the row rather
+    // than behind a click.
+    const row = new ProjectStudioPage(page).page.locator(
+      `[data-testid="project-level-row"][data-level-name="${name}"]`,
+    );
+    // The provisioning step gives the level "<name> description"; asserting the
+    // row carries a description at all would pass on a name, so the text matters.
+    await expect(row).toContainText(`${name} description`);
+  },
+);
+
+Then(
+  "the level row {string} should offer to open a workspace",
+  async ({ page }, name: string) => {
+    const row = new ProjectStudioPage(page).page.locator(
+      `[data-testid="project-level-row"][data-level-name="${name}"]`,
+    );
+    await expect(row.getByTestId("project-level-open")).toBeVisible();
+  },
+);
+
+Then(
+  "the level should list {int} scene(s)",
+  async ({ page }, count: number) => {
+    await expect(
+      new ProjectStudioPage(page).page.getByTestId("project-level-scene-row"),
+    ).toHaveCount(count, { timeout: 15000 });
+  },
+);
+
+Then(
+  "the level scene {string} should be marked primary",
+  async ({ page }, sceneName: string) => {
+    await expect(
+      new ProjectStudioPage(page).levelSceneRow(sceneName),
+    ).toHaveAttribute("data-primary", "true");
+  },
+);
+
+Then(
+  "the level scene {string} should not be marked primary",
+  async ({ page }, sceneName: string) => {
+    await expect(
+      new ProjectStudioPage(page).levelSceneRow(sceneName),
+    ).toHaveAttribute("data-primary", "false");
+  },
+);
+
+Then(
+  "the level should place {string}",
+  async ({ page }, modelAlias: string) => {
+    const studio = new ProjectStudioPage(page);
+    await expect(studio.levelAssetRow(modelAlias)).toBeVisible({
+      timeout: 20000,
+    });
+  },
+);
+
+Then("the level assets should offer no level picker", async ({ page }) => {
+  // The level's Assets view *is* the filter. A picker there would let the user
+  // navigate out of the level they opened.
+  await expect(
+    new ProjectStudioPage(page).page.getByTestId("level-assets-level"),
+  ).toHaveCount(0);
+});
+
+Then("the missing-level notice should be shown", async ({ page }) => {
+  await expect(
+    new ProjectStudioPage(page).page.getByText("This level no longer exists"),
+  ).toBeVisible({ timeout: 15000 });
+});
+Given(
+  "a variant {string} of character {string} is scoped to level {string}",
+  async ({ page, $testInfo }, variant, characterName, levelName) => {
+    // Provisioned rather than clicked: this scenario is about the level reading
+    // the variant, and driving the character editor to get there would be a
+    // different scenario that already exists.
+    const project = requireProject(page, projectNameFor($testInfo));
+    const level = await requireLevel(page, project.id, levelName);
+    const characters = await apiHelper.getProjectCharacters(project.id);
+    const character = characters.find(
+      (candidate: { name: string }) => candidate.name === characterName,
+    );
+    if (!character) {
+      throw new Error(`no character named ${characterName}`);
+    }
+    const created = await page.request.post(
+      `${API_BASE}/projects/${project.id}/characters/${character.id}/variants`,
+      {
+        data: {
+          name: variant,
+          description: `${variant} description`,
+          projectLevelId: level.id,
+        },
+      },
+    );
+    expect(
+      created.ok(),
+      `The variant could not be created: ${created.status()} ${await created.text()}`,
+    ).toBe(true);
+  },
+);
+
+Then(
+  "the level workspace should list {int} character variant(s)",
+  async ({ page }, count: number) => {
+    await expect(
+      new ProjectStudioPage(page).page.getByTestId(
+        "project-level-variant-count",
+      ),
+    ).toHaveText(String(count), { timeout: 15000 });
+  },
+);
+
+Then(
+  "the level workspace should name the variant {string}",
+  async ({ page }, name: string) => {
+    const chips = new ProjectStudioPage(page).page.getByTestId(
+      "project-level-variants",
+    );
+    await expect(chips).toContainText(name, { timeout: 15000 });
+  },
+);
+
+When(
   "I press the scene control of the level {string}",
   async ({ page }, levelName: string) => {
     const studio = new ProjectStudioPage(page);
