@@ -356,18 +356,25 @@ jobs:
           Start-Process -FilePath $exe
 
       # ───── Wait for HTTP server ─────
+      # Budget absorbs a COLD FIRST BOOT on the runner: an empty cluster must be
+      # initialized and the full schema applied from scratch before the API serves.
+      # The macOS runner is the slowest of the three and timed out at 180s doing
+      # exactly that (Linux and Windows pass the same test with room to spare).
+      # This is not a flake papering over a hang - a genuine boot failure still
+      # fails here, just with enough room for the migrations to finish.
       - name: Wait for app ready
         shell: bash
         run: |
-          for i in $(seq 1 60); do
+          attempts=${APP_READY_ATTEMPTS:-120}
+          for i in $(seq 1 "$attempts"); do
             if curl -sf http://127.0.0.1:3010 -o /dev/null; then
               echo "App responding after ${i} attempts"
               exit 0
             fi
-            echo "Waiting for app... ($i/60)"
+            echo "Waiting for app... ($i/$attempts)"
             sleep 3
           done
-          echo "App did not become ready within 180s"
+          echo "App did not become ready within $((attempts * 3))s"
           exit 1
 
       # ───── Smoke tests ─────

@@ -81,11 +81,27 @@ Set these in your `.env` file:
 | `PG_DUMP_PATH`                           | `pg_dump` | Optional absolute path to `pg_dump`. Leave unset for Docker/source PATH lookup; managed desktop installs provide the bundled path.                                                       |
 | `PSQL_PATH`                              | `psql`    | Optional absolute path to `psql` for the backup version/size probes. Leave unset for PATH lookup.                                                                                        |
 
+## When backups are unavailable
+
+Backups need PostgreSQL's `pg_dump` and `psql`. Not every installation has
+them - notably the packaged desktop app, whose bundled PostgreSQL ships only the
+server binaries.
+
+When they are missing, **Settings → Backups** says so explicitly: it shows a
+warning explaining what is missing, and **Create backup** is disabled instead of
+letting you start a backup that can only fail. Existing archives can still be
+downloaded and restored.
+
+To keep a copy of your data in the meantime, run `pg_dump` from a PostgreSQL
+installation on that machine, or copy the data folder while Modelibr is closed.
+
 ## Notes
 
 - Docker deployments store backups under `./data/backups` on the host.
 - Native (desktop) installs use the bundled PostgreSQL `pg_dump` and `psql`
-  binaries for both manual and automatic pre-migration backups.
+  binaries for both manual and automatic pre-migration backups - but see
+  [When backups are unavailable](#when-backups-are-unavailable), because the
+  current bundle ships only the server binaries.
 - Only one backup can run at a time; starting a second while one is in
   progress is rejected.
 

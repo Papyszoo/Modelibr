@@ -20,7 +20,8 @@
 
 /* Banners (kept compatible with existing e2e selectors) */
 .settings-error,
-.settings-success {
+.settings-success,
+.settings-warning {
   margin: 1rem 1.5rem 0;
   padding: 0.75rem 1rem;
   border-radius: 7px;
@@ -30,6 +31,12 @@
 .settings-error {
   background: rgba(220, 50, 50, 0.12);
   border: 1px solid rgba(220, 50, 50, 0.35);
+  color: var(--text-color);
+}
+/* Capability state, not a failure of an action the user took. */
+.settings-warning {
+  background: rgba(234, 179, 8, 0.12);
+  border: 1px solid rgba(234, 179, 8, 0.35);
   color: var(--text-color);
 }
 .settings-success {
@@ -822,6 +829,18 @@
 }
 .backups-storage-line {
   font-size: 0.78rem;
+}
+.backups-unavailable p {
+  margin: 0.4rem 0 0;
+  font-size: 0.86rem;
+}
+.backups-unavailable-how {
+  color: var(--text-color-secondary);
+}
+.backups-unavailable code {
+  background: var(--surface-card);
+  padding: 1px 5px;
+  border-radius: 3px;
 }
 .backups-storage-line code {
   background: var(--surface-card);

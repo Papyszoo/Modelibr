@@ -20,6 +20,21 @@ public static class BackupEndpoints
         .WithName("Get Backup Storage Info")
         .WithTags("Backups");
 
+        app.MapGet("/backups/capabilities", (IBackupService backupService) =>
+        {
+            // Lets the UI be honest instead of offering a "Create backup" button
+            // that can only fail: a packaged desktop build without the PostgreSQL
+            // client tools cannot produce an archive at all.
+            var availability = backupService.GetToolAvailability();
+            return Results.Ok(new
+            {
+                available = availability.Available,
+                reason = availability.Reason,
+            });
+        })
+        .WithName("Get Backup Capabilities")
+        .WithTags("Backups");
+
         app.MapGet("/backups/estimate", async (IBackupService backupService, CancellationToken ct) =>
         {
             var estimate = await backupService.EstimateSizeAsync(ct);
