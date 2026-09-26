@@ -2,7 +2,11 @@ import { type JSX, type ReactNode, useContext } from 'react'
 
 import { useDockPanelActions } from '@/components/layout/dock-panel/DockPanelActionsContext'
 import { TabContext, type TabContextValue } from '@/contexts/TabContext'
-import { createTab } from '@/stores/navigationStore'
+import {
+  createTab,
+  getWindowId,
+  useNavigationStore,
+} from '@/stores/navigationStore'
 import { type Tab } from '@/types'
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -32,6 +36,7 @@ export const TabProvider = ({
   setActiveTab,
 }: TabProviderProps): JSX.Element => {
   const { closeTab } = useDockPanelActions()
+  const setTabLabel = useNavigationStore(state => state.setTabLabel)
 
   const openModelDetailsTab = (
     modelId: string,
@@ -169,6 +174,28 @@ export const TabProvider = ({
     setActiveTab(newTab.id)
   }
 
+  /**
+   * Relabels an existing tab in place.
+   *
+   * Not a re-open: a scene renamed in the editor must keep the tab the user is
+   * looking at, and a rename that recreated it would take the tab's internal UI
+   * state - and with it the scene's unsaved draft - down to nothing.
+   */
+  const relabelTab = (tabId: string, label: string): void => {
+    setTabLabel(getWindowId(), tabId, label)
+  }
+
+  const openScenesList = (): void => {
+    const existing = tabs.find(tab => tab.type === 'scenes')
+    if (existing) {
+      setActiveTab(existing.id)
+      return
+    }
+    const listTab = createTab('scenes')
+    setTabs([...tabs, listTab])
+    setActiveTab(listTab.id)
+  }
+
   const openTab = (
     type: Tab['type'],
     title: string,
@@ -218,6 +245,8 @@ export const TabProvider = ({
     openProjectDetailsTab,
     openScriptDetailsTab,
     openSceneEditorTab,
+    openScenesList,
+    relabelTab,
     openTab,
     tabId: activeTab,
     closeTab,

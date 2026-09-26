@@ -61,6 +61,22 @@ describe('openTab', () => {
     expect(win().activeTabId).toBe('scripts')
   })
 
+  it('relabels a tab without recreating it', () => {
+    // A scene renamed in its editor keeps the tab the user is looking at. If the
+    // rename recreated the tab, the id and the internal UI state would go with it -
+    // and a scene editor tab's internal state is how the app knows which scene's
+    // unsaved draft it is showing.
+    store().initWindow('w1')
+    store().setTabUiState('w1', 'modelList', 'sceneId', '12')
+
+    store().setTabLabel('w1', 'modelList', 'Rooftop chase')
+
+    const tab = store().activeWindows['w1'].tabs.find(t => t.id === 'modelList')
+    expect(tab?.label).toBe('Rooftop chase')
+    expect(tab?.id).toBe('modelList')
+    expect(tab?.internalUiState.sceneId).toBe('12')
+  })
+
   it('does not duplicate an already-open tab - it just re-activates it', () => {
     store().openTab('w1', 'left', createTab('scripts'))
     store().setActiveTab('w1', 'modelList')

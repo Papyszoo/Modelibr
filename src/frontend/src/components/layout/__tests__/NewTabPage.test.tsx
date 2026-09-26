@@ -28,6 +28,8 @@ function makeContextValue(
     openProjectDetailsTab: noop,
     openScriptDetailsTab: noop,
     openSceneEditorTab: noop,
+    openScenesList: noop,
+    relabelTab: jest.fn(),
     openTab: noop,
     tabId: '',
     closeTab: noop,

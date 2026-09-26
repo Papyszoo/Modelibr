@@ -3,14 +3,7 @@ import './SceneEditor.css'
 import { Button } from 'primereact/button'
 import { Message } from 'primereact/message'
 import { SelectButton } from 'primereact/selectbutton'
-import {
-  type JSX,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react'
+import { type JSX, useCallback, useEffect, useMemo, useRef } from 'react'
 
 import { ApiClientError } from '@/lib/apiBase'
 import { ErrorState, ListHeader, LoadingState } from '@/shared/components'
@@ -61,11 +54,34 @@ const STAGE_OPTIONS: { label: string; value: SceneStage | 'none' }[] = [
 
 interface SceneEditorProps {
   sceneId: number
+  /**
+   * Focuses the Scenes list. This is a navigation, not a close: the editor stays
+   * open with its draft, because the alternative - a Back button that closes the
+   * tab - is how an unsaved scene disappears.
+   */
+  onShowSceneList: () => void
+  /**
+   * Publishes the save so the tab's close guard can run it for "Save and close".
+   * Called on every render; the caller stores it in a ref.
+   */
+  registerSave: (save: () => Promise<boolean>) => void
+  /**
+   * Reports the scene's current name, so the tab can be relabelled in place.
+   *
+   * Driven by the fetched name rather than by a rename control on purpose: a scene
+   * can also be renamed from the list or by an agent over MCP, and a tab that
+   * only relabelled on its own control would keep the old name after either.
+   */
+  onSceneNameChange?: (name: string) => void
+  /** Explicitly abandons this scene: the tab caller forgets the session and closes. */
   onClose: () => void
 }
 
 export function SceneEditor({
   sceneId,
+  onShowSceneList,
+  registerSave,
+  onSceneNameChange,
   onClose,
 }: SceneEditorProps): JSX.Element {
   const {
@@ -85,7 +101,6 @@ export function SceneEditor({
   const resolveSlot = useResolveSceneSlotMutation()
   const rejectCandidates = useRejectSceneCandidatesMutation()
   const acceptRecommendations = useAcceptSceneRecommendationsMutation()
-  const [saveError, setSaveError] = useState<string | null>(null)
 
   const {
     document,
@@ -106,6 +121,20 @@ export function SceneEditor({
     past,
     future,
     sceneId: storeSceneId,
+    saveError,
+    placeError,
+    slotError,
+    preview,
+    isPlacing,
+    failedNodes,
+    blockoutOverride,
+    setSaveError,
+    setPlaceError,
+    setSlotError,
+    setPreview,
+    setIsPlacing,
+    setBlockoutOverride,
+    recordNodeFailure,
   } = useSceneEditorStore()
 
   // Editing is held while a direct scene write is moving the scene's revision -
@@ -151,36 +180,12 @@ export function SceneEditor({
   const undo = useGuardedEdit(undoDraft, editsBlockedRef)
   const redo = useGuardedEdit(redoDraft, editsBlockedRef)
 
-  const [placeError, setPlaceError] = useState<string | null>(null)
-
-  // Which candidate the viewport is showing instead of what the slot's node
-  // actually wears. Local state, never a write: looking at four options must
-  // not move the scene's revision four times, and must not disturb anything the
-  // user has already settled.
-  const [preview, setPreview] = useState<{
-    slotId: string
-    candidateId: string
-    ref: string
-  } | null>(null)
-  const [slotError, setSlotError] = useState<string | null>(null)
-  const [isPlacing, setIsPlacing] = useState(false)
-  const [failedNodes, setFailedNodes] = useState<Map<string, string>>(new Map())
-
-  // Null until the user decides, and then it is theirs. Until then it follows
-  // the stage: a scene being laid out is shown as the volumes its composition
-  // is actually judged on, and a dressed scene is shown dressed.
-  const [blockoutOverride, setBlockoutOverride] = useState<boolean | null>(null)
-
-  const handleNodeLoadError = useCallback((nodeId: string, message: string) => {
-    setFailedNodes(previous => {
-      if (previous.get(nodeId) === message) {
-        return previous
-      }
-      const next = new Map(previous)
-      next.set(nodeId, message)
-      return next
-    })
-  }, [])
+  const handleNodeLoadError = useCallback(
+    (nodeId: string, message: string) => {
+      recordNodeFailure(nodeId, message)
+    },
+    [recordNodeFailure]
+  )
 
   // The draft is seeded once per (scene, revision): re-seeding on every render
   // of a fetched query would throw away the user's unsaved edits each time
@@ -262,8 +267,11 @@ export function SceneEditor({
 
   const handlePreviewCandidate = useCallback(
     (slot: SceneSlotView, candidateRef: string, candidateId: string) => {
-      setPreview(current =>
-        current?.ref === candidateRef
+      // Toggling: previewing the candidate the viewport already shows clears it.
+      // Read through the store rather than an updater, because the write is a
+      // session field and the value it compares against is the same session's.
+      setPreview(
+        preview?.ref === candidateRef
           ? null
           : { slotId: slot.slotId, candidateId, ref: candidateRef }
       )
@@ -271,7 +279,7 @@ export function SceneEditor({
         selectNode(slot.nodeId)
       }
     },
-    [selectNode]
+    [preview, selectNode, setPreview]
   )
 
   /**
@@ -544,7 +552,33 @@ export function SceneEditor({
           : 'The scene could not be saved.'
       )
     }
-  }, [document, baseRevision, sceneId, save, markSaved, editsBlocked])
+  }, [
+    document,
+    baseRevision,
+    sceneId,
+    save,
+    markSaved,
+    editsBlocked,
+    setSaveError,
+  ])
+
+  // handleSave is what Save does; the close guard needs the same code path to
+  // answer whether the save actually landed, so it is published rather than
+  // duplicated.
+  const saveAndReport = useCallback(async (): Promise<boolean> => {
+    await handleSave()
+    return !useSceneEditorStore.getState().saveError
+  }, [handleSave])
+
+  useEffect(() => {
+    registerSave(saveAndReport)
+  }, [registerSave, saveAndReport])
+
+  useEffect(() => {
+    if (view?.scene.name) {
+      onSceneNameChange?.(view.scene.name)
+    }
+  }, [view?.scene.name, onSceneNameChange])
 
   // Undo/redo on the usual chord. Scoped to the editor being mounted, and
   // ignored while a text field has focus so typing in the name box does not
@@ -585,21 +619,45 @@ export function SceneEditor({
   }
 
   if (error || !view) {
+    // A scene deleted while its tab was open is a normal outcome, not a crash:
+    // the tab is still here, and the honest thing is to say what happened and
+    // offer the two ways out. Throwing the whole tab layout away for one missing
+    // scene would be the worse answer.
+    const missing =
+      error instanceof ApiClientError &&
+      (error.status === 404 ||
+        error.message.toLowerCase().includes('not found'))
     return (
       <ErrorState
-        title="This scene could not be opened"
+        title={
+          missing
+            ? 'This scene no longer exists'
+            : 'This scene could not be opened'
+        }
         message={
-          error instanceof ApiClientError
-            ? error.message
-            : 'The scene could not be loaded.'
+          missing
+            ? 'It was deleted while this tab was open. The tab can be closed, and the rest of your workspace is untouched.'
+            : error instanceof ApiClientError
+              ? error.message
+              : 'The scene could not be loaded.'
         }
         action={
-          <Button
-            label="Back to scenes"
-            icon="pi pi-arrow-left"
-            size="small"
-            onClick={onClose}
-          />
+          <div className="scene-editor-missing-actions">
+            <Button
+              label="Scenes"
+              icon="pi pi-arrow-left"
+              size="small"
+              onClick={onShowSceneList}
+            />
+            <Button
+              label="Close tab"
+              icon="pi pi-times"
+              size="small"
+              severity="secondary"
+              outlined
+              onClick={onClose}
+            />
+          </div>
         }
       />
     )
@@ -636,9 +694,9 @@ export function SceneEditor({
               text
               rounded
               size="small"
-              aria-label="Back to scenes"
-              tooltip="Back to scenes"
-              onClick={onClose}
+              aria-label="Scenes"
+              tooltip="Scenes"
+              onClick={onShowSceneList}
             />
             {view.scene.name}
             <SceneProjectBrief

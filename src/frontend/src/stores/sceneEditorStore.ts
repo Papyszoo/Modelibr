@@ -27,12 +27,29 @@ import type {
 export const SCENE_HISTORY_LIMIT = 100
 
 /**
+ * The candidate a viewport is previewing instead of what the slot's node wears.
+ * View state, never a write: looking at four options must not move the scene's
+ * revision four times.
+ */
+export interface SceneSlotPreview {
+  slotId: string
+  candidateId: string
+  ref: string
+}
+
+/**
  * One scene's working state. Kept per scene so that switching between two open
- * scene tabs cannot discard an unsaved draft: the flat fields below are a
- * projection of whichever draft the ACTIVE tab is showing, and `drafts` is what
- * they are restored from. Without this, opening a second scene threw away the
- * first scene's unsaved work - the exact loss the `openSceneId` field was added
- * to prevent.
+ * scene tabs cannot discard anything: the flat fields below are a projection of
+ * whichever draft the ACTIVE tab is showing, and `drafts` is what they are
+ * restored from. Without this, opening a second scene threw away the first
+ * scene's unsaved work - the exact loss the `openSceneId` field was added to
+ * prevent.
+ *
+ * The editor-only state is in here too, and that is the point of it. Error
+ * banners, the candidate preview, the blockout override and the per-node
+ * resource failures were all component `useState`, which the dock unmounts on
+ * every tab switch: leaving to look at another scene and coming back used to
+ * clear the error you were reading and drop the view you had chosen.
  */
 interface SceneDraft {
   sceneId: number | null
@@ -42,6 +59,13 @@ interface SceneDraft {
   future: SceneDocument[]
   isDirty: boolean
   selectedNodeId: string | null
+  saveError: string | null
+  placeError: string | null
+  slotError: string | null
+  preview: SceneSlotPreview | null
+  isPlacing: boolean
+  failedNodes: Map<string, string>
+  blockoutOverride: boolean | null
 }
 
 const EMPTY_DRAFT: SceneDraft = {
@@ -52,6 +76,13 @@ const EMPTY_DRAFT: SceneDraft = {
   future: [],
   isDirty: false,
   selectedNodeId: null,
+  saveError: null,
+  placeError: null,
+  slotError: null,
+  preview: null,
+  isPlacing: false,
+  failedNodes: new Map(),
+  blockoutOverride: null,
 }
 
 /**
@@ -70,6 +101,13 @@ function patchDraft(
     future: state.future,
     isDirty: state.isDirty,
     selectedNodeId: state.selectedNodeId,
+    saveError: state.saveError,
+    placeError: state.placeError,
+    slotError: state.slotError,
+    preview: state.preview,
+    isPlacing: state.isPlacing,
+    failedNodes: state.failedNodes,
+    blockoutOverride: state.blockoutOverride,
   }
   const merged: SceneDraft = { ...current, ...patch }
   return {
@@ -109,6 +147,23 @@ interface SceneEditorState {
   /** True when the draft differs from what was last loaded or saved. */
   isDirty: boolean
   selectedNodeId: string | null
+  /** The last save failure for this scene, kept so a tab switch does not hide it. */
+  saveError: string | null
+  /** The last placement failure, same reason. */
+  placeError: string | null
+  /** The last slot-resolution failure, same reason. */
+  slotError: string | null
+  /** The candidate the viewport is previewing instead of the slot's own node. */
+  preview: SceneSlotPreview | null
+  /** True while a placement gesture is in flight. */
+  isPlacing: boolean
+  /** Per-node resource failures, by node id. */
+  failedNodes: Map<string, string>
+  /**
+   * The user's blockout/dressed choice, or null to follow the scene's stage.
+   * Per scene: the same override means opposite things in two scenes.
+   */
+  blockoutOverride: boolean | null
 
   /** Opens a scene in the editor, restoring any draft it already has. */
   openScene: (sceneId: number) => void
@@ -116,10 +171,30 @@ interface SceneEditorState {
   open: (sceneId: number, document: SceneDocument, revision: number) => void
   close: () => void
   /**
-   * Forgets a scene's draft without touching whichever scene is on screen - used
-   * when a scene tab is closed. Closing a tab is as explicit as pressing Back.
+   * Forgets a scene's state without touching whichever scene is on screen.
+   *
+   * Called when the last tab for that scene closes, and only then: a session map
+   * that only ever grows is a memory leak that outlives the tabs it was opened
+   * for, and a draft for a scene with no tab is a draft nobody can save.
    */
   discardDraft: (sceneId: number) => void
+  setSaveError: (message: string | null) => void
+  setPlaceError: (message: string | null) => void
+  setSlotError: (message: string | null) => void
+  setPreview: (preview: SceneSlotPreview | null) => void
+  setIsPlacing: (isPlacing: boolean) => void
+  setBlockoutOverride: (override: boolean | null) => void
+  /**
+   * Records a resource failure for one node.
+   *
+   * The message is compared first so an unchanged failure does not produce a new
+   * Map, and therefore a new render, on every frame the viewport reports it.
+   */
+  recordNodeFailure: (nodeId: string, message: string) => void
+  /** Clears one node's failure - the resource loaded, or the user retried. */
+  clearNodeFailure: (nodeId: string) => void
+  /** How many sessions are being held. The release test asserts this does not grow. */
+  sessionCount: () => number
   /**
    * Records that `savedDocument` was stored as `revision`.
    *
@@ -158,6 +233,13 @@ export const useSceneEditorStore = create<SceneEditorState>((set, get) => ({
   future: [],
   isDirty: false,
   selectedNodeId: null,
+  saveError: null,
+  placeError: null,
+  slotError: null,
+  preview: null,
+  isPlacing: false,
+  failedNodes: new Map(),
+  blockoutOverride: null,
 
   openScene: sceneId =>
     set(state => {
@@ -186,6 +268,17 @@ export const useSceneEditorStore = create<SceneEditorState>((set, get) => ({
         future: [],
         isDirty: false,
         selectedNodeId: null,
+        // A seed is the start of a scene's session, not a continuation of
+        // whatever the last one was showing. Without this, scene 1's save error
+        // and node failures were still on screen after opening scene 2 - the
+        // editor reported a failure for a scene the user was not looking at.
+        saveError: null,
+        placeError: null,
+        slotError: null,
+        preview: null,
+        isPlacing: false,
+        failedNodes: new Map(),
+        blockoutOverride: null,
       }),
     })),
 
@@ -208,6 +301,46 @@ export const useSceneEditorStore = create<SceneEditorState>((set, get) => ({
       delete drafts[sceneId]
       return { drafts }
     }),
+
+  // The editor-only state. Each one is a setter rather than a setState-shaped
+  // updater so the call sites cannot write fields the projection does not carry.
+  setSaveError: message =>
+    set(state => patchDraft(state, { saveError: message })),
+
+  setPlaceError: message =>
+    set(state => patchDraft(state, { placeError: message })),
+
+  setSlotError: message =>
+    set(state => patchDraft(state, { slotError: message })),
+
+  setPreview: preview => set(state => patchDraft(state, { preview })),
+
+  setIsPlacing: isPlacing => set(state => patchDraft(state, { isPlacing })),
+
+  setBlockoutOverride: override =>
+    set(state => patchDraft(state, { blockoutOverride: override })),
+
+  recordNodeFailure: (nodeId, message) =>
+    set(state => {
+      if (state.failedNodes.get(nodeId) === message) {
+        return state
+      }
+      const failedNodes = new Map(state.failedNodes)
+      failedNodes.set(nodeId, message)
+      return patchDraft(state, { failedNodes })
+    }),
+
+  clearNodeFailure: nodeId =>
+    set(state => {
+      if (!state.failedNodes.has(nodeId)) {
+        return state
+      }
+      const failedNodes = new Map(state.failedNodes)
+      failedNodes.delete(nodeId)
+      return patchDraft(state, { failedNodes })
+    }),
+
+  sessionCount: () => Object.keys(get().drafts).length,
 
   markSaved: (revision, savedDocument) =>
     set(state =>

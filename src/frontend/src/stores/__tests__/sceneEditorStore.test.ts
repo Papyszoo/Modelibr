@@ -36,7 +36,12 @@ function makeNode(id: string): SceneNode {
 
 describe('sceneEditorStore', () => {
   beforeEach(() => {
+    // `close()` forgets only the ACTIVE scene's session, which is the product
+    // behaviour and not a reset. The store is a module singleton, so the session
+    // map is cleared outright here - otherwise one test's scenes outlive it and a
+    // count assertion measures the wrong thing.
     useSceneEditorStore.getState().close()
+    useSceneEditorStore.setState({ drafts: {} })
   })
 
   it('opens a scene with clean history', () => {
@@ -281,6 +286,78 @@ describe('sceneEditorStore', () => {
 
     expect(useSceneEditorStore.getState().document).toBeNull()
     expect(useSceneEditorStore.getState().isDirty).toBe(false)
+  })
+
+  it('keeps the editor-only state per scene, not per component', () => {
+    // Error banners, the candidate preview, the blockout override and the node
+    // failures were all component useState, which the dock unmounts on every tab
+    // switch. Coming back to a scene used to clear the error you were reading and
+    // drop the view you had chosen - the editor looked like it had forgotten.
+    useSceneEditorStore.getState().open(1, makeDocument(), 1)
+    useSceneEditorStore.getState().setSaveError('The scene could not be saved.')
+    useSceneEditorStore.getState().setBlockoutOverride(true)
+    useSceneEditorStore.getState().recordNodeFailure('lamp', 'texture 404')
+
+    useSceneEditorStore.getState().open(2, makeDocument(), 1)
+
+    // Scene 2 is a different scene: none of scene 1's state leaks into it.
+    expect(useSceneEditorStore.getState().saveError).toBeNull()
+    expect(useSceneEditorStore.getState().blockoutOverride).toBeNull()
+    expect(useSceneEditorStore.getState().failedNodes.size).toBe(0)
+
+    useSceneEditorStore.getState().openScene(1)
+    expect(useSceneEditorStore.getState().saveError).toBe(
+      'The scene could not be saved.'
+    )
+    expect(useSceneEditorStore.getState().blockoutOverride).toBe(true)
+    expect(useSceneEditorStore.getState().failedNodes.get('lamp')).toBe(
+      'texture 404'
+    )
+  })
+
+  it('does not replace the node-failure map when the message is unchanged', () => {
+    // The viewport re-reports a failed resource on every frame. Producing a new
+    // Map each time re-renders the hierarchy for no reason at all.
+    useSceneEditorStore.getState().open(1, makeDocument(), 1)
+    useSceneEditorStore.getState().recordNodeFailure('lamp', 'texture 404')
+    const first = useSceneEditorStore.getState().failedNodes
+
+    useSceneEditorStore.getState().recordNodeFailure('lamp', 'texture 404')
+
+    expect(useSceneEditorStore.getState().failedNodes).toBe(first)
+
+    useSceneEditorStore.getState().recordNodeFailure('lamp', 'texture 500')
+    expect(useSceneEditorStore.getState().failedNodes).not.toBe(first)
+    expect(useSceneEditorStore.getState().failedNodes.get('lamp')).toBe(
+      'texture 500'
+    )
+  })
+
+  it('releases a session so repeated open/close does not grow the map', () => {
+    // A session map that only ever grows is a leak that outlives the tabs it was
+    // opened for, and keeps whole scene documents in memory after the user is
+    // done with them.
+    for (let round = 0; round < 5; round++) {
+      useSceneEditorStore.getState().openScene(100 + round)
+      useSceneEditorStore
+        .getState()
+        .open(100 + round, makeDocument([makeNode('n')]), 1)
+      useSceneEditorStore.getState().discardDraft(100 + round)
+    }
+
+    expect(useSceneEditorStore.getState().sessionCount()).toBe(0)
+  })
+
+  it('clears one node failure without touching the others', () => {
+    useSceneEditorStore.getState().open(1, makeDocument(), 1)
+    useSceneEditorStore.getState().recordNodeFailure('lamp', 'texture 404')
+    useSceneEditorStore.getState().recordNodeFailure('chair', 'mesh 500')
+
+    useSceneEditorStore.getState().clearNodeFailure('lamp')
+
+    const failed = useSceneEditorStore.getState().failedNodes
+    expect(failed.has('lamp')).toBe(false)
+    expect(failed.get('chair')).toBe('mesh 500')
   })
 
   it('discardDraft drops one scene without disturbing the other', () => {

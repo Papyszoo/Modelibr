@@ -8,6 +8,7 @@ import {
   createTab,
   getWindowId,
 } from '@/stores/navigationStore'
+import { useTabCloseGuardStore } from '@/stores/tabCloseGuardStore'
 import { type Tab } from '@/types'
 
 import { DockBar, type DockPlacement } from './dock-panel/DockBar'
@@ -111,8 +112,22 @@ export function DockPanelContent({
     }
   }
 
-  const closeTab = (tabId: string): void => {
+  const closeTab = async (tabId: string): Promise<void> => {
     const tab = tabs.find(candidate => candidate.id === tabId)
+
+    // A tab that installed a guard answers for itself, because only it knows
+    // whether it can save. The scene editor uses this to offer Save / Discard /
+    // Cancel instead of a browser confirm, which is not a product decision UI.
+    const guard = useTabCloseGuardStore.getState().get(tabId)
+    if (guard) {
+      const decision = await guard()
+      if (decision === 'cancel') {
+        return
+      }
+      performClose(tabId)
+      return
+    }
+
     if (hasUnsavedChanges(tab)) {
       const accepted = window.confirm(
         `${tab?.label ?? 'This tab'} has unsaved changes. Close it without saving?`

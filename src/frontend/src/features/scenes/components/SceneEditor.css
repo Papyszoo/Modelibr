@@ -135,3 +135,23 @@
     border-left: 1px solid var(--mod-color-border);
   }
 }
+
+/* The two ways out of a scene that no longer exists, side by side. */
+.scene-editor-missing-actions {
+  display: flex;
+  gap: var(--mod-space-xs);
+  margin-top: var(--mod-space-xs);
+}
+
+/* The unsaved-changes decision: Cancel, Discard, Save and close. */
+.scene-close-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--mod-space-xs);
+}
+
+.scene-close-message {
+  margin: 0;
+  color: var(--text-color-secondary);
+  font-size: var(--mod-text-sm);
+}

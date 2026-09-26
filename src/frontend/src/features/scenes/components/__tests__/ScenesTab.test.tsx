@@ -6,7 +6,8 @@ import { TabContext, type TabContextValue } from '@/contexts/TabContext'
 import { useSceneEditorStore } from '@/stores/sceneEditorStore'
 import { type Tab } from '@/types'
 
-import { SceneEditorTab, ScenesTab } from '../ScenesTab'
+import { SceneEditorTab } from '../SceneEditorTab'
+import { ScenesTab } from '../ScenesTab'
 
 /**
  * One tab per scene.
@@ -32,10 +33,13 @@ jest.mock('../SceneEditor', () => {
       sceneId: number
       onClose: () => void
     }) => {
-      const nodes = useSceneEditorStore(state =>
-        state.document?.nodes.map(node => node.id).join(',')
+      const nodes = useSceneEditorStore(
+        (state: { document: { nodes: { id: string }[] } | null }) =>
+          state.document?.nodes.map(node => node.id).join(',')
       )
-      const isDirty = useSceneEditorStore(state => state.isDirty)
+      const isDirty = useSceneEditorStore(
+        (state: { isDirty: boolean }) => state.isDirty
+      )
       return (
         <div>
           <span data-testid="editor-scene">{sceneId}</span>
@@ -118,6 +122,8 @@ function Harness({ initialSceneId }: { initialSceneId?: string }): JSX.Element {
     openProjectDetailsTab: () => undefined,
     openScriptDetailsTab: () => undefined,
     openTab: () => undefined,
+    openScenesList: jest.fn(),
+    relabelTab: jest.fn(),
     openSceneEditorTab: (sceneId, name) => {
       const existing = tabs.find(
         tab => tab.type === 'sceneEditor' && tab.sceneId === sceneId

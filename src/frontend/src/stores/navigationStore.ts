@@ -166,6 +166,14 @@ export interface NavigationStore {
     key: string,
     value: unknown
   ) => void
+  /**
+   * Relabels a tab in place.
+   *
+   * A rename must not recreate the tab: that would drop the tab's internal UI
+   * state with it, and a scene editor tab holds the id of the scene whose draft
+   * belongs to it.
+   */
+  setTabLabel: (windowId: string, tabId: string, label: string) => void
   getTabUiState: (windowId: string, tabId: string, key: string) => unknown
 
   // ── Actions: splitter ──────────────────────────────────────────────
@@ -764,6 +772,25 @@ export const useNavigationStore = create<NavigationStore>()(
 
       // ── Tab internal UI state ───────────────────────────────────────
 
+      setTabLabel: (windowId, tabId, label) => {
+        set(state => {
+          const ws = state.activeWindows[windowId]
+          if (!ws) return state
+
+          return {
+            activeWindows: {
+              ...state.activeWindows,
+              [windowId]: {
+                ...ws,
+                // Only `label` moves. The id, the params and the internal UI state
+                // are what make this tab this tab, and a rename that recreated
+                // any of them would take a scene's unsaved draft with it.
+                tabs: ws.tabs.map(t => (t.id === tabId ? { ...t, label } : t)),
+              },
+            },
+          }
+        })
+      },
       setTabUiState: (windowId, tabId, key, value) => {
         set(state => {
           const ws = state.activeWindows[windowId]
