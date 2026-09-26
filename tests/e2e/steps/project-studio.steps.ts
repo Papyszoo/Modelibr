@@ -38,6 +38,203 @@ async function openStudio(page: Page, name: string) {
   return studio;
 }
 
+// ---- Level assets ---------------------------------------------------------
+//
+// A level owns no assets: what it shows is derived from the scenes filed under
+// it. So the provisioning here is a scene, a level link, and a document that
+// places models - the same three writes the product's own journey performs.
+
+/** Aliases the Gherkin uses -> the real names the server derived, per worker. */
+const LEVEL_ASSET_ALIASES = "level-assets:aliases";
+
+function aliasKey(kind: "model" | "scene", alias: string): string {
+  return `${kind}:${alias}`;
+}
+
+function rememberAlias(
+  page: Page,
+  kind: "model" | "scene",
+  alias: string,
+  actual: string,
+): void {
+  const state = getScenarioState(page);
+  const aliases =
+    state.getCustom<Record<string, string>>(LEVEL_ASSET_ALIASES) ?? {};
+  aliases[aliasKey(kind, alias)] = actual;
+  state.setCustom(LEVEL_ASSET_ALIASES, aliases);
+}
+
+function resolveAlias(
+  page: Page,
+  kind: "model" | "scene",
+  alias: string,
+): string {
+  const actual =
+    getScenarioState(page).getCustom<Record<string, string>>(
+      LEVEL_ASSET_ALIASES,
+    )?.[aliasKey(kind, alias)];
+  if (!actual) {
+    throw new Error(
+      `No ${kind} was provisioned for the alias "${alias}" - a Given that creates it is missing.`,
+    );
+  }
+  return actual;
+}
+
+/**
+ * A unique model per alias, uploaded once per scenario and shared by every
+ * scene the alias appears in - the dedup case needs the same asset in two
+ * scenes, not two assets with one name.
+ *
+ * The GLB is written with a unique filename so two workers never collide on it,
+ * and the Gherkin keeps calling it the alias rather than the generated name.
+ */
+async function ensureAliasedModel(
+  page: Page,
+  alias: string,
+): Promise<{ id: number; name: string; versionId: number }> {
+  const state = getScenarioState(page);
+  const existing = state.getModel(alias);
+  if (existing) {
+    // Remembered on this path too, not only when the model is first created. A
+    // model can reach shared state from an earlier scenario, and the Then steps
+    // address assets by the real name they were uploaded under - without this the
+    // alias resolves to nothing and the failure reads like a missing Given rather
+    // than the bookkeeping it is.
+    rememberAlias(page, "model", alias, existing.name);
+    return {
+      id: existing.id,
+      name: existing.name,
+      versionId: await activeModelVersionId(page, existing.id),
+    };
+  }
+
+  const filePath = await UniqueFileGenerator.generate("test-cube.glb", {
+    uniqueFilename: true,
+  });
+  const uploaded = await apiHelper.uploadModel(filePath);
+  expect(
+    uploaded.id,
+    `Model for alias "${alias}" was not created`,
+  ).toBeTruthy();
+
+  // The upload response carries an id and a version id but NO name - the model is
+  // named after the file, and the server reports that only when asked. Reading it
+  // back is the only way to know what the library will call this asset, which is
+  // exactly the label the derived view and the assertions address.
+  const name = await modelName(page, uploaded.id);
+  const versionId = await activeModelVersionId(page, uploaded.id);
+
+  state.saveModel(alias, { id: uploaded.id, name });
+  rememberAlias(page, "model", alias, name);
+  return { id: uploaded.id, name, versionId };
+}
+
+/** The name the library gave a model, which is its uploaded file's name. */
+async function modelName(page: Page, modelId: number): Promise<string> {
+  const response = await page.request.get(`${API_BASE}/models/${modelId}`);
+  expect(response.ok(), `Model ${modelId} could not be read back`).toBe(true);
+  const model = await response.json();
+  expect(model.name, `Model ${modelId} has no name`).toBeTruthy();
+  return String(model.name);
+}
+
+/**
+ * The model's current version, which a scene node has to pin.
+ *
+ * Read through the versions endpoint rather than taken from the upload response:
+ * the same model can be reached again through shared state, by which time it may
+ * have gained a version, and a node pinned to a version the model no longer has is
+ * a document the server rejects.
+ */
+async function activeModelVersionId(
+  page: Page,
+  modelId: number,
+): Promise<number> {
+  const response = await page.request.get(
+    `${API_BASE}/models/${modelId}/versions`,
+  );
+  expect(response.ok(), `Versions of model ${modelId} could not be read`).toBe(
+    true,
+  );
+  const versions = await response.json();
+  expect(
+    versions.length,
+    `Model ${modelId} has no version for a scene node to pin`,
+  ).toBeGreaterThan(0);
+  return Number(versions[0].id);
+}
+
+function sceneNode(
+  id: string,
+  name: string,
+  assetId: number,
+  versionId: number,
+) {
+  return {
+    id,
+    name,
+    transform: {
+      position: { x: 0, y: 0, z: 0 },
+      rotationEuler: { x: 0, y: 0, z: 0 },
+      scale: { x: 1, y: 1, z: 1 },
+    },
+    // versionId is REQUIRED, not optional: the server refuses an unpinned Model node
+    // (Scene.DocumentInvalid) because it would silently re-point when the asset gets
+    // a new version. Fetching the active version is what a real placement does.
+    asset: { assetType: "Model", assetId, versionId },
+    visible: true,
+  };
+}
+
+/** The one level of a project by name, or a clear failure rather than undefined. */
+async function requireLevel(page: Page, projectId: number, name: string) {
+  const response = await page.request.get(
+    `${API_BASE}/projects/${projectId}/levels`,
+  );
+  expect(response.ok()).toBeTruthy();
+  const levels = await response.json();
+  const level = levels.find((candidate: any) => candidate.name === name);
+  expect(
+    level,
+    `Level "${name}" is missing from project ${projectId}`,
+  ).toBeTruthy();
+  return level;
+}
+
+/**
+ * A scene for this worker, created on first use.
+ *
+ * Scene names are global, so the worker's index is part of the real name: two
+ * workers running the same scenario would otherwise find each other's scene and
+ * re-link it to the wrong project.
+ */
+async function ensureWorkerScene(
+  page: Page,
+  testInfo: TestInfo,
+  alias: string,
+): Promise<number> {
+  const name = `${alias} W${testInfo.workerIndex}`;
+  const listed = await page.request.get(`${API_BASE}/scenes`);
+  expect(listed.ok()).toBeTruthy();
+  const { scenes } = await listed.json();
+  const existing = scenes.find(
+    (scene: any) => scene.name === name && scene.projectId === null,
+  );
+  if (existing) {
+    rememberAlias(page, "scene", alias, existing.name);
+    return existing.id;
+  }
+
+  const created = await page.request.post(`${API_BASE}/scenes`, {
+    data: { name, description: `${alias} for level assets coverage` },
+  });
+  expect(created.ok()).toBeTruthy();
+  const scene = await created.json();
+  rememberAlias(page, "scene", alias, scene.name);
+  return scene.id;
+}
+
 Given(
   "a studio project exists for the production workspace",
   async ({ page, $testInfo }) => {
@@ -422,5 +619,186 @@ Then(
     expect(fileId, "No reference file id captured for the upload").toBeTruthy();
     const preview = await apiHelper.getFilePreview(fileId!);
     expect(preview.status).toBe(200);
+  },
+);
+
+/**
+ * Files a scene under a level and places models in it.
+ *
+ * Three writes in the order the domain requires them: a scene must belong to a
+ * project before it can belong to one of that project's levels, the document
+ * says what the scene places, and the level link is what makes those placements
+ * this level's. `modelAliases` is a comma-separated list so one Given can place
+ * the same alias in two scenes - the case the derived view has to deduplicate.
+ */
+Given(
+  "a scene {string} is linked to level {string} placing {string}",
+  async (
+    { page, $testInfo },
+    sceneAlias: string,
+    levelName: string,
+    modelAliases: string,
+  ) => {
+    const project = requireProject(page, projectNameFor($testInfo));
+    const level = await requireLevel(page, project.id, levelName);
+    const sceneId = await ensureWorkerScene(page, $testInfo, sceneAlias);
+
+    const linked = await page.request.put(
+      `${API_BASE}/scenes/${sceneId}/project`,
+      { data: { projectId: project.id } },
+    );
+    expect(linked.ok(), "The scene could not be linked to the project").toBe(
+      true,
+    );
+
+    const detail = await page.request.get(`${API_BASE}/scenes/${sceneId}`);
+    expect(detail.ok()).toBeTruthy();
+    const view = await detail.json();
+
+    // The document is REPLACED with the placements this step declares rather
+    // than appended to. A scene survives a project's deletion (only its links
+    // are cleared) and this worker reuses it, so appending would accumulate a
+    // previous scenario's placements - and the assertions would then be about
+    // leftovers. One Given, one known state.
+    const nodes = [];
+    for (const alias of modelAliases
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter(Boolean)) {
+      const model = await ensureAliasedModel(page, alias);
+      // The node carries the model's real name: it is what the view falls back
+      // to for an asset the project's member list cannot name.
+      //
+      // The id is a slug off the alias, not the alias itself. Node ids allow
+      // letters, digits, '-', '_', ':' and '.', and these aliases are human names
+      // with spaces - which the server rejects, naming the offending character. The
+      // id only has to be unique inside the scene, so a slug is enough.
+      const nodeId = alias
+        .toLowerCase()
+        .replace(/[^a-z0-9._:-]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+      nodes.push(
+        sceneNode(`${nodeId}-node`, model.name, model.id, model.versionId),
+      );
+    }
+
+    const saved = await page.request.put(
+      `${API_BASE}/scenes/${sceneId}/document`,
+      { data: { documentJson: JSON.stringify({ ...view.document, nodes }) } },
+    );
+    // The server's own message, not a bare "not ok": a rejected document names the
+    // field it refused, which is the only way to tell a wrong node shape from a
+    // lost revision race.
+    expect(
+      saved.ok(),
+      `The scene document was not saved: ${await saved.text()}`,
+    ).toBe(true);
+
+    // At most one primary per level: the first scene filed under this level
+    // claims it, and a later one must not steal it.
+    const listed = await page.request.get(`${API_BASE}/scenes`);
+    const { scenes } = await listed.json();
+    const alreadyPrimary = scenes.some(
+      (scene: any) =>
+        scene.projectLevelId === level.id && scene.isPrimaryLevelScene,
+    );
+    const leveled = await page.request.put(
+      `${API_BASE}/scenes/${sceneId}/level`,
+      {
+        data: {
+          projectLevelId: level.id,
+          isPrimaryLevelScene: !alreadyPrimary,
+        },
+      },
+    );
+    expect(leveled.ok(), "The scene could not be linked to the level").toBe(
+      true,
+    );
+  },
+);
+
+Given(
+  "the model {string} is an explicit project member",
+  async ({ page, $testInfo }, modelAlias: string) => {
+    const project = requireProject(page, projectNameFor($testInfo));
+    const model = await ensureAliasedModel(page, modelAlias);
+    const response = await page.request.post(
+      `${API_BASE}/projects/${project.id}/models/${model.id}`,
+    );
+    expect(response.ok(), "The model could not be added to the project").toBe(
+      true,
+    );
+  },
+);
+
+When(
+  "I show the level assets of {string}",
+  async ({ page }, levelName: string) => {
+    const studio = new ProjectStudioPage(page);
+    await studio.waitForLevelAssets();
+    await studio.showLevelAssetsFor(levelName);
+  },
+);
+
+Then(
+  "the level asset {string} should list the scene {string}",
+  async ({ page }, modelAlias: string, sceneAlias: string) => {
+    const studio = new ProjectStudioPage(page);
+    const row = studio.levelAssetRow(resolveAlias(page, "model", modelAlias));
+    await expect(row).toBeVisible({ timeout: 15000 });
+    await expect(
+      studio
+        .levelAssetScenes(row)
+        .filter({ hasText: resolveAlias(page, "scene", sceneAlias) }),
+    ).toBeVisible({ timeout: 15000 });
+  },
+);
+
+Then(
+  "the level asset {string} should not list the scene {string}",
+  async ({ page }, modelAlias: string, sceneAlias: string) => {
+    const studio = new ProjectStudioPage(page);
+    const row = studio.levelAssetRow(resolveAlias(page, "model", modelAlias));
+    await expect(row).toBeVisible({ timeout: 15000 });
+    await expect(
+      studio
+        .levelAssetScenes(row)
+        .filter({ hasText: resolveAlias(page, "scene", sceneAlias) }),
+    ).toHaveCount(0, { timeout: 15000 });
+  },
+);
+
+Then(
+  "the level should place {string} exactly once",
+  async ({ page }, modelAlias: string) => {
+    const studio = new ProjectStudioPage(page);
+    const label = resolveAlias(page, "model", modelAlias);
+    await expect(
+      studio.levelAssetGroup.locator(
+        `[data-testid="level-assets-row"][data-asset-label="${label}"]`,
+      ),
+    ).toHaveCount(1, { timeout: 15000 });
+  },
+);
+
+/**
+ * The same asset in two lists is the point: it is placed by a scene AND it is a
+ * member of the project, and those are two different facts. One merged list
+ * would make the second unknowable.
+ */
+Then(
+  "the project member {string} should be listed apart from the placed assets",
+  async ({ page }, modelAlias: string) => {
+    const studio = new ProjectStudioPage(page);
+    const label = resolveAlias(page, "model", modelAlias);
+
+    await expect(
+      studio.projectMemberGroup.locator(
+        `[data-testid="level-assets-member-row"][data-asset-label="${label}"]`,
+      ),
+    ).toBeVisible({ timeout: 15000 });
+    // Still derived from the scene as well - the two groups do not exclude
+    // each other, they report two relationships.
+    await expect(studio.levelAssetRow(label)).toBeVisible({ timeout: 15000 });
   },
 );

@@ -1484,6 +1484,32 @@ public class Enemy : MonoBehaviour
           mimeType: 'image/png',
         },
       ],
+      // The studio's whole production shape is levels - a level's assets are
+      // derived from the scenes linked to it - so the demo project ships two.
+      // Without them the studio opens empty and the level asset view has nothing
+      // to show but its own empty state.
+      levels: [
+        {
+          id: 1,
+          projectId: 1,
+          name: 'Forest Crossing',
+          description: 'Fog, rope bridges, and a bell tower.',
+          productionStatus: 'in_progress' as const,
+          sortOrder: 0,
+          createdAt: now,
+          updatedAt: now,
+        },
+        {
+          id: 2,
+          projectId: 1,
+          name: 'Ruined Keep',
+          description: 'The opening level, still blocked out.',
+          productionStatus: 'planned' as const,
+          sortOrder: 1,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
       models: [
         { id: 1, name: 'Test Cube' },
         { id: 2, name: 'Test Cone' },

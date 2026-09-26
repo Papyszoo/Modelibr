@@ -1,6 +1,6 @@
 import './ProjectCharactersSection.css'
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from 'primereact/button'
 import { confirmDialog } from 'primereact/confirmdialog'
 import { InputText } from 'primereact/inputtext'
@@ -8,7 +8,6 @@ import { InputTextarea } from 'primereact/inputtextarea'
 import { useState } from 'react'
 
 import { uploadFile } from '@/features/models/api/modelApi'
-import { getModelsByProject } from '@/features/project/api/projectApi'
 import {
   addCharacterAbility,
   addCharacterVariant,
@@ -33,6 +32,7 @@ import {
   useProductionNotesQuery,
   useProjectCharactersQuery,
   useProjectLevelsQuery,
+  useProjectMemberModelsQuery,
 } from '@/features/project/api/projectStudioQueries'
 import {
   EmptyState,
@@ -68,10 +68,7 @@ export function ProjectCharactersSection({
   const charactersQuery = useProjectCharactersQuery(projectId)
   const levelsQuery = useProjectLevelsQuery(projectId)
   const notesQuery = useProductionNotesQuery(projectId)
-  const modelsQuery = useQuery({
-    queryKey: ['projects', projectId, 'character-models'],
-    queryFn: () => getModelsByProject(projectId),
-  })
+  const modelsQuery = useProjectMemberModelsQuery(projectId)
   const [showCreate, setShowCreate] = useState(false)
   const [expandedId, setExpandedId] = useState<number | null>(null)
 

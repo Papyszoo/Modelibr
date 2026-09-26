@@ -506,6 +506,19 @@ export const handlers = [
     () => new HttpResponse(null, { status: 204 })
   ),
 
+  // Scenes. The project studio derives a level's assets from the scenes filed
+  // under it, so an unmocked `/scenes` would leave the read bypassing to the
+  // static server and answering HTML - which a component reading `.scenes` off
+  // it throws on. An empty list is the honest answer here: the static set has no
+  // scene documents to serve.
+  http.get(`${BASE_URL}/scenes`, () => HttpResponse.json({ scenes: [] })),
+  http.get(`${BASE_URL}/scenes/:id`, () =>
+    HttpResponse.json(
+      { error: 'Scene.NotFound', message: 'No such scene.' },
+      { status: 404 }
+    )
+  ),
+
   // Sounds (paginated)
   http.get(`${BASE_URL}/sounds`, ({ request }) => {
     const url = new URL(request.url)

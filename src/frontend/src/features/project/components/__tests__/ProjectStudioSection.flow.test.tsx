@@ -3,15 +3,23 @@ import userEvent from '@testing-library/user-event'
 
 import * as projectStudioApi from '@/features/project/api/projectStudioApi'
 import * as projectStudioQueries from '@/features/project/api/projectStudioQueries'
+import * as sceneQueries from '@/features/scenes/api/queries'
 import { renderWithProviders } from '@/test/renderWithProviders'
 
 import { ProjectStudioSection } from '../ProjectStudioSection'
 
 jest.mock('@/features/project/api/projectStudioApi')
 jest.mock('@/features/project/api/projectStudioQueries')
+// Only the scene LIST is stubbed: the studio's level asset view reads scene
+// documents through the editor's own query options, which stay real.
+jest.mock('@/features/scenes/api/queries', () => ({
+  ...jest.requireActual('@/features/scenes/api/queries'),
+  useScenesQuery: jest.fn(),
+}))
 
 const api = projectStudioApi as jest.Mocked<typeof projectStudioApi>
 const queries = projectStudioQueries as jest.Mocked<typeof projectStudioQueries>
+const sceneQueriesMock = sceneQueries as jest.Mocked<typeof sceneQueries>
 
 const query = <T,>(data: T) => ({
   data,
@@ -28,6 +36,10 @@ describe('ProjectStudioSection flow', () => {
     )
     queries.useProjectCharactersQuery.mockReturnValue(query([]) as never)
     queries.useProductionNotesQuery.mockReturnValue(query([]) as never)
+    // The level asset view's two reads: the project's explicit members and the
+    // scene list. Both empty here - this flow is about creating a level.
+    queries.useProjectMemberModelsQuery.mockReturnValue(query([]) as never)
+    sceneQueriesMock.useScenesQuery.mockReturnValue(query([]) as never)
     queries.useProjectReferencesQuery.mockReturnValue(
       query([
         {
@@ -50,7 +62,11 @@ describe('ProjectStudioSection flow', () => {
       <ProjectStudioSection projectId={7} onChanged={onChanged} />
     )
 
-    expect(screen.getByText('Forest Crossing')).toBeVisible()
+    // Scoped to the level row: the level asset view's picker carries the same
+    // level name as an <option>, which is not the row under test.
+    expect(screen.getByTestId('project-level-row')).toHaveTextContent(
+      'Forest Crossing'
+    )
 
     await userEvent.click(screen.getByRole('button', { name: 'Add level' }))
     await userEvent.type(screen.getByLabelText('New level'), 'Ruined Keep')

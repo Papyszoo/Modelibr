@@ -24,6 +24,38 @@ export class ProjectStudioPage {
     return this.page.getByTestId("project-reference-board");
   }
 
+  get levelAssets(): Locator {
+    return this.page.getByTestId("level-assets");
+  }
+
+  get levelAssetPicker(): Locator {
+    return this.page.getByTestId("level-assets-level");
+  }
+
+  get levelAssetGroup(): Locator {
+    return this.page.getByTestId("level-assets-scene-group");
+  }
+
+  get projectMemberGroup(): Locator {
+    return this.page.getByTestId("level-assets-member-group");
+  }
+
+  /** One derived asset row, addressed by the label the view resolved for it. */
+  levelAssetRow(label: string): Locator {
+    return this.page.locator(
+      `[data-testid="level-assets-row"][data-asset-label="${label}"]`,
+    );
+  }
+
+  /** The scene chips on one derived row - the provenance of that asset. */
+  levelAssetScenes(row: Locator): Locator {
+    return row.getByTestId("level-assets-scene");
+  }
+
+  projectMemberRows(): Locator {
+    return this.page.getByTestId("level-assets-member-row");
+  }
+
   levelRow(name: string): Locator {
     return this.page.locator(
       `[data-testid="project-level-row"][data-level-name="${name}"]`,
@@ -57,6 +89,25 @@ export class ProjectStudioPage {
    */
   async waitForStudio(): Promise<void> {
     await expect(this.studio).toBeVisible({ timeout: 30000 });
+  }
+
+  /**
+   * The level asset view reads a level's scenes and then one document per scene,
+   * so it settles after the studio header does.
+   */
+  async waitForLevelAssets(): Promise<void> {
+    await expect(this.levelAssets).toBeVisible({ timeout: 30000 });
+    await expect(this.levelAssetGroup).toBeVisible({ timeout: 30000 });
+  }
+
+  /**
+   * Switches the view to one level, which is a read - not a navigation. The
+   * scene documents it then fetches are waited on by the assertions that follow,
+   * which retry against the rows themselves.
+   */
+  async showLevelAssetsFor(levelName: string): Promise<void> {
+    await expect(this.levelAssetPicker).toBeVisible({ timeout: 30000 });
+    await this.levelAssetPicker.selectOption({ label: levelName });
   }
 
   async createLevel(

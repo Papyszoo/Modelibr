@@ -78,6 +78,8 @@ describe('ProjectCharactersSection', () => {
       query([{ id: 5, name: 'Forest Crossing' }]) as never
     )
     queries.useProductionNotesQuery.mockReturnValue(query([]) as never)
+    // The linked-model picker reads the project's explicit members.
+    queries.useProjectMemberModelsQuery.mockReturnValue(query([]) as never)
     api.createProjectCharacter.mockResolvedValue(character)
     api.updateProjectCharacter.mockResolvedValue(character)
     api.addCharacterAbility.mockResolvedValue({

@@ -25,6 +25,7 @@ import {
 } from '@/shared/components/feedback'
 
 import { ProjectCharactersSection } from './ProjectCharactersSection'
+import { ProjectLevelAssetsSection } from './ProjectLevelAssetsSection'
 import { ProjectReferenceBoard } from './ProjectReferenceBoard'
 
 interface ProjectStudioSectionProps {
@@ -393,6 +394,7 @@ export function ProjectStudioSection({
           ) : null}
         </section>
       </div>
+      <ProjectLevelAssetsSection projectId={projectId} />
       <ProjectCharactersSection projectId={projectId} onChanged={onChanged} />
       <ProjectReferenceBoard projectId={projectId} onChanged={onChanged} />
     </div>

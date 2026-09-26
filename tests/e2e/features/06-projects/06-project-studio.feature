@@ -1,8 +1,9 @@
 @projects @project-studio
 Feature: Project Studio
   The production workspace above a project's asset sections: ordered levels,
-  a character cast with abilities and level-scoped variants, and a reference
-  board whose images link to levels and characters.
+  a level's assets derived from the scenes that place them, a character cast
+  with abilities and level-scoped variants, and a reference board whose images
+  link to levels and characters.
 
   Each scenario provisions through the API first and then navigates once, so no
   scenario depends on a second navigation landing on the same tab.
@@ -84,3 +85,26 @@ Feature: Project Studio
     And I add a reference image to the board
     And I remove the reference image from the project
     Then the reference board should be empty and the file should still exist
+
+  Scenario: A level's assets come from the scenes that place them
+    Given a level named "Forest Crossing" exists
+    And a level named "Ruined Keep" exists
+    And a scene "Crossing Layout" is linked to level "Forest Crossing" placing "Crossing Cube"
+    And a scene "Crossing Detail" is linked to level "Forest Crossing" placing "Crossing Cube, Crossing Barrel"
+    And a scene "Keep Approach" is linked to level "Ruined Keep" placing "Crossing Cube"
+    When I am on the studio project
+    And I show the level assets of "Forest Crossing"
+    Then the level should place "Crossing Cube" exactly once
+    And the level asset "Crossing Cube" should list the scene "Crossing Layout"
+    And the level asset "Crossing Cube" should list the scene "Crossing Detail"
+    And the level asset "Crossing Cube" should not list the scene "Keep Approach"
+    And the level asset "Crossing Barrel" should list the scene "Crossing Detail"
+    And the level asset "Crossing Barrel" should not list the scene "Crossing Layout"
+
+  Scenario: A level keeps scene-placed assets apart from explicit project members
+    Given a level named "Forest Crossing" exists
+    And a scene "Crossing Layout" is linked to level "Forest Crossing" placing "Crossing Cube"
+    And the model "Crossing Cube" is an explicit project member
+    When I am on the studio project
+    And I show the level assets of "Forest Crossing"
+    Then the project member "Crossing Cube" should be listed apart from the placed assets

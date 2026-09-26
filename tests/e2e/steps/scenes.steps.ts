@@ -67,6 +67,16 @@ When("I create a scene named {string}", async ({ page }, name: string) => {
   openScene.set(page, name);
 });
 
+Given("a scene named {string} exists", async ({ page }, name: string) => {
+  // Through the API, deliberately: creating it through the UI would open its editor
+  // tab, and the scenario counts editor tabs to prove there are two. A scene that
+  // exists but has never been opened is the state "the user is about to open it".
+  const created = await page.request.post(`${apiBase()}/scenes`, {
+    data: { name },
+  });
+  expect(created.ok()).toBeTruthy();
+});
+
 Then("the scene editor should be visible", async ({ page }) => {
   await expect(new ScenesPage(page).editorLocator()).toBeVisible();
 });
@@ -75,8 +85,8 @@ When(
   "I open another scene named {string} from the list",
   async ({ page }, name: string) => {
     const scenes = new ScenesPage(page);
-    await scenes.backToList();
-    await scenes.openScene(name);
+    // Not backToList(): that closes the first scene's tab and discards its draft.
+    await scenes.openSceneKeepingCurrent(name);
     openScene.set(page, name);
   },
 );

@@ -40,6 +40,11 @@ interface DemoScene {
   /** The project this scene belongs to, or null (v0.6 prompt 13-C). */
   projectId: number | null
   projectName: string | null
+  /** The level of that project this scene is filed under, or null (v0.7). */
+  projectLevelId: number | null
+  projectLevelName: string | null
+  /** At most one scene per level is the level's primary; the rest are versions. */
+  isPrimaryLevelScene: boolean
 }
 
 /** What a person has typed about an asset in this demo session. */
@@ -271,6 +276,100 @@ const emptySceneDocument = JSON.stringify({
   lights: [],
 })
 
+/** A node that places one library model, in the shape a scene document stores. */
+function demoSceneNode(
+  id: string,
+  name: string,
+  assetId: number,
+  position: [number, number, number] = [0, 0, 0]
+) {
+  return {
+    id,
+    name,
+    transform: {
+      position: { x: position[0], y: position[1], z: position[2] },
+      rotationEuler: { x: 0, y: 0, z: 0 },
+      scale: { x: 1, y: 1, z: 1 },
+    },
+    asset: { assetType: 'Model', assetId },
+    visible: true,
+  }
+}
+
+/**
+ * Two scenes filed under the demo project's first level, seeded once per
+ * session.
+ *
+ * The point is the shape a level's asset view has to survive: one primary scene
+ * and one secondary scene that both place a model, so the same asset appears
+ * once with two scenes named. A demo with a single scene per level could not
+ * show that at all, which is the one thing the view is for.
+ *
+ * Seeded lazily on the first scene list read, because the level they belong to
+ * lives in IndexedDB and the seeded project's levels are regenerated with it.
+ */
+let demoScenesSeeded = false
+async function seedDemoScenes() {
+  if (demoScenesSeeded) return
+  demoScenesSeeded = true
+
+  const project = (await getAll('projects'))[0]
+  const level = project?.levels?.[0]
+  if (!project || !level) return
+
+  const timestamp = now()
+  const seeded: DemoScene[] = [
+    {
+      id: nextDemoSceneId++,
+      name: 'Crossing Layout',
+      description: 'The blockout of the rope crossing.',
+      schemaVersion: 1,
+      revision: 1,
+      documentJson: JSON.stringify({
+        schemaVersion: 1,
+        nodes: [
+          demoSceneNode('deck', 'Rope Bridge Deck', 1, [0, 0, 4]),
+          demoSceneNode('bell', 'Bell Tower', 2, [-6, 0, 2]),
+        ],
+        lights: [],
+      }),
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      projectId: project.id,
+      projectName: project.name,
+      projectLevelId: level.id,
+      projectLevelName: level.name,
+      isPrimaryLevelScene: true,
+    },
+    {
+      id: nextDemoSceneId++,
+      name: 'Crossing Dressing',
+      description: 'Props added after the layout was signed off.',
+      schemaVersion: 1,
+      revision: 1,
+      documentJson: JSON.stringify({
+        schemaVersion: 1,
+        nodes: [
+          demoSceneNode('deck-again', 'Rope Bridge Deck', 1, [0, 0, 4]),
+          demoSceneNode('shrub', 'Shrub', 4, [3, 0, 1]),
+        ],
+        lights: [],
+      }),
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      projectId: project.id,
+      projectName: project.name,
+      projectLevelId: level.id,
+      projectLevelName: level.name,
+      isPrimaryLevelScene: false,
+    },
+  ]
+
+  for (const scene of seeded) {
+    demoScenes.set(scene.id, scene)
+  }
+}
+
 function demoSceneSummary(scene: DemoScene) {
   const document = JSON.parse(scene.documentJson) as {
     nodes: unknown[]
@@ -294,6 +393,9 @@ function demoSceneSummary(scene: DemoScene) {
     stage: document.stage ?? null,
     projectId: scene.projectId,
     projectName: scene.projectName,
+    projectLevelId: scene.projectLevelId,
+    projectLevelName: scene.projectLevelName,
+    isPrimaryLevelScene: scene.isPrimaryLevelScene,
   }
 }
 
@@ -607,6 +709,7 @@ export const systemHandlers = [
   // ════════════════════════════════════════════════════════════════════════
 
   http.get('*/scenes', async () => {
+    await seedDemoScenes()
     return HttpResponse.json({
       scenes: [...demoScenes.values()]
         .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
@@ -954,6 +1057,9 @@ export const systemHandlers = [
       updatedAt: timestamp,
       projectId: null,
       projectName: null,
+      projectLevelId: null,
+      projectLevelName: null,
+      isPrimaryLevelScene: false,
     }
     demoScenes.set(scene.id, scene)
 

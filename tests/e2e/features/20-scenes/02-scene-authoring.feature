@@ -115,6 +115,7 @@ Feature: Scene authoring
     # tab overwrote.
     Given a scene named "Comparand Scene" is open
     And I have placed the test model into the scene
+    And a scene named "Subject Scene" exists
     When I open another scene named "Subject Scene" from the list
     Then the scene editor for "Subject Scene" should be in its own tab
     And there should be 2 scene editor tabs open

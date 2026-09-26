@@ -6,6 +6,7 @@ import * as modelApi from '@/features/models/api/modelApi'
 import * as projectApi from '@/features/project/api/projectApi'
 import * as projectStudioQueries from '@/features/project/api/projectStudioQueries'
 import { ProjectDetailsPanel } from '@/features/project/components/ProjectDetailsPanel'
+import * as sceneQueries from '@/features/scenes/api/queries'
 import {
   createTab,
   getWindowId,
@@ -17,12 +18,19 @@ import { type ProjectBriefDto, type ProjectDetailDto } from '@/types'
 jest.mock('@/features/models/api/modelApi')
 jest.mock('@/features/project/api/projectApi')
 jest.mock('@/features/project/api/projectStudioQueries')
+// Only the scene LIST is stubbed: the level asset view reads documents through
+// the editor's own query options, which stay real.
+jest.mock('@/features/scenes/api/queries', () => ({
+  ...jest.requireActual('@/features/scenes/api/queries'),
+  useScenesQuery: jest.fn(),
+}))
 
 const projectApiMock = projectApi as jest.Mocked<typeof projectApi>
 const modelApiMock = modelApi as jest.Mocked<typeof modelApi>
 const studioQueriesMock = projectStudioQueries as jest.Mocked<
   typeof projectStudioQueries
 >
+const sceneQueriesMock = sceneQueries as jest.Mocked<typeof sceneQueries>
 
 const emptyQuery = <T,>(data: T) => ({
   data,
@@ -153,6 +161,12 @@ describe('ProjectDetailsPanel draft ownership', () => {
     studioQueriesMock.useProductionNotesQuery.mockReturnValue(
       emptyQuery([]) as never
     )
+    // The studio's level asset view reads the project's explicit members and
+    // the scene list; neither is what this file is about.
+    studioQueriesMock.useProjectMemberModelsQuery.mockReturnValue(
+      emptyQuery([]) as never
+    )
+    sceneQueriesMock.useScenesQuery.mockReturnValue(emptyQuery([]) as never)
   })
 
   afterEach(() => {

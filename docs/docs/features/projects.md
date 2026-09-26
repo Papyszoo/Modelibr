@@ -59,7 +59,9 @@ production context above the asset sections:
 
 - **Levels** are ordered units such as `Forest Crossing`, with a description, a
   small fixed production status vocabulary, and reference images of their own.
-  A level row is a summary of that level, not just its name.
+  A level row is a summary of that level, not just its name. What a Level
+  _uses_ is derived from the Scenes filed under it - see
+  [Level assets](#level-assets) below.
 - **Characters** are first-class production entities. Each one has a name, a
   description, tags such as `player`, `enemy`, `npc` or `boss`, linked reference
   images, linked library models, production notes, abilities, and variants that
@@ -106,9 +108,30 @@ is active because the picker is driven by the project's Levels and Characters
 rather than by the filtered images.
 
 The first slice keeps the existing asset sections intact while making the
-Project-level context visible in the same place. Level assets are derived from
-linked Scenes in the next slice; there is no second asset relationship to
-maintain.
+Project-level context visible in the same place.
+
+### Level assets
+
+A Level has no assets of its own. Its **Level assets** section is derived: it
+reads the Scenes filed under the selected Level and reports what those Scenes
+place, with the Scene each reference came from named on the row. There is no
+second relationship to maintain, and nothing on this surface is editable - a
+placement is changed in the Scene, where it is authored.
+
+Two relationships are shown apart, because they answer different questions:
+
+- **From level scenes** - everything the Level's Scenes place, deduplicated
+  across them. A model used by two Scenes appears once, naming both; the Level's
+  primary Scene is marked `primary`.
+- **Project members** - the models explicitly added to the Project, whether or
+  not a Scene places them. An asset can appear in both groups, and each row says
+  which relationship it is reporting.
+
+A Level with no Scenes yet is the ordinary first state of a project, so it reads
+as an instruction - link a Scene to the Level - rather than as a failure. The
+picker defaults to the Level first in production order, and each Scene's
+document is read through the same query the scene editor uses, so an agent's
+edit to a Scene is reflected the next time the section loads.
 
 ## Profile - what is being made
 

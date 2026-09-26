@@ -76,6 +76,20 @@ export class ScenesPage {
     await expect(this.page.locator(this.editor)).toBeVisible();
   }
 
+  /**
+   * Opens another scene while leaving the current one open.
+   *
+   * Goes through the Scenes LIST tab rather than the editor's Back button. Back is
+   * "I'm done with this scene" - it closes the tab and discards its draft - so
+   * using it here would throw away the very draft this scenario is about.
+   */
+  async openSceneKeepingCurrent(name: string): Promise<void> {
+    const { clickTab } = await import("../helpers/navigation-helper");
+    await clickTab(this.page, "scenes", "left");
+    await expect(this.page.locator(this.list)).toBeVisible();
+    await this.openScene(name);
+  }
+
   sceneTileByName(name: string) {
     return this.page.locator(this.sceneTile).filter({ hasText: name });
   }
