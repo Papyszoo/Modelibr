@@ -281,6 +281,14 @@ describe('ProjectDetailsPanel draft ownership', () => {
     await userEvent.clear(triangles)
     await userEvent.type(triangles, '3210')
 
+    // The reference board lives on the workspace's References view, so it has to
+    // be switched to before its upload input is in the document. This test is
+    // about draft ownership, not about which view is showing - the switch is
+    // setup, not the thing under test.
+    await userEvent.click(
+      await screen.findByTestId('project-workspace-tab-references')
+    )
+
     const referenceInput = screen.getByLabelText(
       'Reference images to upload'
     ) as HTMLInputElement

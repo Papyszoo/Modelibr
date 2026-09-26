@@ -9,8 +9,12 @@ import { useState } from 'react'
 import {
   createProductionNote,
   createProjectLevel,
+  type ProductionNoteDto,
   type ProductionNoteRequest,
+  type ProjectCharacterDto,
+  type ProjectLevelDto,
   type ProjectLevelStatus,
+  type ProjectReferenceDto,
 } from '@/features/project/api/projectStudioApi'
 import {
   useProductionNotesQuery,
@@ -23,13 +27,19 @@ import {
   ErrorState,
   LoadingState,
 } from '@/shared/components/feedback'
+import { useTabUiState } from '@/hooks/useTabUiState'
 
 import { ProjectCharactersSection } from './ProjectCharactersSection'
 import { ProjectLevelAssetsSection } from './ProjectLevelAssetsSection'
 import { ProjectReferenceBoard } from './ProjectReferenceBoard'
+import {
+  ProjectWorkspaceShell,
+  type ProjectWorkspaceView,
+} from './ProjectWorkspaceShell'
 
 interface ProjectStudioSectionProps {
   projectId: number
+  tabId?: string
   onChanged?: () => void
 }
 
@@ -41,8 +51,35 @@ const LEVEL_STATUSES: Array<{ value: ProjectLevelStatus; label: string }> = [
   { value: 'done', label: 'Done' },
 ]
 
+/**
+ * What a note is attached to, in words rather than ids.
+ *
+ * Resolving the names needs the levels, characters and references the studio has
+ * already loaded, so a note that pointed at "Level #4" said nothing a user could
+ * act on - and the target is the whole point of a production note.
+ */
+function noteTargetLabel(
+  note: ProductionNoteDto,
+  levels: ProjectLevelDto[],
+  characters: ProjectCharacterDto[],
+  references: ProjectReferenceDto[]
+): string {
+  if (note.levelId) {
+    return `Level: ${levels.find(level => level.id === note.levelId)?.name ?? note.levelId}`
+  }
+  if (note.characterId) {
+    return `Character: ${characters.find(character => character.id === note.characterId)?.name ?? note.characterId}`
+  }
+  if (note.referenceImageId) {
+    const reference = references.find(item => item.id === note.referenceImageId)
+    return `Reference: ${reference ? reference.title || reference.fileName : note.referenceImageId}`
+  }
+  return 'Project'
+}
+
 export function ProjectStudioSection({
   projectId,
+  tabId,
   onChanged,
 }: ProjectStudioSectionProps) {
   const queryClient = useQueryClient()
@@ -50,6 +87,18 @@ export function ProjectStudioSection({
   const charactersQuery = useProjectCharactersQuery(projectId)
   const notesQuery = useProductionNotesQuery(projectId)
   const referencesQuery = useProjectReferencesQuery(projectId)
+
+  // Which surface of the workspace this tab is showing, kept in the tab's own UI
+  // state so a reload or a trip to another tab comes back to the same view. The
+  // alternative - a `useState` - resets on every tab switch, which is the same
+  // complaint the scene editor had.
+  const stateKey = tabId ?? `project-${projectId}`
+  const [view, setView] = useTabUiState<ProjectWorkspaceView>(
+    stateKey,
+    'projectWorkspaceView',
+    'overview'
+  )
+
   const [levelName, setLevelName] = useState('')
   const [levelDescription, setLevelDescription] = useState('')
   const [levelStatus, setLevelStatus] = useState<ProjectLevelStatus>('planned')
@@ -159,6 +208,173 @@ export function ProjectStudioSection({
   const characters = charactersQuery.data ?? []
   const notes = notesQuery.data ?? []
   const references = referencesQuery.data ?? []
+  const pinnedNotes = notes.filter(note => note.isPinned)
+
+  /*
+   * Hoisted out of the JSX because the note form is reachable from two views and
+   * duplicated markup drifts. Not a component: it closes over five pieces of
+   * local draft state, and lifting that out would be a bigger change than the
+   * duplication it replaces.
+   */
+  const noteForm = (
+    <form
+      className="project-studio-form"
+      onSubmit={event => {
+        event.preventDefault()
+        if (noteTitle.trim() && noteBody.trim()) createNote.mutate()
+      }}
+    >
+      <label htmlFor="new-project-note">New note or idea</label>
+      <InputText
+        id="new-project-note"
+        value={noteTitle}
+        onChange={event => setNoteTitle(event.target.value)}
+        placeholder="Lighting mood"
+      />
+      <InputTextarea
+        aria-label="Note body"
+        value={noteBody}
+        onChange={event => setNoteBody(event.target.value)}
+        rows={2}
+        placeholder="What should the team remember?"
+      />
+      <div className="project-studio-form-row">
+        <select
+          aria-label="Note target"
+          value={noteTarget}
+          onChange={event => setNoteTarget(event.target.value)}
+        >
+          <option value="project">Project</option>
+          {levels.map(level => (
+            <option key={level.id} value={`level:${level.id}`}>
+              Level: {level.name}
+            </option>
+          ))}
+          {characters.map(character => (
+            <option key={character.id} value={`character:${character.id}`}>
+              Character: {character.name}
+            </option>
+          ))}
+          {references.map(reference => (
+            <option key={reference.id} value={`reference:${reference.id}`}>
+              Reference: {reference.title || reference.fileName}
+            </option>
+          ))}
+        </select>
+        <label className="project-studio-checkbox">
+          <input
+            type="checkbox"
+            checked={notePinned}
+            onChange={event => setNotePinned(event.target.checked)}
+          />
+          Pin as idea
+        </label>
+        <Button
+          type="submit"
+          icon="pi pi-arrow-up"
+          aria-label="Create note"
+          disabled={
+            !noteTitle.trim() || !noteBody.trim() || createNote.isPending
+          }
+        />
+      </div>
+    </form>
+  )
+
+  const levelCard = (
+    <section
+      className="project-studio-card"
+      aria-labelledby="project-levels-title"
+    >
+      <div className="project-studio-card-header">
+        <div className="project-studio-card-title">
+          <h4 id="project-levels-title">Levels</h4>
+          <span className="project-studio-count">{levels.length}</span>
+        </div>
+        <Button
+          icon="pi pi-plus"
+          text
+          rounded
+          aria-label="Add level"
+          title="Add level"
+          onClick={() => setShowLevelForm(current => !current)}
+        />
+      </div>
+      {levels.length === 0 ? (
+        <EmptyState
+          icon="pi pi-map"
+          title="No levels yet"
+          message="Create the first production level for this project."
+        />
+      ) : (
+        <div className="project-level-list">
+          {levels.map(level => (
+            <div
+              className="project-level-row"
+              key={level.id}
+              data-testid="project-level-row"
+              data-level-name={level.name}
+            >
+              <div>
+                <strong>{level.name}</strong>
+                {level.description && <p>{level.description}</p>}
+              </div>
+              <span className="project-status-pill">
+                {LEVEL_STATUSES.find(
+                  status => status.value === level.productionStatus
+                )?.label ?? level.productionStatus}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+      {showLevelForm ? (
+        <form
+          className="project-studio-form"
+          onSubmit={event => {
+            event.preventDefault()
+            if (levelName.trim()) createLevel.mutate()
+          }}
+        >
+          <label htmlFor="new-project-level">New level</label>
+          <InputTextarea
+            aria-label="Level description"
+            value={levelDescription}
+            onChange={event => setLevelDescription(event.target.value)}
+            rows={2}
+            placeholder="What happens in this level?"
+          />
+          <div className="project-studio-form-row">
+            <InputText
+              id="new-project-level"
+              value={levelName}
+              onChange={event => setLevelName(event.target.value)}
+              placeholder="Forest Crossing"
+            />
+            <select
+              aria-label="New level status"
+              value={levelStatus}
+              onChange={event =>
+                setLevelStatus(event.target.value as ProjectLevelStatus)
+              }
+            >
+              {LEVEL_STATUSES.map(status => (
+                <option key={status.value} value={status.value}>
+                  {status.label}
+                </option>
+              ))}
+            </select>
+            <Button
+              type="submit"
+              icon="pi pi-plus"
+              aria-label="Create level"
+              disabled={!levelName.trim() || createLevel.isPending}
+            />
+          </div>
+        </form>
+      ) : null}
+    </section>
+  )
 
   return (
     <div className="project-studio-section" data-testid="project-studio">
@@ -169,234 +385,95 @@ export function ProjectStudioSection({
         </div>
         <span className="project-studio-summary">
           {levels.length} {levels.length === 1 ? 'level' : 'levels'} ·{' '}
-          {notes.filter(note => note.isPinned).length} pinned notes
+          {pinnedNotes.length} pinned notes
         </span>
       </div>
 
-      <div className="project-studio-grid">
-        <section
-          className="project-studio-card"
-          aria-labelledby="project-levels-title"
-        >
-          <div className="project-studio-card-header">
-            <div className="project-studio-card-title">
-              <h4 id="project-levels-title">Levels</h4>
-              <span className="project-studio-count">{levels.length}</span>
-            </div>
-            <Button
-              icon="pi pi-plus"
-              text
-              rounded
-              aria-label="Add level"
-              title="Add level"
-              onClick={() => setShowLevelForm(current => !current)}
-            />
-          </div>
-          {levels.length === 0 ? (
-            <EmptyState
-              icon="pi pi-map"
-              title="No levels yet"
-              message="Create the first production level for this project."
-            />
-          ) : (
-            <div className="project-level-list">
-              {levels.map(level => (
-                <div
-                  className="project-level-row"
-                  key={level.id}
-                  data-testid="project-level-row"
-                  data-level-name={level.name}
-                >
-                  <div>
-                    <strong>{level.name}</strong>
-                    {level.description && <p>{level.description}</p>}
-                  </div>
-                  <span className="project-status-pill">
-                    {LEVEL_STATUSES.find(
-                      status => status.value === level.productionStatus
-                    )?.label ?? level.productionStatus}
-                  </span>
+      <ProjectWorkspaceShell
+        view={view}
+        onViewChange={setView}
+        counts={{
+          levels: levels.length,
+          cast: characters.length,
+          references: references.length,
+        }}
+      >
+        {view === 'overview' ? (
+          <div className="project-studio-grid">
+            {levelCard}
+            <section
+              className="project-studio-card"
+              aria-labelledby="project-notes-title"
+            >
+              <div className="project-studio-card-header">
+                <div className="project-studio-card-title">
+                  <h4 id="project-notes-title">Notes & ideas</h4>
+                  <span className="project-studio-count">{notes.length}</span>
                 </div>
-              ))}
-            </div>
-          )}
-          {showLevelForm ? (
-            <form
-              className="project-studio-form"
-              onSubmit={event => {
-                event.preventDefault()
-                if (levelName.trim()) createLevel.mutate()
-              }}
-            >
-              <label htmlFor="new-project-level">New level</label>
-              <InputTextarea
-                aria-label="Level description"
-                value={levelDescription}
-                onChange={event => setLevelDescription(event.target.value)}
-                rows={2}
-                placeholder="What happens in this level?"
-              />
-              <div className="project-studio-form-row">
-                <InputText
-                  id="new-project-level"
-                  value={levelName}
-                  onChange={event => setLevelName(event.target.value)}
-                  placeholder="Forest Crossing"
-                />
-                <select
-                  aria-label="New level status"
-                  value={levelStatus}
-                  onChange={event =>
-                    setLevelStatus(event.target.value as ProjectLevelStatus)
-                  }
-                >
-                  {LEVEL_STATUSES.map(status => (
-                    <option key={status.value} value={status.value}>
-                      {status.label}
-                    </option>
-                  ))}
-                </select>
                 <Button
-                  type="submit"
                   icon="pi pi-plus"
-                  aria-label="Create level"
-                  disabled={!levelName.trim() || createLevel.isPending}
+                  text
+                  rounded
+                  aria-label="Add note"
+                  title="Add note"
+                  onClick={() => setShowNoteForm(current => !current)}
                 />
               </div>
-            </form>
-          ) : null}
-        </section>
-
-        <section
-          className="project-studio-card"
-          aria-labelledby="project-notes-title"
-        >
-          <div className="project-studio-card-header">
-            <div className="project-studio-card-title">
-              <h4 id="project-notes-title">Notes & ideas</h4>
-              <span className="project-studio-count">{notes.length}</span>
-            </div>
-            <Button
-              icon="pi pi-plus"
-              text
-              rounded
-              aria-label="Add note"
-              title="Add note"
-              onClick={() => setShowNoteForm(current => !current)}
-            />
+              {notes.length === 0 ? (
+                <EmptyState
+                  icon="pi pi-file-edit"
+                  title="No notes yet"
+                  message="Record what the team should remember, or pin an idea."
+                />
+              ) : (
+                <div className="project-note-list">
+                  {notes.map(note => (
+                    <article
+                      className={`project-note-row${note.isPinned ? ' is-pinned' : ''}`}
+                      key={note.id}
+                      data-testid="project-note-row"
+                      data-note-title={note.title}
+                    >
+                      <div className="project-note-heading">
+                        <strong>{note.title}</strong>
+                        {note.isPinned && (
+                          <i
+                            className="pi pi-bookmark-fill"
+                            aria-label="Pinned"
+                          />
+                        )}
+                      </div>
+                      <p>{note.body}</p>
+                      <small>
+                        {noteTargetLabel(note, levels, characters, references)}
+                      </small>
+                    </article>
+                  ))}
+                </div>
+              )}
+              {showNoteForm ? noteForm : null}
+            </section>
           </div>
-          {notes.length === 0 ? (
-            <EmptyState
-              icon="pi pi-lightbulb"
-              title="No notes yet"
-              message="Capture a production note or pin an idea for later."
-            />
-          ) : (
-            <div className="project-note-list">
-              {notes.map(note => (
-                <article
-                  className={`project-note-row${note.isPinned ? ' is-pinned' : ''}`}
-                  key={note.id}
-                  data-testid="project-note-row"
-                  data-note-title={note.title}
-                >
-                  <div className="project-note-heading">
-                    <strong>{note.title}</strong>
-                    {note.isPinned && (
-                      <i className="pi pi-bookmark-fill" aria-label="Pinned" />
-                    )}
-                  </div>
-                  <p>{note.body}</p>
-                  <small>
-                    {note.levelId
-                      ? `Level #${note.levelId}`
-                      : note.referenceImageId
-                        ? `Reference #${note.referenceImageId}`
-                        : note.characterId
-                          ? `Character #${note.characterId}`
-                          : 'Project'}
-                  </small>
-                </article>
-              ))}
-            </div>
-          )}
-          {showNoteForm ? (
-            <form
-              className="project-studio-form"
-              onSubmit={event => {
-                event.preventDefault()
-                if (noteTitle.trim() && noteBody.trim()) createNote.mutate()
-              }}
-            >
-              <label htmlFor="new-project-note">New note or idea</label>
-              <InputText
-                id="new-project-note"
-                value={noteTitle}
-                onChange={event => setNoteTitle(event.target.value)}
-                placeholder="Lighting mood"
-              />
-              <InputTextarea
-                aria-label="Note body"
-                value={noteBody}
-                onChange={event => setNoteBody(event.target.value)}
-                rows={2}
-                placeholder="What should the team remember?"
-              />
-              <div className="project-studio-form-row">
-                <select
-                  aria-label="Note target"
-                  value={noteTarget}
-                  onChange={event => setNoteTarget(event.target.value)}
-                >
-                  <option value="project">Project</option>
-                  {levels.map(level => (
-                    <option key={level.id} value={`level:${level.id}`}>
-                      Level: {level.name}
-                    </option>
-                  ))}
-                  {characters.map(character => (
-                    <option
-                      key={character.id}
-                      value={`character:${character.id}`}
-                    >
-                      Character: {character.name}
-                    </option>
-                  ))}
-                  {references.map(reference => (
-                    <option
-                      key={reference.id}
-                      value={`reference:${reference.id}`}
-                    >
-                      Reference: {reference.title || reference.fileName}
-                    </option>
-                  ))}
-                </select>
-                <label className="project-studio-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={notePinned}
-                    onChange={event => setNotePinned(event.target.checked)}
-                  />
-                  Pin as idea
-                </label>
-                <Button
-                  type="submit"
-                  icon="pi pi-arrow-up"
-                  aria-label="Create note"
-                  disabled={
-                    !noteTitle.trim() ||
-                    !noteBody.trim() ||
-                    createNote.isPending
-                  }
-                />
-              </div>
-            </form>
-          ) : null}
-        </section>
-      </div>
-      <ProjectLevelAssetsSection projectId={projectId} />
-      <ProjectCharactersSection projectId={projectId} onChanged={onChanged} />
-      <ProjectReferenceBoard projectId={projectId} onChanged={onChanged} />
+        ) : null}
+
+        {view === 'levels' ? (
+          <>
+            {levelCard}
+            <ProjectLevelAssetsSection projectId={projectId} />
+          </>
+        ) : null}
+
+        {view === 'cast' ? (
+          <ProjectCharactersSection
+            projectId={projectId}
+            onChanged={onChanged}
+          />
+        ) : null}
+
+        {view === 'references' ? (
+          <ProjectReferenceBoard projectId={projectId} onChanged={onChanged} />
+        ) : null}
+      </ProjectWorkspaceShell>
     </div>
   )
 }

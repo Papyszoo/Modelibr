@@ -54,8 +54,23 @@ Removing an asset from a project does NOT delete the asset itself - it only remo
 
 ## Project studio - production context
 
-The Project details page opens with a **Project studio** section that holds the
-production context above the asset sections:
+The Project details page opens with a **Project studio** above the asset
+sections, and the studio has its own four views: **Overview**, **Levels**,
+**Cast**, **References**. They are views inside the Project's tab, not dock tabs -
+the Project tab already has a tab bar for asset families, and a second nested one
+would compete with it.
+
+- **Overview** answers "where is this project": the level list and the notes and
+  pinned ideas, which is where a new project starts.
+- **Levels** adds the level's assets, derived from the Scenes filed under it -
+  see [Level assets](#level-assets).
+- **Cast** is the character list.
+- **References** is the reference board.
+
+The view you were on is kept in the tab's own state, so reloading or a trip to
+another tab comes back to it.
+
+The production context itself:
 
 - **Levels** are ordered units such as `Forest Crossing`, with a description, a
   small fixed production status vocabulary, and reference images of their own.
@@ -70,7 +85,7 @@ production context above the asset sections:
   weaknesses, behaviour, and threat are written where they are read.
 - **Notes & ideas** are plain-text notes. Pinning a note marks it as an idea;
   a note can target the Project, one Level, one reference image, or one
-  Character.
+  Character, and each note names its target rather than printing an id.
 - **References** are the project's concept images, gathered on one Reference
   Board. Every image can be titled, linked to any number of Levels and
   Characters, annotated with its own notes, and removed from the project while

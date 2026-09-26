@@ -217,6 +217,7 @@ export function ProjectDetailsPanel({
     <div className="container-rich-details">
       <ProjectStudioSection
         projectId={project.id}
+        tabId={tabStateKey}
         onChanged={refetchContainer}
       />
       <div className="container-rich-layout">

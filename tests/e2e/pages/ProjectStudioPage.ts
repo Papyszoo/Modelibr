@@ -28,6 +28,10 @@ export class ProjectStudioPage {
     return this.page.getByTestId("level-assets");
   }
 
+  get workspace(): Locator {
+    return this.page.getByTestId("project-workspace");
+  }
+
   get levelAssetPicker(): Locator {
     return this.page.getByTestId("level-assets-level");
   }
@@ -92,10 +96,27 @@ export class ProjectStudioPage {
   }
 
   /**
+   * Switches the workspace to one of its views.
+   *
+   * Each surface lives on its own view now, so a step that acts on characters or
+   * references has to go there first. Done as a page method rather than repeated
+   * in steps because forgetting it produces a "not found" that looks like a
+   * missing feature rather than a missing click.
+   */
+  async showWorkspaceView(view: "overview" | "levels" | "cast" | "references") {
+    await expect(this.workspace).toBeVisible({ timeout: 30000 });
+    await this.page.getByTestId(`project-workspace-tab-${view}`).click();
+    await expect(
+      this.page.getByTestId(`project-workspace-tab-${view}`),
+    ).toHaveAttribute("aria-selected", "true");
+  }
+
+  /**
    * The level asset view reads a level's scenes and then one document per scene,
    * so it settles after the studio header does.
    */
   async waitForLevelAssets(): Promise<void> {
+    await this.ensureView("levels");
     await expect(this.levelAssets).toBeVisible({ timeout: 30000 });
     await expect(this.levelAssetGroup).toBeVisible({ timeout: 30000 });
   }
@@ -110,11 +131,36 @@ export class ProjectStudioPage {
     await this.levelAssetPicker.selectOption({ label: levelName });
   }
 
+  /**
+   * Brings a workspace view into view if it is not already the selected one.
+   *
+   * Idempotent, like `ensureCharacterEditorOpen` and for the same reason: the
+   * decision comes from the tab bar's own `aria-selected`, never from project
+   * data. It lives here rather than in the steps so a step that acts on a surface
+   * cannot forget it - a forgotten view switch reads as a missing feature rather
+   * than a missing click.
+   */
+  private async ensureView(
+    view: "overview" | "levels" | "cast" | "references",
+  ): Promise<void> {
+    const tab = this.page.getByTestId(`project-workspace-tab-${view}`);
+    await expect(tab).toBeVisible({ timeout: 30000 });
+    if ((await tab.getAttribute("aria-selected")) !== "true") {
+      await tab.click();
+    }
+    await expect(tab).toHaveAttribute("aria-selected", "true", {
+      timeout: 15000,
+    });
+  }
+
   async createLevel(
     name: string,
     description: string,
     status: string,
   ): Promise<void> {
+    // Levels are on the Overview as well as the Levels view; Overview is where a
+    // new project starts, so the form is looked for there first.
+    await this.ensureView("overview");
     await this.page.getByRole("button", { name: "Add level" }).click();
     const form = this.page.locator(
       ".project-studio-card:has(#new-project-level)",
@@ -142,6 +188,7 @@ export class ProjectStudioPage {
    * open. Only the tab bar decides whether to click - never project data.
    */
   private async ensureCharacterEditorOpen(name: string): Promise<Locator> {
+    await this.ensureView("cast");
     const card = this.characterCard(name);
     await expect(card).toBeVisible({ timeout: 15000 });
     if (
@@ -178,6 +225,7 @@ export class ProjectStudioPage {
     description: string,
     tags: string[],
   ): Promise<void> {
+    await this.ensureView("cast");
     await this.characters
       .getByRole("button", { name: "Add character" })
       .click();
@@ -294,6 +342,7 @@ export class ProjectStudioPage {
   }
 
   async uploadReferenceImage(filePath: string): Promise<void> {
+    await this.ensureView("references");
     const before = await this.referenceCards().count();
     const responsePromise = this.page.waitForResponse(
       (response) =>
