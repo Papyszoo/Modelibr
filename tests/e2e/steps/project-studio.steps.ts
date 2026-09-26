@@ -647,9 +647,12 @@ Given(
       `${API_BASE}/scenes/${sceneId}/project`,
       { data: { projectId: project.id } },
     );
-    expect(linked.ok(), "The scene could not be linked to the project").toBe(
-      true,
-    );
+    // The body, not just the status: "could not be linked" with nothing else is
+    // the one failure here that says nothing about why.
+    expect(
+      linked.ok(),
+      `The scene could not be linked to the project: ${linked.status()} ${await linked.text()}`,
+    ).toBe(true);
 
     const detail = await page.request.get(`${API_BASE}/scenes/${sceneId}`);
     expect(detail.ok()).toBeTruthy();
