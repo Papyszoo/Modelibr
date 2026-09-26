@@ -50,6 +50,32 @@ const reference: projectStudioApi.ProjectReferenceDto = {
   characterNames: [],
 }
 
+/** Linked to nothing, so it must disappear the moment a filter is on. */
+const dockReference: projectStudioApi.ProjectReferenceDto = {
+  ...reference,
+  id: 10,
+  title: 'Harbor at dusk',
+  fileId: 211,
+  fileName: 'harbor.png',
+  links: [],
+  levelNames: [],
+  characterNames: [],
+}
+
+/**
+ * Routes the references the way the endpoint does: the option the component
+ * sends decides the set, so a client-side filter over one flat list fails here.
+ */
+function mockReferencesByTarget() {
+  queries.useProjectReferencesQuery.mockImplementation(
+    (_projectId, options = {}) => {
+      if (options.levelId === 3) return query([reference]) as never
+      if (options.characterId === 4) return query([]) as never
+      return query([reference, dockReference]) as never
+    }
+  )
+}
+
 function renderBoard() {
   return renderWithProviders(
     <>
@@ -170,5 +196,61 @@ describe('ProjectReferenceBoard', () => {
         555
       )
     })
+  })
+
+  // "Show me this level's references" is the whole point of the link chips; a
+  // filter that ignored the server options, or that counted the filtered set as
+  // the total, would answer the question wrongly.
+  it('filters the board to a level, keeps the link picker working, and resets', async () => {
+    mockReferencesByTarget()
+    renderBoard()
+
+    const filter = screen.getByLabelText('Filter references by target')
+    expect(screen.getByTestId('project-reference-count')).toHaveTextContent('2')
+    expect(screen.getAllByTestId('project-reference-card')).toHaveLength(2)
+
+    await userEvent.selectOptions(filter, 'level:3')
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId('project-reference-card')).toHaveLength(1)
+    })
+    expect(screen.getByLabelText('Title for forest.png')).toBeVisible()
+    expect(
+      screen.queryByLabelText('Title for harbor.png')
+    ).not.toBeInTheDocument()
+    expect(screen.getByTestId('project-reference-count')).toHaveTextContent(
+      '1 of 2'
+    )
+
+    // The picker is driven by the full level/character lists, so adding a link
+    // stays possible while a filter hides the rest of the board.
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Link character' })
+    )
+    expect(
+      await screen.findByRole('button', { name: 'Ashen Warden' })
+    ).toBeVisible()
+
+    await userEvent.selectOptions(filter, 'all')
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId('project-reference-card')).toHaveLength(2)
+    })
+    expect(screen.getByTestId('project-reference-count')).toHaveTextContent('2')
+  })
+
+  it('shows an empty state rather than a placeholder row when nothing matches', async () => {
+    mockReferencesByTarget()
+    renderBoard()
+
+    await userEvent.selectOptions(
+      screen.getByLabelText('Filter references by target'),
+      'character:4'
+    )
+
+    expect(
+      await screen.findByText('No references linked here yet')
+    ).toBeVisible()
+    expect(screen.queryAllByTestId('project-reference-card')).toHaveLength(0)
   })
 })

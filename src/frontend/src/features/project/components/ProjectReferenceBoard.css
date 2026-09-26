@@ -20,6 +20,18 @@
   margin: 0;
 }
 
+.project-reference-filter {
+  min-width: 0;
+  max-width: 12rem;
+  min-height: 1.75rem;
+  padding: 0 var(--mod-space-2xs);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--mod-radius-sm);
+  background: var(--surface-ground);
+  color: var(--text-color);
+  font-size: var(--mod-text-xs);
+}
+
 .project-reference-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
@@ -58,8 +70,8 @@
 
 .project-reference-remove {
   position: absolute;
-  top: var(--mod-space-3xs);
-  right: var(--mod-space-3xs);
+  top: var(--mod-space-2xs);
+  right: var(--mod-space-2xs);
 }
 
 .project-reference-body {
@@ -90,13 +102,13 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--mod-space-2xs);
-  margin-top: var(--mod-space-3xs);
+  margin-top: var(--mod-space-2xs);
 }
 
 .project-reference-chip {
   display: inline-flex;
   align-items: center;
-  gap: var(--mod-space-3xs);
+  gap: var(--mod-space-2xs);
   padding: 0.12rem 0.35rem;
   border: 1px solid var(--surface-border);
   border-radius: var(--mod-radius-pill);
@@ -127,8 +139,8 @@
   flex-direction: column;
   max-height: 160px;
   overflow-y: auto;
-  margin-top: var(--mod-space-3xs);
-  padding: var(--mod-space-3xs);
+  margin-top: var(--mod-space-2xs);
+  padding: var(--mod-space-2xs);
   border: 1px solid var(--surface-border);
   border-radius: var(--mod-radius-sm);
   background: var(--surface-overlay);
@@ -136,7 +148,7 @@
 }
 
 .project-reference-picker button {
-  padding: var(--mod-space-3xs) var(--mod-space-2xs);
+  padding: var(--mod-space-2xs) var(--mod-space-2xs);
   border: 0;
   border-radius: var(--mod-radius-sm);
   background: none;
@@ -169,19 +181,19 @@
 }
 
 .project-reference-note p {
-  margin: var(--mod-space-3xs) 0 0;
+  margin: var(--mod-space-2xs) 0 0;
   color: var(--text-color-secondary);
 }
 
 .project-reference-note-form {
   display: flex;
   flex-direction: column;
-  gap: var(--mod-space-3xs);
+  gap: var(--mod-space-2xs);
 }
 
 .project-reference-note-form textarea {
   width: 100%;
-  padding: var(--mod-space-3xs);
+  padding: var(--mod-space-2xs);
   border: 1px solid var(--surface-border);
   border-radius: var(--mod-radius-sm);
   background: var(--surface-ground);

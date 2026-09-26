@@ -36,12 +36,18 @@ export function useProductionNotesQuery(
   })
 }
 
+/**
+ * `enabled` exists for the board's "n of m" count: the unfiltered total is
+ * only worth a second request while a target filter is active.
+ */
 export function useProjectReferencesQuery(
   projectId: number,
-  options: { levelId?: number; characterId?: number } = {}
+  options: { levelId?: number; characterId?: number } = {},
+  enabled = true
 ) {
   return useQuery({
     queryKey: ['projects', projectId, 'references', options],
     queryFn: () => getProjectReferences(projectId, options),
+    enabled,
   })
 }

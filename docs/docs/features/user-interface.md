@@ -36,16 +36,21 @@ The interface is split into **two panels** (left and right), each containing mul
 
 **Organize and system:**
 
-| Tab                | Description                                            |
-| ------------------ | ------------------------------------------------------ |
-| **Packs**          | Reusable asset bundles                                 |
-| **Projects**       | Project workspaces                                     |
-| **Asset Store**    | Import packs from your store library (optional)        |
-| **History**        | Recent uploads, renames, and version bumps             |
-| **Recycled Files** | Recover deleted items                                  |
-| **Settings**       | Storage, appearance, WebDAV, and Blender CLI           |
+| Tab                | Description                                     |
+| ------------------ | ----------------------------------------------- |
+| **Packs**          | Reusable asset bundles                          |
+| **Projects**       | Project workspaces                              |
+| **Asset Store**    | Import packs from your store library (optional) |
+| **History**        | Recent uploads, renames, and version bumps      |
+| **Recycled Files** | Recover deleted items                           |
+| **Settings**       | Storage, appearance, WebDAV, and Blender CLI    |
 
 **Viewers** open when you click an asset: **Model Viewer** (3D), **Texture Set Viewer**, **Environment Map Viewer**, **Script Viewer**, plus **Pack** and **Project** viewers.
+
+A **Scene editor** opens the same way - clicking a scene in the Scenes tab
+replaces the list with a dock tab of its own, one per scene, so two scenes can be
+open side by side. Each scene tab keeps its own unsaved draft, and Back closes
+that tab and discards that draft.
 
 ### The New Tab Page
 

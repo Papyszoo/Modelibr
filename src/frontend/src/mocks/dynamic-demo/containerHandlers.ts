@@ -22,6 +22,28 @@ import {
 } from './shared'
 
 /**
+ * The link rows of one reference image, resolved to the level/character names
+ * the real endpoint denormalizes into them.
+ */
+function referenceLinkDtos(project: DemoProject, referenceImageId: number) {
+  return (project.referenceLinks ?? [])
+    .filter(link => link.referenceImageId === referenceImageId)
+    .map(link => ({
+      id: link.id,
+      targetType: link.projectLevelId != null ? 'level' : 'character',
+      projectLevelId: link.projectLevelId,
+      projectLevelName:
+        project.levels?.find(level => level.id === link.projectLevelId)?.name ??
+        null,
+      projectCharacterId: link.projectCharacterId,
+      projectCharacterName:
+        project.characters?.find(
+          character => character.id === link.projectCharacterId
+        )?.name ?? null,
+    }))
+}
+
+/**
  * A small closed vocabulary for the demo. Not the server's 48 seeded options -
  * enough to show what the five dimensions are for, without turning the walkthrough
  * into a data-entry exercise.
@@ -636,7 +658,8 @@ export const containerHandlers = [
     '*/projects/:id/characters/:characterId',
     async ({ params, request }) => {
       const project = await getById('projects', Number(params.id))
-      const character = project?.characters?.find(
+      if (!project) return new HttpResponse(null, { status: 404 })
+      const character = project.characters?.find(
         item => item.id === Number(params.characterId)
       )
       if (!character) return new HttpResponse(null, { status: 404 })
@@ -673,7 +696,8 @@ export const containerHandlers = [
     '*/projects/:id/characters/:characterId/images',
     async ({ params, request }) => {
       const project = await getById('projects', Number(params.id))
-      const character = project?.characters?.find(
+      if (!project) return new HttpResponse(null, { status: 404 })
+      const character = project.characters?.find(
         item => item.id === Number(params.characterId)
       )
       if (!character) return new HttpResponse(null, { status: 404 })
@@ -702,11 +726,40 @@ export const containerHandlers = [
     }
   ),
 
+  http.put(
+    '*/projects/:id/characters/:characterId/images/:imageId',
+    async ({ params, request }) => {
+      const project = await getById('projects', Number(params.id))
+      if (!project) return new HttpResponse(null, { status: 404 })
+      const character = project.characters?.find(
+        item => item.id === Number(params.characterId)
+      )
+      if (!character) return new HttpResponse(null, { status: 404 })
+      const image = character.images.find(
+        item => item.id === Number(params.imageId)
+      )
+      if (!image) return new HttpResponse(null, { status: 404 })
+      // Only the editable fields travel; the file behind the link never changes.
+      const body = (await request.json()) as {
+        title?: string | null
+        caption?: string | null
+        sortOrder?: number | null
+      }
+      image.title = body.title ?? null
+      image.caption = body.caption ?? null
+      if (typeof body.sortOrder === 'number') image.sortOrder = body.sortOrder
+      character.updatedAt = now()
+      await put('projects', project)
+      return HttpResponse.json(image)
+    }
+  ),
+
   http.delete(
     '*/projects/:id/characters/:characterId/images/:imageId',
     async ({ params }) => {
       const project = await getById('projects', Number(params.id))
-      const character = project?.characters?.find(
+      if (!project) return new HttpResponse(null, { status: 404 })
+      const character = project.characters?.find(
         item => item.id === Number(params.characterId)
       )
       if (!character) return new HttpResponse(null, { status: 404 })
@@ -724,7 +777,8 @@ export const containerHandlers = [
     '*/projects/:id/characters/:characterId/models',
     async ({ params, request }) => {
       const project = await getById('projects', Number(params.id))
-      const character = project?.characters?.find(
+      if (!project) return new HttpResponse(null, { status: 404 })
+      const character = project.characters?.find(
         item => item.id === Number(params.characterId)
       )
       if (!character) return new HttpResponse(null, { status: 404 })
@@ -749,11 +803,38 @@ export const containerHandlers = [
     }
   ),
 
+  http.put(
+    '*/projects/:id/characters/:characterId/models/:modelLinkId',
+    async ({ params, request }) => {
+      const project = await getById('projects', Number(params.id))
+      if (!project) return new HttpResponse(null, { status: 404 })
+      const character = project.characters?.find(
+        item => item.id === Number(params.characterId)
+      )
+      if (!character) return new HttpResponse(null, { status: 404 })
+      const link = character.models.find(
+        item => item.id === Number(params.modelLinkId)
+      )
+      if (!link) return new HttpResponse(null, { status: 404 })
+      // Only the editable fields travel; the linked model never changes.
+      const body = (await request.json()) as {
+        label?: string | null
+        sortOrder?: number | null
+      }
+      link.label = body.label ?? null
+      if (typeof body.sortOrder === 'number') link.sortOrder = body.sortOrder
+      character.updatedAt = now()
+      await put('projects', project)
+      return HttpResponse.json(link)
+    }
+  ),
+
   http.delete(
     '*/projects/:id/characters/:characterId/models/:modelLinkId',
     async ({ params }) => {
       const project = await getById('projects', Number(params.id))
-      const character = project?.characters?.find(
+      if (!project) return new HttpResponse(null, { status: 404 })
+      const character = project.characters?.find(
         item => item.id === Number(params.characterId)
       )
       if (!character) return new HttpResponse(null, { status: 404 })
@@ -771,7 +852,8 @@ export const containerHandlers = [
     '*/projects/:id/characters/:characterId/abilities',
     async ({ params, request }) => {
       const project = await getById('projects', Number(params.id))
-      const character = project?.characters?.find(
+      if (!project) return new HttpResponse(null, { status: 404 })
+      const character = project.characters?.find(
         item => item.id === Number(params.characterId)
       )
       if (!character) return new HttpResponse(null, { status: 404 })
@@ -793,11 +875,45 @@ export const containerHandlers = [
     }
   ),
 
+  http.put(
+    '*/projects/:id/characters/:characterId/abilities/:abilityId',
+    async ({ params, request }) => {
+      const project = await getById('projects', Number(params.id))
+      if (!project) return new HttpResponse(null, { status: 404 })
+      const character = project.characters?.find(
+        item => item.id === Number(params.characterId)
+      )
+      if (!character) return new HttpResponse(null, { status: 404 })
+      const ability = character.abilities.find(
+        item => item.id === Number(params.abilityId)
+      )
+      if (!ability) return new HttpResponse(null, { status: 404 })
+      const body = (await request.json()) as {
+        name: string
+        description?: string | null
+        sortOrder?: number | null
+      }
+      if (!body.name?.trim()) {
+        return HttpResponse.json(
+          { error: 'InvalidCharacterAbility' },
+          { status: 400 }
+        )
+      }
+      ability.name = body.name.trim()
+      ability.description = body.description ?? null
+      if (typeof body.sortOrder === 'number') ability.sortOrder = body.sortOrder
+      character.updatedAt = now()
+      await put('projects', project)
+      return HttpResponse.json(ability)
+    }
+  ),
+
   http.delete(
     '*/projects/:id/characters/:characterId/abilities/:abilityId',
     async ({ params }) => {
       const project = await getById('projects', Number(params.id))
-      const character = project?.characters?.find(
+      if (!project) return new HttpResponse(null, { status: 404 })
+      const character = project.characters?.find(
         item => item.id === Number(params.characterId)
       )
       if (!character) return new HttpResponse(null, { status: 404 })
@@ -815,7 +931,8 @@ export const containerHandlers = [
     '*/projects/:id/characters/:characterId/variants',
     async ({ params, request }) => {
       const project = await getById('projects', Number(params.id))
-      const character = project?.characters?.find(
+      if (!project) return new HttpResponse(null, { status: 404 })
+      const character = project.characters?.find(
         item => item.id === Number(params.characterId)
       )
       if (!character) return new HttpResponse(null, { status: 404 })
@@ -849,11 +966,57 @@ export const containerHandlers = [
     }
   ),
 
+  http.put(
+    '*/projects/:id/characters/:characterId/variants/:variantId',
+    async ({ params, request }) => {
+      const project = await getById('projects', Number(params.id))
+      if (!project) return new HttpResponse(null, { status: 404 })
+      const character = project.characters?.find(
+        item => item.id === Number(params.characterId)
+      )
+      if (!character) return new HttpResponse(null, { status: 404 })
+      const variant = character.variants.find(
+        item => item.id === Number(params.variantId)
+      )
+      if (!variant) return new HttpResponse(null, { status: 404 })
+      const body = (await request.json()) as {
+        name: string
+        description?: string | null
+        projectLevelId?: number | null
+        sortOrder?: number | null
+      }
+      if (!body.name?.trim()) {
+        return HttpResponse.json(
+          { error: 'InvalidCharacterVariant' },
+          { status: 400 }
+        )
+      }
+      const level = project.levels?.find(
+        item => item.id === body.projectLevelId
+      )
+      if (body.projectLevelId != null && !level) {
+        return HttpResponse.json(
+          { error: 'ProjectLevelNotFound' },
+          { status: 404 }
+        )
+      }
+      variant.name = body.name.trim()
+      variant.description = body.description ?? null
+      variant.projectLevelId = level?.id ?? null
+      variant.projectLevelName = level?.name ?? null
+      if (typeof body.sortOrder === 'number') variant.sortOrder = body.sortOrder
+      character.updatedAt = now()
+      await put('projects', project)
+      return HttpResponse.json(variant)
+    }
+  ),
+
   http.delete(
     '*/projects/:id/characters/:characterId/variants/:variantId',
     async ({ params }) => {
       const project = await getById('projects', Number(params.id))
-      const character = project?.characters?.find(
+      if (!project) return new HttpResponse(null, { status: 404 })
+      const character = project.characters?.find(
         item => item.id === Number(params.characterId)
       )
       if (!character) return new HttpResponse(null, { status: 404 })
@@ -1007,7 +1170,8 @@ export const containerHandlers = [
 
   http.put('*/projects/:id/levels/:levelId', async ({ params, request }) => {
     const project = await getById('projects', Number(params.id))
-    const level = project?.levels?.find(
+    if (!project) return new HttpResponse(null, { status: 404 })
+    const level = project.levels?.find(
       item => item.id === Number(params.levelId)
     )
     if (!level) return new HttpResponse(null, { status: 404 })
@@ -1060,7 +1224,7 @@ export const containerHandlers = [
     if (characterId !== null)
       notes = notes.filter(note => note.characterId === Number(characterId))
     if (isPinned !== null)
-      notes = notes.filter(note => (note.isPinned === isPinned) === 'true')
+      notes = notes.filter(note => String(note.isPinned) === isPinned)
     return HttpResponse.json(notes)
   }),
 
@@ -1116,7 +1280,8 @@ export const containerHandlers = [
     '*/projects/:id/production-notes/:noteId',
     async ({ params, request }) => {
       const project = await getById('projects', Number(params.id))
-      const note = project?.productionNotes?.find(
+      if (!project) return new HttpResponse(null, { status: 404 })
+      const note = project.productionNotes?.find(
         item => item.id === Number(params.noteId)
       )
       if (!note) return new HttpResponse(null, { status: 404 })
@@ -1186,21 +1351,7 @@ export const containerHandlers = [
         return true
       })
       .map(image => {
-        const imageLinks = links
-          .filter(link => link.referenceImageId === (image.id ?? image.fileId))
-          .map(link => ({
-            id: link.id,
-            targetType: link.projectLevelId != null ? 'level' : 'character',
-            projectLevelId: link.projectLevelId,
-            projectLevelName:
-              project.levels?.find(level => level.id === link.projectLevelId)
-                ?.name ?? null,
-            projectCharacterId: link.projectCharacterId,
-            projectCharacterName:
-              project.characters?.find(
-                character => character.id === link.projectCharacterId
-              )?.name ?? null,
-          }))
+        const imageLinks = referenceLinkDtos(project, image.id ?? image.fileId)
         return {
           id: image.id ?? image.fileId,
           projectId: project.id,
@@ -1233,6 +1384,9 @@ export const containerHandlers = [
       const body = (await request.json()) as { title?: string | null }
       reference.title = body.title ?? ''
       await put('projects', project)
+      // The links come back with the rename, exactly as the real route does -
+      // a client that trusted this body must not see them vanish.
+      const links = referenceLinkDtos(project, reference.id ?? reference.fileId)
       return HttpResponse.json({
         id: reference.id ?? reference.fileId,
         projectId: project.id,
@@ -1242,9 +1396,13 @@ export const containerHandlers = [
         previewUrl: reference.previewUrl,
         fileUrl: reference.fileUrl,
         sortOrder: reference.sortOrder,
-        links: [],
-        levelNames: [],
-        characterNames: [],
+        links,
+        levelNames: links
+          .map(link => link.projectLevelName)
+          .filter((name): name is string => Boolean(name)),
+        characterNames: links
+          .map(link => link.projectCharacterName)
+          .filter((name): name is string => Boolean(name)),
       })
     }
   ),

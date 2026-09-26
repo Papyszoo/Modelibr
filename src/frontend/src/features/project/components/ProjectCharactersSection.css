@@ -212,6 +212,25 @@
   white-space: nowrap;
 }
 
+.project-character-media-actions {
+  position: absolute;
+  top: var(--mod-space-2xs);
+  right: var(--mod-space-2xs);
+  display: flex;
+  gap: var(--mod-space-2xs);
+}
+
+.project-character-media-actions .project-character-remove {
+  display: grid;
+  place-items: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--mod-radius-pill);
+  background: var(--surface-overlay);
+  font-size: var(--mod-text-xs);
+}
+
 .project-character-file-button {
   display: inline-flex;
   align-items: center;
@@ -255,4 +274,17 @@
 
 .project-character-remove:hover {
   color: var(--primary-color);
+}
+
+.project-character-row-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--mod-space-2xs);
+}
+
+/* An edit form replaces the row summary, so it has to claim the free width. */
+.project-character-link-row > .project-character-form {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-top: 0;
 }

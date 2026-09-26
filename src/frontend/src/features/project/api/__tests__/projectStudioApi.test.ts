@@ -2,7 +2,6 @@ import { client } from '@/lib/apiBase'
 
 import {
   addCharacterAbility,
-  addCharacterVariant,
   addProjectReferenceLink,
   createProductionNote,
   createProjectCharacter,

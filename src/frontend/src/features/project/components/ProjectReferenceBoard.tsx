@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from 'primereact/button'
 import { confirmDialog } from 'primereact/confirmdialog'
 import { InputText } from 'primereact/inputtext'
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 
 import { uploadFile } from '@/features/models/api/modelApi'
 import {
@@ -40,13 +40,37 @@ interface ProjectReferenceBoardProps {
 
 type LinkTarget = 'level' | 'character'
 
+const ALL_TARGETS = 'all'
+const LEVEL_PREFIX = 'level:'
+const CHARACTER_PREFIX = 'character:'
+
 export function ProjectReferenceBoard({
   projectId,
   onChanged,
 }: ProjectReferenceBoardProps) {
   const queryClient = useQueryClient()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
-  const referencesQuery = useProjectReferencesQuery(projectId)
+  const [target, setTarget] = useState(ALL_TARGETS)
+  // Server-side filtering, not a client-side pass over every image: the board
+  // and the endpoint can never disagree about what a link means.
+  const filterOptions = useMemo(() => {
+    if (target.startsWith(LEVEL_PREFIX)) {
+      return { levelId: Number(target.slice(LEVEL_PREFIX.length)) }
+    }
+    if (target.startsWith(CHARACTER_PREFIX)) {
+      return { characterId: Number(target.slice(CHARACTER_PREFIX.length)) }
+    }
+    return {}
+  }, [target])
+  const filtering = target !== ALL_TARGETS
+  const referencesQuery = useProjectReferencesQuery(projectId, filterOptions)
+  // The unfiltered count is what the "n of m" header needs, and it is only
+  // worth the second request while a filter is on.
+  const allReferencesQuery = useProjectReferencesQuery(
+    projectId,
+    {},
+    !filtering
+  )
   const levelsQuery = useProjectLevelsQuery(projectId)
   const charactersQuery = useProjectCharactersQuery(projectId)
   const notesQuery = useProductionNotesQuery(projectId)
@@ -135,6 +159,7 @@ export function ProjectReferenceBoard({
         onRetry={() => {
           void Promise.all([
             referencesQuery.refetch(),
+            allReferencesQuery.refetch(),
             levelsQuery.refetch(),
             charactersQuery.refetch(),
             notesQuery.refetch(),
@@ -151,11 +176,28 @@ export function ProjectReferenceBoard({
   const levels = levelsQuery.data ?? []
   const characters = charactersQuery.data ?? []
   const notes = notesQuery.data ?? []
+  // Unfiltered total, so "3 of 12" stays honest while a target filter is on.
+  const totalReferences = filtering
+    ? (allReferencesQuery.data?.length ?? references.length)
+    : references.length
+  const filterOptionsList = [
+    ...levels.map(level => ({
+      value: `${LEVEL_PREFIX}${level.id}`,
+      label: `Level: ${level.name}`,
+    })),
+    ...characters.map(character => ({
+      value: `${CHARACTER_PREFIX}${character.id}`,
+      label: `Character: ${character.name}`,
+    })),
+  ]
   const lightboxImages = references.map(reference => ({
     id: reference.fileId,
     name: reference.title || reference.fileName,
-    previewUrl: resolveApiAssetUrl(reference.previewUrl),
-    fullUrl: resolveApiAssetUrl(reference.fileUrl),
+    // Resolution can only fail on an empty URL, in which case the API's own
+    // path is the honest answer - the dialog has no placeholder for a broken one.
+    previewUrl:
+      resolveApiAssetUrl(reference.previewUrl) ?? reference.previewUrl,
+    fullUrl: resolveApiAssetUrl(reference.fileUrl) ?? reference.fileUrl,
   }))
 
   return (
@@ -169,7 +211,30 @@ export function ProjectReferenceBoard({
           <h3>Reference Board</h3>
         </div>
         <div className="project-reference-header-actions">
-          <span className="project-studio-count">{references.length}</span>
+          {filterOptionsList.length > 0 ? (
+            <select
+              className="project-reference-filter"
+              data-testid="project-reference-filter"
+              aria-label="Filter references by target"
+              value={target}
+              onChange={event => setTarget(event.target.value)}
+            >
+              <option value={ALL_TARGETS}>All targets</option>
+              {filterOptionsList.map(option => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          ) : null}
+          <span
+            className="project-studio-count"
+            data-testid="project-reference-count"
+          >
+            {filtering
+              ? `${references.length} of ${totalReferences}`
+              : references.length}
+          </span>
           <Button
             icon="pi pi-plus"
             text
@@ -206,11 +271,19 @@ export function ProjectReferenceBoard({
       />
 
       {references.length === 0 ? (
-        <EmptyState
-          icon="pi pi-images"
-          title="No reference images yet"
-          message="Add concept art, mood references, and character sheets here, then link each image to the level or character it belongs to."
-        />
+        filtering ? (
+          <EmptyState
+            icon="pi pi-filter-slash"
+            title="No references linked here yet"
+            message="Link an image to this level or character, or switch the filter back to all targets."
+          />
+        ) : (
+          <EmptyState
+            icon="pi pi-images"
+            title="No reference images yet"
+            message="Add concept art, mood references, and character sheets here, then link each image to the level or character it belongs to."
+          />
+        )
       ) : (
         <div className="project-reference-grid">
           {references.map((reference, index) => (
@@ -315,7 +388,9 @@ function ReferenceCard({
           onClick={onOpen}
         >
           <img
-            src={resolveApiAssetUrl(reference.previewUrl)}
+            src={
+              resolveApiAssetUrl(reference.previewUrl) ?? reference.previewUrl
+            }
             alt={reference.title || reference.fileName}
           />
         </button>

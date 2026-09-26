@@ -81,6 +81,12 @@ variants - and each create action sits behind a `+`, so the default view stays a
 scannable list of the cast. Deleting a character removes its production links
 and notes; the linked files, models, and levels stay in the library.
 
+Everything a character already has is edited in place, not re-created: an
+ability or a variant opens a small inline form pre-filled with its current
+values, an image's title and caption and a linked model's label are edited where
+they are shown, and saving leaves the section open. Production data that can only
+be added and removed is a read-only surface wearing an editing costume.
+
 ### Reference links
 
 The Reference Board links images to targets through
@@ -90,6 +96,14 @@ The Reference Board links images to targets through
 or a Character unlinks the image instead of removing it
 (`SetNull` on the link), and removing a level link that a rollback cannot express
 is reported rather than silently dropped.
+
+The board has one **target filter** - all references, one Level's, or one
+Character's - so "what does this level have to go on" is one click rather than a
+scan. The filter is applied by the server
+(`GET /projects/{projectId}/references?levelId=&characterId=`), the header counts
+what is shown against the total, and adding a link keeps working while a filter
+is active because the picker is driven by the project's Levels and Characters
+rather than by the filtered images.
 
 The first slice keeps the existing asset sections intact while making the
 Project-level context visible in the same place. Level assets are derived from

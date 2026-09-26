@@ -47,18 +47,6 @@ export interface ProductionNoteRequest {
   isPinned: boolean
 }
 
-export interface ProjectReferenceDto {
-  id: number
-  projectId: number
-  projectLevelId: number | null
-  title: string
-  fileId: number
-  fileName: string
-  previewUrl: string
-  fileUrl: string
-  sortOrder: number
-}
-
 export interface ProjectCharacterImageDto {
   id: number
   fileId: number | null
@@ -125,8 +113,21 @@ export interface ProjectCharacterImageRequest {
   sortOrder?: number
 }
 
+/** The update route takes only the editable fields - the file never changes. */
+export interface ProjectCharacterImageUpdateRequest {
+  title?: string | null
+  caption?: string | null
+  sortOrder?: number
+}
+
 export interface ProjectCharacterModelRequest {
   modelId: number
+  label?: string | null
+  sortOrder?: number
+}
+
+/** The update route takes only the editable fields - the model never changes. */
+export interface ProjectCharacterModelUpdateRequest {
   label?: string | null
   sortOrder?: number
 }
@@ -153,6 +154,11 @@ export interface ProjectReferenceLinkDto {
   projectCharacterName: string | null
 }
 
+/**
+ * A reference image and what it is linked to. Mirrors the backend's
+ * `ProjectReferenceDto` exactly - the single level-scope column it used to carry
+ * became the `links` list when references could address several targets.
+ */
 export interface ProjectReferenceDto {
   id: number
   projectId: number
@@ -379,7 +385,7 @@ export async function updateProjectCharacterImage(
   projectId: number,
   characterId: number,
   imageId: number,
-  request: ProjectCharacterImageRequest
+  request: ProjectCharacterImageUpdateRequest
 ): Promise<ProjectCharacterImageDto> {
   const response = await client.put<ProjectCharacterImageDto>(
     `/projects/${projectId}/characters/${characterId}/images/${imageId}`,
@@ -414,7 +420,7 @@ export async function updateProjectCharacterModel(
   projectId: number,
   characterId: number,
   modelLinkId: number,
-  request: ProjectCharacterModelRequest
+  request: ProjectCharacterModelUpdateRequest
 ): Promise<ProjectCharacterModelDto> {
   const response = await client.put<ProjectCharacterModelDto>(
     `/projects/${projectId}/characters/${characterId}/models/${modelLinkId}`,

@@ -305,7 +305,23 @@ export const handlers = [
   ),
   http.put(
     `${BASE_URL}/projects/:id/characters/:characterId/images/:imageId`,
-    () => new HttpResponse(null, { status: 404 })
+    async ({ request, params }) => {
+      const body = (await request.json()) as {
+        title?: string | null
+        caption?: string | null
+        sortOrder?: number | null
+      }
+      return HttpResponse.json({
+        id: Number(params.imageId),
+        fileId: 0,
+        fileName: null,
+        title: body.title ?? null,
+        caption: body.caption ?? null,
+        previewUrl: null,
+        fileUrl: null,
+        sortOrder: body.sortOrder ?? 0,
+      })
+    }
   ),
   http.delete(
     `${BASE_URL}/projects/:id/characters/:characterId/images/:imageId`,
@@ -317,7 +333,19 @@ export const handlers = [
   ),
   http.put(
     `${BASE_URL}/projects/:id/characters/:characterId/models/:modelLinkId`,
-    () => new HttpResponse(null, { status: 404 })
+    async ({ request, params }) => {
+      const body = (await request.json()) as {
+        label?: string | null
+        sortOrder?: number | null
+      }
+      return HttpResponse.json({
+        id: Number(params.modelLinkId),
+        modelId: null,
+        modelName: null,
+        label: body.label ?? null,
+        sortOrder: body.sortOrder ?? 0,
+      })
+    }
   ),
   http.delete(
     `${BASE_URL}/projects/:id/characters/:characterId/models/:modelLinkId`,
@@ -329,7 +357,19 @@ export const handlers = [
   ),
   http.put(
     `${BASE_URL}/projects/:id/characters/:characterId/abilities/:abilityId`,
-    () => new HttpResponse(null, { status: 404 })
+    async ({ request, params }) => {
+      const body = (await request.json()) as {
+        name?: string
+        description?: string | null
+        sortOrder?: number | null
+      }
+      return HttpResponse.json({
+        id: Number(params.abilityId),
+        name: body.name ?? '',
+        description: body.description ?? null,
+        sortOrder: body.sortOrder ?? 0,
+      })
+    }
   ),
   http.delete(
     `${BASE_URL}/projects/:id/characters/:characterId/abilities/:abilityId`,
@@ -341,7 +381,22 @@ export const handlers = [
   ),
   http.put(
     `${BASE_URL}/projects/:id/characters/:characterId/variants/:variantId`,
-    () => new HttpResponse(null, { status: 404 })
+    async ({ request, params }) => {
+      const body = (await request.json()) as {
+        name?: string
+        description?: string | null
+        projectLevelId?: number | null
+        sortOrder?: number | null
+      }
+      return HttpResponse.json({
+        id: Number(params.variantId),
+        name: body.name ?? '',
+        description: body.description ?? null,
+        projectLevelId: body.projectLevelId ?? null,
+        projectLevelName: null,
+        sortOrder: body.sortOrder ?? 0,
+      })
+    }
   ),
   http.delete(
     `${BASE_URL}/projects/:id/characters/:characterId/variants/:variantId`,

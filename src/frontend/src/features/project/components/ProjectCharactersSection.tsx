@@ -23,19 +23,30 @@ import {
   removeCharacterVariant,
   removeProjectCharacterImage,
   removeProjectCharacterModel,
+  updateCharacterAbility,
+  updateCharacterVariant,
   updateProjectCharacter,
+  updateProjectCharacterImage,
+  updateProjectCharacterModel,
 } from '@/features/project/api/projectStudioApi'
 import {
   useProductionNotesQuery,
   useProjectCharactersQuery,
   useProjectLevelsQuery,
 } from '@/features/project/api/projectStudioQueries'
-import { resolveApiAssetUrl } from '@/lib/apiBase'
 import {
   EmptyState,
   ErrorState,
   LoadingState,
 } from '@/shared/components/feedback'
+
+import {
+  CharacterAbilities,
+  type CharacterChildEditor,
+  type CharacterChildKind,
+  CharacterMedia,
+  CharacterVariants,
+} from './CharacterChildSections'
 
 interface ProjectCharactersSectionProps {
   projectId: number
@@ -170,10 +181,66 @@ export function ProjectCharactersSection({
     onSuccess: invalidate,
   })
 
+  const updateImage = useMutation({
+    mutationFn: (input: {
+      characterId: number
+      imageId: number
+      title: string
+      caption: string
+    }) =>
+      updateProjectCharacterImage(projectId, input.characterId, input.imageId, {
+        title: input.title,
+        caption: input.caption,
+      }),
+    onSuccess: invalidate,
+  })
+
+  const updateModel = useMutation({
+    mutationFn: (input: {
+      characterId: number
+      linkId: number
+      label: string
+    }) =>
+      updateProjectCharacterModel(projectId, input.characterId, input.linkId, {
+        label: input.label,
+      }),
+    onSuccess: invalidate,
+  })
+
+  const updateAbility = useMutation({
+    mutationFn: (input: {
+      characterId: number
+      abilityId: number
+      name: string
+      description: string
+    }) =>
+      updateCharacterAbility(projectId, input.characterId, input.abilityId, {
+        name: input.name,
+        description: input.description,
+      }),
+    onSuccess: invalidate,
+  })
+
+  const updateVariant = useMutation({
+    mutationFn: (input: {
+      characterId: number
+      variantId: number
+      name: string
+      description: string
+      projectLevelId: number | null
+    }) =>
+      updateCharacterVariant(projectId, input.characterId, input.variantId, {
+        name: input.name,
+        description: input.description,
+        projectLevelId: input.projectLevelId,
+      }),
+    onSuccess: invalidate,
+  })
+
   const removeChild = useMutation({
     mutationFn: (input: {
       characterId: number
-      kind: 'ability' | 'variant' | 'image' | 'model'
+      kind: CharacterChildKind
       id: number
     }) => {
       if (input.kind === 'ability') {
@@ -265,53 +332,83 @@ export function ProjectCharactersSection({
         />
       ) : (
         <div className="project-character-grid">
-          {characters.map(character => (
-            <CharacterCard
-              key={character.id}
-              character={character}
-              notes={notes.filter(note => note.characterId === character.id)}
-              levels={levels}
-              models={models}
-              expanded={expandedId === character.id}
-              onToggle={() =>
-                setExpandedId(current =>
-                  current === character.id ? null : character.id
-                )
-              }
-              onUpdate={values =>
-                updateCharacter.mutate({ id: character.id, ...values })
-              }
-              onAddNote={values =>
-                createNote.mutate({ characterId: character.id, ...values })
-              }
-              onAddImage={file =>
-                addImage.mutate({ characterId: character.id, file })
-              }
-              onAddModel={modelId =>
-                addModel.mutate({ characterId: character.id, modelId })
-              }
-              onAddAbility={values =>
-                addAbility.mutate({ characterId: character.id, ...values })
-              }
-              onAddVariant={values =>
-                addVariant.mutate({ characterId: character.id, ...values })
-              }
-              onRemoveChild={(kind, id) =>
-                removeChild.mutate({ characterId: character.id, kind, id })
-              }
-              onDelete={() => {
-                confirmDialog({
-                  header: 'Delete character',
-                  message: `Delete ${character.name} and its production notes, abilities, and variants? Linked files and models stay in the library.`,
-                  icon: 'pi pi-exclamation-triangle',
-                  acceptLabel: 'Delete',
-                  rejectLabel: 'Cancel',
-                  acceptClassName: 'p-button-danger',
-                  accept: () => deleteCharacter.mutate(character.id),
-                })
-              }}
-            />
-          ))}
+          {characters.map(character => {
+            const childEditor: CharacterChildEditor = {
+              addImage: file =>
+                addImage.mutate({ characterId: character.id, file }),
+              addModel: modelId =>
+                addModel.mutate({ characterId: character.id, modelId }),
+              addAbility: values =>
+                addAbility.mutate({ characterId: character.id, ...values }),
+              addVariant: values =>
+                addVariant.mutate({ characterId: character.id, ...values }),
+              updateImage: (imageId, values) =>
+                updateImage.mutate({
+                  characterId: character.id,
+                  imageId,
+                  ...values,
+                }),
+              updateModel: (linkId, label) =>
+                updateModel.mutate({
+                  characterId: character.id,
+                  linkId,
+                  label,
+                }),
+              updateAbility: (abilityId, values) =>
+                updateAbility.mutate({
+                  characterId: character.id,
+                  abilityId,
+                  ...values,
+                }),
+              updateVariant: (variantId, values) =>
+                updateVariant.mutate({
+                  characterId: character.id,
+                  variantId,
+                  ...values,
+                }),
+              remove: (kind, id) =>
+                removeChild.mutate({ characterId: character.id, kind, id }),
+              pending: {
+                image: addImage.isPending || updateImage.isPending,
+                model: addModel.isPending || updateModel.isPending,
+                ability: addAbility.isPending || updateAbility.isPending,
+                variant: addVariant.isPending || updateVariant.isPending,
+              },
+            }
+            return (
+              <CharacterCard
+                key={character.id}
+                character={character}
+                notes={notes.filter(note => note.characterId === character.id)}
+                levels={levels}
+                models={models}
+                childEditor={childEditor}
+                expanded={expandedId === character.id}
+                onToggle={() =>
+                  setExpandedId(current =>
+                    current === character.id ? null : character.id
+                  )
+                }
+                onUpdate={values =>
+                  updateCharacter.mutate({ id: character.id, ...values })
+                }
+                onAddNote={values =>
+                  createNote.mutate({ characterId: character.id, ...values })
+                }
+                onDelete={() => {
+                  confirmDialog({
+                    header: 'Delete character',
+                    message: `Delete ${character.name} and its production notes, abilities, and variants? Linked files and models stay in the library.`,
+                    icon: 'pi pi-exclamation-triangle',
+                    acceptLabel: 'Delete',
+                    rejectLabel: 'Cancel',
+                    acceptClassName: 'p-button-danger',
+                    accept: () => deleteCharacter.mutate(character.id),
+                  })
+                }}
+              />
+            )
+          })}
         </div>
       )}
     </section>
@@ -323,21 +420,18 @@ function CharacterCard({
   notes,
   levels,
   models,
+  childEditor,
   expanded,
   onToggle,
   onUpdate,
   onAddNote,
-  onAddImage,
-  onAddModel,
-  onAddAbility,
-  onAddVariant,
-  onRemoveChild,
   onDelete,
 }: {
   character: ProjectCharacterDto
   notes: ProductionNoteDto[]
   levels: Array<{ id: number; name: string }>
   models: Array<{ id: string; name: string }>
+  childEditor: CharacterChildEditor
   expanded: boolean
   onToggle: () => void
   onUpdate: (values: {
@@ -346,18 +440,6 @@ function CharacterCard({
     tags: string[]
   }) => void
   onAddNote: (values: { title: string; body: string }) => void
-  onAddImage: (file: File) => void
-  onAddModel: (modelId: number) => void
-  onAddAbility: (values: { name: string; description: string }) => void
-  onAddVariant: (values: {
-    name: string
-    description: string
-    projectLevelId: number | null
-  }) => void
-  onRemoveChild: (
-    kind: 'ability' | 'variant' | 'image' | 'model',
-    id: number
-  ) => void
   onDelete: () => void
 }) {
   const isEnemy = character.tags.some(tag => tag.toLowerCase() === 'enemy')
@@ -471,24 +553,17 @@ function CharacterCard({
             <CharacterMedia
               character={character}
               models={models}
-              onAddImage={onAddImage}
-              onAddModel={onAddModel}
-              onRemove={onRemoveChild}
+              editor={childEditor}
             />
           ) : null}
           {section === 'abilities' ? (
-            <CharacterAbilities
-              character={character}
-              onAdd={onAddAbility}
-              onRemove={onRemoveChild}
-            />
+            <CharacterAbilities character={character} editor={childEditor} />
           ) : null}
           {section === 'variants' ? (
             <CharacterVariants
               character={character}
               levels={levels}
-              onAdd={onAddVariant}
-              onRemove={onRemoveChild}
+              editor={childEditor}
             />
           ) : null}
         </div>
@@ -654,318 +729,6 @@ function CharacterNotes({
           />
         </form>
       ) : null}
-    </div>
-  )
-}
-
-function CharacterMedia({
-  character,
-  models,
-  onAddImage,
-  onAddModel,
-  onRemove,
-}: {
-  character: ProjectCharacterDto
-  models: Array<{ id: string; name: string }>
-  onAddImage: (file: File) => void
-  onAddModel: (modelId: number) => void
-  onRemove: (
-    kind: 'ability' | 'variant' | 'image' | 'model',
-    id: number
-  ) => void
-}) {
-  const [modelId, setModelId] = useState('')
-
-  return (
-    <div className="project-character-editor-section">
-      <h5>Media and models</h5>
-      <div className="project-character-media-grid">
-        {character.images.map(image => (
-          <figure key={image.id} className="project-character-media">
-            {image.previewUrl ? (
-              <img
-                src={resolveApiAssetUrl(image.previewUrl)}
-                alt={image.title ?? image.fileName ?? 'Character image'}
-              />
-            ) : (
-              <div className="project-character-media-placeholder">
-                <i className="pi pi-image" />
-              </div>
-            )}
-            <figcaption>{image.title || image.fileName || 'Image'}</figcaption>
-            <button
-              type="button"
-              className="project-character-remove"
-              aria-label={`Remove image from ${character.name}`}
-              onClick={() => onRemove('image', image.id)}
-            >
-              <i className="pi pi-times" />
-            </button>
-          </figure>
-        ))}
-      </div>
-      <label className="project-character-file-button">
-        <i className="pi pi-plus" />
-        <span>Add image</span>
-        <input
-          type="file"
-          accept="image/png,image/jpeg,image/webp"
-          onChange={event => {
-            const file = event.target.files?.[0]
-            if (file) onAddImage(file)
-            event.target.value = ''
-          }}
-        />
-      </label>
-      <div className="project-character-inline-form">
-        <select
-          aria-label={`Link a model to ${character.name}`}
-          value={modelId}
-          onChange={event => setModelId(event.target.value)}
-        >
-          <option value="">Link a model…</option>
-          {models.map(model => (
-            <option key={model.id} value={model.id}>
-              {model.name}
-            </option>
-          ))}
-        </select>
-        <Button
-          icon="pi pi-plus"
-          aria-label="Link model"
-          disabled={!modelId}
-          onClick={() => {
-            onAddModel(Number(modelId))
-            setModelId('')
-          }}
-        />
-      </div>
-      {character.models.map(model => (
-        <div className="project-character-link-row" key={model.id}>
-          <span>
-            {model.label || model.modelName || `Model #${model.modelId}`}
-          </span>
-          <button
-            type="button"
-            className="project-character-remove"
-            aria-label={`Remove ${model.modelName ?? 'model'} from ${character.name}`}
-            onClick={() => onRemove('model', model.id)}
-          >
-            <i className="pi pi-times" />
-          </button>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function CharacterAbilities({
-  character,
-  onAdd,
-  onRemove,
-}: {
-  character: ProjectCharacterDto
-  onAdd: (values: { name: string; description: string }) => void
-  onRemove: (
-    kind: 'ability' | 'variant' | 'image' | 'model',
-    id: number
-  ) => void
-}) {
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [showAdd, setShowAdd] = useState(false)
-  return (
-    <div className="project-character-editor-section">
-      <div className="project-character-section-header">
-        <h5>Abilities</h5>
-        <Button
-          icon="pi pi-plus"
-          text
-          rounded
-          aria-label={`Add ability to ${character.name}`}
-          title="Add ability"
-          onClick={() => setShowAdd(current => !current)}
-        />
-      </div>
-      {character.abilities.map(ability => (
-        <CharacterChildRow
-          key={ability.id}
-          testId="project-character-ability"
-          dataName={ability.name}
-          title={ability.name}
-          description={ability.description}
-          onRemove={() => onRemove('ability', ability.id)}
-        />
-      ))}
-      {showAdd ? (
-        <form
-          className="project-character-form"
-          onSubmit={event => {
-            event.preventDefault()
-            if (name.trim()) {
-              onAdd({ name: name.trim(), description: description.trim() })
-              setName('')
-              setDescription('')
-              setShowAdd(false)
-            }
-          }}
-        >
-          <InputText
-            aria-label={`New ability for ${character.name}`}
-            value={name}
-            onChange={event => setName(event.target.value)}
-            placeholder="Ability name"
-          />
-          <InputText
-            aria-label={`Ability description for ${character.name}`}
-            value={description}
-            onChange={event => setDescription(event.target.value)}
-            placeholder="What does it do?"
-          />
-          <Button
-            type="submit"
-            label="Save ability"
-            aria-label="Save ability"
-            disabled={!name.trim()}
-          />
-        </form>
-      ) : null}
-    </div>
-  )
-}
-
-function CharacterVariants({
-  character,
-  levels,
-  onAdd,
-  onRemove,
-}: {
-  character: ProjectCharacterDto
-  levels: Array<{ id: number; name: string }>
-  onAdd: (values: {
-    name: string
-    description: string
-    projectLevelId: number | null
-  }) => void
-  onRemove: (
-    kind: 'ability' | 'variant' | 'image' | 'model',
-    id: number
-  ) => void
-}) {
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [levelId, setLevelId] = useState('')
-  const [showAdd, setShowAdd] = useState(false)
-  return (
-    <div className="project-character-editor-section">
-      <div className="project-character-section-header">
-        <h5>Variants</h5>
-        <Button
-          icon="pi pi-plus"
-          text
-          rounded
-          aria-label={`Add variant to ${character.name}`}
-          title="Add variant"
-          onClick={() => setShowAdd(current => !current)}
-        />
-      </div>
-      {character.variants.map(variant => (
-        <CharacterChildRow
-          key={variant.id}
-          testId="project-character-variant"
-          dataName={variant.name}
-          title={variant.name}
-          description={[variant.projectLevelName, variant.description]
-            .filter(Boolean)
-            .join(' · ')}
-          onRemove={() => onRemove('variant', variant.id)}
-        />
-      ))}
-      {showAdd ? (
-        <form
-          className="project-character-form"
-          onSubmit={event => {
-            event.preventDefault()
-            if (name.trim()) {
-              onAdd({
-                name: name.trim(),
-                description: description.trim(),
-                projectLevelId: levelId ? Number(levelId) : null,
-              })
-              setName('')
-              setDescription('')
-              setLevelId('')
-              setShowAdd(false)
-            }
-          }}
-        >
-          <InputText
-            aria-label={`New variant for ${character.name}`}
-            value={name}
-            onChange={event => setName(event.target.value)}
-            placeholder="Variant name"
-          />
-          <InputText
-            aria-label={`Variant description for ${character.name}`}
-            value={description}
-            onChange={event => setDescription(event.target.value)}
-            placeholder="What changes?"
-          />
-          <select
-            aria-label={`Variant level for ${character.name}`}
-            value={levelId}
-            onChange={event => setLevelId(event.target.value)}
-          >
-            <option value="">Any level</option>
-            {levels.map(level => (
-              <option key={level.id} value={level.id}>
-                {level.name}
-              </option>
-            ))}
-          </select>
-          <Button
-            type="submit"
-            label="Save variant"
-            aria-label="Save variant"
-            disabled={!name.trim()}
-          />
-        </form>
-      ) : null}
-    </div>
-  )
-}
-
-function CharacterChildRow({
-  testId,
-  dataName,
-  title,
-  description,
-  onRemove,
-}: {
-  testId: string
-  dataName: string
-  title: string
-  description?: string | null
-  onRemove: () => void
-}) {
-  return (
-    <div
-      className="project-character-link-row"
-      data-testid={testId}
-      data-name={dataName}
-    >
-      <div>
-        <strong>{title}</strong>
-        {description ? <small>{description}</small> : null}
-      </div>
-      <button
-        type="button"
-        className="project-character-remove"
-        aria-label={`Remove ${title}`}
-        onClick={onRemove}
-      >
-        <i className="pi pi-times" />
-      </button>
     </div>
   )
 }
