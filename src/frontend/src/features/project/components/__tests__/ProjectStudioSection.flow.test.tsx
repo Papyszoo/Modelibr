@@ -59,7 +59,8 @@ describe('ProjectStudioSection flow', () => {
   it('creates a level and a reference-targeted pinned idea', async () => {
     const onChanged = jest.fn()
     renderWithProviders(
-      <ProjectStudioSection projectId={7} onChanged={onChanged} />
+      <ProjectStudioSection projectId={7} onChanged={onChanged} />,
+      { tabId: 'project-7' }
     )
 
     // Scoped to the level row: the level asset view's picker carries the same

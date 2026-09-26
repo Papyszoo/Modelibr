@@ -45,6 +45,19 @@ export class ProjectStudioPage {
   }
 
   /** One derived asset row, addressed by the label the view resolved for it. */
+  /**
+   * The level-assets panel's own "nothing here" state.
+   *
+   * Distinguished from a panel with no rows on purpose: an empty list is also
+   * what a view that failed to load looks like, and only the message says the
+   * level was actually read.
+   */
+  get levelAssetsEmptyState(): Locator {
+    return this.page
+      .locator('[data-testid="level-assets"]')
+      .getByText(/place[s]? nothing yet/i);
+  }
+
   levelAssetRow(label: string): Locator {
     return this.page.locator(
       `[data-testid="level-assets-row"][data-asset-label="${label}"]`,
@@ -126,6 +139,57 @@ export class ProjectStudioPage {
    * scene documents it then fetches are waited on by the assertions that follow,
    * which retry against the rows themselves.
    */
+  /**
+   * Presses a level's own scene control - the way a person gets from a level
+   * into the scene that level is shot in.
+   *
+   * The same button opens a scene that exists and creates one that does not, so
+   * the label it carries is read from the row rather than assumed.
+   */
+  async pressLevelSceneControl(levelName: string): Promise<void> {
+    // The project tab has to be in front before its views exist at all: the dock
+    // renders one tab at a time, so after the previous press opened a scene
+    // editor the whole workspace - and this row - was unmounted. Focusing the
+    // project tab by tooltip prefix, because the workspace does not know its own
+    // tab's name.
+    const { clickTabByTooltip } = await import("../helpers/navigation-helper");
+    await clickTabByTooltip(this.page, "Project: ");
+    // Then the Levels view inside it, which is where the control lives. Skipping
+    // this made the step click whatever button the Overview happened to have.
+    await this.ensureView("levels");
+    const row = this.page.locator(
+      `[data-testid="project-level-row"][data-level-name="${levelName}"]`,
+    );
+    await expect(row).toBeVisible({ timeout: 30000 });
+    await row.getByRole("button").first().click();
+
+    // The control creates, files and opens, which is three requests - so the
+    // click returns before any of it has happened. Waited for rather than
+    // asserted immediately, or the step would read the dock as it was before the
+    // button was ever pressed. The error state is the other legitimate ending,
+    // and saying so is what makes a failure say which one it was.
+    await expect
+      .poll(
+        async () => {
+          if (await this.levelSceneError.isVisible().catch(() => false)) {
+            return "failed";
+          }
+          const tooltip = await this.page
+            .locator(".draggable-tab.active")
+            .first()
+            .getAttribute("data-pr-tooltip");
+          return tooltip?.startsWith("Scene: ") ? "opened" : "pending";
+        },
+        { timeout: 30000 },
+      )
+      .toBe("opened");
+  }
+
+  /** The level row's own report that its scene could not be opened. */
+  get levelSceneError(): Locator {
+    return this.page.locator(".project-level-scene-error");
+  }
+
   async showLevelAssetsFor(levelName: string): Promise<void> {
     await expect(this.levelAssetPicker).toBeVisible({ timeout: 30000 });
     await this.levelAssetPicker.selectOption({ label: levelName });

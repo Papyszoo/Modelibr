@@ -1016,6 +1016,54 @@ export const systemHandlers = [
     })
   }),
 
+  // Filing a scene under a level, with the same two rules the API enforces:
+  // the level must exist and belong to the scene's project. The demo would
+  // otherwise accept a link the app refuses, and the level row would look
+  // broken for a reason the demo made up.
+  http.put('*/scenes/:id/level', async ({ params, request }) => {
+    const scene = demoScenes.get(Number(params.id))
+    if (!scene) {
+      return HttpResponse.json(
+        { error: 'SceneNotFound', message: 'No such scene.' },
+        { status: 404 }
+      )
+    }
+
+    const body = (await request.json()) as { projectLevelId: number | null }
+    const previousLevelId = scene.projectLevelId
+
+    if (body.projectLevelId !== null) {
+      const levels = await getAll('projectLevels')
+      const level = levels.find(
+        candidate => candidate.id === body.projectLevelId
+      )
+      if (!level || level.projectId !== scene.projectId) {
+        return HttpResponse.json(
+          {
+            error: 'LevelNotUsable',
+            message:
+              'That level is not part of the project this scene belongs to.',
+          },
+          { status: 400 }
+        )
+      }
+      scene.projectLevelId = level.id as number
+    } else {
+      scene.projectLevelId = null
+    }
+
+    scene.isPrimaryLevelScene = scene.projectLevelId !== null
+    scene.revision += 1
+    scene.updatedAt = now()
+
+    return HttpResponse.json({
+      sceneId: scene.id,
+      projectLevelId: scene.projectLevelId,
+      previousLevelId,
+      revision: scene.revision,
+    })
+  }),
+
   http.get('*/scenes/:id/slots', async ({ params }) => {
     const scene = demoScenes.get(Number(params.id))
     return scene

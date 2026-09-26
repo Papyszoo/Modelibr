@@ -19,7 +19,7 @@ function testModel(page: Page) {
 }
 
 /** Reads a scene back through the API, by the name it was created with. */
-async function fetchSceneByName(page: Page, name: string) {
+export async function fetchSceneByName(page: Page, name: string) {
   const listed = await page.request.get(`${apiBase()}/scenes`);
   expect(listed.ok()).toBeTruthy();
 

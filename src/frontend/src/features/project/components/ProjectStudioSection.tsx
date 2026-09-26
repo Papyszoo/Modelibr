@@ -31,6 +31,7 @@ import { useTabUiState } from '@/hooks/useTabUiState'
 
 import { ProjectCharactersSection } from './ProjectCharactersSection'
 import { ProjectLevelAssetsSection } from './ProjectLevelAssetsSection'
+import { ProjectLevelSceneButton } from './ProjectLevelSceneButton'
 import { ProjectReferenceBoard } from './ProjectReferenceBoard'
 import {
   ProjectWorkspaceShell,
@@ -319,6 +320,11 @@ export function ProjectStudioSection({
                 <strong>{level.name}</strong>
                 {level.description && <p>{level.description}</p>}
               </div>
+              <ProjectLevelSceneButton
+                projectId={projectId}
+                levelId={level.id}
+                levelName={level.name}
+              />
               <span className="project-status-pill">
                 {LEVEL_STATUSES.find(
                   status => status.value === level.productionStatus

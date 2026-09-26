@@ -116,7 +116,9 @@ beforeEach(() => {
 describe('ProjectStudioSection workspace navigation', () => {
   it('opens on Overview and shows the level and the notes, not the whole studio', async () => {
     const tabId = registerTab()
-    renderWithProviders(<ProjectStudioSection projectId={7} tabId={tabId} />)
+    renderWithProviders(<ProjectStudioSection projectId={7} tabId={tabId} />, {
+      tabId,
+    })
 
     expect(
       screen.getByTestId('project-workspace-tab-overview')
@@ -132,7 +134,9 @@ describe('ProjectStudioSection workspace navigation', () => {
   it('shows exactly one surface at a time', async () => {
     const tabId = registerTab()
     const user = userEvent.setup()
-    renderWithProviders(<ProjectStudioSection projectId={7} tabId={tabId} />)
+    renderWithProviders(<ProjectStudioSection projectId={7} tabId={tabId} />, {
+      tabId,
+    })
 
     await user.click(screen.getByTestId('project-workspace-tab-references'))
 
@@ -153,7 +157,8 @@ describe('ProjectStudioSection workspace navigation', () => {
     const tabId = registerTab()
     const user = userEvent.setup()
     const { unmount } = renderWithProviders(
-      <ProjectStudioSection projectId={7} tabId={tabId} />
+      <ProjectStudioSection projectId={7} tabId={tabId} />,
+      { tabId }
     )
 
     await user.click(screen.getByTestId('project-workspace-tab-references'))
@@ -164,7 +169,9 @@ describe('ProjectStudioSection workspace navigation', () => {
     // Remounted from scratch, as a tab switch or a reload would: the view has to
     // come from the tab's persisted state rather than from component state.
     unmount()
-    renderWithProviders(<ProjectStudioSection projectId={7} tabId={tabId} />)
+    renderWithProviders(<ProjectStudioSection projectId={7} tabId={tabId} />, {
+      tabId,
+    })
 
     expect(
       screen.getByTestId('project-workspace-tab-references')
@@ -191,7 +198,9 @@ describe('ProjectStudioSection workspace navigation', () => {
       ]) as never
     )
 
-    renderWithProviders(<ProjectStudioSection projectId={7} tabId={tabId} />)
+    renderWithProviders(<ProjectStudioSection projectId={7} tabId={tabId} />, {
+      tabId,
+    })
 
     // "Level #3" is true and useless; the user has to recognise the level.
     expect(screen.getByText('Level: Forest Crossing')).toBeVisible()

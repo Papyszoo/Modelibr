@@ -133,6 +133,21 @@ place, with the Scene each reference came from named on the row. There is no
 second relationship to maintain, and nothing on this surface is editable - a
 placement is changed in the Scene, where it is authored.
 
+### Opening a level's scene
+
+Each level row in the **Levels** view carries one control that goes into that
+level's Scene, and it means whichever of the two things is useful:
+
+- a level that already has a Scene opens it in a tab of its own, the primary
+  Scene first, so it opens beside whatever else you have open;
+- a level that has none gets one - named after the level, filed under it as its
+  primary Scene, and opened.
+
+Creating and opening are the same gesture on purpose. A level whose scene can only
+be created and not reached would be a dead end, and an empty scene is the right
+starting point anyway: there is nothing to ask about before one exists, and the
+name it gets is the level's - editable immediately in the editor that opens.
+
 Two relationships are shown apart, because they answer different questions:
 
 - **From level scenes** - everything the Level's Scenes place, deduplicated

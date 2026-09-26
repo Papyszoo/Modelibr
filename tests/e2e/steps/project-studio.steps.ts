@@ -4,6 +4,7 @@ import { getScenarioState } from "../fixtures/shared-state";
 import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
 import { ApiHelper } from "../helpers/api-helper";
 import { ProjectStudioPage } from "../pages/ProjectStudioPage";
+import { fetchSceneByName } from "./scenes.steps";
 import { ProjectsPage } from "../pages/ProjectsPage";
 
 const { Given, When, Then } = createBdd();
@@ -735,11 +736,44 @@ Given(
 );
 
 When(
+  "I press the scene control of the level {string}",
+  async ({ page }, levelName: string) => {
+    const studio = new ProjectStudioPage(page);
+    await studio.pressLevelSceneControl(levelName);
+  },
+);
+
+When(
   "I show the level assets of {string}",
   async ({ page }, levelName: string) => {
     const studio = new ProjectStudioPage(page);
     await studio.waitForLevelAssets();
     await studio.showLevelAssetsFor(levelName);
+  },
+);
+
+Then(
+  "the scene {string} should be filed under that level",
+  async ({ page, $testInfo }, sceneName: string) => {
+    // Through the API, not the derived view: the editor tab is the active one by
+    // now, and "the level's assets panel says nothing yet" would be a claim about
+    // an empty scene rather than about the filing. The level has to be one of
+    // THIS worker's, or the assertion could pass against somebody else's.
+    const project = requireProject(page, projectNameFor($testInfo));
+    const levels = await page.request.get(
+      `${API_BASE}/projects/${project.id}/levels`,
+    );
+    expect(levels.ok()).toBeTruthy();
+    const level = (await levels.json()).find(
+      (candidate: { name: string }) => candidate.name === sceneName,
+    );
+    expect(level, `no level named ${sceneName}`).toBeTruthy();
+
+    // The detail endpoint nests the summary: the filing is a field of the scene,
+    // not of the document beside it.
+    const view = await fetchSceneByName(page, sceneName);
+    expect(view.scene.projectLevelId).toBe(level.id);
+    expect(view.scene.isPrimaryLevelScene).toBe(true);
   },
 );
 

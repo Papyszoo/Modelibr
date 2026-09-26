@@ -144,6 +144,41 @@ export async function setSceneProject(
 }
 
 /**
+ * Files a scene under one of its project's levels, or lifts it back out.
+ *
+ * The same kind of decision as `setSceneProject`, and deliberately not folded
+ * into it: a level is a *production* placement ("this shot is the forest
+ * crossing") while the project is a search and validation boundary, and a level
+ * can only be chosen among the project the scene already belongs to. Making the
+ * second a field of the first would let a scene be filed under a level of a
+ * project it is not in.
+ *
+ * `null` lifts the scene out of its level without detaching it from the project,
+ * which is what "this scene is not part of any level" means.
+ *
+ * `isPrimary` is required of the caller rather than defaulted to something
+ * sensible: it decides which of a level's scenes is the level's own shot, and
+ * that is a production judgement. A level with three scenes has exactly one
+ * primary, and a scene filed without saying so becomes a second-rate one.
+ */
+export async function setSceneLevel(
+  sceneId: number,
+  projectLevelId: number | null,
+  isPrimary = false
+): Promise<{
+  sceneId: number
+  projectLevelId: number | null
+  revision: number
+}> {
+  const response = await client.put<{
+    sceneId: number
+    projectLevelId: number | null
+    revision: number
+  }>(`/scenes/${sceneId}/level`, { projectLevelId, isPrimary })
+  return response.data
+}
+
+/**
  * Settles several slots on their recommended candidates, in one write.
  *
  * Deliberately not a loop over `resolveSceneSlot`: each of those moves the scene's

@@ -108,3 +108,19 @@ Feature: Project Studio
     When I am on the studio project
     And I show the level assets of "Forest Crossing"
     Then the project member "Crossing Cube" should be listed apart from the placed assets
+
+  @project-level-scene
+  Scenario: A level opens its own scene, and makes one when it has none
+    # The backend has filed scenes under levels since v0.7, and until now the
+    # only way to reach that scene was the Scenes list - so the level was a dead
+    # end in the UI and the journey could only be driven through the API. Both
+    # halves of the button are asked here: a level with a scene opens it, and a
+    # level without one gets one filed under it and opened.
+    Given a level named "Forest Crossing" exists
+    And a level named "Ruined Keep" exists
+    When I am on the studio project
+    And I press the scene control of the level "Forest Crossing"
+    Then the scene editor for "Forest Crossing" should be in its own tab
+    When I press the scene control of the level "Ruined Keep"
+    Then the scene editor for "Ruined Keep" should be in its own tab
+    And the scene "Ruined Keep" should be filed under that level

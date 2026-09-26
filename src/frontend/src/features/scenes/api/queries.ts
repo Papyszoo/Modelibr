@@ -20,6 +20,7 @@ import {
   rejectSceneCandidates,
   renameScene,
   resolveSceneSlot,
+  setSceneLevel,
   setSceneProject,
   updateSceneDocument,
 } from './scenesApi'
@@ -383,6 +384,40 @@ export function isDefiniteWriteRefusal(error: unknown): boolean {
  * unresolved - no matter what is mounted.
  * </p>
  */
+
+/**
+ * Files a scene under a level, or lifts it back out, with no write hold.
+ *
+ * The guarded path exists to stop a link landing while a *draft* is unresolved: a
+ * draft carries the revision it was based on, and a link moves that revision out
+ * from under it. That is the only hazard here, and it is why this is not simply
+ * the same mutation with its guard removed.
+ *
+ * Neither link endpoint takes an expected revision - they carry a project id or a
+ * level id and nothing else - so two of them in sequence cannot conflict with each
+ * other. And the hold is released by the scene editor's own reconciliation, which
+ * means a hold opened for a scene nobody is editing never clears. A freshly
+ * created scene is exactly that scene: guarding its second link would wait for a
+ * reconciliation no component is in a position to perform, and the level would
+ * silently never be filed.
+ *
+ * So the caller states the precondition instead: use this when the scene has no
+ * open editor, and use the guarded mutation when it has one.
+ */
+export function useFileSceneUnderLevel(): (
+  sceneId: number,
+  projectLevelId: number | null,
+  isPrimary: boolean
+) => Promise<void> {
+  const queryClient = useQueryClient()
+
+  return async (sceneId, projectLevelId, isPrimary) => {
+    await setSceneLevel(sceneId, projectLevelId, isPrimary)
+    void queryClient.invalidateQueries({ queryKey: ['scenes'] })
+    void queryClient.invalidateQueries({ queryKey: ['projects'] })
+  }
+}
+
 export function useSetSceneProjectMutation() {
   const queryClient = useQueryClient()
 
