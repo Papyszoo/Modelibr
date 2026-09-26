@@ -830,18 +830,6 @@
 .backups-storage-line {
   font-size: 0.78rem;
 }
-.backups-unavailable p {
-  margin: 0.4rem 0 0;
-  font-size: 0.86rem;
-}
-.backups-unavailable-how {
-  color: var(--text-color-secondary);
-}
-.backups-unavailable code {
-  background: var(--surface-card);
-  padding: 1px 5px;
-  border-radius: 3px;
-}
 .backups-storage-line code {
   background: var(--surface-card);
   padding: 1px 5px;

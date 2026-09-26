@@ -36,15 +36,13 @@ RUN dotnet publish "./WebApi.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:
 
 # Final stage
 FROM base AS final
-# Install curl for healthchecks, libgomp1 for Magick.NET (ImageMagick OpenMP),
-# and postgresql-client-16 (matching postgres:16-alpine in compose) for backup/restore via pg_dump/pg_restore.
+# Install curl for healthchecks and libgomp1 for Magick.NET (ImageMagick OpenMP).
+# No PostgreSQL client tools: backups and restores go through the Npgsql driver the
+# app already depends on, so the image needs neither pg_dump nor pg_restore. That
+# also means a legacy pg_dump-format archive can only be restored where the client
+# tools happen to be installed - see docs/docs/features/backups.md.
 USER root
-RUN apt-get update && apt-get install -y curl libgomp1 xz-utils gnupg lsb-release \
-    && install -d /usr/share/postgresql-common/pgdg \
-    && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
-    && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list \
-    && apt-get update \
-    && apt-get install -y postgresql-client-16 \
+RUN apt-get update && apt-get install -y curl libgomp1 xz-utils \
     && rm -rf /var/lib/apt/lists/*
 
 # Install x86_64 compatibility libraries when the container itself is not amd64.

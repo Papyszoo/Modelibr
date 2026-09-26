@@ -3,7 +3,6 @@ import { client } from '@/lib/apiBase'
 import {
   createBackup,
   deleteBackup,
-  getBackupCapabilities,
   getBackupDownloadUrl,
   stageRestore,
 } from '../backupsApi'
@@ -20,19 +19,6 @@ beforeEach(() => {
 })
 
 describe('backups api', () => {
-  it('reads whether this build can actually produce a backup', async () => {
-    mockGet.mockResolvedValueOnce({
-      data: {
-        available: false,
-        reason: "'/rt/postgres/bin/pg_dump' is configured but does not exist.",
-      },
-    })
-    const caps = await getBackupCapabilities()
-    expect(mockGet).toHaveBeenCalledWith('/backups/capabilities')
-    expect(caps.available).toBe(false)
-    expect(caps.reason).toContain('pg_dump')
-  })
-
   it('creates a backup with the includeThumbnails flag', async () => {
     await createBackup(true)
     expect(mockPost).toHaveBeenCalledWith('/backups', {

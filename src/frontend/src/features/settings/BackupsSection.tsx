@@ -2,13 +2,11 @@ import { confirmDialog } from 'primereact/confirmdialog'
 import { type JSX, useCallback, useEffect, useState } from 'react'
 
 import {
-  type BackupCapabilities,
   type BackupSizeEstimate,
   type BackupStorageInfo,
   type BackupSummary,
   createBackup,
   deleteBackup,
-  getBackupCapabilities,
   getBackupDownloadUrl,
   getBackupSizeEstimate,
   getBackupStorageInfo,
@@ -142,9 +140,6 @@ export function BackupsSection(): JSX.Element {
   const [backups, setBackups] = useState<BackupSummary[]>([])
   const [storage, setStorage] = useState<BackupStorageInfo | null>(null)
   const [estimate, setEstimate] = useState<BackupSizeEstimate | null>(null)
-  const [capabilities, setCapabilities] = useState<BackupCapabilities | null>(
-    null
-  )
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
   const [showCreate, setShowCreate] = useState(false)
@@ -153,14 +148,12 @@ export function BackupsSection(): JSX.Element {
 
   const refresh = useCallback(async () => {
     try {
-      const [list, store, caps] = await Promise.all([
+      const [list, store] = await Promise.all([
         listBackups(),
         getBackupStorageInfo(),
-        getBackupCapabilities(),
       ])
       setBackups(list.backups)
       setStorage(store)
-      setCapabilities(caps)
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load backups')
@@ -261,38 +254,12 @@ export function BackupsSection(): JSX.Element {
       )}
       {info && <div className="settings-success">{info}</div>}
 
-      {capabilities && !capabilities.available && (
-        <div className="settings-warning backups-unavailable" role="status">
-          <strong>Backups are unavailable in this build.</strong>
-          <p>
-            Creating a backup needs PostgreSQL&apos;s <code>pg_dump</code> and{' '}
-            <code>psql</code>, and this installation does not include them.
-            {capabilities.reason ? ` ${capabilities.reason}` : ''}
-          </p>
-          <p className="backups-unavailable-how">
-            Until this is fixed, do not rely on in-app backups here. To keep a
-            copy of your data, either run <code>pg_dump</code> from a PostgreSQL
-            installation on this machine, or copy the data folder while Modelibr
-            is closed. Existing backups below can still be downloaded and
-            restored.
-          </p>
-        </div>
-      )}
-
       <div className="backups-toolbar">
         <button
           type="button"
           onClick={() => void openCreate()}
           className="settings-button settings-button-primary"
-          disabled={
-            backups.some(b => b.status === 'in_progress') ||
-            capabilities?.available === false
-          }
-          title={
-            capabilities?.available === false
-              ? 'Backups are unavailable: the PostgreSQL client tools are missing'
-              : undefined
-          }
+          disabled={backups.some(b => b.status === 'in_progress')}
         >
           Create backup
         </button>

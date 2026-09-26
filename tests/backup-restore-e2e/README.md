@@ -68,6 +68,7 @@ npm run test:report
   expect to own it for their duration.
 - Test assets are pulled from `../e2e/assets/test-cube.glb`. If you remove the
   main e2e suite's assets these specs will skip themselves.
-- `postgresql-client-16` is installed in the WebApi image at build time
-  (matching `postgres:16-alpine`). The first `test:setup` therefore takes a
-  bit longer; subsequent runs hit the layer cache.
+- The WebApi image needs no PostgreSQL client packages. Backups and restores go
+  through the database driver, so the first `test:setup` is not slowed by an apt
+  layer, and a failure here means the app's own dump path is broken rather than
+  a missing binary.

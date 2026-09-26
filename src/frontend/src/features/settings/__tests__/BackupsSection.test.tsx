@@ -16,41 +16,19 @@ const storage = {
   totalUsedBytes: 1024,
 }
 
-describe('BackupsSection capability warning', () => {
+describe('BackupsSection', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     api.listBackups.mockResolvedValue({ backups: [] })
     api.getBackupStorageInfo.mockResolvedValue(storage)
   })
 
-  it('says backups are unavailable and disables creating one when tooling is missing', async () => {
-    api.getBackupCapabilities.mockResolvedValue({
-      available: false,
-      reason:
-        "'/runtime/postgres/bin/pg_dump' is configured but does not exist.",
-    })
-
-    renderWithProviders(<BackupsSection />)
-
-    await waitFor(() => {
-      expect(
-        screen.getByText(/Backups are unavailable in this build/i)
-      ).toBeVisible()
-    })
-
-    // The reason from the API is surfaced, not swallowed.
-    expect(screen.getByText(/is configured but does not exist/i)).toBeVisible()
-    // And the user is told what to do instead of being left to guess.
-    expect(screen.getByText(/copy the data folder/i)).toBeVisible()
-    // A button that can only fail is not offered.
-    expect(screen.getByRole('button', { name: 'Create backup' })).toBeDisabled()
-  })
-
-  it('leaves backups usable when the tooling is present', async () => {
-    api.getBackupCapabilities.mockResolvedValue({
-      available: true,
-      reason: null,
-    })
+  it('offers a working Create backup with no capability probe', async () => {
+    // The section used to ask the API whether this build could back up at all, and
+    // disable the button when it could not - the desktop build could not, because
+    // its PostgreSQL runtime ships no client tools. Backups are now written through
+    // the database driver, so the question no longer has an answer that varies by
+    // build, and asking it would be a request that can only mislead.
     api.getBackupSizeEstimate.mockResolvedValue({
       databaseBytes: 10,
       uploadsBytes: 20,
@@ -59,18 +37,43 @@ describe('BackupsSection capability warning', () => {
 
     renderWithProviders(<BackupsSection />)
 
+    const create = await screen.findByRole('button', { name: 'Create backup' })
     await waitFor(() => {
-      expect(
-        screen.getByRole('button', { name: 'Create backup' })
-      ).toBeEnabled()
+      expect(create).toBeEnabled()
     })
     expect(
       screen.queryByText(/Backups are unavailable in this build/i)
     ).not.toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Create backup' }))
+    await userEvent.click(create)
     await waitFor(() => {
       expect(api.getBackupSizeEstimate).toHaveBeenCalled()
+    })
+  })
+
+  it('disables creating a backup only while one is already running', async () => {
+    api.listBackups.mockResolvedValue({
+      backups: [
+        {
+          fileName: 'modelibr-2026-01-01-000000.tar',
+          sizeBytes: 10,
+          createdAtUtc: '2026-01-01T00:00:00Z',
+          status: 'in_progress',
+          hostPath: './data/backups/modelibr-2026-01-01-000000.tar',
+          containerPath:
+            '/var/lib/modelibr/backups/modelibr-2026-01-01-000000.tar',
+          includesThumbnails: false,
+          error: null,
+        },
+      ],
+    })
+
+    renderWithProviders(<BackupsSection />)
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: 'Create backup' })
+      ).toBeDisabled()
     })
   })
 })

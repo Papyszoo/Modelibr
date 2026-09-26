@@ -10,14 +10,14 @@ using Xunit;
 namespace Infrastructure.Tests.Extensions;
 
 /// <summary>
-/// Covers the pre-migration backup gate in isolation from the database: whether a
-/// backup is attempted, skipped, or fatal.
+/// Covers the pre-migration backup in isolation from the database: whether a
+/// snapshot is taken, skipped, or fatal.
 ///
-/// The distinction that matters is between a backup that RUNS and fails (a real loss
-/// of the safety net - must abort startup) and tooling that was never shipped (a
-/// packaging gap - must not leave the app unable to start). A packaged desktop build
-/// carries a trimmed embedded PostgreSQL whose bin/ holds only initdb, pg_ctl and
-/// postgres, so the second case is the normal one on desktop.
+/// The decision this file pins down is that a backup that RUNS and fails aborts
+/// startup. That has no second case next to it any more: the dump is written
+/// through the same driver the app already uses to reach PostgreSQL, so there is
+/// no external tool that can be missing, and no "the packaging never shipped it"
+/// path to confuse a lost safety net with a deliberate skip.
 ///
 /// Deliberately database-free: the migration path itself is covered by the
 /// [Category=Integration] DatabaseExtensionsTests, which needs a live PostgreSQL.
@@ -50,13 +50,9 @@ public sealed class PreMigrationBackupGateTests
         IncludesThumbnails: false,
         Error: null);
 
-    private static Mock<IBackupService> BackupWithTooling(bool available)
+    private static Mock<IBackupService> WorkingBackup()
     {
         var mock = new Mock<IBackupService>();
-        mock.Setup(b => b.GetToolAvailability()).Returns(
-            available
-                ? new BackupToolAvailability(true, null)
-                : new BackupToolAvailability(false, "'/runtime/postgres/bin/pg_dump' is configured but does not exist."));
         mock
             .Setup(b => b.EstimateSizeAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new BackupSizeEstimate(0, 0, 0));
@@ -70,31 +66,9 @@ public sealed class PreMigrationBackupGateTests
     }
 
     [Fact]
-    public async Task ToolingNotShipped_SkipsSnapshotWithoutThrowing()
+    public async Task TakesSnapshotAndAppliesRetention()
     {
-        var mock = BackupWithTooling(available: false);
-        await using var provider = BuildProvider(mock.Object);
-
-        await DatabaseExtensions.TakePreMigrationBackupAsync(
-            provider,
-            NullLogger.Instance,
-            provider.GetRequiredService<IConfiguration>());
-
-        mock.Verify(
-            b => b.CreateSnapshotAsync(
-                It.IsAny<BackupScope>(),
-                It.IsAny<string>(),
-                It.IsAny<CancellationToken>()),
-            Times.Never);
-        mock.Verify(
-            b => b.CleanupSnapshots(It.IsAny<string>(), It.IsAny<int>()),
-            Times.Never);
-    }
-
-    [Fact]
-    public async Task ToolingAvailable_TakesSnapshotAndAppliesRetention()
-    {
-        var mock = BackupWithTooling(available: true);
+        var mock = WorkingBackup();
         await using var provider = BuildProvider(mock.Object);
 
         await DatabaseExtensions.TakePreMigrationBackupAsync(
@@ -116,17 +90,19 @@ public sealed class PreMigrationBackupGateTests
     }
 
     [Fact]
-    public async Task ToolingAvailableButSnapshotFails_StillAborts()
+    public async Task SnapshotFails_AbortsStartup()
     {
-        // The skip in the first test must not weaken this one: a backup that actually
-        // ran and failed means the safety net is gone, so startup must stop.
-        var mock = BackupWithTooling(available: true);
+        // The whole point of the pre-migration backup is that it is there when the
+        // migration goes wrong. A backup that ran and failed means the safety net is
+        // gone, so startup stops rather than applying a destructive migration with
+        // nothing to go back to.
+        var mock = WorkingBackup();
         mock
             .Setup(b => b.CreateSnapshotAsync(
                 It.IsAny<BackupScope>(),
                 BackupNaming.PreMigrationSnapshotPrefix,
                 It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new InvalidOperationException("pg_dump exited with code 1"));
+            .ThrowsAsync(new InvalidOperationException("the managed dump could not be written"));
 
         await using var provider = BuildProvider(mock.Object);
 
@@ -142,8 +118,10 @@ public sealed class PreMigrationBackupGateTests
     }
 
     [Fact]
-    public async Task SkipEnvVarSet_NeverConsultsToolingOrTakesSnapshot()
+    public async Task SkipEnvVarSet_TakesNoSnapshot()
     {
+        // Strict behaviour: the opt-out must not reach the backup service at all, so
+        // this fails if a future change consults anything before the env check.
         var mock = new Mock<IBackupService>(MockBehavior.Strict);
         await using var provider = BuildProvider(
             mock.Object,
@@ -154,6 +132,11 @@ public sealed class PreMigrationBackupGateTests
             NullLogger.Instance,
             provider.GetRequiredService<IConfiguration>());
 
-        mock.Verify(b => b.GetToolAvailability(), Times.Never);
+        mock.Verify(
+            b => b.CreateSnapshotAsync(
+                It.IsAny<BackupScope>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 }

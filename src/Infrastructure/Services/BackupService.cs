@@ -1,10 +1,11 @@
-using System.Diagnostics;
 using System.Formats.Tar;
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Application.Abstractions.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Npgsql;
 
 namespace Infrastructure.Services;
 
@@ -23,7 +24,6 @@ public sealed class BackupService : IBackupService
     private readonly ILogger<BackupService> _logger;
     private readonly BackupPaths _paths;
     private readonly PostgresConnectionInfo _postgres;
-    private readonly PostgresToolPaths _postgresTools;
     private readonly IBackupConsistencyGate _consistencyGate;
     private readonly SemaphoreSlim _runLock = new(1, 1);
     private readonly SemaphoreSlim _stageLock = new(1, 1);
@@ -39,7 +39,6 @@ public sealed class BackupService : IBackupService
         _logger = logger;
         _paths = BackupPaths.FromConfiguration(configuration);
         _postgres = PostgresConnectionInfo.FromConfiguration(configuration);
-        _postgresTools = PostgresToolPaths.FromConfiguration(configuration);
         _consistencyGate = consistencyGate;
 
         Directory.CreateDirectory(_paths.BackupRoot);
@@ -276,26 +275,6 @@ public sealed class BackupService : IBackupService
             Error: null);
     }
 
-    public BackupToolAvailability GetToolAvailability()
-    {
-        foreach (var tool in new[] { _postgresTools.PgDumpPath, _postgresTools.PsqlPath })
-        {
-            // A bare executable name (the Docker/PATH fallback) is resolved by the OS at
-            // launch; we deliberately do not probe PATH here so a missing system install
-            // still surfaces as a real backup failure. Only an explicitly configured
-            // absolute path can be checked cheaply and without side effects.
-            if (Path.IsPathRooted(tool) && !File.Exists(tool))
-            {
-                return new BackupToolAvailability(
-                    false,
-                    $"'{tool}' is configured but does not exist. The packaged PostgreSQL " +
-                    "runtime is missing its client tools, so no backup can be produced.");
-            }
-        }
-
-        return new BackupToolAvailability(true, null);
-    }
-
     public void CleanupSnapshots(string fileNamePrefix, int keepCount)
     {
         if (string.IsNullOrWhiteSpace(fileNamePrefix))
@@ -350,11 +329,10 @@ public sealed class BackupService : IBackupService
             var referencedBeforeDump = await GetReferencedUploadPathsAsync();
             EnsureReferencedUploadFilesExist(referencedBeforeDump);
 
-            // Pre-flight: query the running Postgres for its actual major version
-            // so the manifest reports the truth, not a baked-in literal.
-            var pgMajor = await GetPostgresMajorVersionAsync();
-
-            await RunPgDumpAsync(dumpPath);
+            // The dumper reports the server's actual major version, so the manifest
+            // records the truth rather than a baked-in literal.
+            var header = await WriteDatabaseDumpAsync(dumpPath);
+            var pgMajor = header.PostgresMajorVersion;
 
             // A second read closes the other side of the race: a row committed
             // while the dump was running must be checked too. The physical-file
@@ -408,6 +386,7 @@ public sealed class BackupService : IBackupService
                         Database: true,
                         Uploads: true,
                         Thumbnails: scope.IncludeThumbnails),
+                    DatabaseDumpFormat: ManagedDumpFormat.Id,
                     Stats: new BackupManifestStats(
                         UploadsCount: uploadsCount,
                         UploadsBytes: uploadsBytes,
@@ -443,19 +422,103 @@ public sealed class BackupService : IBackupService
         // The first-boot pre-migration backup runs before the schema exists.
         // Avoid treating an absent Files table as a database failure; once the
         // table exists, any query failure is still fatal to the backup.
-        var tableExists = await RunPsqlQueryAsync(
+        var tableExists = await ScalarAsync(
             "SELECT to_regclass('public.\"Files\"') IS NOT NULL;");
-        if (!string.Equals(tableExists.Trim(), "t", StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(tableExists, "t", StringComparison.OrdinalIgnoreCase))
         {
             return Array.Empty<string>();
         }
 
-        var output = await RunPsqlQueryAsync(
-            "SELECT DISTINCT \"FilePath\" FROM \"Files\";");
+        var output = await QueryAsync("SELECT DISTINCT \"FilePath\" FROM \"Files\";");
         return output
             .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Where(path => path.Length > 0)
             .ToList();
+    }
+
+    /// <summary>
+    /// Runs a scalar query over the same connection the dump uses.
+    /// </summary>
+    /// <remarks>
+    /// This used to shell out to <c>psql</c>. It cannot any more: the embedded
+    /// PostgreSQL the desktop app ships carries the server, not the client tools,
+    /// and the app already has a driver for the server.
+    ///
+    /// The result comes back as <see cref="object"/> because a PostgreSQL scalar is
+    /// not always a string - <c>to_regclass(...) IS NOT NULL</c> is a boolean - and
+    /// casting that to <c>string</c> throws rather than returning anything. So it is
+    /// stringified, which is what the two callers wanted all along.
+    /// </remarks>
+    private async Task<string?> ScalarAsync(string query)
+    {
+        await using var connection = await OpenConnectionAsync();
+        await using var command = new NpgsqlCommand(query, connection);
+        var value = await command.ExecuteScalarAsync();
+        return value switch
+        {
+            null => null,
+            string text => text,
+            bool flag => flag ? "t" : "f",
+            IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture),
+            _ => value.ToString(),
+        };
+    }
+
+    private async Task<string> QueryAsync(string query)
+    {
+        await using var connection = await OpenConnectionAsync();
+        await using var command = new NpgsqlCommand(query, connection);
+        var value = await command.ExecuteScalarAsync();
+        return value switch
+        {
+            null => string.Empty,
+            string text => text,
+            bool flag => flag ? "t" : "f",
+            IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture),
+            _ => value.ToString() ?? string.Empty,
+        };
+    }
+
+    private async Task<NpgsqlConnection> OpenConnectionAsync()
+    {
+        var connection = new NpgsqlConnection(BuildConnectionString());
+        await connection.OpenAsync();
+        return connection;
+    }
+
+    private string BuildConnectionString() => new NpgsqlConnectionStringBuilder
+    {
+        Host = _postgres.Host,
+        Port = _postgres.Port,
+        Database = _postgres.Database,
+        Username = _postgres.User,
+        Password = _postgres.Password,
+    }.ConnectionString;
+
+    /// <summary>
+    /// Writes the database half of the archive.
+    /// </summary>
+    /// <remarks>
+    /// Replaces <c>pg_dump -Fc</c>. The dump is COPY text streamed through Npgsql -
+    /// see <see cref="ManagedDatabaseDumpper"/> for why the client tools are not an
+    /// option here and what the format gives up (schema) in exchange.
+    /// </remarks>
+    private async Task<ManagedDumpHeader> WriteDatabaseDumpAsync(string outputPath)
+    {
+        await using var connection = await OpenConnectionAsync();
+
+        // A repeatable-read transaction is what makes a per-table dump a
+        // consistent snapshot of the whole database, which is what pg_dump's own
+        // transaction gave us for free.
+        await using var transaction = await connection.BeginTransactionAsync(
+            System.Data.IsolationLevel.RepeatableRead);
+
+        var dumpper = new ManagedDatabaseDumpper(_logger);
+        await using var output = File.Create(outputPath);
+        var header = await dumpper.WriteAsync(connection, output);
+
+        await transaction.CommitAsync();
+        return header;
     }
 
     private void EnsureReferencedUploadFilesExist(IEnumerable<string> referencedPaths)
@@ -513,103 +576,6 @@ public sealed class BackupService : IBackupService
         }
 
         return missing.Distinct(StringComparer.Ordinal).ToList();
-    }
-
-    private async Task<string> RunPsqlQueryAsync(string query)
-    {
-        var psi = new ProcessStartInfo
-        {
-            FileName = _postgresTools.PsqlPath,
-            ArgumentList =
-            {
-                "-v", "ON_ERROR_STOP=1",
-                "-h", _postgres.Host,
-                "-p", _postgres.Port.ToString(),
-                "-U", _postgres.User,
-                "-d", _postgres.Database,
-                "-t", "-A",
-                "-c", query,
-            },
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-        };
-        psi.Environment["PGPASSWORD"] = _postgres.Password;
-
-        using var p = Process.Start(psi)
-            ?? throw new InvalidOperationException("Failed to launch psql for backup consistency query.");
-        var output = await p.StandardOutput.ReadToEndAsync();
-        var stderr = await p.StandardError.ReadToEndAsync();
-        await p.WaitForExitAsync();
-        if (p.ExitCode != 0)
-        {
-            throw new InvalidOperationException(
-                $"Backup consistency query failed with psql exit code {p.ExitCode}: {stderr.Trim()}");
-        }
-
-        return output;
-    }
-
-    private async Task RunPgDumpAsync(string outputPath)
-    {
-        var psi = new ProcessStartInfo
-        {
-            FileName = _postgresTools.PgDumpPath,
-            ArgumentList =
-            {
-                "-Fc",                               // custom format (compressed)
-                "-h", _postgres.Host,
-                "-p", _postgres.Port.ToString(),
-                "-U", _postgres.User,
-                "-d", _postgres.Database,
-                "-f", outputPath,
-            },
-            RedirectStandardError = true,
-            RedirectStandardOutput = true,
-            UseShellExecute = false,
-        };
-        psi.Environment["PGPASSWORD"] = _postgres.Password;
-
-        using var p = Process.Start(psi)
-            ?? throw new InvalidOperationException("Failed to launch pg_dump.");
-        var stderr = await p.StandardError.ReadToEndAsync();
-        await p.WaitForExitAsync();
-        if (p.ExitCode != 0)
-        {
-            throw new InvalidOperationException($"pg_dump exited with code {p.ExitCode}: {stderr}");
-        }
-    }
-
-    private async Task<int> GetPostgresMajorVersionAsync()
-    {
-        var psi = new ProcessStartInfo
-        {
-            FileName = _postgresTools.PsqlPath,
-            ArgumentList =
-            {
-                "-h", _postgres.Host,
-                "-p", _postgres.Port.ToString(),
-                "-U", _postgres.User,
-                "-d", _postgres.Database,
-                "-t", "-A",
-                "-c", "SHOW server_version_num",
-            },
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-        };
-        psi.Environment["PGPASSWORD"] = _postgres.Password;
-
-        using var p = Process.Start(psi)
-            ?? throw new InvalidOperationException("Failed to launch psql for version probe.");
-        var output = (await p.StandardOutput.ReadToEndAsync()).Trim();
-        await p.WaitForExitAsync();
-        if (p.ExitCode != 0 || !int.TryParse(output, out var verNum))
-        {
-            throw new InvalidOperationException($"Failed to read postgres version (exit {p.ExitCode}): '{output}'");
-        }
-        // server_version_num format: 160003 → major 16; 170000 → 17. Major = verNum / 10000.
-        return verNum / 10000;
     }
 
     private static async Task WriteFileEntryAsync(TarWriter tar, string filePath, string entryName)
@@ -706,34 +672,20 @@ public sealed class BackupService : IBackupService
 
     private async Task<long> GetDatabaseSizeBytesAsync(CancellationToken cancellationToken)
     {
-        var psi = new ProcessStartInfo
-        {
-            FileName = _postgresTools.PsqlPath,
-            ArgumentList =
-            {
-                "-h", _postgres.Host,
-                "-p", _postgres.Port.ToString(),
-                "-U", _postgres.User,
-                "-d", _postgres.Database,
-                "-t", "-A",
-                "-c", $"SELECT pg_database_size('{_postgres.Database}')",
-            },
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-        };
-        psi.Environment["PGPASSWORD"] = _postgres.Password;
-
+        // An estimate, not a measurement that must be exact: 0 on any failure is
+        // the honest answer for "how big will the database half be" and keeps a
+        // size probe from ever standing between a user and their backup.
         try
         {
-            using var p = Process.Start(psi);
-            if (p == null) return 0;
-            var output = await p.StandardOutput.ReadToEndAsync(cancellationToken);
-            await p.WaitForExitAsync(cancellationToken);
-            return long.TryParse(output.Trim(), out var size) ? size : 0;
+            await using var connection = await OpenConnectionAsync();
+            await using var command = new NpgsqlCommand(
+                "SELECT pg_database_size(current_database());", connection);
+            var size = await command.ExecuteScalarAsync(cancellationToken);
+            return size is long bytes ? bytes : 0;
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogWarning(ex, "Could not read the database size; the estimate omits it.");
             return 0;
         }
     }
@@ -800,26 +752,6 @@ public sealed class BackupService : IBackupService
                 UploadRoot = uploadRoot,
                 ThumbnailRoot = thumbRoot,
                 HostBackupRoot = hostBackupRoot,
-            };
-        }
-    }
-
-    internal sealed class PostgresToolPaths
-    {
-        public required string PgDumpPath { get; init; }
-        public required string PsqlPath { get; init; }
-
-        public static PostgresToolPaths FromConfiguration(IConfiguration cfg)
-        {
-            // Empty/unset values intentionally fall back to bare executable
-            // names. That preserves Docker/source-mode PATH resolution; managed
-            // desktop installs pass absolute paths for their bundled runtime.
-            var pgDumpPath = cfg["PG_DUMP_PATH"];
-            var psqlPath = cfg["PSQL_PATH"];
-            return new PostgresToolPaths
-            {
-                PgDumpPath = string.IsNullOrWhiteSpace(pgDumpPath) ? "pg_dump" : pgDumpPath,
-                PsqlPath = string.IsNullOrWhiteSpace(psqlPath) ? "psql" : psqlPath,
             };
         }
     }

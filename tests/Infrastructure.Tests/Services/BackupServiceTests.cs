@@ -8,7 +8,7 @@ namespace Infrastructure.Tests.Services;
 
 /// <summary>
 /// Covers BackupService's pure filesystem bookkeeping (snapshot retention, filename
-/// validation) - none of this needs Postgres or `pg_dump`, unlike CreateSnapshotAsync/
+/// validation) - none of this needs a database, unlike CreateSnapshotAsync/
 /// StartBackupAsync themselves, so it runs as a fast, non-Integration unit test against
 /// a real temp directory. The safety constraint under test - automatic-snapshot cleanup
 /// must never delete a user-initiated backup - is called out explicitly in the
@@ -47,54 +47,6 @@ public sealed class BackupServiceTests
     private static void TouchFile(string backupRoot, string fileName)
     {
         File.WriteAllBytes(Path.Combine(backupRoot, fileName), new byte[] { 1, 2, 3 });
-    }
-
-    [Fact]
-    public void GetToolAvailability_MissingConfiguredPath_ReportsUnavailable()
-    {
-        // The packaged desktop runtime is a trimmed embedded PostgreSQL whose bin/
-        // holds only initdb, pg_ctl and postgres. Pointing PG_DUMP_PATH at the bin
-        // that does not exist must be reported as "tooling not shipped" so startup
-        // can degrade instead of aborting.
-        var (service, _) = NewService(new Dictionary<string, string?>
-        {
-            ["PG_DUMP_PATH"] = Path.Combine(Path.GetTempPath(), "definitely", "absent", "pg_dump"),
-        });
-
-        var availability = service.GetToolAvailability();
-
-        Assert.False(availability.Available);
-        Assert.Contains("pg_dump", availability.Reason);
-    }
-
-    [Fact]
-    public void GetToolAvailability_BareNamesOnPath_AssumesAvailable()
-    {
-        // Docker/source mode resolves bare names through PATH; probing PATH here
-        // would turn an ordinary missing system install into a silent skip.
-        var (service, _) = NewService();
-
-        Assert.True(service.GetToolAvailability().Available);
-    }
-
-    [Fact]
-    public void GetToolAvailability_ExistingConfiguredPath_ReportsAvailable()
-    {
-        var tool = Path.Combine(Path.GetTempPath(), $"pg_dump_{Guid.NewGuid():N}");
-        File.WriteAllText(tool, string.Empty);
-        try
-        {
-            var (service, _) = NewService(new Dictionary<string, string?>
-            {
-                ["PG_DUMP_PATH"] = tool,
-            });
-
-            Assert.True(service.GetToolAvailability().Available);
-        }
-        finally
-        {
-            File.Delete(tool);
-        }
     }
 
     [Fact]
@@ -193,34 +145,6 @@ public sealed class BackupServiceTests
     }
 
     [Fact]
-    public void PostgresToolPaths_UseManagedPathsWhenConfigured()
-    {
-        var config = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["PG_DUMP_PATH"] = "/opt/modelibr/postgres/bin/pg_dump",
-                ["PSQL_PATH"] = "/opt/modelibr/postgres/bin/psql",
-            })
-            .Build();
-
-        var tools = BackupService.PostgresToolPaths.FromConfiguration(config);
-
-        Assert.Equal("/opt/modelibr/postgres/bin/pg_dump", tools.PgDumpPath);
-        Assert.Equal("/opt/modelibr/postgres/bin/psql", tools.PsqlPath);
-    }
-
-    [Fact]
-    public void PostgresToolPaths_FallBackToPathLookupWhenUnset()
-    {
-        var config = new ConfigurationBuilder().Build();
-
-        var tools = BackupService.PostgresToolPaths.FromConfiguration(config);
-
-        Assert.Equal("pg_dump", tools.PgDumpPath);
-        Assert.Equal("psql", tools.PsqlPath);
-    }
-
-    [Fact]
     public void FindMissingReferencedUploadPaths_RejectsMissingButAllowsUnreferencedFiles()
     {
         var root = Path.Combine(Path.GetTempPath(), "modelibr_backup_tests", Path.GetRandomFileName());
@@ -237,12 +161,19 @@ public sealed class BackupServiceTests
     }
 
     [Fact]
-    public async Task CreateSnapshotAsync_FailureLeavesNoPublishedArchive()
+    public async Task CreateSnapshotAsync_UnreachableDatabase_LeavesNoPublishedArchive()
     {
+        // A backup that cannot reach the database must fail without publishing a
+        // half-written archive. This used to be expressed as a missing pg_dump
+        // binary; the driver is the dependency now, so the same guarantee is
+        // asserted by pointing the service at a port nothing is listening on.
         var (service, backupRoot) = NewService(new Dictionary<string, string?>
         {
-            ["PG_DUMP_PATH"] = "missing-pg-dump-for-test",
-            ["PSQL_PATH"] = "missing-psql-for-test",
+            ["POSTGRES_HOST"] = "127.0.0.1",
+            ["POSTGRES_PORT"] = "1",
+            ["POSTGRES_DB"] = "Modelibr",
+            ["POSTGRES_USER"] = "modelibr",
+            ["POSTGRES_PASSWORD"] = "modelibr",
         });
 
         await Assert.ThrowsAnyAsync<Exception>(() => service.CreateSnapshotAsync(

@@ -23,21 +23,6 @@ export interface BackupSizeEstimate {
   thumbnailsBytes: number
 }
 
-/**
- * Whether this build can actually produce a backup. False means the PostgreSQL
- * client tools (pg_dump/psql) are not present, which is the case for the
- * packaged desktop app's trimmed embedded runtime.
- */
-export interface BackupCapabilities {
-  available: boolean
-  reason: string | null
-}
-
-export async function getBackupCapabilities(): Promise<BackupCapabilities> {
-  const response = await client.get<BackupCapabilities>('/backups/capabilities')
-  return response.data
-}
-
 export async function listBackups(): Promise<{ backups: BackupSummary[] }> {
   const response = await client.get('/backups')
   return response.data

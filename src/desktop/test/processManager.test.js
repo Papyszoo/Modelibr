@@ -197,22 +197,18 @@ test('clearStalePostgresLock is a no-op when there is no lock file', async () =>
   }
 })
 
-test('web api environment uses bundled PostgreSQL tools and keeps pre-migration backup enabled', () => {
+test('web api environment needs no PostgreSQL client tools and keeps backups on', () => {
+  // The regression this replaced: PG_DUMP_PATH/PSQL_PATH were advertised, and the
+  // packaged runtime has no such files. Backups are now written through the same
+  // driver the app already uses, so there is no tool path to point at and nothing
+  // to skip.
   const pm = makePM({ postgresPort: 35432 })
   pm.markRunning()
 
   const env = pm.buildWebApiEnvironment()
-  const postgresBinDir = path.join(pm.runtimeDir, 'postgres', 'bin')
-  const executable = name =>
-    path.join(
-      postgresBinDir,
-      process.platform === 'win32' ? `${name}.exe` : name
-    )
 
-  assert.equal(env.PG_DUMP_PATH, executable('pg_dump'))
-  assert.equal(env.PSQL_PATH, executable('psql'))
-  assert.equal(path.isAbsolute(env.PG_DUMP_PATH), true)
-  assert.equal(path.isAbsolute(env.PSQL_PATH), true)
+  assert.equal('PG_DUMP_PATH' in env, false)
+  assert.equal('PSQL_PATH' in env, false)
   assert.equal(env.POSTGRES_HOST, '127.0.0.1')
   assert.equal(env.POSTGRES_PORT, '35432')
   assert.equal(env.POSTGRES_DB, 'Modelibr')
@@ -221,28 +217,11 @@ test('web api environment uses bundled PostgreSQL tools and keeps pre-migration 
   assert.equal(env.MODELIBR_SKIP_PREMIGRATION_BACKUP, 'false')
 })
 
-test('web api environment omits client-tool paths the runtime does not ship', () => {
-  // The packaged runtime is a trimmed embedded PostgreSQL: bin/ holds only
-  // initdb, pg_ctl and postgres. Advertising PG_DUMP_PATH for a file that does
-  // not exist turns "this build has no client tools" into a bogus backup
-  // failure, so the vars must be absent instead.
-  const pm = makePM({ postgresPort: 35432 })
-  pm.markRunning()
-  pm.postgresToolsAvailable = false
-
-  const env = pm.buildWebApiEnvironment()
-
-  assert.equal('PG_DUMP_PATH' in env, false)
-  assert.equal('PSQL_PATH' in env, false)
-  // Everything else the WebApi needs is unaffected.
-  assert.equal(env.POSTGRES_HOST, '127.0.0.1')
-  assert.equal(env.MODELIBR_SKIP_PREMIGRATION_BACKUP, 'false')
-})
-
-test('a runtime without the client tools still passes the asset check', async () => {
+test('a runtime with only the server binaries passes the asset check', async () => {
   // Regression guard for the 0.6.1 desktop break: pg_dump/psql were listed as
   // required assets, so every packaged build threw "Missing runtime asset" and
-  // the app refused to start.
+  // the app refused to start. The server binaries are the whole requirement now,
+  // so a runtime carrying exactly those three is a complete one.
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'mlbr-runtime-'))
   const runtimeDir = path.join(root, 'runtime')
   const exe = name => (process.platform === 'win32' ? `${name}.exe` : name)
@@ -269,7 +248,10 @@ test('a runtime without the client tools still passes the asset check', async ()
 
     await pm.ensureRuntimeAssets()
 
-    assert.equal(pm.postgresToolsAvailable, false)
+    const env = pm.buildWebApiEnvironment()
+    // Boot did not throw, and the WebApi is told to keep taking pre-migration
+    // backups - a runtime that cannot back up is no longer a state that exists.
+    assert.equal(env.MODELIBR_SKIP_PREMIGRATION_BACKUP, 'false')
   } finally {
     await fs.rm(root, { recursive: true, force: true })
   }

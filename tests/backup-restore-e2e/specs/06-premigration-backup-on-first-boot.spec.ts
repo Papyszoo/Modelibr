@@ -12,8 +12,9 @@ import { getWebapiLogs } from "../helpers/docker-stack.js";
 // This stack's Postgres container is created empty by `test:setup` (`docker compose up
 // --build`), so on webapi's very first boot EVERY migration is "pending" - the exact
 // condition this feature targets. That makes the ordinary suite startup itself a live
-// exercise of the real code path (real pg_dump - the webapi image bundles
-// postgresql-client-16, see README) without needing to fabricate an upgrade boundary.
+// exercise of the real code path (a real dump, written through the database driver
+// rather than by pg_dump - the webapi image no longer needs postgresql-client) without
+// needing to fabricate an upgrade boundary.
 //
 // Verified via container logs rather than the `/backups` list or `data/backups/` on
 // disk: `01-create-list-download.spec.ts`'s beforeAll deletes every existing backup

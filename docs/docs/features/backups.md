@@ -60,48 +60,57 @@ migrations on every startup and, if there are any, takes an automatic backup
   unprotected migration. The application log explains why. This is
   intentional - a failed pre-migration backup usually means something (disk
   space, permissions) needs attention before it's safe to proceed.
-- **If the tooling is missing**: a different case, handled separately. If
-  `pg_dump`/`psql` were never shipped in this build's PostgreSQL runtime, the
-  snapshot is skipped with a loud `CRITICAL` log line and migrations still
-  apply. Aborting startup on a packaging gap would leave the app permanently
-  unable to launch, which is worse than proceeding without an automatic
-  snapshot - but you lose that protection, so take a manual backup before
-  upgrading. This is the current state of the packaged desktop build, whose
-  embedded PostgreSQL ships only the server binaries; manual backups in that
-  build are affected the same way.
 
 ### Configuration
 
 Set these in your `.env` file:
 
-| Variable                                 | Default   | Purpose                                                                                                                                                                                  |
-| ---------------------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `MODELIBR_SKIP_PREMIGRATION_BACKUP`      | `false`   | Set to `true` to skip the automatic backup and apply migrations unconditionally. Not recommended outside throwaway/CI databases - there's no rollback point if the migration goes wrong. |
-| `MODELIBR_PREMIGRATION_BACKUP_RETENTION` | `3`       | How many `pre-migration-*` snapshots to keep before older ones are pruned.                                                                                                               |
-| `PG_DUMP_PATH`                           | `pg_dump` | Optional absolute path to `pg_dump`. Leave unset for Docker/source PATH lookup; managed desktop installs provide the bundled path.                                                       |
-| `PSQL_PATH`                              | `psql`    | Optional absolute path to `psql` for the backup version/size probes. Leave unset for PATH lookup.                                                                                        |
+| Variable                                 | Default | Purpose                                                                                                                                                                                  |
+| ---------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MODELIBR_SKIP_PREMIGRATION_BACKUP`      | `false` | Set to `true` to skip the automatic backup and apply migrations unconditionally. Not recommended outside throwaway/CI databases - there's no rollback point if the migration goes wrong. |
+| `MODELIBR_PREMIGRATION_BACKUP_RETENTION` | `3`     | How many `pre-migration-*` snapshots to keep before older ones are pruned.                                                                                                               |
 
-## When backups are unavailable
+## How the database half is dumped
 
-Backups need PostgreSQL's `pg_dump` and `psql`. Not every installation has
-them - notably the packaged desktop app, whose bundled PostgreSQL ships only the
-server binaries.
+Modelibr writes and reads its own dumps, through the same PostgreSQL driver it
+already uses to talk to the server. It does not need `pg_dump`, `pg_restore`,
+`psql` or `pg_isready`, which is what lets a packaged install - shipping an
+embedded PostgreSQL with only the server binaries - still take real backups.
 
-When they are missing, **Settings → Backups** says so explicitly: it shows a
-warning explaining what is missing, and **Create backup** is disabled instead of
-letting you start a backup that can only fail. Existing archives can still be
-downloaded and restored.
+The dump is PostgreSQL `COPY` text, written in the order tables depend on each
+other, with a truncate and a sequence reset around the rows:
 
-To keep a copy of your data in the meantime, run `pg_dump` from a PostgreSQL
-installation on that machine, or copy the data folder while Modelibr is closed.
+```
+-- modelibr managed dump copy-text-v1
+-- postgres-major: 16
+-- last-migration: 20260925172320_AddProjectReferenceLinks
+TRUNCATE TABLE "Projects", "ProjectLevels" RESTART IDENTITY CASCADE;
+COPY "Projects" ("Id", "Name") FROM STDIN (FORMAT text);
+1	Rooftop chase
+\.
+SELECT pg_catalog.setval('"public"."Projects_Id_seq"', 1, true);
+```
+
+Three consequences worth knowing:
+
+- **It is a valid `psql` script.** `psql -f database.dump` against a matching
+  database reproduces the rows, and an archive can be inspected with ordinary
+  tools.
+- **It carries data, not schema.** The archive records the migration it was taken
+  at, and a restore brings the database to that migration before loading rows.
+  The normal startup migration then closes any remaining gap.
+- **A restore is one transaction.** If any part of the load fails, the database
+  is left exactly as it was - a half-restored library is worse than an
+  un-restored one, because there is no way to tell which half is real.
+
+An archive written by an older Modelibr may hold a `pg_dump` custom dump
+instead. Those still restore wherever the PostgreSQL client tools are installed
+(a source checkout or the Docker stack), and the restore says so plainly if they
+are not.
 
 ## Notes
 
 - Docker deployments store backups under `./data/backups` on the host.
-- Native (desktop) installs use the bundled PostgreSQL `pg_dump` and `psql`
-  binaries for both manual and automatic pre-migration backups - but see
-  [When backups are unavailable](#when-backups-are-unavailable), because the
-  current bundle ships only the server binaries.
 - Only one backup can run at a time; starting a second while one is in
   progress is rejected.
 

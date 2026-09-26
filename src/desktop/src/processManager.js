@@ -178,12 +178,6 @@ export class ProcessManager {
     this.workerProcesses = []
     this.postgresControlPath = null
     this.stoppingWorkers = false
-    // Whether the packaged runtime actually ships the PostgreSQL client tools.
-    // Optimistic until ensureRuntimeAssets() probes it, so a caller that builds the
-    // WebApi environment without probing keeps the historical behaviour; the probe
-    // downgrades this to false, and the WebApi then skips the automatic pre-migration
-    // backup with an explicit warning instead of failing one.
-    this.postgresToolsAvailable = true
     // Shared secret the worker presents (X-Api-Key) and the WebApi validates
     // (WORKER_API_KEY) on upload endpoints. The WebApi runs as Production, where
     // an empty key is rejected as Unauthorized, so we mint a strong per-session
@@ -479,27 +473,11 @@ export class ProcessManager {
       }
     }
 
-    // The PostgreSQL client tools are OPTIONAL, unlike the server binaries above.
-    // The packaged runtime is a trimmed embedded distribution whose bin/ carries only
-    // initdb, pg_ctl and postgres - requiring pg_dump/psql here made every packaged
-    // desktop build refuse to start. Absent tools only downgrade backups: the WebApi
-    // logs that it is skipping the automatic pre-migration snapshot and continues.
-    this.postgresToolsAvailable = true
-    for (const tool of ['pg_dump', 'psql']) {
-      if (!(await exists(this.postgresToolPath(tool)))) {
-        this.postgresToolsAvailable = false
-        break
-      }
-    }
-  }
-
-  postgresToolPath(tool) {
-    return path.join(
-      this.runtimeDir,
-      'postgres',
-      'bin',
-      platformExecutable(tool)
-    )
+    // Nothing else is required, and that is the point: the client tools
+    // (pg_dump/pg_restore/psql) are not in the list because the app no longer
+    // needs them. Backups are written and read through the same database driver the
+    // app already uses, so a packaged build that ships only initdb/pg_ctl/postgres
+    // can still protect a user's work.
   }
 
   getPostgresEnvironment() {
@@ -707,20 +685,9 @@ export class ProcessManager {
   }
 
   buildWebApiEnvironment() {
-    // Only advertise the client tools when the packaged runtime actually has them.
-    // Pointing PG_DUMP_PATH at a file that does not exist would make the WebApi
-    // report a missing-path backup failure, which is a different (and misleading)
-    // signal from "this build ships no client tools".
-    const postgresToolEnv = this.postgresToolsAvailable
-      ? {
-          PG_DUMP_PATH: this.postgresToolPath('pg_dump'),
-          PSQL_PATH: this.postgresToolPath('psql'),
-        }
-      : {}
-
     return {
-      // pg_dump/psql are launched by the WebApi. Reuse the embedded Postgres
-      // environment so the absolute tool paths also get bundled shared libraries.
+      // The WebApi starts the embedded Postgres itself, so it needs the bundled
+      // shared libraries on the loader path.
       ...this.getPostgresEnvironment(),
       ASPNETCORE_ENVIRONMENT: 'Production',
       DisableHttpsRedirection: 'true',
@@ -741,7 +708,6 @@ export class ProcessManager {
       POSTGRES_DB: POSTGRES_DATABASE,
       POSTGRES_USER,
       POSTGRES_PASSWORD,
-      ...postgresToolEnv,
       // Do not inherit a developer's skip switch into the installed app.
       MODELIBR_SKIP_PREMIGRATION_BACKUP: 'false',
     }

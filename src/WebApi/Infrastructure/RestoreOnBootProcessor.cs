@@ -3,6 +3,12 @@ using System.Formats.Tar;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Application.Abstractions.Services;
+using Infrastructure.Persistence;
+using Infrastructure.Services;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
+using Npgsql;
 
 namespace WebApi.Infrastructure;
 
@@ -11,9 +17,13 @@ namespace WebApi.Infrastructure;
 /// directory, performs a strict pre-flight validation (manifest version, app
 /// schema compat, archive integrity, expected entries) BEFORE moving any live
 /// data. If validation passes, stages existing uploads/thumbnails into
-/// <c>.pre-restore-&lt;ts&gt;/</c>, extracts the archive, runs
-/// <c>pg_restore --clean --if-exists --exit-on-error</c>, and only then moves
-/// the archive to <c>restore/processed/</c>.
+/// <c>.pre-restore-&lt;ts&gt;/</c>, extracts the archive, loads the database, and
+/// only then moves the archive to <c>restore/processed/</c>.
+///
+/// The database half is loaded by <see cref="ManagedDatabaseDumpper"/> for
+/// archives this app wrote, in one transaction. An older archive carrying a
+/// <c>pg_dump</c> custom dump is still handed to <c>pg_restore</c>, which only
+/// works where the client tools are installed.
 ///
 /// Invalid archives go to <c>restore/failed/</c> with an <c>.error.txt</c>
 /// sibling - live data is never touched in that path.
@@ -182,8 +192,19 @@ public static class RestoreOnBootProcessor
                     $"{manifest.Stats.ThumbnailsCount}. Pre-restore copy preserved at {thumbnailsPreRestore}.");
             }
 
-            // ── Phase 5: pg_restore with --exit-on-error so exit 1 is fatal ──
-            await RunPgRestoreAsync(dumpPath, host, port, user, password, db, logger);
+            // ── Phase 5: load the database ─────────────────────────────────────
+            // Which loader runs is the archive's to decide: a dump this app wrote
+            // is read by ManagedDatabaseDumpper, and only a pg_dump custom dump -
+            // which nothing this app produces any more - needs the external tool.
+            var format = manifest.DatabaseDumpFormat ?? BackupDatabaseDumpFormats.PgDumpCustom;
+            if (format == BackupDatabaseDumpFormats.CopyText)
+            {
+                await RestoreManagedDumpAsync(dumpPath, host, port, user, password, db, logger);
+            }
+            else
+            {
+                await RunPgRestoreAsync(dumpPath, host, port, user, password, db, logger);
+            }
 
             // Success - drop the pre-restore copies and move the archive aside.
             DeleteDirectoryQuiet(uploadsPreRestore, logger);
@@ -317,6 +338,111 @@ public static class RestoreOnBootProcessor
         return combined;
     }
 
+    /// <summary>
+    /// Loads a managed dump: migrate to the schema it was taken against, then load
+    /// its rows.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The migration is not optional. A managed dump is data only - it carries no
+    /// DDL - so the tables it writes into have to exist, and on a fresh install
+    /// they do not yet. The dump records the migration it was taken at, so the
+    /// schema is brought to exactly that point: a backup from an older build
+    /// restores into the schema that build had, which is the only shape the rows
+    /// are guaranteed to fit.
+    /// </para>
+    /// <para>
+    /// Migrating to a version this build does not know about means the archive came
+    /// from a newer Modelibr than the one running. That is refused with a message
+    /// naming the version, rather than restoring rows into a schema that cannot hold
+    /// them.
+    /// </para>
+    /// </remarks>
+    private static async Task RestoreManagedDumpAsync(
+        string dumpPath, string host, int port, string user, string password, string db, ILogger logger)
+    {
+        var connectionString = new NpgsqlConnectionStringBuilder
+        {
+            Host = host,
+            Port = port,
+            Database = db,
+            Username = user,
+            Password = password,
+        }.ConnectionString;
+
+        ManagedDumpHeader header;
+        await using (var probe = File.OpenRead(dumpPath))
+        {
+            header = ManagedDatabaseDumpper.ReadHeader(probe);
+        }
+
+        await MigrateToDumpSchemaAsync(connectionString, header, logger);
+
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync();
+
+        var dumpper = new ManagedDatabaseDumpper(logger);
+        await using var input = File.OpenRead(dumpPath);
+        await dumpper.RestoreAsync(connection, input);
+    }
+
+    /// <summary>
+    /// Brings the database up to the migration the dump was taken at, no further.
+    /// </summary>
+    /// <remarks>
+    /// Stopping at the dump's migration rather than the newest one is deliberate: the
+    /// rows in the archive were written for that schema, and migrating past it could
+    /// add a NOT NULL column the restored rows cannot satisfy. Whatever version gap
+    /// remains is closed by the normal startup migration, after this restore.
+    /// </remarks>
+    private static async Task MigrateToDumpSchemaAsync(
+        string connectionString,
+        ManagedDumpHeader header,
+        ILogger logger)
+    {
+        var target = header.LastAppliedMigration;
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseNpgsql(connectionString)
+            .Options;
+
+        await using var context = new ApplicationDbContext(options);
+        var migrator = context.GetService<IMigrator>();
+        var pending = (await context.Database.GetPendingMigrationsAsync()).ToList();
+        var applied = (await context.Database.GetAppliedMigrationsAsync()).ToHashSet();
+
+        if (target is not null && !applied.Contains(target) && pending.Contains(target))
+        {
+            // The dump is older than this build and its migration is still ahead of
+            // the live database: land on it, so the rows have the shape they expect.
+            logger.LogInformation("Migrating database to {Migration} for this archive before loading it.", target);
+            await migrator.MigrateAsync(target);
+            return;
+        }
+
+        if (target is not null && !applied.Contains(target))
+        {
+            // The archive names a migration this build has never heard of, which
+            // means it came from a newer Modelibr. Loading it would write rows
+            // shaped for a schema this build cannot produce.
+            throw new InvalidOperationException(
+                $"This backup was made by a newer version of Modelibr (migration " +
+                $"{target} is not one this build knows). Update Modelibr and restore " +
+                "again. Nothing has been changed.");
+        }
+
+        if (target is null)
+        {
+            // A dump taken before this database was ever migrated has no tables to
+            // write into; the startup migration creates them.
+            logger.LogInformation(
+                "This archive was taken from a database with no migrations applied; " +
+                "leaving the schema empty and loading what it has.");
+            return;
+        }
+
+        logger.LogInformation("Database schema already matches this archive ({Migration}).", target);
+    }
+
     private static async Task RunPgRestoreAsync(
         string dumpPath, string host, int port, string user, string password, string db, ILogger logger)
     {
@@ -354,77 +480,71 @@ public static class RestoreOnBootProcessor
         logger.LogInformation("pg_restore completed successfully.");
     }
 
+    private static string BuildConnectionString(
+        string host, int port, string user, string password, string db) =>
+        new NpgsqlConnectionStringBuilder
+        {
+            Host = host,
+            Port = port,
+            Database = db,
+            Username = user,
+            Password = password,
+        }.ConnectionString;
+
+    /// <summary>
+    /// Waits for the server to accept a connection.
+    /// </summary>
+    /// <remarks>
+    /// Replaces <c>pg_isready</c>, which the embedded runtime does not ship. What
+    /// matters here is whether the database is ready for the queries that follow, so
+    /// this asks that question directly instead of asking a different tool about it.
+    /// </remarks>
     private static async Task WaitForPostgresAsync(
         string host, int port, string user, string password, string db, ILogger logger)
     {
+        var connectionString = BuildConnectionString(host, port, user, password, db);
+        var lastError = "no attempt was made";
+
         for (var attempt = 1; attempt <= 30; attempt++)
         {
-            var psi = new ProcessStartInfo
-            {
-                FileName = "pg_isready",
-                ArgumentList = { "-h", host, "-p", port.ToString(), "-U", user, "-d", db },
-                RedirectStandardError = true,
-                RedirectStandardOutput = true,
-                UseShellExecute = false,
-            };
-            psi.Environment["PGPASSWORD"] = password;
             try
             {
-                using var p = Process.Start(psi);
-                if (p != null)
-                {
-                    await p.WaitForExitAsync();
-                    if (p.ExitCode == 0) return;
-                }
+                await using var connection = new NpgsqlConnection(connectionString);
+                await connection.OpenAsync();
+                return;
             }
-            catch
+            catch (Exception ex)
             {
-                // try again
+                lastError = ex.Message;
             }
+
             logger.LogInformation("Postgres not ready (attempt {Attempt}/30), retrying...", attempt);
             await Task.Delay(1000);
         }
-        throw new InvalidOperationException("Postgres did not become ready within 30 seconds.");
+
+        throw new InvalidOperationException(
+            $"Postgres did not become ready within 30 seconds. Last error: {lastError}");
     }
 
     private static async Task<int> GetPostgresMajorVersionAsync(
         string host, int port, string user, string password, string db)
     {
-        var psi = new ProcessStartInfo
-        {
-            FileName = "psql",
-            ArgumentList =
-            {
-                "-h", host,
-                "-p", port.ToString(),
-                "-U", user,
-                "-d", db,
-                "-t", "-A",
-                "-c", "SHOW server_version_num",
-            },
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-        };
-        psi.Environment["PGPASSWORD"] = password;
+        await using var connection = new NpgsqlConnection(
+            BuildConnectionString(host, port, user, password, db));
+        await connection.OpenAsync();
 
-        using var p = Process.Start(psi)
-            ?? throw new InvalidOperationException("Failed to launch psql for version probe.");
-        var output = (await p.StandardOutput.ReadToEndAsync()).Trim();
-        await p.WaitForExitAsync();
-        if (p.ExitCode != 0 || !int.TryParse(output, out var verNum))
+        await using var command = new NpgsqlCommand("SHOW server_version_num;", connection);
+        var output = ((string?)await command.ExecuteScalarAsync())?.Trim();
+        if (!int.TryParse(output, out var versionNumber))
         {
-            throw new InvalidOperationException($"Failed to read postgres version (exit {p.ExitCode}): '{output}'");
+            throw new InvalidOperationException(
+                $"Could not read the PostgreSQL server version (got '{output}').");
         }
-        return verNum / 10000;
+
+        // server_version_num is 160003 for 16.3 - the major is the leading part.
+        return versionNumber / 10000;
     }
 
-    /// <summary>
-    /// Moves every direct entry of <paramref name="root"/> into a sibling
-    /// <c>{root}/{suffix}</c> directory. Throws if ANY entry cannot be moved -
-    /// a partial stage would leave live files mixed with restored files after
-    /// extraction, producing silent inconsistency.
-    /// </summary>
     private static string StageExistingTreeStrict(string root, string suffix, ILogger logger)
     {
         Directory.CreateDirectory(root);
