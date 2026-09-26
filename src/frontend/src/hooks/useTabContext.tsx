@@ -1,5 +1,6 @@
 import { type JSX, type ReactNode, useContext } from 'react'
 
+import { useDockPanelActions } from '@/components/layout/dock-panel/DockPanelActionsContext'
 import { TabContext, type TabContextValue } from '@/contexts/TabContext'
 import { createTab } from '@/stores/navigationStore'
 import { type Tab } from '@/types'
@@ -30,6 +31,8 @@ export const TabProvider = ({
   activeTab,
   setActiveTab,
 }: TabProviderProps): JSX.Element => {
+  const { closeTab } = useDockPanelActions()
+
   const openModelDetailsTab = (
     modelId: string,
     name?: string,
@@ -148,6 +151,24 @@ export const TabProvider = ({
     setActiveTab(newTab.id)
   }
 
+  const openSceneEditorTab = (sceneId: string, name?: string): void => {
+    // One tab per scene, so two scenes can stay open side by side. Re-opening a
+    // scene that is already open focuses its tab instead of duplicating it -
+    // and, crucially, does not restart its draft.
+    const existingTab = tabs.find(
+      tab => tab.type === 'sceneEditor' && tab.sceneId === sceneId
+    )
+
+    if (existingTab) {
+      setActiveTab(existingTab.id)
+      return
+    }
+
+    const newTab = createTab('sceneEditor', sceneId, name)
+    setTabs([...tabs, newTab])
+    setActiveTab(newTab.id)
+  }
+
   const openTab = (
     type: Tab['type'],
     title: string,
@@ -196,7 +217,10 @@ export const TabProvider = ({
     openPackDetailsTab,
     openProjectDetailsTab,
     openScriptDetailsTab,
+    openSceneEditorTab,
     openTab,
+    tabId: activeTab,
+    closeTab,
   }
 
   return <TabContext.Provider value={value}>{children}</TabContext.Provider>

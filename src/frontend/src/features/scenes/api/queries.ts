@@ -11,12 +11,12 @@ import { useSceneLinkHoldStore } from '@/stores'
 
 import type { SceneDocument, SceneRecommendationChoice } from '../types'
 import {
+  acceptSceneRecommendations,
   createScene,
   deleteScene,
   getSceneById,
   getScenes,
   getSceneSlots,
-  acceptSceneRecommendations,
   rejectSceneCandidates,
   renameScene,
   resolveSceneSlot,

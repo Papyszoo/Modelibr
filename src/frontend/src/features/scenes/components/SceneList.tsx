@@ -27,7 +27,11 @@ import {
 import type { SceneSummary } from '../types'
 
 interface SceneListProps {
-  onOpenScene: (sceneId: number) => void
+  /**
+   * Opens a scene somewhere else - a tab of its own. The name comes along so the
+   * tab can be labelled with it: a dock full of "Scene 7" is not navigation.
+   */
+  onOpenScene: (sceneId: number, name?: string) => void
 }
 
 export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
@@ -154,7 +158,7 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
       // Past this point the scene EXISTS. The form must never return to a state
       // where submitting it would create another one - see `linkFailure`.
       if (projectId === null) {
-        finish(created.scene.id)
+        finish(created.scene.id, trimmed)
         return
       }
 
@@ -189,17 +193,17 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
     }
 
     setLinkFailure(null)
-    finish(sceneId)
+    finish(sceneId, name.trim() || undefined)
   }
 
-  const finish = (sceneId: number) => {
+  const finish = (sceneId: number, sceneName?: string) => {
     setIsCreating(false)
     setName('')
     setDescription('')
     setProjectId(null)
     setCreateError(null)
     setLinkFailure(null)
-    onOpenScene(sceneId)
+    onOpenScene(sceneId, sceneName)
   }
 
   /**
@@ -216,7 +220,7 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
    */
   const openCreatedScene = () => {
     if (linkFailure) {
-      finish(linkFailure.sceneId)
+      finish(linkFailure.sceneId, name.trim() || undefined)
     }
   }
 
@@ -290,7 +294,7 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
                 'data-testid': 'scene-tile',
                 'data-scene-id': scene.id,
               }}
-              onClick={() => onOpenScene(scene.id)}
+              onClick={() => onOpenScene(scene.id, scene.name)}
               onContextMenu={event => {
                 event.preventDefault()
                 setPendingDelete(scene)

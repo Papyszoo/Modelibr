@@ -26,6 +26,7 @@ const mockGetEnvironmentMapById = jest.fn()
 const mockGetPackById = jest.fn()
 const mockGetProjectById = jest.fn()
 const mockGetStageById = jest.fn()
+const mockGetSceneById = jest.fn()
 
 jest.mock('../../services/ApiClient', () => ({
   __esModule: true,
@@ -57,6 +58,9 @@ jest.mock('@/features/project/api/projectApi', () => ({
 }))
 jest.mock('@/features/stage-editor/api/stageApi', () => ({
   getStageById: (...args: unknown[]) => mockGetStageById(...args),
+}))
+jest.mock('@/features/scenes/api/scenesApi', () => ({
+  getSceneById: (...args: unknown[]) => mockGetSceneById(...args),
 }))
 
 describe('Tab Serialization (Browser Refresh Compatibility)', () => {
@@ -147,6 +151,21 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
       expect(result).toHaveLength(1)
       expect(result[0].type).toBe('environmentMapViewer')
       expect(result[0].environmentMapId).toBe('42')
+    })
+
+    it('should parse scene editor tabs, one per scene', () => {
+      // Without the `scene-` branch this id is not a tab type, the parse throws,
+      // and the catch returns the DEFAULT layout - a refresh would silently drop
+      // every open tab.
+      const result = parseCompactTabFormat('scenes,scene-12,scene-13')
+
+      expect(result.map(tab => tab.id)).toEqual([
+        'scenes',
+        'scene-12',
+        'scene-13',
+      ])
+      expect(result[1].sceneId).toBe('12')
+      expect(result[2].sceneId).toBe('13')
     })
 
     it('should generate deterministic IDs for same input', () => {
@@ -474,6 +493,19 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
       expect(result[0].label).toBe('My Stage')
       expect(result[0].stageId).toBe('222')
       expect(mockGetStageById).toHaveBeenCalledWith(222)
+    })
+
+    it('should fetch scene name from API, one tab per scene', async () => {
+      mockGetSceneById.mockResolvedValue({
+        scene: { id: 12, name: 'Rooftop chase' },
+      })
+
+      const result = await parseCompactTabFormatAsync('scene-12,scene-13')
+      expect(result.map(tab => tab.id)).toEqual(['scene-12', 'scene-13'])
+      expect(result[0].type).toBe('sceneEditor')
+      expect(result[0].label).toBe('Rooftop chase')
+      expect(result[0].sceneId).toBe('12')
+      expect(mockGetSceneById).toHaveBeenCalledWith(12)
     })
 
     it('should fall back to ID-based label when API fails', async () => {

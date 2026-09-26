@@ -19,6 +19,7 @@ export type TabType =
   | 'stageList'
   | 'stageEditor'
   | 'scenes'
+  | 'sceneEditor'
   | 'assetStore'
   | 'settings'
   | 'history'
@@ -40,6 +41,7 @@ export interface Tab {
   projectId?: string
   stageId?: string
   scriptId?: string
+  sceneId?: string
 }
 
 export interface SplitterEvent {

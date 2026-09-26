@@ -26,7 +26,11 @@ function makeContextValue(
     openEnvironmentMapDetailsTab: noop,
     openPackDetailsTab: noop,
     openProjectDetailsTab: noop,
+    openScriptDetailsTab: noop,
+    openSceneEditorTab: noop,
     openTab: noop,
+    tabId: '',
+    closeTab: noop,
     ...overrides,
   }
 }

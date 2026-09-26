@@ -120,7 +120,9 @@ describe('SceneList - creating a scene', () => {
     await userEvent.click(create)
 
     held.resolve(sceneView(9) as never)
-    await waitFor(() => expect(onOpenScene).toHaveBeenCalledWith(9))
+    await waitFor(() =>
+      expect(onOpenScene).toHaveBeenCalledWith(9, 'Rundown city street')
+    )
     expect(scenes.createScene).toHaveBeenCalledTimes(1)
   })
 
@@ -137,7 +139,9 @@ describe('SceneList - creating a scene', () => {
     await userEvent.type(nameField, '{Enter}{Enter}{Enter}')
 
     held.resolve(sceneView(9) as never)
-    await waitFor(() => expect(onOpenScene).toHaveBeenCalledWith(9))
+    await waitFor(() =>
+      expect(onOpenScene).toHaveBeenCalledWith(9, 'Rundown city street')
+    )
     expect(scenes.createScene).toHaveBeenCalledTimes(1)
   })
 
@@ -167,7 +171,9 @@ describe('SceneList - creating a scene', () => {
     await userEvent.click(screen.getByTestId('scene-create-confirm'))
 
     heldLink.resolve({ sceneId: 9, projectId: 4, revision: 2 } as never)
-    await waitFor(() => expect(onOpenScene).toHaveBeenCalledWith(9))
+    await waitFor(() =>
+      expect(onOpenScene).toHaveBeenCalledWith(9, 'Rundown city street')
+    )
     expect(scenes.createScene).toHaveBeenCalledTimes(1)
   })
 
@@ -212,7 +218,9 @@ describe('SceneList - creating a scene', () => {
     // The retry links scene 9 - it does not create scene 10.
     await userEvent.click(screen.getByTestId('scene-create-confirm'))
 
-    await waitFor(() => expect(onOpenScene).toHaveBeenCalledWith(9))
+    await waitFor(() =>
+      expect(onOpenScene).toHaveBeenCalledWith(9, 'Rundown city street')
+    )
     expect(scenes.createScene).toHaveBeenCalledTimes(1)
     expect(scenes.setSceneProject).toHaveBeenCalledTimes(2)
     expect(scenes.setSceneProject).toHaveBeenLastCalledWith(9, 4)
@@ -229,7 +237,7 @@ describe('SceneList - creating a scene', () => {
 
     await userEvent.click(screen.getByTestId('scene-create-skip-link'))
 
-    expect(onOpenScene).toHaveBeenCalledWith(9)
+    expect(onOpenScene).toHaveBeenCalledWith(9, 'Rundown city street')
     expect(scenes.createScene).toHaveBeenCalledTimes(1)
   })
 
@@ -237,7 +245,9 @@ describe('SceneList - creating a scene', () => {
     await openDialog()
     await userEvent.click(screen.getByTestId('scene-create-confirm'))
 
-    await waitFor(() => expect(onOpenScene).toHaveBeenCalledWith(9))
+    await waitFor(() =>
+      expect(onOpenScene).toHaveBeenCalledWith(9, 'Rundown city street')
+    )
     expect(scenes.setSceneProject).not.toHaveBeenCalled()
   })
 
@@ -331,7 +341,7 @@ describe('SceneList - creating a scene', () => {
 
     await userEvent.click(screen.getByTestId('scene-create-skip-link'))
 
-    expect(onOpenScene).toHaveBeenCalledWith(9)
+    expect(onOpenScene).toHaveBeenCalledWith(9, 'Rundown city street')
     expect(scenes.createScene).toHaveBeenCalledTimes(1)
     // Still exactly one attempt: opening is a read, not a second write.
     expect(scenes.setSceneProject).toHaveBeenCalledTimes(1)
@@ -375,7 +385,7 @@ describe('SceneList - creating a scene', () => {
     await userEvent.click(screen.getByTestId('scene-create-skip-link'))
 
     expect(scenes.setSceneProject).toHaveBeenCalledTimes(1)
-    expect(onOpenScene).toHaveBeenCalledWith(9)
+    expect(onOpenScene).toHaveBeenCalledWith(9, 'Rundown city street')
   })
 
   it('refuses a second link write while one is unresolved, even if something asks for it', async () => {

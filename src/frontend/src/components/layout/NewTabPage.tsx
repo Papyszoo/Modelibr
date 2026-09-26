@@ -249,6 +249,7 @@ const RECENT_TAB_ICON: Partial<Record<TabType, string>> = {
   stageList: 'pi-th-large',
   stageEditor: 'pi-th-large',
   scenes: 'pi-box',
+  sceneEditor: 'pi-box',
   assetStore: 'pi-shopping-bag',
   settings: 'pi-cog',
   history: 'pi-history',

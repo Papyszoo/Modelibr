@@ -105,6 +105,7 @@ export function SceneEditor({
     setLight: setLightDraft,
     past,
     future,
+    sceneId: storeSceneId,
   } = useSceneEditorStore()
 
   // Editing is held while a direct scene write is moving the scene's revision -
@@ -188,6 +189,13 @@ export function SceneEditor({
   // revision, so nothing is re-seeded and nothing is lost.
   const loadedRevision = view?.scene.revision
   useEffect(() => {
+    // A fetch that resolves after the user moved on to another scene tab must
+    // not pull the store back to this one: the editor the user is actually
+    // looking at would end up showing this scene's document, and the other
+    // scene's draft would go with it.
+    if (storeSceneId !== null && storeSceneId !== sceneId) {
+      return
+    }
     if (view && (baseRevision === null || loadedRevision !== baseRevision)) {
       if (!isDirty) {
         open(sceneId, view.document, view.scene.revision)

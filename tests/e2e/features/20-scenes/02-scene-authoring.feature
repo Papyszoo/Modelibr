@@ -106,6 +106,23 @@ Feature: Scene authoring
     And the scene should hold 1 node
     And the scene should have unsaved changes
 
+  @scene-tab-per-scene
+  Scenario: Two scenes stay open at once, each keeping its own unsaved work
+    # One editor at a time meant comparing a level's scene against another one
+    # was save-and-reload: the second open threw the first one's draft away. Each
+    # scene now edits in a tab of its own, and switching between them is what
+    # proves the drafts are kept per scene rather than one global draft the last
+    # tab overwrote.
+    Given a scene named "Comparand Scene" is open
+    And I have placed the test model into the scene
+    When I open another scene named "Subject Scene" from the list
+    Then the scene editor for "Subject Scene" should be in its own tab
+    And there should be 2 scene editor tabs open
+    When I return to the tab of the scene named "Comparand Scene"
+    Then the scene editor should be visible
+    And the scene should hold 1 node
+    And the scene should have unsaved changes
+
   @scene-dressing
   Scenario: Dressing a node with a material persists on the saved document
     # Applying a material to a slot was MCP-only until the editor grew this

@@ -2,6 +2,7 @@ import { getEnvironmentMapById } from '@/features/environment-map/api/environmen
 import { getModelById } from '@/features/models/api/modelApi'
 import { getPackById } from '@/features/pack/api/packApi'
 import { getProjectById } from '@/features/project/api/projectApi'
+import { getSceneById } from '@/features/scenes/api/scenesApi'
 import { getScriptById } from '@/features/scripts/api/scriptApi'
 import { getStageById } from '@/features/stage-editor/api/stageApi'
 import { getTextureSetById } from '@/features/texture-set/api/textureSetApi'
@@ -71,6 +72,10 @@ export function parseCompactTabFormat(
         tabs.push(createTab('scriptViewer', tabId.substring(7)))
         continue
       }
+      if (tabId.startsWith('scene-')) {
+        tabs.push(createTab('sceneEditor', tabId.substring(6)))
+        continue
+      }
 
       // Legacy URL id from before the texture-set split.
       const tabType = (
@@ -96,6 +101,7 @@ export function parseCompactTabFormat(
           'stageList',
           'stageEditor',
           'scenes',
+          'sceneEditor',
           'assetStore',
           'history',
           'settings',
@@ -244,6 +250,19 @@ export async function parseCompactTabFormatAsync(
         continue
       }
 
+      if (tabId.startsWith('scene-')) {
+        const sceneId = tabId.substring(6)
+        let sceneName: string | undefined
+        try {
+          const scene = await getSceneById(Number(sceneId))
+          sceneName = scene.scene.name
+        } catch {
+          /* fall back to ID-based label */
+        }
+        tabs.push(createTab('sceneEditor', sceneId, sceneName))
+        continue
+      }
+
       // Legacy URL id from before the texture-set split.
       const tabType = (
         tabId === 'textureSets' ? 'modelTextures' : tabId
@@ -268,6 +287,7 @@ export async function parseCompactTabFormatAsync(
           'stageList',
           'stageEditor',
           'scenes',
+          'sceneEditor',
           'assetStore',
           'history',
           'settings',

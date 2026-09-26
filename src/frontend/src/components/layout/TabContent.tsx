@@ -94,6 +94,11 @@ const ScenesTab = lazy(() =>
     default: module.ScenesTab,
   }))
 )
+const SceneEditorTab = lazy(() =>
+  import('@/features/scenes').then(module => ({
+    default: module.SceneEditorTab,
+  }))
+)
 const RecycledFilesList = lazy(() =>
   import('@/features/recycled-files').then(module => ({
     default: module.RecycledFilesList,
@@ -239,6 +244,9 @@ export function TabContent({ tab }: TabContentProps): JSX.Element {
 
       case 'scenes':
         return <ScenesTab />
+
+      case 'sceneEditor':
+        return <SceneEditorTab sceneId={tab.sceneId} />
 
       case 'assetStore':
         return <AssetStorePage />

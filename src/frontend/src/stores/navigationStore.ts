@@ -188,6 +188,7 @@ export function getTabLabel(
     projectId?: string
     stageId?: string
     scriptId?: string
+    sceneId?: string
     modelName?: string
     setName?: string
     environmentMapName?: string
@@ -195,6 +196,7 @@ export function getTabLabel(
     projectName?: string
     stageName?: string
     scriptName?: string
+    sceneName?: string
   } = {}
 ): string {
   const {
@@ -205,6 +207,7 @@ export function getTabLabel(
     projectId,
     stageId,
     scriptId,
+    sceneId,
     modelName,
     setName,
     environmentMapName,
@@ -212,6 +215,7 @@ export function getTabLabel(
     projectName,
     stageName,
     scriptName,
+    sceneName,
   } = options
   switch (type) {
     case 'newTab':
@@ -263,6 +267,9 @@ export function getTabLabel(
       return stageId ? `Stage ${stageId}` : 'Stage Editor'
     case 'scenes':
       return 'Scenes'
+    case 'sceneEditor':
+      if (sceneName) return sceneName
+      return sceneId ? `Scene ${sceneId}` : 'Scene Editor'
     case 'assetStore':
       return 'Asset Store'
     case 'history':
@@ -315,6 +322,10 @@ export function createTab(
         tabId = `script-${id}`
         params.scriptId = id
         break
+      case 'sceneEditor':
+        tabId = `scene-${id}`
+        params.sceneId = id
+        break
     }
   }
 
@@ -331,6 +342,7 @@ export function createTab(
         projectId: type === 'projectViewer' ? id : undefined,
         stageId: type === 'stageEditor' ? id : undefined,
         scriptId: type === 'scriptViewer' ? id : undefined,
+        sceneId: type === 'sceneEditor' ? id : undefined,
         modelName: type === 'modelViewer' && name ? name : undefined,
         setName: type === 'textureSetViewer' && name ? name : undefined,
         environmentMapName:
@@ -339,6 +351,7 @@ export function createTab(
         projectName: type === 'projectViewer' && name ? name : undefined,
         stageName: type === 'stageEditor' && name ? name : undefined,
         scriptName: type === 'scriptViewer' && name ? name : undefined,
+        sceneName: type === 'sceneEditor' && name ? name : undefined,
       }),
     params,
     internalUiState,
@@ -350,6 +363,7 @@ export function createTab(
     projectId: params.projectId,
     stageId: params.stageId,
     scriptId: params.scriptId,
+    sceneId: params.sceneId,
   }
 }
 

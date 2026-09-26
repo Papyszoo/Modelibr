@@ -1,9 +1,8 @@
+import type { SceneDocument, SceneNode } from '@/features/scenes/types'
 import {
   SCENE_HISTORY_LIMIT,
   useSceneEditorStore,
 } from '@/stores/sceneEditorStore'
-
-import type { SceneDocument, SceneNode } from '@/features/scenes/types'
 
 /**
  * The undo stack the old stage editor never had.
@@ -182,20 +181,24 @@ describe('sceneEditorStore', () => {
     // The same trap the dangling anchor above fixes: a slot naming a node that is
     // not there fails the whole save, for a node the user has already deleted.
     const lamp: SceneNode = { ...makeNode('lamp-1'), slotId: 'streetlight' }
-    useSceneEditorStore.getState().open(1, {
-      ...makeDocument([lamp]),
-      slots: [
-        {
-          id: 'streetlight',
-          candidates: [
-            {
-              id: 'A',
-              asset: { assetType: 'Model', assetId: 1, versionId: 1 },
-            },
-          ],
-        },
-      ],
-    })
+    useSceneEditorStore.getState().open(
+      1,
+      {
+        ...makeDocument([lamp]),
+        slots: [
+          {
+            id: 'streetlight',
+            candidates: [
+              {
+                id: 'A',
+                asset: { assetType: 'Model', assetId: 1, versionId: 1 },
+              },
+            ],
+          },
+        ],
+      },
+      1
+    )
 
     useSceneEditorStore.getState().removeNode('lamp-1')
 
@@ -227,6 +230,75 @@ describe('sceneEditorStore', () => {
     const lights = useSceneEditorStore.getState().document?.lights ?? []
     expect(lights).toHaveLength(1)
     expect(lights[0].intensity).toBe(2)
+  })
+
+  it('keeps one unsaved draft per scene when switching between scenes', () => {
+    // The regression this guards: with one tab per scene, looking at another
+    // scene must not throw away the first one's unsaved edits. Before drafts were
+    // keyed by scene, `openScene` reset every field and the work was only ever in
+    // the browser - unrecoverable.
+    useSceneEditorStore.getState().open(1, makeDocument(), 1)
+    useSceneEditorStore.getState().addNode(makeNode('a'))
+
+    useSceneEditorStore.getState().open(2, makeDocument(), 7)
+    useSceneEditorStore.getState().addNode(makeNode('b'))
+
+    expect(
+      useSceneEditorStore.getState().document?.nodes.map(n => n.id)
+    ).toEqual(['b'])
+
+    // Back to scene 1: its own draft, with its own node and its own revision.
+    useSceneEditorStore.getState().openScene(1)
+    expect(
+      useSceneEditorStore.getState().document?.nodes.map(n => n.id)
+    ).toEqual(['a'])
+    expect(useSceneEditorStore.getState().isDirty).toBe(true)
+    expect(useSceneEditorStore.getState().baseRevision).toBe(1)
+
+    // Undo history belongs to the scene it was made in, not to whichever tab is
+    // currently mounted.
+    expect(useSceneEditorStore.getState().canUndo()).toBe(true)
+  })
+
+  it('starts a scene with no stored draft from a clean state', () => {
+    useSceneEditorStore.getState().open(1, makeDocument(), 1)
+    useSceneEditorStore.getState().addNode(makeNode('a'))
+
+    useSceneEditorStore.getState().openScene(99)
+
+    expect(useSceneEditorStore.getState().openSceneId).toBe(99)
+    expect(useSceneEditorStore.getState().document).toBeNull()
+    expect(useSceneEditorStore.getState().isDirty).toBe(false)
+  })
+
+  it('close forgets the draft, so reopening does not resurrect abandoned edits', () => {
+    useSceneEditorStore.getState().open(1, makeDocument(), 1)
+    useSceneEditorStore.getState().addNode(makeNode('a'))
+
+    // Back is the explicit "forget this" gesture.
+    useSceneEditorStore.getState().close()
+    useSceneEditorStore.getState().openScene(1)
+
+    expect(useSceneEditorStore.getState().document).toBeNull()
+    expect(useSceneEditorStore.getState().isDirty).toBe(false)
+  })
+
+  it('discardDraft drops one scene without disturbing the other', () => {
+    useSceneEditorStore.getState().open(1, makeDocument(), 1)
+    useSceneEditorStore.getState().addNode(makeNode('a'))
+    useSceneEditorStore.getState().open(2, makeDocument(), 2)
+    useSceneEditorStore.getState().addNode(makeNode('b'))
+
+    // Closing the tab for scene 2 while scene 1's draft is on screen.
+    useSceneEditorStore.getState().discardDraft(2)
+
+    useSceneEditorStore.getState().openScene(1)
+    expect(
+      useSceneEditorStore.getState().document?.nodes.map(n => n.id)
+    ).toEqual(['a'])
+
+    useSceneEditorStore.getState().openScene(2)
+    expect(useSceneEditorStore.getState().document).toBeNull()
   })
 
   it('ignores an edit that returns the same document', () => {

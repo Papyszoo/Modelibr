@@ -28,6 +28,9 @@ describe('createTab', () => {
     expect(createTab('projectViewer', '5').id).toBe('project-5')
     expect(createTab('scriptViewer', '7').id).toBe('script-7')
     expect(createTab('scriptViewer', '7').params.scriptId).toBe('7')
+    // One tab per scene, so two scenes can be open at once.
+    expect(createTab('sceneEditor', '12').id).toBe('scene-12')
+    expect(createTab('sceneEditor', '12').params.sceneId).toBe('12')
   })
 
   it('uses the entity name as the label, falling back to a type label', () => {
@@ -37,6 +40,10 @@ describe('createTab', () => {
     )
     // No name given → getTabLabel fallback with the id.
     expect(createTab('scriptViewer', '7').label).toBe('Script 7')
+    expect(createTab('sceneEditor', '12', 'Rooftop chase').label).toBe(
+      'Rooftop chase'
+    )
+    expect(createTab('sceneEditor', '12').label).toBe('Scene 12')
   })
 
   it('gives list tabs an id equal to their type (single-instance tabs)', () => {

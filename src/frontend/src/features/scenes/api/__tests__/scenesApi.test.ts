@@ -1,12 +1,12 @@
 import { client } from '@/lib/apiBase'
 
+import type { SceneDocument } from '../../types'
 import {
   createScene,
   getSceneById,
   getScenes,
   updateSceneDocument,
 } from '../scenesApi'
-import type { SceneDocument } from '../../types'
 
 /**
  * Request construction for the scene endpoints.
