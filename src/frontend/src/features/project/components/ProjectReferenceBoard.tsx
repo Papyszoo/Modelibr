@@ -17,6 +17,7 @@ import {
   type ProductionNoteDto,
   type ProjectReferenceDto,
   removeProjectReferenceLink,
+  updateProductionNote,
   updateProjectReference,
 } from '@/features/project/api/projectStudioApi'
 import {
@@ -32,6 +33,8 @@ import {
   LoadingState,
 } from '@/shared/components/feedback'
 import { ImageLightboxDialog } from '@/shared/components/ImageLightboxDialog'
+
+import { ProductionNoteItem } from './ProductionNoteItem'
 
 interface ProjectReferenceBoardProps {
   projectId: number
@@ -153,6 +156,26 @@ export function ProjectReferenceBoard({
         title: input.title,
         body: input.body,
         isPinned: false,
+      }),
+    onSuccess: invalidate,
+  })
+
+  const updateNote = useMutation({
+    mutationFn: (input: {
+      note: ProductionNoteDto
+      title: string
+      body: string
+      isPinned: boolean
+    }) =>
+      updateProductionNote(projectId, input.note.id, {
+        // The reference link has to ride along: the update route replaces the
+        // note rather than patching it.
+        levelId: input.note.levelId,
+        referenceImageId: input.note.referenceImageId,
+        characterId: input.note.characterId,
+        title: input.title,
+        body: input.body,
+        isPinned: input.isPinned,
       }),
     onSuccess: invalidate,
   })
@@ -327,6 +350,9 @@ export function ProjectReferenceBoard({
               onAddNote={values =>
                 addNote.mutate({ referenceId: reference.id, ...values })
               }
+              onUpdateNote={(note, values) =>
+                updateNote.mutate({ note, ...values })
+              }
               onRemove={() => {
                 confirmDialog({
                   header: 'Remove reference image',
@@ -357,6 +383,7 @@ function ReferenceCard({
   onAddLink,
   onRemoveLink,
   onAddNote,
+  onUpdateNote,
   onRemove,
 }: {
   reference: ProjectReferenceDto
@@ -372,6 +399,10 @@ function ReferenceCard({
   }) => void
   onRemoveLink: (linkId: number) => void
   onAddNote: (values: { title: string; body: string }) => void
+  onUpdateNote: (
+    note: ProductionNoteDto,
+    values: { title: string; body: string; isPinned: boolean }
+  ) => void
   onRemove: () => void
 }) {
   const [title, setTitle] = useState(reference.title)
@@ -473,14 +504,13 @@ function ReferenceCard({
 
         <div className="project-reference-notes">
           {notes.map(note => (
-            <div
-              className="project-reference-note"
+            <ProductionNoteItem
               key={note.id}
-              data-testid="project-reference-note"
-            >
-              <strong>{note.title}</strong>
-              <p>{note.body}</p>
-            </div>
+              note={note}
+              testId="project-reference-note"
+              className="project-reference-note"
+              onSave={values => onUpdateNote(note, values)}
+            />
           ))}
           {showNote ? (
             <NoteForm

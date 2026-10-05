@@ -24,6 +24,7 @@ import {
   removeProjectCharacterModel,
   updateCharacterAbility,
   updateCharacterVariant,
+  updateProductionNote,
   updateProjectCharacter,
   updateProjectCharacterImage,
   updateProjectCharacterModel,
@@ -47,6 +48,7 @@ import {
   CharacterMedia,
   CharacterVariants,
 } from './CharacterChildSections'
+import { ProductionNoteItem } from './ProductionNoteItem'
 
 interface ProjectCharactersSectionProps {
   projectId: number
@@ -128,6 +130,26 @@ export function ProjectCharactersSection({
         title: input.title,
         body: input.body,
         isPinned: false,
+      }),
+    onSuccess: invalidate,
+  })
+
+  const updateNote = useMutation({
+    mutationFn: (input: {
+      note: ProductionNoteDto
+      title: string
+      body: string
+      isPinned: boolean
+    }) =>
+      updateProductionNote(projectId, input.note.id, {
+        // The update route replaces the whole note, so the character it belongs
+        // to has to be resent with the new text.
+        levelId: input.note.levelId,
+        referenceImageId: input.note.referenceImageId,
+        characterId: input.note.characterId,
+        title: input.title,
+        body: input.body,
+        isPinned: input.isPinned,
       }),
     onSuccess: invalidate,
   })
@@ -392,6 +414,9 @@ export function ProjectCharactersSection({
                 onAddNote={values =>
                   createNote.mutate({ characterId: character.id, ...values })
                 }
+                onUpdateNote={(note, values) =>
+                  updateNote.mutate({ note, ...values })
+                }
                 onDelete={() => {
                   confirmDialog({
                     header: 'Delete character',
@@ -422,6 +447,7 @@ function CharacterCard({
   onToggle,
   onUpdate,
   onAddNote,
+  onUpdateNote,
   onDelete,
 }: {
   character: ProjectCharacterDto
@@ -437,6 +463,10 @@ function CharacterCard({
     tags: string[]
   }) => void
   onAddNote: (values: { title: string; body: string }) => void
+  onUpdateNote: (
+    note: ProductionNoteDto,
+    values: { title: string; body: string; isPinned: boolean }
+  ) => void
   onDelete: () => void
 }) {
   const isEnemy = character.tags.some(tag => tag.toLowerCase() === 'enemy')
@@ -544,6 +574,7 @@ function CharacterCard({
               notes={notes}
               isEnemy={isEnemy}
               onAdd={onAddNote}
+              onUpdateNote={onUpdateNote}
             />
           ) : null}
           {section === 'media' ? (
@@ -657,11 +688,16 @@ function CharacterNotes({
   notes,
   isEnemy,
   onAdd,
+  onUpdateNote,
 }: {
   character: ProjectCharacterDto
   notes: ProductionNoteDto[]
   isEnemy: boolean
   onAdd: (values: { title: string; body: string }) => void
+  onUpdateNote: (
+    note: ProductionNoteDto,
+    values: { title: string; body: string; isPinned: boolean }
+  ) => void
 }) {
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
@@ -681,14 +717,13 @@ function CharacterNotes({
         />
       </div>
       {notes.map(note => (
-        <div
-          className="project-character-note"
+        <ProductionNoteItem
           key={note.id}
-          data-testid="project-character-note"
-        >
-          <strong>{note.title}</strong>
-          <p>{note.body}</p>
-        </div>
+          note={note}
+          testId="project-character-note"
+          className="project-character-note"
+          onSave={values => onUpdateNote(note, values)}
+        />
       ))}
       {showAdd ? (
         <form

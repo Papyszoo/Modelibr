@@ -180,6 +180,31 @@ describe('ProjectReferenceBoard', () => {
     })
   })
 
+  it('edits the note under a reference image in place', async () => {
+    api.updateProductionNote.mockResolvedValue({ id: 5 } as never)
+    renderBoard()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Edit note Fog' }))
+    const body = screen.getByLabelText('Edit note body')
+    expect(body).toHaveValue('Keep the horizon soft.')
+    await userEvent.clear(body)
+    await userEvent.type(body, 'Keep the horizon unreadable.')
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Save note changes' })
+    )
+
+    await waitFor(() =>
+      expect(api.updateProductionNote).toHaveBeenCalledWith(7, 5, {
+        levelId: null,
+        referenceImageId: 9,
+        characterId: null,
+        title: 'Fog',
+        body: 'Keep the horizon unreadable.',
+        isPinned: false,
+      })
+    )
+  })
+
   it('uploads then attaches a file to the project', async () => {
     const { uploadFile } = jest.requireMock('@/features/models/api/modelApi')
     uploadFile.mockResolvedValue({ fileId: 555, alreadyExists: false })

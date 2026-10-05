@@ -434,4 +434,52 @@ describe('ProjectCharactersSection', () => {
       label: 'Boss rig',
     })
   })
+
+  it('edits a character note in place', async () => {
+    queries.useProductionNotesQuery.mockReturnValue(
+      query([
+        {
+          id: 8,
+          projectId: 7,
+          levelId: null,
+          referenceImageId: null,
+          characterId: 3,
+          title: 'Weakness',
+          body: 'Fears water.',
+          isPinned: false,
+          createdAt: '2026-09-25T00:00:00Z',
+          updatedAt: '2026-09-25T00:00:00Z',
+        },
+      ]) as never
+    )
+    api.updateProductionNote.mockResolvedValue({ id: 8 } as never)
+
+    renderSection()
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Edit Ashen Warden' })
+    )
+    await userEvent.click(screen.getByRole('tab', { name: 'Enemy notes' }))
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Edit note Weakness' })
+    )
+    const body = screen.getByLabelText('Edit note body')
+    expect(body).toHaveValue('Fears water.')
+    await userEvent.clear(body)
+    await userEvent.type(body, 'Fears fire.')
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Save note changes' })
+    )
+
+    await waitFor(() =>
+      expect(api.updateProductionNote).toHaveBeenCalledWith(7, 8, {
+        levelId: null,
+        referenceImageId: null,
+        characterId: 3,
+        title: 'Weakness',
+        body: 'Fears fire.',
+        isPinned: false,
+      })
+    )
+  })
 })

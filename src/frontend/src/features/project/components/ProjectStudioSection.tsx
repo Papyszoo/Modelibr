@@ -15,6 +15,7 @@ import {
   type ProjectLevelDto,
   type ProjectLevelStatus,
   type ProjectReferenceDto,
+  updateProductionNote,
 } from '@/features/project/api/projectStudioApi'
 import {
   useProductionNotesQuery,
@@ -37,6 +38,7 @@ import { ProjectCharactersSection } from './ProjectCharactersSection'
 import { ProjectLevelAssetsSection } from './ProjectLevelAssetsSection'
 import { ProjectLevelSceneButton } from './ProjectLevelSceneButton'
 import { ProjectLevelWorkspace } from './ProjectLevelWorkspace'
+import { ProductionNoteItem } from './ProductionNoteItem'
 import { ProjectReferenceBoard } from './ProjectReferenceBoard'
 import {
   ProjectWorkspaceShell,
@@ -176,6 +178,26 @@ export function ProjectStudioSection({
       setNotePinned(false)
       await invalidateStudio()
     },
+  })
+
+  const updateNote = useMutation({
+    mutationFn: (input: {
+      note: ProductionNoteDto
+      title: string
+      body: string
+      isPinned: boolean
+    }) =>
+      updateProductionNote(projectId, input.note.id, {
+        // The update route replaces the whole note, so the target it was
+        // written for has to be resent or it would be detached.
+        levelId: input.note.levelId,
+        referenceImageId: input.note.referenceImageId,
+        characterId: input.note.characterId,
+        title: input.title,
+        body: input.body,
+        isPinned: input.isPinned,
+      }),
+    onSuccess: invalidateStudio,
   })
 
   const queryError =
@@ -503,31 +525,22 @@ export function ProjectStudioSection({
                 ) : (
                   <div className="project-note-list">
                     {notes.map(note => (
-                      <article
-                        className={`project-note-row${note.isPinned ? ' is-pinned' : ''}`}
+                      <ProductionNoteItem
                         key={note.id}
-                        data-testid="project-note-row"
-                        data-note-title={note.title}
-                      >
-                        <div className="project-note-heading">
-                          <strong>{note.title}</strong>
-                          {note.isPinned && (
-                            <i
-                              className="pi pi-bookmark-fill"
-                              aria-label="Pinned"
-                            />
-                          )}
-                        </div>
-                        <p>{note.body}</p>
-                        <small>
-                          {noteTargetLabel(
-                            note,
-                            levels,
-                            characters,
-                            references
-                          )}
-                        </small>
-                      </article>
+                        note={note}
+                        testId="project-note-row"
+                        className="project-note-row"
+                        pending={updateNote.isPending}
+                        meta={noteTargetLabel(
+                          note,
+                          levels,
+                          characters,
+                          references
+                        )}
+                        onSave={values =>
+                          updateNote.mutate({ note, ...values })
+                        }
+                      />
                     ))}
                   </div>
                 )}

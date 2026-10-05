@@ -1,0 +1,58 @@
+/*
+ * One production note, editable in place. Shared by the studio, the reference
+ * board and the character card, so it is styled here rather than in any one
+ * caller's stylesheet.
+ */
+.production-note {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-2xs);
+}
+
+.production-note-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mod-space-xs);
+}
+
+.production-note-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--mod-space-2xs);
+}
+
+.production-note-icon {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-color-secondary);
+  cursor: pointer;
+  font-size: var(--mod-text-xs);
+}
+
+.production-note-icon:hover {
+  color: var(--primary-color);
+}
+
+.production-note.is-pinned .production-note-icon:first-child {
+  color: var(--primary-color);
+}
+
+.production-note p {
+  margin: 0;
+  color: var(--text-color-secondary);
+}
+
+.production-note-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-2xs);
+}
+
+.production-note-form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--mod-space-xs);
+}
