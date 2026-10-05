@@ -29,8 +29,6 @@ do something wrong without this?"** If no - delete it.
 
 ## Maintenance rules
 
-- **Code wins.** If a skill claim contradicts the code, fix the skill in the
-  same session (AGENTS.md rule). Don't soften with "may have changed".
 - **Prefer replace/delete over append.** A feature that changes behavior
   rewrites the stale line; it doesn't add a second paragraph beside it.
 - Temporary state ("until prompt N lands") is allowed ONLY with the trigger

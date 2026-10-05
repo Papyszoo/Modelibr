@@ -90,9 +90,10 @@ factories / mutation methods with `ArgumentException`.
 - Integration tests: `WebApplicationFactory<Program>` +
   `[Trait("Category", "Integration")]` (excluded from the default suite; run via
   the `backend-integration` suite, which starts dev Postgres itself). Gotcha:
-  `Program.Main` reads `RESTORE_STORAGE_PATH` / `THUMBNAIL_STORAGE_PATH` BEFORE
-  host config applies - in-process tests must set them as environment variables
-  (see `ModelibrWebFactory`).
+  `RestoreOnBootProcessor` runs during `Program.Main` BEFORE host config applies
+  and reads `RESTORE_STORAGE_PATH` / `THUMBNAIL_STORAGE_PATH`; `BackupService`
+  reads the same keys from `IConfiguration`. In-process tests must set them as
+  environment variables (see `ModelibrWebFactory`).
 
 ## Verify
 
