@@ -39,8 +39,14 @@ public sealed class AssetMetadataReadMcpTools
         IQueryHandler<ReadAssetMetadataQuery, AssetMetadataResponse> handler,
         [Description("Asset family, e.g. Model.")] string assetType,
         [Description("Asset id.")] int assetId,
+        McpCallerContext? caller = null,
         CancellationToken cancellationToken = default)
     {
+        if (caller?.FamilyDenial(assetType) is { } denied)
+        {
+            return new { error = "AssetFamilyNotAllowed", message = denied };
+        }
+
         var result = await handler.Handle(new ReadAssetMetadataQuery(assetType, assetId), cancellationToken);
 
         return result.IsFailure

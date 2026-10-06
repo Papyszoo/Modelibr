@@ -916,6 +916,97 @@
   border-radius: 3px;
 }
 
+/* ── MCP agents (inside section-detail body) ─────────────────────── */
+
+.mcp-agents-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+.mcp-agent-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--mod-radius-lg);
+  background: var(--surface-card);
+}
+.mcp-agent-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.mcp-agent-name {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+.mcp-agent-families {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+.mcp-agent-family-chip {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.72em;
+  border-radius: var(--mod-radius-pill);
+  background: rgba(var(--primary-color-rgb), 0.12);
+  border: 1px solid rgba(var(--primary-color-rgb), 0.24);
+  color: var(--text-color);
+}
+.mcp-agent-desc {
+  margin: 0;
+  font-size: 0.85em;
+  color: var(--text-color-secondary);
+}
+.mcp-agents-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin: 0.15rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.mcp-agent-tool {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+}
+.mcp-agent-tool-name {
+  width: fit-content;
+  padding: 1px 5px;
+  font-size: 0.8em;
+  background: var(--surface-ground);
+  border-radius: 3px;
+}
+.mcp-agent-tool-desc {
+  font-size: 0.78em;
+  color: var(--text-color-secondary);
+}
+.mcp-agent-tools-details {
+  font-size: 0.85em;
+}
+.mcp-agent-tools-details summary {
+  cursor: pointer;
+  font-size: 0.82em;
+  color: var(--text-color-secondary);
+}
+.mcp-agents-connect-hint code {
+  background: var(--surface-card);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+.mcp-agents-empty {
+  padding: 1rem;
+  font-style: italic;
+}
+
 /* BackupsSection still uses these legacy button classes */
 .settings-button {
   display: inline-flex;

@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using Application.Abstractions.Messaging;
+using Application.Projects;
 using Application.Projects.Profile;
 using ModelContextProtocol.Server;
 
@@ -52,5 +53,52 @@ public sealed class ProjectReadMcpTools
         return result.IsFailure
             ? new { error = result.Error.Code, message = result.Error.Message }
             : new { options = result.Value };
+    }
+
+    [McpServerTool(Name = "list_project_notes")]
+    [Description("A project's production notes. pinnedOnly=true returns just the ideas. Filter by levelId or referenceImageId to read one target's notes.")]
+    public static async Task<object> ListProjectNotes(
+        IQueryHandler<GetProductionNotesQuery, IReadOnlyList<ProductionNoteDto>> handler,
+        [Description("Project id.")] int projectId,
+        [Description("Optional level filter.")] int? levelId = null,
+        [Description("Optional reference-image filter.")] int? referenceImageId = null,
+        [Description("Only notes pinned as ideas (default false = all notes).")] bool pinnedOnly = false,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await handler.Handle(
+            new GetProductionNotesQuery(projectId, levelId, referenceImageId, pinnedOnly ? true : (bool?)null),
+            cancellationToken);
+
+        return result.IsFailure
+            ? new { error = result.Error.Code, message = result.Error.Message }
+            : new { notes = result.Value };
+    }
+
+    [McpServerTool(Name = "list_project_levels")]
+    [Description("A project's levels in production order, with their status, description and variant counts.")]
+    public static async Task<object> ListProjectLevels(
+        IQueryHandler<GetProjectLevelsQuery, IReadOnlyList<ProjectLevelDto>> handler,
+        [Description("Project id.")] int projectId,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await handler.Handle(new GetProjectLevelsQuery(projectId), cancellationToken);
+
+        return result.IsFailure
+            ? new { error = result.Error.Code, message = result.Error.Message }
+            : new { levels = result.Value };
+    }
+
+    [McpServerTool(Name = "list_project_characters")]
+    [Description("A project's characters, with their tags, images, linked models, abilities and variants.")]
+    public static async Task<object> ListProjectCharacters(
+        IQueryHandler<GetProjectCharactersQuery, IReadOnlyList<ProjectCharacterDto>> handler,
+        [Description("Project id.")] int projectId,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await handler.Handle(new GetProjectCharactersQuery(projectId), cancellationToken);
+
+        return result.IsFailure
+            ? new { error = result.Error.Code, message = result.Error.Message }
+            : new { characters = result.Value };
     }
 }

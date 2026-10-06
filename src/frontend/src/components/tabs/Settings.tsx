@@ -35,6 +35,7 @@ import {
   updateSettings,
 } from '@/features/settings/api/settingsApi'
 import { BackupsSection } from '@/features/settings/BackupsSection'
+import { McpAgentsSection } from '@/features/settings/McpAgentsSection'
 import { useTabUiState } from '@/hooks/useTabUiState'
 import { useTheme } from '@/hooks/useTheme'
 import { settingsFormSchema } from '@/shared/validation/formSchemas'
@@ -59,6 +60,7 @@ type SectionKey =
   | 'webdav'
   | 'scriptTemplates'
   | 'backup'
+  | 'mcpAgents'
 
 interface SectionMeta {
   key: SectionKey
@@ -164,6 +166,15 @@ const SECTIONS: SectionMeta[] = [
     fields: ['Create backup', 'Download backup', 'Restore backup'],
     hasFormSave: false,
     demoLocked: true,
+  },
+  {
+    key: 'mcpAgents',
+    label: 'MCP agents',
+    icon: 'pi-microchip-ai',
+    desc: 'Read-only agents and the tools they can call',
+    fields: ['MCP agents', 'Connect a client'],
+    hasFormSave: false,
+    demoLocked: false,
   },
 ]
 
@@ -1421,6 +1432,12 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
                 ) : (
                   <BackupsSection />
                 )}
+              </div>
+            )}
+
+            {currentSection.key === 'mcpAgents' && (
+              <div className="section-fields">
+                <McpAgentsSection />
               </div>
             )}
           </div>

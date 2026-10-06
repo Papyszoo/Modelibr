@@ -129,8 +129,34 @@ namespace WebApi
                 builder.Services.AddSingleton(WebApi.Mcp.McpTokenRegistry.FromConfiguration(builder.Configuration));
                 builder.Services.AddScoped<WebApi.Mcp.McpCallerContext>();
 
+                // Named agents, each seeing only a subset of the tools and asset families.
+                // Loaded and validated once here: a definition that names a tool or family
+                // that does not exist fails startup rather than quietly exposing a surface
+                // nobody intended.
+                var mcpAgents = WebApi.Mcp.McpAgentRegistry.FromFile(
+                    Path.Combine(AppContext.BaseDirectory, "Mcp", "mcp-agents.json"),
+                    WebApi.Mcp.McpAgentRegistry.DiscoverKnownTools(typeof(Program).Assembly));
+                builder.Services.AddSingleton(mcpAgents);
+
                 var mcpServer = builder.Services.AddMcpServer()
-                    .WithHttpTransport()
+                    .WithHttpTransport(options =>
+                    {
+                        // ConfigureSessionOptions is the SDK's per-session options hook: it
+                        // hands us a fresh McpServerOptions and the initiating request's
+                        // HttpContext, so the agent named on the route can be resolved and its
+                        // tool subset applied without touching /mcp.
+                        options.ConfigureSessionOptions = (httpContext, sessionOptions, _) =>
+                        {
+                            var agent = mcpAgents.Find(
+                                httpContext.Request.RouteValues[WebApi.Mcp.McpAgentEndpointFilter.AgentRouteValue] as string);
+                            if (agent is not null)
+                            {
+                                WebApi.Mcp.McpAgentRegistry.RestrictTools(sessionOptions, agent);
+                            }
+
+                            return Task.CompletedTask;
+                        };
+                    })
                     .WithTools<WebApi.Mcp.AssetSearchMcpTools>()
                     // Browsing the companion Asset Store's PUBLIC catalog is a read, and a
                     // credential-free one - these tools acquire nothing. They are here so an
@@ -285,6 +311,17 @@ namespace WebApi
                 // overload of AddEndpointFilter is written against.
                 app.MapMcp("/mcp")
                     .AddEndpointFilter<IEndpointConventionBuilder, WebApi.Mcp.McpTokenEndpointFilter>();
+
+                // The per-agent surface. Authentication runs first so an unknown agent is
+                // not disclosed to a caller with no valid token; the agent filter then
+                // rejects an unknown name with 404 and records the agent on the caller
+                // context so family-spanning tools can narrow themselves to it.
+                app.MapMcp("/mcp/agents/{" + WebApi.Mcp.McpAgentEndpointFilter.AgentRouteValue + "}")
+                    .AddEndpointFilter<IEndpointConventionBuilder, WebApi.Mcp.McpTokenEndpointFilter>()
+                    .AddEndpointFilter<IEndpointConventionBuilder, WebApi.Mcp.McpAgentEndpointFilter>();
+
+                // The same definitions over REST, for a read-only Settings view.
+                app.MapMcpAgentEndpoints();
             }
 
             // Map SignalR hubs

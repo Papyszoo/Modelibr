@@ -189,21 +189,29 @@ public sealed class McpCallerContext
 {
     internal const string PrincipalItemKey = "Modelibr.Mcp.Principal";
 
+    /// <summary>Set by <see cref="McpAgentEndpointFilter"/> on an agent-scoped route.</summary>
+    internal const string AgentItemKey = "Modelibr.Mcp.Agent";
+
     private readonly IHttpContextAccessor? _httpContextAccessor;
     private readonly McpPrincipal? _explicitPrincipal;
+    private readonly McpAgentDefinition? _explicitAgent;
 
     public McpCallerContext(IHttpContextAccessor httpContextAccessor)
     {
         _httpContextAccessor = httpContextAccessor;
     }
 
-    private McpCallerContext(McpPrincipal principal)
+    private McpCallerContext(McpPrincipal principal, McpAgentDefinition? agent = null)
     {
         _explicitPrincipal = principal;
+        _explicitAgent = agent;
     }
 
     /// <summary>A caller carrying a known principal, for exercising scope gating without an HTTP request.</summary>
     public static McpCallerContext For(McpPrincipal principal) => new(principal);
+
+    /// <summary>As <see cref="For(McpPrincipal)"/>, with the named agent whose families apply.</summary>
+    public static McpCallerContext For(McpPrincipal principal, McpAgentDefinition? agent) => new(principal, agent);
 
     /// <summary>The unauthenticated local caller: every scope, no identity.</summary>
     public static McpCallerContext Unauthenticated() => For(McpPrincipal.Unscoped);
@@ -220,6 +228,32 @@ public sealed class McpCallerContext
             && stored is McpPrincipal principal
                 ? principal
                 : McpPrincipal.Unscoped);
+
+    /// <summary>
+    /// The agent this call arrived through, or null on <c>/mcp</c> and in-process calls. A
+    /// null agent means no restriction: every family-spanning tool keeps its full reach.
+    /// </summary>
+    public McpAgentDefinition? Agent =>
+        _explicitAgent
+        ?? (_httpContextAccessor?.HttpContext?.Items.TryGetValue(AgentItemKey, out var stored) == true
+            && stored is McpAgentDefinition agent
+                ? agent
+                : null);
+
+    /// <summary>
+    /// Null when the current agent (if any) may read <paramref name="family"/>; otherwise the
+    /// message a tool returns in its usual error shape. A blank family means "all families"
+    /// and is always allowed.
+    /// </summary>
+    public string? FamilyDenial(string? family)
+    {
+        if (string.IsNullOrWhiteSpace(family) || Agent is null || Agent.Allows(family))
+        {
+            return null;
+        }
+
+        return $"The agent '{Agent.Name}' may only read {string.Join(", ", Agent.Families)} assets; '{family}' is not one of them.";
+    }
 
     /// <summary>The name recorded as the actor on anything this caller writes.</summary>
     public string? Actor => Principal.Name;

@@ -1314,6 +1314,40 @@ export const systemHandlers = [
     return HttpResponse.json({ ...(body as object), updatedAt: now() })
   }),
 
+  http.get('*/mcp-agents', async () => {
+    return HttpResponse.json([
+      {
+        name: 'stylist',
+        description: 'Edits materials and texture sets',
+        families: ['Model', 'TextureSet'],
+        tools: [
+          {
+            name: 'bind_texture_set',
+            description: 'Bind a texture set to a model version',
+          },
+          {
+            name: 'create_material',
+            description: 'Create a global material',
+          },
+        ],
+      },
+      {
+        name: 'librarian',
+        description: 'Organises models, packs and projects',
+        families: ['Model', 'Pack', 'Project'],
+        tools: [
+          { name: 'tag_asset', description: 'Apply tags to an asset' },
+          { name: 'move_to_pack', description: 'Move a model into a pack' },
+          { name: 'create_project', description: 'Create a project' },
+          {
+            name: 'set_project_thumbnail',
+            description: 'Set a project thumbnail',
+          },
+        ],
+      },
+    ])
+  }),
+
   // ════════════════════════════════════════════════════════════════════════
   //  RECYCLED FILES
   // ════════════════════════════════════════════════════════════════════════

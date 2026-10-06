@@ -72,8 +72,16 @@ public sealed class AssetSearchMcpTools
                      "bias (default): style ranks the results, the budget is reported per hit and nothing is removed. " +
                      "enforce: the triangle budget also becomes a filter, and the response says how many assets it removed. " +
                      "off: ordinary search. Only meaningful with projectId or sceneId.")] string? applyProfile = null,
+        McpCallerContext? caller = null,
         CancellationToken cancellationToken = default)
     {
+        // An agent scoped to some families may not search outside them. Null family means
+        // "all", and the search index is Model-only, so the default path is unconstrained.
+        if (caller?.FamilyDenial(assetType) is { } denied)
+        {
+            return new { error = "AssetFamilyNotAllowed", message = denied };
+        }
+
         var result = await handler.Handle(
             new AssetSearchQuery(query, limit, includeSecondary, minTriangles, maxTriangles,
                 hasAnimations, shapeClass, engine, assetType,
@@ -123,6 +131,7 @@ public sealed class AssetSearchMcpTools
         [Description("Search every entry on behalf of this project: its style ranks the results and its budget rides along.")] int? projectId = null,
         [Description("Search on behalf of this scene's project. A shortcut for looking the project up yourself.")] int? sceneId = null,
         [Description("How much of the project's profile to apply: bias (default), enforce or off.")] string? applyProfile = null,
+        McpCallerContext? caller = null,
         CancellationToken cancellationToken = default)
     {
         var entries = searches ?? [];
@@ -147,6 +156,14 @@ public sealed class AssetSearchMcpTools
         {
             var entry = entries[index];
             var label = entry.Label ?? entry.Query;
+
+            // A disallowed family costs its own entry, like any other per-entry failure:
+            // one question outside the agent's reach must not lose the rest of the batch.
+            if (caller?.FamilyDenial(entry.AssetType) is { } denied)
+            {
+                results.Add(new { index, label, query = entry.Query, error = "AssetFamilyNotAllowed", message = denied });
+                continue;
+            }
 
             var result = await handler.Handle(
                 new AssetSearchQuery(
@@ -198,6 +215,7 @@ public sealed class AssetSearchMcpTools
     public static async Task<object> GetAssets(
         IQueryHandler<GetAssetMetadataQuery, AssetMetadataResponse> handler,
         [Description("The assets to look up.")] AssetRequest[] assets,
+        McpCallerContext? caller = null,
         CancellationToken cancellationToken = default)
     {
         var entries = assets ?? [];
@@ -221,6 +239,20 @@ public sealed class AssetSearchMcpTools
         for (var index = 0; index < entries.Length; index++)
         {
             var entry = entries[index];
+
+            if (caller?.FamilyDenial(entry.AssetType) is { } denied)
+            {
+                results.Add(new
+                {
+                    index,
+                    assetType = entry.AssetType,
+                    assetId = entry.AssetId,
+                    error = "AssetFamilyNotAllowed",
+                    message = denied,
+                });
+                continue;
+            }
+
             var result = await handler.Handle(
                 new GetAssetMetadataQuery(entry.AssetType, entry.AssetId, VersionId: entry.VersionId),
                 cancellationToken);
@@ -258,8 +290,14 @@ public sealed class AssetSearchMcpTools
         [Description("Asset family, e.g. Model.")] string assetType,
         [Description("Asset id.")] int assetId,
         [Description("Version to inspect - use the search hit's versionId. Defaults to the active version.")] int? versionId = null,
+        McpCallerContext? caller = null,
         CancellationToken cancellationToken = default)
     {
+        if (caller?.FamilyDenial(assetType) is { } denied)
+        {
+            return new { error = "AssetFamilyNotAllowed", message = denied };
+        }
+
         var result = await handler.Handle(
             new GetAssetMetadataQuery(assetType, assetId, VersionId: versionId), cancellationToken);
         return result.IsFailure
@@ -276,8 +314,14 @@ public sealed class AssetSearchMcpTools
         [Description("Asset id.")] int assetId,
         [Description("Part path (from the scene-graph part-path scheme).")] string partPath,
         [Description("Version to inspect - use the search hit's versionId. Defaults to the active version.")] int? versionId = null,
+        McpCallerContext? caller = null,
         CancellationToken cancellationToken = default)
     {
+        if (caller?.FamilyDenial(assetType) is { } denied)
+        {
+            return new { error = "AssetFamilyNotAllowed", message = denied };
+        }
+
         var result = await handler.Handle(
             new GetAssetMetadataQuery(assetType, assetId, partPath, versionId), cancellationToken);
         return result.IsFailure

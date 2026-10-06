@@ -1,0 +1,102 @@
+[
+  {
+    "name": "asset-scout",
+    "description": "Read-only search across the whole library and the store catalog, with no write surface.",
+    "families": ["Model", "Sound", "Sprite", "EnvironmentMap", "TextureSet"],
+    "tools": [
+      "search_assets",
+      "search_many",
+      "get_assets",
+      "get_asset",
+      "get_part",
+      "list_facets",
+      "get_facet_ranges",
+      "get_duplicate_assets",
+      "get_asset_metadata",
+      "get_metadata_schema",
+      "search_store_assets",
+      "get_store_asset"
+    ]
+  },
+  {
+    "name": "scene-builder",
+    "description": "Builds and edits scenes: places, arranges, lights and validates assets from the library.",
+    "families": ["Model", "TextureSet", "EnvironmentMap"],
+    "tools": [
+      "list_scenes",
+      "get_scene",
+      "get_slots",
+      "validate_scene",
+      "render_scene",
+      "get_scene_render",
+      "create_scene",
+      "place_asset",
+      "place_assets_batch",
+      "distribute_assets",
+      "place_primitive",
+      "create_room",
+      "move_asset",
+      "remove_asset",
+      "set_lighting_preset",
+      "set_light",
+      "apply_material",
+      "propose_candidates",
+      "resolve_slot",
+      "reject_candidates",
+      "set_scene_recommendations",
+      "update_scene_document",
+      "set_scene_project",
+      "search_assets",
+      "search_many",
+      "get_assets",
+      "get_asset",
+      "list_materials",
+      "get_material",
+      "reverse_operation"
+    ]
+  },
+  {
+    "name": "stylist",
+    "description": "Finds, creates and binds materials and texture sets to models.",
+    "families": ["Model", "TextureSet"],
+    "tools": [
+      "search_assets",
+      "get_asset",
+      "get_assets",
+      "list_materials",
+      "get_material",
+      "create_material",
+      "update_material",
+      "import_texture_set",
+      "add_texture_channel",
+      "bind_texture_set",
+      "request_upload_ticket",
+      "get_job_status",
+      "generate_uvs",
+      "bake_textures",
+      "reverse_operation"
+    ]
+  },
+  {
+    "name": "designer",
+    "description": "Reads projects and the library to decide what a scene needs.",
+    "families": ["Model", "Sound", "Sprite", "EnvironmentMap", "TextureSet"],
+    "tools": [
+      "list_projects",
+      "get_project",
+      "list_project_notes",
+      "add_project_note",
+      "update_project_note",
+      "add_project_reference",
+      "list_project_levels",
+      "add_project_level",
+      "update_project_level",
+      "list_project_characters",
+      "add_project_character",
+      "update_project_character",
+      "search_assets",
+      "get_asset",
+      "request_upload_ticket"
+    ]
+  }
+]
