@@ -2,7 +2,7 @@
 .model-cache/
 
 # Node modules
-node_modules/
+node_modules
 
 # Logs
 *.log
