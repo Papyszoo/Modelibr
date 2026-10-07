@@ -25,6 +25,28 @@ public class AssetMetadataWriteMcpToolsTests
         Array.Empty<AssetMetadataValue>(),
         new AssetMetadataCompleteness(0, 0, Array.Empty<string>()));
 
+    private static AssetMetadataResponse Metadata(
+        string name = "probe", string? description = null, IReadOnlyList<string>? tags = null) => new(
+        "Model", 1, name, 1, 1,
+        new[]
+        {
+            new AssetMetadataValue(
+                "description", "identity", "multiline", false, false, "authored", "entity", description),
+            new AssetMetadataValue(
+                "tags", "classification", "text", true, false, "authored", "entity",
+                tags is null ? null : tags.ToList()),
+        },
+        new AssetMetadataCompleteness(0, 0, Array.Empty<string>()));
+
+    private static Mock<IQueryHandler<ReadAssetMetadataQuery, AssetMetadataResponse>> ReadReturning(
+        AssetMetadataResponse response)
+    {
+        var read = new Mock<IQueryHandler<ReadAssetMetadataQuery, AssetMetadataResponse>>();
+        read.Setup(h => h.Handle(It.IsAny<ReadAssetMetadataQuery>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success(response));
+        return read;
+    }
+
     private static Mock<IAgentAudit> ClaimGranted()
     {
         var audit = new Mock<IAgentAudit>();
@@ -127,6 +149,45 @@ public class AssetMetadataWriteMcpToolsTests
             "key-array-string");
 
         Assert.Contains("InvalidMetadataPatch", Json(result));
+        handler.Verify(h => h.Handle(
+            It.IsAny<SetAssetMetadataCommand>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Annotate_GapFillsAnEmptyDescriptionAndMergesTags()
+    {
+        var handler = Write();
+
+        var result = await AssetMetadataWriteMcpTools.AnnotateAsset(
+            handler.Object,
+            ReadReturning(Metadata("Arrow", description: null, tags: new[] { "Weapons" })).Object,
+            ClaimGranted().Object,
+            Caller(),
+            "Model", 1, "A wooden arrow.", new[] { "weapons", "projectile" }, "key-annotate");
+
+        var json = Json(result);
+        Assert.Contains("\"ok\"", json);
+        Assert.Contains("\"descriptionWritten\":true", json);
+        Assert.Contains("\"tagsWritten\":true", json);
+        handler.Verify(h => h.Handle(
+            It.Is<SetAssetMetadataCommand>(c =>
+                c.Fields.ContainsKey("description") && c.Fields.ContainsKey("tags")),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Annotate_KeepsAnAuthoredDescriptionAndReportsUnchangedWhenNoTagsAreNew()
+    {
+        var handler = Write();
+
+        var result = await AssetMetadataWriteMcpTools.AnnotateAsset(
+            handler.Object,
+            ReadReturning(Metadata("Arrow", description: "Words a person wrote", tags: new[] { "arrow" })).Object,
+            ClaimGranted().Object,
+            Caller(),
+            "Model", 1, "Store prose", new[] { "Arrow" }, "key-annotate-unchanged");
+
+        Assert.Contains("\"unchanged\"", Json(result));
         handler.Verify(h => h.Handle(
             It.IsAny<SetAssetMetadataCommand>(), It.IsAny<CancellationToken>()), Times.Never);
     }

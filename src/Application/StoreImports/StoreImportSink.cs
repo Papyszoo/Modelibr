@@ -253,17 +253,51 @@ internal sealed class StoreImportSink : IStoreImportSink
         string assetType, int assetId, StoreAssetMetadataStamp stamp, CancellationToken ct)
     {
         var current = await _readAssetMetadata.Handle(new ReadAssetMetadataQuery(assetType, assetId), ct);
-        var filled = current.IsSuccess
-            ? current.Value.Fields.Where(f => f.Value is not null).Select(f => f.Key)
-            : Enumerable.Empty<string>();
+        var fields = new Dictionary<string, JsonElement>(
+            StoreMetadataStampFields.Build(
+                assetType, stamp,
+                current.IsSuccess
+                    ? current.Value.Fields.Where(f => f.Value is not null).Select(f => f.Key)
+                    : Enumerable.Empty<string>()),
+            StringComparer.Ordinal);
 
-        var fields = StoreMetadataStampFields.Build(assetType, stamp, filled);
+        if (current.IsSuccess)
+        {
+            var descriptive = StoreMetadataStampFields.BuildDescriptive(
+                stamp, CurrentFrom(current.Value));
+            foreach (var (key, value) in descriptive)
+            {
+                fields[key] = value;
+            }
+        }
+
         if (fields.Count == 0)
         {
             return;
         }
 
-        await _setAssetMetadata.Handle(new SetAssetMetadataCommand(assetType, assetId, fields), ct);
+        // The command refuses a patch it cannot land in full. Swallowing that failure is what
+        // let every store import create an asset with no metadata row at all: the rights and
+        // provenance were "best-effort", and best-effort had no teeth. Surface it so the
+        // processor's best-effort wrapper can log what actually went wrong.
+        await RunAsync<AssetMetadataResponse>(
+            _setAssetMetadata.Handle(new SetAssetMetadataCommand(assetType, assetId, fields), ct));
+    }
+
+    private static StoreMetadataStampFields.Current CurrentFrom(AssetMetadataResponse response)
+    {
+        static object? Value(AssetMetadataResponse response, string key)
+            => response.Fields.FirstOrDefault(f => string.Equals(f.Key, key, StringComparison.Ordinal))?.Value;
+
+        static IReadOnlyList<string> List(object? value)
+            => value is IEnumerable<string> items ? items.ToList() : Array.Empty<string>();
+
+        return new StoreMetadataStampFields.Current(
+            response.Name,
+            Value(response, "description") as string,
+            List(Value(response, "tags")),
+            List(Value(response, "styles")),
+            List(Value(response, "themes")));
     }
 
 

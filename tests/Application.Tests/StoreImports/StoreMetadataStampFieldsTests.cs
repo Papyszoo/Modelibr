@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Application.Metadata;
 using Application.StoreImports;
 using Xunit;
 
@@ -105,4 +106,187 @@ public class StoreMetadataStampFieldsTests
         Assert.Equal("CC-BY", Text(fields, "license"));
         Assert.False(fields.ContainsKey("frameWidth"));
     }
+
+    /// <summary>
+    /// The regression behind 330 store models importing with no <c>AssetMetadata</c> row:
+    /// the patch carried <c>importedAt</c>, the schema declares it read-only, and the command
+    /// refuses an entire patch that contains a read-only field. A stamp may only ever carry
+    /// writable fields.
+    /// </summary>
+    [Fact]
+    public void Build_NeverCarriesAFieldTheCommandWillRefuse()
+    {
+        var fields = StoreMetadataStampFields.Build("Model", Stamp(), Array.Empty<string>());
+
+        Assert.DoesNotContain("importedAt", fields.Keys);
+
+        foreach (var key in fields.Keys)
+        {
+            var field = AssetMetadataSchema.Field("Model", key);
+            Assert.NotNull(field);
+            Assert.False(field!.ReadOnly, $"'{key}' is read-only, so a patch carrying it would write nothing.");
+            Assert.NotEqual(
+                AssetMetadataSchema.AssetMetadataStorage.Derived, field.Storage);
+        }
+    }
+
+    [Fact]
+    public void Description_TheAssetHasItsOwn_IsNotOverwritten()
+    {
+        var fields = StoreMetadataStampFields.BuildDescriptive(
+            DescriptiveStamp(description: "Store prose"),
+            Current(description: "Words a person wrote"));
+
+        Assert.False(fields.ContainsKey("description"));
+    }
+
+    [Fact]
+    public void Description_ThatStillRepeatsTheName_IsReplaced()
+    {
+        // Every created asset starts with its name as the description; that placeholder is
+        // exactly what the store's description is for.
+        var fields = StoreMetadataStampFields.BuildDescriptive(
+            DescriptiveStamp(description: "Arrow ranged weapon"),
+            Current(name: "Arrow", description: "Arrow"));
+
+        Assert.Equal("Arrow ranged weapon", Text(fields, "description"));
+    }
+
+    [Fact]
+    public void Tags_AreMergedAdditively_CaseInsensitively()
+    {
+        var fields = StoreMetadataStampFields.BuildDescriptive(
+            DescriptiveStamp(tags: new[] { "weapons", "LOW-POLY", "arrow" }),
+            Current(tags: new[] { "furniture", "Weapons" }));
+
+        var tags = fields["tags"].Deserialize<IReadOnlyList<string>>();
+        // Existing spelling wins for a tag already present; genuinely new tags are appended.
+        Assert.Equal(new[] { "furniture", "Weapons", "LOW-POLY", "arrow" }, tags);
+    }
+
+    [Fact]
+    public void Tags_ThatAreAllAlreadyPresent_AreNotRewritten()
+    {
+        var fields = StoreMetadataStampFields.BuildDescriptive(
+            DescriptiveStamp(tags: new[] { "weapons", "arrow" }),
+            Current(tags: new[] { "Weapons", "arrow" }));
+
+        Assert.False(fields.ContainsKey("tags"));
+    }
+
+    [Fact]
+    public void GapFill_Description_AuthoredByTheAsset_IsKept()
+    {
+        var (description, tags) = StoreMetadataStampFields.GapFillDescriptiveMetadata(
+            "Arrow", "Words a person wrote", Array.Empty<string>(), "Store prose", null);
+
+        // A description of the asset's own is never overwritten, and there is nothing to add.
+        Assert.Null(description);
+        Assert.Null(tags);
+    }
+
+    [Fact]
+    public void GapFill_Description_ThatIsEmpty_IsReplaced()
+    {
+        var (description, _) = StoreMetadataStampFields.GapFillDescriptiveMetadata(
+            "Arrow", null, Array.Empty<string>(), "A wooden arrow", null);
+
+        Assert.Equal("A wooden arrow", description);
+    }
+
+    [Fact]
+    public void GapFill_Description_ThatStillRepeatsTheName_IsReplaced()
+    {
+        // Every created asset starts with its name as the description; that placeholder is
+        // what a gap-fill is for.
+        var (description, _) = StoreMetadataStampFields.GapFillDescriptiveMetadata(
+            "Arrow", "Arrow", Array.Empty<string>(), "A wooden arrow", null);
+
+        Assert.Equal("A wooden arrow", description);
+    }
+
+    [Fact]
+    public void GapFill_WithNothingToWrite_ReturnsTwoNulls()
+    {
+        var (description, tags) = StoreMetadataStampFields.GapFillDescriptiveMetadata(
+            "Arrow", "Authored prose", new[] { "Weapons" }, null, new[] { "weapons" });
+
+        Assert.Null(description);
+        Assert.Null(tags);
+    }
+
+    [Fact]
+    public void GapFill_Tags_MergeAdditively_CaseInsensitively_WithoutDuplicates()
+    {
+        var (_, tags) = StoreMetadataStampFields.GapFillDescriptiveMetadata(
+            "Arrow", null, new[] { "furniture", "Weapons" },
+            null, new[] { "weapons", "LOW-POLY", "arrow", "  " });
+
+        // Existing spelling wins for a tag already present; blank tags are ignored; genuinely
+        // new tags are appended in the order the caller gave them.
+        Assert.Equal(new[] { "furniture", "Weapons", "LOW-POLY", "arrow" }, tags);
+    }
+
+    [Fact]
+    public void FilterEnum_DropsUnknownValuesAndKeepsTheSchemaSpelling()
+    {
+        var (accepted, dropped) = StoreMetadataStampFields.FilterEnum(
+            new[] { "low poly", "voxel", "lowpoly" },
+            AssetMetadataSchema.Styles);
+
+        Assert.Equal(new[] { "Low Poly", "Voxel" }, accepted);
+        Assert.Equal(new[] { "lowpoly" }, dropped);
+    }
+
+    [Fact]
+    public void Styles_TheSchemaKnows_AreFilledOnlyWhenTheAssetHasNone()
+    {
+        var ontoEmpty = StoreMetadataStampFields.BuildDescriptive(
+            DescriptiveStamp(styles: new[] { "Low Poly" }), Current());
+        var ontoExisting = StoreMetadataStampFields.BuildDescriptive(
+            DescriptiveStamp(styles: new[] { "Low Poly" }),
+            Current(styles: new[] { "Realistic" }));
+
+        Assert.Equal(new[] { "Low Poly" }, ontoEmpty["styles"].Deserialize<IReadOnlyList<string>>());
+        Assert.False(ontoExisting.ContainsKey("styles"));
+    }
+
+    [Fact]
+    public void Themes_TheSchemaKnows_AreFilledOnlyWhenTheAssetHasNone()
+    {
+        var ontoEmpty = StoreMetadataStampFields.BuildDescriptive(
+            DescriptiveStamp(themes: new[] { "Medieval" }), Current());
+        var ontoExisting = StoreMetadataStampFields.BuildDescriptive(
+            DescriptiveStamp(themes: new[] { "Medieval" }),
+            Current(themes: new[] { "Sci-Fi" }));
+
+        Assert.Equal(new[] { "Medieval" }, ontoEmpty["themes"].Deserialize<IReadOnlyList<string>>());
+        Assert.False(ontoExisting.ContainsKey("themes"));
+    }
+
+    private static StoreAssetMetadataStamp DescriptiveStamp(
+        string? description = "Arrow ranged weapon",
+        IReadOnlyList<string>? tags = null,
+        IReadOnlyList<string>? styles = null,
+        IReadOnlyList<string>? themes = null)
+        => Stamp() with
+        {
+            Description = description,
+            Tags = tags,
+            Styles = styles,
+            Themes = themes,
+        };
+
+    private static StoreMetadataStampFields.Current Current(
+        string? name = "Arrow",
+        string? description = null,
+        IReadOnlyList<string>? tags = null,
+        IReadOnlyList<string>? styles = null,
+        IReadOnlyList<string>? themes = null)
+        => new(
+            name,
+            description,
+            tags ?? Array.Empty<string>(),
+            styles ?? Array.Empty<string>(),
+            themes ?? Array.Empty<string>());
 }

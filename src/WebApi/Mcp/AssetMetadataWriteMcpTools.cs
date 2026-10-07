@@ -3,6 +3,7 @@ using System.Text.Json;
 using Application.Abstractions.Messaging;
 using Application.Agents;
 using Application.Metadata;
+using Application.StoreImports;
 using ModelContextProtocol.Server;
 using WebApi.Infrastructure;
 using static WebApi.Mcp.McpWriteGuard;
@@ -77,6 +78,104 @@ public sealed class AssetMetadataWriteMcpTools
                     assetId,
                     result.Value,
                     before.IsSuccess ? before.Value : null);
+            },
+            cancellationToken);
+    }
+
+    [McpServerTool(Name = "annotate_asset")]
+    [Description("Call this after actually looking at an asset (render or thumbnail) to record a visual description and alternative names/use cases as tags, improving discoverability. Never overwrites a description authored by a person, only gap-fills empty or auto-generated ones. Tags are merged additively without duplicates.")]
+    public static Task<object> AnnotateAsset(
+        ICommandHandler<SetAssetMetadataCommand, AssetMetadataResponse> handler,
+        IQueryHandler<ReadAssetMetadataQuery, AssetMetadataResponse> readHandler,
+        IAgentAudit audit,
+        McpCallerContext caller,
+        [Description("Asset family, e.g. Model.")] string assetType,
+        [Description("Asset id.")] int assetId,
+        [Description("What the asset looks like, in prose. Ignored when the asset already carries a description of its own (non-empty and not just its name).")] string? description,
+        [Description("Alternative names and use cases, as tags. Merged onto the asset's existing tags case-insensitively, without duplicates.")] string[]? tags,
+        [Description("Unique key so a retried call does not re-apply.")] string idempotencyKey,
+        [Description("Optional batch id. Writes sharing one can be undone together with reverse_operation.")] string? batchId = null,
+        CancellationToken cancellationToken = default)
+    {
+        return Guarded(
+            audit,
+            caller,
+            // The change under this tool IS a metadata merge, so it records the operation the
+            // undo surface already knows how to reverse rather than inventing a second name
+            // for the same change.
+            new AgentWrite(idempotencyKey, "set-asset-metadata", assetType, assetId, BatchId: batchId),
+            async ct =>
+            {
+                var id = assetId;
+
+                // Read first: the gap-fill rule needs what the asset already says, and the
+                // same read is the "before" the undo restores.
+                var before = await readHandler.Handle(new ReadAssetMetadataQuery(assetType, id), ct);
+                if (before.IsFailure)
+                {
+                    return Failed(before.Error);
+                }
+
+                var current = before.Value;
+                var currentDescription = FieldText(current, "description");
+                var currentTags = FieldTags(current, "tags");
+
+                var (descriptionToWrite, tagsToWrite) = StoreMetadataStampFields.GapFillDescriptiveMetadata(
+                    current.Name, currentDescription, currentTags, description, tags);
+
+                var resultingDescription = descriptionToWrite ?? currentDescription;
+                var resultingTags = tagsToWrite ?? currentTags;
+
+                // Nothing the asset's own state does not already say: report it, settle the
+                // key, and write nothing. The recorded before and after are equal, so an undo
+                // of this entry correctly finds no field to restore.
+                if (descriptionToWrite is null && tagsToWrite is null)
+                {
+                    return Applied(
+                        new
+                        {
+                            status = "unchanged",
+                            descriptionWritten = false,
+                            tagsWritten = false,
+                            description = resultingDescription,
+                            tags = resultingTags,
+                        },
+                        assetType,
+                        id,
+                        current,
+                        current);
+                }
+
+                var patch = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+                if (descriptionToWrite is not null)
+                {
+                    patch["description"] = JsonSerializer.SerializeToElement(descriptionToWrite);
+                }
+
+                if (tagsToWrite is not null)
+                {
+                    patch["tags"] = JsonSerializer.SerializeToElement(tagsToWrite);
+                }
+
+                var result = await handler.Handle(new SetAssetMetadataCommand(assetType, id, patch), ct);
+                if (result.IsFailure)
+                {
+                    return Failed(result.Error);
+                }
+
+                return Applied(
+                    new
+                    {
+                        status = "ok",
+                        descriptionWritten = descriptionToWrite is not null,
+                        tagsWritten = tagsToWrite is not null,
+                        description = resultingDescription,
+                        tags = resultingTags,
+                    },
+                    assetType,
+                    id,
+                    result.Value,
+                    before.Value);
             },
             cancellationToken);
     }
@@ -164,4 +263,18 @@ public sealed class AssetMetadataWriteMcpTools
         patch = default;
         return false;
     }
+
+    /// <summary>One field's current text value, or null when it holds none.</summary>
+    private static string? FieldText(AssetMetadataResponse metadata, string key)
+        => metadata.Fields
+            .FirstOrDefault(f => string.Equals(f.Key, key, StringComparison.OrdinalIgnoreCase))
+            ?.Value as string;
+
+    /// <summary>One repeating field's current values, empty when it holds none.</summary>
+    private static IReadOnlyList<string> FieldTags(AssetMetadataResponse metadata, string key)
+        => metadata.Fields
+            .FirstOrDefault(f => string.Equals(f.Key, key, StringComparison.OrdinalIgnoreCase))
+            ?.Value is IEnumerable<string> tags
+                ? tags.ToList()
+                : Array.Empty<string>();
 }

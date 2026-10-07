@@ -32,7 +32,17 @@ public sealed record StoreManifestItem(
     string? Id = null,
     // Item metadata JSON as stored by the store; today its only contract key is
     // "category" (taxonomy v1 name), read via StoreManifestMapping.GetItemCategory.
-    string? MetadataJson = null);
+    string? MetadataJson = null,
+    // Per-item descriptive fields (manifest schema v1, extended). All optional so a manifest
+    // written before the store sent them still deserializes - absent means "the store did
+    // not say", never "clear what is there". Category/subcategory mirror the names inside
+    // MetadataJson; the top-level fields win when both are present.
+    string? Description = null,
+    IReadOnlyList<string>? Tags = null,
+    string? Category = null,
+    string? Subcategory = null,
+    IReadOnlyList<string>? Styles = null,
+    IReadOnlyList<string>? Themes = null);
 
 public sealed record StoreManifestFile(
     string FileName,

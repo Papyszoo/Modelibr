@@ -82,10 +82,24 @@ public interface IStoreImportSink
     Task SetEnvironmentMapCategoryAsync(int environmentMapId, int categoryId, CancellationToken ct);
 }
 
-/// <summary>What one import knows about an asset's rights and where it came from.</summary>
+/// <summary>What one import knows about an asset's rights, origin and descriptive facets.</summary>
 /// <param name="FacetsJson">
 /// Per-family extras copied verbatim from the store item's metadata, as a JSON object -
 /// today the sprite frame grid. Null when the item carried none.
+/// </param>
+/// <param name="Description">
+/// The store item's own description, applied only when the asset has none of its own.
+/// </param>
+/// <param name="Tags">
+/// The store item's tags, merged additively onto whatever the asset already carries.
+/// </param>
+/// <param name="Styles">
+/// Schema-validated "how it looks" values, applied only when the asset has none. The caller
+/// filters these against <c>AssetMetadataSchema.Styles</c>; see
+/// <see cref="StoreMetadataStampFields.FilterEnum"/>.
+/// </param>
+/// <param name="Themes">
+/// Schema-validated "what world" values, applied only when the asset has none.
 /// </param>
 public sealed record StoreAssetMetadataStamp(
     string? License,
@@ -99,4 +113,8 @@ public sealed record StoreAssetMetadataStamp(
     string StoreAssetId,
     string? StoreItemId,
     DateTime ImportedAt,
-    string? FacetsJson = null);
+    string? FacetsJson = null,
+    string? Description = null,
+    IReadOnlyList<string>? Tags = null,
+    IReadOnlyList<string>? Styles = null,
+    IReadOnlyList<string>? Themes = null);

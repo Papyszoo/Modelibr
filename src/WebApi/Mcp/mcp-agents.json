@@ -67,6 +67,7 @@
       "search_many",
       "get_assets",
       "get_asset",
+      "annotate_asset",
       "list_materials",
       "get_material",
       "reverse_operation"
