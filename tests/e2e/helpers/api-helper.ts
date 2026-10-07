@@ -1031,10 +1031,15 @@ export class ApiHelper {
     const formData = new FormData();
     formData.append("file", fs.createReadStream(filePath));
 
-    let url = `/models/${modelId}/versions?setAsActive=${setAsActive}`;
+    // description/setAsActive are multipart FORM fields: the endpoint binds them
+    // with [FromForm] (the asset-processor worker sends them the same way, and
+    // an integration test pins it). On the query string they are ignored.
+    formData.append("setAsActive", String(setAsActive));
     if (description) {
-      url += `&description=${encodeURIComponent(description)}`;
+      formData.append("description", description);
     }
+
+    const url = `/models/${modelId}/versions`;
 
     const response = await this.client.post(url, formData, {
       headers: formData.getHeaders(),

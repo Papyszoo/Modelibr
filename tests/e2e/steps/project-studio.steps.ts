@@ -231,7 +231,12 @@ async function ensureWorkerScene(
     data: { name, description: `${alias} for level assets coverage` },
   });
   expect(created.ok()).toBeTruthy();
-  const scene = await created.json();
+  // POST /scenes answers with a SceneView - `{ scene: SceneSummary, document, ... }` -
+  // not the summary itself. Reading `scene.id` off the view left the id undefined and
+  // the next write went to /scenes/undefined/project, which the {id:int} route rejects
+  // with an empty 404. The list read below returns bare summaries; this create does not.
+  const view = await created.json();
+  const scene = view.scene;
   rememberAlias(page, "scene", alias, scene.name);
   return scene.id;
 }
@@ -711,7 +716,11 @@ Given(
       {
         data: {
           projectLevelId: level.id,
-          isPrimaryLevelScene: !alreadyPrimary,
+          // The endpoint's request record names this `isPrimary` (JSON for
+          // IsPrimary). Sending `isPrimaryLevelScene` - the response's name -
+          // silently bound nothing and defaulted it to false, so the first
+          // scene filed never claimed primary.
+          isPrimary: !alreadyPrimary,
         },
       },
     );
@@ -869,9 +878,12 @@ Then(
   "the level should place {string}",
   async ({ page }, modelAlias: string) => {
     const studio = new ProjectStudioPage(page);
-    await expect(studio.levelAssetRow(modelAlias)).toBeVisible({
-      timeout: 20000,
-    });
+    // Resolve the alias to the name the library gave the upload, as the other
+    // asset assertions do - the derived row is labelled with that real name,
+    // not the Gherkin alias.
+    await expect(
+      studio.levelAssetRow(resolveAlias(page, "model", modelAlias)),
+    ).toBeVisible({ timeout: 20000 });
   },
 );
 
@@ -887,6 +899,12 @@ Then("the missing-level notice should be shown", async ({ page }) => {
   await expect(
     new ProjectStudioPage(page).page.getByText("This level no longer exists"),
   ).toBeVisible({ timeout: 15000 });
+});
+
+When("I leave the missing level", async ({ page }) => {
+  // The notice's own way out. The breadcrumb the other scenarios use lives in
+  // the workspace shell, which is exactly what a missing level no longer renders.
+  await page.getByRole("button", { name: "Back to levels" }).click();
 });
 Given(
   "a variant {string} of character {string} is scoped to level {string}",

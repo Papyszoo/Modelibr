@@ -234,7 +234,14 @@ export class ProjectsPage {
         const actionsBtn = projectCard.getByRole("button", {
             name: `Project actions for ${projectName}`,
         });
-        await actionsBtn.click();
+        // Keyboard activation, exactly as deleteProject does for this same
+        // button: the card's :hover transform makes the pointer hit-test land
+        // on the card (or the grid) instead of the button, so a click retries
+        // forever. The button is real and enabled; focus + Enter is the
+        // activation that reaches it.
+        await expect(actionsBtn).toBeVisible();
+        await actionsBtn.focus();
+        await this.page.keyboard.press("Enter");
 
         const confirmation = this.page
             .locator(".p-confirm-dialog")

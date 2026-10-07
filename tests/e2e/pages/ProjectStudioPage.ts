@@ -161,7 +161,13 @@ export class ProjectStudioPage {
       `[data-testid="project-level-row"][data-level-name="${levelName}"]`,
     );
     await expect(row).toBeVisible({ timeout: 30000 });
-    await row.getByRole("button").first().click();
+    // The row's FIRST button is now "Open the level X" (the workspace drill-down
+    // added in v0.7); the scene control is the one beside it, named for its
+    // gesture. `.first()` landed on the level-open button and opened the level
+    // workspace instead, so the poll below never saw a Scene tab.
+    await row
+      .getByRole("button", { name: /^(Create a scene for|Open the scene of) / })
+      .click();
 
     // The control creates, files and opens, which is three requests - so the
     // click returns before any of it has happened. Waited for rather than

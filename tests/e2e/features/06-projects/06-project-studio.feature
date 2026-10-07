@@ -202,6 +202,11 @@ Feature: Project Studio
     When I am on the studio project
     And I open the level "Vanishing Level"
     And the level "Vanishing Level" is deleted
+    # The delete is an API write behind the app's back, so the levels read is
+    # cached and the workspace cannot notice on its own; reloading re-reads it
+    # with the tab (and its open level id) restored, which is the state the
+    # notice is about. Same reason the project-link scenarios reload.
+    And I reload the app
     Then the missing-level notice should be shown
-    When I go back to the project from the level
+    When I leave the missing level
     Then the project workspace should be showing its own four surfaces

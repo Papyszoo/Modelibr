@@ -557,7 +557,7 @@ export class ModelViewerPage {
         const fileName = path.basename(filePath);
 
         const response = await this.page.request.post(
-            `${apiBase}/models/${modelId}/versions?setAsActive=true`,
+            `${apiBase}/models/${modelId}/versions`,
             {
                 multipart: {
                     file: {
@@ -565,6 +565,9 @@ export class ModelViewerPage {
                         mimeType: "application/octet-stream",
                         buffer: fileBuffer,
                     },
+                    // Form field, not a query param - the endpoint binds it
+                    // with [FromForm].
+                    setAsActive: "true",
                 },
             },
         );

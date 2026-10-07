@@ -455,8 +455,18 @@ test.describe("demo mode e2e", () => {
                 page.locator(".container-cover-card img").first(),
             ).toBeVisible({ timeout: 15000 });
 
-            // Concept art lives on the studio's Reference Board, above the
-            // left/right details layout, and is uploaded from there.
+            // Concept art lives on the studio's Reference Board. The studio is a
+            // four-view workspace now (Overview/Levels/Cast/References), so the
+            // board is its own view rather than a strip above the details layout.
+            const referencesTab = page.getByTestId(
+                "project-workspace-tab-references",
+            );
+            await referencesTab.click();
+            await expect(referencesTab).toHaveAttribute(
+                "aria-selected",
+                "true",
+            );
+
             await page
                 .locator('[data-testid="project-reference-upload"]')
                 .first()
