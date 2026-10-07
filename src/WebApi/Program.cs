@@ -188,7 +188,11 @@ namespace WebApi
                     // What is being made. Reading a project's brief is what turns "build a
                     // scene" into "build a scene for THIS", and there were no project tools
                     // at all before it.
-                    .WithTools<WebApi.Mcp.ProjectReadMcpTools>();
+                    .WithTools<WebApi.Mcp.ProjectReadMcpTools>()
+                    // The agent definitions, so a harness can create them in its own format.
+                    // A read, and on /mcp only: no agent lists it, so no restricted session
+                    // ever sees it.
+                    .WithTools<WebApi.Mcp.AgentSetupMcpTools>();
 
                 // Write tools (prompt 30) are opt-in: OFF by default keeps a stock server
                 // read-only so enabling agent writes on a LAN-reachable endpoint is a

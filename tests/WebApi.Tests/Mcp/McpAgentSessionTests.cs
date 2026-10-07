@@ -32,6 +32,7 @@ public class McpAgentSessionTests
           {
             "name": "stylist",
             "description": "Dresses models.",
+            "main": true,
             "families": ["Model", "TextureSet"],
             "tools": ["search_assets", "get_asset"]
           }

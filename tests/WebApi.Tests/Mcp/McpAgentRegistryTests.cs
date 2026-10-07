@@ -24,8 +24,10 @@ public class McpAgentRegistryTests
           {
             "name": "stylist",
             "description": "Dresses models.",
+            "main": true,
             "families": ["Model", "TextureSet"],
-            "tools": ["search_assets", "get_asset"]
+            "tools": ["search_assets", "get_asset"],
+            "instructions": "Dress each model."
           }
         ]
         """;
@@ -63,7 +65,50 @@ public class McpAgentRegistryTests
         Assert.Equal("stylist", agent!.Name);
         Assert.Equal(["Model", "TextureSet"], agent.Families);
         Assert.Equal("Search the library.", agent.Tools.Single(t => t.Name == "search_assets").Description);
+        Assert.Equal("Dress each model.", agent.Instructions);
+        Assert.True(agent.IsMain);
         Assert.Null(registry.Find("nobody"));
+    }
+
+    [Fact]
+    public void A_Definition_With_No_Main_Agent_Fails_Startup()
+    {
+        var json = ValidJson.Replace("\"main\": true", "\"main\": false");
+
+        var thrown = Assert.Throws<InvalidOperationException>(
+            () => McpAgentRegistry.Load(json, KnownTools, McpAgentRegistry.KnownFamilies));
+
+        Assert.Contains("main", thrown.Message);
+    }
+
+    [Fact]
+    public void A_Definition_With_Two_Main_Agents_Fails_Startup()
+    {
+        // Two agents claiming the main role would leave the harness no way to know which one
+        // the user talks to, so it is a configuration error, not a last-one-wins tie-break.
+        const string json = """
+            [
+              {
+                "name": "first",
+                "description": "First.",
+                "main": true,
+                "families": ["Model"],
+                "tools": ["search_assets"]
+              },
+              {
+                "name": "second",
+                "description": "Second.",
+                "main": true,
+                "families": ["Model"],
+                "tools": ["get_asset"]
+              }
+            ]
+            """;
+
+        var thrown = Assert.Throws<InvalidOperationException>(
+            () => McpAgentRegistry.Load(json, KnownTools, McpAgentRegistry.KnownFamilies));
+
+        Assert.Contains("first, second", thrown.Message);
     }
 
     [Fact]
@@ -76,8 +121,11 @@ public class McpAgentRegistryTests
 
         var registry = McpAgentRegistry.FromFile(path, known);
 
-        Assert.Equal(["asset-scout", "scene-builder", "stylist", "designer"],
+        Assert.Equal(["modelibr", "asset-scout", "scene-builder", "stylist", "designer"],
             registry.Agents.Select(a => a.Name));
+        // The main agent is the one the user talks to, and it is exactly one.
+        Assert.Equal("modelibr", registry.Agents.Single(a => a.IsMain).Name);
+        Assert.All(registry.Agents, a => Assert.False(string.IsNullOrWhiteSpace(a.Instructions)));
     }
 
     [Fact]

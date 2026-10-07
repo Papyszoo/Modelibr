@@ -12,13 +12,16 @@ public sealed record McpAgentTool(string Name, string Description);
 /// <summary>
 /// A named agent: the subset of the tool surface it may see and the asset families it may
 /// read across. Definitions live in <c>Mcp/mcp-agents.json</c> so an operator can add or
-/// re-scope an agent without a code change.
+/// re-scope an agent without a code change. <see cref="IsMain"/> marks the one agent a
+/// harness's model talks to; the rest are the subagents it hands work to.
 /// </summary>
 public sealed record McpAgentDefinition(
     string Name,
     string Description,
     IReadOnlyList<string> Families,
-    IReadOnlyList<McpAgentTool> Tools)
+    IReadOnlyList<McpAgentTool> Tools,
+    string Instructions,
+    bool IsMain)
 {
     /// <summary>True when this agent may read <paramref name="family"/> (case-insensitive).</summary>
     public bool Allows(string family) =>
@@ -99,6 +102,7 @@ public sealed class McpAgentRegistry
 
         var agents = new List<McpAgentDefinition>(entries.Length);
         var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var mainAgents = new List<string>();
 
         foreach (var entry in entries)
         {
@@ -111,6 +115,11 @@ public sealed class McpAgentRegistry
             {
                 throw new InvalidOperationException(
                     $"The MCP agent '{entry.Name}' is defined more than once.");
+            }
+
+            if (entry.Main == true)
+            {
+                mainAgents.Add(entry.Name);
             }
 
             var families = new List<string>();
@@ -139,7 +148,16 @@ public sealed class McpAgentRegistry
                 entry.Name,
                 entry.Description ?? string.Empty,
                 families,
-                tools));
+                tools,
+                entry.Instructions ?? string.Empty,
+                entry.Main == true));
+        }
+
+        if (mainAgents.Count != 1)
+        {
+            throw new InvalidOperationException(mainAgents.Count == 0
+                ? "No MCP agent is marked as the main agent. Exactly one agent must have \"main\": true."
+                : $"More than one MCP agent is marked as the main agent ({string.Join(", ", mainAgents)}). Exactly one agent must have \"main\": true.");
         }
 
         return new McpAgentRegistry(agents);
@@ -209,7 +227,9 @@ public sealed class McpAgentRegistry
         string Name,
         string? Description,
         string[]? Families,
-        string[]? Tools);
+        string[]? Tools,
+        string? Instructions,
+        bool? Main);
 }
 
 /// <summary>
