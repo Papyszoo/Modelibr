@@ -125,6 +125,14 @@ export class ModelDataService {
    */
   async downloadTextureFile(fileId, originalFileName) {
     try {
+      // ensureTempDirectory() runs once in the constructor, but the periodic
+      // temp sweep (ModelFileService.cleanupOldFiles) treats every entry under
+      // /tmp/modelibr-worker as disposable and removes this textures/ directory
+      // once it is an hour stale. Recreate it at the write site so the next
+      // download after a sweep does not fail with ENOENT - which silently
+      // dropped the bound texture set and rendered the model neutral grey.
+      this.ensureTempDirectory()
+
       logger.debug('Downloading texture file', { fileId, originalFileName })
 
       const response = await this.apiClient.get(`/files/${fileId}`, {

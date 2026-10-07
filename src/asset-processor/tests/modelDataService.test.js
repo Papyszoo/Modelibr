@@ -1,4 +1,9 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import fs from 'fs'
+import os from 'os'
+import path from 'path'
+import { Readable } from 'stream'
+
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
 import { ModelDataService } from '../modelDataService.js'
 
@@ -68,6 +73,47 @@ describe('ModelDataService.saveTechnicalMetadata', () => {
     expect(body.animationCount).toBeNull()
     expect(body.boneCount).toBeNull()
     expect(body.animationNames).toEqual([])
+  })
+})
+
+describe('ModelDataService.downloadTextureFile', () => {
+  let service
+  let rootDir
+
+  beforeEach(() => {
+    service = new ModelDataService()
+    rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'modelibr-texture-test-'))
+    service.tempDir = path.join(rootDir, 'textures')
+  })
+
+  afterEach(() => {
+    fs.rmSync(rootDir, { recursive: true, force: true })
+  })
+
+  // Regression: the textures/ dir was only created in the constructor. The
+  // periodic ModelFileService.cleanupOldFiles sweep deletes stale entries under
+  // /tmp/modelibr-worker - including this directory - after which every texture
+  // download failed with ENOENT, so a model with a bound texture set rendered
+  // as neutral grey. Recreating the dir at the write site keeps downloads alive.
+  it('recreates the texture temp directory after the periodic sweep removed it', async () => {
+    fs.mkdirSync(service.tempDir, { recursive: true })
+    fs.rmSync(service.tempDir, { recursive: true, force: true })
+    expect(fs.existsSync(service.tempDir)).toBe(false)
+
+    service.apiClient = {
+      get: vi.fn().mockResolvedValue({
+        data: Readable.from([Buffer.from('png-bytes')]),
+      }),
+    }
+
+    const filePath = await service.downloadTextureFile(
+      335,
+      'Dungeons_Texture_01.png'
+    )
+
+    expect(filePath).toBeTruthy()
+    expect(fs.existsSync(filePath)).toBe(true)
+    expect(fs.readFileSync(filePath).toString()).toBe('png-bytes')
   })
 })
 
